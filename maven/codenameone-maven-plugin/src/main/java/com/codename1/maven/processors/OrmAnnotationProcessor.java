@@ -792,13 +792,43 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
     /// The dao is generated into THIS module either way. The jar it was read
     /// from is somebody else's build output and is not written to.
     private void scanClasspathEntities(ProcessorContext ctx) throws ProcessingException {
+        // THIS MODULE'S OWN OUTPUT IS NOT A DEPENDENCY, and it is on this list:
+        // Maven's getCompileClasspathElements puts target/classes first. Scanned
+        // here it re-enters processClass with fromThisModule false, which is what
+        // turns off the backing-source check -- so a class whose .java was
+        // deleted or renamed, deliberately skipped moments earlier as an orphan,
+        // is accepted on the second pass as somebody else's entity. The stale dao
+        // and bootstrap come back, and a removed table can be recreated, until a
+        // mvn clean removes the class file. The module's own classes have already
+        // been offered to processClass with the check in place; there is nothing
+        // here to find a second time.
+        File ownOutput = canonical(ctx.getOutputClassDir());
         for (String element : ctx.getCompileClasspath()) {
             File file = new File(element);
             if (file.isDirectory()) {
+                if (ownOutput != null && ownOutput.equals(canonical(file))) {
+                    continue;
+                }
                 scanDirectoryForEntities(file, file, ctx);
             } else if (file.isFile()) {
                 scanArchiveForEntities(file, ctx);
             }
+        }
+    }
+
+    /// Canonical form for comparing two paths, or null when it cannot be taken.
+    ///
+    /// Compared canonically because the two spellings come from different places
+    /// -- the mojo's configured output directory and Maven's classpath list --
+    /// and need not match character for character for the same directory.
+    private static File canonical(File file) {
+        if (file == null) {
+            return null;
+        }
+        try {
+            return file.getCanonicalFile();
+        } catch (IOException unreadable) {
+            return file.getAbsoluteFile();
         }
     }
 

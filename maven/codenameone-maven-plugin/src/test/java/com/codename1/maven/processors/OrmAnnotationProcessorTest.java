@@ -402,6 +402,57 @@ public class OrmAnnotationProcessorTest {
     }
 
     @Test
+    public void doesNotResurrectAnOrphanThroughTheModulesOwnOutput() throws Exception {
+        // THE REAL MOJO CLASSPATH. ProcessAnnotationsMojo passes
+        // MavenProject.getCompileClasspathElements(), and Maven puts the module's
+        // OWN target/classes first in it. The dependency scan then re-reads the
+        // directory the module pass just walked -- with fromThisModule false,
+        // which is what turns the backing-source check off -- so a class whose
+        // .java is gone, skipped moments earlier as an orphan, came back as
+        // somebody else's entity and its bootstrap with it.
+        //
+        // TWO things every other test here leaves out, and it needs both. They
+        // pass only the backend jar, so the module's own output is never on the
+        // classpath; and they pass NO compile source roots, which makes
+        // hasBackingSource return true for everything, so the orphan skip this
+        // is about never runs at all.
+        File sourceRoot = tmp.newFolder();
+        File pkgDir = new File(sourceRoot, "com/example");
+        assertTrue("could not create the source package", pkgDir.mkdirs());
+        File source = new File(pkgDir, "Ledger.java");
+        String entity = "package com.example;\n"
+                + "import com.codename1.annotations.*;\n"
+                + "@Entity public class Ledger {\n"
+                + "    @Id public long id;\n"
+                + "    public String memo;\n"
+                + "    public Ledger() {}\n"
+                + "}\n";
+        writeFile(source, entity);
+        File classes = compileFixture("com.example.Ledger", entity);
+
+        List<String> withOwnOutput = new ArrayList<String>();
+        withOwnOutput.add(classes.getAbsolutePath());
+        withOwnOutput.addAll(backendClasspath());
+        List<String> roots = Collections.singletonList(sourceRoot.getAbsolutePath());
+
+        ProcessorContext first = runProcessor(classes, withOwnOutput, roots);
+        assertFalse("the first pass should not have reported errors: " + first.getErrors(),
+                first.hasErrors());
+        File bootstrap = new File(classes, "cn1app/BackendDaoBootstrap.class");
+        assertTrue("the first pass should have generated the bootstrap", bootstrap.exists());
+
+        // THE SOURCE GOES, THE CLASS FILE STAYS -- still carrying @Entity, which
+        // is what an incremental build leaves after a delete or a rename. This is
+        // the orphan, and it is the case removing the annotation does NOT cover.
+        assertTrue("could not delete the source", source.delete());
+        ProcessorContext second = runProcessor(classes, withOwnOutput, roots);
+        assertFalse("the second pass should not have reported errors: " + second.getErrors(),
+                second.hasErrors());
+        assertFalse("the orphan was re-accepted through the module's own output "
+                + "being scanned as a dependency", bootstrap.exists());
+    }
+
+    @Test
     public void refusesAnExplicitTypeOnACharField() throws Exception {
         // A char is stored as its UTF-16 code unit in an integer column, so 'x'
         // binds as 120. Declared onto CHAR(1) -- the natural way to meet an
@@ -799,6 +850,28 @@ public class OrmAnnotationProcessorTest {
     private ProcessorContext runProcessor(File classesDir, List<String> compileClasspath)
             throws Exception {
         return runProcessor(classesDir, compileClasspath, false);
+    }
+
+    /// As below, with compile source roots -- which is what makes
+    /// hasBackingSource able to answer at all: an empty list means "cannot
+    /// tell", and it keeps every class.
+    private ProcessorContext runProcessor(File classesDir, List<String> compileClasspath,
+                                          List<String> sourceRoots) throws Exception {
+        Map<String, AnnotatedClass> index = ClassScanner.scan(classesDir);
+        OrmAnnotationProcessor proc = new OrmAnnotationProcessor();
+        ProcessorContext ctx = new ProcessorContext(classesDir, tmp.newFolder(),
+                index, new SystemStreamLog(), null, null, null,
+                sourceRoots, "UTF-8", compileClasspath);
+        proc.start(ctx);
+        for (AnnotatedClass cls : index.values()) {
+            if (!cls.getClassAnnotations().isEmpty()) proc.processClass(cls, ctx);
+        }
+        proc.finish(ctx);
+        return ctx;
+    }
+
+    private static void writeFile(File target, String content) throws Exception {
+        Files.write(target.toPath(), content.getBytes("UTF-8"));
     }
 
     private ProcessorContext runProcessor(File classesDir, List<String> compileClasspath,
