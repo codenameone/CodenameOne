@@ -309,6 +309,28 @@ def seed_token(project, mvn, email, token, plugin_version):
     log("seeded build-client token")
 
 
+# Anything a child process has no business seeing. Maven resolves artifacts
+# over the network and runs plugin code from them, so every variable exported
+# here is readable by code we did not write.
+SENSITIVE_ENV = ("CN1_CANARY_PASSWORD", "CN1_CANARY_EMAIL", "CN1_CANARY_TOKEN",
+                 "CANARY_REPORT", "GITHUB_TOKEN", "ACTIONS_RUNTIME_TOKEN",
+                 "ACTIONS_ID_TOKEN_REQUEST_TOKEN", "ACTIONS_ID_TOKEN_REQUEST_URL")
+
+
+def child_environment():
+    """The environment a build is allowed to run in.
+
+    The account password is not needed after sign-in, and the token is passed to
+    the goal as an argument rather than through the environment -- so nothing
+    here has to carry a credential, and a compromised dependency resolved by the
+    starter has nothing to exfiltrate.
+    """
+    env = dict(os.environ)
+    for name in SENSITIVE_ENV:
+        env.pop(name, None)
+    return env
+
+
 def redact(text, secrets):
     for value in secrets:
         if value:
@@ -341,7 +363,7 @@ def run(command, cwd, what, timeout, secrets=(), check=True):
         else {"start_new_session": True}
     process = subprocess.Popen(
         command, cwd=str(cwd), stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
-        text=True, **extra
+        text=True, env=child_environment(), **extra
     )
     try:
         output, _ = process.communicate(timeout=timeout)
@@ -505,6 +527,14 @@ def check_target_is_cloud(project, target):
     # *-source target, which generates an Android Studio or Xcode project on
     # the user's machine. Both would leave the canary polling for a build that
     # was never submitted and then blaming the starter.
+    expensive = ("ios", "iphone", "ipad", "mac", "catalyst", "xcode", "watch", "tv")
+    hit = next((m for m in expensive if m in resolved.lower()), None)
+    if hit:
+        raise CanaryFailure(
+            f"'{target}' resolves to '{resolved}' in the served {launcher.name}, which "
+            f"looks like an Apple target ('{hit}'). Those need a Mac host and cost several "
+            "times a normal build; the canary refuses them however they are reached."
+        )
     if resolved.startswith("local-") or resolved.endswith("-source"):
         raise CanaryFailure(
             f"'{target}' maps to '{resolved}' in the served {launcher.name}, which "

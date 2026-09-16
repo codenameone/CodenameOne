@@ -289,6 +289,64 @@ class TimeoutHandling(unittest.TestCase):
                          "a spawned grandchild outlived the timeout")
 
 
+class ChildEnvironment(unittest.TestCase):
+    """Maven runs plugin code resolved over the network; it gets no credentials."""
+
+    def test_credentials_are_stripped_from_the_child_environment(self):
+        import os
+        for name in ("CN1_CANARY_PASSWORD", "CN1_CANARY_EMAIL", "GITHUB_TOKEN"):
+            os.environ[name] = "must-not-be-inherited"
+        try:
+            env = canary.child_environment()
+            for name in canary.SENSITIVE_ENV:
+                self.assertNotIn(name, env, name)
+            self.assertIn("PATH", env, "the child still needs an ordinary environment")
+        finally:
+            for name in ("CN1_CANARY_PASSWORD", "CN1_CANARY_EMAIL", "GITHUB_TOKEN"):
+                os.environ.pop(name, None)
+
+    def test_a_spawned_process_cannot_read_the_password(self):
+        import os
+        os.environ["CN1_CANARY_PASSWORD"] = "leaked-password-value"
+        try:
+            code, output = canary.run(
+                [sys.executable, "-c",
+                 "import os;print('SEEN:'+os.environ.get('CN1_CANARY_PASSWORD','absent'))"],
+                cwd=".", what="probe", timeout=60)
+            self.assertIn("SEEN:absent", output)
+            self.assertNotIn("leaked-password-value", output)
+        finally:
+            os.environ.pop("CN1_CANARY_PASSWORD", None)
+
+
+class ResolvedTargetPolicy(unittest.TestCase):
+    """The allowlist guards the name; this guards what the name resolves to."""
+
+    def launcher(self, text):
+        directory = Path(tempfile.mkdtemp())
+        (directory / ("build.bat" if canary.WINDOWS else "build.sh")).write_text(text)
+        return directory
+
+    def test_allowed_name_resolving_to_an_apple_target_is_refused(self):
+        text = ('function javascript {\n'
+                '  "$MVNW" "package" "-Dcodename1.buildTarget=ios-device"\n}\n')
+        with self.assertRaises(canary.CanaryFailure) as caught:
+            canary.check_target_is_cloud(self.launcher(text), "javascript")
+        self.assertIn("Apple target", str(caught.exception))
+
+    def test_mac_native_regression_is_refused(self):
+        text = ('function javascript {\n'
+                '  "$MVNW" "package" "-Dcodename1.buildTarget=mac-os-x-native"\n}\n')
+        with self.assertRaises(canary.CanaryFailure):
+            canary.check_target_is_cloud(self.launcher(text), "javascript")
+
+    def test_ordinary_cheap_targets_still_pass(self):
+        for resolved in ("javascript", "windows-device", "linux-device", "android-device"):
+            text = ('function t {\n'
+                    f'  "$MVNW" "package" "-Dcodename1.buildTarget={resolved}"\n}}\n')
+            canary.check_target_is_cloud(self.launcher(text), "t")
+
+
 class Budgets(unittest.TestCase):
     JOB_TIMEOUT_MINUTES = 70  # starter-canary.yml
 
@@ -373,10 +431,14 @@ class TargetGuards(unittest.TestCase):
             canary.WINDOWS = original
 
     def test_prefix_named_neighbour_is_not_matched(self):
-        """`function ios` must not match inside `function ios_source`."""
-        text = ('function ios_source {\n  "$MVNW" "-Dcodename1.buildTarget=ios-source"\n}\n'
-                'function ios {\n  "$MVNW" "-Dcodename1.buildTarget=ios-device"\n}\n')
-        canary.check_target_is_cloud(self.launcher(text), "ios")
+        """`function android` must not match inside `function android_source`.
+
+        Uses a cheap pair on purpose: an Apple pair would now be refused by the
+        resolved-target policy before the anchoring could be observed.
+        """
+        text = ('function android_source {\n  "$MVNW" "-Dcodename1.buildTarget=android-source"\n}\n'
+                'function android {\n  "$MVNW" "-Dcodename1.buildTarget=android-device"\n}\n')
+        canary.check_target_is_cloud(self.launcher(text), "android")
 
     def test_body_does_not_bleed_into_the_next_target(self):
         """A delegating target must not be judged on its neighbour's buildTarget."""
