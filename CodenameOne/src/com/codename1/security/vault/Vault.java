@@ -361,15 +361,14 @@ public final class Vault {
     }
 
     /// Whether the data key is currently available.
-    public boolean isUnlocked() {
+    public synchronized boolean isUnlocked() {
         checkAutoLock();
         return dataKey != null;
     }
 
     /// One of [#NOT_ENROLLED], [#LOCKED], [#UNLOCKED] or [#STATE_UNKNOWN].
     public int state() {
-        checkAutoLock();
-        if (dataKey != null) {
+        if (isUnlocked()) {
             return UNLOCKED;
         }
         try {
@@ -691,9 +690,11 @@ public final class Vault {
                     // Ownership transferred: the vault holds this array now, so the finally must
                     // not wipe it. Load bearing, not a dead store -- see unlockRemembered.
                     key = null;
-                    setPasswordNeedsRewrap(envelope.getKdf().needsUpgrade());
-                    touch();
-                    out.complete(Boolean.TRUE);
+                    synchronized (Vault.this) {
+                        requireSameGeneration(generation);
+                        setPasswordNeedsRewrap(envelope.getKdf().needsUpgrade());
+                        completeUnlock(out, generation);
+                    }
                 } catch (VaultException failed) {
                     out.error(failed);
                 } catch (RuntimeException broke) {
@@ -803,8 +804,7 @@ public final class Vault {
                     requireProtections(record.policy);
                     publishKey(generation, meta, key);
                     key = null;
-                    touch();
-                    out.complete(Boolean.TRUE);
+                    completeUnlock(out, generation);
                 } catch (VaultException failed) {
                     out.error(failed);
                 } catch (RuntimeException broke) {
@@ -910,7 +910,7 @@ public final class Vault {
         // unknown fault. With the snapshot the write finishes and the caller is told it was LOCKED,
         // by the generation check the two public entry points make after this returns.
         VaultMetadata meta = sessionMetadata();
-        byte[] key = dataKey;
+        byte[] key = sessionKey();
         if (meta == null || key == null) {
             throw new VaultException(VaultError.LOCKED,
                     "the vault was locked before this device could be remembered");
@@ -1170,7 +1170,7 @@ public final class Vault {
                     // turned a concurrent lock() into a NullPointerException -- lock() nulls
                     // the field, and this expression dereferenced it after requireUnlocked had
                     // already passed.
-                    byte[] key = dataKey;
+                    byte[] key = sessionKey();
                     VaultMetadata meta = sessionMetadata();
                     requireSameGeneration(generation);
                     if (key == null || meta == null) {
@@ -1376,7 +1376,7 @@ public final class Vault {
                     // Snapshotted for the same reason as putSecret: lock() nulls metadata, and
                     // dereferencing it here after requireUnlocked has passed is a
                     // NullPointerException rather than a refusal.
-                    byte[] key = dataKey;
+                    byte[] key = sessionKey();
                     VaultMetadata meta = sessionMetadata();
                     requireSameGeneration(generation);
                     if (key == null || meta == null) {
@@ -1472,7 +1472,7 @@ public final class Vault {
             public void run() {
                 try {
                     requireUnlocked();
-                    byte[] source = dataKey;
+                    byte[] source = sessionKey();
                     VaultMetadata meta = sessionMetadata();
                     requireSameGeneration(generation);
                     if (source == null || meta == null) {
@@ -1787,7 +1787,7 @@ public final class Vault {
                     }
                     // Snapshotted once and used for BOTH the wrap and the MAC, so the two
                     // cannot disagree about which key this record belongs to.
-                    byte[] sealing = dataKey;
+                    byte[] sealing = sessionKey();
                     requireSameKey(keyAt);
                     byte[] derived = recoveryKey(code);
                     VaultMetadata next = current.copy();
@@ -1871,8 +1871,7 @@ public final class Vault {
                     publishKey(generation, meta, key);
                     // Ownership transferred; the finally must not wipe what the vault now holds.
                     key = null;
-                    touch();
-                    out.complete(Boolean.TRUE);
+                    completeUnlock(out, generation);
                 } catch (VaultException failed) {
                     out.error(failed);
                 } catch (RuntimeException broke) {
@@ -1932,7 +1931,7 @@ public final class Vault {
                     // against null and reported AUTHENTICATION_FAILED, telling the user their
                     // password was wrong when it was fine and the vault had simply been locked.
                     // Measured: the lock-race test produced exactly that before this snapshot.
-                    byte[] currentKey = dataKey;
+                    byte[] currentKey = sessionKey();
                     // Proven before anything changes: a rotation that leaves the password unable
                     // to unwrap the new key is a vault nobody can open on another device.
                     byte[] check = SecureEnvelope.parse(meta.passwordWrap).openWithPassword(
@@ -2661,7 +2660,7 @@ public final class Vault {
         // Both callers are on this path: openAnyVersion, which every retired-version read goes
         // through, and subkeyAtVersion behind a post-rotation KeyHandle.
         VaultMetadata record = sessionMetadata();
-        byte[] live = dataKey;
+        byte[] live = sessionKey();
         if (record == null || live == null) {
             throw new VaultException(VaultError.LOCKED,
                     "the vault was locked while a record sealed under an earlier key version "
@@ -2910,6 +2909,12 @@ public final class Vault {
         return mac.doFinal();
     }
 
+    /// A borrowed key reference, read under the publication monitor. Operations still check
+    /// their captured generations before delivering results; lock() may wipe this array.
+    private synchronized byte[] sessionKey() {
+        return dataKey;
+    }
+
     /// Reads the published cache under the same monitor as lock() and adoptSession().
     private synchronized VaultMetadata sessionMetadata() {
         return metadata;
@@ -2918,7 +2923,7 @@ public final class Vault {
     private void requireUnlocked() {
         checkAutoLock();
         VaultMetadata session = sessionMetadata();
-        if (dataKey == null || session == null) {
+        if (sessionKey() == null || session == null) {
             throw new VaultException(VaultError.LOCKED, "the vault is locked");
         }
         // Other browser tabs share storage, but not this session or Storage's cache.
@@ -2965,7 +2970,7 @@ public final class Vault {
         }
     }
 
-    private void checkAutoLock() {
+    private synchronized void checkAutoLock() {
         long idle = options.getAutoLockMillis();
         if (idle > 0 && dataKey != null
                 && (System.nanoTime() - lastActivity) / 1000000L > idle) {
@@ -2980,7 +2985,7 @@ public final class Vault {
     /// -- so the vault stays open until the clock catches up, which can turn a one-minute idle
     /// timeout into hours. nanoTime has no relationship to the date and cannot be set;
     /// ShieldToken measures its own expiry this way for the same reason.
-    private void touch() {
+    private synchronized void touch() {
         lastActivity = System.nanoTime();
     }
 
@@ -3316,8 +3321,16 @@ public final class Vault {
     /// operation is rejected before it can make even a temporary unlocked session visible.
     private synchronized void adoptSession(int generation, VaultMetadata meta, byte[] key) {
         requireSameGeneration(generation);
+        // Polling threads must never see a live key paired with the previous idle timestamp.
+        touch();
         metadata = meta;
         adoptKey(key);
+    }
+
+    /// Reports unlock success only while the published session has not been locked again.
+    private synchronized void completeUnlock(AsyncResource<Boolean> out, int generation) {
+        requireSameGeneration(generation);
+        out.complete(Boolean.TRUE);
     }
 
     /// Withdraws a device record that a lock landed on top of, and reports the lock.

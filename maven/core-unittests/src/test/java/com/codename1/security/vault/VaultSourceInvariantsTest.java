@@ -101,6 +101,24 @@ class VaultSourceInvariantsTest extends UITestBase {
     }
 
     @Test
+    void initialActivityAndUnlockCompletionShareThePublicationMonitor() throws Exception {
+        for (String method : new String[] {"touch", "checkAutoLock", "isUnlocked", "sessionKey"}) {
+            assertTrue(java.lang.reflect.Modifier.isSynchronized(
+                    Vault.class.getDeclaredMethod(method).getModifiers()), method);
+        }
+        assertTrue(java.lang.reflect.Modifier.isSynchronized(Vault.class.getDeclaredMethod(
+                "completeUnlock", com.codename1.util.AsyncResource.class, int.class).getModifiers()));
+        String source = readVaultSource();
+        String adopt = codeOnly(methodBody(source, "private synchronized void adoptSession("));
+        assertTrue(adopt.indexOf("touch()") >= 0 && adopt.indexOf("touch()") < adopt.indexOf("adoptKey("));
+        for (String name : new String[] {"unlockWithPassword", "unlockRemembered", "unlockWithRecoveryCode"}) {
+            String body = codeOnly(methodBody(source, "public AsyncResource<Boolean> " + name + "("));
+            assertTrue(body.contains("completeUnlock(out, generation)"), name);
+            assertFalse(body.contains("out.complete("), name);
+        }
+    }
+
+    @Test
     void generationChecksAcquireTheMonitorThatPublishesStateChanges() throws Exception {
         // A stress test cannot prove Java memory-model visibility. Assert the synchronization
         // boundary directly, alongside the behavioural lock and rotation race tests.
@@ -465,7 +483,7 @@ class VaultSourceInvariantsTest extends UITestBase {
         // of the comparison reads it. ShieldToken measures its own expiry the same way.
         String source = readVaultSource();
         for (String signature : new String[]{
-                "private void checkAutoLock()", "private void touch()"}) {
+                "private synchronized void checkAutoLock()", "private synchronized void touch()"}) {
             String body = methodBody(source, signature);
             assertTrue(body.indexOf("System.nanoTime()") > 0,
                     signature + " must measure on the monotonic clock: " + body);

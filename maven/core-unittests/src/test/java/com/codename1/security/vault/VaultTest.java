@@ -3840,6 +3840,64 @@ class VaultTest extends UITestBase {
     }
 
     @Test
+    void publishingAKeyInitializesActivityBeforeAnObserverCanAutoLockIt() throws Exception {
+        final Vault vault = Vault.named(freshName()).configure(fast().autoLockAfter(60000));
+        vault.enroll(pw("p"), fast().autoLockAfter(60000)).get();
+        java.lang.reflect.Field metadata = Vault.class.getDeclaredField("metadata");
+        java.lang.reflect.Field dataKey = Vault.class.getDeclaredField("dataKey");
+        java.lang.reflect.Field activity = Vault.class.getDeclaredField("lastActivity");
+        metadata.setAccessible(true);
+        dataKey.setAccessible(true);
+        activity.setAccessible(true);
+        Object record = metadata.get(vault);
+        byte[] recovered = ((byte[]) dataKey.get(vault)).clone();
+        vault.lock();
+        activity.setLong(vault, System.nanoTime() - java.util.concurrent.TimeUnit.MINUTES.toNanos(5));
+        java.lang.reflect.Method publish = Vault.class.getDeclaredMethod("publishKey",
+                int.class, VaultMetadata.class, byte[].class);
+        publish.setAccessible(true);
+        final java.util.concurrent.atomic.AtomicBoolean observed = new java.util.concurrent.atomic.AtomicBoolean();
+        try {
+            long before = System.nanoTime();
+            publish.invoke(vault, vault.generation(), record, recovered);
+            assertTrue(activity.getLong(vault) - before >= 0,
+                    "activity must be current when publication returns, before the unlock worker resumes");
+            Thread observer = new Thread(new Runnable() {
+                public void run() { observed.set(vault.isUnlocked()); }
+            });
+            observer.start();
+            observer.join(10000);
+            assertFalse(observer.isAlive());
+            assertTrue(observed.get(), "polling a newly published key must not auto-lock it");
+            assertTrue(vault.isUnlocked());
+        } finally {
+            vault.lock();
+            Bytes.zero(recovered);
+        }
+    }
+
+    @Test
+    void unlockCompletionRefusesALockThatArrivedAfterPublication() throws Exception {
+        Vault vault = Vault.named(freshName()).configure(fast());
+        vault.enroll(pw("p"), fast()).get();
+        int generation = vault.generation();
+        java.lang.reflect.Method complete = Vault.class.getDeclaredMethod("completeUnlock",
+                AsyncResource.class, int.class);
+        complete.setAccessible(true);
+        AsyncResource<Boolean> live = new AsyncResource<Boolean>();
+        complete.invoke(vault, live, generation);
+        assertTrue(live.get().booleanValue());
+        vault.lock();
+        AsyncResource<Boolean> refused = new AsyncResource<Boolean>();
+        java.lang.reflect.InvocationTargetException thrown = assertThrows(
+                java.lang.reflect.InvocationTargetException.class,
+                () -> complete.invoke(vault, refused, generation));
+        assertTrue(thrown.getCause() instanceof VaultException);
+        assertEquals(VaultError.LOCKED, ((VaultException) thrown.getCause()).getError());
+        assertFalse(refused.isDone(), "a closed vault must not be reported as successfully unlocked");
+    }
+
+    @Test
     void staleUnlockPublicationDoesNotTemporarilyReopenALockedVault() throws Exception {
         final Vault vault = Vault.named(freshName()).configure(fast());
         vault.enroll(pw("p"), fast()).get();
