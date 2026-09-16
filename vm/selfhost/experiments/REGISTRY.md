@@ -2485,3 +2485,72 @@ type propagation) is a different piece of work from the cursor protocol.
 The lesson is the one this file keeps recording: a number re-quoted from an earlier run in
 the same session is not a measurement. Three separate claims in this session have now been
 wrong that way -- a stale subject binary, a non-LTO benchmark, and this.
+
+## Round 21: zeroing the overhead -- an iterator and a stateless lambda are not objects
+
+The Round 20 case was argued from a stale iterator count and withdrawn. This is the same
+target argued from allocation VOLUME, which is the metric that actually describes overhead,
+measured on the current tree.
+
+    total allocated over the run    7,627,446 objects, 708.7MB
+    ArrayList.ArrayListIterator       724,829 objects  (9.50% of all objects), 27.65MB (3.90%)
+    lambdas                                 0          (this corpus is Java-8 era)
+
+**Nearly one allocation in ten is an iterator**, and that is AFTER the for-each lowering
+removed 71 of ~295 sites. It is small in bytes and large in events, and events are what
+drive the collection trigger, the mark and the sweep. The right way to read the earlier
+"6.86MB live" figure is that iterators are churned, not retained -- which is exactly the
+shape that costs GC throughput rather than footprint.
+
+An iterator is a parent pointer and an index. A stateless lambda is nothing at all. Neither
+needs a heap object, and neither should cost one even at a site the indexed lowering
+refuses.
+
+### Three mechanisms, in increasing order of what they need to prove
+
+**1. A non-capturing lambda is a singleton. This needs no analysis whatsoever.**
+A lambda is emitted here as a real class whose captured values are its instance fields,
+built by a `lambda$factory` that does `CN1_FAST_NEW` + `<init>` on every evaluation.
+Measured on this corpus: **4 of 6 lambda classes have ZERO captured fields.** A class with
+no instance fields has no distinguishable instances, so one static instance per class is
+indistinguishable from a fresh one -- return it from the factory and the allocation is gone
+permanently. The test is "does the class declare instance fields", which the translator
+already knows; there is no escape analysis and no receiver analysis.
+
+**2. An iterator is a stack object.** `resolveConcreteIteratorType` ALREADY proves the
+thing this needs: it only answers when `iterator()`'s whole body is `return new T(...)`,
+via `allocatedReturnType()`. So the allocation can be hoisted to the call site -- replacing
+`INVOKEINTERFACE iterator()` with `NEW T; DUP; <coll>; INVOKESPECIAL T.<init>` -- and the
+iterator local then only ever feeds calls to T's own methods. If those do not store `this`,
+it does not escape the loop and can be emitted as a C stack object, which is machinery this
+VM already has and uses for StringBuilder (`struct obj__java_lang_StringBuilder __cn1stk_6`
+appears in the emitted C). That removes the 724,829 allocations without needing the
+receiver to be ArrayList specifically -- only for `iterator()` to resolve.
+
+**3. A capturing lambda is a stack object** wherever the factory result feeds a call that
+does not store it, which is the `forEach`/`removeIf`/`sort` shape. Same stack-allocation
+mechanism as (2), same escape question.
+
+### The one thing that multiplies all of it
+
+(2) and (3) are gated by the same proof the indexed lowering is gated by: the concrete type
+of the receiver. That fires on 71 of ~295 for-each sites, and the ~224 refusals are 51
+parameters, ~60 method returns and 23 polymorphic fields. **Transitive type propagation
+through parameters and returns is therefore the single change that multiplies every
+downstream optimization** -- the indexed walk, the stack iterator, and the lambda inlining
+all widen with it, and none of them widens without it.
+
+(1) is gated by nothing and should go first for that reason: it is the only one of the
+three that is pure profit with no analysis and no GC interaction.
+
+### Order
+
+1. Non-capturing lambdas -> static singletons. No proof required.
+2. Transitive concrete-type propagation for container receivers. The multiplier.
+3. Iterator allocation hoisted and stack-allocated. Removes ~9.5% of all allocations.
+4. Capturing lambdas stack-allocated at non-escaping call sites.
+5. The Round 20 registry, which is now a tidying of 1-4 rather than the headline.
+
+The collector precondition from Round 20 still stands for anything that moves references
+into block storage; it does NOT apply to 1, 2 or 3, none of which change where a reference
+lives -- they change whether an object is allocated at all.
