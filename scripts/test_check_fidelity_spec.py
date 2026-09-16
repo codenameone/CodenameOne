@@ -50,6 +50,34 @@ class FidelitySpecTest(unittest.TestCase):
         validator.SPEC.write_text(original.replace("    material: glass\n", "", 1))
         self.assertEqual(0, self.check(), "omitting material retains the legacy heuristic")
 
+    def test_component_dimensions_require_positive_java_integers(self):
+        original = validator.SPEC.read_text()
+        for key in sorted(validator.TILE_KEYS):
+            row = "DesktopButton" if key.endswith("_px") else "Button"
+            marker = "  - id: " + row + "\n"
+            for value in ("24O", "0", "-1", "2147483648", "1.5", "", "1px"):
+                with self.subTest(key=key, value=value):
+                    validator.SPEC.write_text(original.replace(marker, marker + "    " + key + ": " + value + "\n", 1))
+                    self.assertEqual(1, self.check())
+                    self.assertTrue(any("positive Java integer" in error for error in validator.ERRORS))
+            for value in ("1", "+24", "2147483647", '"24"'):
+                with self.subTest(key=key, value=value):
+                    validator.SPEC.write_text(original.replace(marker, marker + "    " + key + ": " + value + "\n", 1))
+                    self.assertEqual(0, self.check())
+
+    def test_backdrop_values_match_renderer_contract(self):
+        original = validator.SPEC.read_text()
+        self.assertIn("backdrop: grouped", original)
+        for value in ("phoot", "Photo", "fff", "fffffff", "gg0000", ""):
+            with self.subTest(value=value):
+                validator.SPEC.write_text(original.replace("backdrop: grouped", "backdrop: " + value, 1))
+                self.assertEqual(1, self.check())
+                self.assertTrue(any("backdrop must be" in error for error in validator.ERRORS))
+        for value in ("photo", "gradient", "grouped", "000000", "Ab09fF", '"808080"', "'photo'"):
+            with self.subTest(value=value):
+                validator.SPEC.write_text(original.replace("backdrop: grouped", "backdrop: " + value, 1))
+                self.assertEqual(0, self.check())
+
     def test_unknown_defaults_are_rejected(self):
         original = validator.SPEC.read_text()
         for old, new in (("appearances:", "appearance:"), ("tile_width_px:", "tile_wdith_px:"),

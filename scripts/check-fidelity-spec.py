@@ -30,8 +30,10 @@ KNOWN_KEYS = MOBILE_KEYS | DESKTOP_KEYS | {
 KNOWN_PLATFORMS = {"ios", "android", "windows", "macos", "gnome", "linux"}
 KNOWN_STATES = {"normal", "pressed", "disabled", "selected", "hover", "focus"}
 KNOWN_MATERIALS = {"normal", "glass", "lens"}
+KNOWN_BACKDROPS = {"photo", "gradient", "grouped"}
+TILE_KEYS = {"tile_width_mm", "tile_height_mm", "tile_width_px", "tile_height_px"}
 
-DEFAULT_KEYS = {"tile_width_mm", "tile_height_mm", "tile_width_px", "tile_height_px", "bg", "appearances"}
+DEFAULT_KEYS = TILE_KEYS | {"bg", "appearances"}
 
 
 def unquote(value):
@@ -40,17 +42,21 @@ def unquote(value):
     return value
 
 
+def check_tile_dimension(key, value, where):
+    try:
+        valid = re.fullmatch(r"\+?[0-9]+", value) and 0 < int(value) <= 2147483647
+    except ValueError:
+        valid = False
+    if not valid:
+        yield_error(f"{where}: '{key}' must be a positive Java integer")
+
+
 def check_default(key, value, line):
     where = f"defaults (line {line})"
     if key not in DEFAULT_KEYS:
         yield_error(f"{where}: unknown default key '{key}'; the on-device parser ignores it")
     elif key.startswith("tile_"):
-        try:
-            valid = re.fullmatch(r"\+?[0-9]+", value) and 0 < int(value) <= 2147483647
-        except ValueError:
-            valid = False
-        if not valid:
-            yield_error(f"{where}: '{key}' must be a positive Java integer")
+        check_tile_dimension(key, value, where)
     elif key == "bg" and not re.fullmatch(r"[0-9a-fA-F]{6}", value):
         yield_error(f"{where}: bg must be a six-digit hexadecimal color")
     elif key == "appearances":
@@ -144,6 +150,13 @@ def main():
         if "material" in r and r["material"] not in KNOWN_MATERIALS:
             yield_error(f"{where}: unknown material '{r['material']}' "
                         f"(known: {sorted(KNOWN_MATERIALS)})")
+
+        if "backdrop" in r and r["backdrop"] not in KNOWN_BACKDROPS:
+            if not re.fullmatch(r"[0-9a-fA-F]{6}", r["backdrop"]):
+                yield_error(f"{where}: backdrop must be photo, gradient, grouped, "
+                            "or a six-digit hexadecimal color")
+        for key in sorted(TILE_KEYS & set(r)):
+            check_tile_dimension(key, r[key], where)
 
         has_desktop = bool(DESKTOP_KEYS & set(r))
         has_mobile = bool(MOBILE_KEYS & set(r))
