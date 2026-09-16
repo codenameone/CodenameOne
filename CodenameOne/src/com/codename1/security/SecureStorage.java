@@ -22,6 +22,10 @@
  */
 package com.codename1.security;
 
+import com.codename1.security.vault.Protection;
+import com.codename1.security.vault.ProtectionReport;
+import com.codename1.security.vault.VaultError;
+import com.codename1.security.vault.VaultException;
 import com.codename1.ui.Display;
 import com.codename1.util.AsyncResource;
 
@@ -293,11 +297,45 @@ public class SecureStorage {
     protected static String gateName(String account) {
         String encoded = sanitizeNamespace(account == null ? "" : account);
         if (encoded.length() > MAX_GATE_NAME) {
-            encoded = encoded.substring(0, MAX_GATE_NAME)
-                    + "-" + Integer.toHexString(account.hashCode());
+            // A DIGEST of the account, not its hashCode. String.hashCode is a 32-bit
+            // non-cryptographic hash whose collisions are trivial to write down -- "Aa" and "BB"
+            // is the textbook pair -- so two accounts sharing the truncated prefix and colliding
+            // there shared one gate. That is not merely a lock they contend on: the gate carries
+            // a mark saying the account behind it has been created, so once the first account
+            // writes it the second finds a mark with no value of its own and reports that
+            // somebody else owns it, for good. Its managed database or vault key could then never
+            // be created.
+            encoded = encoded.substring(0, MAX_GATE_NAME) + "-" + digestOf(account);
         }
         return "cn1ss-gate-" + applicationNamespace() + "-" + encoded;
     }
+
+    /// The leading bytes of SHA-256 over the account, in hex.
+    ///
+    /// Twelve bytes is far past any accidental collision for the number of accounts one
+    /// application has, and finding a deliberate one means finding a SHA-256 prefix collision.
+    /// Falls back on the old hashCode only where no digest is available at all, which keeps a
+    /// port that cannot hash working rather than failing to name a file.
+    private static String digestOf(String account) {
+        try {
+            byte[] digest = Hash.sha256(account.getBytes("UTF-8"));
+            StringBuilder b = new StringBuilder(24);
+            for (int iter = 0; iter < 12 && iter < digest.length; iter++) {
+                int v = digest[iter] & 0xff;
+                b.append(HEX_DIGITS.charAt(v >> 4));
+                b.append(HEX_DIGITS.charAt(v & 0x0f));
+            }
+            return b.toString();
+        } catch (java.io.UnsupportedEncodingException noUtf8) {
+            return Integer.toHexString(account.hashCode());
+        } catch (RuntimeException noDigest) {
+            // A port with no SHA-256 at all. Naming the file is more important than naming it
+            // well, so this falls back on what it did before rather than failing to name it.
+            return Integer.toHexString(account.hashCode());
+        }
+    }
+
+    private static final String HEX_DIGITS = "0123456789abcdef";
 
     /// Leaves room for the application namespace and the prefix inside a 255 byte file name.
     private static final int MAX_GATE_NAME = 120;
@@ -363,5 +401,117 @@ public class SecureStorage {
     /// one of `#ENTRY_PRESENT`, `#ENTRY_ABSENT` or `#ENTRY_UNKNOWN`
     public int entryState(String account) {
         return ENTRY_UNKNOWN;
+    }
+
+    // -----------------------------------------------------------------
+    // Capability reporting and required protections
+    // -----------------------------------------------------------------
+    //
+    // The non-prompting methods above answer "did it work". They cannot
+    // answer "what protected it", and on the JavaScript port those are
+    // very different questions: a write that succeeds into ordinary
+    // origin-private storage is persistence and nothing else, while the
+    // same call on iOS put the value in the keychain. An application
+    // storing a database key needs to be able to tell those apart, and
+    // an application that requires the second needs to be refused rather
+    // than silently given the first.
+
+    /// What this store actually provides, as observed rather than as advertised.
+    ///
+    /// The base class answers [ProtectionReport#none()], which is the honest report for a
+    /// platform with no store at all. A port answers what it can verify, and
+    /// [ProtectionReport#UNKNOWN] for what it cannot -- no browser can say whether a key ended up
+    /// in a secure element, and a port that guessed would be making a guarantee up.
+    public ProtectionReport protection() {
+        return ProtectionReport.none();
+    }
+
+    /// What protects one particular entry, which need not be what the store can provide.
+    ///
+    /// An entry written before a port gained encryption is still plaintext; an entry written by an
+    /// older version of the application may be too. The default answers the store-wide report,
+    /// which is correct for a store where every entry is alike.
+    ///
+    /// #### Parameters
+    ///
+    /// - `account`: the entry to ask about
+    public ProtectionReport protectionOf(String account) {
+        return protection();
+    }
+
+    /// Stores a value, refusing rather than downgrading when a required protection is missing.
+    ///
+    /// This is the overload to use for anything whose exposure would matter. `set(account, value)`
+    /// stores what it can and reports whether the write worked; this one first checks that the
+    /// store provides everything in `required` and throws
+    /// [com.codename1.security.vault.VaultError#POLICY_NOT_MET] if it does not, naming the
+    /// protection that was missing.
+    ///
+    /// [ProtectionReport#UNKNOWN] does not satisfy a requirement. A store that cannot say whether
+    /// it encrypts has not encrypted anything as far as a policy is concerned.
+    ///
+    /// #### Parameters
+    ///
+    /// - `account`: the entry name
+    ///
+    /// - `value`: the value to store
+    ///
+    /// - `required`: the protections this value must have, or null for none
+    ///
+    /// #### Returns
+    ///
+    /// whether the write succeeded
+    ///
+    /// #### Throws
+    ///
+    /// - `VaultException`: with [com.codename1.security.vault.VaultError#POLICY_NOT_MET] when a
+    ///   required protection is not provided. Nothing is written in that case
+    public boolean set(String account, String value, Protection[] required) {
+        Protection unmet = protection().firstUnmet(required);
+        if (unmet != null) {
+            throw new VaultException(VaultError.POLICY_NOT_MET,
+                    "this platform's secure storage does not provide " + unmet.name()
+                    + "; refusing to store the value with weaker protection than was asked for",
+                    unmet, null);
+        }
+        return set(account, value);
+    }
+
+    /// Reads a value, refusing when the entry is not protected the way the caller requires.
+    ///
+    /// The check is against [#protectionOf(String)] rather than [#protection()], so an entry
+    /// written before a port gained encryption is refused even on a port that now encrypts. An
+    /// application seeing this should rewrite the entry.
+    ///
+    /// #### Parameters
+    ///
+    /// - `account`: the entry name
+    ///
+    /// - `required`: the protections this value must have, or null for none
+    ///
+    /// #### Returns
+    ///
+    /// the value, or null when there is none
+    ///
+    /// #### Throws
+    ///
+    /// - `VaultException`: with [com.codename1.security.vault.VaultError#POLICY_NOT_MET] when the
+    ///   entry is not protected as required
+    public String get(String account, Protection[] required) {
+        // Fetched first, so an entry that is not there answers null the way this overload says
+        // it does. Checking the store's report before looking meant that probing an optional
+        // value on a weaker platform -- JavaSE with ENCRYPTED_AT_REST required -- threw
+        // POLICY_NOT_MET for an account that did not exist, when nothing unprotected would have
+        // been handed back either way.
+        String value = get(account);
+        if (value == null) {
+            return null;
+        }
+        Protection unmet = protectionOf(account).firstUnmet(required);
+        if (unmet != null) {
+            throw new VaultException(VaultError.POLICY_NOT_MET,
+                    "the stored entry is not protected by " + unmet.name(), unmet, null);
+        }
+        return value;
     }
 }

@@ -18691,6 +18691,20 @@ JAVA_INT com_codename1_impl_ios_IOSNative_aesGcm___int_byte_1ARRAY_byte_1ARRAY_b
         (uint8_t*) CN1_PRIM_ARR_DATA(outArr), (int) CN1_PRIM_ARR_LEN(outArr));
 }
 
+JAVA_INT com_codename1_impl_ios_IOSNative_pbkdf2___int_byte_1ARRAY_byte_1ARRAY_int_byte_1ARRAY(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT hashKind, JAVA_OBJECT passwordArr, JAVA_OBJECT saltArr, JAVA_INT iterations, JAVA_OBJECT outArr) {
+    (void) instanceObject;
+    if (saltArr == JAVA_NULL || outArr == JAVA_NULL) {
+        return CN1_CRYPTO_E_BAD_INPUT;
+    }
+    const uint8_t* pwPtr = (passwordArr == JAVA_NULL) ? NULL : (uint8_t*) CN1_PRIM_ARR_DATA(passwordArr);
+    int pwLen = (passwordArr == JAVA_NULL) ? 0 : (int) CN1_PRIM_ARR_LEN(passwordArr);
+    return cn1_crypto_pbkdf2(hashKind,
+        pwPtr, pwLen,
+        (uint8_t*) CN1_PRIM_ARR_DATA(saltArr), (int) CN1_PRIM_ARR_LEN(saltArr),
+        iterations,
+        (uint8_t*) CN1_PRIM_ARR_DATA(outArr), (int) CN1_PRIM_ARR_LEN(outArr));
+}
+
 JAVA_INT com_codename1_impl_ios_IOSNative_rsaEncrypt___int_byte_1ARRAY_byte_1ARRAY_byte_1ARRAY(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT paddingKind, JAVA_OBJECT x509, JAVA_OBJECT inArr, JAVA_OBJECT outArr) {
     return cn1_crypto_rsa_encrypt(paddingKind,
         (uint8_t*) CN1_PRIM_ARR_DATA(x509),  (int) CN1_PRIM_ARR_LEN(x509),
@@ -18751,6 +18765,11 @@ JAVA_INT com_codename1_impl_ios_IOSNative_aesCbc___int_byte_1ARRAY_byte_1ARRAY_b
 
 JAVA_INT com_codename1_impl_ios_IOSNative_aesGcm___int_byte_1ARRAY_byte_1ARRAY_byte_1ARRAY_byte_1ARRAY_byte_1ARRAY(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT encrypt, JAVA_OBJECT keyArr, JAVA_OBJECT ivArr, JAVA_OBJECT aadArr, JAVA_OBJECT inArr, JAVA_OBJECT outArr) {
     (void) instanceObject; (void) encrypt; (void) keyArr; (void) ivArr; (void) aadArr; (void) inArr; (void) outArr;
+    return CN1_CRYPTO_E_UNSUPPORTED;
+}
+
+JAVA_INT com_codename1_impl_ios_IOSNative_pbkdf2___int_byte_1ARRAY_byte_1ARRAY_int_byte_1ARRAY(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT hashKind, JAVA_OBJECT passwordArr, JAVA_OBJECT saltArr, JAVA_INT iterations, JAVA_OBJECT outArr) {
+    (void) instanceObject; (void) hashKind; (void) passwordArr; (void) saltArr; (void) iterations; (void) outArr;
     return CN1_CRYPTO_E_UNSUPPORTED;
 }
 
@@ -22780,6 +22799,10 @@ JAVA_INT com_codename1_impl_ios_IOSNative_aesCbc___int_byte_1ARRAY_byte_1ARRAY_b
 
 JAVA_INT com_codename1_impl_ios_IOSNative_aesGcm___int_byte_1ARRAY_byte_1ARRAY_byte_1ARRAY_byte_1ARRAY_byte_1ARRAY_R_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT encrypt, JAVA_OBJECT keyArr, JAVA_OBJECT ivArr, JAVA_OBJECT aadArr, JAVA_OBJECT inArr, JAVA_OBJECT outArr) {
     return com_codename1_impl_ios_IOSNative_aesGcm___int_byte_1ARRAY_byte_1ARRAY_byte_1ARRAY_byte_1ARRAY_byte_1ARRAY(CN1_THREAD_STATE_PASS_ARG instanceObject, encrypt, keyArr, ivArr, aadArr, inArr, outArr);
+}
+
+JAVA_INT com_codename1_impl_ios_IOSNative_pbkdf2___int_byte_1ARRAY_byte_1ARRAY_int_byte_1ARRAY_R_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT hashKind, JAVA_OBJECT passwordArr, JAVA_OBJECT saltArr, JAVA_INT iterations, JAVA_OBJECT outArr) {
+    return com_codename1_impl_ios_IOSNative_pbkdf2___int_byte_1ARRAY_byte_1ARRAY_int_byte_1ARRAY(CN1_THREAD_STATE_PASS_ARG instanceObject, hashKind, passwordArr, saltArr, iterations, outArr);
 }
 
 JAVA_INT com_codename1_impl_ios_IOSNative_rsaEncrypt___int_byte_1ARRAY_byte_1ARRAY_byte_1ARRAY_R_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT paddingKind, JAVA_OBJECT x509, JAVA_OBJECT inArr, JAVA_OBJECT outArr) {

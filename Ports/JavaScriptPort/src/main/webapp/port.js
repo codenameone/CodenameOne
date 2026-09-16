@@ -1261,6 +1261,237 @@ bindNative([
   return pair;
 });
 
+// --------------------------------------------------------------------------
+// com.codename1.impl.html5.HTML5DeviceProtection -- the browser half of
+// com.codename1.security.vault.
+//
+// Each native forwards one request to the ``__cn1_vault__`` host bridge in
+// browser_bridge.js, where Web Crypto and IndexedDB live, and converts the
+// reply into a Java byte[]. The reply's first byte is a status; the Java side
+// maps it to a VaultError. Nothing here interprets it, so a status added on one
+// side and not the other degrades to VaultError.UNKNOWN rather than to a
+// silently wrong answer.
+// --------------------------------------------------------------------------
+
+function* cn1VaultHost(request) {
+  if (typeof jvm.invokeHostNative !== "function") {
+    // One byte: STATUS_STORAGE_UNAVAILABLE with no payload. Returned rather
+    // than thrown so the Java side takes its normal typed-failure path.
+    return [4];
+  }
+  try {
+    return yield jvm.invokeHostNative("__cn1_vault__", [request]);
+  } catch (err) {
+    // STATUS_UNKNOWN. A rejected host promise has already lost whatever the
+    // browser knew, and guessing a more specific code from the message would be
+    // inventing one.
+    return [8];
+  }
+}
+
+function cn1VaultByteValues(value) {
+  if (value == null) {
+    return null;
+  }
+  const out = new Array(value.length | 0);
+  for (let i = 0; i < out.length; i++) {
+    out[i] = (value[i] | 0) & 0xff;
+  }
+  return out;
+}
+
+function cn1VaultJavaBytes(value) {
+  const source = value == null ? [] : value;
+  const out = jvm.newArray(source.length | 0, "JAVA_BYTE", 1);
+  for (let i = 0; i < out.length; i++) {
+    const unsigned = source[i] | 0;
+    out[i] = unsigned > 127 ? unsigned - 256 : unsigned;
+  }
+  return out;
+}
+
+bindNative([
+  "cn1_com_codename1_impl_html5_HTML5DeviceProtection_nativeCapabilities_R_byte_1ARRAY"
+], function*() {
+  return cn1VaultJavaBytes(yield* cn1VaultHost({ op: "capabilities" }));
+});
+
+bindNative([
+  "cn1_com_codename1_impl_html5_HTML5DeviceProtection_nativeKeyState_java_lang_String_R_byte_1ARRAY"
+], function*(keyId) {
+  return cn1VaultJavaBytes(yield* cn1VaultHost({
+    op: "keyState",
+    keyId: jvm.toNativeString(keyId)
+  }));
+});
+
+// The atomic create for an ordinary secure-storage account. Two tabs opening the same managed
+// database both find nothing and both generate a value; IndexedDB's ``add`` accepts exactly one
+// and this hands the loser back the record that won, so both proceed under the same value.
+bindNative([
+  "cn1_com_codename1_impl_html5_HTML5SecureStorage_nativeSetIfAbsent_java_lang_String_java_lang_String_R_byte_1ARRAY"
+], function*(entry, sealed) {
+  return cn1VaultJavaBytes(yield* cn1VaultHost({
+    op: "secureStoreSetIfAbsent",
+    entry: jvm.toNativeString(entry),
+    sealed: jvm.toNativeString(sealed)
+  }));
+});
+
+// Reads the settled record without creating one, so the mirror can tell whether what it is
+// about to copy is still what the store holds.
+bindNative([
+  "cn1_com_codename1_impl_html5_HTML5SecureStorage_nativeRead_java_lang_String_R_byte_1ARRAY"
+], function*(entry) {
+  return cn1VaultJavaBytes(yield* cn1VaultHost({
+    op: "secureStoreRead",
+    entry: jvm.toNativeString(entry)
+  }));
+});
+
+// An ordinary set(), settled in the same store the create gate uses. Without it a tab paused
+// inside setIfAbsent could create the gate after this write and mirror its own candidate over
+// the value set() had already stored.
+bindNative([
+  "cn1_com_codename1_impl_html5_HTML5SecureStorage_nativeSet_java_lang_String_java_lang_String_R_byte_1ARRAY"
+], function*(entry, sealed) {
+  return cn1VaultJavaBytes(yield* cn1VaultHost({
+    op: "secureStoreSet",
+    entry: jvm.toNativeString(entry),
+    sealed: jvm.toNativeString(sealed)
+  }));
+});
+
+// Releases the gate only while it still holds the record this tab wrote, which is what a
+// rollback needs: by then another tab may own it.
+bindNative([
+  "cn1_com_codename1_impl_html5_HTML5SecureStorage_nativeForgetIf_java_lang_String_java_lang_String_R_byte_1ARRAY"
+], function*(entry, sealed) {
+  return cn1VaultJavaBytes(yield* cn1VaultHost({
+    op: "secureStoreForgetIf",
+    entry: jvm.toNativeString(entry),
+    sealed: jvm.toNativeString(sealed)
+  }));
+});
+
+// Releases the create gate, so remove() leaves nothing behind that a later setIfAbsent could
+// answer with.
+bindNative([
+  "cn1_com_codename1_impl_html5_HTML5SecureStorage_nativeForget_java_lang_String_R_byte_1ARRAY"
+], function*(entry) {
+  return cn1VaultJavaBytes(yield* cn1VaultHost({
+    op: "secureStoreForget",
+    entry: jvm.toNativeString(entry)
+  }));
+});
+
+bindNative([
+  "cn1_com_codename1_impl_html5_HTML5DeviceProtection_nativeEnsureKey_java_lang_String_R_byte_1ARRAY"
+], function*(keyId) {
+  return cn1VaultJavaBytes(yield* cn1VaultHost({
+    op: "ensureKey",
+    keyId: jvm.toNativeString(keyId)
+  }));
+});
+
+bindNative([
+  "cn1_com_codename1_impl_html5_HTML5DeviceProtection_nativeWrap_java_lang_String_byte_1ARRAY_byte_1ARRAY_R_byte_1ARRAY"
+], function*(keyId, plaintext, aad) {
+  return cn1VaultJavaBytes(yield* cn1VaultHost({
+    op: "wrap",
+    keyId: jvm.toNativeString(keyId),
+    data: cn1VaultByteValues(plaintext),
+    aad: cn1VaultByteValues(aad)
+  }));
+});
+
+bindNative([
+  "cn1_com_codename1_impl_html5_HTML5DeviceProtection_nativeUnwrap_java_lang_String_byte_1ARRAY_byte_1ARRAY_R_byte_1ARRAY"
+], function*(keyId, wrapped, aad) {
+  return cn1VaultJavaBytes(yield* cn1VaultHost({
+    op: "unwrap",
+    keyId: jvm.toNativeString(keyId),
+    data: cn1VaultByteValues(wrapped),
+    aad: cn1VaultByteValues(aad)
+  }));
+});
+
+bindNative([
+  "cn1_com_codename1_impl_html5_HTML5DeviceProtection_nativeDeleteKey_java_lang_String_R_byte_1ARRAY"
+], function*(keyId) {
+  return cn1VaultJavaBytes(yield* cn1VaultHost({
+    op: "deleteKey",
+    keyId: jvm.toNativeString(keyId)
+  }));
+});
+
+// --------------------------------------------------------------------------
+// com.codename1.impl.html5.HTML5PasskeyProtection -- the user-verifying variant.
+//
+// Enrol and derive both put a prompt on screen; prfState deliberately does not,
+// so an application can ask whether the option is available without asking for
+// the thing it is offering.
+// --------------------------------------------------------------------------
+
+bindNative([
+  "cn1_com_codename1_impl_html5_HTML5PasskeyProtection_nativePrfState_java_lang_String_R_byte_1ARRAY"
+], function*(keyId) {
+  return cn1VaultJavaBytes(yield* cn1VaultHost({
+    op: "prfState",
+    keyId: jvm.toNativeString(keyId)
+  }));
+});
+
+bindNative([
+  "cn1_com_codename1_impl_html5_HTML5PasskeyProtection_nativePrfEnroll_java_lang_String_java_lang_String_boolean_R_byte_1ARRAY"
+], function*(keyId, userName, deviceBound) {
+  return cn1VaultJavaBytes(yield* cn1VaultHost({
+    op: "prfEnroll",
+    keyId: jvm.toNativeString(keyId),
+    userName: jvm.toNativeString(userName),
+    deviceBound: !!deviceBound
+  }));
+});
+
+bindNative([
+  "cn1_com_codename1_impl_html5_HTML5PasskeyProtection_nativePrfDerive_java_lang_String_R_byte_1ARRAY"
+], function*(keyId) {
+  return cn1VaultJavaBytes(yield* cn1VaultHost({
+    op: "prfDerive",
+    keyId: jvm.toNativeString(keyId)
+  }));
+});
+
+bindNative([
+  "cn1_com_codename1_impl_html5_HTML5PasskeyProtection_nativePrfForget_java_lang_String_R_byte_1ARRAY"
+], function*(keyId) {
+  return cn1VaultJavaBytes(yield* cn1VaultHost({
+    op: "prfForget",
+    keyId: jvm.toNativeString(keyId)
+  }));
+});
+
+// PBKDF2 through Web Crypto. The portable fallback in KdfProfile is the same
+// algorithm in pure Java and produces identical bytes, and at the default six
+// hundred thousand iterations it is minutes of a translated worker's time
+// rather than the tens of milliseconds the browser takes natively. Returning
+// null from this native is how a port says "no native derivation"; this one
+// never does, and a browser that refuses the derivation throws instead, which
+// surfaces as a crypto failure rather than a silent slow path.
+bindNative([
+  "cn1_com_codename1_impl_CodenameOneImplementation_pbkdf2_java_lang_String_byte_1ARRAY_byte_1ARRAY_int_int_R_byte_1ARRAY"
+], function*(_impl, hashAlgorithm, password, salt, iterations, length) {
+  const result = yield* cn1CryptoHost({
+    op: "pbkdf2",
+    hash: jvm.toNativeString(hashAlgorithm),
+    password: cn1VaultByteValues(password),
+    salt: cn1VaultByteValues(salt),
+    iterations: iterations | 0,
+    length: length | 0
+  });
+  return cn1CryptoJavaBytes(result);
+});
+
 bindNative(["cn1_com_codename1_html5_js_core_JSArray_create_R_com_codename1_html5_js_core_JSArray", "cn1_com_codename1_html5_js_core_JSArray_create___R_com_codename1_html5_js_core_JSArray"], function() {
   const arr = [];
   return jvm.wrapJsObject(arr, "com_codename1_html5_js_core_JSArray");

@@ -608,9 +608,19 @@ public abstract class Executor {
 
         private final boolean cipher;
 
-        DatabaseUsage(boolean database, boolean cipher) {
+        private final boolean vault;
+
+        private final boolean vaultUnknown;
+
+        DatabaseUsage(boolean database, boolean cipher, boolean vault) {
+            this(database, cipher, vault, false);
+        }
+
+        DatabaseUsage(boolean database, boolean cipher, boolean vault, boolean vaultUnknown) {
             this.database = database;
             this.cipher = cipher;
+            this.vault = vault;
+            this.vaultUnknown = vaultUnknown;
         }
 
         /// The answer from two roots, since a build can stage classes and libraries separately.
@@ -626,7 +636,8 @@ public abstract class Executor {
             if (other == null) {
                 return this;
             }
-            return new DatabaseUsage(database || other.database, cipher || other.cipher);
+            return new DatabaseUsage(database || other.database, cipher || other.cipher,
+                    vault || other.vault, vaultUnknown || other.vaultUnknown);
         }
 
         /// Whether anything outside the framework references `com.codename1.db`.
@@ -638,11 +649,95 @@ public abstract class Executor {
         public boolean usesDatabaseCipher() {
             return cipher;
         }
+
+        /// Whether anything outside the framework references `com.codename1.security.vault`.
+        ///
+        /// Attributed the same way the database answers are, and for the same reason: Display,
+        /// CodenameOneImplementation and DatabaseConfig all name vault types in their own
+        /// signatures -- DatabaseConfig holds a Vault field -- so a plain package check answers
+        /// yes for every application ever built.
+        public boolean usesVault() {
+            return vault;
+        }
+
+        /// Whether part of the submission could not be read, so vault use cannot be ruled out.
+        ///
+        /// A budget refusal stops a scan partway, and the code that handles it assumes the
+        /// database and its cipher ARE used -- the comment there says why: a refusal means the
+        /// rest of the archive is unknown rather than absent, and being wrong in that direction
+        /// costs a fatter binary. The vault answer cannot be guessed the same way. Wrong one way
+        /// it ships an application whose vault has no AES-GCM on iOS; wrong the other it links a
+        /// private CommonCrypto SPI into a binary Apple scans, for an application that may never
+        /// have touched the vault.
+        ///
+        /// So neither guess is made here. This reports that the question is open and leaves the
+        /// decision to the builder that has to act on it, which is the only place that knows what
+        /// the developer asked for.
+        public boolean isVaultUnknown() {
+            return vaultUnknown;
+        }
     }
 
     /// The database API itself. Every class in it names the package, so none of them says
     /// anything about whether the application does.
     private static final String DATABASE_PACKAGE = "com/codename1/db";
+
+    /// The vault API. Referenced by an application only when it actually uses one -- the
+    /// framework classes that name these types are excluded by name below, exactly as the
+    /// database ones are.
+    private static final String VAULT_PACKAGE = "com/codename1/security/vault";
+
+    /// The vault types whose use actually reaches AES-GCM.
+    ///
+    /// Not the package. Protection and ProtectionReport live in it and are the parameter and the
+    /// return type of the SecureStorage policy overloads, so an application that only asks what a
+    /// store already provides -- and never creates a Vault or seals an envelope -- named the
+    /// package and was classified as a vault user. On iOS that enables CN1_INCLUDE_CRYPTO_GCM and
+    /// links the private CommonCrypto GCM SPI symbols into a binary Apple scans, which is the one
+    /// outcome this gating exists to prevent. These four are the entry points that reach the GCM
+    /// implementation; the rest of the package describes a policy rather than performing crypto.
+    private static final String[] VAULT_GCM_CLASSES = {
+        VAULT_PACKAGE + "/Vault",
+        VAULT_PACKAGE + "/SecureEnvelope",
+        // KeyHandle is deliberately NOT here. It is fully abstract -- every method including
+        // seal and open -- so a class-file reference to it carries no GCM implementation, and an
+        // application declaring a KeyHandle-typed API or subclassing it for its own non-GCM
+        // purpose was charged the cipher for a type reference alone. Nothing is lost by the
+        // omission: Vault.operationalKey is the ONLY producer of a KeyHandle anywhere in the
+        // framework, so an application holding one has named Vault, which is on this list.
+        VAULT_PACKAGE + "/VaultKeyHandle",
+        // Public, and it seals and opens envelopes itself, so an application can reach GCM
+        // through it without ever naming Vault.
+        VAULT_PACKAGE + "/SecureStorageDeviceProtection",
+    };
+
+    /// Whether a referenced name -- an internal name, a descriptor or a signature -- mentions a
+    /// vault type that needs AES-GCM.
+    ///
+    /// Substring, because the caller cannot say which of the three it holds, but the character
+    /// after the match is checked: "Vault" must not match VaultMetadata, VaultException,
+    /// VaultError or VaultPolicy, all of which an application can name without any crypto. An
+    /// inner class ("Vault$1") does count, so '$' is accepted along with the ';' and '<' that
+    /// end a name inside a descriptor or a signature.
+    private static boolean isVaultGcmClass(String name) {
+        for (int iter = 0; iter < VAULT_GCM_CLASSES.length; iter++) {
+            String one = VAULT_GCM_CLASSES[iter];
+            int at = name.indexOf(one);
+            while (at >= 0) {
+                int after = at + one.length();
+                if (after >= name.length()) {
+                    return true;
+                }
+                char c = name.charAt(after);
+                if (c == '$' || (!(c >= 'a' && c <= 'z') && !(c >= 'A' && c <= 'Z')
+                        && !(c >= '0' && c <= '9') && c != '_')) {
+                    return true;
+                }
+                at = name.indexOf(one, at + 1);
+            }
+        }
+        return false;
+    }
 
     /// Framework classes whose reference to the database package is their own.
     ///
@@ -674,6 +769,40 @@ public abstract class Executor {
         "com/codename1/db/DatabaseConfig",
         "com/codename1/db/DatabaseEncryptionException",
         "com/codename1/db/ManagedKeys",
+        // Name vault types in their own signatures rather than using a vault: Display and
+        // CodenameOneImplementation expose the SPI, DatabaseConfig holds a Vault field, and
+        // SecureStorage reports a ProtectionReport. Without these an application that never
+        // heard of the vault would link a private CommonCrypto SPI on iOS.
+        // (Display and CodenameOneImplementation are already listed above for the database.)
+        "com/codename1/security/SecureStorage",
+        // And the vault package itself, which is the larger half of the same problem. Every one
+        // of these classes carries its own name in its constant pool, so leaving them in made
+        // the package prove its own use: the scan found the string in Vault.class and charged an
+        // application that has never heard of a vault the private CommonCrypto SPI on iOS. Listed
+        // by name rather than skipped as a directory, for the reason the database package is:
+        // the package is the framework's by convention, not by ownership, and an application or
+        // a library putting a class there must still be scanned. VaultClassExclusionTest holds
+        // this list against the package, so a class added later cannot quietly reopen it.
+        "com/codename1/security/vault/AssociatedData",
+        "com/codename1/security/vault/Bytes",
+        "com/codename1/security/vault/KdfProfile",
+        "com/codename1/security/vault/KeyHandle",
+        "com/codename1/security/vault/KeyUsage",
+        "com/codename1/security/vault/Protection",
+        "com/codename1/security/vault/ProtectionReport",
+        "com/codename1/security/vault/SecureEnvelope",
+        "com/codename1/security/vault/SecureStorageDeviceProtection",
+        "com/codename1/security/vault/UnlockPolicy",
+        "com/codename1/security/vault/Vault",
+        "com/codename1/security/vault/VaultCapabilities",
+        "com/codename1/security/vault/VaultError",
+        "com/codename1/security/vault/VaultException",
+        "com/codename1/security/vault/VaultKeyHandle",
+        "com/codename1/security/vault/VaultMetadata",
+        "com/codename1/security/vault/VaultOptions",
+        "com/codename1/security/vault/package-info",
+        "com/codename1/security/vault/spi/DeviceProtection",
+        "com/codename1/security/vault/spi/package-info",
         "com/codename1/db/Row",
         "com/codename1/db/RowExt",
         "com/codename1/db/ThreadSafeDatabase",
@@ -717,13 +846,13 @@ public abstract class Executor {
     ///
     /// what the application's own classes reference, never null
     protected DatabaseUsage scanForDatabaseUsage(File classesDir) throws IOException {
-        boolean[] found = {false, false};
+        boolean[] found = {false, false, false, false};
         if (classesDir != null && classesDir.isDirectory()) {
             // One budget for the whole scan, so a hundred small archives cannot
             // add up to what one big one is refused for.
             scanForDatabaseUsage(classesDir, "", found, new PermScanBudget());
         }
-        return new DatabaseUsage(found[0], found[1]);
+        return new DatabaseUsage(found[0], found[1], found[2], found[3]);
     }
 
     private void scanForDatabaseUsage(File dir, String relativePath, boolean[] found,
@@ -734,7 +863,7 @@ public abstract class Executor {
             return;
         }
         for (int iter = 0; iter < children.length; iter++) {
-            if (found[0] && found[1]) {
+            if (found[0] && found[1] && found[2]) {
                 return;
             }
             File child = children[iter];
@@ -767,7 +896,7 @@ public abstract class Executor {
         try {
             zip = new java.util.zip.ZipFile(archive);
             java.util.Enumeration<? extends java.util.zip.ZipEntry> entries = zip.entries();
-            while (entries.hasMoreElements() && !(found[0] && found[1])) {
+            while (entries.hasMoreElements() && !(found[0] && found[1] && found[2])) {
                 java.util.zip.ZipEntry entry = entries.nextElement();
                 String name = entry.getName();
                 // Charged before any branch, exactly as the permission scanner
@@ -853,9 +982,15 @@ public abstract class Executor {
             // minimum SDK), which is the loud, recoverable half of the trade.
             found[0] = true;
             found[1] = true;
+            // NOT found[2]. The same "unknown, not absent" reasoning applies, and the cost of
+            // being wrong does not: charging the vault links a private CommonCrypto SPI into an
+            // iOS binary Apple scans. Recorded as open instead, for the builder to resolve --
+            // see DatabaseUsage.isVaultUnknown.
+            found[3] = true;
             log("WARNING: " + archive + " was refused by the scan budget ("
                     + refused.getMessage() + "); assuming it uses an encrypted database, "
-                    + "because what it contains past that point cannot be known");
+                    + "because what it contains past that point cannot be known. Whether it uses "
+                    + "the vault is left undecided for the same reason");
         } catch (IOException cannotRead) {
             // An archive that cannot be opened says nothing either way, and refusing to build over
             // it would fail every application carrying a jar this cannot parse.
@@ -884,7 +1019,13 @@ public abstract class Executor {
         java.util.zip.ZipInputStream in = new java.util.zip.ZipInputStream(
                 new BoundedInputStream(nested, budget));
         java.util.zip.ZipEntry entry = in.getNextEntry();
-        while (entry != null && !(found[0] && found[1])) {
+        // All THREE, like every other loop in this scan. This one was written when there were two
+        // questions and was not revisited when the vault became the third, so a nested classes.jar
+        // whose early class used an encrypted database answered both of them and stopped -- before
+        // reaching a later class in the same jar that uses the vault. usesVault then came back
+        // false, IPhoneBuilder left AES-GCM out of the binary, and the vault failed on the device
+        // in an application whose dependency demonstrably uses it.
+        while (entry != null && !(found[0] && found[1] && found[2])) {
             String name = entry.getName();
             // Charged before ANY test of what the entry is, directories
             // included. A directory carries no payload, so neither byte budget
@@ -928,10 +1069,10 @@ public abstract class Executor {
     /// - `bytes`: one class file
     /// - `found`: the two answers so far, updated in place
     private void inspectClassForDatabaseUsage(byte[] bytes, boolean[] found) {
-        if (found[0] && found[1]) {
+        if (found[0] && found[1] && found[2]) {
             return;
         }
-        boolean[] hit = {false, false};
+        boolean[] hit = {false, false, false};
         try {
             new ClassReader(bytes).accept(new DatabaseUsageVisitor(hit),
                     ClassReader.SKIP_DEBUG | ClassReader.SKIP_FRAMES);
@@ -943,9 +1084,18 @@ public abstract class Executor {
             // that stops at Java 8, reads the constant pool directly instead for that reason.
             hit[0] = true;
             hit[1] = true;
+            // The vault answer is neither yes nor no, and it used to be recorded as no. Charging
+            // an unreadable class the cipher is conservative, because it adds a dependency;
+            // charging it the vault links a private CommonCrypto SPI into a binary Apple scans,
+            // so neither guess is safe -- which is exactly the state the budget-refusal path
+            // already reports. An unreadable class whose bytecode does use Vault could otherwise
+            // ship with AES-GCM compiled out and a vault that cannot do its crypto, with nothing
+            // asked of the developer.
+            found[3] = true;
         }
         found[0] = found[0] || hit[0];
         found[1] = found[1] || hit[1];
+        found[2] = found[2] || hit[2];
     }
 
     /// Answers "does this class use the database" and "does it configure encryption".
@@ -962,6 +1112,9 @@ public abstract class Executor {
         private void note(String name) {
             if (name == null) {
                 return;
+            }
+            if (isVaultGcmClass(name)) {
+                hit[2] = true;
             }
             if (name.indexOf(DATABASE_PACKAGE + "/") >= 0) {
                 hit[0] = true;
@@ -1105,14 +1258,18 @@ public abstract class Executor {
     /// encrypted, and treating a reference to it as encryption costs that application the cipher
     /// library and, on Android, every device below API 23.
     private static final String[] ENCRYPTING_CONFIG_FACTORIES = {
-        "passphrase", "rawKey", "managed"
+        // `vault` is one of these. An application that keys its database from a vault encrypts
+        // exactly as much as one calling managed() -- but it was absent here, so the scanner saw
+        // the database and pruned the cipher anyway: Android dropped its implementation and the
+        // native builders passed cn1.sqlcipher=false, leaving a database that cannot open.
+        "passphrase", "rawKey", "managed", "vault"
     };
 
     /// Whether this class file is one of the framework's own, by exact name.
     ///
     /// The `$` test catches a nested class, which belongs to the class that declares it --
     /// `SQLMap$SqlType$8` is `SQLMap`.
-    private static boolean isFrameworkDatabaseClass(String path) {
+    static boolean isFrameworkDatabaseClass(String path) {
         String name = path.substring(0, path.length() - ".class".length());
         for (int iter = 0; iter < FRAMEWORK_DATABASE_CLASSES.length; iter++) {
             String framework = FRAMEWORK_DATABASE_CLASSES[iter];

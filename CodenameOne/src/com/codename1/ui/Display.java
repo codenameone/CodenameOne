@@ -6586,6 +6586,14 @@ public final class Display extends CN1Constants {
         return impl.getSecureStorage();
     }
 
+    /// Returns the port-specific device protection, or null when the port has none and the
+    /// portable [com.codename1.security.SecureStorage] backed implementation should be used.
+    /// Application code does not call this --- [com.codename1.security.vault.Vault] picks the
+    /// right implementation on its own.
+    public com.codename1.security.vault.spi.DeviceProtection getDeviceProtection() {
+        return impl.getDeviceProtection();
+    }
+
     /// Returns the platform NFC entry point. Prefer
     /// {@link com.codename1.nfc.Nfc#getInstance()} in application code ---
     /// it handles the fallback to a no-op stub when the current port does

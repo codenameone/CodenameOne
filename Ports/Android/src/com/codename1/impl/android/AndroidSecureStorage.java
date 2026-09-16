@@ -55,6 +55,8 @@ import javax.crypto.NoSuchPaddingException;
 import javax.crypto.SecretKey;
 import javax.crypto.spec.GCMParameterSpec;
 import javax.crypto.spec.IvParameterSpec;
+import com.codename1.security.vault.Protection;
+import com.codename1.security.vault.ProtectionReport;
 
 /**
  * Android backing for {@link SecureStorage}. Values are AES/CBC/PKCS7-encrypted
@@ -216,6 +218,82 @@ public final class AndroidSecureStorage extends SecureStorage {
     // itself deprecated. The value is stored as
     // base64(iv) + ":" + base64(ciphertext) in a private preferences file.
 
+    /// What the Android store provides for the non-prompting tier.
+    ///
+    /// Two different things wear this name. From API 23 the value is AES-GCM ciphertext under an
+    /// `AndroidKeyStore` key the application cannot export, which is a real protection. Below 23
+    /// there is no keystore to use and the value is Base64 in preferences -- obfuscation, and
+    /// reported as such rather than rounded up.
+    ///
+    /// `HARDWARE_BACKED` stays `UNKNOWN` even on a modern device: whether the keystore key lives
+    /// in a TEE or StrongBox is a property of the hardware, and this class does not query the key
+    /// attestation that would establish it.
+    /// What protects one entry, which on an upgraded device is not what the store can provide.
+    ///
+    /// The store-wide answer is about the API level: from 23 there is a keystore and entries
+    /// written since are encrypted with it. An entry written by `legacyPlainSet` on API 22 and
+    /// left behind by an OS upgrade is still Base64 in preferences, and the store-wide report
+    /// called it encrypted -- so `SecureStorage.get(account, required)` accepted an
+    /// ENCRYPTED_AT_REST requirement and then handed back the plaintext, including when the
+    /// rewrite that was supposed to fix it failed.
+    ///
+    /// Recognised the same way `get` recognises it: no IV separator. That is the format itself
+    /// rather than a flag beside it, so an entry cannot be described as migrated while it is not.
+    @Override
+    public ProtectionReport protectionOf(String account) {
+        if (account != null && isLegacyPlaintext(account)) {
+            return ProtectionReport.builder()
+                    .set(Protection.PERSISTENT, true)
+                    .set(Protection.ENCRYPTED_AT_REST, false)
+                    .set(Protection.NON_EXTRACTABLE_KEY, false)
+                    .set(Protection.OS_PROTECTED, false)
+                    .set(Protection.HARDWARE_BACKED, false)
+                    .set(Protection.USER_VERIFICATION, false)
+                    .set(Protection.ISOLATED_FROM_APPLICATION_CODE, false)
+                    .build();
+        }
+        return protection();
+    }
+
+    /// Whether this entry is still in the pre-keystore format, read without decrypting anything.
+    ///
+    /// Through plainPrefs(), which is the file a legacy value is actually in. The first version of
+    /// this opened PREFS -- the prompting, biometric tier -- where a value written by
+    /// legacyPlainSet has never been, so it saw nothing, fell through to the store-wide report,
+    /// and let a required ENCRYPTED_AT_REST read hand back exactly the plaintext it was meant to
+    /// catch. It is also the accessor that works without an Activity, which matters for the same
+    /// reason get() uses it: this tier exists so a background caller can read a cached secret.
+    private boolean isLegacyPlaintext(String account) {
+        try {
+            SharedPreferences prefs = plainPrefs();
+            if (prefs == null) {
+                return false;
+            }
+            String stored = prefs.getString(account, null);
+            return stored != null && stored.indexOf(':') < 0;
+        } catch (Throwable cannotAsk) {
+            // Cannot establish that it is legacy, and guessing either way is worse than the
+            // store-wide answer the caller would otherwise have had.
+            return false;
+        }
+    }
+
+    @Override
+    public ProtectionReport protection() {
+        boolean keystore = android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.M;
+        return ProtectionReport.builder()
+                .set(Protection.PERSISTENT, true)
+                .set(Protection.ENCRYPTED_AT_REST, keystore)
+                // The keystore key itself cannot be exported, which is exactly what this flag is
+                // about -- and below API 23 there is no such key.
+                .set(Protection.NON_EXTRACTABLE_KEY, keystore)
+                .set(Protection.OS_PROTECTED, keystore)
+                .set(Protection.HARDWARE_BACKED, ProtectionReport.UNKNOWN)
+                .set(Protection.USER_VERIFICATION, false)
+                .set(Protection.ISOLATED_FROM_APPLICATION_CODE, false)
+                .build();
+    }
+
     @Override
     public boolean set(String account, String value) {
         if (account == null || value == null) {
@@ -292,6 +370,18 @@ public final class AndroidSecureStorage extends SecureStorage {
      * turns a permanent, silent corruption into a transient failure -- {@code ManagedKeys} raises
      * KEY_UNAVAILABLE and the next launch, whose process reads the file fresh, finds the key.</p>
      *
+     * <p>That last paragraph described what this was supposed to do and not what it did. The
+     * loser blocked on the lock, re-read through {@code get(account)} -- its own stale cache --
+     * saw nothing, and wrote its own value over the winner's. The first process meanwhile kept
+     * using the value it had cached and may already have encrypted data under it, so the outcome
+     * was exactly the permanent corruption the gate exists to prevent, just narrowed to the
+     * window where both processes had opened the preferences before either wrote.</p>
+     *
+     * <p>So the recheck under the lock cannot be the preferences: whatever decides it has to be
+     * visible across processes, and the gate file already is. The winner marks it, and a caller
+     * that finds the mark but reads nothing reports nothing -- which is the transient failure
+     * above, now actually delivered.</p>
+     *
      * @param account the account to create
      * @param value the value to store when there is none
      * @return the value now stored, or null when this caller did not store it and cannot read what
@@ -308,7 +398,19 @@ public final class AndroidSecureStorage extends SecureStorage {
         }
         java.io.File gate = gateFile(account);
         if (gate == null) {
-            return super.setIfAbsent(account, value);
+            // FAILS CLOSED, and does not fall back to the inherited check-then-write. That
+            // fallback is uncoordinated by construction, and this override exists because
+            // SharedPreferences gives each android:process its own cache: two first opens then
+            // both read "nothing here", both store, and each returns a DIFFERENT managed
+            // database or vault key -- the exact corruption the gate was written to prevent, and
+            // permanent, because whichever loses has data encrypted under a key nobody kept.
+            //
+            // Answering null instead means the caller retries rather than proceeding under a key
+            // it may not own. There is no gate here at all, so there is nothing to coordinate
+            // with and no safe way to create.
+            Log.p("SecureStorage: no cross-process gate for this account, so it will not be "
+                    + "created here", Log.WARNING);
+            return null;
         }
         java.io.RandomAccessFile handle = null;
         java.nio.channels.FileLock lock = null;
@@ -323,10 +425,65 @@ public final class AndroidSecureStorage extends SecureStorage {
             if (stored != null) {
                 return stored;
             }
-            return set(account, value) ? value : null;
+            // Same reason the browser tier asks: get() answers null for "nothing is stored here"
+            // AND for "something is stored here and it cannot be read" -- a value under a
+            // keystore key that has become unusable is the case this class already recovers from
+            // elsewhere. The gate mark below covers the CROSS-PROCESS blindness; it does not
+            // cover an entry this process can see and cannot decrypt, and creating over one
+            // disconnects a managed database from its key for good. The base class has always
+            // asked entryState here.
+            if (entryState(account) != ENTRY_ABSENT) {
+                return null;
+            }
+            if (handle.length() > 0) {
+                // Marked, so some process has already stored this account -- and this one cannot
+                // see it, because the read above went through a SharedPreferences instance that
+                // was cached before that write. Reporting nothing is the honest answer and the
+                // documented one; writing here is what overwrote a key the winner was already
+                // encrypting under.
+                return null;
+            }
+            if (!set(account, value)) {
+                return null;
+            }
+            try {
+                // After the write, never before: a mark left by a store that then failed would
+                // make the account permanently uncreatable, which is worse than the race.
+                handle.seek(0);
+                handle.write(1);
+                handle.getChannel().force(true);
+            } catch (java.io.IOException cannotMark) {
+                // Fails CLOSED. An earlier version logged this and answered with the value on
+                // the reasoning that it was stored either way -- which gives away the entire
+                // mechanism, because the mark is the ONLY thing that stops the stale-cache case
+                // two branches above. A second process whose SharedPreferences was cached before
+                // this write reads no value AND no mark, takes the gate, and stores a different
+                // managed database or vault key over this one -- while this caller has been told
+                // it owns the first and is already encrypting under it. That data is then
+                // orphaned for good.
+                //
+                // So the candidate is withdrawn and this reports nothing. Even if the removal
+                // itself fails, answering null is what makes it safe: the caller never uses this
+                // value, so nothing is encrypted under it and a later winner overwriting it
+                // costs nothing. The retry is the caller's, and it is a retry rather than a loss.
+                Log.e(cannotMark);
+                if (!remove(account)) {
+                    // Already covered by the paragraph above: this leaves a value stored under
+                    // no mark, and answering null is what keeps that harmless, because the caller
+                    // never uses it and so nothing is encrypted under it.
+                    Log.p("SecureStorage: the unmarked candidate could not be withdrawn",
+                            Log.WARNING);
+                }
+                return null;
+            }
+            return value;
         } catch (java.io.IOException cannotLock) {
+            // Same reasoning as the missing-gate branch above: the inherited path cannot see
+            // another process's write, so falling back to it here is how two processes each
+            // create a different key. A gate that cannot be locked is a gate, and refusing is
+            // the answer the caller can retry from.
             Log.e(cannotLock);
-            return super.setIfAbsent(account, value);
+            return null;
         } finally {
             if (lock != null) {
                 try {
@@ -345,10 +502,28 @@ public final class AndroidSecureStorage extends SecureStorage {
         }
     }
 
+    /// The context the non-prompting tier resolves its files from.
+    ///
+    /// Never an Activity: this tier is the one a background service uses. The prompting tier
+    /// above genuinely needs an Activity and keeps asking for one.
+    private static Context context() {
+        Context ctx = AndroidNativeUtil.getContext();
+        if (ctx == null) {
+            throw new IllegalStateException("no Android context");
+        }
+        return ctx;
+    }
+
     /** The file whose creation decides which caller stores this account. */
     private java.io.File gateFile(String account) {
         try {
-            java.io.File dir = new java.io.File(AndroidNativeUtil.getActivity()
+            // getContext(), not getActivity(), for the reason plainPrefs() gives: a port
+            // initialized from a background service has no Activity and does have a context, and
+            // this tier exists precisely so a background caller can work. Through getActivity()
+            // this threw, the catch answered null, and setIfAbsent fell back to the inherited
+            // check-then-write -- losing the cross-process gate in exactly the configuration
+            // (a component with its own android:process) the gate was written for.
+            java.io.File dir = new java.io.File(context()
                     .getApplicationContext().getFilesDir(), "cn1securestorage");
             if (!dir.isDirectory() && !dir.mkdirs()) {
                 return null;
@@ -463,15 +638,32 @@ public final class AndroidSecureStorage extends SecureStorage {
         //
         // Under the same lock as the write and the reset, so a removal cannot be
         // interleaved with a set that recreates the entry it was clearing.
-        boolean removed;
-        synchronized (PLAIN_KEY_LOCK) {
-            removed = prefs.edit().remove(account).commit();
+        // ONE critical section over both halves, not two. Clearing the mark under the gate lock
+        // and then releasing it before deleting the value left a window in between: a
+        // setIfAbsent in another process could take the freed lock, find no mark and the value
+        // still present, hand that value back as the one now stored -- and then have it deleted
+        // by the removal still in progress here. For a vault device key that means a device wrap
+        // written under a key that no longer exists, and the next remembered unlock fails.
+        //
+        // Inside the section the mark goes first and the value only if that succeeded, because
+        // only one of the two orders can be recovered from: a cleared mark with the value still
+        // present is read back by the next setIfAbsent and returned, while a removed value under
+        // a surviving mark refuses that account forever -- forgetDevice() followed by
+        // rememberDevice() could never establish a device key again without clearing application
+        // data.
+        //
+        // What this does NOT close is setIfAbsent's unlocked fast path: a caller that reads a
+        // value just before it is removed is using something that was true when it read it, and
+        // no lock here can change that. What it closes is the LOCKED read seeing a state this
+        // method is halfway through producing.
+        java.io.File gate = gateFile(account);
+        if (gate == null) {
+            // No gate to coordinate through, so setIfAbsent never wrote a mark either.
+            synchronized (PLAIN_KEY_LOCK) {
+                return prefs.edit().remove(account).commit();
+            }
         }
-        // The lock file is deliberately left alone. It gates nothing by existing -- what excludes
-        // a second writer is the lock held on it, which the system drops when the process ends --
-        // and removing it while another process holds that lock would have the next caller create
-        // a different file and lock that instead, which is two writers again.
-        return removed;
+        return removeUnderGate(gate, prefs, account);
     }
 
     /**
@@ -574,26 +766,210 @@ public final class AndroidSecureStorage extends SecureStorage {
     }
 
     private void resetPlainKey() {
-        // Deleting the key and dropping the ciphertexts it protected are one step, under
-        // the same lock readers and writers hold. Clearing outside it left a window
-        // where a writer had already encrypted under the old key and was about to store
-        // a value this was about to wipe -- or worse, stored it just after.
+        // The accounts this process can see that the failed key protected. Read first, because
+        // this is only the WORK LIST -- an account only another process has written is not one
+        // this reset knows about, and its gate is therefore never touched.
+        //
+        // Only what the failed key protected. A device upgraded from API 22 can hold unmigrated
+        // Base64 legacy entries in this same file alongside iv:ciphertext ones, and a legacy
+        // value was never encrypted under the keystore key that has just become unusable -- it is
+        // still perfectly readable. The blanket clear took those with it, which can permanently
+        // orphan a managed database whose key had not been migrated yet. Recognised by the IV
+        // separator, the same way get() recognises one.
+        java.util.List<String> candidates = new java.util.ArrayList<String>();
         synchronized (PLAIN_KEY_LOCK) {
-            try {
-                // Same reasoning as plainKey(): this tier does not touch the shared
-                // KeyStore instance.
-                KeyStore ks = KeyStore.getInstance(ANDROID_KEY_STORE);
-                ks.load(null);
-                ks.deleteEntry(PLAIN_KEY_ID);
-            } catch (Exception e) {
-                Log.e(e);
-            }
             SharedPreferences prefs = plainPrefs();
             if (prefs != null) {
-                // Also commit(), for the same reason: this method's whole purpose is to
-                // make the key deletion and the ciphertext deletion one step, and an
-                // asynchronous clear can be reordered after a writer's pending write.
-                prefs.edit().clear().commit();
+                // entrySet rather than keySet plus get: SpotBugs flags the second as
+                // WMI_WRONG_MAP_ITERATOR, and the gate is zero-findings.
+                for (java.util.Map.Entry<String, ?> entry : prefs.getAll().entrySet()) {
+                    Object value = entry.getValue();
+                    if (!(value instanceof String) || ((String) value).indexOf(':') >= 0) {
+                        candidates.add(entry.getKey());
+                    }
+                }
+            }
+        }
+
+        // EVERY gate lock first, and only then the monitor. That is the order setIfAbsent takes
+        // -- gate, then PLAIN_KEY_LOCK through set() -- so the two cannot invert, and this holds
+        // no monitor while it is acquiring gates, so a setIfAbsent already holding one runs to
+        // completion rather than deadlocking against this.
+        //
+        // Holding them across the whole reset is what makes it CORRECT rather than merely narrow.
+        // The previous version cleared the values under the monitor and swept the marks
+        // afterwards, re-checking each account under its gate before clearing its mark -- and
+        // that re-check was a SharedPreferences lookup, which this class documents elsewhere as
+        // unable to see another process's write. A replacement created in the window therefore
+        // read as absent, its mark was truncated, and a third process with its own stale cache
+        // could then pass setIfAbsent and overwrite a managed database or vault key already in
+        // use. With the gates held there is no window and nothing to re-check: no other process
+        // can create a replacement for any of these accounts while this runs.
+        java.util.List<java.io.RandomAccessFile> handles =
+                new java.util.ArrayList<java.io.RandomAccessFile>();
+        java.util.List<java.nio.channels.FileLock> locks =
+                new java.util.ArrayList<java.nio.channels.FileLock>();
+        java.util.List<String> held = new java.util.ArrayList<String>();
+        try {
+            for (String account : candidates) {
+                java.io.File gate = gateFile(account);
+                if (gate == null) {
+                    continue;
+                }
+                java.io.RandomAccessFile handle = null;
+                try {
+                    // Nothing is recorded until the LOCK succeeds, and the three lists therefore
+                    // stay the same length. Adding the handle first meant a failed lock left an
+                    // extra entry in `handles` with none in `held` -- and the clearing loop
+                    // indexes handles by held's index, so from that point on it truncated the
+                    // gate of an account it had never locked while leaving the locked one
+                    // marked. The removed account became uncreatable and another process could
+                    // recreate or overwrite the wrong one.
+                    handle = new java.io.RandomAccessFile(gate, "rw");
+                    java.nio.channels.FileLock taken = handle.getChannel().lock();
+                    handles.add(handle);
+                    locks.add(taken);
+                    held.add(account);
+                    handle = null;
+                } catch (java.io.IOException cannotLock) {
+                    // This account keeps its mark, which is better than clearing one this reset
+                    // cannot hold -- that is the whole defect above.
+                    Log.e(cannotLock);
+                } catch (RuntimeException cannotLock) {
+                    // OverlappingFileLockException among them, which would mean this process
+                    // already holds that gate. Refusing to clear is the safe answer either way.
+                    Log.e(cannotLock);
+                } finally {
+                    // Non-null only when the lock was not taken, so this closes the handle that
+                    // never made it into the lists rather than leaking it for the whole reset.
+                    if (handle != null) {
+                        try {
+                            handle.close();
+                        } catch (java.io.IOException ignored) {
+                            Log.e(ignored);
+                        }
+                    }
+                }
+            }
+
+            synchronized (PLAIN_KEY_LOCK) {
+                try {
+                    // Same reasoning as plainKey(): this tier does not touch the shared KeyStore
+                    // instance.
+                    KeyStore ks = KeyStore.getInstance(ANDROID_KEY_STORE);
+                    ks.load(null);
+                    ks.deleteEntry(PLAIN_KEY_ID);
+                } catch (Exception e) {
+                    Log.e(e);
+                }
+                SharedPreferences prefs = plainPrefs();
+                if (prefs != null) {
+                    // commit(), for the reason it always was: deleting the key and dropping the
+                    // ciphertexts it protected is one step, and an asynchronous clear can be
+                    // reordered after a writer's pending write.
+                    // `held`, not `candidates`. An account whose gate could not be locked keeps
+                    // its MARK -- the clearing loop below deliberately skips it -- so removing
+                    // its value here left the pair that nothing can recover from: setIfAbsent
+                    // then sees no value and a marked gate, and refuses to recreate the managed
+                    // database or vault key for good. Leaving the value in place keeps the
+                    // account consistent and lets a later reset, which may well get the lock,
+                    // finish the job.
+                    SharedPreferences.Editor editor = prefs.edit();
+                    for (String account : held) {
+                        editor.remove(account);
+                    }
+                    editor.commit();
+                }
+            }
+
+            // The marks, while the gates are still held. An account whose gate could not be
+            // locked above is not in this list and keeps its mark.
+            for (int iter = 0; iter < held.size(); iter++) {
+                try {
+                    java.io.RandomAccessFile handle = handles.get(iter);
+                    handle.setLength(0);
+                    handle.getChannel().force(true);
+                } catch (java.io.IOException cannotClear) {
+                    // Best effort and logged rather than fatal: this path is already the recovery
+                    // from a key that can no longer decrypt anything, and a mark left standing
+                    // refuses a later create rather than corrupting one.
+                    Log.e(cannotClear);
+                    Log.p("SecureStorage could not clear the gate mark for " + held.get(iter),
+                            Log.WARNING);
+                }
+            }
+        } finally {
+            for (java.nio.channels.FileLock lock : locks) {
+                try {
+                    lock.release();
+                } catch (java.io.IOException ignored) {
+                    Log.e(ignored);
+                }
+            }
+            for (java.io.RandomAccessFile handle : handles) {
+                try {
+                    handle.close();
+                } catch (java.io.IOException ignored) {
+                    Log.e(ignored);
+                }
+            }
+        }
+    }
+
+
+    /// Clears the mark and deletes the value as one step, under the lock setIfAbsent takes.
+    private boolean removeUnderGate(java.io.File gate, SharedPreferences prefs, String account) {
+        java.io.RandomAccessFile handle = null;
+        java.nio.channels.FileLock lock = null;
+        try {
+            handle = new java.io.RandomAccessFile(gate, "rw");
+            lock = handle.getChannel().lock();
+            handle.setLength(0);
+            handle.getChannel().force(true);
+            boolean removed;
+            synchronized (PLAIN_KEY_LOCK) {
+                removed = prefs.edit().remove(account).commit();
+            }
+            if (!removed) {
+                // The mark goes back. Clearing it first is right while the removal SUCCEEDS --
+                // a cleared mark beside a surviving value is read back by the next setIfAbsent
+                // and returned -- but a removal that failed leaves exactly the pair this gate
+                // exists to prevent: a value still in use and a gate saying nobody owns it, so a
+                // later process with a stale preferences cache generates a replacement key and
+                // overwrites it. Best effort, because the alternative to a failed rewrite is
+                // nothing at all.
+                try {
+                    handle.seek(0);
+                    handle.write(1);
+                    handle.getChannel().force(true);
+                } catch (java.io.IOException cannotRemark) {
+                    Log.e(cannotRemark);
+                }
+            }
+            return removed;
+        } catch (java.io.IOException cannotRemove) {
+            Log.e(cannotRemove);
+            return false;
+        } catch (RuntimeException cannotRemove) {
+            // OverlappingFileLockException among them. The lock ordering above is what
+            // prevents it; this is here so that being wrong about that is a refused clear
+            // rather than an exception thrown out of a cleanup path.
+            Log.e(cannotRemove);
+            return false;
+        } finally {
+            if (lock != null) {
+                try {
+                    lock.release();
+                } catch (java.io.IOException ignored) {
+                    Log.e(ignored);
+                }
+            }
+            if (handle != null) {
+                try {
+                    handle.close();
+                } catch (java.io.IOException ignored) {
+                    Log.e(ignored);
+                }
             }
         }
     }

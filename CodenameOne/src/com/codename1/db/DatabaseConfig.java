@@ -79,6 +79,15 @@ public final class DatabaseConfig {
     /// The key is 32 raw bytes supplied by the application.
     public static final int KEY_RAW = 3;
 
+    /// The key is derived from an unlocked [com.codename1.security.vault.Vault].
+    ///
+    /// Different from `#KEY_MANAGED` in where the protection comes from. A managed key is held by
+    /// the platform key store and is available whenever the application runs; a vault key exists
+    /// only while the user has unlocked the vault, which is what makes it usable in a browser --
+    /// there is no key store in a page, and a key that is always available there is a key sitting
+    /// in the open.
+    public static final int KEY_VAULT = 4;
+
     /// The only cipher profile currently defined.
     static final String PROFILE_SQLCIPHER4 = "sqlcipher4";
 
@@ -88,12 +97,19 @@ public final class DatabaseConfig {
     private final String keyAlias;
     private char[] passphrase;
     private byte[] rawKey;
+    private final com.codename1.security.vault.Vault vault;
 
     private DatabaseConfig(int keyMode, String keyAlias, char[] passphrase, byte[] rawKey) {
+        this(keyMode, keyAlias, passphrase, rawKey, null);
+    }
+
+    private DatabaseConfig(int keyMode, String keyAlias, char[] passphrase, byte[] rawKey,
+                           com.codename1.security.vault.Vault vault) {
         this.keyMode = keyMode;
         this.keyAlias = keyAlias;
         this.passphrase = passphrase;
         this.rawKey = rawKey;
+        this.vault = vault;
     }
 
     /// Returns a config that opens the database unencrypted.
@@ -236,8 +252,51 @@ public final class DatabaseConfig {
         return new DatabaseConfig(KEY_RAW, null, null, copy);
     }
 
-    /// Returns the key mode, one of `#KEY_NONE`, `#KEY_PASSPHRASE`, `#KEY_MANAGED`
-    /// or `#KEY_RAW`.
+    /// Keys the database from an unlocked vault.
+    ///
+    /// The key is derived from the vault's data key -- see
+    /// [com.codename1.security.vault.Vault#databaseKey(String)], including its honest account of
+    /// what handing raw bytes to a database engine costs. The vault must be unlocked when the
+    /// database is opened; it need not stay unlocked afterwards, because the engine has the key
+    /// by then, and locking the vault does **not** close an open connection.
+    ///
+    /// #### What this buys over `#managed()`
+    ///
+    /// In a browser, everything. `managed()` keeps its key wherever the port's secure storage is,
+    /// which in a page is origin-private storage -- now encrypted under a non-extractable
+    /// `CryptoKey`, and still readable by anything running in the origin at any time, because
+    /// nothing gates it. A vault key does not exist until the user unlocks, so a page loaded and
+    /// left alone has no database key in it at all.
+    ///
+    /// On Android and iOS the two are closer: a managed key already sits in the OS key store.
+    /// The vault still adds the user's password to the chain, and adds cross-device portability,
+    /// which a key generated per device does not have.
+    ///
+    /// #### Rotation
+    ///
+    /// [com.codename1.security.vault.Vault#rotateDataKey] changes this key. A database opened
+    /// under the old one has to be rekeyed in the same operation or it can no longer be opened;
+    /// there is no automatic rekey, because an interrupted one leaves a database encrypted under
+    /// neither key and that is not a thing to do behind a caller's back.
+    ///
+    /// #### Parameters
+    ///
+    /// - `vault`: an unlocked vault
+    ///
+    /// - `alias`: the key alias within the vault, normally the database name
+    ///
+    /// #### Returns
+    ///
+    /// a vault-keyed config
+    public static DatabaseConfig vault(com.codename1.security.vault.Vault vault, String alias) {
+        if (vault == null) {
+            throw new IllegalArgumentException("A vault-keyed database needs a vault");
+        }
+        return new DatabaseConfig(KEY_VAULT, alias, null, null, vault);
+    }
+
+    /// Returns the key mode, one of `#KEY_NONE`, `#KEY_PASSPHRASE`, `#KEY_MANAGED`,
+    /// `#KEY_RAW` or `#KEY_VAULT`.
     ///
     /// #### Returns
     ///
@@ -360,9 +419,114 @@ public final class DatabaseConfig {
                             "The raw key has already been wiped from this configuration");
                 }
                 return toKeyLiteral(rawKey);
+            case KEY_VAULT:
+                return resolveVaultKey(databaseName);
             default:
                 return toKeyLiteral(ManagedKeys.keyFor(keyAlias != null ? keyAlias : databaseName));
         }
+    }
+
+    /// Derives the engine literal from the vault, and clears the bytes as soon as it has.
+    ///
+    /// The literal is still a `String` and still cannot be wiped -- that limitation is the same
+    /// one `#wipe()` documents for every other mode -- but the array the vault produced does not
+    /// outlive this method.
+    private String resolveVaultKey(String databaseName) throws IOException {
+        // Taken as Object and then tested, rather than assigned straight to byte[] inside the
+        // try. Erasure puts a checkcast at this call site, and ParparVM does not throw for a
+        // failed one -- so a cast inside a catch(RuntimeException) is a handler that cannot run
+        // on iOS, and the wrong object would go on to be read as key material.
+        Object resolved;
+        try {
+            resolved = vault.databaseKey(keyAlias != null ? keyAlias : databaseName).get();
+        } catch (RuntimeException failed) {
+            com.codename1.security.vault.VaultError error = errorOf(failed);
+            throw new DatabaseEncryptionException(DatabaseEncryptionException.KEY_UNAVAILABLE,
+                    error == com.codename1.security.vault.VaultError.LOCKED
+                            ? "The vault is locked, so this database cannot be opened. Unlock it "
+                              + "and open the database again."
+                            : "The vault could not produce a key for this database (" + error
+                              + ").", failed);
+        }
+        if (!(resolved instanceof byte[])) {
+            throw new DatabaseEncryptionException(DatabaseEncryptionException.KEY_UNAVAILABLE,
+                    "The vault produced no key material for this database.");
+        }
+        byte[] key = (byte[]) resolved;
+        try {
+            return toKeyLiteral(key);
+        } finally {
+            for (int iter = 0; iter < key.length; iter++) {
+                key[iter] = 0;
+            }
+        }
+    }
+
+    private static com.codename1.security.vault.VaultError errorOf(Throwable failed) {
+        Throwable cause = failed;
+        while (cause != null) {
+            if (cause instanceof com.codename1.security.vault.VaultException) {
+                return ((com.codename1.security.vault.VaultException) cause).getError();
+            }
+            cause = cause.getCause();
+        }
+        return com.codename1.security.vault.VaultError.UNKNOWN;
+    }
+
+    /// What actually protects this database's key on this device.
+    ///
+    /// `#isKeyHardwareBacked()` answers one bit of this and has to answer `false` wherever it
+    /// cannot verify, which reads the same as "definitely not". This reports each protection
+    /// separately and distinguishes "no" from "cannot say" -- see
+    /// [com.codename1.security.vault.ProtectionReport].
+    ///
+    /// #### Returns
+    ///
+    /// the effective protection, never null
+    public com.codename1.security.vault.ProtectionReport effectiveKeyProtection() {
+        com.codename1.security.vault.ProtectionReport.Builder b =
+                com.codename1.security.vault.ProtectionReport.builder();
+        if (keyMode == KEY_NONE) {
+            return com.codename1.security.vault.ProtectionReport.none();
+        }
+        if (keyMode == KEY_VAULT) {
+            return vault.databaseKeyProtection();
+        }
+        if (keyMode == KEY_PASSPHRASE || keyMode == KEY_RAW) {
+            // The application holds this key, wherever it got it. Nothing here knows what
+            // protects it, and guessing would be the one answer worse than saying so.
+            b.set(com.codename1.security.vault.Protection.ENCRYPTED_AT_REST, true);
+            b.set(com.codename1.security.vault.Protection.PERSISTENT,
+                    com.codename1.security.vault.ProtectionReport.UNKNOWN);
+            b.set(com.codename1.security.vault.Protection.NON_EXTRACTABLE_KEY, false);
+            b.set(com.codename1.security.vault.Protection.OS_PROTECTED,
+                    com.codename1.security.vault.ProtectionReport.UNKNOWN);
+            b.set(com.codename1.security.vault.Protection.HARDWARE_BACKED,
+                    com.codename1.security.vault.ProtectionReport.UNKNOWN);
+            b.set(com.codename1.security.vault.Protection.USER_VERIFICATION, false);
+            b.set(com.codename1.security.vault.Protection.ISOLATED_FROM_APPLICATION_CODE, false);
+            return b.build();
+        }
+        com.codename1.security.vault.ProtectionReport store =
+                com.codename1.security.SecureStorage.getInstance().protection();
+        // Propagated, not asserted. The managed key is only as encrypted as the store holding
+        // it, and two stores answer NO on purpose: the JavaSE simulator, where this is
+        // reproducible obfuscation rather than encryption, and Android below API 23, which has
+        // no keystore to wrap with. Answering YES here told policy and diagnostics the key was
+        // encrypted in exactly the two places it is not.
+        b.set(com.codename1.security.vault.Protection.ENCRYPTED_AT_REST,
+                store.answer(com.codename1.security.vault.Protection.ENCRYPTED_AT_REST));
+        b.set(com.codename1.security.vault.Protection.PERSISTENT,
+                store.answer(com.codename1.security.vault.Protection.PERSISTENT));
+        b.set(com.codename1.security.vault.Protection.NON_EXTRACTABLE_KEY, false);
+        b.set(com.codename1.security.vault.Protection.OS_PROTECTED,
+                store.answer(com.codename1.security.vault.Protection.OS_PROTECTED));
+        b.set(com.codename1.security.vault.Protection.HARDWARE_BACKED,
+                isKeyHardwareBacked() ? com.codename1.security.vault.ProtectionReport.YES
+                        : store.answer(com.codename1.security.vault.Protection.HARDWARE_BACKED));
+        b.set(com.codename1.security.vault.Protection.USER_VERIFICATION, false);
+        b.set(com.codename1.security.vault.Protection.ISOLATED_FROM_APPLICATION_CODE, false);
+        return b.build();
     }
 
     /// The length of the literal `#toKeyLiteral(byte[])` writes: `x'`, 64 hex digits, `'`.

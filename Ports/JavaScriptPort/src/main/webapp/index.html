@@ -95,6 +95,15 @@
          scripts/build-javascript-port-hellocodenameone.sh). FontImage.java asks
          for font-family "Material Icons" so that name must match. -->
     <style type="text/css">
+    /* Hidden from here rather than from a style="" attribute on the element. A style
+       attribute is inline CSS, so a page carrying one cannot be served under the generated
+       Content-Security-Policy without 'unsafe-inline' in style-src -- and unlike a <style>
+       block there is no hash that can authorize just this one. The loader shows it with
+       jQuery's .show(), which writes element.style through the CSSOM; CSP does not govern
+       that, so nothing about the progress bar's behaviour changes. */
+    #cn1-splash > .progress-bar {
+        display: none;
+    }
     @font-face {
         font-family: 'Material Icons';
         src: url('assets/material-design-font.ttf?v={APP_VERSION}') format('truetype');
@@ -141,7 +150,7 @@
     <!-- BEFORE-BODY-INCLUDES -->
     <div id="cn1-splash">
         <img class="icon" src="icon.png"/>
-        <div style="display:none" class='progress-bar'>
+        <div class='progress-bar'>
             <div class='progress-bar-internal'> </div>
         </div>
         <img class="progress" src="progress.gif"/>
