@@ -1,0 +1,660 @@
+#!/usr/bin/env python3
+"""Black-box canary for the Codename One cloud onboarding starter.
+
+Does exactly what a new user does, against the live build service:
+
+  1. sign in and pull the personalised starter ZIP from the console (the same
+     session-cookie endpoint the onboarding checklist links to)
+  2. unzip it into a path containing a space and an apostrophe
+  3. assert the properties that have silently broken before -- launcher execute
+     bits, and a <repositories>/<pluginRepositories> pair that can actually
+     resolve Codename One
+  4. run the SHIPPED launcher (build.sh / build.bat) with a real Maven and
+     require the cloud build to reach a terminal success
+
+Why a live end-to-end check and not a unit test: the starter a user receives is
+generated and personalised server-side, then resolves its dependencies over the
+network on the user's own machine. Neither of those is visible to a test that
+reads the template out of a repository or replaces Maven with a stub, and both
+have broken in ways that made the first build impossible while every offline
+check stayed green:
+
+  * the generated pom declared no dependency repository at all, so once
+    Codename One releases moved off Maven Central a pinned starter could not
+    resolve anything
+  * the ZIP shipped build.sh/run.sh/mvnw without the execute bit, so the first
+    command the README documents failed with "permission denied"
+  * build.bat fell through to producing a local jar when given no target, so
+    the user got no cloud build and no error either
+
+Each survived for weeks because nothing exercised the artefact a user actually
+receives. This runs nightly and opens an issue when it breaks.
+"""
+import argparse
+import json
+import os
+import re
+import signal
+import shutil
+import stat
+import subprocess
+import sys
+import tempfile
+import time
+import urllib.error
+import urllib.parse
+import urllib.request
+import uuid
+import zipfile
+from http.cookiejar import CookieJar
+from pathlib import Path
+
+WINDOWS = os.name == "nt"
+# A directory whose name breaks naive quoting. A shipped mvnw.cmd once
+# interpolated the path into PowerShell source, so a space or an apostrophe was
+# a build failure; keep reproducing that shape here.
+AWKWARD = "Project O'Brien with spaces"
+
+# An allowlist, not a blocklist. The launchers expose ios, ios_release,
+# ios_source, xcode, mac_native and mac_catalyst, all of which need a Mac host
+# and cost several times a normal build -- and a blocklist would have to be
+# updated every time another one is added. These are the cheap, non-Apple
+# targets a canary has any reason to ask for.
+# The job timeout in starter-canary.yml must exceed LAUNCH_TIMEOUT + POLL_TIMEOUT
+# plus checkout/python/JDK setup. If the runner kills the job first, the canary
+# never writes its report and the alert job reports an outage that did not
+# happen -- so these two numbers and that one are a single decision.
+HTTP_TIMEOUT = 60       # per request; the console answers in well under a second
+# Sign-in, starter download, two token-minting calls and the build-list polling
+# all happen outside the three phases below. Budgeting only the phases let a
+# slow-but-alive endpoint push the run past the job timeout, which kills it
+# before it can write a report -- reporting an outage that was really latency.
+HTTP_ALLOWANCE = 600    # 10 min for every request outside the phases
+SEED_TIMEOUT = 600      # 10 min: resolving and running one small goal
+LAUNCH_TIMEOUT = 1800   # 30 min: mvnw downloads Maven and the toolchain
+POLL_TIMEOUT = 1200     # 20 min: waiting for the cloud build to finish
+
+CHEAP_TARGETS = ("javascript", "windows_device", "windows_desktop",
+                 "linux_device", "android")
+
+
+class CanaryFailure(RuntimeError):
+    """A user-visible breakage. The message becomes the GitHub issue body."""
+
+
+REPORT_PATH = None
+
+
+def log(message):
+    print(f"[canary] {message}", flush=True)
+
+
+def build_opener():
+    jar = CookieJar()
+    return urllib.request.build_opener(
+        urllib.request.HTTPCookieProcessor(jar),
+        urllib.request.HTTPRedirectHandler(),
+    ), jar
+
+
+def fetch(opener, url, data=None, headers=None):
+    request = urllib.request.Request(url, data=data, headers=headers or {})
+    request.add_header("User-Agent", "cn1-starter-canary")
+    try:
+        with opener.open(request, timeout=HTTP_TIMEOUT) as response:
+            return response.status, response.read(), response.headers, response.url
+    except urllib.error.HTTPError as error:
+        return error.code, error.read(), error.headers, url
+
+
+def login(opener, base, email, password):
+    """Sign in through the ordinary HTML form, exactly as a person does."""
+    status, body, _, _ = fetch(opener, f"{base}/login")
+    if status != 200:
+        raise CanaryFailure(f"GET /login returned HTTP {status}; production may be down")
+    token = extract_csrf(body.decode("utf-8", "replace"))
+    form = {"username": email, "password": password}
+    if token:
+        form[token[0]] = token[1]
+    status, body, _, final = fetch(
+        opener,
+        f"{base}/login",
+        data=urllib.parse.urlencode(form).encode(),
+        headers={"Content-Type": "application/x-www-form-urlencoded"},
+    )
+    if status not in (200, 302) or "error" in urllib.parse.urlparse(final).query:
+        # Never name the account. This message is written to canary.json, and
+        # the alert job copies it verbatim into a tracking issue -- Actions log
+        # masking does not reach artifacts or issue bodies, so putting the
+        # address here would publish a configured credential the first time
+        # sign-in broke, which is precisely when this runs.
+        raise CanaryFailure(
+            f"the canary account could not sign in (HTTP {status}, landed on "
+            f"{urllib.parse.urlparse(final).path}). Either the configured "
+            "credentials are wrong or the sign-in path is broken."
+        )
+    return final
+
+
+def extract_csrf(html):
+    match = re.search(
+        r'<input[^>]+name="(_csrf[^"]*)"[^>]+value="([^"]*)"', html
+    ) or re.search(
+        r'<input[^>]+value="([^"]*)"[^>]+name="(_csrf[^"]*)"', html
+    )
+    if not match:
+        return None
+    a, b = match.group(1), match.group(2)
+    return (a, b) if a.startswith("_csrf") else (b, a)
+
+
+def download_starter(opener, base, target, destination):
+    url = f"{base}/api/v2/console/onboarding/starter.zip?source=canary"
+    if target:
+        url += f"&target={urllib.parse.quote(target)}"
+    status, body, headers, _ = fetch(opener, url)
+    if status == 403:
+        raise CanaryFailure(
+            "starter.zip returned 403 -- the session did not carry through login. "
+            "A signed-in user cannot download the starter."
+        )
+    if status != 200:
+        raise CanaryFailure(f"starter.zip returned HTTP {status}")
+    kind = (headers.get("Content-Type") or "").lower()
+    if body[:2] != b"PK":
+        raise CanaryFailure(
+            f"starter.zip was not a ZIP (Content-Type {kind!r}, {len(body)} bytes). "
+            "The generator is serving something else -- most likely an error page."
+        )
+    destination.write_bytes(body)
+    log(f"downloaded starter.zip ({len(body)} bytes)")
+    return destination
+
+
+def unpack(archive, into):
+    """Unzip preserving the unix mode, which is the whole point of the check."""
+    into.mkdir(parents=True, exist_ok=True)
+    modes = {}
+    try:
+        with zipfile.ZipFile(archive) as zf:
+            zf.extractall(into)
+            for info in zf.infolist():
+                mode = info.external_attr >> 16
+                if mode:
+                    modes[info.filename] = mode
+    except (zipfile.BadZipFile, OSError) as error:
+        raise CanaryFailure(
+            f"the served starter could not be unpacked: {error}. "
+            "A user who clicks Download gets a file that will not open."
+        ) from error
+    for name, mode in modes.items():
+        path = into / name
+        if path.exists() and not path.is_dir():
+            path.chmod(mode & 0o7777)
+    roots = [p for p in into.iterdir() if p.is_dir()]
+    if len(roots) != 1:
+        raise CanaryFailure(
+            f"expected exactly one directory inside starter.zip, found {[p.name for p in roots]}"
+        )
+    return roots[0], modes
+
+
+def check_launcher_bits(project, modes):
+    """The launchers must be executable in the ZIP the server hands out."""
+    if WINDOWS:
+        # Windows has no unix mode; read what the ZIP recorded instead, which is
+        # what a macOS or Linux user would actually get.
+        broken = [
+            name for name, mode in modes.items()
+            if Path(name).name in ("build.sh", "run.sh", "mvnw") and not (mode & 0o111)
+        ]
+    else:
+        broken = []
+        for name in ("build.sh", "run.sh", "mvnw"):
+            path = project / name
+            if path.exists() and not (path.stat().st_mode & stat.S_IXUSR):
+                broken.append(name)
+    if broken:
+        raise CanaryFailure(
+            f"the served starter ZIP has non-executable launchers: {', '.join(sorted(broken))}. "
+            "Every macOS/Linux user gets 'permission denied' on the first documented command. "
+            "Check that the server-side generator sets a unix mode on the launchers."
+        )
+    log("launcher execute bits OK")
+
+
+def check_repositories(project):
+    """A pinned release with no repository declared resolves nothing."""
+    pom = (project / "pom.xml").read_text(encoding="utf-8", errors="replace")
+    def prop(name):
+        found = re.search(r"<%s>\s*([^<\s]+)\s*</%s>" % (re.escape(name), re.escape(name)), pom)
+        return found.group(1) if found else None
+
+    version = prop("cn1.version") or prop("codenameone.version")
+    # The starter declares the Maven plugin through its own property. They are
+    # equal today, but they are separate knobs, and authenticating with the
+    # framework version would resolve a plugin coordinate that may not exist.
+    plugin_version = prop("cn1.plugin.version") or version
+    missing = [
+        block for block in ("repositories", "pluginRepositories")
+        if f"<{block}>" not in pom
+    ]
+    if missing:
+        raise CanaryFailure(
+            f"the served starter pom.xml declares no <{'> and no <'.join(missing)}>. "
+            "Codename One left Maven Central at 7.0.268, so a pin past 7.0.267 resolves "
+            "nothing on a user's machine."
+        )
+    if "repo.codenameone.com" not in pom:
+        raise CanaryFailure(
+            "the served starter pom.xml declares repositories but none pointing at "
+            "repo.codenameone.com -- releases past 7.0.267 live only there."
+        )
+    if version and version <= "7.0.267":
+        log(f"WARNING: starter pins cn1 {version}, at or below the Maven Central freeze point")
+    log(f"repository declarations OK (cn1 {version or 'unknown'}, "
+        f"plugin {plugin_version or 'unknown'})")
+    return version, plugin_version
+
+
+def mint_build_token(opener, base):
+    """Get a build-client token the way the tooling does, from our own session.
+
+    The build client does not authenticate with the account's app token. It
+    stores the JWT that `/appsec/7.0/set-user` mints and `/poll-user` hands back,
+    so that is what has to be seeded -- feeding it the app token instead leaves
+    it unauthenticated, and the client then prints a browser login URL, does not
+    wait for it, reports "your build was submitted", and exits 0 without having
+    submitted anything.
+
+    Minting per run rather than storing one also means there is no long-lived
+    build credential in repository secrets, and nothing to rotate when it
+    expires.
+    """
+    key = str(uuid.uuid4())
+    redirect = urllib.parse.quote(f"{base}/loggedIn.html", safe="")
+    status, _, _, _ = fetch(
+        opener, f"{base}/appsec/7.0/set-user?loginKey={key}&redirect={redirect}&ver=2")
+    if status != 200:
+        raise CanaryFailure(
+            f"set-user returned HTTP {status}; the console session did not carry "
+            "into the build-client login, so no token could be minted."
+        )
+    status, body, _, _ = fetch(opener, f"{base}/poll-user?ver=2&loginKey={key}")
+    if status != 200:
+        raise CanaryFailure(f"poll-user returned HTTP {status}; no build token was issued.")
+    lines = body.decode("utf-8", "replace").strip().splitlines()
+    if not lines or not lines[0].strip():
+        raise CanaryFailure("poll-user returned no build token.")
+    log("minted a build-client token from the console session")
+    return lines[0].strip()
+
+
+def seed_token(project, mvn, email, token, plugin_version):
+    """Headless build-client auth, so no browser OAuth is needed in CI.
+
+    The goal writes into the java Preferences node the build client reads, so it
+    needs no project state -- but it does need an explicit plugin version.
+    An unversioned groupId:artifactId:goal makes Maven resolve LATEST, which is
+    precisely the sort of implicit resolution this canary exists to catch.
+    """
+    if not plugin_version:
+        raise CanaryFailure(
+            "could not read the Maven plugin version out of the served starter pom, "
+            "so the build client cannot be authenticated with a pinned plugin."
+        )
+    run(
+        [mvn, "-B", "-q",
+         f"com.codenameone:codenameone-maven-plugin:{plugin_version}:set-user-token",
+         f"-Dtoken={token}", f"-Duser={email}"],
+        cwd=project,
+        what="cn1:set-user-token",
+        timeout=SEED_TIMEOUT,
+        secrets=(token, email),
+    )
+    log("seeded build-client token")
+
+
+# Anything a child process has no business seeing. Maven resolves artifacts
+# over the network and runs plugin code from them, so every variable exported
+# here is readable by code we did not write.
+SENSITIVE_ENV = ("CN1_CANARY_PASSWORD", "CN1_CANARY_EMAIL", "CN1_CANARY_TOKEN",
+                 "CANARY_REPORT", "GITHUB_TOKEN", "ACTIONS_RUNTIME_TOKEN",
+                 "ACTIONS_ID_TOKEN_REQUEST_TOKEN", "ACTIONS_ID_TOKEN_REQUEST_URL")
+
+
+def child_environment():
+    """The environment a build is allowed to run in.
+
+    The account password is not needed after sign-in, and the token is passed to
+    the goal as an argument rather than through the environment -- so nothing
+    here has to carry a credential, and a compromised dependency resolved by the
+    starter has nothing to exfiltrate.
+    """
+    env = dict(os.environ)
+    for name in SENSITIVE_ENV:
+        env.pop(name, None)
+    return env
+
+
+def as_text(value):
+    """TimeoutExpired.output is bytes even when Popen ran with text=True.
+
+    Its buffered chunks are collected before the newline translation that would
+    have decoded them, while communicate() hands back str -- so concatenating
+    the two raises TypeError, and the redacted timeout report this exists to
+    produce would be replaced by a generic crash report with the diagnostics
+    thrown away.
+    """
+    if value is None:
+        return ""
+    if isinstance(value, bytes):
+        return value.decode("utf-8", "replace")
+    return value
+
+
+def redact(text, secrets):
+    for value in secrets:
+        if value:
+            text = text.replace(value, "***")
+    return text
+
+
+def terminate_tree(process):
+    """Kill the launcher AND everything it spawned.
+
+    subprocess kills only the direct child, but the launcher is a shell that
+    execs mvnw, which execs a JVM. Left alive, that JVM can submit a build
+    minutes after this leg has already failed -- and the next serialised leg
+    would then see a build id it did not create, which is exactly the
+    cross-leg confusion max-parallel is there to prevent.
+    """
+    try:
+        if WINDOWS:
+            subprocess.run(["taskkill", "/F", "/T", "/PID", str(process.pid)],
+                           capture_output=True, timeout=60)
+        else:
+            os.killpg(os.getpgid(process.pid), signal.SIGKILL)
+    except Exception:  # noqa: BLE001 - best effort; the report matters more
+        process.kill()
+
+
+def run(command, cwd, what, timeout, secrets=(), check=True):
+    # Its own process group, so a timeout can take the whole tree down.
+    extra = {"creationflags": subprocess.CREATE_NEW_PROCESS_GROUP} if WINDOWS \
+        else {"start_new_session": True}
+    process = subprocess.Popen(
+        command, cwd=str(cwd), stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+        text=True, env=child_environment(), **extra
+    )
+    try:
+        output, _ = process.communicate(timeout=timeout)
+    except subprocess.TimeoutExpired as expired:
+        terminate_tree(process)
+        # Bounded: if anything in the tree survived and still holds the pipe,
+        # draining it must not hang the phase we just gave up on.
+        try:
+            partial, _ = process.communicate(timeout=30)
+        except subprocess.TimeoutExpired:
+            process.kill()
+            partial = ""
+        # Never surface the exception itself. Its str() carries the whole
+        # command line, which holds the minted token and the account address,
+        # and this text is written to the report and copied into a public issue.
+        raise CanaryFailure(
+            f"{what} did not finish within {timeout}s and was terminated.\n\n"
+            + tail(redact(as_text(expired.output) + as_text(partial), secrets))
+        ) from None
+    output = redact(output or "", secrets)
+    if check and process.returncode != 0:
+        raise CanaryFailure(
+            f"{what} failed with exit {process.returncode}:\n{tail(output)}"
+        )
+    return process.returncode, output
+
+
+def tail(text, lines=40):
+    rows = [r for r in text.splitlines() if r.strip()]
+    return "\n".join(rows[-lines:])
+
+
+def launch(project, target):
+    """Run the launcher the README tells the user to run -- not mvn directly."""
+    if WINDOWS:
+        command = ["cmd", "/c", "build.bat", target]
+    else:
+        launcher = project / "build.sh"
+        if not os.access(launcher, os.X_OK):
+            raise CanaryFailure("build.sh is present but not executable")
+        command = ["./build.sh", target]
+    env_note = f"{'build.bat' if WINDOWS else './build.sh'} {target}"
+    log(f"running {env_note} (this downloads Maven and the CN1 toolchain; several minutes)")
+    code, output = run(
+        command, cwd=project, what=env_note, timeout=LAUNCH_TIMEOUT, check=False
+    )
+    return code, output
+
+
+def list_builds(opener, base):
+    """Authoritative build state, straight from the console API.
+
+    Matching launcher stdout for phrases like "sent to the build server" would
+    be guesswork -- the upload client ships as a binary dependency, so its exact
+    wording is not in this repository and could change without notice. The
+    console's own build list is what the user sees in the web UI, so assert
+    against that instead.
+    """
+    status, body, _, _ = fetch(opener, f"{base}/api/v2/console/builds")
+    if status != 200:
+        raise CanaryFailure(f"GET /api/v2/console/builds returned HTTP {status}")
+    try:
+        return json.loads(body.decode("utf-8", "replace")).get("builds", [])
+    except ValueError as error:
+        raise CanaryFailure(f"the console build list was not JSON: {error}") from error
+
+
+TERMINAL = {"success", "failed", "cancelled"}
+
+
+def await_cloud_build(opener, base, known_ids, target, launcher_code, output,
+                      timeout=POLL_TIMEOUT, interval=20):
+    """Wait for a build this run submitted to reach a terminal state."""
+    deadline = time.time() + timeout
+    seen = None
+    while time.time() < deadline:
+        fresh = [b for b in list_builds(opener, base) if b.get("id") not in known_ids]
+        if fresh:
+            fresh.sort(key=lambda b: b.get("submittedAt") or 0)
+            seen = fresh[-1]
+            if (seen.get("status") or "").lower() in TERMINAL:
+                break
+        time.sleep(interval)
+
+    if seen is None:
+        # The launcher "succeeded" locally and nothing was ever submitted, so
+        # the user is left holding a jar and no cloud build.
+        raise CanaryFailure(
+            f"running the documented launcher for '{target}' never created a build on the "
+            f"server (launcher exit {launcher_code}). A new user following the README gets "
+            f"no cloud build.\n\n{tail(output, 60)}"
+        )
+
+    state = (seen.get("status") or "unknown").lower()
+    if state == "success":
+        log(f"cloud build {seen.get('id')} for '{target}' finished: success")
+        return seen
+    if state in TERMINAL:
+        raise CanaryFailure(
+            f"the cloud build for '{target}' finished as '{state}' "
+            f"(build {seen.get('id')}): {seen.get('message') or 'no message'}"
+        )
+    raise CanaryFailure(
+        f"the cloud build for '{target}' (build {seen.get('id')}) was still '{state}' "
+        f"after {timeout}s"
+    )
+
+
+def check_target_is_cloud(project, target):
+    """Confirm the served launcher maps this target to a cloud build.
+
+    Target names are not portable between launchers: the project archetype maps
+    `javascript` to `local-javascript` and keeps a separate `javascript_cloud`,
+    while the starter served by the console maps `javascript` straight to the
+    cloud target. Reading the launcher we were actually handed is the only way
+    to be sure -- and without this the canary would spend the full build poll
+    waiting for a build that was never going to be submitted, then report the
+    starter as broken when the real fault is the target name.
+    """
+    launcher = project / ("build.bat" if WINDOWS else "build.sh")
+    if not launcher.exists():
+        raise CanaryFailure(f"the served starter has no {launcher.name}")
+    text = launcher.read_text(encoding="utf-8", errors="replace")
+    # Anchor the label to a whole line. A plain substring search for ":ios"
+    # matches inside ":ios_source", and "function ios" inside
+    # "function ios_source", so the check would read a neighbouring target's
+    # buildTarget and rule on the wrong one entirely.
+    marker = (r"^:%s\s*$" % re.escape(target)) if WINDOWS \
+        else (r"^function\s+%s\s*\{" % re.escape(target))
+    found = re.search(marker, text, re.MULTILINE)
+    if not found:
+        offered = re.findall(r"^:([a-z_0-9]+)\s*$" if WINDOWS else r"^function\s+([a-z_0-9]+)\s*\{",
+                             text, re.MULTILINE)
+        raise CanaryFailure(
+            f"the served {launcher.name} has no '{target}' target. It offers: "
+            f"{', '.join(sorted(set(offered))) or 'nothing recognisable'}."
+        )
+    # Bound the body to THIS target. A fixed-size window runs past the end of a
+    # short function into the next one, so a target that merely delegates to
+    # another (ios_source calls xcode) would be judged on its neighbour's
+    # buildTarget. Stop at the closing brace, or at the next label on Windows.
+    rest = text[found.end():]
+    terminator = re.search(r"^:[a-z_0-9]+\s*$" if WINDOWS else r"^\}\s*$",
+                           rest, re.MULTILINE)
+    body = rest[:terminator.start()] if terminator else rest
+    # build.bat escapes the separator for cmd, spelling it `buildTarget^=`, so
+    # the caret has to be optional -- without it this never matched on Windows
+    # and the check silently approved every target it was given.
+    built = re.search(r"codename1\.buildTarget\^?=([A-Za-z0-9._-]+)", body)
+    if not built:
+        # Fail closed. Not being able to read the target is not evidence that
+        # it is a cloud one, and guessing here costs a 30-minute poll and a
+        # false outage report.
+        raise CanaryFailure(
+            f"could not read the buildTarget for '{target}' out of the served "
+            f"{launcher.name}, so there is no way to tell whether it submits a "
+            "cloud build. Refusing to run rather than assume it does."
+        )
+    resolved = built.group(1)
+    # Two shapes never reach the server: an explicitly local target, and a
+    # *-source target, which generates an Android Studio or Xcode project on
+    # the user's machine. Both would leave the canary polling for a build that
+    # was never submitted and then blaming the starter.
+    expensive = ("ios", "iphone", "ipad", "mac", "catalyst", "xcode", "watch", "tv")
+    hit = next((m for m in expensive if m in resolved.lower()), None)
+    if hit:
+        raise CanaryFailure(
+            f"'{target}' resolves to '{resolved}' in the served {launcher.name}, which "
+            f"looks like an Apple target ('{hit}'). Those need a Mac host and cost several "
+            "times a normal build; the canary refuses them however they are reached."
+        )
+    if resolved.startswith("local-") or resolved.endswith("-source"):
+        raise CanaryFailure(
+            f"'{target}' maps to '{resolved}' in the served {launcher.name}, which "
+            "builds or generates locally and never submits to the server. Point the "
+            "canary at one of the launcher's cloud targets instead."
+        )
+    log(f"'{target}' is a cloud target in the served {launcher.name}")
+
+
+def find_maven(project):
+    """Prefer the shipped wrapper -- that is what a real user runs."""
+    wrapper = project / ("mvnw.cmd" if WINDOWS else "mvnw")
+    if wrapper.exists():
+        return str(wrapper)
+    found = shutil.which("mvn")
+    if not found:
+        raise CanaryFailure("neither the shipped mvnw nor a system mvn is available")
+    return found
+
+
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--base", default="https://cloud.codenameone.com")
+    parser.add_argument("--target", default="javascript",
+                        help="build target; never use iphone/macos -- those cost 8 credits")
+    parser.add_argument("--report", help="write a JSON result here")
+    parser.add_argument("--skip-build", action="store_true",
+                        help="artefact checks only; do not submit a cloud build")
+    args = parser.parse_args()
+    global REPORT_PATH
+    REPORT_PATH = args.report or os.environ.get("CANARY_REPORT")
+
+    email = os.environ.get("CN1_CANARY_EMAIL", "").strip()
+    password = os.environ.get("CN1_CANARY_PASSWORD", "").strip()
+    if not email or not password:
+        raise CanaryFailure(
+            "CN1_CANARY_EMAIL and CN1_CANARY_PASSWORD are not set; the canary cannot sign in."
+        )
+    if args.target not in CHEAP_TARGETS:
+        raise CanaryFailure(
+            f"refusing target '{args.target}': the canary only submits cheap, non-Apple "
+            f"builds ({', '.join(CHEAP_TARGETS)}). Apple targets need a Mac host and cost "
+            "several times a normal build, which a nightly run would not survive."
+        )
+
+    base = args.base.rstrip("/")
+    started = time.time()
+    opener, _ = build_opener()
+
+    log(f"signing in to {base}")  # the account is never named in output
+    login(opener, base, email, password)
+
+    with tempfile.TemporaryDirectory(prefix="cn1-canary-") as tmp:
+        root = Path(tmp)
+        archive = download_starter(opener, base, args.target, root / "starter.zip")
+        project, modes = unpack(archive, root / AWKWARD)
+        log(f"unpacked to {project}")
+
+        check_launcher_bits(project, modes)
+        version, plugin_version = check_repositories(project)
+        check_target_is_cloud(project, args.target)
+
+        if args.skip_build:
+            log("--skip-build set; stopping after artefact checks")
+            result = {"ok": True, "stage": "artefact", "cn1Version": version}
+        else:
+            token = mint_build_token(opener, base)
+            mvn = find_maven(project)
+            seed_token(project, mvn, email, token, plugin_version)
+            # Snapshot first: a free account keeps only its most recent build,
+            # so "is there a new id" is the only safe way to spot this run's.
+            known = {b.get("id") for b in list_builds(opener, base)}
+            code, output = launch(project, args.target)
+            build = await_cloud_build(opener, base, known, args.target, code, output)
+            result = {
+                "ok": True,
+                "stage": "build",
+                "cn1Version": version,
+                "target": args.target,
+                "buildId": build.get("id"),
+                "seconds": round(time.time() - started),
+            }
+
+    if REPORT_PATH:
+        Path(REPORT_PATH).write_text(json.dumps(result, indent=2))
+    log(f"PASS in {round(time.time() - started)}s")
+
+
+if __name__ == "__main__":
+    try:
+        main()
+    except Exception as failure:  # noqa: BLE001 - a crash must still be reported
+        message = str(failure) if isinstance(failure, CanaryFailure) else (
+            f"the canary crashed before it could finish: "
+            f"{type(failure).__name__}: {failure}"
+        )
+        print(f"[canary] FAIL: {message}", file=sys.stderr, flush=True)
+        report = REPORT_PATH or os.environ.get("CANARY_REPORT")
+        if report:
+            Path(report).write_text(json.dumps({"ok": False, "error": message}, indent=2))
+        sys.exit(1)
