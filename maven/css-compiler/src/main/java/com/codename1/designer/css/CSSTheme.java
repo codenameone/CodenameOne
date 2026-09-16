@@ -4388,7 +4388,9 @@ public class CSSTheme {
         void setParent(String name) {
             Element parentEl = getElementByName(name);
             Element self = this;
-            if (this.isSelectedStyle() || this.isDisabledStyle() || this.isDisabledStyle() || this.isUnselectedStyle()) {
+            // State elements must keep their owning UIID as parent so flattening
+            // follows the derived UIID's matching state rather than its normal style.
+            if (this.isSelectedStyle() || this.isDisabledStyle() || this.isUnselectedStyle() || this.isHoverStyle()) {
                 self = this.parent;
             }
             

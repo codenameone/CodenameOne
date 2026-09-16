@@ -109,6 +109,20 @@ public class CSSHoverStateTest {
     }
 
     @Test
+    void testDeriveDeclaredOnHoverPreservesStateInheritanceAndOverrides() throws Exception {
+        Hashtable theme = compile("Base { background-color: #111111; color: #222222; }"
+                + "Base.hover { background-color: #abcdef; color: #123456; }"
+                + "Child { background-color: #ffffff; }"
+                + "Child.hover { cn1-derive: Base; color: #334455; }"
+                + "Grandchild.hover { cn1-derive: Child; }");
+        assertEquals("FFFFFF", theme.get("Child.bgColor"), "own normal style remains intact");
+        assertEquals("ABCDEF", theme.get("Child.hover#bgColor"), "hover derives the parent's hover background");
+        assertEquals("334455", theme.get("Child.hover#fgColor"), "local hover overrides remain intact");
+        assertEquals("ABCDEF", theme.get("Grandchild.hover#bgColor"), "transitive state-level derivation");
+        assertEquals("334455", theme.get("Grandchild.hover#fgColor"), "transitive local override");
+    }
+
+    @Test
     void testHoverOnlyRasterEffectTriggersCaptureAndHasAnHtmlElement() throws Exception {
         assertHoverCapture("Button { background-color: #ffffff; }"
                 + "Button.hover { box-shadow: inset 0 2px 4px black; }", false);
