@@ -440,6 +440,10 @@ public final class HTML5SecureStorage extends SecureStorage {
             return false;
         }
         try {
+            Object previousEncrypted = readUncached(encryptedKey(account));
+            if (previousEncrypted == null && !definitelyGone(encryptedKey(account))) {
+                return false;
+            }
             String sealed = seal(account, value);
             // The gate store first, so a setIfAbsent running concurrently in another tab sees
             // this value when it re-reads the settled record and adopts it instead of mirroring
@@ -488,22 +492,45 @@ public final class HTML5SecureStorage extends SecureStorage {
             }
             // The legacy entry goes only after the encrypted one is in place. A store that failed
             // the write above and had already lost the plaintext would have destroyed the value.
-            Storage.getInstance().deleteStorageFile(legacyKey(account));
-            // Checked, because deleteStorageFile cannot report: it returns void, and this port's
-            // implementation catches the IndexedDB failure and returns. Answering true there told
-            // the caller its secret had been written securely while the OLD one was still sitting
-            // in browser storage as plaintext. remove() already checks this way.
-            if (!definitelyGone(legacyKey(account))) {
-                Log.p("SecureStorage: the plaintext entry this replaced could not be removed",
-                        Log.WARNING);
-                return false;
+            boolean legacyRemoved = false;
+            try {
+                Storage.getInstance().deleteStorageFile(legacyKey(account));
+                // deleteStorageFile returns void, so verify it before reporting success.
+                legacyRemoved = definitelyGone(legacyKey(account));
+                if (!legacyRemoved) {
+                    Log.p("SecureStorage: the plaintext entry this replaced could not be removed",
+                            Log.WARNING);
+                }
+                return legacyRemoved;
+            } finally {
+                if (!legacyRemoved) {
+                    rollbackReplacement(account, sealed, previousEncrypted);
+                }
             }
-            return true;
         } catch (RuntimeException failed) {
             // Not logged with the value, the account or any part of the ciphertext -- this line
             // reaches the browser console, which is the last place a secret should end up.
             Log.p("SecureStorage write refused: " + reasonOf(failed), Log.WARNING);
             return false;
+        }
+    }
+
+    /// Withdraws only this failed replacement. The previous encrypted value or the legacy
+    /// plaintext must remain the value returned by get() when set() reports failure.
+    private void rollbackReplacement(String account, String sealed, Object previousEncrypted) {
+        releaseMigrationGate(account, sealed);
+        String entry = encryptedKey(account);
+        if (!sealed.equals(readUncached(entry))) {
+            // A later writer owns the mirror now; this rollback cannot undo its successful set.
+            return;
+        }
+        if (previousEncrypted instanceof String) {
+            if (!Storage.getInstance().writeObject(entry, previousEncrypted)) {
+                Log.p("SecureStorage: the previous encrypted value could not be restored",
+                        Log.WARNING);
+            }
+        } else {
+            Storage.getInstance().deleteStorageFile(entry);
         }
     }
 
