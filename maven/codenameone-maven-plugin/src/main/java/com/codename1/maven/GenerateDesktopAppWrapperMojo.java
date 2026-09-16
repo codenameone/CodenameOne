@@ -34,6 +34,8 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.OutputStream;
+import java.util.Properties;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 
@@ -63,8 +65,26 @@ public class GenerateDesktopAppWrapperMojo extends AbstractCN1Mojo {
     @Override
     protected void executeImpl() throws MojoExecutionException, MojoFailureException {
         generateIcons();
+        generateThemeConfiguration();
         generateStub();
         registerCustomStubSourceRoot();
+    }
+
+    // Written even when a custom/archetype stub suppresses source generation. Packaged apps
+    // have no source settings file; JavaSEPort reads this beside the bundled NativeTheme.res.
+    void generateThemeConfiguration() throws MojoExecutionException {
+        Properties theme = new Properties();
+        theme.setProperty("desktop.themeMode", arg("desktop.themeMode",
+                arg("nativeTheme", arg("cn1.nativeTheme", "legacy"))));
+        File output = new File(project.getBuild().getOutputDirectory(), "codenameone-desktop.properties");
+        try {
+            Files.createDirectories(output.toPath().getParent());
+            try (OutputStream stream = Files.newOutputStream(output.toPath())) {
+                theme.store(stream, "Packaged desktop theme selection");
+            }
+        } catch (IOException ex) {
+            throw new MojoExecutionException("Failed to write desktop theme configuration", ex);
+        }
     }
 
     private void generateIcons() throws MojoExecutionException {

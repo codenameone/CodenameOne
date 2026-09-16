@@ -23,12 +23,17 @@
 package com.codename1.maven;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
+import org.apache.maven.project.MavenProject;
+import java.nio.file.Path;
+import java.nio.file.Files;
 
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.Properties;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -100,4 +105,38 @@ class GenerateDesktopAppWrapperMojoTest {
         assertTrue(src.contains("private static final String APP_DESKTOP_TITLEBAR = \"native\";"),
                 "an invalid titleBar hint must fall back to native");
     }
+    @Test
+    void packagesThemeHintEvenWithAnArchetypeStub(@TempDir Path root) throws Exception {
+        GenerateDesktopAppWrapperMojo mojo = new GenerateDesktopAppWrapperMojo();
+        mojo.project = new MavenProject();
+        mojo.project.setFile(root.resolve("pom.xml").toFile());
+        mojo.project.getBuild().setDirectory(root.resolve("target").toString());
+        mojo.project.getBuild().setOutputDirectory(root.resolve("target/classes").toString());
+        mojo.properties = new Properties();
+        mojo.properties.setProperty("codename1.packageName", "com.example");
+        mojo.properties.setProperty("codename1.mainName", "MyApp");
+        Path customStub = root.resolve("src/desktop/java/com/example/MyAppStub.java");
+        Files.createDirectories(customStub.getParent());
+        Files.write(customStub, new byte[0]);
+        for (String mode : new String[]{"auto", "fluent", "aqua", "adwaita", "legacy", "custom"}) {
+            mojo.properties.setProperty("codename1.arg.desktop.themeMode", mode);
+            mojo.executeImpl();
+            Properties packaged = new Properties();
+            try (InputStream in = Files.newInputStream(root.resolve("target/classes/codenameone-desktop.properties"))) {
+                packaged.load(in);
+            }
+            assertEquals(mode, packaged.getProperty("desktop.themeMode"));
+            assertEquals(1, packaged.size(), "do not package unrelated build hints or credentials");
+        }
+        assertFalse(Files.exists(root.resolve("target/generated-sources/cn1-desktop/com/example/MyAppStub.java")),
+                "the custom stub remains the source override");
+    }
+
+    @Test
+    void defaultWrapperPreservesPlatformFontsAndExplicitOverrides() throws Exception {
+        String source = render(null, null);
+        assertFalse(source.contains("setFontFaces(\"Arial"));
+        assertTrue(source.contains("JavaSEPort.setFontFaces(fontFaces[0], fontFaces[1], fontFaces[2])"));
+    }
+
 }

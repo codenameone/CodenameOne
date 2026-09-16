@@ -2948,7 +2948,31 @@ public class JavaSEPort extends CodenameOneImplementation {
     }
 
     public static void setNativeTheme(String resFile) {
+        // Existing generated and archetype stubs pass this fallback. Resolve their packaged
+        // hint here too; simulator-only resolution cannot change a shipped application's theme.
+        // An explicitly named custom resource remains an override, even with a theme hint.
+        if ("/NativeTheme.res".equals(resFile)) {
+            Properties theme = new Properties();
+            try (InputStream in = JavaSEPort.class.getResourceAsStream("/codenameone-desktop.properties")) {
+                if (in != null) {
+                    theme.load(in);
+                }
+            } catch (IOException ex) {
+                throw new IllegalStateException("Cannot read packaged desktop theme configuration", ex);
+            }
+            resFile = resolvePackagedDesktopNativeTheme(IS_MAC ? "mac" : (IS_LINUX ? "linux" : "win"), theme);
+        }
         nativeTheme = resFile;
+    }
+
+    static String resolvePackagedDesktopNativeTheme(String platformName, Properties theme) {
+        String mode = System.getProperty("codename1.arg.desktop.themeMode");
+        if (mode == null || mode.isEmpty()) {
+            mode = theme.getProperty("desktop.themeMode");
+        }
+        String resolved = mode == null ? resolveDesktopNativeTheme(platformName)
+                : resolveDesktopNativeTheme(platformName, mode.trim());
+        return resolved == null ? "/NativeTheme.res" : "/" + resolved + ".res";
     }
 
     public static void setNativeTheme(Resources resFile) {
@@ -3163,6 +3187,10 @@ public class JavaSEPort extends CodenameOneImplementation {
         if (mode == null) {
             mode = sharedNativeThemeHint();
         }
+        return resolveDesktopNativeTheme(platformName, mode);
+    }
+
+    private static String resolveDesktopNativeTheme(String platformName, String mode) {
         if (mode == null || "legacy".equalsIgnoreCase(mode)) {
             // What a desktop app has always had. Not a recommendation, just continuity.
             return null;
