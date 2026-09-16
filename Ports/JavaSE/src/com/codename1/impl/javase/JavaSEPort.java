@@ -2961,6 +2961,35 @@ public class JavaSEPort extends CodenameOneImplementation {
             resFile = resolvePackagedDesktopNativeTheme(IS_MAC ? "mac" : (IS_LINUX ? "linux" : "win"), theme);
         }
         nativeTheme = resFile;
+        configureNativeThemeFonts(resFile);
+    }
+
+    /**
+     * Temporarily configures native font aliases for a directly loaded theme.
+     * Call on the EDT before opening the resource; run the returned callback on
+     * the EDT to restore the prior font configuration without changing the
+     * application's selected native theme resource.
+     *
+     * @param resource theme resource path
+     * @return callback that restores the previous font configuration
+     * @since 8.0
+     */
+    public static Runnable pushNativeThemeFontConfiguration(String resource) {
+        final boolean previousDesktopFonts = desktopNativeFonts;
+        final String previousSystemFace = fontFaceSystem;
+        configureNativeThemeFonts(resource);
+        com.codename1.ui.Font.clearDerivedFontCache();
+        return new Runnable() {
+            @Override
+            public void run() {
+                desktopNativeFonts = previousDesktopFonts;
+                fontFaceSystem = previousSystemFace;
+                com.codename1.ui.Font.clearDerivedFontCache();
+            }
+        };
+    }
+
+    private static void configureNativeThemeFonts(String resFile) {
         desktopNativeFonts = isDesktopNativeThemeResource(resFile);
         if (!fontFacesExplicitlyConfigured) {
             fontFaceSystem = defaultSystemFontForTheme(IS_MAC ? "mac" : (IS_LINUX ? "linux" : "win"), resFile);
