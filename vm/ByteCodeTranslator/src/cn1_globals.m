@@ -132,6 +132,76 @@ int cn1GcFaultRefClear = 0;
 // failed with "LOST held key k1" while the gauntlet and all three self-hosting gates were
 // green.
 int cn1GcFaultHalfBlock = 0;
+// CN1_GC_FAULT=freelive reclaims a few slots the sweep has just proved LIVE, so a field
+// that is still in use ends up pointing at freed memory. That is the dangling-reference
+// defect in its purest form, and it is what proves the BiBOP slot quarantine works.
+//
+// It is injected in the SWEEP rather than in the marker, and that took two failed
+// attempts to establish. Dropping marks in gcMarkObject -- one visit in N, then eight
+// sticky victims never marked again -- produced violations=0 at every rate tried, and the
+// victim-fate dump said why: all eight ended the run at mark=currentGcMarkValue, i.e.
+// still marked. The marker has redundant paths (a second referrer marks the object
+// anyway, conservative stack roots keep it regardless, and the belt pass re-marks
+// reachable-but-unmarked objects on purpose), so a mark-side fault does not reach the
+// sweep as a missed root. Freeing a proven-live slot has no such redundancy. That is the
+// canonical dangling-reference defect, and until the BiBOP slot quarantine landed the
+// verifier could not see it at all: the sweep pushed the reclaimed slot straight onto the
+// page free list, the next allocation handed it back, and by the next verify pass the
+// reference resolved to a valid live object again. This fault is what proves the
+// quarantine works -- see self-test5 in run-gauntlet's sibling run-gc-verify.sh.
+// Rare on purpose: frequent enough that a self-hosting-sized run hits it several times,
+// sparse enough that the process is very likely to reach the next verify pass rather than
+// crashing on the damage first. A fault the verifier never lives to report proves nothing.
+// CN1_GC_FAULT_EVERY overrides it, because the right rate is a property of the workload,
+// not of the VM: this drops a single VISIT, and an object with a second referrer is marked
+// by that one anyway, so only the sole-referrer fraction actually leaks.
+#define CN1_GC_FAULT_DROPMARK_EVERY 20000
+int cn1GcFaultFreeLive = 0;
+// Capped hard: every one of these is real corruption, and the point is to give the
+// verifier something to find, not to destroy the heap before it can report.
+#define CN1_GC_FAULT_MAX_FREES 8
+// Candidate victims are nominated in gcMarkObject, NOT in the sweep, and that is the
+// whole trick. The verifier classifies objects it reaches as reference-field CHILDREN;
+// an object referenced only from a stack slot or a static root is never a child and a
+// dangling pointer to it is invisible to this instrument by construction. gcMarkObject is
+// called once per reference field, so anything arriving there is provably a child of some
+// holder. Picking victims in the sweep instead gave 8 freed live slots, 239 verify passes,
+// 161k refs and violations=0 -- the fault fired and there was simply nothing to see.
+#define CN1_GC_FAULT_CANDIDATES 64
+JAVA_OBJECT cn1GcFaultCand[CN1_GC_FAULT_CANDIDATES] = {0};
+int cn1GcFaultCandN = 0;
+// The slots the fault actually freed, kept so the verify pass can classify those exact
+// addresses. Without this, "violations=0" has several possible causes -- the slot was
+// reallocated, its page was recycled whole, the holder died too -- and they are not
+// distinguishable from the summary line.
+JAVA_OBJECT cn1GcFaultFreed[CN1_GC_FAULT_MAX_FREES] = {0};
+int cn1GcFaultFreedN = 0;
+#ifdef CN1_GC_VERIFY
+// Selects a slot the sweep has just proved LIVE and reclaims it anyway. Only ever true
+// under -DCN1_GC_VERIFY with CN1_GC_FAULT=freelive, and capped, so an ordinary build
+// cannot reach it and a fault run cannot run the heap into the ground.
+static int cn1GcFaultShouldFreeLive(JAVA_OBJECT o, int m) {
+    extern long cn1GcFaultDropsApplied;
+    if(!cn1GcFaultFreeLive || cn1GcFaultDropsApplied >= CN1_GC_FAULT_MAX_FREES) return 0;
+    // Only a FULLY live slot: an aging one is a step from being reclaimed legitimately,
+    // and freeing that would not distinguish the fault from ordinary collection.
+    if(m != currentGcMarkValue) return 0;
+    for(int i = 0 ; i < cn1GcFaultCandN ; i++) {
+        if(cn1GcFaultCand[i] == o) {
+            cn1GcFaultCand[i] = JAVA_NULL;   // fire once per nomination
+            if(cn1GcFaultFreedN < CN1_GC_FAULT_MAX_FREES) {
+                cn1GcFaultFreed[cn1GcFaultFreedN++] = o;
+            }
+            cn1GcFaultDropsApplied++;
+            return 1;
+        }
+    }
+    return 0;
+}
+#define CN1_GC_FAULT_FREE_LIVE(o, m) cn1GcFaultShouldFreeLive(o, m)
+#endif
+long cn1GcFaultDropEvery = CN1_GC_FAULT_DROPMARK_EVERY;
+long cn1GcFaultDropsApplied = 0;
 void cn1GcFaultInitPublic(void);
 static void cn1GcFaultInit(void) {
     static int done = 0;
@@ -148,6 +218,12 @@ static void cn1GcFaultInit(void) {
     } else if(strcmp(f, "halfblock") == 0) {
         cn1GcFaultHalfBlock = 1;
         fprintf(stderr, "[GC-FAULT] native reference blocks traced only half way\n");
+    } else if(strcmp(f, "freelive") == 0) {
+        cn1GcFaultFreeLive = 1;
+        { const char* e = getenv("CN1_GC_FAULT_EVERY");
+          if(e != 0 && atol(e) > 0) { cn1GcFaultDropEvery = atol(e); } }
+        fprintf(stderr, "[GC-FAULT] freeing one live slot in every %ld, max %d (fault injection)\n",
+                cn1GcFaultDropEvery, CN1_GC_FAULT_MAX_FREES);
     } else if(strcmp(f, "refnoclear") == 0) {
         cn1GcFaultRefClear = 1;
         fprintf(stderr, "[GC-FAULT] dead referents left in place instead of cleared\n");
@@ -157,6 +233,13 @@ static void cn1GcFaultInit(void) {
     fflush(stderr);
 }
 void cn1GcFaultInitPublic(void) { cn1GcFaultInit(); }
+#endif
+// Deliberately outside the CN1_GC_VERIFY guard above. The first cut put the #else arm
+// INSIDE it, so an ordinary build defined the macro on neither branch and the sweep's
+// call to it became an implicit declaration -- the same shape as the cn1GcFaultHalfBlock
+// link failure, and caught the same way, by the gauntlet rather than by any verifier run.
+#ifndef CN1_GC_FAULT_FREE_LIVE
+#define CN1_GC_FAULT_FREE_LIVE(o, m) 0
 #endif
 
 #if defined(__APPLE__) && defined(__OBJC__)
@@ -5816,6 +5899,21 @@ _Atomic int cn1GcCycleState = CN1_GC_CYCLE_IDLE;
 // the slot's first pointer word (the __codenameOneParentClsReference slot),
 // which a free slot does not otherwise use.
 #define CN1_BIBOP_FREE_MARK (-7)
+#ifdef CN1_GC_VERIFY
+// QA ONLY: a slot reclaimed by THIS sweep, held back from the free list for one cycle.
+//
+// Without it the verifier is structurally blind to the defect it most needs to catch. The
+// sweep poisons a reclaimed slot and then pushes it straight onto the page free list, so
+// the very next allocation hands that slot out again -- and a dangling reference into it
+// resolves to a perfectly valid live object by the time the next verify pass looks.
+// Measured: 60 verifier runs under memory pressure produced 2 crashes and violations=0.
+// Only LEGACY blocks were ever quarantined; BiBOP slots, which is where nearly all objects
+// live, were not.
+//
+// One cycle is enough because the verify pass runs per cycle: a reference that survived
+// into the cycle after its target was freed is seen while the slot still says FREE.
+#define CN1_BIBOP_QUAR_MARK (-8)
+#endif
 // CN1_BIBOP_HEAP_POS is defined in cn1_globals.h (shared with the inlined
 // bump fast path); keep the .m self-consistent if the header changes.
 #ifndef CN1_BIBOP_HEAP_POS
@@ -8184,6 +8282,11 @@ void cn1LiveCensus(const char* label) {
             if(m == CN1_BIBOP_FREE_MARK) {
                 continue;
             }
+#ifdef CN1_GC_VERIFY
+            if(m == CN1_BIBOP_QUAR_MARK) {
+                continue;   // reclaimed, held back from the free list for one cycle
+            }
+#endif
             int bucket = cn1LiveBucket(m);
             cn1LiveTally(o->__codenameOneParentClsReference, (long long)p->slotSize, bucket);
             bibopBytes += (long long)p->slotSize;
@@ -8996,6 +9099,14 @@ static void cn1BibopSweep(CODENAME_ONE_THREAD_STATE) {
             }
             if(m == CN1_BIBOP_FREE_MARK) {
                 *(void**)o = fl; fl = o; freeCount++;
+#ifdef CN1_GC_VERIFY
+            } else if(m == CN1_BIBOP_QUAR_MARK) {
+                // Quarantined by the PREVIOUS sweep: its cycle has passed, so release it
+                // to the free list now. Still counted dead the whole time -- freeCount
+                // covered it while quarantined, so page liveness never saw it as live.
+                __atomic_store_n(&o->__codenameOneGcMark, CN1_BIBOP_FREE_MARK, __ATOMIC_RELAXED);
+                *(void**)o = fl; fl = o; freeCount++;
+#endif
             } else if(m == -1) {
                 // fresh, never marked -> one cycle of grace (legacy parity)
                 __atomic_store_n(&o->__codenameOneGcMark, V, __ATOMIC_RELAXED);
@@ -9010,7 +9121,7 @@ static void cn1BibopSweep(CODENAME_ONE_THREAD_STATE) {
                 if(o->__codenameOneParentClsReference != 0 &&
                    o->__codenameOneParentClsReference->finalizerFunction != 0) needsReclaim = JAVA_TRUE;
 #endif
-            } else if(cn1GcSweepReclaims(m)) {
+            } else if(cn1GcSweepReclaims(m) || CN1_GC_FAULT_FREE_LIVE(o, m)) {
                 cn1BibopReclaimSlot(threadStateData, o);
 #ifdef CN1_GC_VERIFY
                 { extern long cn1GcVerifyFreedSlots; cn1GcVerifyFreedSlots++; }
@@ -9019,8 +9130,21 @@ static void cn1BibopSweep(CODENAME_ONE_THREAD_STATE) {
                 // are written after, so the page structure is unaffected.
                 cn1GcVerifyPoisonSlot(o, page->slotSize);
 #endif
+#if defined(CN1_GC_VERIFY) && !defined(CN1_GC_NO_QUARANTINE)
+                // QUARANTINE: mark it dead but do NOT link it into the free list, so it
+                // cannot be handed out again until the next sweep. freeCount still counts
+                // it, so the page's live/empty accounting is unchanged.
+                //
+                // -DCN1_GC_NO_QUARANTINE restores the old immediate-reuse behaviour. That
+                // is the negative control for self-test5: with it, CN1_GC_FAULT=freelive
+                // -- a slot freed while still referenced -- reports violations=0, which is
+                // what this whole mechanism exists to stop being true.
+                __atomic_store_n(&o->__codenameOneGcMark, CN1_BIBOP_QUAR_MARK, __ATOMIC_RELAXED);
+                freeCount++;
+#else
                 __atomic_store_n(&o->__codenameOneGcMark, CN1_BIBOP_FREE_MARK, __ATOMIC_RELAXED);
                 *(void**)o = fl; fl = o; freeCount++;
+#endif
             } else {
                 liveCount++;
                 if(m == V) policyLiveCount++;
@@ -10102,6 +10226,9 @@ JAVA_OBJECT cn1ConservativeResolve(void* w) {
                 // whose first 8 bytes still hold the free-list next pointer.
                 int m = __atomic_load_n(&o->__codenameOneGcMark, __ATOMIC_ACQUIRE);
                 if(m == CN1_BIBOP_FREE_MARK) return JAVA_NULL;   // on the page free-list
+#ifdef CN1_GC_VERIFY
+                if(m == CN1_BIBOP_QUAR_MARK) return JAVA_NULL;  // reclaimed, quarantined
+#endif
                 // Accept both a normal BiBOP slot and a MATURED (adopted) slot -- a
                 // matured object's memory is still in this page, so a conservative stack
                 // word must still resolve to it or it would be missed as a root and swept.
@@ -10280,6 +10407,9 @@ static void cn1GcVerifyCensus(JAVA_OBJECT o, int m);
 // CN1_GC_VERIFY_ALL=1 walks everything, including objects already given up on.
 static int cn1GcVerifyHolderKept(int m) {
     if(cn1GcVerifyAllHolders) {
+#ifdef CN1_GC_VERIFY
+        if(m == CN1_BIBOP_QUAR_MARK) return 0;
+#endif
         return m != CN1_BIBOP_FREE_MARK && m != CN1_GC_POISON_MARK;
     }
     if(m == currentGcMarkValue) {
@@ -10453,6 +10583,7 @@ static int cn1GcVerifyClassify(JAVA_OBJECT o, CN1BibopPage** outPage, int* outId
             if(idx >= bump) return CN1_GC_VS_STALE_SLOT;
             int m = __atomic_load_n(&o->__codenameOneGcMark, __ATOMIC_ACQUIRE);
             if(m == CN1_BIBOP_FREE_MARK) return CN1_GC_VS_FREE_SLOT;
+            if(m == CN1_BIBOP_QUAR_MARK) return CN1_GC_VS_FREE_SLOT;   // the catch
             return CN1_GC_VS_OK;
         }
     }
@@ -10488,7 +10619,7 @@ static const char* cn1GcVerifyClsName(JAVA_OBJECT o) {
 static void cn1GcVerifyCensus(JAVA_OBJECT o, int m) {
     if(cn1GcVerifyCensusCls == 0) return;
     struct clazz* c = o->__codenameOneParentClsReference;
-    if(c == 0 || c->clsName == 0 || m == CN1_BIBOP_FREE_MARK || m == CN1_GC_POISON_MARK) return;
+    if(c == 0 || c->clsName == 0 || m == CN1_BIBOP_FREE_MARK || m == CN1_BIBOP_QUAR_MARK || m == CN1_GC_POISON_MARK) return;
     if(strstr(c->clsName, cn1GcVerifyCensusCls) == 0) return;
     int age = m == -1 ? 0 : currentGcMarkValue - m;
     if(age < 0) age = 0;
@@ -10675,6 +10806,12 @@ static void cn1GcVerifySummary(void) {
     fprintf(stderr, "[GC-VERIFY] FIELDTYPE checks=%ld findings=%ld\n",
             atomic_load_explicit(&cn1GcFieldTypeChecks, memory_order_relaxed),
             atomic_load_explicit(&cn1GcFieldTypeFindings, memory_order_relaxed));
+    if(cn1GcFaultFreeLive) {
+        // Printed next to the verdict so a self-test can require BOTH: the fault
+        // actually fired, and the verifier reported it. Either alone is a hollow gate.
+        fprintf(stderr, "[GC-FAULT] freelive slots freed while live: %ld\n",
+                cn1GcFaultDropsApplied);
+    }
     fprintf(stderr, "[GC-VERIFY] SUMMARY passes=%ld refs=%ld violations=%ld earlyFreed=%ld resurrected=%ld resurrectedDangling=%ld\n",
             cn1GcVerifyPasses, cn1GcVerifyTotalRefs, cn1GcVerifyTotalViolations,
             cn1GcVerifyEarlyFreed, cn1GcResTotal, cn1GcResDangling);
@@ -10682,6 +10819,24 @@ static void cn1GcVerifySummary(void) {
 }
 
 void cn1GcVerifyHeap(CODENAME_ONE_THREAD_STATE) {
+    if(cn1GcFaultFreeLive && cn1GcFaultFreedN > 0) {
+        // What actually became of each slot the fault freed, at the one moment the
+        // verifier looks. FREE/QUAR here means the instrument can see the defect;
+        // OK means the slot was handed out again and the reference now resolves to a
+        // perfectly valid object, which is the blindness the quarantine exists to end.
+        static int reported = 0;
+        if(reported < 3) {
+            reported++;
+            for(int i = 0 ; i < cn1GcFaultFreedN ; i++) {
+                int st = cn1GcVerifyClassify(cn1GcFaultFreed[i], 0, 0);
+                int mk = __atomic_load_n(&cn1GcFaultFreed[i]->__codenameOneGcMark,
+                                         __ATOMIC_RELAXED);
+                fprintf(stderr, "[GC-FAULT]   freed slot %d %p classify=%d mark=%d\n",
+                        i, (void*)cn1GcFaultFreed[i], st, mk);
+            }
+            fflush(stderr);
+        }
+    }
     cn1GcFaultInit();   // idempotent; the mark's grace pass already resolved it
     if(cn1GcVerifyPasses == 0) {
         atexit(cn1GcVerifySummary);
@@ -12321,6 +12476,15 @@ void gcMarkObject(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj, JAVA_BOOLEAN force
         // cannot obtain it -- from there this frame is in the way.
         cn1GcVerifyChild(obj, __builtin_return_address(0));
         return;
+    }
+    // Nominate this child as a freelive victim. Marking, not sweeping, is where an
+    // object's status as a reference-field child is known.
+    if(cn1GcFaultFreeLive && cn1GcFaultCandN < CN1_GC_FAULT_CANDIDATES) {
+        extern long cn1GcFaultDropEvery;
+        static unsigned long cn1CandCounter = 0;
+        if((++cn1CandCounter % (unsigned long)cn1GcFaultDropEvery) == 0) {
+            cn1GcFaultCand[cn1GcFaultCandN++] = obj;
+        }
     }
 #endif
 #ifdef CN1_CONSERVATIVE_GC_ROOTS

@@ -214,4 +214,65 @@ else
     fi
 fi
 
+# Fifth self-test, for the BiBOP SLOT QUARANTINE -- and, through it, for whether this
+# verifier can see a dangling reference at all.
+#
+# Until the quarantine landed it could not. The sweep poisoned a reclaimed slot and pushed
+# it straight onto the page free list, so the next allocation handed the slot back and a
+# stale reference into it resolved to a valid live object by the time the verify pass ran.
+# Measured before the change: 60 verifier runs under memory pressure produced 2 crashes and
+# violations=0. The verifier's own CN1_GC_VS_FREE_SLOT branch existed the whole time and
+# simply never fired.
+#
+# CN1_GC_FAULT=freelive reclaims up to 8 slots the sweep has just proved LIVE, nominating
+# them in gcMarkObject so they are provably reference-field children (a victim chosen in
+# the sweep is usually referenced only from a stack slot, which this instrument cannot see
+# by construction -- that version fired 8 times and reported nothing). MapTorture2 is the
+# driver because it holds 4000 entries across forced collections, so a freed victim still
+# has a live holder.
+#
+# The assertion is that the injected corruption is NEVER missed. Measured over 6 runs each:
+#
+#     quarantine on   verifier caught 4, driver caught 2, missed 0
+#     quarantine off  verifier caught 0, driver caught 1, missed 5
+#
+# so a silent clean run is the failure, and -DCN1_GC_NO_QUARANTINE is the negative control
+# that reproduces it. The gate does not require the VERIFIER specifically to be the one
+# that catches it on any given run -- which of the two notices first is a race -- but it
+# does require the arm without the quarantine to be the only way a run goes quiet.
+printf '%-16s ' "self-test5"
+if [ ! -x ./target/bin/MapTorture2-verify ]; then
+    echo "BROKEN -- self-test4 did not leave a MapTorture2-verify binary"
+    fail=1
+else
+    flAttempts=4
+    flMissed=0
+    flVerifier=0
+    flFired=0
+    for flI in $(seq 1 $flAttempts); do
+        flOut="$(CN1_GC_FAULT=freelive CN1_GC_FAULT_EVERY=3000 CN1_GC_VERIFY_SOFT=1 \
+                 ./target/bin/MapTorture2-verify 2>&1)" || true
+        flV="$(printf '%s' "$flOut" | grep -oE 'violations=[0-9]+' | tail -1 | cut -d= -f2)"
+        # "the fault fired" and "the fault was caught" are separate claims; a run where
+        # nothing was freed proves nothing either way and must not count as a pass.
+        if printf '%s' "$flOut" | grep -qE 'slots freed while live: [1-9]'; then
+            flFired=$((flFired + 1))
+        fi
+        if [ "${flV:-0}" -gt 0 ] 2>/dev/null; then
+            flVerifier=$((flVerifier + 1))
+        elif ! printf '%s' "$flOut" | grep -qE 'LOST|CORRUPT'; then
+            flMissed=$((flMissed + 1))
+        fi
+    done
+    if [ "$flFired" -eq 0 ]; then
+        echo "BROKEN -- freelive never freed a live slot in $flAttempts runs"
+        fail=1
+    elif [ "$flMissed" -gt 0 ]; then
+        echo "BROKEN -- $flMissed of $flAttempts runs freed live slots and NOTHING noticed"
+        fail=1
+    else
+        echo "caught the injected dangling reference $flAttempts/$flAttempts (verifier $flVerifier)"
+    fi
+fi
+
 [ "$fail" -eq 0 ] && echo "GC-VERIFY GREEN" || { echo "GC-VERIFY FAILED"; exit 1; }
