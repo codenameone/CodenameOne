@@ -535,6 +535,14 @@ public final class HTML5SecureStorage extends SecureStorage {
     }
 
     public String get(String account) {
+        return read(account, null);
+    }
+
+    public String get(String account, Protection[] required) {
+        return read(account, required);
+    }
+
+    private String read(String account, Protection[] required) {
         if (account == null) {
             return null;
         }
@@ -543,6 +551,8 @@ public final class HTML5SecureStorage extends SecureStorage {
         // an account it kept returning that plaintext however many times another tab replaced the
         // value. A secure store shared by every tab on an origin cannot answer from one tab's
         // memory.
+        ProtectionReport before = required == null || required.length == 0
+                ? null : protectionOf(account);
         Object sealed = readUncached(encryptedKey(account));
         if (sealed instanceof String) {
             // The cast is taken before the try rather than inside it: ParparVM does not throw
@@ -560,7 +570,7 @@ public final class HTML5SecureStorage extends SecureStorage {
                 // value and is the only one still readable. This ordering is the whole point:
                 // the delete below used to run BEFORE this open, so a failure here had already
                 // destroyed the only recoverable copy.
-                return legacyValue(account);
+                return checkedRead(legacyValue(account), before, legacyProtection(), required);
             }
             // Proven readable, so the interrupted migration can be finished now and not sooner.
             // Only when it is the value this ciphertext holds. An older service worker or tab
@@ -568,11 +578,17 @@ public final class HTML5SecureStorage extends SecureStorage {
             // deleting it here unconditionally threw that update away for good while get() went
             // on answering the older ciphertext. Read past the cache for the same reason migrate
             // does: the copy this tab took earlier is precisely what hides the other tab's write.
+            // Capture the report before cleanup can hide a plaintext copy that appeared while
+            // open() yielded to the browser. The initial report may have described an absence.
+            ProtectionReport actual = before == null ? null : protectionOf(account);
             Object stale = readUncached(legacyKey(account));
+            if (stale instanceof String) {
+                actual = legacyProtection();
+            }
             if (stale instanceof String && plaintext.equals(stale)) {
                 Storage.getInstance().deleteStorageFile(legacyKey(account));
             }
-            return plaintext;
+            return checkedRead(plaintext, before, actual, required);
         }
         Object legacy = readUncached(legacyKey(account));
         if (!(legacy instanceof String)) {
@@ -582,7 +598,25 @@ public final class HTML5SecureStorage extends SecureStorage {
             return null;
         }
         migrate(account, (String) legacy);
-        return (String) legacy;
+        // Migration may already have removed the plaintext. Its source, rather than the
+        // replacement's protection, describes the value this invocation actually read.
+        return checkedRead((String) legacy, before, legacyProtection(), required);
+    }
+
+    private String checkedRead(String value, ProtectionReport before, ProtectionReport actual,
+            Protection[] required) {
+        if (value == null || required == null || required.length == 0) {
+            return value;
+        }
+        Protection unmet = before.firstUnmet(required);
+        if (unmet == null) {
+            unmet = actual.firstUnmet(required);
+        }
+        if (unmet != null) {
+            throw new VaultException(VaultError.POLICY_NOT_MET,
+                    "the stored entry is not protected by " + unmet.name(), unmet, null);
+        }
+        return value;
     }
 
     /// The plaintext entry alone, read without migrating it.
@@ -808,17 +842,21 @@ public final class HTML5SecureStorage extends SecureStorage {
             // requirement be satisfied by a value that is then served from the open one. It
             // corrects itself: the first get() that opens the ciphertext deletes the plaintext,
             // and this answers encrypted from then on.
-            ProtectionReport.Builder b = ProtectionReport.builder();
-            b.set(Protection.PERSISTENT, true);
-            b.set(Protection.ENCRYPTED_AT_REST, false);
-            b.set(Protection.NON_EXTRACTABLE_KEY, false);
-            b.set(Protection.OS_PROTECTED, false);
-            b.set(Protection.HARDWARE_BACKED, false);
-            b.set(Protection.USER_VERIFICATION, false);
-            b.set(Protection.ISOLATED_FROM_APPLICATION_CODE, false);
-            return b.build();
+            return legacyProtection();
         }
         return protection();
+    }
+
+    private ProtectionReport legacyProtection() {
+        ProtectionReport.Builder b = ProtectionReport.builder();
+        b.set(Protection.PERSISTENT, true);
+        b.set(Protection.ENCRYPTED_AT_REST, false);
+        b.set(Protection.NON_EXTRACTABLE_KEY, false);
+        b.set(Protection.OS_PROTECTED, false);
+        b.set(Protection.HARDWARE_BACKED, false);
+        b.set(Protection.USER_VERIFICATION, false);
+        b.set(Protection.ISOLATED_FROM_APPLICATION_CODE, false);
+        return b.build();
     }
 
     /// A checked narrowing that does not rely on a cast raising anything.

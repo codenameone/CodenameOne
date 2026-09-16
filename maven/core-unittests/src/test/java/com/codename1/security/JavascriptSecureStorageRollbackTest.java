@@ -33,19 +33,31 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import static org.junit.jupiter.api.Assertions.*;
 
-/** Exercises the browser store's Java update path with failed legacy cleanup. */
+/** Exercises browser storage reads and writes across legacy cleanup and concurrent updates. */
 class JavascriptSecureStorageRollbackTest {
     @TempDir
     Path temporary;
 
     @Test
     void failedLegacyCleanupPreservesThePriorValueAndLaterWriters() throws Exception {
+        runHarness("JavascriptStorageHarness", new String[] {"public boolean set(",
+                "private void rollbackReplacement(", "private void releaseMigrationGate("});
+    }
+
+    @Test
+    void checkedReadsRejectPlaintextThatAppearsAfterTheInitialProtectionCheck() throws Exception {
+        runHarness("JavascriptStorageReadHarness", new String[] {"public String get(String account)",
+                "public String get(String account, Protection[] required)", "private String read(",
+                "private String checkedRead(", "private String legacyValue(",
+                "public ProtectionReport protectionOf(", "private ProtectionReport legacyProtection("});
+    }
+
+    private void runHarness(String name, String[] signatures) throws Exception {
         String source = new String(Files.readAllBytes(Paths.get("../../Ports/JavaScriptPort/"
                 + "src/main/java/com/codename1/impl/html5/HTML5SecureStorage.java")),
                 StandardCharsets.UTF_8);
         StringBuilder methods = new StringBuilder();
-        for (String signature : new String[] {"public boolean set(",
-                "private void rollbackReplacement(", "private void releaseMigrationGate("}) {
+        for (String signature : signatures) {
             int start = source.indexOf(signature);
             assertTrue(start >= 0, "Missing production method: " + signature);
             int end = source.indexOf('{', start) + 1;
@@ -59,15 +71,16 @@ class JavascriptSecureStorageRollbackTest {
             methods.append(source.substring(start, end)).append('\n');
         }
         String fixture = new String(Files.readAllBytes(Paths.get(
-                "src/test/resources/JavascriptStorageHarness.java.template")), StandardCharsets.UTF_8)
+                "src/test/resources/" + name + ".java.template")), StandardCharsets.UTF_8)
                 .replace("/* PRODUCTION_METHODS */", methods.toString());
-        Path file = temporary.resolve("JavascriptStorageHarness.java");
+        Path file = temporary.resolve(name + ".java");
         Files.write(file, fixture.getBytes(StandardCharsets.UTF_8));
         assertNotNull(ToolProvider.getSystemJavaCompiler());
         assertEquals(0, ToolProvider.getSystemJavaCompiler().run(null, null, null,
-                "-d", temporary.toString(), file.toString()));
-        try (URLClassLoader loader = new URLClassLoader(new URL[] {temporary.toUri().toURL()}, null)) {
-            loader.loadClass("JavascriptStorageHarness").getMethod("verify").invoke(null);
+                "-cp", "../core/target/classes", "-d", temporary.toString(), file.toString()));
+        try (URLClassLoader loader = new URLClassLoader(new URL[] {temporary.toUri().toURL()},
+                SecureStorage.class.getClassLoader())) {
+            loader.loadClass(name).getMethod("verify").invoke(null);
         }
     }
 }
