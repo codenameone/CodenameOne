@@ -78,6 +78,19 @@ public final class FileIo {
     }
 
     /**
+     * The same call, because statImpl is a live fstat on the open descriptor and
+     * so is already current.
+     *
+     * <p>It exists so the two runtimes present one API: the Java SE
+     * implementation answers stat() from an open-time snapshot that asset
+     * serving needs, and therefore cannot answer whether the file has changed
+     * since. See the javadoc there.
+     */
+    public static int statFresh(int fd, long[] out) {
+        return statImpl(fd, out);
+    }
+
+    /**
      * Sends bytes from a file straight to a socket, without them entering this
      * process where the platform allows it. Returns how many moved, which may be
      * fewer than asked; the caller loops.

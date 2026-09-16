@@ -479,7 +479,12 @@ public final class Config {
             return null;
         }
         try {
-            long[] info = new long[3];
+            // FOUR, not three: the fourth is the file's identity, which the
+            // post-read check compares so an atomic replace is caught as well as
+            // an in-place rewrite. A three-long array here would leave the
+            // before-identity at 0 against a real after-identity and refuse every
+            // configuration file there is.
+            long[] info = new long[4];
             if(info.length >= 3 && FileIo.stat(fd, info) >= 0 && info[2] == 1) {
                 // A DIRECTORY IS NOT AN ABSENT FILE. openRead gives a descriptor
                 // for one -- StaticFiles needs that, to stat it and retry at the
@@ -514,6 +519,12 @@ public final class Config {
             // buffer can be part of the old file and part of the new. See the
             // re-stat below.
             long modifiedBefore = info[1];
+            // AND WHICH FILE IT WAS. mtime alone misses an atomic replace: a new
+            // application.properties moved over the path can carry any timestamp,
+            // the old one included, and then the comparison below sees no change
+            // in a file that is not even the same file. info is four long, so the
+            // identity is already there.
+            long identityBefore = info[3];
             // A configuration file is kilobytes. The ceiling is here because the
             // size comes from the filesystem and this allocates it: a device node
             // or a truncated-then-growing file should fail with a message rather
@@ -582,14 +593,47 @@ public final class Config {
                 // post-read one fall through to success would leave the stability
                 // check unperformed on exactly the mounts that need it, which is
                 // where a rewrite underneath a reader actually happens.
-                long[] after = new long[3];
-                if(FileIo.stat(fd, after) < 0) {
+                // statFresh, NOT stat. On the Java SE runtime stat() answers
+                // from the snapshot taken when the descriptor opened -- asset
+                // serving needs that, so a response describes the bytes it will
+                // stream -- which means a pre-read and a post-read stat return
+                // the IDENTICAL captured values and this comparison could never
+                // be unequal. The check read as passed on a runtime where it had
+                // never run, while the native runtime's live fstat did perform
+                // it. statFresh re-reads on both.
+                //
+                // Measured on Java SE with the descriptor held open across an
+                // in-place rewrite of the same length: stat() answered the same
+                // mtime before and after (changed=false), statFresh() answered
+                // the new one (changed=true), and after a replace-by-rename the
+                // identity moved too.
+                long[] after = new long[4];
+                if(FileIo.statFresh(fd, after) < 0) {
                     throw new IOException(path + " was read but could not be checked for "
                             + "a rewrite: its size and modification time are no longer "
                             + "readable through the open descriptor. What was loaded "
                             + "cannot be shown to be one version of the file, and every "
                             + "setting in it would otherwise fall back to a default, "
                             + "silently.");
+                }
+                // WHAT THIS CATCHES DEPENDS ON THE RUNTIME, and saying so beats
+                // implying it is universal. statFresh re-reads the PATH on Java
+                // SE, so a replace-by-rename shows up as a different identity
+                // there. On the native runtime it is an fstat of the open
+                // DESCRIPTOR, which pins the inode, so the value cannot change
+                // and this comparison is inert. That is the tolerable half: a
+                // replaced file leaves the descriptor holding a whole, consistent
+                // version of the old one, which is stale rather than corrupt. The
+                // mtime check below is the one that catches the corrupting case
+                // -- an in-place rewrite of the same length -- and it works on
+                // both.
+                if(after[3] != identityBefore) {
+                    throw new IOException(path + " was REPLACED while it was being "
+                            + "read: the name now refers to a different file than the "
+                            + "one these bytes came from. What was loaded is a whole "
+                            + "version of the old file, but it is not the configuration "
+                            + "this process was told to use; start again once the "
+                            + "deployment has settled.");
                 }
                 if(after[1] != modifiedBefore) {
                     throw new IOException(path + " was rewritten while it was being "

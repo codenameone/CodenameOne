@@ -305,6 +305,72 @@ public final class FileIo {
         }
     }
 
+    /**
+     * The file's metadata AS IT IS NOW, rather than as it was when the
+     * descriptor opened.
+     *
+     * <p>{@link #stat} deliberately answers from the open-time snapshot -- the
+     * comment on OpenFile.size says why, and static asset serving depends on it,
+     * since a response has to describe the bytes the channel will actually
+     * stream. That makes stat() useless for asking whether the file CHANGED: on
+     * this runtime both a pre-read and a post-read stat return the identical
+     * captured values, so a comparison between them can never be unequal and the
+     * check reads as passed when it never ran. The native runtime's statImpl is
+     * a live fstat and does not have that problem, so the two runtimes disagreed
+     * about a check that looked symmetric.
+     *
+     * <p>Identity is reported from the same re-read, because mtime alone misses
+     * an atomic replace: a new file moved over the path can carry any timestamp,
+     * including the old one. The pair -- same identity with a different mtime is
+     * an in-place rewrite, a different identity is a replacement -- is what the
+     * caller compares against the open-time values.
+     *
+     * <p>Read through the unix view in one call where there is one, for the
+     * reason the open-time capture states: two lookups of a PATH can straddle a
+     * replace and pair one file's timestamp with another's inode.
+     */
+    public static int statFresh(int fd, long[] out) {
+        Object entry = Descriptors.get(fd);
+        if(!(entry instanceof OpenFile) || out == null || out.length < 3) {
+            return -1;
+        }
+        OpenFile file = (OpenFile)entry;
+        try {
+            Map unix = null;
+            try {
+                unix = Files.readAttributes(file.path, "unix:*");
+            } catch (Exception unsupported) {
+                unix = null;
+            }
+            if(unix != null) {
+                Object modifiedValue = unix.get("lastModifiedTime");
+                Object sizeValue = unix.get("size");
+                Object inoValue = unix.get("ino");
+                out[0] = sizeValue instanceof Number ? ((Number)sizeValue).longValue() : 0;
+                out[1] = modifiedValue instanceof FileTime
+                        ? ((FileTime)modifiedValue).toMillis() : 0;
+                out[2] = Boolean.TRUE.equals(unix.get("isDirectory")) ? 1 : 0;
+                if(out.length > 3) {
+                    out[3] = inoValue instanceof Number
+                            ? ((Number)inoValue).longValue() : 0;
+                }
+            } else {
+                BasicFileAttributes a = Files.readAttributes(file.path,
+                        BasicFileAttributes.class);
+                out[0] = a.size();
+                out[1] = a.lastModifiedTime().toMillis();
+                out[2] = a.isDirectory() ? 1 : 0;
+                if(out.length > 3) {
+                    Object key = a.fileKey();
+                    out[3] = key == null ? 0 : key.hashCode();
+                }
+            }
+            return 0;
+        } catch (Exception unreadable) {
+            return -1;
+        }
+    }
+
     public static int stat(int fd, long[] out) {
         Object entry = Descriptors.get(fd);
         if(!(entry instanceof OpenFile) || out == null || out.length < 3) {
