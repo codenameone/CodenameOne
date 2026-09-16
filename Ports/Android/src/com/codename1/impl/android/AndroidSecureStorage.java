@@ -325,6 +325,8 @@ public final class AndroidSecureStorage extends SecureStorage {
             // answering false, which a caller reasonably reads as "the previous value still
             // stands". Read under the gate, so nothing can change it between here and the write.
             String overwritten = get(account);
+            handle.seek(0);
+            int previousMark = handle.length() == 0 ? 0 : handle.read();
             if (!setUnderHeldGate(account, value)) {
                 return false;
             }
@@ -346,12 +348,16 @@ public final class AndroidSecureStorage extends SecureStorage {
                 // The value is withdrawn so nothing is left half-published, and the caller is
                 // told the write did not happen, which is the state it can retry from.
                 Log.e(cannotMark);
-                boolean undone = overwritten == null
-                        ? removeValueUnderHeldGate(account)
-                        : setUnderHeldGate(account, overwritten);
-                if (!undone) {
-                    Log.p("SecureStorage: the value this write replaced could not be put back "
-                            + "after its gate mark failed", Log.WARNING);
+                try {
+                    boolean undone = overwritten == null
+                            ? removeValueUnderHeldGate(account)
+                            : setUnderHeldGate(account, overwritten);
+                    if (!undone) {
+                        Log.p("SecureStorage: the value this write replaced could not be put back "
+                                + "after its gate mark failed", Log.WARNING);
+                    }
+                } finally {
+                    restoreGateMark(handle, previousMark);
                 }
                 return false;
             }
@@ -635,6 +641,8 @@ public final class AndroidSecureStorage extends SecureStorage {
     /// tombstone left by a removal this process could not see.
     private String createUnderGate(java.io.RandomAccessFile handle, String account, String value)
             throws java.io.IOException {
+            handle.seek(0);
+            int previousMark = handle.length() == 0 ? 0 : handle.read();
             // setUnderHeldGate, never set(): this thread already holds this account's gate, and
             // taking it again raises OverlappingFileLockException rather than blocking.
             if (!setUnderHeldGate(account, value)) {
@@ -669,12 +677,17 @@ public final class AndroidSecureStorage extends SecureStorage {
                 // withdrawal silently failed and left the candidate stored under an unmarked
                 // gate: exactly the pair this fails closed to avoid. The gate is held, so the
                 // ordering is the same one every other path takes.
-                if (!removeValueUnderHeldGate(account)) {
-                    // Already covered by the paragraph above: this leaves a value stored under
-                    // no mark, and answering null is what keeps that harmless, because the caller
-                    // never uses it and so nothing is encrypted under it.
-                    Log.p("SecureStorage: the unmarked candidate could not be withdrawn",
-                            Log.WARNING);
+                try {
+                    if (!removeValueUnderHeldGate(account)) {
+                        // The caller never received this candidate, so nothing uses it yet.
+                        Log.p("SecureStorage: the unmarked candidate could not be withdrawn",
+                                Log.WARNING);
+                    }
+                } finally {
+                    // write() may have succeeded before force() failed. Restore the free
+                    // gate as well as withdrawing the candidate, while its lock is held.
+                    // Preserve a tombstone: another process can still cache the removed value.
+                    restoreGateMark(handle, previousMark);
                 }
                 return null;
             }
@@ -1115,11 +1128,13 @@ public final class AndroidSecureStorage extends SecureStorage {
                     //
                     // Safe to widen the window like this because the gates are held for the whole
                     // reset: no other process can act on a cleared mark while this runs.
+                    java.util.List<String> cleared = new java.util.ArrayList<String>();
                     for (int iter = 0; iter < held.size(); iter++) {
                         try {
                             java.io.RandomAccessFile handle = handles.get(iter);
                             handle.setLength(0);
                             handle.getChannel().force(true);
+                            cleared.add(held.get(iter));
                         } catch (java.io.IOException cannotClear) {
                             Log.e(cannotClear);
                             Log.p("SecureStorage could not clear the gate mark for "
@@ -1128,7 +1143,7 @@ public final class AndroidSecureStorage extends SecureStorage {
                         }
                     }
                     SharedPreferences.Editor editor = prefs.edit();
-                    for (String account : held) {
+                    for (String account : cleared) {
                         editor.remove(account);
                     }
                     // commit(), for the reason it always was: deleting the key and dropping the
@@ -1199,6 +1214,23 @@ public final class AndroidSecureStorage extends SecureStorage {
     /// and the next launch cannot find the key it names.
     private static final int GATE_REMOVED = 2;
 
+    /// Best-effort rollback after a gate write failed, including after its byte became visible.
+    /// The caller holds the file lock until both the value and its mark have been restored.
+    private static void restoreGateMark(java.io.RandomAccessFile handle, int mark) {
+        try {
+            handle.seek(0);
+            if (mark == 0) {
+                handle.setLength(0);
+            } else {
+                handle.write(mark);
+                handle.setLength(1);
+            }
+            handle.getChannel().force(true);
+        } catch (java.io.IOException cannotRestore) {
+            Log.e(cannotRestore);
+        }
+    }
+
     private boolean removeUnderGate(java.io.File gate, SharedPreferences prefs, String account) {
         java.io.RandomAccessFile handle = null;
         java.nio.channels.FileLock lock = null;
@@ -1206,34 +1238,29 @@ public final class AndroidSecureStorage extends SecureStorage {
             handle = new java.io.RandomAccessFile(gate, "rw");
             lock = handle.getChannel().lock();
             HELD_GATE.set(account);
+            handle.seek(0);
+            int previousMark = handle.length() == 0 ? 0 : handle.read();
             // A TOMBSTONE, not an erasure: see GATE_REMOVED. Truncating here said "nobody has
             // settled this account", which is indistinguishable from never-used and left every
             // other process free to keep serving the value its own cache still holds.
-            handle.setLength(0);
-            handle.seek(0);
-            handle.write(GATE_REMOVED);
-            handle.getChannel().force(true);
-            boolean removed;
-            synchronized (PLAIN_KEY_LOCK) {
-                removed = prefs.edit().remove(account).commit();
-            }
-            if (!removed) {
-                // The mark goes back. Clearing it first is right while the removal SUCCEEDS --
-                // a cleared mark beside a surviving value is read back by the next setIfAbsent
-                // and returned -- but a removal that failed leaves exactly the pair this gate
-                // exists to prevent: a value still in use and a gate saying nobody owns it, so a
-                // later process with a stale preferences cache generates a replacement key and
-                // overwrites it. Best effort, because the alternative to a failed rewrite is
-                // nothing at all.
-                try {
-                    handle.seek(0);
-                    handle.write(GATE_SETTLED);
-                    handle.getChannel().force(true);
-                } catch (java.io.IOException cannotRemark) {
-                    Log.e(cannotRemark);
+            boolean removed = false;
+            try {
+                handle.setLength(0);
+                handle.seek(0);
+                handle.write(GATE_REMOVED);
+                handle.getChannel().force(true);
+                synchronized (PLAIN_KEY_LOCK) {
+                    removed = prefs.edit().remove(account).commit();
+                }
+                return removed;
+            } finally {
+                if (!removed) {
+                    // Covers a partial tombstone write, a failed force, and a refused or
+                    // throwing preference commit. The old value must not become replaceable
+                    // merely because removal reported failure.
+                    restoreGateMark(handle, previousMark);
                 }
             }
-            return removed;
         } catch (java.io.IOException cannotRemove) {
             Log.e(cannotRemove);
             return false;
