@@ -634,7 +634,17 @@ public final class HTML5SecureStorage extends SecureStorage {
                 // The encrypted copy does not read back as the original. Leave the plaintext
                 // alone: it is the only correct copy there is -- and take the gate record with
                 // the entry, for the same reason the write failure above does.
-                Storage.getInstance().deleteStorageFile(encryptedKey(account));
+                //
+                // Only while the mirror is still THIS migration's ciphertext. Another tab
+                // completing set() between the write above and this read is the other way the
+                // comparison fails, and deleting then removes that setter's mirror -- so get()
+                // answers null after set() reported success, while the gate still holds the
+                // newer record. The compare-and-delete below already protects the gate; the
+                // ordinary entry needs the same protection.
+                Object mirrorNow = readUncached(encryptedKey(account));
+                if (mirrorNow instanceof String && sealed.equals(mirrorNow)) {
+                    Storage.getInstance().deleteStorageFile(encryptedKey(account));
+                }
                 releaseMigrationGate(account, sealed);
                 return;
             }

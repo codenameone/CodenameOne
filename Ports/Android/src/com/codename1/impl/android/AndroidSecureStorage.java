@@ -319,6 +319,12 @@ public final class AndroidSecureStorage extends SecureStorage {
             handle = new java.io.RandomAccessFile(gate, "rw");
             lock = handle.getChannel().lock();
             HELD_GATE.set(account);
+            // What this write is about to overwrite, so the rollback below can put it back. set()
+            // is an UPDATE as often as it is a create, and withdrawing on a failed mark deleted
+            // the account outright -- destroying the credential that was already there while
+            // answering false, which a caller reasonably reads as "the previous value still
+            // stands". Read under the gate, so nothing can change it between here and the write.
+            String overwritten = get(account);
             if (!setUnderHeldGate(account, value)) {
                 return false;
             }
@@ -340,9 +346,12 @@ public final class AndroidSecureStorage extends SecureStorage {
                 // The value is withdrawn so nothing is left half-published, and the caller is
                 // told the write did not happen, which is the state it can retry from.
                 Log.e(cannotMark);
-                if (!removeValueUnderHeldGate(account)) {
-                    Log.p("SecureStorage: an unmarked value could not be withdrawn after its "
-                            + "gate mark failed", Log.WARNING);
+                boolean undone = overwritten == null
+                        ? removeValueUnderHeldGate(account)
+                        : setUnderHeldGate(account, overwritten);
+                if (!undone) {
+                    Log.p("SecureStorage: the value this write replaced could not be put back "
+                            + "after its gate mark failed", Log.WARNING);
                 }
                 return false;
             }
