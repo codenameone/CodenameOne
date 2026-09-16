@@ -46,32 +46,114 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class HoverDeliveryTest extends UITestBase {
 
     @FormTest
-    void hoverOnlyPainterJoinsTheFormAnimationLoop() {
+    void hoverOnlyPainterReleasesItsOwnAnimationRegistration() {
+        class AnimatedPainter implements Painter, com.codename1.ui.animations.Animation {
+            int ticks;
+            public void paint(Graphics g, com.codename1.ui.geom.Rectangle rect) { }
+            public void paint(Graphics g) { }
+            // An idle frame must not deregister an animation with later frames.
+            public boolean animate() { ticks++; return ticks % 2 == 0; }
+        }
+        class AnimatedImage extends Image {
+            int ticks;
+            AnimatedImage() { super(Image.createImage(2, 2).getImage()); }
+            public boolean isAnimation() { return true; }
+            public boolean animate() { ticks++; return ticks % 2 == 0; }
+        }
+        implementation.setDesktop(true);
+        implementation.setMultiWindowSupported(true);
+        for (boolean secondary : new boolean[]{false, true}) {
+            Form form = new Form("hover animation", new BorderLayout());
+            form.show();
+            Window window = secondary ? new Window("hover animation", new BorderLayout()) : null;
+            Container root = secondary ? window : form;
+            TopLevelContainer host = secondary ? window : form;
+            Label component = new Label("animated hover");
+            root.add(BorderLayout.CENTER, component);
+            if (secondary) {
+                window.show();
+            }
+            DisplayTest.flushEdt();
+            try {
+                AnimatedPainter painter = new AnimatedPainter();
+                AnimatedImage image = new AnimatedImage();
+                com.codename1.ui.plaf.Style hover = new com.codename1.ui.plaf.Style(component.getUnselectedStyle());
+                hover.setBgPainter(painter);
+                hover.setBgImage(image);
+                component.setHoverStyle(hover);
+                assertFalse(secondary ? window.hasAnimations() : form.hasAnimations());
+                component.setHovered(true);
+                assertTrue(secondary ? window.hasAnimations() : form.hasAnimations());
+                int before = painter.ticks;
+                for (int i = 0; i < 3; i++) {
+                    if (secondary) { window.repaintAnimations(); } else { form.repaintAnimations(); }
+                }
+                assertEquals(before + 3, painter.ticks, "idle frames must retain the hover registration");
+                assertEquals(painter.ticks, image.ticks, "image and painter each advance once per frame");
+                component.setHovered(false);
+                assertFalse(secondary ? window.hasAnimations() : form.hasAnimations(),
+                        "hover exit must let an otherwise idle top level sleep");
+
+                // A public registration remains owned by the application, whether made
+                // before or after hover starts. Its background still advances only once.
+                for (boolean registerFirst : new boolean[]{true, false}) {
+                    if (registerFirst) { host.registerAnimated(component); }
+                    component.setHovered(true);
+                    if (!registerFirst) { host.registerAnimated(component); }
+                    before = painter.ticks;
+                    if (secondary) { window.repaintAnimations(); } else { form.repaintAnimations(); }
+                    assertEquals(before + 1, painter.ticks);
+                    assertEquals(painter.ticks, image.ticks);
+                    component.setHovered(false);
+                    assertTrue(secondary ? window.hasAnimations() : form.hasAnimations());
+                    host.deregisterAnimated(component);
+                    assertFalse(secondary ? window.hasAnimations() : form.hasAnimations());
+                }
+                component.setHovered(true);
+                root.removeComponent(component);
+                assertFalse(secondary ? window.hasAnimations() : form.hasAnimations(),
+                        "teardown must remove the hover animation from its original owner");
+            } finally {
+                if (secondary) { window.dispose(); }
+            }
+        }
+    }
+
+    @FormTest
+    void hoverAnimationResumesAfterTemporaryStyleChanges() {
         class AnimatedPainter implements Painter, com.codename1.ui.animations.Animation {
             int ticks;
             public void paint(Graphics g, com.codename1.ui.geom.Rectangle rect) { }
             public void paint(Graphics g) { }
             public boolean animate() { ticks++; return true; }
         }
-        Form form = new Form("hover animation", new BorderLayout());
-        Label component = new Label("animated hover");
-        form.add(BorderLayout.CENTER, component);
+        Form form = new Form("hover state changes", new BorderLayout());
+        Button button = new Button("animated hover");
+        form.add(BorderLayout.CENTER, button);
         form.show();
         DisplayTest.flushEdt();
         AnimatedPainter painter = new AnimatedPainter();
-        com.codename1.ui.plaf.Style hover = new com.codename1.ui.plaf.Style(component.getUnselectedStyle());
+        com.codename1.ui.plaf.Style hover = new com.codename1.ui.plaf.Style(button.getUnselectedStyle());
         hover.setBgPainter(painter);
-        component.setHoverStyle(hover);
-        form.repaintAnimations();
-        assertEquals(0, painter.ticks, "inactive hover style must not animate");
-        component.setHovered(true);
-        int before = painter.ticks;
-        form.repaintAnimations();
-        assertTrue(painter.ticks > before, "hover activation must register with the real animation loop");
-        component.setHovered(false);
-        before = painter.ticks;
-        form.repaintAnimations();
-        assertEquals(before, painter.ticks, "inactive hover painter must stop advancing");
+        button.setHoverStyle(hover);
+        button.setHovered(true);
+        for (int change = 0; change < 3; change++) {
+            if (change == 0) { button.setEnabled(false); }
+            if (change == 1) { button.setVisible(false); }
+            if (change == 2) { button.setState(Button.STATE_PRESSED); }
+            assertFalse(form.hasAnimations(), "an inactive hover style must release its registration, change " + change);
+            int before = painter.ticks;
+            form.repaintAnimations();
+            assertEquals(before, painter.ticks);
+            if (change == 0) { button.setEnabled(true); }
+            if (change == 1) { button.setVisible(true); }
+            if (change == 2) { button.setState(Button.STATE_DEFAULT); }
+            assertTrue(form.hasAnimations(), "restoring the active hover style must resume animation");
+            form.repaintAnimations();
+            assertEquals(before + 1, painter.ticks);
+        }
+        button.setHovered(false);
+        assertFalse(form.hasAnimations());
     }
 
     /// setDesktop is global to the implementation, so a test that turns it on has to put it

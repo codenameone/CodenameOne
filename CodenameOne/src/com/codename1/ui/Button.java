@@ -429,6 +429,9 @@ public class Button extends Label implements ReleasableComponent, ActionSource<A
     void setState(int state) {
         if (state != this.state) {
             this.state = state;
+            if (isHovered()) {
+                checkAnimation();
+            }
             fireStateChange();
         }
     }

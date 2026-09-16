@@ -1250,6 +1250,9 @@ public class Component implements Animation, StyleListener, Editable {
             return;
         }
         this.visible = visible;
+        if (hovered && hoverStyle != null) {
+            checkAnimation();
+        }
         accessibilityChanged(AccessibilityManager.CHANGE_STRUCTURE);
     }
 
@@ -8118,7 +8121,74 @@ public class Component implements Animation, StyleListener, Editable {
         checkAnimation();
     }
 
+    private Animation hoverBackgroundAnimation;
+    private TopLevelContainer hoverAnimationHost;
+
+    private boolean hasAnimatedHoverBackground() {
+        if (!hovered || !isVisible() || hoverStyle == null || getStyle() != hoverStyle) { // NOPMD CompareObjectsWithEquals
+            return false;
+        }
+        Image image = hoverStyle.getBgImage();
+        Painter painter = hoverStyle.getBgPainter();
+        return (image != null && image.isAnimation())
+                || (painter instanceof Animation && !(painter instanceof BGPainter));
+    }
+
+    private void stopHoverBackgroundAnimation() {
+        if (hoverAnimationHost != null) {
+            hoverAnimationHost.deregisterAnimated(hoverBackgroundAnimation);
+            hoverAnimationHost = null;
+        }
+    }
+
+    private void registerHoverBackgroundAnimation() {
+        TopLevelContainer host = getTopLevelContainer();
+        if (host == null || host == hoverAnimationHost) { // NOPMD CompareObjectsWithEquals
+            return;
+        }
+        stopHoverBackgroundAnimation();
+        if (hoverBackgroundAnimation == null) {
+            // Own a separate registration: removing the Component itself on hover exit
+            // would also cancel an animation explicitly registered by application code.
+            hoverBackgroundAnimation = new Animation() {
+                @Override
+                public boolean animate() {
+                    if (!isInitialized() || !hasAnimatedHoverBackground()) {
+                        stopHoverBackgroundAnimation();
+                        return false;
+                    }
+                    Image image = hoverStyle.getBgImage();
+                    boolean changed = image != null && image.isAnimation() && image.animate();
+                    Painter painter = hoverStyle.getBgPainter();
+                    if (painter instanceof Animation && !(painter instanceof BGPainter)) {
+                        changed = ((Animation) painter).animate() || changed;
+                    }
+                    if (changed) {
+                        repaint();
+                    }
+                    return false;
+                }
+
+                @Override
+                public void paint(Graphics graphics) {
+                    // The component repaints itself when the background changes.
+                }
+            };
+        }
+        hoverAnimationHost = host;
+        host.registerAnimated(hoverBackgroundAnimation);
+    }
+
     void checkAnimation() {
+        if (hovered && !isVisible()) {
+            stopHoverBackgroundAnimation();
+            return;
+        }
+        if (hasAnimatedHoverBackground()) {
+            registerHoverBackgroundAnimation();
+            return;
+        }
+        stopHoverBackgroundAnimation();
         Image bgImage = getStyle().getBgImage();
         if (bgImage != null && bgImage.isAnimation()) {
             registerForAnimation();
@@ -8212,7 +8282,11 @@ public class Component implements Animation, StyleListener, Editable {
             return false;
         }
         Image bgImage = getStyle().getBgImage();
-        boolean animateBackground = bgImage != null && bgImage.isAnimation() && bgImage.animate();
+        // A separately registered hover background advances once even if the app also
+        // registered this Component (or its scrolling/ticker uses the internal list).
+        boolean hoverBackgroundScheduled = hoverAnimationHost != null && getStyle() == hoverStyle; // NOPMD CompareObjectsWithEquals
+        boolean animateBackground = !hoverBackgroundScheduled && bgImage != null
+                && bgImage.isAnimation() && bgImage.animate();
         Motion m = getAnimationMotion();
 
         // perform regular scrolling
@@ -8358,7 +8432,7 @@ public class Component implements Animation, StyleListener, Editable {
 
 
         Painter bgp = getStyle().getBgPainter();
-        boolean animateBackgroundB = bgp != null &&
+        boolean animateBackgroundB = !hoverBackgroundScheduled && bgp != null &&
                 !(bgp instanceof BGPainter) &&
                 bgp instanceof Animation &&
                 ((Animation) bgp).animate();
@@ -8770,6 +8844,7 @@ public class Component implements Animation, StyleListener, Editable {
     }
 
     private void clearHoverOnDeinitialize() {
+        stopHoverBackgroundAnimation();
         // Removal outside a pointer callback must also release the owner's target.
         // Reset directly: setHovered would register the newly active style for
         // animation while this component is being torn down.
@@ -9081,6 +9156,9 @@ public class Component implements Animation, StyleListener, Editable {
             return;
         }
         this.enabled = enabled;
+        if (hovered && hoverStyle != null) {
+            checkAnimation();
+        }
         accessibilityChanged(AccessibilityManager.CHANGE_STATE);
         repaint();
     }
