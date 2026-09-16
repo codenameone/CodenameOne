@@ -2628,3 +2628,68 @@ than stack-allocating one. Stack allocation would only help sites that resolve b
 refused on loop SHAPE -- `it.remove()` in the body, a non-canonical loop -- and those are a
 handful. The remaining 522,140 iterator allocations are at sites where the type is not
 proven, so they need item 2 widened, not a different allocation strategy.
+
+## Round 23: the iterator universe is closed and ours -- survey, and the mechanism
+
+The remaining 522,140 iterator allocations are at for-each sites where the RECEIVER's type
+cannot be proven, so widening the receiver proof reaches them only one shape at a time.
+There is a better lever, and it does not need the receiver at all: the iterators are our
+classes. Surveyed rather than assumed.
+
+### Every Iterator implementation in the closed world
+
+    real implementations of hasNext()Z      34
+      ours (java.util.*)                    33
+      foreign                                1   org.objectweb.asm.tree.InsnList.InsnListIterator
+
+**One class in a 37.6k-line program is not ours**, and it is itself a plain cursor. Their
+shapes, from the emitted structs:
+
+| iterator | own state |
+|---|---|
+| `ArrayListIterator` | 3 ints + parent |
+| `SimpleListIterator` | 3 ints + parent |
+| `ArrayDequeIterator` | 2 ints + boolean + parent |
+| `HashMap.AbstractMapIterator` (+3 subclasses) | 3 ints + map ref |
+| `Hashtable.HashIterator` | 3 ints + boolean + 2 refs |
+| `IdentityHashMapIterator` | 4 ints + boolean + 2 refs |
+| TreeMap's 11 | no own fields, all inherited |
+
+Every one is a parent reference plus a handful of primitives. The largest,
+`Hashtable.HashEnumIterator`, is ~56 bytes including the 16-byte header. **A single uniform
+bound covers all of them**, which is what makes a special case possible: the translator
+does not need to know WHICH iterator a call returns, only that it is one of a known set
+that is small, and that the loop does not let it escape.
+
+### The mechanism this enables
+
+At a canonical for-each whose iterator local is provably non-escaping -- exactly the check
+the indexed lowering already performs, the slot being read only by hasNext() and next() --
+the translator emits a C stack buffer of the uniform size and hands it to the thread:
+
+    char __cn1iter_N[CN1_MAX_ITER_SIZE];
+    cn1IterScopeBegin(threadStateData, __cn1iter_N);   // one-shot
+    ... coll.iterator() ...                            // first iterator-class NEW takes it
+    ... loop ...
+
+The allocator consumes the pending buffer on the first allocation of a class flagged as an
+iterator, exactly once, and constructs there with the header shape the existing stack-object
+path already uses (`__cn1stk_` for StringBuilder). The one-shot is what keeps it safe when
+an iterator wraps another: the outer takes the buffer, anything allocated later in the body
+goes to the heap as usual.
+
+**It needs no receiver type at all**, which is precisely why it reaches the 522,140 that
+widening the proof does not.
+
+### Why it is NOT being built yet, and this is a technical reason rather than a hedge
+
+A stack-allocated iterator is reachable to the collector ONLY through the conservative scan
+of the native stack. That is the same mechanism Round 19 implicated in the live-object loss:
+the application thread is never handshaked, so its roots come from a single SIGUSR2 capture
+per cycle and the correctness of everything it holds rests on that capture plus SATB. Adding
+a class of objects that exist ONLY on that stack increases the VM's dependence on the exact
+mechanism that is currently losing objects roughly 1 run in 16 under memory pressure.
+
+The ordering is therefore: fix the handshake, then build this. Doing it in the other order
+means any new corruption is unattributable between the two, and this VM has already shown
+that a gate suite can be entirely green while live objects are being freed.
