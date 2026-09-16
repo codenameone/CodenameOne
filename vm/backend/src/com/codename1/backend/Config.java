@@ -575,8 +575,23 @@ public final class Config {
                 // inside the same second as the open. It closes the window that
                 // is actually open -- a tool writing a file after this process
                 // started reading it -- rather than every window.
+                // A FAILED stat HERE IS A FAILED CHECK, not a passed one. The
+                // pre-read stat two branches up is already fatal for the same
+                // reason -- the descriptor is open, so the file exists and the
+                // filesystem is failing to describe it -- and letting the
+                // post-read one fall through to success would leave the stability
+                // check unperformed on exactly the mounts that need it, which is
+                // where a rewrite underneath a reader actually happens.
                 long[] after = new long[3];
-                if(FileIo.stat(fd, after) >= 0 && after[1] != modifiedBefore) {
+                if(FileIo.stat(fd, after) < 0) {
+                    throw new IOException(path + " was read but could not be checked for "
+                            + "a rewrite: its size and modification time are no longer "
+                            + "readable through the open descriptor. What was loaded "
+                            + "cannot be shown to be one version of the file, and every "
+                            + "setting in it would otherwise fall back to a default, "
+                            + "silently.");
+                }
+                if(after[1] != modifiedBefore) {
                     throw new IOException(path + " was rewritten while it was being "
                             + "read, so what was loaded may be part of the old file and "
                             + "part of the new. It is the same length either way, which "
