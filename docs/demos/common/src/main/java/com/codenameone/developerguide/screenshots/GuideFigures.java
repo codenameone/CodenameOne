@@ -85,6 +85,7 @@ public final class GuideFigures {
             new FigureVariant(new ComponentsGenericRendererFigure(), FigureDevice.ANDROID, false, "components-generic-list-cell-renderer.png"),
             new FigureVariant(new ComponentsMillionEntriesFigure(), FigureDevice.ANDROID, false, "components-millionbooks.png"),
             new FigureVariant(new IoStorageListFigure(), FigureDevice.ANDROID, false, "storage-list.png"),
+            new FigureVariant(new ComponentsValidationFigure(), FigureDevice.ANDROID, false, "validation-regex-masking-1.png"),
             new FigureVariant(new ComponentsDialogModalSouthFigure(), FigureDevice.ANDROID, false, "components-dialog-modal-south.png"),
             new FigureVariant(new ComponentsDialogBottomHalfFigure(), FigureDevice.ANDROID, false, "components-dialog-modal-bottom-half.png"),
             new FigureVariant(new ComponentsDialogTintFigure(), FigureDevice.ANDROID, false, "components-dialog-tint.png"),

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  * This code is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License version 2 only, as
@@ -20,75 +20,29 @@
  * Please contact Codename One through http://www.codenameone.com/ if you
  * need additional information or have any questions.
  */
-package com.codenameone.developerguide.snippets.generated;
 
-import com.codename1.gpu.*;
-import com.codename1.ui.*;
-import com.codename1.ui.animations.*;
-import com.codename1.ui.events.*;
-import com.codename1.ui.geom.*;
-import com.codename1.ui.layouts.*;
-import com.codename1.ui.list.*;
-import com.codename1.ui.plaf.*;
-import com.codename1.ui.util.*;
-import com.codename1.components.*;
-import com.codename1.charts.models.*;
-import com.codename1.charts.renderers.*;
-import com.codename1.charts.views.*;
-import com.codename1.capture.*;
-import com.codename1.io.*;
-import com.codename1.l10n.*;
-import com.codename1.location.*;
-import com.codename1.maps.*;
-import com.codename1.media.*;
-import com.codename1.messaging.*;
-import com.codename1.payment.*;
-import com.codename1.processing.*;
-import com.codename1.properties.*;
-import com.codename1.push.*;
-import com.codename1.security.*;
-import com.codename1.social.*;
-import com.codename1.ui.spinner.*;
-import java.io.*;
-import com.codename1.components.ToastBar.Status;
-import com.codename1.maps.layers.*;
-import com.codename1.charts.*;
-import com.codename1.ui.validation.*;
-import com.codename1.xml.*;
-import com.codename1.charts.util.*;
-import com.codename1.javascript.*;
-import com.codename1.ui.tree.*;
-import com.codename1.ui.table.*;
-import com.codename1.contacts.*;
-import java.util.*;
+package com.codenameone.developerguide.screenshots;
 
+import com.codename1.ui.Button;
+import com.codename1.ui.Form;
+import com.codename1.ui.TextField;
+import com.codename1.ui.layouts.BoxLayout;
+import com.codename1.ui.validation.LengthConstraint;
+import com.codename1.ui.validation.RegexConstraint;
+import com.codename1.ui.validation.Validator;
 
-class TheComponentsOfCodenameOneJava161Snippet {
+/// A form under a Validator, with the constraints the chapter sets up.
+class ComponentsValidationFigure implements GuideFigure {
 
+    @Override
+    public String id() {
+        return "validation-regex-masking-1";
+    }
 
-    Object context;
-    Object value;
-    Object body;
-    Object event;
-    String apiKey = "test-key";
-    String myHttpsURL = "https://example.com";
-    java.util.List<String> validKeysList = new java.util.ArrayList<>();
-    Image myImage;
-    Graphics graphics;
-    Graphics g;
-    GraphicsDevice device;
-    Form form;
-    Form hi;
-    Container cnt;
-    Container myForm;
-    Component component;
-    Button button;
-    MultiButton myMultiButton;
-    Label label;
-    BrowserComponent browserComponent;
-    Resources theme;
-    
-    void snippet() throws Exception {
+    /// The tagged region is what the chapter includes, so the listing beside the
+    /// picture is the code that drew it.
+    @Override
+    public Form build() {
         // tag::the-components-of-codename-one-java-161[]
         TextField firstName = new TextField("", "First Name");
         TextField surname = new TextField("", "Surname");
@@ -96,7 +50,7 @@ class TheComponentsOfCodenameOneJava161Snippet {
         TextField email = new TextField("", "E-Mail", 20, TextField.EMAILADDR);
         TextField phone = new TextField("", "Phone", 20, TextField.PHONENUMBER);
         String phoneRegex = "[0-9\\-\\+ ]+";
-            TextField num1 = new TextField("", "", 5, TextField.NUMERIC);
+        TextField num1 = new TextField("", "", 5, TextField.NUMERIC);
         TextField num2 = new TextField("", "", 5, TextField.NUMERIC);
         TextField num3 = new TextField("", "", 5, TextField.NUMERIC);
         TextField num4 = new TextField("", "", 5, TextField.NUMERIC);
@@ -125,25 +79,23 @@ class TheComponentsOfCodenameOneJava161Snippet {
                 add(num1).add(num2).add(num3).add(num4).add(submit);
         hi.show();
         // end::the-components-of-codename-one-java-161[]
+        return hi;
     }
 
-
-
-
-
+    /// The masking helper the previous section builds, carried here so the
+    /// listing above runs rather than compiling against a stub.
     private void automoveToNext(final TextField current, final TextField next) {
         current.addDataChangedListener((type, index) -> {
             String val = current.getText();
-            if(val.length() > 4) {
+            if (val.length() > 4) {
                 current.stopEditing();
                 current.setText(val.substring(0, 4));
                 String rest = val.substring(4);
                 next.setText(rest);
-                if(rest.length() <= 4) {
+                if (rest.length() <= 4) {
                     next.startEditingAsync();
                 }
             }
         });
     }
-
 }

@@ -892,11 +892,11 @@ This sample below continues from the place where the <<text-component-sample-cod
 
 [source,java]
 ----
-include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/TheComponentsOfCodenameOneJava161Snippet.java[tag=the-components-of-codename-one-java-161,indent=0]
+include::../demos/common/src/main/java/com/codenameone/developerguide/screenshots/ComponentsValidationFigure.java[tag=the-components-of-codename-one-java-161,indent=0]
 ----
 
 .Validation & Regular Expressions
-image::img/validation-regex-masking-1.png[Validation and Regular Expressions,scaledwidth=20%]
+image::img/generated/validation-regex-masking-1.png[Validation and Regular Expressions,scaledwidth=20%]
 
 When the form components are bound to a model with `@Bindable`, the
 same constraints can be expressed as field annotations -- `@Required`,
