@@ -1250,6 +1250,11 @@ public class Component implements Animation, StyleListener, Editable {
             return;
         }
         this.visible = visible;
+        if (!visible) {
+            // Hiding an attached subtree ends its pointer ownership just like removal.
+            // Showing it again must wait for a fresh pointer event, including tooltips.
+            clearHoverForInactiveSubtree();
+        }
         if (hovered && hoverStyle != null) {
             checkAnimation();
         }
@@ -8837,7 +8842,7 @@ public class Component implements Animation, StyleListener, Editable {
             if (p instanceof BGPainter) {
                 ((BGPainter) p).radialCache = null;
             }
-            clearHoverOnDeinitialize();
+            clearHoverForInactiveSubtree();
             if (stateChangeListeners != null) {
                 stateChangeListeners.fireActionEvent(new ComponentStateChangeEvent(this, false));
             }
@@ -8855,15 +8860,15 @@ public class Component implements Animation, StyleListener, Editable {
                 }
             }
         } else {
-            clearHoverOnDeinitialize();
+            clearHoverForInactiveSubtree();
         }
     }
 
-    private void clearHoverOnDeinitialize() {
+    private void clearHoverForInactiveSubtree() {
         stopHoverBackgroundAnimation();
-        // Removal outside a pointer callback must also release the owner's target.
+        // Hiding or removal outside a pointer callback must release the owner's target.
         // Reset directly: setHovered would register the newly active style for
-        // animation while this component is being torn down.
+        // animation while this component is hidden or being torn down.
         hovered = false;
         clearInteractiveScrollHover();
         Container root = TopLevelSupport.rootOf(this);

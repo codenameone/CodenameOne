@@ -146,7 +146,12 @@ class HoverDeliveryTest extends UITestBase {
             form.repaintAnimations();
             assertEquals(before, painter.ticks);
             if (change == 0) { button.setEnabled(true); }
-            if (change == 1) { button.setVisible(true); }
+            if (change == 1) {
+                button.setVisible(true);
+                assertFalse(button.isHovered(), "showing a hidden component cannot restore stale hover");
+                assertFalse(form.hasAnimations());
+                hoverForm(form, button);
+            }
             if (change == 2) { button.setState(Button.STATE_DEFAULT); }
             assertTrue(form.hasAnimations(), "restoring the active hover style must resume animation");
             form.repaintAnimations();
@@ -557,6 +562,71 @@ class HoverDeliveryTest extends UITestBase {
         } finally {
             if (window != null) {
                 window.dispose();
+            }
+        }
+    }
+
+    @FormTest
+    void hidingAnAttachedSubtreeClearsHoverAndTooltips() throws Exception {
+        implementation.setDesktop(true);
+        implementation.setMultiWindowSupported(true);
+        java.lang.reflect.Field pending = TooltipManager.class.getDeclaredField("pendingTooltip");
+        java.lang.reflect.Field visible = TooltipManager.class.getDeclaredField("currentTooltip");
+        java.lang.reflect.Field anchor = TooltipManager.class.getDeclaredField("currentComponent");
+        pending.setAccessible(true);
+        visible.setAccessible(true);
+        anchor.setAccessible(true);
+        for (boolean secondary : new boolean[]{false, true}) {
+            Form form = new Form("visibility", new BorderLayout());
+            form.show();
+            Window window = secondary ? new Window("visibility", new BorderLayout()) : null;
+            Container surface = secondary ? window : form;
+            Container subtree = new Container(new BorderLayout());
+            Button target = new Button("hover target");
+            target.setTooltip("attached target");
+            subtree.add(BorderLayout.CENTER, target);
+            surface.add(BorderLayout.CENTER, subtree);
+            if (window != null) {
+                window.setWindowSize(500, 400);
+                window.show();
+            }
+            surface.revalidate();
+            DisplayTest.flushEdt();
+            TooltipManager previous = TooltipManager.getInstance();
+            TooltipManager manager = new TooltipManager();
+            manager.setTooltipShowDelay(60000);
+            TooltipManager.enableTooltips(manager);
+            try {
+                for (Component hidden : new Component[]{target, subtree}) {
+                    int x = target.getAbsoluteX() + target.getWidth() / 2;
+                    int y = target.getAbsoluteY() + target.getHeight() / 2;
+                    surface.pointerHover(new int[]{x}, new int[]{y});
+                    assertTrue(target.isHovered());
+                    assertNotNull(pending.get(manager));
+                    manager.showTooltip(target.getTooltip(), target);
+                    assertNotNull(visible.get(manager));
+                    new Container().setVisible(false);
+                    assertNotNull(pending.get(manager), "unrelated hiding must preserve the timer");
+                    assertNotNull(visible.get(manager), "unrelated hiding must preserve the popup");
+                    hidden.setVisible(false);
+                    assertFalse(target.isHovered());
+                    assertFalse(surface.getHoverTracker().isOver(target));
+                    assertNull(pending.get(manager));
+                    assertNull(visible.get(manager));
+                    assertNull(anchor.get(manager));
+                    hidden.setVisible(true);
+                    assertFalse(target.isHovered(), "show waits for a new pointer event");
+                    surface.pointerHover(new int[]{x}, new int[]{y});
+                    assertTrue(target.isHovered(), "a new event restores hover on the same target");
+                    assertNotNull(pending.get(manager), "the new event schedules a fresh tooltip");
+                    manager.clearTooltip();
+                }
+            } finally {
+                manager.clearTooltip();
+                TooltipManager.enableTooltips(previous);
+                if (window != null) {
+                    window.dispose();
+                }
             }
         }
     }
