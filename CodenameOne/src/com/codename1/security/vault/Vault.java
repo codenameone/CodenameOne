@@ -3264,11 +3264,11 @@ public final class Vault {
     /// counter raised. Everything inside such a record agrees with itself, and an offline client
     /// has nothing to compare it against. That is the freshness limit documented on
     /// [#importSyncState].
-    /// Publishes a recovered key, and undoes it if a lock arrived while it was being published.
+    /// Publishes a recovered key only if no lock has invalidated the operation.
     ///
-    /// Storage checks may yield, so publication rechecks the lock generation after adopting the
-    /// key. The generation read and state transitions acquire the same monitor; no monitor is
-    /// held across storage or device operations.
+    /// Storage checks may yield. After they finish, the generation check and both state writes
+    /// share lock()'s monitor, so a stale unlock never installs a key. No monitor is held across
+    /// storage or device operations.
     private void publishKey(int generation, VaultMetadata meta, byte[] key) {
         // The stored record has to still be the one this key was derived FROM. Deriving takes as
         // long as the KDF profile asks, and a rotation committing inside that window leaves this
@@ -3291,12 +3291,12 @@ public final class Vault {
                     "this vault's record changed while the key was being derived, so the key this "
                     + "unlock produced is not the one the vault now describes; try again");
         }
-        metadata = meta;
-        adoptKey(key);
-        if (generation != lockGeneration()) {
-            lock();
-            throw new VaultException(VaultError.LOCKED,
-                    "the vault was locked while it was being unlocked");
+        synchronized (this) {
+            // Refuse before publishing either field. Installing and then undoing would expose
+            // an unlocked session between these operations after lock() had already returned.
+            requireSameGeneration(generation);
+            metadata = meta;
+            adoptKey(key);
         }
     }
 

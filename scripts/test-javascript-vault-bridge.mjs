@@ -125,6 +125,49 @@ try {
   const status = (reply) => reply[0];
   const payload = (reply) => reply.slice(1);
 
+  // A browser can answer the PRF question asynchronously. Keep its answer pending until
+  // after the real IndexedDB/crypto probe finishes, so the startup race is deterministic.
+  for (const mode of ['denied', 'allowed', 'unknown', 'rejected', 'missing', 'throwing']) {
+    const probeContext = await browser.newContext();
+    await probeContext.addInitScript((mode) => {
+      Object.defineProperty(navigator.storage, 'persisted', { configurable: true, value: () => {
+        window.__storageProbeFinished = true;
+        return Promise.resolve(false);
+      } });
+      Object.defineProperty(PublicKeyCredential, 'getClientCapabilities', {
+        configurable: true,
+        value: mode === 'missing' ? undefined : () => {
+          if (mode === 'throwing') throw new Error('capability API unavailable');
+          return new Promise((resolve, reject) => {
+            window.__answerCapabilities = () => {
+              if (mode === 'rejected') reject(new Error('capability API refused'));
+              else resolve(mode === 'unknown' ? {} : { 'extension:prf': mode === 'allowed' });
+            };
+          });
+        }
+      });
+    }, mode);
+    const probe = await probeContext.newPage();
+    await probe.goto(url);
+    await probe.evaluate(() => {
+      window.__capabilitySettled = false;
+      window.__capabilityResult = window.__cn1VaultCall({ op: 'capabilities' }).then(reply => {
+        window.__capabilitySettled = true;
+        return reply;
+      });
+    });
+    await probe.waitForFunction(() => window.__storageProbeFinished === true);
+    if (mode !== 'missing' && mode !== 'throwing') {
+      check('capability query awaits the browser answer: ' + mode,
+        await probe.evaluate(() => window.__capabilitySettled), false);
+      await probe.evaluate(() => window.__answerCapabilities());
+    }
+    const reply = await probe.evaluate(() => window.__capabilityResult);
+    check('PRF capability follows the browser answer: ' + mode,
+      reply[1] & 16, mode === 'denied' ? 0 : 16);
+    await probeContext.close();
+  }
+
   // ---------------------------------------------------------------- device key
   const KEY = 'browser-vault';
   const AAD = [1, 2, 3, 4];

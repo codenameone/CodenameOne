@@ -739,10 +739,12 @@
       if (persisted) {
         bits |= 8;
       }
-      if (cn1VaultPrfCapable()) {
-        bits |= 16;
-      }
-      return cn1VaultReply(CN1V_OK, [bits]);
+      return cn1VaultClientCapabilities.then(function(caps) {
+        if (cn1VaultPrfCapable(caps)) {
+          bits |= 16;
+        }
+        return cn1VaultReply(CN1V_OK, [bits]);
+      });
     });
   }
 
@@ -825,7 +827,7 @@
     });
   }
 
-  function cn1VaultPrfCapable() {
+  function cn1VaultPrfCapable(caps) {
     // Presence of the API, plus the one PRF signal a browser exposes without a
     // ceremony. Whether a given AUTHENTICATOR implements the extension is still
     // only discoverable by performing one -- so this bit says "worth offering"
@@ -841,7 +843,6 @@
         && w.navigator && w.navigator.credentials)) {
       return false;
     }
-    var caps = cn1VaultCachedClientCapabilities;
     if (caps && typeof caps === 'object') {
       // Present and false is a definite no; absent means the browser does not
       // report this, and the ceremony stays the only way to find out.
@@ -852,25 +853,24 @@
     return true;
   }
 
-  // Filled in once, if the browser offers it. getClientCapabilities is async and
-  // this predicate is not, so the answer is fetched when the bridge loads and
-  // read here; before it arrives the predicate behaves exactly as it did, which
-  // is the pre-existing "worth offering" answer rather than a new false negative.
-  var cn1VaultCachedClientCapabilities = null;
-  (function () {
+  // Start once at bridge load. Capability requests await the same result instead of treating
+  // a pending definitive answer as support. Missing/refused APIs leave the ceremony as the
+  // remaining signal, just as browsers without getClientCapabilities do.
+  var cn1VaultClientCapabilities = (function () {
     try {
       var w = global.window || global;
       if (w.PublicKeyCredential
           && typeof w.PublicKeyCredential.getClientCapabilities === 'function') {
-        w.PublicKeyCredential.getClientCapabilities().then(function (caps) {
-          cn1VaultCachedClientCapabilities = caps;
+        return Promise.resolve(w.PublicKeyCredential.getClientCapabilities()).then(function (caps) {
+          return caps;
         }, function () {
-          // Unsupported or refused; the ceremony remains the only signal.
+          return null;
         });
       }
     } catch (ignored) {
       // Nothing here may prevent the bridge from loading.
     }
+    return Promise.resolve(null);
   })();
 
 

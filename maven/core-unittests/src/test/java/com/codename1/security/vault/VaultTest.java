@@ -3770,6 +3770,58 @@ class VaultTest extends UITestBase {
     }
 
     @Test
+    void staleUnlockPublicationDoesNotTemporarilyReopenALockedVault() throws Exception {
+        final Vault vault = Vault.named(freshName()).configure(fast());
+        vault.enroll(pw("p"), fast()).get();
+        final int generation = vault.generation();
+        final java.lang.reflect.Field metadata = Vault.class.getDeclaredField("metadata");
+        final java.lang.reflect.Field dataKey = Vault.class.getDeclaredField("dataKey");
+        metadata.setAccessible(true);
+        dataKey.setAccessible(true);
+        final Object record = metadata.get(vault);
+        final byte[] recovered = ((byte[]) dataKey.get(vault)).clone();
+        final java.lang.reflect.Method publish = Vault.class.getDeclaredMethod("publishKey",
+                int.class, VaultMetadata.class, byte[].class);
+        publish.setAccessible(true);
+        final java.util.concurrent.atomic.AtomicReference<Throwable> failure =
+                new java.util.concurrent.atomic.AtomicReference<Throwable>();
+        Thread unlocking = new Thread(new Runnable() {
+            public void run() {
+                try {
+                    publish.invoke(vault, generation, record, recovered);
+                } catch (Throwable problem) {
+                    failure.set(problem);
+                }
+            }
+        });
+        try {
+            synchronized (vault) {
+                vault.lock();
+                unlocking.start();
+                long deadline = System.nanoTime() + java.util.concurrent.TimeUnit.SECONDS.toNanos(10);
+                while (unlocking.getState() != Thread.State.BLOCKED && unlocking.isAlive()
+                        && System.nanoTime() < deadline) {
+                    Thread.yield();
+                }
+                assertEquals(Thread.State.BLOCKED, unlocking.getState());
+                assertNull(metadata.get(vault), "a stale publisher must not install metadata first");
+                assertNull(dataKey.get(vault));
+            }
+            unlocking.join(10000);
+            assertFalse(unlocking.isAlive());
+            assertTrue(failure.get() instanceof java.lang.reflect.InvocationTargetException);
+            Throwable cause = failure.get().getCause();
+            assertTrue(cause instanceof VaultException);
+            assertNull(metadata.get(vault));
+            assertNull(dataKey.get(vault));
+            assertFalse(vault.isUnlocked());
+        } finally {
+            unlocking.join(10000);
+            Bytes.zero(recovered);
+        }
+    }
+
+    @Test
     void sensitiveResultsAreDeliveredWhileHoldingTheVaultLockMonitor() throws Exception {
         final Vault vault = Vault.named(freshName()).configure(fast());
         vault.enroll(pw("p"), fast()).get();
