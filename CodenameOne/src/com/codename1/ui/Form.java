@@ -4697,6 +4697,7 @@ public class Form extends Container implements TopLevelContainer {
     /// {@inheritDoc}
     @Override
     public void pointerReleased(int x, int y) {
+        final boolean hoverOnRelease = HoverTracker.canHoverOnRelease();
         // A press that never became a drag releases the operation the press staged, so a
         // later gesture somewhere else cannot start the drag this one declined to.
         //
@@ -4901,7 +4902,7 @@ public class Form extends Container implements TopLevelContainer {
             // In the finally, beside the other piece of end-of-gesture bookkeeping, because
             // this method returns from six places inside the try above and a catch-up after
             // the block is reached by none of them.
-            if (Display.getInstance().isDesktop()) {
+            if (hoverOnRelease) {
                 hoverTracker.pointerOver(hoverTargetAt(x, y), x, y);
             }
         }

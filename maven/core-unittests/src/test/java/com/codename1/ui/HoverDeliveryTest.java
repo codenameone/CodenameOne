@@ -25,6 +25,7 @@ package com.codename1.ui;
 import com.codename1.junit.FormTest;
 import com.codename1.junit.UITestBase;
 import com.codename1.ui.layouts.BorderLayout;
+import com.codename1.ui.events.PointerEvent;
 import com.codename1.ui.plaf.UIManager;
 
 import java.util.Hashtable;
@@ -32,6 +33,8 @@ import java.util.Hashtable;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /// Hover DELIVERY: what actually happens when a port reports a pointer position.
@@ -47,6 +50,7 @@ class HoverDeliveryTest extends UITestBase {
     @org.junit.jupiter.api.AfterEach
     void restoreDesktopFlag() {
         implementation.setDesktop(false);
+        implementation.resetPointerEventMetadata();
     }
 
     /// Theme with a hover colour on the row UIID and on a plain button.
@@ -160,6 +164,7 @@ class HoverDeliveryTest extends UITestBase {
         f.pointerPressed(new int[]{a.getAbsoluteX() + a.getWidth() / 2},
                 new int[]{a.getAbsoluteY() + a.getHeight() / 2});
         DisplayTest.flushEdt();
+        implementation.setPointerType(PointerEvent.TYPE_MOUSE);
         f.pointerReleased(b.getAbsoluteX() + b.getWidth() / 2,
                 b.getAbsoluteY() + b.getHeight() / 2);
         DisplayTest.flushEdt();
@@ -208,4 +213,87 @@ class HoverDeliveryTest extends UITestBase {
         w.dispose();
         DisplayTest.flushEdt();
     }
+    @FormTest
+    void releasesOnlyCreateHoverForMouseAndPenOnForms() {
+        checkReleaseSources(false);
+    }
+
+    @FormTest
+    void releasesOnlyCreateHoverForMouseAndPenOnWindows() {
+        checkReleaseSources(true);
+    }
+
+    private void checkReleaseSources(boolean secondaryWindow) {
+        implementation.setDesktop(true);
+        implementation.setMultiWindowSupported(true);
+        Form main = new Form("main", new BorderLayout());
+        main.show();
+        DisplayTest.flushEdt();
+        Window window = secondaryWindow ? new Window("release", new BorderLayout()) : null;
+        Container surface = secondaryWindow ? window : main;
+        Button button = new Button("release");
+        surface.add(BorderLayout.CENTER, button);
+        if (window != null) {
+            window.setWindowSize(500, 400);
+            window.show();
+        }
+        surface.revalidate();
+        DisplayTest.flushEdt();
+        installHoverTheme(surface);
+        int x = button.getAbsoluteX() + button.getWidth() / 2;
+        int y = button.getAbsoluteY() + button.getHeight() / 2;
+        try {
+            for (int type : new int[]{PointerEvent.TYPE_TOUCH, PointerEvent.TYPE_MOUSE,
+                    PointerEvent.TYPE_STYLUS, PointerEvent.TYPE_ERASER, PointerEvent.TYPE_UNKNOWN}) {
+                surface.pointerHover(new int[]{-1}, new int[]{-1});
+                implementation.setPointerType(type);
+                surface.pointerPressed(x, y);
+                surface.pointerReleased(x, y);
+                assertEquals(type == PointerEvent.TYPE_MOUSE || type == PointerEvent.TYPE_STYLUS
+                        || type == PointerEvent.TYPE_ERASER, button.isHovered(),
+                        "release hover for pointer type " + type + " in window=" + secondaryWindow);
+            }
+        } finally {
+            if (window != null) {
+                window.dispose();
+            }
+        }
+    }
+
+    @FormTest
+    void leavingAWindowCancelsPendingAndVisibleTooltips() throws Exception {
+        implementation.setMultiWindowSupported(true);
+        new Form("main", new BorderLayout()).show();
+        Window window = new Window("tooltip", new BorderLayout());
+        window.setWindowSize(500, 400);
+        Button button = new Button("tip");
+        button.setTooltip("Window tooltip");
+        window.add(BorderLayout.CENTER, button);
+        window.show();
+        DisplayTest.flushEdt();
+        TooltipManager previous = TooltipManager.getInstance();
+        TooltipManager manager = new TooltipManager();
+        manager.setTooltipShowDelay(60000);
+        TooltipManager.enableTooltips(manager);
+        java.lang.reflect.Field pending = TooltipManager.class.getDeclaredField("pendingTooltip");
+        java.lang.reflect.Field visible = TooltipManager.class.getDeclaredField("currentTooltip");
+        pending.setAccessible(true);
+        visible.setAccessible(true);
+        try {
+            window.pointerHover(new int[]{button.getAbsoluteX() + button.getWidth() / 2},
+                    new int[]{button.getAbsoluteY() + button.getHeight() / 2});
+            assertNotNull(pending.get(manager), "hover schedules a tooltip");
+            window.pointerHover(new int[]{-1}, new int[]{-1});
+            assertNull(pending.get(manager), "leaving cancels the scheduled tooltip");
+            manager.showTooltip(button.getTooltip(), button);
+            assertNotNull(visible.get(manager), "tooltip is visible before leaving");
+            window.pointerHover(new int[]{-1}, new int[]{-1});
+            assertNull(visible.get(manager), "leaving dismisses a visible tooltip");
+        } finally {
+            manager.clearTooltip();
+            TooltipManager.enableTooltips(previous);
+            window.dispose();
+        }
+    }
+
 }

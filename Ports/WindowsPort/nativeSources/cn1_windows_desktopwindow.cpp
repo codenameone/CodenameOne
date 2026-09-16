@@ -384,8 +384,9 @@ static LRESULT CALLBACK cn1WinDesktopWndProc(HWND hwnd, UINT msg, WPARAM wParam,
                  * for it. windowPointerHover routes by window id, so a control in a
                  * secondary window reaches the hover state like any other. */
                 /* Touch-promoted motion is not hover; see the main window's handler. */
-                if (cn1WinTouchFlag() == 0) {
-                    cn1WinDesktopPushPointer(w, CN1_EVENT_POINTER_HOVER, lParam, 0);
+                int source = cn1WinTouchFlag();
+                if ((source & CN1_PE_TOUCH_FLAG) == 0) {
+                    cn1WinDesktopPushPointer(w, CN1_EVENT_POINTER_HOVER, lParam, source);
                 }
                 /* One-shot, so re-armed on every hover. Without it the pointer can leave
                  * this window and the last control stays lit. */

@@ -22,6 +22,8 @@
  */
 package com.codename1.ui;
 
+import com.codename1.ui.events.PointerEvent;
+
 /// Remembers which component a single top level container's pointer is over, and moves the
 /// hover state as it changes.
 ///
@@ -37,6 +39,15 @@ package com.codename1.ui;
 ///
 /// Desktop only in practice, because nothing else generates hover events.
 class HoverTracker {
+    // Capture this before release callbacks: nested dispatch may change the current device.
+    // Desktop touch screens still send finger releases, which must never create hover.
+    static boolean canHoverOnRelease() {
+        Display display = Display.getInstance();
+        int type = display.getPointerType();
+        return display.isDesktop() && (type == PointerEvent.TYPE_MOUSE
+                || type == PointerEvent.TYPE_STYLUS || type == PointerEvent.TYPE_ERASER);
+    }
+
     private Component hovered;
     private Component lastInteractiveScrollHover;
 

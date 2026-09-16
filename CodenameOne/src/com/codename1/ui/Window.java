@@ -3404,6 +3404,7 @@ public class Window extends Container implements TopLevelContainer {
     /// {@inheritDoc}
     @Override
     public void pointerReleased(int x, int y) {
+        final boolean hoverOnRelease = HoverTracker.canHoverOnRelease();
         // Not once the gesture has been taken away. This resolves the component under
         // the pointer afresh, so after an overlay took the pointer it hit tested into
         // that overlay and handed it the rest of a gesture whose press it never saw --
@@ -3449,7 +3450,7 @@ public class Window extends Container implements TopLevelContainer {
                 // Still cleared: the gesture is over regardless of who handled it,
                 // and leaving these set would strand the next press.
                 endGesture(releasing);
-                refreshHoverAfterRelease(x, y);
+                refreshHoverAfterRelease(x, y, hoverOnRelease);
                 return;
             }
         }
@@ -3462,7 +3463,7 @@ public class Window extends Container implements TopLevelContainer {
                 LeadUtil.dragFinished(releasingDragged, x, y);
             }
             endGesture(releasing);
-            refreshHoverAfterRelease(x, y);
+            refreshHoverAfterRelease(x, y, hoverOnRelease);
             return;
         }
         Component target = releasingDragged != null ? releasingDragged : releasingPressed;
@@ -3479,7 +3480,7 @@ public class Window extends Container implements TopLevelContainer {
             }
         }
         endGesture(releasing);
-        refreshHoverAfterRelease(x, y);
+        refreshHoverAfterRelease(x, y, hoverOnRelease);
     }
 
     /// Catches hover up at the end of a gesture, the way Form.pointerReleased does.
@@ -3492,8 +3493,8 @@ public class Window extends Container implements TopLevelContainer {
     /// Called from each of this method's three exits rather than once at the bottom: two of
     /// them return early, and a single call after the last endGesture is reached by neither
     /// -- which is exactly how the same catch-up in Form started out as dead code.
-    private void refreshHoverAfterRelease(int x, int y) {
-        if (!Display.getInstance().isDesktop()) {
+    private void refreshHoverAfterRelease(int x, int y, boolean hoverOnRelease) {
+        if (!hoverOnRelease) {
             return;
         }
         Component after = resolveComponentAt(x, y);
@@ -4335,11 +4336,11 @@ public class Window extends Container implements TopLevelContainer {
         // The tooltip timer starts here or it never starts at all: this is the only
         // hover dispatch a window has. The manager resolves the surface through
         // getTopLevelContainer() and hosts the tooltip on it, so a tooltip raised from
-        // a window appears on that window. Guarded on cmp, which the Form path is not
-        // -- a hover over empty space there would already have been a null dereference.
+        // a window appears on that window. Leaving the window must also cancel a pending
+        // timer or dismiss a visible tooltip, even though there is no component to query.
         TooltipManager tm = TooltipManager.getInstance();
-        if (tm != null && cmp != null) {
-            String tip = cmp.getTooltip();
+        if (tm != null) {
+            String tip = cmp == null ? null : cmp.getTooltip();
             if (tip != null && tip.length() > 0) {
                 tm.prepareTooltip(tip, cmp);
             } else {

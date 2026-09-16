@@ -588,7 +588,10 @@ static int cn1WinMoveMask(WPARAM wParam) {
 int cn1WinTouchFlag(void) {
     LONG_PTR extra = GetMessageExtraInfo();
     if ((extra & 0xFFFFFF00) == 0xFF515700) {
-        return (extra & 0x80) ? CN1_PE_PEN_FLAG : CN1_PE_TOUCH_FLAG;
+        /* Microsoft defines bit 0x80 as TOUCH, not pen. Reversing it makes a
+         * touch-only hover filter admit fingers and discard hovering pens.
+         * https://learn.microsoft.com/en-us/windows/win32/tablet/system-events-and-mouse-messages */
+        return (extra & 0x80) ? CN1_PE_TOUCH_FLAG : CN1_PE_PEN_FLAG;
     }
     return 0;
 }
@@ -723,16 +726,12 @@ LRESULT CALLBACK cn1WinWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam
                  * next motion re-establishes it. A lost RELEASE, by contrast,
                  * leaves a button held for good, which is why that one is
                  * protected. */
-                /* Touch-promoted motion is NOT hover. Windows turns touch and pen input
-                 * into tagged mouse messages, so a finger dragging across the window
-                 * arrives here with no button held and would light a control in a
-                 * desktop-only hover style that nothing clears until the next pointer
-                 * event. Dropped at the source rather than filtered on the Java side,
-                 * because the tag is carried in the event's key field and the hover
-                 * routing does not read it. */
-                if (cn1WinTouchFlag() == 0) {
+                /* A hovering pen is valid hover; only touch-promoted motion is excluded.
+                 * Keep the source flag so Java callbacks receive stylus metadata. */
+                int source = cn1WinTouchFlag();
+                if ((source & CN1_PE_TOUCH_FLAG) == 0) {
                     cn1WinPushEvent(CN1_EVENT_POINTER_HOVER, GET_X_LPARAM(lParam),
-                            GET_Y_LPARAM(lParam), 0);
+                            GET_Y_LPARAM(lParam), source);
                 }
                 /* Ask for one WM_MOUSELEAVE. Without it the cursor can move straight off
                  * the window and the last hovered control stays lit: motion simply stops,

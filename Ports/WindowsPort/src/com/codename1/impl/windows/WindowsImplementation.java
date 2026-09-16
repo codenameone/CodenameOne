@@ -824,6 +824,9 @@ public class WindowsImplementation extends CodenameOneImplementation {
                     // window's own Desktop instance, so a control in one reaches the
                     // hover state like any other; the earlier main-window-only guard
                     // made hover unreachable there.
+                    markPointer(key);
+                    setPointerButton(com.codename1.ui.events.PointerEvent.BUTTON_NONE, 0);
+                    setPointerHovering(true);
                     windowPointerHover(windowId, x, y);
                     break;
                 case EVENT_KEY_PRESSED:
