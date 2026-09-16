@@ -813,7 +813,16 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
                 scanDirectoryForEntities(root, child, ctx);
                 continue;
             }
-            if (!child.getName().endsWith(".class") || skipPackage(child.getName())) {
+            // THE ENTRY NAME, not the file name. This passed child.getName(),
+            // which is "Note.class" and never contains a '/', so not one of
+            // skipPackage's prefixes could match and the whole rule was dead on
+            // this side -- the same dependency was scanned differently depending
+            // on whether Maven resolved it as a directory or as a jar. That is
+            // the exact shape of the org/ bug recorded on skipPackage, which was
+            // fixed there and left here.
+            String entryName = root.toPath().relativize(child.toPath()).toString()
+                    .replace(File.separatorChar, '/');
+            if (!child.getName().endsWith(".class") || skipPackage(entryName)) {
                 continue;
             }
             AnnotatedClass cls;
@@ -909,13 +918,21 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
     /// milliseconds; a skipped entity costs a server that fails on its first
     /// query.
     ///
-    /// What is left cannot hold an application's entity: the JDK's own
-    /// namespaces, and the two packages this runtime declares the annotations
-    /// and the ORM in.
+    /// What is left cannot hold an application's entity at all: the JDK's own
+    /// namespaces, which no application may add a class to.
+    ///
+    /// `com/codename1/backend/` and `com/codename1/annotations/` USED to be here
+    /// as well, on the reasoning that they are the runtime's own. That is the
+    /// same reasoning `org/` was removed for: a package belonging to a library
+    /// is not a package an application cannot put a class in, and a shared
+    /// entity squatting one of them was dropped from a jar while the identical
+    /// class was accepted from a reactor directory. The annotation is what
+    /// decides whether a class is an entity, so let it decide -- the runtime
+    /// declares no `@Entity` of its own for this to pick up, and reading a few
+    /// hundred more class headers costs milliseconds against a server that fails
+    /// on its first query.
     private static boolean skipPackage(String entryName) {
-        return entryName.startsWith("java/") || entryName.startsWith("javax/")
-                || entryName.startsWith("com/codename1/backend/")
-                || entryName.startsWith("com/codename1/annotations/");
+        return entryName.startsWith("java/") || entryName.startsWith("javax/");
     }
 
     /// Runs one class found on the classpath through the same acceptance the

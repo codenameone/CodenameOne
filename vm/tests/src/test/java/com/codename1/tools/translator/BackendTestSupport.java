@@ -98,8 +98,9 @@ final class BackendTestSupport {
         build.environment().put("CN1_BACKEND_DEMO", demoDir);
         build.redirectErrorStream(true);
         Process p = build.start();
-        String log = readFully(p.getInputStream());
-        boolean ok = p.waitFor(20, TimeUnit.MINUTES) && p.exitValue() == 0
+        boolean[] timedOut = new boolean[1];
+        String log = awaitOutput(p, 20, TimeUnit.MINUTES, timedOut);
+        boolean ok = !timedOut[0] && p.exitValue() == 0
                 && Files.isExecutable(binary);
         if (ok) {
             return null;
@@ -200,9 +201,9 @@ final class BackendTestSupport {
         pb.environment().putAll(env);
         pb.redirectErrorStream(true);
         Process p = pb.start();
-        String out = readFully(p.getInputStream());
-        if (!p.waitFor(timeoutSeconds, TimeUnit.SECONDS)) {
-            p.destroyForcibly();
+        boolean[] timedOut = new boolean[1];
+        String out = awaitOutput(p, timeoutSeconds, TimeUnit.SECONDS, timedOut);
+        if (timedOut[0]) {
             status[0] = -1;
             return out;
         }
@@ -216,8 +217,9 @@ final class BackendTestSupport {
             ProcessBuilder pb = new ProcessBuilder(command, "--version");
             pb.redirectErrorStream(true);
             Process p = pb.start();
-            readFully(p.getInputStream());
-            return p.waitFor(20, TimeUnit.SECONDS) && p.exitValue() == 0;
+            boolean[] timedOut = new boolean[1];
+            awaitOutput(p, 20, TimeUnit.SECONDS, timedOut);
+            return !timedOut[0] && p.exitValue() == 0;
         } catch (Exception err) {
             return false;
         }
@@ -229,14 +231,70 @@ final class BackendTestSupport {
             ProcessBuilder pb = new ProcessBuilder(command);
             pb.redirectErrorStream(true);
             Process p = pb.start();
-            String out = readFully(p.getInputStream());
-            if (!p.waitFor(timeoutSeconds, TimeUnit.SECONDS)) {
-                p.destroyForcibly();
+            boolean[] timedOut = new boolean[1];
+            String out = awaitOutput(p, timeoutSeconds, TimeUnit.SECONDS, timedOut);
+            if (timedOut[0]) {
                 return null;
             }
             return p.exitValue() == 0 ? out : null;
         } catch (Exception err) {
             return null;
+        }
+    }
+
+    /**
+     * Waits for a process with a timeout WHILE DRAINING ITS OUTPUT, and returns
+     * what it produced.
+     *
+     * <p>Reading the stream to EOF first and only then calling waitFor is the
+     * shape this replaces, and its timeout is unreachable: EOF arrives when the
+     * child closes its stdout, which for a hung child is never, so the read
+     * blocks forever and the waitFor below it never runs. The backend has
+     * processes that hang for real -- a wedged server loop, a collector waiting
+     * on a mutator -- so the branch that exists to kill one and print a
+     * diagnostic was exactly the branch that could not be reached, and the job
+     * spent its whole workflow timeout instead of failing in minutes.
+     *
+     * <p>Whatever was produced before the kill is returned rather than
+     * discarded: on the timeout path it is the only evidence of where the
+     * process stopped.
+     *
+     * @param timedOut set to true when the process had to be killed
+     */
+    static String awaitOutput(Process p, long timeout, TimeUnit unit, boolean[] timedOut)
+            throws Exception {
+        final InputStream in = p.getInputStream();
+        final ByteArrayOutputStream raw = new ByteArrayOutputStream();
+        Thread drain = new Thread(new Runnable() {
+            public void run() {
+                byte[] buffer = new byte[8192];
+                int n;
+                try {
+                    while ((n = in.read(buffer)) > 0) {
+                        synchronized (raw) {
+                            raw.write(buffer, 0, n);
+                        }
+                    }
+                } catch (IOException err) {
+                    // The pipe closed because the process died, which is the
+                    // normal end of this thread on the kill path.
+                }
+            }
+        });
+        // A daemon, so a drain that somehow outlives the kill cannot stop the
+        // JVM from exiting and turn a test failure into a hung build.
+        drain.setDaemon(true);
+        drain.start();
+        boolean exited = p.waitFor(timeout, unit);
+        if (!exited) {
+            p.destroyForcibly();
+            // Killing the process is what closes the pipe and ends the drain.
+            p.waitFor(30, TimeUnit.SECONDS);
+        }
+        drain.join(30000);
+        timedOut[0] = !exited;
+        synchronized (raw) {
+            return new String(raw.toByteArray(), StandardCharsets.UTF_8);
         }
     }
 

@@ -951,6 +951,41 @@ public abstract class Dialect {
             return (kind == INTEGER ? "INT" : "BIGINT") + " NOT NULL AUTO_INCREMENT PRIMARY KEY";
         }
 
+        /**
+         * True, which is this server's default and NOT its only setting: a
+         * session with NO_BACKSLASH_ESCAPES in its sql_mode treats a backslash
+         * as an ordinary character, and the scanner then disagrees with the
+         * server about where a literal ends.
+         *
+         * <p>The session is deliberately NOT pinned, because the disagreement
+         * FAILS CLOSED. A backslash immediately before a quote is the only way
+         * the two readings diverge: this scanner swallows that quote, which
+         * flips the quote parity for the whole rest of the statement, and every
+         * further tuple contributes an even number of quotes -- so the parity
+         * stays odd and the scan ends inside an unterminated literal, which
+         * countInsertRows refuses outright. Measured against a MySQL session
+         * holding sql_mode='NO_BACKSLASH_ESCAPES', six crafted statements
+         * including VALUES ('x\'), ('y') and the three- and four-tuple
+         * versions of it: all six refused, ROWS WRITTEN 0 in every case. The
+         * one that did restore the parity was then refused by the server itself
+         * with a 1064. Nothing was committed and no key was answered, so the
+         * single-row contract of Database#insert holds in that mode too.
+         *
+         * <p>The refusal of an unterminated literal is what does that work, and
+         * it is load bearing rather than incidental: with that one throw removed
+         * and nothing else changed, the same six statements go to 3 accepted and
+         * 8 ROWS WRITTEN. So the protection is real and this is where it lives.
+         *
+         * <p>What the mode does cost is a false REFUSAL -- an application that
+         * has turned it on can write VALUES ('C:\') as one legal row and be
+         * told the statement ends inside a literal. That is the residual, and
+         * it is preferred to the two alternatives. Pinning sql_mode on connect
+         * would silently reinterpret the application's OWN literals, which is a
+         * data change rather than a refusal; and reading the active mode per
+         * connection cannot reach this method, because the dialects are shared
+         * singletons with no connection to ask. OrmCheck.aBackslashModeStillFailsClosed
+         * is what holds the measured behaviour in place.
+         */
         boolean backslashEscapesInLiterals() {
             return true;
         }

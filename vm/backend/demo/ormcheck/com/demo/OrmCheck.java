@@ -84,6 +84,7 @@ public class OrmCheck {
                 anUpsertThatUpdatesStillAnswers(pool);
                 anIgnoredInsertAnswersNoKey(pool);
                 aMultiRowInsertIsRefused(pool);
+                aBackslashModeStillFailsClosed(pool);
                 anExactNumericKeyIsStillAKey(pool);
                 aValueTheFieldCannotHoldIsRefused(em, pool);
                 aNulIsRefusedOnTheRawPathToo(pool);
@@ -904,6 +905,63 @@ public class OrmCheck {
      * first, PostgreSQL returns a row per insert -- so there is no key insert()
      * could answer with.
      */
+    /**
+     * The tuple scanner assumes MySQL's DEFAULT lexical mode, and a session can
+     * change it. With NO_BACKSLASH_ESCAPES set, a backslash is an ordinary
+     * character and the server ends a literal where this scanner does not.
+     *
+     * <p>What this pins down is that the disagreement FAILS CLOSED. The concern
+     * is the other direction -- a statement miscounted as one tuple, committed,
+     * and answered with a single key it does not have -- so the assertion is on
+     * the ROWS WRITTEN, not merely on something having been thrown. Every
+     * variant here puts a backslash immediately before a quote, which is the
+     * only construct the two readings disagree about, and adds tuples after it
+     * to try to restore the quote parity the swallowed quote flipped.
+     *
+     * <p>MySQL only: it is the one engine with this mode. See
+     * Dialect.MySqlDialect.backslashEscapesInLiterals for why the session is not
+     * pinned instead.
+     */
+    private static void aBackslashModeStillFailsClosed(DataSource pool) throws Exception {
+        if(!"mysql".equals(pool.dialect().getName())) {
+            return;
+        }
+        pool.execute("SET SESSION sql_mode='NO_BACKSLASH_ESCAPES'", null);
+        pool.execute("DROP TABLE IF EXISTS cn1_bsmode", null);
+        pool.execute("CREATE TABLE cn1_bsmode (id "
+                + pool.dialect().generatedKeyColumn(com.codename1.backend.sql.Dialect.BIGINT)
+                + ", name " + pool.dialect().columnType(com.codename1.backend.sql.Dialect.TEXT)
+                + ")", null);
+        try {
+            String[] variants = new String[] {
+                "INSERT INTO cn1_bsmode (name) VALUES ('x\\'), ('y')",
+                "INSERT INTO cn1_bsmode (name) VALUES ('x\\'), ('y'), ('z')",
+                "INSERT INTO cn1_bsmode (name) VALUES ('x\\'), ('y\'')",
+                "INSERT INTO cn1_bsmode (name) VALUES ('x\\','y')",
+                "INSERT INTO cn1_bsmode (name) VALUES ('a\\\\'), ('b')",
+                "INSERT INTO cn1_bsmode (name) VALUES ('x\\'), ('a'), ('b''c')"
+            };
+            int accepted = 0;
+            int written = 0;
+            for(int v = 0 ; v < variants.length ; v++) {
+                pool.execute("DELETE FROM cn1_bsmode", null);
+                try {
+                    pool.insert(variants[v], null, "id");
+                    accepted++;
+                } catch(Exception expected) {
+                    // Refused by this scanner or by the server; either is closed.
+                }
+                written += pool.query("SELECT name FROM cn1_bsmode", null).size();
+            }
+            check("no statement is accepted under NO_BACKSLASH_ESCAPES", "0",
+                    String.valueOf(accepted));
+            check("and none of them wrote a row", "0", String.valueOf(written));
+        } finally {
+            pool.execute("DROP TABLE IF EXISTS cn1_bsmode", null);
+            pool.execute("SET SESSION sql_mode=DEFAULT", null);
+        }
+    }
+
     private static void aMultiRowInsertIsRefused(DataSource pool) throws Exception {
         pool.execute("DROP TABLE IF EXISTS cn1_multi", null);
         pool.execute("CREATE TABLE cn1_multi (id "
