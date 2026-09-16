@@ -75,6 +75,9 @@ final class InputValidationUITests: XCTestCase {
         // synchronised one right up until a step races -- worth one log line.
         NSLog("CN1IV: gate directory %@", syncDir?.path ?? "<none: running ungated on fixed delays>")
         app.launch()
+        // GestureSuite leaves iOS alive after its final event. Terminate only
+        // after the last XCTest operation, including when the test fails.
+        addTeardownBlock { app.terminate() }
         if syncDir == nil {
             // Local fallback when the shell harness is not coordinating from
             // CN1IV:READY log markers.
@@ -98,6 +101,8 @@ final class InputValidationUITests: XCTestCase {
 
         try driveKeyType(app: app, syncDir: syncDir)
         Thread.sleep(forTimeInterval: max(stepDelaySeconds, 10.0))
+        XCTAssertEqual(app.state, .runningForeground,
+                       "The gesture driver must own app termination after the final event")
     }
 
     private func driveTap(app: XCUIApplication, syncDir: URL?) throws {
@@ -148,50 +153,12 @@ final class InputValidationUITests: XCTestCase {
         // the guess. KeyTypeStep asserts the field CONTAINS "cn1", so the
         // repeats a slow start can leave in front of it are harmless.
         //
-        // Stopped by the driver's keytype.stop gate, written as soon as the step
-        // resolves either way, AND by a deadline inside the STEP's own budget. The
-        // app exits SUITE_EXIT_DELAY_MS (8 seconds) after the suite finishes, and
-        // typing into a process that has left fails the XCUITest run even though
-        // every event landed.
-        //
-        // The GATE is checked before every key, not once per pass. It is the leading
-        // signal -- the driver writes it as soon as the step resolves, about a second
-        // and a half before the app goes -- whereas app.state only flips once the app
-        // is already on its way out, which is too late to stop a keystroke already
-        // being synthesised. Relying on app.state alone, and testing the gate only
-        // once per pass, left up to three keystrokes and a one-second sleep between
-        // the stop being requested and this loop noticing: a CI run typed straight
-        // through the app's exit that way, with every gesture already landed and
-        // CN1IV:SUITE:FINISHED already in the log, and failed anyway.
-        //
-        // The sleep is sliced for the same reason: a whole second of not looking is
-        // most of the margin the gate buys.
-        // BOUNDED BY THE STEP'S OWN BUDGET, not by a pass count and not by the
-        // app's exit grace.
-        //
-        // A pass count was the original defect: fifteen passes of three keystrokes
-        // and a one-second sleep is eighty seconds, and a keystroke is not cheap --
-        // MEASURED on the failing run, one `Type '1' key` to the next `Type 'c' key`
-        // was 1.5 seconds, because every key waits for the app to idle while the
-        // simulator is also serving accessibility snapshots.
-        //
-        // Bounding it by the 8-second exit grace instead was the WRONG CLOCK, and
-        // the fix for one failure caused another. That grace starts when the suite
-        // FINISHES, not when this loop starts; the step it is feeding has its own
-        // 30-second budget (GestureSuite.DEFAULT_STEP_TIMEOUT_MS) and the native
-        // editor can take three and a half seconds to appear before a keystroke
-        // lands anywhere. A six-second deadline therefore expires before a second
-        // complete pass can land on a slow runner -- this returns, KeyTypeStep goes
-        // on waiting, and the step times out at thirty. Failing the keyboard test
-        // on exactly the slow CI runs the retry loop exists to support.
-        //
-        // The step's budget is the lifecycle this loop belongs to, so the deadline
-        // is inside THAT, and what stops it promptly is the gate rather than the
-        // clock: written as soon as the step resolves either way, and checked
-        // before every key rather than once a pass, so the loop stops within one
-        // keystroke of the step finishing -- 1.5 seconds against the 8 the app then
-        // waits before leaving. The clock is only the backstop for a gate that
-        // never arrives.
+        // The stop gate avoids unnecessary retries once the event is recorded.
+        // Its delivery can be delayed, so it is not an app-lifetime boundary:
+        // GestureSuite keeps iOS alive and testGestureSuite terminates it after
+        // input finishes. An eight-second app-exit timer previously raced a
+        // later typeKey even though every gesture had already passed.
+        // Keep the retry deadline inside the Java step's 30-second input budget.
         let deadline = Date().addingTimeInterval(25.0)
         while Date() < deadline {
             if stopRequested("keytype", syncDir: syncDir) {
@@ -201,9 +168,7 @@ final class InputValidationUITests: XCTestCase {
                 if stopRequested("keytype", syncDir: syncDir) {
                     return
                 }
-                // app.state is the second stop: once the app has gone there is
-                // nothing to type into, and a key synthesised into a departed
-                // process fails the whole XCUITest run.
+                // Stop if the app unexpectedly leaves the foreground.
                 guard app.state == .runningForeground, Date() < deadline else {
                     return
                 }
