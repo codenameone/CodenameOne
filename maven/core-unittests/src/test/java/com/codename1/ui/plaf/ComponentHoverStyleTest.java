@@ -70,6 +70,40 @@ public class ComponentHoverStyleTest extends UITestBase {
         assertEquals(0x112233, b.getStyle().getBgColor());
     }
 
+    @Test
+    public void programmaticallyInstalledHoverIsRenderedAndClearedWithTheTheme() {
+        UIManager manager = UIManager.getInstance();
+        Hashtable theme = new Hashtable();
+        theme.put("Button.bgColor", "112233");
+        manager.setThemeProps(theme);
+        Button button = new Button("installed hover");
+        assertNull(button.getHoverStyle());
+        manager.getComponentCustomStyle("Button", "hover");
+        assertNull(button.getHoverStyle(), "a generated fallback does not declare hover");
+
+        Style installed = new Style();
+        installed.setBgColor(0x44ff88);
+        manager.setComponentStyle("Button", installed, "hover");
+        button.setHovered(true);
+        assertEquals(0x44ff88, button.getStyle().getBgColor());
+        button.getStyle().setBgColor(0x123456);
+        assertEquals(0x44ff88, installed.getBgColor(), "components receive defensive copies");
+
+        installed.setBgColor(0xabcdef);
+        button.refreshTheme(false);
+        assertEquals(0xabcdef, button.getStyle().getBgColor(), "refresh reads later mutations");
+        Style replacement = new Style();
+        replacement.setBgColor(0x765432);
+        manager.setComponentStyle("Button", replacement, "hover");
+        button.refreshTheme(false);
+        assertEquals(0x765432, button.getStyle().getBgColor(), "replacement bypasses old caches");
+
+        manager.setThemeProps(theme);
+        button.refreshTheme(false);
+        assertNull(button.getHoverStyle(), "installations have the same lifetime as the theme");
+        assertEquals(0x112233, button.getStyle().getBgColor());
+    }
+
     /** A theme that declares hover gets it. */
     @Test
     public void declaredHoverStyleAppliesWhileHovered() {

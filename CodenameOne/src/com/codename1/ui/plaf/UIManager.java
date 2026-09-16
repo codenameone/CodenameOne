@@ -666,7 +666,7 @@ public class UIManager {
         return getComponentStyleImpl(id, false, type + "#");
     }
 
-    /// True when the theme actually declares at least one entry for the given custom style
+    /// True when a custom style was installed programmatically or the theme declares an entry for the style
     /// type on this UIID -- `Button.hover#bgColor`, `Button.hover#derive` and so on.
     ///
     /// This exists because {@link #getComponentCustomStyle(String, String)} *never returns
@@ -695,14 +695,16 @@ public class UIManager {
     ///
     /// #### Returns
     ///
-    /// true when the theme declares that custom style for this UIID
+    /// true when that custom style is installed or declared for this UIID
     public boolean hasComponentCustomStyle(String id, String type) {
         if (type == null || type.length() == 0) {
             return false;
         }
         String dotted = (id == null || id.length() == 0) ? "" : dottedId(id);
         String suffix = dotted + type + "#";
-        if (hasStyleDefinition(suffix)) {
+        // Typed installations live in styles, while generated custom-style prototypes
+        // live in prefixedStyles. Only the former explicitly opts a UIID into hover.
+        if (styles.get(suffix) != null || hasStyleDefinition(suffix)) {
             return true;
         }
         // A $Dark-only declaration counts ONLY while dark mode is actually on. In light
@@ -773,12 +775,15 @@ public class UIManager {
                     // Cached on prefix + id, exactly as the unprefixed styles
                     // are. The returned Style is a copy either way, so a
                     // caller still gets its own mutable instance.
-                    if (programmaticStyleInstalled) {
+                    // The typed setter stores an explicit prototype under id + prefix.
+                    // Detecting its existence alone is insufficient: return its values too.
+                    style = styles.get(id + prefix);
+                    if (style == null && programmaticStyleInstalled) {
                         // Rebuild every time, exactly as this did before the
                         // cache existed: a base installed programmatically can
                         // be mutated by whoever installed it without telling us.
                         style = createStyle(id, prefix, false);
-                    } else {
+                    } else if (style == null) {
                         String key = prefixedKey(prefix, id);
                         style = prefixedStyles.get(key);
                         if (style == null) {
