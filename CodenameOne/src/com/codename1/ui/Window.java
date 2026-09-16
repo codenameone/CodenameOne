@@ -3497,7 +3497,7 @@ public class Window extends Container implements TopLevelContainer {
         if (!hoverOnRelease) {
             return;
         }
-        Component after = resolveComponentAt(x, y);
+        Component after = hoverTargetAt(x, y);
         hoverTracker.pointerOver(after == null ? null : LeadUtil.leadParentImpl(after), x, y);
     }
 
@@ -3881,6 +3881,13 @@ public class Window extends Container implements TopLevelContainer {
         // kind of cancellation; this is the one for a window going away.
         NativeDragAndDrop.topLevelInputCancelled(this);
         Display.getInstance().windowInputCancelled(this);
+    }
+
+    private Component hoverTargetAt(int x, int y) {
+        // Keep this check specific to hover: captured drag/release dispatch can still
+        // target a pressed component outside the window. A leave must not hover its root.
+        Container actual = getActualPane(x, y);
+        return actual != null && actual.contains(x, y) ? resolveComponentAt(x, y) : null;
     }
 
     private Component resolveComponentAt(int x, int y) {
@@ -4321,7 +4328,7 @@ public class Window extends Container implements TopLevelContainer {
             LeadUtil.pointerHover(dragged, x, y);
             return;
         }
-        Component cmp = resolveComponentAt(x[0], y[0]);
+        Component cmp = hoverTargetAt(x[0], y[0]);
         if (cmp != null) {
             cmp = LeadUtil.leadParentImpl(cmp);
             LeadUtil.pointerHover(cmp, x, y);

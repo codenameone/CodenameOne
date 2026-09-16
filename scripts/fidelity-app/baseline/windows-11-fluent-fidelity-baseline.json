@@ -11,14 +11,14 @@
       "width_ratio": 1.2031
     },
     "DesktopAccentButton_hover_dark": {
-      "center_offset": 10.12,
-      "height_ratio": 1.1,
-      "width_ratio": 1.2344
+      "center_offset": 6.52,
+      "height_ratio": 1.0333,
+      "width_ratio": 1.2031
     },
     "DesktopAccentButton_hover_light": {
-      "center_offset": 10.12,
-      "height_ratio": 1.1,
-      "width_ratio": 1.2344
+      "center_offset": 6.52,
+      "height_ratio": 1.0333,
+      "width_ratio": 1.2031
     },
     "DesktopAccentButton_normal_dark": {
       "center_offset": 6.52,
@@ -51,12 +51,12 @@
       "width_ratio": 0.7258
     },
     "DesktopButton_hover_dark": {
-      "center_offset": 10.12,
-      "height_ratio": 1.1,
-      "width_ratio": 1.2344
+      "center_offset": 6.52,
+      "height_ratio": 1.0333,
+      "width_ratio": 1.2031
     },
     "DesktopButton_hover_light": {
-      "center_offset": 9.82,
+      "center_offset": 5.7,
       "height_ratio": 0.3929,
       "width_ratio": 0.7031
     },
@@ -91,12 +91,12 @@
       "width_ratio": 1.1111
     },
     "DesktopCheckBox_hover_dark": {
-      "center_offset": 11.18,
-      "height_ratio": 1.8,
-      "width_ratio": 1.2813
+      "center_offset": 8.54,
+      "height_ratio": 1.7,
+      "width_ratio": 1.25
     },
     "DesktopCheckBox_hover_light": {
-      "center_offset": 13.0,
+      "center_offset": 9.22,
       "height_ratio": 1.0,
       "width_ratio": 1.0938
     },
@@ -131,12 +131,12 @@
       "width_ratio": 0.5055
     },
     "DesktopComboBox_hover_dark": {
-      "center_offset": 5.7,
-      "height_ratio": 1.1,
-      "width_ratio": 0.8587
+      "center_offset": 7.52,
+      "height_ratio": 1.0333,
+      "width_ratio": 0.837
     },
     "DesktopComboBox_hover_light": {
-      "center_offset": 6.73,
+      "center_offset": 9.01,
       "height_ratio": 0.4828,
       "width_ratio": 0.5
     },
@@ -171,12 +171,12 @@
       "width_ratio": 1.1148
     },
     "DesktopRadioButton_hover_dark": {
-      "center_offset": 11.18,
-      "height_ratio": 1.8,
-      "width_ratio": 1.2951
+      "center_offset": 8.54,
+      "height_ratio": 1.7,
+      "width_ratio": 1.2623
     },
     "DesktopRadioButton_hover_light": {
-      "center_offset": 12.54,
+      "center_offset": 8.73,
       "height_ratio": 1.1,
       "width_ratio": 1.1148
     },
@@ -211,14 +211,14 @@
       "width_ratio": 0.5466
     },
     "DesktopSlider_hover_dark": {
-      "center_offset": 4.0,
+      "center_offset": 0.0,
       "height_ratio": 1.0,
-      "width_ratio": 0.9831
+      "width_ratio": 1.0
     },
     "DesktopSlider_hover_light": {
-      "center_offset": 4.0,
+      "center_offset": 0.0,
       "height_ratio": 1.0,
-      "width_ratio": 0.9831
+      "width_ratio": 1.0
     },
     "DesktopSlider_normal_dark": {
       "center_offset": 0.0,
@@ -241,12 +241,12 @@
       "width_ratio": 0.5714
     },
     "DesktopSwitch_hover_dark": {
-      "center_offset": 9.62,
+      "center_offset": 13.29,
       "height_ratio": 1.05,
       "width_ratio": 0.5571
     },
     "DesktopSwitch_hover_light": {
-      "center_offset": 10.11,
+      "center_offset": 13.76,
       "height_ratio": 1.05,
       "width_ratio": 0.5714
     },
@@ -281,14 +281,14 @@
       "width_ratio": 0.1368
     },
     "DesktopTextField_hover_dark": {
-      "center_offset": 5.0,
-      "height_ratio": 1.1333,
-      "width_ratio": 0.9831
+      "center_offset": 1.5,
+      "height_ratio": 1.1,
+      "width_ratio": 1.0
     },
     "DesktopTextField_hover_light": {
-      "center_offset": 5.5,
+      "center_offset": 1.5,
       "height_ratio": 1.1429,
-      "width_ratio": 0.9831
+      "width_ratio": 1.0
     },
     "DesktopTextField_normal_dark": {
       "center_offset": 1.5,
@@ -304,62 +304,62 @@
   "pairs": {
     "DesktopAccentButton_disabled_dark": 91.73,
     "DesktopAccentButton_disabled_light": 88.26,
-    "DesktopAccentButton_hover_dark": 75.53,
-    "DesktopAccentButton_hover_light": 75.62,
+    "DesktopAccentButton_hover_dark": 86.11,
+    "DesktopAccentButton_hover_light": 84.12,
     "DesktopAccentButton_normal_dark": 84.19,
     "DesktopAccentButton_normal_light": 82.06,
     "DesktopAccentButton_pressed_dark": 86.7,
     "DesktopAccentButton_pressed_light": 83.47,
     "DesktopButton_disabled_dark": 93.05,
     "DesktopButton_disabled_light": 91.89,
-    "DesktopButton_hover_dark": 86.71,
-    "DesktopButton_hover_light": 77.88,
+    "DesktopButton_hover_dark": 92.93,
+    "DesktopButton_hover_light": 86.63,
     "DesktopButton_normal_dark": 93.15,
     "DesktopButton_normal_light": 86.06,
     "DesktopButton_pressed_dark": 90.83,
     "DesktopButton_pressed_light": 89.85,
     "DesktopCheckBox_disabled_dark": 86.22,
     "DesktopCheckBox_disabled_light": 86.16,
-    "DesktopCheckBox_hover_dark": 83.79,
-    "DesktopCheckBox_hover_light": 76.33,
+    "DesktopCheckBox_hover_dark": 86.42,
+    "DesktopCheckBox_hover_light": 79.74,
     "DesktopCheckBox_normal_dark": 73.95,
     "DesktopCheckBox_normal_light": 74.79,
     "DesktopCheckBox_selected_dark": 79.15,
     "DesktopCheckBox_selected_light": 79.09,
     "DesktopComboBox_disabled_dark": 91.49,
     "DesktopComboBox_disabled_light": 91.34,
-    "DesktopComboBox_hover_dark": 86.13,
-    "DesktopComboBox_hover_light": 78.48,
+    "DesktopComboBox_hover_dark": 92.36,
+    "DesktopComboBox_hover_light": 86.26,
     "DesktopComboBox_normal_dark": 92.57,
     "DesktopComboBox_normal_light": 85.71,
     "DesktopProgressBar_normal_dark": 74.7,
     "DesktopProgressBar_normal_light": 74.5,
     "DesktopRadioButton_disabled_dark": 87.76,
     "DesktopRadioButton_disabled_light": 87.66,
-    "DesktopRadioButton_hover_dark": 85.05,
-    "DesktopRadioButton_hover_light": 78.2,
+    "DesktopRadioButton_hover_dark": 87.26,
+    "DesktopRadioButton_hover_light": 81.96,
     "DesktopRadioButton_normal_dark": 78.95,
     "DesktopRadioButton_normal_light": 79.41,
     "DesktopRadioButton_selected_dark": 82.37,
     "DesktopRadioButton_selected_light": 82.46,
     "DesktopSlider_disabled_dark": 80.76,
     "DesktopSlider_disabled_light": 76.51,
-    "DesktopSlider_hover_dark": 71.54,
-    "DesktopSlider_hover_light": 72.02,
+    "DesktopSlider_hover_dark": 95.42,
+    "DesktopSlider_hover_light": 93.81,
     "DesktopSlider_normal_dark": 95.8,
     "DesktopSlider_normal_light": 94.0,
     "DesktopSwitch_disabled_dark": 74.86,
     "DesktopSwitch_disabled_light": 87.42,
-    "DesktopSwitch_hover_dark": 70.86,
-    "DesktopSwitch_hover_light": 79.52,
+    "DesktopSwitch_hover_dark": 71.36,
+    "DesktopSwitch_hover_light": 80.91,
     "DesktopSwitch_normal_dark": 69.62,
     "DesktopSwitch_normal_light": 79.53,
     "DesktopSwitch_selected_dark": 71.05,
     "DesktopSwitch_selected_light": 80.46,
     "DesktopTextField_disabled_dark": 92.64,
     "DesktopTextField_disabled_light": 91.37,
-    "DesktopTextField_hover_dark": 74.16,
-    "DesktopTextField_hover_light": 65.71,
+    "DesktopTextField_hover_dark": 78.74,
+    "DesktopTextField_hover_light": 69.94,
     "DesktopTextField_normal_dark": 77.55,
     "DesktopTextField_normal_light": 69.6
   }

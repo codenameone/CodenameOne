@@ -296,4 +296,43 @@ class HoverDeliveryTest extends UITestBase {
         }
     }
 
+    @FormTest
+    void leavingAFormDoesNotHoverItsRootPane() {
+        checkRootPaneLeave(false);
+    }
+
+    @FormTest
+    void leavingAWindowDoesNotHoverItsRootPane() {
+        checkRootPaneLeave(true);
+    }
+
+    private void checkRootPaneLeave(boolean secondaryWindow) {
+        implementation.setMultiWindowSupported(true);
+        Form main = new Form("main", new BorderLayout());
+        main.show();
+        Window window = secondaryWindow ? new Window("root", new BorderLayout()) : null;
+        if (window != null) {
+            window.setWindowSize(500, 400);
+            window.show();
+        }
+        DisplayTest.flushEdt();
+        Container surface = window == null ? main : window;
+        Container root = window == null ? main.getContentPane() : window.getContentPane();
+        int x = root.getAbsoluteX() + root.getWidth() / 2;
+        int y = root.getAbsoluteY() + root.getHeight() / 2;
+        try {
+            for (int[] outside : new int[][]{{-1, -1}, {surface.getWidth(), y},
+                    {x, surface.getHeight()}, {x, -1}}) {
+                surface.pointerHover(new int[]{x}, new int[]{y});
+                assertTrue(root.isHovered(), "empty root pane is hovered while inside");
+                surface.pointerHover(new int[]{outside[0]}, new int[]{outside[1]});
+                assertFalse(root.isHovered(), "outside coordinates must not hit the root pane");
+            }
+        } finally {
+            if (window != null) {
+                window.dispose();
+            }
+        }
+    }
+
 }

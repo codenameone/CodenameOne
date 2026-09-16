@@ -53,7 +53,10 @@
     --accent-color-dark: #4cc2ff;       /* SystemAccentColorLight2 on dark */
     --accent-fg-color: #ffffff;         /* TextOnAccentFillColorPrimary */
     --accent-fg-color-dark: #000000;
-    --accent-pressed-color: #005a9e;    /* AccentFillColorTertiary */
+    /* Committed WinUI light pressed reference: #3183CB over the #F3F3F3 surface.
+       The old #005A9E was too dark; the fidelity renderer's former iOS-only alpha
+       adjustment partly hid that mismatch instead of measuring this opaque fill. */
+    --accent-pressed-color: #3183cb;    /* AccentFillColorTertiary */
     --accent-pressed-color-dark: #2a8ad4;
     --control-bg-color: #fbfbfb;          /* CardBackgroundFillColorDefault */
     --control-bg-color-dark: #2c2c2c;
@@ -211,7 +214,7 @@ RaisedButton.hover {
 
 RaisedButton.pressed {
     color: #cce3f5;
-    background-color: var(--accent-pressed-color, #005a9e);
+    background-color: var(--accent-pressed-color, #3183cb);
     border-radius: 1.06mm;
     padding: 1.3mm 3.1mm 1.3mm 3.1mm;
     margin: 0.8mm;

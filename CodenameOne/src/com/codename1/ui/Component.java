@@ -8041,13 +8041,14 @@ public class Component implements Animation, StyleListener, Editable {
                     setPressedStyle(mergeStyle(pressedStyle, manager.getComponentCustomStyle(id, "press")));
                 }
             }
-            // Only re-merged when one was already built. A theme swap that drops hover
-            // entirely leaves the old style in place here, which is why setUIID and the
-            // wholesale branch below null it instead; this arm exists for the ordinary case
-            // where the same UIID is re-resolved against a refreshed theme.
+            // Merge local overrides just like the other states. When a theme removes its
+            // hover rule, only application-modified properties survive; the remaining
+            // properties follow the refreshed normal style instead of the removed rule.
             if (hoverStyle != null) {
                 if (manager.hasComponentCustomStyle(id, "hover")) {
                     setHoverStyle(mergeStyle(hoverStyle, manager.getComponentCustomStyle(id, "hover")));
+                } else if (hoverStyle.isModified()) {
+                    setHoverStyle(mergeStyle(hoverStyle, getUnselectedStyle()));
                 } else {
                     // The refreshed theme dropped hover for this UIID. Unregister before
                     // letting go: every other arm in this block goes through a setter that

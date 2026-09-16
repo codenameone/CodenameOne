@@ -4576,7 +4576,9 @@ public class Form extends Container implements TopLevelContainer {
     /// component's hover callback or start a tooltip timer.
     private Component hoverTargetAt(int x, int y) {
         Container actual = getActualPane(formLayeredPane, x, y);
-        if (actual == null) {
+        // getComponentAt returns the container itself for an outside point. A window
+        // leave must resolve to nothing, even when the root pane has a hover style.
+        if (actual == null || !actual.contains(x, y)) {
             return null;
         }
         Component cmp = actual.getComponentAt(x, y);

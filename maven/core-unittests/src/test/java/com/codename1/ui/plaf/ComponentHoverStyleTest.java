@@ -218,4 +218,46 @@ public class ComponentHoverStyleTest extends UITestBase {
         c.setHovered(true);
         assertEquals(0x44ff88, c.getStyle().getBgColor(), "hovered, from the $Dark block");
     }
+    @Test
+    public void programmaticHoverSurvivesMergedRefreshWithoutThemeHover() {
+        UIManager.getInstance().setThemeProps(new Hashtable());
+        Button button = new Button("local hover");
+        Style hover = new Style();
+        hover.setBgColor(0x44ff88);
+        button.setHoverStyle(hover);
+        button.refreshTheme(true);
+        assertNotNull(button.getHoverStyle());
+        assertEquals(0x44ff88, button.getHoverStyle().getBgColor());
+    }
+
+    @Test
+    public void removingThemeHoverKeepsOnlyLocalOverrides() {
+        Hashtable theme = new Hashtable();
+        theme.put("Button.hover#bgColor", "44ff88");
+        theme.put("Button.hover#fgColor", "ff0000");
+        UIManager.getInstance().setThemeProps(theme);
+        Button button = new Button("local override");
+        button.getHoverStyle().setBgColor(0x123456);
+        Hashtable replacement = new Hashtable();
+        replacement.put("Button.fgColor", "112233");
+        UIManager.getInstance().setThemeProps(replacement);
+        button.refreshTheme(true);
+        assertNotNull(button.getHoverStyle());
+        assertEquals(0x123456, button.getHoverStyle().getBgColor());
+        assertEquals(0x112233, button.getHoverStyle().getFgColor(),
+                "removed theme hover properties must not survive as local overrides");
+    }
+
+    @Test
+    public void removingUnmodifiedThemeHoverDropsTheCachedStyle() {
+        Hashtable theme = new Hashtable();
+        theme.put("Button.hover#bgColor", "44ff88");
+        UIManager.getInstance().setThemeProps(theme);
+        Button button = new Button("theme hover");
+        assertNotNull(button.getHoverStyle());
+        UIManager.getInstance().setThemeProps(new Hashtable());
+        button.refreshTheme(true);
+        assertNull(button.getHoverStyle());
+    }
+
 }
