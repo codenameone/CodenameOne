@@ -46,7 +46,16 @@ class VaultTest extends UITestBase {
 
     /// A device key store that is simply a map, so the remembered-device paths can be tested.
     private static class FakeDeviceProtection extends DeviceProtection {
-        final Map<String, byte[]> keys = new HashMap<String, byte[]>();
+        final Map<String, byte[]> keys;
+        Runnable beforeDelete;
+
+        FakeDeviceProtection() {
+            this(new HashMap<String, byte[]>());
+        }
+
+        FakeDeviceProtection(Map<String, byte[]> sharedKeys) {
+            keys = sharedKeys;
+        }
         boolean userVerification;
         boolean refuseWrites;
         boolean unreadable;
@@ -166,6 +175,11 @@ class VaultTest extends UITestBase {
                 // Present, and not removed: the exact answer the finding is about.
                 out.complete(Boolean.FALSE);
                 return out;
+            }
+            if (beforeDelete != null) {
+                Runnable action = beforeDelete;
+                beforeDelete = null;
+                action.run();
             }
             out.complete(Boolean.valueOf(keys.remove(keyId) != null));
             return out;
@@ -465,6 +479,95 @@ class VaultTest extends UITestBase {
         reopened.unlockWithPassword(pw("p")).get();
         reopened.rotateDataKey(pw("p")).get();
         assertEquals(UnlockPolicy.REQUIRE_USER_VERIFICATION, reopened.getPolicy());
+    }
+
+    @Test
+    void theStoredPolicyCannotBypassVerificationWhenProvidersShareAKey() {
+        FakeDeviceProtection sharedGated = new FakeDeviceProtection(device.keys);
+        sharedGated.userVerification = true;
+        device.gatedVariant = sharedGated;
+        String name = freshName();
+        Vault vault = Vault.named(name).configure(fast());
+        VaultOptions verifying = fast().policy(UnlockPolicy.REQUIRE_USER_VERIFICATION);
+        vault.enroll(pw("p"), verifying).get();
+        String recordName = deviceRecordName(name);
+        String authentic = (String) Storage.getInstance().readObject(recordName);
+        vault.lock();
+        Storage.getInstance().writeObject(recordName, authentic.replace(
+                "policy=REQUIRE_USER_VERIFICATION", "policy=REMEMBER_DEVICE"));
+        Vault reopened = Vault.named(name).configure(fast());
+        assertEquals(VaultError.AUTHENTICATION_FAILED, errorOf(reopened.unlockRemembered()),
+                "the same key in an unattended provider must not authenticate a changed policy");
+        assertFalse(reopened.isUnlocked());
+        Storage.getInstance().writeObject(recordName, authentic);
+        assertTrue(reopened.unlockRemembered().get(), "the authentic gated record still opens");
+        reopened.lock();
+        device.gatedVariant = null;
+        assertEquals(VaultError.POLICY_NOT_MET, errorOf(reopened.unlockRemembered()),
+                "an unavailable verifying provider must not fall back to the shared unattended key");
+    }
+
+    @Test
+    void forgettingAndConcurrentRememberingCannotLeaveAnOrphanedRecord() {
+        for (final boolean publishAfterKeyDeletion : new boolean[] {false, true}) {
+            String name = freshName();
+            Vault forgetting = Vault.named(name).configure(fast().policy(UnlockPolicy.REMEMBER_DEVICE));
+            forgetting.enroll(pw("p"), fast().policy(UnlockPolicy.REMEMBER_DEVICE)).get();
+            final Vault remembering = Vault.named(name).configure(fast().policy(UnlockPolicy.REMEMBER_DEVICE));
+            remembering.unlockWithPassword(pw("p")).get();
+            final String recordName = deviceRecordName(name);
+            final String keyId = vaultKeyIdOf(device);
+            final java.util.concurrent.atomic.AtomicReference<VaultError> remembered =
+                    new java.util.concurrent.atomic.AtomicReference<VaultError>(VaultError.UNKNOWN);
+            device.beforeDelete = new Runnable() {
+                public void run() {
+                    if (publishAfterKeyDeletion) {
+                        TestCodenameOneImplementation.getInstance().setDuringStorageWrite(
+                                recordName, new Runnable() {
+                            public void run() { device.keys.remove(keyId); }
+                        });
+                    }
+                    remembered.set(errorOf(remembering.rememberDevice()));
+                }
+            };
+            try {
+                assertTrue(forgetting.forgetDevice().get());
+                assertEquals(publishAfterKeyDeletion ? VaultError.KEY_MISSING : null, remembered.get());
+                assertEquals(UnlockPolicy.SESSION_ONLY, forgetting.getPolicy());
+                assertFalse(Storage.getInstance().exists(recordName));
+                assertFalse(device.keys.containsKey(keyId));
+                forgetting.lock();
+                assertTrue(forgetting.unlockWithPassword(pw("p")).get());
+            } finally {
+                device.beforeDelete = null;
+                TestCodenameOneImplementation.getInstance().setDuringStorageWrite(recordName, null);
+            }
+        }
+    }
+
+    @Test
+    void forgettingReportsAConflictWhenAnotherSessionKeepsRepublishing() {
+        String name = freshName();
+        Vault forgetting = Vault.named(name).configure(fast().policy(UnlockPolicy.REMEMBER_DEVICE));
+        forgetting.enroll(pw("p"), fast().policy(UnlockPolicy.REMEMBER_DEVICE)).get();
+        final Vault remembering = Vault.named(name).configure(fast().policy(UnlockPolicy.REMEMBER_DEVICE));
+        remembering.unlockWithPassword(pw("p")).get();
+        final int[] attempts = {0};
+        device.beforeDelete = new Runnable() {
+            public void run() {
+                assertTrue(remembering.rememberDevice().get());
+                attempts[0]++;
+                device.beforeDelete = this;
+            }
+        };
+        try {
+            assertEquals(VaultError.CONFLICT, errorOf(forgetting.forgetDevice()));
+            assertEquals(3, attempts[0], "forgetting must not spin indefinitely against another writer");
+        } finally {
+            device.beforeDelete = null;
+        }
+        assertTrue(forgetting.forgetDevice().get(), "forgetting can be retried once the writer stops");
+        assertEquals(UnlockPolicy.SESSION_ONLY, forgetting.getPolicy());
     }
 
     @Test

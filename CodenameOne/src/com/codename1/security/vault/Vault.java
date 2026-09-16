@@ -199,9 +199,8 @@ public final class Vault {
     /// Ask before offering the user a choice: a "remember this device" switch on a platform that
     /// cannot remember is worse than no switch.
     public VaultCapabilities capabilities() {
-        // The BASE mechanism, not the one the current policy happens to use. deviceProtection()
-        // answers the gated variant while this vault is enrolled REQUIRE_USER_VERIFICATION, so
-        // seeding capabilities with it made protectionFor(REMEMBER_DEVICE) describe the passkey
+        // The base mechanism, independent of the current policy. Selecting the current policy's
+        // gated variant for capabilities made protectionFor(REMEMBER_DEVICE) describe the passkey
         // rather than the store that policy would actually use -- in the browser, reporting
         // NON_EXTRACTABLE_KEY=NO from the passkey where the device key reports YES. A capability
         // query is about what each policy WOULD provide, and protectionFor selects the gated
@@ -775,7 +774,13 @@ public final class Vault {
                     // ensureKey is the validation, not a creation: with a record already stored
                     // the port checks it against the requirement and refuses rather than making
                     // anything.
-                    DeviceProtection unlocking = deviceProtection();
+                    DeviceProtection unlocking = deviceProtection(record.policy);
+                    if (record.policy == UnlockPolicy.REQUIRE_USER_VERIFICATION
+                            && !unlocking.requiresUserVerification()) {
+                        throw new VaultException(VaultError.POLICY_NOT_MET,
+                                "this device cannot provide the verification required by its "
+                                + "remembered unlock policy", Protection.USER_VERIFICATION, null);
+                    }
                     unlocking.setDeviceBoundRequired(options.isDeviceBoundPasskeyRequired());
                     if (options.isDeviceBoundPasskeyRequired()) {
                         await(unlocking.ensureKey(deviceKeyId()),
@@ -783,7 +788,7 @@ public final class Vault {
                                 + "device-bound requirement");
                     }
                     key = awaitBytes(unlocking.unwrap(deviceKeyId(), record.wrap,
-                                    wrapBinding(meta, PURPOSE_DEVICE).serialize()),
+                                    deviceWrapBinding(meta, record.policy).serialize()),
                             "the remembered device key could not be used");
                     if (generation != lockGeneration()) {
                         throw new VaultException(VaultError.LOCKED,
@@ -897,6 +902,7 @@ public final class Vault {
     /// configured, and a rewrap that read the configured one would replace the gated wrap with an
     /// unattended one -- silently turning off the prompt the user asked for.
     private void rememberNow(UnlockPolicy policy) {
+        final int generation = lockGeneration();
         final int keyAt = keyGeneration();
         // Snapshotted, not re-read, for the reason rotateDataKey gives: the store below prompts,
         // so this method runs for as long as the user takes, and lock() nulls both of these. Read
@@ -927,7 +933,7 @@ public final class Vault {
                     "the device key could not be created");
         }
         requireRememberedKeyCurrent(meta, keyAt);
-        byte[] aad = wrapBinding(meta, PURPOSE_DEVICE).serialize();
+        byte[] aad = deviceWrapBinding(meta, policy).serialize();
         byte[] wrapped = await(device.wrap(deviceKeyId(), key, aad),
                 "the data key could not be wrapped for this device");
         // Proven before it is trusted, same reasoning as enrolment: a wrap that cannot be
@@ -943,8 +949,27 @@ public final class Vault {
         requireRememberedKeyCurrent(meta, keyAt);
         DeviceRecord attempted = new DeviceRecord(policy, wrapped, meta.dataKeyVersion);
         writeDeviceRecord(attempted);
+        byte[] persistedProof = null;
         try {
             requireRememberedKeyCurrent(meta, keyAt);
+            // A concurrent forget can delete the key after the first proof but before this
+            // record is published. Verify after publication as well; keyState alone cannot
+            // distinguish the original key from a replacement created under the same id.
+            // A lock is handled by the caller's existing rollback/degradation path.
+            if (generation != lockGeneration()) {
+                return;
+            }
+            persistedProof = awaitBytes(device.unwrap(deviceKeyId(), wrapped, aad),
+                    "the published device wrap no longer has a usable device key");
+            if (generation != lockGeneration()) {
+                return;
+            }
+            requireAuthenticRecord(meta, persistedProof);
+            requireRememberedKeyCurrent(meta, keyAt);
+            if (!attempted.serialize().equals(readUncached(deviceRecordKey()))) {
+                throw new VaultException(VaultError.CONFLICT,
+                        "this device's remembered record changed while it was being published");
+            }
         } catch (VaultException changed) {
             // A replacement inside the storage write must not leave this stale wrap active.
             // Preserve a later writer's record; only this attempt can be withdrawn here.
@@ -956,7 +981,16 @@ public final class Vault {
                 }
             }
             throw changed;
+        } finally {
+            Bytes.zero(persistedProof);
         }
+    }
+
+    /// Authenticates the selected mechanism as well as the vault and data-key version. Providers
+    /// may share key material between their gated and unattended variants; changing the policy
+    /// in ordinary Storage must never let the unattended variant open a gated wrap.
+    private AssociatedData deviceWrapBinding(VaultMetadata meta, UnlockPolicy policy) {
+        return wrapBinding(meta, PURPOSE_DEVICE + "." + policy.name());
     }
 
     /// A prompt or wrapping operation can outlive a rotation in this session or another tab.
@@ -982,23 +1016,28 @@ public final class Vault {
             public void run() {
                 try {
                     Storage storage = Storage.getInstance();
-                    storage.deleteStorageFile(deviceRecordKey());
-                    // Proven gone BEFORE the mechanism behind it is destroyed, and the order is
-                    // the whole point. deleteStorageFile returns void on every port and both real
-                    // ones can fail it silently -- JavaSE discards File.delete()'s boolean, the
-                    // browser catches the IndexedDB error -- so this used to go on and delete the
-                    // device key under a record that had survived. What that leaves is worse than
-                    // either end state: getPolicy() still reports a remembering policy, the record
-                    // still names a key that no longer exists, unlockRemembered() is broken, and
-                    // forgetDevice() reported TRUE. Refusing leaves the remembered unlock WORKING,
-                    // which is the state the caller can retry from.
-                    if (!definitelyGone(deviceRecordKey())) {
-                        throw new VaultException(VaultError.STORAGE_UNAVAILABLE,
-                                "this device's remembered-unlock record could not be removed, so "
-                                + "the key it names has been left in place rather than orphaned");
+                    for (int attempt = 0; attempt < 3; attempt++) {
+                        storage.deleteStorageFile(deviceRecordKey());
+                        // Prove removal before destroying its key. A refused record deletion
+                        // must leave the existing remembered unlock usable for a later retry.
+                        if (!definitelyGone(deviceRecordKey())) {
+                            throw new VaultException(VaultError.STORAGE_UNAVAILABLE,
+                                    "this device's remembered-unlock record could not be removed, so "
+                                    + "the key it names has been left in place rather than orphaned");
+                        }
+                        forgetEveryMechanism();
+                        if (definitelyGone(deviceRecordKey())) {
+                            out.complete(Boolean.TRUE);
+                            return;
+                        }
+                        // A remembering session published while key deletion yielded. Remove
+                        // that record and its mechanism together on the next pass. A publisher
+                        // arriving after this final absence check must verify its key after its
+                        // own write, so it either establishes a usable new enrolment or refuses.
                     }
-                    forgetEveryMechanism();
-                    out.complete(Boolean.TRUE);
+                    throw new VaultException(VaultError.CONFLICT,
+                            "another session kept remembering this device while it was being "
+                            + "forgotten; retry forgetting after that operation finishes");
                 } catch (VaultException failed) {
                     out.error(failed);
                 } catch (RuntimeException broke) {
@@ -3169,12 +3208,6 @@ public final class Vault {
             }
         }
         return base;
-    }
-
-    /// The protection for the policy this device is actually enrolled under, which is the one to
-    /// use for an operation on an existing wrap.
-    private DeviceProtection deviceProtection() {
-        return deviceProtection(getPolicy());
     }
 
     private DeviceProtection baseDeviceProtection() {
