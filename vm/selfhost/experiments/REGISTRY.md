@@ -2693,3 +2693,91 @@ mechanism that is currently losing objects roughly 1 run in 16 under memory pres
 The ordering is therefore: fix the handshake, then build this. Doing it in the other order
 means any new corruption is unattributable between the two, and this VM has already shown
 that a gate suite can be entirely green while live objects are being freed.
+
+## Round 24: QA first -- the verifier could not see a dangling reference, and the gauntlet's answer depended on $PATH
+
+Round 23 ends by saying the handshake bug must be fixed before the stack-iterator mechanism
+is built, because otherwise new corruption is unattributable. That ordering assumed the
+instruments work. Two of them did not, and both failures were invisible in exactly the way
+that matters: each reported success.
+
+### The verifier was structurally blind to its own headline invariant
+
+`cn1GcVerifyClassify` has had a `CN1_GC_VS_FREE_SLOT` branch since it was written, and it
+had never fired. The sweep poisoned a reclaimed slot and immediately pushed it onto the
+page free list, so the next allocation handed the slot back; by the time the verify pass
+ran, a stale reference into it resolved to a valid live object. Measured before the change:
+60 verifier runs under memory pressure produced 2 crashes and `violations=0`. Only legacy
+blocks were ever quarantined, and nearly every object is in a BiBOP slot.
+
+Under `CN1_GC_VERIFY` a reclaimed slot now takes a `QUAR` mark and is withheld from the
+free list until the next sweep. One cycle suffices: the verify pass runs once per cycle,
+immediately after the sweep. `freeCount` covers a quarantined slot the whole time, so page
+liveness accounting is unchanged, and an ordinary build is untouched.
+
+**Two fault designs failed before one worked, and the failures are the useful part:**
+
+| fault | result | why |
+|---|---|---|
+| drop 1 mark in N, in `gcMarkObject` | `violations=0` down to 1-in-50 (2699 drops) | one dropped *visit* is not a missed object -- a second referrer marks it anyway, and the sweep needs two consecutive missed cycles |
+| 8 sticky victims, never marked again | `violations=0`; all 8 ended at `mark=currentGcMarkValue` | the marker has redundant paths: conservative stack roots, and the belt pass exists specifically to re-mark reachable-but-unmarked objects |
+| free 8 slots the sweep proved live, victims chosen **in the sweep** | fault fired 8 times, 239 verify passes, 161k refs, `violations=0` | a victim picked there is usually referenced only from a stack slot, which this instrument cannot see by construction |
+| free 8 proven-live slots, victims nominated **in `gcMarkObject`** | caught | anything arriving there is provably a reference-field child of some holder |
+
+The lesson generalises past this fault: **an instrument that only reads object graphs can
+only be tested with defects that live in object graphs.** Three of the four attempts above
+injected real corruption and reported nothing, and only the victim-fate dump
+(`classify=`/`mark=` per freed slot) distinguished "the verifier missed it" from "there was
+nothing to miss".
+
+`CN1_GC_FAULT=freelive` is the survivor, `MapTorture2` is the driver because it holds 4000
+entries across forced collections, and self-test5 asserts the corruption is *never* missed
+while separately asserting the fault fired. Measured, 6 runs each:
+
+| | verifier caught | driver caught | **missed** |
+|---|---:|---:|---:|
+| quarantine on | 4 | 2 | **0** |
+| quarantine off (`-DCN1_GC_NO_QUARANTINE`) | 0 | 1 | **5** |
+
+The ablation is kept as the permanent negative control. Which of the two notices first is a
+race, so the gate does not require the verifier specifically -- it requires that nothing
+goes quiet.
+
+### The gauntlet's verdict depended on which JDK was on $PATH
+
+JDK-4511638 replaced FloatingDecimal with the shortest-representation algorithm in Java 19.
+One unchanged `BoxEdge`, measured on this machine:
+
+| | double (2^62) | float (2^31) |
+|---|---|---|
+| JDK 25 / 21 / 19 | `4.611686018427388E18` | `2.1474836E9` |
+| JDK 17 / 11 / 8 | `4.6116860184273879E18` | `2.14748365E9` |
+| ParparVM (`cn1ShortestDouble`) | `4.611686018427388E18` | `2.1474836E9` |
+
+`REF_JAVA` defaulted to `java`. Sourcing `tools/env.sh` -- which every other instruction in
+this tree tells you to do -- puts JDK 8 on `PATH`, so the gate reported `BoxEdge: DIVERGE`
+on a tree with no bug in it. The dangerous half is the repair that reading suggests: making
+the VM emit the pre-19 form would break it against every JDK anyone still ships. This is the
+same class as the `parpar-O3` staleness trap -- the harness quietly chose what it compared,
+and the wrong answer looked like a code regression.
+
+The gauntlet now refuses a pre-19 reference with an explanation, and checks each torture
+against **both** references: byte-identical to the modern JDK (the shipping contract), and
+equal to Java 8 on every line where the two JDKs agree with each other. The era-dependent
+lines are derived by diffing the two references rather than hand-listed, so the set cannot
+go stale, and a real divergence landing on a floating-point line is still caught.
+
+Result: 16 tortures identical to both JDKs; `BoxEdge` identical to the modern one with
+exactly 4 era-dependent lines (plus and minus 2^62 as a double, plus and minus 2^31 as a
+float). The target's diff against Java 8 is line-for-line the same as the JDKs' own diff.
+
+### State after this round
+
+GC-VERIFY GREEN with five non-vacuous self-tests; GAUNTLET GREEN dual-era; Gate D PASS,
+Gate A PASS (798 files byte-identical), negative control PASS.
+
+Round 23's ordering still stands, with one correction: the handshake bug is next, and it is
+now worth attacking with an instrument that can actually observe a freed-but-referenced
+slot. What the quarantine does *not* yet do is survive a slot being reused across more than
+one cycle, so a reference that dangles for several cycles before being read is still seen
+only at the first verify pass after the free.
