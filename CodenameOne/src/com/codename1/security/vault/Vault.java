@@ -1475,7 +1475,20 @@ public final class Vault {
                     next.counter = meta.counter + 1;
                     stampMac(next, meta, key);
                     commitMetadata(meta, next);
-                    metadata = next;
+                    // Cached ONLY by an instance that actually holds the key. changePassword is
+                    // the one path documented to work on a LOCKED vault, and caching the record
+                    // there left this tab warm with no key: loadMetadata() then answers the
+                    // in-memory copy instead of reading storage, so a later unlockWithPassword
+                    // opened the wrap THIS tab remembered. Another tab changing the password or
+                    // rotating in between was invisible, and the superseded password kept
+                    // working while the tab operated on stale key metadata.
+                    //
+                    // Every other assignment to this field adopts a key in the same breath --
+                    // enrolment, publishKey, the rotation, the recovery code -- so this is the
+                    // only one that can be holding nothing.
+                    if (dataKey != null) {
+                        metadata = next;
+                    }
                     passwordNeedsRewrap = false;
                     out.complete(Boolean.TRUE);
                 } catch (VaultException failed) {

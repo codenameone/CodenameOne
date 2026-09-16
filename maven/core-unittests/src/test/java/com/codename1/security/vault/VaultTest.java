@@ -1337,6 +1337,38 @@ class VaultTest extends UITestBase {
     }
 
     @Test
+    void aLockedTabThatChangedThePasswordDoesNotKeepOpeningTheWrapItRemembers() throws Exception {
+        // changePassword is the one path documented to work on a LOCKED vault, and it cached the
+        // record it wrote. loadMetadata() answers the in-memory copy when there is one, so this
+        // tab's next unlockWithPassword opened the wrap it remembered rather than the settled
+        // one -- another tab changing the password or rotating in between was invisible, and the
+        // superseded password went on working.
+        String name = freshName();
+        VaultOptions options = fast();
+        Vault owner = Vault.named(name).configure(options);
+        owner.enroll(pw("first"), options).get();
+
+        // A second instance of the same vault, which is what a second tab is: its own caches,
+        // the same storage underneath. It changes the password while LOCKED, which is allowed.
+        Vault locked = Vault.named(name).configure(fast());
+        assertFalse(locked.isUnlocked(), "this instance must not be holding a key");
+        assertTrue(locked.changePassword(pw("first"), pw("second")).get().booleanValue());
+        assertFalse(locked.isUnlocked(), "and it still must not be, afterwards");
+
+        // A third party moves the vault on again.
+        Vault elsewhere = Vault.named(name).configure(fast());
+        assertTrue(elsewhere.changePassword(pw("second"), pw("third")).get().booleanValue());
+
+        // The locked instance must not still be able to open the wrap it wrote: it has to read
+        // the settled record, where only the newest password works.
+        assertEquals(VaultError.AUTHENTICATION_FAILED, errorOf(locked.unlockWithPassword(pw("second"))),
+                "a superseded password must not keep working because this tab cached its own "
+                + "record");
+        assertTrue(locked.unlockWithPassword(pw("third")).get().booleanValue(),
+                "and the current password must open it");
+    }
+
+    @Test
     void aWithdrawnDeviceRecordThatWillNotGoHasItsMechanismDestroyed() throws Exception {
         // A lock landing inside rememberNow's prompt leaves a wrap of the ZEROED key, and the
         // withdrawal discards it. The delete is void-returning and both real ports can drop one
