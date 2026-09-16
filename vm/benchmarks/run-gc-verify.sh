@@ -29,7 +29,20 @@ unset CN1_GC_FAULT CN1_GC_VERIFY_SOFT CN1_GC_VERIFY_AGING CN1_GC_VERIFY_ALL \
 # Every workload that allocates enough to drive real collection cycles. The
 # point is coverage of ALLOCATION SHAPES, not of answers: page-heap churn,
 # monitors, finalizers, threads, oversized/legacy objects, adopted survivors.
-DRIVERS="${*:-GraceAudit LegacyGrace BulkCopyBarrier GcStress MtStress MapTorture SbTorture FusedTest ThreadChurn LargeArrayLoad}"
+# MapTorture2 REPLACES MapTorture here, and the reason is worth keeping.
+#
+# MapTorture is HashMap<Integer,Integer> throughout, and an Integer is a tagged immediate:
+# it never allocates and is never traced. Once HashMap's storage moved from Java arrays
+# into C blocks that workload stopped allocating on the Java heap almost entirely and
+# completed ZERO GC cycles under the verifier -- this script correctly reported it vacuous
+# rather than passing it. MapTorture stays in run-gauntlet.sh, where byte-identity against
+# the host is what it is for.
+#
+# The gap that exposed is the older problem: no driver here ever held a map full of REAL
+# references across a collection, which is exactly what the block storage depends on -- a
+# C block is reachable to the collector only through the owner's generated __GC_MARK_.
+# MapTorture2 is String-keyed and Object-valued for that reason.
+DRIVERS="${*:-GraceAudit LegacyGrace BulkCopyBarrier GcStress MtStress MapTorture2 SbTorture FusedTest ThreadChurn LargeArrayLoad}"
 
 fail=0
 for d in $DRIVERS; do

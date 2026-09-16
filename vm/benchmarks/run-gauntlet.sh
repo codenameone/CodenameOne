@@ -39,7 +39,13 @@ J8="${JDK_8_HOME:?set JDK_8_HOME}"
 # duplicator gets wrong (break, continue, early return, nesting, a try/catch inside the
 # body) crossed with receivers that must and must NOT take an ArrayList fast path. It
 # prints per receiver rather than only a checksum, so a failure names the shape.
-TORTURES="MapTorture IdmTorture HtTorture SbTorture StrCmp FusedTest IbpTest ExcTest ThreadChurn SoeTest TaggedSync BoxEdge ConcatCorrupt ToCharT ForEachT"
+#
+# MapTorture2 is the object-keyed companion to MapTorture. MapTorture is
+# HashMap<Integer,Integer> throughout and an Integer is a TAGGED IMMEDIATE, so it neither
+# allocates nor gets traced -- it never held a real reference across a collection. That
+# gap hid a live-object loss: MapTorture2 failed on its first run with "LOST held key k1",
+# and MapTorture, the gauntlet and the self-hosting gates were all green at the time.
+TORTURES="MapTorture MapTorture2 IdmTorture HtTorture SbTorture StrCmp FusedTest IbpTest ExcTest ThreadChurn SoeTest TaggedSync BoxEdge ConcatCorrupt ToCharT ForEachT"
 mkdir -p target/host-classes target/bin
 # FusedTest uses @com.codename1.annotations.Fused -- supply the annotation
 # source for the host compile (ParparVM's JavaAPI carries its own copy)
