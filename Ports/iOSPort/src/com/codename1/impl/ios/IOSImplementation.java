@@ -11054,7 +11054,7 @@ public class IOSImplementation extends CodenameOneImplementation {
     
     
 
-    private String nativeFontName(String fontName) {
+    protected String nativeFontName(String fontName) {
         if(fontName != null && fontName.startsWith("native:")) {
             if("native:MainThin".equals(fontName)) {
                 return "HelveticaNeue-UltraLight";

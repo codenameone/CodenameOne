@@ -108,6 +108,15 @@ public class MacImplementation extends IOSImplementation {
         return null;
     }
 
+    @Override
+    protected String nativeFontName(String fontName) {
+        // Keep native: aliases intact for the AppKit resolver. The shared loader
+        // already maps non-italic Helvetica aliases to system fonts, but the iOS
+        // Regular alias requests medium weight and its italics stay Helvetica.
+        // AppKit chooses the current system family without a private SF font name.
+        return fontName;
+    }
+
     /// The natives this class needs directly. The window manager owns its own;
     /// density is asked for long before any secondary window exists.
     private final MacNative macNative = new MacNative();
