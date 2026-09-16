@@ -68,6 +68,9 @@ class HoverTracker {
     ///
     /// - `y`: the position of the event
     void pointerOver(Component cmp, int x, int y) {
+        if (cmp != null && cmp.isHidden(true)) {
+            cmp = null;
+        }
         pointerTarget = cmp;
         pointerX = x;
         pointerY = y;
@@ -140,6 +143,10 @@ class HoverTracker {
         // leadComponentImpl answers the component itself when there is no lead, so an
         // ordinary component is unaffected.
         Component target = cmp == null ? null : LeadUtil.leadComponentImpl(cmp);
+        // Preferred-size collapse can precede layout, leaving stale hit-test bounds.
+        if (cmp != null && (cmp.isHidden(true) || (target != null && target.isHidden(true)))) {
+            target = null;
+        }
         // Identity is the question being asked -- whether this is the same component
         // instance the pointer was already over -- so equals() would be wrong here as well
         // as slower.

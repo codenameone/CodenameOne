@@ -21,6 +21,8 @@ from pathlib import Path
 REPO = Path(__file__).resolve().parent.parent
 SPEC = Path(__file__).resolve().parent / "fidelity-app/common/src/main/resources/fidelity-tests.yaml"
 
+RENDERER = REPO / "scripts/fidelity-app/common/src/main/java/com/codenameone/fidelity/render/Cn1WidgetRenderer.java"
+
 MOBILE_KEYS = {"native", "native_android"}
 DESKTOP_KEYS = {"native_win", "native_mac", "native_gnome"}
 KNOWN_KEYS = MOBILE_KEYS | DESKTOP_KEYS | {
@@ -139,12 +141,29 @@ ERRORS = []
 def yield_error(msg):
     ERRORS.append(msg)
 
+def renderer_support():
+    # Read the renderer's own literal IDs/prefixes rather than maintain a second list.
+    # The device runner skips unknown IDs, so validate them before any capture starts.
+    source = RENDERER.read_text()
+    method = re.search(r"public static boolean isSupported\(String id\)\s*\{(.*?)^    \}", source, re.S | re.M)
+    if not method:
+        yield_error("cannot locate Cn1WidgetRenderer.isSupported")
+        return set(), ()
+    body = re.sub(r"//[^\n]*|/\*.*?\*/", "", method.group(1), flags=re.S)
+    ids = set(re.findall(r'"([^"\n]+)"\.equals\(id\)', body))
+    prefixes = tuple(re.findall(r'id\.startsWith\("([^"\n]+)"\)', body))
+    if not ids:
+        yield_error("cannot read supported CN1 renderer IDs")
+    return ids, prefixes
+
+
 def main():
     if not SPEC.exists():
         print(f"check-fidelity-spec: {SPEC} not found", file=sys.stderr)
         return 2
     ERRORS.clear()
     rows = parse(SPEC)
+    renderer_ids, renderer_prefixes = renderer_support()
     seen = set()
     desktop = mobile = 0
 
@@ -156,6 +175,8 @@ def main():
         elif rid in seen:
             yield_error(f"{where}: duplicate id, so one row's tiles would overwrite the other's")
         seen.add(rid)
+        if rid and rid not in renderer_ids and not rid.startswith(renderer_prefixes):
+            yield_error(f"{where}: unsupported CN1 renderer id")
 
         for k in r:
             if k != "__line" and k not in KNOWN_KEYS:

@@ -759,34 +759,45 @@ class HoverDeliveryTest extends UITestBase {
             }
             surface.revalidate();
             DisplayTest.flushEdt();
+            com.codename1.ui.plaf.Style hover = new com.codename1.ui.plaf.Style(target.getUnselectedStyle());
+            hover.setBgPainter(new CountingHoverPainter());
+            target.setHoverStyle(hover);
             TooltipManager previous = TooltipManager.getInstance();
             TooltipManager manager = new TooltipManager();
             manager.setTooltipShowDelay(60000);
             TooltipManager.enableTooltips(manager);
             try {
-                for (Component hidden : new Component[]{target, subtree}) {
-                    int x = target.getAbsoluteX() + target.getWidth() / 2;
-                    int y = target.getAbsoluteY() + target.getHeight() / 2;
-                    surface.pointerHover(new int[]{x}, new int[]{y});
-                    assertTrue(target.isHovered());
-                    assertNotNull(pending.get(manager));
-                    manager.showTooltip(target.getTooltip(), target);
-                    assertNotNull(visible.get(manager));
-                    new Container().setVisible(false);
-                    assertNotNull(pending.get(manager), "unrelated hiding must preserve the timer");
-                    assertNotNull(visible.get(manager), "unrelated hiding must preserve the popup");
-                    hidden.setVisible(false);
-                    assertFalse(target.isHovered());
-                    assertFalse(surface.getHoverTracker().isOver(target));
-                    assertNull(pending.get(manager));
-                    assertNull(visible.get(manager));
-                    assertNull(anchor.get(manager));
-                    hidden.setVisible(true);
-                    assertFalse(target.isHovered(), "show waits for a new pointer event");
-                    surface.pointerHover(new int[]{x}, new int[]{y});
-                    assertTrue(target.isHovered(), "a new event restores hover on the same target");
-                    assertNotNull(pending.get(manager), "the new event schedules a fresh tooltip");
-                    manager.clearTooltip();
+                for (int mode = 0; mode < 3; mode++) {
+                    for (Component hidden : new Component[]{target, subtree}) {
+                        int x = target.getAbsoluteX() + target.getWidth() / 2;
+                        int y = target.getAbsoluteY() + target.getHeight() / 2;
+                        surface.pointerHover(new int[]{x}, new int[]{y});
+                        assertTrue(target.isHovered());
+                        assertNotNull(pending.get(manager));
+                        manager.showTooltip(target.getTooltip(), target);
+                        assertNotNull(visible.get(manager));
+                        new Container().setVisible(false);
+                        assertNotNull(pending.get(manager), "unrelated hiding must preserve the timer");
+                        assertNotNull(visible.get(manager), "unrelated hiding must preserve the popup");
+                        if (mode == 0) { hidden.setVisible(false); }
+                        else { hidden.setHidden(true, mode == 1); }
+                        assertFalse(target.isHovered());
+                        assertFalse(surface.getHoverTracker().isOver(target));
+                        assertNull(pending.get(manager));
+                        assertNull(visible.get(manager));
+                        assertNull(anchor.get(manager));
+                        assertFalse(secondary ? window.hasAnimations() : form.hasAnimations());
+                        surface.pointerHover(new int[]{x}, new int[]{y});
+                        assertFalse(target.isHovered(), "collapsed bounds must not reacquire hover before layout");
+                        assertNull(pending.get(manager));
+                        if (mode == 0) { hidden.setVisible(true); }
+                        else { hidden.setHidden(false, mode == 1); }
+                        assertFalse(target.isHovered(), "show waits for a new pointer event");
+                        surface.pointerHover(new int[]{x}, new int[]{y});
+                        assertTrue(target.isHovered(), "a new event restores hover on the same target");
+                        assertNotNull(pending.get(manager), "the new event schedules a fresh tooltip");
+                        manager.clearTooltip();
+                    }
                 }
             } finally {
                 manager.clearTooltip();

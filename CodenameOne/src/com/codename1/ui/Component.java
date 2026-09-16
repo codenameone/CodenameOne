@@ -8193,7 +8193,7 @@ public class Component implements Animation, StyleListener, Editable {
     }
 
     private boolean hasAnimatedHoverBackground() {
-        if (!isEffectivelyHovered() || !isVisible()) {
+        if (!isEffectivelyHovered() || !isVisible() || isHidden(true)) {
             return false;
         }
         // Resolve first: an active UIID/inline change may have cleared hoverStyle.
@@ -8253,7 +8253,7 @@ public class Component implements Animation, StyleListener, Editable {
     }
 
     void checkAnimation() {
-        if (isEffectivelyHovered() && !isVisible()) {
+        if (isEffectivelyHovered() && (!isVisible() || isHidden(true))) {
             stopHoverBackgroundAnimation();
             return;
         }
@@ -10007,6 +10007,10 @@ public class Component implements Animation, StyleListener, Editable {
                     getAllStyles().setMargin(0, 0, 0, 0);
                 }
                 setPreferredSize(new Dimension());
+            }
+            if (isHidden()) {
+                // Collapsing does not change visible, but must release hover/tooltip ownership.
+                clearHoverForInactiveSubtree();
             }
         } else {
             setPreferredSize(null);

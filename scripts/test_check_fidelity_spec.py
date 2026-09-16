@@ -35,6 +35,17 @@ class FidelitySpecTest(unittest.TestCase):
     def test_current_sources(self):
         self.assertEqual(0, self.check())
 
+    def test_unknown_mobile_renderer_ids_fail_even_with_valid_native_keys(self):
+        original = validator.SPEC.read_text()
+        for known in ("Button", "TextField", "SwitchMorph"):
+            with self.subTest(original_id=known):
+                validator.SPEC.write_text(original.replace("  - id: " + known + "\n",
+                                                           "  - id: UnsupportedProbe\n", 1))
+                self.assertEqual(1, self.check())
+                self.assertTrue(any("unsupported CN1 renderer id" in error for error in validator.ERRORS))
+        validator.SPEC.write_text(original.replace("  - id: GlassPanelGrad\n", "  - id: GlassPanelProbe\n", 1))
+        self.assertEqual(0, self.check(), "the renderer intentionally supports the GlassPanel prefix")
+
     def test_material_values_match_comparator_modes(self):
         original = validator.SPEC.read_text()
         self.assertIn("    material: glass", original)
