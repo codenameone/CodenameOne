@@ -2253,7 +2253,13 @@ public final class Vault {
                         // against a different object than the one this transition actually used
                         // and delete the outgoing key when the two are in fact the same store.
                         DeviceProtection incoming = deviceProtection(policy);
-                        if (outgoing != incoming) {
+                        // Identity is exactly the question -- whether the two policies resolve to
+                        // the SAME store object, in which case deleting the outgoing key would
+                        // delete the incoming one that was just written -- so equals() would be
+                        // wrong here as well as meaningless for an SPI implementation. PMD only
+                        // started seeing this when the right-hand side stopped being a method
+                        // call; the comparison itself has not changed.
+                        if (outgoing != incoming) { //NOPMD CompareObjectsWithEquals
                             requireKeyDeleted(outgoing,
                                     "the previous device key could not be deleted");
                             outgoingKeyGone[0] = true;
