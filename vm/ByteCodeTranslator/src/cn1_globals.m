@@ -3731,6 +3731,20 @@ void codenameOneGCMark() {
                  * migration would empty a table it is still appending to.
                  */
                 JAVA_BOOLEAN vtExecuting = JAVA_FALSE;
+                /*
+                 * Whether the claim below is HELD, so it is released exactly once
+                 * at the end of this iteration. Held across both the migration
+                 * and the heapAllocationSize reset, because the two together are
+                 * what empties the table.
+                 */
+                JAVA_BOOLEAN vtClaimed = JAVA_FALSE;
+                /*
+                 * Hoisted to this scope because the claim is RELEASED further
+                 * down, outside the lightweightThread block it used to be
+                 * declared in. Null for every ordinary thread state, which is
+                 * what cn1GcVtForState answers for one.
+                 */
+                struct cn1VirtualThread* vtOfState = 0;
                 // Deferred report for the escalation (see above). Zero means nothing to
                 // report; the values are captured under the freeze and printed after it.
                 long long forcedStopWaitUs = 0;
@@ -3778,7 +3792,7 @@ void codenameOneGCMark() {
                      * rather than the flag: not "has it parked" but "is it
                      * executing", which for a virtual thread is answerable exactly.
                      */
-                    struct cn1VirtualThread* vtOfState = cn1GcVtForState(t);
+                    vtOfState = cn1GcVtForState(t);
                     // 64-bit: at 500us a spin, an int overflowed after ~36 minutes of
                     // waiting, and signed overflow is undefined -- the one input that
                     // can reach it is precisely the wedge this loop is trying to report.
@@ -3854,8 +3868,34 @@ void codenameOneGCMark() {
                              * already declines the migration for, so a running
                              * virtual thread is marked and declines it too.
                              */
-                            vtExecuting = cn1VirtualThreadIsRunning(vtOfState)
+                            /*
+                             * CLAIMED, not merely observed. Reading "is it
+                             * running" here and acting on it below is a
+                             * check-to-use window: this loop stops one thread
+                             * state at a time, so the CARRIER is very likely
+                             * still running, and it can resume this virtual
+                             * thread between the read and the migration. The
+                             * migration would then empty a table the mutator has
+                             * started appending to, which is the lost or
+                             * double-placed object this whole branch exists to
+                             * avoid -- reached by a different route.
+                             *
+                             * The claim publishes the collector's intent and
+                             * re-reads `running` with seq_cst on both sides, and
+                             * resume does the mirror image, so one of the two
+                             * always sees the other. A failed claim means running
+                             * and is handled exactly as before.
+                             *
+                             * Deliberately NOT a mutex: a carrier blocked on one
+                             * holds threadActive raised, and this collector's
+                             * unbounded wait for a carrier is precisely what the
+                             * forced-stop escalation exists to break -- and
+                             * cannot, for a state with no pthread. Both reverted
+                             * attempts recorded above were that shape.
+                             */
+                            vtClaimed = cn1VirtualThreadGcClaim(vtOfState)
                                     ? JAVA_TRUE : JAVA_FALSE;
+                            vtExecuting = vtClaimed ? JAVA_FALSE : JAVA_TRUE;
                             break;
                         }
                         usleep(500);
@@ -4043,6 +4083,16 @@ void codenameOneGCMark() {
                 
                 if(!forcedStop && !vtExecuting) {
                     t->heapAllocationSize = 0;
+                }
+                /*
+                 * RELEASED HERE, after the reset and not after the migration: the
+                 * table is only empty once heapAllocationSize is back to zero, so
+                 * a resume between the two would append at an index the migration
+                 * has already taken.
+                 */
+                if(vtClaimed) {
+                    cn1VirtualThreadGcRelease(vtOfState);
+                    vtClaimed = JAVA_FALSE;
                 }
 
                 int stackSize = t->threadObjectStackOffset;
@@ -11193,6 +11243,20 @@ static int cn1GcParkedVirtualThreadsScanned = 0;
  * (threads x virtual threads) per mark rather than per microsecond. A map keyed
  * by state would have to be maintained by the scheduler on every switch, which
  * is the hot path this is trying not to touch.
+ */
+/*
+ * MEASURED, and worth knowing before treating anything this gates as proven: on
+ * vm/backend's petserver under 80,000 requests this never returned non-null.
+ * Virtual threads were definitely in use and the snapshot was populated (6 to 16
+ * entries per cycle), but the entries' attached state read back as NULL, so no
+ * allThreads entry could match one.
+ *
+ * So the branch guarded by a non-null answer here -- the virtual-thread arm of
+ * the stop loop, its executing check and the claim it takes -- is correct by
+ * construction rather than by observation, and nothing should be described as
+ * load bearing on the strength of that workload. Why the snapshot's states are
+ * null is a separate question from the race the claim closes, and is not
+ * answered here.
  */
 static struct cn1VirtualThread* cn1GcVtForState(struct ThreadLocalData* t) {
     if(t == 0) {
