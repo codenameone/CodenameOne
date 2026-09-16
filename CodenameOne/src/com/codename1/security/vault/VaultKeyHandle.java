@@ -230,6 +230,16 @@ final class VaultKeyHandle extends KeyHandle {
                     + "import. Ask the vault for a new handle");
         }
         owner.noteHandleUse();
-        return material;
+        // SNAPSHOTTED, then checked. Reading the field on the way out made the liveness test and
+        // the value two separate reads: a destroy() landing between them returned the null it had
+        // just assigned, and Hmac.create dereferenced it -- a NullPointerException thrown
+        // synchronously out of mac()/verifyMac(), which catch only VaultException, so an
+        // asynchronous API threw at its caller instead of answering LOCKED.
+        byte[] snapshot = material;
+        if (snapshot == null) {
+            throw new VaultException(VaultError.LOCKED,
+                    "this key handle was destroyed while it was being used");
+        }
+        return snapshot;
     }
 }

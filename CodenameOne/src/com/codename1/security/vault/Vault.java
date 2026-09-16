@@ -234,7 +234,10 @@ public final class Vault {
         // up -- a transient IndexedDB refusal -- is not a platform that cannot store, and
         // reporting the policy as unsupported there turned "retry, the store is busy" into
         // POLICY_NOT_MET, which an application reads as "this device will never do this".
-        String probe = STORAGE_PREFIX + "capability.probe";
+        // A NAME PER PROBE. A fixed one collided with itself: two tabs or threads asking at once
+        // both wrote it, and the first to finish read and deleted it before the second read its
+        // own write -- so a perfectly healthy platform answered "session-only unsupported".
+        String probe = STORAGE_PREFIX + "capability.probe." + Bytes.toHex(SecureRandom.bytes(8));
         if (storage.entryState(probe)
                 == com.codename1.impl.CodenameOneImplementation.STORAGE_ENTRY_UNKNOWN) {
             return false;
@@ -286,7 +289,17 @@ public final class Vault {
         // describing the settled record with the PASSKEY provider: USER_VERIFICATION=YES over a
         // record that now permits unattended unlock, which is the one claim a caller must be
         // able to trust.
-        Object storedRecord = readUncached(deviceRecordKey());
+        Object storedRecord;
+        try {
+            storedRecord = readUncached(deviceRecordKey());
+        } catch (VaultException cannotRead) {
+            // readUncached refuses when storage cannot say whether the entry is there, and this
+            // method's whole contract is to DESCRIBE that condition rather than to fail on it --
+            // the recordState == UNKNOWN branch below exists for exactly this. Throwing here meant
+            // diagnostics and DatabaseConfig.effectiveKeyProtection got a synchronous exception
+            // where they asked a question with an "unknown" answer available.
+            storedRecord = null;
+        }
         DeviceRecord snapshot = storedRecord instanceof String
                 ? DeviceRecord.parse((String) storedRecord) : null;
         DeviceProtection device = deviceProtection(
