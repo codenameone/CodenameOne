@@ -234,9 +234,30 @@ public final class Vault {
         // up -- a transient IndexedDB refusal -- is not a platform that cannot store, and
         // reporting the policy as unsupported there turned "retry, the store is busy" into
         // POLICY_NOT_MET, which an application reads as "this device will never do this".
-        if (storage.entryState(STORAGE_PREFIX + "capability.probe")
+        String probe = STORAGE_PREFIX + "capability.probe";
+        if (storage.entryState(probe)
                 == com.codename1.impl.CodenameOneImplementation.STORAGE_ENTRY_UNKNOWN) {
             return false;
+        }
+        // WRITTEN and read back, not merely looked up. A store can be perfectly readable and
+        // refuse writes -- an IndexedDB origin at quota is exactly that -- and a lookup answers
+        // ABSENT there just as it does on an empty store, so the policy was advertised and then
+        // failed at enrolment, after the user had typed a password. Enrolling persists a record;
+        // the only way to know that will work is to persist one.
+        try {
+            if (!storage.writeObject(probe, "probe")) {
+                return false;
+            }
+            if (!"probe".equals(asString(readUncached(probe)))) {
+                return false;
+            }
+        } catch (RuntimeException cannotProbe) {
+            return false;
+        } finally {
+            // Never left behind: this is a capability query an application may call on every
+            // settings screen, and it must not accumulate an entry or leave one that a later
+            // enumeration has to explain.
+            storage.deleteStorageFile(probe);
         }
         byte[] probeKey = null;
         try {
@@ -1222,7 +1243,9 @@ public final class Vault {
                     Object previous = readUncached(entry);
                     Storage.getInstance().deleteStorageFile(entry);
                     if (generation != lockGeneration) {
-                        // null: this path DELETED the entry, so "still ours" means still absent.
+                        // null: this path DELETED the entry, so "still ours" means still
+                        // absent. What that cannot distinguish, and why it restores anyway, is
+                        // recorded on the helper.
                         requireSecretRestored(entry, previous, null);
                         throw new VaultException(VaultError.LOCKED,
                                 "the vault was locked while this secret was being removed");
@@ -3571,6 +3594,24 @@ public final class Vault {
     /// The same reasoning covers the delete: if another tab created an entry after this one
     /// removed it, putting `previous` back would bury that too.
     private void requireSecretRestored(String entry, Object previous, String ours) {
+        // `ours == null` is the DELETE path, where "still ours" means still absent -- and that
+        // is the one case this cannot establish, which a review has raised and which is worth
+        // recording rather than re-deriving. An absent entry is equally what ANOTHER tab's
+        // successful removeSecret looks like, so restoring can resurrect a secret somebody else
+        // was told had gone.
+        //
+        // It still restores, deliberately. The alternative loses the contract lock() actually
+        // has and that aVaultLockedWhileASecretIsRemovedKeepsTheSecret pins down: a removal
+        // interrupted by a lock must not take the secret with it, because reporting LOCKED over
+        // ciphertext that is irreversibly gone tells the caller nothing changed when everything
+        // did. That is the single-instance case, which is every non-browser port and most
+        // browser sessions; the resurrection needs TWO unlocked tabs removing the same secret
+        // concurrently with a lock landing inside one of them.
+        //
+        // Closing it properly means a per-operation tombstone -- a change to what a secret entry
+        // IS, so that "absent because I deleted it" and "absent because you did" stop looking
+        // alike -- rather than anything this rollback can decide. That is a deliberate trade,
+        // not an oversight.
         Object current = readUncached(entry);
         boolean stillOurs = ours == null
                 ? !(current instanceof String)

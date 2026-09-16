@@ -343,7 +343,15 @@ public final class HTML5SecureStorage extends SecureStorage {
             try {
                 byte[] answer = nativeRead(encryptedKey(account));
                 if (answer == null || answer.length == 0 || answer[0] != STATUS_OK) {
-                    return value;
+                    // FAILS CLOSED. The bridge answered and refused, so this cannot tell whether
+                    // the gate still holds what was just written -- and accepting the candidate
+                    // on that leaves ordinary storage on it while the gate may hold a set() that
+                    // completed in between, which is two callers proceeding under different
+                    // managed database keys. An unresolved create is not an agreement.
+                    //
+                    // Distinct from the throw below, which is a build whose bridge has no read
+                    // native at all and therefore no gate to disagree with.
+                    return null;
                 }
                 current = new String(answer, 1, answer.length - 1, "UTF-8");
             } catch (RuntimeException noBridge) {

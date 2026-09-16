@@ -221,10 +221,16 @@ class JavascriptSecureStorageNamespaceTest {
                 "and the mirror must actually write the ordinary entry: " + mirror);
         assertTrue(mirror.indexOf("nativeRead(") > 0,
                 "and re-read the gate, or it can return a value it never wrote: " + mirror);
-        assertTrue(methodBody(source, "public boolean remove(String account)")
-                        .indexOf("nativeForget(") > 0,
+        // nativeForgetIf, not nativeForget: the release is a compare-and-delete now, because a
+        // set() in another tab can replace the record first and deleting THAT discards a
+        // ciphertext whose own call is about to report success. The property this holds is
+        // unchanged -- remove() must release the gate -- so it accepts either spelling rather
+        // than pinning the weaker one.
+        String removeBody = methodBody(source, "public boolean remove(String account)");
+        assertTrue(removeBody.indexOf("nativeForgetIf(") > 0
+                        || removeBody.indexOf("nativeForget(") > 0,
                 "and remove() must release the gate, or a later create answers with what it "
-                + "forgot");
+                + "forgot: " + removeBody);
     }
 
     private static String read(Path path) {
