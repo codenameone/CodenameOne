@@ -123,6 +123,15 @@ int cn1GcFaultEarlyFree = 0;
 // warrants only produces extra nulls, which are safe, and an attempt at it reported
 // violations=0 for exactly that reason. The dangling direction is clearing LESS.
 int cn1GcFaultRefClear = 0;
+// CN1_GC_FAULT=halfblock traces only the first half of every native reference block, so a
+// container whose storage is a C block loses the elements past the midpoint. That is the
+// one hazard this storage scheme adds over a Java array: the block is reachable to the
+// collector ONLY through the owner's generated __GC_MARK_, and nothing else in the VM
+// would notice if that walk were short. The real bug this reproduces was not hypothetical
+// -- cn1Grow freed replaced blocks while a marker was still walking them, and MapTorture2
+// failed with "LOST held key k1" while the gauntlet and all three self-hosting gates were
+// green.
+int cn1GcFaultHalfBlock = 0;
 void cn1GcFaultInitPublic(void);
 static void cn1GcFaultInit(void) {
     static int done = 0;
@@ -136,6 +145,9 @@ static void cn1GcFaultInit(void) {
     } else if(strcmp(f, "earlyfree") == 0) {
         cn1GcFaultEarlyFree = 1;
         fprintf(stderr, "[GC-FAULT] O(1) page reclaim restored to the pre-fix bound\n");
+    } else if(strcmp(f, "halfblock") == 0) {
+        cn1GcFaultHalfBlock = 1;
+        fprintf(stderr, "[GC-FAULT] native reference blocks traced only half way\n");
     } else if(strcmp(f, "refnoclear") == 0) {
         cn1GcFaultRefClear = 1;
         fprintf(stderr, "[GC-FAULT] dead referents left in place instead of cleared\n");
@@ -2332,6 +2344,17 @@ void cn1GcMarkRefBlock(CODENAME_ONE_THREAD_STATE, JAVA_LONG block, JAVA_BOOLEAN 
         return;
     }
     JAVA_OBJECT* refs = (JAVA_OBJECT*)(uintptr_t)block;
+    // CN1_GC_FAULT=halfblock, see cn1GcFaultInit. Guarded: the whole fault family lives
+    // inside #ifdef CN1_GC_VERIFY, and this function is compiled in EVERY build -- an
+    // unguarded reference is an undefined symbol at link time for the shipping shape.
+#ifdef CN1_GC_VERIFY
+    {
+        extern int cn1GcFaultHalfBlock;
+        if(cn1GcFaultHalfBlock) {
+            count = count / 2;
+        }
+    }
+#endif
     for(JAVA_INT i = 0 ; i < count ; i++) {
         JAVA_OBJECT o = refs[i];
         if(o != JAVA_NULL) {

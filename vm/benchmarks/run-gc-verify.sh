@@ -181,4 +181,37 @@ else
     fi
 fi
 
+# Fourth self-test, for NATIVE REFERENCE BLOCKS. A container whose storage is a C block
+# (HashMap's three tables) is reachable to the collector ONLY through the owner's generated
+# __GC_MARK_ -- the conservative scanner walks native stacks, not arbitrary malloc blocks.
+# Nothing else in the VM would notice if that walk were short, which is exactly the failure
+# this feature can produce: the real bug it shipped with freed replaced blocks while a
+# marker was still walking them, and MapTorture2 reported "LOST held key" while the
+# gauntlet and all three self-hosting gates were green.
+#
+# halfblock traces only the first half of every block. The driver must then LOSE entries.
+# Note this is a BEHAVIOURAL self-test rather than a violations= one: a swept element is
+# not a dangling pointer the verifier can see, it is an entry that is simply gone, so the
+# driver's own read-back is what catches it.
+printf '%-16s ' "self-test4"
+rm -f ./target/bin/MapTorture2-verify
+if ! ./translate-and-build.sh MapTorture2 target/bin/MapTorture2-verify -DCN1_GC_VERIFY \
+        > target/bin/MapTorture2-selftest-build.log 2>&1; then
+    echo "BROKEN -- could not build MapTorture2 for the block self-test"
+    tail -25 target/bin/MapTorture2-selftest-build.log
+    fail=1
+elif [ ! -x ./target/bin/MapTorture2-verify ]; then
+    echo "BROKEN -- could not build MapTorture2 for the block self-test"
+    fail=1
+else
+    hbOut="$(CN1_GC_FAULT=halfblock ./target/bin/MapTorture2-verify 2>&1)" || true
+    if printf '%s' "$hbOut" | grep -qE 'LOST|CORRUPT'; then
+        echo "detected the injected half-traced block ($(printf '%s' "$hbOut" | grep -oE 'LOST[^"]*|CORRUPT[^"]*' | head -1))"
+    else
+        echo "BROKEN -- tracing only half of every reference block lost nothing"
+        printf '%s\n' "$hbOut" | tail -5
+        fail=1
+    fi
+fi
+
 [ "$fail" -eq 0 ] && echo "GC-VERIFY GREEN" || { echo "GC-VERIFY FAILED"; exit 1; }
