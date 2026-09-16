@@ -3793,6 +3793,34 @@ void codenameOneGCMark() {
                      * executing", which for a virtual thread is answerable exactly.
                      */
                     vtOfState = cn1GcVtForState(t);
+                    if(vtOfState != 0) {
+                        /*
+                         * CLAIMED BEFORE THE WAIT, not inside it, because the wait
+                         * is the one place this is NOT guaranteed to run.
+                         *
+                         * The loop below is entered only while threadActive is
+                         * raised, and for a virtual thread's state that flag is
+                         * not a statement about whether it is running:
+                         * cn1CreateThreadLocalData starts it FALSE and
+                         * cn1VirtualThreadResume deliberately never raises it, for
+                         * the reason the comment in the loop gives. So a virtual
+                         * thread that has not yet allocated -- a fresh one, which
+                         * under a request-per-thread server is most of them --
+                         * skips the loop entirely, and with the claim nested in
+                         * there it was never taken at all: the migration below
+                         * then emptied the table of a thread that was executing,
+                         * or that its carrier resumed a moment later.
+                         *
+                         * Taking it here makes the claim unconditional for every
+                         * virtual-thread state, which is what it has to be. The
+                         * loop keeps its own branch, because refusing to WAIT for
+                         * such a state is a separate question from whether its
+                         * table may be touched.
+                         */
+                        vtClaimed = cn1VirtualThreadGcClaim(vtOfState)
+                                ? JAVA_TRUE : JAVA_FALSE;
+                        vtExecuting = vtClaimed ? JAVA_FALSE : JAVA_TRUE;
+                    }
                     // 64-bit: at 500us a spin, an int overflowed after ~36 minutes of
                     // waiting, and signed overflow is undefined -- the one input that
                     // can reach it is precisely the wedge this loop is trying to report.
@@ -3893,9 +3921,12 @@ void codenameOneGCMark() {
                              * cannot, for a state with no pthread. Both reverted
                              * attempts recorded above were that shape.
                              */
-                            vtClaimed = cn1VirtualThreadGcClaim(vtOfState)
-                                    ? JAVA_TRUE : JAVA_FALSE;
-                            vtExecuting = vtClaimed ? JAVA_FALSE : JAVA_TRUE;
+                            /*
+                             * The claim was taken before this loop -- see the
+                             * block above it -- because a state that never raises
+                             * threadActive never reaches here. All this does is
+                             * decline to wait.
+                             */
                             break;
                         }
                         usleep(500);
@@ -11245,18 +11276,26 @@ static int cn1GcParkedVirtualThreadsScanned = 0;
  * is the hot path this is trying not to touch.
  */
 /*
- * MEASURED, and worth knowing before treating anything this gates as proven: on
- * vm/backend's petserver under 80,000 requests this never returned non-null.
- * Virtual threads were definitely in use and the snapshot was populated (6 to 16
- * entries per cycle), but the entries' attached state read back as NULL, so no
- * allThreads entry could match one.
+ * THIS NEVER MATCHES ON vm/backend, AND THE COUNTERS ARE UNAMBIGUOUS. Over 600
+ * collections serving 200,000 requests: 11,748 calls here, a snapshot holding 2
+ * to 15 virtual threads every cycle, and ZERO matches. Instrumenting the
+ * snapshot itself says why -- every registered virtual thread reports a NULL
+ * attached state (withState=0 in every sample), so there is no pointer for an
+ * allThreads entry to equal.
  *
- * So the branch guarded by a non-null answer here -- the virtual-thread arm of
- * the stop loop, its executing check and the claim it takes -- is correct by
- * construction rather than by observation, and nothing should be described as
- * load bearing on the strength of that workload. Why the snapshot's states are
- * null is a separate question from the race the claim closes, and is not
- * answered here.
+ * The whole virtual-thread arm of the stop loop therefore does not execute on
+ * that workload: not the refusal to wait, not the executing check, not the claim.
+ * Anything reasoning about those paths should say "correct by construction", and
+ * no measurement taken against this server proves one of them either way.
+ *
+ * Note what it also means for the hazard they guard. With vtOfState null the
+ * migration below runs with no virtual-thread handling at all -- so either those
+ * states are not in allThreads to be migrated, or they are and nothing is
+ * guarding them. Which of the two is open, and it is a bigger question than the
+ * claim: cn1SpawnVirtualThread does attach a state, and the backend creates its
+ * threads through it, so a null here is not what the code leads you to expect.
+ * The retire path clears the state before markDeadThread while the body is still
+ * running, which is the nearest candidate and is not established.
  */
 static struct cn1VirtualThread* cn1GcVtForState(struct ThreadLocalData* t) {
     if(t == 0) {
