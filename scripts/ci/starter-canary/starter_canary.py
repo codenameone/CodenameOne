@@ -64,6 +64,12 @@ AWKWARD = "Project O'Brien with spaces"
 # plus checkout/python/JDK setup. If the runner kills the job first, the canary
 # never writes its report and the alert job reports an outage that did not
 # happen -- so these two numbers and that one are a single decision.
+HTTP_TIMEOUT = 60       # per request; the console answers in well under a second
+# Sign-in, starter download, two token-minting calls and the build-list polling
+# all happen outside the three phases below. Budgeting only the phases let a
+# slow-but-alive endpoint push the run past the job timeout, which kills it
+# before it can write a report -- reporting an outage that was really latency.
+HTTP_ALLOWANCE = 600    # 10 min for every request outside the phases
 SEED_TIMEOUT = 600      # 10 min: resolving and running one small goal
 LAUNCH_TIMEOUT = 1800   # 30 min: mvnw downloads Maven and the toolchain
 POLL_TIMEOUT = 1200     # 20 min: waiting for the cloud build to finish
@@ -95,7 +101,7 @@ def fetch(opener, url, data=None, headers=None):
     request = urllib.request.Request(url, data=data, headers=headers or {})
     request.add_header("User-Agent", "cn1-starter-canary")
     try:
-        with opener.open(request, timeout=120) as response:
+        with opener.open(request, timeout=HTTP_TIMEOUT) as response:
             return response.status, response.read(), response.headers, response.url
     except urllib.error.HTTPError as error:
         return error.code, error.read(), error.headers, url
@@ -331,6 +337,22 @@ def child_environment():
     return env
 
 
+def as_text(value):
+    """TimeoutExpired.output is bytes even when Popen ran with text=True.
+
+    Its buffered chunks are collected before the newline translation that would
+    have decoded them, while communicate() hands back str -- so concatenating
+    the two raises TypeError, and the redacted timeout report this exists to
+    produce would be replaced by a generic crash report with the diagnostics
+    thrown away.
+    """
+    if value is None:
+        return ""
+    if isinstance(value, bytes):
+        return value.decode("utf-8", "replace")
+    return value
+
+
 def redact(text, secrets):
     for value in secrets:
         if value:
@@ -381,7 +403,7 @@ def run(command, cwd, what, timeout, secrets=(), check=True):
         # and this text is written to the report and copied into a public issue.
         raise CanaryFailure(
             f"{what} did not finish within {timeout}s and was terminated.\n\n"
-            + tail(redact((expired.output or "") + (partial or ""), secrets))
+            + tail(redact(as_text(expired.output) + as_text(partial), secrets))
         ) from None
     output = redact(output or "", secrets)
     if check and process.returncode != 0:

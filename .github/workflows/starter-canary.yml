@@ -72,11 +72,12 @@ jobs:
       matrix:
         os: [ubuntu-latest, windows-latest]
     runs-on: ${{ matrix.os }}
-    # Must exceed the canary's own budgets (LAUNCH_TIMEOUT 30m + POLL_TIMEOUT
-    # 20m in starter_canary.py) plus checkout/python/JDK setup. Cut it below
-    # their sum and the runner kills the job before the canary can write its
-    # report, turning a slow-but-healthy build into a reported outage.
-    timeout-minutes: 70
+    # Must exceed everything starter_canary.py can spend: HTTP_ALLOWANCE 10m +
+    # SEED_TIMEOUT 10m + LAUNCH_TIMEOUT 30m + POLL_TIMEOUT 20m = 70m, plus
+    # checkout/python/JDK setup. Cut it below that and the runner kills the job
+    # before the canary can write its report, turning slow-but-healthy into a
+    # reported outage. A test asserts the relationship.
+    timeout-minutes: 85
     steps:
       - uses: actions/checkout@v6
 

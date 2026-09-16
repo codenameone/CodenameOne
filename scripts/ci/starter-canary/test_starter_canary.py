@@ -272,6 +272,24 @@ class TimeoutHandling(unittest.TestCase):
         self.assertNotIn(secret_email, message)
         self.assertIn("did not finish within", message)
 
+    def test_timeout_output_survives_the_bytes_str_split(self):
+        """TimeoutExpired.output is bytes even under text=True; concatenating raises."""
+        secret = "credential-in-the-output"
+        with self.assertRaises(canary.CanaryFailure) as caught:
+            canary.run(
+                [sys.executable, "-c",
+                 f"import time,sys;print('{secret}');sys.stdout.flush();time.sleep(30)"],
+                cwd=".", what="probe", timeout=1, secrets=(secret,))
+        message = str(caught.exception)
+        self.assertIn("did not finish within", message)
+        self.assertNotIn(secret, message)
+        self.assertNotIn("crashed before it could finish", message)
+
+    def test_as_text_normalises_both_shapes(self):
+        self.assertEqual(canary.as_text(b"bytes"), "bytes")
+        self.assertEqual(canary.as_text("str"), "str")
+        self.assertEqual(canary.as_text(None), "")
+
     def test_timeout_kills_the_whole_process_tree(self):
         """A surviving grandchild could submit a build after this leg failed."""
         marker = Path(tempfile.mkdtemp()) / "grandchild-survived"
@@ -348,13 +366,19 @@ class ResolvedTargetPolicy(unittest.TestCase):
 
 
 class Budgets(unittest.TestCase):
-    JOB_TIMEOUT_MINUTES = 70  # starter-canary.yml
+    JOB_TIMEOUT_MINUTES = 85  # starter-canary.yml
 
     def test_every_phase_fits_the_job_timeout(self):
-        """Each blocking phase must be counted, or the runner kills the job first."""
-        total = (canary.SEED_TIMEOUT + canary.LAUNCH_TIMEOUT + canary.POLL_TIMEOUT) / 60
+        """Every blocking phase counts, HTTP included, or the runner kills the job."""
+        total = (canary.HTTP_ALLOWANCE + canary.SEED_TIMEOUT
+                 + canary.LAUNCH_TIMEOUT + canary.POLL_TIMEOUT) / 60
         self.assertLess(total, self.JOB_TIMEOUT_MINUTES,
                         "raise timeout-minutes in starter-canary.yml to cover this")
+
+    def test_http_requests_are_individually_bounded(self):
+        """A hung endpoint must not sit inside an otherwise-bounded phase."""
+        self.assertLessEqual(canary.HTTP_TIMEOUT, 120)
+        self.assertLess(canary.HTTP_TIMEOUT, canary.HTTP_ALLOWANCE)
 
     def test_run_requires_an_explicit_timeout(self):
         """No unbounded default: an uncounted phase is how the budget drifted."""
