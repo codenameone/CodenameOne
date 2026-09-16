@@ -25,6 +25,7 @@ package com.codename1.impl.javase;
 import com.codename1.io.Properties;
 import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 
 class DesktopNativeThemeSelectionTest {
     @Test
@@ -42,10 +43,12 @@ class DesktopNativeThemeSelectionTest {
                 theme.setProperty("desktop.themeMode", entry[0]);
                 assertEquals("/" + entry[1] + ".res", JavaSEPort.resolvePackagedDesktopNativeTheme("mac", theme));
             }
-            for (String mode : new String[]{"legacy", "custom", "invalid"}) {
+            for (String mode : new String[]{"legacy", "invalid"}) {
                 theme.setProperty("desktop.themeMode", mode);
                 assertEquals("/NativeTheme.res", JavaSEPort.resolvePackagedDesktopNativeTheme("mac", theme));
             }
+            theme.setProperty("desktop.themeMode", " custom ");
+            assertNull(JavaSEPort.resolvePackagedDesktopNativeTheme("mac", theme));
             System.setProperty("codename1.arg.desktop.themeMode", "fluent");
             assertEquals("/WindowsFluentTheme.res", JavaSEPort.resolvePackagedDesktopNativeTheme("mac", theme),
                     "a launch-time override takes precedence over the packaged hint");
@@ -67,6 +70,9 @@ class DesktopNativeThemeSelectionTest {
             System.setProperty("codename1.arg.desktop.themeMode", "fluent");
             JavaSEPort.setNativeTheme("/NativeTheme.res");
             assertEquals("/WindowsFluentTheme.res", nativeTheme.get(null));
+            System.setProperty("codename1.arg.desktop.themeMode", "custom");
+            JavaSEPort.setNativeTheme("/NativeTheme.res");
+            assertNull(nativeTheme.get(null), "custom must not install the legacy framework base");
             JavaSEPort.setNativeTheme("/ApplicationCustomTheme.res");
             assertEquals("/ApplicationCustomTheme.res", nativeTheme.get(null));
         } finally {

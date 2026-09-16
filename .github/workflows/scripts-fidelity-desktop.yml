@@ -164,7 +164,8 @@ jobs:
         run: echo "path=$JAVA_HOME" >> "$GITHUB_OUTPUT"
       - uses: actions/setup-java@v4
         with:
-          distribution: temurin
+          # Temurin 8 has no macOS ARM64 build; Zulu provides native Java 8.
+          distribution: ${{ matrix.platform == 'macos' && 'zulu' || 'temurin' }}
           java-version: '8'
 
       # Needed by the BUILD as well as by the run. The fidelity app is a Codename One

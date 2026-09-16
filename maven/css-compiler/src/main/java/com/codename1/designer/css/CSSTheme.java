@@ -4106,18 +4106,13 @@ public class CSSTheme {
             if (color != null && !isNone(color) && (getColorInt(color) & 0xffffff) != 0) {
                 return false;
             }
-            // A review asked for a spread>0 guard here, on the grounds that
-            // createRoundRectBorder() leaves shadowSpread at zero so the software shadow
-            // loop `for (iter = shadowSpreadL - 1; iter >= 0; iter--)` runs zero times, and
-            // that the blur is stored negative. Both halves were checked and both are
-            // wrong, so there is no guard: RoundRectBorder's constructor seeds
-            // shadowSpread to convertToPixels(0.2f), a NON-zero default that survives
-            // unless the CSS sets a spread explicitly, and the minus in
-            // shadowBlur(-calculateShadowRatio(...)) cancels the one inside that method's
-            // px branch, yielding a positive blur.
-            //
-            // Adding the guard made `box-shadow: 0 2px 4px rgba(...)` rasterize again and
-            // broke CSSBoxShadowNativeBorderTest, which exists to pin exactly that case.
+            // Omitted spread retains RoundRectBorder's nonzero default. Explicit zero or
+            // negative spread overrides it and cannot render a software shadow, so those
+            // declarations still need rasterization even when they also have a radius.
+            ScaledUnit spread = (ScaledUnit) styles.get("cn1-box-shadow-spread");
+            if (spread != null && spread.getNumericValue() <= 0) {
+                return false;
+            }
             return true;
         }
 

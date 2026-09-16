@@ -105,6 +105,17 @@ public class CSSBoxShadowNativeBorderTest {
                 + " box-shadow: 0 2px 6px rgba(255,0,0,0.5); }", "coloured shadow");
     }
 
+    @Test
+    void testExplicitNonpositiveSpreadRequiresRasterization() throws Exception {
+        for (String spread : new String[]{"0", "0px", "0mm", "-1px"}) {
+            for (String radius : new String[]{"", "border-radius: 2mm;"}) {
+                assertRefusedByStrictNoCef("Card { background-color: #ffffff; " + radius
+                        + " box-shadow: 0 2px 4px " + spread + " rgba(0,0,0,0.2); }",
+                        "explicit spread " + spread);
+            }
+        }
+    }
+
     /** Compiles the sheet and returns the resulting theme properties. */
     private static Hashtable compile(String css) throws Exception {
         Path cssFile = Files.createTempFile("cn1-box-shadow", ".css");

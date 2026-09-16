@@ -2970,8 +2970,18 @@ public class JavaSEPort extends CodenameOneImplementation {
         if (mode == null || mode.isEmpty()) {
             mode = theme.getProperty("desktop.themeMode");
         }
-        String resolved = mode == null ? resolveDesktopNativeTheme(platformName)
-                : resolveDesktopNativeTheme(platformName, mode.trim());
+        if (mode == null) {
+            mode = buildHint("desktop.themeMode");
+            if (mode == null) {
+                mode = sharedNativeThemeHint();
+            }
+        }
+        mode = mode == null ? null : mode.trim();
+        // Custom means no framework base; legacy still uses the stub's historical resource.
+        if ("custom".equalsIgnoreCase(mode)) {
+            return null;
+        }
+        String resolved = resolveDesktopNativeTheme(platformName, mode);
         return resolved == null ? "/NativeTheme.res" : "/" + resolved + ".res";
     }
 
