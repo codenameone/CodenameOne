@@ -2357,3 +2357,97 @@ unbounded); `java.lang.ref` clearing (the program contains no Reference class); 
 allocated arrays (zero `alloca` uses in the generated C); the force-stop escalation (its
 message never appeared, `noStop=0`); frameless object codegen (4 crashes either way over
 ~55 interleaved pairs); and the aging slack (slack=2 crashed at iteration 6).
+
+## Round 20: ONE contract for every collection -- storage, iteration and lambdas
+
+Three separate optimizations have landed on collections so far and each is a special case:
+the for-each lowering hard-codes `java/util/ArrayList` and reads its fields by name; the
+block storage hard-codes HashMap in a two-entry table; nothing touches the other eight
+containers or the functional entry points at all. This is the design that replaces all
+three with one mechanism, and the case for it is measured rather than aesthetic.
+
+### What the heap actually holds
+
+From the live census of the self-hosting corpus:
+
+| | objects | note |
+|---|---:|---|
+| `ArrayList.ArrayListIterator` | **337,322** | 67% dead; one per for-each |
+| `HashMap` | 174,903 | |
+| `ArrayList` | 160,235 | |
+| `Object[]` | 577,239 | 88.4% of them a container's backing store |
+| `int[]` | 185,860 | 94.1% HashMap's slot metadata |
+
+**The iterators outnumber the containers they walk, 337,322 against 335,138.** That is the
+single largest object population in the program, it exists only to carry an index, and
+every one of them is allocated, marked and swept. Storage is where the BYTES are; iterators
+are where the OBJECTS are. A strategy that only moves backing arrays leaves the larger half.
+
+### The contract
+
+A container opts in by exposing three things in C, and nothing else:
+
+    blocks      0..n length-prefixed C blocks (cn1RefBlockAlloc), one kind tag each
+    cursor      int first(c)          -> first valid index, or -1
+                int next(c, int i)    -> next valid index after i, or -1
+    element     JAVA_OBJECT at(c, int i)
+
+That is enough to express every container whose iteration order is an index walk, which is
+all of the ones that matter: ArrayList and Vector (0..size-1), HashMap, Hashtable,
+IdentityHashMap and LinkedHashMap (skip empty and tombstone), HashSet and LinkedHashSet
+(delegate), ArrayDeque (wrap the circular buffer). It is NOT enough for LinkedList or
+TreeMap, whose order is a pointer chain -- those keep the Iterator they have, and that is
+the honest boundary of the mechanism rather than a gap to paper over.
+
+### One registry, four consumers
+
+The translator gets a single table -- class -> {block fields, cursor natives, element kind}
+-- and that one table drives everything that is currently bespoke:
+
+    __GC_MARK_        mark each reference block   (today: NATIVE_REF_BLOCKS, 2 entries)
+    __FINALIZER_      free the blocks             (today: NATIVE_BLOCK_FREE, 3 entries)
+    for-each          Iterator protocol -> cursor (today: ArrayList only, 71 sites)
+    forEach(lambda)   the same walk, body inlined (today: nothing)
+
+The for-each lowering stops being ArrayList-specific and becomes container-agnostic,
+because the shape it emits is the same for all of them:
+
+    for(int i = first(c); i >= 0; i = next(c, i)) { E e = at(c, i); <body> }
+
+The lambda case is the same loop with one more step. A lambda is created AT the call site,
+so its concrete class is statically known -- the translator already emits them as real
+classes (`Parser_lambda_0` and friends are in the emitted C) -- which means `accept` is
+monomorphic by construction and needs no receiver analysis at all. `coll.forEach(x -> ...)`
+therefore lowers to the loop above with a direct call in the body, which ThinLTO inlines to
+nothing. Zero allocation, zero dispatch, running straight over the block.
+
+### Why this is the whole win rather than three partial ones
+
+The measured pieces compose. Block storage took HashMap's page heap down 38% (5 of 5
+rounds) with per-cycle mark -12% and sweep -22%, because 524,709 array objects left the
+heap entirely -- the bytes moved to malloc, which is why process footprint did not move and
+why measuring footprint was the wrong axis. The cursor protocol removes 337,322 iterator
+allocations on top of that, and it is the same 337,322 objects the mark and sweep walk. The
+lambda lowering removes the last interface dispatch from the loop body.
+
+None of the three needs the collector to move objects, and none of them needs a general
+escape analysis. They need one thing the closed world gives for free: the concrete class of
+a container and of a lambda, known at translate time.
+
+### Order, and the one precondition
+
+1. Generalize the two hard-coded tables into the registry, with ArrayList and HashMap as
+   its first two entries and the existing behaviour unchanged. Pure refactor, gated by the
+   existing byte-identity suites.
+2. Cursor natives per container; retarget the for-each lowering onto them. This is where
+   the 337,322 iterators go.
+3. `forEach`/`removeIf`/`replaceAll` lowering onto the same walk.
+4. The remaining containers' storage, in descending census order.
+
+**The precondition is the collector, not the design.** The self-hosted translator loses
+live objects roughly 1 run in 16 under memory pressure because the application thread is
+never handshaked (Round 19), and every step above puts MORE live references into storage
+the collector reaches only through a generated mark hook. `CN1_GC_FAULT=halfblock` and
+MapTorture2 now prove that hook is walked; they cannot prove the collector around it is
+sound. Step 1 is safe to do regardless -- it moves no references -- but steps 2-4 should
+follow the handshake fix.
