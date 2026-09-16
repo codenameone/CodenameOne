@@ -329,9 +329,21 @@ public final class AndroidSecureStorage extends SecureStorage {
                 handle.write(GATE_SETTLED);
                 handle.getChannel().force(true);
             } catch (java.io.IOException cannotMark) {
-                // The value IS stored and this reports that truthfully. What is lost is the
-                // protection for the next create, which the next write through here restores.
+                // FAILS CLOSED, like every other path in this class that cannot make its mark
+                // durable. Reporting true was the tempting answer -- the value really is stored
+                // -- but the gate is unmarked at the moment this returns, so another process
+                // whose cache predates the write sees an absent account AND a free gate, creates
+                // a different managed database or vault key, and orphans whatever was just
+                // stored under the value this call said it had written.
+                //
+                // The value is withdrawn so nothing is left half-published, and the caller is
+                // told the write did not happen, which is the state it can retry from.
                 Log.e(cannotMark);
+                if (!removeValueUnderHeldGate(account)) {
+                    Log.p("SecureStorage: an unmarked value could not be withdrawn after its "
+                            + "gate mark failed", Log.WARNING);
+                }
+                return false;
             }
             return true;
         } catch (java.io.IOException cannotLock) {

@@ -994,16 +994,23 @@ public final class Vault {
                                 + "this vault cannot be found to delete; nothing was removed");
                     }
                     String prefix = secretKey("");
+                    java.util.Vector deleted = new java.util.Vector();
                     try {
                         for (String entry : entries) {
                             if (entry != null && entry.startsWith(prefix)) {
+                                // Remembered, because the confirmation cannot rely on a second
+                                // enumeration: on the browser a failed listing answers an EMPTY
+                                // array, so a refused secret deletion followed by a failed
+                                // re-enumeration read as "nothing left" and destroyLocalData
+                                // reported success over ciphertext that is still there.
+                                deleted.addElement(entry);
                                 storage.deleteStorageFile(entry);
                             }
                         }
                         storage.deleteStorageFile(deviceRecordKey());
                         storage.deleteStorageFile(metadataKey());
                         forgetEveryMechanism();
-                        requireEverythingGone(storage, prefix);
+                        requireEverythingGone(storage, prefix, deleted);
                     } finally {
                         // In a finally, because once ANY of that has happened the live key and
                         // cached record describe a vault that is no longer on disk. A device key
@@ -3281,8 +3288,20 @@ public final class Vault {
     /// the password still opens, on a call whose entire contract is that it is gone. Checked
     /// rather than assumed, the same way removeSecret answers with exists() instead of with the
     /// fact that it asked.
-    private void requireEverythingGone(Storage storage, String prefix) {
+    private void requireEverythingGone(Storage storage, String prefix,
+            java.util.Vector deleted) {
         StringBuilder left = new StringBuilder();
+        // Every name this call actually deleted, asked by entryState rather than by enumerating
+        // again. A second listing is not evidence on the browser, where a failed enumeration
+        // answers an EMPTY array: a secret whose deletion was silently refused, followed by a
+        // listing that fails, read as "nothing left" and let this report success over ciphertext
+        // still on disk. entryState answers UNKNOWN there instead, and UNKNOWN is not gone.
+        for (int iter = 0; iter < deleted.size(); iter++) {
+            if (!definitelyGone((String) deleted.elementAt(iter))) {
+                left.append("a secret");
+                break;
+            }
+        }
         // Re-enumerated, not the array the deletion loop walked. Another context can store a
         // secret after that snapshot was taken -- a second browser tab holding the same key --
         // and verifying against the snapshot would confirm the entries this call knew about
@@ -3290,6 +3309,9 @@ public final class Vault {
         // local had been destroyed. What this cannot do is stop a write that lands after the
         // check; it closes the window between the snapshot and the verification, which is the
         // whole of the deletion, rather than an instant.
+        // And a fresh listing as well, which catches an entry that APPEARED since the snapshot
+        // -- a second tab storing a secret while this ran. It is an addition to the check above,
+        // never a substitute: an empty array here can mean the enumeration failed.
         String[] now = storage.listEntries();
         if (now == null) {
             throw new VaultException(VaultError.STORAGE_UNAVAILABLE,
