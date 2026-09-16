@@ -4582,8 +4582,9 @@ public class Form extends Container implements TopLevelContainer {
         }
 
         Container actual = getActualPane(formLayeredPane, x[0], y[0]);
+        Component cmp = null;
         if (actual != null) {
-            Component cmp = actual.getComponentAt(x[0], y[0]);
+            cmp = actual.getComponentAt(x[0], y[0]);
             while (cmp != null && cmp.isIgnorePointerEvents()) {
                 cmp = cmp.getParent();
             }
@@ -4594,11 +4595,13 @@ public class Form extends Container implements TopLevelContainer {
                     setFocused(cmp);
                 }
                 LeadUtil.pointerHover(cmp, x, y);
-                updateHoveredComponent(cmp);
                 updateInteractiveScrollHover(cmp, x[0], y[0]);
             }
             if (TooltipManager.getInstance() != null) {
-                String tip = cmp.getTooltip();
+                // Guarded: cmp is reachable as null here. A desktop port reports the pointer
+                // LEAVING the window as a hover at (-1,-1) -- there is no component under
+                // that -- and this line dereferenced it unconditionally.
+                String tip = cmp == null ? null : cmp.getTooltip();
                 if (tip != null && tip.length() > 0) {
                     TooltipManager.getInstance().prepareTooltip(tip, cmp);
                 } else {
@@ -4606,6 +4609,10 @@ public class Form extends Container implements TopLevelContainer {
                 }
             }
         }
+        // Outside the null checks on purpose: hover has to be CLEARED when the pointer is
+        // over nothing, which is how a desktop port reports the cursor leaving the window.
+        // Updating it only when a component was found left the last one lit for good.
+        updateHoveredComponent(cmp);
     }
 
     /// Moves the hover state to the component under the pointer, clearing whichever component

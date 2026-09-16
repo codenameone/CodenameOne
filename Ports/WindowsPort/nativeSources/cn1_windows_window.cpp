@@ -725,7 +725,25 @@ LRESULT CALLBACK cn1WinWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam
                  * protected. */
                 cn1WinPushEvent(CN1_EVENT_POINTER_HOVER, GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam),
                         cn1WinTouchFlag());
+                /* Ask for one WM_MOUSELEAVE. Without it the cursor can move straight off
+                 * the window and the last hovered control stays lit: motion simply stops,
+                 * and Form only clears its tracked hover when a DIFFERENT component is
+                 * reported. TrackMouseEvent is one-shot, so it is re-armed on every hover
+                 * rather than once at creation. */
+                TRACKMOUSEEVENT tme;
+                tme.cbSize = sizeof(tme);
+                tme.dwFlags = TME_LEAVE;
+                tme.hwndTrack = hwnd;
+                tme.dwHoverTime = HOVER_DEFAULT;
+                TrackMouseEvent(&tme);
             }
+            return 0;
+        }
+        case WM_MOUSELEAVE: {
+            /* -1,-1 is the agreed "nothing is under the pointer" coordinate: the Java side
+             * turns it into pointerHover over no component, which clears the hover style.
+             * A real client coordinate is never negative, so the two cannot be confused. */
+            cn1WinPushEvent(CN1_EVENT_POINTER_HOVER, -1, -1, cn1WinTouchFlag());
             return 0;
         }
 #ifdef WM_GESTURE

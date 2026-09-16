@@ -4518,6 +4518,17 @@ public class CSSTheme {
                     out.putAll(parent.getFlattenedStyle());
                 }
                 out.putAll(getFlattenedPressedStyle());
+            } else if (this.isHoverStyle()) {
+                // Hover dispatches here like every other state. Without this branch a hover
+                // element fell through to the default below, which merges the parent chain
+                // with this element's RAW style map -- so a UIID that derives from one
+                // declaring .hover, without redeclaring hover itself, emitted the parent's
+                // normal properties and none of its hover ones, and the derived control
+                // silently lost its rollover colours.
+                if (parent != null) {
+                    out.putAll(parent.getFlattenedStyle());
+                }
+                out.putAll(getFlattenedHoverStyle());
             } else {
                 if (parent != null) {
                     out.putAll(parent.getFlattenedStyle());

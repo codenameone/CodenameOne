@@ -57,8 +57,23 @@ cn1ss_log() { rf_log "$1"; }
 # switch expressions and the simulator needs 11+, while tools/env.sh puts JDK 8 on
 # PATH for the framework build. CN1SS_DESKTOP_JAVA is how CI passes the newer one.
 JAVA_BIN="${CN1SS_DESKTOP_JAVA:-$(command -v java || true)}"
+# Normalize a Windows path before testing it. On the Windows leg this value comes from
+# setup-java's JAVA_HOME, which is a native spelling like C:\hostedtoolcache\... . Git
+# Bash's `test -x` does not resolve that, so the check below would fail and the leg would
+# exit 25 without rendering a single tile -- a green-looking "no java" message on a runner
+# that has one. The fidelity app's own mvnw converts JAVA_HOME the same way.
+case "$(uname)" in
+  CYGWIN* | MINGW* | MSYS*)
+    if command -v cygpath >/dev/null 2>&1 && [ -n "$JAVA_BIN" ]; then
+      JAVA_BIN="$(cygpath --unix "$JAVA_BIN" 2>/dev/null || printf '%s' "$JAVA_BIN")"
+      # setup-java points at the JDK root, so the .exe suffix is added here rather than
+      # being assumed present: C:\...\bin\java exists only as java.exe on Windows.
+      [ -x "$JAVA_BIN" ] || [ ! -x "${JAVA_BIN}.exe" ] || JAVA_BIN="${JAVA_BIN}.exe"
+    fi
+    ;;
+esac
 if [ -z "$JAVA_BIN" ] || [ ! -x "$JAVA_BIN" ]; then
-  rf_log "FAILED: no java on PATH; set CN1SS_DESKTOP_JAVA to a JDK 17+ java binary."
+  rf_log "FAILED: no usable java (tried '$JAVA_BIN'); set CN1SS_DESKTOP_JAVA to a JDK 17+ java binary."
   exit 25
 fi
 if ! cn1ss_setup "$JAVA_BIN" "$CN1SS_HELPER_SOURCE_DIR"; then

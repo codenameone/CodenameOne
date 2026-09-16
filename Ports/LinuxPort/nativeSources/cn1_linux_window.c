@@ -527,6 +527,26 @@ static gboolean cn1OnMotion(GtkWidget* widget, GdkEventMotion* e, gpointer data)
  * model). Additional concurrent fingers are ignored until it ends. */
 static GdkEventSequence* cn1TouchSeq = NULL;
 
+/* The pointer left the drawing area: clear hover.
+ *
+ * Without this the cursor can move straight off the window and the last hovered control
+ * stays lit -- motion simply stops, and Form only clears its tracked hover when a
+ * DIFFERENT component is reported. -1,-1 is the agreed "nothing is under the pointer"
+ * coordinate, the same one the Windows port sends from WM_MOUSELEAVE; a real coordinate
+ * is never negative, so the two cannot be confused.
+ *
+ * GDK_NOTIFY_INFERIOR is ignored: that is the pointer moving onto a CHILD of the drawing
+ * area, which has not left the window at all, and treating it as a leave would blink the
+ * hover off and on again. */
+static gboolean cn1OnLeave(GtkWidget* widget, GdkEventCrossing* e, gpointer data) {
+    (void) widget;
+    (void) data;
+    if (e->detail != GDK_NOTIFY_INFERIOR) {
+        cn1LinuxPushEvent(CN1_EVENT_POINTER_HOVER, -1, -1, 0);
+    }
+    return FALSE;
+}
+
 static gboolean cn1OnTouch(GtkWidget* widget, GdkEventTouch* e, gpointer data) {
     (void) widget;
     (void) data;
@@ -945,6 +965,10 @@ JAVA_VOID com_codename1_impl_linux_LinuxNative_initDisplay___java_lang_String_in
     cn1DrawingArea = gtk_drawing_area_new();
     gtk_widget_set_events(cn1DrawingArea,
             GDK_BUTTON_PRESS_MASK | GDK_BUTTON_RELEASE_MASK | GDK_POINTER_MOTION_MASK |
+            /* LEAVE_NOTIFY drives the hover clear (cn1OnLeave). A g_signal_connect for
+             * an event the mask does not select is never called, so the handler would
+             * have been dead code without this bit. */
+            GDK_LEAVE_NOTIFY_MASK |
             GDK_KEY_PRESS_MASK | GDK_KEY_RELEASE_MASK | GDK_SCROLL_MASK |
             GDK_SMOOTH_SCROLL_MASK | GDK_TOUCH_MASK |
             GDK_TOUCHPAD_GESTURE_MASK | GDK_STRUCTURE_MASK);
@@ -970,6 +994,7 @@ JAVA_VOID com_codename1_impl_linux_LinuxNative_initDisplay___java_lang_String_in
     g_signal_connect(cn1DrawingArea, "button-press-event", G_CALLBACK(cn1OnButton), 0);
     g_signal_connect(cn1DrawingArea, "button-release-event", G_CALLBACK(cn1OnButton), 0);
     g_signal_connect(cn1DrawingArea, "motion-notify-event", G_CALLBACK(cn1OnMotion), 0);
+    g_signal_connect(cn1DrawingArea, "leave-notify-event", G_CALLBACK(cn1OnLeave), 0);
     g_signal_connect(cn1DrawingArea, "touch-event", G_CALLBACK(cn1OnTouch), 0);
     g_signal_connect(cn1DrawingArea, "event", G_CALLBACK(cn1OnGenericEvent), 0);
     g_signal_connect(cn1Window, "key-press-event", G_CALLBACK(cn1OnKey), 0);

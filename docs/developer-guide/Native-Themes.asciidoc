@@ -64,16 +64,18 @@ Windows, macOS and GNOME have their own native themes, selected with
 |Hint |Values |Description
 
 |`desktop.themeMode`
-|`auto` / `native` (default) +
+|`legacy` (default) +
+`auto` / `native` +
 `fluent` / `aqua` / `adwaita` +
-`legacy` +
 `custom`
-|`auto` and `native` both mean "whatever this machine is" -- Windows 11
-Fluent, macOS Aqua or GNOME Adwaita -- which is the only sensible reading
-on desktop, where one binary runs on all three. Naming a theme outright is
-what a build that wants one look everywhere asks for. `legacy` keeps what
-desktop applications have always had, and `custom` installs no framework
-theme so your own `theme.css` is the only one.
+|Unset is `legacy`: an existing desktop project keeps the theme it has
+always loaded, so upgrading the framework does not restyle an application
+nobody asked to restyle. `auto` and `native` opt in and both mean
+"whatever this machine is" -- Windows 11 Fluent, macOS Aqua or GNOME
+Adwaita -- which is the only sensible reading on desktop, where one binary
+runs on all three. Naming a theme outright is what a build that wants one
+look everywhere asks for. `custom` installs no framework theme so your own
+`theme.css` is the only one.
 
 |`macos.themeMode`
 |`aqua` (default) +
