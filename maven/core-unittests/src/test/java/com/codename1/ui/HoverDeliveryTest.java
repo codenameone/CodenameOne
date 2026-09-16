@@ -203,6 +203,92 @@ class HoverDeliveryTest extends UITestBase {
         assertFalse(button.isHovered(), "showing the source again must not revive stale hover");
     }
 
+    @FormTest
+    void hoverCallbacksSeeCurrentStateAndCanDetachOrHide() {
+        implementation.setDesktop(true);
+        implementation.setMultiWindowSupported(true);
+        for (boolean secondary : new boolean[]{false, true}) {
+            for (final boolean detach : new boolean[]{false, true}) {
+                final Form main = new Form("hover callback", new com.codename1.ui.layouts.BoxLayout(
+                        com.codename1.ui.layouts.BoxLayout.Y_AXIS));
+                main.setTransitionOutAnimator(com.codename1.ui.animations.CommonTransitions.createEmpty());
+                main.show();
+                DisplayTest.flushEdt();
+                final Window window = secondary ? new Window("hover callback", new com.codename1.ui.layouts.BoxLayout(
+                        com.codename1.ui.layouts.BoxLayout.Y_AXIS)) : null;
+                final Container surface = window == null ? main : window;
+                final Button previous = new Button("previous");
+                Button target = new Button("target") {
+                    @Override
+                    public void pointerHover(int[] x, int[] y) {
+                        assertTrue(isHovered(), "enter callback sees its new hover state");
+                        assertFalse(previous.isHovered(), "the previous target is already cleared");
+                        assertEquals(0x44ff88, getStyle().getBgColor());
+                        if (detach) {
+                            getParent().removeComponent(this);
+                        } else if (window != null) {
+                            window.hide();
+                        } else {
+                            new Form("navigated").show();
+                        }
+                    }
+                };
+                surface.add(previous);
+                surface.add(target);
+                if (window != null) {
+                    window.setWindowSize(500, 400);
+                    window.show();
+                }
+                installHoverTheme(surface);
+                try {
+                    surface.pointerHover(new int[]{previous.getAbsoluteX() + previous.getWidth() / 2},
+                            new int[]{previous.getAbsoluteY() + previous.getHeight() / 2});
+                    assertTrue(previous.isHovered());
+                    surface.pointerHover(new int[]{target.getAbsoluteX() + target.getWidth() / 2},
+                            new int[]{target.getAbsoluteY() + target.getHeight() / 2});
+                    DisplayTest.flushEdt();
+                    assertFalse(target.isHovered(), "a callback must not leave a detached or hidden target hovered");
+                } finally {
+                    if (window != null) window.dispose();
+                }
+            }
+        }
+    }
+
+    @FormTest
+    void hidingAReusableWindowClearsHoverIncludingDuringRelease() {
+        implementation.setDesktop(true);
+        implementation.setMultiWindowSupported(true);
+        new Form("main").show();
+        DisplayTest.flushEdt();
+        final Window window = new Window("reusable", new BorderLayout());
+        Button button = new Button("hide");
+        window.add(BorderLayout.CENTER, button);
+        window.setWindowSize(500, 400);
+        window.show();
+        installHoverTheme(window);
+        try {
+            int x = button.getAbsoluteX() + button.getWidth() / 2;
+            int y = button.getAbsoluteY() + button.getHeight() / 2;
+            window.pointerHover(new int[]{x}, new int[]{y});
+            assertTrue(button.isHovered());
+            window.hide();
+            assertFalse(button.isHovered());
+            window.show();
+            assertFalse(button.isHovered());
+            button.addActionListener(event -> window.hide());
+            implementation.setPointerType(PointerEvent.TYPE_MOUSE);
+            window.pointerPressed(x, y);
+            window.pointerReleased(x, y);
+            assertFalse(window.isTopLevelShowing());
+            assertFalse(button.isHovered(), "release catch-up must not revive hover after hide");
+            window.show();
+            assertFalse(button.isHovered());
+        } finally {
+            window.dispose();
+        }
+    }
+
     /// A control in a secondary window responds to hover.
     ///
     /// `Window` is not a `Form` -- it extends `Container` -- and its `pointerHover` only

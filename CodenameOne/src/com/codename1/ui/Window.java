@@ -3494,7 +3494,9 @@ public class Window extends Container implements TopLevelContainer {
     /// them return early, and a single call after the last endGesture is reached by neither
     /// -- which is exactly how the same catch-up in Form started out as dead code.
     private void refreshHoverAfterRelease(int x, int y, boolean hoverOnRelease) {
-        if (!hoverOnRelease) {
+        // A release callback can hide a reusable window; cancellation has already
+        // cleared its hover, and catch-up must not restore it on the hidden surface.
+        if (!hoverOnRelease || !isTopLevelShowing()) {
             return;
         }
         Component after = hoverTargetAt(x, y);
@@ -3852,6 +3854,8 @@ public class Window extends Container implements TopLevelContainer {
     /// pressed state with no release coming; and the framework's own recorded targets
     /// and timers, which otherwise keep firing into a tree nobody can see.
     void cancelPendingInput() {
+        // Hide/minimize shares this path with disposal, including HIDE_ON_CLOSE.
+        hoverTracker.pointerOver(null, -1, -1);
         // Held keys never arrive as releases once the window has gone, so their
         // recorded scopes would sit here until some later press happened to reuse the
         // same key code.
@@ -4331,15 +4335,17 @@ public class Window extends Container implements TopLevelContainer {
         Component cmp = hoverTargetAt(x[0], y[0]);
         if (cmp != null) {
             cmp = LeadUtil.leadParentImpl(cmp);
-            LeadUtil.pointerHover(cmp, x, y);
         }
-        // Outside the null check, and the reason this window tracks hover at all: routing the
-        // native event here is not enough on its own, because nothing in this method used to
-        // record WHICH component the pointer was over, so a control in a secondary window
-        // could never paint a hover style its theme declared. Null is the pointer leaving the
-        // window -- the ports report that as a hover at (-1, -1) -- and it has to clear the
-        // state or the last control stays lit with the cursor somewhere else.
+        // Publish the new state before callbacks, which can hide the window or
+        // remove the target. Null clears the old state on pointer leave.
         hoverTracker.pointerOver(cmp, x[0], y[0]);
+        try {
+            if (cmp != null) {
+                LeadUtil.pointerHover(cmp, x, y);
+            }
+        } finally {
+            hoverTracker.clearDetached(this);
+        }
         // The tooltip timer starts here or it never starts at all: this is the only
         // hover dispatch a window has. The manager resolves the surface through
         // getTopLevelContainer() and hosts the tooltip on it, so a tooltip raised from
@@ -4347,7 +4353,7 @@ public class Window extends Container implements TopLevelContainer {
         // timer or dismiss a visible tooltip, even though there is no component to query.
         TooltipManager tm = TooltipManager.getInstance();
         if (tm != null) {
-            String tip = cmp == null ? null : cmp.getTooltip();
+            String tip = hoverTracker.isOver(cmp) ? cmp.getTooltip() : null;
             if (tip != null && tip.length() > 0) {
                 tm.prepareTooltip(tip, cmp);
             } else {

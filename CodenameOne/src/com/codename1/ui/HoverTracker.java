@@ -69,6 +69,20 @@ class HoverTracker {
         updateInteractiveScrollHover(cmp, x, y);
     }
 
+    // A hover callback can remove its own component without deinitializing the
+    // entire form/window. Drop that detached target before scheduling a tooltip.
+    void clearDetached(TopLevelContainer owner) {
+        if ((hovered != null && hovered.getTopLevelContainer() != owner) //NOPMD CompareObjectsWithEquals
+                || (lastInteractiveScrollHover != null
+                && lastInteractiveScrollHover.getTopLevelContainer() != owner)) { //NOPMD CompareObjectsWithEquals
+            pointerOver(null, -1, -1);
+        }
+    }
+
+    boolean isOver(Component cmp) {
+        return cmp != null && hovered == LeadUtil.leadComponentImpl(cmp); //NOPMD CompareObjectsWithEquals
+    }
+
     private void updateHovered(Component cmp) {
         // The flag goes on the lead COMPONENT, not on the lead parent the pointer resolved
         // to, because the lead component is what Component.getStyle() consults: a component

@@ -4597,34 +4597,30 @@ public class Form extends Container implements TopLevelContainer {
             return;
         }
 
-        Container actual = getActualPane(formLayeredPane, x[0], y[0]);
-        Component cmp = null;
-        if (actual != null) {
-            cmp = hoverTargetAt(x[0], y[0]);
+        Component cmp = hoverTargetAt(x[0], y[0]);
+        // Callbacks must observe the entered/left states, and navigation inside a
+        // callback must be able to clear them without a later update restoring them.
+        // Null also clears the previous target when the pointer leaves the surface.
+        hoverTracker.pointerOver(cmp, x[0], y[0]);
+        try {
             if (cmp != null) {
-
                 if (!isScrollWheeling && cmp.isFocusable() && cmp.isEnabled() && !Display.getInstance().isDesktop()) {
                     setFocused(cmp);
                 }
                 LeadUtil.pointerHover(cmp, x, y);
             }
-            if (TooltipManager.getInstance() != null) {
-                // Guarded: cmp is reachable as null here. A desktop port reports the pointer
-                // LEAVING the window as a hover at (-1,-1) -- there is no component under
-                // that -- and this line dereferenced it unconditionally.
-                String tip = cmp == null ? null : cmp.getTooltip();
-                if (tip != null && tip.length() > 0) {
-                    TooltipManager.getInstance().prepareTooltip(tip, cmp);
-                } else {
-                    TooltipManager.getInstance().clearTooltip();
-                }
+        } finally {
+            hoverTracker.clearDetached(this);
+        }
+        TooltipManager tm = TooltipManager.getInstance();
+        if (tm != null) {
+            String tip = hoverTracker.isOver(cmp) ? cmp.getTooltip() : null;
+            if (tip != null && tip.length() > 0) {
+                tm.prepareTooltip(tip, cmp);
+            } else {
+                tm.clearTooltip();
             }
         }
-        // Outside the null checks on purpose: hover has to be CLEARED when the pointer is
-        // over nothing, which is how a desktop port reports the cursor leaving the window.
-        // Updating only when a component was found left the last component -- and the last
-        // scrollbar thumb -- lit for good.
-        hoverTracker.pointerOver(cmp, x[0], y[0]);
     }
 
 
