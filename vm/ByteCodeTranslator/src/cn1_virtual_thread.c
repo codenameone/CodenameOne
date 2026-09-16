@@ -47,6 +47,24 @@ struct cn1VirtualThread {
     void*  vmState;     /* this virtual thread's ThreadLocalData */
     int    yieldReason; /* CN1_VT_YIELD_* -- why it last gave up its host */
     int    running;     /* executing on some OS thread right now */
+    /*
+     * The collector's claim on this virtual thread's pending-allocation table.
+     *
+     * Read `running` and act on it and you have a check-to-use window: the
+     * virtual thread is parked when the collector looks, and the CARRIER -- a
+     * different OS thread, which this loop has not stopped yet, because it stops
+     * one thread state at a time -- resumes it a moment later. The collector then
+     * migrates and zeroes a table the mutator has started appending to, which
+     * loses an object or places one twice.
+     *
+     * This closes it as a Dekker exclusion rather than a lock, because a lock
+     * here is the shape that has already broken this collector twice: the
+     * carrier would block holding threadActive, and the collector's own wait for
+     * that carrier is what the escalation exists to break. Each side publishes
+     * its intent and then reads the other's, both seq_cst, so at least one sees
+     * the other and they cannot both proceed.
+     */
+    int    gcClaim;
     void*  stackLow;    /* mmap base */
     void*  stackHigh;   /* one past the usable end */
     size_t stackBytes;
@@ -325,12 +343,34 @@ void cn1VirtualThreadResume(struct cn1VirtualThread* co) {
     if(co == 0 || co->finished) {
         return;
     }
+    /*
+     * THE CARRIER'S HALF OF THE HANDSHAKE, before `running` is published.
+     *
+     * Publish first, then read the collector's claim: the store below and the
+     * collector's load are both seq_cst, so if it saw running == 0 it has not
+     * yet set gcClaim, and if it has set gcClaim this load sees it. Exactly one
+     * of the two proceeds.
+     *
+     * The wait is a spin, and bounded by construction -- the collector's claim
+     * spans one table migration and no call that can block on this thread, so
+     * there is nothing for this to deadlock against. It cannot wait on a
+     * collection either, which is the trap the reverted attempts fell into.
+     */
+    __atomic_store_n(&co->running, 1, __ATOMIC_SEQ_CST);
+    while(__atomic_load_n(&co->gcClaim, __ATOMIC_SEQ_CST)) {
+        /* Not usleep: the claim is memory work of bounded length and a sleep
+         * here would put a request's latency on the collector's schedule. */
+        __atomic_store_n(&co->running, 0, __ATOMIC_SEQ_CST);
+        while(__atomic_load_n(&co->gcClaim, __ATOMIC_SEQ_CST)) {
+            cn1VirtualThreadSpinHint();
+        }
+        __atomic_store_n(&co->running, 1, __ATOMIC_SEQ_CST);
+    }
     if(!co->started) {
         co->started = 1;
         co->sp = cn1VirtualThreadPrime(co->stackHigh, co, (void*)cn1VirtualThreadTrampoline);
     }
     cn1CurrentVirtualThread = co;
-    co->running = 1;
     /* NOTE, and this is a KNOWN GAP rather than an oversight -- see the block above
      * cn1SpawnVirtualThread in nativeMethods.m. The attached VM state is NOT marked
      * threadActive here. Marking it looks obviously right and is a collector HANG:
@@ -341,8 +381,44 @@ void cn1VirtualThreadResume(struct cn1VirtualThread* co) {
      * The C stack is covered regardless, by cn1GcScanParkedVirtualThreads, which
      * scans every registered virtual thread whether or not it is running. */
     cn1VirtualThreadSwitch(&co->returnSp, co->sp);
-    co->running = 0;
+    __atomic_store_n(&co->running, 0, __ATOMIC_SEQ_CST);
     cn1CurrentVirtualThread = previous;
+}
+
+/* One pause instruction where the architecture has one; a plain no-op otherwise. */
+void cn1VirtualThreadSpinHint(void) {
+#if defined(__x86_64__) || defined(__i386__)
+    __builtin_ia32_pause();
+#elif defined(__aarch64__) || defined(__arm__)
+    __asm__ __volatile__("yield");
+#endif
+}
+
+/*
+ * The COLLECTOR's half: claim this virtual thread's table, and say whether the
+ * claim won.
+ *
+ * Returns 1 when the collector may migrate -- it holds the claim and the virtual
+ * thread was not running when the claim was already visible -- and 0 when the
+ * virtual thread is running, in which case the claim is dropped before
+ * returning and the caller must leave the table alone.
+ */
+int cn1VirtualThreadGcClaim(struct cn1VirtualThread* co) {
+    if(co == 0) {
+        return 0;
+    }
+    __atomic_store_n(&co->gcClaim, 1, __ATOMIC_SEQ_CST);
+    if(__atomic_load_n(&co->running, __ATOMIC_SEQ_CST)) {
+        __atomic_store_n(&co->gcClaim, 0, __ATOMIC_SEQ_CST);
+        return 0;
+    }
+    return 1;
+}
+
+void cn1VirtualThreadGcRelease(struct cn1VirtualThread* co) {
+    if(co != 0) {
+        __atomic_store_n(&co->gcClaim, 0, __ATOMIC_SEQ_CST);
+    }
 }
 
 void cn1VirtualThreadSetYieldReason(int reason) {

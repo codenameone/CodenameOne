@@ -45,11 +45,8 @@ public final class GestureSuite {
     /// tap before it can type anything, which took three and a half seconds
     /// on a simulator busy serving XCUITest accessibility snapshots.
     private static final long DEFAULT_STEP_TIMEOUT_MS = 30000L;
-    /// Grace period between the last event and exitApplication(). It has to
-    /// outlast the platform driver noticing that the final step resolved and
-    /// telling its input loop to stop: the keytype driver types in a retry loop,
-    /// and a key synthesised into a process that has already left fails the
-    /// XCUITest run even though every event landed.
+    /// Non-iOS drivers retain the automatic exit. On iOS, XCUITest owns
+    /// termination so completion cannot race a key still being synthesized.
     private static final long SUITE_EXIT_DELAY_MS = 8000L;
 
     private final GestureStep[] steps;
@@ -131,6 +128,12 @@ public final class GestureSuite {
     private void finishSuite() {
         this.activeStepToken++;
         log("CN1IV:SUITE:FINISHED");
+        // A stop gate can arrive late, and typeKey can still be in flight.
+        // No fixed exit grace can synchronize those operations. Let XCUITest
+        // terminate the iOS app after its last input operation instead.
+        if ("ios".equals(CN.getPlatformName())) {
+            return;
+        }
         UITimer.timer((int) SUITE_EXIT_DELAY_MS, false, this.form, () -> {
             try {
                 Display.getInstance().exitApplication();
