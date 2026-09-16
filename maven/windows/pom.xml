@@ -78,7 +78,17 @@
             <plugin>
                 <artifactId>maven-antrun-plugin</artifactId>
                 <executions>
-                    <!-- Stage the port's native theme as a classpath resource
+                    <!-- STILL the Material theme, deliberately, even though WindowsFluentTheme.res
+                         now exists and is measured. Staging it here is the DEFAULT FLIP for
+                         this port, and that restyles every screen: it reseeds ~154 committed
+                         screenshot baselines, which is a change that deserves its own review
+                         rather than riding along inside the one that introduces the theme.
+                         It also wants doing once, after the theme reaches its fidelity
+                         target, rather than now and again later.
+
+                         Flipping it is this one line plus the reseed.
+
+                         Stage the port's native theme as a classpath resource
                          (windowsNativeTheme.res) so the windows
                          translator target embeds it into the exe and the
                          getResourceAsStream call in installNativeTheme() serves it
@@ -95,7 +105,7 @@
                         </goals>
                         <configuration>
                             <target>
-                                <copy file="${project.basedir}/../../Themes/WindowsFluentTheme.res"
+                                <copy file="${project.basedir}/../../Themes/AndroidMaterialTheme.res"
                                       tofile="${project.build.outputDirectory}/windowsNativeTheme.res"
                                       overwrite="true" failonerror="true"/>
                             </target>

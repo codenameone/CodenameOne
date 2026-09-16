@@ -599,12 +599,8 @@ public class MacOSBuildHintsTest {
     /// mode whatsoever, however carefully the application asked for one. That is
     /// what made every *_dark screenshot come out light.
     @Test
-    public void theNativeThemeDefaultsToAquaAndIsConstrainedToKnownModes() {
-        // Aqua, not modern. Modern was the default because it was the only theme that
-        // declared @darkModeBool, so ios7 left a macOS application with no dark mode at
-        // all. MacOSAquaTheme declares it too, and is the theme for this platform rather
-        // than an iPhone one, so the reason for preferring modern no longer holds.
-        assertEquals("aqua", parse(raw(), "p").getThemeMode());
+    public void theNativeThemeDefaultsToModernAndIsConstrainedToKnownModes() {
+        assertEquals("modern", parse(raw(), "p").getThemeMode());
         // aqua and native have to survive the whitelist or the hint cannot select the
         // theme it names.
         assertEquals("aqua", parse(raw("macos.themeMode", "aqua"), "p").getThemeMode());
@@ -622,9 +618,9 @@ public class MacOSBuildHintsTest {
         // constrained to what the runtime understands rather than passed
         // through. A settings file is an upload, and a source file is an
         // injection site.
-        assertEquals("aqua",
+        assertEquals("modern",
                 parse(raw("macos.themeMode", "\"); System.exit(1); //"), "p").getThemeMode());
-        assertEquals("aqua", parse(raw("macos.themeMode", "nonsense"), "p").getThemeMode());
+        assertEquals("modern", parse(raw("macos.themeMode", "nonsense"), "p").getThemeMode());
     }
 
     /// Every remaining setting the builders used to read straight off the

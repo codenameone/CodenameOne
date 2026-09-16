@@ -78,11 +78,15 @@ look everywhere asks for. `custom` installs no framework theme so your own
 `theme.css` is the only one.
 
 |`macos.themeMode`
-|`aqua` (default) +
-`modern` / `liquid` +
+|`modern` (default) +
+`aqua` / `native` +
+`liquid` +
 `ios7` / `flat`
-|The native macOS port. `aqua` is the macOS theme; `modern` is the iOS
-Liquid Glass theme, which the port shipped before an Aqua theme existed.
+|The native macOS port. `aqua` selects the macOS theme; `modern` / `liquid`
+is the iOS Liquid Glass theme, which is what the port shipped before an Aqua
+theme existed and what it still installs unless asked otherwise. The default
+moves to `aqua` in the change that reseeds this port's screenshot baselines,
+which is deliberately separate from the one that introduces the theme.
 |===
 
 The three desktop themes are generated from `native-themes/windows-fluent`,

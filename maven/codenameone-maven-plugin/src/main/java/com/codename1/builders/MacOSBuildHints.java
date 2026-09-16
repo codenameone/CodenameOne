@@ -741,7 +741,13 @@ public class MacOSBuildHints {
                 // asked for the modern iOS look and still gets it.
                 mode = shared;
             } else {
-                mode = "aqua";
+                // NOT aqua yet, and that is the same sequencing as the Windows and Linux
+                // poms: making Aqua the default restyles every screen and reseeds this
+                // port's committed screenshot baselines, which deserves its own review and
+                // wants doing once, after the theme reaches its fidelity target. Until
+                // then macos.themeMode=aqua selects it explicitly, which is what the
+                // whitelist above is for and what the review asked for.
+                mode = "modern";
             }
         }
         // Interpolated into generated Java source, so it is constrained to the
@@ -753,10 +759,8 @@ public class MacOSBuildHints {
                 return THEME_MODES[iter];
             }
         }
-        // A value the whitelist rejects behaves as if the hint were unset, which is the
-        // platform's own theme. Returning "modern" here meant a typo silently produced an
-        // iOS look on a Mac.
-        return "aqua";
+        // A value the whitelist rejects behaves as if the hint were unset.
+        return "modern";
     }
 
     /// Every value IOSImplementation.installNativeTheme() acts on.

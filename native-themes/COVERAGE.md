@@ -165,6 +165,23 @@ These are starting points, not results. All three themes were written without a
 reference to check them against, so this is the first time any of them has been
 measured, and the ratchet moves them up from here.
 
+### No port installs one by default yet
+
+The themes are built, measured and selectable, and every desktop port still
+installs what it installed before: Windows and Linux stage the Material
+placeholder, macOS installs the iOS theme unless `macos.themeMode=aqua` asks for
+Aqua.
+
+That is sequencing, not an oversight. Flipping a port's theme restyles every
+screen and reseeds its committed screenshot baselines -- about 154 on the Windows
+port alone -- which deserves its own review rather than riding along inside the
+change that introduces the theme, and wants doing once the themes reach their
+fidelity targets rather than now and again later.
+
+Each flip is one line: the `<copy file=` in `maven/windows/pom.xml` and
+`maven/linux/pom.xml`, and the unset branch of
+`MacOSBuildHints.getThemeMode()`.
+
 What the first round of measurement actually found is worth recording, because
 only one of the four was a CSS problem:
 
