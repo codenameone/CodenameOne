@@ -8186,6 +8186,9 @@ public class Component implements Animation, StyleListener, Editable {
         }
         if (hasAnimatedHoverBackground()) {
             registerHoverBackgroundAnimation();
+            // The hover callback advances only the background. A restored scrollbar
+            // still needs Component.animate() in the independent internal registry.
+            checkScrollbarAnimation();
             return;
         }
         stopHoverBackgroundAnimation();
@@ -8197,13 +8200,16 @@ public class Component implements Animation, StyleListener, Editable {
             if (p != null && p.getClass() != BGPainter.class && p instanceof Animation) {
                 registerForAnimation();
             } else {
-                if (scrollOpacity == 0xff && isScrollable() && getUIManager().getLookAndFeel().isFadeScrollBar()) {
-                    // trigger initial fade process on a fresh view.
-                    Container pf = TopLevelSupport.rootOf(this);
-                    if (pf != null) {
-                        pf.registerAnimatedInternal(this);
-                    }
-                }
+                checkScrollbarAnimation();
+            }
+        }
+    }
+
+    private void checkScrollbarAnimation() {
+        if (scrollOpacity == 0xff && isScrollable() && getUIManager().getLookAndFeel().isFadeScrollBar()) {
+            Container root = TopLevelSupport.rootOf(this);
+            if (root != null) {
+                root.registerAnimatedInternal(this);
             }
         }
     }
