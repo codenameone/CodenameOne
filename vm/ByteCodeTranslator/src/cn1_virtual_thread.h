@@ -257,6 +257,16 @@ static inline struct cn1VirtualThread* cn1VirtualThreadForStackAddress(
     (void)addr; (void)count; (void)snapshot; return 0;
 }
 static inline int   cn1VirtualThreadIsRunning(struct cn1VirtualThread* co) { (void)co; return 0; }
+/*
+ * 0 is "the claim was NOT taken", which is the safe answer and not just the
+ * convenient one: the caller reads a failed claim as "this virtual thread may be
+ * running" and leaves its pending-allocation table alone, costing a deferred
+ * reclaim. Answering 1 would license the migration. Unreachable either way here,
+ * since without virtual threads no thread state ever resolves to one.
+ */
+static inline int   cn1VirtualThreadGcClaim(struct cn1VirtualThread* co) { (void)co; return 0; }
+static inline void  cn1VirtualThreadGcRelease(struct cn1VirtualThread* co) { (void)co; }
+static inline void  cn1VirtualThreadSpinHint(void) { }
 static inline void  cn1VirtualThreadStackBounds(struct cn1VirtualThread* co, void** lo, void** hi) {
     (void)co; if(lo) { *lo = 0; } if(hi) { *hi = 0; }
 }
