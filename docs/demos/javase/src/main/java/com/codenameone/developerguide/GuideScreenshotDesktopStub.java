@@ -96,6 +96,10 @@ public final class GuideScreenshotDesktopStub implements Runnable {
         }
 
         frame = new JFrame(APP_TITLE);
+        // CN.setWindowSize sizes this frame, while dialogs centre on its content area.
+        // Native title bars subtract a host-dependent height (28 pixels on macOS),
+        // moving dialogs even when the figure's Form has explicit dimensions.
+        frame.setUndecorated(true);
         Display.init(frame.getContentPane());
         Display.getInstance().setProperty("AppName", APP_NAME);
         Display.getInstance().setProperty("AppVersion", APP_VERSION);

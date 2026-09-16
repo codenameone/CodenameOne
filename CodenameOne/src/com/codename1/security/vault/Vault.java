@@ -2855,8 +2855,17 @@ public final class Vault {
 
     private void requireUnlocked() {
         checkAutoLock();
-        if (dataKey == null || metadata == null) {
+        VaultMetadata session = metadata;
+        if (dataKey == null || session == null) {
             throw new VaultException(VaultError.LOCKED, "the vault is locked");
+        }
+        // Other browser tabs share storage, but not this session or Storage's cache.
+        // A key whose persisted wrap was deleted must never produce new ciphertext.
+        VaultMetadata stored = loadMetadataFresh();
+        if (stored == null || !stored.serialize().equals(session.serialize())) {
+            lock();
+            throw new VaultException(stored == null ? VaultError.LOCKED : VaultError.CONFLICT,
+                    "another session removed or changed this vault; unlock it again before use");
         }
         touch();
     }
@@ -2933,7 +2942,7 @@ public final class Vault {
     /// exists to measure -- so making handles honour the idle lock without this would replace one
     /// defect with a worse one.
     void noteHandleUse() {
-        touch();
+        requireUnlocked();
     }
 
     /// The key generation, for a handle to notice that the key it derives from has been replaced.

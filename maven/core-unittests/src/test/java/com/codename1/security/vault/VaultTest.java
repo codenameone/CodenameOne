@@ -3429,6 +3429,51 @@ class VaultTest extends UITestBase {
     }
 
     @Test
+    void anotherSessionDestroyingTheVaultInvalidatesEveryKeyProducingOperation() {
+        for (int operation = 0; operation < 5; operation++) {
+            String name = freshName();
+            Vault owner = Vault.named(name).configure(fast());
+            owner.enroll(pw("p"), fast()).get();
+            Vault other = Vault.named(name).configure(fast());
+            other.unlockWithPassword(pw("p")).get();
+            KeyHandle handle = other.operationalKey("token").get();
+            String entry = secretEntryName(other, "new");
+            assertTrue(owner.destroyLocalData().get().booleanValue());
+
+            AsyncResource<?> result;
+            switch (operation) {
+                case 0: result = other.putSecret("new", pw("lost")); break;
+                case 1: result = other.databaseKey("new"); break;
+                case 2: result = other.seal("new", new byte[] {1}); break;
+                case 3: result = other.operationalKey("new"); break;
+                default: result = handle.mac(new byte[] {1}); break;
+            }
+            assertEquals(VaultError.LOCKED, errorOf(result), "operation " + operation);
+            assertFalse(other.isUnlocked());
+            assertTrue(handle.isDestroyed());
+            assertEquals(Vault.NOT_ENROLLED, Vault.named(name).configure(fast()).state());
+            assertFalse(Storage.getInstance().exists(entry));
+        }
+    }
+
+    @Test
+    void replacingTheStoredVaultInvalidatesAnAlreadyUnlockedSession() {
+        String name = freshName();
+        Vault owner = Vault.named(name).configure(fast());
+        owner.enroll(pw("old"), fast()).get();
+        Vault other = Vault.named(name).configure(fast());
+        other.unlockWithPassword(pw("old")).get();
+        owner.destroyLocalData().get();
+        owner.enroll(pw("new"), fast()).get();
+
+        assertEquals(VaultError.CONFLICT, errorOf(other.putSecret("new", pw("lost"))));
+        assertFalse(other.isUnlocked());
+        other.unlockWithPassword(pw("new")).get();
+        assertTrue(other.putSecret("new", pw("readable")).get().booleanValue());
+        assertEquals("readable", new String(owner.getSecret("new").get()));
+    }
+
+    @Test
     void autoLockClosesTheVaultAfterIdleTime() throws Exception {
         VaultOptions options = fast().autoLockAfter(1);
         Vault vault = Vault.named(freshName()).configure(options);
