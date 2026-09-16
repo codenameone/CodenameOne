@@ -226,6 +226,12 @@ public class Parser extends ClassVisitor {
     private int lambdaCounter;
     private int stringConcatCounter;
     public static void cleanup() {
+        if ("true".equals(System.getProperty("cn1.iteratorCensus"))) {
+            // Reported HERE rather than from the census itself: the census runs BEFORE
+            // the pass that scopes the loops, so printing it there reports zero for both.
+            System.out.println("[ITER] for-each sites scoped=" + BytecodeMethod.stackIterScoped
+                    + " refused=" + BytecodeMethod.stackIterRefused);
+        }
         if (BytecodeMethod.FRAMELESS_CENSUS) {
             int t = BytecodeMethod.censusTotal;
             System.out.println("[FRAMELESS] methods=" + t

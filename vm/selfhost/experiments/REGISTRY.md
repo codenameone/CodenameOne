@@ -2781,3 +2781,81 @@ now worth attacking with an instrument that can actually observe a freed-but-ref
 slot. What the quarantine does *not* yet do is survive a slot being reused across more than
 one cycle, so a reference that dangles for several cycles before being read is still seen
 only at the first verify pass after the free.
+
+## Round 25: the iterator moves to the caller's stack frame -- 28% of them, and no measurable time
+
+Round 23 designed this and deferred it behind the handshake bug. It is now built, and the
+design survived contact with one significant correction.
+
+### What was built
+
+A for-each offers a C stack buffer; whatever `iterator()` allocates takes it. Neither side
+learns anything about the other, which is exactly why it reaches the sites a receiver proof
+cannot -- the 522,140 allocations Round 23 counted at for-each sites whose receiver type is
+not provable.
+
+Three separate proofs, all COMPUTED by `IteratorEscape` rather than listed:
+
+1. `this` escapes no method of the iterator class, constructor included;
+2. every allocation site of that class in the closed world lets the object escape only by
+   returning it;
+3. the for-each slot is read at `hasNext()` and `next()` and nowhere else -- the same proof
+   the indexed lowering needs, now factored into `validateForEach` and shared.
+
+On the self-hosting corpus: 40 Iterator implementations, 37 `this`-safe, 56 allocation
+sites, 44 safe, **25 classes eligible**. The analysis pays for itself on the refusals, none
+of which are obvious by inspection and all of which would have been dangling pointers:
+`LinkedList.removeFirstOccurrenceImpl` passes its iterator to a helper,
+`Hashtable.__CLINIT__` stores two in statics, and `Collections$SingletonMap$1$1.next()`
+returns `this` as the entry.
+
+### Measured
+
+| | iterator allocations | change |
+|---|---:|---:|
+| ForEachT, mechanism off | 561 | |
+| ForEachT, mechanism on | 93 | **-83%** |
+| self-hosting corpus, off | 526,199 | |
+| self-hosting corpus, on | 377,123 | **-28%** |
+
+The 526,199 independently confirms Round 23's 522,140. Both arms emit **byte-identical C**
+-- the only file that differs is `CMakeLists.txt`, which embeds its own output path.
+
+**Wall clock and footprint did not move measurably.** Ten interleaved rounds, and the
+machine was not quiet (another checkout was running `core-unittests`, load 10-13 throughout,
+which is why this is reported as a null result rather than a regression):
+
+    wall   min-of-10: on 0.962s  off 0.988s   sign test: on faster in 5 of 10 pairs
+    peak   max-of-10: on 869MB   off 897MB    sign test: on smaller in 7 of 10 pairs
+
+3.1% on a metric this file calls noise below ~5%, and a 5/10 sign test is the definition of
+no effect. The allocation reduction is real and counted; the throughput win it was supposed
+to produce is not there yet. The honest reading is that 149k allocations out of 779 MILLION
+total objects is 0.02% of allocation traffic -- the iterator count was never the bottleneck
+it looked like when measured as a fraction of *iterators*.
+
+### The correction that cost the first measurement
+
+The hook was placed in `__NEW_X`, which is where a Java-level reading says allocation
+happens. It is not: the generated code calls `CN1_FAST_NEW(...)`, which inlines the BiBOP
+bump path and reaches `__NEW_X` only when a page is full. The first build measured 460
+ArrayListIterator allocations with the mechanism on and 460 with it off -- a perfectly
+working mechanism attached to a path that never runs. `CN1_ITER_NEW` replaced it.
+
+Related trap, twice in one session: `translate-and-build.sh` rebuilds the translator only
+when its main class file is **missing**, so editing a translator source and running the
+script measures the previous translator. Both times the symptom was "the change does
+nothing", which is also what a real null result looks like.
+
+### Remaining headroom
+
+**123 of 207 surviving for-each sites are scoped; 84 are refused** by `validateForEach` --
+they are not the canonical javac shape, or the slot outlives the loop (`it.remove()` in the
+body is the common one). All 377,123 residual allocations are `ArrayListIterator`, so they
+are concentrated: these are sites whose receiver is an ArrayList at runtime but not
+provably so at translate time, which is precisely the population this mechanism was built
+for and has not yet reached. A census counter now reports the scoped/refused split so the
+next widening is aimed at a measured shape.
+
+Not yet measured: whether the win shows up on a quiet machine, and whether it shows up at
+all on a workload whose iterators are a larger share of allocation than 0.02%.
