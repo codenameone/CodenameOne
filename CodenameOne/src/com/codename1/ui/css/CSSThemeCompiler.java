@@ -109,7 +109,10 @@ public class CSSThemeCompiler {
         for (int appearance = 0; appearance < 2; appearance++) {
             boolean dark = appearance == 1;
             String prefix = dark ? "$Dark" : "";
-            for (int pass = 0; pass < ids.size(); pass++) {
+            // Each pass can expose another link in a derive chain; this is a
+            // convergence bound, not an iteration over individual component IDs.
+            int remainingPasses = ids.size();
+            while (remainingPasses-- > 0) {
                 boolean changed = false;
                 for (String id : ids) {
                     String base = hoverBase(theme, id, dark);
