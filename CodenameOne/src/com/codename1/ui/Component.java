@@ -7701,6 +7701,8 @@ public class Component implements Animation, StyleListener, Editable {
         }
         this.hovered = hovered;
         if (getHoverStyle() != null) {
+            // A hover-only image or painter can become animated after initialization.
+            checkAnimation();
             repaint();
         }
     }

@@ -62,7 +62,7 @@ public class CSSBoxShadowNativeBorderTest {
     @Test
     void testSimpleBlackShadowCompilesToRoundRectBorder() throws Exception {
         Hashtable theme = compile("Card { background-color: #ffffff; border-radius: 2.1mm;"
-                + " box-shadow: 0 2px 4px 1px rgba(0,0,0,0.13); }");
+                + " box-shadow: 0 1px 4px 1px rgba(0,0,0,0.13); }");
         Object border = theme.get("Card.border");
         assertInstanceOf(RoundRectBorder.class, border, "Card.border");
         RoundRectBorder rr = (RoundRectBorder) border;
@@ -123,7 +123,7 @@ public class CSSBoxShadowNativeBorderTest {
         for (String spread : new String[]{"1px", "4px", "8px"}) {
             for (int blur : new int[]{0, 4}) {
                 Hashtable theme = compile("Card { background-color: #ffffff;"
-                        + " box-shadow: 0 2px " + blur + "px " + spread + " rgba(0,0,0,0.2); }");
+                        + " box-shadow: 0 0.5px " + blur + "px " + spread + " rgba(0,0,0,0.2); }");
                 RoundRectBorder border = (RoundRectBorder) theme.get("Card.border");
                 assertTrue(border.getShadowBlur() == blur, "blur must not depend on spread " + spread);
                 assertTrue(border.getShadowSpread() > 0, "software shadow needs positive spread");
@@ -153,7 +153,7 @@ public class CSSBoxShadowNativeBorderTest {
                 1.5f * 25.4f / 72f};
         for (int i = 0; i < spreads.length; i++) {
             RoundRectBorder border = (RoundRectBorder) compile("Card { background-color: #ffffff;"
-                    + " box-shadow: 0 2px 4px " + spreads[i] + " rgba(0,0,0,0.2); }").get("Card.border");
+                    + " box-shadow: 0 0.1px 4px " + spreads[i] + " rgba(0,0,0,0.2); }").get("Card.border");
             assertTrue(Math.abs(border.getShadowSpread() - expectedMM[i]) < 0.0001f,
                     "fractional spread changed for " + spreads[i] + ": " + border.getShadowSpread());
             assertTrue(!Float.isInfinite(border.getShadowY()) && !Float.isNaN(border.getShadowY()),
@@ -165,6 +165,32 @@ public class CSSBoxShadowNativeBorderTest {
                 "fractional x offset must survive");
         assertTrue(Math.abs(border.getShadowY()) < 0.0001f, "fractional y offset must survive");
         assertTrue(border.getShadowBlur() == 0.5f, "fractional blur must survive");
+    }
+
+    @Test
+    void testOffsetsOutsideNativeSpreadRequireRasterization() throws Exception {
+        for (String offset : new String[]{"2px", "-2px", "0.1cm", "-1mm", "2pt"}) {
+            for (String axes : new String[]{offset + " 0", "0 " + offset}) {
+                assertRefusedByStrictNoCef("Card { background-color: white; border-radius: 2mm;"
+                        + " box-shadow: " + axes + " 4px 1px black; }", "offset " + axes);
+            }
+        }
+        for (String ratio : new String[]{"-0.1", "1.1"}) {
+            assertRefusedByStrictNoCef("Card { background-color: white; border-radius: 2mm;"
+                    + " box-shadow: 0 0 4px 1px black; cn1-box-shadow-h: " + ratio + "; }",
+                    "position ratio " + ratio);
+        }
+    }
+
+    @Test
+    void testOffsetsAtNativeSpreadBoundaryRemainSupported() throws Exception {
+        for (String axes : new String[]{"1px -1px", "-1px 1px", "0 0", "0.1cm -1mm"}) {
+            String spread = axes.contains("cm") ? "1mm" : "1px";
+            RoundRectBorder border = (RoundRectBorder) compile("Card { background-color: white;"
+                    + " box-shadow: " + axes + " 4px " + spread + " black; }").get("Card.border");
+            assertTrue(border.getShadowX() >= 0 && border.getShadowX() <= 1, "x ratio in range");
+            assertTrue(border.getShadowY() >= 0 && border.getShadowY() <= 1, "y ratio in range");
+        }
     }
 
     /** Compiles the sheet and returns the resulting theme properties. */

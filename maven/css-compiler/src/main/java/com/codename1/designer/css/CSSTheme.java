@@ -4139,6 +4139,34 @@ public class CSSTheme {
                 default:
                     return false; // The native constructor cannot translate relative spread units.
             }
+            // RoundRectBorder stores positions as ratios in [0,1]. Larger offsets
+            // would be clipped; increasing spread to fit would change the requested shadow.
+            for (String axis : new String[]{"cn1-box-shadow-h", "cn1-box-shadow-v"}) {
+                ScaledUnit offset = (ScaledUnit) styles.get(axis);
+                if (offset == null) {
+                    continue;
+                }
+                switch (offset.getLexicalUnitType()) {
+                    case LexicalUnit.SAC_INTEGER:
+                    case LexicalUnit.SAC_REAL:
+                        // Explicit CN1 unitless properties are ratios, not CSS lengths.
+                        if (offset.getNumericValue() < 0 || offset.getNumericValue() > 1) {
+                            return false;
+                        }
+                        break;
+                    case LexicalUnit.SAC_PIXEL:
+                    case LexicalUnit.SAC_MILLIMETER:
+                    case LexicalUnit.SAC_CENTIMETER:
+                    case LexicalUnit.SAC_INCH:
+                    case LexicalUnit.SAC_POINT:
+                        if (Math.abs(shadowLengthMM(offset)) > shadowLengthMM(spread)) {
+                            return false;
+                        }
+                        break;
+                    default:
+                        return false;
+                }
+            }
             return true;
         }
 
@@ -4157,6 +4185,16 @@ public class CSSTheme {
     
     
     
+    private static float shadowLengthMM(ScaledUnit value) {
+        float amount = (float)value.getNumericValue();
+        switch (value.getLexicalUnitType()) {
+            case LexicalUnit.SAC_MILLIMETER: return amount;
+            case LexicalUnit.SAC_CENTIMETER: return amount * 10f;
+            case LexicalUnit.SAC_INCH: return amount * 25.4f;
+            default: return amount / 72f * 25.4f; // px and pt use the compiler's 72dpi scale.
+        }
+    }
+
     private static boolean eq(Object o1, Object o2) {
         return o1 == null ? o1 == null : o1.equals(o2);
     }
@@ -6131,17 +6169,6 @@ public class CSSTheme {
             return 0;
         }
         
-        private float shadowLengthMM(ScaledUnit value) {
-            float amount = (float)value.getNumericValue();
-            switch (value.getLexicalUnitType()) {
-                case LexicalUnit.SAC_MILLIMETER: return amount;
-                case LexicalUnit.SAC_CENTIMETER: return amount * 10f;
-                case LexicalUnit.SAC_INCH: return in2mm(amount);
-                case LexicalUnit.SAC_POINT: return pt2mm(amount);
-                default: return amount / 72f * 25.4f;
-            }
-        }
-
         private float calculateShadowRatio(com.codename1.ui.plaf.Border out, boolean spreadMM, float spreadMMVal, ScaledUnit value) {
             float val = (float)value.getNumericValue();
             if (out instanceof RoundRectBorder && spreadMM && spreadMMVal > 0) {

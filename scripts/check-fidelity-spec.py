@@ -27,6 +27,7 @@ KNOWN_KEYS = MOBILE_KEYS | DESKTOP_KEYS | {
     "id", "cn1_uiid", "text", "backdrop", "material", "states", "platforms", "frames",
     "tile_width_mm", "tile_height_mm", "tile_width_px", "tile_height_px",
 }
+KNOWN_PLATFORMS = {"ios", "android", "windows", "macos", "gnome", "linux"}
 KNOWN_STATES = {"normal", "pressed", "disabled", "selected", "hover", "focus"}
 
 def parse(path):
@@ -61,6 +62,7 @@ def main():
     if not SPEC.exists():
         print(f"check-fidelity-spec: {SPEC} not found", file=sys.stderr)
         return 2
+    ERRORS.clear()
     rows = parse(SPEC)
     seen = set()
     desktop = mobile = 0
@@ -107,6 +109,13 @@ def main():
         for st in [s.strip() for s in r.get("states", "").split(",") if s.strip()]:
             if st not in KNOWN_STATES:
                 yield_error(f"{where}: unknown state '{st}' (known: {sorted(KNOWN_STATES)})")
+
+        for platform in [p.strip() for p in r.get("platforms", "").split(",") if p.strip()]:
+            # ComponentSpec deliberately matches prefixes in either direction. In
+            # particular, "window" is valid for "windows", as are "win" and "and".
+            if not any(host.startswith(platform) or platform.startswith(host)
+                       for host in KNOWN_PLATFORMS):
+                yield_error(f"{where}: unknown platform '{platform}'")
 
         # Hover is a desktop state. A mobile row asking for it would never be captured, because
         # a touch device has no pointer to hover with.
@@ -162,17 +171,64 @@ def check_desktop_labels(rows):
                         f"'{want}'. The two sides would compare different strings, which "
                         f"caps the score at something no theme change can reach")
 
-    # And the apps must really contain those literals, so this table cannot rot into a
-    # statement about a string nobody uses any more.
+    # Bind the row to its native kind, then inspect only that kind's widget
+    # constructor. A literal elsewhere (e.g. the accent button) proves nothing.
     for platform, path in NATIVE_REF_SOURCES.items():
         if not path.is_file():
             yield_error(f"{path.name}: missing; cannot verify the {platform} labels")
             continue
         src = path.read_text(encoding="utf-8", errors="replace")
-        for rid, want in sorted(DESKTOP_LABEL_LITERALS.items()):
-            if f'"{want}"' not in src:
-                yield_error(f"{path.name}: does not contain the literal \"{want}\" that "
-                            f"{rid} is declared to render")
+        # Remove comments without treating comment markers inside strings as comments.
+        src = re.sub(r'"(?:\\.|[^"\\])*"|//[^\n]*|/\*.*?\*/',
+                     lambda m: m.group() if m.group().startswith('"') else '', src, flags=re.S)
+        for row in rows:
+            rid = row.get("id")
+            if rid not in DESKTOP_LABEL_LITERALS:
+                continue
+            key = {"windows": "native_win", "macos": "native_mac", "gnome": "native_gnome"}[platform]
+            kind = row.get(key)
+            if not kind:
+                continue
+            mapping, actual = native_label(platform, src, rid, kind)
+            if mapping != kind:
+                yield_error(f"{path.name}: {rid} maps to '{mapping}', but the spec uses '{kind}'")
+            want = row.get("text")
+            if actual != want:
+                yield_error(f"{path.name}: {rid} ({kind}) renders '{actual}', expected '{want}'")
+
+
+def matched(pattern, source, group=1):
+    match = re.search(pattern, source, re.S | re.M)
+    return match.group(group) if match else None
+
+
+def native_label(platform, src, rid, kind):
+    """Read the deliberately small reference-app constructor tables, failing closed on drift."""
+    rid, kind = re.escape(rid), re.escape(kind)
+    if platform == "windows":
+        mapping = matched(r'new\(\s*"' + rid + r'"\s*,\s*"([^"\n]+)"', src)
+        body = matched(r'^\s*"' + kind + r'"\s*=>\s*(.*?)(?=^\s*(?:"\w+"|_)\s*=>)', src) or ""
+        if re.fullmatch(r'MakeComboBox\(\),\s*', body):
+            body = matched(r'ComboBox MakeComboBox\(\)\s*\{(.*?)^\s*\}', src) or ""
+            label = matched(r'\.Items\.Add\(\s*"([^"\n]*)"\s*\)', body)
+        else:
+            label = matched(r'\b(?:Content|Text)\s*=\s*"([^"\n]*)"', body)
+    elif platform == "macos":
+        mapping = matched(r'Spec\(id:\s*"' + rid + r'",\s*kind:\s*"([^"\n]+)"', src)
+        body = matched(r'case "' + kind + r'":(.*?)(?=^\s*(?:case |default:))', src) or ""
+        label = matched(r'(?:NSButton\((?:title|checkboxWithTitle|radioButtonWithTitle):|'
+                        r'NSTextField\(string:|\.addItem\(withTitle:)\s*"([^"\n]*)"', body)
+    else:
+        mapping = matched(r'\{\s*"' + rid + r'",\s*"([^"\n]+)"', src)
+        # Scope to make_widget: other functions also branch on these kind strings.
+        factory = src.split('static GtkWidget *make_widget(', 1)[-1]
+        body = matched(r'if \(strcmp\(kind, "' + kind + r'"\) == 0\) \{(.*?)'
+                       r'(?=^    if \(strcmp\(kind,|^    blocker\()', factory) or ""
+        label = matched(r'(?:gtk_(?:button|check_button)_new_with_label\(|'
+                        r'gtk_editable_set_text\(GTK_EDITABLE\(\w+\),|'
+                        r'const char \*items\[\]\s*=\s*\{)\s*"([^"\n]*)"', body)
+    return mapping, label
+
 
 if __name__ == "__main__":
     sys.exit(main())

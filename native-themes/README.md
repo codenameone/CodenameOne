@@ -35,7 +35,8 @@ require CEF rasterization fails the build and lists the offending UIID.
   to a `CSSBorder`, which carries each side natively. This is what the Fluent
   text field's bottom accent stroke is made of.
 - **`box-shadow`**, as long as it is a single, non-`inset`, **black** shadow
-  with explicit positive spread (at least `1px` when using pixels).
+  with explicit positive spread (at least `1px` when using pixels) and absolute
+  offsets whose magnitude does not exceed that spread.
   It compiles to `RoundRectBorder`'s own shadow -- shadowX, shadowY, shadowBlur,
   shadowSpread and shadowOpacity all round-trip through the resource format
   (`Resources` cases 0xff13 and 0xff15), so elevation is drawn, not rasterized.
@@ -65,6 +66,8 @@ require CEF rasterization fails the build and lists the offending UIID.
 - A `box-shadow` with omitted, zero, negative, or subpixel pixel spread. CSS
   omitted spread is zero; the native software painter requires positive spread,
   and its constructor default is not equivalent to CSS zero.
+- A shadow offset larger in magnitude than its spread, or a relative-unit offset.
+  Native shadow positions are ratios in `[0,1]`; out-of-range positions clip.
 - An **`inset`** `box-shadow`. `RoundRectBorder` only draws an outer drop shadow.
 - A **tinted** `box-shadow`. The resource format stops at shadowY and never reads
   a shadow colour, so a coloured shadow would round-trip to black and lose its hue

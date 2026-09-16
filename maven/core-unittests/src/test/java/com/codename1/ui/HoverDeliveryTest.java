@@ -45,6 +45,35 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 /// nowhere at all.
 class HoverDeliveryTest extends UITestBase {
 
+    @FormTest
+    void hoverOnlyPainterJoinsTheFormAnimationLoop() {
+        class AnimatedPainter implements Painter, com.codename1.ui.animations.Animation {
+            int ticks;
+            public void paint(Graphics g, com.codename1.ui.geom.Rectangle rect) { }
+            public void paint(Graphics g) { }
+            public boolean animate() { ticks++; return true; }
+        }
+        Form form = new Form("hover animation", new BorderLayout());
+        Label component = new Label("animated hover");
+        form.add(BorderLayout.CENTER, component);
+        form.show();
+        DisplayTest.flushEdt();
+        AnimatedPainter painter = new AnimatedPainter();
+        com.codename1.ui.plaf.Style hover = new com.codename1.ui.plaf.Style(component.getUnselectedStyle());
+        hover.setBgPainter(painter);
+        component.setHoverStyle(hover);
+        form.repaintAnimations();
+        assertEquals(0, painter.ticks, "inactive hover style must not animate");
+        component.setHovered(true);
+        int before = painter.ticks;
+        form.repaintAnimations();
+        assertTrue(painter.ticks > before, "hover activation must register with the real animation loop");
+        component.setHovered(false);
+        before = painter.ticks;
+        form.repaintAnimations();
+        assertEquals(before, painter.ticks, "inactive hover painter must stop advancing");
+    }
+
     /// setDesktop is global to the implementation, so a test that turns it on has to put it
     /// back or every later test in the run inherits a desktop it did not ask for.
     @org.junit.jupiter.api.AfterEach
