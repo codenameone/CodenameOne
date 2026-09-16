@@ -1629,14 +1629,14 @@ A common usage for `Tabs` is the swipe to proceed effect which is common in iOS 
 
 [source,java]
 ----
-include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/TheComponentsOfCodenameOneJava081Snippet.java[tag=the-components-of-codename-one-java-081,indent=0]
+include::../demos/common/src/main/java/com/codenameone/developerguide/screenshots/ComponentsTabsSwipeFigure.java[tag=the-components-of-codename-one-java-081,indent=0]
 ----
 
 .Swipeable Tabs with an iOS carousel effect page 1
-image::img/components-tabs-swipe1.png[Swipeable Tabs with an iOS carousel effect page 1,scaledwidth=20%]
+image::img/generated/components-tabs-swipe1.png[Swipeable Tabs with an iOS carousel effect page 1,scaledwidth=20%]
 
 .Swipeable Tabs with an iOS carousel effect page 2
-image::img/components-tabs-swipe2.png[Swipeable Tabs with an iOS carousel effect page 2,scaledwidth=20%]
+image::img/generated/components-tabs-swipe2.png[Swipeable Tabs with an iOS carousel effect page 2,scaledwidth=20%]
 
 NOTE: Notice that you used `setRadioButtonImages` to explicitly set the radio button images to the look you want for the carousel.
 
@@ -2405,16 +2405,16 @@ You can combine some demos above including the <<slider-stars-demo,Slider stars 
 
 [source,java]
 ----
-include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/TheComponentsOfCodenameOneJava211Snippet.java[tag=the-components-of-codename-one-java-211,indent=0]
+include::../demos/common/src/main/java/com/codenameone/developerguide/screenshots/ComponentsSwipeableContainerFigure.java[tag=the-components-of-codename-one-java-211,indent=0]
 ----
 
 [source,java]
 ----
-include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/TheComponentsOfCodenameOneJava211Snippet.java[tag=the-components-of-codename-one-java-211-helper,indent=0]
+include::../demos/common/src/main/java/com/codenameone/developerguide/screenshots/ComponentsSwipeableContainerFigure.java[tag=the-components-of-codename-one-java-211-helper,indent=0]
 ----
 
 .SwipeableContainer showing a common use case of ranking on swipe
-image::img/components-swipablecontainer.png[SwipeableContainer showing a common use case of ranking on swipe,scaledwidth=20%]
+image::img/generated/components-swipablecontainer.png[SwipeableContainer showing a common use case of ranking on swipe,scaledwidth=20%]
 
 
 === EmbeddedContainer
