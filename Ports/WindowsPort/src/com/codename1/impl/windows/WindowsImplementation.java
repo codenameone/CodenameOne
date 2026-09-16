@@ -796,6 +796,16 @@ public class WindowsImplementation extends CodenameOneImplementation {
         setPointerEventMetadata(button, mask, type, 1f, 0, 0, 0, 0, false);
     }
 
+    void dispatchPointerHover(int windowId, int x, int y, int keyField) {
+        // Keep the native mouse/pen source, but hover has no contact pressure.
+        // markPointer resets the other fields so earlier contact metadata cannot leak in.
+        markPointer(keyField);
+        setPointerButton(com.codename1.ui.events.PointerEvent.BUTTON_NONE, 0);
+        setPointerPressure(0f);
+        setPointerHovering(true);
+        windowPointerHover(windowId, x, y);
+    }
+
     private void drainInput() {
         while (WindowsNative.pollEvent(eventScratch)) {
             int type = eventScratch[0];
@@ -824,10 +834,7 @@ public class WindowsImplementation extends CodenameOneImplementation {
                     // window's own Desktop instance, so a control in one reaches the
                     // hover state like any other; the earlier main-window-only guard
                     // made hover unreachable there.
-                    markPointer(key);
-                    setPointerButton(com.codename1.ui.events.PointerEvent.BUTTON_NONE, 0);
-                    setPointerHovering(true);
-                    windowPointerHover(windowId, x, y);
+                    dispatchPointerHover(windowId, x, y, key);
                     break;
                 case EVENT_KEY_PRESSED:
                     windowKeyPressed(windowId, key);
