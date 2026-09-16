@@ -146,10 +146,25 @@ public final class Dao<T> {
         if(sql == null) {
             return;
         }
+        // ONE TRANSACTION, so the lock is still held when the setval lands.
+        // Taken outside it the lock would be released at the end of its own
+        // statement and exclude nothing; the read of max() and the write of the
+        // sequence have to be inside the same one, because a concurrent insert
+        // between them can commit the key this is about to hand out next.
+        final String lock = table.dialect.lockForResync(table.definition.table());
         owner.run(new DataSource.Work() {
-            public Object run(Database db) throws Exception {
-                db.query(sql, null);
-                return null;
+            public Object run(final Database db) throws Exception {
+                if(lock == null) {
+                    db.query(sql, null);
+                    return null;
+                }
+                return db.transaction(new Database.Work() {
+                    public Object run(Database inTransaction) throws Exception {
+                        inTransaction.execute(lock, null);
+                        inTransaction.query(sql, null);
+                        return null;
+                    }
+                });
             }
         });
     }

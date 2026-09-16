@@ -152,11 +152,25 @@ public final class Query<T> {
         if(values == null || values.length == 0) {
             return raw("1 = 0");
         }
+        // EVERY OPERAND IS CHECKED BEFORE ANY OF THEM IS KEPT. checked() refuses
+        // a value the column cannot hold, and appending as the loop went left the
+        // operands before the bad one in params while the clause -- built here
+        // and handed to raw() only at the end -- was never appended at all. A
+        // caller that catches the refusal and reuses the query then has more
+        // parameters than the SQL has placeholders, which fails at execution
+        // with an error about the statement rather than here with one naming the
+        // value. eq() and the range comparisons do not have this shape: they
+        // evaluate checked() as the argument to a single add, so a throw leaves
+        // params untouched.
+        Object[] bound = new Object[values.length];
+        for(int iter = 0 ; iter < values.length ; iter++) {
+            bound[iter] = checked(field, values[iter]);
+        }
         StringBuilder clause = new StringBuilder(quoted);
         clause.append(" IN (");
-        for(int iter = 0 ; iter < values.length ; iter++) {
+        for(int iter = 0 ; iter < bound.length ; iter++) {
             clause.append(iter > 0 ? ", ?" : "?");
-            params.add(checked(field, values[iter]));
+            params.add(bound[iter]);
         }
         clause.append(")");
         return raw(clause.toString());

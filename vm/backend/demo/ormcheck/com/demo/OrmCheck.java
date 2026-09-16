@@ -30,6 +30,7 @@ import com.codename1.backend.Config;
 import com.codename1.backend.DataSource;
 import com.codename1.backend.orm.Dao;
 import com.codename1.backend.orm.EntityManager;
+import com.codename1.backend.orm.Query;
 
 /**
  * The ORM against a REAL server, one engine per run.
@@ -408,6 +409,25 @@ public class OrmCheck {
         }
         check("a value past a boolean field is refused as well", "refused",
                 boolOverflow);
+        // A REFUSED in() LEAVES THE QUERY AS IT FOUND IT. The operands were bound
+        // one at a time while the clause went on at the end, so a refusal partway
+        // through kept the earlier operands with no placeholders to match them --
+        // and a caller that catches the refusal and carries on with the same
+        // query then binds more parameters than the SQL has, which fails at
+        // execution with an error about the statement rather than about the
+        // value. Counting rows is what shows it: the fallback has to still work.
+        Query<Note> reused = notes.query();
+        String inRefused;
+        try {
+            reused.in("views", new Object[] {Integer.valueOf(10), "not a number"});
+            inRefused = "accepted";
+        } catch(IllegalArgumentException err) {
+            inRefused = "refused";
+        }
+        check("a bad operand in in() is refused", "refused", inRefused);
+        check("and the query it was called on still works", "1",
+                String.valueOf(reused.eq("views", Integer.valueOf(10)).count()));
+
         // THE CONTROLS. A range check that refused every long, or that applied
         // the integer range to a 64-bit column, would pass everything above.
         check("an int-range long against an integer field still works", "1",

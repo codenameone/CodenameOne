@@ -477,6 +477,23 @@ public abstract class Dialect {
     }
 
     /**
+     * The statement that holds inserts off {@code table} while
+     * {@link #resyncGeneratedKey} runs, or null where none is needed.
+     *
+     * <p>Null here, and that is not an oversight for the two engines that answer
+     * it. Neither SQLite nor MySQL needs a resync at all -- both advance their
+     * counter past an explicitly assigned key on their own -- so
+     * resyncGeneratedKey is null for them and this is never reached.
+     *
+     * <p>Must run in the SAME TRANSACTION as the resync, which is the only thing
+     * that makes it a lock rather than a gesture: a lock taken by a statement of
+     * its own is released the moment that statement ends.
+     */
+    public String lockForResync(String table) {
+        return null;
+    }
+
+    /**
      * Whether anything follows the first statement in {@code sql}.
      *
      * <p>What {@link com.codename1.backend.Database} refuses before dispatching,
@@ -844,10 +861,29 @@ public abstract class Dialect {
             // exact shape it was added to remove.
             String quotedTable = quote(table);
             String quotedColumn = quote(column);
+            // READ AND WRITE UNDER THE LOCK lockForResync takes, because the two
+            // halves are not atomic on their own: max() is a snapshot, and a
+            // concurrent insert can take the very value this then installs as the
+            // sequence's next one, so the following generated insert fails on a
+            // duplicate key. EXCLUSIVE mode is what excludes that insert.
             return "SELECT setval(pg_get_serial_sequence(" + literal(quotedTable)
                     + ", " + literal(column) + "), "
                     + "greatest(coalesce((SELECT max(" + quotedColumn + ") FROM "
                     + quotedTable + "), 0) + 1, 1), false)";
+        }
+
+        /**
+         * EXCLUSIVE, which is the weakest mode that excludes an insert: it
+         * conflicts with ROW EXCLUSIVE, which every INSERT, UPDATE and DELETE
+         * takes, and does not conflict with ACCESS SHARE, so ordinary reads of
+         * the table continue while this runs.
+         *
+         * <p>ACCESS EXCLUSIVE would also work and is worse -- it would stop
+         * readers as well, for a maintenance statement that only needs writers
+         * held still.
+         */
+        public String lockForResync(String table) {
+            return "LOCK TABLE " + quote(table) + " IN EXCLUSIVE MODE";
         }
 
         public boolean generatedKeysThroughReturning() {
