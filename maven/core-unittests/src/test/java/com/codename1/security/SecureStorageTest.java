@@ -301,4 +301,101 @@ class SecureStorageTest extends UITestBase {
                 "a short account keeps its own name in the gate: "
                 + SecureStorage.gateName(ordinary));
     }
+
+    /// Every setIfAbsent must decide absence from entryState, not from get().
+    ///
+    /// get() answers null for "nothing is stored here" AND for "something is stored here and it
+    /// cannot be read" -- a ciphertext whose key is temporarily unusable, or an entry a migration
+    /// wrote without taking the cross-process gate. Creating over one of those overwrites a value
+    /// that is still there, and for a managed database key that disconnects the database from its
+    /// key permanently.
+    ///
+    /// The base implementation has always asked entryState. BOTH port overrides were written
+    /// against get() instead, and were reported one at a time -- which is the reason this is held
+    /// across the files rather than in each of them.
+    @Test
+    void everySetIfAbsentDecidesAbsenceFromEntryStateRatherThanFromGet() throws java.io.IOException {
+        String[] sources = {
+            "../../CodenameOne/src/com/codename1/security/SecureStorage.java",
+            "../../Ports/Android/src/com/codename1/impl/android/AndroidSecureStorage.java",
+            "../../Ports/JavaScriptPort/src/main/java/com/codename1/impl/html5/"
+                    + "HTML5SecureStorage.java",
+        };
+        int checked = 0;
+        for (String path : sources) {
+            java.io.File f = new java.io.File(path);
+            assertTrue(f.isFile(), "source not found: " + f.getAbsolutePath());
+            String source = readAll(f);
+            int at = source.indexOf("public String setIfAbsent(");
+            if (at < 0) {
+                // A port that does not override it inherits the base, which is correct.
+                continue;
+            }
+            checked++;
+            String body = braceBody(source, at);
+            int create = firstCreateIn(body);
+            assertTrue(create > 0, path + ": setIfAbsent must write the candidate somewhere");
+            String before = body.substring(0, create);
+            assertTrue(before.indexOf("entryState(") > 0,
+                    path + ": setIfAbsent must ask entryState before it creates, because get() "
+                    + "answers null for an entry that is there and unreadable: " + before);
+            assertTrue(before.indexOf("ENTRY_ABSENT") > 0,
+                    path + ": and it must require a DEFINITE absence, not merely a non-null "
+                    + "state: " + before);
+        }
+        assertTrue(checked >= 2, "only " + checked + " setIfAbsent implementations found, so "
+                + "this scanned almost nothing");
+    }
+
+    /// The first point in a body where the candidate is written.
+    ///
+    /// Delegating to super is deliberately NOT one: the base implementation asks entryState
+    /// itself, so handing the decision to it is the safe path rather than a bypass of it. The
+    /// Android override does exactly that when it has no gate file, ahead of its own check.
+    private static int firstCreateIn(String body) {
+        int best = -1;
+        for (String call : new String[]{"set(account, value)", "nativeSetIfAbsent("}) {
+            int at = body.indexOf(call);
+            if (at > 0 && (best < 0 || at < best)) {
+                best = at;
+            }
+        }
+        return best;
+    }
+
+    /// One method body, by brace counting from an index inside its signature.
+    private static String braceBody(String source, int at) {
+        int open = source.indexOf('{', at);
+        int depth = 0;
+        for (int iter = open; iter < source.length(); iter++) {
+            char c = source.charAt(iter);
+            if (c == '{') {
+                depth++;
+            } else if (c == '}') {
+                depth--;
+                if (depth == 0) {
+                    return source.substring(open, iter + 1);
+                }
+            }
+        }
+        throw new IllegalStateException("unterminated method at " + at);
+    }
+
+    private static String readAll(java.io.File f) throws java.io.IOException {
+        byte[] raw = new byte[(int) f.length()];
+        java.io.InputStream in = new java.io.FileInputStream(f);
+        try {
+            int read = 0;
+            while (read < raw.length) {
+                int n = in.read(raw, read, raw.length - read);
+                if (n < 0) {
+                    break;
+                }
+                read += n;
+            }
+        } finally {
+            in.close();
+        }
+        return new String(raw, "UTF-8");
+    }
 }

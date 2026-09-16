@@ -413,6 +413,16 @@ public final class AndroidSecureStorage extends SecureStorage {
             if (stored != null) {
                 return stored;
             }
+            // Same reason the browser tier asks: get() answers null for "nothing is stored here"
+            // AND for "something is stored here and it cannot be read" -- a value under a
+            // keystore key that has become unusable is the case this class already recovers from
+            // elsewhere. The gate mark below covers the CROSS-PROCESS blindness; it does not
+            // cover an entry this process can see and cannot decrypt, and creating over one
+            // disconnects a managed database from its key for good. The base class has always
+            // asked entryState here.
+            if (entryState(account) != ENTRY_ABSENT) {
+                return null;
+            }
             if (handle.length() > 0) {
                 // Marked, so some process has already stored this account -- and this one cannot
                 // see it, because the read above went through a SharedPreferences instance that

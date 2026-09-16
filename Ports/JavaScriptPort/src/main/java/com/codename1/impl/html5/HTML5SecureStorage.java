@@ -220,6 +220,15 @@ public final class HTML5SecureStorage extends SecureStorage {
         if (existing != null) {
             return existing;
         }
+        // get() answers null for "nothing is stored here" AND for "something is stored here and
+        // this tab cannot read it" -- a ciphertext whose key is temporarily unavailable, or an
+        // entry migrate() wrote into ordinary Storage without ever taking the native gate. Both
+        // used to reach the create below, which then overwrote the existing ciphertext; for a
+        // managed database key that disconnects the database from its key for good. The base
+        // class has always asked entryState here and this override stopped doing it.
+        if (entryState(account) != ENTRY_ABSENT) {
+            return null;
+        }
         try {
             // Sealed first: what the store settles on has to be the ciphertext, or two tabs
             // would converge on one record and disagree about what it decrypts to.
