@@ -361,13 +361,16 @@ void cn1WinPushEvent(CN1EventType type, int x, int y, int keyCode) {
  * Note the asymmetry with presses, which stay droppable: a release that arrives with
  * no press behind it finds no recorded target and is discarded harmlessly, so when
  * something has to go it must never be the release. */
-static int cn1WinIsProtectedEvent(CN1EventType type) {
+/* Unlike hover motion, leave has no later motion outside the window to repair
+ * a dropped notification. Protect only the terminal sentinel, not the motion stream. */
+static int cn1WinIsProtectedEvent(CN1EventType type, int x, int y) {
     return type == CN1_EVENT_WINDOW_SHOWN || type == CN1_EVENT_WINDOW_HIDDEN
             || type == CN1_EVENT_WINDOW_CLOSE
             || type == CN1_EVENT_KEY_RELEASED
             || type == CN1_EVENT_POINTER_RELEASED
             || type == CN1_EVENT_WINDOW_FOCUS
-            || type == CN1_EVENT_SIZE_CHANGED;
+            || type == CN1_EVENT_SIZE_CHANGED
+            || (type == CN1_EVENT_POINTER_HOVER && x == -1 && y == -1);
 }
 
 /* Visibility only. A close request is protected from eviction like any other
@@ -433,7 +436,8 @@ static void cn1WinRemoveAtLocked(LONG idx) {
 static int cn1WinEvictInputLocked(void) {
     LONG idx = cn1Win.eventHead;
     while (idx != cn1Win.eventTail) {
-        if (!cn1WinIsProtectedEvent((CN1EventType) cn1Win.events[idx].type)) {
+        if (!cn1WinIsProtectedEvent((CN1EventType) cn1Win.events[idx].type,
+                cn1Win.events[idx].x, cn1Win.events[idx].y)) {
             cn1WinRemoveAtLocked(idx);
             return 1;
         }
@@ -483,7 +487,9 @@ static int cn1WinEvictOldestTerminationLocked(void) {
     while (idx != cn1Win.eventTail) {
         CN1EventType t = (CN1EventType) cn1Win.events[idx].type;
         if (t == CN1_EVENT_KEY_RELEASED || t == CN1_EVENT_POINTER_RELEASED
-                || t == CN1_EVENT_WINDOW_FOCUS) {
+                || t == CN1_EVENT_WINDOW_FOCUS
+                || (t == CN1_EVENT_POINTER_HOVER && cn1Win.events[idx].x == -1
+                        && cn1Win.events[idx].y == -1)) {
             cn1WinRemoveAtLocked(idx);
             return 1;
         }
@@ -495,7 +501,7 @@ static int cn1WinEvictOldestTerminationLocked(void) {
 void cn1WinPushWindowEvent(int windowId, CN1EventType type, int x, int y, int keyCode) {
     EnterCriticalSection(&cn1Win.eventLock);
     LONG next = (cn1Win.eventTail + 1) % CN1_EVENT_QUEUE_CAPACITY;
-    if (next == cn1Win.eventHead && cn1WinIsProtectedEvent(type)) {
+    if (next == cn1Win.eventHead && cn1WinIsProtectedEvent(type, x, y)) {
         /* Full, and this one must not be the casualty. Supersede this window's own
          * queued transition if it has one, otherwise take the room from an input event,
          * and failing that from a transition that a later one already supersedes. Never

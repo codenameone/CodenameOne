@@ -83,13 +83,16 @@ void cn1LinuxPushEvent(int type, int x, int y, int keyCode) {
  * Note the asymmetry with presses, which stay droppable: a release that arrives with
  * no press behind it finds no recorded target and is discarded harmlessly, so when
  * something has to go it must never be the release. */
-static int cn1LinuxIsProtectedEvent(int type) {
+/* Unlike hover motion, leave has no later motion outside the window to repair
+ * a dropped notification. Protect only the terminal sentinel, not the motion stream. */
+static int cn1LinuxIsProtectedEvent(int type, int x, int y) {
     return type == CN1_EVENT_WINDOW_SHOWN || type == CN1_EVENT_WINDOW_HIDDEN
             || type == CN1_EVENT_WINDOW_CLOSE
             || type == CN1_EVENT_KEY_RELEASED
             || type == CN1_EVENT_POINTER_RELEASED
             || type == CN1_EVENT_WINDOW_FOCUS
-            || type == CN1_EVENT_SIZE_CHANGED;
+            || type == CN1_EVENT_SIZE_CHANGED
+            || (type == CN1_EVENT_POINTER_HOVER && x == -1 && y == -1);
 }
 
 /* Visibility only. A close request is protected from eviction like any other
@@ -155,7 +158,8 @@ static void cn1LinuxRemoveAtLocked(int idx) {
 static int cn1LinuxEvictInputLocked(void) {
     int idx = cn1EventHead;
     while (idx != cn1EventTail) {
-        if (!cn1LinuxIsProtectedEvent(cn1EventRing[idx].type)) {
+        if (!cn1LinuxIsProtectedEvent(cn1EventRing[idx].type,
+                cn1EventRing[idx].x, cn1EventRing[idx].y)) {
             cn1LinuxRemoveAtLocked(idx);
             return 1;
         }
@@ -203,7 +207,9 @@ static int cn1LinuxEvictOldestTerminationLocked(void) {
     while (idx != cn1EventTail) {
         int t = cn1EventRing[idx].type;
         if (t == CN1_EVENT_KEY_RELEASED || t == CN1_EVENT_POINTER_RELEASED
-                || t == CN1_EVENT_WINDOW_FOCUS) {
+                || t == CN1_EVENT_WINDOW_FOCUS
+                || (t == CN1_EVENT_POINTER_HOVER && cn1EventRing[idx].x == -1
+                        && cn1EventRing[idx].y == -1)) {
             cn1LinuxRemoveAtLocked(idx);
             return 1;
         }
@@ -215,7 +221,7 @@ static int cn1LinuxEvictOldestTerminationLocked(void) {
 void cn1LinuxPushWindowEvent(int windowId, int type, int x, int y, int keyCode) {
     pthread_mutex_lock(&cn1EventLock);
     int next = (cn1EventTail + 1) % CN1_EVENT_RING;
-    if (next == cn1EventHead && cn1LinuxIsProtectedEvent(type)) {
+    if (next == cn1EventHead && cn1LinuxIsProtectedEvent(type, x, y)) {
         /* Full, and this one must not be the casualty. Supersede this window's own
          * queued transition if it has one, otherwise take the room from an input event,
          * and failing that from a transition that a later one already supersedes. Never

@@ -44,3 +44,6 @@ jobs:
         run: |
           python3 scripts/test_check_fidelity_spec.py
           python3 scripts/check-fidelity-spec.py
+
+      - name: Check desktop hover queues under saturation
+        run: python3 scripts/test_native_hover_queue.py
