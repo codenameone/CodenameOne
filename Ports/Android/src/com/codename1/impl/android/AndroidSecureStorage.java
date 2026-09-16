@@ -425,6 +425,25 @@ public final class AndroidSecureStorage extends SecureStorage {
             int mark = handle.length() > 0 ? handle.read() : 0;
             String stored = mark == GATE_REMOVED ? null : get(account);
             if (stored != null) {
+                if (mark != GATE_SETTLED) {
+                    // Backfilled while the gate is HELD. A value with no mark is what an older
+                    // build left, or what a plain set() writes, and returning it unmarked leaves
+                    // the gate free -- so another process whose cache still says the account is
+                    // absent takes it, creates a different managed database or vault key, and
+                    // overwrites the one already in use. Marking it here is also what makes the
+                    // unmarked state converge: every account this path hands back becomes
+                    // unambiguous from then on.
+                    try {
+                        handle.setLength(0);
+                        handle.seek(0);
+                        handle.write(GATE_SETTLED);
+                        handle.getChannel().force(true);
+                    } catch (java.io.IOException cannotMark) {
+                        // The value is real and is being returned either way; what is lost is
+                        // the protection for NEXT time, which the next call through here retries.
+                        Log.e(cannotMark);
+                    }
+                }
                 return stored;
             }
             if (mark == GATE_REMOVED) {
@@ -477,6 +496,24 @@ public final class AndroidSecureStorage extends SecureStorage {
         }
     }
 
+    /// Removes one value with this thread ALREADY holding that account's gate lock.
+    ///
+    /// remove() cannot be used from there: it routes to removeUnderGate, which locks the same
+    /// file, and a second lock on a file this process already holds raises
+    /// OverlappingFileLockException rather than blocking. Taking PLAIN_KEY_LOCK here keeps the
+    /// gate-then-monitor order every other path uses.
+    private boolean removeValueUnderHeldGate(String account) {
+        SharedPreferences prefs = plainPrefs();
+        if (prefs == null) {
+            return false;
+        }
+        synchronized (PLAIN_KEY_LOCK) {
+            // commit() for the reason remove() gives: an apply() that is still in memory is not
+            // a withdrawal, and this one is undoing a candidate nobody may use.
+            return prefs.edit().remove(account).commit();
+        }
+    }
+
     /// Stores the candidate and marks the gate, with the gate already held by the caller.
     ///
     /// Shared by the two ways setIfAbsent decides the account is free: no mark at all, and a
@@ -509,7 +546,13 @@ public final class AndroidSecureStorage extends SecureStorage {
                 // value, so nothing is encrypted under it and a later winner overwriting it
                 // costs nothing. The retry is the caller's, and it is a retry rather than a loss.
                 Log.e(cannotMark);
-                if (!remove(account)) {
+                // Directly, NOT through remove(). This runs with the gate's FileLock already
+                // held by the caller, and remove() goes to removeUnderGate and tries to lock the
+                // same file -- which raises OverlappingFileLockException on the same JVM, so the
+                // withdrawal silently failed and left the candidate stored under an unmarked
+                // gate: exactly the pair this fails closed to avoid. The gate is held, so the
+                // ordering is the same one every other path takes.
+                if (!removeValueUnderHeldGate(account)) {
                     // Already covered by the paragraph above: this leaves a value stored under
                     // no mark, and answering null is what keeps that harmless, because the caller
                     // never uses it and so nothing is encrypted under it.

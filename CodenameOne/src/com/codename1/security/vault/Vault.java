@@ -216,7 +216,18 @@ public final class Vault {
     /// [UnlockPolicy#SESSION_ONLY] reports no device key because there is none, on the same
     /// platform where [#capabilities()] says one is available.
     public ProtectionReport protection() {
-        DeviceProtection device = deviceProtection();
+        // ONE read of the device record, used for BOTH the provider below and the presence
+        // further down. They used to be two independent uncached reads -- deviceProtection() goes
+        // through getPolicy(), and deviceRecordState() reads again -- so another tab moving the
+        // policy from REQUIRE_USER_VERIFICATION to REMEMBER_DEVICE between them left this
+        // describing the settled record with the PASSKEY provider: USER_VERIFICATION=YES over a
+        // record that now permits unattended unlock, which is the one claim a caller must be
+        // able to trust.
+        Object storedRecord = readUncached(deviceRecordKey());
+        DeviceRecord snapshot = storedRecord instanceof String
+                ? DeviceRecord.parse((String) storedRecord) : null;
+        DeviceProtection device = deviceProtection(
+                snapshot == null ? UnlockPolicy.SESSION_ONLY : snapshot.policy);
         ProtectionReport.Builder b = ProtectionReport.builder();
         // Three states, because there are three. `state() != NOT_ENROLLED` folded STATE_UNKNOWN --
         // a record that is present and could not be read -- into "enrolled", so an unreadable
@@ -228,7 +239,7 @@ public final class Vault {
         int enrolled = stored == STATE_UNKNOWN ? ProtectionReport.UNKNOWN
                 : (stored != NOT_ENROLLED ? ProtectionReport.YES : ProtectionReport.NO);
         b.set(Protection.PERSISTENT, enrolled);
-        int recordState = deviceRecordState();
+        int recordState = recordStateOf(storedRecord, snapshot);
         if (recordState == ProtectionReport.UNKNOWN) {
             // A record is there and could not be read, so which mechanism protects this vault is
             // not known -- and neither branch below can be taken without claiming it is.
@@ -2865,9 +2876,15 @@ public final class Vault {
     /// managed to read the record that decides them.
     private int deviceRecordState() {
         Object stored = readUncached(deviceRecordKey());
+        return recordStateOf(stored, stored instanceof String
+                ? DeviceRecord.parse((String) stored) : null);
+    }
+
+    /// The same answer from a record ALREADY read, so a caller that needs the record itself does
+    /// not read it a second time and risk describing two different states as one.
+    private int recordStateOf(Object stored, DeviceRecord parsed) {
         if (stored instanceof String) {
-            return DeviceRecord.parse((String) stored) == null
-                    ? ProtectionReport.UNKNOWN : ProtectionReport.YES;
+            return parsed == null ? ProtectionReport.UNKNOWN : ProtectionReport.YES;
         }
         // Only a definite ABSENT is NO. A port that could not tell used to answer false here
         // and this reported NO -- "this device has no remembered unlock" -- which a caller is
