@@ -245,12 +245,19 @@ public final class HTML5SecureStorage extends SecureStorage {
             // all of them, so Database.forgetManagedKey saw an existing managed key as absent and
             // could never delete it, and remove() reported success while the entry lived on.
             //
-            // Both tabs write the same settled bytes, so this is idempotent however the race
-            // went: the loser is writing the winner's record, not its own. A set() landing
-            // after the re-read above still wins in the gate store and loses here, which is
-            // two concurrent writes resolving last-write-wins rather than a create discarding
-            // a value it was told about -- that one is closed by set() settling in the gate.
-            if (!Storage.getInstance().writeObject(encryptedKey(account), settled)) {
+            // Written in a loop that re-reads the gate, and the reason is not last-write-wins.
+            // A set() completing between the create's answer and this write leaves the gate
+            // holding ITS value and ordinary storage holding the create's -- the two namespaces
+            // DISAGREE, so get() answers one value while the next create adopts the other. No
+            // sequential ordering produces that. Re-reading and mirroring what the gate actually
+            // holds converges the two; the loop is bounded because a store being rewritten
+            // continuously has no settled value to agree on, and the last pass simply accepts
+            // what it wrote.
+            // Kept, because the rollback below asks whether THIS tab is the one that won the
+            // gate, and the loop can legitimately change `settled` to somebody else's record.
+            String created = settled;
+            settled = mirrorUntilItAgreesWithTheGate(account, settled);
+            if (settled == null) {
                 // The gate goes with it. The add succeeded, so the ciphertext is settled in the
                 // gate store; leaving it there while reporting failure means the entry is absent
                 // from every namespace a read uses AND present in the one a create consults, so
@@ -258,7 +265,7 @@ public final class HTML5SecureStorage extends SecureStorage {
                 // value from a call that reported failure visible as though it had been stored.
                 // Released only when this tab is the one that won -- the loser is looking at
                 // somebody else's live record and must not delete it.
-                if (sealed.equals(settled)) {
+                if (sealed.equals(created)) {
                     try {
                         nativeForget(encryptedKey(account));
                     } catch (RuntimeException noBridge) {
@@ -286,12 +293,65 @@ public final class HTML5SecureStorage extends SecureStorage {
         }
     }
 
+    /// Copies the settled ciphertext into ordinary Storage, and keeps going until the two agree.
+    ///
+    /// The create answers what the gate held at the moment it ran, and that is not necessarily
+    /// what it holds when this write lands: an ordinary set() completing in between leaves the
+    /// gate on its value and this write about to put a different one into the namespace every
+    /// read uses. The result is not a lost update but a DISAGREEMENT -- get() answers one value
+    /// while the next create adopts the other -- and no sequential ordering of the two calls
+    /// produces it.
+    ///
+    /// So the write is followed by a read of the gate, and if the gate has moved, its value is
+    /// what gets mirrored instead. Answers the value the two settled on, or null when the write
+    /// was refused.
+    ///
+    /// Bounded, and the bound is not arbitrary: a gate being rewritten continuously has no
+    /// settled value to agree on, so the last pass accepts what it wrote rather than spinning. A
+    /// build whose bridge has no read native gets one plain write, which is what it had before.
+    private String mirrorUntilItAgreesWithTheGate(String account, String settled) {
+        String value = settled;
+        for (int attempt = 0; attempt < 4; attempt++) {
+            if (!Storage.getInstance().writeObject(encryptedKey(account), value)) {
+                return null;
+            }
+            String current;
+            try {
+                byte[] answer = nativeRead(encryptedKey(account));
+                if (answer == null || answer.length == 0 || answer[0] != STATUS_OK) {
+                    return value;
+                }
+                current = new String(answer, 1, answer.length - 1, "UTF-8");
+            } catch (RuntimeException noBridge) {
+                // No read native in this build, so there is nothing to compare against.
+                return value;
+            } catch (java.io.UnsupportedEncodingException noUtf8) {
+                return value;
+            }
+            // An empty answer is "the record is gone" -- somebody removed it between the create
+            // and now. What this wrote is then the only copy, and removing it here would be this
+            // method deciding to undo a remove() it knows nothing about.
+            if (current.length() == 0 || current.equals(value)) {
+                return value;
+            }
+            value = current;
+        }
+        return value;
+    }
+
     /// Adds one record if its id is free, and answers the record that is there either way.
     ///
     /// Status byte first, then the settled ciphertext as UTF-8 -- the same shape every native in
     /// HTML5DeviceProtection uses, and for the same reason: a browser has several distinct ways
     /// to refuse and the Java side has to tell them apart.
     static native byte[] nativeSetIfAbsent(String entry, String sealed);
+
+    /// Reads the settled record without creating one.
+    ///
+    /// The mirror needs to know whether what it is about to copy is still what the store holds.
+    /// Re-calling the create to find out would RE-CREATE a record somebody had just removed, so
+    /// this is its own read-only native. Answers the empty payload when nothing is there.
+    static native byte[] nativeRead(String entry);
 
     /// Writes one record into the same store the create gate uses, replacing what was there.
     ///

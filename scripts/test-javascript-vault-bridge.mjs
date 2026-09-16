@@ -313,6 +313,20 @@ try {
   const gateAfterSet = await call({ op: 'secureStoreSetIfAbsent', entry: ENTRY, sealed: 'fourth' });
   check('and a later create adopts the value the set stored', asText(gateAfterSet), 'third');
 
+  // The read-only probe the mirror uses to tell whether what it is copying is still what the
+  // store holds. It must NOT create: a record removed between the create and the mirror would
+  // otherwise be resurrected by the very check meant to keep the two namespaces in step.
+  const readBack = await call({ op: 'secureStoreRead', entry: ENTRY });
+  check('the gate can be read without creating', status(readBack), 0);
+  check('and it answers what the store holds', asText(readBack), 'third');
+  const absentRead = await call({ op: 'secureStoreRead', entry: 'account.nothing' });
+  check('an absent record reads as empty', asText(absentRead), '');
+  check('and reading it did not create one',
+    asText(await call({ op: 'secureStoreSetIfAbsent', entry: 'account.nothing', sealed: 'new' })),
+    'new');
+  check('releasing that probe entry',
+    status(await call({ op: 'secureStoreForget', entry: 'account.nothing' })), 0);
+
   check('forgetting the entry succeeds',
     status(await call({ op: 'secureStoreForget', entry: ENTRY })), 0);
   const gateReopened = await call({ op: 'secureStoreSetIfAbsent', entry: ENTRY, sealed: 'fifth' });

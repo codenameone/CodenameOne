@@ -1338,6 +1338,17 @@ bindNative([
   }));
 });
 
+// Reads the settled record without creating one, so the mirror can tell whether what it is
+// about to copy is still what the store holds.
+bindNative([
+  "cn1_com_codename1_impl_html5_HTML5SecureStorage_nativeRead_java_lang_String_R_byte_1ARRAY"
+], function*(entry) {
+  return cn1VaultJavaBytes(yield* cn1VaultHost({
+    op: "secureStoreRead",
+    entry: jvm.toNativeString(entry)
+  }));
+});
+
 // An ordinary set(), settled in the same store the create gate uses. Without it a tab paused
 // inside setIfAbsent could create the gate after this write and mirror its own candidate over
 // the value set() had already stored.

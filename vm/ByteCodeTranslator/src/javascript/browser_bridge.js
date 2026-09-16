@@ -914,6 +914,25 @@
     });
   }
 
+  /// Reads one secure-storage record without creating it.
+  ///
+  /// The mirror into ordinary Storage needs to know whether the record it is about to copy is
+  /// still the one the store holds. Doing that by calling the create again would be wrong in the
+  /// one case that matters -- a record deleted in between would be RE-CREATED by the probe -- so
+  /// this is its own read-only op.
+  function cn1SecureStoreRead(entry) {
+    return cn1VaultOpenDb().then(function(db) {
+      var read = db.transaction(CN1_VAULT_STORE, 'readonly');
+      return cn1VaultRequest(read.objectStore(CN1_VAULT_STORE), function(store) {
+        return store.get(CN1_SECURE_STORE_PREFIX + String(entry));
+      }).then(function(found) {
+        // An absent record answers the empty string, which the Java side treats as "nothing to
+        // agree with" rather than as a value.
+        return found && typeof found.sealed === 'string' ? found.sealed : '';
+      });
+    });
+  }
+
   /// Writes one secure-storage record, replacing whatever was there.
   ///
   /// ``put`` and not ``add``, because this is set(): last write wins is what it means. What it
@@ -1249,6 +1268,13 @@
       if (op === 'secureStoreForget') {
         return cn1SecureStoreForget(request.entry).then(function() {
           return cn1VaultReply(CN1V_OK, null);
+        }, function(error) {
+          return cn1VaultReply(cn1VaultStatusOf(error), null);
+        });
+      }
+      if (op === 'secureStoreRead') {
+        return cn1SecureStoreRead(request.entry).then(function(sealed) {
+          return cn1VaultReply(CN1V_OK, cn1VaultUtf8Bytes(sealed));
         }, function(error) {
           return cn1VaultReply(cn1VaultStatusOf(error), null);
         });
