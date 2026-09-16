@@ -148,6 +148,36 @@ class DesktopNativeThemeSelectionTest {
     }
 
     @Test
+    void simulatorPseudoSkinKeepsCustomDistinctFromLegacyAtInstallation() throws Exception {
+        String previousMode = System.getProperty("codename1.arg.desktop.themeMode");
+        java.lang.reflect.Field nativeTheme = field("nativeTheme");
+        Object previousTheme = nativeTheme.get(null);
+        java.util.Map<String, Object> previousFonts = saveFontState();
+        try {
+            for (String[] host : new String[][]{{"win", "/WindowsFluentTheme.res"},
+                    {"mac", "/MacOSAquaTheme.res"}, {"linux", "/GnomeAdwaitaTheme.res"}}) {
+                for (String mode : new String[]{"auto", " custom ", "legacy", "invalid", "CUSTOM"}) {
+                    System.setProperty("codename1.arg.desktop.themeMode", mode);
+                    JavaSEPort.setSimulatorDesktopNativeTheme(host[0], false);
+                    String expected = "custom".equalsIgnoreCase(mode.trim()) ? null
+                            : ("auto".equals(mode) ? host[1] : "/iOS7Theme.res");
+                    assertEquals(expected, nativeTheme.get(null), host[0] + " / " + mode);
+                }
+                JavaSEPort.setSimulatorDesktopNativeTheme(host[0], true);
+                assertEquals("/winTheme.res", nativeTheme.get(null), "the explicit UWP skin preference still wins");
+            }
+        } finally {
+            nativeTheme.set(null, previousTheme);
+            restoreFontState(previousFonts);
+            if (previousMode == null) {
+                System.clearProperty("codename1.arg.desktop.themeMode");
+            } else {
+                System.setProperty("codename1.arg.desktop.themeMode", previousMode);
+            }
+        }
+    }
+
+    @Test
     void systemFontsAreOptInAndExplicitFacesRemainOverrides() throws Exception {
         java.util.Set<String> installed = new java.util.HashSet<String>();
         installed.add("segoe ui variable text");

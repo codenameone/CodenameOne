@@ -2999,13 +2999,24 @@ public class JavaSEPort extends CodenameOneImplementation {
             // Mobile nativeTheme hints must not opt existing desktop apps into a new theme.
             mode = buildHint("desktop.themeMode");
         }
+        return resolveDesktopNativeThemeResource(platformName, mode, "/NativeTheme.res");
+    }
+
+    static void setSimulatorDesktopNativeTheme(String platformName, boolean uwpDesktopSkin) {
+        setNativeTheme(uwpDesktopSkin ? "/winTheme.res"
+                : resolveDesktopNativeThemeResource(platformName, buildHint("desktop.themeMode"), "/iOS7Theme.res"));
+    }
+
+    private static String resolveDesktopNativeThemeResource(String platformName, String mode, String legacyResource) {
         mode = mode == null ? null : mode.trim();
+        // A null theme basename can mean either custom or legacy. Keep that distinction
+        // at both installation paths so the simulator does not reintroduce a framework base.
         // Custom means no framework base; legacy still uses the stub's historical resource.
         if ("custom".equalsIgnoreCase(mode)) {
             return null;
         }
         String resolved = resolveDesktopNativeTheme(platformName, mode);
-        return resolved == null ? "/NativeTheme.res" : "/" + resolved + ".res";
+        return resolved == null ? legacyResource : "/" + resolved + ".res";
     }
 
     public static void setNativeTheme(Resources resFile) {
@@ -11006,12 +11017,8 @@ public class JavaSEPort extends CodenameOneImplementation {
             // previews what the app will actually ship with. The uwpDesktopSkin preference
             // still forces the old stub for anyone relying on it, and a developer who has
             // opted into nothing still gets iOS 7, unchanged.
-            if (pref.getBoolean("uwpDesktopSkin", false)) {
-                setNativeTheme("/winTheme.res");
-            } else {
-                String desktopTheme = resolveDesktopNativeTheme(IS_MAC ? "mac" : (IS_LINUX ? "linux" : "win"));
-                setNativeTheme(desktopTheme != null ? "/" + desktopTheme + ".res" : "/iOS7Theme.res");
-            }
+            setSimulatorDesktopNativeTheme(IS_MAC ? "mac" : (IS_LINUX ? "linux" : "win"),
+                    pref.getBoolean("uwpDesktopSkin", false));
         }
         setInvokePointerHover(desktopSkin || invokePointerHover);
         
