@@ -243,6 +243,7 @@ public class JavaSEPort extends CodenameOneImplementation {
     public static boolean blockNativeBrowser;
     private static final boolean isWindows;
     private static String fontFaceSystem;
+    private static boolean fontFacesExplicitlyConfigured;
     private Boolean darkMode;
     private AutoLocalizationBundle autoLocalizationBundle;
     private boolean autoUpdateDefaultResourceBundle;
@@ -778,20 +779,9 @@ public class JavaSEPort extends CodenameOneImplementation {
             System.setProperty("apple.laf.useScreenMenuBar", "true");
         }
         
-        // The platform UI font, not Arial. A desktop native theme asks for
-        // "native:MainRegular" and gets whatever this names, so leaving it at Arial meant
-        // every desktop theme was measured in a face the platform does not use: Windows 11
-        // draws its controls in Segoe UI Variable, GNOME in Cantarell or Adwaita Sans, macOS
-        // in SF Pro. Text metrics are most of a fidelity score, so this is not cosmetic.
-        if (isWindows) {
-            fontFaceSystem = "Segoe UI Variable Text";
-        } else if (IS_MAC) {
-            fontFaceSystem = "SF Pro Text";
-        } else if (IS_LINUX) {
-            fontFaceSystem = "Cantarell";
-        } else {
-            fontFaceSystem = "Arial";
-        }
+        // New desktop fonts are opt-in with the native desktop theme. Keep legacy
+        // system-font metrics unchanged for applications that only upgrade the framework.
+        fontFaceSystem = isWindows ? "ArialUnicodeMS" : "Arial";
     }
 
     /**
@@ -1954,6 +1944,11 @@ public class JavaSEPort extends CodenameOneImplementation {
     }
 
     public static void setFontFaces(String system, String proportional, String monospace) {
+        setFontFaces(system, proportional, monospace, true);
+    }
+
+    private static void setFontFaces(String system, String proportional, String monospace, boolean explicit) {
+        fontFacesExplicitlyConfigured = explicit;
         fontFaceSystem = system;
         fontFaceProportional = proportional;
         fontFaceMonospace = monospace;
@@ -2963,6 +2958,28 @@ public class JavaSEPort extends CodenameOneImplementation {
             resFile = resolvePackagedDesktopNativeTheme(IS_MAC ? "mac" : (IS_LINUX ? "linux" : "win"), theme);
         }
         nativeTheme = resFile;
+        if (!fontFacesExplicitlyConfigured) {
+            fontFaceSystem = defaultSystemFontForTheme(IS_MAC ? "mac" : (IS_LINUX ? "linux" : "win"), resFile);
+            DEFAULT_FONT = fontFaceSystem + "-plain-" + medianFontSize;
+        }
+    }
+
+    private static boolean isDesktopNativeThemeResource(String resource) {
+        return "/WindowsFluentTheme.res".equals(resource) || "/MacOSAquaTheme.res".equals(resource)
+                || "/GnomeAdwaitaTheme.res".equals(resource);
+    }
+
+    static String defaultSystemFontForTheme(String platform, String resource) {
+        if (!isDesktopNativeThemeResource(resource)) {
+            return "win".equals(platform) ? "ArialUnicodeMS" : "Arial";
+        }
+        if ("win".equals(platform)) {
+            return "Segoe UI Variable Text";
+        }
+        if ("mac".equals(platform)) {
+            return "SF Pro Text";
+        }
+        return "linux".equals(platform) ? "Cantarell" : "Arial";
     }
 
     static String resolvePackagedDesktopNativeTheme(String platformName, Properties theme) {
@@ -5820,7 +5837,10 @@ public class JavaSEPort extends CodenameOneImplementation {
             isIOS = props.getProperty("systemFontFamily", "Arial").toLowerCase().contains("helvetica");
             setFontFaces(props.getProperty("systemFontFamily", "Arial"),
                     props.getProperty("proportionalFontFamily", "SansSerif"),
-                    props.getProperty("monospaceFontFamily", "Monospaced"));
+                    props.getProperty("monospaceFontFamily", "Monospaced"), false);
+            if (isDesktopNativeThemeResource("/" + overrideTheme + ".res")) {
+                fontFaceSystem = defaultSystemFontForTheme(platformName, "/" + overrideTheme + ".res");
+            }
             int med;
             int sm;
             int la;

@@ -66,6 +66,7 @@ class DesktopNativeThemeSelectionTest {
         java.lang.reflect.Field nativeTheme = JavaSEPort.class.getDeclaredField("nativeTheme");
         nativeTheme.setAccessible(true);
         Object previousTheme = nativeTheme.get(null);
+        java.util.Map<String, Object> previousFonts = saveFontState();
         try {
             System.setProperty("codename1.arg.desktop.themeMode", "fluent");
             JavaSEPort.setNativeTheme("/NativeTheme.res");
@@ -77,11 +78,65 @@ class DesktopNativeThemeSelectionTest {
             assertEquals("/ApplicationCustomTheme.res", nativeTheme.get(null));
         } finally {
             nativeTheme.set(null, previousTheme);
+            restoreFontState(previousFonts);
             if (previousMode == null) {
                 System.clearProperty("codename1.arg.desktop.themeMode");
             } else {
                 System.setProperty("codename1.arg.desktop.themeMode", previousMode);
             }
+        }
+    }
+
+    @Test
+    void systemFontsAreOptInAndExplicitFacesRemainOverrides() throws Exception {
+        for (String platform : new String[]{"win", "mac", "linux"}) {
+            String legacy = "win".equals(platform) ? "ArialUnicodeMS" : "Arial";
+            for (String resource : new String[]{null, "/NativeTheme.res", "/iOS7Theme.res", "/Custom.res"}) {
+                assertEquals(legacy, JavaSEPort.defaultSystemFontForTheme(platform, resource));
+            }
+            String modern = "win".equals(platform) ? "Segoe UI Variable Text"
+                    : ("mac".equals(platform) ? "SF Pro Text" : "Cantarell");
+            for (String resource : new String[]{"/WindowsFluentTheme.res", "/MacOSAquaTheme.res", "/GnomeAdwaitaTheme.res"}) {
+                assertEquals(modern, JavaSEPort.defaultSystemFontForTheme(platform, resource));
+            }
+        }
+        java.util.Map<String, Object> previous = saveFontState();
+        java.lang.reflect.Field nativeTheme = field("nativeTheme");
+        Object previousTheme = nativeTheme.get(null);
+        try {
+            field("fontFacesExplicitlyConfigured").set(null, false);
+            JavaSEPort.setNativeTheme("/MacOSAquaTheme.res");
+            String host = JavaSEPort.IS_MAC ? "mac" : (JavaSEPort.IS_LINUX ? "linux" : "win");
+            assertEquals(JavaSEPort.defaultSystemFontForTheme(host, "/MacOSAquaTheme.res"), field("fontFaceSystem").get(null));
+            JavaSEPort.setNativeTheme((String) null);
+            assertEquals(JavaSEPort.defaultSystemFontForTheme(host, null), field("fontFaceSystem").get(null));
+            JavaSEPort.setFontFaces("ExplicitFace", "ExplicitProportional", "ExplicitMonospace");
+            JavaSEPort.setNativeTheme("/MacOSAquaTheme.res");
+            assertEquals("ExplicitFace", field("fontFaceSystem").get(null));
+        } finally {
+            nativeTheme.set(null, previousTheme);
+            restoreFontState(previous);
+        }
+    }
+
+    private static java.lang.reflect.Field field(String name) throws Exception {
+        java.lang.reflect.Field out = JavaSEPort.class.getDeclaredField(name);
+        out.setAccessible(true);
+        return out;
+    }
+
+    private static java.util.Map<String, Object> saveFontState() throws Exception {
+        java.util.Map<String, Object> state = new java.util.HashMap<String, Object>();
+        for (String name : new String[]{"fontFaceSystem", "fontFaceProportional", "fontFaceMonospace",
+                "fontFacesExplicitlyConfigured", "DEFAULT_FONT", "autoAdjustFontSize"}) {
+            state.put(name, field(name).get(null));
+        }
+        return state;
+    }
+
+    private static void restoreFontState(java.util.Map<String, Object> state) throws Exception {
+        for (java.util.Map.Entry<String, Object> entry : state.entrySet()) {
+            field(entry.getKey()).set(null, entry.getValue());
         }
     }
 

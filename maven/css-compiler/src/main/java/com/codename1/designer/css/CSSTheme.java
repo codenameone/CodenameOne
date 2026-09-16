@@ -7922,7 +7922,17 @@ public class CSSTheme {
                         case LexicalUnit.SAC_POINT:
                         case LexicalUnit.SAC_INTEGER:
                         case LexicalUnit.SAC_REAL:
-                            apply(style, params[i++], value);
+                            LexicalUnit shadowValue = value;
+                            if (i < 2 && (value.getLexicalUnitType() == LexicalUnit.SAC_INTEGER
+                                    || value.getLexicalUnitType() == LexicalUnit.SAC_REAL)
+                                    && ((ScaledUnit) value).getNumericValue() == 0) {
+                                // CSS shorthand 0 means zero pixels. Only the explicit CN1
+                                // shadow-h/v properties use unitless values as position ratios.
+                                ScaledUnit unit = (ScaledUnit) value;
+                                shadowValue = new ScaledUnit(new PixelUnit(0), unit.dpi,
+                                        unit.screenWidth, unit.screenHeight);
+                            }
+                            apply(style, params[i++], shadowValue);
                             break;
                             
                         case LexicalUnit.SAC_RGBCOLOR:

@@ -76,6 +76,8 @@ public final class DesktopTileRunner {
         final File outDir = new File(args[2]);
         outDir.mkdirs();
 
+        // Select through the packaged-app entry point so font defaults follow the theme.
+        com.codename1.impl.javase.JavaSEPort.setNativeTheme("/" + themeRes + ".res");
         Display.init(new java.awt.Container());
         final int[] written = new int[1];
         final Throwable[] failure = new Throwable[1];

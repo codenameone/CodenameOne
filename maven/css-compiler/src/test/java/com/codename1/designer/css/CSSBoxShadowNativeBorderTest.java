@@ -131,6 +131,21 @@ public class CSSBoxShadowNativeBorderTest {
         }
     }
 
+    @Test
+    void testUnitlessZeroOffsetsMatchPixelZero() throws Exception {
+        RoundRectBorder unitless = (RoundRectBorder) compile("Card { background-color: #ffffff;"
+                + " box-shadow: 0 0 4px 1px rgba(0,0,0,0.2); }").get("Card.border");
+        RoundRectBorder pixels = (RoundRectBorder) compile("Card { background-color: #ffffff;"
+                + " box-shadow: 0px 0px 4px 1px rgba(0,0,0,0.2); }").get("Card.border");
+        assertTrue(unitless.getShadowX() == pixels.getShadowX(), "CSS zero x offsets must be equivalent");
+        assertTrue(unitless.getShadowY() == pixels.getShadowY(), "CSS zero y offsets must be equivalent");
+        RoundRectBorder ratios = (RoundRectBorder) compile("Card { background-color: #ffffff;"
+                + " box-shadow: 0px 0px 4px 1px rgba(0,0,0,0.2);"
+                + " cn1-box-shadow-h: 0; cn1-box-shadow-v: 0; }").get("Card.border");
+        assertTrue(ratios.getShadowX() == 0 && ratios.getShadowY() == 0,
+                "explicit CN1 properties retain their ratio semantics");
+    }
+
     /** Compiles the sheet and returns the resulting theme properties. */
     private static Hashtable compile(String css) throws Exception {
         Path cssFile = Files.createTempFile("cn1-box-shadow", ".css");
