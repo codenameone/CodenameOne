@@ -1281,6 +1281,19 @@ JAVA_VOID com_codename1_impl_windows_WindowsNative_parkMainThread___int(
 
 /* ---------------------------------------------------------------- dark mode */
 
+/* INSIDE extern "C", and that is not decoration. This file is C++ and wraps its whole
+ * body in an extern "C" block that closes above; a ParparVM native appended after it
+ * gets C++ name mangling, and the generated C calls the unmangled name. It compiles, and
+ * the LINKER fails:
+ *
+ *   lld-link: error: undefined symbol:
+ *     com_codename1_impl_windows_WindowsNative_systemUsesDarkTheme___R_boolean
+ *
+ * Note scripts/check-native-signatures.sh does NOT catch this. It verifies that the
+ * NAME matches the Java signature, which it did; linkage is a different property and the
+ * only thing that reports it is a real device build. */
+extern "C" {
+
 /* True when the user has chosen the dark app theme.
  *
  * AppsUseLightTheme under HKCU\...\Themes\Personalize is what the Settings app writes
@@ -1311,3 +1324,5 @@ JAVA_BOOLEAN com_codename1_impl_windows_WindowsNative_systemUsesDarkTheme___R_bo
     }
     return value == 0 ? JAVA_TRUE : JAVA_FALSE;
 }
+
+} /* extern "C" */
