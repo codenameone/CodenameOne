@@ -398,7 +398,19 @@ public final class AndroidSecureStorage extends SecureStorage {
         }
         java.io.File gate = gateFile(account);
         if (gate == null) {
-            return super.setIfAbsent(account, value);
+            // FAILS CLOSED, and does not fall back to the inherited check-then-write. That
+            // fallback is uncoordinated by construction, and this override exists because
+            // SharedPreferences gives each android:process its own cache: two first opens then
+            // both read "nothing here", both store, and each returns a DIFFERENT managed
+            // database or vault key -- the exact corruption the gate was written to prevent, and
+            // permanent, because whichever loses has data encrypted under a key nobody kept.
+            //
+            // Answering null instead means the caller retries rather than proceeding under a key
+            // it may not own. There is no gate here at all, so there is nothing to coordinate
+            // with and no safe way to create.
+            Log.p("SecureStorage: no cross-process gate for this account, so it will not be "
+                    + "created here", Log.WARNING);
+            return null;
         }
         java.io.RandomAccessFile handle = null;
         java.nio.channels.FileLock lock = null;
@@ -466,8 +478,12 @@ public final class AndroidSecureStorage extends SecureStorage {
             }
             return value;
         } catch (java.io.IOException cannotLock) {
+            // Same reasoning as the missing-gate branch above: the inherited path cannot see
+            // another process's write, so falling back to it here is how two processes each
+            // create a different key. A gate that cannot be locked is a gate, and refusing is
+            // the answer the caller can retry from.
             Log.e(cannotLock);
-            return super.setIfAbsent(account, value);
+            return null;
         } finally {
             if (lock != null) {
                 try {

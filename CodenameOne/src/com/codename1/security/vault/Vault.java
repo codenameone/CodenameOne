@@ -1003,7 +1003,7 @@ public final class Vault {
                         // Asked again after the write, like createRecoveryCode. Completing here
                         // would let a screen that was already stale when the user touched it
                         // change what the vault holds after lock() had returned.
-                        requireSecretRestored(entry, previous);
+                        requireSecretRestored(entry, previous, Bytes.toHex(sealed));
                         throw new VaultException(VaultError.LOCKED,
                                 "the vault was locked while this secret was being stored");
                     }
@@ -1115,7 +1115,8 @@ public final class Vault {
                     Object previous = readUncached(entry);
                     Storage.getInstance().deleteStorageFile(entry);
                     if (generation != lockGeneration) {
-                        requireSecretRestored(entry, previous);
+                        // null: this path DELETED the entry, so "still ours" means still absent.
+                        requireSecretRestored(entry, previous, null);
                         throw new VaultException(VaultError.LOCKED,
                                 "the vault was locked while this secret was being removed");
                     }
@@ -3234,7 +3235,28 @@ public final class Vault {
     /// over a secret that had in fact been overwritten, created or deleted. LOCKED is a promise
     /// that nothing changed; when it cannot be kept the answer is the storage failure, which is
     /// the one the caller can do something about.
-    private static void requireSecretRestored(String entry, Object previous) {
+    /// `ours` is what this operation left in the entry -- the ciphertext it wrote, or null when
+    /// it deleted. The restore happens ONLY while that is still what is stored.
+    ///
+    /// Restoring unconditionally was itself a lost update. Another tab completing putSecret for
+    /// the same name between this operation's write and its post-write lock check has committed
+    /// a NEWER value, and writing `previous` over it discards a call that reported success --
+    /// while this one reports LOCKED, whose whole meaning is that nothing changed. Finding
+    /// something other than `ours` means this operation is no longer the last writer, and the
+    /// state it was going to restore is not the state to restore to.
+    ///
+    /// The same reasoning covers the delete: if another tab created an entry after this one
+    /// removed it, putting `previous` back would bury that too.
+    private void requireSecretRestored(String entry, Object previous, String ours) {
+        Object current = readUncached(entry);
+        boolean stillOurs = ours == null
+                ? !(current instanceof String)
+                : (current instanceof String) && ours.equals(current);
+        if (!stillOurs) {
+            // Somebody else is the last writer. Leaving their value alone IS the rollback: this
+            // operation's own effect is already gone.
+            return;
+        }
         if (previous instanceof String) {
             if (!Storage.getInstance().writeObject(entry, previous)) {
                 throw new VaultException(VaultError.STORAGE_UNAVAILABLE,

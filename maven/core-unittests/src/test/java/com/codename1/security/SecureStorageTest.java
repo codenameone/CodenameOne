@@ -350,8 +350,10 @@ class SecureStorageTest extends UITestBase {
     /// The first point in a body where the candidate is written.
     ///
     /// Delegating to super is deliberately NOT one: the base implementation asks entryState
-    /// itself, so handing the decision to it is the safe path rather than a bypass of it. The
-    /// Android override does exactly that when it has no gate file, ahead of its own check.
+    /// itself, so handing the decision to it is the safe path rather than a bypass of it. No
+    /// override delegates that way today -- both now refuse outright when their cross-process
+    /// gate is unavailable, because the inherited check-then-write cannot see another process's
+    /// write -- but the exclusion stays, since delegating would remain correct.
     private static int firstCreateIn(String body) {
         int best = -1;
         for (String call : new String[]{"set(account, value)", "nativeSetIfAbsent("}) {
