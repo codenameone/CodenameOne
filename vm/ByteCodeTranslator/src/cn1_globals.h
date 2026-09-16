@@ -3093,6 +3093,39 @@ void codenameOneGcFree(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj);
 
 extern int currentGcMarkValue;
 extern void gcMarkObject(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj, JAVA_BOOLEAN force);
+
+// Native reference blocks -- ArrayList/HashMap backing stores held in C memory rather
+// than in a Java array. See the block comment beside the implementations in cn1_globals.m;
+// the short version is that the elements are live Java references, so the owner's
+// generated __GC_MARK_ must call cn1GcMarkRefBlock and its __FINALIZER_ must call
+// cn1RefBlockFree, and every mutation below already carries the SATB barrier that AASTORE
+// and System.arraycopy carry.
+extern JAVA_LONG cn1IntBlockAlloc(JAVA_INT capacity);
+extern void cn1IntBlockClear(JAVA_LONG block, JAVA_INT capacity);
+static inline JAVA_INT cn1IntBlockGet(JAVA_LONG block, JAVA_INT index) {
+    return ((JAVA_INT*)(uintptr_t)block)[index];
+}
+static inline void cn1IntBlockSet(JAVA_LONG block, JAVA_INT index, JAVA_INT value) {
+    ((JAVA_INT*)(uintptr_t)block)[index] = value;
+}
+extern JAVA_LONG cn1RefBlockAlloc(JAVA_INT capacity);
+extern void cn1RefBlockFree(JAVA_LONG block);
+extern void cn1RefBlockRetire(JAVA_LONG block);
+extern void cn1RefBlockDrainRetired(void);
+extern JAVA_LONG cn1RefBlockGrow(JAVA_LONG block, JAVA_INT oldCount, JAVA_INT newCap);
+extern void cn1RefBlockSet(CODENAME_ONE_THREAD_STATE, JAVA_LONG block, JAVA_INT index, JAVA_OBJECT value);
+extern void cn1RefBlockMove(CODENAME_ONE_THREAD_STATE, JAVA_LONG block, JAVA_INT from, JAVA_INT to, JAVA_INT count);
+extern void cn1RefBlockClear(CODENAME_ONE_THREAD_STATE, JAVA_LONG block, JAVA_INT from, JAVA_INT count);
+extern void cn1GcMarkRefBlock(CODENAME_ONE_THREAD_STATE, JAVA_LONG block, JAVA_BOOLEAN force);
+extern JAVA_INT cn1RefBlockCount(JAVA_LONG block);
+// READ is inline and unchecked on purpose: it is the operation the for-each lowering
+// emits per element, and a C block has no header and no ->data indirection to chase, so
+// this is strictly cheaper than the array access it replaces.
+static inline JAVA_OBJECT cn1RefBlockGet(JAVA_LONG block, JAVA_INT index) {
+    return ((JAVA_OBJECT*)(uintptr_t)block)[index];
+}
+
+
 // Drop every soft referent at the next collection, whatever the retention policy would
 // otherwise have decided. Called when an allocation has actually failed: SoftReference's
 // one hard guarantee is that all of them are cleared before the VM gives up, and the

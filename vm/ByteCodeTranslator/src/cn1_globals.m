@@ -2111,6 +2111,235 @@ JAVA_BOOLEAN cn1SatbBulkBegin(void) {
 #endif
 }
 
+// ===================== NATIVE REFERENCE BLOCKS =====================
+// A block of JAVA_OBJECT references held in C memory instead of in a Java array.
+//
+// WHY. The live-set census says 88.4% of every java.lang.Object[] in this program is a
+// java.util.ArrayList or java.util.HashMap backing store (510,041 of 577,239), and 94.1%
+// of every int[] is HashMap's cn1Meta. That is ~130MB of a 488MB live set held in arrays
+// no Java code ever sees: we are committed to the ArrayList and Map APIs, not to the
+// data structure behind them. Each of those arrays costs a 32-byte Java header, a BiBOP
+// size-class rounding, a slot the sweep has to visit, and -- on every growth -- a fresh
+// allocation plus an arraycopy that abandons the old one as garbage. A C block costs a
+// malloc header, is resized in place by realloc, and is freed the moment its owner is.
+//
+// THE BLOCK IS NOT OUTSIDE THE COLLECTOR, ONLY OUTSIDE THE HEAP. Its elements are live
+// Java references, so three things must hold and all three are provided here rather than
+// left to callers:
+//
+//   - The owner's generated __GC_MARK_ traces it (cn1GcMarkRefBlock). Nothing else can:
+//     the conservative scanner walks native STACKS, not arbitrary malloc blocks, so a
+//     block that no mark function visits is a set of references the collector cannot see.
+//   - Every store fires the SATB deletion barrier, exactly as AASTORE does. A reference
+//     overwritten during a concurrent mark is otherwise lost to the snapshot.
+//   - Every bulk move or clear goes through the bulk barrier with its handshake, for the
+//     same reason System.arraycopy on an object array does.
+//
+// The owner frees the block from its generated __FINALIZER_. That is why an owner class
+// must also call cn1BibopNoteNativePeer: without it a page whose slots are all dead takes
+// the O(1) reclaim path, which never runs a finalizer, and the blocks leak.
+// THE BLOCK CARRIES ITS OWN LENGTH, one slot below the pointer handed out.
+//
+// The obvious layout -- a bare array plus a `cn1Cap` field on the owner -- has a race the
+// collector loses. Growth must publish a new block and a new capacity, and a concurrent
+// marker reading those two fields separately can pair the NEW block with the OLD capacity
+// (under-traces, so live entries past the old end are swept) or the OLD block with the NEW
+// capacity (reads past its end). There is no store order that fixes it, because the marker
+// can read between any two stores. Keeping the count inside the block makes the pair
+// atomic by construction: whichever pointer the marker loads, the count it reads belongs
+// to that block.
+JAVA_LONG cn1RefBlockAlloc(JAVA_INT capacity) {
+    if(capacity <= 0) {
+        return 0;
+    }
+    // calloc: the elements must read as JAVA_NULL before anything stores into them, and
+    // a lazily-zeroed page from the kernel is cheaper than an eager memset for the large
+    // blocks a big map or list reaches. One extra slot holds the count.
+    void* p = calloc((size_t)capacity + 1, sizeof(JAVA_OBJECT));
+    if(p == 0) {
+        return 0;
+    }
+    *(intptr_t*)p = (intptr_t)capacity;
+    return (JAVA_LONG)(uintptr_t)((JAVA_OBJECT*)p + 1);
+}
+
+/** Capacity of a block, or 0 for the null block. */
+JAVA_INT cn1RefBlockCount(JAVA_LONG block) {
+    if(block == 0) {
+        return 0;
+    }
+    return (JAVA_INT)*((intptr_t*)(uintptr_t)block - 1);
+}
+
+void cn1RefBlockFree(JAVA_LONG block) {
+    if(block != 0) {
+        free((JAVA_OBJECT*)(uintptr_t)block - 1);
+    }
+}
+
+// GROWTH DOES NOT realloc, AND THAT IS THE WHOLE DESIGN PROBLEM OF THIS SCHEME.
+//
+// realloc may MOVE the block and free the old address. A concurrent marker that has
+// already loaded the old pointer is then walking freed memory -- a use-after-free the
+// Java-array version cannot have, because ArrayList allocates a NEW array and the old one
+// stays a valid heap object until the collector proves it dead. Trading the array away
+// gives up exactly that guarantee, so it has to be bought back.
+//
+// It is bought with a RETIRE LIST. Growth publishes a new block and hands the old one to
+// cn1RefBlockRetire; the blocks on that list are freed by the sweep, which runs after the
+// mark has finished, so any marker that could still hold the old pointer has completed by
+// then. This is the same reasoning as the collector's one-cycle grace, applied to C
+// memory instead of to slots.
+static JAVA_LONG* cn1RetiredBlocks = 0;
+static int cn1RetiredCount = 0, cn1RetiredCap = 0;
+static pthread_mutex_t cn1RetiredMutex = PTHREAD_MUTEX_INITIALIZER;
+
+void cn1RefBlockRetire(JAVA_LONG block) {
+    if(block == 0) {
+        return;
+    }
+    // RETIRE ONLY WHILE A CYCLE IS RUNNING. The hazard is a marker that loaded this
+    // pointer before the caller swapped the field; no cycle running means no marker
+    // exists, and the field no longer holds the pointer, so a cycle starting after this
+    // check can never obtain it. Freeing straight away in that case matters: the retire
+    // list holds every block a growing map replaces until the next sweep, and a map that
+    // grows 16 -> 32 -> ... -> N retires the whole geometric series. Deferring all of it
+    // cost the entire memory win this storage change is for -- measured at parity with
+    // Java arrays instead of -15%.
+    extern JAVA_BOOLEAN gcCurrentlyRunning;
+    if(!gcCurrentlyRunning) {
+        free((JAVA_OBJECT*)(uintptr_t)block - 1);
+        return;
+    }
+    pthread_mutex_lock(&cn1RetiredMutex);
+    if(cn1RetiredCount == cn1RetiredCap) {
+        int cap = cn1RetiredCap == 0 ? 64 : cn1RetiredCap * 2;
+        JAVA_LONG* g = (JAVA_LONG*)realloc(cn1RetiredBlocks, (size_t)cap * sizeof(JAVA_LONG));
+        if(g == 0) {
+            // Cannot grow the list: leak this block rather than free it while a marker
+            // may still be walking it. A leak is recoverable; a use-after-free is not.
+            pthread_mutex_unlock(&cn1RetiredMutex);
+            return;
+        }
+        cn1RetiredBlocks = g;
+        cn1RetiredCap = cap;
+    }
+    cn1RetiredBlocks[cn1RetiredCount++] = block;
+    pthread_mutex_unlock(&cn1RetiredMutex);
+}
+
+// Drained by the sweep, i.e. after the mark that could have been reading these has ended.
+void cn1RefBlockDrainRetired(void) {
+    pthread_mutex_lock(&cn1RetiredMutex);
+    for(int i = 0 ; i < cn1RetiredCount ; i++) {
+        free((JAVA_OBJECT*)(uintptr_t)cn1RetiredBlocks[i] - 1);
+    }
+    cn1RetiredCount = 0;
+    pthread_mutex_unlock(&cn1RetiredMutex);
+}
+
+// Allocates a larger block, copies, and retires the old one. Returns the old block on
+// failure so the caller keeps a usable structure.
+JAVA_LONG cn1RefBlockGrow(JAVA_LONG block, JAVA_INT oldCount, JAVA_INT newCap) {
+    JAVA_LONG fresh = cn1RefBlockAlloc(newCap);
+    if(fresh == 0) {
+        return block;
+    }
+    if(block != 0 && oldCount > 0) {
+        memcpy((void*)(uintptr_t)fresh, (void*)(uintptr_t)block,
+               (size_t)oldCount * sizeof(JAVA_OBJECT));
+    }
+    cn1RefBlockRetire(block);
+    return fresh;
+}
+
+// PRIMITIVE BLOCKS. The same storage idea with none of the collector interaction: these
+// hold ints, not references, so nothing traces them and no barrier applies. HashMap's
+// cn1Meta is 174,903 of the 185,860 live int[] on the self-hosting corpus (94.1%) and
+// exists only to hold two sentinels and a hash marker per slot -- no Java code ever sees
+// the array, so it does not need to be one.
+JAVA_LONG cn1IntBlockAlloc(JAVA_INT capacity) {
+    if(capacity <= 0) {
+        return 0;
+    }
+    // Same one-slot length header as the reference blocks, so cn1RefBlockFree releases
+    // either kind and the two cannot be confused at the free site.
+    void* p = calloc((size_t)capacity + 2, sizeof(JAVA_INT));
+    if(p == 0) {
+        return 0;
+    }
+    *(intptr_t*)p = (intptr_t)capacity;
+    return (JAVA_LONG)(uintptr_t)((char*)p + sizeof(intptr_t));
+}
+
+void cn1IntBlockClear(JAVA_LONG block, JAVA_INT capacity) {
+    if(block != 0 && capacity > 0) {
+        memset((void*)(uintptr_t)block, 0, (size_t)capacity * sizeof(JAVA_INT));
+    }
+}
+
+// STORE. The SATB deletion barrier is not optional here: a reference overwritten while a
+// mark is running is otherwise absent from the snapshot and gets swept under a live
+// pointer. This is the same pair AASTORE emits, applied to a raw slot.
+void cn1RefBlockSet(CODENAME_ONE_THREAD_STATE, JAVA_LONG block, JAVA_INT index, JAVA_OBJECT value) {
+    JAVA_OBJECT* slot = &((JAVA_OBJECT*)(uintptr_t)block)[index];
+    CN1_SATB_DELETE(slot);
+    CN1_WRITE_BARRIER(slot, value);
+    *slot = value;
+}
+
+// BULK MOVE, for the insert/remove shifts ArrayList does with System.arraycopy. The whole
+// source range is logged ONCE under the bulk handshake rather than per element: the
+// per-element barrier takes the SATB mutex per accepted reference, which turns one memmove
+// into an acquisition per element (measured 210x on the grace-pass audit). Overlapping
+// ranges are why this is memmove and not memcpy.
+void cn1RefBlockMove(CODENAME_ONE_THREAD_STATE, JAVA_LONG block, JAVA_INT from, JAVA_INT to, JAVA_INT count) {
+    if(count <= 0 || block == 0) {
+        return;
+    }
+    JAVA_OBJECT* base = (JAVA_OBJECT*)(uintptr_t)block;
+    if(cn1SatbBulkBegin()) {
+        // The DESTINATION range is what is being overwritten, so that is what the
+        // deletion barrier owes the snapshot.
+        cn1SatbEnqueueRangeLocked((JAVA_ARRAY_OBJECT*)(base + to), count);
+        cn1SatbEnqueueRangeLocked((JAVA_ARRAY_OBJECT*)(base + from), count);
+        cn1SatbBulkEnd();
+    }
+    memmove(base + to, base + from, (size_t)count * sizeof(JAVA_OBJECT));
+}
+
+// CLEAR, for Arrays.fill(array, a, b, null) -- the range a removal blanks so the dropped
+// elements stop being reachable.
+void cn1RefBlockClear(CODENAME_ONE_THREAD_STATE, JAVA_LONG block, JAVA_INT from, JAVA_INT count) {
+    if(count <= 0 || block == 0) {
+        return;
+    }
+    JAVA_OBJECT* base = (JAVA_OBJECT*)(uintptr_t)block;
+    if(cn1SatbBulkBegin()) {
+        cn1SatbEnqueueRangeLocked((JAVA_ARRAY_OBJECT*)(base + from), count);
+        cn1SatbBulkEnd();
+    }
+    memset(base + from, 0, (size_t)count * sizeof(JAVA_OBJECT));
+}
+
+// Trace `count` elements. Called from the owner's generated __GC_MARK_.
+void cn1GcMarkRefBlock(CODENAME_ONE_THREAD_STATE, JAVA_LONG block, JAVA_BOOLEAN force) {
+    if(block == 0) {
+        return;
+    }
+    JAVA_INT count = cn1RefBlockCount(block);
+    if(count <= 0) {
+        return;
+    }
+    JAVA_OBJECT* refs = (JAVA_OBJECT*)(uintptr_t)block;
+    for(JAVA_INT i = 0 ; i < count ; i++) {
+        JAVA_OBJECT o = refs[i];
+        if(o != JAVA_NULL) {
+            gcMarkObject(threadStateData, o, force);
+        }
+    }
+}
+
 void cn1SatbBulkEnd(void) {
 #ifndef CN1_SATB_NO_BULK_HANDSHAKE
     atomic_fetch_sub_explicit(&cn1SatbBulkInFlight, 1, memory_order_seq_cst);
@@ -8834,6 +9063,12 @@ static void cn1BibopSweep(CODENAME_ONE_THREAD_STATE) {
     }
     cn1BibopAdaptAfterSweep(occupiedBytes, liveBytes, reclaimedBytes,
                             classSlots, classLive);
+    // Free the native reference blocks retired by growth since the last sweep. HERE and
+    // not at retire time: a marker that loaded the old block pointer before the swap may
+    // still have been walking it, and the mark that could have done so has ended by the
+    // time the sweep runs. Same reasoning as the collector's one-cycle grace, applied to
+    // C memory. See cn1RefBlockRetire.
+    cn1RefBlockDrainRetired();
     // Hand surplus empty pages back to the OS (issue 5537). Last, so it sees the
     // pool this sweep just refilled, and outside the per-page loop so the madvise
     // work is batched rather than interleaved with the walk.

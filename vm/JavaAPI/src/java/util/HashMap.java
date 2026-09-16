@@ -46,10 +46,58 @@ public class HashMap<K, V> extends AbstractMap<K, V> implements Map<K, V> {
     /** slot metadata: tombstone (previously occupied). */
     static final int META_TOMB = 1;
 
-    /** parallel storage; length is always a power of two. */
-    transient Object[] cn1Keys;
-    transient Object[] cn1Vals;
-    transient int[] cn1Meta;
+    /**
+     * PARALLEL STORAGE, HELD IN C BLOCKS RATHER THAN JAVA ARRAYS. Capacity is always a
+     * power of two and lives in {@link #cn1Cap}; there is no array to ask for a length.
+     *
+     * No Java code outside this class ever sees these, so they do not need to be arrays,
+     * and being arrays is expensive: on the self-hosting corpus HashMap's three arrays are
+     * 349,806 of the 577,239 live Object[] and 174,903 of the 185,860 live int[], each
+     * paying a 32-byte array header, a BiBOP size-class rounding and a slot for the sweep
+     * to walk. A block pays a malloc header and is freed the moment the map dies.
+     *
+     * THE COLLECTOR STILL TRACES THE REFERENCE BLOCKS. ByteCodeClass.NATIVE_REF_BLOCKS
+     * makes the generated __GC_MARK_ walk them and the generated __FINALIZER_ free them;
+     * the finalize() below is what puts this class on the per-slot reclaim path, without
+     * which a page taking the O(1) all-dead reclaim would never free a block.
+     */
+    transient long cn1KeysBlock;
+    transient long cn1ValsBlock;
+    transient long cn1MetaBlock;
+
+    /** capacity of all three blocks, always a power of two. */
+    transient int cn1Cap;
+
+    // Block primitives. Static and typeless on purpose: the same C helpers back
+    // Hashtable and ArrayList when they convert, and a native call that LTO inlines is
+    // cheaper than the array access it replaces -- no header, no ->data indirection.
+    static native long cn1BlkRefNew(int n);
+    static native long cn1BlkIntNew(int n);
+    static native void cn1BlkFree(long b);
+    /** replace-while-live: the sweep frees it, after any marker walking it has finished. */
+    static native void cn1BlkRetire(long b);
+    static native Object cn1BlkRefGet(long b, int i);
+    static native void cn1BlkRefSet(long b, int i, Object v);
+    static native int cn1BlkIntGet(long b, int i);
+    static native void cn1BlkIntSet(long b, int i, int v);
+    /** scan loop in C: one crossing per call instead of one per slot. */
+    static native int cn1BlkNextOccupied(long metaBlock, int from, int cap);
+    /** the clear fast path -- two memsets and a barriered blank of the reference blocks. */
+    static native void cn1BlkClearAll(long keys, long vals, long meta, int cap);
+
+    /**
+     * Frees the three blocks. Declaring it is also what keeps this class off the O(1)
+     * all-dead page reclaim (the sweep's needsReclaim test reads finalizerFunction), which
+     * is the path on which the generated finalizer -- and therefore the free -- runs.
+     */
+    protected void finalize() {
+        cn1BlkFree(cn1KeysBlock);
+        cn1BlkFree(cn1ValsBlock);
+        cn1BlkFree(cn1MetaBlock);
+        cn1KeysBlock = 0;
+        cn1ValsBlock = 0;
+        cn1MetaBlock = 0;
+    }
 
     /** live mappings. */
     transient int elementCount;
@@ -137,9 +185,13 @@ public class HashMap<K, V> extends AbstractMap<K, V> implements Map<K, V> {
     }
 
     final void cn1Alloc(int capacity) {
-        cn1Keys = new Object[capacity];
-        cn1Vals = new Object[capacity];
-        cn1Meta = new int[capacity];
+        cn1BlkFree(cn1KeysBlock);
+        cn1BlkFree(cn1ValsBlock);
+        cn1BlkFree(cn1MetaBlock);
+        cn1KeysBlock = cn1BlkRefNew(capacity);
+        cn1ValsBlock = cn1BlkRefNew(capacity);
+        cn1MetaBlock = cn1BlkIntNew(capacity);
+        cn1Cap = capacity;
         elementCount = 0;
         cn1Occupied = 0;
         threshold = (int) (capacity * loadFactor);
@@ -211,19 +263,19 @@ public class HashMap<K, V> extends AbstractMap<K, V> implements Map<K, V> {
      */
     final int cn1FindSlotImpl(Object key) {
         int marker = cn1Marker(key);
-        int[] meta = cn1Meta;
-        int mask = meta.length - 1;
+        long meta = cn1MetaBlock;
+        int mask = cn1Cap - 1;
         int i = marker & mask;
         int perturb = marker;
         int firstTomb = -1;
         while (true) {
-            int m = meta[i];
+            int m = cn1BlkIntGet(meta, i);
             if (m == META_EMPTY) {
                 int ins = firstTomb >= 0 ? firstTomb : i;
                 return -(ins + 1);
             }
             if (m == marker) {
-                Object k = cn1Keys[i];
+                Object k = cn1BlkRefGet(cn1KeysBlock, i);
                 if (key == null ? k == null : (key == k || areEqualKeys(key, k))) {
                     return i;
                 }
@@ -244,17 +296,17 @@ public class HashMap<K, V> extends AbstractMap<K, V> implements Map<K, V> {
         int idx = cn1FindSlotImpl(key);
         if (idx >= 0) {
             @SuppressWarnings("unchecked")
-            V old = (V) cn1Vals[idx];
-            cn1Vals[idx] = value;
+            V old = (V) cn1BlkRefGet(cn1ValsBlock, idx);
+            cn1BlkRefSet(cn1ValsBlock, idx, value);
             cn1LastPut = idx;
             cn1LastInserted = false;
             return old;
         }
         int ins = -idx - 1;
-        boolean wasEmpty = cn1Meta[ins] == META_EMPTY;
-        cn1Meta[ins] = cn1Marker(key);
-        cn1Keys[ins] = key;
-        cn1Vals[ins] = value;
+        boolean wasEmpty = cn1BlkIntGet(cn1MetaBlock, ins) == META_EMPTY;
+        cn1BlkIntSet(cn1MetaBlock, ins, cn1Marker(key));
+        cn1BlkRefSet(cn1KeysBlock, ins, key);
+        cn1BlkRefSet(cn1ValsBlock, ins, value);
         elementCount++;
         if (wasEmpty) {
             cn1Occupied++;
@@ -281,7 +333,7 @@ public class HashMap<K, V> extends AbstractMap<K, V> implements Map<K, V> {
      * LinkedHashMap overrides this to preserve its ordering links.
      */
     void cn1Grow() {
-        int cap = cn1Meta.length;
+        int cap = cn1Cap;
         // Grow when the LIVE count has reached the threshold; rebuild at the
         // same size only when the threshold was reached because of TOMBSTONES.
         //
@@ -295,34 +347,67 @@ public class HashMap<K, V> extends AbstractMap<K, V> implements Map<K, V> {
         // any positive load factor, so this was reachable from ordinary code.
         // At 0.75 and 0.5 the two rules agree exactly, rebuild for rebuild.
         int newCap = (elementCount >= threshold) ? cap << 1 : cap;
-        Object[] oldK = cn1Keys;
-        Object[] oldV = cn1Vals;
-        int[] oldM = cn1Meta;
-        cn1Alloc(newCap);
+        // REHASH OUT OF THE CURRENT BLOCKS, THEN SWAP -- not the other way round.
+        //
+        // The array version could allocate first and rehash from locals, because the old
+        // arrays were heap objects the collector still traced. A block is traced only
+        // while a FIELD of this map points at it, so allocating into the fields first
+        // would leave the old block holding the only reference to every key and value
+        // while it is no longer traced -- collectible mid-rehash. Reading from the fields
+        // and writing into locals keeps the source traced for the whole loop, and every
+        // reference written into the new blocks is also still in the old ones, so nothing
+        // is unreachable at any point.
+        long newKeys = cn1BlkRefNew(newCap);
+        long newVals = cn1BlkRefNew(newCap);
+        long newMeta = cn1BlkIntNew(newCap);
+        int newMask = newCap - 1;
         int count = 0;
-        for (int i = 0; i < oldM.length; i++) {
-            if (oldM[i] < 0) {
-                cn1Insert(oldK[i], oldV[i], oldM[i]);
+        for (int i = 0; i < cap; i++) {
+            int m = cn1BlkIntGet(cn1MetaBlock, i);
+            if (m < 0) {
+                int j = m & newMask;
+                int perturb = m;
+                while (cn1BlkIntGet(newMeta, j) != META_EMPTY) {
+                    perturb >>>= 5;
+                    j = cn1NextSlot(j, perturb, newMask);
+                }
+                cn1BlkIntSet(newMeta, j, m);
+                cn1BlkRefSet(newKeys, j, cn1BlkRefGet(cn1KeysBlock, i));
+                cn1BlkRefSet(newVals, j, cn1BlkRefGet(cn1ValsBlock, i));
                 count++;
             }
         }
+        long oldK = cn1KeysBlock, oldV = cn1ValsBlock, oldM = cn1MetaBlock;
+        cn1KeysBlock = newKeys;
+        cn1ValsBlock = newVals;
+        cn1MetaBlock = newMeta;
+        cn1Cap = newCap;
+        threshold = (int) (newCap * loadFactor);
+        if (threshold >= newCap) {
+            threshold = newCap - 1;
+        }
+        // RETIRE, not free: a marker that loaded these pointers before the swap above
+        // may still be walking them. The sweep releases them once the mark has ended.
+        cn1BlkRetire(oldK);
+        cn1BlkRetire(oldV);
+        cn1BlkRetire(oldM);
         elementCount = count;
         cn1Occupied = count;
     }
 
     /** raw insert into a table known not to contain the key (rebuild path). */
     final int cn1Insert(Object key, Object value, int marker) {
-        int[] meta = cn1Meta;
-        int mask = meta.length - 1;
+        long meta = cn1MetaBlock;
+        int mask = cn1Cap - 1;
         int i = marker & mask;
         int perturb = marker;
-        while (meta[i] != META_EMPTY) {
+        while (cn1BlkIntGet(meta, i) != META_EMPTY) {
             perturb >>>= 5;
             i = cn1NextSlot(i, perturb, mask);
         }
-        meta[i] = marker;
-        cn1Keys[i] = key;
-        cn1Vals[i] = value;
+        cn1BlkIntSet(meta, i, marker);
+        cn1BlkRefSet(cn1KeysBlock, i, key);
+        cn1BlkRefSet(cn1ValsBlock, i, value);
         return i;
     }
 
@@ -331,9 +416,9 @@ public class HashMap<K, V> extends AbstractMap<K, V> implements Map<K, V> {
      * first; ALWAYS the single mutation point for removals (iterators too).
      */
     void cn1RemoveAtIndex(int idx) {
-        cn1Meta[idx] = META_TOMB;
-        cn1Keys[idx] = null;
-        cn1Vals[idx] = null;
+        cn1BlkIntSet(cn1MetaBlock, idx, META_TOMB);
+        cn1BlkRefSet(cn1KeysBlock, idx, null);
+        cn1BlkRefSet(cn1ValsBlock, idx, null);
         elementCount--;
         modCount++;
     }
@@ -349,13 +434,7 @@ public class HashMap<K, V> extends AbstractMap<K, V> implements Map<K, V> {
     }
 
     final int cn1NextOccupied(int from) {
-        int[] meta = cn1Meta;
-        for (int i = from; i < meta.length; i++) {
-            if (meta[i] < 0) {
-                return i;
-            }
-        }
-        return -1;
+        return cn1BlkNextOccupied(cn1MetaBlock, from, cn1Cap);
     }
 
     /**
@@ -371,14 +450,7 @@ public class HashMap<K, V> extends AbstractMap<K, V> implements Map<K, V> {
 
     void clearImpl() {
         if (elementCount > 0 || cn1Occupied > 0) {
-            Object[] k = cn1Keys;
-            Object[] v = cn1Vals;
-            int[] m = cn1Meta;
-            for (int i = 0; i < m.length; i++) {
-                m[i] = META_EMPTY;
-                k[i] = null;
-                v[i] = null;
-            }
+            cn1BlkClearAll(cn1KeysBlock, cn1ValsBlock, cn1MetaBlock, cn1Cap);
             elementCount = 0;
             cn1Occupied = 0;
             modCount++;
@@ -408,17 +480,20 @@ public class HashMap<K, V> extends AbstractMap<K, V> implements Map<K, V> {
      */
     @Override
     public boolean containsValue(Object value) {
-        int[] meta = cn1Meta;
-        Object[] vals = cn1Vals;
+        long meta = cn1MetaBlock;
+        long vals = cn1ValsBlock;
         if (value != null) {
-            for (int i = 0; i < meta.length; i++) {
-                if (meta[i] < 0 && (value == vals[i] || areEqualKeys(value, vals[i]))) {
-                    return true;
+            for (int i = 0; i < cn1Cap; i++) {
+                if (cn1BlkIntGet(meta, i) < 0) {
+                    Object v = cn1BlkRefGet(vals, i);
+                    if (value == v || areEqualKeys(value, v)) {
+                        return true;
+                    }
                 }
             }
         } else {
-            for (int i = 0; i < meta.length; i++) {
-                if (meta[i] < 0 && vals[i] == null) {
+            for (int i = 0; i < cn1Cap; i++) {
+                if (cn1BlkIntGet(meta, i) < 0 && cn1BlkRefGet(vals, i) == null) {
                     return true;
                 }
             }
@@ -454,7 +529,7 @@ public class HashMap<K, V> extends AbstractMap<K, V> implements Map<K, V> {
             return null;
         }
         @SuppressWarnings("unchecked")
-        V v = (V) cn1Vals[idx];
+        V v = (V) cn1BlkRefGet(cn1ValsBlock, idx);
         return v;
     }
 
@@ -568,7 +643,7 @@ public class HashMap<K, V> extends AbstractMap<K, V> implements Map<K, V> {
             return null;
         }
         @SuppressWarnings("unchecked")
-        V old = (V) cn1Vals[idx];
+        V old = (V) cn1BlkRefGet(cn1ValsBlock, idx);
         cn1RemoveAtIndex(idx);
         return old;
     }
@@ -703,7 +778,7 @@ public class HashMap<K, V> extends AbstractMap<K, V> implements Map<K, V> {
         @SuppressWarnings("unchecked")
         public K next() {
             makeNext();
-            return (K) associatedMap.cn1Keys[currentIndex];
+            return (K) cn1BlkRefGet(associatedMap.cn1KeysBlock, currentIndex);
         }
     }
 
@@ -715,7 +790,7 @@ public class HashMap<K, V> extends AbstractMap<K, V> implements Map<K, V> {
         @SuppressWarnings("unchecked")
         public V next() {
             makeNext();
-            return (V) associatedMap.cn1Vals[currentIndex];
+            return (V) cn1BlkRefGet(associatedMap.cn1ValsBlock, currentIndex);
         }
     }
 
@@ -736,17 +811,17 @@ public class HashMap<K, V> extends AbstractMap<K, V> implements Map<K, V> {
 
         @SuppressWarnings("unchecked")
         public K getKey() {
-            return (K) map.cn1Keys[index];
+            return (K) cn1BlkRefGet(map.cn1KeysBlock, index);
         }
 
         @SuppressWarnings("unchecked")
         public V getValue() {
-            return (V) map.cn1Vals[index];
+            return (V) cn1BlkRefGet(map.cn1ValsBlock, index);
         }
 
         public V setValue(V object) {
             V result = getValue();
-            map.cn1Vals[index] = object;
+            cn1BlkRefSet(map.cn1ValsBlock, index, object);
             return result;
         }
 
@@ -804,7 +879,7 @@ public class HashMap<K, V> extends AbstractMap<K, V> implements Map<K, V> {
             if (object instanceof Map.Entry) {
                 Map.Entry<?, ?> oEntry = (Map.Entry<?, ?>) object;
                 int idx = associatedMap.cn1FindSlotImpl(oEntry.getKey());
-                if (idx >= 0 && valuesEq(associatedMap.cn1Vals[idx], oEntry)) {
+                if (idx >= 0 && valuesEq(cn1BlkRefGet(associatedMap.cn1ValsBlock, idx), oEntry)) {
                     associatedMap.cn1RemoveAtIndex(idx);
                     return true;
                 }
@@ -817,7 +892,7 @@ public class HashMap<K, V> extends AbstractMap<K, V> implements Map<K, V> {
             if (object instanceof Map.Entry) {
                 Map.Entry<?, ?> oEntry = (Map.Entry<?, ?>) object;
                 int idx = associatedMap.cn1FindSlotImpl(oEntry.getKey());
-                return idx >= 0 && valuesEq(associatedMap.cn1Vals[idx], oEntry);
+                return idx >= 0 && valuesEq(cn1BlkRefGet(associatedMap.cn1ValsBlock, idx), oEntry);
             }
             return false;
         }

@@ -68,6 +68,46 @@ public class ByteCodeClass {
      * frees a referent a mutator is holding, and adding the barrier without
      * suppressing the mark produces a weak reference that is still strong.
      */
+    /**
+     * NATIVE BACKING BLOCKS: library containers whose storage is a C block rather than a
+     * Java array, listed as {mangled class, block field, count field}.
+     *
+     * The live-set census says 88.4% of every Object[] in a real program is one of these
+     * containers' backing store and 94.1% of every int[] is HashMap's slot metadata --
+     * ~130MB of a 488MB live set in arrays no Java code ever sees. We are committed to
+     * the Map and List APIs, not to Object[] behind them, and a C block costs no 32-byte
+     * array header, no BiBOP size-class rounding and no slot for the sweep to visit.
+     *
+     * A block is OUTSIDE THE HEAP BUT NOT OUTSIDE THE COLLECTOR. Its elements are live
+     * references, and the conservative scanner walks native STACKS rather than arbitrary
+     * malloc blocks, so nothing would see them unless the owner's mark function does --
+     * which is what this table drives. It is deliberately a hard-coded list of known
+     * library classes, exactly like isReferenceReferent above: this is a VM-internal
+     * representation choice for containers whose internals are ours, not a facility
+     * application code can opt into.
+     */
+    private static final String[][] NATIVE_REF_BLOCKS = {
+        { "java_util_HashMap", "cn1KeysBlock" },
+        { "java_util_HashMap", "cn1ValsBlock" },
+    };
+
+    /** Every block field to release from the owner's finalizer, primitive ones included. */
+    private static final String[][] NATIVE_BLOCK_FREE = {
+        { "java_util_HashMap", "cn1KeysBlock" },
+        { "java_util_HashMap", "cn1ValsBlock" },
+        { "java_util_HashMap", "cn1MetaBlock" },
+    };
+
+    /** True when this class owns at least one native block (traced or merely freed). */
+    private static boolean hasNativeBlocks(String cls) {
+        for (String[] r : NATIVE_BLOCK_FREE) {
+            if (r[0].equals(cls)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     private static boolean isReferenceReferent(String owningClass, ByteCodeField fld) {
         return REFERENCE_CLASS.equals(owningClass)
                 && REFERENCE_REFERENT_FIELD.equals(fld.getFieldName())
@@ -1172,6 +1212,19 @@ public class ByteCodeClass {
             b.append(clsName);
             b.append("_finalize__(threadStateData, objToDelete);\n");
         }
+        // Release native backing blocks. This is the ONLY thing that frees them, which is
+        // why an owner must reach the per-slot reclaim path: a page taking the O(1)
+        // all-dead reclaim never runs a finalizer, and the blocks would leak. Declaring a
+        // finalizer is what puts it on that path (the sweep's needsReclaim test reads
+        // finalizerFunction), so an owner class here must also declare one.
+        for (String[] r : NATIVE_BLOCK_FREE) {
+            if (r[0].equals(clsName)) {
+                b.append("    cn1RefBlockFree(((struct obj__").append(clsName);
+                b.append("*)objToDelete)->").append(clsName).append("_").append(r[1]).append(");\n");
+                b.append("    ((struct obj__").append(clsName);
+                b.append("*)objToDelete)->").append(clsName).append("_").append(r[1]).append(" = 0;\n");
+            }
+        }
         // invoke the finalize method of the base
         if(baseClass != null) {
             b.append("    __FINALIZER_");
@@ -1275,6 +1328,18 @@ public class ByteCodeClass {
             }
         }
         // invoke the mark method of the base
+        // Trace any native backing block BEFORE chaining to the base class, so the
+        // references it holds are marked on the same pass as the owner's own fields.
+        for (String[] r : NATIVE_REF_BLOCKS) {
+            if (r[0].equals(clsName)) {
+                // No count argument: the block carries its own length one slot below the
+                // pointer. Passing a separate capacity field would let a marker pair a new
+                // block with a stale capacity -- see cn1RefBlockAlloc.
+                b.append("    cn1GcMarkRefBlock(threadStateData, ((struct obj__");
+                b.append(clsName).append("*)objToMark)->").append(clsName).append("_").append(r[1]);
+                b.append(", force);\n");
+            }
+        }
         if(baseClass != null) {
             b.append("    __GC_MARK_");
             b.append(baseClass.replace('/', '_').replace('$', '_'));

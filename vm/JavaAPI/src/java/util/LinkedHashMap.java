@@ -114,8 +114,8 @@ public class LinkedHashMap<K, V> extends HashMap<K, V> implements Map<K, V> {
     }
 
     private void cn1InitLinks() {
-        cn1Prev = new int[cn1Meta.length];
-        cn1Next = new int[cn1Meta.length];
+        cn1Prev = new int[cn1Cap];
+        cn1Next = new int[cn1Cap];
         cn1Head = -1;
         cn1Tail = -1;
     }
@@ -183,11 +183,11 @@ public class LinkedHashMap<K, V> extends HashMap<K, V> implements Map<K, V> {
         Object[] vals = new Object[n];
         int c = 0;
         for (int i = cn1Head; i >= 0; i = cn1Next[i]) {
-            keys[c] = cn1Keys[i];
-            vals[c] = cn1Vals[i];
+            keys[c] = cn1BlkRefGet(cn1KeysBlock, i);
+            vals[c] = cn1BlkRefGet(cn1ValsBlock, i);
             c++;
         }
-        int cap = cn1Meta.length;
+        int cap = cn1Cap;
         // Grow when the LIVE count has reached the threshold; rebuild at the
         // same size only when the threshold was reached because of TOMBSTONES.
         //
@@ -229,7 +229,7 @@ public class LinkedHashMap<K, V> extends HashMap<K, V> implements Map<K, V> {
             cn1MoveToTail(idx);
         }
         @SuppressWarnings("unchecked")
-        V v = (V) cn1Vals[idx];
+        V v = (V) cn1BlkRefGet(cn1ValsBlock, idx);
         return v;
     }
 
@@ -274,7 +274,7 @@ public class LinkedHashMap<K, V> extends HashMap<K, V> implements Map<K, V> {
         if (cn1LastInserted && cn1MayEvict && cn1Head >= 0
                 && removeEldestEntry(new CompactEntry<K, V>(this, cn1Head))) {
             @SuppressWarnings("unchecked")
-            K eldest = (K) cn1Keys[cn1Head];
+            K eldest = (K) cn1BlkRefGet(cn1KeysBlock, cn1Head);
             remove(eldest);
         }
         return result;

@@ -3677,10 +3677,9 @@ static inline int cn1HmNextSlot(int i, uint32_t perturb, int mask) {
 // probe; >=0 found slot, else -(insertionPoint+1) (first tombstone on the path
 // if any, else the terminating empty slot). Must match cn1FindSlotImpl.
 static JAVA_INT cn1HmFindSlot(CODENAME_ONE_THREAD_STATE, struct obj__java_util_HashMap* t, JAVA_OBJECT key, JAVA_INT marker) {
-    JAVA_ARRAY metaArr = (JAVA_ARRAY)t->java_util_HashMap_cn1Meta;
-    JAVA_ARRAY_INT* meta = (JAVA_ARRAY_INT*)metaArr->data;
-    JAVA_ARRAY_OBJECT* keys = (JAVA_ARRAY_OBJECT*)((JAVA_ARRAY)t->java_util_HashMap_cn1Keys)->data;
-    int mask = metaArr->length - 1;
+    JAVA_INT* meta = (JAVA_INT*)(uintptr_t)t->java_util_HashMap_cn1MetaBlock;
+    JAVA_OBJECT* keys = (JAVA_OBJECT*)(uintptr_t)t->java_util_HashMap_cn1KeysBlock;
+    int mask = t->java_util_HashMap_cn1Cap - 1;
     int i = marker & mask;
     uint32_t perturb = (uint32_t)marker;
     int firstTomb = -1;
@@ -3703,13 +3702,79 @@ static JAVA_INT cn1HmFindSlot(CODENAME_ONE_THREAD_STATE, struct obj__java_util_H
     }
 }
 
+// ===================== BLOCK PRIMITIVES (HashMap storage) =====================
+// The three parallel tables are C blocks, not Java arrays -- see the field comment in
+// HashMap.java. These are the Java-visible handles; the collector reaches the reference
+// blocks through the generated __GC_MARK_ (ByteCodeClass.NATIVE_REF_BLOCKS) and frees all
+// three from the generated __FINALIZER_.
+JAVA_LONG java_util_HashMap_cn1BlkRefNew___int_R_long(CODENAME_ONE_THREAD_STATE, JAVA_INT n) {
+    return cn1RefBlockAlloc(n);
+}
+
+JAVA_LONG java_util_HashMap_cn1BlkIntNew___int_R_long(CODENAME_ONE_THREAD_STATE, JAVA_INT n) {
+    return cn1IntBlockAlloc(n);
+}
+
+JAVA_VOID java_util_HashMap_cn1BlkFree___long(CODENAME_ONE_THREAD_STATE, JAVA_LONG b) {
+    cn1RefBlockFree(b);
+}
+
+// RETIRE, not free -- for a block that is being replaced while the map stays alive.
+// A concurrent marker may have loaded the old pointer before the swap and still be
+// walking it; the retire list is drained by the sweep, after the mark that could have
+// done so has ended. Freeing here directly is a use-after-free, and it is the bug
+// MapTorture2 caught on its first run.
+JAVA_VOID java_util_HashMap_cn1BlkRetire___long(CODENAME_ONE_THREAD_STATE, JAVA_LONG b) {
+    cn1RefBlockRetire(b);
+}
+
+JAVA_OBJECT java_util_HashMap_cn1BlkRefGet___long_int_R_java_lang_Object(CODENAME_ONE_THREAD_STATE, JAVA_LONG b, JAVA_INT i) {
+    return cn1RefBlockGet(b, i);
+}
+
+JAVA_VOID java_util_HashMap_cn1BlkRefSet___long_int_java_lang_Object(CODENAME_ONE_THREAD_STATE, JAVA_LONG b, JAVA_INT i, JAVA_OBJECT v) {
+    cn1RefBlockSet(threadStateData, b, i, v);
+}
+
+JAVA_INT java_util_HashMap_cn1BlkIntGet___long_int_R_int(CODENAME_ONE_THREAD_STATE, JAVA_LONG b, JAVA_INT i) {
+    return cn1IntBlockGet(b, i);
+}
+
+JAVA_VOID java_util_HashMap_cn1BlkIntSet___long_int_int(CODENAME_ONE_THREAD_STATE, JAVA_LONG b, JAVA_INT i, JAVA_INT v) {
+    cn1IntBlockSet(b, i, v);
+}
+
+// The iterator's advance. In C so the scan is one crossing per call rather than one per
+// slot -- the Java loop this replaces read a slot per iteration, which would have become
+// a native call per iteration on a target that does not link with LTO.
+JAVA_INT java_util_HashMap_cn1BlkNextOccupied___long_int_int_R_int(CODENAME_ONE_THREAD_STATE, JAVA_LONG metaBlock, JAVA_INT from, JAVA_INT cap) {
+    JAVA_INT* meta = (JAVA_INT*)(uintptr_t)metaBlock;
+    if(meta == 0) {
+        return -1;
+    }
+    for(JAVA_INT i = from ; i < cap ; i++) {
+        if(meta[i] < 0) {
+            return i;
+        }
+    }
+    return -1;
+}
+
+// clear(): the reference blocks are blanked under the bulk SATB barrier, the metadata
+// with a plain memset (ints are not traced).
+JAVA_VOID java_util_HashMap_cn1BlkClearAll___long_long_long_int(CODENAME_ONE_THREAD_STATE, JAVA_LONG keys, JAVA_LONG vals, JAVA_LONG meta, JAVA_INT cap) {
+    cn1RefBlockClear(threadStateData, keys, 0, cap);
+    cn1RefBlockClear(threadStateData, vals, 0, cap);
+    cn1IntBlockClear(meta, cap);
+}
+
 JAVA_OBJECT java_util_HashMap_get___java_lang_Object_R_java_lang_Object(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject, JAVA_OBJECT key) {
     struct obj__java_util_HashMap* t = (struct obj__java_util_HashMap*)__cn1ThisObject;
     JAVA_INT idx = cn1HmFindSlot(threadStateData, t, key, cn1HmMarker(threadStateData, key));
     if(idx < 0) {
         return JAVA_NULL;
     }
-    return ((JAVA_ARRAY_OBJECT*)((JAVA_ARRAY)t->java_util_HashMap_cn1Vals)->data)[idx];
+    return ((JAVA_OBJECT*)(uintptr_t)t->java_util_HashMap_cn1ValsBlock)[idx];
 }
 
 JAVA_BOOLEAN java_util_HashMap_containsKey___java_lang_Object_R_boolean(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject, JAVA_OBJECT key) {
@@ -3723,8 +3788,8 @@ JAVA_OBJECT java_util_HashMap_put___java_lang_Object_java_lang_Object_R_java_lan
     struct obj__java_util_HashMap* t = (struct obj__java_util_HashMap*)__cn1ThisObject;
     JAVA_INT marker = cn1HmMarker(threadStateData, key);
     JAVA_INT idx = cn1HmFindSlot(threadStateData, t, key, marker);
-    JAVA_OBJECT valsObj = t->java_util_HashMap_cn1Vals;
-    JAVA_ARRAY_OBJECT* vals = (JAVA_ARRAY_OBJECT*)((JAVA_ARRAY)valsObj)->data;
+    JAVA_LONG valsObj = t->java_util_HashMap_cn1ValsBlock;
+    JAVA_OBJECT* vals = (JAVA_OBJECT*)(uintptr_t)valsObj;
     if(idx >= 0) {
         JAVA_OBJECT old = vals[idx];
         CN1_WRITE_BARRIER(valsObj, value);
@@ -3733,9 +3798,9 @@ JAVA_OBJECT java_util_HashMap_put___java_lang_Object_java_lang_Object_R_java_lan
         return old;
     }
     JAVA_INT ins = -idx - 1;
-    JAVA_ARRAY_INT* meta = (JAVA_ARRAY_INT*)((JAVA_ARRAY)t->java_util_HashMap_cn1Meta)->data;
-    JAVA_OBJECT keysObj = t->java_util_HashMap_cn1Keys;
-    JAVA_ARRAY_OBJECT* keys = (JAVA_ARRAY_OBJECT*)((JAVA_ARRAY)keysObj)->data;
+    JAVA_INT* meta = (JAVA_INT*)(uintptr_t)t->java_util_HashMap_cn1MetaBlock;
+    JAVA_LONG keysObj = t->java_util_HashMap_cn1KeysBlock;
+    JAVA_OBJECT* keys = (JAVA_OBJECT*)(uintptr_t)keysObj;
     JAVA_BOOLEAN wasEmpty = meta[ins] == 0 ? JAVA_TRUE : JAVA_FALSE;
     meta[ins] = marker;
     CN1_WRITE_BARRIER(keysObj, key);
@@ -3763,9 +3828,9 @@ JAVA_OBJECT java_util_HashMap_remove___java_lang_Object_R_java_lang_Object(CODEN
     if(idx < 0) {
         return JAVA_NULL;
     }
-    JAVA_ARRAY_INT* meta = (JAVA_ARRAY_INT*)((JAVA_ARRAY)t->java_util_HashMap_cn1Meta)->data;
-    JAVA_ARRAY_OBJECT* keys = (JAVA_ARRAY_OBJECT*)((JAVA_ARRAY)t->java_util_HashMap_cn1Keys)->data;
-    JAVA_ARRAY_OBJECT* vals = (JAVA_ARRAY_OBJECT*)((JAVA_ARRAY)t->java_util_HashMap_cn1Vals)->data;
+    JAVA_INT* meta = (JAVA_INT*)(uintptr_t)t->java_util_HashMap_cn1MetaBlock;
+    JAVA_OBJECT* keys = (JAVA_OBJECT*)(uintptr_t)t->java_util_HashMap_cn1KeysBlock;
+    JAVA_OBJECT* vals = (JAVA_OBJECT*)(uintptr_t)t->java_util_HashMap_cn1ValsBlock;
     JAVA_OBJECT old = vals[idx];
     CN1_SATB_DELETE(&keys[idx]); // preserve the removed key/value for this mark cycle
     CN1_SATB_DELETE(&vals[idx]);
@@ -3780,21 +3845,20 @@ JAVA_OBJECT java_util_HashMap_remove___java_lang_Object_R_java_lang_Object(CODEN
 JAVA_VOID java_util_HashMap_clear__(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject) {
     struct obj__java_util_HashMap* t = (struct obj__java_util_HashMap*)__cn1ThisObject;
     if(t->java_util_HashMap_elementCount > 0 || t->java_util_HashMap_cn1Occupied > 0) {
-        JAVA_ARRAY metaArr = (JAVA_ARRAY)t->java_util_HashMap_cn1Meta;
-        int len = metaArr->length;
+        int len = t->java_util_HashMap_cn1Cap;
         // SATB deletion barrier: the memsets below bulk-null every live key/value ref,
         // so preserve them for the current mark cycle first. No-op (one flag load) off-GC.
         if(__builtin_expect(gcSatbActive, 0)) {
-            JAVA_ARRAY_OBJECT* ck = (JAVA_ARRAY_OBJECT*)((JAVA_ARRAY)t->java_util_HashMap_cn1Keys)->data;
-            JAVA_ARRAY_OBJECT* cv = (JAVA_ARRAY_OBJECT*)((JAVA_ARRAY)t->java_util_HashMap_cn1Vals)->data;
+            JAVA_OBJECT* ck = (JAVA_OBJECT*)(uintptr_t)t->java_util_HashMap_cn1KeysBlock;
+            JAVA_OBJECT* cv = (JAVA_OBJECT*)(uintptr_t)t->java_util_HashMap_cn1ValsBlock;
             for(int i = 0 ; i < len ; i++) {
                 JAVA_OBJECT k = ck[i]; if(k != JAVA_NULL && !CN1_IS_TAGGED(k)) cn1SatbEnqueue(k);
                 JAVA_OBJECT v = cv[i]; if(v != JAVA_NULL && !CN1_IS_TAGGED(v)) cn1SatbEnqueue(v);
             }
         }
-        memset(metaArr->data, 0, (size_t)len * sizeof(JAVA_ARRAY_INT));
-        memset(((JAVA_ARRAY)t->java_util_HashMap_cn1Keys)->data, 0, (size_t)len * sizeof(JAVA_ARRAY_OBJECT));
-        memset(((JAVA_ARRAY)t->java_util_HashMap_cn1Vals)->data, 0, (size_t)len * sizeof(JAVA_ARRAY_OBJECT));
+        memset((void*)(uintptr_t)t->java_util_HashMap_cn1MetaBlock, 0, (size_t)len * sizeof(JAVA_INT));
+        memset((void*)(uintptr_t)t->java_util_HashMap_cn1KeysBlock, 0, (size_t)len * sizeof(JAVA_OBJECT));
+        memset((void*)(uintptr_t)t->java_util_HashMap_cn1ValsBlock, 0, (size_t)len * sizeof(JAVA_OBJECT));
         t->java_util_HashMap_elementCount = 0;
         t->java_util_HashMap_cn1Occupied = 0;
         t->java_util_HashMap_modCount++;
