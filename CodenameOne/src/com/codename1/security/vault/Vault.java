@@ -717,7 +717,18 @@ public final class Vault {
                         // Refused rather than repaired: repairing needs the new key, and the only
                         // thing here that has it is a password unlock. The stale record is removed
                         // so the next remembered unlock is an honest "not remembered".
-                        Storage.getInstance().deleteStorageFile(deviceRecordKey());
+                        //
+                        // Only while it is still the record that was INSPECTED. Another tab can
+                        // refresh the wrap between the read above and this line, and deleting
+                        // then threw away a valid record that tab had already reported storing
+                        // -- leaving this one reporting KEY_MISSING for a device that really is
+                        // remembered. Finding something else means the problem this is reacting
+                        // to has already been fixed by somebody.
+                        Object stillStale = readUncached(deviceRecordKey());
+                        if (stillStale instanceof String
+                                && record.serialize().equals(stillStale)) {
+                            Storage.getInstance().deleteStorageFile(deviceRecordKey());
+                        }
                         throw new VaultException(VaultError.KEY_MISSING,
                                 "this device's remembered key is from before a key rotation and "
                                 + "has been discarded; unlock with the password to remember it "
@@ -2376,7 +2387,21 @@ public final class Vault {
                             // rememberNow writes the device record, so a failure partway can
                             // leave it describing a mechanism that was never completed. Put back
                             // exactly what was there and report the failure: nothing changed.
-                            if (saved instanceof String) {
+                            // Only over a record this attempt is responsible for. Another tab
+                            // completing its own policy change while rememberNow waited on a
+                            // prompt leaves ITS record here, and writing `saved` over that
+                            // silently reverts a call that already reported success -- and can
+                            // restore a record naming a mechanism that tab has since deleted.
+                            //
+                            // Whose it is cannot be told from the bytes, but it can from the
+                            // POLICY: this attempt was installing `policy`, so a record naming
+                            // anything else was put there by somebody else and is left alone. A
+                            // second tab installing the SAME policy is the benign case either
+                            // way -- what gets restored then is a record equivalent to the one
+                            // it wrote.
+                            DeviceRecord standing = deviceRecord();
+                            if (saved instanceof String
+                                    && (standing == null || standing.policy == policy)) {
                                 requireDeviceRecordRestored(deviceRecordKey(), (String) saved,
                                         establishFailed);
                             }

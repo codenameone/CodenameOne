@@ -503,11 +503,21 @@ public class SecureStorage {
         // value on a weaker platform -- JavaSE with ENCRYPTED_AT_REST required -- threw
         // POLICY_NOT_MET for an account that did not exist, when nothing unprotected would have
         // been handed back either way.
+        // SNAPSHOTTED BEFORE the read, and consulted after. get() is not a pure read on every
+        // port: the browser MIGRATES through it, rewriting a legacy plaintext entry as an
+        // encrypted one and deleting the plaintext -- so asking afterwards described the
+        // replacement rather than the entry the caller asked about, and an account written
+        // before encryption existed passed a check that exists to refuse exactly that.
+        //
+        // Taking it early does not bring back the problem the ordering was for: the report is
+        // only consulted once the value is known to be there, so an absent account still answers
+        // null instead of throwing POLICY_NOT_MET.
+        ProtectionReport asStored = protectionOf(account);
         String value = get(account);
         if (value == null) {
             return null;
         }
-        Protection unmet = protectionOf(account).firstUnmet(required);
+        Protection unmet = asStored.firstUnmet(required);
         if (unmet != null) {
             throw new VaultException(VaultError.POLICY_NOT_MET,
                     "the stored entry is not protected by " + unmet.name(), unmet, null);
