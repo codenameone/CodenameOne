@@ -204,6 +204,57 @@ class Redaction(unittest.TestCase):
         self.assertIn("***", output)
 
 
+class TokenMinting(unittest.TestCase):
+    """The build client wants the minted JWT, not the account's app token."""
+
+    class Response:
+        def __init__(self, body=b"", status=200):
+            self.status, self.headers, self.url = status, {}, "https://x"
+            self._body = body
+
+        def read(self):
+            return self._body
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *exc):
+            return False
+
+    def opener(self, *responses):
+        outer = self
+
+        class Opener:
+            def __init__(self):
+                self.calls, self.urls = 0, []
+
+            def open(self, request, timeout=0):
+                self.urls.append(request.full_url)
+                response = responses[min(self.calls, len(responses) - 1)]
+                self.calls += 1
+                return response
+
+        return Opener()
+
+    def test_token_is_the_first_line_of_poll_user(self):
+        opener = self.opener(self.Response(b""),
+                             self.Response(b"jwt-value\nuser@example.com\n"))
+        self.assertEqual(canary.mint_build_token(opener, "https://x"), "jwt-value")
+        self.assertIn("set-user", opener.urls[0])
+        self.assertIn("poll-user", opener.urls[1])
+
+    def test_empty_poll_response_is_a_failure(self):
+        opener = self.opener(self.Response(b""), self.Response(b"\n"))
+        with self.assertRaises(canary.CanaryFailure):
+            canary.mint_build_token(opener, "https://x")
+
+    def test_set_user_rejection_is_reported(self):
+        opener = self.opener(self.Response(b"", status=401))
+        with self.assertRaises(canary.CanaryFailure) as caught:
+            canary.mint_build_token(opener, "https://x")
+        self.assertIn("set-user", str(caught.exception))
+
+
 class Budgets(unittest.TestCase):
     JOB_TIMEOUT_MINUTES = 70  # starter-canary.yml
 

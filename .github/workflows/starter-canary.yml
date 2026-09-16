@@ -99,7 +99,6 @@ jobs:
         env:
           CN1_CANARY_EMAIL: ${{ secrets.CN1_CANARY_EMAIL }}
           CN1_CANARY_PASSWORD: ${{ secrets.CN1_CANARY_PASSWORD }}
-          CN1_CANARY_TOKEN: ${{ secrets.CN1_CANARY_TOKEN }}
           CANARY_REPORT: ${{ runner.temp }}/canary.json
           # Through `env`, never interpolated into the script body. A dispatch
           # input expanded straight into `run:` is evaluated by the shell before

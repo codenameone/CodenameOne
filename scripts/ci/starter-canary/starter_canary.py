@@ -43,6 +43,7 @@ import time
 import urllib.error
 import urllib.parse
 import urllib.request
+import uuid
 import zipfile
 from http.cookiejar import CookieJar
 from pathlib import Path
@@ -247,6 +248,39 @@ def check_repositories(project):
     log(f"repository declarations OK (cn1 {version or 'unknown'}, "
         f"plugin {plugin_version or 'unknown'})")
     return version, plugin_version
+
+
+def mint_build_token(opener, base):
+    """Get a build-client token the way the tooling does, from our own session.
+
+    The build client does not authenticate with the account's app token. It
+    stores the JWT that `/appsec/7.0/set-user` mints and `/poll-user` hands back,
+    so that is what has to be seeded -- feeding it the app token instead leaves
+    it unauthenticated, and the client then prints a browser login URL, does not
+    wait for it, reports "your build was submitted", and exits 0 without having
+    submitted anything.
+
+    Minting per run rather than storing one also means there is no long-lived
+    build credential in repository secrets, and nothing to rotate when it
+    expires.
+    """
+    key = str(uuid.uuid4())
+    redirect = urllib.parse.quote(f"{base}/loggedIn.html", safe="")
+    status, _, _, _ = fetch(
+        opener, f"{base}/appsec/7.0/set-user?loginKey={key}&redirect={redirect}&ver=2")
+    if status != 200:
+        raise CanaryFailure(
+            f"set-user returned HTTP {status}; the console session did not carry "
+            "into the build-client login, so no token could be minted."
+        )
+    status, body, _, _ = fetch(opener, f"{base}/poll-user?ver=2&loginKey={key}")
+    if status != 200:
+        raise CanaryFailure(f"poll-user returned HTTP {status}; no build token was issued.")
+    lines = body.decode("utf-8", "replace").strip().splitlines()
+    if not lines or not lines[0].strip():
+        raise CanaryFailure("poll-user returned no build token.")
+    log("minted a build-client token from the console session")
+    return lines[0].strip()
 
 
 def seed_token(project, mvn, email, token, plugin_version):
@@ -462,7 +496,6 @@ def main():
 
     email = os.environ.get("CN1_CANARY_EMAIL", "").strip()
     password = os.environ.get("CN1_CANARY_PASSWORD", "").strip()
-    token = os.environ.get("CN1_CANARY_TOKEN", "").strip()
     if not email or not password:
         raise CanaryFailure(
             "CN1_CANARY_EMAIL and CN1_CANARY_PASSWORD are not set; the canary cannot sign in."
@@ -495,10 +528,7 @@ def main():
             log("--skip-build set; stopping after artefact checks")
             result = {"ok": True, "stage": "artefact", "cn1Version": version}
         else:
-            if not token:
-                raise CanaryFailure(
-                    "CN1_CANARY_TOKEN is not set; cannot authenticate the build client headlessly."
-                )
+            token = mint_build_token(opener, base)
             mvn = find_maven(project)
             seed_token(project, mvn, email, token, plugin_version)
             # Snapshot first: a free account keeps only its most recent build,
@@ -523,8 +553,11 @@ def main():
 if __name__ == "__main__":
     try:
         main()
-    except CanaryFailure as failure:
-        message = str(failure)
+    except Exception as failure:  # noqa: BLE001 - a crash must still be reported
+        message = str(failure) if isinstance(failure, CanaryFailure) else (
+            f"the canary crashed before it could finish: "
+            f"{type(failure).__name__}: {failure}"
+        )
         print(f"[canary] FAIL: {message}", file=sys.stderr, flush=True)
         report = REPORT_PATH or os.environ.get("CANARY_REPORT")
         if report:
