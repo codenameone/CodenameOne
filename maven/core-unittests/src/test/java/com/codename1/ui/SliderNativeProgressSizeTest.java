@@ -25,6 +25,9 @@ package com.codename1.ui;
 import com.codename1.junit.FormTest;
 import com.codename1.junit.UITestBase;
 import com.codename1.ui.plaf.UIManager;
+import com.codename1.ui.plaf.Style;
+import com.codename1.ui.plaf.Border;
+import com.codename1.ui.plaf.RoundBorder;
 import java.util.Hashtable;
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -38,6 +41,9 @@ class SliderNativeProgressSizeTest extends UITestBase {
         progress.setEditable(false);
         progress.getAllStyles().setPadding(2, 2, 0, 0);
         progress.getAllStyles().setBorder(null);
+        progress.getAllStyles().setBgTransparency(255);
+        progress.getSliderFullUnselectedStyle().setBgTransparency(255);
+        progress.getSliderFullSelectedStyle().setBgTransparency(255);
         progress.getAllStyles().setFont(Font.createSystemFont(Font.FACE_SYSTEM, Font.STYLE_PLAIN, Font.SIZE_LARGE));
         int trackHeight = Math.max(2, Display.getInstance().convertToPixels(0.3f));
         int textHeight = progress.getStyle().getFont().getHeight();
@@ -69,4 +75,83 @@ class SliderNativeProgressSizeTest extends UITestBase {
         assertEquals(trackHeight + 4, progress.getPreferredH(),
                 "returning to determinate mode must discard the cached full height");
     }
+
+    private Slider nativeProgress() {
+        Hashtable theme = new Hashtable();
+        theme.put("@progressTrackThicknessMM", "0.3");
+        UIManager.getInstance().setThemeProps(theme);
+        Slider progress = new Slider();
+        progress.setEditable(false);
+        progress.setProgress(50);
+        progress.setWidth(100);
+        progress.setHeight(40);
+        for (Style style : new Style[] {progress.getUnselectedStyle(), progress.getSelectedStyle(),
+                progress.getSliderFullUnselectedStyle(), progress.getSliderFullSelectedStyle()}) {
+            style.setPadding(0, 0, 0, 0);
+            style.setBgTransparency(255);
+            style.setBackgroundType(Style.BACKGROUND_NONE);
+            style.setBorder(null);
+        }
+        return progress;
+    }
+
+    @FormTest
+    void customProgressAssetsKeepLegacyHeightAndPainters() {
+        Slider progress = nativeProgress();
+        int trackHeight = Math.max(2, Display.getInstance().convertToPixels(0.3f));
+        assertEquals(trackHeight, progress.getPreferredH());
+        Style full = progress.getSliderFullUnselectedStyle();
+        Painter original = full.getBgPainter();
+        int[] paints = {0};
+        full.setBgPainter((g, rect) -> paints[0]++);
+        assertTrue(progress.getPreferredH() >= Font.getDefaultFont().getHeight());
+        progress.paintComponentBackground(Image.createImage(100, 40).getGraphics());
+        assertEquals(1, paints[0], "custom fill painter must run");
+        full.setBgPainter(original);
+        assertEquals(trackHeight, progress.getPreferredH());
+
+        Style empty = progress.getUnselectedStyle();
+        Painter emptyOriginal = empty.getBgPainter();
+        empty.setBgPainter((g, rect) -> paints[0]++);
+        progress.paintComponentBackground(Image.createImage(100, 40).getGraphics());
+        assertEquals(2, paints[0], "custom empty painter must run");
+        empty.setBgPainter(emptyOriginal);
+        assertEquals(trackHeight, progress.getPreferredH());
+
+        full.setBgImage(Image.createImage(8, 24));
+        assertTrue(progress.getPreferredH() > trackHeight, "fill image must use legacy sizing");
+        full.setBgImage(null);
+        assertEquals(trackHeight, progress.getPreferredH());
+        empty.setBorder(Border.createLineBorder(2));
+        assertTrue(progress.getPreferredH() > trackHeight, "custom border must use legacy sizing");
+        empty.setBorder(null);
+        assertEquals(trackHeight, progress.getPreferredH());
+        progress.setThumbImage(Image.createImage(8, 32));
+        assertTrue(progress.getPreferredH() >= 32, "thumb must fit after caching thin size");
+        progress.setThumbImage(null);
+        assertEquals(trackHeight, progress.getPreferredH());
+        empty.setBackgroundType(Style.BACKGROUND_GRADIENT_LINEAR_VERTICAL);
+        assertTrue(progress.getPreferredH() > trackHeight, "gradient must retain legacy painter");
+        empty.setBackgroundType(Style.BACKGROUND_NONE);
+        empty.setBgTransparency(100);
+        assertTrue(progress.getPreferredH() > trackHeight, "translucent backgrounds must remain translucent");
+    }
+
+    @FormTest
+    void bundledPlainPillsStayNativeWhileDecoratedPillsKeepLegacyPath() {
+        Slider progress = nativeProgress();
+        int trackHeight = Math.max(2, Display.getInstance().convertToPixels(0.3f));
+        for (Style style : new Style[] {progress.getUnselectedStyle(),
+                progress.getSliderFullUnselectedStyle(), progress.getSliderFullSelectedStyle()}) {
+            style.setBgColor(0x007aff);
+            style.setBgTransparency(0);
+            style.setBorder(RoundBorder.create().rectangle(true).color(0x007aff)
+                    .stroke(1, false).strokeOpacity(0));
+        }
+        assertEquals(trackHeight, progress.getPreferredH(), "CSS pill borders must retain native sizing");
+        progress.getSliderFullUnselectedStyle().setBorder(RoundBorder.create().rectangle(true)
+                .color(0x007aff).stroke(2, false).strokeOpacity(255));
+        assertTrue(progress.getPreferredH() > trackHeight, "decorated pill border must be preserved");
+    }
+
 }

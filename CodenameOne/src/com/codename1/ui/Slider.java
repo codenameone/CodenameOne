@@ -30,6 +30,8 @@ import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.events.ActionSource;
 import com.codename1.ui.events.DataChangedListener;
 import com.codename1.ui.geom.Dimension;
+import com.codename1.ui.plaf.Border;
+import com.codename1.ui.plaf.RoundBorder;
 import com.codename1.ui.plaf.Style;
 import com.codename1.ui.plaf.UIManager;
 import com.codename1.ui.util.EventDispatcher;
@@ -431,7 +433,7 @@ public class Slider extends Label implements ActionSource {
         //
         // Gated on exactly what makes it paint that way, so nothing that renders the
         // legacy full-height fill changes size.
-        if (!infinite && !vertical && !isEditable()) {
+        if (usesNativeProgressStyles()) {
             String progressTrackMM = getUIManager().getThemeConstant("progressTrackThicknessMM", null);
             if (progressTrackMM != null) {
                 try {
@@ -458,13 +460,52 @@ public class Slider extends Label implements ActionSource {
         return new Dimension(prefW, prefH);
     }
 
+    private boolean usesNativeProgressStyles() {
+        return !infinite && !vertical && !isEditable() && thumbImage == null
+                && isNativeProgressStyle(super.getStyle())
+                && isNativeProgressStyle(getSliderFullUnselectedStyle())
+                && isNativeProgressStyle(getSliderFullSelectedStyle());
+    }
+
+    private boolean isNativeProgressStyle(Style style) {
+        if (style.getBgImage() != null || !isDefaultBackgroundPainter(style)) {
+            return false;
+        }
+        byte background = style.getBackgroundType();
+        if (background != Style.BACKGROUND_NONE && background != Style.BACKGROUND_IMAGE_SCALED) {
+            return false;
+        }
+        Border border = style.getBorder();
+        if (border == null) {
+            return (style.getBgTransparency() & 0xff) == 255;
+        }
+        // Bundled themes use plain pill borders. Keep those native, but preserve
+        // application borders, gradients, images and painters through the legacy path.
+        if (border.getClass() != RoundBorder.class) {
+            return false;
+        }
+        RoundBorder round = (RoundBorder) border;
+        return round.isRectangle() && !round.isOnlyLeftRounded() && !round.isOnlyRightRounded()
+                && round.getColor() == style.getBgColor() && round.getOpacity() == 255
+                && (round.getStrokeOpacity() == 0 || round.getStrokeThickness() == 0)
+                && round.getShadowOpacity() == 0;
+    }
+
+    /// {@inheritDoc}
+    @Override
+    public void styleChanged(String propertyName, Style source) {
+        super.styleChanged(propertyName, source);
+        // Background customization can switch both the renderer and its preferred height.
+        setShouldCalcPreferredSize(true);
+    }
+
     /// Paint the progress indicator
     @Override
     public void paintComponentBackground(Graphics g) {
         // Native progress indicators are thin capsules even when their component
         // receives a taller touch/layout box.  Keep this opt-in so legacy themes
         // and progress bars with image backgrounds retain their existing painter.
-        if (!infinite && !vertical && !isEditable()) {
+        if (usesNativeProgressStyles()) {
             String progressTrackMM = getUIManager().getThemeConstant("progressTrackThicknessMM", null);
             if (progressTrackMM != null && paintNativeProgress(g, progressTrackMM)) {
                 return;
@@ -703,10 +744,10 @@ public class Slider extends Label implements ActionSource {
         if (aa) {
             g.setAntiAliased(true);
         }
-        g.setColor(getSliderEmptyUnselectedStyle().getBgColor());
+        g.setColor(super.getStyle().getBgColor());
         g.fillRoundRect(x, y, width, track, track, track);
         if (fullWidth > 0) {
-            g.setColor(getSliderFullUnselectedStyle().getBgColor());
+            g.setColor((hasFocus() ? getSliderFullSelectedStyle() : getSliderFullUnselectedStyle()).getBgColor());
             g.fillRoundRect(x, y, Math.min(width, fullWidth), track, track, track);
         }
         if (aa) {
@@ -1082,6 +1123,7 @@ public class Slider extends Label implements ActionSource {
     /// - `thumbImage`: the thumbImage to set
     public void setThumbImage(Image thumbImage) {
         this.thumbImage = thumbImage;
+        setShouldCalcPreferredSize(true);
     }
 
     /// {@inheritDoc}

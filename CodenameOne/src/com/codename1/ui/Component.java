@@ -10237,6 +10237,20 @@ public class Component implements Animation, StyleListener, Editable {
         }
     }
 
+    final boolean isDefaultBackgroundPainter(Style style) {
+        Painter painter = style.getBgPainter();
+        if (painter == null) {
+            return true;
+        }
+        if (painter.getClass() != BGPainter.class) {
+            return false;
+        }
+        BGPainter background = (BGPainter) painter;
+        return background.painter == null && background.wMotion == null && background.hMotion == null
+                && background.previousTint == null
+                && (background.constantStyle == null || background.constantStyle == style); //NOPMD CompareObjectsWithEquals
+    }
+
     class BGPainter implements Painter, Animation {
         Image radialCache;
         CodenameOneImplementation impl;
