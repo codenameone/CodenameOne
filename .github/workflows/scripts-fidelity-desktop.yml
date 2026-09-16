@@ -96,24 +96,13 @@ jobs:
       - id: pick
         shell: bash
         env:
-          # On a dispatch, whatever was asked for. On a trigger, every platform whose
-          # golden set is committed, which is now all three.
-          #
-          # macos has its goldens but no BASELINE yet: the hosted macOS queue has not
-          # yielded a scoring slot. That is safe rather than a shortcut -- FidelityGate
-          # treats a pair with no baseline entry as new, prints its score and passes, so
-          # the first run that gets a runner establishes the numbers instead of failing on
-          # their absence. Verified by running the leg locally against the committed
-          # goldens with no baseline file: 60 pairs scored, exit 0.
-          #
-          # Record that run's baseline from its own fidelity-compare.json -- from the
-          # runner that scored it, never locally. A Mac-recorded baseline failed the gnome
-          # gate on eighteen pairs because the slider comes out a pixel taller on Linux.
+          # On a dispatch, whatever was asked for. On a trigger, only the platforms whose
+          # golden sets are committed -- macos is absent until its set lands.
           TARGETS: ${{ github.event_name == 'workflow_dispatch' && inputs.targets || 'gated' }}
         run: |
           set -eo pipefail
           case "$TARGETS" in
-            gated)   legs='gnome windows macos' ;;
+            gated)   legs='gnome windows' ;;
             all)     legs='gnome windows macos' ;;
             gnome|windows|macos) legs="$TARGETS" ;;
             *) echo "unknown targets '$TARGETS'" >&2; exit 2 ;;

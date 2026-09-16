@@ -1,0 +1,39 @@
+name: Check workflows
+
+# A workflow file GitHub rejects is not a broken job, it is a broken BRANCH: an invalid
+# file produces a failed check run on every push to every branch that contains it,
+# regardless of that workflow's own triggers and regardless of what the push touched. The
+# only symptom is "This run likely failed because of a workflow file issue" with no log,
+# which reads like infrastructure noise rather than a file someone has to fix.
+#
+# That happened here. A job-level `if:` referencing the `matrix` context took two unrelated
+# pull requests red for hours. Nothing local objected, because the file is valid YAML --
+# yaml.safe_load parses it, an editor shows nothing, and the error exists only in GitHub's
+# own expression parser. actionlint reimplements that parser.
+#
+# Runs on pull_request as well as push, because the point is to catch the file BEFORE it
+# reaches a branch other people build on. It is cheap: one ubuntu minute, no build.
+
+permissions:
+  contents: read
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches:
+      - master
+  push:
+    branches:
+      - master
+
+jobs:
+  check-workflows:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      # Deliberately NOT filtered by paths. A workflow file is only one of the ways this
+      # check goes stale: actionlint's own rules move, and a run over an unchanged tree
+      # that starts failing is information rather than noise.
+      - name: Validate every workflow file
+        run: scripts/check-workflows.sh

@@ -108,6 +108,10 @@ public class WindowsImplementation extends CodenameOneImplementation {
     /// gesture cannot inherit the previous one's zoom.
     private float pinchScale = 1f;
 
+    /// Pointer motion with no button held. Must match CN1_EVENT_POINTER_HOVER in
+    /// nativeSources/cn1_windows.h -- the two tables are the wire protocol and a
+    /// mismatch routes an event to the wrong handler rather than failing.
+    private static final int EVENT_POINTER_HOVER = 22;
     private static final int EVENT_PINCH_BEGIN = 20;
     private static final int EVENT_PINCH_END = 21;
     private static final int EVENT_ROTATE = 11;
@@ -813,6 +817,14 @@ public class WindowsImplementation extends CodenameOneImplementation {
                 case EVENT_POINTER_DRAGGED:
                     markPointer(key);
                     windowPointerDragged(windowId, x, y);
+                    break;
+                case EVENT_POINTER_HOVER:
+                    // Only the main window. Form.pointerHover resolves against the
+                    // showing Form, so routing a secondary window's motion here would
+                    // hover a component under coordinates from a different window.
+                    if (windowId == 0) {
+                        pointerHover(new int[]{x}, new int[]{y});
+                    }
                     break;
                 case EVENT_KEY_PRESSED:
                     windowKeyPressed(windowId, key);
@@ -3202,6 +3214,43 @@ public class WindowsImplementation extends CodenameOneImplementation {
     @Override
     public String getPlatformName() {
         return "win";
+    }
+
+    /// Windows is a desktop, always.
+    ///
+    /// CodenameOneImplementation.isDesktop() answers false, and this port never
+    /// overrode it, so a windows application was a mobile one as far as the framework
+    /// was concerned. That reached further than it looks: no `_desktop.ovr` resource
+    /// layer, no `device-desktop-` theme layer, no @defaultDesktopFontSizeInt, no
+    /// @desktopTitleBarMode, and the mobile branch of Button.pointerHover,
+    /// TextSelection and SplitPane.
+    @Override
+    public boolean isDesktop() {
+        return true;
+    }
+
+    /// @inheritDoc
+    ///
+    /// Desktop layers. Matches the JavaSE desktop port and the macOS port
+    /// (`desktop`, `tablet`, ...) so one override written for the desktop covers all
+    /// three, with `windows` last so a layer can name this port specifically.
+    @Override
+    public String[] getPlatformOverrides() {
+        return new String[] {"desktop", "tablet", "windows"};
+    }
+
+    /// @inheritDoc
+    ///
+    /// CodenameOneImplementation.isDarkMode() answers false and this port never
+    /// overrode it, so every $Dark entry in a desktop theme was dead weight in the
+    /// .res: the Fluent theme's whole dark palette could never be selected.
+    ///
+    /// Returns Boolean rather than boolean because the contract distinguishes "the
+    /// platform does not know" (null) from "light" (FALSE), and callers such as
+    /// UIManager's dark-mode resolution treat the two differently.
+    @Override
+    public Boolean isDarkMode() {
+        return WindowsNative.systemUsesDarkTheme() ? Boolean.TRUE : Boolean.FALSE;
     }
 
     @Override

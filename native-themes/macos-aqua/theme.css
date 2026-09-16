@@ -19,6 +19,7 @@
  *
  * Please contact Codename One through http://www.codenameone.com/ if you
  * need additional information or have any questions.
+ */
 
 /*
  * macOS (AppKit) native theme for Codename One.
@@ -57,10 +58,20 @@
     --control-bg-color-dark: #1e1e1e;
     --text-color: #000000;              /* labelColor */
     --text-color-dark: #ffffff;
-    --secondary-text-color: #7f7f7f;    /* secondaryLabelColor */
-    --secondary-text-color-dark: #98989d;
+    --text-secondary-color: #7f7f7f;    /* secondaryLabelColor */
+    --text-secondary-color-dark: #98989d;
     --separator-color: #dcdcdc;         /* separatorColor */
     --separator-color-dark: #48484a;
+    --accent-pressed-color: #0060df;    /* controlAccentColor darkened on press */
+    --accent-pressed-color-dark: #0060df;
+    --view-bg-color: #ffffff;           /* textBackgroundColor */
+    --view-bg-color-dark: #1e1e1e;
+    --stroke-color: #c6c6c8;            /* the control outline, distinct from separatorColor */
+    --stroke-color-dark: #545456;
+    --headerbar-bg-color: #ececec;      /* the macOS title bar matches windowBackgroundColor */
+    --headerbar-bg-color-dark: #323232;
+    --destructive-color: #ff3b30;       /* systemRed */
+    --success-color: #34c759;           /* systemGreen */
 
     includeNativeBool: false;
     darkModeBool: true;
@@ -82,6 +93,21 @@
 
     /* NSSlider: a 3pt trough. */
     sliderTrackThicknessMM: "1.06";
+
+    /* Desktop sliders have a round KNOB on one continuous track. Without these the
+       painter draws Material's thumb instead: a thin vertical bar, with a gap either
+       side of it and a "stop indicator" dot near the far end, none of which any desktop
+       toolkit draws. Equal width and height is what makes the thumb a circle.
+       16px, the NSSlider knob. */
+    sliderThumbWidthMM: "3.21";
+    sliderThumbHeightMM: "3.21";
+    sliderContinuousTrackBool: true;
+
+    /* A desktop progress bar is much thinner than the slider beside it: 8px, measured from the macOS CI capture.
+       Its own constant for that reason -- one value for both would be wrong for one of
+       them. Without it a progress bar paints the legacy full-height fill, 19px against
+       this reference. */
+    progressTrackThicknessMM: "2.12";
 }
 
 /* --- Window and text ------------------------------------------------------------------- */
@@ -107,21 +133,19 @@ Label {
  * slightly on hover and noticeably when pressed.
  */
 
+/* NO .hover RULES for the controls below, and that is the platform rather than an
+   omission. AppKit draws no rollover state for a push button, text field, checkbox,
+   radio, switch, slider or popup button -- the captured reference says so itself, listing
+   all sixteen hover tiles in states_identical_to_normal, byte-identical to their normal
+   ones. A theme that styles hover here diverges from a reference that cannot move: those
+   rows were the six worst-scoring tiles in the set.
+
+   ScrollThumb and ListRenderer keep theirs. Neither is in the fidelity matrix, and AppKit
+   really does highlight a list row and a scroller under the pointer. */
+
 Button {
     color: var(--text-color, #000000);
     background-color: #ffffff;
-    border: 0.26mm solid #c9c9c9;
-    border-radius: 1.76mm;
-    padding: 0.9mm 3.5mm 0.9mm 3.5mm;
-    margin: 0.7mm;
-    font-family: "native:MainRegular";
-    font-size: 3.4mm;
-    text-align: center;
-}
-
-Button.hover {
-    color: var(--text-color, #000000);
-    background-color: #f7f7f7;
     border: 0.26mm solid #c9c9c9;
     border-radius: 1.76mm;
     padding: 0.9mm 3.5mm 0.9mm 3.5mm;
@@ -167,17 +191,6 @@ RaisedButton {
     text-align: center;
 }
 
-RaisedButton.hover {
-    color: var(--accent-fg-color, #ffffff);
-    background-color: #1a88ff;
-    border-radius: 1.76mm;
-    padding: 0.9mm 3.5mm 0.9mm 3.5mm;
-    margin: 0.7mm;
-    font-family: "native:MainRegular";
-    font-size: 3.4mm;
-    text-align: center;
-}
-
 RaisedButton.pressed {
     color: var(--accent-fg-color, #ffffff);
     background-color: #0060cc;
@@ -211,17 +224,6 @@ FlatButton {
     text-align: center;
 }
 
-FlatButton.hover {
-    color: var(--accent-color, #007aff);
-    background-color: #e8e8e8;
-    border-radius: 1.76mm;
-    padding: 0.9mm 3.5mm 0.9mm 3.5mm;
-    margin: 0.7mm;
-    font-family: "native:MainRegular";
-    font-size: 3.4mm;
-    text-align: center;
-}
-
 FlatButton.pressed {
     color: #0060cc;
     background-color: #dcdcdc;
@@ -239,17 +241,6 @@ TextField {
     color: var(--text-color, #000000);
     background-color: var(--control-bg-color, #ffffff);
     border: 0.26mm solid #c0c0c0;
-    border-radius: 1.06mm;
-    padding: 0.9mm 2.1mm 0.9mm 2.1mm;
-    margin: 0.7mm;
-    font-family: "native:MainRegular";
-    font-size: 3.4mm;
-}
-
-TextField.hover {
-    color: var(--text-color, #000000);
-    background-color: var(--control-bg-color, #ffffff);
-    border: 0.26mm solid #a8a8a8;
     border-radius: 1.06mm;
     padding: 0.9mm 2.1mm 0.9mm 2.1mm;
     margin: 0.7mm;
@@ -294,7 +285,6 @@ CheckBox {
 }
 
 CheckBox.selected { color: var(--accent-color, #007aff); background-color: transparent; }
-CheckBox.hover { color: var(--text-color, #000000); background-color: #e4e4e4; }
 CheckBox.disabled { color: #b4b4b4; background-color: transparent; }
 
 RadioButton {
@@ -307,7 +297,6 @@ RadioButton {
 }
 
 RadioButton.selected { color: var(--accent-color, #007aff); background-color: transparent; }
-RadioButton.hover { color: var(--text-color, #000000); background-color: #e4e4e4; }
 RadioButton.disabled { color: #b4b4b4; background-color: transparent; }
 
 /* NSSwitch: a 38x22pt pill. */
@@ -327,14 +316,6 @@ Switch.selected {
     margin: 0.4mm;
 }
 
-Switch.hover {
-    color: #ffffff;
-    background-color: #d4d4d4;
-    cn1-background-type: cn1-pill-border;
-    padding: 0.4mm;
-    margin: 0.4mm;
-}
-
 Switch.disabled {
     color: #ffffff;
     background-color: #f0f0f0;
@@ -346,7 +327,10 @@ Switch.disabled {
 /* --- Slider and progress --------------------------------------------------------------- */
 
 Slider {
-    color: var(--accent-color, #007aff);
+    /* The KNOB colour, not the track's: paintNativeSlider takes the thumb from the
+       Slider style's foreground. White on every desktop, where the accent is the
+       filled part of the track behind it. */
+    color: #ffffff;
     background-color: #d4d4d4;
     cn1-background-type: cn1-pill-border;
     margin: 0.7mm;
@@ -372,6 +356,46 @@ ProgressBar {
 ProgressBarFull {
     background-color: #007aff;
     color: #007aff;
+    cn1-background-type: cn1-pill-border;
+    margin: 0.7mm;
+}
+
+/* --- ComboBox ------------------------------------------------------------------------- */
+/*
+ * Declared because the fidelity matrix asks for it and nothing was styling it: the tile
+ * rendered from UIManager's blank defaults and was pixel-identical in normal and hover,
+ * which is what an unstyled control looks like when you only glance at it. A native
+ * NSPopUpButton / GtkDropDown / WinUI ComboBox reads as a button with a label, which is what
+ * the Codename One side has to offer against it.
+ */
+
+ComboBox {
+    color: #000000;
+    background-color: #ffffff;
+    border: 0.26mm solid #c9c9c9;
+    border-radius: 1.76mm;
+    padding: 0.9mm 3.5mm 0.9mm 3.5mm;
+    margin: 0.7mm;
+    font-family: "native:MainRegular";
+    font-size: 3.4mm;
+}
+
+ComboBox.disabled {
+    color: #b4b4b4;
+    background-color: #fafafa;
+    border: 0.26mm solid #c9c9c9;
+    border-radius: 1.76mm;
+    padding: 0.9mm 3.5mm 0.9mm 3.5mm;
+    margin: 0.7mm;
+    font-family: "native:MainRegular";
+    font-size: 3.4mm;
+}
+
+/* A native slider highlights its track under the pointer. Without this the hover tile was
+   byte-identical to the normal one. */
+Slider.disabled {
+    color: #b4b4b4;
+    background-color: #fafafa;
     cn1-background-type: cn1-pill-border;
     margin: 0.7mm;
 }
@@ -477,38 +501,31 @@ ListRendererFocus {
     Form { background-color: #323232; color: #ffffff; }
     Label { color: #ffffff; }
 
-    Button { color: #ffffff; background-color: #5a5a5a; border: 0.26mm solid #6b6b6b; }
-    Button.hover { color: #ffffff; background-color: #666666; border: 0.26mm solid #6b6b6b; }
-    Button.pressed { color: #ffffff; background-color: #4a4a4a; border: 0.26mm solid #5c5c5c; }
-    Button.disabled { color: #6e6e6e; background-color: #3c3c3c; border: 0.26mm solid #4a4a4a; }
+    Button { color: #ffffff; background-color: #5a5a5a; border: 0.26mm solid #6b6b6b; border-radius: 1.76mm; }
+    Button.pressed { color: #ffffff; background-color: #4a4a4a; border: 0.26mm solid #5c5c5c; border-radius: 1.76mm; }
+    Button.disabled { color: #6e6e6e; background-color: #3c3c3c; border: 0.26mm solid #4a4a4a; border-radius: 1.76mm; }
 
     RaisedButton { color: #ffffff; background-color: #007aff; }
-    RaisedButton.hover { color: #ffffff; background-color: #1a88ff; }
     RaisedButton.pressed { color: #ffffff; background-color: #0060cc; }
     RaisedButton.disabled { color: #6e6e6e; background-color: #3c3c3c; }
 
     FlatButton { color: #4da3ff; background-color: transparent; }
-    FlatButton.hover { color: #4da3ff; background-color: #3c3c3c; }
     FlatButton.pressed { color: #007aff; background-color: #4a4a4a; }
 
-    TextField { color: #ffffff; background-color: #1e1e1e; border: 0.26mm solid #48484a; }
-    TextField.hover { color: #ffffff; background-color: #1e1e1e; border: 0.26mm solid #5c5c5e; }
-    TextField.selected { color: #ffffff; background-color: #1e1e1e; border: 0.53mm solid #007aff; }
-    TextField.disabled { color: #6e6e6e; background-color: #2a2a2a; border: 0.26mm solid #3c3c3c; }
+    TextField { color: #ffffff; background-color: #1e1e1e; border: 0.26mm solid #48484a; border-radius: 1.06mm; }
+    TextField.selected { color: #ffffff; background-color: #1e1e1e; border: 0.53mm solid #007aff; border-radius: 1.06mm; }
+    TextField.disabled { color: #6e6e6e; background-color: #2a2a2a; border: 0.26mm solid #3c3c3c; border-radius: 1.06mm; }
 
     CheckBox { color: #ffffff; }
     CheckBox.selected { color: #007aff; }
-    CheckBox.hover { color: #ffffff; background-color: #3c3c3c; }
     CheckBox.disabled { color: #6e6e6e; }
 
     RadioButton { color: #ffffff; }
     RadioButton.selected { color: #007aff; }
-    RadioButton.hover { color: #ffffff; background-color: #3c3c3c; }
     RadioButton.disabled { color: #6e6e6e; }
 
     Switch { background-color: #5a5a5a; }
     Switch.selected { background-color: #007aff; }
-    Switch.hover { background-color: #666666; }
     Switch.disabled { background-color: #3c3c3c; }
 
     Slider { background-color: #5a5a5a; }
@@ -524,6 +541,9 @@ ListRendererFocus {
     DialogTitle { color: #ffffff; }
     DialogBody { color: #ffffff; }
 
+    ComboBox { color: #ffffff; background-color: #5a5a5a; border: 0.26mm solid #6b6b6b; border-radius: 1.76mm; }
+    ComboBox.disabled { color: #6e6e6e; background-color: #3c3c3c; border: 0.26mm solid #6b6b6b; border-radius: 1.76mm; }
+    Slider.disabled { background-color: #3c3c3c; color: #6e6e6e; }
     ScrollThumb { background-color: #5a5a5a; }
     ScrollThumb.hover { background-color: #6e6e6e; }
     ScrollThumb.pressed { background-color: #8e8e8e; }
@@ -531,5 +551,14 @@ ListRendererFocus {
     ListRenderer { color: #ffffff; background-color: transparent; }
     ListRenderer.selected { color: #ffffff; background-color: #0064e1; }
     ListRenderer.hover { color: #ffffff; background-color: #3c3c3c; }
-    ListRendererFocus { border: 0.53mm solid #007aff; }
+    ListRendererFocus { border: 0.53mm solid #007aff; border-radius: 1.41mm; }
+
+    /* cn1-derive is flattened against the LIGHT parent at compile time, so a UIID
+       that derives in the light block gets a concrete COPY of the light colours and
+       no $Dark entry at all. Without repeating the derive here, a dark-mode TextArea
+       keeps TextField's near-white background on a dark form. Repeat every derive. */
+    TextArea { cn1-derive: TextField; }
+    HorizontalScrollThumb { cn1-derive: ScrollThumb; }
+    DesktopScrollThumb { cn1-derive: ScrollThumb; }
+    DesktopHorizontalScrollThumb { cn1-derive: ScrollThumb; }
 }

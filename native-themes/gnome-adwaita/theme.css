@@ -19,6 +19,7 @@
  *
  * Please contact Codename One through http://www.codenameone.com/ if you
  * need additional information or have any questions.
+ */
 
 /*
  * GNOME (GTK4 + libadwaita) native theme for Codename One.
@@ -53,16 +54,26 @@
     --accent-fg-color-dark: #ffffff;
     --window-bg-color: #fafafa;
     --window-bg-color-dark: #242424;
-    --window-fg-color: #2e3436;
-    --window-fg-color-dark: #ffffff;
+    --text-color: #2e3436;
+    --text-color-dark: #ffffff;
     --view-bg-color: #ffffff;
     --view-bg-color-dark: #1e1e1e;
     --headerbar-bg-color: #ebebeb;
     --headerbar-bg-color-dark: #303030;
-    --card-bg-color: #ffffff;
-    --card-bg-color-dark: #2a2a2a;
+    --control-bg-color: #ffffff;
+    --control-bg-color-dark: #2a2a2a;
     --destructive-color: #e01b24;
     --success-color: #2ec27e;
+    --accent-pressed-color: #1c71d8;    /* accent_bg_color darkened on press */
+    --accent-pressed-color-dark: #1c71d8;
+    --text-secondary-color: #5e5c64;    /* the dim label colour */
+    --text-secondary-color-dark: #c0bfbc;
+    --stroke-color: #cdc7c2;            /* the control outline */
+    --stroke-color-dark: #3d3846;
+    --separator-color: #d8d4d0;         /* the divider line */
+    --separator-color-dark: #3d3846;
+    --selection-color: #3584e4;         /* Adwaita selects with the accent */
+    --selection-color-dark: #3584e4;
 
     includeNativeBool: false;
     darkModeBool: true;
@@ -86,19 +97,34 @@
 
     /* GtkScale: a 4px trough with a 20px thumb. */
     sliderTrackThicknessMM: "1.06";
+
+    /* Desktop sliders have a round KNOB on one continuous track. Without these the
+       painter draws Material's thumb instead: a thin vertical bar, with a gap either
+       side of it and a "stop indicator" dot near the far end, none of which any desktop
+       toolkit draws. Equal width and height is what makes the thumb a circle.
+       20px, the Adwaita knob. */
+    sliderThumbWidthMM: "4.02";
+    sliderThumbHeightMM: "4.02";
+    sliderContinuousTrackBool: true;
+
+    /* A desktop progress bar is much thinner than the slider beside it: 8px, measured from the committed Adwaita golden.
+       Its own constant for that reason -- one value for both would be wrong for one of
+       them. Without it a progress bar paints the legacy full-height fill, 19px against
+       this reference. */
+    progressTrackThicknessMM: "2.12";
 }
 
 /* --- Window and text ------------------------------------------------------------------- */
 
 Form {
     background-color: var(--window-bg-color, #fafafa);
-    color: var(--window-fg-color, #2e3436);
+    color: var(--text-color, #2e3436);
     font-family: "native:MainRegular";
     font-size: 2.9mm;
 }
 
 Label {
-    color: var(--window-fg-color, #2e3436);
+    color: var(--text-color, #2e3436);
     background-color: transparent;
     font-family: "native:MainRegular";
     font-size: 2.9mm;
@@ -112,7 +138,7 @@ Label {
  */
 
 Button {
-    color: var(--window-fg-color, #2e3436);
+    color: var(--text-color, #2e3436);
     background-color: #e1e1e0;
     border-radius: 1.59mm;
     padding: 1.3mm 4.2mm 1.3mm 4.2mm;
@@ -123,7 +149,7 @@ Button {
 }
 
 Button.hover {
-    color: var(--window-fg-color, #2e3436);
+    color: var(--text-color, #2e3436);
     background-color: #d6d6d5;
     border-radius: 1.59mm;
     padding: 1.3mm 4.2mm 1.3mm 4.2mm;
@@ -134,7 +160,7 @@ Button.hover {
 }
 
 Button.pressed {
-    color: var(--window-fg-color, #2e3436);
+    color: var(--text-color, #2e3436);
     background-color: #c8c8c7;
     border-radius: 1.59mm;
     padding: 1.3mm 4.2mm 1.3mm 4.2mm;
@@ -202,7 +228,7 @@ RaisedButton.disabled {
 
 /* The flat button: no fill until hovered. */
 FlatButton {
-    color: var(--window-fg-color, #2e3436);
+    color: var(--text-color, #2e3436);
     background-color: transparent;
     border-radius: 1.59mm;
     padding: 1.3mm 4.2mm 1.3mm 4.2mm;
@@ -213,7 +239,7 @@ FlatButton {
 }
 
 FlatButton.hover {
-    color: var(--window-fg-color, #2e3436);
+    color: var(--text-color, #2e3436);
     background-color: #e1e1e0;
     border-radius: 1.59mm;
     padding: 1.3mm 4.2mm 1.3mm 4.2mm;
@@ -224,7 +250,7 @@ FlatButton.hover {
 }
 
 FlatButton.pressed {
-    color: var(--window-fg-color, #2e3436);
+    color: var(--text-color, #2e3436);
     background-color: #d6d6d5;
     border-radius: 1.59mm;
     padding: 1.3mm 4.2mm 1.3mm 4.2mm;
@@ -237,7 +263,7 @@ FlatButton.pressed {
 /* --- Text entry ------------------------------------------------------------------------ */
 
 TextField {
-    color: var(--window-fg-color, #2e3436);
+    color: var(--text-color, #2e3436);
     background-color: var(--view-bg-color, #ffffff);
     border: 0.26mm solid #cdc7c2;
     border-radius: 1.59mm;
@@ -248,7 +274,7 @@ TextField {
 }
 
 TextField.hover {
-    color: var(--window-fg-color, #2e3436);
+    color: var(--text-color, #2e3436);
     background-color: var(--view-bg-color, #ffffff);
     border: 0.26mm solid #b8b0a8;
     border-radius: 1.59mm;
@@ -260,7 +286,7 @@ TextField.hover {
 
 /* Focused: the accent ring Adwaita draws round an active entry. */
 TextField.selected {
-    color: var(--window-fg-color, #2e3436);
+    color: var(--text-color, #2e3436);
     background-color: var(--view-bg-color, #ffffff);
     border: 0.53mm solid var(--accent-color, #3584e4);
     border-radius: 1.59mm;
@@ -286,7 +312,7 @@ TextArea { cn1-derive: TextField; }
 /* --- Check, radio, switch -------------------------------------------------------------- */
 
 CheckBox {
-    color: var(--window-fg-color, #2e3436);
+    color: var(--text-color, #2e3436);
     background-color: transparent;
     padding: 0.8mm;
     margin: 0.5mm;
@@ -295,11 +321,11 @@ CheckBox {
 }
 
 CheckBox.selected { color: var(--accent-color, #3584e4); background-color: transparent; }
-CheckBox.hover { color: var(--window-fg-color, #2e3436); background-color: #ededeb; }
+CheckBox.hover { color: var(--text-color, #2e3436); background-color: #ededeb; }
 CheckBox.disabled { color: #9a9996; background-color: transparent; }
 
 RadioButton {
-    color: var(--window-fg-color, #2e3436);
+    color: var(--text-color, #2e3436);
     background-color: transparent;
     padding: 0.8mm;
     margin: 0.5mm;
@@ -308,7 +334,7 @@ RadioButton {
 }
 
 RadioButton.selected { color: var(--accent-color, #3584e4); background-color: transparent; }
-RadioButton.hover { color: var(--window-fg-color, #2e3436); background-color: #ededeb; }
+RadioButton.hover { color: var(--text-color, #2e3436); background-color: #ededeb; }
 RadioButton.disabled { color: #9a9996; background-color: transparent; }
 
 /* GtkSwitch: a 48x26px pill that fills with accent when on. */
@@ -347,7 +373,10 @@ Switch.disabled {
 /* --- Slider and progress --------------------------------------------------------------- */
 
 Slider {
-    color: var(--accent-color, #3584e4);
+    /* The KNOB colour, not the track's: paintNativeSlider takes the thumb from the
+       Slider style's foreground. White on every desktop, where the accent is the
+       filled part of the track behind it. */
+    color: #ffffff;
     background-color: #d6d6d5;
     cn1-background-type: cn1-pill-border;
     margin: 0.8mm;
@@ -377,6 +406,64 @@ ProgressBarFull {
     margin: 0.8mm;
 }
 
+/* --- ComboBox ------------------------------------------------------------------------- */
+/*
+ * Declared because the fidelity matrix asks for it and nothing was styling it: the tile
+ * rendered from UIManager's blank defaults and was pixel-identical in normal and hover,
+ * which is what an unstyled control looks like when you only glance at it. A native
+ * NSPopUpButton / GtkDropDown / WinUI ComboBox reads as a button with a label, which is what
+ * the Codename One side has to offer against it.
+ */
+
+ComboBox {
+    color: #2e3436;
+    background-color: #e1e1e0;
+    border: 0.26mm solid #cdc7c2;
+    border-radius: 1.59mm;
+    padding: 1.3mm 4.2mm 1.3mm 4.2mm;
+    margin: 0.8mm;
+    font-family: "native:MainRegular";
+    font-size: 2.9mm;
+}
+
+ComboBox.hover {
+    color: #2e3436;
+    background-color: #d6d6d5;
+    border: 0.26mm solid #cdc7c2;
+    border-radius: 1.59mm;
+    padding: 1.3mm 4.2mm 1.3mm 4.2mm;
+    margin: 0.8mm;
+    font-family: "native:MainRegular";
+    font-size: 2.9mm;
+}
+
+ComboBox.disabled {
+    color: #9a9996;
+    background-color: #ededeb;
+    border: 0.26mm solid #cdc7c2;
+    border-radius: 1.59mm;
+    padding: 1.3mm 4.2mm 1.3mm 4.2mm;
+    margin: 0.8mm;
+    font-family: "native:MainRegular";
+    font-size: 2.9mm;
+}
+
+/* A native slider highlights its track under the pointer. Without this the hover tile was
+   byte-identical to the normal one. */
+Slider.hover {
+    color: #3584e4;
+    background-color: #c8c8c7;
+    cn1-background-type: cn1-pill-border;
+    margin: 0.8mm;
+}
+
+Slider.disabled {
+    color: #9a9996;
+    background-color: #ededeb;
+    cn1-background-type: cn1-pill-border;
+    margin: 0.8mm;
+}
+
 /* --- Header bar ------------------------------------------------------------------------ */
 /*
  * AdwHeaderBar is the window's title bar, not a strip below it. It carries a 1px bottom
@@ -391,7 +478,7 @@ TitleArea {
 }
 
 Title {
-    color: var(--window-fg-color, #2e3436);
+    color: var(--text-color, #2e3436);
     background-color: transparent;
     font-family: "native:MainBold";
     font-size: 2.9mm;
@@ -408,14 +495,14 @@ Toolbar {
 /* --- Dialog --------------------------------------------------------------------------- */
 
 Dialog {
-    background-color: var(--card-bg-color, #ffffff);
+    background-color: var(--control-bg-color, #ffffff);
     border-radius: 3.18mm;
     padding: 4.2mm;
     margin: 2.1mm;
 }
 
 DialogTitle {
-    color: var(--window-fg-color, #2e3436);
+    color: var(--text-color, #2e3436);
     background-color: transparent;
     font-family: "native:MainBold";
     font-size: 3.4mm;
@@ -423,7 +510,7 @@ DialogTitle {
 }
 
 DialogBody {
-    color: var(--window-fg-color, #2e3436);
+    color: var(--text-color, #2e3436);
     background-color: transparent;
     font-family: "native:MainRegular";
     font-size: 2.9mm;
@@ -449,7 +536,7 @@ DesktopHorizontalScroll { background-color: transparent; }
 DesktopHorizontalScrollThumb { cn1-derive: ScrollThumb; }
 
 ListRenderer {
-    color: var(--window-fg-color, #2e3436);
+    color: var(--text-color, #2e3436);
     background-color: transparent;
     border-radius: 1.59mm;
     padding: 1.6mm 2.6mm 1.6mm 2.6mm;
@@ -463,7 +550,7 @@ ListRenderer.selected {
 }
 
 ListRenderer.hover {
-    color: var(--window-fg-color, #2e3436);
+    color: var(--text-color, #2e3436);
     background-color: #ededeb;
     border-radius: 1.59mm;
     padding: 1.6mm 2.6mm 1.6mm 2.6mm;
@@ -497,10 +584,10 @@ ListRendererFocus {
     FlatButton.hover { color: #ffffff; background-color: #383838; }
     FlatButton.pressed { color: #ffffff; background-color: #454545; }
 
-    TextField { color: #ffffff; background-color: #1e1e1e; border: 0.26mm solid #3d3d3d; }
-    TextField.hover { color: #ffffff; background-color: #1e1e1e; border: 0.26mm solid #575757; }
-    TextField.selected { color: #ffffff; background-color: #1e1e1e; border: 0.53mm solid #3584e4; }
-    TextField.disabled { color: #919191; background-color: #282828; border: 0.26mm solid #363636; }
+    TextField { color: #ffffff; background-color: #1e1e1e; border: 0.26mm solid #3d3d3d; border-radius: 1.59mm; }
+    TextField.hover { color: #ffffff; background-color: #1e1e1e; border: 0.26mm solid #575757; border-radius: 1.59mm; }
+    TextField.selected { color: #ffffff; background-color: #1e1e1e; border: 0.53mm solid #3584e4; border-radius: 1.59mm; }
+    TextField.disabled { color: #919191; background-color: #282828; border: 0.26mm solid #363636; border-radius: 1.59mm; }
 
     CheckBox { color: #ffffff; }
     CheckBox.selected { color: #3584e4; }
@@ -517,7 +604,10 @@ ListRendererFocus {
     Switch.hover { background-color: #575757; }
     Switch.disabled { background-color: #2e2e2e; }
 
-    Slider { background-color: #454545; }
+    /* color is the KNOB. Adwaita's dark knob is light grey, not white, and a white
+       one scored worse than the bar thumb it replaced until this was measured off
+       the committed dark golden. */
+    Slider { background-color: #454545; color: #d2d2d2; }
     SliderFull { background-color: #3584e4; color: #3584e4; }
     ProgressBar { background-color: #454545; }
     ProgressBarFull { background-color: #3584e4; color: #3584e4; }
@@ -530,6 +620,11 @@ ListRendererFocus {
     DialogTitle { color: #ffffff; }
     DialogBody { color: #ffffff; }
 
+    ComboBox { color: #ffffff; background-color: #383838; border: 0.26mm solid #3d3d3d; border-radius: 1.59mm; }
+    ComboBox.hover { color: #ffffff; background-color: #454545; border: 0.26mm solid #3d3d3d; border-radius: 1.59mm; }
+    ComboBox.disabled { color: #919191; background-color: #2e2e2e; border: 0.26mm solid #3d3d3d; border-radius: 1.59mm; }
+    Slider.hover { background-color: #575757; color: #3584e4; }
+    Slider.disabled { background-color: #2e2e2e; color: #919191; }
     ScrollThumb { background-color: #5e5c64; }
     ScrollThumb.hover { background-color: #77767b; }
     ScrollThumb.pressed { background-color: #9a9996; }
@@ -537,5 +632,14 @@ ListRendererFocus {
     ListRenderer { color: #ffffff; background-color: transparent; }
     ListRenderer.selected { color: #ffffff; background-color: #3584e4; }
     ListRenderer.hover { color: #ffffff; background-color: #383838; }
-    ListRendererFocus { border: 0.53mm solid #3584e4; }
+    ListRendererFocus { border: 0.53mm solid #3584e4; border-radius: 1.59mm; }
+
+    /* cn1-derive is flattened against the LIGHT parent at compile time, so a UIID
+       that derives in the light block gets a concrete COPY of the light colours and
+       no $Dark entry at all. Without repeating the derive here, a dark-mode TextArea
+       keeps TextField's near-white background on a dark form. Repeat every derive. */
+    TextArea { cn1-derive: TextField; }
+    HorizontalScrollThumb { cn1-derive: ScrollThumb; }
+    DesktopScrollThumb { cn1-derive: ScrollThumb; }
+    DesktopHorizontalScrollThumb { cn1-derive: ScrollThumb; }
 }

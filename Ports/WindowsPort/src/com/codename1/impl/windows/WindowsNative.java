@@ -42,6 +42,17 @@ public final class WindowsNative {
     /** Writes a line to the native debug log (OutputDebugString + stderr). */
     public static native void nativeLog(String message);
 
+    /**
+     * True when the user has chosen the dark app theme.
+     *
+     * Reads AppsUseLightTheme under
+     * HKCU\Software\Microsoft\Windows\CurrentVersion\Themes\Personalize, which is
+     * the value the Settings app writes and the one every Windows application reads.
+     * Note the inversion: the value is "use LIGHT", so 0 means dark and a missing value
+     * means light, which is the pre-Windows-10 default.
+     */
+    public static native boolean systemUsesDarkTheme();
+
     /* ------------------------------------------------------------- VideoIO */
     /** True when the Media Foundation backend for VideoIO is available (MFStartup ok). */
     public static native boolean videoBackendAvailable();

@@ -512,6 +512,13 @@ static gboolean cn1OnMotion(GtkWidget* widget, GdkEventMotion* e, gpointer data)
     int mask = cn1LinuxStateMask(e->state);
     if (mask != 0) {
         cn1LinuxPushEvent(CN1_EVENT_POINTER_DRAGGED, (int) e->x, (int) e->y, mask);
+    } else {
+        /* No button held: this is hover, and it used to be dropped here.
+         * Component's hover style is driven by Form.pointerHover, which has
+         * nothing else to fire it, so every hover rule in a desktop theme was
+         * inert. Droppable rather than protected: a lost hover costs nothing
+         * because hover is idempotent and the next motion re-establishes it. */
+        cn1LinuxPushEvent(CN1_EVENT_POINTER_HOVER, (int) e->x, (int) e->y, 0);
     }
     return TRUE;
 }
@@ -1410,4 +1417,32 @@ JAVA_OBJECT com_codename1_impl_linux_LinuxNative_captureWindowToPngBytes___R_byt
     arr = cn1LinuxNewByteArray(threadStateData, data, len);
     free(data);
     return arr;
+}
+
+/* ------------------------------------------------------------- colour scheme */
+
+/* The desktop's colour scheme: 1 dark, 0 light, -1 unknown.
+ *
+ * Asked of GtkSettings, which this port already links and already initialises for its
+ * own window -- so no D-Bus, no xdg-desktop-portal round trip, and no subprocess.
+ * gtk-application-prefer-dark-theme is what a GTK session sets from the desktop's
+ * colour-scheme preference, and it is the same value every GTK application reads.
+ *
+ * -1 is a real answer here, not an error code being smuggled: a session with no
+ * settings daemon (a bare Xvfb, a minimal container) has no default to report, and
+ * calling that "light" would be a guess presented as a fact. The Java side maps it to
+ * null, which UIManager's dark-mode resolution tests for explicitly.
+ *
+ * The signature is ParparVM's and is checked by nothing at build time -- a wrong name
+ * compiles, links, and leaves the Java method looking unused to the dead-code pass,
+ * which then removes it. scripts/check-native-signatures.sh is what catches that.
+ */
+JAVA_INT com_codename1_impl_linux_LinuxNative_systemColorScheme___R_int(CODENAME_ONE_THREAD_STATE) {
+    GtkSettings* settings = gtk_settings_get_default();
+    if (settings == NULL) {
+        return -1;
+    }
+    gboolean dark = FALSE;
+    g_object_get(settings, "gtk-application-prefer-dark-theme", &dark, NULL);
+    return dark ? 1 : 0;
 }
