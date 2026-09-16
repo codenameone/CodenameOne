@@ -318,6 +318,7 @@ public final class AndroidSecureStorage extends SecureStorage {
         try {
             handle = new java.io.RandomAccessFile(gate, "rw");
             lock = handle.getChannel().lock();
+            HELD_GATE.set(account);
             if (!setUnderHeldGate(account, value)) {
                 return false;
             }
@@ -356,6 +357,7 @@ public final class AndroidSecureStorage extends SecureStorage {
             Log.e(cannotLock);
             return false;
         } finally {
+            HELD_GATE.remove();
             if (lock != null) {
                 try {
                     lock.release();
@@ -517,6 +519,7 @@ public final class AndroidSecureStorage extends SecureStorage {
             // permanently uncreatable. Blocking, so a second caller waits for the first rather
             // than proceeding as though the entry were absent.
             lock = handle.getChannel().lock();
+            HELD_GATE.set(account);
             // The gate byte first, because it is the only thing here that crosses processes.
             int mark = handle.length() > 0 ? handle.read() : 0;
             String stored = mark == GATE_REMOVED ? null : get(account);
@@ -581,6 +584,7 @@ public final class AndroidSecureStorage extends SecureStorage {
             Log.e(cannotLock);
             return null;
         } finally {
+            HELD_GATE.remove();
             if (lock != null) {
                 try {
                     lock.release();
@@ -1014,11 +1018,27 @@ public final class AndroidSecureStorage extends SecureStorage {
                     Log.e(cannotLock);
                     everyGateHeld = false;
                 } catch (RuntimeException cannotLock) {
-                    // OverlappingFileLockException among them, which means a thread in THIS
-                    // process already holds that gate -- setIfAbsent, most likely, since its
-                    // set() can reach here.
-                    Log.e(cannotLock);
-                    everyGateHeld = false;
+                    // OverlappingFileLockException among them, which means a thread in this
+                    // process already holds that gate. If that thread is US -- this reset was
+                    // reached from inside the gate, which is the ordinary way an invalid alias
+                    // is discovered -- then the gate is held and the requirement is met; the
+                    // mark can be truncated through a second handle without locking, because
+                    // nobody else can be in there. Any OTHER thread holding it is a genuine
+                    // unavailability and still aborts.
+                    if (account.equals(HELD_GATE.get())) {
+                        try {
+                            handles.add(new java.io.RandomAccessFile(gate, "rw"));
+                            locks.add(null);
+                            held.add(account);
+                            handle = null;
+                        } catch (java.io.IOException cannotReopen) {
+                            Log.e(cannotReopen);
+                            everyGateHeld = false;
+                        }
+                    } else {
+                        Log.e(cannotLock);
+                        everyGateHeld = false;
+                    }
                 } finally {
                     // Non-null only when the lock was not taken, so this closes the handle that
                     // never made it into the lists rather than leaking it for the whole reset.
@@ -1088,6 +1108,11 @@ public final class AndroidSecureStorage extends SecureStorage {
             }
         } finally {
             for (java.nio.channels.FileLock lock : locks) {
+                // Null for the gate this thread already held on the way in: it is not ours to
+                // release here, and the frame that took it will.
+                if (lock == null) {
+                    continue;
+                }
                 try {
                     lock.release();
                 } catch (java.io.IOException ignored) {
@@ -1106,6 +1131,20 @@ public final class AndroidSecureStorage extends SecureStorage {
 
 
     /// Clears the mark and deletes the value as one step, under the lock setIfAbsent takes.
+    /// The account whose gate THIS THREAD is holding, or null.
+    ///
+    /// A reset can be reached from inside a held gate -- setUnderHeldGate hits an invalid
+    /// keystore alias, and get() does too when setIfAbsent calls it under the lock. The reset
+    /// wants every gate, and asking the file for one this thread already owns raises
+    /// OverlappingFileLockException rather than blocking, so it counted its own lock as
+    /// unavailable, aborted, and left the unusable alias in place. Every retry took the same
+    /// path, which made managed keys permanently unrecreatable after a keystore invalidation --
+    /// a livelock, and a strictly worse outcome than the stranding the abort was added to stop.
+    ///
+    /// Knowing which one is ours turns that into the truth: the gate IS held, by us, so the
+    /// coordination the reset needs is satisfied for that account.
+    private static final ThreadLocal<String> HELD_GATE = new ThreadLocal<String>();
+
     /// The gate byte meaning "a value is settled here".
     private static final int GATE_SETTLED = 1;
 
@@ -1128,6 +1167,7 @@ public final class AndroidSecureStorage extends SecureStorage {
         try {
             handle = new java.io.RandomAccessFile(gate, "rw");
             lock = handle.getChannel().lock();
+            HELD_GATE.set(account);
             // A TOMBSTONE, not an erasure: see GATE_REMOVED. Truncating here said "nobody has
             // settled this account", which is indistinguishable from never-used and left every
             // other process free to keep serving the value its own cache still holds.
@@ -1166,6 +1206,7 @@ public final class AndroidSecureStorage extends SecureStorage {
             Log.e(cannotRemove);
             return false;
         } finally {
+            HELD_GATE.remove();
             if (lock != null) {
                 try {
                     lock.release();

@@ -1549,6 +1549,26 @@ public final class Vault {
                     next.counter = meta.counter + 1;
                     stampMac(next, meta, key);
                     commitMetadata(meta, next);
+                    // No lock-generation check here, and that is deliberate rather than an
+                    // omission -- a review has asked for one, so the reasoning belongs beside
+                    // the code rather than in rotateDataKey's comment where it used to live.
+                    //
+                    // Three things make a lock landing inside this harmless. It never reads the
+                    // shared data key: the key it re-wraps is derived from the password wrap
+                    // into an array of its own, so lock() zeroing dataKey cannot corrupt what
+                    // this produces. It publishes no key, so the vault is closed afterwards
+                    // either way, which is the state lock() was asking for. And it is documented
+                    // to work on an ALREADY-locked vault -- so a lock arriving in the middle
+                    // cannot make the operation invalid, when the same state at the start is
+                    // explicitly supported.
+                    //
+                    // Undoing it would also be the worse answer. Rolling the record back
+                    // restores the OLD password after the user asked to change it, on a call
+                    // that would then report LOCKED; leaving it stands means the change the user
+                    // asked for is durable and their next unlock uses the new password. What a
+                    // lock must prevent is an operation DELIVERING a key or reopening a closed
+                    // vault, and this does neither.
+                    //
                     // Cached ONLY by an instance that actually holds the key. changePassword is
                     // the one path documented to work on a LOCKED vault, and caching the record
                     // there left this tab warm with no key: loadMetadata() then answers the
