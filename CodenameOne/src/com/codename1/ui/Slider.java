@@ -730,7 +730,10 @@ public class Slider extends Label implements ActionSource {
     ///
     /// - `vertical`: true if the slider is vertical
     public void setVertical(boolean vertical) {
-        this.vertical = vertical;
+        if (this.vertical != vertical) {
+            this.vertical = vertical;
+            setShouldCalcPreferredSize(true);
+        }
     }
 
     /// Indicates the slider is modifyable

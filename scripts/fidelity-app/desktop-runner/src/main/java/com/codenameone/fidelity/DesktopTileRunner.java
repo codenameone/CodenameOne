@@ -158,8 +158,12 @@ public final class DesktopTileRunner {
             List components = spec.getComponents();
             for (int i = 0; i < components.size(); i++) {
                 ComponentSpec c = (ComponentSpec) components.get(i);
-                if (!c.appliesToPlatform(platform) || !Cn1WidgetRenderer.isSupported(c.getId())) {
+                if (!c.appliesToPlatform(platform)) {
                     continue;
+                }
+                // A new row has no baseline yet, so silently dropping it evades the gate.
+                if (!Cn1WidgetRenderer.isSupported(c.getId())) {
+                    throw new IllegalArgumentException("Unsupported desktop fidelity component: " + c.getId());
                 }
                 int w = spec.tileWidthPx(c);
                 int h = spec.tileHeightPx(c);

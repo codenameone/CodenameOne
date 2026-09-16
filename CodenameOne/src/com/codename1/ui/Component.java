@@ -4687,9 +4687,14 @@ public class Component implements Animation, StyleListener, Editable {
     ///
     /// - `blockLead`: the blockLead to set
     public void setBlockLead(boolean blockLead) {
+        if (this.blockLead == blockLead) {
+            return;
+        }
+        HoverTracker tracker = HoverTracker.prepareLeadChange(this);
         this.blockLead = blockLead;
-        if (blockLead) {
-            hasLead = false;
+        hasLead = !blockLead && getLeadComponent() != null;
+        if (tracker != null) {
+            tracker.finishLeadChange(this);
         }
     }
 

@@ -3899,7 +3899,7 @@ public class Window extends Container implements TopLevelContainer {
         Display.getInstance().windowInputCancelled(this);
     }
 
-    private Component hoverTargetAt(int x, int y) {
+    Component hoverTargetAt(int x, int y) {
         // Keep this check specific to hover: captured drag/release dispatch can still
         // target a pressed component outside the window. A leave must not hover its root.
         Container actual = getActualPane(x, y);

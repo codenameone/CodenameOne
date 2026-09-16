@@ -4580,7 +4580,7 @@ public class Form extends Container implements TopLevelContainer {
     /// pointer events, mapped to its lead parent. Resolution only -- nothing is dispatched --
     /// so a caller that just needs to know what is under the pointer does not also fire a
     /// component's hover callback or start a tooltip timer.
-    private Component hoverTargetAt(int x, int y) {
+    Component hoverTargetAt(int x, int y) {
         Container actual = getActualPane(formLayeredPane, x, y);
         // getComponentAt returns the container itself for an outside point. A window
         // leave must resolve to nothing, even when the root pane has a hover style.

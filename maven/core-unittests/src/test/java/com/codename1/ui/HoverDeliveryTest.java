@@ -176,6 +176,67 @@ class HoverDeliveryTest extends UITestBase {
         }
     }
 
+    @FormTest
+    void stationaryPointerFollowsLeadTopologyChanges() {
+        implementation.setMultiWindowSupported(true);
+        for (boolean secondary : new boolean[]{false, true}) {
+            Form form = new Form("lead changes", new BorderLayout());
+            form.show();
+            Window window = secondary ? new Window("lead changes", new BorderLayout()) : null;
+            Container surface = secondary ? window : form;
+            Container row = new Container(new BorderLayout());
+            Button first = new Button("first");
+            Button second = new Button("second");
+            Label target = new Label("pointer target");
+            row.add(BorderLayout.WEST, first).add(BorderLayout.EAST, second).add(BorderLayout.CENTER, target);
+            surface.add(BorderLayout.CENTER, row);
+            if (secondary) { window.setWindowSize(500, 400); window.show(); }
+            surface.revalidate();
+            DisplayTest.flushEdt();
+            CountingHoverPainter parentPainter = new CountingHoverPainter();
+            CountingHoverPainter targetPainter = new CountingHoverPainter();
+            com.codename1.ui.plaf.Style rowHover = new com.codename1.ui.plaf.Style(row.getUnselectedStyle());
+            rowHover.setBgPainter(parentPainter);
+            row.setHoverStyle(rowHover);
+            com.codename1.ui.plaf.Style targetHover = new com.codename1.ui.plaf.Style(target.getUnselectedStyle());
+            targetHover.setBgPainter(targetPainter);
+            target.setHoverStyle(targetHover);
+            try {
+                surface.pointerHover(new int[]{target.getAbsoluteX() + target.getWidth() / 2},
+                        new int[]{target.getAbsoluteY() + target.getHeight() / 2});
+                Runnable[] changes = new Runnable[]{() -> { }, () -> row.setLeadComponent(first),
+                        () -> row.setLeadComponent(second), () -> {
+                            // A standalone child must remain hittable inside a focusable lead row.
+                            target.setFocusable(true);
+                            target.setBlockLead(true);
+                        },
+                        () -> target.setBlockLead(false), () -> row.setLeadComponent(null)};
+                Component[] owners = new Component[]{target, first, second, target, second, target};
+                for (int i = 0; i < changes.length; i++) {
+                    changes[i].run();
+                    assertEquals(owners[i] == target, target.isHovered(), "transition " + i + " secondary=" + secondary);
+                    assertEquals(owners[i] == first, first.isHovered());
+                    assertEquals(owners[i] == second, second.isHovered());
+                    assertSame(targetHover, target.getStyle());
+                    boolean rowHovered = owners[i] != target;
+                    assertSame(rowHovered ? rowHover : row.getUnselectedStyle(), row.getStyle());
+                    int parentBefore = parentPainter.ticks;
+                    int targetBefore = targetPainter.ticks;
+                    if (secondary) { window.repaintAnimations(); } else { form.repaintAnimations(); }
+                    assertEquals(parentBefore + (rowHovered ? 1 : 0), parentPainter.ticks);
+                    assertEquals(targetBefore + 1, targetPainter.ticks);
+                }
+                surface.pointerHover(new int[]{-1}, new int[]{-1});
+                assertFalse(target.isHovered());
+                assertFalse(first.isHovered());
+                assertFalse(second.isHovered());
+                assertFalse(secondary ? window.hasAnimations() : form.hasAnimations());
+            } finally {
+                if (secondary) { window.dispose(); }
+            }
+        }
+    }
+
     private static class CountingHoverImage extends Image {
         int ticks;
         CountingHoverImage() { super(Image.createImage(2, 2).getImage()); }

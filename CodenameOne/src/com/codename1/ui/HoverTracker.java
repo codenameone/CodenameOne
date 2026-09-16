@@ -50,6 +50,9 @@ class HoverTracker {
 
     private Component hovered;
     private Component lastInteractiveScrollHover;
+    private Component pointerTarget;
+    private int pointerX;
+    private int pointerY;
 
     /// Reports where the pointer now is.
     ///
@@ -65,8 +68,38 @@ class HoverTracker {
     ///
     /// - `y`: the position of the event
     void pointerOver(Component cmp, int x, int y) {
+        pointerTarget = cmp;
+        pointerX = x;
+        pointerY = y;
         updateHovered(cmp);
         updateInteractiveScrollHover(cmp, x, y);
+    }
+
+    static HoverTracker prepareLeadChange(Component changed) {
+        Container root = TopLevelSupport.rootOf(changed);
+        HoverTracker tracker = root == null ? null : root.getHoverTracker();
+        if (tracker == null || tracker.hovered == null
+                || (!isInSubtree(changed, tracker.hovered)
+                && !isInSubtree(LeadUtil.leadParentImpl(changed), tracker.hovered))) {
+            return null;
+        }
+        // Release the old hierarchy while it still owns its flags and animations.
+        // Keep the pointer coordinates so a stationary pointer can acquire the new lead.
+        tracker.updateHovered(null);
+        TooltipManager tooltip = TooltipManager.getInstance();
+        if (tooltip != null && tracker.pointerTarget != null) {
+            tooltip.clearTooltipFor(tracker.pointerTarget);
+        }
+        return tracker;
+    }
+
+    void finishLeadChange(Component changed) {
+        Container root = TopLevelSupport.rootOf(changed);
+        Component target = root instanceof Form ? ((Form) root).hoverTargetAt(pointerX, pointerY)
+                : (root instanceof Window ? ((Window) root).hoverTargetAt(pointerX, pointerY) : null);
+        // Reuse normal hit-testing, including focusable-parent capture. Resolve state
+        // only; a topology mutation must not dispatch a pointer callback.
+        pointerOver(target, pointerX, pointerY);
     }
 
     // A hover callback can remove its own component without deinitializing the
