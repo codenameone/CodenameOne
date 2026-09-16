@@ -280,6 +280,7 @@ public final class DesktopTileRunner {
         row.getAllStyles().setPadding(0, 0, 0, 0);
         row.add(comp);
         f.add(BorderLayout.NORTH, row);
+        Cn1WidgetRenderer.applyAttachedState(comp, state);
         f.setSize(new Dimension(w, h));
         f.layoutContainer();
 

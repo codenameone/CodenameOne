@@ -177,6 +177,7 @@ public class FidelityDeviceRunner {
                 form.getAllStyles().setBgTransparency(255);
                 form.getContentPane().getAllStyles().setBgColor(bgColor(appearance));
                 form.getContentPane().getAllStyles().setBgTransparency(255);
+                Component focusTarget = null;
                 for (int s = 0; s < states.size(); s++) {
                     String state = (String) states.get(s);
                     Component comp = Cn1WidgetRenderer.build(c, state, appearance);
@@ -270,6 +271,9 @@ public class FidelityDeviceRunner {
                     }
                     Container tile = newTile(comp, c.getId(), w, h, appearance, resolveBackdrop(c));
                     form.add(centerRow(tile));
+                    if ("focus".equals(state)) {
+                        focusTarget = comp;
+                    }
                     wrappers.add(tile);
                     names.add(c.getId() + "_" + state + "_" + appearance + "_cn1");
                 }
@@ -279,6 +283,9 @@ public class FidelityDeviceRunner {
                 form.setTransitionInAnimator(CommonTransitions.createEmpty());
                 form.setTransitionOutAnimator(CommonTransitions.createEmpty());
                 form.show();
+                if (focusTarget != null) {
+                    Cn1WidgetRenderer.applyAttachedState(focusTarget, "focus");
+                }
             }
         });
         settle();

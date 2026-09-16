@@ -530,6 +530,18 @@ public final class Cn1WidgetRenderer {
         }
     }
 
+    /// Applies state that requires an attached component, after the host Form is shown.
+    /// Build cannot assign focus: neither runner has attached the widget at that point.
+    public static void applyAttachedState(Component c, String state) {
+        if ("focus".equals(state)) {
+            Form form = c.getComponentForm();
+            if (form == null) {
+                throw new IllegalStateException("Focus capture requires an attached component");
+            }
+            form.setFocused(c);
+        }
+    }
+
     /// Applies the two states that only exist on the desktop.
     ///
     /// Both are set on the MODEL rather than synthesised as input, which is how every other
@@ -545,10 +557,7 @@ public final class Cn1WidgetRenderer {
             c.setHovered(true);
         } else if ("focus".equals(state)) {
             c.setFocusable(true);
-            Form f = c.getComponentForm();
-            if (f != null) {
-                f.setFocused(c);
-            }
+            // applyAttachedState assigns the focus owner after attachment and show.
         }
     }
 }

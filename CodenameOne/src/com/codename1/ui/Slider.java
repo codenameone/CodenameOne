@@ -238,6 +238,7 @@ public class Slider extends Label implements ActionSource {
     public void setInfinite(boolean i) {
         if (infinite != i) {
             infinite = i;
+            setShouldCalcPreferredSize(true);
             if (isInitialized()) {
                 if (i) {
                     TopLevelSupport.registerAnimatedInternal(this, this);
