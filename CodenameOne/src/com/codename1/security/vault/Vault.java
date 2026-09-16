@@ -2238,6 +2238,20 @@ public final class Vault {
                                 // remembered unlock that other tab had just established.
                                 if (vaultIsStillUntouched(incoming)) {
                                     Storage.getInstance().deleteStorageFile(metadataKey());
+                                    if (!definitelyGone(metadataKey())) {
+                                        // Same check enrolment's rollback makes, and this is its
+                                        // sibling: a silently refused delete leaves the imported
+                                        // record ENROLLED while the call reports only the setup
+                                        // failure, so the device carries persisted state the
+                                        // caller never agreed to and no mechanism to go with it.
+                                        // The storage failure is what describes that, with the
+                                        // original as its cause.
+                                        throw new VaultException(VaultError.STORAGE_UNAVAILABLE,
+                                                "the imported vault record could not be removed "
+                                                + "after its setup failed, so this device is "
+                                                + "still enrolled from that import",
+                                                rememberFailed);
+                                    }
                                     try {
                                         forgetEveryMechanism();
                                     } catch (RuntimeException alsoFailed) {

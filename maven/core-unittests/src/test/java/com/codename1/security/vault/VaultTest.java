@@ -939,7 +939,14 @@ class VaultTest extends UITestBase {
         assertFalse(device.keys.isEmpty());
 
         // The gated mechanism exists but cannot complete -- a cancelled passkey ceremony.
-        gated.refuseWrites = true;
+        //
+        // refuseEnsure and not refuseWrites, which is the distinction the fake documents on
+        // those two fields: refuseWrites also drives protection(), so the gated mechanism would
+        // REPORT that it cannot persist, and supports() now refuses the policy outright for
+        // that -- before reaching the transition this test is about. refuseEnsure fails the
+        // ceremony while the store still reports itself healthy, which is the cancelled-prompt
+        // shape intended here.
+        gated.refuseEnsure = true;
         device.userVerification = true;
         assertEquals(VaultError.STORAGE_UNAVAILABLE,
                 errorOf(vault.setPolicy(UnlockPolicy.REQUIRE_USER_VERIFICATION)));

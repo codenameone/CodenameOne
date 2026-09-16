@@ -71,8 +71,17 @@ public final class VaultCapabilities {
         }
         if (policy == UnlockPolicy.REQUIRE_USER_VERIFICATION) {
             DeviceProtection gated = device.userVerifying();
-            return gated != null && gated.requiresUserVerification()
-                    && gated.protection().provides(Protection.USER_VERIFICATION);
+            if (gated == null || !gated.requiresUserVerification()) {
+                return false;
+            }
+            ProtectionReport gatedReport = gated.protection();
+            // The GATED mechanism's own persistence, not the base's. They can be different
+            // objects -- a passkey beside a stored key in the browser, an application's own
+            // adapter anywhere -- and checking only the base accepted a variant that does not
+            // survive a restart, so a vault enrolled under this policy was not remembered at all
+            // while the capability said it would be.
+            return gatedReport.provides(Protection.PERSISTENT)
+                    && gatedReport.provides(Protection.USER_VERIFICATION);
         }
         return true;
     }
@@ -85,9 +94,11 @@ public final class VaultCapabilities {
     /// every time" rather than listing flags.
     public ProtectionReport protectionFor(UnlockPolicy policy) {
         ProtectionReport.Builder b = ProtectionReport.builder();
-        b.set(Protection.PERSISTENT, true);
         b.set(Protection.ISOLATED_FROM_APPLICATION_CODE, false);
         if (policy == UnlockPolicy.SESSION_ONLY) {
+            // What session-only needs in order to persist anything is ordinary Storage and the
+            // cipher, which is what canKeepARecord measures -- not a device store it never uses.
+            b.set(Protection.PERSISTENT, canKeepARecord);
             // Nothing that can reopen the vault is written, so what is at rest is ciphertext under
             // a key derived from a password that is stored nowhere. Genuinely encrypted at rest.
             b.set(Protection.ENCRYPTED_AT_REST, true);
@@ -107,6 +118,12 @@ public final class VaultCapabilities {
                 ? device.userVerifying() : null;
         DeviceProtection forPolicy = gated != null ? gated : device;
         ProtectionReport report = forPolicy.protection();
+        // PERSISTENT from the mechanism this policy would actually use, not hardcoded. It used
+        // to be set to true at the top of this method for every policy, so a gated variant that
+        // does not survive a restart -- an application's own adapter, a token that is not
+        // present -- was still described as persistent, and Vault.requireProtections then
+        // accepted a PERSISTENT guarantee for an enrolment that would not be remembered at all.
+        b.set(Protection.PERSISTENT, report.answer(Protection.PERSISTENT));
         // Taken from the store rather than assumed. A remembered vault is only as encrypted at
         // rest as the wrapping key is: where that key sits in the clear beside the ciphertext --
         // the simulator, and Android before the keystore existed -- the records are ciphertext and
