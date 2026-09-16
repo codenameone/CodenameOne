@@ -1422,7 +1422,7 @@ IMPORTANT: You must set the column width constraint when you want multi-line to 
 image::img/generated/components-table-multiline-portrait.png[Multiline table cell in portrait mode,scaledwidth=20%]
 
 .Multiline table cell in landscape mode. Notice the cell row count adapts seamlessly
-image::img/components-table-multiline-landscape.png[Multiline table cell in landscape mode. Notice the cell row count adapts seamlessly,scaledwidth=20%]
+image::img/generated/components-table-multiline-landscape.png[Multiline table cell in landscape mode. Notice the cell row count adapts seamlessly,scaledwidth=20%]
 
 ==== Sorting tables
 
