@@ -508,6 +508,12 @@ public final class Config {
                         + "silently.");
             }
             long size = info[0];
+            // Kept for the check after the read: a rewrite that replaces the file
+            // with one of the SAME LENGTH passes both guards below -- the buffer
+            // fills exactly and nothing is beyond it -- while what is in the
+            // buffer can be part of the old file and part of the new. See the
+            // re-stat below.
+            long modifiedBefore = info[1];
             // A configuration file is kilobytes. The ceiling is here because the
             // size comes from the filesystem and this allocates it: a device node
             // or a truncated-then-growing file should fail with a message rather
@@ -550,6 +556,32 @@ public final class Config {
                             + "was loaded is the first " + out.length + " bytes of a file "
                             + "that is now longer. It is being rewritten underneath this "
                             + "process; start again once it has settled.");
+                }
+                // AND THE FILE IS STILL THE ONE THAT WAS MEASURED. The two guards
+                // above both key off LENGTH, so the rewrite they cannot see is the
+                // one that keeps it: a deployment tool writing a new
+                // application.properties over the old one in place, where the
+                // buffer ends up part old and part new. It parses -- every
+                // complete line in it is a setting -- so the result is a
+                // configuration that never existed, and the pairing that matters
+                // is an old TLS certificate path with a new key.
+                //
+                // The modification time is what tells, and it is checked on the
+                // SAME DESCRIPTOR, so this asks about the file that was read
+                // rather than about whatever the path names now.
+                //
+                // NOT AIRTIGHT, and worth saying so: a filesystem that stamps
+                // mtime to the second cannot distinguish a rewrite that lands
+                // inside the same second as the open. It closes the window that
+                // is actually open -- a tool writing a file after this process
+                // started reading it -- rather than every window.
+                long[] after = new long[3];
+                if(FileIo.stat(fd, after) >= 0 && after[1] != modifiedBefore) {
+                    throw new IOException(path + " was rewritten while it was being "
+                            + "read, so what was loaded may be part of the old file and "
+                            + "part of the new. It is the same length either way, which "
+                            + "is why nothing else here noticed; start again once it has "
+                            + "settled.");
                 }
                 return out;
             }

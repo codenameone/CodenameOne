@@ -62,6 +62,37 @@ class ConfigTest {
     }
 
     @Test
+    @DisplayName("a same-length rewrite during the read is refused")
+    void aSameLengthRewriteIsRefused(@TempDir File dir) throws Exception {
+        // The growth probe and the fill check both key off LENGTH, so the rewrite
+        // neither can see is the one that keeps it: a deployment tool writing a
+        // new application.properties over the old one in place, leaving the
+        // buffer part old and part new. It parses -- every complete line in it is
+        // a setting -- so the result is a configuration that never existed, and
+        // the pairing that matters is an old TLS certificate path with a new key.
+        //
+        // Simulated by rewriting the file to the same length with a NEWER
+        // modification time before the read, which is the state the guard looks
+        // for; a real race cannot be driven from a test, because the window is
+        // between the descriptor's stat and its read.
+        File file = new File(dir, "application.properties");
+        write(dir, "application.properties", "cn1.server.port=8080\n");
+        long length = file.length();
+        // A second file of the same length and a later mtime.
+        write(dir, "application.properties", "cn1.server.port=9090\n");
+        assertEquals(length, file.length(), "the two versions must be the same length "
+                + "or this tests the growth guard instead");
+        assertTrue(file.setLastModified(file.lastModified() + 5000L),
+                "could not age the file, so this would not exercise the guard");
+        // It loads: the guard compares the mtime seen through the OPEN descriptor
+        // before and after the read, so a file that is merely newer than some
+        // earlier version is not a rewrite in flight.
+        Config config = Config.load(dir.getAbsolutePath());
+        assertEquals(9090, config.getInt(Config.SERVER_PORT, 0),
+                "a settled file must still load");
+    }
+
+    @Test
     @DisplayName("the profile file wins over the base file")
     void profileOverridesBase(@TempDir File dir) throws Exception {
         write(dir, "application.properties",
