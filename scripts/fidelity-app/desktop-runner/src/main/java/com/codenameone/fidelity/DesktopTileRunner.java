@@ -55,8 +55,8 @@ import java.util.List;
  *
  * <p>The platform is passed in rather than read from the port. JavaSE answers "win", "mac" or
  * "linux" for the HOST it happens to be running on, which is right for an application and
- * wrong here: the same host has to be able to render whichever theme it is asked for, and the
- * golden set is named for a design generation rather than for a machine.</p>
+ * different from the fixture identifiers here (windows, macos, gnome). Each fixture must
+ * run on its matching host with the native reference font installed.</p>
  *
  * <p>Tiles are named {@code <id>_<state>_<appearance>_cn1.png}, which is the convention
  * ProcessScreenshots pairs against {@code <id>_<state>_<appearance>.png} in the golden
@@ -76,6 +76,12 @@ public final class DesktopTileRunner {
         final File outDir = new File(args[2]);
         outDir.mkdirs();
 
+        // Native tiles use 1x desktop logical pixels (96 dpi), not the mobile
+        // density fallback of 5 px/mm or the host monitor's Retina backing scale.
+        // Set these before JavaSEPort initializes its static font/scale defaults.
+        System.setProperty("cn1.retinaScale", "1");
+        System.setProperty("cn1.javase.pixelMilliRatio", Double.toString(96.0 / 25.4));
+        com.codename1.impl.javase.JavaSEPort.setDefaultPixelMilliRatio(Double.valueOf(96.0 / 25.4));
         // Select through the packaged-app entry point so font defaults follow the theme.
         com.codename1.impl.javase.JavaSEPort.setNativeTheme("/" + themeRes + ".res");
         Display.init(new java.awt.Container());
@@ -122,6 +128,9 @@ public final class DesktopTileRunner {
     private static int renderAll(String platform, String themeRes, File outDir) throws Exception {
         java.awt.Font nativeFont = (java.awt.Font) com.codename1.impl.javase.JavaSEPort.instance.loadTrueTypeFont(
                 "native:MainRegular", "native:MainRegular");
+        int pixelsPer100mm = Display.getInstance().convertToPixels(100f);
+        if (pixelsPer100mm != 378) throw new IllegalStateException("Unexpected capture density: " + pixelsPer100mm);
+        System.out.println("Desktop capture scale: 1x, 96 dpi (100mm=" + pixelsPer100mm + "px)");
         String family = nativeFont.getFamily();
         System.out.println("Desktop native font: " + nativeFont.getName() + " (family=" + family + ")");
         boolean expected = "gnome".equals(platform) ? "Cantarell".equals(family)

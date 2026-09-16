@@ -33,10 +33,9 @@
  * macOS is the one platform where the user's HIGHLIGHT colour is separate from the accent
  * and separately settable, so it gets its own variable rather than being derived.
  *
- * DIMENSIONS are converted from AppKit's documented control metrics at 1x (1pt = 0.3528mm)
- * and written in MILLIMETRES so they scale on the 2x displays every real Mac has. The
- * reference runner reports a 1.0 backing scale, which no real Mac has, which is why the
- * capture forces 2x rather than inheriting it.
+ * DIMENSIONS are authored in millimetres so the port can scale them with display DPI.
+ * The fidelity runners normalize both sides to 1x logical pixels at 96 dpi; AppKit
+ * capture explicitly uses 1x even when the host monitor has a 2x backing scale.
  *
  * VIBRANCY is not expressed here. NSVisualEffectView is a view the window hosts, not a fill
  * a control owns, so it belongs to port code rather than a stylesheet. The reference runner
