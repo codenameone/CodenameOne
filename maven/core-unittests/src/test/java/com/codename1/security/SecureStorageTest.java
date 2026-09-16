@@ -336,12 +336,20 @@ class SecureStorageTest extends UITestBase {
             int create = firstCreateIn(body);
             assertTrue(create > 0, path + ": setIfAbsent must write the candidate somewhere");
             String before = body.substring(0, create);
-            assertTrue(before.indexOf("entryState(") > 0,
-                    path + ": setIfAbsent must ask entryState before it creates, because get() "
-                    + "answers null for an entry that is there and unreadable: " + before);
-            assertTrue(before.indexOf("ENTRY_ABSENT") > 0,
-                    path + ": and it must require a DEFINITE absence, not merely a non-null "
-                    + "state: " + before);
+            // Either discriminator counts, and both are cross-process: entryState, or a read of
+            // the gate mark. The Android tier needs the second because its tombstone branch must
+            // run BEFORE entryState -- entryState consults the same per-process SharedPreferences
+            // cache that the tombstone exists to overrule, so asking it first would refuse to
+            // recreate an account another process had removed. What is held either way is that
+            // nothing creates on the strength of get() alone.
+            boolean asksState = before.indexOf("entryState(") > 0
+                    && before.indexOf("ENTRY_ABSENT") > 0;
+            boolean asksGate = before.indexOf("GATE_REMOVED") > 0;
+            assertTrue(asksState || asksGate,
+                    path + ": setIfAbsent must consult cross-process state before it creates -- "
+                    + "entryState for a definite absence, or the gate mark -- because get() "
+                    + "answers null both for an entry that is not there and for one that is "
+                    + "there and unreadable: " + before);
         }
         assertTrue(checked >= 2, "only " + checked + " setIfAbsent implementations found, so "
                 + "this scanned almost nothing");
@@ -356,7 +364,8 @@ class SecureStorageTest extends UITestBase {
     /// write -- but the exclusion stays, since delegating would remain correct.
     private static int firstCreateIn(String body) {
         int best = -1;
-        for (String call : new String[]{"set(account, value)", "nativeSetIfAbsent("}) {
+        for (String call : new String[]{"set(account, value)", "nativeSetIfAbsent(",
+                "createUnderGate("}) {
             int at = body.indexOf(call);
             if (at > 0 && (best < 0 || at < best)) {
                 best = at;

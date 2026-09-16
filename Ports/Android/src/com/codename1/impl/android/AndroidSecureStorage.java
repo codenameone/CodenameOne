@@ -392,10 +392,10 @@ public final class AndroidSecureStorage extends SecureStorage {
         if (account == null || value == null) {
             return null;
         }
-        String existing = get(account);
-        if (existing != null) {
-            return existing;
-        }
+        // NO unlocked read first. That fast path returned whatever this process had cached
+        // before any gate was taken -- which remove() in another process cannot invalidate, and
+        // which removeUnderGate's own comment already recorded as the one thing it could not
+        // close. Every decision here is made under the gate now.
         java.io.File gate = gateFile(account);
         if (gate == null) {
             // FAILS CLOSED, and does not fall back to the inherited check-then-write. That
@@ -421,9 +421,17 @@ public final class AndroidSecureStorage extends SecureStorage {
             // permanently uncreatable. Blocking, so a second caller waits for the first rather
             // than proceeding as though the entry were absent.
             lock = handle.getChannel().lock();
-            String stored = get(account);
+            // The gate byte first, because it is the only thing here that crosses processes.
+            int mark = handle.length() > 0 ? handle.read() : 0;
+            String stored = mark == GATE_REMOVED ? null : get(account);
             if (stored != null) {
                 return stored;
+            }
+            if (mark == GATE_REMOVED) {
+                // Removed by somebody, so any value this process still has cached for it is
+                // stale and must not be handed back or treated as occupying the account. The
+                // create below is free to take it, which is what overwrites the tombstone.
+                return createUnderGate(handle, account, value);
             }
             // Same reason the browser tier asks: get() answers null for "nothing is stored here"
             // AND for "something is stored here and it cannot be read" -- a value under a
@@ -435,7 +443,7 @@ public final class AndroidSecureStorage extends SecureStorage {
             if (entryState(account) != ENTRY_ABSENT) {
                 return null;
             }
-            if (handle.length() > 0) {
+            if (mark == GATE_SETTLED) {
                 // Marked, so some process has already stored this account -- and this one cannot
                 // see it, because the read above went through a SharedPreferences instance that
                 // was cached before that write. Reporting nothing is the honest answer and the
@@ -443,6 +451,38 @@ public final class AndroidSecureStorage extends SecureStorage {
                 // encrypting under.
                 return null;
             }
+            return createUnderGate(handle, account, value);
+        } catch (java.io.IOException cannotLock) {
+            // Same reasoning as the missing-gate branch above: the inherited path cannot see
+            // another process's write, so falling back to it here is how two processes each
+            // create a different key. A gate that cannot be locked is a gate, and refusing is
+            // the answer the caller can retry from.
+            Log.e(cannotLock);
+            return null;
+        } finally {
+            if (lock != null) {
+                try {
+                    lock.release();
+                } catch (java.io.IOException ignored) {
+                    Log.e(ignored);
+                }
+            }
+            if (handle != null) {
+                try {
+                    handle.close();
+                } catch (java.io.IOException ignored) {
+                    Log.e(ignored);
+                }
+            }
+        }
+    }
+
+    /// Stores the candidate and marks the gate, with the gate already held by the caller.
+    ///
+    /// Shared by the two ways setIfAbsent decides the account is free: no mark at all, and a
+    /// tombstone left by a removal this process could not see.
+    private String createUnderGate(java.io.RandomAccessFile handle, String account, String value)
+            throws java.io.IOException {
             if (!set(account, value)) {
                 return null;
             }
@@ -450,7 +490,9 @@ public final class AndroidSecureStorage extends SecureStorage {
                 // After the write, never before: a mark left by a store that then failed would
                 // make the account permanently uncreatable, which is worse than the race.
                 handle.seek(0);
-                handle.write(1);
+                handle.setLength(0);
+                handle.seek(0);
+                handle.write(GATE_SETTLED);
                 handle.getChannel().force(true);
             } catch (java.io.IOException cannotMark) {
                 // Fails CLOSED. An earlier version logged this and answered with the value on
@@ -477,29 +519,6 @@ public final class AndroidSecureStorage extends SecureStorage {
                 return null;
             }
             return value;
-        } catch (java.io.IOException cannotLock) {
-            // Same reasoning as the missing-gate branch above: the inherited path cannot see
-            // another process's write, so falling back to it here is how two processes each
-            // create a different key. A gate that cannot be locked is a gate, and refusing is
-            // the answer the caller can retry from.
-            Log.e(cannotLock);
-            return null;
-        } finally {
-            if (lock != null) {
-                try {
-                    lock.release();
-                } catch (java.io.IOException ignored) {
-                    Log.e(ignored);
-                }
-            }
-            if (handle != null) {
-                try {
-                    handle.close();
-                } catch (java.io.IOException ignored) {
-                    Log.e(ignored);
-                }
-            }
-        }
     }
 
     /// The context the non-prompting tier resolves its files from.
@@ -918,13 +937,34 @@ public final class AndroidSecureStorage extends SecureStorage {
 
 
     /// Clears the mark and deletes the value as one step, under the lock setIfAbsent takes.
+    /// The gate byte meaning "a value is settled here".
+    private static final int GATE_SETTLED = 1;
+
+    /// The gate byte meaning "this account was REMOVED", which an empty gate cannot say.
+    ///
+    /// An empty gate is ambiguous: it is what a never-used account looks like, and also what an
+    /// entry written by a build that predates gates looks like. So setIfAbsent cannot read
+    /// "unmarked" as "absent" -- on an upgrade that would create over real data. A removal
+    /// therefore records itself rather than erasing the record, which is the only cross-process
+    /// signal that a locally cached value is stale: SharedPreferences hands each
+    /// android:process its own cache and never observes another's write, so after a removal in
+    /// one process the others keep answering the old value out of memory with nothing to tell
+    /// them otherwise. A vault device key read that way gets wrapped into a fresh device record,
+    /// and the next launch cannot find the key it names.
+    private static final int GATE_REMOVED = 2;
+
     private boolean removeUnderGate(java.io.File gate, SharedPreferences prefs, String account) {
         java.io.RandomAccessFile handle = null;
         java.nio.channels.FileLock lock = null;
         try {
             handle = new java.io.RandomAccessFile(gate, "rw");
             lock = handle.getChannel().lock();
+            // A TOMBSTONE, not an erasure: see GATE_REMOVED. Truncating here said "nobody has
+            // settled this account", which is indistinguishable from never-used and left every
+            // other process free to keep serving the value its own cache still holds.
             handle.setLength(0);
+            handle.seek(0);
+            handle.write(GATE_REMOVED);
             handle.getChannel().force(true);
             boolean removed;
             synchronized (PLAIN_KEY_LOCK) {
@@ -940,7 +980,7 @@ public final class AndroidSecureStorage extends SecureStorage {
                 // nothing at all.
                 try {
                     handle.seek(0);
-                    handle.write(1);
+                    handle.write(GATE_SETTLED);
                     handle.getChannel().force(true);
                 } catch (java.io.IOException cannotRemark) {
                     Log.e(cannotRemark);

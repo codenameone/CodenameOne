@@ -1876,7 +1876,15 @@ public final class Vault {
                             // discarded is a wrap that cannot open anything.
                             withdrawDeviceRecordIfLocked(generation);
                         } catch (RuntimeException rewrapFailed) {
-                            Storage.getInstance().deleteStorageFile(deviceRecordKey());
+                            // The same discard as the success path above, and it has to be the
+                            // same DISCARD: a re-wrap that threw partway can have written the
+                            // record before it failed, and a delete that is then dropped
+                            // silently -- both real ports can -- leaves getPolicy() reporting a
+                            // remembering policy over a wrap that opens nothing. Routed through
+                            // the helper so the record's mechanism is destroyed when the record
+                            // itself will not go, rather than repeating the blind delete this
+                            // used to make.
+                            discardDeviceRecord();
                         }
                     }
                     out.complete(Boolean.TRUE);
@@ -2805,6 +2813,27 @@ public final class Vault {
                     + "nothing was written here");
         }
         writeMetadata(next);
+        // Read back, because the compare above and the write below it are two steps. Two tabs
+        // calling changePassword from the same base record both passed that check and both wrote,
+        // and both reported success -- so one of them told the user a password was installed that
+        // cannot open the record that actually survived. Concurrent recovery-code creation fails
+        // the same way, and neither of those callers had the settled read-back that enrolment and
+        // rotation do.
+        //
+        // Placed HERE rather than in those two callers because this is where every metadata
+        // mutation goes through, including the rollbacks that put a previous record back.
+        //
+        // It does NOT make the commit atomic and cannot: com.codename1.io.Storage has writeObject
+        // and no compare-and-set. What it does is stop BOTH writers reporting success in the
+        // overlapping case -- the one whose record did not survive now says CONFLICT, which is
+        // what its caller is documented to retry from. A writer that lands after this read still
+        // wins silently, and that residue is the same one enrolment records.
+        VaultMetadata settled = loadMetadataFresh();
+        if (settled == null || !settled.serialize().equals(next.serialize())) {
+            throw new VaultException(VaultError.CONFLICT,
+                    "another session changed this vault while this change was being written; "
+                    + "what is stored is not what this call wrote");
+        }
     }
 
     private void writeMetadata(VaultMetadata meta) {
@@ -3047,6 +3076,16 @@ public final class Vault {
         if (generation == lockGeneration) {
             return;
         }
+        discardDeviceRecord();
+    }
+
+    /// Removes the device record, and destroys its mechanism when the record will not go.
+    ///
+    /// Shared by the two paths that discard a wrap they can no longer vouch for: a lock landing
+    /// inside rememberNow's prompt, and a re-wrap that threw after writing the record. Both are
+    /// beside an operation that is already committed and stays reported as done, so neither can
+    /// refuse -- which is exactly why the delete has to be checked rather than assumed.
+    private void discardDeviceRecord() {
         Storage.getInstance().deleteStorageFile(deviceRecordKey());
         if (definitelyGone(deviceRecordKey())) {
             return;
