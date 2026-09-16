@@ -480,6 +480,63 @@ class HoverDeliveryTest extends UITestBase {
     }
 
     @FormTest
+    void windowInputCancellationClearsOnlyItsOwnTooltip() throws Exception {
+        implementation.setDesktop(true);
+        implementation.setMultiWindowSupported(true);
+        java.lang.reflect.Field pending = TooltipManager.class.getDeclaredField("pendingTooltip");
+        java.lang.reflect.Field visible = TooltipManager.class.getDeclaredField("currentTooltip");
+        java.lang.reflect.Field anchor = TooltipManager.class.getDeclaredField("currentComponent");
+        pending.setAccessible(true);
+        visible.setAccessible(true);
+        anchor.setAccessible(true);
+        for (int mode = 0; mode < 3; mode++) {
+            Window window = new Window("tooltip owner", new BorderLayout());
+            window.setWindowSize(500, 400);
+            Button target = new Button("anchor");
+            target.setTooltip("owner tooltip");
+            window.add(BorderLayout.CENTER, target);
+            window.show();
+            Window other = new Window("other");
+            other.show();
+            DisplayTest.flushEdt();
+            TooltipManager previous = TooltipManager.getInstance();
+            TooltipManager manager = new TooltipManager();
+            manager.setTooltipShowDelay(60000);
+            TooltipManager.enableTooltips(manager);
+            try {
+                window.pointerHover(new int[]{target.getAbsoluteX() + target.getWidth() / 2},
+                        new int[]{target.getAbsoluteY() + target.getHeight() / 2});
+                assertNotNull(pending.get(manager));
+                manager.showTooltip(target.getTooltip(), target);
+                assertNotNull(visible.get(manager));
+                other.cancelPendingInput();
+                assertNotNull(pending.get(manager), "another window must not cancel this timer");
+                assertNotNull(visible.get(manager), "another window must not dismiss this tooltip");
+                if (mode == 0) {
+                    window.hide();
+                } else if (mode == 1) {
+                    window.hideNotify();
+                } else {
+                    Desktop.getInstance().windowFocusChanged(window.getWindowId(), false);
+                    DisplayTest.flushEdt();
+                }
+                assertNull(pending.get(manager));
+                assertNull(visible.get(manager));
+                assertNull(anchor.get(manager));
+                assertFalse(target.isHovered());
+                window.show();
+                DisplayTest.flushEdt();
+                assertNull(visible.get(manager), "showing a reusable window must not revive its tooltip");
+            } finally {
+                manager.clearTooltip();
+                TooltipManager.enableTooltips(previous);
+                other.dispose();
+                window.dispose();
+            }
+        }
+    }
+
+    @FormTest
     void leavingAWindowCancelsPendingAndVisibleTooltips() throws Exception {
         implementation.setMultiWindowSupported(true);
         new Form("main", new BorderLayout()).show();

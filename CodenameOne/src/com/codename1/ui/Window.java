@@ -3862,6 +3862,12 @@ public class Window extends Container implements TopLevelContainer {
     void cancelPendingInput() {
         // Hide/minimize shares this path with disposal, including HIDE_ON_CLOSE.
         hoverTracker.pointerOver(null, -1, -1);
+        TooltipManager tooltip = TooltipManager.getInstance();
+        if (tooltip != null) {
+            // Hidden/reusable windows retain their tree; cancel its tooltip now,
+            // without dismissing an anchor in another window sharing the manager.
+            tooltip.clearTooltipFor(this);
+        }
         // Held keys never arrive as releases once the window has gone, so their
         // recorded scopes would sit here until some later press happened to reuse the
         // same key code.
