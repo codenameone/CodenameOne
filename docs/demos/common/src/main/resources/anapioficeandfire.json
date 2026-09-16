@@ -1,0 +1,34 @@
+{
+    "root": [
+        {
+            "url": "https://anapioficeandfire.com/api/characters/583",
+            "name": "Jon Snow",
+            "titles": ["Lord Commander of the Night's Watch"],
+            "aliases": ["Lord Snow", "The Bastard of Winterfell"]
+        },
+        {
+            "url": "https://anapioficeandfire.com/api/characters/148",
+            "name": "Daenerys Targaryen",
+            "titles": ["Queen of the Andals", "Breaker of Chains"],
+            "aliases": ["Dany", "Mother of Dragons"]
+        },
+        {
+            "url": "https://anapioficeandfire.com/api/characters/232",
+            "name": "",
+            "titles": ["Ser"],
+            "aliases": ["The Hound"]
+        },
+        {
+            "url": "https://anapioficeandfire.com/api/characters/1303",
+            "name": "Tyrion Lannister",
+            "titles": ["Hand of the Queen"],
+            "aliases": ["The Imp", "Halfman"]
+        },
+        {
+            "url": "https://anapioficeandfire.com/api/characters/271",
+            "name": "Arya Stark",
+            "titles": [],
+            "aliases": ["Arry", "No One"]
+        }
+    ]
+}
