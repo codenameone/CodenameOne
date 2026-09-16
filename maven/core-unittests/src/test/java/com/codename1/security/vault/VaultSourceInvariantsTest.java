@@ -38,6 +38,30 @@ import static org.junit.jupiter.api.Assertions.*;
 class VaultSourceInvariantsTest extends UITestBase {
 
     @Test
+    void handleCopiesAreWipedAndPublicationSharesTheDestructionMonitor() throws Exception {
+        for (String name : new String[] {"destroy", "isDestroyed", "copyMaterial"}) {
+            assertTrue(java.lang.reflect.Modifier.isSynchronized(
+                    VaultKeyHandle.class.getDeclaredMethod(name).getModifiers()), name);
+        }
+        for (java.lang.reflect.Method method : VaultKeyHandle.class.getDeclaredMethods()) {
+            if (method.getName().startsWith("complete")) {
+                assertTrue(java.lang.reflect.Modifier.isSynchronized(method.getModifiers()),
+                        method.getName());
+            }
+        }
+        String source = new String(java.nio.file.Files.readAllBytes(java.nio.file.Paths.get(
+                "../../CodenameOne/src/com/codename1/security/vault/VaultKeyHandle.java")), "UTF-8");
+        for (String name : new String[] {"seal", "open", "mac", "verifyMac"}) {
+            String type = name.equals("verifyMac") ? "Boolean" : "byte[]";
+            String body = codeOnly(methodBody(source, "public AsyncResource<" + type + "> " + name + "("));
+            int cleanup = body.lastIndexOf("finally");
+            String local = name.equals("open") ? "current" : "key";
+            assertTrue(cleanup >= 0 && body.indexOf("Bytes.zero(" + local + ")", cleanup) > cleanup,
+                    name + " must wipe its private key on every outcome");
+        }
+    }
+
+    @Test
     void generationChecksAcquireTheMonitorThatPublishesStateChanges() throws Exception {
         // A stress test cannot prove Java memory-model visibility. Assert the synchronization
         // boundary directly, alongside the behavioural lock and rotation race tests.

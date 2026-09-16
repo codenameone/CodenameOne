@@ -2489,6 +2489,75 @@ class VaultTest extends UITestBase {
     }
 
     @Test
+    void destroyingAHandleDoesNotWipeAnOperationsPrivateKeyCopy() throws Exception {
+        Vault vault = Vault.named(freshName()).configure(fast());
+        vault.enroll(pw("p"), fast()).get();
+        KeyHandle handle = vault.operationalKey("cache").get();
+        java.lang.reflect.Method live = handle.getClass().getDeclaredMethod("live");
+        live.setAccessible(true);
+        byte[] copy = (byte[]) live.invoke(handle);
+        java.lang.reflect.Field field = handle.getClass().getDeclaredField("material");
+        field.setAccessible(true);
+        byte[] owned = (byte[]) field.get(handle);
+        byte[] expected = copy.clone();
+        try {
+            assertNotSame(owned, copy, "the operation must not borrow the array destroy wipes");
+            Thread destroyer = new Thread(new Runnable() {
+                public void run() { handle.destroy(); }
+            });
+            destroyer.start();
+            destroyer.join(10000);
+            assertFalse(destroyer.isAlive());
+            assertArrayEquals(new byte[owned.length], owned, "destroy must wipe the owned key");
+            assertArrayEquals(expected, copy, "the running operation's key must stay intact");
+            assertTrue(handle.isDestroyed());
+            AssociatedData aad = AssociatedData.of("app", "v", "r", "cache");
+            assertEquals(VaultError.LOCKED, errorOf(handle.seal(new byte[] {1}, aad)));
+            assertEquals(VaultError.LOCKED, errorOf(handle.mac(new byte[] {1})));
+            assertEquals(VaultError.LOCKED, errorOf(handle.verifyMac(new byte[] {1}, new byte[32])));
+        } finally {
+            Bytes.zero(copy);
+            Bytes.zero(expected);
+            handle.destroy();
+        }
+    }
+
+    @Test
+    void aHandleDestroyedInsideCryptoDiscardsItsResultWithoutBlockingDestruction() {
+        Vault vault = Vault.named(freshName()).configure(fast());
+        vault.enroll(pw("p"), fast()).get();
+        AssociatedData aad = AssociatedData.of("app", "v", "r", "cache");
+        byte[] message = {1, 2, 3};
+        for (boolean opening : new boolean[] {false, true}) {
+            final KeyHandle handle = vault.operationalKey("cache").get();
+            byte[] sealed = handle.seal(message, aad).get();
+            TestCodenameOneImplementation.getInstance().setDuringAes(new Runnable() {
+                public void run() {
+                    Thread destroyer = new Thread(new Runnable() {
+                        public void run() { handle.destroy(); }
+                    });
+                    destroyer.start();
+                    try {
+                        destroyer.join(10000);
+                    } catch (InterruptedException interrupted) {
+                        Thread.currentThread().interrupt();
+                        throw new IllegalStateException(interrupted);
+                    }
+                    assertFalse(destroyer.isAlive(), "crypto must not hold the destruction monitor");
+                }
+            });
+            try {
+                assertEquals(VaultError.LOCKED,
+                        errorOf(opening ? handle.open(sealed, aad) : handle.seal(message, aad)),
+                        "destruction must discard the valid result, not corrupt the crypto key");
+            } finally {
+                TestCodenameOneImplementation.getInstance().setDuringAes(null);
+                handle.destroy();
+            }
+        }
+    }
+
+    @Test
     void aHandleLockedMidOperationDiscardsItsResult() {
         // The liveness check happens before the work, and the work is where the time goes -- so a
         // lock() landing inside it was not noticed and the operation completed afterwards anyway,

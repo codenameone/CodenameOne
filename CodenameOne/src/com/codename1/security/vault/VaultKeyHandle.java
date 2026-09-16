@@ -97,12 +97,15 @@ final class VaultKeyHandle extends KeyHandle {
     @Override
     public AsyncResource<byte[]> seal(byte[] plaintext, AssociatedData aad) {
         AsyncResource<byte[]> out = new AsyncResource<byte[]>();
+        byte[] key = null;
         try {
-            byte[] key = live();
+            key = live();
             int at = owner.generation();
-            out.complete(stillOurs(at, SecureEnvelope.seal(key, purpose, version, aad, plaintext)));
+            completeBytes(out, at, SecureEnvelope.seal(key, purpose, version, aad, plaintext));
         } catch (VaultException failed) {
             out.error(failed);
+        } finally {
+            Bytes.zero(key);
         }
         return out;
     }
@@ -110,14 +113,15 @@ final class VaultKeyHandle extends KeyHandle {
     @Override
     public AsyncResource<byte[]> open(byte[] sealed, AssociatedData aad) {
         AsyncResource<byte[]> out = new AsyncResource<byte[]>();
+        byte[] current = null;
         try {
             SecureEnvelope envelope = SecureEnvelope.parse(sealed);
             // live() first either way: it is the liveness check, and a destroyed or locked
             // handle must answer LOCKED rather than reach into the vault for an older key.
-            byte[] current = live();
+            current = live();
             int at = owner.generation();
             if (envelope.getKeyVersion() == version) {
-                out.complete(stillOurs(at, envelope.open(current, aad)));
+                completeBytes(out, at, envelope.open(current, aad));
             } else {
                 // Every subkey is derived from the data key, so a rotation changes this handle's
                 // material and a record sealed before it no longer opens under the live one --
@@ -128,13 +132,15 @@ final class VaultKeyHandle extends KeyHandle {
                 // it at the first rotation.
                 byte[] older = owner.subkeyAtVersion(purpose, envelope.getKeyVersion());
                 try {
-                    out.complete(stillOurs(at, envelope.open(older, aad)));
+                    completeBytes(out, at, envelope.open(older, aad));
                 } finally {
                     Bytes.zero(older);
                 }
             }
         } catch (VaultException failed) {
             out.error(failed);
+        } finally {
+            Bytes.zero(current);
         }
         return out;
     }
@@ -142,12 +148,16 @@ final class VaultKeyHandle extends KeyHandle {
     @Override
     public AsyncResource<byte[]> mac(byte[] data) {
         AsyncResource<byte[]> out = new AsyncResource<byte[]>();
+        byte[] key = null;
         try {
-            Hmac hmac = Hmac.create(Hash.SHA256, live());
+            key = live();
+            Hmac hmac = Hmac.create(Hash.SHA256, key);
             int at = owner.generation();
-            out.complete(stillOurs(at, hmac.doFinal(data == null ? new byte[0] : data)));
+            completeBytes(out, at, hmac.doFinal(data == null ? new byte[0] : data));
         } catch (VaultException failed) {
             out.error(failed);
+        } finally {
+            Bytes.zero(key);
         }
         return out;
     }
@@ -155,52 +165,50 @@ final class VaultKeyHandle extends KeyHandle {
     @Override
     public AsyncResource<Boolean> verifyMac(byte[] data, byte[] tag) {
         AsyncResource<Boolean> out = new AsyncResource<Boolean>();
+        byte[] key = null;
         try {
-            Hmac hmac = Hmac.create(Hash.SHA256, live());
+            key = live();
+            Hmac hmac = Hmac.create(Hash.SHA256, key);
             int at = owner.generation();
             byte[] computed = hmac.doFinal(data == null ? new byte[0] : data);
             boolean same = Bytes.constantTimeEquals(computed, tag);
             Bytes.zero(computed);
-            requireStillOurs(at);
-            out.complete(Boolean.valueOf(same));
+            completeVerification(out, at, same);
         } catch (VaultException failed) {
             out.error(failed);
+        } finally {
+            Bytes.zero(key);
         }
         return out;
     }
 
     @Override
-    public void destroy() {
+    public synchronized void destroy() {
         Bytes.zero(material);
         material = null;
     }
 
     @Override
-    public boolean isDestroyed() {
+    public synchronized boolean isDestroyed() {
         return material == null || generation != owner.generation()
                 || keyGeneration != owner.keyGeneration();
     }
 
-    /// The result, or a refusal if the vault stopped being ours while it was being produced.
-    ///
-    /// The liveness check happens before the work, and the work is where the time goes -- so a
-    /// lock() landing inside it was not noticed and the operation completed afterwards anyway,
-    /// which is precisely what [Vault#lock()] documents cannot happen. Every operation the vault
-    /// performs itself already asks again at the end; these did not.
-    ///
-    /// Note what is NOT the risk here, because the review that found this named it: lock() does
-    /// not zero this handle's bytes. The material is a subkey derived into an array this object
-    /// owns, not a reference to the vault's data key, so the crypto above cannot run against a
-    /// buffer being cleared underneath it. What it can do is hand back a result the caller is no
-    /// longer entitled to, and that is what this refuses.
-    private byte[] stillOurs(int at, byte[] produced) {
+    /// Publication shares the destruction monitor, so destruction cannot complete between the
+    /// final liveness check and delivery. Crypto and storage run outside this monitor.
+    private synchronized void completeBytes(AsyncResource<byte[]> out, int at, byte[] produced) {
         try {
             requireStillOurs(at);
         } catch (VaultException locked) {
             Bytes.zero(produced);
             throw locked;
         }
-        return produced;
+        out.complete(produced);
+    }
+
+    private synchronized void completeVerification(AsyncResource<Boolean> out, int at, boolean same) {
+        requireStillOurs(at);
+        out.complete(Boolean.valueOf(same));
     }
 
     private void requireStillOurs(int at) {
@@ -230,16 +238,18 @@ final class VaultKeyHandle extends KeyHandle {
                     + "import. Ask the vault for a new handle");
         }
         owner.noteHandleUse();
-        // SNAPSHOTTED, then checked. Reading the field on the way out made the liveness test and
-        // the value two separate reads: a destroy() landing between them returned the null it had
-        // just assigned, and Hmac.create dereferenced it -- a NullPointerException thrown
-        // synchronously out of mac()/verifyMac(), which catch only VaultException, so an
-        // asynchronous API threw at its caller instead of answering LOCKED.
-        byte[] snapshot = material;
-        if (snapshot == null) {
+        return copyMaterial();
+    }
+
+    /// Copies under the destruction monitor. An alias would let destroy() wipe a key while
+    /// crypto was still consuming it. Every caller wipes its private copy in a finally block.
+    private synchronized byte[] copyMaterial() {
+        if (material == null) {
             throw new VaultException(VaultError.LOCKED,
                     "this key handle was destroyed while it was being used");
         }
-        return snapshot;
+        byte[] copy = new byte[material.length];
+        System.arraycopy(material, 0, copy, 0, material.length);
+        return copy;
     }
 }
