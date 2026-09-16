@@ -35,6 +35,50 @@ class FidelitySpecTest(unittest.TestCase):
     def test_current_sources(self):
         self.assertEqual(0, self.check())
 
+    def test_unknown_defaults_are_rejected(self):
+        original = validator.SPEC.read_text()
+        for old, new in (("appearances:", "appearance:"), ("tile_width_px:", "tile_wdith_px:"),
+                         ("defaults:", "default:")):
+            with self.subTest(new=new):
+                validator.SPEC.write_text(original.replace(old, new, 1))
+                self.assertEqual(1, self.check())
+
+    def test_default_indentation_and_tabs_are_rejected(self):
+        original = validator.SPEC.read_text()
+        for replacement in (" appearances:", "    appearances:", "\tappearances:",
+                            "  appearances\t:", "  appearances "):
+            with self.subTest(replacement=replacement):
+                validator.SPEC.write_text(original.replace("  appearances:", replacement, 1))
+                self.assertEqual(1, self.check())
+
+    def test_invalid_default_values_and_duplicates_are_rejected(self):
+        original = validator.SPEC.read_text()
+        for old, new in (("tile_width_px: 240", "tile_width_px: 240px"),
+                         ("tile_width_px: 240", "tile_width_px: 0"),
+                         ("tile_width_px: 240", "tile_width_px: 2147483648"),
+                         ("bg: ffffff", "bg: nothex"),
+                         ("appearances: light,dark", "appearances: light,drak"),
+                         ("appearances: light,dark", "appearances:"),
+                         ("appearances: light,dark", "appearances: light,light"),
+                         ("appearances: light,dark", "appearances: light,dark\n  appearances: light")):
+            with self.subTest(new=new):
+                validator.SPEC.write_text(original.replace(old, new, 1))
+                self.assertEqual(1, self.check())
+
+    def test_quoted_defaults_and_deliberate_single_appearance_are_valid(self):
+        original = validator.SPEC.read_text()
+        for appearances in ('"light,dark"', "'light'", "dark"):
+            with self.subTest(appearances=appearances):
+                validator.SPEC.write_text(original.replace("appearances: light,dark", "appearances: " + appearances)
+                                         .replace("tile_width_px: 240", 'tile_width_px: "240"')
+                                         .replace("bg: ffffff", "bg: 'ffffff'"))
+                self.assertEqual(0, self.check())
+
+    def test_malformed_component_indentation_is_not_silently_ignored(self):
+        original = validator.SPEC.read_text()
+        validator.SPEC.write_text(original.replace("  - id: Button", "   - id: Button", 1))
+        self.assertEqual(1, self.check())
+
     def test_platform_typo_is_rejected_but_runtime_prefixes_are_valid(self):
         original = validator.SPEC.read_text()
         for token in ("gnmoe", "windwos", "unknown"):

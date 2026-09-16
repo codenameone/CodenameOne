@@ -30,28 +30,85 @@ KNOWN_KEYS = MOBILE_KEYS | DESKTOP_KEYS | {
 KNOWN_PLATFORMS = {"ios", "android", "windows", "macos", "gnome", "linux"}
 KNOWN_STATES = {"normal", "pressed", "disabled", "selected", "hover", "focus"}
 
+DEFAULT_KEYS = {"tile_width_mm", "tile_height_mm", "tile_width_px", "tile_height_px", "bg", "appearances"}
+
+
+def unquote(value):
+    if len(value) >= 2 and value[0] == value[-1] and value[0] in "\"'":
+        return value[1:-1]
+    return value
+
+
+def check_default(key, value, line):
+    where = f"defaults (line {line})"
+    if key not in DEFAULT_KEYS:
+        yield_error(f"{where}: unknown default key '{key}'; the on-device parser ignores it")
+    elif key.startswith("tile_"):
+        try:
+            valid = re.fullmatch(r"\+?[0-9]+", value) and 0 < int(value) <= 2147483647
+        except ValueError:
+            valid = False
+        if not valid:
+            yield_error(f"{where}: '{key}' must be a positive Java integer")
+    elif key == "bg" and not re.fullmatch(r"[0-9a-fA-F]{6}", value):
+        yield_error(f"{where}: bg must be a six-digit hexadecimal color")
+    elif key == "appearances":
+        appearances = [unquote(item.strip()) for item in value.split(",")]
+        if not appearances or any(item not in {"light", "dark"} for item in appearances):
+            yield_error(f"{where}: appearances must contain light and/or dark")
+        elif len(appearances) != len(set(appearances)):
+            yield_error(f"{where}: duplicate appearance would overwrite captures")
+
+
 def parse(path):
-    """The same flat subset FidelitySpecParser accepts: 2-space indent, no anchors, no flow."""
-    rows, cur, in_components = [], None, False
+    """Validate the documented flat subset before the permissive device parser sees it."""
+    rows, cur, section = [], None, None
+    sections, defaults = set(), set()
     for n, raw in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
-        line = raw.split("#", 1)[0].rstrip() if not raw.lstrip().startswith("#") else ""
+        line = raw.split("#", 1)[0].rstrip()
         if not line.strip():
             continue
-        if line.startswith("components:"):
-            in_components = True
-            continue
-        if not in_components:
-            continue
         if "\t" in raw:
-            yield_error(f"line {n}: tab character; the on-device parser rejects tabs")
-        m = re.match(r"^  - (\w+):\s*(.*)$", line)
-        if m:
-            cur = {"__line": n, m.group(1): m.group(2).strip()}
-            rows.append(cur)
+            yield_error(f"line {n}: tab character; use the documented space indentation")
+        if line == line.lstrip():
+            match = re.fullmatch(r"(defaults|components):", line)
+            if not match:
+                yield_error(f"line {n}: expected a defaults: or components: section")
+                section = None
+                continue
+            section = match.group(1)
+            if section in sections:
+                yield_error(f"line {n}: duplicate {section}: section")
+            sections.add(section)
+            cur = None
             continue
-        m = re.match(r"^    (\w+):\s*(.*)$", line)
-        if m and cur is not None:
-            cur[m.group(1)] = m.group(2).strip()
+        if section == "defaults":
+            match = re.fullmatch(r"  (\w+):\s*(.*)", line)
+            if not match:
+                yield_error(f"line {n}: defaults need two-space indentation and key: value")
+                continue
+            key, value = match.group(1), unquote(match.group(2).strip())
+            if key in defaults:
+                yield_error(f"line {n}: duplicate default key '{key}'")
+            defaults.add(key)
+            check_default(key, value, n)
+            continue
+        if section == "components":
+            match = re.fullmatch(r"  - (\w+):\s*(.*)", line)
+            if match:
+                cur = {"__line": n, match.group(1): unquote(match.group(2).strip())}
+                rows.append(cur)
+                continue
+            match = re.fullmatch(r"    (\w+):\s*(.*)", line)
+            if match and cur is not None:
+                key = match.group(1)
+                if key in cur:
+                    yield_error(f"line {n}: duplicate component key '{key}'")
+                cur[key] = unquote(match.group(2).strip())
+                continue
+        yield_error(f"line {n}: malformed or misplaced field in the flat fidelity spec")
+    if not rows:
+        yield_error("components: must contain at least one component")
     return rows
 
 ERRORS = []
