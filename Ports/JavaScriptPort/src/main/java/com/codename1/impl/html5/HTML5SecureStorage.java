@@ -251,8 +251,8 @@ public final class HTML5SecureStorage extends SecureStorage {
             // DISAGREE, so get() answers one value while the next create adopts the other. No
             // sequential ordering produces that. Re-reading and mirroring what the gate actually
             // holds converges the two; the loop is bounded because a store being rewritten
-            // continuously has no settled value to agree on, and the last pass simply accepts
-            // what it wrote.
+            // continuously has no settled value to agree on. Exhaustion refuses the create
+            // instead of handing the caller an unverified key.
             // Kept, because the rollback below asks whether THIS tab is the one that won the
             // gate, and the loop can legitimately change `settled` to somebody else's record.
             String created = settled;
@@ -330,9 +330,9 @@ public final class HTML5SecureStorage extends SecureStorage {
     /// what gets mirrored instead. Answers the value the two settled on, or null when the write
     /// was refused.
     ///
-    /// Bounded, and the bound is not arbitrary: a gate being rewritten continuously has no
-    /// settled value to agree on, so the last pass accepts what it wrote rather than spinning. A
-    /// build whose bridge has no read native gets one plain write, which is what it had before.
+    /// Bounded: a gate being rewritten continuously has no settled value to agree on, so an
+    /// exhausted retry returns null. A build whose bridge has no read native gets one plain
+    /// write, which is what it had before.
     private String mirrorUntilItAgreesWithTheGate(String account, String settled) {
         String value = settled;
         for (int attempt = 0; attempt < 4; attempt++) {
@@ -368,15 +368,10 @@ public final class HTML5SecureStorage extends SecureStorage {
             }
             value = current;
         }
-        // One last write, because the loop's exit used to return a value it had never mirrored.
-        // The final pass writes the PREVIOUS value, reads a newer one into `value`, and falls out
-        // here -- so setIfAbsent answered the plaintext of the newest gate record while every
-        // later get() read the preceding ciphertext out of ordinary storage. Whatever this
-        // returns has now been written, which is the property the caller depends on.
-        if (!Storage.getInstance().writeObject(encryptedKey(account), value)) {
-            return null;
-        }
-        return value;
+        // Another setter can replace and mirror the gate after the final read. An extra blind
+        // write here would overwrite that successful setter with an older ciphertext and then
+        // report agreement without checking it. Refuse this attempt; the caller must retry.
+        return null;
     }
 
     /// Adds one record if its id is free, and answers the record that is there either way.

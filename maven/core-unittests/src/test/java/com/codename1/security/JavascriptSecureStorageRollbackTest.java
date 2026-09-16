@@ -52,6 +52,12 @@ class JavascriptSecureStorageRollbackTest {
                 "public ProtectionReport protectionOf(", "private ProtectionReport legacyProtection("});
     }
 
+    @Test
+    void exhaustedMirrorRetriesNeverPublishAnUncheckedFinalWrite() throws Exception {
+        runHarness("JavascriptStorageMirrorHarness",
+                new String[] {"private String mirrorUntilItAgreesWithTheGate("});
+    }
+
     private void runHarness(String name, String[] signatures) throws Exception {
         String source = new String(Files.readAllBytes(Paths.get("../../Ports/JavaScriptPort/"
                 + "src/main/java/com/codename1/impl/html5/HTML5SecureStorage.java")),

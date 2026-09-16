@@ -1,0 +1,101 @@
+/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+import java.nio.charset.StandardCharsets;
+
+public class JavascriptStorageMirrorHarness {
+    private static final byte STATUS_OK = 0;
+    private static final Storage storage = new Storage();
+    private static String gate;
+    private static int writes;
+    private static int reads;
+    private static int competingWrites;
+    private static boolean refuseWrite;
+    private static boolean refuseRead;
+
+    static class Storage {
+        String mirror;
+        static Storage getInstance() { return storage; }
+        boolean writeObject(String ignored, Object value) {
+            writes++;
+            if (refuseWrite) return false;
+            mirror = (String) value;
+            return true;
+        }
+    }
+    private static String encryptedKey(String account) { return "encrypted." + account; }
+    private static byte[] nativeRead(String ignored) {
+        reads++;
+        if (refuseRead) return new byte[] {1};
+        if (reads <= competingWrites) {
+            gate = "ciphertext-" + reads;
+            storage.mirror = gate;
+        }
+        String observed = gate;
+        if (reads == 4 && competingWrites == 4) {
+            // A fifth setter completes after the fourth read took its snapshot.
+            gate = "ciphertext-latest";
+            storage.mirror = gate;
+        }
+        byte[] text = observed.getBytes(StandardCharsets.UTF_8);
+        byte[] answer = new byte[text.length + 1];
+        System.arraycopy(text, 0, answer, 1, text.length);
+        return answer;
+    }
+    private static void reset(int competitors) {
+        gate = "ciphertext-initial";
+        storage.mirror = gate;
+        writes = 0;
+        reads = 0;
+        competingWrites = competitors;
+        refuseWrite = false;
+        refuseRead = false;
+    }
+    private static void check(boolean condition, String message) {
+        if (!condition) throw new AssertionError(message);
+    }
+    public static void main(String[] args) { verify(); }
+    public static void verify() {
+        JavascriptStorageMirrorHarness h = new JavascriptStorageMirrorHarness();
+        reset(4);
+        check(h.mirrorUntilItAgreesWithTheGate("account", gate) == null,
+                "an exhausted mirror must fail instead of returning an unverified key");
+        check(writes == 4, "there must be no unchecked write after the bounded attempts");
+        check("ciphertext-latest".equals(storage.mirror) && gate.equals(storage.mirror),
+                "exhaustion must preserve the setter that completed after the last read");
+
+        reset(2);
+        check("ciphertext-2".equals(h.mirrorUntilItAgreesWithTheGate("account", gate)),
+                "finite contention must converge on the settled key");
+        check(gate.equals(storage.mirror), "successful convergence must mirror that key");
+        reset(0);
+        refuseWrite = true;
+        check(h.mirrorUntilItAgreesWithTheGate("account", gate) == null && reads == 0,
+                "a refused mirror write must fail without accepting a gate value");
+        reset(0);
+        refuseRead = true;
+        check(h.mirrorUntilItAgreesWithTheGate("account", gate) == null,
+                "an unreadable gate cannot establish agreement");
+    }
+
+    /* PRODUCTION_METHODS */
+}
