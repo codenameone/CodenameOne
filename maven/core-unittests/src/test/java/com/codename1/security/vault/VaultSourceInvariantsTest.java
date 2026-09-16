@@ -322,6 +322,36 @@ class VaultSourceInvariantsTest extends UITestBase {
     }
 
     @Test
+    void enrolmentChecksTheSettledRecordAgainAFTERItPublishesTheKey() {
+        // The settled-record check before publication is a READ, and the publication that follows
+        // is not part of it. A second tab writing its own record in between left this one
+        // unlocked and holding a key whose vaultId no persisted record names, with enroll()
+        // reporting success -- and every secret written afterwards seals against that vaultId,
+        // reads back fine in that tab, and is permanently unrecoverable after a reload.
+        //
+        // This cannot be made atomic: com.codename1.io.Storage has writeObject and no
+        // compare-and-set, so create-if-absent is not expressible for every port. What is held
+        // here is that the LOSER finds out -- a second read after the publish, and a refusal.
+        //
+        // A shape check because the window is the instructions between a read and an assignment:
+        // the test harness has no hook that lands inside it, which is exactly why the defect
+        // survived a behavioural suite.
+        String body = codeOnly(methodBody(readVaultSource(),
+                "private void enrollNow(char[] password, int generation)"));
+        int publish = body.indexOf("adoptKey(");
+        assertTrue(publish > 0, "enrolment must publish the key it derived");
+        String after = body.substring(publish);
+        assertTrue(after.indexOf("loadMetadataFresh()") > 0,
+                "enrolment must re-read the settled record AFTER publishing, or a tab that lost "
+                + "the race reports success and loses every secret it writes next: " + after);
+        int refuse = after.indexOf("VaultError.CONFLICT");
+        assertTrue(refuse > 0, "and it must refuse when that read says it lost: " + after);
+        assertTrue(after.lastIndexOf("lock()", refuse) > 0,
+                "and lock first, so nothing is left holding a key the store does not describe: "
+                + after);
+    }
+
+    @Test
     void isEnrolledAsksForTheStateOnceAndComparesThatOneAnswer() {
         // state() is not a pure read: it runs checkAutoLock() and can consult storage. Asking it
         // twice and comparing each answer separately meant an unlocked vault crossing its

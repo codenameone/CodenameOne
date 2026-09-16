@@ -867,8 +867,15 @@ public final class AndroidSecureStorage extends SecureStorage {
                     // commit(), for the reason it always was: deleting the key and dropping the
                     // ciphertexts it protected is one step, and an asynchronous clear can be
                     // reordered after a writer's pending write.
+                    // `held`, not `candidates`. An account whose gate could not be locked keeps
+                    // its MARK -- the clearing loop below deliberately skips it -- so removing
+                    // its value here left the pair that nothing can recover from: setIfAbsent
+                    // then sees no value and a marked gate, and refuses to recreate the managed
+                    // database or vault key for good. Leaving the value in place keeps the
+                    // account consistent and lets a later reset, which may well get the lock,
+                    // finish the job.
                     SharedPreferences.Editor editor = prefs.edit();
-                    for (String account : candidates) {
+                    for (String account : held) {
                         editor.remove(account);
                     }
                     editor.commit();

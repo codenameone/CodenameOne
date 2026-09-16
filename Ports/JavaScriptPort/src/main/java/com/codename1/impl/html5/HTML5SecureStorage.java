@@ -567,6 +567,30 @@ public final class HTML5SecureStorage extends SecureStorage {
             if (!definitelyGone(encryptedKey(account))) {
                 return;
             }
+            // Through the GATE, not a plain write. The check above and a blind write are two
+            // steps, and another tab completing set() in between had its newer ciphertext
+            // overwritten by this stale legacy value -- while the gate still held the newer one,
+            // so the two stores then disagreed. nativeSetIfAbsent is the atomic create the rest
+            // of this class already uses: if somebody got there first this loses the add, learns
+            // it, and leaves both the winner's record and the plaintext alone.
+            try {
+                byte[] answer = nativeSetIfAbsent(encryptedKey(account), sealed);
+                if (answer == null || answer.length == 0 || answer[0] != STATUS_OK) {
+                    return;
+                }
+                if (!sealed.equals(new String(answer, 1, answer.length - 1, "UTF-8"))) {
+                    // Somebody else settled this account while the seal above was running. Their
+                    // value is the live one and the migration simply does not happen now -- the
+                    // plaintext stays, so nothing is lost and a later get() can try again.
+                    return;
+                }
+            } catch (RuntimeException noBridge) {
+                // A build with no gate store. The plain write below is what this always did.
+                Log.p("SecureStorage: migrating without the create gate: "
+                        + reasonOf(noBridge), Log.WARNING);
+            } catch (java.io.UnsupportedEncodingException noUtf8) {
+                return;
+            }
             if (!Storage.getInstance().writeObject(encryptedKey(account), sealed)) {
                 return;
             }

@@ -453,6 +453,28 @@ public final class Vault {
             adoptKey(key);
             key = null;
             touch();
+            // Asked AGAIN, after publishing. The check above is a read, and the publication that
+            // follows it is not part of it: a second tab writing its own record in between left
+            // this one unlocked and holding a key whose vaultId no persisted record names, with
+            // enroll() reporting success. Every secret written afterwards seals against that
+            // vaultId, reads back fine in this tab, and is permanently unrecoverable after a
+            // reload -- silent data loss on a call that said it succeeded.
+            //
+            // This does NOT make enrolment atomic and cannot: com.codename1.io.Storage has
+            // writeObject and no compare-and-set, so a create-if-absent is not expressible for
+            // every port. What it does is make the LOSER find out. The window shrinks to the
+            // instructions between this read and the throw, and the outcome changes from "report
+            // success and lose data later" to "report CONFLICT now", which is the answer the
+            // documentation already tells the caller how to handle: unlock with the password
+            // instead of enrolling again.
+            VaultMetadata afterPublish = loadMetadataFresh();
+            if (afterPublish == null || !afterPublish.serialize().equals(verified.serialize())) {
+                // Locked before reporting, so nothing holds a key the store no longer describes.
+                lock();
+                throw new VaultException(VaultError.CONFLICT,
+                        "another session finished setting up this vault first; unlock with "
+                        + "the password instead of enrolling again");
+            }
             if (options.getPolicy() != UnlockPolicy.SESSION_ONLY) {
                 try {
                     rememberNow(options.getPolicy());
