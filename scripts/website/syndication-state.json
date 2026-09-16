@@ -2133,6 +2133,18 @@
         "url": "https://medium.com/@Codename_One/we-stopped-waiting-for-platform-changes-to-find-us-566ee9018cc8?postPublishedType=initial",
         "syndicated_at": "2026-09-15T19:01:29+00:00"
       }
+    },
+    "private-contact-picker": {
+      "hashnode": {
+        "url": "https://debugagent.com/pick-one-contact-without-asking-for-the-address-book",
+        "published": true,
+        "draft_url": "https://hashnode.com/draft/6aa9dc107d960c121a845a36",
+        "cover_set": true,
+        "subheading_set": true,
+        "tags_set": true,
+        "canonical_set": true,
+        "syndicated_at": "2026-09-16T00:01:12+00:00"
+      }
     }
   }
 }
