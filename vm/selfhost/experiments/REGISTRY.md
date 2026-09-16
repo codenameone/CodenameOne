@@ -2451,3 +2451,37 @@ the collector reaches only through a generated mark hook. `CN1_GC_FAULT=halfbloc
 MapTorture2 now prove that hook is walked; they cannot prove the collector around it is
 sound. Step 1 is safe to do regardless -- it moves no references -- but steps 2-4 should
 follow the handshake fix.
+
+### CORRECTION to Round 20: that iterator count was STALE and its conclusion is withdrawn
+
+Round 20 above opens with "ArrayList.ArrayListIterator 337,322 live objects" and concludes
+"the iterators outnumber the containers they walk, 337,322 against 335,138". **Both are
+wrong on the tree they were written against.** The figure came from a census log taken
+earlier in the session and was quoted without re-measuring.
+
+Re-run on the current HEAD, same corpus, same instrument:
+
+| | quoted | actual |
+|---|---:|---:|
+| `ArrayList.ArrayListIterator` | 337,322 / 15.44MB | **149,776 / 6.86MB** |
+| `ArrayList` | 160,235 | 109,623 |
+| `HashMap` | 174,903 | 172,996 |
+
+Iterators are **down 56%**, and they do NOT outnumber the containers -- 149,776 against
+282,619. Two changes since that census account for it: the for-each lowering (Round 13)
+replaced the Iterator with an indexed walk at 71 sites, and the aging slack default going
+to 0 (Round 15) reclaims the dead ones a cycle earlier -- the old census showed this class
+at 67% dead, so most of the apparent population was garbage awaiting collection rather than
+live iterators.
+
+**The design in Round 20 does not depend on that number and stands; the case made FOR it
+does not.** Iterators are no longer the largest object population and the cursor protocol
+should not be sold as if they were. What is actually left is narrower and worth stating
+exactly: the lowering fires on 71 of ~295 for-each sites, and the ~224 it refuses are
+receivers the analysis cannot prove -- 51 parameters, ~60 method returns, 23 polymorphic
+fields. Those are the remaining iterator allocations, and widening the proof (transitive
+type propagation) is a different piece of work from the cursor protocol.
+
+The lesson is the one this file keeps recording: a number re-quoted from an earlier run in
+the same session is not a measurement. Three separate claims in this session have now been
+wrong that way -- a stale subject binary, a non-LTO benchmark, and this.
