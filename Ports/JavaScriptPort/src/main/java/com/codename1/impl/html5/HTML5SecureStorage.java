@@ -440,6 +440,9 @@ public final class HTML5SecureStorage extends SecureStorage {
                 return false;
             }
             String sealed = seal(account, value);
+            if (!removeLegacyBeforeReplacement(account)) {
+                return false;
+            }
             // The gate store first, so a setIfAbsent running concurrently in another tab sees
             // this value when it re-reads the settled record and adopts it instead of mirroring
             // its own candidate over it. Ordinary Storage is the mirror; this is where the two
@@ -485,23 +488,9 @@ public final class HTML5SecureStorage extends SecureStorage {
                 }
                 return false;
             }
-            // The legacy entry goes only after the encrypted one is in place. A store that failed
-            // the write above and had already lost the plaintext would have destroyed the value.
-            boolean legacyRemoved = false;
-            try {
-                Storage.getInstance().deleteStorageFile(legacyKey(account));
-                // deleteStorageFile returns void, so verify it before reporting success.
-                legacyRemoved = definitelyGone(legacyKey(account));
-                if (!legacyRemoved) {
-                    Log.p("SecureStorage: the plaintext entry this replaced could not be removed",
-                            Log.WARNING);
-                }
-                return legacyRemoved;
-            } finally {
-                if (!legacyRemoved) {
-                    rollbackReplacement(account, sealed, previousEncrypted);
-                }
-            }
+            // Cleanup was verified before this replacement became visible. Once readers can
+            // use the key, a failed legacy deletion must never roll it back underneath them.
+            return true;
         } catch (RuntimeException failed) {
             // Not logged with the value, the account or any part of the ciphertext -- this line
             // reaches the browser console, which is the last place a secret should end up.
@@ -510,23 +499,34 @@ public final class HTML5SecureStorage extends SecureStorage {
         }
     }
 
-    /// Withdraws only this failed replacement. The previous encrypted value or the legacy
-    /// plaintext must remain the value returned by get() when set() reports failure.
-    private void rollbackReplacement(String account, String sealed, Object previousEncrypted) {
-        releaseMigrationGate(account, sealed);
-        String entry = encryptedKey(account);
-        if (!sealed.equals(readUncached(entry))) {
-            // A later writer owns the mirror now; this rollback cannot undo its successful set.
-            return;
+    /// Removes plaintext before publishing a replacement. If plaintext is the only copy,
+    /// migrate the old value first so a refused write cannot destroy it. Failure may leave an
+    /// encrypted copy of the old value, but never a temporarily visible replacement key.
+    private boolean removeLegacyBeforeReplacement(String account) {
+        if (definitelyGone(legacyKey(account))) {
+            return true;
         }
-        if (previousEncrypted instanceof String) {
-            if (!Storage.getInstance().writeObject(entry, previousEncrypted)) {
-                Log.p("SecureStorage: the previous encrypted value could not be restored",
-                        Log.WARNING);
+        Object previous = readUncached(encryptedKey(account));
+        if (previous == null && definitelyGone(encryptedKey(account))) {
+            Object legacy = readUncached(legacyKey(account));
+            if (!(legacy instanceof String)) {
+                return false;
             }
-        } else {
-            Storage.getInstance().deleteStorageFile(entry);
+            migrate(account, asString(legacy));
+            previous = readUncached(encryptedKey(account));
         }
+        // A corrupt or unreadable encrypted entry must not cost the only readable plaintext.
+        if (!(previous instanceof String) || open(account, asString(previous)) == null) {
+            return false;
+        }
+        if (!definitelyGone(legacyKey(account))) {
+            Storage.getInstance().deleteStorageFile(legacyKey(account));
+        }
+        if (!definitelyGone(legacyKey(account))) {
+            Log.p("SecureStorage: plaintext cleanup refused this replacement", Log.WARNING);
+            return false;
+        }
+        return true;
     }
 
     public String get(String account) {

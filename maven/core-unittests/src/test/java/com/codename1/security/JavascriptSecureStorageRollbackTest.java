@@ -41,7 +41,8 @@ class JavascriptSecureStorageRollbackTest {
     @Test
     void failedLegacyCleanupPreservesThePriorValueAndLaterWriters() throws Exception {
         runHarness("JavascriptStorageHarness", new String[] {"public boolean set(",
-                "private void rollbackReplacement(", "private void releaseMigrationGate("});
+                "private boolean removeLegacyBeforeReplacement(", "private void migrate(",
+                "private void releaseMigrationGate("});
     }
 
     @Test
