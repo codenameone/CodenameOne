@@ -198,26 +198,27 @@ final class VaultKeyHandle extends KeyHandle {
         }
     }
 
-    /// One monitor covers handle destruction, vault locking, key replacement and delivery.
-    /// Using only the owner monitor also avoids opposite lock orders in completion callbacks.
-    /// Crypto and storage run outside this monitor.
-    private void completeBytes(AsyncResource<byte[]> out, int at, byte[] produced) {
-        synchronized (owner) {
-            try {
-                requireStillOurs(at);
-            } catch (VaultException locked) {
-                Bytes.zero(produced);
-                throw locked;
+    /// One monitor covers handle destruction, vault locking, key replacement and publication.
+    /// Crypto, storage and application callbacks run outside this monitor.
+    private void completeBytes(AsyncResource<byte[]> out, final int at, final byte[] produced) {
+        out.complete(produced, owner, new Runnable() {
+            public void run() {
+                try {
+                    requireStillOurs(at);
+                } catch (VaultException locked) {
+                    Bytes.zero(produced);
+                    throw locked;
+                }
             }
-            out.complete(produced);
-        }
+        });
     }
 
-    private void completeVerification(AsyncResource<Boolean> out, int at, boolean same) {
-        synchronized (owner) {
-            requireStillOurs(at);
-            out.complete(Boolean.valueOf(same));
-        }
+    private void completeVerification(AsyncResource<Boolean> out, final int at, boolean same) {
+        out.complete(Boolean.valueOf(same), owner, new Runnable() {
+            public void run() {
+                requireStillOurs(at);
+            }
+        });
     }
 
     private void requireStillOurs(int at) {

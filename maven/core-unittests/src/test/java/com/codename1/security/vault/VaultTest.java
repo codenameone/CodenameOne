@@ -3877,6 +3877,39 @@ class VaultTest extends UITestBase {
     }
 
     @Test
+    void unlockCallbackCanWaitForAnotherThreadToReadTheVault() throws Exception {
+        final Vault vault = Vault.named(freshName()).configure(fast());
+        vault.enroll(pw("p"), fast()).get();
+        java.lang.reflect.Method complete = Vault.class.getDeclaredMethod("completeUnlock",
+                AsyncResource.class, int.class);
+        complete.setAccessible(true);
+        final AsyncResource<Boolean> result = new AsyncResource<Boolean>();
+        final java.util.concurrent.atomic.AtomicBoolean read = new java.util.concurrent.atomic.AtomicBoolean();
+        final Thread reader = new Thread(() -> read.set(vault.isUnlocked()));
+        final java.util.concurrent.atomic.AtomicBoolean callbackRan = new java.util.concurrent.atomic.AtomicBoolean();
+        // Register off the EDT so completion invokes the callback on the completing worker.
+        Thread subscriber = new Thread(() -> result.ready(value -> {
+            callbackRan.set(true);
+            reader.start();
+            try {
+                reader.join(2000);
+            } catch (InterruptedException interrupted) {
+                throw new RuntimeException(interrupted);
+            }
+            assertTrue(read.get(), "completion must release the vault monitor before calling application code");
+        }));
+        subscriber.start();
+        subscriber.join(10000);
+        try {
+            complete.invoke(vault, result, vault.generation());
+            assertTrue(callbackRan.get());
+        } finally {
+            reader.join(10000);
+            vault.lock();
+        }
+    }
+
+    @Test
     void unlockCompletionRefusesALockThatArrivedAfterPublication() throws Exception {
         Vault vault = Vault.named(freshName()).configure(fast());
         vault.enroll(pw("p"), fast()).get();
@@ -3950,7 +3983,7 @@ class VaultTest extends UITestBase {
     }
 
     @Test
-    void sensitiveResultsAreDeliveredWhileHoldingTheVaultLockMonitor() throws Exception {
+    void sensitiveResultsArePublishedAtomicallyBeforeCallbacksRun() throws Exception {
         final Vault vault = Vault.named(freshName()).configure(fast());
         vault.enroll(pw("p"), fast()).get();
         final int generation = vault.generation();
@@ -3965,13 +3998,24 @@ class VaultTest extends UITestBase {
         final byte[] secret = {1, 2, 3};
         final AsyncResource<byte[]> result = new AsyncResource<byte[]>() {
             @Override
-            public void complete(byte[] value) {
-                assertTrue(Thread.holdsLock(vault), "lock must not return between check and delivery");
-                publishing.countDown();
-                assertTrue(awaitQuietly(release));
-                super.complete(value);
+            public void complete(byte[] value, Object monitor, final Runnable validator) {
+                assertSame(vault, monitor);
+                super.complete(value, monitor, new Runnable() {
+                    public void run() {
+                        validator.run();
+                        assertTrue(Thread.holdsLock(vault), "validation and publication must be atomic");
+                        publishing.countDown();
+                        assertTrue(awaitQuietly(release));
+                    }
+                });
             }
         };
+        Thread subscriber = new Thread(() -> result.ready(value -> {
+            assertFalse(Thread.holdsLock(vault), "application callbacks must run outside the vault monitor");
+            assertTrue(result.isDone());
+        }));
+        subscriber.start();
+        subscriber.join(10000);
         Thread producer = new Thread(new Runnable() {
             public void run() {
                 try {

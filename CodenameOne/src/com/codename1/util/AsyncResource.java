@@ -550,15 +550,36 @@ public class AsyncResource<V> extends Observable {
     /// - `value`: The value to set for the resource.
     @Async.Execute
     public void complete(final V value) {
-        SuccessCallback cb = null;
-        synchronized (lock) {
-            this.value = value;
-            done = true;
-            if (successCallback != null) {
+        complete(value, lock, null);
+    }
+
+    /// Sets the resource value while holding a caller-supplied monitor, then runs observers
+    /// and ready callbacks after releasing it. This lets state validation and result publication
+    /// be atomic without calling application code under the state owner's monitor.
+    ///
+    /// The validator runs before this resource changes. If it throws, the resource remains
+    /// unchanged and the exception is propagated. It must not block or invoke application code.
+    /// Call this method without already holding the supplied monitor; an outer synchronized
+    /// block would keep that monitor held during callbacks.
+    ///
+    /// #### Parameters
+    ///
+    /// - `value`: The value to set for the resource.
+    /// - `completionMonitor`: Non-null monitor shared with changes that invalidate the result.
+    /// - `validator`: Optional validation or state update to run under the monitor.
+    @Async.Execute
+    public void complete(final V value, Object completionMonitor, Runnable validator) {
+        SuccessCallback cb;
+        synchronized (completionMonitor) {
+            if (validator != null) {
+                validator.run();
+            }
+            synchronized (lock) {
+                this.value = value;
+                done = true;
                 cb = successCallback;
             }
         }
-
         setChanged();
         notifyObservers();
         if (cb != null) {

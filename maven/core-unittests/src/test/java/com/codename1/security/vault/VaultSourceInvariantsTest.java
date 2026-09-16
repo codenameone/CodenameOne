@@ -42,8 +42,7 @@ class VaultSourceInvariantsTest extends UITestBase {
         String source = new String(java.nio.file.Files.readAllBytes(java.nio.file.Paths.get(
                 "../../CodenameOne/src/com/codename1/security/vault/VaultKeyHandle.java")), "UTF-8");
         for (String signature : new String[] {"public void destroy(", "public boolean isDestroyed(",
-                "private byte[] copyMaterial(", "private void completeBytes(",
-                "private void completeVerification("}) {
+                "private byte[] copyMaterial("}) {
             String body = codeOnly(methodBody(source, signature));
             assertTrue(body.trim().startsWith("{\n        synchronized (owner)"), signature);
         }
@@ -59,10 +58,13 @@ class VaultSourceInvariantsTest extends UITestBase {
 
     @Test
     void sensitiveResultPathsUseAtomicPublication() throws Exception {
-        assertTrue(java.lang.reflect.Modifier.isSynchronized(Vault.class.getDeclaredMethod(
-                "completeUnlocked", com.codename1.util.AsyncResource.class, int.class,
-                int.class, Object.class).getModifiers()));
         String source = readVaultSource();
+        String completion = codeOnly(methodBody(source,
+                "private <T> void completeUnlocked(AsyncResource<T> out, final int generation,"));
+        assertTrue(completion.contains("out.complete(result, this, new Runnable()"));
+        assertTrue(completion.contains("requireSameGeneration(generation)"));
+        assertTrue(completion.contains("requireSameKey(keyAt)"));
+        assertFalse(completion.contains("synchronized"), "callbacks must run outside the vault monitor");
         for (String signature : new String[] {
                 "public AsyncResource<char[]> getSecret(",
                 "public AsyncResource<byte[]> seal(",
@@ -78,8 +80,9 @@ class VaultSourceInvariantsTest extends UITestBase {
                 "../../CodenameOne/src/com/codename1/security/vault/VaultKeyHandle.java")), "UTF-8");
         for (String name : new String[] {"completeBytes", "completeVerification"}) {
             String body = codeOnly(methodBody(handle, "private void " + name + "("));
-            assertTrue(body.contains("synchronized (owner)"), name);
-            assertTrue(body.indexOf("requireStillOurs(at)") < body.indexOf("out.complete("), name);
+            assertTrue(body.contains(", owner, new Runnable()"), name);
+            assertTrue(body.contains("requireStillOurs(at)"), name);
+            assertFalse(body.contains("synchronized"), name);
         }
     }
 
@@ -106,14 +109,17 @@ class VaultSourceInvariantsTest extends UITestBase {
             assertTrue(java.lang.reflect.Modifier.isSynchronized(
                     Vault.class.getDeclaredMethod(method).getModifiers()), method);
         }
-        assertTrue(java.lang.reflect.Modifier.isSynchronized(Vault.class.getDeclaredMethod(
-                "completeUnlock", com.codename1.util.AsyncResource.class, int.class).getModifiers()));
         String source = readVaultSource();
+        String completion = codeOnly(methodBody(source,
+                "private void completeUnlock(AsyncResource<Boolean> out, final int generation,"));
+        assertTrue(completion.contains("out.complete(Boolean.TRUE, this, new Runnable()"));
+        assertTrue(completion.contains("requireSameGeneration(generation)"));
+        assertFalse(completion.contains("synchronized"));
         String adopt = codeOnly(methodBody(source, "private synchronized void adoptSession("));
         assertTrue(adopt.indexOf("touch()") >= 0 && adopt.indexOf("touch()") < adopt.indexOf("adoptKey("));
         for (String name : new String[] {"unlockWithPassword", "unlockRemembered", "unlockWithRecoveryCode"}) {
             String body = codeOnly(methodBody(source, "public AsyncResource<Boolean> " + name + "("));
-            assertTrue(body.contains("completeUnlock(out, generation)"), name);
+            assertTrue(body.contains("completeUnlock(out, generation"), name);
             assertFalse(body.contains("out.complete("), name);
         }
     }

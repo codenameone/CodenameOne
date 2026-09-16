@@ -690,11 +690,7 @@ public final class Vault {
                     // Ownership transferred: the vault holds this array now, so the finally must
                     // not wipe it. Load bearing, not a dead store -- see unlockRemembered.
                     key = null;
-                    synchronized (Vault.this) {
-                        requireSameGeneration(generation);
-                        setPasswordNeedsRewrap(envelope.getKdf().needsUpgrade());
-                        completeUnlock(out, generation);
-                    }
+                    completeUnlock(out, generation, Boolean.valueOf(envelope.getKdf().needsUpgrade()));
                 } catch (VaultException failed) {
                     out.error(failed);
                 } catch (RuntimeException broke) {
@@ -1805,17 +1801,21 @@ public final class Vault {
                     requireSameGeneration(generation);
                     VaultMetadata previous = current;
                     commitMetadata(previous, next);
+                    // The completion boundary now owns cleanup on validation failure. Once
+                    // published, callbacks may retain the code even if application code throws.
+                    owned = null;
+                    final VaultMetadata published = next;
                     try {
-                        synchronized (Vault.this) {
-                            requireSameGeneration(generation);
-                            requireSameKey(keyAt);
-                            metadata = next;
-                            owned = null;
-                            completeUnlocked(out, generation, keyAt, code);
-                        }
+                        completeUnlocked(out, generation, keyAt, code, new Runnable() {
+                            public void run() {
+                                metadata = published;
+                            }
+                        });
                     } catch (VaultException failed) {
-                        // Storage can yield; restore the prior wrap outside the lock monitor.
-                        commitMetadata(next, previous);
+                        // Storage can yield; restore only a wrap whose code was not delivered.
+                        if (!out.isDone()) {
+                            commitMetadata(next, previous);
+                        }
                         throw failed;
                     }
                 } catch (VaultException failed) {
@@ -3328,9 +3328,20 @@ public final class Vault {
     }
 
     /// Reports unlock success only while the published session has not been locked again.
-    private synchronized void completeUnlock(AsyncResource<Boolean> out, int generation) {
-        requireSameGeneration(generation);
-        out.complete(Boolean.TRUE);
+    private void completeUnlock(AsyncResource<Boolean> out, int generation) {
+        completeUnlock(out, generation, null);
+    }
+
+    private void completeUnlock(AsyncResource<Boolean> out, final int generation,
+            final Boolean needsRewrap) {
+        out.complete(Boolean.TRUE, this, new Runnable() {
+            public void run() {
+                requireSameGeneration(generation);
+                if (needsRewrap != null) {
+                    setPasswordNeedsRewrap(needsRewrap.booleanValue());
+                }
+            }
+        });
     }
 
     /// Withdraws a device record that a lock landed on top of, and reports the lock.
@@ -3462,24 +3473,34 @@ public final class Vault {
         }
     }
 
-    /// Checks and delivery share lock() and adoptKey()'s monitor. Crypto, storage, and device
-    /// prompts must finish before entering this boundary. A refused result still belongs to us.
-    private synchronized <T> void completeUnlocked(AsyncResource<T> out, int generation,
-            int keyAt, T result) {
-        try {
-            requireSameGeneration(generation);
-            requireSameKey(keyAt);
-        } catch (VaultException failed) {
-            if (result instanceof byte[]) {
-                Bytes.zero((byte[]) result);
-            } else if (result instanceof char[]) {
-                Bytes.zero((char[]) result);
-            } else if (result instanceof KeyHandle) {
-                ((KeyHandle) result).destroy();
+    /// Checks and result publication share lock() and adoptKey()'s monitor. Crypto, storage,
+    /// device prompts and completion callbacks run outside it. A refused result belongs to us.
+    private <T> void completeUnlocked(AsyncResource<T> out, int generation, int keyAt, T result) {
+        completeUnlocked(out, generation, keyAt, result, null);
+    }
+
+    private <T> void completeUnlocked(AsyncResource<T> out, final int generation,
+            final int keyAt, final T result, final Runnable update) {
+        out.complete(result, this, new Runnable() {
+            public void run() {
+                try {
+                    requireSameGeneration(generation);
+                    requireSameKey(keyAt);
+                } catch (VaultException failed) {
+                    if (result instanceof byte[]) {
+                        Bytes.zero((byte[]) result);
+                    } else if (result instanceof char[]) {
+                        Bytes.zero((char[]) result);
+                    } else if (result instanceof KeyHandle) {
+                        ((KeyHandle) result).destroy();
+                    }
+                    throw failed;
+                }
+                if (update != null) {
+                    update.run();
+                }
             }
-            throw failed;
-        }
-        out.complete(result);
+        });
     }
 
     private void requireSameGeneration(int generation) {
