@@ -66,6 +66,7 @@ class VaultSourceInvariantsTest extends UITestBase {
         assertTrue(completion.contains("requireSameKey(keyAt)"));
         assertFalse(completion.contains("synchronized"), "callbacks must run outside the vault monitor");
         for (String signature : new String[] {
+                "public AsyncResource<Boolean> removeSecret(",
                 "public AsyncResource<char[]> getSecret(",
                 "public AsyncResource<byte[]> seal(",
                 "public AsyncResource<byte[]> open(",

@@ -1234,6 +1234,51 @@ class VaultTest extends UITestBase {
     }
 
     @Test
+    void secretRemovalCannotDeleteAReenrolledVaultsValueAfterReadingIt() {
+        for (boolean recreate : new boolean[] {false, true}) {
+            final boolean replace = recreate;
+            final Vault owner = Vault.named(freshName()).configure(fast());
+            owner.enroll(pw("old"), fast()).get();
+            final String entry = secretEntryName(owner, "token");
+            owner.putSecret("token", pw("old-secret")).get();
+            final Vault stale = Vault.named(owner.getName()).configure(fast());
+            stale.unlockWithPassword(pw("old")).get();
+            final java.util.concurrent.atomic.AtomicBoolean intercepted = new java.util.concurrent.atomic.AtomicBoolean();
+            Storage original = Storage.getInstance();
+            Storage.setStorageInstance(new Storage() {
+                @Override
+                public java.io.InputStream createInputStream(String name) throws java.io.IOException {
+                    java.io.InputStream snapshot = super.createInputStream(name);
+                    if (entry.equals(name) && intercepted.compareAndSet(false, true)) {
+                        assertTrue(owner.destroyLocalData().get().booleanValue());
+                        if (replace) {
+                            owner.enroll(pw("new"), fast()).get();
+                            owner.putSecret("token", pw("new-secret")).get();
+                        }
+                    }
+                    return snapshot;
+                }
+            });
+            try {
+                VaultError outcome = errorOf(stale.removeSecret("token"));
+                assertTrue(intercepted.get(), "replacement must land after the initial metadata check");
+                assertEquals(replace ? VaultError.CONFLICT : VaultError.LOCKED, outcome);
+                assertFalse(stale.isUnlocked());
+                if (replace) {
+                    assertArrayEquals(pw("new-secret"), owner.getSecret("token").get());
+                } else {
+                    assertEquals(Vault.NOT_ENROLLED, owner.state());
+                    assertFalse(Storage.getInstance().exists(entry));
+                }
+            } finally {
+                Storage.setStorageInstance(original);
+                owner.lock();
+                stale.lock();
+            }
+        }
+    }
+
+    @Test
     void removingASecretWhileLockedIsRefused() {
         // Deleting needs no key, so this was the one secret operation that ran while locked --
         // including after the auto-lock timeout, where the session is over and a stale screen

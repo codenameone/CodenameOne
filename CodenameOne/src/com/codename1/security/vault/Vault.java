@@ -1305,6 +1305,7 @@ public final class Vault {
         final AsyncResource<Boolean> out = new AsyncResource<Boolean>();
         // On the calling thread; see unlockWithPassword for why not in the worker.
         final int generation = lockGeneration();
+        final int keyAt = keyGeneration();
         background(new Runnable() {
             @Override
             public void run() {
@@ -1316,6 +1317,8 @@ public final class Vault {
                     // works without a key; this one is an ordinary edit and answers LOCKED like
                     // its siblings.
                     requireUnlocked();
+                    VaultMetadata meta = sessionMetadata();
+                    requireSameGeneration(generation);
                     String entry = secretKey(secretName);
                     // Kept so the delete can be undone, the way putSecret keeps what it
                     // overwrites. The generation is checked after the delete -- it has to be,
@@ -1324,19 +1327,26 @@ public final class Vault {
                     // when everything did.
                     // Uncached, for the reason putSecret gives: a rollback restores this.
                     Object previous = readUncached(entry);
+                    // Reading the secret can yield after the first metadata check. A different
+                    // tab can destroy and re-enroll the named vault in that interval, so the
+                    // ciphertext we just read may belong to its replacement, not this session.
+                    requireStoredRecord(meta);
+                    requireSameGeneration(generation);
+                    requireSameKey(keyAt);
                     Storage.getInstance().deleteStorageFile(entry);
-                    if (generation != lockGeneration()) {
-                        // null: this path DELETED the entry, so "still ours" means still
-                        // absent. What that cannot distinguish, and why it restores anyway, is
-                        // recorded on the helper.
+                    // Do not restore an old secret into a different vault if replacement was
+                    // observed during deletion. Storage has no cross-record transaction; this
+                    // check also prevents reporting success over an observed replacement.
+                    requireStoredRecord(meta);
+                    try {
+                        // definitelyGone, not !exists: unreadable storage is not removal.
+                        completeUnlocked(out, generation, keyAt, Boolean.valueOf(definitelyGone(entry)));
+                    } catch (VaultException changed) {
+                        // Restore only while the persisted vault still owns the previous value.
+                        requireStoredRecord(meta);
                         requireSecretRestored(entry, previous, null);
-                        throw new VaultException(VaultError.LOCKED,
-                                "the vault was locked while this secret was being removed");
+                        throw changed;
                     }
-                    // definitelyGone, not !exists: a port that cannot tell answers false, which
-                    // this line read as "removed" and reported as success over a secret that is
-                    // still on the device.
-                    out.complete(Boolean.valueOf(definitelyGone(entry)));
                 } catch (VaultException failed) {
                     out.error(failed);
                 } catch (RuntimeException broke) {
@@ -2938,6 +2948,17 @@ public final class Vault {
                     "another session removed or changed this vault; unlock it again before use");
         }
         touch();
+    }
+
+    /// Revalidates the persisted identity around a destructive secret operation. A different
+    /// tab's replacement changes no local generation counter, so it must be checked in storage.
+    private void requireStoredRecord(VaultMetadata expected) {
+        VaultMetadata stored = loadMetadataFresh();
+        if (expected == null || stored == null || !stored.serialize().equals(expected.serialize())) {
+            lock();
+            throw new VaultException(stored == null ? VaultError.LOCKED : VaultError.CONFLICT,
+                    "another session removed or changed the vault while a secret was being removed");
+        }
     }
 
     private void requireProtections() {
