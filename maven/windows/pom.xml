@@ -78,8 +78,9 @@
             <plugin>
                 <artifactId>maven-antrun-plugin</artifactId>
                 <executions>
-                    <!-- Stage the port's native theme as a classpath resource
-                         (windowsNativeTheme.res) so the windows
+                    <!-- The port has no built-in native look, so its native theme is
+                         the full material theme (the same one Android ships). Stage it
+                         as a classpath resource (windowsNativeTheme.res) so the windows
                          translator target embeds it into the exe and the
                          getResourceAsStream call in installNativeTheme() serves it
                          straight from the executable. Mirrors how the iOS port carries
@@ -95,7 +96,7 @@
                         </goals>
                         <configuration>
                             <target>
-                                <copy file="${project.basedir}/../../Themes/WindowsFluentTheme.res"
+                                <copy file="${project.basedir}/../../Themes/AndroidMaterialTheme.res"
                                       tofile="${project.build.outputDirectory}/windowsNativeTheme.res"
                                       overwrite="true" failonerror="true"/>
                             </target>

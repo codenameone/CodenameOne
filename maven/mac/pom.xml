@@ -226,13 +226,6 @@
                                 <zip destfile="${project.build.directory}/codenameone/macport-bundle/nativemac.jar">
                                     <fileset dir="${shared.apple.natives.dir}"/>
                                     <fileset dir="${project.basedir}/../../Themes">
-                                        <!-- Aqua, not iOS Modern. The macOS port inherits
-                                             IOSImplementation and so inherited its theme
-                                             too, which put an iPhone design language on a
-                                             Mac. iOSModernTheme.res stays in the bundle for
-                                             a project that asks for it by name through the
-                                             macos.themeMode build hint. -->
-                                        <include name="MacOSAquaTheme.res"/>
                                         <include name="iOSModernTheme.res"/>
                                     </fileset>
                                 </zip>
