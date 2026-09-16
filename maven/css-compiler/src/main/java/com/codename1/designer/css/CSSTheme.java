@@ -4099,6 +4099,7 @@ public class CSSTheme {
         ///
         /// Unsupported shadow geometry stays on the raster path:
         ///
+        /// - Any blur other than explicit zero: software rendering has no CSS blur halo.
         /// - An omitted, zero, or negative spread: the software painter requires spread.
         /// - An `inset` shadow. RoundRectBorder only draws an outer drop shadow.
         /// - A shadow tinted anything other than black. The reader never reads a shadow
@@ -4118,6 +4119,15 @@ public class CSSTheme {
             }
             LexicalUnit color = styles.get("cn1-box-shadow-color");
             if (color != null && !isNone(color) && (getColorInt(color) & 0xffffff) != 0) {
+                return false;
+            }
+            // A small blur is not safe merely because it is smaller than spread:
+            // the software target has no separate CSS blur halo allocation, and the
+            // cached fast path skips Gaussian blur. Keep every nonzero CSS blur on
+            // the raster path until the native painter can preserve those semantics.
+            // Requiring explicit zero also avoids the constructor's default blur.
+            ScaledUnit blur = (ScaledUnit) styles.get("cn1-box-shadow-blur");
+            if (blur == null || blur.getNumericValue() != 0) {
                 return false;
             }
             // CSS omitted spread is zero, not RoundRectBorder's density-dependent default.

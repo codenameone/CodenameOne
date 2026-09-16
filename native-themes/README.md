@@ -35,7 +35,7 @@ require CEF rasterization fails the build and lists the offending UIID.
   to a `CSSBorder`, which carries each side natively. This is what the Fluent
   text field's bottom accent stroke is made of.
 - **`box-shadow`**, as long as it is a single, non-`inset`, **black** shadow
-  with explicit positive spread (at least `1px` when using pixels) and absolute
+  with explicit zero blur, positive spread (at least `1px` when using pixels), and absolute
   offsets whose magnitude does not exceed that spread.
   It compiles to `RoundRectBorder`'s own shadow -- shadowX, shadowY, shadowBlur,
   shadowSpread and shadowOpacity all round-trip through the resource format
@@ -63,6 +63,9 @@ require CEF rasterization fails the build and lists the offending UIID.
 
 **Forbidden (trigger CEF):**
 
+- A blurred `box-shadow`, even when its blur is smaller than its spread. The
+  software painter has no separate CSS blur halo allocation and its cached fast
+  path skips Gaussian blur. These shadows need rasterization.
 - A `box-shadow` with omitted, zero, negative, or subpixel pixel spread. CSS
   omitted spread is zero; the native software painter requires positive spread,
   and its constructor default is not equivalent to CSS zero.
