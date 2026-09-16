@@ -317,7 +317,7 @@ public final class Query<T> {
         }
         throw new IllegalArgumentException(table.definition.type().getName() + "."
                 + field + " is stored as " + table.dialect.columnType(kind)
-                + " and cannot be compared with " + value.getClass().getName()
+                + " and cannot be compared with " + describe(value, canonical)
                 + ". PostgreSQL refuses the comparison and MySQL coerces it, so the "
                 + "same query throws on one engine and answers rows on another.");
     }
@@ -335,14 +335,68 @@ public final class Query<T> {
             // arithmetic on every engine, not a mistake.
             return canonical instanceof Number;
         }
-        // INTEGER and BOOLEAN, which share a storage class. bound() turns a
-        // Boolean, a Date and a Character into a Long, and the narrow integrals
-        // arrive as themselves -- an Integer is what eq("views", 5) hands over,
-        // and the driver binds it as the integer it is. What this excludes is a
-        // String, a byte[] and a floating-point value, which are the three that
-        // make the engines disagree.
-        return canonical instanceof Long || canonical instanceof Integer
-                || canonical instanceof Short || canonical instanceof Byte;
+        // INTEGER, BIGINT, BOOLEAN and TIMESTAMP, which share a storage class.
+        // bound() turns a Boolean, a Date and a Character into a Long, and the
+        // narrow integrals arrive as themselves -- an Integer is what
+        // eq("views", 5) hands over, and the driver binds it as the integer it
+        // is. What this excludes is a String, a byte[] and a floating-point
+        // value, which are three of the ways the engines disagree.
+        if(!(canonical instanceof Long || canonical instanceof Integer
+                || canonical instanceof Short || canonical instanceof Byte)) {
+            return false;
+        }
+        // AND BEING INTEGRAL IS NOT ENOUGH: IT HAS TO FIT THE COLUMN. Every kind
+        // here is integral, but they are not the same width, and the engines
+        // disagree about an operand that overflows one. Measured, with views
+        // stored as INTEGER and pinned as BOOLEAN:
+        //
+        //   eq("views", Long.MAX_VALUE)  PostgreSQL 22003 "out of range for type
+        //                                integer"; MySQL, MariaDB and SQLite all
+        //                                answer 0 rows
+        //   eq("pinned", 100000L)        PostgreSQL 22003 "out of range for type
+        //                                smallint" -- BOOLEAN is narrower still,
+        //                                SMALLINT on PostgreSQL and TINYINT on
+        //                                MySQL; the others answer 0 rows
+        //
+        // That is the same throws-here-answers-there split this method exists to
+        // refuse, so the range is checked and not only the type. BIGINT and
+        // TIMESTAMP need no check: a long IS the column, and the same probe
+        // answers 0 rows on every engine.
+        //
+        // The cast is guarded by the instanceof chain above, which it has to be
+        // -- ParparVM's CHECKCAST is unchecked, so a failed cast here would read
+        // the wrong object rather than throw.
+        long widened = ((Number)canonical).longValue();
+        if(kind == Dialect.INTEGER) {
+            return widened >= Integer.MIN_VALUE && widened <= Integer.MAX_VALUE;
+        }
+        if(kind == Dialect.BOOLEAN) {
+            // 0 or 1, which is what the column holds on every engine -- see the
+            // note on the kind constants. Anything else matches no row where it
+            // does not throw, so refusing it reports the mistake rather than
+            // answering differently per engine.
+            return widened == 0 || widened == 1;
+        }
+        return true;
+    }
+
+    /**
+     * How a refused operand is named in the message.
+     *
+     * <p>The TYPE is what is wrong for a String against an integer column. It is
+     * useless for a Long that is merely too large -- "cannot be compared with
+     * java.lang.Long" reads as a bug in this check rather than in the call -- so
+     * an integral operand is named by its value as well. The canonical form is
+     * what gets printed, because that is what the column would have seen: a Date
+     * against an integer column is refused for the millisecond count it became,
+     * not for being a Date.
+     */
+    static String describe(Object value, Object canonical) {
+        if(canonical instanceof Long || canonical instanceof Integer
+                || canonical instanceof Short || canonical instanceof Byte) {
+            return value.getClass().getName() + " " + canonical;
+        }
+        return value.getClass().getName();
     }
 
     private Query<T> raw(String clause) {

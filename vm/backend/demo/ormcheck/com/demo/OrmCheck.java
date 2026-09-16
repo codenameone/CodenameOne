@@ -367,6 +367,69 @@ public class OrmCheck {
         // refusing everything. A narrow integral is what a caller actually writes.
         check("an int value against an integer field still works", "1",
                 String.valueOf(notes.query().eq("views", Integer.valueOf(10)).count()));
+        // AN OPERAND THAT OVERFLOWS THE COLUMN IS REFUSED, not passed to the
+        // engine. Measured before the range check existed: PostgreSQL answered
+        // 22003 "out of range for type integer" and MySQL, MariaDB and SQLite
+        // all answered 0 rows, which is the split every check in this block is
+        // about. The refusal has to name the RANGE -- "refused" alone passes on
+        // any exception, including one thrown for the wrong reason.
+        String eqOverflow;
+        try {
+            notes.query().eq("views", Long.valueOf(Long.MAX_VALUE)).count();
+            eqOverflow = "accepted";
+        } catch(IllegalArgumentException err) {
+            String message = String.valueOf(err.getMessage());
+            eqOverflow = message.indexOf("9223372036854775807") >= 0
+                    ? "refused" : "other: " + message;
+        }
+        check("an out of range value against an integer field is refused",
+                "refused", eqOverflow);
+        // The ordering comparisons take the same path, and gt() is the one that
+        // looks harmless -- "greater than Long.MAX_VALUE" is empty by
+        // inspection, and still throws on PostgreSQL.
+        String gtOverflow;
+        try {
+            notes.query().gt("views", Long.valueOf(Long.MAX_VALUE)).count();
+            gtOverflow = "accepted";
+        } catch(IllegalArgumentException err) {
+            gtOverflow = "refused";
+        }
+        check("and the ordering comparisons refuse it too", "refused", gtOverflow);
+        // BOOLEAN IS NARROWER THAN INTEGER, not the same: PostgreSQL stores it
+        // as SMALLINT and answered 22003 for 100000 while MySQL answered 0 rows.
+        // Fixing the integer range alone would have left this one diverging.
+        String boolOverflow;
+        try {
+            notes.query().eq("pinned", Long.valueOf(100000L)).count();
+            boolOverflow = "accepted";
+        } catch(IllegalArgumentException err) {
+            boolOverflow = "refused";
+        }
+        check("a value past a boolean field is refused as well", "refused",
+                boolOverflow);
+        // THE CONTROLS. A range check that refused every long, or that applied
+        // the integer range to a 64-bit column, would pass everything above.
+        check("an int-range long against an integer field still works", "1",
+                String.valueOf(notes.query().eq("views", Long.valueOf(10L)).count()));
+        check("a long past the integer range is fine on a timestamp field", "0",
+                String.valueOf(notes.query().gt("created",
+                        Long.valueOf(Long.MAX_VALUE)).count()));
+        check("and a boolean field still compares against a boolean", "1",
+                String.valueOf(notes.query().eq("pinned", Boolean.TRUE).count()));
+        // The key lookups share the same helper, so they inherit the range --
+        // and every entity here has a 64-bit or a text key, so what that shares
+        // is the ACCEPTANCE: applying the integer range to a BIGINT key would
+        // refuse an ordinary lookup. There is no int-keyed entity to refuse.
+        String bigKey;
+        try {
+            bigKey = notes.findById(Long.valueOf(Long.MAX_VALUE)) == null
+                    ? "no row" : "a row";
+        } catch(Exception err) {
+            bigKey = "threw: " + err.getMessage();
+        }
+        check("a long past the integer range is still a legal BIGINT key",
+                "no row", bigKey);
+
         check("in", "2",
                 String.valueOf(notes.query().in("title", new Object[] {"low", "mid"}).count()));
         // An empty set matches nothing: a filter that silently disappeared would

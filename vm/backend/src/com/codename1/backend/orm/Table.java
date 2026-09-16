@@ -224,7 +224,7 @@ final class Table {
         }
         throw new IllegalArgumentException(definition.type().getName() + " has a "
                 + dialect.columnType(kind) + " key and cannot be looked up with "
-                + id.getClass().getName() + ". PostgreSQL refuses the comparison and "
+                + Query.describe(id, canonical) + ". PostgreSQL refuses the comparison and "
                 + "MySQL coerces it, so the same call throws on one engine and answers "
                 + "or deletes the wrong row on another.");
     }
