@@ -68,6 +68,12 @@ final class BackendTestSupport {
             org.junit.jupiter.api.Assertions.fail(
                     "CN1_BACKEND_REQUIRED is set, so this must not be skipped: " + reason);
         }
+        // PRINTED, because a skip is otherwise invisible. Surefire reports one as
+        // "Tests run: 1, Skipped: 1" and keeps the reason in a report file nobody
+        // opens, so these tests skipped in CI for as long as they have existed and
+        // the job stayed green: a missing link library looked exactly like a
+        // developer machine without a toolchain. The reason is what says which.
+        System.out.println("SKIPPING a backend test: " + reason);
         org.junit.jupiter.api.Assumptions.abort(reason);
     }
 

@@ -1,0 +1,1054 @@
+/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.demo;
+
+import java.util.ArrayList;
+import java.util.Date;
+import java.util.List;
+
+import com.codename1.backend.Config;
+import com.codename1.backend.DataSource;
+import com.codename1.backend.orm.Dao;
+import com.codename1.backend.orm.EntityManager;
+
+/**
+ * The ORM against a REAL server, one engine per run.
+ *
+ * <p>Same shape as dbcheck and for the same reason: the claim is that ONE entity
+ * class, annotated once, is stored by SQLite, PostgreSQL and MySQL alike, and the
+ * only way to hold that claim is to run one body of assertions against all three
+ * and require the same answers. The generated dao is the production one -- the
+ * maven plugin wrote it from {@link Note} during generate-contract.sh -- so what
+ * runs here is what a developer's project runs.
+ *
+ * <p>Point it at a database with CN1_ORMCHECK_URL, or CN1_DBCHECK_URL, which is
+ * what the test harness already sets. Without either it runs the SQLite arm,
+ * which needs nothing installed.
+ */
+public class OrmCheck {
+    private static int passed;
+    private static final List failures = new ArrayList();
+
+    public static void main(String[] args) throws Exception {
+        // What the generated entry point does at start-up, and the only thing
+        // that keeps the generated daos in the binary: the translator drops a
+        // class nothing references.
+        new cn1app.BackendDaoBootstrap();
+
+        String url = System.getenv("CN1_ORMCHECK_URL");
+        if(url == null || url.length() == 0) {
+            url = System.getenv("CN1_DBCHECK_URL");
+        }
+        if(url == null || url.length() == 0) {
+            url = ":memory:";
+            note("no database URL set, running the SQLite arm only");
+        }
+        System.out.println("checking " + url);
+        DataSource pool = DataSource.open(url, 1);
+        try {
+            System.out.println("connected to " + pool + " as " + pool.dialect());
+            EntityManager em = EntityManager.open(pool);
+            Dao<Note> notes = em.dao(Note.class);
+            notes.dropTable();
+            notes.createTable();
+            try {
+                roundTripsEveryColumn(notes);
+                updatesAndDeletes(notes);
+                queriesByFieldName(notes, pool.dialect().getName());
+                transactionsAreAtomic(em, notes);
+                createTableIsIdempotent(notes);
+                anEntityThatIsOnlyAKey(em);
+                aStringKeyTheApplicationAssigns(em);
+                aTerminatedStatementStillAnswersItsKey(pool);
+                anUpsertThatUpdatesStillAnswers(pool);
+                anIgnoredInsertAnswersNoKey(pool);
+                aMultiRowInsertIsRefused(pool);
+                anExactNumericKeyIsStillAKey(pool);
+                aValueTheFieldCannotHoldIsRefused(em, pool);
+                aNulIsRefusedOnTheRawPathToo(pool);
+            } finally {
+                notes.dropTable();
+            }
+        } finally {
+            pool.close();
+        }
+        configurationChoosesTheDatabase();
+
+        System.out.println("passed=" + passed + " failed=" + failures.size());
+        for(int iter = 0 ; iter < failures.size() ; iter++) {
+            System.out.println("FAIL " + failures.get(iter));
+        }
+        System.out.println(failures.isEmpty() ? "ORMCHECK OK" : "ORMCHECK FAILED");
+        if(!failures.isEmpty()) {
+            System.exit(1);
+        }
+    }
+
+    /**
+     * Every column type, out and back.
+     *
+     * <p>The types are where the engines differ if nobody looks: a boolean is a
+     * SMALLINT on PostgreSQL and a TINYINT on MySQL, a date is milliseconds in a
+     * BIGINT rather than a native timestamp whose text format follows the
+     * server's time zone, and a blob is BYTEA, BLOB or LONGBLOB.
+     */
+    private static void roundTripsEveryColumn(Dao<Note> notes) throws Exception {
+        Note note = new Note();
+        note.title = "first";
+        // A QUESTION MARK in a stored value. Every statement goes through the
+        // placeholder rewrite, and a value is not a statement.
+        note.body = "how? like this";
+        note.views = 3;
+        note.pinned = true;
+        note.score = 1.5;
+        note.created = new Date(1700000000000L);
+        note.payload = new byte[] {1, 2, 3, 0, 4};
+        note.revision = null;
+        note.initial = 'x';
+        note.grade = null;
+        note.rank = (short)-32768;
+        note.flags = (byte)127;
+        note.weight = 0.5f;
+        note.priority = null;
+        note.archived = null;
+        note.weightAgain = null;
+        note.rankAgain = null;
+        note.flagsAgain = null;
+        note.weightNarrow = null;
+        note.cached = "never stored";
+        notes.insert(note);
+        check("the generated key is written back", "true", String.valueOf(note.id > 0));
+
+        Note back = notes.findById(Long.valueOf(note.id));
+        check("the row is there", "true", String.valueOf(back != null));
+        if(back == null) {
+            return;
+        }
+        check("String", "first", back.title);
+        check("String with a question mark in it", "how? like this", back.body);
+        check("int", "3", String.valueOf(back.views));
+        check("boolean", "true", String.valueOf(back.pinned));
+        check("double", "1.5", String.valueOf(back.score));
+        check("Date", "1700000000000", String.valueOf(back.created.getTime()));
+        check("byte[] length", "5", String.valueOf(back.payload == null ? -1 : back.payload.length));
+        // A NUL INSIDE the blob, which is where a length-unaware path truncates.
+        check("byte[] content", "1,2,3,0,4", join(back.payload));
+        check("a null boxed field stays null", "null", String.valueOf(back.revision));
+        check("char", "x", String.valueOf(back.initial));
+        // A nullable char has no default to fall back on, so it is read through
+        // a conversion of its own rather than through the primitive one.
+        check("a null boxed char stays null", "null", String.valueOf(back.grade));
+        // The narrow integrals at their extremes, which is where a column that
+        // is too wide on one engine and a narrowing read disagree.
+        check("short", "-32768", String.valueOf(back.rank));
+        check("byte", "127", String.valueOf(back.flags));
+        check("float", "0.5", String.valueOf(back.weight));
+        check("a null Integer stays null", "null", String.valueOf(back.priority));
+        check("a null Boolean stays null", "null", String.valueOf(back.archived));
+        check("a null Double stays null", "null", String.valueOf(back.weightAgain));
+        check("a null Short stays null", "null", String.valueOf(back.rankAgain));
+        check("a null Byte stays null", "null", String.valueOf(back.flagsAgain));
+        check("a null Float stays null", "null", String.valueOf(back.weightNarrow));
+        check("@DbTransient is not stored", "null", String.valueOf(back.cached));
+
+        // A STRING PAST MySQL's TEXT LIMIT. TEXT holds 65,535 bytes there while
+        // SQLite and PostgreSQL leave a string column unbounded, so a document
+        // body this size stored on two engines and was rejected by a strict
+        // MySQL -- or truncated by a permissive one, which loses data and
+        // reports nothing. Checked by LENGTH rather than by equality so a
+        // truncation says how much survived.
+        StringBuilder big = new StringBuilder(70000);
+        while(big.length() < 70000) {
+            big.append("abcdefghij");
+        }
+        Note large = new Note();
+        large.title = "large";
+        large.body = big.toString();
+        notes.insert(large);
+        Note largeBack = notes.findById(Long.valueOf(large.id));
+        check("a string past MySQL's TEXT limit round trips", "70000",
+                String.valueOf(largeBack == null || largeBack.body == null
+                        ? -1 : largeBack.body.length()));
+        notes.delete(large);
+
+        // A NUL INSIDE A STRING. SQLite and MySQL store it -- both keep text
+        // with a length rather than a terminator -- while PostgreSQL refuses the
+        // row with "invalid byte sequence for encoding UTF8: 0x00". So this
+        // inserted through a whole SQLite development cycle and failed the first
+        // time it met production. Refused on every engine now, before binding.
+        Note nul = new Note();
+        nul.title = "has a nul";
+        nul.body = "a" + ((char)0) + "b";
+        String refusedNul;
+        try {
+            notes.insert(nul);
+            refusedNul = "accepted";
+        } catch (Exception err) {
+            refusedNul = "refused";
+        }
+        check("a NUL in a string field is refused on every engine", "refused", refusedNul);
+
+        // And a byte[] still carries one, because that is what a blob is for --
+        // the payload above already holds a zero byte and round trips.
+
+        // And a value in the boxed column comes back as that value.
+        back.revision = Long.valueOf(7);
+        back.grade = Character.valueOf('A');
+        back.priority = Integer.valueOf(-2147483648);
+        back.archived = Boolean.TRUE;
+        back.weightAgain = Double.valueOf(-0.25);
+        back.rankAgain = Short.valueOf((short)32767);
+        back.flagsAgain = Byte.valueOf((byte)-128);
+        back.weightNarrow = Float.valueOf(0.25f);
+        notes.update(back);
+        check("a boxed field round trips", "7",
+                String.valueOf(notes.findById(Long.valueOf(note.id)).revision));
+        check("a boxed char round trips", "A",
+                String.valueOf(notes.findById(Long.valueOf(note.id)).grade));
+        Note filled = notes.findById(Long.valueOf(note.id));
+        check("a boxed int round trips at its minimum", "-2147483648",
+                String.valueOf(filled.priority));
+        check("a boxed boolean round trips", "true", String.valueOf(filled.archived));
+        check("a boxed double round trips", "-0.25", String.valueOf(filled.weightAgain));
+        check("a boxed short round trips at its maximum", "32767",
+                String.valueOf(filled.rankAgain));
+        check("a boxed byte round trips at its minimum", "-128",
+                String.valueOf(filled.flagsAgain));
+        check("a boxed float round trips", "0.25", String.valueOf(filled.weightNarrow));
+    }
+
+    private static void updatesAndDeletes(Dao<Note> notes) throws Exception {
+        Note note = new Note();
+        note.title = "to change";
+        notes.insert(note);
+        note.title = "changed";
+        check("update reports the row", "true", String.valueOf(notes.update(note)));
+        // AND AN UPDATE THAT CHANGES NOTHING STILL FOUND ITS ROW. MySQL counts
+        // rows it altered rather than rows it matched unless the connection asks
+        // for CLIENT_FOUND_ROWS, so without that bit saving an entity nobody had
+        // edited answered false here -- and a handler turns false into a 404.
+        // SQLite and PostgreSQL always answered true, so this is the assertion
+        // that holds the three to one answer.
+        check("an update that changes nothing still reports its row", "true",
+                String.valueOf(notes.update(note)));
+        check("the update took", "changed",
+                notes.findById(Long.valueOf(note.id)).title);
+        check("delete reports the row", "true", String.valueOf(notes.delete(note)));
+        // The row that is not there is a case a handler turns into a 404, which
+        // is why these answer rather than returning void.
+        check("a second delete reports nothing", "false", String.valueOf(notes.delete(note)));
+        check("an update of a missing row reports nothing", "false",
+                String.valueOf(notes.update(note)));
+        check("a missing row reads as null", "null",
+                String.valueOf(notes.findById(Long.valueOf(note.id))));
+    }
+
+    /**
+     * The query builder, which names JAVA FIELDS.
+     *
+     * <p>`created` maps to a column called createdAt, and PostgreSQL folds an
+     * unquoted name to lower case -- so these queries pass only because every
+     * identifier the ORM writes is quoted.
+     */
+    private static void queriesByFieldName(Dao<Note> notes, String engine) throws Exception {
+        // Cleared first, so what these count is what this method inserted rather
+        // than what the checks before it left behind. A query with no conditions
+        // deletes the table, which is the reading of the SQL it builds.
+        notes.query().delete();
+        check("the table is empty after a bulk delete", "0", String.valueOf(notes.count()));
+        notes.insert(note("low", 1, false, 1000L));
+        notes.insert(note("high", 10, true, 2000L));
+        notes.insert(note("mid", 5, false, 3000L));
+        check("count", "3", String.valueOf(notes.count()));
+        check("gt", "1", String.valueOf(notes.query().gt("views", Integer.valueOf(5)).count()));
+        // A TEXT range comparison, which is where the three engines disagree by
+        // default. The three titles here -- low, high, mid -- are all lower case,
+        // so in BYTE order every one of them is above 'Z' (0x61.. against 0x5a).
+        // SQLite compares BINARY and the generated MySQL column carries a binary
+        // collation, so both answer 3. PostgreSQL follows the database locale, and
+        // on the en_US.utf8 a standard image creates, 'a' sorts BEFORE 'Z' --
+        // measured, this same query answered 3 on two engines and 0 on the third.
+        // The dialect's comparison collation is what makes it one number.
+        check("a text range comparison is byte order on every engine",
+                "above=3 below=0",
+                "above=" + notes.query().gt("title", "Z").count()
+                        + " below=" + notes.query().lt("title", "Z").count());
+        // And it agrees with the ORDER BY over the same column, which is the
+        // inconsistency this closes: ordering was already pinned to byte order
+        // while the comparison deciding which rows come back was not. Ascending by
+        // title, "high" is first, and it is one of the rows gt('Z') returns.
+        check("ordering and comparison agree on the same column", "high",
+                notes.query().orderBy("title", true).first().title);
+        check("eq on a boolean", "1",
+                String.valueOf(notes.query().eq("pinned", Boolean.TRUE).count()));
+        check("gte on a date and a mixed-case column", "2",
+                String.valueOf(notes.query().gte("created", new Date(2000L)).count()));
+        check("like", "1", String.valueOf(notes.query().like("title", "lo%").count()));
+        // AND ONLY ON TEXT. Measured, like("views", "12%") matches the row
+        // holding 123 on SQLite and MySQL and makes PostgreSQL throw "operator
+        // does not exist: integer ~~ text" -- one call, rows on two engines and
+        // an error on the third. So it is refused before the statement is built,
+        // which is the same answer everywhere.
+        String likeOnAnInt;
+        try {
+            notes.query().like("views", "12%").count();
+            likeOnAnInt = "accepted";
+        } catch(IllegalArgumentException err) {
+            likeOnAnInt = "refused";
+        }
+        check("like on a non-text field is refused on every engine", "refused", likeOnAnInt);
+        check("in", "2",
+                String.valueOf(notes.query().in("title", new Object[] {"low", "mid"}).count()));
+        // An empty set matches nothing: a filter that silently disappeared would
+        // return every row in the table.
+        check("in with nothing in it", "0",
+                String.valueOf(notes.query().in("title", new Object[0]).count()));
+        check("isNull", "3", String.valueOf(notes.query().isNull("body").count()));
+
+        // EQUALITY IS CASE SENSITIVE ON ALL THREE. MySQL's default collation is
+        // case and accent insensitive, so without the binary collation the
+        // generated text column pins, eq("title", "LOW") matched the stored
+        // "low" there and matched nothing on the other two -- measured, 2 rows
+        // against 1. eq and in() are what an application builds behaviour on.
+        check("eq is case sensitive", "1",
+                String.valueOf(notes.query().eq("title", "low").count()));
+        check("and does not match another case", "0",
+                String.valueOf(notes.query().eq("title", "LOW").count()));
+        check("in() is case sensitive too", "1",
+                String.valueOf(notes.query().in("title",
+                        new Object[] {"low", "LOW"}).count()));
+
+        // WHERE A NULL SORTS. Measured over one null and two values, the
+        // engines disagreed by default: SQLite and MySQL put the null first
+        // ascending, PostgreSQL put it last -- so orderBy(..., true).first()
+        // answered the null row on two engines and a real one on the third.
+        // NULL sorts LOWEST now on all three, which is what two of them already
+        // did. `body` is null on every row this method inserted except none, so
+        // the ordering is done on a column that really has one.
+        // TEXT ORDER IS BYTE ORDER ON ALL THREE. SQLite compares text by bytes,
+        // so "Z" sorts before "a"; a PostgreSQL database initialised with a
+        // locale-aware collation puts "a" first. Measured through raw SQL the
+        // two still disagree -- that is the engine's own default and not this
+        // ORM's business -- but a query the builder wrote has to answer the
+        // same everywhere, so it pins COLLATE "C" there.
+        notes.query().delete();
+        notes.insert(note("Zeta", 1, false, 1000L));
+        notes.insert(note("alpha", 2, false, 2000L));
+        check("upper case sorts before lower, as bytes do", "Zeta",
+                notes.query().orderBy("title", true).first().title);
+        check("and the other way descending", "alpha",
+                notes.query().orderBy("title", false).first().title);
+        notes.query().delete();
+        notes.insert(note("first", 1, false, 1000L));
+        Note withBody = note("second", 2, false, 2000L);
+        withBody.body = "text";
+        notes.insert(withBody);
+        check("a null sorts first ascending", "null",
+                String.valueOf(notes.query().orderBy("body", true).first().body));
+        check("and last descending", "text",
+                String.valueOf(notes.query().orderBy("body", false).first().body));
+        notes.query().delete();
+        notes.insert(note("low", 1, false, 1000L));
+        notes.insert(note("high", 10, true, 2000L));
+        notes.insert(note("mid", 5, false, 3000L));
+
+        // AND SO IS LIKE. SQLite folds ASCII case in LIKE while PostgreSQL does
+        // not, so "lo%" matched "LOW" on SQLite alone. Closed by rendering GLOB
+        // there rather than by turning on PRAGMA case_sensitive_like, which is
+        // connection wide and would change what an existing schema's
+        // CHECK(v LIKE ...) accepts. The wildcards are translated with it, so a
+        // pattern written for LIKE keeps meaning what it says.
+        notes.insert(note("LOW", 2, false, 4000L));
+        check("LIKE is case sensitive on every engine", "1",
+                String.valueOf(notes.query().like("title", "lo%").count()));
+        check("and matches the other case on its own", "1",
+                String.valueOf(notes.query().like("title", "LO%").count()));
+        // The single-character wildcard travels too.
+        check("the _ wildcard matches one character", "1",
+                String.valueOf(notes.query().like("title", "lo_").count()));
+        // And a literal * or [ in a pattern stays literal, which is where a
+        // careless LIKE-to-GLOB translation would start matching everything.
+        check("a literal asterisk is not a wildcard", "0",
+                String.valueOf(notes.query().like("title", "lo*").count()));
+        check("and nor is a literal bracket", "0",
+                String.valueOf(notes.query().like("title", "lo[w]").count()));
+        notes.query().eq("title", "LOW").delete();
+        // A CHARACTER AS A QUERY VALUE. The column holds the code unit, so a
+        // query that bound one-character text compared 120 with "x" and matched
+        // nothing -- an empty result being an ordinary answer, silently.
+        check("eq on a char", "3",
+                String.valueOf(notes.query().eq("initial", Character.valueOf('z')).count()));
+        check("eq on a char that no row has", "0",
+                String.valueOf(notes.query().eq("initial", Character.valueOf('q')).count()));
+        // And a condition that matches some of them deletes only those.
+        check("a bulk delete answers how many", "1",
+                String.valueOf(notes.query().eq("title", "low").delete()));
+        notes.insert(note("low", 1, false, 1000L));
+
+        List<Note> ordered = notes.query().orderBy("views", false).limit(2).list();
+        check("order and limit", "2", String.valueOf(ordered.size()));
+        check("ordered first", "high", ordered.get(0).title);
+        check("ordered second", "mid", ordered.get(1).title);
+        check("first()", "low", notes.query().orderBy("views", true).first().title);
+        List<Note> offset = notes.query().orderBy("views", true).offset(1).limit(1).list();
+        check("offset", "mid", offset.get(0).title);
+
+        // The escape hatch, which is SQL: the column name, not the field name.
+        check("a hand-written where clause", "1",
+                String.valueOf(notes.find("views > ?", new Object[] {Integer.valueOf(5)}).size()));
+    }
+
+    private static void transactionsAreAtomic(EntityManager em, Dao<Note> notes)
+            throws Exception {
+        final long before = notes.count();
+        try {
+            em.transaction(new EntityManager.Work() {
+                public Object run(EntityManager tx) throws Exception {
+                    tx.dao(Note.class).insert(note("rolled back", 1, false, 1L));
+                    throw new IllegalStateException("deliberate");
+                }
+            });
+            check("a failing transaction throws", "threw", "returned");
+        } catch (IllegalStateException expected) {
+            check("a failing transaction throws", "threw", "threw");
+        }
+        check("a failing transaction wrote nothing", String.valueOf(before),
+                String.valueOf(notes.count()));
+
+        em.transaction(new EntityManager.Work() {
+            public Object run(EntityManager tx) throws Exception {
+                tx.dao(Note.class).insert(note("committed", 1, false, 1L));
+                return null;
+            }
+        });
+        check("a successful transaction committed", String.valueOf(before + 1),
+                String.valueOf(notes.count()));
+    }
+
+    /** Called at every start-up on a development profile, so it has to be idempotent. */
+    private static void createTableIsIdempotent(Dao<Note> notes) throws Exception {
+        long before = notes.count();
+        notes.createTable();
+        check("creating an existing table keeps its rows", String.valueOf(before),
+                String.valueOf(notes.count()));
+    }
+
+    /**
+     * An entity with nothing but a generated key, on every engine.
+     *
+     * <p>The insert names no columns, and the three engines disagree about how
+     * to write that: SQLite and PostgreSQL want DEFAULT VALUES and refuse the
+     * empty lists, MySQL wants the empty lists and has no DEFAULT VALUES.
+     */
+    /**
+     * A key the APPLICATION assigns, and a string one.
+     *
+     * <p>The column the three engines declare most differently: unbounded text
+     * on SQLite and PostgreSQL, and on MySQL a VARCHAR with a length, because it
+     * cannot index an unbounded column at all. So the portable key domain is the
+     * tightest of the three, and a key past it has to be refused everywhere
+     * rather than working on two engines and failing on the third with "Data too
+     * long" -- which is what happened until Table.MAX_ASSIGNED_TEXT_KEY existed.
+     */
+    private static void aStringKeyTheApplicationAssigns(EntityManager em) throws Exception {
+        Dao<Coupon> coupons = em.dao(Coupon.class);
+        coupons.dropTable();
+        coupons.createTable();
+        try {
+            Coupon ten = new Coupon();
+            ten.code = "SAVE-TEN";
+            ten.discount = 10;
+            coupons.insert(ten);
+            check("an assigned string key round trips", "10",
+                    String.valueOf(coupons.findById("SAVE-TEN").discount));
+            // Updated and deleted BY THAT KEY, which is the generated
+            // id = ? predicate doing its work against text rather than a number.
+            ten.discount = 15;
+            check("update finds the row by its string key", "true",
+                    String.valueOf(coupons.update(ten)));
+            check("and the update took", "15",
+                    String.valueOf(coupons.findById("SAVE-TEN").discount));
+
+            // THE BOUNDARY, which is where a VARCHAR(255) and an unbounded TEXT
+            // stop agreeing. 255 must store on every engine.
+            StringBuilder longest = new StringBuilder();
+            for(int iter = 0 ; iter < 255 ; iter++) {
+                longest.append('k');
+            }
+            Coupon edge = new Coupon();
+            edge.code = longest.toString();
+            edge.discount = 1;
+            coupons.insert(edge);
+            check("a key of exactly 255 characters stores", "1",
+                    String.valueOf(coupons.findById(longest.toString()).discount));
+
+            // And one past it is refused BEFORE the statement runs, on all three
+            // -- not accepted by two of them and rejected by the third.
+            Coupon tooLong = new Coupon();
+            tooLong.code = longest.toString() + "k";
+            tooLong.discount = 2;
+            String refused;
+            try {
+                coupons.insert(tooLong);
+                refused = "accepted";
+            } catch (Exception err) {
+                refused = "refused";
+            }
+            check("a key of 256 characters is refused on every engine", "refused", refused);
+            check("and nothing was written", "null",
+                    String.valueOf(coupons.findById(tooLong.code)));
+
+            // CASE, which MySQL's default collation folds away. Measured: with
+            // the collation left to the server, inserting "A" after "a" gives
+            // "Duplicate entry 'a' for key 'PRIMARY'" there while SQLite and
+            // PostgreSQL store two rows. Two keys an application issued as
+            // distinct became one, on one engine.
+            Coupon upper = new Coupon();
+            upper.code = "CaseKey";
+            upper.discount = 3;
+            coupons.insert(upper);
+            Coupon lower = new Coupon();
+            lower.code = "casekey";
+            lower.discount = 4;
+            coupons.insert(lower);
+            check("keys differing only in case are two rows", "3",
+                    String.valueOf(coupons.findById("CaseKey").discount));
+            check("and the other is its own row", "4",
+                    String.valueOf(coupons.findById("casekey").discount));
+            coupons.delete(upper);
+            coupons.delete(lower);
+
+            // A TRAILING SPACE IS PART OF THE KEY. MySQL's older binary
+            // collation is PAD SPACE, so "token" and "token " were the same
+            // primary key there -- measured, "Duplicate entry 'token '" --
+            // while SQLite and PostgreSQL kept them apart. The NO PAD
+            // collation makes the three agree.
+            Coupon padded = new Coupon();
+            padded.code = "PAD";
+            padded.discount = 6;
+            coupons.insert(padded);
+            Coupon spaced = new Coupon();
+            spaced.code = "PAD ";
+            spaced.discount = 7;
+            coupons.insert(spaced);
+            check("a trailing space makes a different key", "6",
+                    String.valueOf(coupons.findById("PAD").discount));
+            check("and the padded one is its own row", "7",
+                    String.valueOf(coupons.findById("PAD ").discount));
+            coupons.delete(padded);
+            coupons.delete(spaced);
+
+            check("delete by a string key reports the row", "true",
+                    String.valueOf(coupons.delete(ten)));
+            check("and it is gone", "null", String.valueOf(coupons.findById("SAVE-TEN")));
+        } finally {
+            coupons.dropTable();
+        }
+    }
+
+    private static void anEntityThatIsOnlyAKey(EntityManager em) throws Exception {
+        Dao<Ticket> tickets = em.dao(Ticket.class);
+        tickets.dropTable();
+        tickets.createTable();
+        try {
+            Ticket first = new Ticket();
+            tickets.insert(first);
+            check("a key-only entity is created", "true", String.valueOf(first.id > 0));
+            Ticket second = new Ticket();
+            tickets.insert(second);
+            check("a key-only entity gets a new key each time", "true",
+                    String.valueOf(second.id > first.id));
+            check("both rows are there", "2", String.valueOf(tickets.count()));
+        } finally {
+            tickets.dropTable();
+        }
+    }
+
+    /**
+     * An INSERT written with the semicolon SQL is usually written with.
+     *
+     * <p>PostgreSQL is the engine that has to read its generated key back out of
+     * the statement, and appending RETURNING after a terminator produces two
+     * statements, the second of which is not SQL. The same call works on the
+     * other two whatever the terminator, which is what makes it a portability
+     * hole rather than an error everywhere.
+     */
+    private static void aTerminatedStatementStillAnswersItsKey(DataSource pool) throws Exception {
+        pool.execute("DROP TABLE IF EXISTS cn1_terminated", null);
+        pool.execute("CREATE TABLE cn1_terminated (id "
+                + pool.dialect().generatedKeyColumn(com.codename1.backend.sql.Dialect.BIGINT)
+                + ", name " + pool.dialect().columnType(com.codename1.backend.sql.Dialect.TEXT)
+                + ")", null);
+        try {
+            long key = pool.insert("INSERT INTO cn1_terminated (name) VALUES (?);",
+                    new Object[] {"terminated"}, "id");
+            check("a statement ending in a semicolon still answers its key", "true",
+                    String.valueOf(key > 0));
+            check("and it wrote exactly one row", "1",
+                    String.valueOf(pool.query("SELECT name FROM cn1_terminated", null).size()));
+        } finally {
+            pool.execute("DROP TABLE IF EXISTS cn1_terminated", null);
+        }
+    }
+
+    /**
+     * An upsert that UPDATES an existing row still answers, on every engine.
+     *
+     * <p>One row, and each engine spells the conflict clause its own way, which
+     * is why this is the one check that branches. What it is really about is
+     * MySQL: it reports TWO affected rows for a single-tuple ON DUPLICATE KEY
+     * UPDATE that changed a row, and reading that as "rows inserted" refused an
+     * ordinary upsert AFTER it had committed.
+     */
+    /**
+     * An insert that CONFLICTED and was ignored answers no key.
+     *
+     * <p>The other half of the upsert problem, and the one the row count can
+     * answer: last_insert_rowid() and LAST_INSERT_ID() belong to the CONNECTION,
+     * so after an ignored insert they still hold the id of whatever this
+     * connection wrote before. Reporting that would hand the caller a key
+     * belonging to a different row -- and it is the same number a successful
+     * insert would have returned, so nothing downstream could tell. Zero is what
+     * PostgreSQL's RETURNING already answers for a row it did not write, which
+     * is what makes the three agree.
+     *
+     * <p>Two rows are inserted first for the same reason the upsert check needs
+     * them: with one row on the connection the stale value is accidentally
+     * right, and a broken reading passes.
+     */
+    private static void anIgnoredInsertAnswersNoKey(DataSource pool) throws Exception {
+        String engine = pool.dialect().getName();
+        boolean mysql = "mysql".equals(engine);
+        pool.execute("DROP TABLE IF EXISTS cn1_ignored", null);
+        pool.execute("CREATE TABLE cn1_ignored (id "
+                + pool.dialect().generatedKeyColumn(com.codename1.backend.sql.Dialect.BIGINT)
+                + ", name " + (mysql ? "VARCHAR(64)" : "TEXT")
+                + " NOT NULL UNIQUE)", null);
+        try {
+            pool.insert("INSERT INTO cn1_ignored (name) VALUES (?)",
+                    new Object[] {"a"}, "id");
+            long second = pool.insert("INSERT INTO cn1_ignored (name) VALUES (?)",
+                    new Object[] {"b"}, "id");
+            check("the second fixture row has a key", "true", String.valueOf(second > 0));
+            String ignore;
+            if("postgresql".equals(engine)) {
+                ignore = "INSERT INTO cn1_ignored (name) VALUES (?) ON CONFLICT DO NOTHING";
+            } else if(mysql) {
+                ignore = "INSERT IGNORE INTO cn1_ignored (name) VALUES (?)";
+            } else {
+                ignore = "INSERT OR IGNORE INTO cn1_ignored (name) VALUES (?)";
+            }
+            // Zero, and specifically NOT the key of row b.
+            check("an insert that conflicted answers no key", "0",
+                    String.valueOf(pool.insert(ignore, new Object[] {"a"}, "id")));
+            check("and it wrote nothing", "2",
+                    String.valueOf(((java.util.Map)pool.query(
+                            "SELECT COUNT(*) AS c FROM cn1_ignored", null).get(0))
+                            .values().iterator().next()));
+        } finally {
+            pool.execute("DROP TABLE IF EXISTS cn1_ignored", null);
+        }
+    }
+
+    private static void anUpsertThatUpdatesStillAnswers(DataSource pool) throws Exception {
+        String engine = pool.dialect().getName();
+        boolean mysql = "mysql".equals(engine);
+        pool.execute("DROP TABLE IF EXISTS cn1_upsert", null);
+        pool.execute("CREATE TABLE cn1_upsert (id "
+                + pool.dialect().generatedKeyColumn(com.codename1.backend.sql.Dialect.BIGINT)
+                + ", name " + (mysql ? "VARCHAR(64)" : "TEXT")
+                + " NOT NULL UNIQUE, hits INTEGER)", null);
+        try {
+            long first = pool.insert("INSERT INTO cn1_upsert (name, hits) VALUES (?, ?)",
+                    new Object[] {"a", Long.valueOf(1)}, "id");
+            check("the upsert fixture inserted", "true", String.valueOf(first > 0));
+            // A SECOND ROW ON THE SAME CONNECTION, which is what makes the
+            // stale key visible: with only one row ever inserted, the connection
+            // state happens to hold the right answer and a wrong reading passes.
+            long second = pool.insert("INSERT INTO cn1_upsert (name, hits) VALUES (?, ?)",
+                    new Object[] {"b", Long.valueOf(1)}, "id");
+            check("the second fixture row has its own key", "true",
+                    String.valueOf(second > first));
+            String upsert = mysql
+                    ? "INSERT INTO cn1_upsert (name, hits) VALUES (?, ?) "
+                            + "ON DUPLICATE KEY UPDATE hits = hits + 1"
+                    : "INSERT INTO cn1_upsert (name, hits) VALUES (?, ?) "
+                            + "ON CONFLICT (name) DO UPDATE SET hits = cn1_upsert.hits + 1";
+            // PostgreSQL reads the key of the row it actually touched, through
+            // RETURNING, so the upsert answers and answers correctly. The other
+            // two read it from CONNECTION state, which after the update branch
+            // still holds row b's key -- so insert() refuses rather than
+            // reporting that key for row a. The refusal is a preflight: nothing
+            // is committed behind it, which the hits check below confirms.
+            String answered;
+            try {
+                answered = String.valueOf(pool.insert(upsert,
+                        new Object[] {"a", Long.valueOf(1)}, "id"));
+            } catch (Exception err) {
+                answered = "refused";
+            }
+            boolean returning = pool.dialect().generatedKeysThroughReturning();
+            check("an upsert answers with the updated row's key, or not at all",
+                    returning ? String.valueOf(first) : "refused", answered);
+            if(!returning) {
+                // And the statement itself is fine -- it is the KEY that cannot
+                // be answered, so execute() runs it and the caller reads the key
+                // back with a query.
+                check("the same statement runs through execute", "1",
+                        String.valueOf(pool.execute(upsert,
+                                new Object[] {"a", Long.valueOf(1)}) > 0 ? 1 : 0));
+            }
+            List rows = pool.query("SELECT hits FROM cn1_upsert WHERE name = ?",
+                    new Object[] {"a"});
+            check("and the update happened exactly once", "2",
+                    String.valueOf(((java.util.Map)rows.get(0)).values().iterator().next()));
+        } finally {
+            pool.execute("DROP TABLE IF EXISTS cn1_upsert", null);
+        }
+    }
+
+    /**
+     * A multi-row insert is refused BEFORE it writes, on every engine.
+     *
+     * <p>The three key one differently -- SQLite reports the last, MySQL the
+     * first, PostgreSQL returns a row per insert -- so there is no key insert()
+     * could answer with.
+     */
+    private static void aMultiRowInsertIsRefused(DataSource pool) throws Exception {
+        pool.execute("DROP TABLE IF EXISTS cn1_multi", null);
+        pool.execute("CREATE TABLE cn1_multi (id "
+                + pool.dialect().generatedKeyColumn(com.codename1.backend.sql.Dialect.BIGINT)
+                + ", name " + pool.dialect().columnType(com.codename1.backend.sql.Dialect.TEXT)
+                + ")", null);
+        try {
+            String refused;
+            try {
+                pool.insert("INSERT INTO cn1_multi (name) VALUES (?), (?)",
+                        new Object[] {"one", "two"}, "id");
+                refused = "accepted";
+            } catch (Exception err) {
+                String message = String.valueOf(err.getMessage());
+                refused = message.indexOf("ONE generated key") >= 0
+                        ? "refused" : "other: " + message;
+            }
+            check("a multi-row insert is refused", "refused", refused);
+            check("and it wrote nothing", "0",
+                    String.valueOf(pool.query("SELECT name FROM cn1_multi", null).size()));
+        } finally {
+            pool.execute("DROP TABLE IF EXISTS cn1_multi", null);
+        }
+    }
+
+    /**
+     * A generated key declared NUMERIC still answers, on PostgreSQL.
+     *
+     * <p>PostgreSQL alone, because it is the only engine that returns a value as
+     * exact TEXT rather than as a number -- deliberately, since an
+     * arbitrary-precision value does not survive a double. "numeric(19,0) DEFAULT
+     * nextval(...)" is an ordinary way to spell a key, and a check that insisted
+     * the key be a Number threw after the insert had committed.
+     */
+    private static void anExactNumericKeyIsStillAKey(DataSource pool) throws Exception {
+        if(!"postgresql".equals(pool.dialect().getName())) {
+            return;
+        }
+        pool.execute("DROP TABLE IF EXISTS cn1_numeric_key", null);
+        pool.execute("DROP SEQUENCE IF EXISTS cn1_numeric_seq", null);
+        pool.execute("CREATE SEQUENCE cn1_numeric_seq", null);
+        pool.execute("CREATE TABLE cn1_numeric_key (id numeric(19,0) PRIMARY KEY "
+                + "DEFAULT nextval('cn1_numeric_seq'), name TEXT)", null);
+        try {
+            long key = pool.insert("INSERT INTO cn1_numeric_key (name) VALUES (?)",
+                    new Object[] {"exact"}, "id");
+            check("a numeric generated key answers", "true", String.valueOf(key > 0));
+            check("and the row is there", "1", String.valueOf(pool.query(
+                    "SELECT name FROM cn1_numeric_key WHERE id = ?",
+                    new Object[] {Long.valueOf(key)}).size()));
+        } finally {
+            pool.execute("DROP TABLE IF EXISTS cn1_numeric_key", null);
+            pool.execute("DROP SEQUENCE IF EXISTS cn1_numeric_seq", null);
+        }
+    }
+
+    /**
+     * A row the entity cannot represent is refused rather than rounded, read
+     * through the generated dao.
+     *
+     * <p>SQLite only, and not for want of trying: it is the engine with
+     * AFFINITIES rather than types, so an INTEGER column accepts 12.5 and a
+     * value past an int, and another client or a migration can put either there
+     * any day. PostgreSQL and MySQL reject both at the insert, which is the same
+     * outcome one step earlier.
+     */
+    /**
+     * The raw path refuses a NUL as well.
+     *
+     * <p>A caller writing its own SQL through Database or DataSource has the
+     * same claim on a portable answer as one going through a dao, and the ORM's
+     * check does not stand in front of it. PostgreSQL cannot hold a zero byte in
+     * a text value while SQLite and MySQL store one, so without this the same
+     * statement wrote a row on two engines and failed on the third.
+     */
+    private static void aNulIsRefusedOnTheRawPathToo(DataSource pool) throws Exception {
+        pool.execute("DROP TABLE IF EXISTS cn1_rawnul", null);
+        pool.execute("CREATE TABLE cn1_rawnul (v "
+                + pool.dialect().columnType(com.codename1.backend.sql.Dialect.TEXT) + ")", null);
+        try {
+            String refused;
+            try {
+                pool.execute("INSERT INTO cn1_rawnul (v) VALUES (?)",
+                        new Object[] {"a" + ((char)0) + "b"});
+                refused = "accepted";
+            } catch (Exception err) {
+                refused = "refused";
+            }
+            check("a NUL bound through execute() is refused on every engine",
+                    "refused", refused);
+            // NaN is the same shape of problem with three different answers:
+            // measured, SQLite writes NULL, PostgreSQL writes NaN and MySQL
+            // refuses the row outright. Nothing encodes to all three, so it is
+            // refused before any of them sees it.
+            String refusedNan;
+            try {
+                pool.execute("INSERT INTO cn1_rawnul (v) VALUES (?)",
+                        new Object[] {Double.valueOf(Double.NaN)});
+                refusedNan = "accepted";
+            } catch (Exception err) {
+                refusedNan = "refused";
+            }
+            check("NaN is refused on every engine", "refused", refusedNan);
+            // An INFINITY is the same story: SQLite and PostgreSQL store it and
+            // MySQL answers "Out of range value", so it cannot be written the
+            // same way on all three either.
+            String refusedInf;
+            try {
+                pool.execute("INSERT INTO cn1_rawnul (v) VALUES (?)",
+                        new Object[] {Double.valueOf(Double.POSITIVE_INFINITY)});
+                refusedInf = "accepted";
+            } catch (Exception err) {
+                refusedInf = "refused";
+            }
+            check("an infinity is refused on every engine", "refused", refusedInf);
+            // A RAW Boolean binds as 0/1 like the generated access does. The
+            // encoders disagreed: SQLite and MySQL sent 1 while PostgreSQL sent
+            // "t", which its own SMALLINT boolean column refuses with "invalid
+            // input syntax for type smallint". A caller writing its own SQL has
+            // the same claim on a portable answer as a dao.
+            pool.execute("DROP TABLE IF EXISTS cn1_rawbool", null);
+            pool.execute("CREATE TABLE cn1_rawbool (flag "
+                    + pool.dialect().columnType(com.codename1.backend.sql.Dialect.BOOLEAN)
+                    + ")", null);
+            pool.execute("INSERT INTO cn1_rawbool (flag) VALUES (?)",
+                    new Object[] {Boolean.TRUE});
+            pool.execute("INSERT INTO cn1_rawbool (flag) VALUES (?)",
+                    new Object[] {Boolean.FALSE});
+            check("a raw Boolean binds as 1 and 0 on every engine", "1,0",
+                    String.valueOf(((java.util.Map)pool.query(
+                            "SELECT flag FROM cn1_rawbool ORDER BY flag DESC", null).get(0))
+                            .values().iterator().next())
+                            + "," + String.valueOf(((java.util.Map)pool.query(
+                            "SELECT flag FROM cn1_rawbool ORDER BY flag ASC", null).get(0))
+                            .values().iterator().next()));
+            pool.execute("DROP TABLE IF EXISTS cn1_rawbool", null);
+            // A SECOND STATEMENT, which SQLite runs the first half of and
+            // reports success for while the other two refuse it. Measured: the
+            // DELETE never ran and nothing said so.
+            String refusedTail;
+            try {
+                pool.execute("INSERT INTO cn1_rawnul (v) VALUES (?); DELETE FROM cn1_rawnul",
+                        new Object[] {"tail"});
+                refusedTail = "accepted";
+            } catch (Exception err) {
+                refusedTail = "refused";
+            }
+            check("a second statement is refused on every engine", "refused", refusedTail);
+            // INCLUDING ONE HIDDEN BEHIND A TRANSACTION BEGIN, which the block
+            // counting used to read as an unclosed trigger body -- SQLite then
+            // ran the BEGIN alone and returned the connection to the pool still
+            // inside a transaction.
+            String refusedBegin;
+            try {
+                pool.execute("BEGIN; INSERT INTO cn1_rawnul (v) VALUES (?)",
+                        new Object[] {"begun"});
+                refusedBegin = "accepted";
+            } catch (Exception err) {
+                refusedBegin = "refused";
+            }
+            check("a statement after BEGIN is refused too", "refused", refusedBegin);
+            // A TERMINATOR IS NOT A SECOND STATEMENT, and that already worked.
+            pool.execute("INSERT INTO cn1_rawnul (v) VALUES (?);", new Object[] {"terminated"});
+            // THE CONTROLS, counted together so neither refusal can pass by
+            // refusing everything: the same statement without a NUL writes, and
+            // an ordinary double binds. Two rows, and the count is taken after
+            // both rather than between them -- an earlier version inserted one
+            // of them first and then asserted a single row.
+            pool.execute("INSERT INTO cn1_rawnul (v) VALUES (?)", new Object[] {"ab"});
+            pool.execute("INSERT INTO cn1_rawnul (v) VALUES (?)",
+                    new Object[] {Double.valueOf(1.5)});
+            check("and the same statements without one still write", "3",
+                    String.valueOf(pool.query("SELECT v FROM cn1_rawnul", null).size()));
+            // And a byte[] carrying a NUL is fine, because a blob is where one
+            // belongs on every engine.
+            pool.execute("DROP TABLE IF EXISTS cn1_rawnul", null);
+            pool.execute("CREATE TABLE cn1_rawnul (v "
+                    + pool.dialect().columnType(com.codename1.backend.sql.Dialect.BLOB)
+                    + ")", null);
+            pool.execute("INSERT INTO cn1_rawnul (v) VALUES (?)",
+                    new Object[] {new byte[] {97, 0, 98}});
+            check("a NUL inside a byte[] is still bound", "1",
+                    String.valueOf(pool.query("SELECT v FROM cn1_rawnul", null).size()));
+        } finally {
+            pool.execute("DROP TABLE IF EXISTS cn1_rawnul", null);
+        }
+    }
+
+    private static void aValueTheFieldCannotHoldIsRefused(EntityManager em, DataSource pool)
+            throws Exception {
+        if(!"sqlite".equals(pool.dialect().getName())) {
+            return;
+        }
+        Dao<Note> notes = em.dao(Note.class);
+        notes.query().delete();
+        // The ROW is written by the ORM and then one COLUMN is overwritten with
+        // raw SQL, the way a migration or another client would. Writing the
+        // whole row by hand named the columns it cared about and left the rest
+        // to the schema, which stopped working the moment a primitive column
+        // became NOT NULL -- the fixture, not the feature. This version names
+        // one column and stays correct however many the entity gains.
+        Note seed = new Note();
+        seed.title = "fractional";
+        notes.insert(seed);
+        pool.execute("UPDATE cn1_notes SET views = 12.5 WHERE id = ?",
+                new Object[] {Long.valueOf(seed.id)});
+        String refusedFraction;
+        try {
+            notes.findAll();
+            refusedFraction = "accepted";
+        } catch (Exception err) {
+            String message = String.valueOf(err.getMessage());
+            refusedFraction = message.indexOf("fractional part") >= 0
+                    ? "refused" : "other: " + message;
+        }
+        check("a fractional value in an int field is refused", "refused", refusedFraction);
+
+        notes.query().delete();
+        Note big = new Note();
+        big.title = "oversized";
+        notes.insert(big);
+        pool.execute("UPDATE cn1_notes SET views = 2147483648 WHERE id = ?",
+                new Object[] {Long.valueOf(big.id)});
+        String refusedRange;
+        try {
+            notes.findAll();
+            refusedRange = "accepted";
+        } catch (Exception err) {
+            String message = String.valueOf(err.getMessage());
+            refusedRange = message.indexOf("outside the range") >= 0
+                    ? "refused" : "other: " + message;
+        }
+        check("a value past an int field is refused, not wrapped", "refused", refusedRange);
+
+        // AND THE COLUMN CANNOT BE NULL IN THE FIRST PLACE. A primitive field
+        // has no null to read, so the table the ORM creates says so and the
+        // engine refuses the write -- which is why the refusal above is for a
+        // table somebody else made, not for this one.
+        notes.query().delete();
+        Note present = new Note();
+        present.title = "not null";
+        notes.insert(present);
+        String refusedNull;
+        try {
+            // A ROW HAS TO BE THERE. An UPDATE that matches nothing succeeds on
+            // every engine, so an empty table made this pass whatever the schema
+            // said -- a check satisfiable by "nothing happened" is no check.
+            pool.execute("UPDATE cn1_notes SET views = NULL WHERE id = ?",
+                    new Object[] {Long.valueOf(present.id)});
+            refusedNull = "accepted";
+        } catch (Exception err) {
+            refusedNull = "refused";
+        }
+        check("a primitive's column is declared NOT NULL", "refused", refusedNull);
+        notes.query().delete();
+    }
+
+    /**
+     * The switch this whole layer exists for: the same binary, a different
+     * database, decided by the environment rather than by the source.
+     */
+    private static void configurationChoosesTheDatabase() throws Exception {
+        DataSource dev = DataSource.fromConfig(Config.of(new java.util.Properties(), "dev"));
+        try {
+            check("a development profile with nothing configured gets SQLite", "sqlite",
+                    dev.dialect().getName());
+        } finally {
+            dev.close();
+        }
+        String refused;
+        try {
+            DataSource.fromConfig(Config.of(new java.util.Properties(), "production")).close();
+            refused = "opened";
+        } catch (Exception err) {
+            String message = String.valueOf(err.getMessage());
+            // The WORDING, not merely that it threw: anything failing would also
+            // throw, and would pass a bare "it failed" check.
+            refused = message.indexOf("No database is configured") >= 0
+                    ? "refused" : "other: " + message;
+        }
+        check("any other profile refuses to invent one", "refused", refused);
+    }
+
+    private static Note note(String title, int views, boolean pinned, long created) {
+        Note out = new Note();
+        out.title = title;
+        out.views = views;
+        out.pinned = pinned;
+        out.created = new Date(created);
+        // So the three rows this builds share a char value a query can find them
+        // by; an unset char is '\0', which is a value too but a less legible one.
+        out.initial = 'z';
+        return out;
+    }
+
+    private static String join(byte[] bytes) {
+        if(bytes == null) {
+            return "null";
+        }
+        StringBuilder out = new StringBuilder();
+        for(int iter = 0 ; iter < bytes.length ; iter++) {
+            out.append(iter > 0 ? "," : "").append(bytes[iter]);
+        }
+        return out.toString();
+    }
+
+    private static void check(String name, String expected, String actual) {
+        if(expected.equals(actual)) {
+            passed++;
+        } else {
+            failures.add(name + ": expected <" + expected + "> but was <" + actual + ">");
+        }
+    }
+
+    private static void note(String message) {
+        System.out.println("NOTE " + message);
+    }
+}

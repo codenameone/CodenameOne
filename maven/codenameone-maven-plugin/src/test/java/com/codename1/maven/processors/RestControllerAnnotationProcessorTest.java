@@ -201,35 +201,27 @@ public class RestControllerAnnotationProcessorTest {
     }
 
     @Test
-    public void theBootstrapRefusesToStartWithoutAShutdownHandler() throws Exception {
-        // installShutdownHandler answers false when the self-pipe or the sigaction
-        // cannot be set up -- under descriptor exhaustion, say. The bootstrap
-        // ignored that, and Signals.onShutdown then got -1 from
-        // awaitShutdownSignal immediately, stopped the server it had just started,
-        // and called System.exit(0): a container that never served a request,
-        // reporting success.
+    public void theEntryPointDelegatesTheWholeLifecycleToTheBuilder() throws Exception {
+        // The twenty lines every server used to open with -- read PORT, start,
+        // install a shutdown handler, refuse if it could not be installed, drain
+        // on SIGTERM, wait -- now live in Backend.Builder.run(), and this file
+        // writes the part that differs between one server and the next.
         //
-        // ASSERTED ON THE EMITTED SOURCE, which is what there is. The generated
+        // ASSERTED ON THE EMITTED SOURCE, which is what there is: the generated
         // file is compiled straight to classes and never written anywhere a test
-        // can open, and the only behavioural alternative -- calling main() -- starts
-        // a server and cannot make the install fail anyway.
+        // can open, and the behavioural alternative -- calling main() -- starts a
+        // server. The refusal itself is tested where it now lives, against the
+        // runtime, in the backend module's BackendBuilderTest.
         String bootstrap = new RestControllerAnnotationProcessor()
                 .generateBootstrap("com.example");
-        int install = bootstrap.indexOf("installShutdownHandler()");
-        assertTrue("the bootstrap no longer installs a shutdown handler", install >= 0);
-        assertTrue("the bootstrap ignores whether the shutdown handler installed:\n"
-                        + bootstrap,
-                bootstrap.indexOf("if (!com.codename1.backend.Signals."
-                        + "installShutdownHandler())") >= 0);
-        // And it refuses rather than carrying on, which is the point.
-        int throwAt = bootstrap.indexOf("IllegalStateException", install);
-        assertTrue("the bootstrap does not fail when the install fails:\n" + bootstrap,
-                throwAt > install);
-        // Before the server is started, not after: a refusal that has already
-        // bound the port is the failure mode this replaces.
-        int start = bootstrap.indexOf("HttpServer.start");
-        assertTrue("the check must come before the server starts:\n" + bootstrap,
-                start < 0 || throwAt < start);
+        assertTrue("the entry point no longer goes through the builder:\n" + bootstrap,
+                bootstrap.indexOf("com.codename1.backend.Backend.builder()") >= 0);
+        assertTrue("the entry point does not run the server:\n" + bootstrap,
+                bootstrap.indexOf(".run();") >= 0);
+        // And it does NOT open a server itself: a copy of the lifecycle here is
+        // a second place for it to be wrong.
+        assertTrue("the entry point starts a server of its own:\n" + bootstrap,
+                bootstrap.indexOf("HttpServer.start") < 0);
     }
 
     @Test
@@ -267,6 +259,43 @@ public class RestControllerAnnotationProcessorTest {
         assertNotNull("a controller with its source present must still be generated",
                 ctx.getEmittedResources()
                         .get(RestControllerAnnotationProcessor.MAIN_CLASS_RESOURCE));
+    }
+
+    /// An @Entity named to match compileBoth's second file.
+    private static final String ORPHANED_ENTITY_SOURCE =
+            "package com.example;\n"
+            + "import com.codename1.annotations.*;\n"
+            + "@Entity public class Other {\n"
+            + "    @Id public long id;\n"
+            + "    public Other() {}\n"
+            + "}\n";
+
+    @Test
+    public void anOrphanedEntityDoesNotBreakTheGeneratedEntryPoint() throws Exception {
+        // THE OTHER HALF OF THE STALE-ENTITY FIX, and the assertion is the exact
+        // failure it produces rather than a proxy for it.
+        //
+        // Maven does not clean target/classes, so deleting the last entity source
+        // leaves its annotated .class behind. The ORM processor now ignores that
+        // class and DELETES the stale BackendDaoBootstrap -- and this processor
+        // went on seeing the orphan in the class index, so the generated
+        // BackendApplication still wrote `new ...BackendDaoBootstrap()` for a
+        // class that had just been removed. run() compiles what it generates, so
+        // that is a "cannot find symbol" here and "would not build until mvn
+        // clean" in a real module.
+        //
+        // The controller keeps ITS source, so the entry point really is
+        // generated: without one nothing is emitted at all and this would pass
+        // for any implementation, which is what a first version of it did.
+        File classes = compileBoth(CONTROLLER_SOURCE, ORPHANED_ENTITY_SOURCE);
+        File root = tmp.newFolder();
+        File pkg = new File(root, "com/example");
+        assertTrue(pkg.mkdirs());
+        writeUtf8(new File(pkg, "Notes.java"), CONTROLLER_SOURCE);
+        ProcessorContext ctx = run(classes,
+                Collections.singletonList(root.getAbsolutePath()));
+        assertFalse("an entity whose source is gone must not be an error",
+                ctx.hasErrors());
     }
 
     @Test

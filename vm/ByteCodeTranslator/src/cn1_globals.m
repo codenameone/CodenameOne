@@ -1794,6 +1794,13 @@ static void cn1GcSignalReleaseThreads(struct ThreadLocalData* self);
 static JAVA_BOOLEAN cn1GcMarkForceStopUncooperative(struct ThreadLocalData* t);
 static void cn1GcMarkReleaseForced(struct ThreadLocalData* t);
 #endif
+/*
+ * The virtual thread this state belongs to, or 0 when the state is an OS
+ * thread's. Answered from the cycle's registry SNAPSHOT, never from the live
+ * registry, because walking that needs its mutex and a thread frozen by the stop
+ * signal may be the one holding it.
+ */
+static struct cn1VirtualThread* cn1GcVtForState(struct ThreadLocalData* t);
 void cn1GcBuildRootSnapshots(void);
 JAVA_OBJECT cn1ConservativeResolve(void* w);
 #ifdef CN1_CONSERVATIVE_GC_SELFCHECK
@@ -3736,6 +3743,34 @@ void codenameOneGCMark() {
                 // we don't have much control and who barely call into Java anyway
                 if(t->lightweightThread) {
                     t->threadBlockedByGC = JAVA_TRUE;
+                    /*
+                     * CARRIER ASSOCIATION. Resolved once, before the wait, because
+                     * it is a linear walk of the registry snapshot and has no
+                     * business inside a 500us spin.
+                     *
+                     * A virtual thread's state has gcPthreadValid permanently
+                     * false, so the escalation below can never fire for it and the
+                     * wait has no bound at all. That is not theoretical: it is a
+                     * permanent VM freeze, MEASURED after ~160,000 requests against
+                     * vm/backend and reported only as "[GC] trapped for 20 seconds
+                     * waiting for thread 162961 in slot 19 (killed=0)", killed=0
+                     * being the escalation declining. It reproduces with CN1_WORKERS
+                     * set too, so it is not confined to the virtual-thread
+                     * scheduler.
+                     *
+                     * The flag itself cannot be trusted for such a state: every park
+                     * in this file lowers threadActive, waits out the handshake and
+                     * then ASSERTS JAVA_TRUE rather than restoring what it was, so a
+                     * virtual thread that allocated once carries a raised flag for
+                     * the rest of its life. Setting the flag honestly instead was
+                     * tried and reverted -- see the known-gap note above
+                     * cn1SpawnVirtualThread -- because the collector then migrates
+                     * pendingHeapAllocations while the virtual thread is still
+                     * appending to it. So the question the wait asks has to change
+                     * rather than the flag: not "has it parked" but "is it
+                     * executing", which for a virtual thread is answerable exactly.
+                     */
+                    struct cn1VirtualThread* vtOfState = cn1GcVtForState(t);
                     // 64-bit: at 500us a spin, an int overflowed after ~36 minutes of
                     // waiting, and signed overflow is undefined -- the one input that
                     // can reach it is precisely the wedge this loop is trying to report.
@@ -3758,6 +3793,50 @@ void codenameOneGCMark() {
                     long long __wt0 = cn1GcNowNs();
 #endif
                     while(t->threadActive) {
+                        if(vtOfState != 0) {
+                            /*
+                             * DO NOT WAIT FOR A VIRTUAL THREAD'S STATE. EVER.
+                             *
+                             * cn1VirtualThreadResume deliberately never marks such a
+                             * state threadActive, precisely because the escalation
+                             * that bounds this wait is gated on gcPthreadValid --
+                             * permanently false here -- so a raised flag is a wait
+                             * with no end and no diagnostic beyond "(killed=0)".
+                             * MEASURED as a permanent freeze after ~160,000 requests
+                             * against vm/backend, and it reproduces with CN1_WORKERS
+                             * set, so it is not confined to the virtual-thread
+                             * scheduler.
+                             *
+                             * The flag gets raised anyway because every park in this
+                             * file lowers threadActive, waits out the handshake and
+                             * then ASSERTS JAVA_TRUE instead of restoring what it
+                             * was, so one allocation inside a virtual thread leaves
+                             * it raised for that thread's whole life. Fixing the
+                             * parks instead was tried, and it is the state the
+                             * known-gap note above cn1SpawnVirtualThread describes as
+                             * reverted: with the flag honestly false the collector
+                             * migrates pendingHeapAllocations while the virtual
+                             * thread is still appending to it. Measured here too --
+                             * 511 requests to a wedge against 163,000.
+                             *
+                             * So the wait is skipped rather than the flag corrected,
+                             * which is what the runtime already promises: this
+                             * collector never waited for a virtual thread by design,
+                             * and every root it holds is reached anyway --
+                             * cn1GcScanParkedVirtualThreads walks every registered
+                             * virtual thread's C stack whether or not it is running,
+                             * and its Java object stack is walked below exactly as it
+                             * is for a state whose flag was honestly false.
+                             *
+                             * What this does NOT fix is the first known gap: that
+                             * walk can still race a running virtual thread. This
+                             * change does not widen that window -- it restores the
+                             * behaviour a correct flag would have produced -- and
+                             * closing it needs the stop handshake to stop being
+                             * per-TLD, which is a larger change than this one.
+                             */
+                            break;
+                        }
                         usleep(500);
                         totalwait += 500;
                         // REPORTING, fixed. time(0) is in SECONDS; this compared the
@@ -11086,6 +11165,26 @@ static int cn1GcVtSnapshotTruncated = 0;
 
 // Reset at the start of every cycle; see the use below.
 static int cn1GcParkedVirtualThreadsScanned = 0;
+
+/*
+ * Linear over the snapshot, and that is deliberate: it runs ONCE per state per
+ * cycle, not inside the 500us wait spin, so the cost is bounded by
+ * (threads x virtual threads) per mark rather than per microsecond. A map keyed
+ * by state would have to be maintained by the scheduler on every switch, which
+ * is the hot path this is trying not to touch.
+ */
+static struct cn1VirtualThread* cn1GcVtForState(struct ThreadLocalData* t) {
+    if(t == 0) {
+        return 0;
+    }
+    for(int iter = 0 ; iter < cn1GcVtSnapshotCount ; iter++) {
+        struct cn1VirtualThread* vt = cn1GcVtSnapshot[iter];
+        if(vt != 0 && cn1VirtualThreadState(vt) == (void*)t) {
+            return vt;
+        }
+    }
+    return 0;
+}
 
 static void cn1GcBuildVirtualThreadSnapshot(void) {
     cn1GcParkedVirtualThreadsScanned = 0;

@@ -52,6 +52,7 @@ public final class MySql {
     /** Capability bits, from the protocol's CLIENT_* set. */
     private static final int CLIENT_LONG_PASSWORD = 0x00000001;
     private static final int CLIENT_LONG_FLAG = 0x00000004;
+    private static final int CLIENT_FOUND_ROWS = 0x00000002;
     private static final int CLIENT_CONNECT_WITH_DB = 0x00000008;
     private static final int CLIENT_LOCAL_FILES = 0x00000080;
     private static final int CLIENT_PROTOCOL_41 = 0x00000200;
@@ -75,8 +76,40 @@ public final class MySql {
      */
     private volatile boolean closed;
 
+    /**
+     * Whether the server that answered is MariaDB rather than MySQL.
+     *
+     * <p>Read from the handshake banner, because the two do not offer the same
+     * collations and the URL scheme cannot be trusted to say which is there --
+     * a mysql:// URL points at a MariaDB server perfectly often. See
+     * Dialect.MARIADB.
+     */
+    private boolean mariaDb;
+
+    /**
+     * Whether {@code haystack} holds {@code needle}, folding ASCII case by hand.
+     *
+     * <p>String.toLowerCase is locale sensitive and this runtime has no Locale
+     * to ask for the root one, so on a Turkish device the I of "MariaDB" folds
+     * to a dotless i and the marker stops matching.
+     */
+    private static boolean containsIgnoreCaseAscii(String haystack, String needle) {
+        int limit = haystack.length() - needle.length();
+        for(int at = 0 ; at <= limit ; at++) {
+            if(haystack.regionMatches(true, at, needle, 0, needle.length())) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     private MySql(Wire wire) {
         this.wire = wire;
+    }
+
+    /** See {@link #mariaDb}. */
+    public boolean isMariaDb() {
+        return mariaDb;
     }
 
     /**
@@ -118,7 +151,13 @@ public final class MySql {
         if(protocol != 10) {
             throw new IOException("Unsupported MySQL handshake protocol " + protocol);
         }
-        reader.cString(); // server version
+        // KEPT, not discarded: MariaDB and MySQL differ in which collations they
+        // have, and the URL scheme is not the answer -- mysql:// points at a
+        // MariaDB server perfectly often. The banner is the server's own word
+        // for what it is. MariaDB 10.x sends "5.5.5-10.11.19-MariaDB" for the
+        // benefit of old clients, so the marker is looked for anywhere in it.
+        String banner = reader.cString();
+        mariaDb = banner != null && containsIgnoreCaseAscii(banner, "mariadb");
         reader.skip(4);   // connection id
         byte[] scrambleFirst = reader.bytes(8);
         reader.skip(1);   // filler
@@ -161,12 +200,21 @@ public final class MySql {
             useTls = false;
         }
 
-        // Deliberately NOT CLIENT_FOUND_ROWS. With it MySQL reports the rows an
-        // UPDATE MATCHED rather than the rows it changed, so an update that found
-        // its row and altered nothing answers 1 where Database.execute documents
-        // "the number of rows changed" and where SQLite and Postgres both answer
-        // 0. Code that reads 0 as "no such row" would have been told it succeeded.
-        int capabilities = CLIENT_LONG_PASSWORD | CLIENT_LONG_FLAG
+        // CLIENT_FOUND_ROWS, so that an UPDATE reports the rows it MATCHED.
+        //
+        // An earlier version left it off, on the stated grounds that SQLite and
+        // PostgreSQL answer 0 for an update that found its row and changed
+        // nothing. They do not. Measured against all three, "UPDATE t SET a = 7
+        // WHERE id = 1" on a row that already holds 7:
+        //
+        //     sqlite 1, postgresql 1, mysql 0   (without this bit)
+        //
+        // so MySQL was the one engine out of step, and it is the direction that
+        // does harm: Dao.update reads the count as "did a row match", a handler
+        // turns false into a 404, and saving an entity nobody had edited
+        // answered "no such row". A row that genuinely is not there still
+        // reports 0 on all three, which is the case that has to keep working.
+        int capabilities = CLIENT_LONG_PASSWORD | CLIENT_LONG_FLAG | CLIENT_FOUND_ROWS
                 | CLIENT_PROTOCOL_41 | CLIENT_TRANSACTIONS | CLIENT_SECURE_CONNECTION
                 | CLIENT_PLUGIN_AUTH | CLIENT_PLUGIN_AUTH_LENENC_CLIENT_DATA;
         if(database != null && database.length() > 0) {

@@ -5,9 +5,20 @@ on:
     paths:
       - 'scripts/ci/retry.sh'
       - '.github/workflows/parparvm-tests.yml'
-      - 'scripts/ci/retry.sh'
       - 'vm/**'
       - 'Ports/JavaScriptPort/**'
+      # The GENERATOR, because the translated backend tests run what it writes:
+      # a change to the @Entity processor or BackendPackageMojo alone reaches
+      # PostgreSQL and MySQL through the daos it generates, and this is the only
+      # matrix that stands those servers up. maven/backend has no source of its
+      # own -- it compiles vm/backend/src, which 'vm/**' already covers -- but
+      # its pom decides what the install step below produces.
+      #
+      # NOT maven/core: the contract compiles against it, so a core change can
+      # break this matrix, but almost every PR touches core and this is a long
+      # job. The translated tests in pr.yml catch a core break first.
+      - 'maven/codenameone-maven-plugin/**'
+      - 'maven/backend/**'
       - '!vm/**/README.md'
       - '!vm/**/readme.md'
       - '!vm/**/docs/**'
@@ -16,9 +27,20 @@ on:
     paths:
       - 'scripts/ci/retry.sh'
       - '.github/workflows/parparvm-tests.yml'
-      - 'scripts/ci/retry.sh'
       - 'vm/**'
       - 'Ports/JavaScriptPort/**'
+      # The GENERATOR, because the translated backend tests run what it writes:
+      # a change to the @Entity processor or BackendPackageMojo alone reaches
+      # PostgreSQL and MySQL through the daos it generates, and this is the only
+      # matrix that stands those servers up. maven/backend has no source of its
+      # own -- it compiles vm/backend/src, which 'vm/**' already covers -- but
+      # its pom decides what the install step below produces.
+      #
+      # NOT maven/core: the contract compiles against it, so a core change can
+      # break this matrix, but almost every PR touches core and this is a long
+      # job. The translated tests in pr.yml catch a core break first.
+      - 'maven/codenameone-maven-plugin/**'
+      - 'maven/backend/**'
       - '!vm/**/README.md'
       - '!vm/**/readme.md'
       - '!vm/**/docs/**'
@@ -45,14 +67,102 @@ jobs:
   vm-tests:
     runs-on: ubuntu-latest
     timeout-minutes: 90
+    # The two database engines the backend speaks a wire protocol to.
+    #
+    # BackendDatabaseTest and BackendOrmTest run one body of assertions against
+    # SQLite, PostgreSQL and MySQL and require the same answers from all three --
+    # that is the whole of the claim that a handler cannot tell which engine
+    # answered it, and that one entity class is stored by any of them. SQLite
+    # needs nothing installed, so without these two services the tests ran their
+    # easiest arm and reported green: the engines with a wire protocol, a
+    # different schema syntax and a different way of generating a key are exactly
+    # the ones worth running.
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: cn1
+          POSTGRES_PASSWORD: cn1secret
+          POSTGRES_DB: cn1
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U cn1"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+      mariadb:
+        # The LTS, and the version that rejects MySQL's NO PAD collation -- which
+        # is the whole reason this service is here. Its own is utf8mb4_nopad_bin,
+        # which MySQL in turn does not have.
+        image: mariadb:10.11
+        env:
+          MARIADB_ROOT_PASSWORD: cn1secret
+          MARIADB_DATABASE: cn1
+          MARIADB_USER: cn1
+          MARIADB_PASSWORD: cn1secret
+        ports:
+          - 3307:3306
+        options: >-
+          --health-cmd "healthcheck.sh --connect --innodb_initialized"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 20
+
+      mysql:
+        # 8.0 rather than 8, because 8.4 no longer LOADS mysql_native_password
+        # and a service container cannot be given server flags to turn it back
+        # on: GitHub's `services` supports image, env, ports and options, and
+        # none of those appends a command. See the step below for why the plugin
+        # has to be reachable at all.
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: cn1secret
+          MYSQL_USER: cn1
+          MYSQL_PASSWORD: cn1secret
+          MYSQL_DATABASE: cn1
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd "mysqladmin ping -h 127.0.0.1 -ucn1 -pcn1secret"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 30
     steps:
       - name: Check out repository
         uses: actions/checkout@v6
 
+      # The backend's MySQL client REFUSES to complete caching_sha2_password's
+      # full exchange on an unencrypted connection, because that exchange sends
+      # the password itself. That refusal is the client behaving correctly, and
+      # it means a freshly created service container -- whose password cache is
+      # empty -- cannot be reached over plaintext loopback at all: the first
+      # connection is exactly the one with nothing cached.
+      #
+      # The alternative to this step is TLS, and the container's auto-generated
+      # certificate chains to nothing and carries no name the client could
+      # verify, so `sslmode=require` fails for a different reason. Native
+      # password authentication is what CI can actually offer, and the code path
+      # under test -- the wire protocol, the schema, the generated keys -- is the
+      # same either way.
+      - name: Let the MySQL service authenticate our client
+        run: |
+          docker exec ${{ job.services.mysql.id }} mysql -uroot -pcn1secret -e \
+            "ALTER USER 'cn1'@'%' IDENTIFIED WITH mysql_native_password BY 'cn1secret'; \
+             FLUSH PRIVILEGES;"
+
       - name: Install native build tools
         run: |
           bash scripts/ci/apt-get-update.sh
-          sudo apt-get install -y clang
+          # clang alone is not enough to LINK a backend binary. vm/backend's
+          # build.sh links -lcurl -lssl -lcrypto -lnghttp2 (outbound TLS is
+          # libcurl's, the auth primitives are OpenSSL's, the HTTP/2 framing is
+          # nghttp2's) and needs their headers to compile the natives that call
+          # them. Without these, every test that builds a server binary --
+          # BackendDatabaseTest, BackendOrmTest, BackendRuntimeSelfTest --
+          # compiled, failed at the link, and SKIPPED, which this job reported
+          # as green for as long as it has existed.
+          sudo apt-get install -y clang libcurl4-openssl-dev libssl-dev libnghttp2-dev
 
       # Install JDKs and export their paths
       - name: Set up JDK 8
@@ -108,6 +218,38 @@ jobs:
         with:
           node-version: '20'
 
+      # WITHOUT THIS EVERY BACKEND TEST SKIPS. generate-contract.sh compiles the
+      # shared @RestClient/@Entity contract against codenameone-core and runs the
+      # Codename One maven plugin over it, so both have to be in the local repo
+      # the backend scripts use -- and this job never built the maven modules, so
+      # they never were. BackendDatabaseTest, BackendOrmTest,
+      # BackendRuntimeSelfTest and BackendJavaSeRuntimeTest all reported
+      # "codenameone-core:8.0-SNAPSHOT is not in .m2-repo" and skipped, which is
+      # why CN1_BACKEND_REQUIRED below found four of them at once: the PostgreSQL
+      # and MySQL services this job stands up were serving nobody.
+      #
+      # -Plocal-dev-javase and the repo-local .m2-repo are what the scripts
+      # expect; the path is $GITHUB_WORKSPACE/.m2-repo because that is where
+      # generate-contract.sh looks (CN1_M2 overrides it, and nothing sets one).
+      #
+      # The static-analysis gates are OFF here on purpose. This step exists to
+      # put jars in a repo, and -am drags in every port because the maven plugin
+      # depends on them -- so with them on, a SpotBugs finding in the Android
+      # port fails THIS workflow, where nobody would look for it and where it
+      # says nothing about ParparVM. pr.yml owns those gates and runs them over
+      # the same modules.
+      - name: Install core + maven plugin for the backend contract
+        working-directory: maven
+        run: |
+          bash "$GITHUB_WORKSPACE/scripts/ci/retry.sh" mvn -B -pl core,backend,codenameone-maven-plugin \
+            -am install -DskipTests -Plocal-dev-javase \
+            -Dspotbugs.skip=true -Dpmd.skip=true -Dcheckstyle.skip=true \
+            -Dmaven.javadoc.skip=true \
+            -Dmaven.repo.local="$GITHUB_WORKSPACE/.m2-repo"
+        env:
+          JAVA_HOME: ${{ env.JDK_8_HOME }}
+          JDK_8_HOME: ${{ env.JDK_8_HOME }}
+
       - name: Run ParparVM JVM tests
         working-directory: vm
         # Maven Central intermittently serves 403/429 from the runner CDN edge
@@ -130,6 +272,28 @@ jobs:
           JDK_17_HOME: ${{ env.JDK_17_HOME }}
           JDK_21_HOME: ${{ env.JDK_21_HOME }}
           JDK_25_HOME: ${{ env.JDK_25_HOME }}
+          # The services above. sslmode=disable because these are loopback
+          # containers with no certificate: the default, prefer, would attempt
+          # TLS and fail verification rather than quietly downgrading, which is
+          # the behaviour the database layer is supposed to have.
+          CN1_DBCHECK_POSTGRES: postgres://cn1:cn1secret@127.0.0.1:5432/cn1?sslmode=disable
+          CN1_DBCHECK_MYSQL: mysql://cn1:cn1secret@127.0.0.1:3306/cn1?sslmode=disable
+          # MARIADB REACHED THROUGH A mysql:// URL, deliberately: the dialect is
+          # chosen from the server's handshake banner rather than from the
+          # scheme, and this is the case that proves it. The two families have
+          # no case-sensitive NO PAD collation in common, so picking the wrong
+          # one is an unknown-collation error on every CREATE TABLE.
+          CN1_DBCHECK_MARIADB: mysql://cn1:cn1secret@127.0.0.1:3307/cn1?sslmode=disable
+          # WITHOUT THIS THE BACKEND TESTS CAN SKIP AND THE JOB STAYS GREEN.
+          # BackendTestSupport.skipOrFail turns a backend build failure into a
+          # JUnit assumption abort, because a developer machine with no C
+          # toolchain must not fail the suite -- and a missing link library in CI
+          # looks exactly the same from inside the test. This is the only job
+          # that runs the whole tests module, so it is the one place that has to
+          # say the backend is expected to build here: a compile, link or
+          # toolchain regression fails the workflow rather than quietly
+          # subtracting BackendDatabaseTest, BackendOrmTest and the rest from it.
+          CN1_BACKEND_REQUIRED: 1
 
       - name: Run ParparVM Benchmark
         working-directory: vm
