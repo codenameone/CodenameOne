@@ -728,11 +728,9 @@
     if (api && api.subtle) {
       bits |= 2;
     }
-    // Whether IndexedDB is *usable*, which is a different question from whether
-    // the object exists: a private window can expose the API and refuse every
-    // open, and reporting persistence on the strength of the symbol being there
-    // is how an application promises to remember something it will lose.
-    return cn1VaultOpenDb().then(function() {
+    // Opening a database does not prove it can commit a non-extractable CryptoKey. Quota and
+    // structured-clone failures must keep remembered policies unavailable, too.
+    return cn1VaultProbeStorage().then(function() {
       bits |= 4;
       return cn1VaultPersisted();
     }, function() {
@@ -746,6 +744,73 @@
       }
       return cn1VaultReply(CN1V_OK, [bits]);
     });
+  }
+
+  function cn1VaultProbeStorage() {
+    var id;
+    var addedProbe = false;
+    return Promise.resolve().then(function() {
+      if (!cn1VaultSecureContext()) {
+        throw { cn1VaultStatus: CN1V_INSECURE_CONTEXT };
+      }
+      var api = cn1CryptoApi();
+      var random = cn1VaultRandom(32);
+      id = 'probe:';
+      for (var i = 0; i < random.length; i++) {
+        id += ('0' + random[i].toString(16)).slice(-2);
+      }
+      return api.subtle.generateKey({ name: 'AES-GCM', length: 256 }, false,
+        ['encrypt', 'decrypt']);
+    }).then(function(key) {
+      return cn1VaultOpenDb().then(function(db) {
+        var tx = db.transaction(CN1_VAULT_STORE, 'readwrite');
+        return cn1VaultRequest(tx.objectStore(CN1_VAULT_STORE), function(store) {
+          return store.add({ id: id, key: key, created: 0 });
+        }).then(function(added) {
+          addedProbe = added !== undefined;
+          return cn1VaultCommit(tx).then(function() {
+            if (added === undefined) {
+              throw { cn1VaultStatus: CN1V_STORAGE_UNAVAILABLE };
+            }
+            return cn1VaultRead(id);
+          });
+        });
+      }).then(function(found) {
+        if (!found || !found.key || found.key.extractable !== false) {
+          throw { cn1VaultStatus: CN1V_STORAGE_UNAVAILABLE };
+        }
+        // The clone must remain a usable key, not just a record that resembles one.
+        var nonce = cn1VaultRandom(CN1_VAULT_NONCE);
+        return cn1CryptoApi().subtle.encrypt({ name: 'AES-GCM', iv: nonce }, found.key,
+          new Uint8Array([1])).then(function(sealed) {
+          return cn1CryptoApi().subtle.decrypt({ name: 'AES-GCM', iv: nonce }, key, sealed);
+        });
+      });
+    }).then(function() {
+      return removeProbe();
+    }, function(error) {
+      return removeProbe().then(function() { throw error; }, function() { throw error; });
+    });
+
+    function removeProbe() {
+      if (!addedProbe) {
+        return Promise.resolve();
+      }
+      return cn1VaultOpenDb().then(function(db) {
+        var tx = db.transaction(CN1_VAULT_STORE, 'readwrite');
+        return cn1VaultRequest(tx.objectStore(CN1_VAULT_STORE), function(store) {
+          return store.delete(id);
+        }).then(function() {
+          return cn1VaultCommit(tx);
+        });
+      }).then(function() {
+        return cn1VaultRead(id);
+      }).then(function(remaining) {
+        if (remaining) {
+          throw { cn1VaultStatus: CN1V_STORAGE_UNAVAILABLE };
+        }
+      });
+    }
   }
 
   function cn1VaultPersisted() {

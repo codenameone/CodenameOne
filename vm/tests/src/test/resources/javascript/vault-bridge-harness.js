@@ -68,6 +68,7 @@ function makeIndexedDb() {
   // bridge's commit wait had nothing to listen to and the difference between "the request
   // succeeded" and "the write is durable" could not be expressed here.
   let failEveryCommit = false;
+  let rejectKeyClone = false;
 
   // onAbort is how the stub models the rule that cost a CI round: an IndexedDB request error
   // that is not cancelled with preventDefault() goes on to ABORT its transaction. Settling a
@@ -174,6 +175,9 @@ function makeIndexedDb() {
       const store = {
         get: (key) => request(() => data.get(key), abort, bubble),
         add: (record) => request(() => {
+          if (rejectKeyClone && record.key) {
+            throw Object.assign(new Error('cannot clone CryptoKey'), { name: 'DataCloneError' });
+          }
           if (data.has(record.id)) {
             constraintErrors++;
             const err = new Error('key already exists');
@@ -208,6 +212,7 @@ function makeIndexedDb() {
   return {
     setFailEveryOpen(value) { failEveryOpen = value; },
     setFailEveryCommit(value) { failEveryCommit = value; },
+    setRejectKeyClone(value) { rejectKeyClone = value; },
     constraintErrors() { return constraintErrors; },
     clonedKeys() { return clonedKeys; },
     recordCount(name) { return stores.has(name) ? stores.get(name).size : 0; },
@@ -282,10 +287,20 @@ function payload(reply) {
       throw new Error('the bridge did not register a __cn1_vault__ handler');
     }
 
-    // Capabilities. Bit 1 secure context, bit 2 subtle, bit 4 IndexedDB opened.
+    // Capabilities. Bit 1 secure context, bit 2 subtle, bit 4 durable CryptoKey storage.
     const caps = await call({ op: 'capabilities' });
     results.capabilitiesStatus = status(caps);
     results.capabilityBits = payload(caps)[0];
+    results.probeRecordsAfterSuccess = fakeIndexedDb.recordCount('keys');
+    fakeIndexedDb.setFailEveryCommit(true);
+    results.capabilityBitsWithoutCommit = payload(await call({ op: 'capabilities' }))[0];
+    fakeIndexedDb.setFailEveryCommit(false);
+    results.probeRecordsAfterAbort = fakeIndexedDb.recordCount('keys');
+    fakeIndexedDb.setRejectKeyClone(true);
+    results.capabilityBitsWithoutClone = payload(await call({ op: 'capabilities' }))[0];
+    fakeIndexedDb.setRejectKeyClone(false);
+    results.probeRecordsAfterCloneFailure = fakeIndexedDb.recordCount('keys');
+    results.capabilityBitsAfterRecovery = payload(await call({ op: 'capabilities' }))[0];
 
     // Nothing stored yet, and the store can say so. That distinction is the one
     // the Java side needs before it will create anything.

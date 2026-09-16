@@ -89,12 +89,11 @@ import com.codename1.util.AsyncResource;
 /// [com.codename1.ui.CN#invokeAndBlock] rather than freezing it. Calls that only touch memory
 /// complete before they return and `get()` on them is free.
 ///
-/// A vault instance is not safe to drive from two threads at once. The state it holds is one
-/// unlocked data key; the operations that change it are not designed to interleave, and racing
-/// an unlock against a lock is a bug in the caller rather than something to lock against. Ports
-/// where a single application runs in more than one process are handled where it matters -- the
-/// device key's create-if-absent converges (see [DeviceProtection#ensureKey]) -- and the metadata
-/// record carries a counter so a caller can detect that another writer moved it.
+/// Applications should serialize state-changing operations on a vault instance. Locking can
+/// cancel work already running on a worker; generation checks share a monitor with key changes
+/// so the cancellation is visible across threads. Ports where an application runs in more than
+/// one process converge device-key creation (see [DeviceProtection#ensureKey]), and the metadata
+/// counter detects another writer's changes.
 public final class Vault {
 
     // ---------------------------------------------------------------- state
@@ -394,8 +393,12 @@ public final class Vault {
     /// True only after a successful [#unlockWithPassword]. An application that sees this and
     /// still holds the password should call [#changePassword] with the same password on both
     /// sides, which rewraps under today's profile.
-    public boolean passwordNeedsRewrap() {
+    public synchronized boolean passwordNeedsRewrap() {
         return passwordNeedsRewrap;
+    }
+
+    private synchronized void setPasswordNeedsRewrap(boolean value) {
+        passwordNeedsRewrap = value;
     }
 
     // ---------------------------------------------------------- enrolment
@@ -436,7 +439,7 @@ public final class Vault {
         }
         final AsyncResource<Boolean> out = new AsyncResource<Boolean>();
         // On the calling thread; see unlockWithPassword for why not in the worker.
-        final int generation = lockGeneration;
+        final int generation = lockGeneration();
         background(new Runnable() {
             @Override
             public void run() {
@@ -650,7 +653,7 @@ public final class Vault {
         // until after a lock() has already run, and it would then read the post-lock value, agree
         // with itself, and publish the key into a vault the application had just closed. Measured
         // -- a test that locked between the call and the worker starting reopened the vault.
-        final int generation = lockGeneration;
+        final int generation = lockGeneration();
         background(new Runnable() {
             @Override
             public void run() {
@@ -670,7 +673,7 @@ public final class Vault {
                     SecureEnvelope envelope = SecureEnvelope.parse(meta.passwordWrap);
                     key = envelope.openWithPassword(password,
                             wrapBinding(meta, PURPOSE_PASSWORD));
-                    if (generation != lockGeneration) {
+                    if (generation != lockGeneration()) {
                         throw new VaultException(VaultError.LOCKED,
                                 "the vault was locked while it was being unlocked");
                     }
@@ -695,7 +698,7 @@ public final class Vault {
                     // Ownership transferred: the vault holds this array now, so the finally must
                     // not wipe it. Load bearing, not a dead store -- see unlockRemembered.
                     key = null;
-                    passwordNeedsRewrap = envelope.getKdf().needsUpgrade();
+                    setPasswordNeedsRewrap(envelope.getKdf().needsUpgrade());
                     touch();
                     out.complete(Boolean.TRUE);
                 } catch (VaultException failed) {
@@ -728,7 +731,7 @@ public final class Vault {
         final AsyncResource<Boolean> out = new AsyncResource<Boolean>();
         // On the calling thread. The unwrap can prompt and can take as long as the user does, and
         // a vault locked in the meantime must not be reopened by a result already in flight.
-        final int generation = lockGeneration;
+        final int generation = lockGeneration();
         background(new Runnable() {
             @Override
             public void run() {
@@ -787,7 +790,7 @@ public final class Vault {
                     key = awaitBytes(unlocking.unwrap(deviceKeyId(), record.wrap,
                                     wrapBinding(meta, PURPOSE_DEVICE).serialize()),
                             "the remembered device key could not be used");
-                    if (generation != lockGeneration) {
+                    if (generation != lockGeneration()) {
                         throw new VaultException(VaultError.LOCKED,
                                 "the vault was locked while it was being unlocked");
                     }
@@ -831,7 +834,7 @@ public final class Vault {
     public AsyncResource<Boolean> rememberDevice() {
         final AsyncResource<Boolean> out = new AsyncResource<Boolean>();
         // On the calling thread; see unlockWithPassword for why not in the worker.
-        final int generation = lockGeneration;
+        final int generation = lockGeneration();
         background(new Runnable() {
             @Override
             public void run() {
@@ -899,7 +902,7 @@ public final class Vault {
     /// configured, and a rewrap that read the configured one would replace the gated wrap with an
     /// unattended one -- silently turning off the prompt the user asked for.
     private void rememberNow(UnlockPolicy policy) {
-        final int keyAt = keyGeneration;
+        final int keyAt = keyGeneration();
         // Snapshotted, not re-read, for the reason rotateDataKey gives: the store below prompts,
         // so this method runs for as long as the user takes, and lock() nulls both of these. Read
         // afterwards they are null and the worker dies on a NullPointerException, which the
@@ -1023,7 +1026,7 @@ public final class Vault {
     /// An operation already in flight when this runs does not deliver its result -- it fails with
     /// [VaultError#LOCKED] instead. What locking cannot do is reach a plaintext or a key already
     /// handed to a caller, including to hostile code that got one while the vault was open.
-    public void lock() {
+    public synchronized void lock() {
         Bytes.zero(dataKey);
         dataKey = null;
         metadata = null;
@@ -1122,8 +1125,8 @@ public final class Vault {
     public AsyncResource<Boolean> putSecret(final String secretName, final char[] value) {
         final AsyncResource<Boolean> out = new AsyncResource<Boolean>();
         // On the calling thread; see unlockWithPassword for why not in the worker.
-        final int generation = lockGeneration;
-        final int keyAt = keyGeneration;
+        final int generation = lockGeneration();
+        final int keyAt = keyGeneration();
         background(new Runnable() {
             @Override
             public void run() {
@@ -1169,7 +1172,7 @@ public final class Vault {
                         throw new VaultException(VaultError.QUOTA_EXCEEDED,
                                 "the secret could not be written to storage");
                     }
-                    if (generation != lockGeneration) {
+                    if (generation != lockGeneration()) {
                         // Asked again after the write, like createRecoveryCode. Completing here
                         // would let a screen that was already stale when the user touched it
                         // change what the vault holds after lock() had returned.
@@ -1205,7 +1208,7 @@ public final class Vault {
     public AsyncResource<char[]> getSecret(final String secretName) {
         final AsyncResource<char[]> out = new AsyncResource<char[]>();
         // On the calling thread; see unlockWithPassword for why not in the worker.
-        final int generation = lockGeneration;
+        final int generation = lockGeneration();
         background(new Runnable() {
             @Override
             public void run() {
@@ -1263,7 +1266,7 @@ public final class Vault {
     public AsyncResource<Boolean> removeSecret(final String secretName) {
         final AsyncResource<Boolean> out = new AsyncResource<Boolean>();
         // On the calling thread; see unlockWithPassword for why not in the worker.
-        final int generation = lockGeneration;
+        final int generation = lockGeneration();
         background(new Runnable() {
             @Override
             public void run() {
@@ -1284,7 +1287,7 @@ public final class Vault {
                     // Uncached, for the reason putSecret gives: a rollback restores this.
                     Object previous = readUncached(entry);
                     Storage.getInstance().deleteStorageFile(entry);
-                    if (generation != lockGeneration) {
+                    if (generation != lockGeneration()) {
                         // null: this path DELETED the entry, so "still ours" means still
                         // absent. What that cannot distinguish, and why it restores anyway, is
                         // recorded on the helper.
@@ -1323,8 +1326,8 @@ public final class Vault {
     public AsyncResource<byte[]> seal(final String recordId, final byte[] plaintext) {
         final AsyncResource<byte[]> out = new AsyncResource<byte[]>();
         // On the calling thread; see unlockWithPassword for why not in the worker.
-        final int generation = lockGeneration;
-        final int keyAt = keyGeneration;
+        final int generation = lockGeneration();
+        final int keyAt = keyGeneration();
         background(new Runnable() {
             @Override
             public void run() {
@@ -1376,7 +1379,7 @@ public final class Vault {
     public AsyncResource<byte[]> open(final String recordId, final byte[] sealed) {
         final AsyncResource<byte[]> out = new AsyncResource<byte[]>();
         // On the calling thread; see unlockWithPassword for why not in the worker.
-        final int generation = lockGeneration;
+        final int generation = lockGeneration();
         background(new Runnable() {
             @Override
             public void run() {
@@ -1392,7 +1395,7 @@ public final class Vault {
                     }
                     byte[] plain = openAnyVersion(sealed,
                             binding(meta, recordId, PURPOSE_RECORD));
-                    if (generation != lockGeneration) {
+                    if (generation != lockGeneration()) {
                         Bytes.zero(plain);
                         requireSameGeneration(generation);
                     }
@@ -1426,8 +1429,8 @@ public final class Vault {
         // On the calling thread; see unlockWithPassword for why not in the worker. BOTH
         // generations, because this derives from a snapshot of the data key and must not stamp
         // the handle with a generation that moved after the snapshot was taken.
-        final int generation = lockGeneration;
-        final int keyAt = keyGeneration;
+        final int generation = lockGeneration();
+        final int keyAt = keyGeneration();
         background(new Runnable() {
             @Override
             public void run() {
@@ -1441,7 +1444,7 @@ public final class Vault {
                                 "the vault was locked while this key was being derived");
                     }
                     byte[] derived = deriveSubkey(source, purpose);
-                    if (generation != lockGeneration || keyAt != keyGeneration) {
+                    if (generation != lockGeneration() || keyAt != keyGeneration()) {
                         Bytes.zero(derived);
                         requireSameGeneration(generation);
                         requireSameKey(keyAt);
@@ -1514,8 +1517,8 @@ public final class Vault {
     public AsyncResource<byte[]> databaseKey(final String alias) {
         final AsyncResource<byte[]> out = new AsyncResource<byte[]>();
         // On the calling thread; see unlockWithPassword for why not in the worker.
-        final int generation = lockGeneration;
-        final int keyAt = keyGeneration;
+        final int generation = lockGeneration();
+        final int keyAt = keyGeneration();
         background(new Runnable() {
             @Override
             public void run() {
@@ -1537,7 +1540,7 @@ public final class Vault {
                     mac.update(Bytes.utf8("cn1.vault.dbkey.v1"));
                     mac.update(Bytes.utf8(alias == null ? "" : alias));
                     byte[] key = mac.doFinal();
-                    if (generation != lockGeneration) {
+                    if (generation != lockGeneration()) {
                         Bytes.zero(key);
                         requireSameGeneration(generation);
                     }
@@ -1668,7 +1671,7 @@ public final class Vault {
                     if (dataKey == null) {
                         metadata = null;
                     }
-                    passwordNeedsRewrap = false;
+                    setPasswordNeedsRewrap(false);
                     out.complete(Boolean.TRUE);
                 } catch (VaultException failed) {
                     out.error(failed);
@@ -1702,7 +1705,7 @@ public final class Vault {
     public AsyncResource<char[]> createRecoveryCode() {
         final AsyncResource<char[]> out = new AsyncResource<char[]>();
         // On the calling thread; see unlockWithPassword for why not in the worker.
-        final int generation = lockGeneration;
+        final int generation = lockGeneration();
         // The key generation as well. adoptKey zeroes the dataKey array IN PLACE, so an unlock of
         // an already-unlocked vault or a key import running beside this leaves the seal below
         // wrapping zeroes while stampMac -- which read the field a second time, after the
@@ -1711,7 +1714,7 @@ public final class Vault {
         // one way back in. seal, putSecret, databaseKey, operationalKey and rotateDataKey all
         // carry this guard; this path read the field twice and carried neither the snapshot nor
         // the check.
-        final int keyAt = keyGeneration;
+        final int keyAt = keyGeneration();
         background(new Runnable() {
             @Override
             public void run() {
@@ -1762,7 +1765,7 @@ public final class Vault {
                     requireSameGeneration(generation);
                     VaultMetadata previous = current;
                     commitMetadata(previous, next);
-                    if (generation != lockGeneration) {
+                    if (generation != lockGeneration()) {
                         // Asked again, because the check above is before a storage write and a
                         // lock can land inside one. Completing here would hand back a working
                         // recovery credential after lock() had already returned.
@@ -1803,7 +1806,7 @@ public final class Vault {
     public AsyncResource<Boolean> unlockWithRecoveryCode(final char[] code) {
         final AsyncResource<Boolean> out = new AsyncResource<Boolean>();
         // On the calling thread; see unlockWithPassword for why not in the worker.
-        final int generation = lockGeneration;
+        final int generation = lockGeneration();
         background(new Runnable() {
             @Override
             public void run() {
@@ -1822,7 +1825,7 @@ public final class Vault {
                     derived = recoveryKey(code);
                     key = SecureEnvelope.parse(meta.recoveryWrap).open(derived,
                             wrapBinding(meta, PURPOSE_RECOVERY));
-                    if (generation != lockGeneration) {
+                    if (generation != lockGeneration()) {
                         throw new VaultException(VaultError.LOCKED,
                                 "the vault was locked while it was being unlocked");
                     }
@@ -1878,11 +1881,11 @@ public final class Vault {
         // of zeroes as the retired key, reporting success, and making every secret from the old
         // version permanently unreadable. seal, putSecret, databaseKey and operationalKey were
         // given this guard; the rotation, which is the operation that MOVES the key, was not.
-        final int keyAt = keyGeneration;
+        final int keyAt = keyGeneration();
         // Rotation derives from the password twice -- once to prove it, once to wrap the new key
         // -- so at the default profile it holds the vault open for well over a second. A lock that
         // lands in there must not be undone by the publish at the end.
-        final int generation = lockGeneration;
+        final int generation = lockGeneration();
         background(new Runnable() {
             @Override
             public void run() {
@@ -1900,7 +1903,7 @@ public final class Vault {
                     // to unwrap the new key is a vault nobody can open on another device.
                     byte[] check = SecureEnvelope.parse(meta.passwordWrap).openWithPassword(
                             password, wrapBinding(meta, PURPOSE_PASSWORD));
-                    if (generation != lockGeneration) {
+                    if (generation != lockGeneration()) {
                         // Asked before the comparison, so a lock is reported as a lock rather than
                         // as whatever the comparison happens to conclude about a key that is no
                         // longer there.
@@ -1937,7 +1940,7 @@ public final class Vault {
                             wrapBinding(next, PURPOSE_PASSWORD), fresh);
                     next.recoveryWrap = null;
                     next.counter = meta.counter + 1;
-                    if (generation != lockGeneration) {
+                    if (generation != lockGeneration()) {
                         // Checked before the write, so a rotation interrupted by a lock simply did
                         // not happen: nothing is persisted and nothing is published. Refusing
                         // after the write would leave a rotated record on disk that the caller was
@@ -1979,7 +1982,7 @@ public final class Vault {
                                 "another session changed this vault while the key was being "
                                 + "rotated; nothing was adopted here");
                     }
-                    if (generation != lockGeneration) {
+                    if (generation != lockGeneration()) {
                         // Asked once more, immediately before publication. The earlier check is
                         // before the write, and the write plus its read-back is long enough for a
                         // lock to land inside -- publishing after that reopens a vault the caller
@@ -2133,7 +2136,7 @@ public final class Vault {
     public AsyncResource<Boolean> importSyncState(final byte[] state, final char[] password) {
         final AsyncResource<Boolean> out = new AsyncResource<Boolean>();
         // On the calling thread; see unlockWithPassword for why not in the worker.
-        final int generation = lockGeneration;
+        final int generation = lockGeneration();
         background(new Runnable() {
             @Override
             public void run() {
@@ -2218,7 +2221,7 @@ public final class Vault {
                     // capabilities and throw, so hoisting them changes nothing else.
                     requirePolicySupported(options.getPolicy());
                     requireProtections();
-                    if (generation != lockGeneration) {
+                    if (generation != lockGeneration()) {
                         // The record is still written -- enrolling this device is the point of the
                         // call and it succeeded. What is refused is leaving the vault unlocked
                         // afterwards, because the application asked for it to be locked.
@@ -2387,7 +2390,7 @@ public final class Vault {
     public AsyncResource<Boolean> setPolicy(final UnlockPolicy policy) {
         final AsyncResource<Boolean> out = new AsyncResource<Boolean>();
         // On the calling thread; see unlockWithPassword for why not in the worker.
-        final int generation = lockGeneration;
+        final int generation = lockGeneration();
         background(new Runnable() {
             @Override
             public void run() {
@@ -2969,7 +2972,7 @@ public final class Vault {
     /// asked it directly and locked itself the moment they did.
     int generation() {
         checkAutoLock();
-        return lockGeneration;
+        return lockGeneration();
     }
 
     /// Counts a handle operation as activity, exactly as requireUnlocked does for the vault's own.
@@ -2983,15 +2986,20 @@ public final class Vault {
     }
 
     /// The key generation, for a handle to notice that the key it derives from has been replaced.
-    int keyGeneration() {
+    synchronized int keyGeneration() {
         return keyGeneration;
+    }
+
+    /// Acquires the same monitor that publishes lock()'s state clearing and counter increment.
+    private synchronized int lockGeneration() {
+        return lockGeneration;
     }
 
     /// Installs a data key, and tells every handle derived from the old one that it is stale.
     ///
     /// One place, because a counter that is bumped at some of the assignments is worse than none:
     /// a handle would keep working across exactly the rotation nobody remembered to stamp.
-    private void adoptKey(byte[] key) {
+    private synchronized void adoptKey(byte[] key) {
         // Unlocking an already-unlocked vault would otherwise leave the previous array in the
         // heap with nothing pointing at it, which is the one copy this class can still do
         // something about.
@@ -3259,16 +3267,9 @@ public final class Vault {
     /// [#importSyncState].
     /// Publishes a recovered key, and undoes it if a lock arrived while it was being published.
     ///
-    /// The check and the assignment are two statements and a lock can land between them. What
-    /// this does NOT do is make them atomic: that means a mutex in core, and this project's
-    /// model is one thread on each side of a boundary with a plain int counter for work that
-    /// outlives the EDT turn that started it -- which is exactly what `generation` is. A lock
-    /// here would be the first of several, each closing the interleaving the last one opened.
-    ///
-    /// So the window is not closed; the OUTCOME is. If the generation moved, the key just
-    /// published is withdrawn and the vault is left locked, which is the state lock() was
-    /// asking for. A caller that raced is told LOCKED rather than handed an open vault, and
-    /// the transient is a few statements wide and self-correcting rather than permanent.
+    /// Storage checks may yield, so publication rechecks the lock generation after adopting the
+    /// key. The generation read and state transitions acquire the same monitor; no monitor is
+    /// held across storage or device operations.
     private void publishKey(int generation, VaultMetadata meta, byte[] key) {
         // The stored record has to still be the one this key was derived FROM. Deriving takes as
         // long as the KDF profile asks, and a rotation committing inside that window leaves this
@@ -3293,47 +3294,13 @@ public final class Vault {
         }
         metadata = meta;
         adoptKey(key);
-        if (generation != lockGeneration) {
+        if (generation != lockGeneration()) {
             lock();
             throw new VaultException(VaultError.LOCKED,
                     "the vault was locked while it was being unlocked");
         }
     }
 
-    /// Why this is a plain int and not volatile, which a review has asked for more than once.
-    ///
-    /// Codename One's model is one thread on each side of a boundary rather than two on the same
-    /// state, and its rule for work that outlives the turn that started it is a plain counter --
-    /// explicitly not a lock and not volatile. The PR quality gate enforces the same thing:
-    /// `AvoidUsingVolatile` is on the forbidden PMD list, so the suggested change does not
-    /// compile past CI, and `volatile` appears nowhere else in this package or in Display.
-    ///
-    /// What is true, and worth stating rather than hiding: the sanctioned pattern compares the
-    /// counter ON the EDT, and these workers compare it off it, so the Java memory model
-    /// promises nothing about when an increment becomes visible to them. Closing that properly
-    /// means the rest of the prescribed answer -- workers that take what they need as parameters
-    /// and return through callSerially, touching no field -- which is a redesign of this class's
-    /// asynchronous API rather than a keyword, and belongs to whoever decides that trade.
-    ///
-    /// What is here instead bounds the damage rather than the window: every publication goes
-    /// through publishKey, which re-reads the counter and locks again if it moved, so a worker
-    /// that loses the race leaves the vault closed rather than open.
-    ///
-    /// A later round asked for the same keyword on a second ground -- that observing the counter
-    /// would also publish the KEY CLEARING that precedes it -- so that is worth answering too. A
-    /// worker holds the data key as a reference it captured before lock() ran, and lock() zeroes
-    /// that same array in place; whether those zeroes are visible to it is the same race, one
-    /// level down. It does not change the outcome, and this is why: a worker that sees neither
-    /// the increment nor the zeroes finishes its work under the key it started with, which is an
-    /// operation that was legitimately in flight, and it still cannot PUBLISH -- publishKey and
-    /// the requireSameKey/requireSameGeneration checks all re-read on the way out. The failure
-    /// mode is a missed abort, never a wrong answer and never an open vault.
-    ///
-    /// lock() promises that nothing in flight delivers afterwards, and an operation that reads
-    /// storage and decrypts is in flight for long enough to matter -- an EDT caller's lifecycle
-    /// callback can land squarely inside it. The generation has to be captured on the CALLING
-    /// thread: read inside the worker it can already be the post-lock value, and the check then
-    /// passes for the very interleaving it exists to catch.
     /// Withdraws a device record that a lock landed on top of, and reports the lock.
     ///
     /// The device wrap is a way back into this vault without a password, and establishing one runs
@@ -3372,7 +3339,7 @@ public final class Vault {
     /// Named rather than written out at each site, because it was written out at ONE of the three
     /// and the other two were reported separately.
     private void withdrawDeviceRecordIfLocked(int generation) {
-        if (generation == lockGeneration) {
+        if (generation == lockGeneration()) {
             return;
         }
         discardDeviceRecord();
@@ -3411,7 +3378,7 @@ public final class Vault {
     }
 
     private void requireDeviceRecordStillWanted(int generation, String restore) {
-        if (generation == lockGeneration) {
+        if (generation == lockGeneration()) {
             return;
         }
         Storage storage = Storage.getInstance();
@@ -3456,7 +3423,7 @@ public final class Vault {
     /// zeroes round-trips. What it wrote was a secret, a database key or a remembered record that
     /// nothing can read afterwards.
     private void requireSameKey(int at) {
-        if (at != keyGeneration) {
+        if (at != keyGeneration()) {
             throw new VaultException(VaultError.CONFLICT,
                     "this vault's data key was replaced while the operation was running, so what "
                     + "it produced was not sealed under the key this vault now has");
@@ -3464,7 +3431,7 @@ public final class Vault {
     }
 
     private void requireSameGeneration(int generation) {
-        if (generation != lockGeneration) {
+        if (generation != lockGeneration()) {
             throw new VaultException(VaultError.LOCKED,
                     "the vault was locked while this operation was running");
         }

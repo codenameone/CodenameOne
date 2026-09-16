@@ -103,10 +103,21 @@ class JavascriptVaultBridgeTest {
     void capabilitiesReportWhatWasActuallyReached() throws Exception {
         Map<String, String> r = run();
         assertEquals("0", r.get("capabilitiesStatus"));
-        // Secure context, subtle crypto, and an IndexedDB that genuinely opened. Persistence is
+        // Secure context, subtle crypto, and a CryptoKey that survived committed storage. Persistence is
         // not granted in the harness, so its bit stays clear -- which is the point of reporting
         // it separately rather than inferring it from IndexedDB existing.
         assertEquals("7", r.get("capabilityBits"));
+    }
+
+    @Test
+    void rememberedStorageRequiresACommittedCryptoKeyAndCleansUpItsProbe() throws Exception {
+        Map<String, String> r = run();
+        assertEquals("3", r.get("capabilityBitsWithoutCommit"));
+        assertEquals("3", r.get("capabilityBitsWithoutClone"));
+        assertEquals("7", r.get("capabilityBitsAfterRecovery"));
+        assertEquals("0", r.get("probeRecordsAfterSuccess"));
+        assertEquals("0", r.get("probeRecordsAfterAbort"));
+        assertEquals("0", r.get("probeRecordsAfterCloneFailure"));
     }
 
     @Test

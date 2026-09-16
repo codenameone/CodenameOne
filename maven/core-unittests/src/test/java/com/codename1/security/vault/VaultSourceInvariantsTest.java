@@ -38,6 +38,30 @@ import static org.junit.jupiter.api.Assertions.*;
 class VaultSourceInvariantsTest extends UITestBase {
 
     @Test
+    void generationChecksAcquireTheMonitorThatPublishesStateChanges() throws Exception {
+        // A stress test cannot prove Java memory-model visibility. Assert the synchronization
+        // boundary directly, alongside the behavioural lock and rotation race tests.
+        for (java.lang.reflect.Method method : new java.lang.reflect.Method[] {
+                Vault.class.getDeclaredMethod("lock"),
+                Vault.class.getDeclaredMethod("adoptKey", byte[].class),
+                Vault.class.getDeclaredMethod("lockGeneration"),
+                Vault.class.getDeclaredMethod("keyGeneration")}) {
+            assertTrue(java.lang.reflect.Modifier.isSynchronized(method.getModifiers()),
+                    method.getName() + " must share the vault monitor");
+        }
+        String code = codeOnly(readVaultSource());
+        for (String field : new String[] {"lockGeneration", "keyGeneration"}) {
+            // Only the declaration, synchronized increment, and synchronized accessor may
+            // reference the field directly. Every other use must acquire the accessor's monitor.
+            String remaining = code.replace("private int " + field + ";", "")
+                    .replace(field + "++;", "").replace("return " + field + ";", "")
+                    .replace(field + "()", "");
+            assertFalse(java.util.regex.Pattern.compile("\\b" + field + "\\b")
+                    .matcher(remaining).find(), "unsynchronized generation access: " + field);
+        }
+    }
+
+    @Test
     void theTwoSecretPathsDoNotRouteThroughAString() {
         // The encoders above are correct; this is the part that says they are USED. "No String is
         // created" is a property of the shape of the code and not of anything a caller can

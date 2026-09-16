@@ -132,9 +132,46 @@ try {
 
   const caps = await call({ op: 'capabilities' });
   check('capabilities succeed', status(caps), 0);
-  // Secure context (1) + subtle (2) + IndexedDB opened (4). Persistence is not
+  // Secure context (1) + subtle (2) + committed CryptoKey storage (4). Persistence is not
   // granted to a fresh headless profile, so bit 8 stays clear.
   check('capability bits report a usable secure origin', payload(caps)[0] & 7, 7);
+
+  const probeCount = () => tab.evaluate(() => new Promise((resolve, reject) => {
+    const opened = indexedDB.open('cn1-vault', 1);
+    opened.onerror = () => reject(opened.error);
+    opened.onsuccess = () => {
+      const db = opened.result;
+      const tx = db.transaction('keys', 'readonly');
+      const request = tx.objectStore('keys').getAllKeys();
+      request.onsuccess = () => resolve(request.result.filter(k => String(k).startsWith('probe:')).length);
+      request.onerror = () => reject(request.error);
+      tx.oncomplete = () => db.close();
+    };
+  }));
+  check('capability probe leaves no stored key', await probeCount(), 0);
+  for (const failure of ['QuotaExceededError', 'DataCloneError', 'abort']) {
+    const unavailable = await tab.evaluate(async mode => {
+      const originalAdd = IDBObjectStore.prototype.add;
+      IDBObjectStore.prototype.add = function(record) {
+        if (String(record.id).startsWith('probe:')) {
+          if (mode !== 'abort') throw new DOMException('injected probe failure', mode);
+          const request = originalAdd.apply(this, arguments);
+          request.addEventListener('success', () => this.transaction.abort());
+          return request;
+        }
+        return originalAdd.apply(this, arguments);
+      };
+      try {
+        return await window.__cn1VaultCall({ op: 'capabilities' });
+      } finally {
+        IDBObjectStore.prototype.add = originalAdd;
+      }
+    }, failure);
+    check('capabilities refuse unusable key storage: ' + failure, payload(unavailable)[0] & 7, 3);
+    check('failed capability probe leaves no key: ' + failure, await probeCount(), 0);
+  }
+  check('capabilities recover after storage becomes writable',
+    payload(await call({ op: 'capabilities' }))[0] & 7, 7);
 
   check('an absent key reads as absent', await call({ op: 'keyState', keyId: KEY }), [0, 0]);
   check('unwrap with no key is KEY_MISSING',
