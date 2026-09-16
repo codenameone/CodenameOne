@@ -236,39 +236,34 @@ public final class Vault {
         // A NAME PER PROBE. A fixed one collided with itself: two tabs or threads asking at once
         // both wrote it, and the first to finish read and deleted it before the second read its
         // own write -- so a perfectly healthy platform answered "session-only unsupported".
-        String probe = STORAGE_PREFIX + "capability.probe." + Bytes.toHex(SecureRandom.bytes(8));
-        if (storage.entryState(probe)
-                == com.codename1.impl.CodenameOneImplementation.STORAGE_ENTRY_UNKNOWN) {
-            return false;
-        }
-        // WRITTEN and read back, not merely looked up. A store can be perfectly readable and
-        // refuse writes -- an IndexedDB origin at quota is exactly that -- and a lookup answers
-        // ABSENT there just as it does on an empty store, so the policy was advertised and then
-        // failed at enrolment, after the user had typed a password. Enrolling persists a record;
-        // the only way to know that will work is to persist one.
-        try {
-            if (!storage.writeObject(probe, "probe")) {
-                return false;
-            }
-            if (!"probe".equals(asString(readUncached(probe)))) {
-                return false;
-            }
-        } catch (RuntimeException cannotProbe) {
-            return false;
-        } finally {
-            // Never left behind: this is a capability query an application may call on every
-            // settings screen, and it must not accumulate an entry or leave one that a later
-            // enumeration has to explain.
-            storage.deleteStorageFile(probe);
-        }
         byte[] probeKey = null;
         try {
+            // Name generation and storage lookup can fail before any write, too. A capability
+            // query must report the missing prerequisite rather than throw at its caller.
+            String probe = STORAGE_PREFIX + "capability.probe." + Bytes.toHex(SecureRandom.bytes(8));
+            if (storage.entryState(probe)
+                    == com.codename1.impl.CodenameOneImplementation.STORAGE_ENTRY_UNKNOWN) {
+                return false;
+            }
+            // A readable store may still refuse writes, so persist and read back a probe.
+            try {
+                if (!storage.writeObject(probe, "probe")) {
+                    return false;
+                }
+                if (!"probe".equals(asString(readUncached(probe)))) {
+                    return false;
+                }
+            } finally {
+                // This query may run on every settings screen; do not accumulate probe entries.
+                // Cleanup failures are handled by the same outer guard as write failures.
+                storage.deleteStorageFile(probe);
+            }
             probeKey = SecureRandom.bytes(32);
             SecureEnvelope.seal(probeKey, DATA_KEY_RECORD, 1,
                     AssociatedData.of(application, "probe", DATA_KEY_RECORD, "probe"),
                     probeKey);
             return true;
-        } catch (RuntimeException noCipher) {
+        } catch (RuntimeException cannotProbe) {
             return false;
         } finally {
             Bytes.zero(probeKey);

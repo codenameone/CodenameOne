@@ -59,11 +59,15 @@ public final class VaultCapabilities {
     /// not what session-only uses, so an application-supplied DeviceProtection reporting no
     /// persistence, an unplugged hardware token say, refused a policy that never touches it.
     ///
-    /// The other two need a device key, and the strongest additionally needs that key to be
-    /// gated on user verification.
+    /// The other two share those prerequisites and also need a device key. The strongest
+    /// additionally needs that key to be gated on user verification.
     public boolean supports(UnlockPolicy policy) {
+        // Every policy persists encrypted metadata, even when its device key store is healthy.
+        if (!canKeepARecord) {
+            return false;
+        }
         if (policy == UnlockPolicy.SESSION_ONLY) {
-            return canKeepARecord;
+            return true;
         }
         ProtectionReport report = device.protection();
         if (!report.provides(Protection.PERSISTENT)) {

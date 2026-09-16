@@ -687,6 +687,23 @@ class VaultTest extends UITestBase {
         assertFalse(vault.capabilities().supports(UnlockPolicy.REQUIRE_USER_VERIFICATION));
     }
 
+    @Test
+    void capabilityQueriesRefusePoliciesWhenSecureRandomnessIsUnavailable() {
+        Vault vault = Vault.named(freshName()).configure(fast());
+        TestCodenameOneImplementation impl = TestCodenameOneImplementation.getInstance();
+        impl.setSecureRandomUnavailable(true);
+        try {
+            VaultCapabilities capabilities = assertDoesNotThrow(() -> vault.capabilities());
+            for (UnlockPolicy policy : UnlockPolicy.values()) {
+                assertFalse(capabilities.supports(policy), "randomness is required for " + policy);
+            }
+        } finally {
+            impl.setSecureRandomUnavailable(false);
+        }
+        assertTrue(vault.capabilities().supports(UnlockPolicy.SESSION_ONLY),
+                "a failed probe must not poison later capability queries");
+    }
+
     /// The single key id this vault registered with a mechanism, for the leftover assertion above.
     private static String vaultKeyIdOf(FakeDeviceProtection mechanism) {
         for (String key : mechanism.keys.keySet()) {

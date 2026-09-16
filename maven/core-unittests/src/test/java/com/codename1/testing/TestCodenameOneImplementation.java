@@ -4349,8 +4349,17 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
         return testSecureRandom;
     }
 
+    private boolean secureRandomUnavailable;
+
+    public void setSecureRandomUnavailable(boolean unavailable) {
+        secureRandomUnavailable = unavailable;
+    }
+
     @Override
     public void secureRandomBytes(byte[] out) {
+        if (secureRandomUnavailable) {
+            throw new com.codename1.security.CryptoException("secure randomness is unavailable");
+        }
         if (out == null) return;
         testSecureRandom().nextBytes(out);
     }
