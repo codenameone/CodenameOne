@@ -100,7 +100,7 @@ public final class GuideFigureRenderer {
                 } finally {
                     Toolbar.setGlobalToolbar(globalToolbar);
                 }
-                prepare(form, device);
+                prepare(form, variant.width(), variant.height());
                 // After the layout, because a component that has not been
                 // measured yet refuses most of what a figure wants to say:
                 // Tree.expandPath does nothing before the tree is shown.
@@ -115,7 +115,8 @@ public final class GuideFigureRenderer {
                 Form shown = Display.getInstance().getCurrent();
                 Form target = shown != null ? shown : form;
                 verifyAppearance(variant, target);
-                write(sink, variant.fileName(), target, device);
+                write(sink, variant.fileName(), target, variant.width(), variant.height(),
+                        variant.figure().fillsViewport());
                 rendered++;
             } catch (Throwable err) {
                 // One figure that cannot render must not take the rest with it:
@@ -190,15 +191,15 @@ public final class GuideFigureRenderer {
         return (r * 299 + g * 587 + b * 114) / 1000 > 127;
     }
 
-    private static void prepare(Form form, FigureDevice device) {
-        CN.setWindowSize(device.width(), device.height());
+    private static void prepare(Form form, int width, int height) {
+        CN.setWindowSize(width, height);
         form.setScrollableY(false);
         form.show();
-        form.setWidth(device.width());
-        form.setHeight(device.height());
-        form.getContentPane().setWidth(device.width());
+        form.setWidth(width);
+        form.setHeight(height);
+        form.getContentPane().setWidth(width);
         form.getContentPane().setHeight(
-                Math.max(0, device.height() - form.getTitleArea().getHeight()));
+                Math.max(0, height - form.getTitleArea().getHeight()));
         form.revalidate();
         settle();
     }
@@ -239,12 +240,12 @@ public final class GuideFigureRenderer {
     ///
     /// So: a preferred height is used when the component states one, and a
     /// component that states none is taken at the height it was given.
-    private static int figureHeight(Form form, FigureDevice device) {
+    private static int figureHeight(Form form, int deviceHeight) {
         if (form instanceof Dialog) {
             // A dialog's picture is the whole screen: the tint, the blur and the
             // form underneath are the subject as much as the dialog is, and the
             // dialog itself sits wherever it was positioned within that.
-            return device.height();
+            return deviceHeight;
         }
         Container content = form.getContentPane();
         int bottom = 0;
@@ -264,7 +265,7 @@ public final class GuideFigureRenderer {
         // content left the figure cropped to the one label underneath it and the
         // dialog that is the whole point of the picture fell outside the frame.
         used = Math.max(used, layeredBottom(form));
-        return Math.min(device.height(), Math.max(1, used));
+        return Math.min(deviceHeight, Math.max(1, used));
     }
 
     /// How far down anything floating over the content reaches.
@@ -302,12 +303,13 @@ public final class GuideFigureRenderer {
         return bottom;
     }
 
-    private static void write(ScreenshotSink sink, String fileName, Form form, FigureDevice device)
-            throws IOException {
-        Image screenshot = Image.createImage(device.width(), device.height(), 0xffffff);
+    private static void write(ScreenshotSink sink, String fileName, Form form, int width, int height,
+            boolean fillsViewport) throws IOException {
+        Image screenshot = Image.createImage(width, height, 0xffffff);
         Graphics graphics = screenshot.getGraphics();
         form.paintComponent(graphics, true);
-        screenshot = screenshot.subImage(0, 0, device.width(), figureHeight(form, device), true);
+        int keep = fillsViewport ? height : figureHeight(form, height);
+        screenshot = screenshot.subImage(0, 0, width, keep, true);
         OutputStream out = sink.open(fileName);
         try {
             ImageIO.getImageIO().save(screenshot, out, ImageIO.FORMAT_PNG, 1);

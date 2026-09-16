@@ -1755,7 +1755,7 @@ include::../demos/common/src/main/java/com/codenameone/developerguide/advancedto
 ----
 
 .Center layout staircase effect with margin
-image::img/center-layout.png[Center layout staircase effect with margin,scaledwidth=20%]
+image::img/generated/center-layout.png[Center layout staircase effect with margin,scaledwidth=20%]
 
 ==== Porting a Swing/AWT Layout manager
 
