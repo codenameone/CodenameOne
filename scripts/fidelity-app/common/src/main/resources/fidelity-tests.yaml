@@ -342,7 +342,7 @@ components:
     native_win: winui_button
     native_mac: appkit_push_button
     native_gnome: adw_button
-    text: Button
+    text: Default
     states: normal,hover,pressed,disabled
 
   - id: DesktopAccentButton
@@ -350,7 +350,7 @@ components:
     native_win: winui_button_accent
     native_mac: appkit_push_button_default
     native_gnome: adw_button_suggested
-    text: Button
+    text: Accept
     states: normal,hover,pressed,disabled
 
   - id: DesktopTextField
@@ -358,7 +358,7 @@ components:
     native_win: winui_textbox
     native_mac: appkit_textfield
     native_gnome: gtk_entry
-    text: Text
+    text: Hello
     states: normal,hover,disabled
 
   - id: DesktopCheckBox
@@ -366,7 +366,7 @@ components:
     native_win: winui_checkbox
     native_mac: appkit_checkbox
     native_gnome: gtk_check_button
-    text: Check
+    text: Enabled
     states: normal,selected,hover,disabled
 
   - id: DesktopRadioButton
@@ -374,7 +374,7 @@ components:
     native_win: winui_radiobutton
     native_mac: appkit_radio
     native_gnome: gtk_radio_button
-    text: Radio
+    text: Option
     states: normal,selected,hover,disabled
 
   - id: DesktopSwitch
@@ -403,5 +403,5 @@ components:
     native_win: winui_combobox
     native_mac: appkit_popupbutton
     native_gnome: gtk_dropdown
-    text: Option
+    text: Choice
     states: normal,hover,disabled

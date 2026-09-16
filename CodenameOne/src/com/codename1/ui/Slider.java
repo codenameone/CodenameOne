@@ -422,27 +422,6 @@ public class Slider extends Label implements ActionSource {
                 prefH = Math.max(prefH, Font.getDefaultFont().getHeight());
             }
         }
-        // A progress bar that paints a thin native capsule should also MEASURE as one.
-        // Without this its preferred height is a full font height -- 19px against a 3px
-        // Fluent bar and an 8px Adwaita one -- so layout reserves six times the space the
-        // platform does, and the capsule is centred in a box the user cannot see. The
-        // widget looks almost right and sits wrong.
-        //
-        // Gated on exactly what makes it paint that way, so nothing that renders the
-        // legacy full-height fill changes size.
-        if (!infinite && !vertical && !isEditable()) {
-            String progressTrackMM = getUIManager().getThemeConstant("progressTrackThicknessMM", null);
-            if (progressTrackMM != null) {
-                try {
-                    float tmm = Float.parseFloat(progressTrackMM.trim());
-                    if (tmm > 0) {
-                        prefH = Math.max(2, Display.getInstance().convertToPixels(tmm));
-                    }
-                } catch (NumberFormatException notANumber) {
-                    // Malformed constant: keep the font-height default rather than guess.
-                }
-            }
-        }
         if (prefH != 0) {
             prefH += style.getVerticalPadding();
         }

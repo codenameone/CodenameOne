@@ -17,7 +17,6 @@
   </licenses>
   <modules>
     <module>common</module>
-    <module>desktop-runner</module>
   </modules>
   <properties>
     <cn1.plugin.version>8.0-SNAPSHOT</cn1.plugin.version>
