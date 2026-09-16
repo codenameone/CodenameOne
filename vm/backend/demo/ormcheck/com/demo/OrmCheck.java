@@ -679,8 +679,10 @@ public class OrmCheck {
             // exercised it.
             pool.execute("INSERT INTO " + table + " (id, name) VALUES (?, ?)",
                     new Object[] {Long.valueOf(-5L), "imported"});
-            String resync = pool.dialect().resyncGeneratedKey(
-                    pool.dialect().quote(table), pool.dialect().quote("id"));
+            // RAW NAMES: the dialect spells each one for the position it lands
+            // in. Passing the quoted forms double-quoted them and PostgreSQL
+            // looked for a relation called "\"cn1_idsync\"".
+            String resync = pool.dialect().resyncGeneratedKey(table, "id");
             check("only PostgreSQL needs the identity put back",
                     "postgresql".equals(pool.dialect().getName()) ? "needed" : "none",
                     resync == null ? "none" : "needed");

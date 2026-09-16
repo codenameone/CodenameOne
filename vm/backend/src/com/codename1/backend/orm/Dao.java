@@ -139,8 +139,10 @@ public final class Dao<T> {
         if(!table.columns[table.idIndex].isGenerated()) {
             return;
         }
+        // RAW NAMES: the dialect spells each one for the position it lands in --
+        // an identifier stays quoted, a text argument becomes an escaped literal.
         final String sql = table.dialect.resyncGeneratedKey(
-                table.quotedTable(), table.quotedId());
+                table.definition.table(), table.columns[table.idIndex].getColumn());
         if(sql == null) {
             return;
         }

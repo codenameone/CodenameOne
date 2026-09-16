@@ -448,7 +448,31 @@ public abstract class Dialect {
      * leaving every importer to write engine-specific SQL it has no reason to
      * know about.
      */
-    public String resyncGeneratedKey(String quotedTable, String quotedColumn) {
+    /**
+     * A SQL string literal holding {@code value}.
+     *
+     * <p>Doubling the apostrophe is the whole of the escape a standard literal
+     * needs, and it is the reason this exists rather than each caller writing
+     * quotes around a name: a table called owner's_items is a perfectly ordinary
+     * identifier, and pasting it between apostrophes ends the literal early and
+     * leaves the rest of the statement as syntax.
+     *
+     * <p>For NAMES only. Values are bound, always.
+     */
+    static String literal(String value) {
+        StringBuilder out = new StringBuilder(value.length() + 2);
+        out.append('\'');
+        for(int iter = 0 ; iter < value.length() ; iter++) {
+            char c = value.charAt(iter);
+            if(c == '\'') {
+                out.append('\'');
+            }
+            out.append(c);
+        }
+        return out.append('\'').toString();
+    }
+
+    public String resyncGeneratedKey(String table, String column) {
         return null;
     }
 
@@ -789,7 +813,28 @@ public abstract class Dialect {
          * fresh identity starts. Passing the max with the default true would skip
          * a key on an empty table, which is harmless but wrong.
          */
-        public String resyncGeneratedKey(String quotedTable, String quotedColumn) {
+        public String resyncGeneratedKey(String table, String column) {
+            // RAW NAMES IN, and each one spelled for the position it lands in.
+            // This took the QUOTED forms and dropped them into a SQL string
+            // literal, which breaks on two ordinary names:
+            //
+            //   @Entity(table = "owner's_items") creates fine, because the
+            //   identifier is double quoted -- and then closed the literal here,
+            //   making the statement invalid;
+            //
+            //   a column with a double quote in it arrives already escaped as
+            //   "" inside the quoted form, and trimming the outer quotes left
+            //   the doubling behind, so pg_get_serial_sequence looked for a
+            //   column nobody has.
+            //
+            // pg_get_serial_sequence takes TEXT, and its first argument is parsed
+            // as an identifier -- so the table goes in as its quoted form, which
+            // preserves case, and the column goes in raw, because that argument
+            // is matched against the column name as given. Both are escaped as
+            // string literals by doubling the apostrophes, which is the only
+            // escape a PostgreSQL literal needs. The identifier positions below
+            // keep the quoted forms.
+            //
             // CLAMPED TO 1, because an import can carry negative keys and
             // PostgreSQL accepts them: max(id) + 1 is then zero or negative, and
             // setval refuses that outright because the identity's sequence starts
@@ -797,8 +842,10 @@ public abstract class Dialect {
             // after such an import, so without the clamp the resync turns a
             // portable capability into one that throws on one engine only -- the
             // exact shape it was added to remove.
-            return "SELECT setval(pg_get_serial_sequence('" + quotedTable + "', "
-                    + "trim(both '\"' from '" + quotedColumn + "')), "
+            String quotedTable = quote(table);
+            String quotedColumn = quote(column);
+            return "SELECT setval(pg_get_serial_sequence(" + literal(quotedTable)
+                    + ", " + literal(column) + "), "
                     + "greatest(coalesce((SELECT max(" + quotedColumn + ") FROM "
                     + quotedTable + "), 0) + 1, 1), false)";
         }

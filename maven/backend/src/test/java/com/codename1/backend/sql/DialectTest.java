@@ -455,6 +455,39 @@ class DialectTest {
     }
 
     @Test
+    @DisplayName("the sequence resync escapes a name that carries an apostrophe")
+    void resyncEscapesItsNames() {
+        // @Entity(table = "owner's_items") is a perfectly ordinary name: the
+        // identifier is double quoted, so the table CREATES. This statement then
+        // has to name it inside a SQL string literal for pg_get_serial_sequence,
+        // and pasting the quoted form in ended the literal early -- MEASURED
+        // against a live server as
+        //
+        //   LINE 1: ...pg_get_serial_sequence('"owner's_items"', trim...
+        //                                              ^
+        //
+        // so the resync was invalid SQL for a table that had been created without
+        // complaint. The apostrophe is doubled now, which is the only escape a
+        // standard literal needs.
+        String sql = Dialect.POSTGRES.resyncGeneratedKey("owner's_items", "id");
+        assertTrue(sql.contains("'\"owner''s_items\"'"),
+                "the table name must reach the literal with its apostrophe doubled: " + sql);
+        // The COLUMN goes in raw, because pg_get_serial_sequence matches that
+        // argument against the column name as given. Trimming the quotes off the
+        // quoted form instead left a doubled " behind for a column that has one,
+        // and the function then looked for a column nobody has.
+        assertTrue(sql.contains("'id'"), "the column must reach it unquoted: " + sql);
+        // And the identifier positions keep the quoted spelling, which is what
+        // preserves the case the table was created with.
+        assertTrue(sql.contains("FROM \"owner's_items\""),
+                "the identifier position must stay quoted: " + sql);
+        // The engines that need no resync say so rather than returning SQL that
+        // happens to be harmless.
+        assertNull(Dialect.SQLITE.resyncGeneratedKey("owner's_items", "id"));
+        assertNull(Dialect.MYSQL.resyncGeneratedKey("owner's_items", "id"));
+    }
+
+    @Test
     @DisplayName("SQLite renders GLOB for like(), and translates the pattern with it")
     void likeIsCaseSensitiveWithoutAPragma() {
         // SQLite's LIKE folds ASCII case and PostgreSQL's does not. The pragma
