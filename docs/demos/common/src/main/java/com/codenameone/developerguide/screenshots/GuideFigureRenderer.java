@@ -115,7 +115,7 @@ public final class GuideFigureRenderer {
                 Form shown = Display.getInstance().getCurrent();
                 Form target = shown != null ? shown : form;
                 verifyAppearance(variant, target);
-                write(sink, variant.fileName(), target, device);
+                write(sink, variant.fileName(), target, device, variant.figure().fillsViewport());
                 rendered++;
             } catch (Throwable err) {
                 // One figure that cannot render must not take the rest with it:
@@ -302,12 +302,13 @@ public final class GuideFigureRenderer {
         return bottom;
     }
 
-    private static void write(ScreenshotSink sink, String fileName, Form form, FigureDevice device)
-            throws IOException {
+    private static void write(ScreenshotSink sink, String fileName, Form form, FigureDevice device,
+            boolean fillsViewport) throws IOException {
         Image screenshot = Image.createImage(device.width(), device.height(), 0xffffff);
         Graphics graphics = screenshot.getGraphics();
         form.paintComponent(graphics, true);
-        screenshot = screenshot.subImage(0, 0, device.width(), figureHeight(form, device), true);
+        int height = fillsViewport ? device.height() : figureHeight(form, device);
+        screenshot = screenshot.subImage(0, 0, device.width(), height, true);
         OutputStream out = sink.open(fileName);
         try {
             ImageIO.getImageIO().save(screenshot, out, ImageIO.FORMAT_PNG, 1);
