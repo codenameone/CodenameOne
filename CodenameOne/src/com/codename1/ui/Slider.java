@@ -461,8 +461,17 @@ public class Slider extends Label implements ActionSource {
     }
 
     private boolean usesNativeProgressStyles() {
-        return !infinite && !vertical && !isEditable() && thumbImage == null
-                && isNativeProgressStyle(super.getStyle())
+        if (infinite || vertical || isEditable() || thumbImage != null) {
+            return false;
+        }
+        // Reserve legacy height before any state transition can expose custom artwork.
+        // Pressed also matters when this slider inherits state from a lead component.
+        Style hover = getHoverStyle();
+        return isNativeProgressStyle(getUnselectedStyle())
+                && isNativeProgressStyle(getSelectedStyle())
+                && isNativeProgressStyle(getDisabledStyle())
+                && isNativeProgressStyle(getPressedStyle())
+                && (hover == null || isNativeProgressStyle(hover))
                 && isNativeProgressStyle(getSliderFullUnselectedStyle())
                 && isNativeProgressStyle(getSliderFullSelectedStyle());
     }
