@@ -1204,6 +1204,121 @@ class VaultTest extends UITestBase {
     }
 
     @Test
+    void aRememberPromptCannotPublishAKeyReplacedByRotationOrImport() throws Exception {
+        for (int change = 0; change < 3; change++) {
+            final String name = freshName();
+            final VaultOptions options = fast().policy(UnlockPolicy.REMEMBER_DEVICE);
+            final Vault vault = Vault.named(name).configure(options);
+            vault.enroll(pw("p"), options).get();
+            final Vault other = Vault.named(name).configure(options);
+            other.unlockWithPassword(pw("p")).get();
+            Vault donor = Vault.named(freshName()).configure(fast());
+            donor.importSyncState(vault.exportSyncState(), pw("p")).get();
+            donor.rotateDataKey(pw("p")).get();
+            final byte[] incoming = donor.exportSyncState();
+            final int operation = change;
+            VaultError result = whileTheDeviceStoreIsPrompting(
+                    new java.util.concurrent.Callable<VaultError>() {
+                        public VaultError call() { return errorOf(vault.rememberDevice()); }
+                    }, new Runnable() {
+                        public void run() {
+                            // Only the original prompt stays blocked; a rotation/import may
+                            // establish its own current wrap before the old prompt completes.
+                            java.util.concurrent.CountDownLatch release = device.releaseEnsure;
+                            device.releaseEnsure = null;
+                            try {
+                                if (operation == 0) vault.rotateDataKey(pw("p")).get();
+                                else if (operation == 1) vault.importSyncState(incoming, pw("p")).get();
+                                else other.rotateDataKey(pw("p")).get();
+                            } finally {
+                                device.releaseEnsure = release;
+                            }
+                        }
+                    });
+            assertEquals(VaultError.CONFLICT, result, "replacement " + change);
+            assertTrue(Vault.named(name).configure(options).unlockRemembered().get().booleanValue(),
+                    "the stale prompt must preserve the replacement's current device wrap");
+        }
+    }
+
+    @Test
+    void aPolicyPromptCannotRememberAKeyThatRotatedWhileItWaited() throws Exception {
+        final String name = freshName();
+        final Vault vault = Vault.named(name).configure(fast());
+        vault.enroll(pw("p"), fast()).get();
+        VaultError result = whileTheDeviceStoreIsPrompting(
+                new java.util.concurrent.Callable<VaultError>() {
+                    public VaultError call() {
+                        return errorOf(vault.setPolicy(UnlockPolicy.REMEMBER_DEVICE));
+                    }
+                }, new Runnable() {
+                    public void run() { vault.rotateDataKey(pw("p")).get(); }
+                });
+        assertEquals(VaultError.CONFLICT, result);
+        assertEquals(UnlockPolicy.SESSION_ONLY, vault.getPolicy());
+        assertTrue(Vault.named(name).configure(fast()).unlockWithPassword(pw("p")).get().booleanValue());
+    }
+
+    @Test
+    void aFailedPolicyPromptPreservesTheWrapAConcurrentRotationRefreshed() throws Exception {
+        final String name = freshName();
+        final VaultOptions options = fast().policy(UnlockPolicy.REMEMBER_DEVICE);
+        final Vault vault = Vault.named(name).configure(options);
+        vault.enroll(pw("p"), options).get();
+        VaultError result;
+        try {
+            result = whileTheDeviceStoreIsPrompting(
+                    new java.util.concurrent.Callable<VaultError>() {
+                        public VaultError call() {
+                            gated.ensureEntered = device.ensureEntered;
+                            gated.releaseEnsure = device.releaseEnsure;
+                            return errorOf(vault.setPolicy(UnlockPolicy.REQUIRE_USER_VERIFICATION));
+                        }
+                    }, new Runnable() {
+                        public void run() {
+                            java.util.concurrent.CountDownLatch release = device.releaseEnsure;
+                            device.releaseEnsure = null;
+                            try {
+                                vault.rotateDataKey(pw("p")).get();
+                            } finally {
+                                device.releaseEnsure = release;
+                            }
+                        }
+                    });
+        } finally {
+            gated.ensureEntered = null;
+            gated.releaseEnsure = null;
+        }
+        assertEquals(VaultError.CONFLICT, result);
+        assertEquals(UnlockPolicy.REMEMBER_DEVICE, vault.getPolicy());
+        assertTrue(Vault.named(name).configure(options).unlockRemembered().get().booleanValue(),
+                "policy rollback must not restore the pre-rotation wrap over the current one");
+    }
+
+    @Test
+    void aRotationInsideTheDeviceRecordWriteWithdrawsTheStaleWrap() {
+        final String name = freshName();
+        final VaultOptions options = fast().policy(UnlockPolicy.REMEMBER_DEVICE);
+        final Vault vault = Vault.named(name).configure(options);
+        vault.enroll(pw("p"), options).get();
+        final TestCodenameOneImplementation impl = TestCodenameOneImplementation.getInstance();
+        impl.setDuringStorageWrite(deviceRecordName(name), new Runnable() {
+            public void run() {
+                impl.setDuringStorageWrite(null, null);
+                vault.rotateDataKey(pw("p")).get();
+            }
+        });
+        try {
+            assertEquals(VaultError.CONFLICT, errorOf(vault.rememberDevice()));
+            assertEquals(UnlockPolicy.SESSION_ONLY, vault.getPolicy());
+            assertTrue(Vault.named(name).configure(fast()).unlockWithPassword(pw("p")).get()
+                    .booleanValue());
+        } finally {
+            impl.setDuringStorageWrite(null, null);
+        }
+    }
+
+    @Test
     void aVaultLockedWhileRememberDeviceRunsRemembersNothing() throws Exception {
         // Establishing a device wrap runs through a store that prompts, so the write takes as long
         // as the user takes and lock() can land anywhere inside it. Every other path that

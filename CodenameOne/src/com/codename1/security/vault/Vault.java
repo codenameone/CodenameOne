@@ -899,6 +899,7 @@ public final class Vault {
     /// configured, and a rewrap that read the configured one would replace the gated wrap with an
     /// unattended one -- silently turning off the prompt the user asked for.
     private void rememberNow(UnlockPolicy policy) {
+        final int keyAt = keyGeneration;
         // Snapshotted, not re-read, for the reason rotateDataKey gives: the store below prompts,
         // so this method runs for as long as the user takes, and lock() nulls both of these. Read
         // afterwards they are null and the worker dies on a NullPointerException, which the
@@ -927,6 +928,7 @@ public final class Vault {
             throw new VaultException(VaultError.STORAGE_UNAVAILABLE,
                     "the device key could not be created");
         }
+        requireRememberedKeyCurrent(meta, keyAt);
         byte[] aad = wrapBinding(meta, PURPOSE_DEVICE).serialize();
         byte[] wrapped = await(device.wrap(deviceKeyId(), key, aad),
                 "the data key could not be wrapped for this device");
@@ -940,7 +942,34 @@ public final class Vault {
             throw new VaultException(VaultError.STORAGE_UNAVAILABLE,
                     "the device wrap did not read back as it was written");
         }
-        writeDeviceRecord(new DeviceRecord(policy, wrapped, meta.dataKeyVersion));
+        requireRememberedKeyCurrent(meta, keyAt);
+        DeviceRecord attempted = new DeviceRecord(policy, wrapped, meta.dataKeyVersion);
+        writeDeviceRecord(attempted);
+        try {
+            requireRememberedKeyCurrent(meta, keyAt);
+        } catch (VaultException changed) {
+            // A replacement inside the storage write must not leave this stale wrap active.
+            // Preserve a later writer's record; only this attempt can be withdrawn here.
+            if (attempted.serialize().equals(readUncached(deviceRecordKey()))) {
+                Storage.getInstance().deleteStorageFile(deviceRecordKey());
+                if (!definitelyGone(deviceRecordKey())) {
+                    throw new VaultException(VaultError.STORAGE_UNAVAILABLE,
+                            "a stale device wrap could not be withdrawn", changed);
+                }
+            }
+            throw changed;
+        }
+    }
+
+    /// A prompt or wrapping operation can outlive a rotation in this session or another tab.
+    private void requireRememberedKeyCurrent(VaultMetadata expected, int keyAt) {
+        requireSameKey(keyAt);
+        VaultMetadata stored = loadMetadataFresh();
+        if (stored == null || !stored.serialize().equals(expected.serialize())) {
+            throw new VaultException(VaultError.CONFLICT,
+                    "this vault changed while the device was being remembered; try again");
+        }
+        requireSameKey(keyAt);
     }
 
     /// Forgets this device: the local wrap is deleted and so is the device key behind it.
@@ -2456,6 +2485,14 @@ public final class Vault {
                         try {
                             rememberNow(policy);
                         } catch (VaultException establishFailed) {
+                            if (establishFailed.getError() == VaultError.CONFLICT) {
+                                // rememberNow never published a stale wrap, or withdrew only
+                                // its own attempt. Restoring the pre-prompt record here would
+                                // overwrite the wrap a concurrent rotation already refreshed.
+                                options.policy(configuredBefore);
+                                undone[0] = true;
+                                throw establishFailed;
+                            }
                             // rememberNow writes the device record, so a failure partway can
                             // leave it describing a mechanism that was never completed. Put back
                             // exactly what was there and report the failure: nothing changed.
