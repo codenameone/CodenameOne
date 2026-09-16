@@ -90,6 +90,8 @@ public final class GuideFigures {
             new FigureVariant(new IoSqlEntryFigure(), FigureDevice.ANDROID, false, "sql-entry.png"),
             new FigureVariant(new ComponentsTableMultilineLandscapeFigure(), FigureDevice.ANDROID, false, true, "components-table-multiline-landscape.png"),
             new FigureVariant(new GraphicsShapedClippingFigure(), FigureDevice.ANDROID, false, true, "shaped-clipping.png"),
+            new FigureVariant(new IoJsonParsingFigure(), FigureDevice.ANDROID, false, "json-parsing.png"),
+            new FigureVariant(new IoSqlTableFigure(), FigureDevice.ANDROID, false, "sql-table.png"),
             new FigureVariant(new ComponentsDialogModalSouthFigure(), FigureDevice.ANDROID, false, "components-dialog-modal-south.png"),
             new FigureVariant(new ComponentsDialogBottomHalfFigure(), FigureDevice.ANDROID, false, "components-dialog-modal-bottom-half.png"),
             new FigureVariant(new ComponentsDialogTintFigure(), FigureDevice.ANDROID, false, "components-dialog-tint.png"),

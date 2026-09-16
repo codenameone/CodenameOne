@@ -1,0 +1,77 @@
+[
+  {
+    "url": "http://www.anapioficeandfire.com/api/characters/13",
+    "name": "Chayle",
+    "culture": "",
+    "born": "",
+    "died": "In 299 AC, at Winterfell",
+    "titles": [
+      "Septon"
+    ],
+    "aliases": [],
+    "father": "",
+    "mother": "",
+    "spouse": "",
+    "allegiances": [],
+    "books": [
+      "http://www.anapioficeandfire.com/api/books/1",
+      "http://www.anapioficeandfire.com/api/books/2",
+      "http://www.anapioficeandfire.com/api/books/3"
+    ],
+    "povBooks": [],
+    "tvSeries": [],
+    "playedBy": []
+  },
+  {
+    "url": "http://www.anapioficeandfire.com/api/characters/14",
+    "name": "Gillam",
+    "culture": "",
+    "born": "",
+    "died": "",
+    "titles": [
+      "Brother"
+    ],
+    "aliases": [],
+    "father": "",
+    "mother": "",
+    "spouse": "",
+    "allegiances": [],
+    "books": [
+      "http://www.anapioficeandfire.com/api/books/5"
+    ],
+    "povBooks": [],
+    "tvSeries": [],
+    "playedBy": []
+  },
+  {
+    "url": "http://www.anapioficeandfire.com/api/characters/15",
+    "name": "High Septon",
+    "culture": "",
+    "born": "",
+    "died": "",
+    "titles": [
+      "High Septon",
+      "His High Holiness",
+      "Father of the Faithful",
+      "Voice of the Seven on Earth"
+    ],
+    "aliases": [
+      "The High Sparrow"
+    ],
+    "father": "",
+    "mother": "",
+    "spouse": "",
+    "allegiances": [],
+    "books": [
+      "http://www.anapioficeandfire.com/api/books/5",
+      "http://www.anapioficeandfire.com/api/books/8"
+    ],
+    "povBooks": [],
+    "tvSeries": [
+      "Season 5"
+    ],
+    "playedBy": [
+      "Jonathan Pryce"
+    ]
+  }
+]
