@@ -125,6 +125,20 @@ gnome_adwaita_copies() { :; }
 windows_fluent_copies() { :; }
 macos_aqua_copies() { :; }
 
+# Every file a run WRITES, one repo-relative path per line, for callers that have to
+# stage them -- .github/workflows/native-themes-sync.yml above all. That workflow kept a
+# hand-written list of two paths, and it stayed at two when three desktop themes and two
+# committed port mirrors were added: a desktop-only CSS change regenerated three .res
+# files, staged none of them, reported "nothing to commit" and left every downstream
+# build on the previous binary. A list the script produces cannot go stale that way.
+#
+# Off unless the caller asks for it, so a developer running this by hand writes nothing
+# extra.
+record_output() {
+  [ -n "${NATIVE_THEMES_MANIFEST:-}" ] || return 0
+  printf '%s\n' "$1" >> "$NATIVE_THEMES_MANIFEST"
+}
+
 compile_theme() {
   local jar="$1" name="$2" basename="$3"
   local css="$CSS_SRC_ROOT/$name/theme.css"
@@ -136,9 +150,11 @@ compile_theme() {
   mkdir -p "$OUT_DIR"
   log "Compiling $name -> $out"
   java -jar "$jar" -input "$css" -output "$out"
+  record_output "${out#"$REPO_ROOT"/}"
   if [ -d "$JS_ASSETS_DIR" ]; then
     cp "$out" "$JS_ASSETS_DIR/$basename"
     log "Mirrored -> $JS_ASSETS_DIR/$basename"
+    record_output "${JS_ASSETS_DIR#"$REPO_ROOT"/}/$basename"
   fi
   local copy
   while IFS= read -r copy; do
@@ -146,10 +162,14 @@ compile_theme() {
     mkdir -p "$REPO_ROOT/$(dirname "$copy")"
     cp "$out" "$REPO_ROOT/$copy"
     log "Mirrored -> $copy"
+    record_output "$copy"
   done < <("${name//-/_}_copies")
 }
 
 main() {
+  if [ -n "${NATIVE_THEMES_MANIFEST:-}" ]; then
+    : > "$NATIVE_THEMES_MANIFEST"
+  fi
   local jar
   jar="$(ensure_jar)"
   compile_theme "$jar" ios-modern iOSModernTheme.res

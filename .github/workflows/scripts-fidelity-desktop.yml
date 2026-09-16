@@ -204,6 +204,16 @@ jobs:
           fi
           JAVA_HOME="$JDK21" "${XVFB[@]}" ./mvnw -B -q -pl common,desktop-runner -DskipTests install
 
+      - name: Regenerate the desktop themes from CSS
+        shell: bash
+        # theme.css is the source of truth; Themes/*.res is compiled output that happens to
+        # be committed. run-desktop-fidelity-tests.sh deliberately puts Themes/ FIRST on the
+        # classpath so a stale copy elsewhere cannot win -- which also means that without
+        # this step a push that changes only native-themes/<platform>/theme.css is scored
+        # against the PREVIOUS compiled theme and can pass without the change being tested.
+        # Same step, same reason, as the Android and iOS legs in scripts-fidelity.yml.
+        run: ./scripts/build-native-themes.sh
+
       - name: Score the theme against the native reference
         shell: bash
         env:
