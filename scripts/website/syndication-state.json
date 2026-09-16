@@ -2144,6 +2144,11 @@
         "tags_set": true,
         "canonical_set": true,
         "syndicated_at": "2026-09-16T00:01:12+00:00"
+      },
+      "devto": {
+        "id": 4669906,
+        "url": "https://dev.to/codenameone/pick-one-contact-without-asking-for-the-address-book-578c",
+        "syndicated_at": "2026-09-16T17:39:19+00:00"
       }
     }
   }
