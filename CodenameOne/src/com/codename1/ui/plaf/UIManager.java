@@ -2431,8 +2431,12 @@ public class UIManager {
         } else {
             id = id + ".";
         }
-        if (Arrays.toString(styleString).equals(parseCache().get(cacheKey)) && ((selected && selectedStyles.containsKey(id)) || (!selected && this.styles.containsKey(id)))) {
-
+        // A cached normal style does not prove a custom state survived theme refresh.
+        // Check the same cache that getComponentStyleImpl reads for this prefix.
+        boolean cachedStyle = selected ? selectedStyles.containsKey(id)
+                : ((prefix == null || prefix.length() == 0) ? this.styles.containsKey(id)
+                : prefixedStyles.containsKey(prefixedKey(prefix, id)));
+        if (Arrays.toString(styleString).equals(parseCache().get(cacheKey)) && cachedStyle) {
             return getComponentStyleImpl(originalId, selected, prefix);
         }
         parseCache().put(cacheKey, Arrays.toString(styleString));
@@ -2451,7 +2455,9 @@ public class UIManager {
             resetThemeProps(null);
         }
         if (baseStyle != null) {
-            themeProps.put(id + "derive", baseStyle);
+            // Hover inline overrides inherit the hover state itself. Deriving from the
+            // bare UIID would discard unspecified hover colors, padding and borders.
+            themeProps.put(id + "derive", "hover#".equals(prefix) ? baseStyle + ".hover" : baseStyle);
         } else {
             themeProps.remove(id + "derive");
         }

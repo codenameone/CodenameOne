@@ -7641,7 +7641,7 @@ public class Component implements Animation, StyleListener, Editable {
             if (!getUIManager().hasComponentCustomStyle(getUIID(), "hover")) {
                 return null;
             }
-            hoverStyle = getUIManager().getComponentCustomStyle(getUIID(), "hover");
+            hoverStyle = createHoverStyle(getUIManager(), getUIID());
             if (initialized && hoverStyle.getElevation() > 0) {
                 registerElevatedInternal(this);
             }
@@ -7654,6 +7654,16 @@ public class Component implements Animation, StyleListener, Editable {
             }
         }
         return hoverStyle;
+    }
+
+    private Style createHoverStyle(UIManager manager, String id) {
+        // Inline-all overlays an already declared hover state. Keep the same resource
+        // prerequisite as the other inline states, without inventing hover for old themes.
+        if (getInlineStylesTheme() != null && inlineAllStyles != null) {
+            return manager.parseComponentCustomStyle(getInlineStylesTheme(), id,
+                    getInlineStylesUIID(id), "hover", inlineAllStyles);
+        }
+        return manager.getComponentCustomStyle(id, "hover");
     }
 
     /// Sets the Component Style for the hover state allowing us to manipulate the look of the
@@ -8051,7 +8061,7 @@ public class Component implements Animation, StyleListener, Editable {
             // properties follow the refreshed normal style instead of the removed rule.
             if (hoverStyle != null) {
                 if (manager.hasComponentCustomStyle(id, "hover")) {
-                    setHoverStyle(mergeStyle(hoverStyle, manager.getComponentCustomStyle(id, "hover")));
+                    setHoverStyle(mergeStyle(hoverStyle, createHoverStyle(manager, id)));
                 } else if (hoverStyle.isModified()) {
                     setHoverStyle(mergeStyle(hoverStyle, getUnselectedStyle()));
                 } else {

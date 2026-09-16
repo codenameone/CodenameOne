@@ -260,4 +260,53 @@ public class ComponentHoverStyleTest extends UITestBase {
         assertNull(button.getHoverStyle());
     }
 
+    @Test
+    public void inlineAllStylesOverlayHoverBeforeAndAfterThemeRefresh() {
+        for (boolean merge : new boolean[]{true, false}) {
+            Hashtable theme = new Hashtable();
+            theme.put("Button.hover#bgColor", "445566");
+            theme.put("Button.hover#fgColor", "112233");
+            UIManager.getInstance().setThemeProps(theme);
+            Button button = new Button("inline hover");
+            button.setInlineStylesTheme(new MutableResource());
+            button.setInlineAllStyles("fgColor:ff0000; padding:7px; font:18px");
+            button.setHovered(true);
+            assertEquals(0xff0000, button.getStyle().getFgColor());
+            assertEquals(7, button.getStyle().getPaddingTop());
+            assertEquals(button.getUnselectedStyle().getFont().getPixelSize(), button.getStyle().getFont().getPixelSize());
+            assertEquals(0x445566, button.getStyle().getBgColor(), "unspecified properties retain the hover theme");
+
+            button.setInlineAllStyles("fgColor:00ff00; padding:9px; font:20px");
+            assertEquals(0x00ff00, button.getStyle().getFgColor(), "changing inline-all invalidates cached hover");
+            Hashtable replacement = new Hashtable();
+            replacement.put("Button.hover#bgColor", "abcdef");
+            replacement.put("Button.hover#fgColor", "654321");
+            UIManager.getInstance().setThemeProps(replacement);
+            button.refreshTheme(merge);
+            assertEquals(0x00ff00, button.getStyle().getFgColor());
+            assertEquals(9, button.getStyle().getPaddingTop());
+            assertEquals(button.getUnselectedStyle().getFont().getPixelSize(), button.getStyle().getFont().getPixelSize());
+            assertEquals(0xabcdef, button.getStyle().getBgColor());
+        }
+    }
+
+    @Test
+    public void inlineAllDoesNotCreateAnUndeclaredHoverStateOrBypassResourceRequirement() {
+        UIManager.getInstance().setThemeProps(new Hashtable());
+        Button legacy = new Button("legacy inline");
+        legacy.setInlineStylesTheme(new MutableResource());
+        legacy.setInlineAllStyles("fgColor:ff0000");
+        legacy.setHovered(true);
+        assertNull(legacy.getHoverStyle());
+        assertEquals(0xff0000, legacy.getStyle().getFgColor());
+
+        Hashtable theme = new Hashtable();
+        theme.put("Button.hover#fgColor", "112233");
+        UIManager.getInstance().setThemeProps(theme);
+        Button noResources = new Button("no inline resource context");
+        noResources.setInlineAllStyles("fgColor:ff0000");
+        noResources.setHovered(true);
+        assertEquals(0x112233, noResources.getStyle().getFgColor());
+    }
+
 }
