@@ -112,7 +112,7 @@ jobs:
           for leg in $legs; do
             case "$leg" in
               gnome)   runner=ubuntu-latest ;;
-              windows) runner=windows-latest ;;
+              windows) runner=windows-11-arm ;;
               macos)   runner=macos-15 ;;
             esac
             entries="$entries{\"platform\":\"$leg\",\"runner\":\"$runner\"},"
@@ -142,6 +142,9 @@ jobs:
         with:
           distribution: temurin
           java-version: '21'
+          # Match the Windows 11 font inventory used by native reference capture.
+          # Java 8 and the simulator native libraries run through x64 emulation there.
+          architecture: ${{ matrix.platform == 'windows' && 'x64' || '' }}
       - id: jdk21
         shell: bash
         run: echo "path=$JAVA_HOME" >> "$GITHUB_OUTPUT"
@@ -150,13 +153,14 @@ jobs:
           # Temurin 8 has no macOS ARM64 build; Zulu provides native Java 8.
           distribution: ${{ matrix.platform == 'macos' && 'zulu' || 'temurin' }}
           java-version: '8'
+          architecture: ${{ matrix.platform == 'windows' && 'x64' || '' }}
 
       # Needed by the BUILD as well as by the run. The fidelity app is a Codename One
       # application, so its build runs the cn1 css goal, which rasterizes through CEF and
       # needs a display -- it fails with "An error occurred while compiling the CSS files"
       # on a bare runner. Installed before the build for that reason, not only before the
       # simulator starts.
-      - name: Install xvfb
+      - name: Install display and native reference font
         if: matrix.platform == 'gnome'
         run: bash scripts/ci/apt-get-install.sh xvfb fonts-cantarell
 
