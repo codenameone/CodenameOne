@@ -355,9 +355,9 @@ While the database is open the key is in the process and stays there; locking th
 
 `rotateDataKey` and importing a rotation both change the current database key. Record `vault.getDataKeyVersion()` alongside the database when creating it, and use `DatabaseConfig.vault(vault, alias, recordedVersion)` to open that file even after a later rotation arrives. The vault retains the retired keys across restarts; `vault.databaseKey(alias, version)` also exposes them for database engines you manage directly.
 
-To rekey, open the file at its recorded version, call `database.changeKey(DatabaseConfig.vault(vault, alias, newVersion))`, and update the recorded version only after that succeeds. Keep both version numbers in a local migration journal until reopening succeeds, so a crash between rekey and updating that record is recoverable. There is no automatic rekey.
+To change the database key, open the file at its recorded version, call `database.changeKey(DatabaseConfig.vault(vault, alias, newVersion))`, and update the recorded version only after that succeeds. Keep both version numbers in a local migration journal until reopening succeeds, so a crash between changing the key and updating that record is recoverable. There is no automatic key change.
 
-If import policy setup fails, an untouched import is rolled back. `VaultError.IMPORT_COMMITTED` means the import reached committed state and could not safely be rolled back, or rollback could not be confirmed. The session is locked; reread the persisted sync state before retrying policy setup.
+If import policy setup fails, an untouched import is rolled back. `VaultError.IMPORT_COMMITTED` means the import reached committed state and rollback would risk existing data or couldn't be confirmed. The session is locked; reread the persisted sync state before retrying policy setup.
 
 ==== Cross-platform interoperability
 
