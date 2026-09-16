@@ -452,6 +452,9 @@ jobs:
       - name: Unpack suite classes
         run: tar xzf suite-classes.tgz
       - name: Translate + build + run the suite in Alpine (musl, end-to-end)
+        env:
+          # Resolution failures only -- never a test failure. Same list the other Maven legs use.
+          RETRY_ONLY_MATCHING: 'status( code)?: (403|429|50[0-9])|Could not transfer artifact|Failed to read artifact descriptor|Unresolveable build extension|Non-resolvable import POM|Could not collect dependencies|UnknownHostException|Unknown host|Connection timed out|Connection reset|Premature end of Content-Length|Error getting https'
         run: |
           docker run --rm \
             -v "$GITHUB_WORKSPACE":/cn1 -w /cn1 \
@@ -459,6 +462,7 @@ jobs:
             -e CN1_APP_LOG_TEE=/cn1/artifacts/linux-port/raw-musl/app-output.log \
             -e CN1_REQUIRE_SUITE=true \
             -e LIBGL_ALWAYS_SOFTWARE=1 \
+            -e RETRY_ONLY_MATCHING \
             docker.io/library/alpine:3.20 sh -ec '
               sed -i "s|^#\(.*/community\)|\1|" /etc/apk/repositories
               apk add --no-cache build-base cmake samurai pkgconf bash git openjdk8 openjdk17 maven \
@@ -478,8 +482,18 @@ jobs:
               export DISPLAY=:99
               sleep 2
               # core + Linux port (musl JDK8); the default cc on Alpine already links musl.
-              cd /cn1/maven && mvn -B -pl linux -am -DskipTests -Dmaven.javadoc.skip=true -Plocal-dev-javase install
-              cd /cn1/vm && mvn -B clean package -pl JavaAPI -am -DskipTests
+              #
+              # Through retry.sh, which every other Maven leg in this repo already uses: this
+              # step failed with "Unresolveable build extension:
+              # central-publishing-maven-plugin", one of the strings RETRY_ONLY_MATCHING names,
+              # and a container that cannot reach the repository is not a defect in the build.
+              #
+              # The two BUILD invocations only. The `mvn test` below is deliberately left bare,
+              # for the reason ant.yml records where this pattern comes from: retrying a
+              # network-dependent TEST launders exactly the flake this repository requires to be
+              # root-caused.
+              cd /cn1/maven && bash /cn1/scripts/ci/retry.sh mvn -B -pl linux -am -DskipTests -Dmaven.javadoc.skip=true -Plocal-dev-javase install
+              cd /cn1/vm && bash /cn1/scripts/ci/retry.sh mvn -B clean package -pl JavaAPI -am -DskipTests
               mvn -B test -pl tests -am \
                 -Dtest=CleanTargetLinuxIntegrationTest#capturesHelloSuiteOverWebSocketLinux \
                 -Dsurefire.failIfNoSpecifiedTests=false

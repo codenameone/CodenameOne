@@ -34,8 +34,14 @@ public final class VaultCapabilities {
 
     private final DeviceProtection device;
 
-    VaultCapabilities(DeviceProtection device) {
+    /// Whether ordinary Storage and AES-GCM are both usable, measured directly rather than read
+    /// off the device protection -- see Vault.canKeepAndSealARecord for why the report is the
+    /// wrong source for it.
+    private final boolean canKeepARecord;
+
+    VaultCapabilities(DeviceProtection device, boolean canKeepARecord) {
         this.device = device;
+        this.canKeepARecord = canKeepARecord;
     }
 
     /// Whether an unlock policy can be honoured on this device.
@@ -47,20 +53,19 @@ public final class VaultCapabilities {
     /// window -- advertised a policy that could only fail, and fail after the user had already
     /// typed a password.
     ///
-    /// Refused only on a DEFINITE no, which is the same three-state discipline the rest of this
-    /// API follows: a store that cannot say is not a store that said no. On the browser
-    /// PERSISTENT is reported as crypto AND storage, which is exactly this prerequisite; on a
-    /// port whose device protection is the portable one it describes SecureStorage, which is
-    /// stronger than session-only needs -- so a definite NO there is still a platform that
-    /// cannot keep a record, and refusing is right.
+    /// Those prerequisites are measured DIRECTLY -- can Storage answer for an entry, and does a
+    /// small AES-GCM seal succeed -- and deliberately not read off the device protection's
+    /// report. That was the first attempt and it was wrong in both directions: a device store is
+    /// not what session-only uses, so an application-supplied DeviceProtection reporting no
+    /// persistence, an unplugged hardware token say, refused a policy that never touches it.
     ///
     /// The other two need a device key, and the strongest additionally needs that key to be
     /// gated on user verification.
     public boolean supports(UnlockPolicy policy) {
-        ProtectionReport report = device.protection();
         if (policy == UnlockPolicy.SESSION_ONLY) {
-            return report.answer(Protection.PERSISTENT) != ProtectionReport.NO;
+            return canKeepARecord;
         }
+        ProtectionReport report = device.protection();
         if (!report.provides(Protection.PERSISTENT)) {
             return false;
         }

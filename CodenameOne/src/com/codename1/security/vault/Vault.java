@@ -207,7 +207,49 @@ public final class Vault {
         // NON_EXTRACTABLE_KEY=NO from the passkey where the device key reports YES. A capability
         // query is about what each policy WOULD provide, and protectionFor selects the gated
         // variant itself for the one policy that needs it.
-        return new VaultCapabilities(baseDeviceProtection());
+        return new VaultCapabilities(baseDeviceProtection(), canKeepAndSealARecord());
+    }
+
+    /// Whether this platform can do what a SESSION_ONLY vault needs: keep a record and seal it.
+    ///
+    /// Asked DIRECTLY rather than inferred from the device protection's report. Reading it off
+    /// that report was the first attempt and it was wrong in both directions: a device store is
+    /// not what session-only uses, so an application-supplied DeviceProtection that reports no
+    /// persistence -- an unplugged hardware token, say -- refused a policy that never touches it,
+    /// and on a port whose fallback secure store is unavailable the same thing happened while
+    /// ordinary Storage and the cipher were both fine.
+    ///
+    /// Storage is asked through entryState, which is the tri-state added for exactly this kind
+    /// of question: a browser whose IndexedDB is unusable answers UNKNOWN rather than pretending
+    /// the entry is absent. The cipher is asked by doing the thing -- one small seal under a
+    /// throwaway key -- because a platform either performs AES-GCM or it does not, and nothing
+    /// short of trying distinguishes those on the browser.
+    private boolean canKeepAndSealARecord() {
+        Storage storage = Storage.getInstance();
+        if (storage == null) {
+            return false;
+        }
+        // A NAME OF ITS OWN, never this vault's record. Probing metadataKey() asked two
+        // questions at once and answered the wrong one: a vault whose own entry cannot be looked
+        // up -- a transient IndexedDB refusal -- is not a platform that cannot store, and
+        // reporting the policy as unsupported there turned "retry, the store is busy" into
+        // POLICY_NOT_MET, which an application reads as "this device will never do this".
+        if (storage.entryState(STORAGE_PREFIX + "capability.probe")
+                == com.codename1.impl.CodenameOneImplementation.STORAGE_ENTRY_UNKNOWN) {
+            return false;
+        }
+        byte[] probeKey = null;
+        try {
+            probeKey = SecureRandom.bytes(32);
+            SecureEnvelope.seal(probeKey, DATA_KEY_RECORD, 1,
+                    AssociatedData.of(application, "probe", DATA_KEY_RECORD, "probe"),
+                    probeKey);
+            return true;
+        } catch (RuntimeException noCipher) {
+            return false;
+        } finally {
+            Bytes.zero(probeKey);
+        }
     }
 
     /// What currently protects this vault on this device, as observed.
@@ -521,6 +563,20 @@ public final class Vault {
                     // it, do not enrol it again.
                     if (vaultIsStillUntouched(verified)) {
                         Storage.getInstance().deleteStorageFile(metadataKey());
+                        if (!definitelyGone(metadataKey())) {
+                            // The delete is void-returning and both real ports can drop one
+                            // silently, so rethrowing the original here told the caller its
+                            // enrolment had failed over a vault that is still ENROLLED. The
+                            // documented answer to that failure is to retry with a weaker
+                            // policy, and that retry then hits CONFLICT for reasons the first
+                            // error gave no hint of. The storage failure is the one that
+                            // describes the state the device is actually in, and the original
+                            // goes on as its cause.
+                            throw new VaultException(VaultError.STORAGE_UNAVAILABLE,
+                                    "this vault's enrolment could not be undone after the setup "
+                                    + "failed, so the vault is still enrolled on this device",
+                                    rememberFailed);
+                        }
                         try {
                             forgetEveryMechanism();
                         } catch (RuntimeException alsoFailed) {
