@@ -1318,6 +1318,41 @@ public class SelfTest {
      * <p>The escape case is the one that cannot be explained away as an encoding
      * detail: it is the database's own data choosing what character to become.
      */
+    /**
+     * A Date and a Character bound through raw SQL are stored the way the ORM
+     * stores them.
+     *
+     * <p>Database.execute normalised only Boolean, so the other two scalars
+     * whose Java form is not what the column holds reached the driver as objects
+     * the engines render with String.valueOf. SQLite's integer affinity stores
+     * that text without complaint, while PostgreSQL and a strict MySQL refuse it
+     * as invalid integer input -- so the same statement wrote a row on one
+     * engine and failed on the others, and what SQLite wrote did not compare
+     * equal to what the generated dao writes for the same value.
+     */
+    private static void rawSqlEncodesDatesAndCharsLikeTheOrm() throws Exception {
+        String path = "/tmp/cn1-selftest-scalars-" + System.currentTimeMillis() + ".db";
+        Database db = Database.open(path);
+        try {
+            db.execute("DROP TABLE IF EXISTS scalars", null);
+            db.execute("CREATE TABLE scalars (id INTEGER, whenMs INTEGER, ch INTEGER)", null);
+            java.util.Date when = new java.util.Date(1234567890L);
+            db.execute("INSERT INTO scalars (id, whenMs, ch) VALUES (?, ?, ?)",
+                    new Object[] {Long.valueOf(1L), when, new Character('x')});
+            List rows = db.query("SELECT whenMs, ch FROM scalars WHERE id = ?",
+                    new Object[] {Long.valueOf(1L)});
+            check("a Date binds as its millisecond value", "1234567890",
+                    String.valueOf(com.codename1.backend.orm.Values.asLong(((Map)rows.get(0)).get("whenMs"), -1L)));
+            // 'x' is 120. The ORM stores the code unit, so raw SQL has to as well
+            // or a query written either way misses rows written the other.
+            check("a Character binds as its code unit", "120",
+                    String.valueOf(com.codename1.backend.orm.Values.asLong(((Map)rows.get(0)).get("ch"), -1L)));
+        } finally {
+            db.close();
+            new java.io.File(path).delete();
+        }
+    }
+
     private static void storedTextComesBackUnchanged() throws Exception {
         String path = "/tmp/cn1-selftest-text-" + System.currentTimeMillis() + ".db";
         Database db = Database.open(path);
@@ -5606,6 +5641,7 @@ public class SelfTest {
         urlComponentsKeepTheirUnicode();
         boundParametersMustMatchThePlaceholders();
         storedTextComesBackUnchanged();
+        rawSqlEncodesDatesAndCharsLikeTheOrm();
         scramIterationCountIsBounded();
         scramRefusesAPasswordItCannotPrepare();
         aTruncatedMySqlHeaderIsRefused();

@@ -555,15 +555,47 @@ public final class Database {
         }
         Object[] out = params;
         for(int iter = 0 ; iter < params.length ; iter++) {
-            if(params[iter] instanceof Boolean) {
+            Object canonical = canonical(params[iter]);
+            if(canonical != params[iter]) {
                 if(out == params) {
                     out = new Object[params.length];
                     System.arraycopy(params, 0, out, 0, params.length);
                 }
-                out[iter] = Long.valueOf(((Boolean)params[iter]).booleanValue() ? 1L : 0L);
+                out[iter] = canonical;
             }
         }
         return out;
+    }
+
+    /**
+     * A scalar as the SCHEMA stores it, or the value itself when nothing needs
+     * changing.
+     *
+     * <p>ALL THREE of the types whose Java form is not what the column holds,
+     * not just Boolean. The generated entity access and Query.bound already
+     * encode a Date as its millisecond value and a Character as its code unit,
+     * because the server-side mapping gives both an integer column -- so raw SQL
+     * through execute() against the SAME schema has to encode them the same way
+     * or the two paths disagree about what a row means.
+     *
+     * <p>Left unconverted they reached the driver as objects the engines render
+     * with String.valueOf, and the three then disagree: SQLite's integer
+     * affinity stores the text quite happily, while PostgreSQL and a strict
+     * MySQL refuse it as invalid integer input. One statement, a row on one
+     * engine and an error on the others, which is the whole of what this layer
+     * is for.
+     */
+    private static Object canonical(Object value) {
+        if(value instanceof Boolean) {
+            return Long.valueOf(((Boolean)value).booleanValue() ? 1L : 0L);
+        }
+        if(value instanceof java.util.Date) {
+            return Long.valueOf(((java.util.Date)value).getTime());
+        }
+        if(value instanceof Character) {
+            return Long.valueOf(((Character)value).charValue());
+        }
+        return value;
     }
 
     private static void refuseNulInTextParameters(Object[] params) throws IOException {
