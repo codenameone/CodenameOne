@@ -111,14 +111,18 @@ class JavascriptSecureStorageNamespaceTest {
         String source = new String(Files.readAllBytes(SOURCE), StandardCharsets.UTF_8);
         String body = methodBody(source, "private void migrate(String account, String value)");
 
-        int write = body.indexOf("writeObject(encryptedKey(account)");
-        assertTrue(write > 0, "migrate no longer writes the encrypted entry: " + body);
+        // The establishing write is the atomic create, not a plain writeObject: a check followed
+        // by a blind write let another tab's set() be overwritten by the stale legacy value.
+        int write = body.indexOf("nativeSetIfAbsent(encryptedKey(account)");
+        assertTrue(write > 0, "migrate no longer establishes the encrypted entry: " + body);
         String beforeTheWrite = body.substring(0, write);
         assertTrue(beforeTheWrite.indexOf("readUncached(legacyKey(account))") > 0,
                 "migrate must re-read the plaintext it is migrating before it overwrites the "
                 + "encrypted entry, and past Storage's cache -- readObject answers a copy this "
                 + "tab took earlier, which is exactly the stale value being guarded against");
-        assertTrue(beforeTheWrite.indexOf("exists(encryptedKey(account))") > 0,
+        // definitelyGone rather than exists: a port that cannot tell answers false to exists(),
+        // and false here means "no encrypted entry", which is the claim that must not be guessed.
+        assertTrue(beforeTheWrite.indexOf("definitelyGone(encryptedKey(account))") > 0,
                 "migrate must check that no encrypted entry has appeared before writing one; "
                 + "get() only reaches migrate when there was none, so one now is newer");
 
@@ -205,8 +209,18 @@ class JavascriptSecureStorageNamespaceTest {
         // ordinary reads as well, or forgetManagedKey cannot see a key that exists and remove()
         // reports success over a record that survives.
         String create = methodBody(source, "public String setIfAbsent(String account, String value)");
-        assertTrue(create.indexOf("writeObject(encryptedKey(account), settled)") > 0,
+        // The mirror lives in its own method now, because it has to re-read the gate and copy
+        // what the gate actually holds -- a single blind write let the two namespaces disagree.
+        // So the property is checked in two halves: the create delegates, and the delegate is
+        // what writes the ordinary entry.
+        assertTrue(create.indexOf("mirrorUntilItAgreesWithTheGate(") > 0,
                 "the settled value must be mirrored into the namespace every read uses: " + create);
+        String mirror = methodBody(source,
+                "private String mirrorUntilItAgreesWithTheGate(String account, String settled)");
+        assertTrue(mirror.indexOf("writeObject(encryptedKey(account)") > 0,
+                "and the mirror must actually write the ordinary entry: " + mirror);
+        assertTrue(mirror.indexOf("nativeRead(") > 0,
+                "and re-read the gate, or it can return a value it never wrote: " + mirror);
         assertTrue(methodBody(source, "public boolean remove(String account)")
                         .indexOf("nativeForget(") > 0,
                 "and remove() must release the gate, or a later create answers with what it "
