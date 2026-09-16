@@ -100,15 +100,22 @@ jobs:
           # golden set is committed, which is now all three.
           #
           # macos has its goldens but no BASELINE yet: the hosted macOS queue has not
-          # yielded a scoring slot. That is safe rather than a shortcut -- FidelityGate
-          # treats a pair with no baseline entry as new, prints its score and passes, so
-          # the first run that gets a runner establishes the numbers instead of failing on
-          # their absence. Verified by running the leg locally against the committed
-          # goldens with no baseline file: 60 pairs scored, exit 0.
+          # yielded a scoring slot. It is listed here anyway because the leg still gates
+          # what a baseline is not needed for -- a missing golden, a render that did not
+          # arrive, a blank pair, a size mismatch all fail it -- while a fidelity DROP is
+          # the one thing it cannot catch: FidelityGate reads a missing baseline file as
+          # an empty map, calls every pair new, prints its score and exits 0. Verified by
+          # running the leg locally against the committed goldens with no baseline file:
+          # 60 pairs scored, exit 0.
           #
-          # Record that run's baseline from its own fidelity-compare.json -- from the
-          # runner that scored it, never locally. A Mac-recorded baseline failed the gnome
-          # gate on eighteen pairs because the slider comes out a pixel taller on Linux.
+          # That half-armed state is deliberately NOT silent. cn1ss_process_fidelity
+          # detects the absent file, says so in the log and the job summary, and writes
+          # the baseline this run would record into the job artifact. Seeding the set is
+          # downloading that file into scripts/fidelity-app/baseline/ and committing it.
+          #
+          # The baseline has to come from the runner that scored it, never from a local
+          # Mac: a Mac-recorded baseline failed the gnome gate on eighteen pairs because
+          # the slider comes out a pixel taller on Linux.
           TARGETS: ${{ github.event_name == 'workflow_dispatch' && inputs.targets || 'gated' }}
         run: |
           set -eo pipefail
