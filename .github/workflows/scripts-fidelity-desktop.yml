@@ -43,8 +43,7 @@ name: Desktop theme fidelity
         options: [all, windows, macos, gnome]
   push:
     branches: [master]
-    # Narrow ON PURPOSE: the theme sources, their compiled output, and the harness that is
-    # specific to this suite. Nothing else.
+    # Limit this to theme sources, their generator and compiled output, and this suite.
     #
     # The list used to include scripts/lib/cn1ss.sh and scripts/common/java/**, which are
     # shared with the iOS and Android fidelity suites and with every screenshot runner in
@@ -57,6 +56,10 @@ name: Desktop theme fidelity
     paths:
       - '.github/workflows/scripts-fidelity-desktop.yml'
       - 'scripts/run-desktop-fidelity-tests.sh'
+      # Sync's GITHUB_TOKEN commit does not trigger another workflow. Score generator
+      # changes from the original master push; this job rebuilds CSS before scoring.
+      - 'maven/css-compiler/**'
+      - 'scripts/build-native-themes.sh'
       - 'scripts/fidelity-app/desktop-runner/**'
       - 'scripts/fidelity-app/goldens/windows-11-fluent/**'
       - 'scripts/fidelity-app/goldens/gnome-adwaita/**'
