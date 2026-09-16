@@ -3733,6 +3733,116 @@ class VaultTest extends UITestBase {
     }
 
     @Test
+    void destroyingOrReplacingTheVaultInsideASecretWriteWithdrawsTheWrite() {
+        for (final boolean replace : new boolean[] {false, true}) {
+            String name = freshName();
+            final Vault owner = Vault.named(name).configure(fast());
+            owner.enroll(pw("old"), fast()).get();
+            Vault writer = Vault.named(name).configure(fast());
+            writer.unlockWithPassword(pw("old")).get();
+            String entry = secretEntryName(writer, "token");
+            writer.putSecret("token", pw("previous")).get();
+            TestCodenameOneImplementation.getInstance().setDuringStorageWrite(entry, new Runnable() {
+                public void run() {
+                    assertTrue(owner.destroyLocalData().get().booleanValue());
+                    if (replace) {
+                        owner.enroll(pw("new"), fast()).get();
+                    }
+                }
+            });
+            try {
+                assertEquals(replace ? VaultError.CONFLICT : VaultError.LOCKED,
+                        errorOf(writer.putSecret("token", pw("orphan"))));
+                Storage.getInstance().clearCache();
+                assertFalse(Storage.getInstance().exists(entry),
+                        "neither the attempted write nor the deleted previous secret may survive");
+                assertFalse(writer.isUnlocked());
+                if (replace) {
+                    assertTrue(owner.putSecret("token", pw("readable")).get().booleanValue());
+                    assertArrayEquals(pw("readable"), owner.getSecret("token").get());
+                } else {
+                    assertEquals(Vault.NOT_ENROLLED, owner.state());
+                }
+            } finally {
+                TestCodenameOneImplementation.getInstance().setDuringStorageWrite(null, null);
+            }
+        }
+    }
+
+    @Test
+    void sensitiveResultsAreDeliveredWhileHoldingTheVaultLockMonitor() throws Exception {
+        final Vault vault = Vault.named(freshName()).configure(fast());
+        vault.enroll(pw("p"), fast()).get();
+        final int generation = vault.generation();
+        final int keyAt = vault.keyGeneration();
+        final java.lang.reflect.Method publish = Vault.class.getDeclaredMethod("completeUnlocked",
+                AsyncResource.class, int.class, int.class, Object.class);
+        publish.setAccessible(true);
+        final java.util.concurrent.CountDownLatch publishing = new java.util.concurrent.CountDownLatch(1);
+        final java.util.concurrent.CountDownLatch release = new java.util.concurrent.CountDownLatch(1);
+        final java.util.concurrent.atomic.AtomicReference<Throwable> failure =
+                new java.util.concurrent.atomic.AtomicReference<Throwable>();
+        final byte[] secret = {1, 2, 3};
+        final AsyncResource<byte[]> result = new AsyncResource<byte[]>() {
+            @Override
+            public void complete(byte[] value) {
+                assertTrue(Thread.holdsLock(vault), "lock must not return between check and delivery");
+                publishing.countDown();
+                assertTrue(awaitQuietly(release));
+                super.complete(value);
+            }
+        };
+        Thread producer = new Thread(new Runnable() {
+            public void run() {
+                try {
+                    publish.invoke(vault, result, generation, keyAt, secret);
+                } catch (Throwable problem) {
+                    failure.set(problem);
+                    publishing.countDown();
+                }
+            }
+        });
+        Thread locker = new Thread(new Runnable() {
+            public void run() { vault.lock(); }
+        });
+        producer.start();
+        try {
+            assertTrue(awaitQuietly(publishing));
+            assertNull(failure.get());
+            locker.start();
+            long deadline = System.nanoTime() + java.util.concurrent.TimeUnit.SECONDS.toNanos(10);
+            while (locker.getState() != Thread.State.BLOCKED && locker.isAlive()
+                    && System.nanoTime() < deadline) {
+                Thread.yield();
+            }
+            assertEquals(Thread.State.BLOCKED, locker.getState(),
+                    "lock must wait until the result has been published");
+        } finally {
+            release.countDown();
+            producer.join(10000);
+            locker.join(10000);
+        }
+        assertFalse(producer.isAlive());
+        assertFalse(locker.isAlive());
+        assertNull(failure.get());
+        assertArrayEquals(secret, result.get());
+        assertFalse(vault.isUnlocked());
+        for (Object refused : new Object[] {new byte[] {4, 5}, new char[] {'a', 'b'}}) {
+            AsyncResource<Object> absent = new AsyncResource<Object>();
+            java.lang.reflect.InvocationTargetException thrown = assertThrows(
+                    java.lang.reflect.InvocationTargetException.class,
+                    () -> publish.invoke(vault, absent, generation, keyAt, refused));
+            assertTrue(thrown.getCause() instanceof VaultException);
+            if (refused instanceof byte[]) {
+                assertArrayEquals(new byte[2], (byte[]) refused);
+            } else {
+                assertArrayEquals(new char[2], (char[]) refused);
+            }
+            assertFalse(absent.isDone(), "a lock that wins must discard the result");
+        }
+    }
+
+    @Test
     void anotherSessionDestroyingTheVaultInvalidatesEveryKeyProducingOperation() {
         for (int operation = 0; operation < 5; operation++) {
             String name = freshName();

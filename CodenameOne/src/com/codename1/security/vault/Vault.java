@@ -1206,15 +1206,22 @@ public final class Vault {
                         throw new VaultException(VaultError.QUOTA_EXCEEDED,
                                 "the secret could not be written to storage");
                     }
-                    if (generation != lockGeneration()) {
-                        // Asked again after the write, like createRecoveryCode. Completing here
-                        // would let a screen that was already stale when the user touched it
-                        // change what the vault holds after lock() had returned.
-                        requireSecretRestored(entry, previous, Bytes.toHex(sealed));
-                        throw new VaultException(VaultError.LOCKED,
-                                "the vault was locked while this secret was being stored");
+                    VaultMetadata persisted = loadMetadataFresh();
+                    if (persisted == null || !persisted.serialize().equals(meta.serialize())) {
+                        // A different tab can destroy or replace the vault inside writeObject.
+                        // Its lock counter is independent. Withdraw only our ciphertext, without
+                        // resurrecting the previous secret into a vault that no longer owns it.
+                        lock();
+                        requireSecretRestored(entry, null, Bytes.toHex(sealed));
+                        throw new VaultException(persisted == null ? VaultError.LOCKED : VaultError.CONFLICT,
+                                "another session removed or changed the vault while the secret was stored");
                     }
-                    out.complete(Boolean.TRUE);
+                    try {
+                        completeUnlocked(out, generation, keyAt, Boolean.TRUE);
+                    } catch (VaultException failed) {
+                        requireSecretRestored(entry, previous, Bytes.toHex(sealed));
+                        throw failed;
+                    }
                 } catch (VaultException failed) {
                     out.error(failed);
                 } catch (RuntimeException broke) {
@@ -1243,6 +1250,7 @@ public final class Vault {
         final AsyncResource<char[]> out = new AsyncResource<char[]>();
         // On the calling thread; see unlockWithPassword for why not in the worker.
         final int generation = lockGeneration();
+        final int keyAt = keyGeneration();
         background(new Runnable() {
             @Override
             public void run() {
@@ -1276,8 +1284,7 @@ public final class Vault {
                                 "the vault was locked while this secret was being read");
                     }
                     plain = openAnyVersion(sealed, binding(meta, secretName, PURPOSE_SECRET));
-                    requireSameGeneration(generation);
-                    out.complete(chars(plain));
+                    completeUnlocked(out, generation, keyAt, chars(plain));
                 } catch (VaultException failed) {
                     out.error(failed);
                 } catch (RuntimeException broke) {
@@ -1386,8 +1393,7 @@ public final class Vault {
                     requireSameGeneration(generation);
                     // And under a key this vault still has: a replacement zeroes the array this
                     // snapshotted, and lockGeneration does not move for one.
-                    requireSameKey(keyAt);
-                    out.complete(sealed);
+                    completeUnlocked(out, generation, keyAt, sealed);
                 } catch (VaultException failed) {
                     out.error(failed);
                 } catch (RuntimeException broke) {
@@ -1414,6 +1420,7 @@ public final class Vault {
         final AsyncResource<byte[]> out = new AsyncResource<byte[]>();
         // On the calling thread; see unlockWithPassword for why not in the worker.
         final int generation = lockGeneration();
+        final int keyAt = keyGeneration();
         background(new Runnable() {
             @Override
             public void run() {
@@ -1429,11 +1436,7 @@ public final class Vault {
                     }
                     byte[] plain = openAnyVersion(sealed,
                             binding(meta, recordId, PURPOSE_RECORD));
-                    if (generation != lockGeneration()) {
-                        Bytes.zero(plain);
-                        requireSameGeneration(generation);
-                    }
-                    out.complete(plain);
+                    completeUnlocked(out, generation, keyAt, plain);
                 } catch (VaultException failed) {
                     out.error(failed);
                 } catch (RuntimeException broke) {
@@ -1478,28 +1481,9 @@ public final class Vault {
                                 "the vault was locked while this key was being derived");
                     }
                     byte[] derived = deriveSubkey(source, purpose);
-                    if (generation != lockGeneration() || keyAt != keyGeneration()) {
-                        Bytes.zero(derived);
-                        requireSameGeneration(generation);
-                        requireSameKey(keyAt);
-                    }
-                    // extractedKeyProtection(), not the device report. The device key may
-                    // well be non-extractable -- in the browser it is -- but what this handle
-                    // carries is a derived subkey sitting in a Java byte array, which its own
-                    // isExportable() correctly reports as exportable. Handing back a report
-                    // saying NON_EXTRACTABLE_KEY while the object contradicts it is the kind
-                    // of guarantee that gets believed.
-                    // `generation`, not lockGeneration. Reading the field again here meant a
-                    // lock landing between the check above and this line stamped the handle
-                    // with the POST-lock value -- so the handle considered itself live and went
-                    // on sealing and opening with key material the lock had invalidated.
-                    // keyAt, not keyGeneration: reading the field here stamped the handle with
-                    // the value AFTER any replacement that had landed since `source` was taken,
-                    // so a handle derived from the superseded key considered itself live -- and
-                    // emitted MACs no handle obtained afterwards could verify. Exactly the defect
-                    // the note above records for the lock generation, in the counter added later.
-                    out.complete(new VaultKeyHandle(Vault.this, generation, keyAt, derived,
-                            purpose, meta.dataKeyVersion, extractedKeyProtection()));
+                    completeUnlocked(out, generation, keyAt,
+                            new VaultKeyHandle(Vault.this, generation, keyAt, derived,
+                                    purpose, meta.dataKeyVersion, extractedKeyProtection()));
                 } catch (VaultException failed) {
                     out.error(failed);
                 } catch (RuntimeException broke) {
@@ -1574,14 +1558,7 @@ public final class Vault {
                     mac.update(Bytes.utf8("cn1.vault.dbkey.v1"));
                     mac.update(Bytes.utf8(alias == null ? "" : alias));
                     byte[] key = mac.doFinal();
-                    if (generation != lockGeneration()) {
-                        Bytes.zero(key);
-                        requireSameGeneration(generation);
-                    }
-                    // A database key derived from an array that was replaced mid-derivation would
-                    // encrypt a database nothing can open afterwards.
-                    requireSameKey(keyAt);
-                    out.complete(key);
+                    completeUnlocked(out, generation, keyAt, key);
                 } catch (VaultException failed) {
                     out.error(failed);
                 } catch (RuntimeException broke) {
@@ -1799,25 +1776,19 @@ public final class Vault {
                     requireSameGeneration(generation);
                     VaultMetadata previous = current;
                     commitMetadata(previous, next);
-                    if (generation != lockGeneration()) {
-                        // Asked again, because the check above is before a storage write and a
-                        // lock can land inside one. Completing here would hand back a working
-                        // recovery credential after lock() had already returned.
-                        //
-                        // And simply refusing is not enough, for the reason the comment above
-                        // gives: this call REPLACES any previous recovery wrap, so a refusal
-                        // that left the new record standing would retire a code the user still
-                        // holds in favour of one they were never given. The previous record goes
-                        // back, so the vault is exactly as it was before this call.
-                        Bytes.zero(code);
+                    try {
+                        synchronized (Vault.this) {
+                            requireSameGeneration(generation);
+                            requireSameKey(keyAt);
+                            metadata = next;
+                            owned = null;
+                            completeUnlocked(out, generation, keyAt, code);
+                        }
+                    } catch (VaultException failed) {
+                        // Storage can yield; restore the prior wrap outside the lock monitor.
                         commitMetadata(next, previous);
-                        throw new VaultException(VaultError.LOCKED,
-                                "the vault was locked while a recovery code was being created");
+                        throw failed;
                     }
-                    metadata = next;
-                    // Delivered, so the finally must not wipe what the caller now holds.
-                    owned = null;
-                    out.complete(code);
                 } catch (VaultException failed) {
                     out.error(failed);
                 } catch (RuntimeException broke) {
@@ -3456,6 +3427,26 @@ public final class Vault {
                     "this vault's data key was replaced while the operation was running, so what "
                     + "it produced was not sealed under the key this vault now has");
         }
+    }
+
+    /// Checks and delivery share lock() and adoptKey()'s monitor. Crypto, storage, and device
+    /// prompts must finish before entering this boundary. A refused result still belongs to us.
+    private synchronized <T> void completeUnlocked(AsyncResource<T> out, int generation,
+            int keyAt, T result) {
+        try {
+            requireSameGeneration(generation);
+            requireSameKey(keyAt);
+        } catch (VaultException failed) {
+            if (result instanceof byte[]) {
+                Bytes.zero((byte[]) result);
+            } else if (result instanceof char[]) {
+                Bytes.zero((char[]) result);
+            } else if (result instanceof KeyHandle) {
+                ((KeyHandle) result).destroy();
+            }
+            throw failed;
+        }
+        out.complete(result);
     }
 
     private void requireSameGeneration(int generation) {

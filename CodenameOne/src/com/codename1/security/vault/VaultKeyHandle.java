@@ -183,32 +183,41 @@ final class VaultKeyHandle extends KeyHandle {
     }
 
     @Override
-    public synchronized void destroy() {
-        Bytes.zero(material);
-        material = null;
+    public void destroy() {
+        synchronized (owner) {
+            Bytes.zero(material);
+            material = null;
+        }
     }
 
     @Override
-    public synchronized boolean isDestroyed() {
-        return material == null || generation != owner.generation()
-                || keyGeneration != owner.keyGeneration();
-    }
-
-    /// Publication shares the destruction monitor, so destruction cannot complete between the
-    /// final liveness check and delivery. Crypto and storage run outside this monitor.
-    private synchronized void completeBytes(AsyncResource<byte[]> out, int at, byte[] produced) {
-        try {
-            requireStillOurs(at);
-        } catch (VaultException locked) {
-            Bytes.zero(produced);
-            throw locked;
+    public boolean isDestroyed() {
+        synchronized (owner) {
+            return material == null || generation != owner.generation()
+                    || keyGeneration != owner.keyGeneration();
         }
-        out.complete(produced);
     }
 
-    private synchronized void completeVerification(AsyncResource<Boolean> out, int at, boolean same) {
-        requireStillOurs(at);
-        out.complete(Boolean.valueOf(same));
+    /// One monitor covers handle destruction, vault locking, key replacement and delivery.
+    /// Using only the owner monitor also avoids opposite lock orders in completion callbacks.
+    /// Crypto and storage run outside this monitor.
+    private void completeBytes(AsyncResource<byte[]> out, int at, byte[] produced) {
+        synchronized (owner) {
+            try {
+                requireStillOurs(at);
+            } catch (VaultException locked) {
+                Bytes.zero(produced);
+                throw locked;
+            }
+            out.complete(produced);
+        }
+    }
+
+    private void completeVerification(AsyncResource<Boolean> out, int at, boolean same) {
+        synchronized (owner) {
+            requireStillOurs(at);
+            out.complete(Boolean.valueOf(same));
+        }
     }
 
     private void requireStillOurs(int at) {
@@ -243,13 +252,15 @@ final class VaultKeyHandle extends KeyHandle {
 
     /// Copies under the destruction monitor. An alias would let destroy() wipe a key while
     /// crypto was still consuming it. Every caller wipes its private copy in a finally block.
-    private synchronized byte[] copyMaterial() {
-        if (material == null) {
-            throw new VaultException(VaultError.LOCKED,
-                    "this key handle was destroyed while it was being used");
+    private byte[] copyMaterial() {
+        synchronized (owner) {
+            if (material == null) {
+                throw new VaultException(VaultError.LOCKED,
+                        "this key handle was destroyed while it was being used");
+            }
+            byte[] copy = new byte[material.length];
+            System.arraycopy(material, 0, copy, 0, material.length);
+            return copy;
         }
-        byte[] copy = new byte[material.length];
-        System.arraycopy(material, 0, copy, 0, material.length);
-        return copy;
     }
 }

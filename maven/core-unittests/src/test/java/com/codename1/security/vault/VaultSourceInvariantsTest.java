@@ -39,18 +39,14 @@ class VaultSourceInvariantsTest extends UITestBase {
 
     @Test
     void handleCopiesAreWipedAndPublicationSharesTheDestructionMonitor() throws Exception {
-        for (String name : new String[] {"destroy", "isDestroyed", "copyMaterial"}) {
-            assertTrue(java.lang.reflect.Modifier.isSynchronized(
-                    VaultKeyHandle.class.getDeclaredMethod(name).getModifiers()), name);
-        }
-        for (java.lang.reflect.Method method : VaultKeyHandle.class.getDeclaredMethods()) {
-            if (method.getName().startsWith("complete")) {
-                assertTrue(java.lang.reflect.Modifier.isSynchronized(method.getModifiers()),
-                        method.getName());
-            }
-        }
         String source = new String(java.nio.file.Files.readAllBytes(java.nio.file.Paths.get(
                 "../../CodenameOne/src/com/codename1/security/vault/VaultKeyHandle.java")), "UTF-8");
+        for (String signature : new String[] {"public void destroy(", "public boolean isDestroyed(",
+                "private byte[] copyMaterial(", "private void completeBytes(",
+                "private void completeVerification("}) {
+            String body = codeOnly(methodBody(source, signature));
+            assertTrue(body.trim().startsWith("{\n        synchronized (owner)"), signature);
+        }
         for (String name : new String[] {"seal", "open", "mac", "verifyMac"}) {
             String type = name.equals("verifyMac") ? "Boolean" : "byte[]";
             String body = codeOnly(methodBody(source, "public AsyncResource<" + type + "> " + name + "("));
@@ -58,6 +54,32 @@ class VaultSourceInvariantsTest extends UITestBase {
             String local = name.equals("open") ? "current" : "key";
             assertTrue(cleanup >= 0 && body.indexOf("Bytes.zero(" + local + ")", cleanup) > cleanup,
                     name + " must wipe its private key on every outcome");
+        }
+    }
+
+    @Test
+    void sensitiveResultPathsUseAtomicPublication() throws Exception {
+        assertTrue(java.lang.reflect.Modifier.isSynchronized(Vault.class.getDeclaredMethod(
+                "completeUnlocked", com.codename1.util.AsyncResource.class, int.class,
+                int.class, Object.class).getModifiers()));
+        String source = readVaultSource();
+        for (String signature : new String[] {
+                "public AsyncResource<char[]> getSecret(",
+                "public AsyncResource<byte[]> seal(",
+                "public AsyncResource<byte[]> open(",
+                "public AsyncResource<KeyHandle> operationalKey(",
+                "public AsyncResource<byte[]> databaseKey(",
+                "public AsyncResource<char[]> createRecoveryCode("}) {
+            String body = codeOnly(methodBody(source, signature));
+            assertTrue(body.contains("completeUnlocked("), signature);
+            assertFalse(body.contains("out.complete("), signature);
+        }
+        String handle = new String(java.nio.file.Files.readAllBytes(java.nio.file.Paths.get(
+                "../../CodenameOne/src/com/codename1/security/vault/VaultKeyHandle.java")), "UTF-8");
+        for (String name : new String[] {"completeBytes", "completeVerification"}) {
+            String body = codeOnly(methodBody(handle, "private void " + name + "("));
+            assertTrue(body.contains("synchronized (owner)"), name);
+            assertTrue(body.indexOf("requireStillOurs(at)") < body.indexOf("out.complete("), name);
         }
     }
 
@@ -515,6 +537,7 @@ class VaultSourceInvariantsTest extends UITestBase {
             String after = body.substring(firstWrite);
             boolean rechecks = after.indexOf("generation != lockGeneration") > 0
                     || after.indexOf("requireSameGeneration(generation)") > 0
+                    || after.indexOf("completeUnlocked(out, generation,") > 0
                     // Matched on the open paren rather than the whole call: this one grew a
                     // second argument -- the record to put back when the write REPLACED one --
                     // and the literal spelling then matched nothing, so the ratchet reported
