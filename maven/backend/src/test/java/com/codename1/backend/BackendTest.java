@@ -258,6 +258,30 @@ class BackendTest {
     }
 
     @Test
+    @DisplayName("an explicitly empty datasource URL never falls back to configuration")
+    void rejectsAnExplicitlyEmptyDataSourceUrl(@TempDir File dir) throws Exception {
+        for(boolean configured : new boolean[] {true, false}) {
+            File fallback = new File(dir, "configured.db");
+            Properties settings = new Properties();
+            settings.setProperty(Config.SERVER_PORT, String.valueOf(freePort()));
+            if(configured) {
+                settings.setProperty(Config.DATASOURCE_URL, fallback.getAbsolutePath());
+            }
+            Backend.Builder builder = Backend.builder(Config.of(settings, "test"))
+                    .quiet()
+                    .handler(ok())
+                    .dataSource("");
+            IOException error = assertThrows(IOException.class, () -> {
+                Backend unexpected = builder.start();
+                // Clean up even if a regression starts the wrong server.
+                unexpected.stop();
+            });
+            assertEquals("No database URL", error.getMessage());
+            assertTrue(!fallback.exists(), "the configured database must not be opened");
+        }
+    }
+
+    @Test
     @DisplayName("the last datasource choice wins, whichever overload made it")
     void theLastDataSourceChoiceWins(@TempDir File dir) throws Exception {
         // openDataSource answers from the POOL first, so a builder given a pool

@@ -612,7 +612,9 @@ public final class Backend {
             if(dataSource != null) {
                 return dataSource;
             }
-            if(dataSourceUrl != null && dataSourceUrl.length() > 0) {
+            if(dataSourceUrl != null) {
+                // Empty is an explicit choice too: let DataSource reject it
+                // instead of silently opening a different configured database.
                 // The URL is the builder's, the POOL SETTINGS are still the
                 // deployment's. cn1.datasource.pool.size, the busy timeout and
                 // the borrow timeout have no builder methods, so opening with
