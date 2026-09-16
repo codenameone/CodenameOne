@@ -17,3 +17,13 @@ the hover renders now use the same placement contract as normal-state renders.
 Only hover entries were updated. Non-hover thresholds and native PNG references
 were retained. The Windows light pressed accent-button failure was handled by
 correcting its theme color, without lowering its score baseline.
+
+The first macOS baseline was seeded from
+[run 35102280850](https://github.com/codenameone/CodenameOne/actions/runs/35102280850)
+(commit `322da2d5aa`, hosted macOS 15 ARM64, Zulu 8 build and Temurin 21 render).
+All 60 light/dark pairs were valid and their comparison overview was inspected.
+The initial mean score is 81.67%, with a minimum of 69.69%; this records the
+current rendering differences, including larger CN1 control geometry, rather
+than claiming a pixel match. The committed native references and the existing
+2-point score tolerance are unchanged. Subsequent runs now gate both score
+and geometry regressions against these runner measurements.

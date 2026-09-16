@@ -4084,8 +4084,9 @@ public class CSSTheme {
         /// box-shadow outright, so an elevated surface fell through to rasterization and,
         /// in a native theme, to a hard `strictNoCef` failure.
         ///
-        /// Two shapes genuinely have no RoundRectBorder equivalent and stay rejected:
+        /// Unsupported shadow geometry stays on the raster path:
         ///
+        /// - An omitted, zero, or negative spread: the software painter requires spread.
         /// - An `inset` shadow. RoundRectBorder only draws an outer drop shadow.
         /// - A shadow tinted anything other than black. The reader never reads a shadow
         ///   colour (`Resources` cases 0xff13 and 0xff15 stop at shadowY), so a coloured
@@ -4106,11 +4107,13 @@ public class CSSTheme {
             if (color != null && !isNone(color) && (getColorInt(color) & 0xffffff) != 0) {
                 return false;
             }
-            // Omitted spread retains RoundRectBorder's nonzero default. Explicit zero or
-            // negative spread overrides it and cannot render a software shadow, so those
-            // declarations still need rasterization even when they also have a radius.
+            // CSS omitted spread is zero, not RoundRectBorder's density-dependent default.
+            // The software painter needs at least one spread pixel; retaining its constructor
+            // default would silently change CSS geometry instead of representing zero spread.
             ScaledUnit spread = (ScaledUnit) styles.get("cn1-box-shadow-spread");
-            if (spread != null && spread.getNumericValue() <= 0) {
+            if (spread == null || spread.getNumericValue() <= 0
+                    || (spread.getLexicalUnitType() == LexicalUnit.SAC_PIXEL
+                        && spread.getNumericValue() < 1)) {
                 return false;
             }
             return true;
@@ -6712,7 +6715,9 @@ public class CSSTheme {
 
             ScaledUnit boxShadowBlur = (ScaledUnit)styles.get("cn1-box-shadow-blur");
             if (boxShadowBlur != null) {
-                out.shadowBlur(-calculateShadowRatio(out, spreadMM, spreadMMVal, boxShadowBlur));
+                // Blur is a radius, not an offset ratio. Dividing by spread can make it
+                // negative (including for zero blur) before it reaches gaussianBlurImage.
+                out.shadowBlur(Math.max(0, boxShadowBlur.getPixelValue()));
             }
 
             LexicalUnit shadowColor = styles.get("cn1-box-shadow-color");

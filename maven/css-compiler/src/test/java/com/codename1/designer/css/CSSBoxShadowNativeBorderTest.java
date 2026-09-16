@@ -62,12 +62,14 @@ public class CSSBoxShadowNativeBorderTest {
     @Test
     void testSimpleBlackShadowCompilesToRoundRectBorder() throws Exception {
         Hashtable theme = compile("Card { background-color: #ffffff; border-radius: 2.1mm;"
-                + " box-shadow: 0 2px 4px rgba(0,0,0,0.13); }");
+                + " box-shadow: 0 2px 4px 1px rgba(0,0,0,0.13); }");
         Object border = theme.get("Card.border");
         assertInstanceOf(RoundRectBorder.class, border, "Card.border");
         RoundRectBorder rr = (RoundRectBorder) border;
         assertTrue(rr.getShadowOpacity() > 0,
                 "shadow opacity should carry the rgba alpha, was " + rr.getShadowOpacity());
+        assertTrue(rr.getShadowSpread() > 0f, "explicit spread must survive");
+        assertTrue(rr.getShadowBlur() == 4f, "blur must retain its pixel radius");
         assertTrue(rr.getCornerRadius() > 0f,
                 "corner radius should survive, was " + rr.getCornerRadius());
     }
@@ -80,7 +82,7 @@ public class CSSBoxShadowNativeBorderTest {
     @Test
     void testShadowWithoutRadiusStillCompilesToRoundRectBorder() throws Exception {
         Hashtable theme = compile("Flat { background-color: #ffffff;"
-                + " box-shadow: 0 1px 3px rgba(0,0,0,0.2); }");
+                + " box-shadow: 0 1px 3px 1px rgba(0,0,0,0.2); }");
         assertInstanceOf(RoundRectBorder.class, theme.get("Flat.border"), "Flat.border");
     }
 
@@ -91,7 +93,7 @@ public class CSSBoxShadowNativeBorderTest {
     @Test
     void testInsetShadowIsStillRefusedInNoCefMode() throws Exception {
         assertRefusedByStrictNoCef("Inset { background-color: #ffffff; border-radius: 2mm;"
-                + " box-shadow: inset 0 2px 4px rgba(0,0,0,0.3); }", "inset shadow");
+                + " box-shadow: inset 0 2px 4px 1px rgba(0,0,0,0.3); }", "inset shadow");
     }
 
     /**
@@ -102,16 +104,29 @@ public class CSSBoxShadowNativeBorderTest {
     @Test
     void testColouredShadowIsStillRefusedInNoCefMode() throws Exception {
         assertRefusedByStrictNoCef("Tinted { background-color: #ffffff; border-radius: 2mm;"
-                + " box-shadow: 0 2px 6px rgba(255,0,0,0.5); }", "coloured shadow");
+                + " box-shadow: 0 2px 6px 1px rgba(255,0,0,0.5); }", "coloured shadow");
     }
 
     @Test
     void testExplicitNonpositiveSpreadRequiresRasterization() throws Exception {
-        for (String spread : new String[]{"0", "0px", "0mm", "-1px"}) {
+        for (String spread : new String[]{"", "0", "0px", "0mm", "-1px", "0.5px"}) {
             for (String radius : new String[]{"", "border-radius: 2mm;"}) {
                 assertRefusedByStrictNoCef("Card { background-color: #ffffff; " + radius
                         + " box-shadow: 0 2px 4px " + spread + " rgba(0,0,0,0.2); }",
                         "explicit spread " + spread);
+            }
+        }
+    }
+
+    @Test
+    void testNativeBlurIsIndependentOfSpread() throws Exception {
+        for (String spread : new String[]{"1px", "4px", "8px"}) {
+            for (int blur : new int[]{0, 4}) {
+                Hashtable theme = compile("Card { background-color: #ffffff;"
+                        + " box-shadow: 0 2px " + blur + "px " + spread + " rgba(0,0,0,0.2); }");
+                RoundRectBorder border = (RoundRectBorder) theme.get("Card.border");
+                assertTrue(border.getShadowBlur() == blur, "blur must not depend on spread " + spread);
+                assertTrue(border.getShadowSpread() > 0, "software shadow needs positive spread");
             }
         }
     }

@@ -29,11 +29,9 @@ name: Desktop theme fidelity
 #
 #   windows-11-fluent  seeded from run 34998745240, baselined, gating
 #   gnome-adwaita      seeded from run 34990802562, baselined, gating
-#   macos-aqua         NOT SEEDED -- the macOS runner queue has not yielded a slot; the
-#                      capture app is verified and the set is one dispatch away
+#   macos-aqua         baseline seeded from run 35102280850, gating
 #
-# Seeding macos-aqua is what promotes it: drop the platform out of the `if` below in the
-# same commit that adds the goldens, and it gates like the other two.
+# Baseline provenance and inspected changes are in scripts/fidelity-app/baseline/README.md.
 
 'on':
   workflow_dispatch:
@@ -99,23 +97,8 @@ jobs:
           # On a dispatch, whatever was asked for. On a trigger, every platform whose
           # golden set is committed, which is now all three.
           #
-          # macos has its goldens but no BASELINE yet: the hosted macOS queue has not
-          # yielded a scoring slot. It is listed here anyway because the leg still gates
-          # what a baseline is not needed for -- a missing golden, a render that did not
-          # arrive, a blank pair, a size mismatch all fail it -- while a fidelity DROP is
-          # the one thing it cannot catch: FidelityGate reads a missing baseline file as
-          # an empty map, calls every pair new, prints its score and exits 0. Verified by
-          # running the leg locally against the committed goldens with no baseline file:
-          # 60 pairs scored, exit 0.
-          #
-          # That half-armed state is deliberately NOT silent. cn1ss_process_fidelity
-          # detects the absent file, says so in the log and the job summary, and writes
-          # the baseline this run would record into the job artifact. Seeding the set is
-          # downloading that file into scripts/fidelity-app/baseline/ and committing it.
-          #
-          # The baseline has to come from the runner that scored it, never from a local
-          # Mac: a Mac-recorded baseline failed the gnome gate on eighteen pairs because
-          # the slider comes out a pixel taller on Linux.
+          # Every platform now has hosted-runner scores and geometry baselines. Keep
+          # each baseline tied to its own runner; font metrics differ across hosts.
           TARGETS: ${{ github.event_name == 'workflow_dispatch' && inputs.targets || 'gated' }}
         run: |
           set -eo pipefail
