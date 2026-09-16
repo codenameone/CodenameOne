@@ -61,11 +61,11 @@ include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/g
 
 [source,java]
 ----
-include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/IoJava093Snippet.java[tag=io-java-093-helper,indent=0]
+include::../demos/common/src/main/java/com/codenameone/developerguide/screenshots/IoStorageListFigure.java[tag=io-java-093-helper,indent=0]
 ----
 
 .List of files within the storage
-image::img/storage-list.png[List of files within the storage,scaledwidth=20%]
+image::img/generated/storage-list.png[List of files within the storage,scaledwidth=20%]
 
 .Content of a file added to the storage
 image::img/storage-content.png[Content of a file added to the storage,scaledwidth=20%]

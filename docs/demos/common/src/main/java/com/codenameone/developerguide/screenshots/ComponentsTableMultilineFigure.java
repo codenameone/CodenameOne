@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  * This code is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License version 2 only, as
@@ -21,14 +21,29 @@
  * need additional information or have any questions.
  */
 
-package com.codenameone.developerguide.snippets.generated;
+package com.codenameone.developerguide.screenshots;
 
-import com.codename1.ui.*;
-import com.codename1.ui.layouts.*;
-import com.codename1.ui.table.*;
+import com.codename1.ui.Component;
+import com.codename1.ui.Form;
+import com.codename1.ui.TextArea;
+import com.codename1.ui.layouts.BorderLayout;
+import com.codename1.ui.table.TableLayout;
+import com.codename1.ui.table.DefaultTableModel;
+import com.codename1.ui.table.Table;
+import com.codename1.ui.table.TableModel;
 
-class TheComponentsOfCodenameOneJava071Snippet {
-    void snippet() {
+/// A table whose middle column wraps onto several lines.
+class ComponentsTableMultilineFigure implements GuideFigure {
+
+    @Override
+    public String id() {
+        return "components-table-multiline-portrait";
+    }
+
+    /// The tagged region is what the chapter includes, so the listing beside the
+    /// picture is the code that drew it.
+    @Override
+    public Form build() {
         // tag::the-components-of-codename-one-java-071[]
         Form hi = new Form("Table", new BorderLayout());
         TableModel model = new DefaultTableModel(
@@ -61,5 +76,6 @@ class TheComponentsOfCodenameOneJava071Snippet {
         hi.add(BorderLayout.CENTER, table);
         hi.show();
         // end::the-components-of-codename-one-java-071[]
+        return hi;
     }
 }
