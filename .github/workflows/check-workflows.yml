@@ -37,3 +37,8 @@ jobs:
       # that starts failing is information rather than noise.
       - name: Validate every workflow file
         run: scripts/check-workflows.sh
+
+      # This workflow is unfiltered, so changes to the spec, its validator, or any
+      # native reference table are checked before they reach master.
+      - name: Validate fidelity spec and native reference tables
+        run: python3 scripts/check-fidelity-spec.py
