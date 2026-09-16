@@ -261,9 +261,8 @@ release_xcui_step longpress || SYNC_FAILED=1
 release_xcui_step keytype || SYNC_FAILED=1
 # The keytype driver types in a retry loop, because CN1 needs a moment to bring
 # the native editor up after the tap and keys typed before then are dropped.
-# Stop it the moment the step resolves: the app exits a second and a half after
-# the suite finishes and typing into a process that has left fails the XCUITest
-# run even when every event landed.
+# Stop unnecessary retries once the step resolves. The app stays alive on iOS
+# until XCUITest terminates it, so delayed marker delivery cannot race app exit.
 wait_for_log_marker 'CN1IV:(EVENT|TIMEOUT):keytype' 120 || true
 : > "$SYNC_DIR/keytype.stop"
 wait "$XCB_PIPE_PID" >/dev/null 2>&1 || true

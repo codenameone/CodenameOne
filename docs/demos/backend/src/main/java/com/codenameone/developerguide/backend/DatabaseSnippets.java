@@ -22,7 +22,9 @@
  */
 package com.codenameone.developerguide.backend;
 
+import com.codename1.backend.DataSource;
 import com.codename1.backend.Database;
+import com.codename1.backend.sql.Dialect;
 import java.io.IOException;
 import java.util.List;
 
@@ -34,13 +36,43 @@ public final class DatabaseSnippets {
 
     public static List open() throws IOException {
 // tag::backend-database[]
-Database db = Database.open(System.getenv("DATABASE_URL"));   // or ":memory:"
-db.execute("CREATE TABLE IF NOT EXISTS note (id INTEGER PRIMARY KEY, body TEXT)",
-           null);
+DataSource db = DataSource.open(System.getenv("DATABASE_URL"));   // or ":memory:"
 
 List rows = db.query("SELECT id, body FROM note WHERE id > ?",
                      new Object[] { Integer.valueOf(10) });
 // end::backend-database[]
         return rows;
+    }
+
+    public static long insert(DataSource db) throws IOException {
+// tag::backend-database-insert[]
+long id = db.insert("INSERT INTO note (body) VALUES (?)",
+                    new Object[] { "first" }, "id");
+// end::backend-database-insert[]
+        return id;
+    }
+
+    public static void transaction(DataSource db) throws Exception {
+// tag::backend-database-transaction[]
+db.inTransaction(new DataSource.Work() {
+    public Object run(Database connection) throws Exception {
+        connection.execute("UPDATE account SET balance = balance - ? WHERE id = ?",
+                           new Object[] { Integer.valueOf(100), Integer.valueOf(1) });
+        connection.execute("UPDATE account SET balance = balance + ? WHERE id = ?",
+                           new Object[] { Integer.valueOf(100), Integer.valueOf(2) });
+        return null;
+    }
+});
+// end::backend-database-transaction[]
+    }
+
+    public static String schema(DataSource db) {
+// tag::backend-database-dialect[]
+Dialect dialect = db.dialect();
+String create = "CREATE TABLE IF NOT EXISTS " + dialect.quote("note") + " ("
+        + dialect.quote("id") + " " + dialect.generatedKeyColumn(Dialect.BIGINT) + ", "
+        + dialect.quote("body") + " " + dialect.columnType(Dialect.TEXT) + ")";
+// end::backend-database-dialect[]
+        return create;
     }
 }

@@ -43,6 +43,7 @@
 #include "cn1_globals.h"
 #include <stdio.h>
 #include <string.h>
+#include <limits.h>   /* PATH_MAX, for the component walk below */
 #include <errno.h>
 #include <poll.h>
 #include <sys/socket.h>
@@ -142,6 +143,44 @@ JAVA_INT com_codename1_backend_FileIo_openBeneathImpl___java_lang_String_java_la
 #endif
 }
 
+/*
+ * Whether any component of `path` is a symlink whose target is missing.
+ *
+ * EVERY COMPONENT, not just the last one. lstat on the full path asks about the
+ * entry the path names and nothing above it, so cn1.config.location=/config/current
+ * with current -> missing-release opened /config/current/application.properties,
+ * got ENOENT for a component in the MIDDLE, and answered "absent" -- the same
+ * silent discard of every file-based setting, TLS paths included, that the
+ * final-component check was added to stop. A release directory swung by symlink is
+ * how most deployments roll forward, so the broken middle is the likelier half.
+ *
+ * Walked from the root down: a component that lstats but does not stat is a link
+ * pointing at nothing. A path that simply names nothing has no such component.
+ */
+static int cn1BackendDanglingLinkIn(const char* path) {
+    char buffer[PATH_MAX];
+    size_t len = strlen(path);
+    size_t iter;
+    if(len == 0 || len >= sizeof(buffer)) {
+        return 0;
+    }
+    memcpy(buffer, path, len + 1);
+    for(iter = 1 ; iter <= len ; iter++) {
+        if(buffer[iter] != '/' && buffer[iter] != 0) {
+            continue;
+        }
+        char saved = buffer[iter];
+        struct stat linkInfo;
+        struct stat targetInfo;
+        buffer[iter] = 0;
+        if(lstat(buffer, &linkInfo) == 0 && stat(buffer, &targetInfo) != 0) {
+            return 1;
+        }
+        buffer[iter] = saved;
+    }
+    return 0;
+}
+
 JAVA_INT com_codename1_backend_FileIo_openReadImpl___java_lang_String_R_int(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT path) {
 #ifdef _WIN32
     (void)path;
@@ -151,7 +190,50 @@ JAVA_INT com_codename1_backend_FileIo_openReadImpl___java_lang_String_R_int(CODE
     if(p == NULL) {
         return -1;
     }
-    return open(p, O_RDONLY | O_CLOEXEC);
+    int fd = open(p, O_RDONLY | O_CLOEXEC);
+    if(fd < 0) {
+        /*
+         * -1 means THERE IS NO SUCH FILE and -2 means there is one and it could
+         * not be opened. Collapsing both into -1 made a configuration file that
+         * exists but cannot be read indistinguishable from an absent optional
+         * one, so a server whose TLS certificate and key are named in
+         * application.properties started in plaintext when the file's
+         * permissions were wrong.
+         *
+         * ONLY ENOENT is absent. ENOTDIR -- a path component that is not a
+         * directory -- reads like "names nothing", and classifying it that way
+         * made the two arms disagree: the JVM's FileChannel.open throws a plain
+         * FileSystemException there rather than NoSuchFileException, so it
+         * already answered -2. Measured, not assumed, and -2 is the better of
+         * the two answers anyway: a configuration path of the shape
+         * /etc/hosts/application.properties is a broken deployment, not an
+         * optional file somebody chose not to write.
+         */
+        if(errno == ENOENT) {
+            /*
+             * A DANGLING SYMLINK IS NOT AN ABSENT FILE. open() follows the link
+             * and reports ENOENT for the missing TARGET, which is the same errno
+             * a path that names nothing gives -- so a deployment whose
+             * application.properties is a symlink into a volume that failed to
+             * mount read as "no configuration", every file-based setting fell
+             * back to an environment default, and a server naming its TLS
+             * certificate and key in that file came up in PLAINTEXT. That is the
+             * failure this whole split exists to prevent, arriving through the
+             * one errno the split treats as benign.
+             *
+             * lstat does not follow the link, so an entry that is there answers
+             * 0 while a path that names nothing answers -1. The link itself is
+             * present, so this is the "there is one and it could not be opened"
+             * case, which nobody may quietly ignore.
+             */
+            if(cn1BackendDanglingLinkIn(p)) {
+                return -2;
+            }
+            return -1;
+        }
+        return -2;
+    }
+    return fd;
 #endif
 }
 
