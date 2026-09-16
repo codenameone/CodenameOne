@@ -507,11 +507,11 @@ For example: this code allows you to draw a rather complex image of duke:
 
 [source,java]
 ----
-include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/GraphicsJava023Snippet.java[tag=graphics-java-023,indent=0]
+include::../demos/common/src/main/java/com/codenameone/developerguide/screenshots/GraphicsShapedClippingFigure.java[tag=graphics-java-023,indent=0]
 ----
 
 .Shape Clipping used to clip the image of duke within the given shape
-image::img/shaped-clipping.png[Shape Clipping used to clip the image of duke within the given shape,scaledwidth=20%]
+image::img/generated/shaped-clipping.png[Shape Clipping used to clip the image of duke within the given shape,scaledwidth=20%]
 
 TIP: Notice that this functionality isn't available on all platforms so you need to test if shaped clipping is supported using https://www.codenameone.com/javadoc/com/codename1/ui/Graphics.html#isShapeClipSupported()[isShapeClipSupported()].
 
