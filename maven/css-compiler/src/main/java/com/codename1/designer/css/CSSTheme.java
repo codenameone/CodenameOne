@@ -4422,8 +4422,8 @@ public class CSSTheme {
         /// `getFlattenedHoverStyle()` cannot answer this: like every other state it inherits
         /// the base UIID's properties, so it is non-empty for every element in the sheet and
         /// would report that all of them declare hover. What distinguishes a real declaration
-        /// is the state Element carrying style properties of its OWN. The walk mirrors the
-        /// flattener's inheritance chain and deliberately reads `hover` directly rather than
+        /// is the state Element carrying style properties of its OWN. This walk visits base
+        /// elements, not state wrappers, and deliberately reads `hover` directly rather than
         /// calling `getHover()`, which would create the very thing being tested for.
         boolean declaresHover() {
             Element el = this;
@@ -4431,7 +4431,9 @@ public class CSSTheme {
                 if (el.hover != null && !el.hover.style.isEmpty()) {
                     return true;
                 }
-                el = el.parent != null ? el.parent.parent : null;
+                // Base elements link directly to their derived parent; only state wrappers
+                // need the flattener's extra hop through their owning base element.
+                el = el.parent;
             }
             return false;
         }

@@ -436,7 +436,12 @@ public class Slider extends Label implements ActionSource {
                 try {
                     float tmm = Float.parseFloat(progressTrackMM.trim());
                     if (tmm > 0) {
-                        prefH = Math.max(2, Display.getInstance().convertToPixels(tmm));
+                        int trackHeight = Math.max(2, Display.getInstance().convertToPixels(tmm));
+                        // Overlay text still needs a full font-height box; the painter centers
+                        // the thin track inside that box without clipping the Label text.
+                        prefH = isRenderPercentageOnTop() || isRenderValueOnTop()
+                                ? Math.max(trackHeight, Math.max(prefH, style.getFont().getHeight()))
+                                : trackHeight;
                     }
                 } catch (NumberFormatException notANumber) {
                     // Malformed constant: keep the font-height default rather than guess.
@@ -1003,7 +1008,10 @@ public class Slider extends Label implements ActionSource {
     ///
     /// - `renderPercentageOnTop`: true to render percentages
     public void setRenderPercentageOnTop(boolean renderPercentageOnTop) {
-        this.renderPercentageOnTop = renderPercentageOnTop;
+        if (this.renderPercentageOnTop != renderPercentageOnTop) {
+            this.renderPercentageOnTop = renderPercentageOnTop;
+            setShouldCalcPreferredSize(true);
+        }
     }
 
     /// #### Returns
@@ -1017,7 +1025,10 @@ public class Slider extends Label implements ActionSource {
     ///
     /// - `renderValueOnTop`: the renderValueOnTop to set
     public void setRenderValueOnTop(boolean renderValueOnTop) {
-        this.renderValueOnTop = renderValueOnTop;
+        if (this.renderValueOnTop != renderValueOnTop) {
+            this.renderValueOnTop = renderValueOnTop;
+            setShouldCalcPreferredSize(true);
+        }
     }
 
     /// #### Returns

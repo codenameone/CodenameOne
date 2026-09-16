@@ -105,7 +105,9 @@ class DesktopNativeThemeSelectionTest {
         Object previousTheme = nativeTheme.get(null);
         try {
             field("fontFacesExplicitlyConfigured").set(null, false);
+            Object defaultFont = field("DEFAULT_FONT").get(null);
             JavaSEPort.setNativeTheme("/MacOSAquaTheme.res");
+            assertEquals(defaultFont, field("DEFAULT_FONT").get(null), "theme selection must not resize default-font controls");
             String host = JavaSEPort.IS_MAC ? "mac" : (JavaSEPort.IS_LINUX ? "linux" : "win");
             assertEquals(JavaSEPort.defaultSystemFontForTheme(host, "/MacOSAquaTheme.res"), field("fontFaceSystem").get(null));
             JavaSEPort.setNativeTheme((String) null);

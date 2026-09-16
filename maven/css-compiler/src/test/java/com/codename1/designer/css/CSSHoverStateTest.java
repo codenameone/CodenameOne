@@ -96,6 +96,18 @@ public class CSSHoverStateTest {
         assertEquals("303030", theme.get("$DarkButton.hover#bgColor"), "dark hover");
     }
 
+    @Test
+    void testHoverInheritanceVisitsDirectAndTransitiveParents() throws Exception {
+        Hashtable theme = compile("Parent { color: #111111; }"
+                + "Parent.hover { background-color: #abcdef; }"
+                + "Child { cn1-derive: Parent; }"
+                + "Grandchild { cn1-derive: Child; }"
+                + "Unrelated { color: #222222; }");
+        assertEquals("ABCDEF", theme.get("Child.hover#bgColor"), "direct parent hover");
+        assertEquals("ABCDEF", theme.get("Grandchild.hover#bgColor"), "transitive parent hover");
+        assertEquals(null, theme.get("Unrelated.hover#bgColor"), "unrelated UIID stays opt-in");
+    }
+
     private static Hashtable compile(String css) throws Exception {
         Path cssFile = Files.createTempFile("cn1-hover", ".css");
         Path resFile = Files.createTempFile("cn1-hover", ".res");

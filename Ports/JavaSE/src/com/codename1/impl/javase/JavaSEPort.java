@@ -2960,7 +2960,9 @@ public class JavaSEPort extends CodenameOneImplementation {
         nativeTheme = resFile;
         if (!fontFacesExplicitlyConfigured) {
             fontFaceSystem = defaultSystemFontForTheme(IS_MAC ? "mac" : (IS_LINUX ? "linux" : "win"), resFile);
-            DEFAULT_FONT = fontFaceSystem + "-plain-" + medianFontSize;
+            // Theme selection changes FACE_SYSTEM, not the default font's size. Its
+            // sizing remains owned by setFontSize/setFontFaces; changing it here also
+            // resizes font-relative controls such as Switch and Slider on startup.
         }
     }
 
