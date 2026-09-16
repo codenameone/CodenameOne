@@ -942,9 +942,9 @@ public class ProcessScreenshots {
             }
         }
         if (count == 0) {
-            // Neither render put anything over the backdrop -> identical (both bare
-            // backdrop). Treat as a perfect match rather than dividing by zero.
-            return new double[]{100.0d, 1.0d, 1.0d};
+            // Matching backdrops contain no widget to compare. Use the same blank
+            // sentinel as ordinary tiles so a new row cannot pass as a perfect match.
+            return new double[]{BOTH_BLANK, 0.0d, 0.0d};
         }
         double fillSim = 1.0d - (double) sum / (count * 255.0d);
         if (fillSim < 0) {

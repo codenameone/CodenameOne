@@ -37,6 +37,46 @@ class FidelityGeometryTest(unittest.TestCase):
         javac = str(Path(java_home) / "bin/javac") if java_home else "javac"
         subprocess.run([javac, "-d", cls.classes.name,
                         str(ROOT / "scripts/common/java/ProcessScreenshots.java")], check=True)
+        cls.gate_classes = tempfile.TemporaryDirectory(prefix="cn1-glass-gate-")
+        cls.addClassCleanup(cls.gate_classes.cleanup)
+        subprocess.run([javac, "-d", cls.gate_classes.name,
+                        str(ROOT / "scripts/common/java/FidelityGate.java")], check=True)
+
+    def test_backdrop_only_glass_and_lens_pairs_fail_even_without_a_baseline(self):
+        with tempfile.TemporaryDirectory(prefix="cn1-glass-data-") as directory:
+            path = Path(directory)
+            reference = path / "reference"
+            reference.mkdir()
+            backdrop = path / "backdrop.png"
+            actual = path / "actual.png"
+            tile(backdrop, "345678", "ffffff", (0, 0, 0, 0))
+            spec = path / "spec.yaml"
+            baseline = path / "baseline.json"
+            comparison = path / "compare.json"
+            for material in ("glass", "lens"):
+                spec.write_text("components:\n  - id: Probe\n    native: probe\n    material: " + material + "\n")
+                for box in ((0, 0, 0, 0), (10, 10, 80, 30)):
+                    with self.subTest(material=material, box=box):
+                        tile(actual, "345678", "ffffff", box)
+                        tile(reference / "Probe_normal_light.png", "345678", "ffffff", box)
+                        result = subprocess.run([self.java, "-Djava.awt.headless=true", "-cp", self.classes.name,
+                                                 "ProcessScreenshots", "--mode", "fidelity", "--reference-dir", str(reference),
+                                                 "--spec", str(spec), "--backdrop", str(backdrop),
+                                                 "--actual", "Probe_normal_light=" + str(actual)],
+                                                capture_output=True, text=True, check=True)
+                        row = json.loads(result.stdout)["results"][0]
+                        blank = box[2] == 0
+                        self.assertEqual("blank_pair" if blank else "compared", row["status"])
+                        self.assertEqual(0 if blank else 100, row["details"]["fidelity_percent"])
+                        comparison.write_text(result.stdout)
+                        for update in (False, True):
+                            baseline.write_text(json.dumps({"pairs": {}}))
+                            command = [self.java, "-cp", self.gate_classes.name, "FidelityGate",
+                                       "--compare-json", str(comparison), "--baseline", str(baseline)]
+                            if update:
+                                command += ["--update-baseline", str(baseline)]
+                            gate = subprocess.run(command, capture_output=True, text=True)
+                            self.assertEqual(20 if blank else 0, gate.returncode, gate.stderr)
 
     def test_grouped_backdrops_preserve_field_size_position_and_empty_detection(self):
         with tempfile.TemporaryDirectory(prefix="cn1-geometry-data-") as directory:
