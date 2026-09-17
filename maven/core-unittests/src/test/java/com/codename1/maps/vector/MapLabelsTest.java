@@ -98,6 +98,40 @@ class MapLabelsTest {
         assertTrue(labels(tile, style, 13).isEmpty());
     }
 
+    @Test
+    void polygonLabelsUseAnInteriorPointAndAvoidHoles() {
+        VectorFeature concave = named("Concave", VectorFeature.GEOM_POLYGON,
+                new int[]{0, 0, 3000, 0, 3000, 3000, 2000, 3000,
+                        2000, 1000, 1000, 1000, 1000, 3000, 0, 3000, 0, 0});
+        VectorFeature holed = named("Holed", VectorFeature.GEOM_POLYGON,
+                new int[]{0, 0, 4000, 0, 4000, 4000, 0, 4000, 0, 0},
+                new int[]{1000, 1000, 1000, 3000, 3000, 3000, 3000, 1000, 1000, 1000});
+        VectorTile tile = new VectorTile(Arrays.asList(layer("park", concave, holed)));
+        List<LabelCandidate> found = labels(tile, MapStyle.light(), 12);
+        assertEquals(Arrays.asList("Concave", "Holed"), texts(found));
+        for (LabelCandidate label : found) {
+            double x = (label.worldX - 2 * 256) * 16;
+            double y = (label.worldY - 3 * 256) * 16;
+            VectorFeature feature = "Concave".equals(label.text) ? concave : holed;
+            assertTrue(insideEvenOdd(x, y, feature.getParts()), label.text + " anchor must be inside");
+        }
+    }
+
+    private static boolean insideEvenOdd(double x, double y, List parts) {
+        boolean inside = false;
+        for (Object partObj : parts) {
+            int[] ring = (int[]) partObj;
+            for (int i = 0, j = ring.length - 2; i + 1 < ring.length; j = i, i += 2) {
+                double xi = ring[i], yi = ring[i + 1];
+                double xj = ring[j], yj = ring[j + 1];
+                if ((yi > y) != (yj > y) && x < (xj - xi) * (y - yi) / (yj - yi) + xi) {
+                    inside = !inside;
+                }
+            }
+        }
+        return inside;
+    }
+
     private static VectorFeature named(String name, int geometry, int[]... parts) {
         Map attributes = new HashMap();
         if (name != null) {

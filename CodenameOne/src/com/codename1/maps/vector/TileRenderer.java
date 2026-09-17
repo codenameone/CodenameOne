@@ -27,6 +27,7 @@ import com.codename1.ui.Stroke;
 import com.codename1.ui.geom.GeneralPath;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 
 /// Rasterizes a decoded [VectorTile] into a tile-sized buffer according to a
@@ -240,18 +241,78 @@ final class TileRenderer {
         if (f.getGeometryType() == VectorFeature.GEOM_POINT) {
             return new double[]{first[0], first[1]};
         }
-        // Average of the first polygon ring as the label anchor.
-        double sx = 0;
-        double sy = 0;
-        int n = 0;
-        for (int i = 0; i + 1 < first.length; i += 2) {
-            sx += first[i];
-            sy += first[i + 1];
-            n++;
+        return polygonAnchor(parts);
+    }
+
+    // Find the midpoint of the widest interior horizontal span. Unlike a
+    // vertex average, this remains inside concave polygons and skips holes.
+    private static double[] polygonAnchor(List parts) {
+        double minX = Double.MAX_VALUE;
+        double minY = Double.MAX_VALUE;
+        double maxX = -Double.MAX_VALUE;
+        double maxY = -Double.MAX_VALUE;
+        for (Object partObj : parts) {
+            int[] ring = (int[]) partObj;
+            for (int i = 0; i + 1 < ring.length; i += 2) {
+                minX = Math.min(minX, ring[i]);
+                maxX = Math.max(maxX, ring[i]);
+                minY = Math.min(minY, ring[i + 1]);
+                maxY = Math.max(maxY, ring[i + 1]);
+            }
         }
-        if (n == 0) {
+        if (minX > maxX || minY > maxY) {
             return null;
         }
-        return new double[]{sx / n, sy / n};
+        double height = maxY - minY;
+        int rows = height <= 0 ? 1 : 32;
+        double[] best = null;
+        double bestWidth = -1;
+        for (int row = 0; row < rows; row++) {
+            double y = height <= 0 ? minY : minY + height * (row + 0.5) / rows;
+            List intersections = new ArrayList();
+            for (Object partObj : parts) {
+                int[] ring = (int[]) partObj;
+                for (int i = 0; i + 1 < ring.length; i += 2) {
+                    int next = (i + 2) % ring.length;
+                    double y0 = ring[i + 1];
+                    double y1 = ring[next + 1];
+                    if ((y0 > y) != (y1 > y)) {
+                        double x0 = ring[i];
+                        double x1 = ring[next];
+                        intersections.add(Double.valueOf(x0 + (y - y0) * (x1 - x0) / (y1 - y0)));
+                    }
+                }
+            }
+            Collections.sort(intersections);
+            for (int i = 0; i + 1 < intersections.size(); i += 2) {
+                double left = ((Double) intersections.get(i)).doubleValue();
+                double right = ((Double) intersections.get(i + 1)).doubleValue();
+                double width = right - left;
+                double x = (left + right) / 2;
+                if (width > bestWidth && pointInPolygon(x, y, parts)) {
+                    bestWidth = width;
+                    best = new double[]{x, y};
+                }
+            }
+        }
+        return best;
+    }
+
+    private static boolean pointInPolygon(double x, double y, List parts) {
+        boolean inside = false;
+        for (Object partObj : parts) {
+            int[] ring = (int[]) partObj;
+            for (int i = 0, j = ring.length - 2; i + 1 < ring.length; j = i, i += 2) {
+                double xi = ring[i];
+                double yi = ring[i + 1];
+                double xj = ring[j];
+                double yj = ring[j + 1];
+                if ((yi > y) != (yj > y)
+                        && x < (xj - xi) * (y - yi) / (yj - yi) + xi) {
+                    inside = !inside;
+                }
+            }
+        }
+        return inside;
     }
 }
