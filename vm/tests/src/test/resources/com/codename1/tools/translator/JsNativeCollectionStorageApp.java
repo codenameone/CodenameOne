@@ -1,0 +1,56 @@
+import java.util.*;
+
+public class JsNativeCollectionStorageApp {
+    static int result;
+    public static void main(String[] args) {
+        int score = 0;
+        ArrayList<Integer> list = new ArrayList<Integer>();
+        for (int i = 0; i < 400; i++) list.add(i);
+        list.subList(10, 390).clear();
+        list.addAll(3, list);
+        if (list.size() == 40 && list.get(3) == 0 && list.get(39) == 399) score |= 1;
+        Integer[] array = list.toArray(new Integer[45]);
+        list.clear();
+        if (array[39] == 399 && array[40] == null && list.isEmpty()) score |= 2;
+
+        HashMap<Integer, Integer> map = new HashMap<Integer, Integer>();
+        Hashtable<Integer, Integer> table = new Hashtable<Integer, Integer>();
+        for (int i = 0; i < 500; i++) { map.put(i, i * 3); table.put(i, i * 3); }
+        for (int i = 0; i < 400; i++) { map.remove(i); table.remove(i); }
+        if (map.size() == 100 && table.size() == 100 && map.get(499) == 1497 && table.get(499) == 1497) score |= 4;
+
+        LinkedHashMap<Integer, Integer> linked = new LinkedHashMap<Integer, Integer>(2, 0.75f, true);
+        for (int i = 0; i < 100; i++) linked.put(i, i);
+        linked.get(0);
+        if (linked.keySet().iterator().next() == 1 && linked.size() == 100) score |= 8;
+
+        Object[] keys = new Object[300];
+        IdentityHashMap<Object, Integer> identities = new IdentityHashMap<Object, Integer>();
+        for (int i = 0; i < keys.length; i++) { keys[i] = new Object(); identities.put(keys[i], i); }
+        for (int i = 0; i < 150; i++) identities.remove(keys[i]);
+        if (identities.size() == 150 && identities.get(keys[299]) == 299 && !identities.containsKey(new Object())) score |= 16;
+
+        ArrayDeque<Integer> deque = new ArrayDeque<Integer>();
+        for (int i = 0; i < 300; i++) deque.addLast(i);
+        for (int i = 0; i < 200; i++) deque.removeFirst();
+        for (int i = 300; i < 600; i++) deque.addLast(i);
+        deque.addFirst(199);
+        if (deque.removeFirst() == 199 && deque.removeLast() == 599 && deque.size() == 399) score |= 32;
+
+        StringBuilder text = new StringBuilder("caf\u00e9\u00ff");
+        String before = text.toString();
+        text.append('\u1234').append("xyz");
+        text.delete(5, text.length());
+        char[] chars = new char[5];
+        text.getChars(0, 5, chars, 0);
+        if (before.equals(text.toString()) && chars[4] == 255 && text.charAt(3) == 233) score |= 64;
+        StringBuilder self = new StringBuilder("abc");
+        self.append(self, 0, 3).insert(1, "\u00ff");
+        String immutable = self.toString();
+        self.setLength(0);
+        self.setLength(8);
+        if (immutable.equals("a\u00ffbcabc") && self.charAt(6) == 0) score |= 128;
+        result = score;
+        System.out.println("RESULT=" + result);
+    }
+}

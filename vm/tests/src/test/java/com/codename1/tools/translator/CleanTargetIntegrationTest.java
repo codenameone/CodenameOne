@@ -1884,6 +1884,9 @@ class CleanTargetIntegrationTest {
         return "#include \"cn1_globals.h\"\n" +
                 "#include <stdio.h>\n" +
                 "void HelloWorld_nativeHello__(CODENAME_ONE_THREAD_STATE) {\n" +
+                "    if (!threadStateData->lightweightThread || !threadStateData->threadActive) {\n" +
+                "        printf(\"Java main was not registered as an active managed thread\\n\"); return;\n" +
+                "    }\n" +
                 "    printf(\"Hello, Clean Target!\\n\");\n" +
                 "}\n";
     }

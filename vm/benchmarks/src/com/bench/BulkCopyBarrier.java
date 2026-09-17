@@ -66,6 +66,7 @@ public class BulkCopyBarrier {
     static Object[] holder;
     static Object sink;
     static volatile long checksum;
+    static volatile boolean copyFailed;
 
     private static void burn() {
         Object last = null;
@@ -97,6 +98,14 @@ public class BulkCopyBarrier {
             dst = new Object[CONTENT];
             System.arraycopy(src, 0, dst, 0, CONTENT);
         }
+        // Copy the same aged references through the native collection layouts.
+        java.util.Set<Object> identity = java.util.Collections.newSetFromMap(
+                new java.util.IdentityHashMap<Object, Boolean>());
+        for (Object value : src) identity.add(value);
+        java.util.ArrayList<Object> nativeCopy = new java.util.ArrayList<Object>(identity);
+        nativeCopy.ensureCapacity(CONTENT * 2);
+        nativeCopy.addAll(CONTENT / 2, nativeCopy);
+        identity = null;
         holder = null;
         src = null;
 
@@ -110,6 +119,11 @@ public class BulkCopyBarrier {
         w = null;
 
         burn();
+        long actual = 0;
+        for (Object value : nativeCopy) actual += ((Content) value).value;
+        long expected = 2L * ((long) CONTENT * r * 7 + (long) CONTENT * (CONTENT - 1) / 2);
+        if (actual != expected || nativeCopy.size() != CONTENT * 2)
+            copyFailed = true;
     }
 
     public static void main(String[] args) {
@@ -131,6 +145,7 @@ public class BulkCopyBarrier {
             } catch (InterruptedException e) {
             }
         }
+        if (copyFailed) throw new AssertionError("Native collection copy lost aged contents");
         System.out.println("ROUNDS=" + (ROUNDS * THREADS));
         System.out.println("RESULT=" + checksum);
         System.out.println("BULK_COPY_BARRIER_DONE");

@@ -47,7 +47,20 @@ PARPAR="${CN1_SELFHOST_BIN:-}"
 echo "verify-selfhost: subject $PARPAR"
 JAPI="$REPO/vm/selfhost/target/javaapi-classes"
 TR="$REPO/vm/ByteCodeTranslator/target/classes"
-ASM="$(cat "$REPO/vm/ByteCodeTranslator/target/selfhost-asm-classpath.txt")"
+ASM_CP_FILE="$REPO/vm/ByteCodeTranslator/target/selfhost-asm-classpath.txt"
+# A MISSING CLASSPATH FILE IS A SETUP ERROR, NOT A CORRECTNESS FAILURE, and it did
+# not read as one: `mvn clean package` (which translate-and-build.sh runs whenever
+# the translator sources change, i.e. after running the gauntlet) deletes target/
+# and takes this file with it. The bare `cat` that used to be here then failed with
+# one line of shell noise, the gate exited non-zero, and perf-guard's own message
+# said to "treat this as a correctness failure". It is not; it just needs the
+# regenerating build to have run.
+[ -r "$ASM_CP_FILE" ] || {
+    echo "missing $ASM_CP_FILE" >&2
+    echo "  mvn clean package removes target/, and the gauntlet triggers one." >&2
+    echo "  Run $REPO/vm/selfhost/build-selfhost.sh -O3 first; it regenerates it." >&2
+    exit 1; }
+ASM="$(cat "$ASM_CP_FILE")"
 
 # The JVM side of gate A runs target/classes, which nothing in this script builds
 # -- build-selfhost.sh compiles the translator only for the NATIVE side. A source

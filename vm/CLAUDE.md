@@ -273,6 +273,70 @@ used `ptr | 2`, which is now a valid tagged `Long`, so it uses the reserved code
 `cn1_debugger_class_of` resolves through `CN1_CLASS_OF` -- would have made every tagged
 assertion an assertion about nothing.
 
+## The self-hosting benchmark measures the translator, so it can be optimized instead of the VM
+
+The self-hosting benchmark times the translator translating a corpus. The program
+being measured is therefore **the translator's own Java source**, which gives two
+completely different ways to make the number go down:
+
+1. Make the **VM** faster -- better generated C, a better runtime, a better
+   `vm/JavaAPI`. This is the goal, and it moves the ParparVM arm only.
+2. Make the **translator's Java** faster -- a cheaper collection, a cached string, a
+   tighter loop in the translator itself. This moves **both** arms, because the JDK
+   arm runs that same Java. It cannot close the gap against HotSpot, and it silently
+   changes the benchmark so absolute numbers stop comparing to earlier sessions.
+
+Both look identical in a "parpar got faster" measurement, and the second is the
+easier one to find -- the translator has plenty of ordinary inefficiency in it. Six
+such edits were made and measured as a ~2% win: a `Hashtable` swapped for a
+`HashMap`, a cached lookup signature, `contains`-before-`add` removed, a one-pass
+class-file read, an inverted `@Concrete` scan, a cached name mangling. The ratio never
+moved, because the JDK arm got the same ~2%.
+
+```bash
+source tools/env.sh
+vm/selfhost/build-selfhost.sh -O3
+vm/selfhost/check-workload-neutral.sh origin/master   # or a prebuilt classes dir
+```
+
+**The check is deterministic, and deliberately does not measure time.** The obvious
+test is "did the JDK arm get faster", and it was tried first and does not work here:
+the mistake was worth ~2% and this harness's run-to-run spread on a shared machine is
+4-9%, so the signal sits under the noise -- an early timing version of the gate failed
+on two *identical* class trees. Instead it translates one fixed corpus with the base
+translator and with this one, and asks:
+
+- **generated classes differ** -> codegen change, this reaches the VM;
+- **generated classes identical, copied C runtime differs** -> VM runtime change
+  (`cn1_globals.*`, `nativeMethods.*`, `cn1_intrinsics.h`, `cn1_collections.h`), this
+  reaches the VM. These files are *excluded* by `verify-output-neutral.sh`, correctly
+  for its purpose, which is why this check separates them rather than reusing it;
+- **`vm/JavaAPI` changed** -> VM change. Note `vm/JavaAPI` is both the VM's library
+  *and* part of the corpus, so it perturbs both arms' absolute times; only the ratio
+  is honest across such a change;
+- **nothing differs** -> workload-only. Not necessarily a bad change, but not a VM
+  change, and it must not be measured or reported as one.
+
+Proven in both directions rather than assumed: an allocating slowdown injected into
+`ByteCodeClass.findDeclaredMethod` is reported WORKLOAD-ONLY with 0 of 5,663 emitted
+files differing, and the real VM work of the same session is reported CODEGEN CHANGE
+with 2,828 generated classes and 5 runtime files differing. Note the first probe
+attempt -- a dead arithmetic loop -- moved nothing at all, because HotSpot eliminates
+it; a probe for this has to allocate or otherwise resist the JIT.
+
+Two corollaries worth keeping in mind while reading any perf number here:
+
+- `perf-guard.sh` runs the **hello** corpus, whose input is `javaapi-classes` plus
+  the app, and the translator corpus, whose input includes `target/classes` -- the
+  translator's own classes. On the translator corpus a translator source edit changes
+  the *input* as well as the translating program.
+- A sampling profile cannot substitute for this. At `-O3` with ThinLTO identical
+  functions are folded and symbol names stop meaning anything (`markDependent`
+  measured 21% of main-thread self time in a phase that takes 2.3% of the run), and
+  at `-O1` nothing is inlined so the shape is not the shipping one. Phase timing
+  inside the translator, reported from both arms, is the instrument that survives
+  both.
+
 ## Narrowing a float to an int is SATURATING, and C's cast is not
 
 JLS 5.1.3: converting a `float` or `double` to an `int` or `long` clamps -- NaN becomes 0,

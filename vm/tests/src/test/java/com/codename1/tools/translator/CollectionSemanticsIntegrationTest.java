@@ -42,22 +42,8 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 
-/**
- * Pins ArrayList and IdentityHashMap against a real JDK after both were changed to
- * stop allocating.
- *
- * <p>ArrayList no longer allocates a backing array in its no-arg constructor -- it
- * shares a zero-length one until the first growth, which then allocates exactly ten
- * so a small list stays in the size class it always occupied. IdentityHashMap's key
- * and value iterators no longer build an Entry per step; only entrySet does, which is
- * the only view where a caller can observe one. java.util.HashMap already had that
- * split and this map had been missed.</p>
- *
- * <p>Both changes are invisible when they work and produce wrong answers at the
- * edges when they do not -- an empty list that reports the wrong size, a null key
- * that reads back as the table's sentinel -- so the JDK is used as the oracle rather
- * than a hand-written expectation.</p>
- */
+/** Compares collection API behavior with the host JDK, including native storage,
+ * exposed subclass arrays, views, typed arrays and callback reentry. */
 class CollectionSemanticsIntegrationTest {
 
     @Test
@@ -109,6 +95,26 @@ class CollectionSemanticsIntegrationTest {
         CleanTargetIntegrationTest.runTranslator(classesDir, outputDir, "CollectionSemanticsApp");
 
         Path distDir = outputDir.resolve("dist");
+        String generated = new String(Files.readAllBytes(distDir.resolve(
+                "CollectionSemanticsApp-src/CollectionSemanticsApp.c")), StandardCharsets.UTF_8);
+        int walkStart = generated.indexOf("JAVA_VOID CollectionSemanticsApp_fieldTraversalCases__(");
+        assertTrue(walkStart >= 0);
+        int walkEnd = generated.indexOf("\nJAVA_VOID CollectionSemanticsApp_main", walkStart);
+        assertTrue(walkEnd > walkStart);
+        String walk = generated.substring(walkStart, walkEnd);
+        assertTrue(walk.contains("cn1RefBlockGet"), "field and call-result loops use native cursors");
+        assertFalse(walk.contains("java_util_HashMap"), "List receivers cannot use map-view layouts");
+        assertFalse(walk.contains("java_util_HashSet"), "List receivers cannot use set layouts");
+        assertFalse(walk.contains("java_util_IdentityHashMap"), "List receivers cannot use identity-map layouts");
+        int directStart = generated.indexOf("JAVA_VOID CollectionSemanticsApp_directCallCases__(");
+        int directEnd = generated.indexOf("\nJAVA_VOID CollectionSemanticsApp_fieldTraversalCases__", directStart);
+        assertTrue(directStart >= 0 && directEnd > directStart);
+        String direct = generated.substring(directStart, directEnd);
+        assertTrue(direct.contains("cn1InlListGet"), direct);
+        assertTrue(direct.contains("__cn1DirectReceiver"), direct);
+        assertTrue(direct.contains("cn1ThrowNullPointerOrDie"), direct);
+        assertTrue(direct.contains("virtual_java_util_List_get___int_R_java_lang_Object"),
+                "mixed receivers must retain dispatch");
         Path cmakeLists = distDir.resolve("CMakeLists.txt");
         assertTrue(Files.exists(cmakeLists), "Translator should emit a CMake project");
         CleanTargetIntegrationTest.replaceLibraryWithExecutableTarget(cmakeLists, "CollectionSemanticsApp-src");

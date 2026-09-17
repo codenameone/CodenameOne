@@ -15,6 +15,7 @@ package com.bench;
  */
 public class FusedTest {
     static final StringBuilder LOG = new StringBuilder();
+    static String[] published;
 
     static String makeParent(int seed) {
         StringBuilder b = new StringBuilder();
@@ -101,8 +102,36 @@ public class FusedTest {
         // 7: general @Fused user class (Image-like, two fused children)
         ck = ck * 31 + userFused();
 
+        ck = ck * 31 + alternateRoots();
+
         System.out.println("CK " + ck);
         System.out.println("DONE");
+    }
+
+    // An inline array must not acquire an independent age when the same owner
+    // moves between a known Java root and a conservatively discovered local.
+    static long alternateRoots() {
+        published = new String[128];
+        for (int i = 0; i < published.length; i++) published[i] = makeParent(i);
+        long result = 0;
+        for (int round = 0; round < 6; round++) {
+            churn();
+            String[] local = published;
+            published = null;
+            churn();
+            churn();
+            for (int i = 0; i < local.length; i++) {
+                String text = local[i];
+                for (int j = 0; j < text.length(); j++) {
+                    char expected = (char) ('a' + ((i + j) % 26));
+                    if (text.charAt(j) != expected) throw new AssertionError("Lost fused storage");
+                    result += text.charAt(j);
+                }
+            }
+            published = local;
+        }
+        published = null;
+        return result;
     }
 
     /** Image-like user class: owns its pixel and flag buffers (fused). */

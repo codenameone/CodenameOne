@@ -60,7 +60,13 @@ public class LineNumber extends Instruction {
             return;
         }
         if(hasInstructions && (getMethod() == null || !getMethod().isDisableDebugInfo())) {
-            b.append(elidable ? "    __CN1_DEBUG_INFO_NT(" : "    __CN1_DEBUG_INFO(");
+            boolean hasFrame = getMethod() != null && !getMethod().isBarebone();
+            if (hasFrame) {
+                b.append(elidable ? "    __CN1_DEBUG_INFO_AT_NT(cn1CurrentLine, "
+                        : "    __CN1_DEBUG_INFO_AT(cn1CurrentLine, ");
+            } else {
+                b.append(elidable ? "    __CN1_DEBUG_INFO_NT(" : "    __CN1_DEBUG_INFO(");
+            }
             b.append(line);
             b.append(");\n");
         }

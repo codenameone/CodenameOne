@@ -39,6 +39,31 @@ import org.objectweb.asm.Opcodes;
  */
 public class Invoke extends Instruction {
     private String owner;
+    // Set only on factories synthesized from LambdaMetafactory, never inferred
+    // from a user-controlled class or method name.
+    private BytecodeMethod lambdaSam;
+    public BytecodeMethod getLambdaSam() { return lambdaSam; }
+    public void setLambdaSam(BytecodeMethod method) { lambdaSam = method; }
+    private String exactReceiverType;
+
+    public void setClosedWorldReceiverTypes(java.util.Set<String> types) {
+        // Consumers require one concrete type; mixed proofs need no retained set.
+        exactReceiverType = types.size() == 1 ? types.iterator().next() : null;
+    }
+
+    public boolean hasExactReceiver(String type) {
+        return exactReceiverType != null && exactReceiverType.equals(type);
+    }
+
+    /** Exact receiver provenance survives interface typing; resolve inherited declarations. */
+    public String getProvenDirectOwner() {
+        if ((opcode != Opcodes.INVOKEVIRTUAL && opcode != Opcodes.INVOKEINTERFACE)
+                || exactReceiverType == null) return null;
+        ByteCodeClass concrete = Parser.getClassObject(exactReceiverType);
+        ByteCodeClass declaring = ByteCodeClass.findConcreteDeclaringClass(concrete, name, desc);
+        return declaring == null ? null : declaring.getClsName();
+    }
+
     private final String name;
     private final String desc;
     private final boolean itf;
@@ -89,33 +114,13 @@ public class Invoke extends Instruction {
     
     @Override
     public void addDependencies(List<String> dependencyList) {
-        String dependencyOwner = owner;
-        if (opcode == Opcodes.INVOKEVIRTUAL) {
-            ByteCodeClass bc = Parser.getClassObject(Util.mangle(owner));
-            String resolvedConcreteOwner = resolveConcreteInvokeOwner(bc, true);
-            if (resolvedConcreteOwner != null) {
-                dependencyOwner = resolvedConcreteOwner;
-            } else {
-                // keep in sync with the closed-world devirt in appendInstruction:
-                // the direct call needs the implementing class's declaration.
-                String devirt = Parser.resolveDevirtualizedOwner(bc, name, desc);
-                if (devirt != null) {
-                    dependencyOwner = devirt;
-                }
-            }
-        }
         String t = owner.replace('.', '_').replace('/', '_').replace('$', '_');
         t = unarray(t);
-        if(t != null && !dependencyList.contains(t)) {
-            dependencyList.add(t);
-        }
-        if (!owner.equals(dependencyOwner)) {
-            String concreteDependency = dependencyOwner.replace('.', '_').replace('/', '_').replace('$', '_');
-            concreteDependency = unarray(concreteDependency);
-            if (concreteDependency != null && !dependencyList.contains(concreteDependency)) {
-                dependencyList.add(concreteDependency);
-            }
-        }
+        if (t != null && !dependencyList.contains(t)) dependencyList.add(t);
+        // The world is incomplete while ClassReader visits instructions. Resolve
+        // inherited/direct-call dependencies in the existing late rescan instead
+        // of rebuilding the subclass index for each newly parsed class.
+        if (!Parser.isReadingClass()) addResolvedDependencies(dependencyList);
 
         StringBuilder bld = new StringBuilder();
         if(opcode != Opcodes.INVOKEINTERFACE && opcode != Opcodes.INVOKEVIRTUAL) {
@@ -139,6 +144,19 @@ public class Invoke extends Instruction {
         BytecodeMethod.addVirtualMethodsInvoked(str);
     }
     
+    public void addResolvedDependencies(List<String> dependencyList) {
+        String proven = getProvenDirectOwner();
+        if (proven != null && !dependencyList.contains(proven)) dependencyList.add(proven);
+        if (opcode != Opcodes.INVOKEVIRTUAL) return;
+        ByteCodeClass bc = Parser.getClassObject(Util.mangle(owner));
+        String resolved = resolveConcreteInvokeOwner(bc, true);
+        if (resolved == null) resolved = Parser.resolveDevirtualizedOwner(bc, name, desc);
+        if (resolved != null) {
+            String dependency = unarray(Util.mangle(resolved));
+            if (dependency != null && !dependencyList.contains(dependency)) dependencyList.add(dependency);
+        }
+    }
+
     private String findActualOwner(ByteCodeClass bc) {
         if(bc == null) {
             return owner;
@@ -305,8 +323,10 @@ public class Invoke extends Instruction {
             // generates such calls.  But ParparVM strips out these virtual method definitions,
             // so we need to check if the method is private, and remove the virtual invocation 
             // if it is.
-            boolean isVirtual = true;
-            if (opcode == Opcodes.INVOKEVIRTUAL) {
+            String proven = getProvenDirectOwner();
+            boolean isVirtual = proven == null;
+            if (proven != null) invokeOwner = proven;
+            if (isVirtual && opcode == Opcodes.INVOKEVIRTUAL) {
                 ByteCodeClass bc = Parser.getClassObject(Util.mangle(owner));
                 if (bc == null) {
                     System.err.println("WARNING: Failed to find class object for owner "+owner+" when rendering virtual method "+name);
@@ -374,10 +394,9 @@ public class Invoke extends Instruction {
                 bld.append(renamed);
             }
         }
+        String receiver = opcode == Opcodes.INVOKESTATIC ? null : "SP[-" + (args.size() + 1) + "].data.o";
         boolean noPop = false;
-        if(returnVal == null) {
-            b.append(bld);
-        } else {
+        if (returnVal != null) {
             if(args.isEmpty() && opcode == Opcodes.INVOKESTATIC) {
                 // special case for static method
                 if(returnVal.equals("JAVA_OBJECT")) {
@@ -409,33 +428,15 @@ public class Invoke extends Instruction {
                 b.append(returnVal);
                 b.append(" tmpResult = ");
             }
-            b.append(bld);
+
         }
-        b.append("(threadStateData");
-        
-        
-        
-        if(opcode != Opcodes.INVOKESTATIC) {
-            b.append(", SP[-");
-            b.append(args.size() + 1);
-            b.append("].data.o");
-        }
-        int offset = args.size();
-        //int numArgs = offset;
-        for(String a : args) {
-            b.append(", ");
-            b.append("SP[-");
-            b.append(offset);
-            b.append("].data.");
-            b.append(a);
-            offset--;
-        }
+        NativeInvocation.append(b, bld.toString(), receiver, args, null, args.size(), getProvenDirectOwner() != null);
         if(noPop) {
-            b.append("));\n");
+            b.append(");\n");
             return;
         }
         if(returnVal != null) {
-            b.append(");\n");
+            b.append(";\n");
             if(opcode != Opcodes.INVOKESTATIC) {
                 if(!args.isEmpty()) {
                     b.append("    SP-=");
@@ -482,7 +483,7 @@ public class Invoke extends Instruction {
 
             return;
         }
-        b.append("); ");
+        b.append("; ");
         int val; 
         if(opcode != Opcodes.INVOKESTATIC) {
             val = args.size() + 1;
@@ -661,6 +662,8 @@ public class Invoke extends Instruction {
      * or the existing @Concrete devirtualization resolves a single concrete owner.
      */
     private BytecodeMethod resolveDirectTarget() {
+        String proven = getProvenDirectOwner();
+        if (proven != null) return findMethodUp(Parser.getClassObject(proven));
         if (opcode == Opcodes.INVOKESPECIAL) {
             return findMethodUp(Parser.getClassObject(Util.mangle(owner)));
         }
@@ -678,6 +681,12 @@ public class Invoke extends Instruction {
             return null; // genuinely virtual -> target not fixed -> unsafe to inline
         }
         return findMethodUp(Parser.getClassObject(Util.mangle(rc)));
+    }
+
+    /** Exact callee for interprocedural ownership analysis; unresolved dispatch is rejected. */
+    public BytecodeMethod getOwnershipTarget() {
+        return opcode == Opcodes.INVOKESTATIC
+                ? findMethodUp(Parser.getClassObject(Util.mangle(owner))) : resolveDirectTarget();
     }
 
     /**

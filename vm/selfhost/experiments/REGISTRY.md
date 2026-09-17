@@ -2859,3 +2859,290 @@ next widening is aimed at a measured shape.
 
 Not yet measured: whether the win shows up on a quiet machine, and whether it shows up at
 all on a workload whose iterators are a larger share of allocation than 0.02%.
+
+## Round 26: past HotSpot on both axes, and the instrument that got us there
+
+**Headline, self-hosting corpus, two independent interleaved 5-round runs
+(macOS arm64, load ~3, min-of-N wall, max-of-N peak phys_footprint, arms
+byte-identical in emitted C):**
+
+    run 1   vs jdk25: elapsed 0.843x   peak 0.599x     vs jdk8: 0.654x / 0.793x
+    run 2   vs jdk25: elapsed 0.824x   peak 0.590x     vs jdk8: 0.632x / 0.771x
+    run 3   vs jdk25: elapsed 0.759x   peak 0.587x     vs jdk8: 0.552x / 0.771x
+
+Peak footprint is steady to 2% across all three (0.587-0.599); wall clock spreads
+more (0.759-0.843) because the machine was not quiet, which is why the time
+ceiling is set off the WORST of the three and not the best.
+
+    parpar 0.795s / 421MB   jdk25 0.941s / 703MB   jdk8 1.218s / 531MB
+
+ParparVM is roughly 18% faster and uses 41% less memory than JDK 25 here. The
+FINAL table earlier in this file (1.35x time, 1.59x memory) is superseded.
+
+### The instrument: vm/benchmarks/memshape.sh
+
+Whole-program footprint cannot say WHICH shape pays, so nothing could be aimed.
+memshape retains exactly n instances of one shape and stops; peak footprint is
+then linear in n and the SLOPE is that shape's deep retained cost. Three points,
+least squares, and it refuses to quote a shape whose residual exceeds 2%.
+Identical driver and source on both VMs, and it measures no time at all, so it
+cannot drift the way a benchmark does.
+
+It sampled each point ONCE at first, while its numbers were quoted to 0.01B --
+with three equally spaced points the slope is (y3-y1)/2h, so the middle point
+cannot catch an endpoint error and the residual gate tolerated ~3B of slope error
+on a fix worth 8. It now runs MEMSHAPE_REPS (default 3) per point, fits the
+minima AND the maxima, and prints the band. Do not quote a number without it.
+
+### Fix 1: every heap array over-allocated eight bytes
+
+`allocArray` asked for `sizeof(header) + elements + sizeof(void*)` while the
+payload has always ended at `sizeof(header) + elements`. Not a consequence of the
+40 -> 32 header narrowing, which is what the first version of the comment claimed:
+origin/master has a 40-byte header, `data` at 32, the payload at 40, and asks for
+40 + n + 8. Master over-allocates the same eight bytes; the bug is older than the
+narrowing and independent of it.
+
+Eight bytes understates it, because BiBOP rounds to a size class:
+
+    objArr0  56.84 -> 40.22  (-29%)     intArr32 201.65 -> 169.61  (-16%)
+    charArr8 72.59 -> 56.45  (-22%)     objArr8  121.25 -> 104.94  (-13%)
+    byteArr32/intArr8 88.8 -> 72.6      strA32/128 137/251 -> 121/221 (-12%)
+
+Every one of those was PREDICTED before it was measured, 10 of 11 exactly; the
+one miss was arithmetic on the class ladder (288 rounds to 320, there is no 288).
+
+**What it removed, and what that broke.** The slack used to absorb small
+fixed-width overruns. `spare = sizeclass(32+payload) - (32+payload)` is ZERO
+whenever 32+payload lands on a class boundary -- char[8] (48), int[8] (64) and
+Object[8] (96) all do. IOSNative.m's eight `nsDataToXArray` converters allocate
+`[d length]/sizeof(elem)` elements and then `memcpy(..., d.length)`: for a length
+that is not a whole number of elements that is up to esz-1 bytes past the payload,
+7 for long/double, and it now lands in the next object's header. Found by an
+adversarial review pass, not by any gate. All eight now copy
+`length * sizeof(elem)`. Any future native that writes more than
+`length * primitiveSize` bytes is a heap corruption rather than a scribble on
+padding.
+
+### Fix 2: String 48 -> 32 bytes
+
+    offset    4 bytes, ALWAYS ZERO. The only ctor that set it non-zero was the
+              package-private (int,int,char[]) aliasing form, and the emitted C
+              for the whole 849-file corpus contained that symbol only in its own
+              definition and declaration -- no call site anywhere. Deleted; javac
+              enumerated all 20 Java uses, and 45 C sites plus 3 JS sites followed.
+    nsString  8 bytes on EVERY String caching an NSString peer that only strings
+              crossing into Objective-C ever acquire. Every read and write of it
+              is already inside #if defined(__APPLE__) && defined(__OBJC__), so
+              off-Apple it was eight bytes the binary could not even read. Now
+              declared only on ObjC targets (ByteCodeClass.targetGuardFor); iOS is
+              bit-for-bit unchanged.
+
+Both or neither: 48 -> 40 still lands in the 48-byte class and buys nothing. The
+first attempt removed only `offset`, predicted a 16-byte drop, and measured zero
+-- because MemShape's strings are NOT fused (String(char[]) gets its byte[] back
+from a call to toLatin1, so @Fused has no inline NEWARRAY to pack) and 40 still
+rounds to 48. The model was wrong, not the change.
+
+    strA8   104.90 -> 88.73   ratio 2.01 -> 1.71
+    strA32  137.41 -> 105.21  ratio 1.81 -> 1.38
+    strA128 251.17 -> 204.82  ratio 1.46 -> 1.19
+
+On the corpus, where strings ARE fused: **112 -> 92 B/obj, an 18% cut on the
+largest class in the heap** (472,561 live instances).
+
+### The census was blind to 101MB, and the ranking was read off it
+
+`cn1BlockAlloc` bumps `cn1NativeBlockLiveBytes` and never
+`CN1_ALLOC_CENSUS_COUNT`, and `occupied` is exactly bibop + legacy. ArrayList,
+HashMap and StringBuilder all keep their element storage in those malloc'd
+blocks, so the per-class table could not see any of it:
+
+    occupied 1,843,140 objects 169.00MB | bibop 132.78MB legacy 36.22MB
+      | nativeBlocks 101.37MB (cumulative: refs 115.7MB of 168.7MB = 69%)
+
+Live is 270MB, not 169MB. Two claims made off the old table were therefore
+unsupportable and are withdrawn: "186,000 mostly-empty HashMaps" (96 B/obj is the
+header slot for an empty and a full map alike) and "Object[] is not the mass"
+(the reference storage was MOVED OUT of Object[] into exactly the region the
+report omitted). **69% of native-block bytes are reference slots**, so 8 -> 4 byte
+references would be worth ~35MB there alone -- and that surface is reached only
+through cn1RefBlockGet/Set/copy/move plus the GC mark, not the 596 sites an
+object-field change would touch.
+
+The reference share is CUMULATIVE, not live, and deliberately so: remembering
+each block's kind wants a field on CN1NativeBlock, and widening that header moves
+every hash-table slice (cn1TableAlloc pins its layout to sizeof(CN1NativeBlock)
+and a hardcoded 16-byte prefix). Measured: it segfaults during class parsing.
+
+### The ratchet could never fire
+
+perf-guard grepped for an arm named `jdk25` while bench-selfhost.py named arms
+POSITIONALLY (`jdk-1`), and parsed `time Nx` while the bench prints `elapsed Nx`.
+It reported FAIL on a run that was in fact 0.843x and 0.599x. Arms are now named
+from the JDK's real feature version -- which also makes the failure it most needs
+to expose collide loudly: with JDK_25_HOME unset both reference arms resolve to
+the same JVM, and a positional scheme reports them as two different ones.
+Ceilings moved from 2.00x/2.10x (which could not catch a doubling) to 0.95x/0.70x,
+set from the two runs above.
+
+### Coverage added
+
+`Latin1T` (251 lines) walks every crossing of String's compact representation --
+replace widening and narrowing, substring windows either side of the wide char,
+all 49 concat pairs, and equality between the SAME text held in different coders.
+Matches JDK 25 byte-for-byte. It also found that toUpperCase forks to NSString on
+iOS and to an ASCII-only path everywhere else (Character.toUpperCase(int) maps
+only a..z, its real body commented out), so "ÿ".toUpperCase() differs by
+platform. Left out of the gauntlet rather than shipping a red gate; tracked
+separately.
+
+`SbLatin1T` (419 lines) does the same for StringBuilder and StringBuffer, whose
+compact representation is a `wide` flag over one native buffer -- the same design
+as OpenJDK's byte[]+coder, with no array-type duality. Measured working:
+sbNarrow32 153.40 vs sbWide32 185.34, exactly one byte per unit for 32 units.
+
+It found a silent wrong-text bug on its first run. `StringBuffer.append(char[])`
+and `insert(int,char[])` were declared PACKAGE-PRIVATE. Overload resolution picks
+the most specific APPLICABLE method, and a package-private one is not applicable
+from outside java.lang -- so every caller silently bound to the Object overload
+and appended "[C@1b6d3586" instead of the characters. No link error, no crash:
+right in the simulator (a real JDK) and wrong on the device. This is a worse
+failure mode than the missing-API case, because nothing fails at link.
+
+### Leads killed by measurement rather than by effort
+
+    [SB] StringBuilder NEW sites=497 stackAllocated=381 refusedByTryCatch=26
+StringBuilder is 8.32MB of peak heap at 0% traced and the try/catch exclusion
+looked like the cause. It is 5% of sites; 77% are already stack-allocated. Dead
+for the cost of one counter, and the setjmp/longjmp risk was not taken.
+
+HashMap.KeyIterator: 190,914 allocated, 100% dead at peak -- but 2% of the heap
+and 1.9% of churn. NativeTraversal already intrinsifies 276 for-each sites with
+no iterator allocation at all; the 60 refusals are loop-SHAPE refusals, not
+receiver-type ones. Widening the matcher buys under 2%.
+
+Size-class rounding waste, computed exactly over all 416 generated structs: mean
+7.21 bytes (149 waste 0, 165 waste 8, 99 waste 16). Worth knowing before anyone
+proposes a finer ladder; it needs instance weighting before it is worth acting on.
+
+### Still open
+
+The self-hosting corpus has ZERO stream call sites and 12 lambda classes of 422,
+so the lambda/stream half of the pre-written-C idea has no measurement basis here
+at all. StreamFusion matches only Stream.of(Object[]) and bails on any branch.
+Either a representative app corpus gets wired into the census, or that work is
+measured by counters (allocations and indirect calls eliminated) on a
+microbenchmark -- never by wall clock.
+
+## Round 27: a set that stopped renting a map, and a symbol that lied
+
+### The waste, measured before it was fixed
+
+Every `HashSet` was a `HashMap` with the set stored as every value
+(`backingMap.put(object, this)`). So each set allocated a map object AND that map's
+table allocated a full VALUES reference array holding one pointer, repeated. On the
+HelloCodenameOne corpus:
+
+    155,787 live HashSets against 366,554 live HashMaps
+
+42% of every map in the heap existed only to back a set, and the collector was
+marking ~2.5M reference slots that could only ever point at the set that owned them.
+
+### The fix: the whole set in C
+
+`HashSet` now owns an open-addressed table in the native heap -- one reference block
+for elements, one int block for slot markers, **no values array** -- and every
+operation is a single C call. It shares HashMap's probe kernel rather than copying
+it: `cn1HmMarker` (including the String cached-hashCode fast path that skips the
+virtual call) and `cn1HmNextSlot`. `LinkedHashSet` still delegates to a
+LinkedHashMap, because it genuinely needs that map's ordering links, so `HashMap`
+itself is untouched by this change.
+
+**Why all of it had to be C, and not Java over NativeStorage.** The first attempt
+kept the probe in Java. Every `NativeStorage.get/set` is a separate native call, so
+a collection can land between any two of them -- and during a rebuild that meant the
+marker traced a half-filled table while elements still living only in the old one
+were reachable from nothing. Publishing the new table last fixes that specific
+window, but the general shape is wrong: in C the whole operation has no safepoint
+inside it. That is the same reason HashMap rebuilds through the single
+`NativeStorage.rehash` native.
+
+### Measured, by counters rather than by the noisy peak metric
+
+    HashMap live    366,554 objs  33.56MB  ->  215,233 objs  19.71MB
+    HashSet live    155,787 objs   4.75MB  ->  153,586 objs   9.37MB  (32 -> 64 B/obj)
+    occupied      7,135,981 objs 653.65MB -> 6,945,411 objs 644.47MB
+    nativeBlocks              274.57MB    ->             270.95MB
+
+**-151,321 HashMap objects, which is essentially exactly the HashSet count** -- that
+correspondence is the proof the mechanism is the claimed one and not a coincidence.
+Net -190,570 live objects and ~12.8MB. The set itself grew 32 -> 64 bytes to carry
+its own table, which is why the net is smaller than the gross.
+
+Peak footprint is NOT quoted for this change and must not be: on this corpus it
+carries 13-21% of run-to-run variance (same binary, same input: 1440/1543/1551/
+1554/1568/1649MB over six standalone runs, against JDK 25's 1.6%), so a 12.8MB
+result is an order of magnitude below what the metric can resolve. Object counts are
+deterministic; that is what is reported.
+
+### THE SYMBOL LIED, AND IT COST HOURS
+
+The corpus SIGSEGV'd while a 582-line differential torture passed. lldb put the
+crash in `ByteCodeTranslator.copy(InputStream, OutputStream, int)` -- a function
+with no connection to sets. Four hypotheses were built and killed against that
+false location: the GC rebuild window, a `toArray()`/`size()` disagreement, a
+missing SATB deletion barrier, and a failing resource lookup.
+
+**`-O3` plus ThinLTO folds identical functions**, and the linker had merged the real
+culprit into `copy`'s symbol. Rebuilding at `-O1` without LTO gave the true stack on
+the first try:
+
+    cn1CollectionMap
+    java_util_ArrayList_addAllNative
+    java_util_ArrayList.<init>(Collection)
+    BytecodeMethod.declarationOrderedLocals
+    BytecodeMethod.appendMethodC
+    ByteCodeClass.generateCCode
+
+`cn1_collections.h` had a SECOND place assuming every HashSet has a backingMap
+(`NativeTraversal` was the first, and was fixed early). `new ArrayList<>(aSet)`
+recursed into `cn1CollectionMap` with a null owner, which dereferences
+`owner->__codenameOneParentClsReference` on its first line.
+
+Two rules earned here:
+
+- **When a crash symbol stops making sense in an LTO build, rebuild at -O1 before
+  forming a single hypothesis.** Every hour after the symbol stopped making sense
+  was wasted.
+- **The GC verifier had already answered it and was not believed**:
+  `violations=0 earlyFreed=0 resurrected=0` over 28.7M references said plainly that
+  nothing had been collected early, while three of the four hypotheses assumed
+  something had.
+
+### Fixed on the way, and worth keeping independently
+
+`cn1CollectionMap` now returns 0 -- its own documented "not a layout I recognise"
+answer -- for a null owner, instead of dereferencing it. A miss should never be a
+segfault.
+
+`copy()` and `copyRuntimeResource()` now name a null stream instead of crashing.
+`Class.getResourceAsStream` returns null for a missing resource and several callers
+piped it straight into `copy`, where ParparVM turns the null receiver into a SIGSEGV
+with no Java stack and no message. It now says which resource and what
+CN1_RESOURCE_PATH was.
+
+### Coverage that did not exist
+
+`SetTorture`, 582 lines, now in the gauntlet. HashSet and LinkedHashSet had **zero**
+differential coverage before this -- none of MapTorture, MapTorture2, HtTorture or
+IdmTorture mentions either. It covers forced collisions, tombstones, re-adding
+through holes, growth across a resize with holes present, null elements,
+`Iterator.remove`, the bulk operations, LinkedHashSet insertion order, and a
+size/iterator/`toArray` agreement sweep across 200 sizes. Iteration order is sorted
+before printing for HashSet (unspecified, so ours and the JDK's may legitimately
+differ) and printed raw for LinkedHashSet (specified).
+
+It did not catch the crash -- the failing path was `new ArrayList<>(aSet)`, which is
+a collection CONSTRUCTOR reading the set through the native bulk-copy path, not any
+set operation. Worth adding.

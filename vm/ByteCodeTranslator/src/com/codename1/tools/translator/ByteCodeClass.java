@@ -86,22 +86,44 @@ public class ByteCodeClass {
      * representation choice for containers whose internals are ours, not a facility
      * application code can opt into.
      */
-    private static final String[][] NATIVE_REF_BLOCKS = {
-        { "java_util_HashMap", "cn1KeysBlock" },
-        { "java_util_HashMap", "cn1ValsBlock" },
+    /** One ownership description drives tracing, reclamation and native field handling. */
+    private static final class NativeBlock {
+        final String owner, field;
+        final boolean references, owns;
+        NativeBlock(String owner, String field, boolean references) {
+            this(owner, field, references, true);
+        }
+        NativeBlock(String owner, String field, boolean references, boolean owns) {
+            this.owner = owner;
+            this.field = field;
+            this.references = references;
+            this.owns = owns;
+        }
+    }
+
+    private static final NativeBlock[] NATIVE_BLOCKS = {
+        new NativeBlock("java_lang_StringBuilder", "cn1Storage", false),
+        new NativeBlock("java_util_IdentityHashMap", "elementData", true),
+        new NativeBlock("java_util_ArrayDeque", "elements", true),
+        new NativeBlock("java_util_LinkedHashMap", "cn1Prev", false, false),
+        new NativeBlock("java_util_LinkedHashMap", "cn1Next", false, false),
+        new NativeBlock("java_util_Hashtable", "cn1Keys", true),
+        new NativeBlock("java_util_Hashtable", "cn1Vals", true, false),
+        new NativeBlock("java_util_Hashtable", "cn1Meta", false, false),
+        new NativeBlock("java_util_ArrayList", "cn1Storage", true),
+        new NativeBlock("java_util_Vector", "cn1Storage", true),
+        // A plain HashSet owns its table: one reference block for elements, one int
+        // block for slot markers, and no values array. Independent allocations.
+        new NativeBlock("java_util_HashSet", "cn1KeysBlock", true),
+        new NativeBlock("java_util_HashSet", "cn1MetaBlock", false),
+        new NativeBlock("java_util_HashMap", "cn1KeysBlock", true),
+        new NativeBlock("java_util_HashMap", "cn1ValsBlock", true, false),
+        new NativeBlock("java_util_HashMap", "cn1MetaBlock", false, false),
     };
 
-    /** Every block field to release from the owner's finalizer, primitive ones included. */
-    private static final String[][] NATIVE_BLOCK_FREE = {
-        { "java_util_HashMap", "cn1KeysBlock" },
-        { "java_util_HashMap", "cn1ValsBlock" },
-        { "java_util_HashMap", "cn1MetaBlock" },
-    };
-
-    /** True when this class owns at least one native block (traced or merely freed). */
     private static boolean hasNativeBlocks(String cls) {
-        for (String[] r : NATIVE_BLOCK_FREE) {
-            if (r[0].equals(cls)) {
+        for (NativeBlock block : NATIVE_BLOCKS) {
+            if (block.owner.equals(cls)) {
                 return true;
             }
         }
@@ -660,7 +682,7 @@ public class ByteCodeClass {
     private boolean hasRealFinalizerInHierarchy() {
         ByteCodeClass c = this;
         while(c != null) {
-            if(c.hasFinalizer()) {
+            if(c.hasFinalizer() || hasNativeBlocks(c.clsName)) {
                 return true;
             }
             if(c.baseClassObject == null) {
@@ -668,6 +690,23 @@ public class ByteCodeClass {
                 // is unresolved -> assume it might declare one.
                 return c.baseClass != null;
             }
+            c = c.baseClassObject;
+        }
+        return false;
+    }
+
+    // Leaf objects need a mark bit, but no queued tracing callback. Native reference
+    // blocks and Reference.referent count even though neither is a normal strong field.
+    private boolean hasGcReferencesInHierarchy() {
+        ByteCodeClass c = this;
+        while (c != null) {
+            for (ByteCodeField field : c.fields) {
+                if (!field.isStaticField() && field.isObjectType()) return true;
+            }
+            for (NativeBlock block : NATIVE_BLOCKS) {
+                if (block.references && block.owner.equals(c.clsName)) return true;
+            }
+            if (c.baseClassObject == null) return c.baseClass != null;
             c = c.baseClassObject;
         }
         return false;
@@ -768,8 +807,12 @@ public class ByteCodeClass {
         } else {
             b.append("0");
         }
-        b.append(" ,0 , &__GC_MARK_");
-        b.append(clsName);
+        b.append(" ,0 , ");
+        if (hasGcReferencesInHierarchy()) {
+            b.append("&__GC_MARK_").append(clsName);
+        } else {
+            b.append("0");
+        }
         
         // initialized defaults to false
         b.append(",  0, ");
@@ -908,6 +951,9 @@ public class ByteCodeClass {
             b.append("0, 0, 0, 0, 0, 0, 0, "+getArrayClazz(iter+1)+"\n};\n\n");
         }
 
+        // Accessors below test completion before fetching thread context. The
+        // recursion flag in class__X is set before <clinit> and cannot publish it.
+        b.append("static int __").append(clsName).append("_LOADED__=0;\n");
         staticFieldList = new ArrayList<ByteCodeField>();
         buildStaticFieldList(staticFieldList);
         String enumValuesField = null;
@@ -945,7 +991,7 @@ public class ByteCodeClass {
                                             b.append("-1.0f / 0.0f");
                                         }
                                     } else {
-                                        b.append(bf.getValue());
+                                        b.append(CNumber.literal(d.doubleValue()));
                                     }
                                 }
                             } else {
@@ -961,7 +1007,7 @@ public class ByteCodeClass {
                                                 b.append("-1.0f / 0.0f");
                                             }
                                         } else {
-                                            b.append(bf.getValue());
+                                            b.append(CNumber.literal(d.floatValue()));
                                         }
                                     }
                                 } else {
@@ -1008,13 +1054,10 @@ public class ByteCodeClass {
                     b.append(clsName);
                     b.append("_");
                     b.append(bf.getFieldName().replace('$', '_'));
-                    // Inline-guard rather than call: the initialiser's own first
-                    // line already returns when the flag is set, so the call was a
-                    // no-op after the first time -- but a CALL, on a path that runs
-                    // per static-field access. MEASURED: __STATIC_INITIALIZER_* was
-                    // 7.2% of mutator self-time, java.util.Iterator's alone 6.26%.
-                    // Safe as an ACQUIRE load now that the flag is release-stored.
-                    b.append("() {\n    __STATIC_INITIALIZER_");
+                    // Match the initializer's acquire/release completion check.
+                    // TLS lookup and initialization are cold after the first access.
+                    b.append("() {\n    if (!__atomic_load_n(&__").append(bf.getClsName());
+                    b.append("_LOADED__, __ATOMIC_ACQUIRE)) __STATIC_INITIALIZER_");
                     b.append(bf.getClsName());
                     if (bf.isVolatile()) {
                         b.append("(getThreadLocalData());\n     return atomic_load_explicit(&STATIC_FIELD_");
@@ -1040,7 +1083,8 @@ public class ByteCodeClass {
                         b.append("CODENAME_ONE_THREAD_STATE, ");
                     }
                     b.append(bf.getCDefinition());
-                    b.append(" __cn1StaticVal) {\n    __STATIC_INITIALIZER_");
+                    b.append(" __cn1StaticVal) {\n    if (!__atomic_load_n(&__").append(bf.getClsName());
+                    b.append("_LOADED__, __ATOMIC_ACQUIRE)) __STATIC_INITIALIZER_");
                     b.append(bf.getClsName());
                     if (bf.isObjectType()) {
                         b.append("(threadStateData);\n    ");
@@ -1093,6 +1137,17 @@ public class ByteCodeClass {
             nullCheck = "if(__cn1T == JAVA_NULL){throwException(getThreadLocalData(), __NEW_INSTANCE_java_lang_NullPointerException(getThreadLocalData()));}\n";
         }
         for(ByteCodeField fld : fullFieldList) {
+            // A conditionally-declared field has no accessor on a target that does
+            // not declare it; see targetGuardFor. The guard has to wrap the WHOLE
+            // getter/setter pair, so it opens here and closes after the setter.
+            String fldGuard = targetGuardFor(fld.getClsName().replace('/', '_').replace('$', '_'),
+                    fld.getFieldName());
+            if(fldGuard == null) {
+                fldGuard = targetGuardFor(clsName, fld.getFieldName());
+            }
+            if(fldGuard != null) {
+                b.append("#if ").append(fldGuard).append("\n");
+            }
             b.append(fld.getCDefinition());
             b.append(" get_field_");
             b.append(clsName);
@@ -1200,6 +1255,9 @@ public class ByteCodeClass {
                 b.append(fld.getFieldName());
                 b.append(" = __cn1Val;\n}\n\n");
             }
+            if(fldGuard != null) {
+                b.append("#endif\n");
+            }
         }
                 
         
@@ -1207,60 +1265,67 @@ public class ByteCodeClass {
         b.append("JAVA_VOID __FINALIZER_");
         b.append(clsName);
         b.append("(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT objToDelete) {\n");
-        if(hasFinalizer()) {
-            b.append("    ");
-            b.append(clsName);
-            b.append("_finalize__(threadStateData, objToDelete);\n");
+        // Invoke the most-derived Java finalizer once. Java code decides whether
+        // to call super.finalize(); native storage cleanup is independent of it.
+        ByteCodeClass finalizerOwner = this;
+        while (finalizerOwner != null && !finalizerOwner.hasFinalizer()) {
+            finalizerOwner = finalizerOwner.baseClassObject;
         }
-        // Release native backing blocks. This is the ONLY thing that frees them, which is
-        // why an owner must reach the per-slot reclaim path: a page taking the O(1)
-        // all-dead reclaim never runs a finalizer, and the blocks would leak. Declaring a
-        // finalizer is what puts it on that path (the sweep's needsReclaim test reads
-        // finalizerFunction), so an owner class here must also declare one.
-        for (String[] r : NATIVE_BLOCK_FREE) {
-            if (r[0].equals(clsName)) {
-                b.append("    cn1RefBlockFree(((struct obj__").append(clsName);
-                b.append("*)objToDelete)->").append(clsName).append("_").append(r[1]).append(");\n");
-                b.append("    ((struct obj__").append(clsName);
-                b.append("*)objToDelete)->").append(clsName).append("_").append(r[1]).append(" = 0;\n");
+        if (finalizerOwner != null) {
+            b.append("    cn1InvokeFinalizer(threadStateData, objToDelete, ");
+            b.append(finalizerOwner.clsName);
+            b.append("_finalize__);\n");
+        }
+        // Walk ownership, not the Java finalize chain: throwing or omitting
+        // super.finalize() must not leak an inherited native backing block.
+        for (ByteCodeClass owner = this; owner != null; owner = owner.baseClassObject) {
+            for (NativeBlock block : NATIVE_BLOCKS) {
+                if (!block.owner.equals(owner.clsName)) continue;
+                if (block.owns) {
+                    if ("java_lang_StringBuilder".equals(block.owner)) {
+                        b.append("    if (((struct obj__java_lang_StringBuilder*)objToDelete)->java_lang_StringBuilder_cn1Storage != ")
+                         .append("(JAVA_LONG)(uintptr_t)((struct obj__java_lang_StringBuilder*)objToDelete)->__cn1InlineStorage)\n");
+                    }
+                    b.append("    cn1RefBlockFree(((struct obj__").append(block.owner);
+                    b.append("*)objToDelete)->").append(block.owner).append("_").append(block.field).append(");\n");
+                }
+                b.append("    ((struct obj__").append(block.owner);
+                b.append("*)objToDelete)->").append(block.owner).append("_").append(block.field).append(" = 0;\n");
             }
         }
-        // invoke the finalize method of the base
-        if(baseClass != null) {
-            b.append("    __FINALIZER_");
-            b.append(baseClass.replace('/', '_').replace('$', '_'));
-            b.append("(threadStateData, objToDelete);\n");
-        }
-        
+
         b.append("}\n\n");
                 
         // mark function for the GC mark cycle to tag the objects that are reachable
         b.append("void __GC_MARK_");
         b.append(clsName);
         b.append("(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT objToMark, JAVA_BOOLEAN force) {\n");
-        // The cast is only worth making for a class that marks fields of its own.
-        // A class that declares no object fields -- and there are thousands, every
-        // one that holds nothing but primitives -- marks nothing here and only
-        // chains to its base, so the declaration would be a variable no statement
-        // in the function reads. Emitting it regardless was ~2,400
-        // -Wunused-variable warnings in one application build.
-        boolean marksOwnFields = false;
-        for(ByteCodeField fld : fullFieldList) {
-            if(!fld.isStaticField() && fld.isObjectType() && fld.getClsName().equals(clsName)) {
-                marksOwnFields = true;
+        // The complete layout is known here: trace inherited fields in the same
+        // callback, sharing one marking context rather than chaining base callbacks.
+        List<ByteCodeField> markFields = new ArrayList<ByteCodeField>();
+        for (ByteCodeClass owner = this; owner != null; owner = owner.baseClassObject) {
+            for (ByteCodeField field : owner.fields) {
+                if (!field.isStaticField()) markFields.add(field);
+            }
+        }
+        boolean marksFields = false;
+        for(ByteCodeField fld : markFields) {
+            if(!fld.isStaticField() && fld.isObjectType()) {
+                marksFields = true;
                 break;
             }
         }
-        if(marksOwnFields) {
+        if(marksFields) {
             b.append("    struct obj__");
             b.append(clsName);
             b.append("* objInstance = (struct obj__");
             b.append(clsName);
             b.append("*)objToMark;\n");
+            b.append("    const int markEpoch = cn1GcFieldMarkEpoch(force);\n");
         }
-        for(ByteCodeField fld : fullFieldList) {
-            if(!fld.isStaticField() && fld.isObjectType() && fld.getClsName().equals(clsName)) {
-                if(isReferenceReferent(clsName, fld)) {
+        for(ByteCodeField fld : markFields) {
+            if(!fld.isStaticField() && fld.isObjectType()) {
+                if(isReferenceReferent(fld.getClsName(), fld)) {
                     // THE REFERENT IS NOT TRACED. Handing it to gcMarkObject here is
                     // what made every WeakReference strong; instead the collector is
                     // told the reference exists and is given the addresses it needs to
@@ -1311,7 +1376,7 @@ public class ByteCodeClass {
                     b.append(", \"").append(clsName).append(".").append(fld.getFieldName()).append("\");\n");
                     b.append("#endif\n");
                 }
-                b.append("    gcMarkObject(threadStateData, ");
+                b.append("    cn1GcMarkField(threadStateData, ");
                 if (fld.isVolatile()) {
                     b.append("atomic_load_explicit(&objInstance->");
                     b.append(fld.getClsName());
@@ -1324,39 +1389,26 @@ public class ByteCodeClass {
                     b.append("_");
                     b.append(fld.getFieldName());
                 }
-                b.append(", force);\n");
+                b.append(", force, markEpoch);\n");
             }
         }
-        // invoke the mark method of the base
-        // Trace any native backing block BEFORE chaining to the base class, so the
-        // references it holds are marked on the same pass as the owner's own fields.
-        for (String[] r : NATIVE_REF_BLOCKS) {
-            if (r[0].equals(clsName)) {
+        // Trace native backing blocks from the complete inherited layout too.
+        for (NativeBlock block : NATIVE_BLOCKS) {
+            boolean ownsBlock = false;
+            for (ByteCodeField field : markFields) {
+                if (!field.isStaticField() && block.owner.equals(field.getClsName())
+                        && block.field.equals(field.getFieldName())) { ownsBlock = true; break; }
+            }
+            if (block.references && ownsBlock) {
                 // No count argument: the block carries its own length one slot below the
                 // pointer. Passing a separate capacity field would let a marker pair a new
                 // block with a stale capacity -- see cn1RefBlockAlloc.
                 b.append("    cn1GcMarkRefBlock(threadStateData, ((struct obj__");
-                b.append(clsName).append("*)objToMark)->").append(clsName).append("_").append(r[1]);
+                b.append(clsName).append("*)objToMark)->").append(block.owner).append("_").append(block.field);
                 b.append(", force);\n");
             }
         }
-        if(baseClass != null) {
-            b.append("    __GC_MARK_");
-            b.append(baseClass.replace('/', '_').replace('$', '_'));
-            b.append("(threadStateData, objToMark, force);\n");
-        } else {
-            // we can do this in Object.java only since all code will reach here eventually.
-            //
-            // ATOMIC, and it has to be: this is the root of every generated mark chain, so
-            // it is THE collector-side write of the mark word, and the SATB barrier
-            // (cn1SatbEnqueue) atomically loads the same field from mutator threads while
-            // the mark is running. A plain store here would leave that pair a mixed
-            // atomic/non-atomic access, which is undefined in C -- the same defect the
-            // hand-written stores in cn1_globals.m were converted for. Relaxed is the same
-            // instruction on every target we build; what it buys is that the write is one
-            // the reader is allowed to observe.
-            b.append("    __atomic_store_n(&objToMark->__codenameOneGcMark, currentGcMarkValue, __ATOMIC_RELAXED);\n");
-        }
+        b.append("    __atomic_store_n(&objToMark->__codenameOneGcMark, currentGcMarkValue, __ATOMIC_RELAXED);\n");
         b.append("}\n\n");
 
         // initialize object instances
@@ -1487,26 +1539,16 @@ public class ByteCodeClass {
                     // claimed this was already restricted; it was not.)
                     if (ByteCodeTranslator.output == ByteCodeTranslator.OutputType.OUTPUT_TYPE_CLEAN) {
                         b.append("    cn1AbortOnUncaughtException = 1;\n");
+                        // This entry executes Java until process exit. Register
+                        // both halves of the cooperative safepoint protocol,
+                        // just as threadRunner does for a Java Thread.
+                        b.append("    struct ThreadLocalData* mainThread = getThreadLocalData();\n");
+                        b.append("    mainThread->lightweightThread = JAVA_TRUE;\n");
+                        b.append("    mainThread->threadActive = JAVA_TRUE;\n");
                     }
-                    // MAIN IS NOT REGISTERED AS A LIGHTWEIGHT THREAD, and that is the
-                    // behaviour every shipping build has always had. A block here used to
-                    // set lightweightThread on it, but it sat inside #ifdef CN1_NURSERY,
-                    // which nothing ever defined, so it was dead text in the emitted C;
-                    // it went with the nursery rather than being switched on, because
-                    // turning it on would change what every generated application does.
-                    //
-                    // Keep the hazard it documented, because it still applies to anything
-                    // that flips that flag here. "Lightweight" is a promise to the
-                    // collector that the thread parks: cn1_globals.m waits for
-                    // threadActive to drop and then migrates pendingHeapAllocations
-                    // WITHOUT taking threadHeapMutex, which is the mutex it does take for
-                    // a native thread. The unlocked append in cn1AddPending is safe only
-                    // under that pause -- its own comment says so -- so a thread that
-                    // never parks and still claims to be lightweight lets a grow inside
-                    // cn1AddPending free the array while the collector is reading it. On
-                    // macOS in particular this thread goes on to become AppKit's event
-                    // loop, which reaches Java only through callbacks and brackets
-                    // nothing, so it must stay native.
+                    // UI host threads remain native: AppKit's event loop enters
+                    // Java through callbacks rather than running a Java main to
+                    // completion. The clean target above has no such host loop.
                     // On the native macOS target the application's main method
                     // runs on a background thread and AppKit owns the main one.
                     // That is not a preference: the main thread has to be free to
@@ -1587,7 +1629,7 @@ public class ByteCodeClass {
                         // we pretend to have a virtual method here but the optimizer says its not really needed
                         if(!m.isVirtualOverriden()) {
                             m.appendVirtualMethodC(clsName, b, "classToInterfaceMap_" + clsName +
-                                    "[CN1_CLASS_OF(__cn1ThisObject)->classId][" + offset + "]", true);
+                                    "[cn1__cls->classId][" + offset + "]", true);
                         }
                         offset++;
                     }
@@ -1648,16 +1690,7 @@ public class ByteCodeClass {
             b.append("}\n\n");
         }
         
-        // insert static initializer
-        // NOT static: the inline guards emitted at allocation and static-access
-        // sites live in OTHER translation units and have to test COMPLETION. They
-        // used to test class__X.initialized instead, which is the wrong flag --
-        // that one is the JLS recursion guard and is deliberately set BEFORE
-        // __CLINIT__ runs, so a thread observing it could skip the initialiser
-        // while another thread was still inside the class initialiser, and then
-        // read statics that had not been written yet. Releasing on "started"
-        // cannot publish writes that happen after it.
-        b.append("static int __").append(clsName).append("_LOADED__=0;\n");
+        // The file-local completion flag was declared before the accessors.
         b.append("void __STATIC_INITIALIZER_");
         b.append(clsName);
         // ACQUIRE, not a plain load. This is the fast path of a double-checked
@@ -1735,7 +1768,11 @@ public class ByteCodeClass {
                         b.append(clsName);
                         b.append("[cn1_class_id_");
                         b.append(cls.clsName);
-                        b.append("] = malloc(sizeof(int*) * ");
+                        // sizeof(int), not sizeof(int*): a row is an int[] of vtable
+                        // slot indices -- the map is int**, so the ROW is what is
+                        // int-sized. Asking for pointer size allocated twice what the
+                        // row can ever hold, on every interface/implementor pair.
+                        b.append("] = malloc(sizeof(int) * ");
                         b.append(getMethodCountIncludingBase());
                         b.append(");\n");
                         offset = 0;
@@ -1887,11 +1924,20 @@ public class ByteCodeClass {
             String declCls = bf.getClsName().replace('/', '_').replace('$', '_');
             int fid = Parser.getOrAssignFieldId(declCls, bf.getFieldName());
             char tc = onDeviceDebugTypeCharFor(bf);
+            // A conditionally-declared field has no offsetof on a target that does
+            // not declare it; see targetGuardFor.
+            String guard = targetGuardFor(declCls, bf.getFieldName());
+            if(guard != null) {
+                b.append("#if ").append(guard).append("\n");
+            }
             b.append("    { ").append(fid)
               .append(", (int)offsetof(struct obj__").append(clsName)
               .append(", ").append(declCls).append("_").append(bf.getFieldName())
               .append("), '").append(tc).append("', \"")
               .append(bf.getFieldName()).append("\" },\n");
+            if(guard != null) {
+                b.append("#endif\n");
+            }
         }
         b.append("};\n");
         b.append("__attribute__((constructor)) static void __cn1_dbg_register_").append(clsName).append("(void) {\n");
@@ -2089,12 +2135,47 @@ public class ByteCodeClass {
         return fieldList;
     } 
     
+    /**
+     * A per-target preprocessor condition for a field the generated struct should
+     * only DECLARE on some targets, or null when the field is unconditional.
+     *
+     * <p>There is exactly one today. {@code java.lang.String.nsString} caches a
+     * retained NSString peer so a string that crosses into Objective-C does not
+     * have to be converted twice. Every read and write of it is already inside
+     * {@code #if defined(__APPLE__) && defined(__OBJC__)} -- so on the clean C
+     * target, native Windows, native Linux and the JavaScript port it is eight
+     * bytes per String that the binary it is compiled into cannot even read.
+     * Measured, that is 8 x 412,859 live Strings = 3.15MB of the 168.97MB peak
+     * heap on the self-hosting corpus.
+     *
+     * <p>Declaring it conditionally rather than deleting it keeps iOS behaviour
+     * bit-for-bit identical: the peer cache is still a plain field load there.
+     * The precedent is DEBUG_GC_VARIABLES, which already varies the object header
+     * between builds.
+     *
+     * <p>EVERY place that reproduces the struct layout must ask this, or it will
+     * disagree with the struct. There are two: {@link #addFields} emits the
+     * declaration, and {@link #appendOnDeviceDebugFieldTable} takes offsetof of
+     * it -- an unguarded entry there fails to compile the moment someone builds
+     * CN1_ON_DEVICE_DEBUG for a non-Apple target.
+     */
+    public static String targetGuardFor(String mangledOwner, String fieldName) {
+        if ("java_lang_String".equals(mangledOwner) && "nsString".equals(fieldName)) {
+            return "defined(__APPLE__) && defined(__OBJC__)";
+        }
+        return null;
+    }
+
     private void addFields(StringBuilder b) {
         if(baseClassObject != null) {
             baseClassObject.addFields(b);
         }
         for(ByteCodeField bf : fields) {
             if(!bf.isStaticField()) {
+                String guard = targetGuardFor(clsName, bf.getFieldName());
+                if(guard != null) {
+                    b.append("#if ").append(guard).append("\n");
+                }
                 b.append("    ");
                 b.append(bf.getCStorageDefinition());
                 b.append(" ");
@@ -2102,6 +2183,9 @@ public class ByteCodeClass {
                 b.append("_");
                 b.append(bf.getFieldName());
                 b.append(";\n");
+                if(guard != null) {
+                    b.append("#endif\n");
+                }
             } 
         }
     }
@@ -2293,6 +2377,14 @@ public class ByteCodeClass {
         }
 
         for(ByteCodeField fld : fullFieldList) {
+            String declGuard = targetGuardFor(fld.getClsName().replace('/', '_').replace('$', '_'),
+                    fld.getFieldName());
+            if(declGuard == null) {
+                declGuard = targetGuardFor(clsName, fld.getFieldName());
+            }
+            if(declGuard != null) {
+                b.append("#if ").append(declGuard).append("\n");
+            }
             b.append(fld.getCDefinition());
             b.append(" get_field_");
             b.append(clsName);
@@ -2307,6 +2399,9 @@ public class ByteCodeClass {
             b.append("(");
             b.append(fld.getCDefinition());
             b.append(" __cn1Val, JAVA_OBJECT __cn1T);\n");
+            if(declGuard != null) {
+                b.append("#endif\n");
+            }
         }
         
         b.append("\n\n");
@@ -2323,7 +2418,10 @@ public class ByteCodeClass {
 
         
         addFields(b);
-        
+        if ("java_lang_StringBuilder".equals(clsName)) {
+            // Small builders need neither a child array nor a malloc allocation.
+            b.append("    unsigned char __cn1InlineStorage[16] __attribute__((aligned(16)));\n");
+        }
         b.append("};\n\n");
                      
         

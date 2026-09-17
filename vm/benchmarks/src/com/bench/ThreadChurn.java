@@ -65,6 +65,11 @@ public class ThreadChurn {
             for (Thread t : ts) t.join();
             for (int w = 0; w < 8; w++) ck += workerSum[w];
             System.gc();
+            // Collection is asynchronous in ParparVM. Keep the survivor table
+            // live while the collector processes the terminated threads before
+            // the next churn round. The verifier separately requires completed
+            // cycles; finishing this short program is not evidence of collection.
+            Thread.sleep(250);
         }
 
         for (int i = 0; i < SURVIVORS; i += 97) {

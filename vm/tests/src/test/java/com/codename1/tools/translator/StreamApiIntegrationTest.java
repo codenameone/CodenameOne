@@ -67,6 +67,19 @@ class StreamApiIntegrationTest {
         CleanTargetIntegrationTest.runTranslator(classesDir, outputDir, "StreamEdgeApp");
 
         Path distDir = outputDir.resolve("dist");
+        String generated = new String(Files.readAllBytes(distDir.resolve("StreamEdgeApp-src/StreamEdgeApp.c")), StandardCharsets.UTF_8);
+        assertTrue(generated.split("fused array stream", -1).length >= 9,
+                "All eight immediate helper pipelines must actually lower to C");
+        for (String helper : Arrays.asList("fusedMatch", "fusedCount", "fusedForEach", "fusedAll",
+                "fusedNone", "fusedZero", "fusedThrow", "fusedMutation")) {
+            int start = generated.indexOf(" StreamEdgeApp_" + helper + "_");
+            assertTrue(start >= 0);
+            int end = generated.indexOf("\nJAVA_", start);
+            String body = generated.substring(start, end < 0 ? generated.length() : end);
+            assertTrue(body.contains("fused array stream"), helper);
+            assertFalse(body.contains("lambda$factory"), helper + " must not allocate callback objects");
+            assertFalse(body.contains("virtual_java_util_stream"), helper + " must not dispatch stream stages");
+        }
         Path cmakeLists = distDir.resolve("CMakeLists.txt");
         assertTrue(Files.exists(cmakeLists), "Translator should emit a CMake project");
 

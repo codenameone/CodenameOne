@@ -24,6 +24,9 @@ CC="${CN1_SELFHOST_CC:-clang}"
 J8="${JDK_8_HOME:?set JDK_8_HOME to a working JDK 8}"
 OUT="$REPO/vm/selfhost/target"
 mkdir -p "$OUT"
+CN1_BUILD_SOURCE_SNAPSHOT="$(mktemp -t cn1sources)"
+export CN1_BUILD_SOURCE_SNAPSHOT
+python3 "$REPO/vm/selfhost/bench-selfhost.py" --snapshot-sources "$CN1_BUILD_SOURCE_SNAPSHOT"
 
 # 1. translator classes + ASM classpath, built once by maven and then cached.
 TRANSLATOR="$REPO/vm/ByteCodeTranslator/target/classes"
@@ -42,7 +45,7 @@ TR_MANIFEST="$REPO/vm/ByteCodeTranslator/target/selfhost-src.manifest"
 # missing file. Caught by asking the gate to stay SILENT when nothing changed, which is
 # the half of a negative control that is easy to skip.
 TR_MANIFEST_NOW="$(mktemp -t cn1selfhostmanifest)"
-trap 'rm -f "$TR_MANIFEST_NOW"' EXIT
+trap 'rm -f "$TR_MANIFEST_NOW" "$CN1_BUILD_SOURCE_SNAPSHOT"' EXIT
 find "$REPO/vm/ByteCodeTranslator/src" -type f | sort > "$TR_MANIFEST_NOW"
 needs_build=0
 if [ ! -f "$TRANSLATOR/com/codename1/tools/translator/ByteCodeTranslator.class" ]; then
@@ -187,4 +190,6 @@ BIN="$OUT/parpar$( [ "$OPT" = "-O3" ] && echo "-O3" || echo "" )"
 $CC $OPT -w -fwrapv -fno-strict-aliasing -fno-builtin-fmod -fno-builtin-fmodf \
     $CN1_SELFHOST_CFLAGS -I"$SRCDIR" "$SRCDIR"/*.c $ASMS -lm -lpthread -o "$BIN" \
     2> "$OUT/cc.log" || { echo "COMPILE FAILED"; tail -40 "$OUT/cc.log"; exit 1; }
+CN1_BUILD_FLAGS="$OPT -fwrapv -fno-strict-aliasing -fno-builtin-fmod -fno-builtin-fmodf $CN1_SELFHOST_CFLAGS" \
+    python3 "$REPO/vm/selfhost/bench-selfhost.py" --record-build "$BIN"
 echo "built $BIN"

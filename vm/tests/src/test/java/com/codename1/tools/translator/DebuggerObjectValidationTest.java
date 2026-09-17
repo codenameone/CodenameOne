@@ -95,9 +95,9 @@ class DebuggerObjectValidationTest {
      * was one bit. Widening the tag to three bits only widens the fraction of arbitrary
      * words this covers, from one in two to seven in eight.
      *
-     * The GC is unaffected. cn1ConservativeResolve rejects any word with a bit set in
-     * (sizeof(void*) - 1), which is the same three bits, so a misread int was never a root
-     * before this change and is not one now.
+     * The debugger classifies the value without dereferencing it. Conservative GC
+     * separately resolves raw machine words against registered allocation ranges,
+     * including unaligned byte-interior pointers retained by optimized native code.
      */
     @Test
     void anIntSlotThatLooksLikeAnImmediateIsReportedWithoutBeingDereferenced() throws Exception {

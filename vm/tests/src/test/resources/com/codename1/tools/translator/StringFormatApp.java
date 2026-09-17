@@ -59,7 +59,160 @@ public class StringFormatApp {
         return sb.toString();
     }
 
+    private static void replacementCases() {
+        int[] lengths = {0, 1, 7, 31, 127, 1024, 4096};
+        char[] characters = {0, 'a', 127, 128, 255, 256, '\ud800', '\udfff'};
+        long checksum = 0;
+        for (int length : lengths) {
+            for (int width = 0; width < 2; width++) {
+                StringBuilder b = new StringBuilder("prefix");
+                for (int i = 0; i < length; i++) b.append(characters[i % (width == 0 ? 5 : 8)]);
+                b.append("suffix");
+                String input = b.toString().substring(6, 6 + length);
+                int originalHash = input.hashCode();
+                for (char oldChar : characters) for (char newChar : characters) {
+                    String result = input.replace(oldChar, newChar);
+                    if (result.length() != length) throw new AssertionError("replacement length");
+                    for (int i = 0; i < length; i++) {
+                        char old = input.charAt(i);
+                        if (result.charAt(i) != (old == oldChar ? newChar : old))
+                            throw new AssertionError("replacement character");
+                    }
+                    if ((oldChar == newChar || input.indexOf(oldChar) < 0) && result != input)
+                        throw new AssertionError("replacement identity");
+                    if (input.hashCode() != originalHash || !input.equals(b.toString().substring(6, 6 + length)))
+                        throw new AssertionError("replacement changed source");
+                    checksum = checksum * 31 + result.hashCode();
+                }
+            }
+        }
+        f("s.replaceChars", "%d", checksum);
+    }
+
+    private static String bytesHex(byte[] bytes) {
+        StringBuilder result = new StringBuilder();
+        for (byte value : bytes) result.append(Integer.toHexString(value & 255)).append(',');
+        return result.toString();
+    }
+
+    private static void encodingCases() {
+        StringBuilder all = new StringBuilder("prefix");
+        for (int i = 0; i < 256; i++) all.append((char)i);
+        all.append("suffix");
+        String[] texts = {"", "plain ASCII", all.toString().substring(6, 262),
+                all.toString().substring(7, 261), "a\u00ff\u0100\ud83d\ude00"};
+        String[] encodings = {"UTF-8", "UTF8", "US-ASCII", "ASCII", "ISO-8859-1", "ISO8859-1", "LATIN1"};
+        try {
+            for (int i = 0; i < texts.length; i++) {
+                f("encode.default." + i, "%s", bytesHex(texts[i].getBytes()));
+                for (String encoding : encodings) {
+                    byte[] bytes = texts[i].getBytes(encoding);
+                    String expected = bytesHex(bytes);
+                    if (bytes.length > 0) bytes[0] ^= 127;
+                    if (!expected.equals(bytesHex(texts[i].getBytes(encoding))))
+                        throw new AssertionError("encoded bytes alias String storage");
+                    f("encode." + i + "." + encoding, "%s", expected);
+                }
+            }
+        } catch (java.io.UnsupportedEncodingException error) { throw new AssertionError(error); }
+    }
+
+    private static int builderThrows() {
+        StringBuilder b = new StringBuilder();
+        b.ensureCapacity(8192);
+        b.append("overflow");
+        return b.charAt(-1);
+    }
+
+    private static StringBuilder escapedBuilder;
+    private static void borrowBuilder(StringBuilder b, long[] ignored) { b.append("borrowed"); }
+    private static void retainBuilder(StringBuilder b) { escapedBuilder = b; }
+    private static String borrowedBuilderResult() {
+        StringBuilder b = new StringBuilder();
+        b.ensureCapacity(8192);
+        borrowBuilder(b, new long[1]);
+        return b.toString();
+    }
+    private static void escapingBuilderResult() {
+        StringBuilder b = new StringBuilder();
+        retainBuilder(b);
+        b.append("retained");
+    }
+
+    private static String builderReturns() {
+        StringBuilder b = new StringBuilder();
+        b.ensureCapacity(8192);
+        b.append("returned");
+        return b.toString();
+    }
+
+    private static void nativeBuilderCases() {
+        f("builder.borrowed", "%s", borrowedBuilderResult());
+        escapingBuilderResult();
+        System.gc();
+        f("builder.escaped", "%s", escapedBuilder.toString());
+        int caught = 0;
+        for (int i = 0; i < 1000; i++) {
+            try { builderThrows(); }
+            catch (IndexOutOfBoundsException expected) { caught++; }
+            if (!"returned".equals(builderReturns())) throw new AssertionError("Stack buffer return");
+        }
+        f("builder.unwind", "%d", caught);
+        StringBuilder b = new StringBuilder(0);
+        b.append(new char[0], 0, 0).append("");
+        b.trimToSize();
+        f("builder.empty", "%d/%d", b.length(), b.capacity());
+        char[] latin = new char[256];
+        for (int i = 0; i < latin.length; i++) latin[i] = (char)i;
+        b.append(latin, 0, latin.length);
+        String before = b.toString();
+        b.ensureCapacity(8192);
+        b.setCharAt(120, '\u4321');
+        b.insert(3, "insert").delete(4, 8).reverse();
+        b.trimToSize();
+        f("builder.widen", "%d/%d/%d/%d", b.length(), b.capacity(), b.toString().hashCode(), before.hashCode());
+        b.setLength(0);
+        b.trimToSize();
+        b.append("reuse").append('\ud83d').append('\ude00').reverse();
+        b.setLength(15);
+        for (int i = 7; i < 15; i++) if (b.charAt(i) != 0) throw new AssertionError("Uninitialized buffer tail");
+        char[] copied = new char[15];
+        b.getChars(0, 15, copied, 0);
+        f("builder.reuse", "%d/%d/%d", b.length(), b.capacity(), new String(copied).hashCode());
+        b.append((CharSequence)b, 0, b.length());
+        f("builder.self", "%d/%d", b.length(), b.toString().hashCode());
+        StringBuilder source = new StringBuilder("xxLatin\u00ffWide\u4321tail");
+        source.setCharAt(2, 'L');
+        StringBuilder slices = new StringBuilder(0);
+        slices.append((CharSequence)source, 2, 8);
+        slices.append((CharSequence)source, 8, source.length());
+        slices.append((CharSequence)"__slice\u00ff__", 2, 8);
+        slices.append((CharSequence)"__wide\u4321__", 2, 7);
+        int original = slices.length();
+        slices.trimToSize();
+        slices.append((CharSequence)slices, 1, original - 1);
+        slices.append((CharSequence)null, 1, 3);
+        f("builder.ranges", "%d/%d", slices.length(), slices.toString().hashCode());
+        StringBuilder compactSelf = new StringBuilder("abc\u00ff");
+        compactSelf.trimToSize();
+        compactSelf.append((CharSequence)compactSelf, 0, 4);
+        f("builder.compactSelf", "%s", compactSelf.toString());
+        final int[] reads = new int[1];
+        CharSequence custom = new CharSequence() {
+            public int length() { return 6; }
+            public char charAt(int index) { reads[0]++; return (char)('a' + index); }
+            public CharSequence subSequence(int start, int end) { throw new AssertionError("Unexpected subsequence"); }
+        };
+        slices.setLength(0);
+        slices.append(custom, 1, 5);
+        f("builder.custom", "%s/%d", slices.toString(), reads[0]);
+
+    }
+
     private static void strings() {
+        nativeBuilderCases();
+        encodingCases();
+        replacementCases();
         f("s.plain", "%s", "hello");
         f("s.null", "[%s]", new Object[] { null });
         f("s.width", "[%10s]", "abc");
@@ -280,6 +433,8 @@ public class StringFormatApp {
     }
 
     public static void main(String[] args) {
+        byte[] consoleSlice = "xCASE|console.slice|bulk\ny".getBytes();
+        System.out.write(consoleSlice, 1, consoleSlice.length - 2);
         strings();
         integers();
         floats();

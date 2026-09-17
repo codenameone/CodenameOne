@@ -315,7 +315,14 @@ public class ByteCodeTranslator {
      */
     private static File copyRuntimeResource(File srcRoot, String name, String destName) throws IOException {
         File dest = new File(srcRoot, destName);
-        copy(ByteCodeTranslator.class.getResourceAsStream("/" + name), new FileOutputStream(dest));
+        InputStream runtimeResource = ByteCodeTranslator.class.getResourceAsStream("/" + name);
+        if (runtimeResource == null) {
+            // Same reasoning as emitVirtualThreadRuntime above: failing here names the
+            // resource, where the null names nothing and crashes somewhere else.
+            throw new IOException("runtime resource missing: " + name
+                    + " (CN1_RESOURCE_PATH=" + System.getenv("CN1_RESOURCE_PATH") + ")");
+        }
+        copy(runtimeResource, new FileOutputStream(dest));
         sourceManifest.recordRuntime(destName, "/" + name);
         return dest;
     }
@@ -332,7 +339,14 @@ public class ByteCodeTranslator {
      */
     private static File copyVendoredResource(File srcRoot, String name) throws IOException {
         File dest = new File(srcRoot, name);
-        copy(ByteCodeTranslator.class.getResourceAsStream("/" + name), new FileOutputStream(dest));
+        InputStream runtimeResource = ByteCodeTranslator.class.getResourceAsStream("/" + name);
+        if (runtimeResource == null) {
+            // Same reasoning as emitVirtualThreadRuntime above: failing here names the
+            // resource, where the null names nothing and crashes somewhere else.
+            throw new IOException("runtime resource missing: " + name
+                    + " (CN1_RESOURCE_PATH=" + System.getenv("CN1_RESOURCE_PATH") + ")");
+        }
+        copy(runtimeResource, new FileOutputStream(dest));
         sourceManifest.recordVendored(name, "/" + name);
         return dest;
     }
@@ -510,6 +524,7 @@ public class ByteCodeTranslator {
 
         File cn1Globals = copyRuntimeResource(srcRoot, "cn1_globals.h");
         copyRuntimeResource(srcRoot, "cn1_intrinsics.h");
+        copyRuntimeResource(srcRoot, "cn1_collections.h");
         // Virtual threads: the switch is a few instructions of assembly per
         // architecture, so the .S travels with the runtime rather than being
         // generated. A project that gets the C and not the .S links against a
@@ -891,6 +906,7 @@ public class ByteCodeTranslator {
 
         File cn1Globals = copyRuntimeResource(srcRoot, "cn1_globals.h");
         copyRuntimeResource(srcRoot, "cn1_intrinsics.h");
+        copyRuntimeResource(srcRoot, "cn1_collections.h");
         // Virtual threads: the switch is a few instructions of assembly per
         // architecture, so the .S travels with the runtime rather than being
         // generated. A project that gets the C and not the .S links against a
@@ -1767,6 +1783,17 @@ public class ByteCodeTranslator {
      * @param bufferSize the size of the buffer, which should be a power of 2 large enoguh
      */
     public static void copy(InputStream i, OutputStream o, int bufferSize) throws IOException {
+        // A NULL STREAM HERE IS A SIGSEGV, NOT A NullPointerException. ParparVM's
+        // CHECKCAST/null handling means i.read(...) on null dereferences address 0 and
+        // takes the process down with no Java stack and no message -- the failure looks
+        // like a VM bug in whatever ran last. Class.getResourceAsStream returns null for
+        // a missing resource and several callers below pipe it straight in, so this is
+        // reachable from an ordinary staging mistake. Name it instead.
+        if (i == null || o == null) {
+            throw new IOException("copy() got a null stream: in=" + (i == null ? "null" : "ok")
+                    + " out=" + (o == null ? "null" : "ok")
+                    + " -- a missing resource reaches here as null from getResourceAsStream");
+        }
         try {
             byte[] buffer = new byte[bufferSize];
             int size = i.read(buffer);

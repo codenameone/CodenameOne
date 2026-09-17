@@ -138,6 +138,10 @@ public class TypeInstruction extends Instruction {
         this.implicitStackAlloc = true;
     }
 
+    private int stackBuilderBytes;
+    public void setStackBuilderBytes(int bytes) { stackBuilderBytes = bytes; }
+    public int getStackBuilderBytes() { return stackBuilderBytes; }
+
     private int stackFusedLen = -1;
     private String stackFusedElemCType;
     private String stackFusedClassRef;
@@ -171,6 +175,23 @@ public class TypeInstruction extends Instruction {
 
     public String getTypeName() {
         return type;
+    }
+
+    /**
+     * The class this INSTANCEOF tests against, or null when this is not an INSTANCEOF
+     * or when it tests an array type. Array ids sit outside the bitmap's row range and
+     * keep the instanceofFunction path.
+     *
+     * @return the mangled class name, or null
+     */
+    public String instanceofTargetClass() {
+        if(getOpcode() != Opcodes.INSTANCEOF) {
+            return null;
+        }
+        if(type.indexOf('[') > -1) {
+            return null;
+        }
+        return actualType;
     }
 
     public String getActualType() {
@@ -270,6 +291,9 @@ public class TypeInstruction extends Instruction {
                     // in ByteCodeClass. A plain load here let a thread see the flag
                     // set while the vtable / classToInterfaceMap rows it describes
                     // were still invisible.
+                    if(stackBuilderBytes > 0) {
+                        b.append("cn1StackBufferReset(&__cn1sbscope_").append(stackAllocId).append("); ");
+                    }
                     b.append("if(__builtin_expect(!__atomic_load_n(&class__");
                     b.append(type);
                     b.append(".initialized, __ATOMIC_ACQUIRE), 0)) __STATIC_INITIALIZER_");
@@ -287,6 +311,14 @@ public class TypeInstruction extends Instruction {
                     b.append(".__codenameOneGcMark = -1; __cn1stk_");
                     b.append(stackAllocId);
                     b.append(".__heapPosition = -1; ");
+                    if(stackBuilderBytes > 0) {
+                        b.append("__cn1stk_").append(stackAllocId).append(".__heapPosition = CN1_GC_STACK_BUILDER; ");
+                        b.append("*(struct CN1StackBuffer**)__cn1stk_").append(stackAllocId)
+                                .append(".__cn1InlineStorage = &__cn1sbscope_").append(stackAllocId).append("; ");
+                        b.append("__cn1stk_").append(stackAllocId)
+                                .append(".java_lang_StringBuilder_cn1Storage = (JAVA_LONG)(uintptr_t)__cn1sbdata_")
+                                .append(stackAllocId).append("; ");
+                    }
                     if(stackFusedLen >= 0) {
                         // stack-resident fused child: install a normal array header,
                         // point the owner's field at it BEFORE the ctor (keep-if-null
@@ -414,6 +446,19 @@ public class TypeInstruction extends Instruction {
                     b.append("_id_");
                     b.append(actualType);
                 } else {
+                    // Constant-time form when this type has a bitmap bit, which is
+                    // every non-array type an instanceof anywhere in the application
+                    // tests against. The id is still passed so the array fallback
+                    // inside the macro has something to call with.
+                    int typeTestIdx = Parser.typeTestIndex(actualType);
+                    if(typeTestIdx >= 0) {
+                        b.append("BC_INSTANCEOF_FAST(");
+                        b.append(typeTestIdx);
+                        b.append(", cn1_class_id_");
+                        b.append(actualType);
+                        b.append(");\n");
+                        break;
+                    }
                     b.append("BC_INSTANCEOF(cn1_class_id_");
                     b.append(actualType);
                 }

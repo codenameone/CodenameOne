@@ -13273,7 +13273,17 @@ JAVA_OBJECT nsDataToByteArr(NSData *data) {
     NSData* d = data;
     JAVA_OBJECT byteArray = allocArray(getThreadLocalData(), [d length] / sizeof(JAVA_ARRAY_BYTE), &class_array1__JAVA_BYTE, sizeof(JAVA_ARRAY_BYTE), 1);
     void* dtd = (void*)((JAVA_ARRAY)byteArray)->data;
-    memcpy(dtd, d.bytes, d.length);
+    // COPY WHAT WAS ALLOCATED, NOT WHAT THE NSData HAPPENS TO HOLD. The length
+    // above is [d length]/sizeof(element), so a byte count that is not a whole
+    // number of elements allocates a payload SHORTER than d.length -- by up to
+    // esz-1, which is 7 for long and double. That overrun used to land in the
+    // eight bytes every array over-allocated. Those are gone, and on a payload
+    // whose 32+size lands exactly on a BiBOP class boundary there is no slack at
+    // all, so the copy would write into the next object's header. An NSData comes
+    // from third-party Objective-C; its length is not ours to constrain.
+    if (dtd != NULL) {
+        memcpy(dtd, d.bytes, (size_t)((JAVA_ARRAY)byteArray)->length * sizeof(JAVA_ARRAY_BYTE));
+    }
     return byteArray;
 }
 
@@ -13281,7 +13291,17 @@ JAVA_OBJECT nsDataToBooleanArray(NSData *data) {
     NSData* d = data;
     JAVA_OBJECT byteArray = allocArray(getThreadLocalData(), [d length]/sizeof(JAVA_ARRAY_BOOLEAN), &class_array1__JAVA_BOOLEAN, sizeof(JAVA_ARRAY_BOOLEAN), 1);
     void* dtd = (void*)((JAVA_ARRAY)byteArray)->data;
-    memcpy(dtd, d.bytes, d.length);
+    // COPY WHAT WAS ALLOCATED, NOT WHAT THE NSData HAPPENS TO HOLD. The length
+    // above is [d length]/sizeof(element), so a byte count that is not a whole
+    // number of elements allocates a payload SHORTER than d.length -- by up to
+    // esz-1, which is 7 for long and double. That overrun used to land in the
+    // eight bytes every array over-allocated. Those are gone, and on a payload
+    // whose 32+size lands exactly on a BiBOP class boundary there is no slack at
+    // all, so the copy would write into the next object's header. An NSData comes
+    // from third-party Objective-C; its length is not ours to constrain.
+    if (dtd != NULL) {
+        memcpy(dtd, d.bytes, (size_t)((JAVA_ARRAY)byteArray)->length * sizeof(JAVA_ARRAY_BOOLEAN));
+    }
     return byteArray;
 }
 
@@ -13289,7 +13309,17 @@ JAVA_OBJECT nsDataToCharArray(NSData *data) {
     NSData* d = data;
     JAVA_OBJECT byteArray = allocArray(getThreadLocalData(), [d length]/sizeof(JAVA_ARRAY_CHAR), &class_array1__JAVA_CHAR, sizeof(JAVA_ARRAY_CHAR), 1);
     void* dtd = (void*)((JAVA_ARRAY)byteArray)->data;
-    memcpy(dtd, d.bytes, d.length);
+    // COPY WHAT WAS ALLOCATED, NOT WHAT THE NSData HAPPENS TO HOLD. The length
+    // above is [d length]/sizeof(element), so a byte count that is not a whole
+    // number of elements allocates a payload SHORTER than d.length -- by up to
+    // esz-1, which is 7 for long and double. That overrun used to land in the
+    // eight bytes every array over-allocated. Those are gone, and on a payload
+    // whose 32+size lands exactly on a BiBOP class boundary there is no slack at
+    // all, so the copy would write into the next object's header. An NSData comes
+    // from third-party Objective-C; its length is not ours to constrain.
+    if (dtd != NULL) {
+        memcpy(dtd, d.bytes, (size_t)((JAVA_ARRAY)byteArray)->length * sizeof(JAVA_ARRAY_CHAR));
+    }
     return byteArray;
 }
 
@@ -13297,7 +13327,17 @@ JAVA_OBJECT nsDataToShortArray(NSData *data) {
     NSData* d = data;
     JAVA_OBJECT byteArray = allocArray(getThreadLocalData(), [d length]/sizeof(JAVA_ARRAY_SHORT), &class_array1__JAVA_SHORT, sizeof(JAVA_ARRAY_SHORT), 1);
     void* dtd = (void*)((JAVA_ARRAY)byteArray)->data;
-    memcpy(dtd, d.bytes, d.length);
+    // COPY WHAT WAS ALLOCATED, NOT WHAT THE NSData HAPPENS TO HOLD. The length
+    // above is [d length]/sizeof(element), so a byte count that is not a whole
+    // number of elements allocates a payload SHORTER than d.length -- by up to
+    // esz-1, which is 7 for long and double. That overrun used to land in the
+    // eight bytes every array over-allocated. Those are gone, and on a payload
+    // whose 32+size lands exactly on a BiBOP class boundary there is no slack at
+    // all, so the copy would write into the next object's header. An NSData comes
+    // from third-party Objective-C; its length is not ours to constrain.
+    if (dtd != NULL) {
+        memcpy(dtd, d.bytes, (size_t)((JAVA_ARRAY)byteArray)->length * sizeof(JAVA_ARRAY_SHORT));
+    }
     return byteArray;
 }
 
@@ -13305,7 +13345,17 @@ JAVA_OBJECT nsDataToIntArray(NSData *data) {
     NSData* d = data;
     JAVA_OBJECT byteArray = allocArray(getThreadLocalData(), [d length]/sizeof(JAVA_ARRAY_INT), &class_array1__JAVA_INT, sizeof(JAVA_ARRAY_INT), 1);
     void* dtd = (void*)((JAVA_ARRAY)byteArray)->data;
-    memcpy(dtd, d.bytes, d.length);
+    // COPY WHAT WAS ALLOCATED, NOT WHAT THE NSData HAPPENS TO HOLD. The length
+    // above is [d length]/sizeof(element), so a byte count that is not a whole
+    // number of elements allocates a payload SHORTER than d.length -- by up to
+    // esz-1, which is 7 for long and double. That overrun used to land in the
+    // eight bytes every array over-allocated. Those are gone, and on a payload
+    // whose 32+size lands exactly on a BiBOP class boundary there is no slack at
+    // all, so the copy would write into the next object's header. An NSData comes
+    // from third-party Objective-C; its length is not ours to constrain.
+    if (dtd != NULL) {
+        memcpy(dtd, d.bytes, (size_t)((JAVA_ARRAY)byteArray)->length * sizeof(JAVA_ARRAY_INT));
+    }
     return byteArray;
 }
 
@@ -13313,7 +13363,17 @@ JAVA_OBJECT nsDataToLongArray(NSData *data) {
     NSData* d = data;
     JAVA_OBJECT byteArray = allocArray(getThreadLocalData(), [d length]/sizeof(JAVA_ARRAY_LONG), &class_array1__JAVA_LONG, sizeof(JAVA_ARRAY_LONG), 1);
     void* dtd = (void*)((JAVA_ARRAY)byteArray)->data;
-    memcpy(dtd, d.bytes, d.length);
+    // COPY WHAT WAS ALLOCATED, NOT WHAT THE NSData HAPPENS TO HOLD. The length
+    // above is [d length]/sizeof(element), so a byte count that is not a whole
+    // number of elements allocates a payload SHORTER than d.length -- by up to
+    // esz-1, which is 7 for long and double. That overrun used to land in the
+    // eight bytes every array over-allocated. Those are gone, and on a payload
+    // whose 32+size lands exactly on a BiBOP class boundary there is no slack at
+    // all, so the copy would write into the next object's header. An NSData comes
+    // from third-party Objective-C; its length is not ours to constrain.
+    if (dtd != NULL) {
+        memcpy(dtd, d.bytes, (size_t)((JAVA_ARRAY)byteArray)->length * sizeof(JAVA_ARRAY_LONG));
+    }
     return byteArray;
 }
 
@@ -13321,7 +13381,17 @@ JAVA_OBJECT nsDataToFloatArray(NSData *data) {
     NSData* d = data;
     JAVA_OBJECT byteArray = allocArray(getThreadLocalData(), [d length]/sizeof(JAVA_ARRAY_FLOAT), &class_array1__JAVA_FLOAT, sizeof(JAVA_ARRAY_FLOAT), 1);
     void* dtd = (void*)((JAVA_ARRAY)byteArray)->data;
-    memcpy(dtd, d.bytes, d.length);
+    // COPY WHAT WAS ALLOCATED, NOT WHAT THE NSData HAPPENS TO HOLD. The length
+    // above is [d length]/sizeof(element), so a byte count that is not a whole
+    // number of elements allocates a payload SHORTER than d.length -- by up to
+    // esz-1, which is 7 for long and double. That overrun used to land in the
+    // eight bytes every array over-allocated. Those are gone, and on a payload
+    // whose 32+size lands exactly on a BiBOP class boundary there is no slack at
+    // all, so the copy would write into the next object's header. An NSData comes
+    // from third-party Objective-C; its length is not ours to constrain.
+    if (dtd != NULL) {
+        memcpy(dtd, d.bytes, (size_t)((JAVA_ARRAY)byteArray)->length * sizeof(JAVA_ARRAY_FLOAT));
+    }
     return byteArray;
 }
 
@@ -13329,7 +13399,17 @@ JAVA_OBJECT nsDataToDoubleArray(NSData *data) {
     NSData* d = data;
     JAVA_OBJECT byteArray = allocArray(getThreadLocalData(), [d length]/sizeof(JAVA_ARRAY_DOUBLE), &class_array1__JAVA_DOUBLE, sizeof(JAVA_ARRAY_DOUBLE), 1);
     void* dtd = (void*)((JAVA_ARRAY)byteArray)->data;
-    memcpy(dtd, d.bytes, d.length);
+    // COPY WHAT WAS ALLOCATED, NOT WHAT THE NSData HAPPENS TO HOLD. The length
+    // above is [d length]/sizeof(element), so a byte count that is not a whole
+    // number of elements allocates a payload SHORTER than d.length -- by up to
+    // esz-1, which is 7 for long and double. That overrun used to land in the
+    // eight bytes every array over-allocated. Those are gone, and on a payload
+    // whose 32+size lands exactly on a BiBOP class boundary there is no slack at
+    // all, so the copy would write into the next object's header. An NSData comes
+    // from third-party Objective-C; its length is not ours to constrain.
+    if (dtd != NULL) {
+        memcpy(dtd, d.bytes, (size_t)((JAVA_ARRAY)byteArray)->length * sizeof(JAVA_ARRAY_DOUBLE));
+    }
     return byteArray;
 }
 #else // NEW_CODENAME_ONE_VM

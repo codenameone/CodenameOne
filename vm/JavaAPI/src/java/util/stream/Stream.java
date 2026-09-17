@@ -42,10 +42,7 @@ public interface Stream<T> extends BaseStream<T, Stream<T>> {
     }
 
     static <T> Stream<T> of(T... values) {
-        List<T> out = new ArrayList<T>();
-        if (values != null) {
-            Collections.addAll(out, values);
-        }
-        return new StreamImpl<T>(out);
+        if (values == null) throw new NullPointerException();
+        return new StreamImpl<T>(java.util.Arrays.asList(values));
     }
 }

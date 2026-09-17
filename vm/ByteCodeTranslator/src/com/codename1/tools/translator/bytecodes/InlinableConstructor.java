@@ -209,9 +209,19 @@ public final class InlinableConstructor {
                 if (written.contains(f.getFieldName())) {
                     continue;
                 }
+                // A field the struct only declares on some targets cannot be zeroed
+                // unconditionally here; see ByteCodeClass.targetGuardFor.
+                String zeroGuard = com.codename1.tools.translator.ByteCodeClass.targetGuardFor(
+                        f.getClsName().replace('/', '_').replace('$', '_'), f.getFieldName());
+                if (zeroGuard != null) {
+                    b.append("#if ").append(zeroGuard).append("\n");
+                }
                 b.append("    ((struct obj__").append(f.getClsName()).append("*)(__ibp))->")
                  .append(f.getClsName()).append("_").append(f.getFieldName())
                  .append(" = ").append(f.isObjectType() ? "JAVA_NULL" : "0").append(";\n");
+                if (zeroGuard != null) {
+                    b.append("#endif\n");
+                }
             }
         }
         // parentCls was left 0 by cn1BibopFastAllocNoZero so that a signal-stopped

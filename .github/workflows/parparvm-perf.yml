@@ -1,0 +1,146 @@
+name: ParparVM Performance
+
+# DOES PARPARVM STILL BEAT HOTSPOT, AND BY HOW MUCH.
+#
+# The self-hosting translator is the only whole-program workload this repo has that
+# is both large and reproducible: 37.6k lines that hammer collections, strings,
+# exceptions and the GC, run over a fixed corpus, with the emitted C compared
+# byte-for-byte between arms. That last part is what makes it a PERFORMANCE
+# benchmark rather than a timing script -- bench-selfhost.py refuses to print any
+# ratio unless every arm produced identical output, so a number here is also a
+# correctness result and a "win" cannot come from doing less work.
+#
+# Measured on a developer Mac, three interleaved 5-round runs on 2026-09-17:
+# elapsed 0.759-0.843x and peak memory 0.587-0.599x against JDK 25. This workflow
+# exists so that stops being a thing somebody remembers and becomes a thing CI
+# asserts.
+#
+# WHY A SEPARATE WORKFLOW FROM parparvm-selfhost.yml. That one is the CORRECTNESS
+# suite (gate D, gate A, the negative control) and it is gated behind a label
+# because a full run is expensive. A performance regression needs to fail on the PR
+# that causes it, not on whichever nightly someone reads next, so this runs on
+# every pull request that touches the VM. It builds at -O3 -- the shipping shape,
+# ThinLTO and all -- because a ratio taken from the -O1 diff-gate binary is a ratio
+# nobody ships.
+#
+# WHAT IS ACTUALLY GATED, and why it is not the same on both halves:
+#   memory  ALWAYS. It is the stable half -- 0.587/0.590/0.599 across three runs on
+#           a machine that was not quiet -- so an unstable peak is itself a finding.
+#   time    Only when the run was steady enough to mean something. perf-guard.sh
+#           reads the per-arm spread bench-selfhost.py prints and declines to assert
+#           on a wall clock it can see is noise. A perf gate that fails at random
+#           gets re-run until green and then ignored, and this repo's rule is that
+#           there is no such thing as an acceptable flake.
+#
+# The ceilings themselves live in vm/selfhost/perf-guard.sh, per platform, each with
+# the measurement it came from written beside it. The Linux ones are direction-only
+# on purpose: there is no runner data yet and the metric there is peak RSS rather
+# than phys_footprint, so they assert that ParparVM must not be slower and must use
+# meaningfully less memory, and get tightened from nightly spread in a follow-up.
+
+on:
+  schedule:
+    # 05:40 UTC, clear of parparvm-selfhost.yml's 04:20 so the two do not contend
+    # for runners and then blame each other for the timings.
+    - cron: '40 5 * * *'
+  workflow_dispatch:
+    inputs:
+      rounds:
+        description: 'Measured rounds per arm (a warmup round is discarded on top)'
+        required: false
+        default: '5'
+  pull_request:
+    paths:
+      - 'vm/**'
+      - '.github/workflows/parparvm-perf.yml'
+      - '!vm/**/README.md'
+      - '!vm/**/docs/**'
+      - '!vm/selfhost/experiments/**'
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
+  cancel-in-progress: true
+
+jobs:
+  performance:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+
+      - name: Install native build tools
+        run: |
+          bash scripts/ci/apt-get-update.sh
+          # GNU time, not the shell builtin: bench-selfhost.py's Linux peak-memory
+          # probe reads its "Maximum resident set size" line.
+          sudo apt-get install -y clang time
+
+      # JDK 25 FIRST, so the JDK 8 below is the one left on PATH for Maven.
+      # bench-selfhost.py names each arm after the JDK's real feature version, so a
+      # missing JDK 25 no longer silently reports JDK 8 twice -- it raises.
+      - name: Set up JDK 25 (the performance reference)
+        uses: actions/setup-java@v5
+        with:
+          distribution: 'temurin'
+          java-version: '25'
+      - name: Save JDK 25 path
+        run: echo "JDK_25_HOME=$JAVA_HOME" >> $GITHUB_ENV
+
+      - name: Set up JDK 8
+        uses: actions/setup-java@v5
+        with:
+          distribution: 'temurin'
+          java-version: '8'
+          cache: 'maven'
+      - name: Save JDK 8 path
+        run: echo "JDK_8_HOME=$JAVA_HOME" >> $GITHUB_ENV
+
+      - name: Build the translator
+        run: >-
+          "$GITHUB_WORKSPACE/scripts/ci/retry.sh" mvn -q -B
+          -pl ByteCodeTranslator -am package -DskipTests
+        working-directory: vm
+
+      # perf-guard.sh and bench-selfhost.py both read this file and now fail with a
+      # pointed message when it is absent -- `mvn clean package` removes target/ and
+      # takes it along, which used to surface as a bare `cat:` error that the guard
+      # then reported as a possible CORRECTNESS failure.
+      - name: Resolve the ASM classpath
+        run: >-
+          "$GITHUB_WORKSPACE/scripts/ci/retry.sh" mvn -q -B -pl ByteCodeTranslator
+          dependency:build-classpath
+          -Dmdep.outputFile=target/selfhost-asm-classpath.txt
+        working-directory: vm
+
+      - name: Build the self-hosted translator at -O3 (the shipping shape)
+        run: vm/selfhost/build-selfhost.sh -O3
+
+      # Redirected, not piped: `perf-guard.sh | tee` reports tee's exit status, which
+      # would turn a real regression into a green step.
+      - name: Beat HotSpot
+        run: |
+          rc=0
+          vm/selfhost/perf-guard.sh "${{ github.event.inputs.rounds || '5' }}" \
+            > perf-guard.log 2>&1 || rc=$?
+          cat perf-guard.log
+          {
+            echo '### ParparVM vs HotSpot'
+            echo '```'
+            grep -E '^(spread|vs |perf-guard:)' perf-guard.log || cat perf-guard.log
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+          exit "$rc"
+
+      # Always, not just on failure: the run-to-run spread on this runner is the data
+      # the Linux ceilings are waiting on, and it is only useful if it accumulates.
+      - name: Upload the measurement evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: parparvm-perf-evidence
+          path: |
+            perf-guard.log
+            vm/selfhost/target/bench/*/results.json
+            vm/selfhost/target/bench/*/*.log
+          retention-days: 30

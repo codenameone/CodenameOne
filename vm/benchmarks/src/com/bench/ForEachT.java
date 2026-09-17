@@ -25,10 +25,7 @@ import java.util.List;
  * reads it from an instance field (resolved by the whole-program store map), so every
  * shape above runs down the fast path by BOTH routes and has to agree with the host.
  *
- * DELIBERATELY NOT COVERED HERE: mutation during iteration. The specialization drops
- * the modCount check by design, so a mutating loop yields stale elements instead of
- * ConcurrentModificationException and CANNOT be byte-identical. That deviation has its
- * own reproducer; a torture in run-gauntlet.sh has to match the host exactly.
+ * Mutation and repeated iterator removal also exercise the native cursor state.
  */
 public class ForEachT {
     static List<Integer> arrayList(int n) {
@@ -310,6 +307,69 @@ public class ForEachT {
         }
     }
 
+    static int mutationChecks() {
+        int score = 0;
+        List<Integer> list = new ArrayList<Integer>();
+        list.add(1); list.add(2); list.add(3);
+        try {
+            for (Integer value : list) list.add(value);
+        } catch (java.util.ConcurrentModificationException expected) { score++; }
+        list.clear(); list.add(1); list.add(2); list.add(3);
+        for (java.util.Iterator<Integer> iterator = list.iterator(); iterator.hasNext();) {
+            iterator.next();
+            iterator.remove();
+            try { iterator.remove(); }
+            catch (IllegalStateException expected) { score += 10; }
+        }
+        return score + list.size() * 100;
+    }
+
+    static int collectionSum(java.util.Collection<Integer> values) {
+        int sum = 0;
+        for (Integer value : values) if (value != null) sum += value;
+        return sum;
+    }
+
+    static String setChecks() {
+        java.util.Set<Integer> set = new java.util.HashSet<Integer>();
+        set.add(null);
+        for (int i = 0; i < 40; i++) set.add(i);
+        int sum = collectionSum(set);
+        for (java.util.Iterator<Integer> it = set.iterator(); it.hasNext();) {
+            Integer value = it.next();
+            if (value == null || (value & 1) == 0) it.remove();
+        }
+        sum += collectionSum(set);
+        java.util.Set<Integer> ordered = new java.util.LinkedHashSet<Integer>();
+        for (int i = 10; i >= 0; i--) ordered.add(i);
+        for (java.util.Iterator<Integer> it = ordered.iterator(); it.hasNext();) {
+            if ((it.next() & 1) == 0) {
+                it.remove();
+                try { it.remove(); throw new AssertionError(); }
+                catch (IllegalStateException expected) { }
+            }
+        }
+        java.util.HashMap<Integer, Integer> map = new java.util.HashMap<Integer, Integer>();
+        for (int i = 0; i < 20; i++) map.put(i, i * 2);
+        for (Integer value : map.values()) sum += value;
+        for (Integer key : map.keySet()) sum -= key;
+        sum += collectionSum(map.values());
+        java.util.LinkedHashMap<Integer, Integer> linked = new java.util.LinkedHashMap<Integer, Integer>();
+        for (int i = 10; i >= 0; i--) linked.put(i, i);
+        for (java.util.Iterator<Integer> it = linked.values().iterator(); it.hasNext();) {
+            if ((it.next() & 1) == 0) it.remove();
+        }
+        String order = ordered.toString() + "/" + linked.keySet().toString();
+        boolean failedFast = false;
+        try { for (Integer value : ordered) ordered.add(99); }
+        catch (java.util.ConcurrentModificationException expected) { failedFast = true; }
+        java.util.Set<Integer> custom = new java.util.HashSet<Integer>() {
+            public java.util.Iterator<Integer> iterator() { return java.util.Collections.singleton(123).iterator(); }
+        };
+        custom.add(456);
+        return sum + ":" + order + ":" + failedFast + ":" + collectionSum(custom);
+    }
+
     public static void main(String[] args) {
         long ck = 0;
         List<Integer> al = arrayList(64);
@@ -370,6 +430,8 @@ public class ForEachT {
         System.out.println("field empty plain=" + he.plain() + " nest=" + he.nested());
         ck += he.plain() * 89 + he.nested() * 97;
 
+        System.out.println("mutation=" + mutationChecks());
+        System.out.println("sets=" + setChecks());
         System.out.println("checksum=" + ck);
     }
 }

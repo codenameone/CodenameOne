@@ -63,21 +63,12 @@ jobs:
           # probe reads ("Maximum resident set size"). The shell builtin is not it.
           sudo apt-get install -y clang time
 
-      # THE PERFORMANCE STEP NEEDS A JDK 25 AND THERE WAS NONE.
-      # bench-selfhost.sh compares against $JDK_25_HOME/bin/java and then
-      # $JDK_8_HOME/bin/java. With only a JDK 8 on the runner BOTH arms resolved to it,
-      # the arm labeller de-duplicated them to `jdk8` and `jdk8#2`, and the `vs jdk25:`
-      # line perf-guard.sh reads was never printed -- so the ratchet failed every run
-      # on a missing line rather than on a regression. Set up 25 FIRST so the JDK 8
-      # below is the one left on PATH for the maven build.
-      - name: Set up JDK 25 (the performance reference)
-        uses: actions/setup-java@v5
-        with:
-          distribution: 'temurin'
-          java-version: '25'
-      - name: Save JDK 25 path
-        run: echo "JDK_25_HOME=$JAVA_HOME" >> $GITHUB_ENV
-
+      # ONLY A JDK 8 HERE. This workflow used to set up a JDK 25 as well, for a
+      # performance step that has since moved to parparvm-perf.yml; nothing left in
+      # this job reads JDK_25_HOME, so setting it up would just be a slower runner.
+      # The perf workflow still needs it and sets it up there -- and bench-selfhost.py
+      # now names each arm after the JDK's real feature version, so a missing JDK 25
+      # raises instead of silently measuring JDK 8 against itself.
       - name: Set up JDK 8
         uses: actions/setup-java@v5
         with:
@@ -125,45 +116,20 @@ jobs:
             com_codename1_tools_translator_ByteCodeTranslator \
             com.codename1.tools.translator
 
-      # THE PERFORMANCE ARM IS BUILT AT -O3, SEPARATELY FROM THE DIFF GATES.
-      # The gates above are built -O1 on purpose (they care about the emitted C, and
-      # -O1 links several times faster). A RATIO from an -O1 binary is not the ratio
-      # anything ships, so measuring the gate binary would gate a number nobody has.
-      # -O3 implies ThinLTO here, which is the documented release shape and the one
-      # the Xcode templates use (LLVM_LTO = YES_THIN).
-      - name: Build the self-hosted translator at -O3 for measurement
-        run: vm/selfhost/build-selfhost.sh -O3
-
-      # PERFORMANCE, REPORTED EVERY RUN AND -- FOR NOW -- NOT GATED.
+      # PERFORMANCE MOVED OUT, to .github/workflows/parparvm-perf.yml.
       #
-      # The two defaults behind the current numbers (marker count and mark-worklist
-      # size) were each set by a measurement that a later configuration change
-      # invalidated, and NEITHER regression would fail a functional test. Something has
-      # to look at the numbers, so this step exists to PRINT them every night.
+      # It used to live here, building the translator a second time at -O3 and then
+      # reporting (never gating) the ratio against JDK 25. Two reasons it is gone:
       #
-      # THE CEILINGS ARE DELIBERATELY UNREACHABLE AND MUST STAY THAT WAY UNTIL THERE IS
-      # RUNNER DATA. Every figure this repo has is from a developer Mac: 1.33-1.35x time
-      # and 1.59-1.80x memory quiet, 1.60x time for the same binary under load. A shared
-      # runner is not quiet, it is a different CPU, and on Linux the memory metric is not
-      # even the same quantity (peak RSS, not phys_footprint -- see bench-selfhost.sh).
-      # Picking a threshold from the Mac numbers would be guessing, and a guessed
-      # threshold is how a gate becomes flaky and then gets ignored. So: let several
-      # nightlies print their spread, then set both ceilings from THAT data in a
-      # follow-up, and only then is this a ratchet.
+      #  - This workflow is the CORRECTNESS suite and it only runs on a PR that asks
+      #    for it by label. A performance regression has to fail on the PR that causes
+      #    it, not on whichever nightly somebody reads next, so the perf gate runs on
+      #    every pull request touching vm/** instead.
+      #  - Keeping it in both places would pay for the expensive -O3 self-host build
+      #    twice on any PR carrying the `selfhost` label.
       #
-      # A failure here today therefore means the harness broke, not that performance
-      # regressed: no ratio line at all (the arms did not emit identical C, which is a
-      # CORRECTNESS failure), or no memory reading.
-      #
-      # Redirected rather than piped: `perf-guard.sh | tee` reports tee's exit status,
-      # which would turn a real regression into a green step.
-      - name: Performance report
-        run: |
-          set -o pipefail
-          CN1_PERF_MAX_TIME=99 CN1_PERF_MAX_MEM=99 \
-            vm/selfhost/perf-guard.sh 3 > perf-guard.log 2>&1 || rc=$?
-          cat perf-guard.log
-          exit "${rc:-0}"
+      # The ceilings, the per-platform metric note and the noise guard all live with
+      # the gate now: vm/selfhost/perf-guard.sh.
 
       # Both trees, so a divergence can be inspected rather than guessed at from
       # a one-line summary.

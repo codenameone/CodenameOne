@@ -61,43 +61,12 @@ public class HashMap<K, V> extends AbstractMap<K, V> implements Map<K, V> {
      * the finalize() below is what puts this class on the per-slot reclaim path, without
      * which a page taking the O(1) all-dead reclaim would never free a block.
      */
-    transient long cn1KeysBlock;
-    transient long cn1ValsBlock;
-    transient long cn1MetaBlock;
+    transient volatile long cn1KeysBlock;
+    transient volatile long cn1ValsBlock;
+    transient volatile long cn1MetaBlock;
 
     /** capacity of all three blocks, always a power of two. */
     transient int cn1Cap;
-
-    // Block primitives. Static and typeless on purpose: the same C helpers back
-    // Hashtable and ArrayList when they convert, and a native call that LTO inlines is
-    // cheaper than the array access it replaces -- no header, no ->data indirection.
-    static native long cn1BlkRefNew(int n);
-    static native long cn1BlkIntNew(int n);
-    static native void cn1BlkFree(long b);
-    /** replace-while-live: the sweep frees it, after any marker walking it has finished. */
-    static native void cn1BlkRetire(long b);
-    static native Object cn1BlkRefGet(long b, int i);
-    static native void cn1BlkRefSet(long b, int i, Object v);
-    static native int cn1BlkIntGet(long b, int i);
-    static native void cn1BlkIntSet(long b, int i, int v);
-    /** scan loop in C: one crossing per call instead of one per slot. */
-    static native int cn1BlkNextOccupied(long metaBlock, int from, int cap);
-    /** the clear fast path -- two memsets and a barriered blank of the reference blocks. */
-    static native void cn1BlkClearAll(long keys, long vals, long meta, int cap);
-
-    /**
-     * Frees the three blocks. Declaring it is also what keeps this class off the O(1)
-     * all-dead page reclaim (the sweep's needsReclaim test reads finalizerFunction), which
-     * is the path on which the generated finalizer -- and therefore the free -- runs.
-     */
-    protected void finalize() {
-        cn1BlkFree(cn1KeysBlock);
-        cn1BlkFree(cn1ValsBlock);
-        cn1BlkFree(cn1MetaBlock);
-        cn1KeysBlock = 0;
-        cn1ValsBlock = 0;
-        cn1MetaBlock = 0;
-    }
 
     /** live mappings. */
     transient int elementCount;
@@ -167,7 +136,8 @@ public class HashMap<K, V> extends AbstractMap<K, V> implements Map<K, V> {
         if (capacity >= 0 && loadFactor > 0) {
             capacity = calculateCapacity(capacity);
             this.loadFactor = loadFactor;
-            cn1Alloc(capacity);
+            cn1Cap = capacity;
+            threshold = Math.min((int) (capacity * loadFactor), capacity - 1);
         } else {
             throw new IllegalArgumentException();
         }
@@ -185,12 +155,13 @@ public class HashMap<K, V> extends AbstractMap<K, V> implements Map<K, V> {
     }
 
     final void cn1Alloc(int capacity) {
-        cn1BlkFree(cn1KeysBlock);
-        cn1BlkFree(cn1ValsBlock);
-        cn1BlkFree(cn1MetaBlock);
-        cn1KeysBlock = cn1BlkRefNew(capacity);
-        cn1ValsBlock = cn1BlkRefNew(capacity);
-        cn1MetaBlock = cn1BlkIntNew(capacity);
+        long keys = NativeStorage.table(capacity, false);
+        long vals = NativeStorage.part(keys, 1), meta = NativeStorage.part(keys, 2);
+        long oldKeys = cn1KeysBlock;
+        cn1KeysBlock = keys;
+        cn1ValsBlock = vals;
+        cn1MetaBlock = meta;
+        NativeStorage.retire(oldKeys);
         cn1Cap = capacity;
         elementCount = 0;
         cn1Occupied = 0;
@@ -262,21 +233,29 @@ public class HashMap<K, V> extends AbstractMap<K, V> implements Map<K, V> {
      * tombstone met on the probe path (reuse), or the terminating empty slot.
      */
     final int cn1FindSlotImpl(Object key) {
-        int marker = cn1Marker(key);
+        return cn1FindSlotImpl(key, cn1Marker(key));
+    }
+
+    private int cn1FindSlotImpl(Object key, int marker) {
+        int expected = modCount;
         long meta = cn1MetaBlock;
         int mask = cn1Cap - 1;
         int i = marker & mask;
+        if (meta == 0) return -(i + 1);
         int perturb = marker;
         int firstTomb = -1;
         while (true) {
-            int m = cn1BlkIntGet(meta, i);
+            int m = NativeStorage.getInt(meta, i);
             if (m == META_EMPTY) {
                 int ins = firstTomb >= 0 ? firstTomb : i;
                 return -(ins + 1);
             }
             if (m == marker) {
-                Object k = cn1BlkRefGet(cn1KeysBlock, i);
-                if (key == null ? k == null : (key == k || areEqualKeys(key, k))) {
+                Object k = NativeStorage.get(cn1KeysBlock, i);
+                boolean matches = key == null ? k == null : (key == k || areEqualKeys(key, k));
+                // User equality can reenter and replace or rearrange this storage.
+                if (expected != modCount || meta != cn1MetaBlock) throw new ConcurrentModificationException();
+                if (matches) {
                     return i;
                 }
             } else if (m == META_TOMB && firstTomb < 0) {
@@ -293,20 +272,22 @@ public class HashMap<K, V> extends AbstractMap<K, V> implements Map<K, V> {
      * a NEW mapping was created (vs a value replacement).
      */
     final V cn1PutSlot(K key, V value) {
-        int idx = cn1FindSlotImpl(key);
+        int marker = cn1Marker(key);
+        if (cn1MetaBlock == 0) cn1Alloc(cn1Cap);
+        int idx = cn1FindSlotImpl(key, marker);
         if (idx >= 0) {
             @SuppressWarnings("unchecked")
-            V old = (V) cn1BlkRefGet(cn1ValsBlock, idx);
-            cn1BlkRefSet(cn1ValsBlock, idx, value);
+            V old = (V) NativeStorage.get(cn1ValsBlock, idx);
+            NativeStorage.set(cn1ValsBlock, idx, value);
             cn1LastPut = idx;
             cn1LastInserted = false;
             return old;
         }
         int ins = -idx - 1;
-        boolean wasEmpty = cn1BlkIntGet(cn1MetaBlock, ins) == META_EMPTY;
-        cn1BlkIntSet(cn1MetaBlock, ins, cn1Marker(key));
-        cn1BlkRefSet(cn1KeysBlock, ins, key);
-        cn1BlkRefSet(cn1ValsBlock, ins, value);
+        boolean wasEmpty = NativeStorage.getInt(cn1MetaBlock, ins) == META_EMPTY;
+        NativeStorage.setInt(cn1MetaBlock, ins, marker);
+        NativeStorage.set(cn1KeysBlock, ins, key);
+        NativeStorage.set(cn1ValsBlock, ins, value);
         elementCount++;
         if (wasEmpty) {
             cn1Occupied++;
@@ -357,27 +338,11 @@ public class HashMap<K, V> extends AbstractMap<K, V> implements Map<K, V> {
         // and writing into locals keeps the source traced for the whole loop, and every
         // reference written into the new blocks is also still in the old ones, so nothing
         // is unreachable at any point.
-        long newKeys = cn1BlkRefNew(newCap);
-        long newVals = cn1BlkRefNew(newCap);
-        long newMeta = cn1BlkIntNew(newCap);
-        int newMask = newCap - 1;
-        int count = 0;
-        for (int i = 0; i < cap; i++) {
-            int m = cn1BlkIntGet(cn1MetaBlock, i);
-            if (m < 0) {
-                int j = m & newMask;
-                int perturb = m;
-                while (cn1BlkIntGet(newMeta, j) != META_EMPTY) {
-                    perturb >>>= 5;
-                    j = cn1NextSlot(j, perturb, newMask);
-                }
-                cn1BlkIntSet(newMeta, j, m);
-                cn1BlkRefSet(newKeys, j, cn1BlkRefGet(cn1KeysBlock, i));
-                cn1BlkRefSet(newVals, j, cn1BlkRefGet(cn1ValsBlock, i));
-                count++;
-            }
-        }
-        long oldK = cn1KeysBlock, oldV = cn1ValsBlock, oldM = cn1MetaBlock;
+        long newKeys = NativeStorage.table(newCap, false);
+        long newVals = NativeStorage.part(newKeys, 1), newMeta = NativeStorage.part(newKeys, 2);
+        NativeStorage.rehash(cn1KeysBlock, cn1ValsBlock, cn1MetaBlock, 0, -1,
+                newKeys, newVals, newMeta, 0, 0);
+        long oldK = cn1KeysBlock;
         cn1KeysBlock = newKeys;
         cn1ValsBlock = newVals;
         cn1MetaBlock = newMeta;
@@ -388,11 +353,8 @@ public class HashMap<K, V> extends AbstractMap<K, V> implements Map<K, V> {
         }
         // RETIRE, not free: a marker that loaded these pointers before the swap above
         // may still be walking them. The sweep releases them once the mark has ended.
-        cn1BlkRetire(oldK);
-        cn1BlkRetire(oldV);
-        cn1BlkRetire(oldM);
-        elementCount = count;
-        cn1Occupied = count;
+        NativeStorage.retire(oldK);
+        cn1Occupied = elementCount;
     }
 
     /** raw insert into a table known not to contain the key (rebuild path). */
@@ -401,13 +363,13 @@ public class HashMap<K, V> extends AbstractMap<K, V> implements Map<K, V> {
         int mask = cn1Cap - 1;
         int i = marker & mask;
         int perturb = marker;
-        while (cn1BlkIntGet(meta, i) != META_EMPTY) {
+        while (NativeStorage.getInt(meta, i) != META_EMPTY) {
             perturb >>>= 5;
             i = cn1NextSlot(i, perturb, mask);
         }
-        cn1BlkIntSet(meta, i, marker);
-        cn1BlkRefSet(cn1KeysBlock, i, key);
-        cn1BlkRefSet(cn1ValsBlock, i, value);
+        NativeStorage.setInt(meta, i, marker);
+        NativeStorage.set(cn1KeysBlock, i, key);
+        NativeStorage.set(cn1ValsBlock, i, value);
         return i;
     }
 
@@ -416,9 +378,9 @@ public class HashMap<K, V> extends AbstractMap<K, V> implements Map<K, V> {
      * first; ALWAYS the single mutation point for removals (iterators too).
      */
     void cn1RemoveAtIndex(int idx) {
-        cn1BlkIntSet(cn1MetaBlock, idx, META_TOMB);
-        cn1BlkRefSet(cn1KeysBlock, idx, null);
-        cn1BlkRefSet(cn1ValsBlock, idx, null);
+        NativeStorage.setInt(cn1MetaBlock, idx, META_TOMB);
+        NativeStorage.set(cn1KeysBlock, idx, null);
+        NativeStorage.set(cn1ValsBlock, idx, null);
         elementCount--;
         modCount++;
     }
@@ -434,7 +396,7 @@ public class HashMap<K, V> extends AbstractMap<K, V> implements Map<K, V> {
     }
 
     final int cn1NextOccupied(int from) {
-        return cn1BlkNextOccupied(cn1MetaBlock, from, cn1Cap);
+        return NativeStorage.nextOccupied(cn1MetaBlock, from, cn1Cap);
     }
 
     /**
@@ -450,7 +412,7 @@ public class HashMap<K, V> extends AbstractMap<K, V> implements Map<K, V> {
 
     void clearImpl() {
         if (elementCount > 0 || cn1Occupied > 0) {
-            cn1BlkClearAll(cn1KeysBlock, cn1ValsBlock, cn1MetaBlock, cn1Cap);
+            NativeStorage.clearMap(cn1KeysBlock, cn1ValsBlock, cn1MetaBlock, cn1Cap);
             elementCount = 0;
             cn1Occupied = 0;
             modCount++;
@@ -480,20 +442,22 @@ public class HashMap<K, V> extends AbstractMap<K, V> implements Map<K, V> {
      */
     @Override
     public boolean containsValue(Object value) {
+        if (elementCount == 0) return false;
+        int expected = modCount;
         long meta = cn1MetaBlock;
         long vals = cn1ValsBlock;
         if (value != null) {
             for (int i = 0; i < cn1Cap; i++) {
-                if (cn1BlkIntGet(meta, i) < 0) {
-                    Object v = cn1BlkRefGet(vals, i);
-                    if (value == v || areEqualKeys(value, v)) {
-                        return true;
-                    }
+                if (NativeStorage.getInt(meta, i) < 0) {
+                    Object v = NativeStorage.get(vals, i);
+                    boolean matches = value == v || areEqualKeys(value, v);
+                    if (expected != modCount || meta != cn1MetaBlock) throw new ConcurrentModificationException();
+                    if (matches) return true;
                 }
             }
         } else {
             for (int i = 0; i < cn1Cap; i++) {
-                if (cn1BlkIntGet(meta, i) < 0 && cn1BlkRefGet(vals, i) == null) {
+                if (NativeStorage.getInt(meta, i) < 0 && NativeStorage.get(vals, i) == null) {
                     return true;
                 }
             }
@@ -529,7 +493,7 @@ public class HashMap<K, V> extends AbstractMap<K, V> implements Map<K, V> {
             return null;
         }
         @SuppressWarnings("unchecked")
-        V v = (V) cn1BlkRefGet(cn1ValsBlock, idx);
+        V v = (V) NativeStorage.get(cn1ValsBlock, idx);
         return v;
     }
 
@@ -555,32 +519,7 @@ public class HashMap<K, V> extends AbstractMap<K, V> implements Map<K, V> {
     @Override
     public Set<K> keySet() {
         if (keySet == null) {
-            keySet = new AbstractSet<K>() {
-                @Override
-                public boolean contains(Object object) {
-                    return containsKey(object);
-                }
-
-                @Override
-                public int size() {
-                    return HashMap.this.size();
-                }
-
-                @Override
-                public void clear() {
-                    HashMap.this.clear();
-                }
-
-                @Override
-                public boolean remove(Object key) {
-                    return HashMap.this.cn1RemoveKey(key);
-                }
-
-                @Override
-                public Iterator<K> iterator() {
-                    return new KeyIterator<K, V>(HashMap.this);
-                }
-            };
+            keySet = new KeySet<K, V>(this);
         }
         return keySet;
     }
@@ -643,7 +582,7 @@ public class HashMap<K, V> extends AbstractMap<K, V> implements Map<K, V> {
             return null;
         }
         @SuppressWarnings("unchecked")
-        V old = (V) cn1BlkRefGet(cn1ValsBlock, idx);
+        V old = (V) NativeStorage.get(cn1ValsBlock, idx);
         cn1RemoveAtIndex(idx);
         return old;
     }
@@ -679,29 +618,29 @@ public class HashMap<K, V> extends AbstractMap<K, V> implements Map<K, V> {
     @Override
     public Collection<V> values() {
         if (valuesCollection == null) {
-            valuesCollection = new AbstractCollection<V>() {
-                @Override
-                public boolean contains(Object object) {
-                    return containsValue(object);
-                }
-
-                @Override
-                public int size() {
-                    return HashMap.this.size();
-                }
-
-                @Override
-                public void clear() {
-                    HashMap.this.clear();
-                }
-
-                @Override
-                public Iterator<V> iterator() {
-                    return new ValueIterator<K, V>(HashMap.this);
-                }
-            };
+            valuesCollection = new Values<K, V>(this);
         }
         return valuesCollection;
+    }
+
+    /** Named VM-private views share the same native table cursor as HashSet. */
+    static final class KeySet<K, V> extends AbstractSet<K> {
+        final HashMap<K, V> map;
+        KeySet(HashMap<K, V> map) { this.map = map; }
+        public boolean contains(Object key) { return map.containsKey(key); }
+        public int size() { return map.size(); }
+        public void clear() { map.clear(); }
+        public boolean remove(Object key) { return map.cn1RemoveKey(key); }
+        public Iterator<K> iterator() { return new KeyIterator<K, V>(map); }
+    }
+
+    static final class Values<K, V> extends AbstractCollection<V> {
+        final HashMap<K, V> map;
+        Values(HashMap<K, V> map) { this.map = map; }
+        public boolean contains(Object value) { return map.containsValue(value); }
+        public int size() { return map.size(); }
+        public void clear() { map.clear(); }
+        public Iterator<V> iterator() { return new ValueIterator<K, V>(map); }
     }
 
     /*
@@ -778,7 +717,7 @@ public class HashMap<K, V> extends AbstractMap<K, V> implements Map<K, V> {
         @SuppressWarnings("unchecked")
         public K next() {
             makeNext();
-            return (K) cn1BlkRefGet(associatedMap.cn1KeysBlock, currentIndex);
+            return (K) NativeStorage.get(associatedMap.cn1KeysBlock, currentIndex);
         }
     }
 
@@ -790,7 +729,7 @@ public class HashMap<K, V> extends AbstractMap<K, V> implements Map<K, V> {
         @SuppressWarnings("unchecked")
         public V next() {
             makeNext();
-            return (V) cn1BlkRefGet(associatedMap.cn1ValsBlock, currentIndex);
+            return (V) NativeStorage.get(associatedMap.cn1ValsBlock, currentIndex);
         }
     }
 
@@ -811,17 +750,17 @@ public class HashMap<K, V> extends AbstractMap<K, V> implements Map<K, V> {
 
         @SuppressWarnings("unchecked")
         public K getKey() {
-            return (K) cn1BlkRefGet(map.cn1KeysBlock, index);
+            return (K) NativeStorage.get(map.cn1KeysBlock, index);
         }
 
         @SuppressWarnings("unchecked")
         public V getValue() {
-            return (V) cn1BlkRefGet(map.cn1ValsBlock, index);
+            return (V) NativeStorage.get(map.cn1ValsBlock, index);
         }
 
         public V setValue(V object) {
             V result = getValue();
-            cn1BlkRefSet(map.cn1ValsBlock, index, object);
+            NativeStorage.set(map.cn1ValsBlock, index, object);
             return result;
         }
 
@@ -879,7 +818,7 @@ public class HashMap<K, V> extends AbstractMap<K, V> implements Map<K, V> {
             if (object instanceof Map.Entry) {
                 Map.Entry<?, ?> oEntry = (Map.Entry<?, ?>) object;
                 int idx = associatedMap.cn1FindSlotImpl(oEntry.getKey());
-                if (idx >= 0 && valuesEq(cn1BlkRefGet(associatedMap.cn1ValsBlock, idx), oEntry)) {
+                if (idx >= 0 && valuesEq(NativeStorage.get(associatedMap.cn1ValsBlock, idx), oEntry)) {
                     associatedMap.cn1RemoveAtIndex(idx);
                     return true;
                 }
@@ -892,7 +831,7 @@ public class HashMap<K, V> extends AbstractMap<K, V> implements Map<K, V> {
             if (object instanceof Map.Entry) {
                 Map.Entry<?, ?> oEntry = (Map.Entry<?, ?>) object;
                 int idx = associatedMap.cn1FindSlotImpl(oEntry.getKey());
-                return idx >= 0 && valuesEq(cn1BlkRefGet(associatedMap.cn1ValsBlock, idx), oEntry);
+                return idx >= 0 && valuesEq(NativeStorage.get(associatedMap.cn1ValsBlock, idx), oEntry);
             }
             return false;
         }

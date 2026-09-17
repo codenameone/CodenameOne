@@ -738,7 +738,19 @@ static _Atomic long cn1GcFullDrains = 0;
 // rather than a timing, so it fails the same way on any machine.
 static _Atomic long cn1GcGraceFullDrains = 0;
 // Set only while a grace pass is running, on the GC thread that runs it.
-static __thread int cn1GcInGracePass = 0;
+// Keep the marker's hot state in one TLS object. On Mach-O each separate TLS
+// variable requires a resolver call; gcMarkObject previously resolved five.
+struct CN1GcTraceContext {
+    struct gcMarkLocalBuffer* localBuffer;
+    int precise, trusted, gracePass;
+    JAVA_BOOLEAN maturing;
+};
+static __thread struct CN1GcTraceContext cn1GcTrace;
+#define cn1GcInGracePass (cn1GcTrace.gracePass)
+#define cn1GcPreciseTrace (cn1GcTrace.precise)
+#define cn1GcTrustedRoots (cn1GcTrace.trusted)
+#define gcCurrentlyMaturing (cn1GcTrace.maturing)
+#define gcMarkLocalBuf (cn1GcTrace.localBuffer)
 // Set for the current cycle when a rebuild was needed and did NOT complete, so the
 // index is missing pages that have been registered for an unbounded number of cycles.
 // A miss makes cn1ConservativeResolve reject every reference into such a page and
@@ -750,6 +762,16 @@ static __thread int cn1GcInGracePass = 0;
 // objects are no longer fresh, still do not resolve, and age into the sweep's
 // m < V - 1 reclamation while a live field still points at them.
 static JAVA_BOOLEAN cn1GcPageIndexStale = JAVA_FALSE;
+// GC-thread only. A missed native-stack capture invalidates this cycle's
+// liveness decisions, even if every heap page resolved successfully.
+static JAVA_BOOLEAN cn1GcRootsIncomplete = JAVA_FALSE;
+// Physical reclamation can lag on mutator-owned/partial pages. A stale native
+// stack word must not revive a logically dead slot after its children were swept.
+// Publish only after a successful sweep; an incomplete mark cannot advance it.
+static _Atomic int cn1GcReclaimedBefore = 0;
+static inline int cn1GcWasReclaimed(int mark) {
+    return mark != -1 && mark < atomic_load_explicit(&cn1GcReclaimedBefore, memory_order_acquire);
+}
 // THE SWEEP'S LIVENESS RULE, IN ONE PLACE.
 //
 // An object survives if it is fresh (-1, the one-cycle grace for anything allocated
@@ -925,6 +947,8 @@ _Atomic long long cn1ConsResolved = 0;   // ...that resolved to a heap object
 // in the same cycle would have marked it anyway), so it is an UPPER BOUND on conservative
 // resurrection -- which is what makes it able to refute cheaply and not to confirm.
 _Atomic long long cn1ConsFirstMarks = 0;
+// Diagnostic: a pending-table waiter slept despite migration already completing.
+static _Atomic long cn1PendingEmptyWaits = 0;
 
 // ---- mutator stall accounting (issue 5537, the "death by GC" half) -------------------
 // The five merged fixes for 5537 all measured the FOOTPRINT and the collector's own wall
@@ -1408,8 +1432,7 @@ static inline void cn1ReleaseStringPeer(JAVA_OBJECT o) {
 #define cn1ReleaseStringPeer(o) do {} while(0)
 #endif
 
-void freeAndFinalize(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj) {
-    finalizerFunctionPointer ptr = (finalizerFunctionPointer)obj->__codenameOneParentClsReference->finalizerFunction;
+void cn1InvokeFinalizer(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj, void (*ptr)(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT)) {
     if(ptr != 0) {
         // Per the Java spec, an exception thrown by finalize() is IGNORED -- and it must
         // NEVER escape the collector. This runs during sweep on the GC thread; if a
@@ -1427,6 +1450,7 @@ void freeAndFinalize(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj) {
         if(CN1_TRY_SETJMP(__finTryJmp) == 0) {
             threadStateData->blocks[threadStateData->tryBlockOffset].monitor = 0;
             threadStateData->blocks[threadStateData->tryBlockOffset].exceptionClass = 0; // catch-all
+            threadStateData->blocks[threadStateData->tryBlockOffset].nativeBuffers = threadStateData->nativeBuffers;
             memcpy(threadStateData->blocks[threadStateData->tryBlockOffset].destination, __finTryJmp, sizeof(jmp_buf));
             threadStateData->tryBlockOffset++;
             ptr(threadStateData, obj);
@@ -1437,6 +1461,13 @@ void freeAndFinalize(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj) {
             threadStateData->exception = JAVA_NULL;
         }
     }
+}
+
+void freeAndFinalize(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj) {
+    // Generated cleanup functions catch Java finalize() exceptions themselves.
+    // Primitive/reference-buffer cleanup needs no second setjmp frame.
+    finalizerFunctionPointer ptr = (finalizerFunctionPointer)obj->__codenameOneParentClsReference->finalizerFunction;
+    if(ptr != 0) ptr(threadStateData, obj);
     cn1ReleaseStringPeer(obj);
     codenameOneGcFree(threadStateData, obj);
 }
@@ -1879,6 +1910,40 @@ static void cn1DrainDeadThreadPending() {
     }
     unlockCriticalSection();
 }
+// The caller holds criticalSection and has parked a lightweight thread.
+// Native threads are not parked; their append and this reset share one mutex.
+static int cn1MigratePendingAllocations(struct ThreadLocalData* t) {
+    if(!t->lightweightThread) lockThreadHeapMutex();
+    int count = t->heapAllocationSize;
+    for(int i = 0; i < count; i++) {
+        JAVA_OBJECT object = (JAVA_OBJECT)t->pendingHeapAllocations[i];
+        if(object != JAVA_NULL) {
+            t->pendingHeapAllocations[i] = JAVA_NULL;
+            placeObjectInHeapCollection(object);
+#ifdef CN1_GC_CONFORM
+            cn1GcMigrated++;
+#endif
+        }
+    }
+    t->heapAllocationSize = 0;
+    if(!t->lightweightThread) unlockThreadHeapMutex();
+    return count;
+}
+
+// Capacity is reserved by the allocating thread before it gets here. Migration
+// can only reduce the count; it cannot invalidate that reserved space.
+static inline void cn1AppendPendingAllocation(struct ThreadLocalData* t, JAVA_OBJECT object) {
+    if(!t->lightweightThread) lockThreadHeapMutex();
+    t->pendingHeapAllocations[t->heapAllocationSize++] = object;
+    if(!t->lightweightThread) unlockThreadHeapMutex();
+}
+
+// Only roots supplied by the Java runtime (not conservative words or grace
+// survivors) establish a live graph. Queue entries carry this provenance across
+// serial, parallel and assisting markers. It is independent of the registry
+// walk's header-validity flag: a valid allocated header is not a live root.
+
+
 static void gcMarkDrain(CODENAME_ONE_THREAD_STATE);
 // Worklist-only drain (no heap rescan) -- see its definition for why the two are
 // separate functions and which callers may use which.
@@ -1974,7 +2039,7 @@ long gcMarkNewObjectCount = 0;
 // marks are matured too -- this is the cascade that keeps the whole subtree in one system.
 // THREAD-LOCAL: each parallel mark worker cascades within the subtree it is draining
 // without racing the others on this flag.
-static __thread JAVA_BOOLEAN gcCurrentlyMaturing = JAVA_FALSE;
+
 #endif
 // Forward (tentative) declarations -- the real definitions are below near the worklist.
 // The belt pass in codenameOneGCMark forces the overflow flag to trigger the full BiBOP
@@ -1982,46 +2047,13 @@ static __thread JAVA_BOOLEAN gcCurrentlyMaturing = JAVA_FALSE;
 // interleaved drain there). The size macro is hoisted with them for the same reason;
 // its rationale stays at the worklist definition.
 #ifndef CN1_GC_MARK_WORKLIST_SIZE
-// 1M ENTRIES (8MB), NOT 64K. When this overflows, the collector drops into a serial
-// page-rescan fixpoint over the whole BiBOP registry, and on a real workload that rescan
-// does an enormous amount of work for nothing. Measured on the self-hosting corpus at
-// 64K entries, in ONE run:
-//
-//   rescanPasses=68  rescanUseful=0  rescanSlots=10,107,804
-//
-// Sixty-eight passes, ten million slots walked, and not one of them found an object the
-// drain had missed. The rescan is a correctness backstop for a worklist that cannot hold
-// the frontier; the fix is to hold the frontier.
-//
-//   worklist   wall (3 reps)         peak          __bss
-//   65536      0.97 / 1.01 / 1.24s   1050-1265MB    1.26MB
-//   262144     1.24 / 1.28s          760-786MB      4.41MB
-//   1048576    0.90 / 0.90 / 0.90s    791-839MB    16.99MB
-//   4194304    0.88 / 0.90 / 0.90s    777-831MB    ~67MB
-//
-// ~25% off peak memory AND a tighter wall clock -- the same move-together behaviour
-// parallel marking showed, for the same reason: work the collector does not waste is
-// cycle time the mutator does not spend running ahead.
-//
-// 262144 IS THE DEFAULT BECAUSE IT IS THE KNEE. Re-measured head to head it is as good
-// as 1M on both axes (760-786MB against 791-858MB) for a QUARTER of the table. The
-// array is static, so its size is a reservation every generated application carries --
-// iOS and Android included, not just a desktop translation -- and 17MB of that for no
-// measured gain is not a trade worth making on a phone.
-//
-// The reservation is zerofill, so it costs no on-disk bytes (all three binaries are
-// byte-identical in size at 4,529,096) and no resident memory until an entry is
-// actually touched. That is why a size this large is affordable at all; it is not a
-// reason to be careless with it, because the pages a big heap DOES touch are real.
-//
-// PRIOR ROUNDS FOUND THE OPPOSITE ("a bigger worklist is neutral-to-worse everywhere it
-// has been tried") and they were measured under SERIAL marking, where the collector was
-// the bottleneck for a different reason. Like the marker-count and aging-slack results,
-// this one is only true for the configuration it was measured in.
+// Initial static reserve. A larger live frontier grows the queue on demand;
+// only allocation failure falls back to rescanning the marked heap.
 #define CN1_GC_MARK_WORKLIST_SIZE 262144
 #endif
 static JAVA_BOOLEAN gcMarkWorklistOverflow;
 static int gcMarkWorklistTop;
+static int gcMarkWorklistCapacity = CN1_GC_MARK_WORKLIST_SIZE;
 static _Atomic JAVA_BOOLEAN gcMarkOverflowSeen = JAVA_FALSE;
 #ifndef CN1_DISABLE_BIBOP
 // Forward declarations -- defined below; the grace-subtree pass in codenameOneGCMark
@@ -2209,14 +2241,9 @@ JAVA_BOOLEAN cn1SatbBulkBegin(void) {
 // ===================== NATIVE REFERENCE BLOCKS =====================
 // A block of JAVA_OBJECT references held in C memory instead of in a Java array.
 //
-// WHY. The live-set census says 88.4% of every java.lang.Object[] in this program is a
-// java.util.ArrayList or java.util.HashMap backing store (510,041 of 577,239), and 94.1%
-// of every int[] is HashMap's cn1Meta. That is ~130MB of a 488MB live set held in arrays
-// no Java code ever sees: we are committed to the ArrayList and Map APIs, not to the
-// data structure behind them. Each of those arrays costs a 32-byte Java header, a BiBOP
-// size-class rounding, a slot the sweep has to visit, and -- on every growth -- a fresh
-// allocation plus an arraycopy that abandons the old one as garbage. A C block costs a
-// malloc header, is resized in place by realloc, and is freed the moment its owner is.
+// Native backing storage avoids a separately registered and swept Java array.
+// Reference buffers still require tracing and mutation barriers. Primitive
+// buffers have no references and may resize in place under exclusive ownership.
 //
 // THE BLOCK IS NOT OUTSIDE THE COLLECTOR, ONLY OUTSIDE THE HEAP. Its elements are live
 // Java references, so three things must hold and all three are provided here rather than
@@ -2230,9 +2257,11 @@ JAVA_BOOLEAN cn1SatbBulkBegin(void) {
 //   - Every bulk move or clear goes through the bulk barrier with its handshake, for the
 //     same reason System.arraycopy on an object array does.
 //
-// The owner frees the block from its generated __FINALIZER_. That is why an owner class
-// must also call cn1BibopNoteNativePeer: without it a page whose slots are all dead takes
-// the O(1) reclaim path, which never runs a finalizer, and the blocks leak.
+// The owner frees the block from its generated __FINALIZER_. Its non-null class
+// finalizer makes the sweep set gcNeedsReclaim for every surviving owner, preventing
+// the O(1) all-dead-page shortcut. A newly allocated page always gets a full sweep.
+// cn1BibopNoteNativePeer is only needed for dynamically attached resources whose
+// ownership is not represented by a class finalizer (for example cached NSStrings).
 // THE BLOCK CARRIES ITS OWN LENGTH, one slot below the pointer handed out.
 //
 // The obvious layout -- a bare array plus a `cn1Cap` field on the owner -- has a race the
@@ -2243,128 +2272,265 @@ JAVA_BOOLEAN cn1SatbBulkBegin(void) {
 // can read between any two stores. Keeping the count inside the block makes the pair
 // atomic by construction: whichever pointer the marker loads, the count it reads belongs
 // to that block.
-JAVA_LONG cn1RefBlockAlloc(JAVA_INT capacity) {
-    if(capacity <= 0) {
-        return 0;
-    }
-    // calloc: the elements must read as JAVA_NULL before anything stores into them, and
-    // a lazily-zeroed page from the kernel is cheaper than an eager memset for the large
-    // blocks a big map or list reaches. One extra slot holds the count.
-    void* p = calloc((size_t)capacity + 1, sizeof(JAVA_OBJECT));
-    if(p == 0) {
-        return 0;
-    }
-    *(intptr_t*)p = (intptr_t)capacity;
-    return (JAVA_LONG)(uintptr_t)((JAVA_OBJECT*)p + 1);
+/* The immutable header travels with each allocation. Retirement is intrusive: it
+ * cannot allocate, fail, or lose a block when the process is short of memory. */
+static pthread_mutex_t cn1RetiredMutex = PTHREAD_MUTEX_INITIALIZER;
+static CN1NativeBlock* cn1RetiredBlocks = NULL;
+static int cn1NativeBlockCycleActive = 0;
+static _Atomic size_t cn1NativeBlockLiveBytes = 0;
+#ifdef CN1_ALLOC_CENSUS
+// CUMULATIVE reference-slot bytes handed out in native blocks; see
+// cn1BlockNoteRefBytes for why this is not a live figure.
+static _Atomic size_t cn1NativeBlockRefLiveBytes = 0;
+static _Atomic size_t cn1NativeBlockAllBytesEver = 0;
+// CAPACITY HISTOGRAM FOR COLLECTION STORAGE. "Collections cost 304MB of native
+// blocks" does not say whether that is a few big collections or millions of tiny
+// ones, and the fix is completely different in each case: a big-collection problem
+// is about reference WIDTH, a small-collection problem is about the fixed cost of
+// giving every list and map its own malloc'd block with a 32-byte header and a
+// default capacity it never uses. Bucketed by requested element capacity.
+#define CN1_CAPHIST_BUCKETS 12
+static _Atomic long cn1RefBlockCapHist[CN1_CAPHIST_BUCKETS];
+static _Atomic long cn1TableCapHist[CN1_CAPHIST_BUCKETS];
+static _Atomic long cn1RefBlockCapBytes[CN1_CAPHIST_BUCKETS];
+static _Atomic long cn1TableCapBytes[CN1_CAPHIST_BUCKETS];
+// Defined far below, beside the other census printers; called from the exit report
+// above it.
+static void cn1CapacityHistogram(void);
+static int cn1CapBucket(JAVA_INT capacity) {
+    int b = 0;
+    while(b < CN1_CAPHIST_BUCKETS - 1 && capacity > (1 << b)) b++;
+    return b;
+}
+#endif
+static _Atomic size_t cn1NativeBlockRetiredBytes = 0;
+static _Atomic size_t cn1NativeBlockReleasedBytes = 0;
+static void cn1NoteNativeAllocation(size_t bytes);
+
+static CN1NativeBlock* cn1BlockHeader(JAVA_LONG block) {
+    return ((CN1NativeBlock*)(uintptr_t)block) - 1;
 }
 
-/** Capacity of a block, or 0 for the null block. */
-JAVA_INT cn1RefBlockCount(JAVA_LONG block) {
-    if(block == 0) {
+static size_t cn1BlockPadding(void) {
+#if (defined(__APPLE__) && defined(__LP64__)) || defined(_WIN64)
+    return 0;
+#else
+    return __alignof__(long double) < 16 ? 15 : 0;
+#endif
+}
+
+static JAVA_LONG cn1BlockAlloc(JAVA_INT capacity, size_t width) {
+    const size_t padding = cn1BlockPadding();
+    if(capacity <= 0 || width == 0 || (size_t)capacity > (SIZE_MAX - sizeof(CN1NativeBlock) - padding) / width) {
         return 0;
     }
-    return (JAVA_INT)*((intptr_t*)(uintptr_t)block - 1);
+    size_t bytes = sizeof(CN1NativeBlock) + (size_t)capacity * width + padding;
+    void* allocation = calloc(1, bytes);
+    if(allocation == NULL) return 0;
+    // Also align on 32-bit allocators whose natural alignment can be only 8.
+    CN1NativeBlock* block = (CN1NativeBlock*)(((uintptr_t)allocation + 15) & ~(uintptr_t)15);
+    block->allocation = allocation;
+    block->capacity = capacity;
+    block->bytes = bytes;
+    atomic_fetch_add_explicit(&cn1NativeBlockLiveBytes, bytes, memory_order_relaxed);
+#ifdef CN1_ALLOC_CENSUS
+    atomic_fetch_add_explicit(&cn1NativeBlockAllBytesEver, bytes, memory_order_relaxed);
+#endif
+    cn1NoteNativeAllocation(bytes);
+    return (JAVA_LONG)(uintptr_t)(block + 1);
+}
+
+#ifdef CN1_ALLOC_CENSUS
+// Record how much of a freshly allocated block is reference slots. Called by the
+// allocators that know -- only they do; cn1BlockAlloc itself takes a width and
+// cannot tell a JAVA_OBJECT array from a JAVA_LONG one.
+// CUMULATIVE, not live, AND THAT IS ON PURPOSE. Tracking a live reference share
+// needs the kind of each block remembered until it is freed, and the obvious place
+// -- a field on CN1NativeBlock -- is not available: cn1TableAlloc slices one
+// allocation into parts whose layout is pinned to sizeof(CN1NativeBlock) and to a
+// hardcoded 16-byte slice prefix, so widening the header silently moves every part
+// and corrupts the table. (Measured: it segfaults during class parsing.)
+//
+// Cumulative bytes still answer the question this exists for -- what FRACTION of
+// native-block memory is reference slots rather than primitive payload -- as long
+// as the reader remembers it is a share of everything ever allocated, not of what
+// is live right now. Those coincide only if the two kinds have similar lifetimes.
+static void cn1BlockNoteRefBytes(JAVA_LONG block, size_t refBytes) {
+    if(block == 0 || refBytes == 0) return;
+    atomic_fetch_add_explicit(&cn1NativeBlockRefLiveBytes, refBytes, memory_order_relaxed);
+}
+#define CN1_BLOCK_NOTE_REFS(b, n) cn1BlockNoteRefBytes((b), (n))
+#else
+#define CN1_BLOCK_NOTE_REFS(b, n) do {} while(0)
+#endif
+
+/* A hash table owns one allocation. The remaining parts are borrowed slices,
+ * each with only a 16-byte capacity prefix; allocation/retirement metadata is
+ * stored once, on the root. The shared reference/primitive kernels apply.
+ * Only part zero may be freed or retired. */
+static size_t cn1TableIntStride(JAVA_INT capacity) {
+    size_t bytes = 16 + (size_t)capacity * sizeof(JAVA_INT);
+    return (bytes + 15) & ~(size_t)15;
+}
+
+JAVA_LONG cn1TablePart(JAVA_LONG table, JAVA_INT part) {
+    if(table == 0) return 0;
+    CN1NativeBlock* root = cn1BlockHeader(table);
+    size_t referenceStride = (16 + (size_t)root->capacity * sizeof(JAVA_OBJECT) + 15) & ~(size_t)15;
+    size_t offset = part < 2 ? (size_t)part * referenceStride
+        : 2 * referenceStride + (size_t)(part - 2) * cn1TableIntStride(root->capacity);
+    return table + (JAVA_LONG)offset;
+}
+
+JAVA_LONG cn1TableAlloc(JAVA_INT capacity, JAVA_BOOLEAN ordered) {
+    if(capacity <= 0 || (size_t)capacity >
+            (SIZE_MAX - 5 * sizeof(CN1NativeBlock) - 5 * 15) /
+            (2 * sizeof(JAVA_OBJECT) + 3 * sizeof(JAVA_INT))) return 0;
+    int parts = ordered ? 5 : 3;
+    size_t bytes = sizeof(CN1NativeBlock) - 16
+        + 2 * ((16 + (size_t)capacity * sizeof(JAVA_OBJECT) + 15) & ~(size_t)15)
+        + (size_t)(parts - 2) * cn1TableIntStride(capacity);
+    JAVA_LONG table = cn1BlockAlloc(1, bytes - sizeof(CN1NativeBlock));
+    if(table == 0) return 0;
+    cn1BlockHeader(table)->capacity = capacity;
+    // Parts 0 and 1 are the key and value REFERENCE arrays; parts 2+ are int
+    // metadata. Only the two reference strides count toward the reference share.
+    CN1_BLOCK_NOTE_REFS(table, 2 * (size_t)capacity * sizeof(JAVA_OBJECT));
+#ifdef CN1_ALLOC_CENSUS
+    {
+        int bucket = cn1CapBucket(capacity);
+        atomic_fetch_add_explicit(&cn1TableCapHist[bucket], 1, memory_order_relaxed);
+        atomic_fetch_add_explicit(&cn1TableCapBytes[bucket],
+                (long)(bytes), memory_order_relaxed);
+    }
+#endif
+    for(int part = 1; part < parts; part++) {
+        char* data = (char*)(uintptr_t)cn1TablePart(table, part);
+        *(JAVA_INT*)(data - (sizeof(CN1NativeBlock) - offsetof(CN1NativeBlock, capacity))) = capacity;
+    }
+    return table;
+}
+
+JAVA_LONG cn1RefBlockAlloc(JAVA_INT capacity) {
+    JAVA_LONG b = cn1BlockAlloc(capacity, sizeof(JAVA_OBJECT));
+    CN1_BLOCK_NOTE_REFS(b, (size_t)capacity * sizeof(JAVA_OBJECT));
+#ifdef CN1_ALLOC_CENSUS
+    if(b != 0) {
+        int bucket = cn1CapBucket(capacity);
+        atomic_fetch_add_explicit(&cn1RefBlockCapHist[bucket], 1, memory_order_relaxed);
+        atomic_fetch_add_explicit(&cn1RefBlockCapBytes[bucket],
+                (long)(sizeof(CN1NativeBlock) + (size_t)capacity * sizeof(JAVA_OBJECT)),
+                memory_order_relaxed);
+    }
+#endif
+    return b;
 }
 
 void cn1RefBlockFree(JAVA_LONG block) {
     if(block != 0) {
-        free((JAVA_OBJECT*)(uintptr_t)block - 1);
+        CN1NativeBlock* header = cn1BlockHeader(block);
+        atomic_fetch_sub_explicit(&cn1NativeBlockLiveBytes, header->bytes, memory_order_relaxed);
+        atomic_fetch_add_explicit(&cn1NativeBlockReleasedBytes, header->bytes, memory_order_relaxed);
+        free(header->allocation);
     }
 }
 
-// GROWTH DOES NOT realloc, AND THAT IS THE WHOLE DESIGN PROBLEM OF THIS SCHEME.
-//
-// realloc may MOVE the block and free the old address. A concurrent marker that has
-// already loaded the old pointer is then walking freed memory -- a use-after-free the
-// Java-array version cannot have, because ArrayList allocates a NEW array and the old one
-// stays a valid heap object until the collector proves it dead. Trading the array away
-// gives up exactly that guarantee, so it has to be bought back.
-//
-// It is bought with a RETIRE LIST. Growth publishes a new block and hands the old one to
-// cn1RefBlockRetire; the blocks on that list are freed by the sweep, which runs after the
-// mark has finished, so any marker that could still hold the old pointer has completed by
-// then. This is the same reasoning as the collector's one-cycle grace, applied to C
-// memory instead of to slots.
-static JAVA_LONG* cn1RetiredBlocks = 0;
-static int cn1RetiredCount = 0, cn1RetiredCap = 0;
-static pthread_mutex_t cn1RetiredMutex = PTHREAD_MUTEX_INITIALIZER;
+// Primitive buffers are never read by the marker. Unlike reference blocks,
+// they need no retirement and can use realloc without retaining the old copy.
+// On allocation failure the original block and accounting remain intact.
+void cn1StackBufferUnwind(struct ThreadLocalData* thread, struct CN1StackBuffer* until) {
+    while(thread->nativeBuffers != until) {
+        struct CN1StackBuffer* scope = thread->nativeBuffers;
+        cn1StackBufferReset(scope);
+        thread->nativeBuffers = scope->previous;
+    }
+}
+
+JAVA_LONG cn1PrimitiveBlockResize(JAVA_LONG block, JAVA_INT bytes) {
+    if(bytes < 0) return 0;
+    if(bytes == 0) { cn1RefBlockFree(block); return 0; }
+    if(block == 0) return cn1BlockAlloc(bytes, 1);
+    CN1NativeBlock* old = cn1BlockHeader(block);
+    if(old->capacity == bytes) return block;
+    if(cn1BlockPadding() != 0) {
+        JAVA_LONG fresh = cn1BlockAlloc(bytes, 1);
+        if(fresh == 0) return 0;
+        memcpy((void*)(uintptr_t)fresh, (void*)(uintptr_t)block,
+               (size_t)(bytes < old->capacity ? bytes : old->capacity));
+        cn1RefBlockFree(block);
+        return fresh;
+    }
+    size_t oldBytes = old->bytes;
+    size_t newBytes = sizeof(CN1NativeBlock) + (size_t)bytes;
+    CN1NativeBlock* fresh = (CN1NativeBlock*)realloc(old->allocation, newBytes);
+    if(fresh == NULL) return 0;
+    fresh->allocation = fresh;
+    fresh->bytes = newBytes;
+    fresh->capacity = bytes;
+    if(newBytes > oldBytes) {
+        atomic_fetch_add_explicit(&cn1NativeBlockLiveBytes, newBytes - oldBytes, memory_order_relaxed);
+        cn1NoteNativeAllocation(newBytes - oldBytes);
+    } else {
+        atomic_fetch_sub_explicit(&cn1NativeBlockLiveBytes, oldBytes - newBytes, memory_order_relaxed);
+        atomic_fetch_add_explicit(&cn1NativeBlockReleasedBytes, oldBytes - newBytes, memory_order_relaxed);
+    }
+    return (JAVA_LONG)(uintptr_t)(fresh + 1);
+}
+
+
+/* The collector enters before reading owners. Publishers store the new pointer
+ * atomically before taking this lock. Thus an idle-cycle free cannot race a
+ * marker that obtained the old pointer. No allocation or Java call holds this lock. */
+void cn1RefBlockBeginCycle(void) {
+    pthread_mutex_lock(&cn1RetiredMutex);
+    cn1NativeBlockCycleActive = 1;
+    pthread_mutex_unlock(&cn1RetiredMutex);
+}
 
 void cn1RefBlockRetire(JAVA_LONG block) {
-    if(block == 0) {
-        return;
-    }
-    // RETIRE ONLY WHILE A CYCLE IS RUNNING. The hazard is a marker that loaded this
-    // pointer before the caller swapped the field; no cycle running means no marker
-    // exists, and the field no longer holds the pointer, so a cycle starting after this
-    // check can never obtain it. Freeing straight away in that case matters: the retire
-    // list holds every block a growing map replaces until the next sweep, and a map that
-    // grows 16 -> 32 -> ... -> N retires the whole geometric series. Deferring all of it
-    // cost the entire memory win this storage change is for -- measured at parity with
-    // Java arrays instead of -15%.
-    extern JAVA_BOOLEAN gcCurrentlyRunning;
-    if(!gcCurrentlyRunning) {
-        free((JAVA_OBJECT*)(uintptr_t)block - 1);
-        return;
-    }
+    if(block == 0) return;
     pthread_mutex_lock(&cn1RetiredMutex);
-    if(cn1RetiredCount == cn1RetiredCap) {
-        int cap = cn1RetiredCap == 0 ? 64 : cn1RetiredCap * 2;
-        JAVA_LONG* g = (JAVA_LONG*)realloc(cn1RetiredBlocks, (size_t)cap * sizeof(JAVA_LONG));
-        if(g == 0) {
-            // Cannot grow the list: leak this block rather than free it while a marker
-            // may still be walking it. A leak is recoverable; a use-after-free is not.
-            pthread_mutex_unlock(&cn1RetiredMutex);
-            return;
-        }
-        cn1RetiredBlocks = g;
-        cn1RetiredCap = cap;
+    if(cn1NativeBlockCycleActive) {
+        CN1NativeBlock* header = cn1BlockHeader(block);
+        header->next = cn1RetiredBlocks;
+        cn1RetiredBlocks = header;
+        atomic_fetch_add_explicit(&cn1NativeBlockRetiredBytes, header->bytes, memory_order_relaxed);
+    } else {
+        cn1RefBlockFree(block);
     }
-    cn1RetiredBlocks[cn1RetiredCount++] = block;
     pthread_mutex_unlock(&cn1RetiredMutex);
 }
 
-// Drained by the sweep, i.e. after the mark that could have been reading these has ended.
+static void cn1RefBlockDrainLocked(void) {
+    while(cn1RetiredBlocks != NULL) {
+        CN1NativeBlock* header = cn1RetiredBlocks;
+        cn1RetiredBlocks = header->next;
+        atomic_fetch_sub_explicit(&cn1NativeBlockRetiredBytes, header->bytes, memory_order_relaxed);
+        cn1RefBlockFree((JAVA_LONG)(uintptr_t)(header + 1));
+    }
+}
+
 void cn1RefBlockDrainRetired(void) {
     pthread_mutex_lock(&cn1RetiredMutex);
-    for(int i = 0 ; i < cn1RetiredCount ; i++) {
-        free((JAVA_OBJECT*)(uintptr_t)cn1RetiredBlocks[i] - 1);
-    }
-    cn1RetiredCount = 0;
+    cn1RefBlockDrainLocked();
     pthread_mutex_unlock(&cn1RetiredMutex);
 }
 
-// Allocates a larger block, copies, and retires the old one. Returns the old block on
-// failure so the caller keeps a usable structure.
-JAVA_LONG cn1RefBlockGrow(JAVA_LONG block, JAVA_INT oldCount, JAVA_INT newCap) {
-    JAVA_LONG fresh = cn1RefBlockAlloc(newCap);
-    if(fresh == 0) {
-        return block;
-    }
-    if(block != 0 && oldCount > 0) {
-        memcpy((void*)(uintptr_t)fresh, (void*)(uintptr_t)block,
-               (size_t)oldCount * sizeof(JAVA_OBJECT));
-    }
-    cn1RefBlockRetire(block);
-    return fresh;
+void cn1RefBlockEndCycle(void) {
+    pthread_mutex_lock(&cn1RetiredMutex);
+    cn1NativeBlockCycleActive = 0;
+    cn1RefBlockDrainLocked();
+    pthread_mutex_unlock(&cn1RetiredMutex);
 }
 
-// PRIMITIVE BLOCKS. The same storage idea with none of the collector interaction: these
-// hold ints, not references, so nothing traces them and no barrier applies. HashMap's
-// cn1Meta is 174,903 of the 185,860 live int[] on the self-hosting corpus (94.1%) and
-// exists only to hold two sentinels and a hash marker per slot -- no Java code ever sees
-// the array, so it does not need to be one.
+void cn1NativeBlockAccounting(size_t* live, size_t* retired, size_t* released) {
+    *live = atomic_load_explicit(&cn1NativeBlockLiveBytes, memory_order_relaxed);
+    *retired = atomic_load_explicit(&cn1NativeBlockRetiredBytes, memory_order_relaxed);
+    *released = atomic_load_explicit(&cn1NativeBlockReleasedBytes, memory_order_relaxed);
+}
+
 JAVA_LONG cn1IntBlockAlloc(JAVA_INT capacity) {
-    if(capacity <= 0) {
-        return 0;
-    }
-    // Same one-slot length header as the reference blocks, so cn1RefBlockFree releases
-    // either kind and the two cannot be confused at the free site.
-    void* p = calloc((size_t)capacity + 2, sizeof(JAVA_INT));
-    if(p == 0) {
-        return 0;
-    }
-    *(intptr_t*)p = (intptr_t)capacity;
-    return (JAVA_LONG)(uintptr_t)((char*)p + sizeof(intptr_t));
+    return cn1BlockAlloc(capacity, sizeof(JAVA_INT));
 }
 
 void cn1IntBlockClear(JAVA_LONG block, JAVA_INT capacity) {
@@ -2398,9 +2564,9 @@ void cn1RefBlockMove(CODENAME_ONE_THREAD_STATE, JAVA_LONG block, JAVA_INT from, 
         // deletion barrier owes the snapshot.
         cn1SatbEnqueueRangeLocked((JAVA_ARRAY_OBJECT*)(base + to), count);
         cn1SatbEnqueueRangeLocked((JAVA_ARRAY_OBJECT*)(base + from), count);
-        cn1SatbBulkEnd();
     }
     memmove(base + to, base + from, (size_t)count * sizeof(JAVA_OBJECT));
+    cn1SatbBulkEnd();
 }
 
 // CLEAR, for Arrays.fill(array, a, b, null) -- the range a removal blanks so the dropped
@@ -2412,9 +2578,45 @@ void cn1RefBlockClear(CODENAME_ONE_THREAD_STATE, JAVA_LONG block, JAVA_INT from,
     JAVA_OBJECT* base = (JAVA_OBJECT*)(uintptr_t)block;
     if(cn1SatbBulkBegin()) {
         cn1SatbEnqueueRangeLocked((JAVA_ARRAY_OBJECT*)(base + from), count);
-        cn1SatbBulkEnd();
     }
     memset(base + from, 0, (size_t)count * sizeof(JAVA_OBJECT));
+    cn1SatbBulkEnd();
+}
+
+// A precisely reached owner supplies real Java references. Hoist that proof
+// outside the buffer walk and reject already-marked edges inline, before the
+// general marker's call frame and TLS lookup. Conservative/grace descendants
+// must still validate addresses before reading any object header.
+int cn1GcFieldMarkEpoch(JAVA_BOOLEAN force) {
+    // Parallel claims already discard marked objects regardless of force.
+    // Serial forced rescans must visit them again using the force-visited table.
+    int precise = cn1GcPreciseTrace && (!force || gcMarkLocalBuf != 0);
+#ifdef CN1_GC_VERIFY
+    if(cn1GcVerifyActive || cn1GcFaultFreeLive) precise = 0;
+#endif
+    return precise ? currentGcMarkValue : 0;
+}
+
+static void cn1GcMarkReferenceRange(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT* refs,
+                                    JAVA_INT count, JAVA_BOOLEAN force) {
+    const int epoch = cn1GcFieldMarkEpoch(force);
+    int precise = epoch != 0;
+    if(precise) {
+        for(JAVA_INT i = 0; i < count; i++) {
+            JAVA_OBJECT value = refs[i];
+            if(value != JAVA_NULL && !CN1_IS_TAGGED(value)
+                    && __atomic_load_n(&value->__codenameOneGcMark, __ATOMIC_ACQUIRE) != epoch) {
+                gcMarkObject(threadStateData, value, JAVA_FALSE);
+            }
+        }
+    } else {
+        for(JAVA_INT i = 0; i < count; i++) {
+            JAVA_OBJECT value = refs[i];
+            if(value != JAVA_NULL && !CN1_IS_TAGGED(value)) {
+                gcMarkObject(threadStateData, value, force);
+            }
+        }
+    }
 }
 
 // Trace `count` elements. Called from the owner's generated __GC_MARK_.
@@ -2438,12 +2640,7 @@ void cn1GcMarkRefBlock(CODENAME_ONE_THREAD_STATE, JAVA_LONG block, JAVA_BOOLEAN 
         }
     }
 #endif
-    for(JAVA_INT i = 0 ; i < count ; i++) {
-        JAVA_OBJECT o = refs[i];
-        if(o != JAVA_NULL) {
-            gcMarkObject(threadStateData, o, force);
-        }
-    }
+    cn1GcMarkReferenceRange(threadStateData, refs, count, force);
 }
 
 void cn1SatbBulkEnd(void) {
@@ -2459,6 +2656,29 @@ void cn1SatbBulkQuiesce(void) {
         usleep(50);
     }
 #endif
+}
+
+// A current-epoch object has already been claimed by the marker. Its scan is
+// queued (or owned by overflow recovery), and gcMarkObject would discard another
+// non-forced visit. Do not retain duplicate pointers in the SATB log. The bulk
+// caller holds the termination handshake; per-store callers hold the reference
+// across their write. An epoch change is handled conservatively by enqueuing.
+static inline int cn1SatbNeedsEnqueue(JAVA_OBJECT object) {
+    // Acquire mark startup before reading its published epoch, including callers
+    // whose inexpensive outer active-flag check was only a relaxed load.
+    (void)__atomic_load_n(&gcSatbActive, __ATOMIC_ACQUIRE);
+    int epoch = atomic_load_explicit(&bibopGcEpoch, memory_order_acquire);
+    int mark = __atomic_load_n(&object->__codenameOneGcMark, __ATOMIC_ACQUIRE);
+#ifndef CN1_SATB_LOG_FRESH
+    if(mark == -1) return 0;
+#endif
+    if(mark == epoch && epoch == atomic_load_explicit(&bibopGcEpoch, memory_order_acquire)) {
+#ifdef CN1_GC_CONFORM
+        atomic_fetch_add_explicit(&cn1GcSatbAlready, 1, memory_order_relaxed);
+#endif
+        return 0;
+    }
+    return 1;
 }
 
 static void cn1SatbFlushChunk(JAVA_OBJECT* buf, int n) {
@@ -2477,7 +2697,8 @@ static void cn1SatbFlushChunk(JAVA_OBJECT* buf, int n) {
         JAVA_OBJECT* grown = (JAVA_OBJECT*)realloc(gcSatbStack, (size_t)ncap * sizeof(JAVA_OBJECT));
         if(grown == 0) {
             pthread_mutex_unlock(&gcSatbMutex);
-            return;   // OOM: drop, exactly as the single-entry path does
+            atomic_fetch_add_explicit(&cn1SatbDrops, 1, memory_order_relaxed);
+            return;   // Reference processing must not trust an incomplete snapshot.
         }
         gcSatbStack = grown;
         gcSatbCap = ncap;
@@ -2508,11 +2729,7 @@ void cn1SatbEnqueueRangeLocked(JAVA_ARRAY_OBJECT* refs, int count) {
         }
         // Same filters as cn1SatbEnqueue, applied WITHOUT the lock -- they only read the
         // object's own mark word.
-#ifndef CN1_SATB_LOG_FRESH
-        if(__atomic_load_n(&o->__codenameOneGcMark, __ATOMIC_RELAXED) == -1) {
-            continue;
-        }
-#endif
+        if(!cn1SatbNeedsEnqueue(o)) continue;
 #ifdef CN1_GC_CONFORM
         {
             int __m = __atomic_load_n(&o->__codenameOneGcMark, __ATOMIC_RELAXED);
@@ -2538,53 +2755,7 @@ void cn1SatbEnqueueRangeLocked(JAVA_ARRAY_OBJECT* refs, int count) {
 }
 
 void cn1SatbEnqueue(JAVA_OBJECT old) {
-#ifndef CN1_SATB_LOG_FRESH
-    // FRESH-REFERENCE FILTER (issue 5537).
-    //
-    // A mark == -1 object was allocated after this cycle's snapshot was taken, so it is
-    // not IN the snapshot this barrier exists to preserve, and the sweep keeps it anyway:
-    // both halves promote a fresh slot to the current epoch instead of freeing it (the
-    // grace rule -- cn1BibopSweep's `m == -1` branch and codenameOneGCSweep's `else`).
-    // Its own outgoing references to NON-fresh objects are still logged by this same
-    // barrier as they are stored, so nothing reachable only through a fresh object is
-    // lost -- which is the hazard the insertion half was added for.
-    //
-    // THAT LAST STEP IS THE WHOLE ARGUMENT, AND IT HAS A PRECONDITION: the INSERTION half
-    // has to exist. CN1_WRITE_BARRIER is that half in every configuration this tree
-    // builds, and -DCN1_DISABLE_SATB compiles out the deletion half with it, so the two
-    // cannot come apart. Do not reintroduce a configuration where the write barrier means
-    // something other than SATB insertion without revisiting this filter: a fresh
-    // container that takes an older child after the grace pass would then have that child
-    // recorded nowhere, and dropping the deletion entry for the container would let the
-    // sweep reclaim a child the graced container still references.
-    //
-    // Without the filter the log is a positive feedback loop rather than a cost. Measured
-    // on the game-tree shape at 4 threads: essentially the ENTIRE log was fresh
-    // references (2,718,413 of 2,718,448 entries in one cycle), and draining them was
-    // 282ms of a 327ms mark. A longer cycle logs more, and logging more lengthens the
-    // cycle, so mark time and footprint climb together until the collector is continuous
-    // -- exactly the reported symptom pair.
-    //
-    // ATOMIC, and RELAXED rather than acquire. The marker reaches this same field through
-    // __atomic_* accesses, so a plain load here would be a mixed atomic/non-atomic access
-    // to one object -- undefined in C, and the concrete hazard is not tearing but the
-    // compiler CACHING a -1 across several inlined barriers in one loop: the filter would
-    // then keep suppressing after the object had aged into a genuine snapshot object, and
-    // a later reference move would escape the log.
-    //
-    // Relaxed is sufficient and acquire is not wanted. Nothing is published through this
-    // read -- it decides only whether to log -- and both stale answers are safe: a stale
-    // -1 for an object that has since been marked suppresses an entry gcMarkObject would
-    // have dropped anyway, and a stale non-fresh value logs an entry that was not needed.
-    // What relaxed buys is that the load actually happens at each barrier. An acquire
-    // fence on every object store, on the mutator's hottest path, buys nothing over that.
-    //
-    // A free slot's sentinel mark is neither value, so it still reaches the log and is
-    // rejected by gcMarkObject exactly as before.
-    if(__atomic_load_n(&old->__codenameOneGcMark, __ATOMIC_RELAXED) == -1) {
-        return;
-    }
-#endif
+    if(!cn1SatbNeedsEnqueue(old)) return;
 #ifdef CN1_GC_CONFORM
     {
         // Same reasoning as the filter above; a census may misclassify but must not be a
@@ -2776,7 +2947,7 @@ static JAVA_BOOLEAN cn1SweepRemoving;
 // Use CN1_GC_TRUSTED_BEGIN/END rather than assigning directly: they save and
 // restore, so nesting and any future early return cannot leak a trusted window
 // into unrelated marking.
-static __thread int cn1GcTrustedRoots = 0;
+
 #define CN1_GC_TRUSTED_BEGIN() int __cn1TrustSaved = cn1GcTrustedRoots; cn1GcTrustedRoots = 1
 #define CN1_GC_TRUSTED_END()   cn1GcTrustedRoots = __cn1TrustSaved
 // An untrusted HOLE inside a trusted walk, for a pass that has to drain the mark
@@ -3568,6 +3739,9 @@ void cn1GcDiscoverReference(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT ref, JAVA_BOO
 // Runs on the GC thread only, inside the SATB termination loop, barrier armed.
 // Returns JAVA_TRUE if it marked anything; it has already drained by then.
 static JAVA_BOOLEAN cn1GcProcessReferences(CODENAME_ONE_THREAD_STATE) {
+    if(cn1GcRootsIncomplete || cn1GcPageIndexStale) {
+        return cn1GcRetainAllReferences(threadStateData);
+    }
     // NOTHING TO DO IN A PROGRAM WITH NO REFERENCES, and doing nothing has to mean
     // touching nothing. Most applications never construct a Reference, and for those this
     // pass previously still ran a cn1SatbBulkQuiesce() on every outer termination pass --
@@ -3858,6 +4032,7 @@ static JAVA_BOOLEAN cn1GcProcessReferences(CODENAME_ONE_THREAD_STATE) {
 }
 
 void codenameOneGCMark() {
+    cn1GcRootsIncomplete = JAVA_FALSE;
     currentGcMarkValue++;
     // PUBLISH THE EPOCH HERE, not only from cn1BibopBeginGcCycle, because that call is
     // compiled out under -DCN1_DISABLE_BIBOP and the mirror then stays at 1 forever.
@@ -3957,9 +4132,11 @@ void codenameOneGCMark() {
     // cn1AddImmortalRoot). Marked as roots every cycle; the per-thread drains
     // below trace them transitively.
     lockCriticalSection();
+    cn1GcPreciseTrace = 1;
     for(int ir = 0 ; ir < cn1ImmortalRootsN ; ir++) {
         gcMarkObject(d, cn1ImmortalRoots[ir], JAVA_FALSE);
     }
+    cn1GcPreciseTrace = 0;
     unlockCriticalSection();
 
 #ifdef CN1_ON_DEVICE_DEBUG
@@ -4215,28 +4392,11 @@ void codenameOneGCMark() {
                 // deferred reclaim and nothing else. It cannot grow without bound either:
                 // a table over its threshold parks its own thread at a safepoint, which is
                 // the cooperative stop this escalation was standing in for.
+                JAVA_INT allocSize = 0;
                 if(!forcedStop) {
                     lockCriticalSection();
                     if(allThreads[iter] == t) {
-                        if (!t->lightweightThread) {
-                            // For native threads, we need to actually lock them while we traverse the
-                            // heap allocations because we can't use the usual locking mechanisms on
-                            // them.
-                            lockThreadHeapMutex();
-                        }
-                        for(int heapTrav = 0 ; heapTrav < t->heapAllocationSize ; heapTrav++) {
-                            JAVA_OBJECT obj = (JAVA_OBJECT)t->pendingHeapAllocations[heapTrav];
-                            if(obj) {
-                                t->pendingHeapAllocations[heapTrav] = 0;
-                                placeObjectInHeapCollection(obj);
-    #ifdef CN1_GC_CONFORM
-                                cn1GcMigrated++;
-    #endif
-                            }
-                        }
-                        if (!t->lightweightThread) {
-                            unlockThreadHeapMutex();
-                        }
+                        allocSize = cn1MigratePendingAllocations(t);
                     }
                     unlockCriticalSection();
                 }
@@ -4246,7 +4406,6 @@ void codenameOneGCMark() {
                 
                 // this is a thread that allocates a lot and might demolish RAM. We will hold it until the sweep is finished...
                 
-                JAVA_INT allocSize = t->heapAllocationSize;
                 JAVA_BOOLEAN agressiveAllocator = JAVA_FALSE;
                 // Skipped under a held freeze, with the diagnostic below it. get_free_memory()
                 // and NSLog both take locks the stopped thread may own, and the EDT is a
@@ -4255,7 +4414,7 @@ void codenameOneGCMark() {
                 // decision is also meaningless here: allocSize is read from a table this
                 // cycle deliberately did not migrate, so it describes the previous cycle's
                 // backlog rather than what this thread just produced.
-#ifndef CN1_NO_AGGRESSIVE_HOLD
+#if defined(CN1_DISABLE_SATB) && !defined(CN1_NO_AGGRESSIVE_HOLD)
                 if(!forcedStop) {
                     if (isEdt(t->threadId) && !lowMemoryMode) {
                         agressiveAllocator = allocSize > CN1_AGRESSIVE_ALLOCATOR_THREAD_HEAP_ALLOCATIONS_THRESHOLD_EDT;
@@ -4272,9 +4431,6 @@ void codenameOneGCMark() {
                     
                 }
                 
-                if(!forcedStop) {
-                    t->heapAllocationSize = 0;
-                }
 
                 int stackSize = t->threadObjectStackOffset;
 #ifdef CN1_CONSERVATIVE_GC_ROOTS
@@ -4410,34 +4566,31 @@ void codenameOneGCMark() {
 #ifdef CN1_GC_VERIFY
     { extern const char* cn1GcMarkPhase; cn1GcMarkPhase = "statics"; }
 #endif
+                cn1GcPreciseTrace = 1;
                 markStatics(d);
-                // Drain the worklist before unblocking the thread so that every object
-                // transitively reachable from this thread's roots is fully marked while the
-                // thread is still paused -- matching the snapshot-at-the-beginning property
-                // the recursive implementation had. Without this drain, an unblocked mutator
-                // can read a still-grey field reference into a new local and null the field;
-                // the captured object would never be visited by the final drain, sweep would
-                // reclaim it, and a later monitorEnter on its freed pthread_mutex_t would
-                // silently deadlock. Earlier attempts at this drain hung at app startup
-                // because the overflow rescan path had a cursor-reset bug; with that fixed
-                // below, the drain runs to completion in O(reachable) time.
-                //
-                // The drain is fanned out across a worker pool (gcMarkDrainParallel).
-                // This still satisfies snapshot-at-the-beginning: the roots were already
-                // pushed onto the worklist serially above (while this thread is paused),
-                // and gcMarkDrainParallel does not return until the entire reachable set
-                // is marked -- it just marks it faster. With a single configured marker
-                // it degrades to the serial gcMarkDrain and is byte-for-byte identical.
+                cn1GcPreciseTrace = 0;
+                // Captured roots are now in the mark queue. With the SATB
+                // deletion barrier armed, a mutator moving a grey object's child
+                // into a local and clearing the field logs that child. Holding the
+                // mutator through the transitive drain is therefore unnecessary.
+                // Allocation pressure is governed by the existing byte/footprint
+                // pacing paths, rather than an additional object-count hold until
+                // sweep. Barrier-free builds retain the original stop-and-drain.
+#if !defined(CN1_DISABLE_SATB)
+                t->threadBlockedByGC = JAVA_FALSE;
+#endif
 #ifdef CN1_GC_CONFORM
                 { long long __t0 = cn1GcNowNs(); gcMarkDrainParallel(d); cn1GcTDrainNs += cn1GcNowNs() - __t0; }
 #else
                 gcMarkDrainParallel(d);
 #endif
+#if defined(CN1_DISABLE_SATB)
                 if(!agressiveAllocator) {
                     t->threadBlockedByGC = JAVA_FALSE;
                 } else {
                     hasAgressiveAllocator = JAVA_TRUE;
                 }
+#endif
             }
         }
     }
@@ -4631,7 +4784,7 @@ void codenameOneGCMark() {
             // times a cycle and quadratic for a caller that drains periodically. Doing
             // it here hung the Mac Catalyst suite outright. The pass still ends with a
             // full gcMarkDrain, which is what closes the fixpoint.
-            if(gcMarkWorklistTop >= CN1_GC_MARK_WORKLIST_SIZE / 2) {
+            if(gcMarkWorklistTop >= gcMarkWorklistCapacity / 2) {
                 atomic_fetch_add_explicit(&cn1GcGraceDrains, 1, memory_order_relaxed);
                 gcMarkDrainWorklist(d);
             }
@@ -4661,7 +4814,7 @@ void codenameOneGCMark() {
     // The page walk above cannot cover these: they are not page-resident.
     // Everything above CN1_BIBOP_MAX_OBJECT lands here (the retained large
     // byte[] blocks and Hashtable bucket arrays of issue 5425), as does every
-    // allocation the adaptive survivor-heavy bypass diverts off the page heap,
+    // allocation that cannot obtain a page slot,
     // and MATURED survivors, whose table entry is what the sweep consults.
     //
     // Only the entries already migrated into the table can be fresh here: a
@@ -4693,12 +4846,12 @@ void codenameOneGCMark() {
                 // Same interleaved drain as the page walk above, and for the same
                 // reason: the number of fresh entries here is set by the allocation
                 // rate (everything over CN1_BIBOP_MAX_OBJECT lands in this table, as
-                // does everything the survivor-heavy bypass diverts off the page
+                // does any small allocation unable to obtain a page
                 // heap), so a busy cycle can push more of them than the worklist
                 // holds and drop the collector into the overflow spiral described
                 // there. Checked only on a push, since nothing else moves the cursor,
                 // and outside the trusted window for the reason spelled out below.
-                if(gcMarkWorklistTop >= CN1_GC_MARK_WORKLIST_SIZE / 2) {
+                if(gcMarkWorklistTop >= gcMarkWorklistCapacity / 2) {
                     atomic_fetch_add_explicit(&cn1GcGraceDrains, 1, memory_order_relaxed);
                     CN1_GC_TRUSTED_SUSPEND();
                     gcMarkDrainWorklist(d);
@@ -4996,6 +5149,10 @@ void codenameOneGCMark() {
  */
 #ifndef CN1_DISABLE_BIBOP
 static void cn1BibopSweep(CODENAME_ONE_THREAD_STATE);
+static inline void cn1BibopNoteAdoptedDeath(JAVA_OBJECT object) {
+    CN1BibopPage* page = (CN1BibopPage*)((uintptr_t)object & ~((uintptr_t)CN1_BIBOP_PAGE_SIZE - 1));
+    atomic_store_explicit(&page->gcAdoptedDied, 1, memory_order_relaxed);
+}
 #endif
 #ifdef CN1_HEAP_HISTOGRAM
 /**
@@ -5121,6 +5278,11 @@ void codenameOneGCSweep() {
     // The blocked-thread release below still has to happen. A thread parked in
     // threadBlockedByGC is waiting on the collector, not on the reclaim, and leaving it
     // parked because the index could not be built would hang the app instead.
+    if(cn1GcRootsIncomplete) {
+        fprintf(stderr, "CN1 GC: incomplete native root capture; skipped sweep\n");
+        cn1GcReleaseBlockedThreads();
+        return;
+    }
     if(cn1GcPageIndexStale) {
         cn1GcReportStaleIndexSkip();
         cn1GcReleaseBlockedThreads();
@@ -5153,12 +5315,6 @@ void codenameOneGCSweep() {
             return;
         }
     }
-#ifndef CN1_DISABLE_BIBOP
-    // Reclaim dead slots on retired BiBOP pages (rebuild per-page free-lists from
-    // the header epoch marks). Runs first, on the GC thread, with no marking in
-    // flight and no mutator owning these pages.
-    cn1BibopSweep(threadStateData);
-#endif
     //int counter = 0;
     int t = currentSizeOfAllObjectsInHeap;
     for(int iter = 0 ; iter < t ; iter++) {
@@ -5185,7 +5341,7 @@ void codenameOneGCSweep() {
                     // A MATURED (-4) object that died: its memory is a BiBOP slot, so its
                     // DEATH belongs entirely to the BiBOP collector. The slot is already
                     // deregistered (nulled above); revert it to a normal dead -3 slot and
-                    // let the next BiBOP sweep run cn1BibopReclaimSlot ONCE (finalizer +
+                    // let this cycle's BiBOP sweep run cn1BibopReclaimSlot ONCE (finalizer +
                     // native peer + monitor). Do NOT freeAndFinalize here: that runs the
                     // finalizer a SECOND time (cn1BibopReclaimSlot runs it too), which
                     // double-frees a native-resource finalizer's buffer -- the deterministic
@@ -5195,6 +5351,7 @@ void codenameOneGCSweep() {
                         atomic_fetch_add_explicit(&cn1GcMaturedDied, 1, memory_order_relaxed);
 #endif
                         o->__heapPosition = CN1_BIBOP_HEAP_POS;
+                        cn1BibopNoteAdoptedDeath(o);
                         continue;
                     }
 #endif
@@ -5263,6 +5420,15 @@ void codenameOneGCSweep() {
         }
     }
     
+#ifndef CN1_DISABLE_BIBOP
+    // First relinquish dead adopted slots from the legacy registry, then reclaim
+    // them in the page sweep of THIS cycle. Marking is complete and the pool lock
+    // excludes mutator-owned pages; finalization still happens exactly once in
+    // cn1BibopReclaimSlot. Sweeping pages first would defer native-buffer release.
+    cn1BibopSweep(threadStateData);
+#endif
+    atomic_store_explicit(&cn1GcReclaimedBefore,
+                          currentGcMarkValue - cn1GcAgingSlack(), memory_order_release);
     // we had a thread that really ripped into the GC so we only release that thread now after cleaning RAM
     cn1GcReleaseBlockedThreads();
     
@@ -5885,14 +6051,8 @@ _Atomic int cn1GcCycleState = CN1_GC_CYCLE_IDLE;
 #ifndef CN1_BIBOP_HIGH_THROUGHPUT_BYTES
 #define CN1_BIBOP_HIGH_THROUGHPUT_BYTES (8*1024*1024)
 #endif
-#ifndef CN1_BIBOP_BYPASS_ALLOCATIONS
-#define CN1_BIBOP_BYPASS_ALLOCATIONS 65536
-#endif
-#ifndef CN1_BIBOP_BYPASS_MIN_SLOTS
-#define CN1_BIBOP_BYPASS_MIN_SLOTS 4096
-#endif
-#ifndef CN1_BIBOP_BYPASS_SURVIVAL_PERCENT
-#define CN1_BIBOP_BYPASS_SURVIVAL_PERCENT 25
+#ifndef CN1_BIBOP_TRIGGER_SURVIVAL_PERCENT
+#define CN1_BIBOP_TRIGGER_SURVIVAL_PERCENT 25
 #endif
 // Header mark sentinel for a slot sitting on a page free-list (distinct from
 // -1 "fresh", and from any real epoch >= 1). The free-list link is stored in
@@ -5947,7 +6107,15 @@ static pthread_once_t  bibopOnce  = PTHREAD_ONCE_INIT;
 // Non-static: also read/written by the inlined bump fast path (cn1_globals.h).
 _Atomic long bibopBytesSinceGc = 0;
 _Atomic long bibopGcTriggerBytes = CN1_BIBOP_GC_TRIGGER_BYTES;
-_Atomic int bibopBypassGeneration[CN1_BIBOP_NUM_CLASSES];
+// Set when CN1_GC_TRIGGER_MB pinned the trigger. THE OVERRIDE USED TO BE DEFEATED BY THE
+// ADAPTATION BELOW: cn1BibopDoInit stored the requested value, and the first
+// cn1BibopAdaptAfterSweep overwrote it -- measured, triggerMB read 100000.0 for two
+// epochs and then 192.0, and the run still took 20 cycles. The knob's whole documented
+// purpose is "raise it far enough that no cycle runs during a measured window", so an
+// experiment built on it concluded that collection costs nothing when collection had in
+// fact happened twenty times. A diagnostic that silently stops applying is worse than
+// none; adaptation now leaves a pinned trigger alone.
+static int bibopGcTriggerPinned = 0;
 static long bibopCycleAllocatedBytes = 0;
 // LEGACY bytes charged to the cycle that is starting -- the twin of
 // bibopCycleAllocatedBytes for allocations above CN1_BIBOP_MAX_OBJECT. The
@@ -5965,7 +6133,6 @@ static long long legacyCycleAllocatedBytes = 0;
 static long bibopLastCycleOccupiedBytes = 0;
 static long bibopLastCycleLiveBytes = 0;
 static long bibopLastCycleReclaimedBytes = 0;
-static int bibopHighSurvivalStreak[CN1_BIBOP_NUM_CLASSES];
 
 // QA instrumentation only. The adaptive policy itself is always enabled;
 // production builds contain neither these counters nor their atomic RMWs.
@@ -6017,6 +6184,7 @@ static void cn1BibopDoInit() {
             if(mb > 0) {
                 atomic_store_explicit(&bibopGcTriggerBytes, mb * 1024L * 1024L,
                                       memory_order_relaxed);
+                bibopGcTriggerPinned = 1;
             }
         }
     }
@@ -6028,8 +6196,6 @@ static void cn1BibopDoInit() {
     }
     for(int i = 0 ; i < CN1_BIBOP_NUM_CLASSES ; i++) {
         bibopPartialPool[i] = 0;
-        atomic_store_explicit(&bibopBypassGeneration[i], 0, memory_order_relaxed);
-        bibopHighSurvivalStreak[i] = 0;
     }
     // Prime the free-memory snapshot the pacing cap is computed from.
     //
@@ -6120,6 +6286,9 @@ static void cn1BibopExitReport(void) {
 #endif
     cn1LiveCensus("exit");
     cn1AllocCensus("exit");
+#ifdef CN1_ALLOC_CENSUS
+    cn1CapacityHistogram();
+#endif
 }
 #endif
 
@@ -6148,6 +6317,7 @@ static void cn1BibopFormatPage(CN1BibopPage* p, int ci) {
     p->gcPageReleased = JAVA_FALSE;
     p->gcPageReusableAdvice = JAVA_FALSE;
     p->gcMajorSpliced = JAVA_FALSE;
+    atomic_store_explicit(&p->gcAdoptedDied, 0, memory_order_relaxed);
 #ifdef CN1_GC_VERIFY
     // QA: a recycled page still holds the DEAD previous occupants' headers, so a
     // reference that dangles into it would resolve to a plausible-looking object
@@ -6991,17 +7161,9 @@ static void cn1BibopUpdateThreadPolicy(CODENAME_ONE_THREAD_STATE) {
                                   memory_order_relaxed);
 #endif
     }
-    // Survivor-heavy size classes publish a new generation at sweep. Threads
-    // consume that signal only on their rare page-acquire path, then route a
-    // bounded allocation sample through the legacy collector before reprobing.
-    for(int ci = 0 ; ci < CN1_BIBOP_NUM_CLASSES ; ci++) {
-        int generation = atomic_load_explicit(&bibopBypassGeneration[ci],
-                                               memory_order_relaxed);
-        if(threadStateData->bibopBypassSeen[ci] != generation) {
-            threadStateData->bibopBypassSeen[ci] = generation;
-            threadStateData->bibopBypassRemaining[ci] = CN1_BIBOP_BYPASS_ALLOCATIONS;
-        }
-    }
+    // Small objects keep one allocation route: aligned page slots. A survivor
+    // ratio does not change their representation or turn fused allocations into
+    // separate malloc objects. Byte accounting and pacing above remain active.
 }
 
 // Monotonic stamp of the last footprint probe taken by cn1PacingPastGrowthFloor.
@@ -8133,6 +8295,9 @@ void cn1HeapAccounting(const char* label) {
         if(o == JAVA_NULL) {
             continue;
         }
+        // Adopted objects still occupy page slots counted above; their address
+        // is not an individual malloc allocation.
+        if(o->__heapPosition == CN1_BIBOP_ADOPTED) continue;
         legacyLive++;
 #if defined(__APPLE__)
         legacyBytes += (long long)malloc_size((void*)o);
@@ -8258,6 +8423,41 @@ static void cn1LiveTally(struct clazz* c, long long bytes, int bucket) {
     // per-class rows, which is the visible signal that it happened.
 }
 
+// Renders the reference share of the native blocks for the [LIVE] header, or an
+// empty string in a build that does not track it.
+#ifdef CN1_ALLOC_CENSUS
+static void cn1CapacityHistogram(void) {
+    fprintf(stderr, "[CAPHIST] element capacity of every collection block ever allocated\n");
+    fprintf(stderr, "[CAPHIST] %10s %14s %14s %14s %14s\n",
+            "capacity", "refBlocks", "refMB", "tables", "tableMB");
+    for(int b = 0 ; b < CN1_CAPHIST_BUCKETS ; b++) {
+        long rc = atomic_load_explicit(&cn1RefBlockCapHist[b], memory_order_relaxed);
+        long tc = atomic_load_explicit(&cn1TableCapHist[b], memory_order_relaxed);
+        if(rc == 0 && tc == 0) continue;
+        char label[24];
+        if(b == CN1_CAPHIST_BUCKETS - 1) snprintf(label, sizeof(label), ">%d", 1 << (b - 1));
+        else snprintf(label, sizeof(label), "<=%d", 1 << b);
+        fprintf(stderr, "[CAPHIST] %10s %14ld %14.1f %14ld %14.1f\n", label, rc,
+                atomic_load_explicit(&cn1RefBlockCapBytes[b], memory_order_relaxed) / 1048576.0,
+                tc, atomic_load_explicit(&cn1TableCapBytes[b], memory_order_relaxed) / 1048576.0);
+    }
+    fflush(stderr);
+}
+#endif
+
+static const char* cn1NativeBlockRefShare(void) {
+#ifdef CN1_ALLOC_CENSUS
+    static char buf[64];
+    double refs = (double)atomic_load_explicit(&cn1NativeBlockRefLiveBytes, memory_order_relaxed);
+    double all = (double)atomic_load_explicit(&cn1NativeBlockAllBytesEver, memory_order_relaxed);
+    snprintf(buf, sizeof(buf), " (cumulative: refs %.1fMB of %.1fMB = %.0f%%)",
+            refs / 1048576.0, all / 1048576.0, all > 0 ? 100.0 * refs / all : 0.0);
+    return buf;
+#else
+    return "";
+#endif
+}
+
 void cn1LiveCensus(const char* label) {
     memset(cn1LiveRows, 0, sizeof(cn1LiveRows));
     long long bibopBytes = 0, legacyBytes = 0;
@@ -8323,14 +8523,25 @@ void cn1LiveCensus(const char* label) {
     // really is holding it, fresh and aging mean the collector is holding it under
     // the grace and aging rules, and dead means this sweep is about to return it.
     long occupied = bibopObjs + legacyObjs;
+    // NATIVE BLOCKS ON THIS LINE, BECAUSE THE PER-CLASS TABLE BELOW CANNOT SEE THEM
+    // AND THE RANKING WAS BEING READ OFF IT. cn1BlockAlloc bumps
+    // cn1NativeBlockLiveBytes and never CN1_ALLOC_CENSUS_COUNT, while
+    // `occupied` is exactly bibop + legacy -- so the element storage of every
+    // ArrayList, HashMap and StringBuilder, which lives in malloc'd blocks, was
+    // invisible here. That made "186,000 mostly-empty HashMaps" and "Object[] is
+    // not the mass" unsupportable claims: the reference storage was MOVED OUT of
+    // Object[] into exactly the region this report omitted.
     fprintf(stderr, "[LIVE:%s] occupied %ld objects %.2fMB | traced %ld (%.0f%%) "
-            "fresh %ld (%.0f%%) aging %ld (%.0f%%) dead %ld (%.0f%%) | bibop %.2fMB legacy %.2fMB\n",
+            "fresh %ld (%.0f%%) aging %ld (%.0f%%) dead %ld (%.0f%%) | bibop %.2fMB legacy %.2fMB"
+            " | nativeBlocks %.2fMB%s\n",
             label, occupied, (bibopBytes + legacyBytes) / 1048576.0,
             totals[CN1_LB_TRACED], 100.0 * totals[CN1_LB_TRACED] / (occupied > 0 ? occupied : 1),
             totals[CN1_LB_FRESH],  100.0 * totals[CN1_LB_FRESH]  / (occupied > 0 ? occupied : 1),
             totals[CN1_LB_AGING],  100.0 * totals[CN1_LB_AGING]  / (occupied > 0 ? occupied : 1),
             totals[CN1_LB_DEAD],   100.0 * totals[CN1_LB_DEAD]   / (occupied > 0 ? occupied : 1),
-            bibopBytes / 1048576.0, legacyBytes / 1048576.0);
+            bibopBytes / 1048576.0, legacyBytes / 1048576.0,
+            (double)atomic_load_explicit(&cn1NativeBlockLiveBytes, memory_order_relaxed) / 1048576.0,
+            cn1NativeBlockRefShare());
     for(int shown = 0 ; shown < 30 ; shown++) {
         int best = -1;
         for(int i = 0 ; i < CN1_LIVE_CENSUS_SLOTS ; i++) {
@@ -8481,14 +8692,6 @@ static JAVA_OBJECT cn1BibopAlloc(CODENAME_ONE_THREAD_STATE, int size, struct cla
     CN1_CLAZZ_REGISTER(parent);
     int ci = cn1BibopSizeToClass[size];
     if(ci < 0) {
-        return 0;
-    }
-    if(threadStateData->bibopBypassRemaining[ci] > 0) {
-        threadStateData->bibopBypassRemaining[ci]--;
-#ifdef CN1_GC_INSTRUMENT
-        atomic_fetch_add_explicit(&cn1BibopBypassAllocations, 1,
-                                  memory_order_relaxed);
-#endif
         return 0;
     }
     CN1BibopPage* p = bibopCurrent[ci];
@@ -8669,8 +8872,7 @@ void cn1BibopNoteNativePeer(JAVA_OBJECT obj) { (void)obj; }
 #endif
 
 static void cn1BibopAdaptAfterSweep(long occupiedBytes, long liveBytes,
-                                    long reclaimedBytes,
-                                    long* classSlots, long* classLive) {
+                                    long reclaimedBytes) {
     bibopLastCycleOccupiedBytes = occupiedBytes;
     bibopLastCycleLiveBytes = liveBytes;
     bibopLastCycleReclaimedBytes = reclaimedBytes;
@@ -8698,7 +8900,7 @@ static void cn1BibopAdaptAfterSweep(long occupiedBytes, long liveBytes,
         // make the per-thread pending table fill, and it runs with the default
         // minimum, so its trigger is at or above the constant and takes exactly
         // the branch it always did.
-        if(oldTrigger > CN1_BIBOP_GC_TRIGGER_BYTES) {
+        if(oldTrigger > CN1_BIBOP_GC_TRIGGER_BYTES && !bibopGcTriggerPinned) {
             atomic_store_explicit(&bibopGcTriggerBytes,
                                   CN1_BIBOP_GC_TRIGGER_BYTES,
                                   memory_order_relaxed);
@@ -8732,7 +8934,7 @@ static void cn1BibopAdaptAfterSweep(long occupiedBytes, long liveBytes,
         // 98MB-to-38MB result, and it needs no live-set measurement to be correct.
         // So the shrink target is that minimum rather than the fixed 24MB constant
         // master uses, and nothing else about this policy differs from master.
-        if(survival >= CN1_BIBOP_BYPASS_SURVIVAL_PERCENT) {
+        if(survival >= CN1_BIBOP_TRIGGER_SURVIVAL_PERCENT) {
             bibopTriggerHighSurvivalStreak++;
             if(bibopTriggerHighSurvivalStreak >= 2) {
                 long ceiling = CN1_BIBOP_GC_MAX_TRIGGER_BYTES;
@@ -8755,32 +8957,12 @@ static void cn1BibopAdaptAfterSweep(long occupiedBytes, long liveBytes,
                 }
             }
         }
-        if(newTrigger != oldTrigger) {
+        if(newTrigger != oldTrigger && !bibopGcTriggerPinned) {
             atomic_store_explicit(&bibopGcTriggerBytes, newTrigger,
                                   memory_order_relaxed);
         }
     }
 
-    for(int ci = 0 ; ci < CN1_BIBOP_NUM_CLASSES ; ci++) {
-        if(classSlots[ci] < CN1_BIBOP_BYPASS_MIN_SLOTS) {
-            bibopHighSurvivalStreak[ci] = 0;
-            continue;
-        }
-        int survival = (int)((classLive[ci] * 100) / classSlots[ci]);
-        if(survival >= CN1_BIBOP_BYPASS_SURVIVAL_PERCENT) {
-            if(++bibopHighSurvivalStreak[ci] >= 2) {
-                atomic_fetch_add_explicit(&bibopBypassGeneration[ci], 1,
-                                          memory_order_relaxed);
-#ifdef CN1_GC_INSTRUMENT
-                atomic_fetch_add_explicit(&cn1BibopBypassActivations, 1,
-                                          memory_order_relaxed);
-#endif
-                bibopHighSurvivalStreak[ci] = 0;
-            }
-        } else if(survival <= 20) {
-            bibopHighSurvivalStreak[ci] = 0;
-        }
-    }
 #ifdef CN1_GC_INSTRUMENT
     fprintf(stderr,
             "[BIBOP-ADAPT] epoch=%d allocatedMB=%.1f triggerMB=%.1f occupiedMB=%.1f "
@@ -8818,6 +9000,33 @@ static void cn1BibopSweep(CODENAME_ONE_THREAD_STATE) {
     const int cn1GcFaultEarlyFree = 0;
 #endif
     CN1BibopPage* list = atomic_exchange_explicit(&bibopSweepStack, (CN1BibopPage*)0, memory_order_acquire);
+    // The legacy sweep has returned dead adopted slots to their owning pages.
+    // A partial page otherwise has no reason to return to this sweep until it
+    // is allocated into or a major sweep happens. Its dead objects (including
+    // native-buffer finalizers) would keep occupying memory in the meantime.
+    // Take only flagged partial pages, under the allocator's handoff lock. Owned
+    // pages remain untouched; their flag is consumed when they retire normally.
+    int retiredAdoptedPages = 0;
+    pthread_mutex_lock(&bibopMutex);
+    for (int ci = 0; ci < CN1_BIBOP_NUM_CLASSES; ci++) {
+        CN1BibopPage** link = &bibopPartialPool[ci];
+        while (*link != NULL) {
+            CN1BibopPage* page = *link;
+            if (atomic_load_explicit(&page->gcAdoptedDied, memory_order_relaxed)) {
+                *link = page->nextPool;
+                page->gcMajorSpliced = JAVA_TRUE; // exclude deep rescans from trigger policy
+                page->nextPool = list;
+                list = page;
+                retiredAdoptedPages++;
+            } else {
+                link = &page->nextPool;
+            }
+        }
+    }
+    pthread_mutex_unlock(&bibopMutex);
+    if (retiredAdoptedPages && cn1PageReleaseTraceOn()) {
+        fprintf(stderr, "[ADOPTED-RECLAIM] cycle=%d pages=%d\n", currentGcMarkValue, retiredAdoptedPages);
+    }
 #if !defined(CN1_BIBOP_NO_PAGE_RELEASE)
     // MAJOR SWEEP (issue 5537). The ordinary sweep only ever sees RETIRED pages
     // -- ones a thread filled and handed back. A page that was swept while it
@@ -8904,8 +9113,6 @@ static void cn1BibopSweep(CODENAME_ONE_THREAD_STATE) {
     long occupiedBytes = 0;
     long liveBytes = 0;
     long reclaimedBytes = 0;
-    long classSlots[CN1_BIBOP_NUM_CLASSES] = {0};
-    long classLive[CN1_BIBOP_NUM_CLASSES] = {0};
 #ifndef CN1_BIBOP_NO_FASTSWEEP
     // Snapshot once: if ANY BiBOP object currently carries a monitor, suppress the O(1)
     // all-dead shortcut this whole sweep so dead monitored slots are full-walked and
@@ -8917,6 +9124,7 @@ static void cn1BibopSweep(CODENAME_ONE_THREAD_STATE) {
     while(list != 0) {
         CN1BibopPage* page = list;
         list = page->nextPool;
+        atomic_store_explicit(&page->gcAdoptedDied, 0, memory_order_relaxed);
         // A page the major sweep pulled out of a PARTIAL pool is a one-off deep
         // sample: mostly-dead slots that the ordinary sweep would never have
         // looked at again. Feeding it to cn1BibopAdaptAfterSweep drags the
@@ -9000,7 +9208,6 @@ static void cn1BibopSweep(CODENAME_ONE_THREAD_STATE) {
                 pthread_mutex_unlock(&bibopMutex);
                 if(!statsExcluded) {
                     occupiedBytes += (long)n * page->slotSize;
-                    classSlots[page->classIndex] += n;
                 }
                 continue;
             } else if(!page->gcHasMonitors) {
@@ -9065,7 +9272,6 @@ static void cn1BibopSweep(CODENAME_ONE_THREAD_STATE) {
                 if(!statsExcluded) {
                     occupiedBytes += (long)n * page->slotSize;
                     reclaimedBytes += (long)n * page->slotSize;
-                    classSlots[page->classIndex] += n;
                 }
                 continue;
             }
@@ -9166,9 +9372,7 @@ static void cn1BibopSweep(CODENAME_ONE_THREAD_STATE) {
         // grace pass put there. A grace mark says only "allocated since the last cycle
         // and not proven dead", so counting it as a survivor makes the measured survival
         // ratio a function of the ALLOCATION RATE. A pure-churn workload then reads as
-        // survivor-heavy and gets diverted onto the legacy heap by the bypass below --
-        // measured on the issue-5537 game-tree search as 190K of 700K 48-byte slots
-        // "surviving" against a real live set of a few hundred objects. Clamped rather
+        // survivor-heavy and incorrectly raises the collection trigger. Clamped rather
         // than allowed to go negative: a page swept several cycles after its grace marks
         // were taken can hold survivors that have since been proven live, and reading
         // those as zero only makes the policy more conservative.
@@ -9180,8 +9384,6 @@ static void cn1BibopSweep(CODENAME_ONE_THREAD_STATE) {
             occupiedBytes += (long)sampledSlots * page->slotSize;
             liveBytes += (long)policySurvivors * page->slotSize;
             reclaimedBytes += (long)(sampledSlots - liveCount) * page->slotSize;
-            classSlots[page->classIndex] += sampledSlots;
-            classLive[page->classIndex] += policySurvivors;
         }
 #ifndef CN1_BIBOP_NO_FASTSWEEP
         // The monitor (CN1ThreadData) no longer lives in the object header, so the
@@ -9208,8 +9410,7 @@ static void cn1BibopSweep(CODENAME_ONE_THREAD_STATE) {
         }
         pthread_mutex_unlock(&bibopMutex);
     }
-    cn1BibopAdaptAfterSweep(occupiedBytes, liveBytes, reclaimedBytes,
-                            classSlots, classLive);
+    cn1BibopAdaptAfterSweep(occupiedBytes, liveBytes, reclaimedBytes);
     // Free the native reference blocks retired by growth since the last sweep. HERE and
     // not at retire time: a marker that loaded the old block pointer before the swap may
     // still have been walking it, and the mark that could have done so has ended by the
@@ -9300,8 +9501,7 @@ static void cn1GraceAuditPreSweep(CODENAME_ONE_THREAD_STATE) {
 // the current epoch instead of freeing it -- but nothing traces its subtree, so
 // an older object reachable ONLY through it is freed while the graced object
 // still references it. Every object above CN1_BIBOP_MAX_OBJECT takes this path,
-// as does every allocation the adaptive survivor-heavy bypass diverts off the
-// page heap, so the class of workload issue 5425 reported is squarely on it.
+// as does an allocation that cannot obtain a page slot, so the class of workload issue 5425 reported is squarely on it.
 //
 // Same reporting contract as the BiBOP half: missedFresh counts graced legacy
 // objects nothing traced, doomedChildren counts objects that became marked ONLY
@@ -9713,6 +9913,15 @@ static int cn1GcSignalStopMode = -1;  // -1 = uninit; 0 = cooperative+signal-for
 
 static void cn1ConsExtAdd(JAVA_OBJECT o) {
     if(o == JAVA_NULL) return;
+#ifndef CN1_DISABLE_BIBOP
+    if(o->__heapPosition == CN1_BIBOP_ADOPTED) {
+        char* page = (char*)((uintptr_t)o & ~((uintptr_t)CN1_BIBOP_PAGE_SIZE - 1));
+        // A published page index already resolves every slot, including adopted
+        // objects. The index only grows and replacement is all-or-nothing. If a
+        // page is not indexed yet, retain the extent as a conservative fallback.
+        if(cn1ConsPgFind(page) != 0) return;
+    }
+#endif
     struct clazz* cls = o->__codenameOneParentClsReference;
     if(cls == 0) return;
     char* base = (char*)o;
@@ -9739,141 +9948,79 @@ static void cn1ConsExtAdd(JAVA_OBJECT o) {
 }
 
 static int cn1ConsExtCmp(const void* a, const void* b) {
-    char* la = ((const CN1ConsExtent*)a)->lo;
-    char* lb = ((const CN1ConsExtent*)b)->lo;
+    uintptr_t la = (uintptr_t)((const CN1ConsExtent*)a)->lo;
+    uintptr_t lb = (uintptr_t)((const CN1ConsExtent*)b)->lo;
     return (la > lb) - (la < lb);
 }
 
-// ---- extent sort -------------------------------------------------------------------
-// The comment above names replacing "the libc qsort (a function-pointer comparator call
-// per compare) with an inlined/radix sort" as one of three directions for this cost. This
-// is that one, and it is the only one of the three that cannot change WHAT the resolver
-// sees: same array, same order, just sorted without an indirect call per comparison.
-//
-// Measured on the array-heavy churn shape (CN1_WL_BIGARRAY=256, 748k extents): the qsort
-// alone was 34.2ms of a 57.5ms snapshot build and 28% of the whole mark.
-//
-// A radix sort would be O(n) but needs a scratch buffer the size of the array (18MB at
-// that extent count), and footprint is the other half of this issue -- so this is an
-// in-place introsort: median-of-3 quicksort, insertion sort for short runs, and a
-// heapsort fallback once the recursion depth exceeds 2*log2(n), which is what makes the
-// worst case O(n log n) rather than O(n^2). Recursion is on the SMALLER side only, so
-// stack depth is bounded by log2(n) even in the worst case.
-//
-// Keys are object base addresses of distinct live objects, so they are unique; the
-// partition below does not rely on that, but it is why no three-way split is needed.
-// -DCN1_CONS_EXT_LIBC_SORT restores qsort for A/B.
-#define CN1_CONS_EXT_SWAP(x, y) do { \
-        CN1ConsExtent __t = (x); (x) = (y); (y) = __t; \
-    } while(0)
-
+// ---- extent sort ------------------------------------------------------------
+// Addresses are fixed-width integer keys. An in-place MSD radix partition avoids
+// comparison sorting and a scratch array proportional to the live heap. Bucket
+// boundaries use bounded C stack storage; small partitions use insertion sort.
+// -DCN1_CONS_EXT_LIBC_SORT retains the libc implementation for diagnostics.
 static void cn1ConsExtInsertionSort(CN1ConsExtent* a, int n) {
-    for(int i = 1 ; i < n ; i++) {
-        CN1ConsExtent v = a[i];
-        int j = i - 1;
-        while(j >= 0 && a[j].lo > v.lo) {
-            a[j + 1] = a[j];
+    for(int i = 1; i < n; i++) {
+        CN1ConsExtent value = a[i];
+        int j = i;
+        while(j > 0 && (uintptr_t)a[j - 1].lo > (uintptr_t)value.lo) {
+            a[j] = a[j - 1];
             j--;
         }
-        a[j + 1] = v;
+        a[j] = value;
     }
 }
 
-static void cn1ConsExtSiftDown(CN1ConsExtent* a, int root, int n) {
-    for(;;) {
-        int child = 2 * root + 1;
-        if(child >= n) {
-            return;
+static void cn1ConsExtRadix(CN1ConsExtent* a, int n, int shift) {
+    if(n <= 32) { cn1ConsExtInsertionSort(a, n); return; }
+    for(; shift >= 0; shift -= 8) {
+        int count[256] = {0};
+        for(int i = 0; i < n; i++) count[((uintptr_t)a[i].lo >> shift) & 255]++;
+        int occupied = 0;
+        for(int b = 0; b < 256; b++) occupied += count[b] != 0;
+        if(occupied <= 1) continue;
+        int next[256], end[256], offset = 0;
+        for(int b = 0; b < 256; b++) {
+            next[b] = offset;
+            offset += count[b];
+            end[b] = offset;
         }
-        if(child + 1 < n && a[child].lo < a[child + 1].lo) {
-            child++;
-        }
-        if(!(a[root].lo < a[child].lo)) {
-            return;
-        }
-        CN1_CONS_EXT_SWAP(a[root], a[child]);
-        root = child;
-    }
-}
-
-static void cn1ConsExtHeapSort(CN1ConsExtent* a, int n) {
-    for(int start = (n - 2) / 2 ; start >= 0 ; start--) {
-        cn1ConsExtSiftDown(a, start, n);
-    }
-    for(int end = n - 1 ; end > 0 ; end--) {
-        CN1_CONS_EXT_SWAP(a[0], a[end]);
-        cn1ConsExtSiftDown(a, 0, end);
-    }
-}
-
-static void cn1ConsExtSortRange(CN1ConsExtent* a, int lo, int hi, int depth) {
-    while(hi - lo > 16) {
-        if(depth <= 0) {
-            cn1ConsExtHeapSort(a + lo, hi - lo + 1);
-            return;
-        }
-        depth--;
-        // Median of three, left in the middle. This also places a[lo] <= pivot <= a[hi],
-        // which is what bounds the two scans below without an explicit index test.
-        int m = lo + ((hi - lo) >> 1);
-        if(a[m].lo < a[lo].lo) {
-            CN1_CONS_EXT_SWAP(a[m], a[lo]);
-        }
-        if(a[hi].lo < a[lo].lo) {
-            CN1_CONS_EXT_SWAP(a[hi], a[lo]);
-        }
-        if(a[hi].lo < a[m].lo) {
-            CN1_CONS_EXT_SWAP(a[hi], a[m]);
-        }
-        char* pivot = a[m].lo;
-        int i = lo - 1;
-        int j = hi + 1;
-        for(;;) {
-            do {
-                i++;
-            } while(a[i].lo < pivot);
-            do {
-                j--;
-            } while(a[j].lo > pivot);
-            if(i >= j) {
-                break;
+        for(int b = 0; b < 256; b++) {
+            while(next[b] < end[b]) {
+                CN1ConsExtent value = a[next[b]];
+                unsigned destination = ((uintptr_t)value.lo >> shift) & 255;
+                while(destination != (unsigned)b) {
+                    CN1ConsExtent displaced = a[next[destination]];
+                    a[next[destination]++] = value;
+                    value = displaced;
+                    destination = ((uintptr_t)value.lo >> shift) & 255;
+                }
+                a[next[b]++] = value;
             }
-            CN1_CONS_EXT_SWAP(a[i], a[j]);
         }
-        // Recurse into the smaller partition and iterate on the larger one, so the
-        // recursion depth is bounded by log2(n) regardless of how the pivots fall.
-        if(j - lo < hi - j) {
-            cn1ConsExtSortRange(a, lo, j, depth);
-            lo = j + 1;
-        } else {
-            cn1ConsExtSortRange(a, j + 1, hi, depth);
-            hi = j;
+        if(shift > 0) {
+            for(int b = 0; b < 256; b++) {
+                if(count[b] > 1) cn1ConsExtRadix(a + end[b] - count[b], count[b], shift - 8);
+            }
         }
+        return;
     }
-    cn1ConsExtInsertionSort(a + lo, hi - lo + 1);
 }
 
 static void cn1ConsExtSort(CN1ConsExtent* a, int n) {
-    if(n < 2) {
-        return;
-    }
+    if(n < 2) return;
 #ifdef CN1_CONS_EXT_LIBC_SORT
     qsort(a, n, sizeof(CN1ConsExtent), cn1ConsExtCmp);
 #else
-    int depth = 0;
-    for(int t = n ; t > 1 ; t >>= 1) {
-        depth += 2;
-    }
-    cn1ConsExtSortRange(a, 0, n - 1, depth);
+    uintptr_t variation = 0, first = (uintptr_t)a[0].lo;
+    for(int i = 1; i < n; i++) variation |= first ^ (uintptr_t)a[i].lo;
+    int shift = (sizeof(uintptr_t) - 1) * 8;
+    while(shift > 0 && (variation >> shift) == 0) shift -= 8;
+    cn1ConsExtRadix(a, n, shift);
 #endif
 #ifdef CN1_GC_VERIFY
-    // A resolver miss is a use-after-free, and every lookup of an INTERIOR pointer binary
-    // searches this array, so an ordering bug here is silent until it corrupts the heap.
-    // The verifier build (run-gc-verify.sh) pays an O(n) check to make it loud instead.
-    for(int v = 1 ; v < n ; v++) {
-        if(a[v].lo < a[v - 1].lo) {
-            fprintf(stderr, "CN1 GC VERIFY: extent array is not sorted at %d of %d\n", v, n);
-            fflush(stderr);
+    for(int i = 1; i < n; i++) {
+        if((uintptr_t)a[i].lo < (uintptr_t)a[i - 1].lo) {
+            fprintf(stderr, "CN1 GC VERIFY: extent array is not sorted at %d of %d\n", i, n);
             abort();
         }
     }
@@ -9928,7 +10075,7 @@ static JAVA_BOOLEAN cn1ConsExtSortTestOne(const char* pattern, int n, int seed,
         ref[i] = mine[i];
     }
     long long t0 = cn1GcNowNs();
-    cn1ConsExtSortRange(mine, 0, n - 1, 64);
+    cn1ConsExtSort(mine, n);
     *introNs += cn1GcNowNs() - t0;
     t0 = cn1GcNowNs();
     qsort(ref, (size_t)n, sizeof(CN1ConsExtent), cn1ConsExtCmp);
@@ -10188,7 +10335,10 @@ void cn1ResolveDiagReport(void) {
 JAVA_OBJECT cn1ConservativeResolve(void* w) {
     uintptr_t v = (uintptr_t)w;
     if(v == 0) return JAVA_NULL;
-    if((v & (sizeof(void*) - 1)) != 0) return JAVA_NULL; // reject unaligned / tagged-Integer
+    // A C string loop may retain only data + byteOffset. Interior addresses do
+    // not have Java-object alignment, and their low bits can look like tags.
+    // Resolve against registered allocations before rejecting them; an integer
+    // that happens to fall inside a live allocation is a conservative retention.
 
 #ifndef CN1_DISABLE_BIBOP
     {
@@ -10226,6 +10376,7 @@ JAVA_OBJECT cn1ConservativeResolve(void* w) {
                 // whose first 8 bytes still hold the free-list next pointer.
                 int m = __atomic_load_n(&o->__codenameOneGcMark, __ATOMIC_ACQUIRE);
                 if(m == CN1_BIBOP_FREE_MARK) return JAVA_NULL;   // on the page free-list
+                if(cn1GcWasReclaimed(m)) return JAVA_NULL;
 #ifdef CN1_GC_VERIFY
                 if(m == CN1_BIBOP_QUAR_MARK) return JAVA_NULL;  // reclaimed, quarantined
 #endif
@@ -11383,9 +11534,13 @@ static void cn1GcScanThreadNativeStack(CODENAME_ONE_THREAD_STATE, struct ThreadL
         if(fbase != 0 && fssz != 0 && fsp != 0
                 && fsp >= fbase - (long)fssz && fsp < fbase) {
             cn1ConservativeMarkRange(threadStateData, fsp, fbase);
+        } else {
+            cn1GcRootsIncomplete = JAVA_TRUE;
         }
         if(t->gcSigRegsLen > 0) {
             cn1ConservativeMarkRange(threadStateData, t->gcSigRegs, t->gcSigRegs + t->gcSigRegsLen);
+        } else {
+            cn1GcRootsIncomplete = JAVA_TRUE;
         }
         return;
     }
@@ -11393,7 +11548,7 @@ static void cn1GcScanThreadNativeStack(CODENAME_ONE_THREAD_STATE, struct ThreadL
 
     size_t ssz = 0;
     char* base = cn1GcStackBase(t->gcPthread, &ssz);
-    if(base == 0 || ssz == 0) return;
+    if(base == 0 || ssz == 0) { cn1GcRootsIncomplete = JAVA_TRUE; return; }
 
     // Snapshot rebuilt BEFORE any signal-stop (realloc-while-frozen would deadlock).
     cn1GcBuildRootSnapshots();
@@ -11415,6 +11570,8 @@ static void cn1GcScanThreadNativeStack(CODENAME_ONE_THREAD_STATE, struct ThreadL
             cn1ConservativeMarkRange(threadStateData, sp, vtHigh);
             if(resumer >= base - (long)ssz && resumer < base) {
                 cn1ConservativeMarkRange(threadStateData, resumer, base);
+            } else {
+                cn1GcRootsIncomplete = JAVA_TRUE;
             }
             cn1ConservativeMarkRange(threadStateData, (char*)&t->gcRegisterSnapshot,
                                      (char*)&t->gcRegisterSnapshot + sizeof(t->gcRegisterSnapshot));
@@ -11440,17 +11597,18 @@ static void cn1GcScanThreadNativeStack(CODENAME_ONE_THREAD_STATE, struct ThreadL
 #endif
     char* sp = cn1GcSignalStopOne(t);
     if(sp == 0) {
-        // Could not stop the thread. If it is lightweight and cooperatively captured we
-        // can still fall back to that capture; otherwise this thread's frameless roots
-        // are at risk -- log once (honest gap).
+        // A valid cooperative capture still covers the roots. Without one the
+        // mark is incomplete: retain this cycle and retry at the next collection.
         if(t->gcParkCaptured && t->gcStackPointerAtPark != 0) {
             char* csp = (char*)t->gcStackPointerAtPark;
             if(csp >= base - (long)ssz && csp < base) {
                 cn1ConservativeMarkRange(threadStateData, csp, base);
                 cn1ConservativeMarkRange(threadStateData, (char*)&t->gcRegisterSnapshot,
                                          (char*)&t->gcRegisterSnapshot + sizeof(t->gcRegisterSnapshot));
+                return;
             }
         }
+        cn1GcRootsIncomplete = JAVA_TRUE;
         return;   // nothing was frozen, so the counter was never raised
     }
     // Raised only on the success path, so the sub below always pairs with an add.
@@ -11468,13 +11626,19 @@ static void cn1GcScanThreadNativeStack(CODENAME_ONE_THREAD_STATE, struct ThreadL
             cn1ConservativeMarkRange(threadStateData, sp, vtHigh);
             if(resumer >= base - (long)ssz && resumer < base) {
                 cn1ConservativeMarkRange(threadStateData, resumer, base);
+            } else {
+                cn1GcRootsIncomplete = JAVA_TRUE;
             }
         } else if(sp >= base - (long)ssz && sp < base) {
             cn1ConservativeMarkRange(threadStateData, sp, base);
+        } else {
+            cn1GcRootsIncomplete = JAVA_TRUE;
         }
     }
     if(t->gcSigRegsLen > 0) {
         cn1ConservativeMarkRange(threadStateData, t->gcSigRegs, t->gcSigRegs + t->gcSigRegsLen);
+    } else {
+        cn1GcRootsIncomplete = JAVA_TRUE;
     }
     cn1GcSignalReleaseOne(t);
     atomic_fetch_sub_explicit(&cn1GcFreezeHeld, 1, memory_order_relaxed);
@@ -11489,8 +11653,8 @@ static void cn1GcScanOwnStack(CODENAME_ONE_THREAD_STATE) {
     char* sp = (char*)spv;
     size_t ssz = 0;
     char* base = cn1GcStackBase(threadStateData->gcPthread, &ssz);
-    if(base == 0 || ssz == 0) return;
-    if(sp < base - (long)ssz || sp >= base) return;
+    if(base == 0 || ssz == 0) { cn1GcRootsIncomplete = JAVA_TRUE; return; }
+    if(sp < base - (long)ssz || sp >= base) { cn1GcRootsIncomplete = JAVA_TRUE; return; }
     cn1GcBuildRootSnapshots();
     cn1ConservativeMarkRange(threadStateData, sp, base);
     cn1ConservativeMarkRange(threadStateData, (char*)&ownRegs, (char*)&ownRegs + sizeof(ownRegs));
@@ -11831,6 +11995,11 @@ cn1GcMallocRetry:
             CN1_GC_PARK_CAPTURE(threadStateData);
             threadStateData->threadActive = JAVA_FALSE;
             while(gcCurrentlyRunning) {
+#ifdef CN1_GC_CONFORM
+                if(threadStateData->heapAllocationSize == 0) {
+                    atomic_fetch_add_explicit(&cn1PendingEmptyWaits, 1, memory_order_relaxed);
+                }
+#endif
                 usleep((JAVA_INT)(1000));
             }
             threadStateData->threadActive = JAVA_TRUE;
@@ -11924,8 +12093,7 @@ cn1GcMallocRetry:
             }
         }
     }
-    threadStateData->pendingHeapAllocations[threadStateData->heapAllocationSize] = o;
-    threadStateData->heapAllocationSize++;
+    cn1AppendPendingAllocation(threadStateData, o);
 #ifndef CN1_DISABLE_BIBOP
     // Event-driven trigger for LEGACY allocation volume, mirroring
     // cn1BibopMaybeGc's simple self-triggering branch: without it, raising the
@@ -12025,6 +12193,7 @@ void codenameOneGcFree(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj) {
             // Hand the slot back to BiBOP: revert to a normal dead BiBOP slot so the next
             // sweep of its (retired) page reclaims it to the page free-list.
             obj->__heapPosition = CN1_BIBOP_HEAP_POS;
+            cn1BibopNoteAdoptedDeath(obj);
         }
         return;
     }
@@ -12177,46 +12346,33 @@ static void cn1ForceVisitedPrune(int key) {
     }
 }
 
-// Iterative mark using an explicit worklist. The previous implementation recursed
-// through reference fields, building one C stack frame per Java reference traversed.
-// iOS gives secondary pthreads a ~512KB stack, so a chain of a few thousand references
-// (linked list, parse tree, deeply nested container) would SIGBUS the GC thread.
-// Issue #3136.
-//
-// gcMarkObject now sets the mark bit and pushes onto a fixed worklist. gcMarkDrain
-// pops entries and invokes their per-class mark function, which calls gcMarkObject on
-// each reference field -- push, not recurse. If the worklist fills, the offending
-// object is still marked (so sweep preserves it) but its field scan is deferred to
-// the heap-rescan pass: walk the live-object table, re-invoke mark functions on
-// already-marked objects to pick up children that were skipped on overflow. Idempotent
-// because already-marked children are no-ops in gcMarkObject.
-//
-// CN1_GC_MARK_WORKLIST_SIZE is overridable at compile time (e.g. via -D in the Xcode
-// build settings or the maven plugin). THE DEFAULT IS 262144 ENTRIES (~4MB on 64-bit,
-// zerofill), raised from 65536 -- see the measurement table beside the #define in the
-// forward-declaration block, which is where the value actually lives. Sized so the
-// constant pool alone fits comfortably (HelloCodenameOne has ~15K entries, real apps
-// can have more). Smaller sizes still work via the heap-rescan slow path, but the
-// rescan adds non-trivial cost and the path is harder to test, so the default errs
-// on the side of avoiding overflow for any normal app -- and on a real heap the
-// overflow was measured doing 10.1M slot walks across 68 passes for zero useful work.
-// (The #define itself is hoisted to the forward-declaration block far above, next to
-// gcMarkWorklistTop, because the grace pass needs it; this #ifndef is what keeps a
-// -D override authoritative in both places.)
-// THE TWO LITERALS MUST MATCH. This is the fallback for the hoisted #define far above;
-// they were both 65536, so a divergence was impossible to notice. The moment they
-// differ, whichever block the preprocessor reaches first silently wins, and reordering
-// or deleting the hoisted one would drop the default back without a single warning.
-#ifndef CN1_GC_MARK_WORKLIST_SIZE
-#define CN1_GC_MARK_WORKLIST_SIZE 262144
-#endif
-
+// Iterative marking avoids recursion proportional to the Java graph depth.
+// Keep a small static reserve and grow geometrically with the live frontier.
+// Marked entries may be dropped ONLY if queue growth fails; the existing full
+// heap rescan then recovers their outgoing edges before sweeping.
 struct gcMarkWorklistEntry {
     JAVA_OBJECT obj;
     JAVA_BOOLEAN force;
+    JAVA_BOOLEAN precise;
 };
 
-static struct gcMarkWorklistEntry gcMarkWorklist[CN1_GC_MARK_WORKLIST_SIZE];
+static struct gcMarkWorklistEntry gcMarkWorklistInitial[CN1_GC_MARK_WORKLIST_SIZE];
+static struct gcMarkWorklistEntry* gcMarkWorklist = gcMarkWorklistInitial;
+// Called serially, or with gcMarkWorklistMutex held by a parallel producer.
+// Workers copy entries out under that mutex and never retain queue addresses.
+static int gcMarkWorklistGrow(void) {
+    if(gcMarkWorklistCapacity > INT_MAX / 2 || (size_t)gcMarkWorklistCapacity > SIZE_MAX / (2 * sizeof(*gcMarkWorklist))) return 0;
+    int capacity = gcMarkWorklistCapacity * 2;
+    struct gcMarkWorklistEntry* grown;
+    if(gcMarkWorklist == gcMarkWorklistInitial) {
+        grown = malloc((size_t)capacity * sizeof(*grown));
+        if(grown) memcpy(grown, gcMarkWorklist, (size_t)gcMarkWorklistTop * sizeof(*grown));
+    } else grown = realloc(gcMarkWorklist, (size_t)capacity * sizeof(*grown));
+    if(!grown) return 0;
+    gcMarkWorklist = grown;
+    gcMarkWorklistCapacity = capacity;
+    return 1;
+}
 static int gcMarkWorklistTop = 0;
 static JAVA_BOOLEAN gcMarkWorklistOverflow = JAVA_FALSE;
 // Set whenever gcMarkObject transitions an object from unmarked to marked. Used by
@@ -12291,7 +12447,7 @@ struct gcMarkLocalBuffer {
     int count;
     struct gcMarkWorklistEntry entries[CN1_GC_MARK_LOCAL_CAP];
 };
-static __thread struct gcMarkLocalBuffer* gcMarkLocalBuf = 0;
+
 
 // Worklist / termination state (guarded by gcMarkWorklistMutex during a parallel drain)
 static pthread_mutex_t gcMarkWorklistMutex = PTHREAD_MUTEX_INITIALIZER;
@@ -12320,7 +12476,7 @@ static void gcMarkFlushLocal(struct gcMarkLocalBuffer* lb) {
     pthread_mutex_lock(&gcMarkWorklistMutex);
     int appended = 0;
     for(int i = 0 ; i < lb->count ; i++) {
-        if(gcMarkWorklistTop >= CN1_GC_MARK_WORKLIST_SIZE) {
+        if(gcMarkWorklistTop >= gcMarkWorklistCapacity && !gcMarkWorklistGrow()) {
             gcMarkWorklistOverflow = JAVA_TRUE;
             // EXCHANGE, so the counter below reads once per CYCLE rather than once per
             // dropped push: what an overflow costs is the belt's O(heap) rescan, and
@@ -12351,11 +12507,12 @@ static inline void gcMarkWorklistPush(JAVA_OBJECT obj, JAVA_BOOLEAN force) {
         }
         lb->entries[lb->count].obj = obj;
         lb->entries[lb->count].force = force;
+        lb->entries[lb->count].precise = cn1GcPreciseTrace;
         lb->count++;
         return;
     }
-    // Serial path: identical to the original single-threaded push.
-    if(gcMarkWorklistTop >= CN1_GC_MARK_WORKLIST_SIZE) {
+    // Serial producer: no workers can access the shared queue in this phase.
+    if(gcMarkWorklistTop >= gcMarkWorklistCapacity && !gcMarkWorklistGrow()) {
         gcMarkWorklistOverflow = JAVA_TRUE;
         // See the matching exchange in gcMarkFlushLocal.
         if(!atomic_exchange_explicit(&gcMarkOverflowSeen, JAVA_TRUE, memory_order_release)) {
@@ -12365,6 +12522,7 @@ static inline void gcMarkWorklistPush(JAVA_OBJECT obj, JAVA_BOOLEAN force) {
     }
     gcMarkWorklist[gcMarkWorklistTop].obj = obj;
     gcMarkWorklist[gcMarkWorklistTop].force = force;
+    gcMarkWorklist[gcMarkWorklistTop].precise = cn1GcPreciseTrace;
     gcMarkWorklistTop++;
 }
 
@@ -12395,7 +12553,11 @@ static inline void cn1BibopStampMarked(JAVA_OBJECT obj, int markVal, int graceOn
     // memory is still in this page, so its page must not be O(1) all-dead reclaimed.
     if(obj->__heapPosition == CN1_BIBOP_HEAP_POS || obj->__heapPosition == CN1_BIBOP_ADOPTED) {
         CN1BibopPage* pg = (CN1BibopPage*)(((uintptr_t)obj) & ~((uintptr_t)CN1_BIBOP_PAGE_SIZE - 1));
-        atomic_store_explicit(&pg->gcLastMarkedEpoch, markVal, memory_order_relaxed);
+        // Every marker publishes the same epoch. Avoid invalidating this shared
+        // cache line for every object on a page already stamped by another worker.
+        if(atomic_load_explicit(&pg->gcLastMarkedEpoch, memory_order_relaxed) != markVal) {
+            atomic_store_explicit(&pg->gcLastMarkedEpoch, markVal, memory_order_relaxed);
+        }
         // The page address is already in hand, which is the whole cost of this
         // accounting -- see gcGraceMarked in cn1_globals.h for what it is for.
         if(graceOnly) {
@@ -12459,6 +12621,24 @@ void cn1GcVerifyFieldType(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT owner, JAVA_OBJ
 }
 #endif
 
+static int cn1GcStringIsFusedLeaf(JAVA_OBJECT obj) {
+#ifndef CN1_DISABLE_BIBOP
+    int position = obj->__heapPosition;
+    if (position != CN1_BIBOP_HEAP_POS && position != CN1_BIBOP_ADOPTED) return 0;
+    size_t offset = (sizeof(struct obj__java_lang_String) + 7) & ~(size_t)7;
+    JAVA_OBJECT child = ((struct obj__java_lang_String*)obj)->java_lang_String_value;
+    if (child != (JAVA_OBJECT)((char*)obj + offset)) return 0;
+    // Address adjacency alone is insufficient: an ordinary String can occupy
+    // the slot immediately before its separate byte array. Check the allocation
+    // extent BEFORE reading the purported embedded child's header.
+    CN1BibopPage* page = (CN1BibopPage*)((uintptr_t)obj & ~((uintptr_t)CN1_BIBOP_PAGE_SIZE - 1));
+    if ((size_t)page->slotSize < offset + sizeof(struct JavaArrayPrototype)) return 0;
+    return child->__heapPosition == CN1_GC_EMBEDDED_PRIMITIVE;
+#else
+    return 0;
+#endif
+}
+
 void gcMarkObject(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj, JAVA_BOOLEAN force) {
     if(obj == JAVA_NULL || CN1_IS_TAGGED(obj)) {
         return;
@@ -12510,9 +12690,8 @@ void gcMarkObject(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj, JAVA_BOOLEAN force
     //    snapshot-live object reachable only through it is covered by the SATB
     //    deletion barrier (its old path was cut during the mark -> logged);
     //    BiBOP-fresh objects resolve anyway via the live-bump revalidation.
-    // Cost: one page/extent binary search per mark call, on the GC thread /
-    // workers only (the mutator never calls gcMarkObject) -- GC-side passes
-    // measured ~0% of wall time on this workload class.
+    // This validation runs on every traced reference, including native blocks.
+    // Its cost is part of marking, even though the mutator never calls it.
     // TRUSTED CALLERS BYPASS THIS (issue 5425). The guard's job is to reject
     // CONSERVATIVELY DERIVED pointers -- arbitrary machine words off a native stack
     // that may not be objects at all. A caller that walked the object out of
@@ -12522,7 +12701,7 @@ void gcMarkObject(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj, JAVA_BOOLEAN force
     // That is exactly how a fresh object came to be grace-promoted by the sweep with
     // its subtree never traced. Do NOT set this flag around anything that marks from
     // a stack scan or a register file.
-    if(!cn1GcTrustedRoots
+    if(!cn1GcPreciseTrace && !cn1GcTrustedRoots
        && cn1ConservativeResolve((void*)obj) != obj && !cn1GcImmortalObjContains(obj)) {
         return;
     }
@@ -12557,6 +12736,14 @@ void gcMarkObject(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj, JAVA_BOOLEAN force
         return;
     }
 #endif
+    // Resolution already established that the header is readable. An ordinary
+    // edge to an already-marked object needs neither class-registry validation
+    // nor worker TLS lookup. Forced serial rescans retain their original path.
+    if(!force && markSnapshot == currentGcMarkValue) return;
+    // Its owner is the allocation and the only sweepable object. Never age the
+    // embedded header independently (it may be reached through both precise and
+    // conservative graphs in different cycles).
+    if(obj->__heapPosition == CN1_GC_EMBEDDED_PRIMITIVE) return;
     // SINGLE load of the class pointer, reused for every deref below. The header of a
     // conservatively-reached object can be freed/reused WHILE this function runs; loading
     // once and validating that one value removes the read-validate-reread window (the
@@ -12587,7 +12774,7 @@ void gcMarkObject(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj, JAVA_BOOLEAN force
     // (An earlier version "adopted" unknown class values here after re-resolving the
     // slot -- but resolve() validates the SLOT, not the header word, and a reused
     // header fed garbage into the registry: the register write faulted on arm64.)
-    if(__cls != 0 && __cls != (&class__java_lang_Class)
+    if(!cn1GcPreciseTrace && __cls != 0 && __cls != (&class__java_lang_Class)
        && !cn1ClazzRegistryContains((uintptr_t)__cls)) {
         return;
     }
@@ -12596,6 +12783,12 @@ void gcMarkObject(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj, JAVA_BOOLEAN force
         return;
     }
 
+    // Fused String bytes belong to this very allocation. They contain no
+    // references and have no independent lifetime, so this instance is a leaf.
+    // Allocation bounds and the embedded tag establish ownership; separate or
+    // shared backing arrays still get traced, even when adjacent in memory.
+    gcMarkFunctionPointer objectMark = __cls->markFunction;
+    if (__cls == &class__java_lang_String && cn1GcStringIsFusedLeaf(obj)) objectMark = 0;
     int markVal = currentGcMarkValue;
 
     // Parallel worker path: claim the object's mark bit with an atomic CAS so exactly
@@ -12611,7 +12804,7 @@ void gcMarkObject(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj, JAVA_BOOLEAN force
         }
         if(__sync_bool_compare_and_swap(&obj->__codenameOneGcMark, old, markVal)) {
             CN1_BIBOP_STAMP_MARKED_GRACE(obj, markVal, old);
-            if(__cls->markFunction != 0) {
+            if(objectMark != 0) {
                 gcMarkWorklistPush(obj, force);
             }
         }
@@ -12626,7 +12819,7 @@ void gcMarkObject(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj, JAVA_BOOLEAN force
             if(cn1ForceVisitedTestAndSet(obj, recursionKey)) {
                 return;
             }
-            if(__cls->markFunction != 0) {
+            if(objectMark != 0) {
                 gcMarkWorklistPush(obj, force);
             }
         }
@@ -12744,7 +12937,7 @@ void gcMarkObject(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj, JAVA_BOOLEAN force
         gcBeltDiagCount++;
     }
 #endif
-    gcMarkFunctionPointer __markFn = __cls->markFunction;
+    gcMarkFunctionPointer __markFn = objectMark;
 #if CN1_ADOPT_POLICY != 0 && !defined(CN1_DISABLE_BIBOP)
     // Poor-man's generational adoption: a reachable, non-leaf (markFunction != 0) BiBOP
     // object graduates into the legacy mark/sweep, which traces it unconditionally =
@@ -12777,12 +12970,7 @@ void gcMarkArrayObject(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj, JAVA_BOOLEAN 
     // (and with the winning worker's CAS) under ThreadSanitizer.
     JAVA_ARRAY arr = (JAVA_ARRAY)obj;
     if(arr->length > 0) {
-        JAVA_ARRAY_OBJECT* data = (JAVA_ARRAY_OBJECT*)arr->data;
-        for(int iter = 0 ; iter < arr->length ; iter++) {
-            if(data[iter] != JAVA_NULL) {
-                gcMarkObject(threadStateData, data[iter], force);
-            }
-        }
+        cn1GcMarkReferenceRange(threadStateData, (JAVA_OBJECT*)arr->data, arr->length, force);
     }
 }
 
@@ -12807,7 +12995,7 @@ static JAVA_BOOLEAN cn1BibopRescanStep() {
         CN1BibopPage* p = bibopRescanPage;
         int n = atomic_load_explicit(&p->bumpIndex, memory_order_acquire);
         while(bibopRescanSlot < n) {
-            if(gcMarkWorklistTop >= CN1_GC_MARK_WORKLIST_SIZE) {
+            if(gcMarkWorklistTop >= gcMarkWorklistCapacity) {
                 return JAVA_FALSE; // worklist full; caller drains and resumes
             }
             JAVA_OBJECT o = cn1BibopSlot(p, bibopRescanSlot);
@@ -12864,6 +13052,7 @@ static void gcMarkDrainWorklist(CODENAME_ONE_THREAD_STATE) {
         gcMarkWorklistTop--;
         JAVA_OBJECT obj = gcMarkWorklist[gcMarkWorklistTop].obj;
         JAVA_BOOLEAN force = gcMarkWorklist[gcMarkWorklistTop].force;
+        JAVA_BOOLEAN precise = gcMarkWorklist[gcMarkWorklistTop].precise;
 #ifdef CN1_BIBOP_VALIDATE
         // The (serial) mark drain crashed here calling obj->parentCls->markFunction
         // on an object whose parentCls is a non-null GARBAGE pointer (fp jumped into
@@ -12914,7 +13103,10 @@ static void gcMarkDrainWorklist(CODENAME_ONE_THREAD_STATE) {
             JAVA_BOOLEAN __savedMaturing = gcCurrentlyMaturing;
             gcCurrentlyMaturing = (obj->__heapPosition == CN1_BIBOP_ADOPTED) ? JAVA_TRUE : __savedMaturing;
 #endif
+            int savedPrecise = cn1GcPreciseTrace;
+            cn1GcPreciseTrace = precise;
             fp(threadStateData, obj, force);
+            cn1GcPreciseTrace = savedPrecise;
 #if CN1_ADOPT_POLICY != 0 && !defined(CN1_DISABLE_BIBOP)
             gcCurrentlyMaturing = __savedMaturing;
 #endif
@@ -13018,7 +13210,7 @@ static void gcMarkDrain(CODENAME_ONE_THREAD_STATE) {
         {
             long long __slots0 = 0, __pushes0 = 0;
 #endif
-        while(rescanCursor < total && gcMarkWorklistTop < CN1_GC_MARK_WORKLIST_SIZE) {
+        while(rescanCursor < total && gcMarkWorklistTop < gcMarkWorklistCapacity) {
             JAVA_OBJECT o = allObjectsInHeap[rescanCursor];
             rescanCursor++;
 #ifdef CN1_GC_CONFORM
@@ -13184,6 +13376,8 @@ static void gcMarkWorkerDrainLoop() {
                 JAVA_OBJECT obj = batch[i].obj;
                 gcMarkFunctionPointer fp = obj->__codenameOneParentClsReference->markFunction;
                 if(fp != 0) {
+                    int savedPrecise = cn1GcPreciseTrace;
+                    cn1GcPreciseTrace = batch[i].precise;
 #if CN1_ADOPT_POLICY != 0 && !defined(CN1_DISABLE_BIBOP)
                     // Same cascade as the serial gcMarkDrain: a matured object's children
                     // mature with it. gcCurrentlyMaturing is thread-local, so workers don't
@@ -13196,6 +13390,7 @@ static void gcMarkWorkerDrainLoop() {
 #else
                     fp(d, obj, batch[i].force);
 #endif
+                    cn1GcPreciseTrace = savedPrecise;
                 }
             }
             gcMarkFlushLocal(&localBuf);
@@ -13303,6 +13498,8 @@ static int cn1GcMutatorAssist(CODENAME_ONE_THREAD_STATE) {
         JAVA_OBJECT obj = batch[i].obj;
         gcMarkFunctionPointer fp = obj->__codenameOneParentClsReference->markFunction;
         if(fp != 0) {
+            int savedPrecise = cn1GcPreciseTrace;
+            cn1GcPreciseTrace = batch[i].precise;
 #if CN1_ADOPT_POLICY != 0 && !defined(CN1_DISABLE_BIBOP)
             JAVA_BOOLEAN __savedMaturing = gcCurrentlyMaturing;
             gcCurrentlyMaturing = (obj->__heapPosition == CN1_BIBOP_ADOPTED)
@@ -13312,6 +13509,7 @@ static int cn1GcMutatorAssist(CODENAME_ONE_THREAD_STATE) {
 #else
             fp(threadStateData, obj, batch[i].force);
 #endif
+            cn1GcPreciseTrace = savedPrecise;
         }
     }
     gcMarkFlushLocal(&localBuf);
@@ -13438,8 +13636,8 @@ static void gcMarkDrainParallel(CODENAME_ONE_THREAD_STATE) {
 //   * the conservative resolver maps any pointer into the block (including the
 //     child header and its interior data) to the SLOT BASE, i.e. the OWNER, so
 //     a stack/register reference to the child keeps the whole block alive;
-//   * the owner's generated mark function still gcMarkObject()s the child --
-//     harmless stores into our own block (nothing ever sweeps by that mark).
+//   * the owner's generated mark function still calls gcMarkObject on the child;
+//     the embedded-storage tag skips independent marking of that primitive data.
 // The block must live in a BiBOP page for the resolver-covers-interior property,
 // so this returns NULL for oversized requests (or when BiBOP is unavailable)
 // and the caller falls back to ordinary two-object allocation. The returned
@@ -13489,17 +13687,13 @@ JAVA_OBJECT allocArray(CODENAME_ONE_THREAD_STATE, int length, struct clazz* type
     CODENAME_ONE_ASSERT(primitiveSize > 0 && primitiveSize <= 255);
     CODENAME_ONE_ASSERT(dim > 0 && dim <= 255);
     int actualSize = length * primitiveSize;
-    JAVA_ARRAY array = (JAVA_ARRAY)codenameOneGcMalloc(threadStateData, sizeof(struct JavaArrayPrototype) + actualSize + sizeof(void*), type);
+    // Size and address both come from CN1_ARRAY_* so they cannot drift apart; the
+    // eight bytes this used to add on top were dead (see cn1_globals.h).
+    JAVA_ARRAY array = (JAVA_ARRAY)codenameOneGcMalloc(threadStateData, CN1_ARRAY_ALLOC_BYTES(actualSize), type);
     (*array).length = length;
     (*array).dimensions = dim;
     (*array).primitiveSize = primitiveSize;
-    if(actualSize > 0) {
-        void* arr = &(array->data);
-        arr += sizeof(void*);
-        (*array).data = arr;
-    } else {
-        (*array).data = 0;
-    }
+    (*array).data = actualSize > 0 ? CN1_ARRAY_PAYLOAD_PTR(array) : 0;
     return (JAVA_OBJECT)array;
 }
 
@@ -13515,14 +13709,16 @@ JAVA_OBJECT allocArrayAligned(CODENAME_ONE_THREAD_STATE, int length, struct claz
     if ((requestedAlignment & (requestedAlignment - 1)) != 0) {
         requestedAlignment = 16;
     }
+    // The payload begins at CN1_ARRAY_PAYLOAD_OFFSET, which is 32 and therefore
+    // already 16-aligned; the slack is still requested because the alignment is a
+    // parameter and the block's own base is only guaranteed pointer-aligned.
     int extraPadding = requestedAlignment - 1;
-    JAVA_ARRAY array = (JAVA_ARRAY)codenameOneGcMalloc(threadStateData, sizeof(struct JavaArrayPrototype) + actualSize + sizeof(void*) + extraPadding, type);
+    JAVA_ARRAY array = (JAVA_ARRAY)codenameOneGcMalloc(threadStateData, CN1_ARRAY_ALLOC_BYTES(actualSize) + extraPadding, type);
     (*array).length = length;
     (*array).dimensions = dim;
     (*array).primitiveSize = primitiveSize;
     if (actualSize > 0) {
-        char* arr = (char*)(&(array->data));
-        arr += sizeof(void*);
+        char* arr = (char*)CN1_ARRAY_PAYLOAD_PTR(array);
         uintptr_t aligned = (((uintptr_t)arr) + ((uintptr_t)requestedAlignment - 1)) & ~((uintptr_t)requestedAlignment - 1);
         (*array).data = (void*)aligned;
     } else {
@@ -14111,9 +14307,11 @@ static long long cn1GcProbeElapsedMs(void) {
 // nothing else in the VM reports them, and a table that ratchets looks exactly like a
 // heap leak from the outside.
 static long long cn1GcProbeSideBytes(void) {
-    long long side = 0;
+    long long side = (long long)atomic_load_explicit(&cn1NativeBlockLiveBytes, memory_order_relaxed);
     side += (long long)cn1ImmortalRootsCap * (long long)sizeof(JAVA_OBJECT);
     side += (long long)gcSatbCap * (long long)sizeof(JAVA_OBJECT);
+    if(gcMarkWorklist != gcMarkWorklistInitial)
+        side += (long long)gcMarkWorklistCapacity * (long long)sizeof(*gcMarkWorklist);
 #ifdef CN1_CONSERVATIVE_GC_ROOTS
     side += (long long)CN1_CLAZZ_SET_SIZE * (long long)sizeof(uintptr_t);
 #endif
@@ -14319,6 +14517,10 @@ void cn1GcProbeCycle(double markMs, double sweepMs, int threw) {
         atomic_load_explicit(&cn1MonitorEntries, memory_order_relaxed),
         cn1ImmortalRootsN, cn1FVLive,
         sideBytes / 1024, residKb);
+    size_t nativeLive, nativeRetired, nativeReleased;
+    cn1NativeBlockAccounting(&nativeLive, &nativeRetired, &nativeReleased);
+    fprintf(stderr, "[NATIVE-STORAGE] cyc=%d liveBytes=%zu retiredBytes=%zu releasedBytes=%zu\n",
+            currentGcMarkValue, nativeLive, nativeRetired, nativeReleased);
     // java.lang.ref, on its own line so it can be grepped and joined on cyc without
     // parsing the wall of fields above.
     //
@@ -14791,6 +14993,8 @@ static void cn1ReportStalls(void) {
                 : 0.0);
     fprintf(stderr, "[GCSTALL] allocRetries=%ld\n",
             atomic_load_explicit(&cn1AllocRetries, memory_order_relaxed));
+    fprintf(stderr, "[GCSTALL] pendingEmptyWaits=%ld\n",
+            atomic_load_explicit(&cn1PendingEmptyWaits, memory_order_relaxed));
     fprintf(stderr, "[GCSTALL] gracePagesWalked=%lld gracePagesSkipped=%lld"
                     " graceSlotsWalked=%lld graceSlotsFresh=%lld graceMarked=%lld\n",
             atomic_load_explicit(&cn1GracePagesWalked, memory_order_relaxed),
@@ -15324,6 +15528,7 @@ void throwException(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT exceptionArg) {
             continue;
         } else if(threadStateData->blocks[threadStateData->tryBlockOffset].exceptionClass <= 0 || instanceofFunction(threadStateData->blocks[threadStateData->tryBlockOffset].exceptionClass, exceptionArg->__codenameOneParentClsReference->classId)) {
             int off = threadStateData->tryBlockOffset;
+            cn1StackBufferUnwind(threadStateData, threadStateData->blocks[off].nativeBuffers);
             CN1_TRY_LONGJMP(threadStateData->blocks[off].destination, 1);
             return;
         } 
@@ -15343,6 +15548,7 @@ void throwException(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT exceptionArg) {
      * that ship today do.
      */
     if(cn1AbortOnUncaughtException) {
+        cn1StackBufferUnwind(threadStateData, NULL);
         cn1ReportUncaughtException(threadStateData, exceptionArg);
     }
 }
@@ -15422,6 +15628,31 @@ CN1_NORETURN void cn1ThrowNullPointerOrDie(CODENAME_ONE_THREAD_STATE) {
     fprintf(stderr, "FATAL: null array access with no exception handler installed\n");
     fflush(stderr);
     abort();
+}
+
+/* The returning counterparts. These exist so the EXCEPTION ALLOCATION happens behind
+ * a cold call rather than inline in the caller: a macro expanding to
+ * throwException(ts, __NEW_INSTANCE_X(ts)) puts the allocation in the caller's body,
+ * where it competes for registers with the fast path even though it never runs.
+ *
+ * They cannot use the ...OrDie() pair above: those abort when no handler is
+ * installed, which is right for a statement-form guard that has nowhere to go, but
+ * wrong here. A frameless method returns to let its caller's frame take the pending
+ * exception, and the expression forms must produce a value. */
+CN1_COLD void cn1ThrowNullPointerHere(CODENAME_ONE_THREAD_STATE) {
+    throwException(threadStateData, __NEW_INSTANCE_java_lang_NullPointerException(threadStateData));
+}
+
+CN1_COLD void cn1ThrowArrayIndexHere(CODENAME_ONE_THREAD_STATE, int index) {
+    throwArrayIndexOutOfBoundsException(threadStateData, index);
+}
+
+CN1_COLD JAVA_BOOLEAN cn1ThrowNullPointer_R_boolean(CODENAME_ONE_THREAD_STATE) {
+    return throwException_R_boolean(threadStateData, __NEW_INSTANCE_java_lang_NullPointerException(threadStateData));
+}
+
+CN1_COLD JAVA_INT cn1ThrowNullPointer_R_int(CODENAME_ONE_THREAD_STATE) {
+    return throwException_R_int(threadStateData, __NEW_INSTANCE_java_lang_NullPointerException(threadStateData));
 }
 
 void** interfaceVtableGlobal = 0;
@@ -15581,3 +15812,43 @@ __attribute__((weak)) void cn1_debugger_register_class(int classId, struct clazz
     (void)cls;
 }
 #endif
+
+/* Native backing buffers participate in the same allocation budget as large
+ * managed arrays. They are empty at this point; publication happens in the owner. */
+static void cn1NoteNativeAllocation(size_t bytes) {
+#ifndef CN1_DISABLE_BIBOP
+    long long total = atomic_fetch_add_explicit(&cn1LegacyBytesSinceGc,
+        (long long)bytes, memory_order_relaxed) + (long long)bytes;
+    if(total > CN1_LEGACY_GC_TRIGGER_BYTES && constantPoolObjects != NULL) {
+        struct ThreadLocalData* threadStateData = getThreadLocalData();
+#ifndef CN1_CONSERVATIVE_GC_ROOTS
+        if(threadStateData->nativeAllocationMode) return;
+#endif
+        int expected = 0;
+        if(atomic_compare_exchange_strong_explicit(&cn1LegacyGcScheduled, &expected, 1,
+                memory_order_acq_rel, memory_order_relaxed)) {
+            JAVA_BOOLEAN previous = threadStateData->nativeAllocationMode;
+            threadStateData->nativeAllocationMode = JAVA_TRUE;
+            // Allocation has succeeded, but its new address is not published yet.
+            // A failure to start the GC thread must not unwind the caller while
+            // its owner/scope still contains the pre-realloc pointer.
+            int savedTry = threadStateData->tryBlockOffset;
+            int savedStack = threadStateData->threadObjectStackOffset;
+            int savedCalls = threadStateData->callStackOffset;
+            JAVA_OBJECT savedException = threadStateData->exception;
+            jmp_buf requestFailure;
+            if(CN1_TRY_SETJMP(requestFailure) == 0) {
+                BEGIN_TRY(0, requestFailure);
+                java_lang_System_gc__(threadStateData);
+            } else {
+                atomic_store_explicit(&cn1LegacyGcScheduled, 0, memory_order_release);
+            }
+            threadStateData->tryBlockOffset = savedTry;
+            threadStateData->threadObjectStackOffset = savedStack;
+            threadStateData->callStackOffset = savedCalls;
+            threadStateData->exception = savedException;
+            threadStateData->nativeAllocationMode = previous;
+        }
+    }
+#endif
+}

@@ -25,10 +25,26 @@ CC="${CN1_BENCH_CC:-clang}"
 J8="${JDK_8_HOME:?set JDK_8_HOME to a JDK 8 home}"
 WORK="$(mktemp -d "${TMPDIR:-/tmp}/cn1bench.XXXXXX")"
 
-# 1. translator classes + ASM classpath (built once, then cached)
+# 1. Reuse translator classes only for identical sources. A presence-only cache
+# silently runs old code after an edit; Maven incremental compilation also misses
+# some source deletions, so changed fingerprints require a clean module build.
 TRANSLATOR="$REPO/vm/ByteCodeTranslator/target/classes"
-if [ ! -f "$TRANSLATOR/com/codename1/tools/translator/ByteCodeTranslator.class" ]; then
-    (cd "$REPO/vm" && mvn -q -B -pl ByteCodeTranslator -am package -DskipTests)
+TRANSLATOR_STAMP="$REPO/vm/ByteCodeTranslator/target/bench-translator.sha256"
+TRANSLATOR_SHA="$(python3 - "$REPO" <<'PYHASH'
+import hashlib, pathlib, sys
+root = pathlib.Path(sys.argv[1]) / 'vm/ByteCodeTranslator'
+h = hashlib.sha256()
+for path in sorted(list((root / 'src').rglob('*')) + [root / 'pom.xml', root.parent / 'pom.xml']):
+    if path.is_file():
+        h.update(str(path.relative_to(root.parent)).encode())
+        h.update(path.read_bytes())
+print(h.hexdigest())
+PYHASH
+)"
+if [ ! -f "$TRANSLATOR/com/codename1/tools/translator/ByteCodeTranslator.class" ] ||
+   [ ! -f "$TRANSLATOR_STAMP" ] || [ "$(cat "$TRANSLATOR_STAMP")" != "$TRANSLATOR_SHA" ]; then
+    (cd "$REPO/vm" && mvn -q -B -pl ByteCodeTranslator -am clean package -DskipTests)
+    printf '%s\n' "$TRANSLATOR_SHA" > "$TRANSLATOR_STAMP"
 fi
 ASM_CP_FILE="$REPO/vm/ByteCodeTranslator/target/bench-asm-classpath.txt"
 if [ ! -f "$ASM_CP_FILE" ]; then

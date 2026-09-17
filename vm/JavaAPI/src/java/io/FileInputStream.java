@@ -56,8 +56,19 @@ public class FileInputStream extends InputStream {
         this(file == null ? null : file.getPath());
     }
 
+    /* Reused rather than allocated per call: this path runs once per byte, so a
+     * fresh array here is one short lived object per byte read. It is passed to the
+     * overridable array form, so a subclass that retained it would see it change
+     * on the next call -- no in-tree subclass does, and the array holds one byte
+     * of data the caller already has, and unsynchronized concurrent reads of one stream are already
+     * undefined for InputStream. */
+    private byte[] oneByte;
+
     public int read() throws IOException {
-        byte[] one = new byte[1];
+        if(oneByte == null) {
+            oneByte = new byte[1];
+        }
+        byte[] one = oneByte;
         int n = read(one, 0, 1);
         if(n <= 0) {
             return -1;

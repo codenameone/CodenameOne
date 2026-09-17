@@ -17,791 +17,240 @@
 
 package java.util;
 
-
-/**
- * ArrayList is an implementation of {@link List}, backed by an array. All
- * optional operations adding, removing, and replacing are supported. The
- * elements can be any objects.
- * 
- * @since 1.2
- */
+/** A resizable sequence whose private backing buffer is owned by the VM. */
 public class ArrayList<E> extends AbstractList<E> implements List<E>, RandomAccess {
-
     private static final long serialVersionUID = 8683452581122892189L;
-
-    private transient int firstIndex;
-
+    private transient volatile long cn1Storage;
+    private transient int capacity;
     private transient int size;
 
-    private transient E[] array;
+    public ArrayList() { capacity = 10; }
 
-    /**
-     * Constructs a new instance of {@code ArrayList} with ten capacity.
-     */
-    // ISOLATION (PR #5766): the lazy default-capacity allocation that used to sit
-    // here is withdrawn. It replaced the eager new Object[10] with a SHARED static
-    // zero-length array, which also gave java.util.ArrayList a <clinit> it had
-    // never had -- master's only static is a compile-time serialVersionUID, so the
-    // class previously emitted no static initializer at all.
-    //
-    // The suite then began stopping after exactly 145 of 166 screenshots on every
-    // target except glibc-x64, with ArrayList state corrupt at the point of
-    // failure: AIOOBE 89 inside pendingIdleSerialCalls.add, then AIOOBE -1, then a
-    // NullPointerException inside ArrayList.get, which only happens when the
-    // backing array reference itself is null.
-    //
-    // The list logic is NOT at fault: a differential fuzz of this exact source
-    // against java.util.ArrayList ran 3000 seeds x 200 random operations with no
-    // divergence, and every access to the corrupted list in Display is inside
-    // synchronized(lock). The corruption is therefore below Java, which makes the
-    // new <clinit> and the process-wide shared array the part worth removing
-    // before anything subtler is blamed.
-    //
-    // The iterator below is the change that carried the measured win (iteration
-    // 25.5% -> 12.4% of mutator self-time) and is kept.
-    public ArrayList() {
-        this(10);
-    }
-
-    public ArrayList(E... arr) {
-        this(arr.length);
-        for(E x : arr) {
-            add(x);
-        }
-    }
-
-    /**
-     * Constructs a new instance of {@code ArrayList} with the specified
-     * capacity.
-     * 
-     * @param capacity
-     *            the initial capacity of this {@code ArrayList}.
-     */
     public ArrayList(int capacity) {
-        if (capacity < 0) {
-            throw new IllegalArgumentException();
-        }
-        firstIndex = size = 0;
-        array = newElementArray(capacity);
+        if (capacity < 0) throw new IllegalArgumentException();
+        cn1Storage = NativeStorage.references(capacity);
+        this.capacity = capacity;
     }
 
-    /**
-     * Constructs a new instance of {@code ArrayList} containing the elements of
-     * the specified collection. The initial size of the {@code ArrayList} will
-     * be 10% larger than the size of the specified collection.
-     * 
-     * @param collection
-     *            the collection of elements to add.
-     */
+    public ArrayList(E... elements) {
+        this(elements.length);
+        for (E value : elements) add(value);
+    }
+
     public ArrayList(Collection<? extends E> collection) {
-        firstIndex = 0;
-        Object[] objects = toObjectArray(collection);
-        size = objects.length;
-
-        // REVIEW: Created 2 array copies of the original collection here
-        //         Could be better to use the collection iterator and
-        //         copy once?
-        array = newElementArray(size + (size / 10));
-        System.arraycopy(objects, 0, array, 0, size);
-        modCount = 1;
+        int nativeResult = initFromNative(collection);
+        if (nativeResult >= 0) return;
+        if (nativeResult == -2) throw new OutOfMemoryError();
+        capacity = collection.size();
+        if (capacity < 0) throw new IllegalArgumentException();
+        cn1Storage = NativeStorage.references(capacity);
+        addAll(collection);
     }
+
+    private native int initFromNative(Collection<?> collection);
 
     static void toObjectArray(Object[] objects, Collection collection) {
-        Iterator i = collection.iterator();
-        for(int iter = 0 ; iter < objects.length ; iter++) {
-            objects[iter] = i.next();
-        }
+        Iterator iterator = collection.iterator();
+        for (int i = 0; i < objects.length; i++) objects[i] = iterator.next();
     }
-    
+
     static Object[] toObjectArray(Collection collection) {
         Object[] objects = new Object[collection.size()];
         toObjectArray(objects, collection);
         return objects;
     }
-    
+
+    private void checkIndex(int index) {
+        if (index < 0 || index >= size) throw new IndexOutOfBoundsException();
+    }
+
+    private void checkPosition(int index) {
+        if (index < 0 || index > size) throw new IndexOutOfBoundsException();
+    }
+
     @SuppressWarnings("unchecked")
-    private E[] newElementArray(int size) {
-        return (E[]) new Object[size];
+    public E get(int index) {
+        checkIndex(index);
+        return (E) NativeStorage.get(cn1Storage, index);
     }
 
-    /**
-     * Inserts the specified object into this {@code ArrayList} at the specified
-     * location. The object is inserted before any previous element at the
-     * specified location. If the location is equal to the size of this
-     * {@code ArrayList}, the object is added at the end.
-     * 
-     * @param location
-     *            the index at which to insert the object.
-     * @param object
-     *            the object to add.
-     * @throws IndexOutOfBoundsException
-     *             when {@code location < 0 || > size()}
-     */
-    @Override
-    public void add(int location, E object) {
-        if (location < 0 || location > size) {
-            throw new IndexOutOfBoundsException("Index out of bounds");
-        }
-        if (location == 0) {
-            if (firstIndex == 0) {
-                growAtFront(1);
-            }
-            array[--firstIndex] = object;
-        } else if (location == size) {
-            if (firstIndex + size == array.length) {
-                growAtEnd(1);
-            }
-            array[firstIndex + size] = object;
-        } else { // must be case: (0 < location && location < size)
-            if (size == array.length) {
-                growForInsert(location, 1);
-            } else if (firstIndex + size == array.length
-                    || (firstIndex > 0 && location < size / 2)) {
-                System.arraycopy(array, firstIndex, array, --firstIndex,
-                        location);
-            } else {
-                int index = location + firstIndex;
-                System.arraycopy(array, index, array, index + 1, size
-                        - location);
-            }
-            array[location + firstIndex] = object;
-        }
-
-        size++;
-        modCount++;
+    @SuppressWarnings("unchecked")
+    public E set(int index, E value) {
+        checkIndex(index);
+        E old = (E) NativeStorage.get(cn1Storage, index);
+        NativeStorage.set(cn1Storage, index, value);
+        return old;
     }
 
-    /**
-     * Adds the specified object at the end of this {@code ArrayList}.
-     * 
-     * @param object
-     *            the object to add.
-     * @return always true
-     */
-    @Override
-    public boolean add(E object) {
-        if (firstIndex + size == array.length) {
-            growAtEnd(1);
+    public int size() { return size; }
+    public boolean isEmpty() { return size == 0; }
+
+    private void reserve(int required) {
+        if (required < 0) throw new OutOfMemoryError();
+        if (required <= capacity) {
+            if (required != 0 && cn1Storage == 0) resize(capacity);
+            return;
         }
-        array[firstIndex + size] = object;
-        size++;
-        modCount++;
-        return true;
+        int grown = capacity + (capacity >> 1) + 1;
+        resize(grown < required || grown < 0 ? required : grown);
     }
 
-    /**
-     * Inserts the objects in the specified collection at the specified location
-     * in this List. The objects are added in the order they are returned from
-     * the collection's iterator.
-     * 
-     * @param location
-     *            the index at which to insert.
-     * @param collection
-     *            the collection of objects.
-     * @return {@code true} if this {@code ArrayList} is modified, {@code false}
-     *         otherwise.
-     * @throws IndexOutOfBoundsException
-     *             when {@code location < 0 || > size()}
-     */
-    @Override
-    public boolean addAll(int location, Collection<? extends E> collection) {
-        if (location < 0 || location > size) {
-            throw new IndexOutOfBoundsException("Index out of bounds");
-        }
-
-        Object[] dumparray = toObjectArray(collection);
-        int growSize = dumparray.length;
-        // REVIEW: Why do this check here rather than check
-        //         collection.size() earlier? RI behaviour?
-        if (growSize == 0) {
-            return false;
-        }
-
-        if (location == 0) {
-            growAtFront(growSize);
-            firstIndex -= growSize;
-        } else if (location == size) {
-            if (firstIndex + size > array.length - growSize) {
-                growAtEnd(growSize);
-            }
-        } else { // must be case: (0 < location && location < size)
-            if (array.length - size < growSize) {
-                growForInsert(location, growSize);
-            } else if (firstIndex + size > array.length - growSize
-                       || (firstIndex > 0 && location < size / 2)) {
-                int newFirst = firstIndex - growSize;
-                if (newFirst < 0) {
-                    int index = location + firstIndex;
-                    System.arraycopy(array, index, array, index - newFirst,
-                            size - location);
-                    newFirst = 0;
-                }
-                System.arraycopy(array, firstIndex, array, newFirst, location);
-                firstIndex = newFirst;
-            } else {
-                int index = location + firstIndex;
-                System.arraycopy(array, index, array, index + growSize, size
-                        - location);
-            }
-        }
-
-        System.arraycopy(dumparray, 0, this.array, location + firstIndex,
-                growSize);
-        size += growSize;
-        modCount++;
-        return true;
+    private void resize(int newCapacity) {
+        long fresh = NativeStorage.references(newCapacity);
+        long old = cn1Storage;
+        NativeStorage.copy(old, 0, fresh, 0, size);
+        cn1Storage = fresh;
+        capacity = newCapacity;
+        NativeStorage.retire(old);
     }
 
-    /**
-     * Adds the objects in the specified collection to this {@code ArrayList}.
-     * 
-     * @param collection
-     *            the collection of objects.
-     * @return {@code true} if this {@code ArrayList} is modified, {@code false}
-     *         otherwise.
-     */
-    @Override
-    public boolean addAll(Collection<? extends E> collection) {
-        Object[] dumpArray = toObjectArray(collection);
-        if (dumpArray.length == 0) {
-            return false;
-        }
-        if (dumpArray.length > array.length - (firstIndex + size)) {
-            growAtEnd(dumpArray.length);
-        }
-        System.arraycopy(dumpArray, 0, this.array, firstIndex + size,
-                         dumpArray.length);
-        size += dumpArray.length;
-        modCount++;
-        return true;
-    }
-
-    /**
-     * Removes all elements from this {@code ArrayList}, leaving it empty.
-     * 
-     * @see #isEmpty
-     * @see #size
-     */
-    @Override
-    public void clear() {
-        if (size != 0) {
-            // REVIEW: Should we use Arrays.fill() instead of just
-            //         allocating a new array?  Should we use the same
-            //         sized array?
-            Arrays.fill(array, firstIndex, firstIndex + size, null);
-            // REVIEW: Should the indexes point into the middle of the
-            //         array rather than 0?
-            firstIndex = size = 0;
+    public void ensureCapacity(int minimumCapacity) {
+        if (minimumCapacity > capacity) {
+            reserve(minimumCapacity);
             modCount++;
         }
     }
 
-    /**
-     * Searches this {@code ArrayList} for the specified object.
-     * 
-     * @param object
-     *            the object to search for.
-     * @return {@code true} if {@code object} is an element of this
-     *         {@code ArrayList}, {@code false} otherwise
-     */
-    @Override
-    public boolean contains(Object object) {
-        int lastIndex = firstIndex + size;
-        if (object != null) {
-            for (int i = firstIndex; i < lastIndex; i++) {
-                if (object.equals(array[i])) {
-                    return true;
-                }
-            }
-        } else {
-            for (int i = firstIndex; i < lastIndex; i++) {
-                if (array[i] == null) {
-                    return true;
-                }
-            }
-        }
-        return false;
+    public void trimToSize() {
+        modCount++;
+        if (capacity != size) resize(size);
     }
 
-    /**
-     * Ensures that after this operation the {@code ArrayList} can hold the
-     * specified number of elements without further growing.
-     * 
-     * @param minimumCapacity
-     *            the minimum capacity asked for.
-     */
-    public void ensureCapacity(int minimumCapacity) {
-        int required = minimumCapacity - array.length;
-        if (required > 0) {
-            // REVIEW: Why do we check the firstIndex first? Growing
-            //         the end makes more sense
-            if (firstIndex > 0) {
-                growAtFront(required);
-            } else {
-                growAtEnd(required);
-            }
-        }
+    public boolean add(E value) {
+        reserve(size + 1);
+        NativeStorage.set(cn1Storage, size++, value);
+        modCount++;
+        return true;
     }
 
-    /**
-     * Direct-array iterator, overriding AbstractList's generic SimpleListIterator.
-     *
-     * The inherited one was the single hottest method in a large translation --
-     * 16.45% of mutator self-time on the 5782-class hellocodenameone corpus, more
-     * than twice the next entry. Three costs per element, none inherent:
-     *
-     *   - a try/catch around the body, to turn IndexOutOfBoundsException into
-     *     NoSuchElementException. ParparVM has no zero-cost exception tables, so a
-     *     try block is a setjmp -- once per element, in the hottest loop in the
-     *     program. An explicit bounds test costs a compare.
-     *   - size() and get() as VIRTUAL calls on the outer list, with no JIT to
-     *     inline them.
-     *   - the index recomputed as size() - numLeft every iteration instead of
-     *     being carried in a cursor.
-     *
-     * MEASURED after: the iteration path fell from 25.5% of mutator self-time to
-     * 12.4%, ArrayList.get from 7.42% to 0.55%, and _setjmp from 1.61% to zero.
-     *
-     * Semantics are unchanged: same ConcurrentModificationException on structural
-     * modification, same NoSuchElementException past the end, remove() still
-     * works. Reads array[firstIndex + i] exactly as get(int) does.
-     *
-     * Applies to every `for (x : list)` in every translated application whatever
-     * the loop's static type, because dispatch lands on the concrete ArrayList.
-     */
-    // Package-private, not private: a private inner class whose constructor is
-    // reached from the outer class makes javac synthesise an access bridge and a
-    // ArrayList$1 marker type, so every iterator() paid an extra class and an
-    // aconst_null for the bridge argument. Nothing outside java.util can see it
-    // either way.
+    public void add(int index, E value) {
+        checkPosition(index);
+        reserve(size + 1);
+        NativeStorage.move(cn1Storage, index, index + 1, size - index);
+        NativeStorage.set(cn1Storage, index, value);
+        size++;
+        modCount++;
+    }
+
+    public boolean addAll(Collection<? extends E> collection) {
+        return addAll(size, collection);
+    }
+
+    // Returns -1 for an unsupported implementation, -2 for allocation failure.
+    // Native layouts copy directly into the destination block without a Java
+    // array, iterator, or per-element method call.
+    private native int addAllNative(int index, Collection<?> collection);
+
+    public boolean addAll(int index, Collection<? extends E> collection) {
+        checkPosition(index);
+        int nativeResult = addAllNative(index, collection);
+        if (nativeResult >= 0) return nativeResult != 0;
+        if (nativeResult == -2) throw new OutOfMemoryError();
+        Object[] values = collection.toArray();
+        if (values.length == 0) return false;
+        reserve(size + values.length);
+        NativeStorage.move(cn1Storage, index, index + values.length, size - index);
+        for (int i = 0; i < values.length; i++) NativeStorage.set(cn1Storage, index + i, values[i]);
+        size += values.length;
+        modCount++;
+        return true;
+    }
+
+    @SuppressWarnings("unchecked")
+    public E remove(int index) {
+        checkIndex(index);
+        E old = (E) NativeStorage.get(cn1Storage, index);
+        NativeStorage.move(cn1Storage, index + 1, index, size - index - 1);
+        NativeStorage.clear(cn1Storage, --size, 1);
+        modCount++;
+        return old;
+    }
+
+    public boolean remove(Object value) {
+        int index = indexOf(value);
+        if (index < 0) return false;
+        remove(index);
+        return true;
+    }
+
+    protected void removeRange(int from, int to) {
+        if (from < 0 || to > size || from > to) throw new IndexOutOfBoundsException();
+        int count = to - from;
+        NativeStorage.move(cn1Storage, to, from, size - to);
+        NativeStorage.clear(cn1Storage, size - count, count);
+        size -= count;
+        modCount++;
+    }
+
+    public void clear() {
+        NativeStorage.clear(cn1Storage, 0, size);
+        size = 0;
+        modCount++;
+    }
+
+    public int indexOf(Object value) {
+        for (int i = 0; i < size; i++) {
+            Object element = NativeStorage.get(cn1Storage, i);
+            if (value == null ? element == null : value.equals(element)) return i;
+        }
+        return -1;
+    }
+
+    public int lastIndexOf(Object value) {
+        for (int i = size - 1; i >= 0; i--) {
+            Object element = NativeStorage.get(cn1Storage, i);
+            if (value == null ? element == null : value.equals(element)) return i;
+        }
+        return -1;
+    }
+
+    public boolean contains(Object value) { return indexOf(value) >= 0; }
+
+    public Object[] toArray() {
+        Object[] result = new Object[size];
+        for (int i = 0; i < size; i++) result[i] = NativeStorage.get(cn1Storage, i);
+        return result;
+    }
+
+    @SuppressWarnings("unchecked")
+    public <T> T[] toArray(T[] result) {
+        if (result.length < size) {
+            result = (T[]) java.lang.reflect.Array.newInstance(result.getClass().getComponentType(), size);
+        }
+        for (int i = 0; i < size; i++) result[i] = (T) NativeStorage.get(cn1Storage, i);
+        if (result.length > size) result[size] = null;
+        return result;
+    }
+
     class ArrayListIterator implements Iterator<E> {
         private int cursor;
         private int lastReturned = -1;
         private int expectedModCount = modCount;
 
-        public boolean hasNext() {
-            return cursor < size;
-        }
+        public boolean hasNext() { return cursor != size; }
 
-        /**
-         * SPLIT SO THIS METHOD CAN BE FRAMELESS, which is the whole point of the shape
-         * below. BytecodeMethod.isFramelessEligible() rejects any method containing
-         * ATHROW (isFramelessObjectOpcode excludes it deliberately), and next() is the
-         * hottest method in any for-each loop -- ArrayListIterator is 41.6MB of aging
-         * heap on the self-hosting corpus. Carrying the three throws inline cost it a
-         * full named shadow frame (DEFINE_INSTANCE_METHOD_STACK: frame push, locals
-         * array, SP, frame pop) on EVERY element of EVERY loop, purely to satisfy
-         * exception paths that essentially never run.
-         *
-         * So the guards stay exactly where they were and only the throws move. Each
-         * `return nextSlow()` below is an unconditional-taken-never branch: clang sinks
-         * it, and what is left is three compares, an add and a load. NOT ONE CHECK IS
-         * DROPPED -- see the bounds-check note below, which is the 145-test failure this
-         * class already paid for once.
-         *
-         * nextSlow() re-tests the three conditions IN THE SAME ORDER, so the exception a
-         * caller sees is identical to the one the inline throws produced. It must stay
-         * in that order: the middle case is NoSuchElementException and the outer two are
-         * ConcurrentModificationException, so reordering them silently changes which
-         * exception a past-the-end iterator on a concurrently modified list reports.
-         */
+        @SuppressWarnings("unchecked")
         public E next() {
-            if (modCount != expectedModCount) {
-                return nextSlow();
-            }
-            int i = cursor;
-            if (i >= size) {
-                return nextSlow();
-            }
-            // The i < size test is only a bounds check while the list's
-            // firstIndex + size <= array.length invariant holds, so the array
-            // itself has to be checked too. The iterator this replaced could not
-            // read out of range: it went through get(), which bounds-checks, inside
-            // a try that turned IndexOutOfBoundsException into
-            // NoSuchElementException. Dropping that -- the try was the point, since
-            // ParparVM has no zero-cost exception tables -- also dropped the only
-            // bounds check on the read, and ParparVM does NOT check an array read in
-            // a release build. The result was an out-of-bounds read of the heap
-            // rather than a recoverable exception, which is how an unrelated int[]
-            // ended up with a zeroed header and the screenshot suite died 145 tests
-            // in. OpenJDK's own ArrayList.Itr carries this identical guard
-            // (`if (i >= elementData.length) throw new ConcurrentModificationException()`);
-            // omitting it is the whole defect. One compare, and the measured win
-            // stays.
-            E[] a = array;
-            int idx = firstIndex + i;
-            if (idx < 0 || idx >= a.length) {
-                return nextSlow();
-            }
-            cursor = i + 1;
-            lastReturned = i;
-            return a[idx];
+            if (modCount != expectedModCount || cursor >= size || cursor >= capacity) return nextSlow();
+            lastReturned = cursor++;
+            return (E) NativeStorage.get(cn1Storage, lastReturned);
         }
 
-        /**
-         * The exception half of {@link #next()}, kept out of line so next() contains no
-         * ATHROW and stays frameless. Reached only when one of next()'s three guards
-         * failed, and it re-tests all three in the same order so it raises exactly the
-         * exception the inline throws used to.
-         *
-         * The trailing throw is not dead code and is not a fallback for "no condition
-         * held": another thread can move modCount between next()'s test and this one, in
-         * which case ConcurrentModificationException is the right answer anyway.
-         */
         private E nextSlow() {
-            if (modCount != expectedModCount) {
-                throw new ConcurrentModificationException();
-            }
-            if (cursor >= size) {
-                throw new NoSuchElementException();
-            }
+            if (modCount != expectedModCount) throw new ConcurrentModificationException();
+            if (cursor >= size) throw new NoSuchElementException();
             throw new ConcurrentModificationException();
         }
 
         public void remove() {
-            if (lastReturned < 0) {
-                throw new IllegalStateException();
-            }
-            if (modCount != expectedModCount) {
-                throw new ConcurrentModificationException();
-            }
+            if (lastReturned < 0) throw new IllegalStateException();
+            if (modCount != expectedModCount) throw new ConcurrentModificationException();
             ArrayList.this.remove(lastReturned);
-            if (lastReturned < cursor) {
-                cursor--;
-            }
+            cursor = lastReturned;
             lastReturned = -1;
             expectedModCount = modCount;
         }
     }
 
-    @Override
-    public Iterator<E> iterator() {
-        return new ArrayListIterator();
-    }
-
-    @Override
-    public E get(int location) {
-        if (location < 0 || location >= size) {
-            throw new IndexOutOfBoundsException("Index out of bounds");
-        }
-        return array[firstIndex + location];
-    }
-
-    private void growAtEnd(int required) {
-        if (array.length - size >= required) {
-            // REVIEW: as growAtEnd, why not move size == 0 out as
-            //         special case
-            if (size != 0) {
-                System.arraycopy(array, firstIndex, array, 0, size);
-                int start = size < firstIndex ? firstIndex : size;
-                // REVIEW: I think we null too much
-                //         array.length should be lastIndex ?
-                Arrays.fill(array, start, array.length, null);
-            }
-            firstIndex = 0;
-        } else {
-            // REVIEW: If size is 0?
-            //         Does size/2 seems a little high!
-            int increment = size / 2;
-            if (required > increment) {
-                increment = required;
-            }
-            if (increment < 12) {
-                increment = 12;
-            }
-            E[] newArray = newElementArray(size + increment);
-            if (size != 0) {
-                System.arraycopy(array, firstIndex, newArray, 0, size);
-                firstIndex = 0;
-            }
-            array = newArray;
-        }
-    }
-
-    private void growAtFront(int required) {
-        if (array.length - size >= required) {
-            int newFirst = array.length - size;
-            // REVIEW: as growAtEnd, why not move size == 0 out as
-            //         special case
-            if (size != 0) {
-                System.arraycopy(array, firstIndex, array, newFirst, size);
-                int lastIndex = firstIndex + size;
-                int length = lastIndex > newFirst ? newFirst : lastIndex;
-                Arrays.fill(array, firstIndex, length, null);
-            }
-            firstIndex = newFirst;
-        } else {
-            int increment = size / 2;
-            if (required > increment) {
-                increment = required;
-            }
-            if (increment < 12) {
-                increment = 12;
-            }
-            E[] newArray = newElementArray(size + increment);
-            if (size != 0) {
-                System.arraycopy(array, firstIndex, newArray, increment, size);
-            }
-            firstIndex = newArray.length - size;
-            array = newArray;
-        }
-    }
-
-    private void growForInsert(int location, int required) {
-        // REVIEW: we grow too quickly because we are called with the
-        //         size of the new collection to add without taking in
-        //         to account the free space we already have
-        int increment = size / 2;
-        if (required > increment) {
-            increment = required;
-        }
-        if (increment < 12) {
-            increment = 12;
-        }
-        E[] newArray = newElementArray(size + increment);
-        // REVIEW: biased towards leaving space at the beginning?
-        //         perhaps newFirst should be (increment-required)/2?
-        int newFirst = increment - required;
-        // Copy elements after location to the new array skipping inserted
-        // elements
-        System.arraycopy(array, location + firstIndex, newArray, newFirst
-                + location + required, size - location);
-        // Copy elements before location to the new array from firstIndex
-        System.arraycopy(array, firstIndex, newArray, newFirst, location);
-        firstIndex = newFirst;
-        array = newArray;
-    }
-
-    @Override
-    public int indexOf(Object object) {
-        // REVIEW: should contains call this method?
-        int lastIndex = firstIndex + size;
-        if (object != null) {
-            for (int i = firstIndex; i < lastIndex; i++) {
-                if (object.equals(array[i])) {
-                    return i - firstIndex;
-                }
-            }
-        } else {
-            for (int i = firstIndex; i < lastIndex; i++) {
-                if (array[i] == null) {
-                    return i - firstIndex;
-                }
-            }
-        }
-        return -1;
-    }
-
-    @Override
-    public boolean isEmpty() {
-        return size == 0;
-    }
-
-    @Override
-    public int lastIndexOf(Object object) {
-        int lastIndex = firstIndex + size;
-        if (object != null) {
-            for (int i = lastIndex - 1; i >= firstIndex; i--) {
-                if (object.equals(array[i])) {
-                    return i - firstIndex;
-                }
-            }
-        } else {
-            for (int i = lastIndex - 1; i >= firstIndex; i--) {
-                if (array[i] == null) {
-                    return i - firstIndex;
-                }
-            }
-        }
-        return -1;
-    }
-
-    /**
-     * Removes the object at the specified location from this list.
-     * 
-     * @param location
-     *            the index of the object to remove.
-     * @return the removed object.
-     * @throws IndexOutOfBoundsException
-     *             when {@code location < 0 || >= size()}
-     */
-    @Override
-    public E remove(int location) {
-        E result;
-        if (location < 0 || location >= size) {
-            throw new IndexOutOfBoundsException("Index out of bounds");
-        }
-        if (location == 0) {
-            result = array[firstIndex];
-            array[firstIndex++] = null;
-        } else if (location == size - 1) {
-            int lastIndex = firstIndex + size - 1;
-            result = array[lastIndex];
-            array[lastIndex] = null;
-        } else {
-            int elementIndex = firstIndex + location;
-            result = array[elementIndex];
-            if (location < size / 2) {
-                System.arraycopy(array, firstIndex, array, firstIndex + 1,
-                                 location);
-                array[firstIndex++] = null;
-            } else {
-                System.arraycopy(array, elementIndex + 1, array,
-                                 elementIndex, size - location - 1);
-                array[firstIndex+size-1] = null;
-            }
-        }
-        size--;
-
-        // REVIEW: we can move this to the first if case since it
-        //         can only occur when size==1
-        if (size == 0) {
-            firstIndex = 0;
-        }
-
-        modCount++;
-        return result;
-    }
-
-    @Override
-    public boolean remove(Object object) {
-        int location = indexOf(object);
-        if (location >= 0) {
-            remove(location);
-            return true;
-        }
-        return false;
-    }
-
-    /**
-     * Removes the objects in the specified range from the start to the end, but
-     * not including the end index.
-     * 
-     * @param start
-     *            the index at which to start removing.
-     * @param end
-     *            the index one after the end of the range to remove.
-     * @throws IndexOutOfBoundsException
-     *             when {@code start < 0, start > end} or {@code end > size()}
-     */
-    @Override
-    protected void removeRange(int start, int end) {
-        // REVIEW: does RI call this from remove(location)
-        if (start < 0) {
-            throw new IndexOutOfBoundsException("Index out of bounds");
-        } else if (end > size) {
-            throw new IndexOutOfBoundsException("Index out of bounds");
-        } else if (start > end) {
-            throw new IndexOutOfBoundsException("Index out of bounds");
-        }
-
-        if (start == end) {
-            return;
-        }
-        if (end == size) {
-            Arrays.fill(array, firstIndex + start, firstIndex + size, null);
-        } else if (start == 0) {
-            Arrays.fill(array, firstIndex, firstIndex + end, null);
-            firstIndex += end;
-        } else {
-            // REVIEW: should this optimize to do the smallest copy?
-            System.arraycopy(array, firstIndex + end, array, firstIndex
-                             + start, size - end);
-            int lastIndex = firstIndex + size;
-            int newLast = lastIndex + start - end;
-            Arrays.fill(array, newLast, lastIndex, null);
-        }
-        size -= end - start;
-        modCount++;
-    }
-
-    /**
-     * Replaces the element at the specified location in this {@code ArrayList}
-     * with the specified object.
-     * 
-     * @param location
-     *            the index at which to put the specified object.
-     * @param object
-     *            the object to add.
-     * @return the previous element at the index.
-     * @throws IndexOutOfBoundsException
-     *             when {@code location < 0 || >= size()}
-     */
-    @Override
-    public E set(int location, E object) {
-        if (location < 0 || location >= size) {
-            throw new IndexOutOfBoundsException("Index out of bounds");
-        }
-        E result = array[firstIndex + location];
-        array[firstIndex + location] = object;
-        return result;
-    }
-
-    /**
-     * Returns the number of elements in this {@code ArrayList}.
-     * 
-     * @return the number of elements in this {@code ArrayList}.
-     */
-    @Override
-    public int size() {
-        return size;
-    }
-
-    /**
-     * Returns a new array containing all elements contained in this
-     * {@code ArrayList}.
-     * 
-     * @return an array of the elements from this {@code ArrayList}
-     */
-    @Override
-    public Object[] toArray() {
-        Object[] result = new Object[size];
-        System.arraycopy(array, firstIndex, result, 0, size);
-        return result;
-    }
-
-    /**
-     * Returns an array containing all elements contained in this
-     * {@code ArrayList}. If the specified array is large enough to hold the
-     * elements, the specified array is used, otherwise an array of the same
-     * type is created. If the specified array is used and is larger than this
-     * {@code ArrayList}, the array element following the collection elements
-     * is set to null.
-     * 
-     * @param contents
-     *            the array.
-     * @return an array of the elements from this {@code ArrayList}.
-     * @throws ArrayStoreException
-     *             when the type of an element in this {@code ArrayList} cannot
-     *             be stored in the type of the specified array.
-     */
-    @Override
-    @SuppressWarnings("unchecked")
-    public <T> T[] toArray(T[] contents) {
-        Object[] arr = contents;
-        if (size > arr.length) {
-            arr = (Object[])java.lang.reflect.Array.newInstance(contents.getClass().getComponentType(), size);
-        }
-        System.arraycopy(array, firstIndex, arr, 0, size);
-        if (size < arr.length) {
-            // REVIEW: do we use this incorrectly - i.e. do we null
-            //         the rest out?
-            arr[size] = null;
-        }
-        return (T[])arr;
-    }
-
-    /**
-     * Sets the capacity of this {@code ArrayList} to be the same as the current
-     * size.
-     * 
-     * @see #size
-     */
-    public void trimToSize() {
-        E[] newArray = newElementArray(size);
-        System.arraycopy(array, firstIndex, newArray, 0, size);
-        array = newArray;
-        firstIndex = 0;
-        modCount = 0;
-    }
+    public Iterator<E> iterator() { return new ArrayListIterator(); }
 }
