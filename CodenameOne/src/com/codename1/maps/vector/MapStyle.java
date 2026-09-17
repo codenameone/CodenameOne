@@ -70,7 +70,9 @@ public final class MapStyle {
 
     // ---- Built-in styles --------------------------------------------------
 
-    /// A clean light basemap (sensible default for most apps).
+    /// A clean light basemap (sensible default for most apps). Settlement
+    /// labels are joined by street and park names from zoom 12 and points of
+    /// interest from zoom 14, when the tile source supplies those names.
     ///
     /// Every colour falls back to the value baked in here but is overridable
     /// through a theme constant (a CSS color string) so an app can recolour the
@@ -96,8 +98,7 @@ public final class MapStyle {
         addPolygonRule(s, "buildings", building);
         int label = themeColor("mapLightLabelColor", 0xff333333);
         int halo = themeColor("mapLightLabelHaloColor", 0xffffffff);
-        addSymbolRule(s, "place", "name", label, halo);
-        addSymbolRule(s, "place_label", "name", label, halo);
+        addBasemapLabels(s, label, halo);
         return s;
     }
 
@@ -123,8 +124,7 @@ public final class MapStyle {
         addPolygonRule(s, "buildings", building);
         int label = themeColor("mapDarkLabelColor", 0xffe8e8e8);
         int halo = themeColor("mapDarkLabelHaloColor", 0xff000000);
-        addSymbolRule(s, "place", "name", label, halo);
-        addSymbolRule(s, "place_label", "name", label, halo);
+        addBasemapLabels(s, label, halo);
         return s;
     }
 
@@ -155,11 +155,25 @@ public final class MapStyle {
         return sl;
     }
 
-    private static void addSymbolRule(MapStyle s, String sourceLayer, String field,
+    // Within each tile, consider settlement names before streets and landmarks.
+    // Detail labels only appear at neighbourhood/street zooms.
+    private static void addBasemapLabels(MapStyle s, int label, int halo) {
+        addSymbolRule(s, "place", "name", label, halo);
+        addSymbolRule(s, "place_label", "name", label, halo);
+        addSymbolRule(s, "transportation_name", "name", label, halo).zoomRange(12, 24);
+        addSymbolRule(s, "road", "name", label, halo).zoomRange(12, 24);
+        addSymbolRule(s, "road_label", "name", label, halo).zoomRange(12, 24);
+        addSymbolRule(s, "park", "name", label, halo).zoomRange(12, 24);
+        addSymbolRule(s, "poi", "name", label, halo).zoomRange(14, 24);
+    }
+
+    private static StyleLayer addSymbolRule(MapStyle s, String sourceLayer, String field,
                                       int textColor, int haloColor) {
-        s.add(new StyleLayer(StyleLayer.TYPE_SYMBOL).sourceLayer(sourceLayer).textField(field)
+        StyleLayer layer = new StyleLayer(StyleLayer.TYPE_SYMBOL).sourceLayer(sourceLayer).textField(field)
                 .textColor(textColor).textHaloColor(haloColor)
-                .textSize(ZoomValue.constant(13)));
+                .textSize(ZoomValue.constant(13));
+        s.add(layer);
+        return layer;
     }
 
     // ---- JSON loading -----------------------------------------------------
