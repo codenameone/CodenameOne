@@ -138,6 +138,8 @@ class MapsModelTest {
         Marker m = new MarkerOptions(new LatLng(1, 2)).title("t").snippet("s").build();
         assertEquals(new LatLng(1, 2), m.getPosition());
         assertEquals("t", m.getTitle());
+        assertNull(m.getLabel(), "info-window titles do not opt into persistent labels");
+        assertEquals("Home", new MarkerOptions(new LatLng(1, 2)).label("Home").build().getLabel());
         assertEquals("s", m.getSnippet());
         assertEquals(0.5f, m.getAnchorU(), 1e-6);
         assertEquals(1.0f, m.getAnchorV(), 1e-6);

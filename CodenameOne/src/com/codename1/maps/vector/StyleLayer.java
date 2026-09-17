@@ -38,7 +38,7 @@ public final class StyleLayer {
     public static final int TYPE_FILL = 1;
     /// Stroked lines.
     public static final int TYPE_LINE = 2;
-    /// Text labels placed at point/centroid positions.
+    /// Text labels placed at points, line midpoints or polygon centers.
     public static final int TYPE_SYMBOL = 3;
 
     private final int type;

@@ -163,7 +163,7 @@ final class TileRenderer {
                     continue;
                 }
                 Object value = sl.getTextField() == null ? null : f.getAttribute(sl.getTextField());
-                if (value == null) {
+                if (value == null || String.valueOf(value).trim().length() == 0) {
                     continue;
                 }
                 double[] anchor = anchorOf(f);
@@ -185,10 +185,53 @@ final class TileRenderer {
         return out;
     }
 
+    // Put road names halfway along the longest line part. Averaging vertices
+    // can put a label far from a curved road, and biases it toward dense bends.
+    private static double[] lineAnchor(List parts) {
+        int[] longest = null;
+        double longestLength = 0;
+        for (Object part : parts) {
+            int[] line = (int[]) part;
+            double length = 0;
+            for (int i = 2; i + 1 < line.length; i += 2) {
+                length += segmentLength(line, i);
+            }
+            if (length > longestLength) {
+                longest = line;
+                longestLength = length;
+            }
+        }
+        if (longest == null) {
+            return null;
+        }
+        double remaining = longestLength / 2;
+        for (int i = 2; i + 1 < longest.length; i += 2) {
+            double length = segmentLength(longest, i);
+            if (length > 0 && remaining <= length) {
+                double fraction = remaining / length;
+                return new double[]{
+                    longest[i - 2] + fraction * ((double) longest[i] - longest[i - 2]),
+                    longest[i - 1] + fraction * ((double) longest[i + 1] - longest[i - 1])
+                };
+            }
+            remaining -= length;
+        }
+        return null;
+    }
+
+    private static double segmentLength(int[] line, int end) {
+        double dx = (double) line[end] - line[end - 2];
+        double dy = (double) line[end + 1] - line[end - 1];
+        return Math.sqrt(dx * dx + dy * dy);
+    }
+
     private static double[] anchorOf(VectorFeature f) {
         List parts = f.getParts();
         if (parts.isEmpty()) {
             return null;
+        }
+        if (f.getGeometryType() == VectorFeature.GEOM_LINESTRING) {
+            return lineAnchor(parts);
         }
         int[] first = (int[]) parts.get(0);
         if (first.length < 2) {
@@ -197,7 +240,7 @@ final class TileRenderer {
         if (f.getGeometryType() == VectorFeature.GEOM_POINT) {
             return new double[]{first[0], first[1]};
         }
-        // Centroid of the first ring/line as the label anchor.
+        // Average of the first polygon ring as the label anchor.
         double sx = 0;
         double sy = 0;
         int n = 0;

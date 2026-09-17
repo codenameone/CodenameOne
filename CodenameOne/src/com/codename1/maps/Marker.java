@@ -34,6 +34,7 @@ public final class Marker extends MapObject {
     private LatLng position;
     private final EncodedImage icon;
     private final String title;
+    private final String label;
     private final String snippet;
     private final float anchorU;
     private final float anchorV;
@@ -45,6 +46,7 @@ public final class Marker extends MapObject {
         this.position = options.getPosition();
         this.icon = options.getIcon();
         this.title = options.getTitle();
+        this.label = options.getLabel();
         this.snippet = options.getSnippet();
         this.anchorU = options.getAnchorU();
         this.anchorV = options.getAnchorV();
@@ -71,6 +73,12 @@ public final class Marker extends MapObject {
     /// The marker title shown in an info window (provider dependent).
     public String getTitle() {
         return title;
+    }
+
+    /// The persistent vector-map label, or `null` when none was supplied.
+    /// See [MarkerOptions#label(String)].
+    public String getLabel() {
+        return label;
     }
 
     /// The secondary text shown beneath the title (provider dependent).
