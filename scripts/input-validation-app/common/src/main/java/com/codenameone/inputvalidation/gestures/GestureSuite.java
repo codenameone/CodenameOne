@@ -62,6 +62,9 @@ public final class GestureSuite {
                 new TapStep(),
                 new DragStep(),
                 new LongPressStep(),
+                // Run before native editing can set editingComponent, so the
+                // earlier TextField fix cannot mask the browser regression.
+                new BrowserKeyTypeStep(),
                 new KeyTypeStep()
         };
         this.form = new Form("Input Validation", new BorderLayout());

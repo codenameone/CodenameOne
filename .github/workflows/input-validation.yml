@@ -18,6 +18,8 @@ on:
     paths:
       - '.github/workflows/input-validation.yml'
       - 'scripts/input-validation-app/**'
+      - 'scripts/ios/keyboard-peer-tests/**'
+      - 'Ports/iOSPort/nativeSources/CN1MacWindows.m'
       - 'scripts/lib/xcode.sh'
       - 'scripts/build-ios-app.sh'
       - 'CodenameOne/src/com/codename1/ui/Component.java'
@@ -56,6 +58,9 @@ jobs:
       CN1_APP_DIR: scripts/input-validation-app
     steps:
       - uses: actions/checkout@v6
+
+      - name: Check native keyboard press ownership
+        run: python3 scripts/ios/keyboard-peer-tests/check.py
 
       - name: Cache CocoaPods and user gems
         uses: actions/cache@v5

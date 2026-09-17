@@ -3703,6 +3703,24 @@ bool lockDrawing;
 }
 #endif
 
+#if !TARGET_OS_OSX
+// BrowserComponent's editor belongs to WebKit, so it never sets
+// editingComponent. Find the focused native text input using public UIKit
+// protocols, including inputs nested inside a peer's private view hierarchy.
+// Scope the search to this window so a peer in another scene cannot steal keys.
+BOOL cn1HasNativeTextInput(UIView *view) {
+    if ([view isFirstResponder] && [view conformsToProtocol:@protocol(UIKeyInput)]) {
+        return YES;
+    }
+    for (UIView *child in view.subviews) {
+        if (cn1HasNativeTextInput(child)) {
+            return YES;
+        }
+    }
+    return NO;
+}
+#endif
+
 // Key codes this controller handed to the framework from pressesBegan:. A press
 // the framework owns has to be completed with the framework whatever the editor
 // does in between -- Display.keyPressedImpl arms the key-repeat and long-press
@@ -3750,7 +3768,7 @@ static BOOL cn1TakeFrameworkOwnedPress(long long identity) {
 //
 // Whether a press belongs to the framework is decided ONCE, in pressesBegan:,
 // and the end and cancellation follow that decision through
-// cn1TakeFrameworkOwnedKey above rather than re-reading the editor's state.
+// cn1TakeFrameworkOwnedPress above rather than re-reading the editor's state.
 //
 // While a native text editor is up (editingComponent != nil) the press is
 // forwarded untouched and never recorded. UIKit inserts typed text at the END
@@ -3774,6 +3792,8 @@ static BOOL cn1TakeFrameworkOwnedPress(long long identity) {
 // [editingComponent isFirstResponder] would put the swallow back for the
 // window between the editor being created and UIKit granting it focus,
 // which is exactly when the first keystroke of a fast typist arrives.
+// Also check the window's native first responder: HTML inputs inside a
+// BrowserComponent do not use editingComponent (issue #5740).
 // UIKit-only declaration: the type in its signature does not exist on macOS,
 // so the whole declaration is dropped rather than just its body. Guarding
 // only the body would leave a signature naming an unknown type.
@@ -3783,7 +3803,7 @@ static BOOL cn1TakeFrameworkOwnedPress(long long identity) {
 // renamed one, so this is inert on the native macOS port until it is ported.
 #if TARGET_OS_OSX
 #else
-    if (editingComponent != nil) {
+    if (editingComponent != nil || cn1HasNativeTextInput(self.view.window)) {
         [super pressesBegan:presses withEvent:event];
         return;
     }

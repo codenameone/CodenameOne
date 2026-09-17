@@ -99,7 +99,11 @@ final class InputValidationUITests: XCTestCase {
             Thread.sleep(forTimeInterval: stepDelaySeconds)
         }
 
-        try driveKeyType(app: app, syncDir: syncDir)
+        try driveKeyType(app: app, syncDir: syncDir, step: "browserkeytype")
+        if syncDir == nil {
+            Thread.sleep(forTimeInterval: stepDelaySeconds)
+        }
+        try driveKeyType(app: app, syncDir: syncDir, step: "keytype")
         Thread.sleep(forTimeInterval: max(stepDelaySeconds, 10.0))
         XCTAssertEqual(app.state, .runningForeground,
                        "The gesture driver must own app termination after the final event")
@@ -126,8 +130,8 @@ final class InputValidationUITests: XCTestCase {
         target.press(forDuration: 2.25)
     }
 
-    private func driveKeyType(app: XCUIApplication, syncDir: URL?) throws {
-        try waitForGate("keytype", syncDir: syncDir)
+    private func driveKeyType(app: XCUIApplication, syncDir: URL?, step: String) throws {
+        try waitForGate(step, syncDir: syncDir)
         // KeyTypeStep places its TextField in BorderLayout.CENTER with
         // generous padding/margin, matching the layout TapStep and
         // LongPressStep use so a single screen-center tap focuses it on
@@ -161,11 +165,16 @@ final class InputValidationUITests: XCTestCase {
         // Keep the retry deadline inside the Java step's 30-second input budget.
         let deadline = Date().addingTimeInterval(25.0)
         while Date() < deadline {
-            if stopRequested("keytype", syncDir: syncDir) {
+            if stopRequested(step, syncDir: syncDir) {
                 return
             }
+            // The browser page and its JS callback load asynchronously. Retry
+            // the focus tap as well as typing in case the first tap preceded load.
+            if step == "browserkeytype" {
+                center.tap()
+            }
             for key in ["c", "n", "1"] {
-                if stopRequested("keytype", syncDir: syncDir) {
+                if stopRequested(step, syncDir: syncDir) {
                     return
                 }
                 // Stop if the app unexpectedly leaves the foreground.
@@ -175,7 +184,7 @@ final class InputValidationUITests: XCTestCase {
                 app.typeKey(key, modifierFlags: [])
             }
             for _ in 0..<10 {
-                if stopRequested("keytype", syncDir: syncDir) || Date() >= deadline {
+                if stopRequested(step, syncDir: syncDir) || Date() >= deadline {
                     return
                 }
                 Thread.sleep(forTimeInterval: 0.1)
