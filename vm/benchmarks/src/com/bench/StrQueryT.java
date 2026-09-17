@@ -197,16 +197,29 @@ public class StrQueryT {
 
         // Cached views: identity across calls, and read-through after mutation.
         Map<String, String> m = new HashMap<String, String>();
-        System.out.println("entrySet identity=" + (m.entrySet() == m.entrySet()));
+        /* Identity across calls is deliberately NOT compared. Map.entrySet is
+         * specified to return "a Set view" and says nothing about returning the
+         * same instance, and this VM deliberately does not cache the entry view:
+         * the field to hold it costs 8 bytes on every map, which moves HashMap into
+         * the next BiBOP size class, and the view allocation it would save does not
+         * appear in the allocation census at all. The JDK does cache it, so
+         * asserting identity here would be asserting the JDK's choice rather than
+         * the contract.
+         *
+         * keySet and values ARE cached, in AbstractMap, and that is pre-existing.
+         * What matters for all three is below: the view must read through to the
+         * map, including after the map is mutated underneath it. */
         System.out.println("keySet identity=" + (m.keySet() == m.keySet()));
         System.out.println("values identity=" + (m.values() == m.values()));
         System.out.println("entrySet empty size=" + m.entrySet().size());
-        Object view = m.entrySet();
+        java.util.Set<Map.Entry<String, String>> view = m.entrySet();
         for (int i = 0; i < 40; i++) {
             m.put("k" + i, "v" + i);
         }
-        System.out.println("same view after growth=" + (view == m.entrySet()));
-        System.out.println("view sees growth=" + m.entrySet().size());
+        // The view held from BEFORE the growth must see it: that is the read-through
+        // property, and it is what a cached view would also have to provide.
+        System.out.println("held view sees growth=" + view.size());
+        System.out.println("fresh view sees growth=" + m.entrySet().size());
         int sum = 0;
         for (Map.Entry<String, String> e : m.entrySet()) {
             sum += e.getKey().length() + e.getValue().length();
@@ -214,12 +227,14 @@ public class StrQueryT {
         System.out.println("entry walk sum=" + sum);
         m.remove("k7");
         System.out.println("view sees removal=" + m.entrySet().size());
+        System.out.println("held view sees removal=" + view.size());
         m.clear();
         System.out.println("view sees clear=" + m.entrySet().size()
-                + " still same=" + (view == m.entrySet()));
+                + " held=" + view.size());
 
         IdentityHashMap<String, String> im = new IdentityHashMap<String, String>();
-        System.out.println("idm entrySet identity=" + (im.entrySet() == im.entrySet()));
+        // Same reasoning as above: behaviour, not instance identity.
+        System.out.println("idm entrySet empty=" + im.entrySet().isEmpty());
         String ka = "a";
         String kb = "b";
         im.put(ka, "1");
