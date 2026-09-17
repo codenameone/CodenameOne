@@ -207,7 +207,7 @@ jobs:
 
       - name: Build macOS port
         if: steps.cn1_built.outputs.cache-hit != 'true'
-        run: ./scripts/build-mac-port.sh -q -DskipTests
+        run: ./scripts/build-mac-port.sh -q -Dtest=MacNativeFontModeTest -Dsurefire.failIfNoSpecifiedTests=false
         timeout-minutes: 40
 
       - name: Report cache outcome

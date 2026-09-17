@@ -72,4 +72,15 @@ class NativeProgressThemeTest {
     @Test @DarkMode @Theme(nativeTheme = NativeTheme.IOS_MODERN)
     void darkIosPillsRemainNative() { assertNativeTrackHeight(); }
 
+    @Test @Theme(nativeTheme = NativeTheme.IOS_MODERN)
+    void genericSliderKeepsItsRoundedRectangleBorderHeight() {
+        Slider slider = new Slider();
+        // Slider's rounded rectangle is distinct from ProgressBar's plain pill.
+        // Preserve its legacy border and height rather than discarding its shape.
+        org.junit.jupiter.api.Assertions.assertInstanceOf(
+                com.codename1.ui.plaf.RoundRectBorder.class, slider.getStyle().getBorder());
+        assertEquals(com.codename1.ui.Font.getDefaultFont().getHeight()
+                + slider.getStyle().getVerticalPadding(), slider.getPreferredH());
+    }
+
 }

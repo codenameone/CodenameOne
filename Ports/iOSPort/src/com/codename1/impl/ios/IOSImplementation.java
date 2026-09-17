@@ -2877,6 +2877,10 @@ public class IOSImplementation extends CodenameOneImplementation {
     public static void setIosMode(String l) {
         iosMode = l;
     }
+
+    protected String nativeThemeMode() {
+        return iosMode == null ? "auto" : iosMode.toLowerCase();
+    }
     
     private static boolean waitForAnimationLock(Form f) {
         while (!f.grabAnimationLock()) {
@@ -2916,7 +2920,7 @@ public class IOSImplementation extends CodenameOneImplementation {
     public void installNativeTheme() {
         try {
             Resources r;
-            String mode = iosMode == null ? "auto" : iosMode.toLowerCase();
+            String mode = nativeThemeMode();
             // A subclass may own a theme this class knows nothing about. The macOS port
             // extends this one and ships Aqua, which is not in the list below; without the
             // hook it inherited the iOS chain and installed an iPhone theme on a Mac.

@@ -110,11 +110,11 @@ public class MacImplementation extends IOSImplementation {
 
     @Override
     protected String nativeFontName(String fontName) {
-        // Keep native: aliases intact for the AppKit resolver. The shared loader
-        // already maps non-italic Helvetica aliases to system fonts, but the iOS
-        // Regular alias requests medium weight and its italics stay Helvetica.
-        // AppKit chooses the current system family without a private SF font name.
-        return fontName;
+        // Aqua uses AppKit's regular weight and system italics. The iOS-style
+        // modes deliberately retain their historical medium/Helvetica mapping;
+        // changing those aliases would restyle existing modern-mode Mac apps.
+        return nativeThemeResourceName(nativeThemeMode()) != null
+                ? fontName : super.nativeFontName(fontName);
     }
 
     /// The natives this class needs directly. The window manager owns its own;
