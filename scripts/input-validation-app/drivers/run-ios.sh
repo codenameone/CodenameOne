@@ -170,6 +170,7 @@ rm -rf "$XCRESULT_BUNDLE"
 mkdir -p "$SYNC_DIR"
 rm -f "$SYNC_DIR/tap.go" "$SYNC_DIR/drag.go" "$SYNC_DIR/longpress.go" "$SYNC_DIR/keytype.go"
 rm -f "$SYNC_DIR/keytype.stop"
+rm -f "$SYNC_DIR/browserkeytype.go" "$SYNC_DIR/browserkeytype.stop"
 XCB_RC_FILE="$ARTIFACTS_DIR/xcodebuild.rc"
 rm -f "$XCB_RC_FILE"
 
@@ -258,6 +259,9 @@ fi
 release_xcui_step tap || SYNC_FAILED=1
 release_xcui_step drag || SYNC_FAILED=1
 release_xcui_step longpress || SYNC_FAILED=1
+release_xcui_step browserkeytype || SYNC_FAILED=1
+wait_for_log_marker 'CN1IV:(EVENT|TIMEOUT):browserkeytype' 120 || true
+: > "$SYNC_DIR/browserkeytype.stop"
 release_xcui_step keytype || SYNC_FAILED=1
 # The keytype driver types in a retry loop, because CN1 needs a moment to bring
 # the native editor up after the tap and keys typed before then are dropped.
@@ -294,7 +298,7 @@ trap - EXIT INT TERM
 # can drive the first gestures before it is live -- a CI run lost the tap
 # event this way while XCUITest itself passed. `log show` reads the persisted
 # unified-log archive retroactively, so appending it recovers anything the
-# stream missed; the event greps below run against the union.
+# stream missed; keep the union as diagnostics and a fallback transcript.
 iv_log "Appending buffered device log (log show) to cover the stream attach window"
 xcrun simctl spawn "$SIM_UDID" log show --style compact --level debug \
     --predicate '(processImagePath CONTAINS[c] "'"$BUNDLE_ID"'") OR (eventMessage CONTAINS "CN1IV:")' \
@@ -303,7 +307,8 @@ xcrun simctl spawn "$SIM_UDID" log show --style compact --level debug \
 # Unified logging DROPS messages under burst pressure (CI observed interleaved
 # CN1IV lines missing from both the stream and the archive), so the app also
 # writes its full event transcript to a file in its container; that file is the
-# authoritative record and is appended for the event greps below.
+# authoritative record and is preferred for the event assertions below.
+ASSERTION_LOG="$LOG_FILE"
 APP_CONTAINER="$(xcrun simctl get_app_container "$SIM_UDID" "$BUNDLE_ID" data 2>/dev/null || true)"
 if [ -n "$APP_CONTAINER" ]; then
   EVENTS_FILE="$(find "$APP_CONTAINER" -maxdepth 3 -name 'cn1iv-events.log' 2>/dev/null | head -n1)"
@@ -311,6 +316,10 @@ if [ -n "$APP_CONTAINER" ]; then
     iv_log "Appending app-side event transcript $EVENTS_FILE"
     cp -f "$EVENTS_FILE" "$ARTIFACTS_DIR/cn1iv-events.log" 2>/dev/null || true
     cat "$EVENTS_FILE" >> "$LOG_FILE"
+    # log show includes earlier launches, including the deliberately failing
+    # build in a before/after regression check. Assert this run's transcript
+    # when available so old successes or timeouts cannot change the result.
+    ASSERTION_LOG="$EVENTS_FILE"
   else
     iv_log "WARNING: app-side event transcript not found under $APP_CONTAINER"
   fi
@@ -326,13 +335,15 @@ REQUIRED_EVENTS=(
   "CN1IV:EVENT:drag"
   "CN1IV:READY:longpress"
   "CN1IV:EVENT:longpress"
+  "CN1IV:READY:browserkeytype"
+  "CN1IV:EVENT:browserkeytype"
   "CN1IV:READY:keytype"
   "CN1IV:EVENT:keytype"
   "CN1IV:SUITE:FINISHED"
 )
 FAILED=0
 for needle in "${REQUIRED_EVENTS[@]}"; do
-  if grep -q "$needle" "$LOG_FILE"; then
+  if grep -q "$needle" "$ASSERTION_LOG"; then
     iv_log "OK  $needle"
   else
     iv_log "MISS $needle"
@@ -340,9 +351,9 @@ for needle in "${REQUIRED_EVENTS[@]}"; do
   fi
 done
 
-if grep -qE 'CN1IV:TIMEOUT:' "$LOG_FILE"; then
+if grep -qE 'CN1IV:TIMEOUT:' "$ASSERTION_LOG"; then
   iv_log "Gesture timeouts detected in device log:"
-  grep -E 'CN1IV:TIMEOUT:' "$LOG_FILE" | sed 's/^/  /'
+  grep -E 'CN1IV:TIMEOUT:' "$ASSERTION_LOG" | sed 's/^/  /'
   FAILED=1
 fi
 

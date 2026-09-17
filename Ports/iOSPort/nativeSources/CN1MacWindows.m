@@ -56,6 +56,7 @@ extern int cn1MapUIKeyToKeyCode(UIKey* key) API_AVAILABLE(ios(13.4));
 /* Identity of the physical control behind a press, shared for the same reason:
  * the CN1 keycode is many-to-one, so ownership cannot be keyed on it. */
 extern long long cn1PressIdentity(UIPress* press, int code) API_AVAILABLE(ios(13.4));
+extern BOOL cn1HasNativeTextInput(UIView* view);
 extern CN1View *editingComponent;
 
 #define CN1_MAC_MAX_WINDOWS 32
@@ -327,6 +328,8 @@ static void CN1MacWindowApplyDecoration(UIWindowScene* scene, int decorated);
  * CN1MacWindowReattachEditor moves it later -- so the scoped test would swallow
  * the keys of the very editor it is meant to protect. A key lost to a window
  * whose sibling has an editor open is the smaller failure.
+ * Peer editors, including WebKit's HTML inputs, do not set editingComponent.
+ * Check the native first responder in this window as well (issue #5740).
  */
 /* Split a terminal set by who owns each press, because one UIPressesEvent can
  * carry both -- a key held from before an editor opened ends in the same event
@@ -392,7 +395,7 @@ static void CN1MacWindowApplyDecoration(UIWindowScene* scene, int decorated);
 }
 
 - (void)pressesBegan:(NSSet<UIPress*>*)presses withEvent:(UIPressesEvent*)event {
-    if (editingComponent != nil) {
+    if (editingComponent != nil || cn1HasNativeTextInput(self.view.window)) {
         [super pressesBegan:presses withEvent:event];
         return;
     }
