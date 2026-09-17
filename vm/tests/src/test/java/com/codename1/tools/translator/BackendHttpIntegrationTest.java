@@ -28,6 +28,9 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
+import org.junit.jupiter.api.extension.ExtensionContext;
+import org.junit.jupiter.api.extension.RegisterExtension;
+import org.junit.jupiter.api.extension.TestWatcher;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -93,6 +96,75 @@ class BackendHttpIntegrationTest {
     private static final int HUGE_BYTES = 8 * 1024 * 1024;
     private static Path work;
     private static String skipReason;
+
+    /**
+     * On a failure, say what each server process said and whether it is still
+     * alive.
+     *
+     * Every server here already redirects its combined output to a file and
+     * nothing ever read one back, so an intermittent failure arrived as
+     * "expected: <200> but was: <-1>" and nothing else. That does not
+     * distinguish the three answers that matter -- the server refused the
+     * request, the server never saw it, or the server is gone -- and without
+     * the distinction there is nothing to debug from. Two CI runs were lost to
+     * exactly that: an upload answered with an empty reply in 20ms, twice, with
+     * no way to tell whether a connection was dropped or a process had died.
+     *
+     * A watcher rather than a message on each assertion, because the next
+     * occurrence will not be in a test that was thought to need one.
+     */
+    @RegisterExtension
+    static final TestWatcher SERVER_DIAGNOSTICS = new TestWatcher() {
+        @Override
+        public void testFailed(ExtensionContext context, Throwable cause) {
+            dumpServerDiagnostics(context.getDisplayName());
+        }
+    };
+
+    private static void dumpServerDiagnostics(String test) {
+        if (work == null) {
+            return;
+        }
+        System.err.println("---- backend servers after the failure of: " + test + " ----");
+        dumpServer("main", server, work.resolve("server.log"));
+        dumpServer("tls", tlsServer, work.resolve("tls-server.log"));
+        dumpServer("busy", busyServer, work.resolve("busy-server.log"));
+        dumpServer("small-upload", smallUploadServer, smallUploadLog);
+    }
+
+    /** The last few lines are the useful part; a healthy server logs once at startup. */
+    private static void dumpServer(String name, Process process, Path log) {
+        String state;
+        if (process == null) {
+            state = "never started";
+        } else if (process.isAlive()) {
+            state = "alive";
+        } else {
+            state = "EXITED with " + process.exitValue();
+        }
+        System.err.println("[" + name + "] " + state);
+        if (log == null || !Files.exists(log)) {
+            System.err.println("[" + name + "] no log file");
+            return;
+        }
+        try {
+            // Decoded leniently and split by hand: this is a native process's
+            // combined output, so a partial write can leave bytes that are not
+            // valid UTF-8, and a diagnostic that throws while reporting a failure
+            // replaces the failure it was meant to explain.
+            String text = new String(Files.readAllBytes(log), StandardCharsets.UTF_8);
+            String[] lines = text.split("\n");
+            int from = Math.max(0, lines.length - 40);
+            if (from > 0) {
+                System.err.println("[" + name + "] ... " + from + " earlier line(s) omitted");
+            }
+            for (int i = from; i < lines.length; i++) {
+                System.err.println("[" + name + "] " + lines[i]);
+            }
+        } catch (IOException err) {
+            System.err.println("[" + name + "] log could not be read: " + err);
+        }
+    }
 
     @BeforeAll
     void startServer() throws Exception {
