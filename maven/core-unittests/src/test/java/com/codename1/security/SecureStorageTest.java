@@ -52,6 +52,20 @@ class SecureStorageTest extends UITestBase {
     }
 
     @Test
+    void anAbsentEntryAnswersNullRatherThanRefusingOnProtection() {
+        // The overload documents "the value, or null when there is none". Checking the store's
+        // report before looking meant an account that does not exist threw POLICY_NOT_MET on any
+        // platform whose store cannot provide the requested protection -- so probing an optional
+        // value was impossible on the weaker ports, even though nothing unprotected would have
+        // been returned either way.
+        SecureStorage store = SecureStorage.getInstance();
+        String absent = "cn1.test.absent." + System.nanoTime();
+        assertNull(store.get(absent, new com.codename1.security.vault.Protection[] {
+                com.codename1.security.vault.Protection.ENCRYPTED_AT_REST
+        }), "an absent entry must answer null, whatever the store can or cannot provide");
+    }
+
+    @Test
     void getInstanceReturnsStableFallbackSingleton() {
         SecureStorage a = SecureStorage.getInstance();
         SecureStorage b = SecureStorage.getInstance();
@@ -256,4 +270,143 @@ class SecureStorageTest extends UITestBase {
                 "a very long alias still has to produce a file name");
     }
 
+
+    @Test
+    void twoLongAccountsThatCollideOnHashCodeGetDifferentGates() {
+        // gateName truncates a long account and appended String.hashCode, which is a 32-bit
+        // non-cryptographic hash whose collisions are trivial to write down. Two accounts sharing
+        // one gate is not just contention: the gate carries a mark saying the account behind it
+        // has been created, so the second finds a mark with no value of its own and reports that
+        // somebody else owns it -- for good.
+        StringBuilder prefix = new StringBuilder();
+        for (int iter = 0; iter < 130; iter++) {
+            prefix.append('a');
+        }
+        // "Aa" and "BB" are the textbook String.hashCode collision.
+        String first = prefix + "Aa";
+        String second = prefix + "BB";
+        assertEquals(first.hashCode(), second.hashCode(),
+                "these must collide on hashCode, or this test proves nothing");
+
+        assertNotEquals(SecureStorage.gateName(first), SecureStorage.gateName(second),
+                "a hashCode collision must not become a shared gate");
+    }
+
+    @Test
+    void anOrdinaryAccountNameIsUnchangedByTheDigestPath() {
+        // Only long names take it, so the common case must not move: a rename there would orphan
+        // every gate an installed application already has.
+        String ordinary = "cn1.managed.db.notes";
+        assertTrue(SecureStorage.gateName(ordinary).endsWith(ordinary),
+                "a short account keeps its own name in the gate: "
+                + SecureStorage.gateName(ordinary));
+    }
+
+    /// Every setIfAbsent must decide absence from entryState, not from get().
+    ///
+    /// get() answers null for "nothing is stored here" AND for "something is stored here and it
+    /// cannot be read" -- a ciphertext whose key is temporarily unusable, or an entry a migration
+    /// wrote without taking the cross-process gate. Creating over one of those overwrites a value
+    /// that is still there, and for a managed database key that disconnects the database from its
+    /// key permanently.
+    ///
+    /// The base implementation has always asked entryState. BOTH port overrides were written
+    /// against get() instead, and were reported one at a time -- which is the reason this is held
+    /// across the files rather than in each of them.
+    @Test
+    void everySetIfAbsentDecidesAbsenceFromEntryStateRatherThanFromGet() throws java.io.IOException {
+        String[] sources = {
+            "../../CodenameOne/src/com/codename1/security/SecureStorage.java",
+            "../../Ports/Android/src/com/codename1/impl/android/AndroidSecureStorage.java",
+            "../../Ports/JavaScriptPort/src/main/java/com/codename1/impl/html5/"
+                    + "HTML5SecureStorage.java",
+        };
+        int checked = 0;
+        for (String path : sources) {
+            java.io.File f = new java.io.File(path);
+            assertTrue(f.isFile(), "source not found: " + f.getAbsolutePath());
+            String source = readAll(f);
+            int at = source.indexOf("public String setIfAbsent(");
+            if (at < 0) {
+                // A port that does not override it inherits the base, which is correct.
+                continue;
+            }
+            checked++;
+            String body = braceBody(source, at);
+            int create = firstCreateIn(body);
+            assertTrue(create > 0, path + ": setIfAbsent must write the candidate somewhere");
+            String before = body.substring(0, create);
+            // Either discriminator counts, and both are cross-process: entryState, or a read of
+            // the gate mark. The Android tier needs the second because its tombstone branch must
+            // run BEFORE entryState -- entryState consults the same per-process SharedPreferences
+            // cache that the tombstone exists to overrule, so asking it first would refuse to
+            // recreate an account another process had removed. What is held either way is that
+            // nothing creates on the strength of get() alone.
+            boolean asksState = before.indexOf("entryState(") > 0
+                    && before.indexOf("ENTRY_ABSENT") > 0;
+            boolean asksGate = before.indexOf("GATE_REMOVED") > 0;
+            assertTrue(asksState || asksGate,
+                    path + ": setIfAbsent must consult cross-process state before it creates -- "
+                    + "entryState for a definite absence, or the gate mark -- because get() "
+                    + "answers null both for an entry that is not there and for one that is "
+                    + "there and unreadable: " + before);
+        }
+        assertTrue(checked >= 2, "only " + checked + " setIfAbsent implementations found, so "
+                + "this scanned almost nothing");
+    }
+
+    /// The first point in a body where the candidate is written.
+    ///
+    /// Delegating to super is deliberately NOT one: the base implementation asks entryState
+    /// itself, so handing the decision to it is the safe path rather than a bypass of it. No
+    /// override delegates that way today -- both now refuse outright when their cross-process
+    /// gate is unavailable, because the inherited check-then-write cannot see another process's
+    /// write -- but the exclusion stays, since delegating would remain correct.
+    private static int firstCreateIn(String body) {
+        int best = -1;
+        for (String call : new String[]{"set(account, value)", "nativeSetIfAbsent(",
+                "createUnderGate("}) {
+            int at = body.indexOf(call);
+            if (at > 0 && (best < 0 || at < best)) {
+                best = at;
+            }
+        }
+        return best;
+    }
+
+    /// One method body, by brace counting from an index inside its signature.
+    private static String braceBody(String source, int at) {
+        int open = source.indexOf('{', at);
+        int depth = 0;
+        for (int iter = open; iter < source.length(); iter++) {
+            char c = source.charAt(iter);
+            if (c == '{') {
+                depth++;
+            } else if (c == '}') {
+                depth--;
+                if (depth == 0) {
+                    return source.substring(open, iter + 1);
+                }
+            }
+        }
+        throw new IllegalStateException("unterminated method at " + at);
+    }
+
+    private static String readAll(java.io.File f) throws java.io.IOException {
+        byte[] raw = new byte[(int) f.length()];
+        java.io.InputStream in = new java.io.FileInputStream(f);
+        try {
+            int read = 0;
+            while (read < raw.length) {
+                int n = in.read(raw, read, raw.length - read);
+                if (n < 0) {
+                    break;
+                }
+                read += n;
+            }
+        } finally {
+            in.close();
+        }
+        return new String(raw, "UTF-8");
+    }
 }

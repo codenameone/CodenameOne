@@ -1,0 +1,118 @@
+/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+import java.util.*;
+import com.codename1.security.SecureStorage;
+import com.codename1.security.vault.*;
+
+public class JavascriptStorageReadHarness extends SecureStorage {
+    private static final Storage storage = new Storage();
+    private static final Protection[] REQUIRED = {Protection.ENCRYPTED_AT_REST};
+    private static boolean writeAfterInitialCheck;
+    private static boolean writeDuringOpen;
+    private static boolean failOpen;
+    private static boolean failMigration;
+
+    static class Log {
+        static final int WARNING = 1;
+        static void p(String ignored, int level) { }
+    }
+    static class Storage {
+        final Map<String, Object> values = new HashMap<String, Object>();
+        static Storage getInstance() { return storage; }
+        void deleteStorageFile(String key) { values.remove(key); }
+    }
+    private static String encryptedKey(String account) { return "encrypted." + account; }
+    private static String legacyKey(String account) { return "legacy." + account; }
+    private static Object readUncached(String key) {
+        if (writeAfterInitialCheck && key.startsWith("encrypted.")) {
+            writeAfterInitialCheck = false;
+            storage.values.put("legacy.account", "secret");
+        }
+        return storage.values.get(key);
+    }
+    private static boolean definitelyGone(String key) { return !storage.values.containsKey(key); }
+    private static String reasonOf(RuntimeException failure) { return failure.getMessage(); }
+    private static String open(String account, String sealed) {
+        if (writeDuringOpen) storage.values.put("legacy.account", "secret");
+        if (failOpen) throw new IllegalStateException("injected decryption failure");
+        return sealed.substring("sealed:".length());
+    }
+    private static void migrate(String account, String value) {
+        if (!failMigration) {
+            storage.values.put(encryptedKey(account), "sealed:" + value);
+            storage.values.remove(legacyKey(account));
+        }
+    }
+    public ProtectionReport protection() {
+        return ProtectionReport.builder().set(Protection.ENCRYPTED_AT_REST, true).build();
+    }
+    private static void check(boolean condition, String message) {
+        if (!condition) throw new AssertionError(message);
+    }
+    private static void reset() {
+        storage.values.clear();
+        writeAfterInitialCheck = false; writeDuringOpen = false;
+        failOpen = false; failMigration = false;
+    }
+    private static void refuse(JavascriptStorageReadHarness h) {
+        try {
+            h.get("account", REQUIRED);
+            throw new AssertionError("a checked read must refuse a plaintext source");
+        } catch (VaultException failure) {
+            check(failure.getError() == VaultError.POLICY_NOT_MET, "must report unmet policy");
+        }
+    }
+    public static void verify() {
+        JavascriptStorageReadHarness h = new JavascriptStorageReadHarness();
+        for (boolean migrationFails : new boolean[] {false, true}) {
+            reset();
+            failMigration = migrationFails;
+            writeAfterInitialCheck = true;
+            refuse(h);
+            check(migrationFails == storage.values.containsKey("legacy.account"),
+                    "must reject the legacy source even after migration removes it");
+        }
+        for (boolean openingFails : new boolean[] {false, true}) {
+            reset();
+            storage.values.put("encrypted.account", "sealed:secret");
+            writeDuringOpen = true; failOpen = openingFails;
+            refuse(h);
+            check(openingFails == storage.values.containsKey("legacy.account"),
+                    "successful open may clean up; failed open must retain the fallback");
+        }
+        reset();
+        storage.values.put("legacy.account", "secret");
+        refuse(h);
+        check("secret".equals(h.get("account", REQUIRED)), "the migrated entry is now encrypted");
+        reset();
+        writeAfterInitialCheck = true;
+        check("secret".equals(h.get("account")), "unrestricted reads must still migrate plaintext");
+        reset();
+        check(h.get("account", REQUIRED) == null, "absence must still return null");
+        check(h.get(null, REQUIRED) == null, "null account must still return null");
+        storage.values.put("encrypted.account", "sealed:secret");
+        check("secret".equals(h.get("account", REQUIRED)), "encrypted reads must succeed");
+    }
+
+    /* PRODUCTION_METHODS */
+}

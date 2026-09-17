@@ -265,17 +265,36 @@ MVN_LOCK_ARGS="-Daether.syncContext.named.time=300 -Daether.syncContext.named.ti
 # grows because a flat retry lands inside the same window a 429 is still rate
 # limiting in. A real build failure fails identically every attempt, so this costs
 # one extra run of a broken build and rescues a green one.
+#
+# The retry has to FORCE re-resolution, and until it did it could not rescue anything.
+# Maven records a failed download in the local repository and then refuses to try again
+# until the update interval elapses -- it says so itself: "was not found ... during a
+# previous attempt. This failure was cached in the local repository and resolution is not
+# reattempted until the update interval of central has elapsed or updates are forced".
+# So every retry re-read the cached miss and failed identically, for exactly the transient
+# outage the retry was written to absorb. Observed on a javascript-screenshots run that
+# spent seven minutes failing three times on one plugin. -U from the second attempt is
+# what "or updates are forced" means; it is not on the first, where there is nothing
+# cached to invalidate and it would only cost update checks on every snapshot.
 mvn_retry() {
   local delay
+  local attempt=0
   for delay in 30 120 300 0; do
-    if "$MAVEN_HOME/bin/mvn" "$@"; then
-      return 0
+    attempt=$((attempt + 1))
+    if [ "$attempt" -eq 1 ]; then
+      if "$MAVEN_HOME/bin/mvn" "$@"; then
+        return 0
+      fi
+    else
+      if "$MAVEN_HOME/bin/mvn" -U "$@"; then
+        return 0
+      fi
     fi
     if [ "$delay" = "0" ]; then
       log "maven failed after all retries"
       return 1
     fi
-    log "maven failed; retrying in ${delay}s in case Maven Central was flaky"
+    log "maven failed; retrying in ${delay}s with -U in case Maven Central was flaky"
     sleep "$delay"
   done
 }

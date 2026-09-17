@@ -2249,6 +2249,11 @@ public final class IOSNative {
     native int aesGcm(int encrypt, byte[] key, byte[] iv,
                       byte[] aad, byte[] in, byte[] out);
 
+    /// PBKDF2 over the password **bytes**, which is what makes the derived key match the one
+    /// Android and a browser derive from the same password. `hashKind` is 256 or 512. Returns the
+    /// number of bytes written into `out`, or a negative CN1_CRYPTO_E_* code.
+    native int pbkdf2(int hashKind, byte[] password, byte[] salt, int iterations, byte[] out);
+
     native int rsaEncrypt(int paddingKind, byte[] x509, byte[] in, byte[] out);
 
     native int rsaDecrypt(int paddingKind, byte[] pkcs8, byte[] in, byte[] out);

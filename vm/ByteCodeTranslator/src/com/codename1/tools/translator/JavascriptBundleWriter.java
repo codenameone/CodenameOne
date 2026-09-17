@@ -57,6 +57,7 @@ final class JavascriptBundleWriter {
         writeWorker(outputDirectory);
         writeBrowserBridge(outputDirectory);
         writeIndex(outputDirectory);
+        JavascriptSecurityHeaders.write(outputDirectory);
         // vm_protocol.md and jso-bridge-dispatch-ids.txt are developer
         // artifacts, and this output directory becomes the app's PUBLIC web
         // root. vm_protocol.md documents the worker boundary and is checked in
@@ -1591,12 +1592,114 @@ final class JavascriptBundleWriter {
         writeResource(outputDirectory, "vm_protocol.md", "vm_protocol.md");
     }
 
+    /**
+     * The files under {@code js/} that only a database-using application needs.
+     *
+     * <p>Together these are about 1.5 MB, and they were being copied into the public web root of
+     * every application built for this port -- most of which never open a database. The payload is
+     * loaded lazily at runtime ({@code importScripts} inside {@code SQLiteNative.init}), so it
+     * never cost page-load time; it cost deployment size, in an artifact people upload to static
+     * hosting.</p>
+     */
+    private static final String[] SQLITE_ASSETS = {
+        "sqlite3mc.js",
+        "sqlite3.wasm",
+        "sqlite3-opfs-async-proxy.js",
+        "README-sqlite3mc.md"
+    };
+
+    /**
+     * The identifier prefix every {@code SQLiteNative} native call is emitted under.
+     *
+     * <p>Built through the mangler rather than written out, so it cannot drift from the names the
+     * generator actually emits. A stale literal here would be the dangerous direction of wrong:
+     * the scan would stop matching, decide no application uses SQLite, and quietly drop the engine
+     * from builds that need it.</p>
+     */
+    static String sqliteNativePrefix() {
+        return "cn1_" + JavascriptNameUtil.sanitizeClassName(
+                "com/codename1/impl/html5/database/SQLiteNative") + "_";
+    }
+
+    /**
+     * Decides which optional assets this application does not need.
+     *
+     * <p>The question is asked of the emitted bundle, not of a model of it: {@code
+     * writeTranslatedClasses} has already run, and the dead-code pass drops every {@code
+     * SQLiteNative} method from an application that never opens a database. If none of those
+     * names appears in the translated output, nothing in the application can reach the engine and
+     * shipping it is dead weight.</p>
+     *
+     * <p><b>Fails toward shipping.</b> If the translated output cannot be read for any reason this
+     * returns an empty set and everything is copied. Shipping an engine that is never loaded costs
+     * download size on a deployment; failing to ship one that is needed is an application whose
+     * databases do not open, discovered by a user. Those are not symmetrical.</p>
+     */
+    static Set<String> optionalAssetsToSkip(File outputDirectory) {
+        int usesSqlite = translatedOutputReferences(outputDirectory, sqliteNativePrefix());
+        if (usesSqlite != REFERENCE_ABSENT) {
+            return Collections.emptySet();
+        }
+        Set<String> skip = new HashSet<String>();
+        for (String name : SQLITE_ASSETS) {
+            skip.add(name);
+        }
+        return skip;
+    }
+
+    /** The marker appears in the emitted application. */
+    static final int REFERENCE_PRESENT = 1;
+
+    /** The application was emitted and does not mention the marker. */
+    static final int REFERENCE_ABSENT = 0;
+
+    /** The emitted output could not be read, so nothing is known. Never treat this as absent. */
+    static final int REFERENCE_UNKNOWN = -1;
+
+    /**
+     * Whether any emitted {@code translated_app*.js} mentions {@code marker}.
+     *
+     * <p>An {@code int} rather than a nullable {@code Boolean}. The third state is the whole point
+     * of this method, and a {@code Boolean} carrying it auto-unboxes to a NullPointerException at
+     * the first caller who forgets -- which is what SpotBugs reports as NP_BOOLEAN_RETURN_NULL.
+     * The same three-answer shape is used by {@code SecureStorage.entryState} and
+     * {@code ProtectionReport}.</p>
+     *
+     * @return {@link #REFERENCE_PRESENT}, {@link #REFERENCE_ABSENT} or {@link #REFERENCE_UNKNOWN}
+     */
+    static int translatedOutputReferences(File outputDirectory, String marker) {
+        File[] files = outputDirectory.listFiles();
+        if (files == null) {
+            return REFERENCE_UNKNOWN;
+        }
+        boolean sawTranslatedOutput = false;
+        for (File file : files) {
+            String name = file.getName();
+            if (!name.startsWith("translated_app") || !name.endsWith(".js")) {
+                continue;
+            }
+            sawTranslatedOutput = true;
+            try {
+                String text = new String(Files.readAllBytes(file.toPath()), StandardCharsets.UTF_8);
+                if (text.indexOf(marker) >= 0) {
+                    return REFERENCE_PRESENT;
+                }
+            } catch (IOException unreadable) {
+                return REFERENCE_UNKNOWN;
+            }
+        }
+        // No translated output at all means this was not a translation, and the caller has no
+        // basis to drop anything.
+        return sawTranslatedOutput ? REFERENCE_ABSENT : REFERENCE_UNKNOWN;
+    }
+
     private static void copyJavaScriptPortWebAppAssets(File outputDirectory) throws IOException {
         Path webApp = locateJavaScriptPortWebApp();
         if (webApp == null) {
             return;
         }
-        copyPathIfPresent(webApp.resolve("js"), outputDirectory.toPath().resolve("js"));
+        copyPathIfPresent(webApp.resolve("js"), outputDirectory.toPath().resolve("js"),
+                optionalAssetsToSkip(outputDirectory));
         copyPathIfPresent(webApp.resolve("css"), outputDirectory.toPath().resolve("css"));
         copyPathIfPresent(webApp.resolve("assets"), outputDirectory.toPath().resolve("assets"));
         copyPathIfPresent(webApp.resolve("style.css"), outputDirectory.toPath().resolve("style.css"));
@@ -1627,6 +1730,11 @@ final class JavascriptBundleWriter {
     }
 
     private static void copyPathIfPresent(Path source, Path target) throws IOException {
+        copyPathIfPresent(source, target, Collections.<String>emptySet());
+    }
+
+    private static void copyPathIfPresent(Path source, Path target, Set<String> skipNames)
+            throws IOException {
         if (!Files.exists(source)) {
             return;
         }
@@ -1636,7 +1744,10 @@ final class JavascriptBundleWriter {
                 for (Path child : stream) {
                     Path childName = child.getFileName();
                     if (childName != null) {
-                        copyPathIfPresent(child, target.resolve(childName.toString()));
+                        if (skipNames.contains(childName.toString())) {
+                            continue;
+                        }
+                        copyPathIfPresent(child, target.resolve(childName.toString()), skipNames);
                     }
                 }
             }

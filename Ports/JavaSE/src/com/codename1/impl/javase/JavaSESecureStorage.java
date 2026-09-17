@@ -45,6 +45,8 @@ import javax.crypto.SecretKeyFactory;
 import javax.crypto.spec.GCMParameterSpec;
 import javax.crypto.spec.PBEKeySpec;
 import javax.crypto.spec.SecretKeySpec;
+import com.codename1.security.vault.Protection;
+import com.codename1.security.vault.ProtectionReport;
 
 /**
  * Simulator backing for {@link SecureStorage}. Reads gate behind the
@@ -315,6 +317,29 @@ public final class JavaSESecureStorage extends SecureStorage {
     }
 
     // --- Non-prompting tier ------------------------------------------------
+
+    /// What the simulator's non-prompting tier provides, which is less than it looks.
+    ///
+    /// The value is encrypted under a key derived from the OS user account and kept in
+    /// `Preferences`. That keeps it out of the project tree and off a casual grep; it is not a key
+    /// store, the derivation is reproducible by anything running as the same user, and this class
+    /// has always described itself as obfuscation rather than security.
+    ///
+    /// Reporting it as encrypted at rest would make [com.codename1.security.vault.VaultOptions]
+    /// requirements pass in the simulator and fail on a device, which is the wrong way round for
+    /// a check whose whole purpose is to fail early.
+    @Override
+    public ProtectionReport protection() {
+        return ProtectionReport.builder()
+                .set(Protection.PERSISTENT, true)
+                .set(Protection.ENCRYPTED_AT_REST, false)
+                .set(Protection.NON_EXTRACTABLE_KEY, false)
+                .set(Protection.OS_PROTECTED, false)
+                .set(Protection.HARDWARE_BACKED, false)
+                .set(Protection.USER_VERIFICATION, false)
+                .set(Protection.ISOLATED_FROM_APPLICATION_CODE, false)
+                .build();
+    }
 
     @Override
     public boolean set(String account, String value) {

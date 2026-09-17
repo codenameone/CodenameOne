@@ -165,6 +165,12 @@ public class IPhoneBuilder extends Executor {
     private boolean usesAppReview;
     private boolean usesWalletApi;
     private boolean usesCryptoAPI;
+
+    /// Whether the APPLICATION uses com.codename1.security.vault, attributed by
+    /// scanForDatabaseUsage rather than by a package check. Drives AES-GCM, which is private SPI.
+    private boolean usesVault;
+    /// Part of the submission could not be scanned, so vault use was neither found nor ruled out.
+    private boolean vaultUnknown;
     private boolean usesCryptoGcm;
     private boolean usesBiometrics;
     private boolean usesNfc;
@@ -2524,6 +2530,8 @@ public class IPhoneBuilder extends Executor {
                     .merge(scanForDatabaseUsage(buildinRes));
             usesDatabase = databaseUsage.usesDatabase();
             usesDatabaseCipher = databaseUsage.usesDatabaseCipher();
+            usesVault = databaseUsage.usesVault();
+            vaultUnknown = databaseUsage.isVaultUnknown();
         } catch (IOException ex) {
             throw new BuildException("Failed to scan for database usage", ex);
         }
@@ -3360,7 +3368,58 @@ public class IPhoneBuilder extends Executor {
         // com.codename1.security.* get stub-only versions of the iOS
         // crypto bridge -- no CommonCrypto / Security framework symbols
         // referenced -- which keeps Apple's static-symbol scanner happy.
-        usesCryptoGcm = usesCryptoAPI && "true".equals(request.getArg("ios.crypto.gcm", "false"));
+        // AES-GCM stays OFF unless this application actually uses it, and the reason is in
+        // CN1Crypto.m: CommonCrypto exposes GCM only through <CommonCrypto/CommonCryptorSPI.h>,
+        // which is not in the public iOS SDK. Enabling it makes the binary reference
+        // CCCryptorGCMAddIV, CCCryptorGCMAddAAD and CCCryptorGCMFinal, and an application that
+        // never asked for GCM would then carry private-API symbols into Apple's static scanner.
+        //
+        // Defaulting it on to match macOS -- whose hint documentation claims iOS already did --
+        // was therefore wrong: macOS is not scanned the same way, and the claim described an
+        // intent the iOS side had deliberately not implemented.
+        //
+        // So it is detected instead. usesVault is attributed the same way the database answers
+        // are: the framework classes that merely NAME vault types in their signatures are
+        // excluded by name, because Display, CodenameOneImplementation, SecureStorage and
+        // DatabaseConfig all do -- DatabaseConfig holds a Vault field -- and a plain package
+        // check would answer yes for every application ever built. An application that uses the
+        // vault gets a working one without having to know a hint exists; one that does not keeps
+        // a binary with no GCM symbols in it.
+        //
+        // A scan that was refused partway answers neither yes nor no, and this is the one place
+        // that can resolve it. Guessing yes links the private CommonCrypto SPI into a binary
+        // Apple scans, for an application that may never touch the vault; guessing no ships a
+        // vault that cannot do its crypto. Both are silent, so neither is guessed: the developer
+        // is asked, through the hint that already exists, and the build stops until they answer.
+        // The default is deliberately not "false" here -- an unset hint has to be distinguishable
+        // from one deliberately turned off.
+        String gcmHint = request.getArg("ios.crypto.gcm", "");
+        // Only while the answer is actually open. An unreadable class or a refused archive
+        // can be scanned BEFORE a perfectly readable one that uses Vault, and then both
+        // flags are set -- at which point there is nothing ambiguous left to ask about and
+        // the expression below enables GCM anyway. Stopping the build there would fail a
+        // known vault application over unrelated input it happens to carry.
+        if (vaultUnknown && !usesVault
+                && !"true".equals(gcmHint) && !"false".equals(gcmHint)) {
+            throw new BuildException("Part of this application could not be scanned (see the "
+                    + "scan budget warning above), so the build cannot tell whether it uses "
+                    + "com.codename1.security.vault. Set codename1.arg.ios.crypto.gcm=true if it "
+                    + "does -- the vault needs AES-GCM -- or false if it does not, which keeps "
+                    + "the GCM symbols out of the binary.");
+        }
+        // Vault use IS crypto use, and the two answers came from scans of different trees. The
+        // database scan merges buildinRes, so a submitted LIBRARY that uses Vault is detected
+        // there; the permission scan that sets usesCryptoAPI walks classesDir only, so it saw
+        // nothing and left the flag false. The conjunction below then disabled the base crypto
+        // implementation as well as GCM, and the library reached the iOS stubs with a vault that
+        // could neither encrypt nor unlock. The vault cannot function without the crypto API, so
+        // detecting one is detecting the other.
+        if (usesVault) {
+            usesCryptoAPI = true;
+        }
+        usesCryptoGcm = usesCryptoAPI
+                && (usesVault || "true".equals(gcmHint)
+                    || (vaultUnknown && !"false".equals(gcmHint)));
         try {
             File cn1Crypto = new File(buildinRes, "CN1Crypto.h");
             if (cn1Crypto.exists()) {

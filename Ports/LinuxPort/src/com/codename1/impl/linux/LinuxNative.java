@@ -668,6 +668,20 @@ public final class LinuxNative {
      */
     public static native byte[] dpapiProtect(byte[] data);
 
+    /**
+     * Whether a usable Secret Service is actually reachable from this process.
+     *
+     * <p>Reachable, not merely installed. Loading libsecret says nothing about the session
+     * behind it: on a headless machine, or one with a broken D-Bus or no keyring daemon, the
+     * library loads and every write still fails. This performs a lookup for a token that cannot
+     * exist, which contacts the service and stores nothing -- {@link #dpapiProtect(byte[])}
+     * would answer the same question by writing a secret into the user's keyring, which is no
+     * way to answer a capability query.
+     *
+     * @return true when a Secret Service answered
+     */
+    public static native boolean secretServiceAvailable();
+
     /** Inverse of {@link #dpapiProtect}: decrypts a DPAPI blob, or {@code null}. */
     public static native byte[] dpapiUnprotect(byte[] data);
 

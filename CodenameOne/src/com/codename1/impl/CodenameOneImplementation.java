@@ -13101,6 +13101,86 @@ public abstract class CodenameOneImplementation {
         return out;
     }
 
+    /// Derives key material from a password with PBKDF2, per RFC 8018.
+    ///
+    /// Used by [com.codename1.security.vault.KdfProfile], which is the portable password KDF
+    /// behind every vault envelope. The default returns `null`, meaning "no native derivation
+    /// here", and the caller falls back to a pure Java loop over HMAC that produces identical
+    /// bytes. Returning null rather than throwing is deliberate: a missing hook must degrade to
+    /// slow, never to a weaker derivation or a failure.
+    ///
+    /// A port SHOULD override this. Six hundred thousand iterations of software HMAC-SHA-256 is
+    /// seconds of a phone's time and considerably worse in a translated JavaScript worker, and
+    /// every platform Codename One targets has a native PBKDF2 a few lines away.
+    ///
+    /// #### Parameters
+    ///
+    /// - `hashAlgorithm`: the PRF hash, currently always `"SHA-256"`
+    ///
+    /// - `password`: the password bytes, already UTF-8 encoded by the caller. Implementations
+    ///   must not re-encode, normalise or null-terminate them: the derived bytes have to match
+    ///   every other port's exactly.
+    ///
+    /// - `salt`: the salt
+    ///
+    /// - `iterations`: the iteration count, already range-checked by the caller
+    ///
+    /// - `length`: how many bytes to derive
+    ///
+    /// #### Returns
+    ///
+    /// the derived bytes, or `null` when this port has no native derivation
+    ///
+    /// Do not conclude from a search for overrides of this method which ports derive
+    /// natively. Android, iOS and JavaSE override it in Java; the JavaScript port does not
+    /// and still derives through `crypto.subtle.deriveBits`, because it replaces THIS method
+    /// by native binding (`port.js`, alongside `aesEncrypt`, `rsaEncrypt`, `sign` and
+    /// `verify`) rather than by subclassing. A reviewer who greps for the signature sees
+    /// three ports and concludes the browser runs the portable fallback's 600,000 rounds in
+    /// translated JavaScript; it does not.
+    public byte[] pbkdf2(String hashAlgorithm, byte[] password, byte[] salt, int iterations, int length) {
+        return null;
+    }
+
+    /// One storage entry is definitely absent.
+    public static final int STORAGE_ENTRY_ABSENT = 0;
+
+    /// One storage entry is definitely present.
+    public static final int STORAGE_ENTRY_PRESENT = 1;
+
+    /// This port could not tell whether the entry is there.
+    public static final int STORAGE_ENTRY_UNKNOWN = 2;
+
+    /// Whether one storage entry exists, keeping "could not tell" distinct from "no".
+    ///
+    /// `storageFileExists` returns a boolean and therefore cannot express the third answer, so a
+    /// port that hits a transient backend failure has to report one of the two it has -- and
+    /// every port that catches reports `false`. The browser is the clearest case: a temporary
+    /// IndexedDB error becomes "this entry is not here", which for a vault's own metadata record
+    /// means "this device is not enrolled". An enrolment then follows, writing fresh metadata
+    /// under a NEW data key over a vault whose secrets were all sealed under the old one.
+    ///
+    /// The default derives the third state away, which is exactly right for every port whose
+    /// existence check cannot fail -- a file system stat either answers or throws. A port
+    /// overrides this only when its storage can fail in a way it can recognise.
+    public int storageEntryState(String name) {
+        return storageFileExists(name) ? STORAGE_ENTRY_PRESENT : STORAGE_ENTRY_ABSENT;
+    }
+
+    /// Returns the port-specific device protection used by
+    /// [com.codename1.security.vault.Vault] to remember an unlocked vault across restarts.
+    ///
+    /// Default implementation returns `null`, and the vault falls back to a portable
+    /// implementation that keeps a wrapping key in
+    /// [com.codename1.security.SecureStorage] -- which is the right answer on every port whose
+    /// secure storage is the OS key store. A port overrides this only when it can do better than
+    /// a key it can read back: the browser does, because a non-extractable `CryptoKey` in
+    /// IndexedDB can wrap and unwrap without the wrapping key ever existing as bytes the page can
+    /// touch.
+    public com.codename1.security.vault.spi.DeviceProtection getDeviceProtection() {
+        return null;
+    }
+
     // -------------------------------------------------------------------
     // Crash protection (com.codename1.crash.CrashProtection) -- platform
     // hooks that let the framework attach native log context and

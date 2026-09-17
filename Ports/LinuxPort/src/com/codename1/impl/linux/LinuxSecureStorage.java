@@ -27,6 +27,8 @@ import com.codename1.security.BiometricError;
 import com.codename1.security.BiometricException;
 import com.codename1.security.SecureStorage;
 import com.codename1.util.AsyncResource;
+import com.codename1.security.vault.Protection;
+import com.codename1.security.vault.ProtectionReport;
 
 /**
  * Linux secure storage backed by the OS Data Protection API (DPAPI). Each
@@ -156,6 +158,45 @@ public class LinuxSecureStorage extends SecureStorage {
         }
     }
 
+
+    /// What the Secret Service provides.
+    ///
+    /// The secret lives in the user's keyring and this class keeps only a token naming it, so the
+    /// value is held by the desktop's own secret store rather than by the application. Whether
+    /// that keyring is locked, and what unlocks it, is the user's session policy and not
+    /// something this can report on.
+    ///
+    /// A desktop with no Secret Service provider running has no store at all, which is why
+    /// availability is asked of the store rather than assumed from the platform.
+    @Override
+    public ProtectionReport protection() {
+        // Asked of the Secret Service itself, not of the token layer in front of it. entryState
+        // answers from ordinary CN1 Storage -- it reports where the TOKEN is, which is readable
+        // on a desktop with no secret provider at all -- so this reported PERSISTENT,
+        // ENCRYPTED_AT_REST and OS_PROTECTED as YES for a store whose every write returns false,
+        // because dpapiProtect answers null the moment cn1LoadSecret fails. A required-protection
+        // check then passed against a store that cannot hold anything.
+        boolean available;
+        try {
+            available = LinuxNative.secretServiceAvailable();
+        } catch (Throwable noNative) {
+            // A build whose native half is missing entirely cannot claim the protections it
+            // would have provided.
+            available = false;
+        }
+        return ProtectionReport.builder()
+                .set(Protection.PERSISTENT, available)
+                .set(Protection.ENCRYPTED_AT_REST, available)
+                .set(Protection.NON_EXTRACTABLE_KEY, false)
+                .set(Protection.OS_PROTECTED, available)
+                .set(Protection.HARDWARE_BACKED, ProtectionReport.UNKNOWN)
+                // A locked keyring can prompt, and an unlocked one does not. The store does not
+                // say which, and a flag that guessed would be describing the session rather than
+                // the entry.
+                .set(Protection.USER_VERIFICATION, ProtectionReport.UNKNOWN)
+                .set(Protection.ISOLATED_FROM_APPLICATION_CODE, false)
+                .build();
+    }
 
     @Override
     public boolean set(String account, String value) {

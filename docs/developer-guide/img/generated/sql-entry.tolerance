@@ -1,0 +1,5 @@
+# After removing native frame decorations, macOS and Linux place the dialog
+# identically. Only the toolbar glyph differs: 139 pixels (0.037%), maximum
+# channel delta 37, measured against the Linux CI rendering.
+maxChannelDelta=45
+maxMismatchPercent=0.05

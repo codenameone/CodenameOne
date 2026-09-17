@@ -15791,6 +15791,21 @@ public class IOSImplementation extends CodenameOneImplementation {
         return doAes(transformation, key, iv, aad, ciphertext, 0);
     }
 
+    /// PBKDF2 through CommonCrypto.
+    ///
+    /// Worth having rather than leaving to the portable fallback: the default profile is six
+    /// hundred thousand iterations, and a pure Java HMAC loop translated to C runs it in tens of
+    /// seconds where `CCKeyDerivationPBKDF` takes a fraction of one. Returns `null` when the
+    /// native reports a failure, which sends the caller to the portable loop rather than failing
+    /// the unlock -- slow is a worse outcome than fast and a much better one than locked out.
+    @Override
+    public byte[] pbkdf2(String hashAlgorithm, byte[] password, byte[] salt, int iterations, int length) {
+        int hashKind = hashAlgorithm != null && hashAlgorithm.indexOf("512") >= 0 ? 512 : 256;
+        byte[] out = new byte[length];
+        int written = nativeInstance.pbkdf2(hashKind, password, salt, iterations, out);
+        return written == length ? out : null;
+    }
+
     private byte[] doAes(String transformation, byte[] key, byte[] iv, byte[] aad, byte[] input, int encrypt) {
         String t = transformation == null ? "" : transformation.toUpperCase();
         if (t.indexOf("GCM") >= 0) {
