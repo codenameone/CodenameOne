@@ -40,11 +40,12 @@ import java.net.Socket;
 import java.net.InetSocketAddress;
 import java.net.ServerSocket;
 import java.nio.charset.StandardCharsets;
+import java.security.KeyStore;
+import java.security.cert.CertificateFactory;
 import java.security.cert.X509Certificate;
 import javax.net.ssl.SSLContext;
+import javax.net.ssl.TrustManagerFactory;
 import javax.net.ssl.SSLSocket;
-import javax.net.ssl.TrustManager;
-import javax.net.ssl.X509TrustManager;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -1772,12 +1773,37 @@ class BackendHttpIntegrationTest {
     private SSLSocket openTls() throws Exception {
         Assumptions.assumeTrue(tlsServer != null && tlsPort != 0,
                 "no TLS server (openssl unavailable, or it did not start)");
+        // PINNED to the certificate startTlsServer just generated, rather than a
+        // TrustManager whose check methods are empty.
+        //
+        // The empty one was here first and it verifies nothing at all -- including
+        // that the server presented the certificate it was configured with, which
+        // is the one thing a TLS test is in a position to assert. It is also the
+        // shape every "disable certificate checking" answer on the internet has,
+        // so it is worth not leaving a copy of it in this repository to be found
+        // and pasted somewhere it is not a throwaway localhost socket. CodeQL
+        // agrees and flags it as a high-severity alert.
+        //
+        // Path validation only: these sockets connect to 127.0.0.1 while the
+        // certificate names localhost, and a raw SSLSocket does no hostname check
+        // unless one is asked for. Pinning the self-signed certificate as a trust
+        // anchor is exactly the assertion that fits.
+        X509Certificate pinned;
+        InputStream certBytes = Files.newInputStream(work.resolve("cert.pem"));
+        try {
+            pinned = (X509Certificate) CertificateFactory.getInstance("X.509")
+                    .generateCertificate(certBytes);
+        } finally {
+            certBytes.close();
+        }
+        KeyStore anchors = KeyStore.getInstance(KeyStore.getDefaultType());
+        anchors.load(null, null);
+        anchors.setCertificateEntry("backend", pinned);
+        TrustManagerFactory trust = TrustManagerFactory.getInstance(
+                TrustManagerFactory.getDefaultAlgorithm());
+        trust.init(anchors);
         SSLContext context = SSLContext.getInstance("TLS");
-        context.init(null, new TrustManager[]{ new X509TrustManager() {
-            public void checkClientTrusted(X509Certificate[] chain, String authType) { }
-            public void checkServerTrusted(X509Certificate[] chain, String authType) { }
-            public X509Certificate[] getAcceptedIssuers() { return new X509Certificate[0]; }
-        } }, null);
+        context.init(null, trust.getTrustManagers(), null);
         SSLSocket socket = (SSLSocket) context.getSocketFactory()
                 .createSocket("127.0.0.1", tlsPort);
         socket.setSoTimeout(20000);
