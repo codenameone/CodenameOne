@@ -219,27 +219,18 @@ jobs:
           echo "app_path=$APP" >> "$GITHUB_OUTPUT"
       - name: Boot simulator (runtime matching the golden set)
         id: sim
-        run: |
-          set -euo pipefail
-          # The golden set names the OS design generation it was captured on
-          # (ios-26-metal). The suite MUST run on a matching runtime: a different
-          # iOS generation renders different SF fonts/glyphs and produces phantom
-          # regressions. Fail loudly if the runner lacks the runtime -- the fix is
-          # pinning a runner image/Xcode that ships it, never regenerating
-          # references on whatever the runner happens to have.
-          RUNTIME="$(xcrun simctl list runtimes | grep -Eo 'com.apple.CoreSimulator.SimRuntime.iOS-26[0-9-]*' | head -n1)"
-          if [ -z "$RUNTIME" ]; then
-            echo "::error::No iOS 26 simulator runtime on this runner (required by golden set ios-26-metal)."
-            xcrun simctl list runtimes
-            exit 78
-          fi
-          UDID="$(xcrun simctl list devices "$RUNTIME" available | grep -E 'iPhone 16 \(' | grep -Eo '[0-9A-F-]{36}' | head -n1 || true)"
-          if [ -z "$UDID" ]; then
-            UDID="$(xcrun simctl create "iPhone16-fidelity" "iPhone 16" "$RUNTIME")"
-          fi
-          xcrun simctl boot "$UDID"
-          xcrun simctl bootstatus "$UDID" -b
-          echo "udid=$UDID" >> "$GITHUB_OUTPUT"
+        # The golden set names the OS design generation it was captured on
+        # (ios-26-metal). The suite MUST run on a matching runtime: a different
+        # iOS generation renders different SF fonts/glyphs and produces phantom
+        # regressions. The helper fails loudly (78) if the runner lacks the
+        # runtime -- the fix is pinning a runner image/Xcode that ships it,
+        # never regenerating references on whatever the runner happens to have.
+        #
+        # It also puts every simctl call on a deadline. Inline, these four calls
+        # twice hung with no output at all and burned the job's entire 90-minute
+        # budget, ending as "cancelled" rather than as a failure; the script's
+        # header records the runs and why the one retry it does is allowed.
+        run: ./scripts/ci/boot-ios-simulator.sh 'iOS-26[0-9-]*' 'iPhone 16' iPhone16-fidelity
       - name: Run fidelity suite (simulator, Metal)
         # The committed baseline is the ratchet floor: the gate fails the job
         # on any regression. To re-anchor intentionally, run locally with
