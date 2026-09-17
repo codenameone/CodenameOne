@@ -122,6 +122,18 @@ class FidelitySpecTest(unittest.TestCase):
         validator.SPEC.write_text(original)
         self.assertEqual(0, self.check())
 
+    def test_gnome_rows_reject_linux_host_aliases(self):
+        original = validator.SPEC.read_text()
+        marker = "  - id: DesktopButton\n"
+        for platform in ("linux", "lin", "linux-gnu", "linux,gnome"):
+            with self.subTest(platform=platform):
+                validator.SPEC.write_text(original.replace(
+                    marker, marker + "    platforms: " + platform + "\n", 1))
+                self.assertEqual(1, self.check())
+                self.assertTrue(any("unknown platform" in error for error in validator.ERRORS))
+        validator.SPEC.write_text(original.replace(marker, marker + "    platforms: gnome\n", 1))
+        self.assertEqual(0, self.check())
+
     def test_unknown_defaults_are_rejected(self):
         original = validator.SPEC.read_text()
         for old, new in (("appearances:", "appearance:"), ("tile_width_px:", "tile_wdith_px:"),
@@ -168,12 +180,12 @@ class FidelitySpecTest(unittest.TestCase):
 
     def test_platform_typo_is_rejected_but_runtime_prefixes_are_valid(self):
         original = validator.SPEC.read_text()
-        for token in ("gnmoe", "windwos", "unknown"):
+        for token in ("gnmoe", "windwos", "unknown", "linux"):
             with self.subTest(token=token):
                 validator.SPEC.write_text(original.replace("platforms: ios", "platforms: " + token, 1))
                 self.assertEqual(1, self.check())
                 self.assertTrue(any("unknown platform" in e for e in validator.ERRORS))
-        for token in ("window", "win", "and", "mac", "linux", "gnome"):
+        for token in ("window", "win", "and", "mac", "gnome"):
             with self.subTest(token=token):
                 validator.SPEC.write_text(original.replace("platforms: ios", "platforms: " + token, 1))
                 self.assertEqual(0, self.check())

@@ -29,8 +29,10 @@ KNOWN_KEYS = MOBILE_KEYS | DESKTOP_KEYS | {
     "id", "cn1_uiid", "text", "backdrop", "material", "states", "platforms", "frames",
     "tile_width_mm", "tile_height_mm", "tile_width_px", "tile_height_px",
 }
+# Use fixture runner IDs, not host names: getNativeKind("linux") resolves a key,
+# but a platforms: linux filter does not match the workflow's "gnome" runner.
 PLATFORM_NATIVE_KEYS = {"ios": "native", "android": "native_android", "windows": "native_win",
-                        "macos": "native_mac", "gnome": "native_gnome", "linux": "native_gnome"}
+                        "macos": "native_mac", "gnome": "native_gnome"}
 KNOWN_PLATFORMS = set(PLATFORM_NATIVE_KEYS)
 KNOWN_STATES = {"normal", "pressed", "disabled", "selected", "hover", "focus"}
 KNOWN_MATERIALS = {"normal", "glass", "lens"}
