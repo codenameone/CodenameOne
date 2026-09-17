@@ -653,8 +653,9 @@ ListRendererFocus {
        committed dark golden. */
     Slider { background-color: #9a9a9a; color: #424242; }
     SliderFull { background-color: #4cc2ff; color: #4cc2ff; }
-    ProgressBar { background-color: #9a9a9a; }
-    ProgressBarFull { background-color: #4cc2ff; color: #4cc2ff; }
+    /* Capsule borders carry their own fill color; rebuild them for dark mode. */
+    ProgressBar { background-color: #9a9a9a; cn1-background-type: cn1-pill-border; }
+    ProgressBarFull { background-color: #4cc2ff; color: #4cc2ff; cn1-background-type: cn1-pill-border; }
 
     TitleArea { background-color: #202020; }
     Title { color: #ffffff; }

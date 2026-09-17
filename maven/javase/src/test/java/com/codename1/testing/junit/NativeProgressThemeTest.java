@@ -31,6 +31,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 
 @CodenameOneTest
 @RunOnEdt
+@DarkMode(enabled = false)
 @DisabledIfSystemProperty(named = "java.awt.headless", matches = "true")
 class NativeProgressThemeTest {
     private void assertNativeTrackHeight() {
@@ -58,4 +59,17 @@ class NativeProgressThemeTest {
 
     @Test @Theme(nativeTheme = NativeTheme.IOS_MODERN)
     void iosPillsRemainNative() { assertNativeTrackHeight(); }
+
+    @Test @DarkMode @Theme(nativeTheme = NativeTheme.WINDOWS_FLUENT)
+    void darkFluentPillsRemainNative() { assertNativeTrackHeight(); }
+
+    @Test @DarkMode @Theme(nativeTheme = NativeTheme.MACOS_AQUA)
+    void darkAquaPillsRemainNative() { assertNativeTrackHeight(); }
+
+    @Test @DarkMode @Theme(nativeTheme = NativeTheme.GNOME_ADWAITA)
+    void darkAdwaitaPillsRemainNative() { assertNativeTrackHeight(); }
+
+    @Test @DarkMode @Theme(nativeTheme = NativeTheme.IOS_MODERN)
+    void darkIosPillsRemainNative() { assertNativeTrackHeight(); }
+
 }
