@@ -3867,11 +3867,17 @@ static JAVA_INT cn1HsFindSlot(CODENAME_ONE_THREAD_STATE, struct obj__java_util_H
     }
 }
 
-static void cn1HsSetThreshold(struct obj__java_util_HashSet* s) {
-    JAVA_INT t = (JAVA_INT)(s->java_util_HashSet_cn1Cap * 0.75f);
-    // Always keep one empty slot: a table with none makes the probe non-terminating.
-    if(t >= s->java_util_HashSet_cn1Cap) t = s->java_util_HashSet_cn1Cap - 1;
-    s->java_util_HashSet_cn1Threshold = t;
+/* Derived, not stored. It was always (int)(cap * 0.75f), and cap is a power of two
+ * of at least 16, for which cap - (cap >> 2) is that value exactly. The field cost 4
+ * bytes on every HashSet, enough to push the object out of the 48-byte BiBOP slot
+ * class into the 64-byte one.
+ *
+ * The old clamp ("always keep one empty slot: a table with none makes the probe
+ * non-terminating") is not lost -- it is unreachable. cap >= 16 gives a threshold of
+ * at most cap - 4, so four slots always stay free. */
+static inline JAVA_INT cn1HsThreshold(const struct obj__java_util_HashSet* s) {
+    JAVA_INT cap = s->java_util_HashSet_cn1Cap;
+    return cap - (cap >> 2);
 }
 
 /** Rebuild. Doubles when the LIVE count reached the threshold, rebuilds at the same
@@ -3880,7 +3886,7 @@ static void cn1HsSetThreshold(struct obj__java_util_HashSet* s) {
 static void cn1HsGrow(CODENAME_ONE_THREAD_STATE, struct obj__java_util_HashSet* s) {
     JAVA_INT oldCap = s->java_util_HashSet_cn1Cap;
     JAVA_INT cap = oldCap;
-    if(s->java_util_HashSet_cn1Size >= s->java_util_HashSet_cn1Threshold) {
+    if(s->java_util_HashSet_cn1Size >= cn1HsThreshold(s)) {
         cap <<= 1;
         if(cap <= 0) { CN1_THROW_OOM(); return; }
     }
@@ -3919,7 +3925,6 @@ static void cn1HsGrow(CODENAME_ONE_THREAD_STATE, struct obj__java_util_HashSet* 
     s->java_util_HashSet_cn1KeysBlock = keys;
     s->java_util_HashSet_cn1MetaBlock = meta;
     s->java_util_HashSet_cn1Occupied = occupied;
-    cn1HsSetThreshold(s);
     cn1RefBlockRetire(oldKeys);
     cn1RefBlockRetire(oldMeta);
 }
@@ -3942,8 +3947,7 @@ JAVA_BOOLEAN java_util_HashSet_cn1AddNative___java_lang_Object_R_boolean(
         s->java_util_HashSet_cn1MetaBlock = meta;
         s->java_util_HashSet_cn1Size = 0;
         s->java_util_HashSet_cn1Occupied = 0;
-        cn1HsSetThreshold(s);
-    }
+        }
     JAVA_INT idx = cn1HsFindSlot(threadStateData, s, __cn1Arg1, marker);
     if(idx >= 0) return JAVA_FALSE;
     JAVA_INT ins = -idx - 1;
@@ -3954,7 +3958,7 @@ JAVA_BOOLEAN java_util_HashSet_cn1AddNative___java_lang_Object_R_boolean(
     s->java_util_HashSet_cn1Size++;
     if(wasEmpty) s->java_util_HashSet_cn1Occupied++;
     s->java_util_HashSet_cn1ModCount++;
-    if(s->java_util_HashSet_cn1Occupied >= s->java_util_HashSet_cn1Threshold) {
+    if(s->java_util_HashSet_cn1Occupied >= cn1HsThreshold(s)) {
         cn1HsGrow(threadStateData, s);
     }
     return JAVA_TRUE;

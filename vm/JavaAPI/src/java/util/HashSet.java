@@ -53,7 +53,6 @@ public class HashSet<E> extends AbstractSet<E> implements Set<E> {
     transient int cn1Cap;
     transient int cn1Size;
     transient int cn1Occupied;
-    transient int cn1Threshold;
     transient int cn1ModCount;
 
     private static final int DEFAULT_CAPACITY = 16;
@@ -75,9 +74,15 @@ public class HashSet<E> extends AbstractSet<E> implements Set<E> {
         if (loadFactor <= 0 || Float.isNaN(loadFactor)) throw new IllegalArgumentException();
         int cap = DEFAULT_CAPACITY;
         while (cap < capacity) cap <<= 1;
+        /* No threshold field. It was always (int)(cap * 0.75f) -- the loadFactor
+         * argument is validated and then ignored -- and for the only capacities this
+         * table ever has, powers of two starting at 16, that is exactly
+         * cap - (cap >> 2). Deriving it costs a shift and a subtract where the field
+         * cost 4 bytes on every set, which is what took java.util.HashSet from the
+         * 48-byte BiBOP slot class into the 64-byte one. The clamp it used to apply
+         * for a table with no empty slot cannot trigger: cap >= 16 always, so
+         * cap - (cap >> 2) <= cap - 4. See cn1HsThreshold in nativeMethods.m. */
         cn1Cap = cap;
-        cn1Threshold = (int) (cap * 0.75f);
-        if (cn1Threshold >= cap) cn1Threshold = cap - 1;
     }
 
     public HashSet(Collection<? extends E> collection) {
