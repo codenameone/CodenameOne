@@ -36,9 +36,15 @@ public class HashSet<E> extends AbstractSet<E> implements Set<E> {
     // see a half-filled table while elements still in the old one are reachable from
     // nothing.
     //
-    // backingMap SURVIVES FOR LinkedHashSet, which extends this class and passes a
-    // LinkedHashMap because it needs that map's ordering links.
-    transient HashMap<E, HashSet<E>> backingMap;
+    // The map-backed form lives in LinkedHashSet, NOT here. It is the only
+    // subclass that needs one -- for the ordering links -- and holding the field
+    // here charged every plain HashSet 8 bytes for it, which is not slack: with
+    // BiBOP size classes it moved java.util.HashSet from the 56-byte class to the
+    // 64-byte class, and a translation of the 5,326-class corpus allocates 432,372
+    // of them. It also put a load and a branch on `backingMap != null` in front of
+    // add, contains, remove, clear, size and iterator -- on every call, for a field
+    // that is null in every plain HashSet ever made. LinkedHashSet overrides those
+    // six instead, which is both smaller and faster here and no slower there.
 
     // volatile to match HashMap's blocks: the concurrent marker reads these while the
     // mutator may be swapping them during a rebuild.
@@ -82,24 +88,30 @@ public class HashSet<E> extends AbstractSet<E> implements Set<E> {
         }
     }
 
-    /** Map-backed construction. Used by LinkedHashSet, which needs ordering links. */
-    HashSet(HashMap<E, HashSet<E>> backingMap) {
-        this.backingMap = backingMap;
+    /**
+     * Subclass-delegating construction: allocates NO native table, because the
+     * subclass keeps the elements somewhere else. The flag is not stored -- it
+     * exists to distinguish this from HashSet(int), which would otherwise be the
+     * same call after erasure of the default capacity.
+     *
+     * @param mapBacked always true; present to select this constructor
+     */
+    HashSet(boolean mapBacked) {
     }
 
     @Override
     public boolean add(E object) {
-        return backingMap != null ? backingMap.put(object, this) == null : cn1AddNative(object);
+        return cn1AddNative(object);
     }
 
     @Override
     public void clear() {
-        if (backingMap != null) backingMap.clear(); else cn1ClearNative();
+        cn1ClearNative();
     }
 
     @Override
     public boolean contains(Object object) {
-        return backingMap != null ? backingMap.containsKey(object) : cn1ContainsNative(object);
+        return cn1ContainsNative(object);
     }
 
     @Override
@@ -107,7 +119,7 @@ public class HashSet<E> extends AbstractSet<E> implements Set<E> {
 
     @Override
     public Iterator<E> iterator() {
-        return backingMap != null ? backingMap.keySet().iterator() : new HashSetIterator();
+        return new HashSetIterator();
     }
 
     private final class HashSetIterator implements Iterator<E> {
@@ -137,13 +149,10 @@ public class HashSet<E> extends AbstractSet<E> implements Set<E> {
 
     @Override
     public boolean remove(Object object) {
-        return backingMap != null ? backingMap.remove(object) != null : cn1RemoveNative(object);
+        return cn1RemoveNative(object);
     }
 
     @Override
-    public int size() { return backingMap != null ? backingMap.size() : cn1Size; }
+    public int size() { return cn1Size; }
 
-    HashMap<E, HashSet<E>> createBackingMap(int capacity, float loadFactor) {
-        return new HashMap<E, HashSet<E>>(capacity, loadFactor);
-    }
 }

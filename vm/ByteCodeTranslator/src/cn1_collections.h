@@ -157,22 +157,29 @@ static inline int cn1CollectionOpen(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT colle
         return cn1CollectionMap(threadStateData, ((struct obj__java_util_IdentityHashMap_Values*)collection)->java_util_IdentityHashMap_Values_map, 1, out);
 #endif
 #ifdef CN1_COLL_SET
-    if(collection->__codenameOneParentClsReference == &class__java_util_HashSet
-#ifdef CN1_COLL_ORDERED_SET
-       || collection->__codenameOneParentClsReference == &class__java_util_LinkedHashSet
-#endif
-    ) {
-        JAVA_OBJECT backing = ((struct obj__java_util_HashSet*)collection)->java_util_HashSet_backingMap;
+    if(collection->__codenameOneParentClsReference == &class__java_util_HashSet) {
         // A PLAIN HashSet HAS NO BACKING MAP. It owns a keys+meta table directly and
         // stores no values, so there is nothing here to view as a map; only
-        // LinkedHashSet still delegates to one. Returning 0 is the documented "not a
+        // LinkedHashSet delegates to one. Returning 0 is the documented "not a
         // layout I know" answer and sends the caller down the generic iterator path.
         //
-        // Without this the recursion below was handed JAVA_NULL and dereferenced it at
-        // the top of this function -- a SIGSEGV from `new ArrayList<>(aSet)`, reached
-        // through ArrayList.addAllNative, and attributed by an -O3 + ThinLTO build to a
-        // completely unrelated function (ByteCodeTranslator.copy) because the linker had
-        // folded identical code. It only reproduced on a large corpus.
+        // This used to read java_util_HashSet_backingMap for BOTH classes and test
+        // it for null. The field now exists only on LinkedHashSet -- holding it on
+        // HashSet cost 8 bytes on every one of them and a branch on every operation
+        // -- so a plain HashSet is answered by its class, with no field read at all.
+        //
+        // Before the null test existed, the recursion below was handed JAVA_NULL and
+        // dereferenced it at the top of this function: a SIGSEGV from
+        // `new ArrayList<>(aSet)` through ArrayList.addAllNative, which an -O3 +
+        // ThinLTO build attributed to a completely unrelated function because the
+        // linker had folded identical code, and which only reproduced on a large
+        // corpus. Answering by class cannot regress into that.
+        return 0;
+    }
+#endif
+#ifdef CN1_COLL_ORDERED_SET
+    if(collection->__codenameOneParentClsReference == &class__java_util_LinkedHashSet) {
+        JAVA_OBJECT backing = ((struct obj__java_util_LinkedHashSet*)collection)->java_util_LinkedHashSet_backingMap;
         if(backing == JAVA_NULL) return 0;
         return cn1CollectionMap(threadStateData, backing, 0, out);
     }

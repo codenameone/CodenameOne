@@ -107,7 +107,13 @@ final class NativeTraversal {
         return "if(" + expected + " != " + modification(layout) + ") CN1_THROW_CME();\n";
     }
     private String start(Layout layout) {
-        String owner = mapReceiver || layout == Layout.ARRAY ? "__c" : field("java_util_HashSet", "backingMap", "__c");
+        // The only receiver that reaches the field read is a LinkedHashSet, and the
+        // field lives on LinkedHashSet now rather than on HashSet -- a plain HashSet
+        // owns its table directly and carries no such field. Layout.SET is excluded
+        // from `proven` above and skipped in the dispatch loop, and a map receiver
+        // uses __c itself, so nothing else can land here.
+        String owner = mapReceiver || layout == Layout.ARRAY ? "__c"
+                : field("java_util_LinkedHashSet", "backingMap", "__c");
         String first = layout == Layout.ARRAY || layout == Layout.IDENTITY ? "0" : layout == Layout.ORDERED_SET
                 ? field("java_util_LinkedHashMap", "cn1Head", root)
                 : "cn1InlTableNext(" + map("cn1MetaBlock") + ", 0, " + map("cn1Cap") + ")";
