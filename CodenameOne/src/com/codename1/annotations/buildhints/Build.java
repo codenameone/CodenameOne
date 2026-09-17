@@ -57,9 +57,10 @@ public @interface Build {
     ///
     /// `native` is `modern` plus the desktop: it additionally selects the host's
     /// own desktop theme -- Fluent, Aqua or Adwaita -- the way
-    /// `desktop.themeMode = auto` does. `modern` deliberately does not, because it
-    /// predates the desktop themes by years and an application that set it for its
-    /// phone builds never asked for its desktop screens to be redrawn.
+    /// `desktop.themeMode = auto` does. `modern` stops short of the desktop on
+    /// purpose, because it predates the desktop themes by years and an application
+    /// that set it for its phone builds never asked for its desktop screens to be
+    /// redrawn.
     /// `desktop.themeMode` overrides this hint either way, and the full per-platform
     /// table is on the `@DesktopBuild` annotation.
     @Hint(valuePattern = "native|modern|legacy|custom")

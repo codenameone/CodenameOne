@@ -100,6 +100,15 @@ public @interface DesktopBuild {
     /// desktop build is resizable
     Toggle resizable() default Toggle.DEFAULT;
 
+    // No javadoc link syntax in the `///` block below, and no note inside it about why.
+    // An attribute's prose is harvested verbatim into the developer guide's hint table,
+    // so a bracketed reference reaches a reader as literal text pointing at a symbol the
+    // guide does not publish -- and a parenthetical explaining that to the next editor is
+    // an internal note published in a customer-facing document. This comment is the right
+    // home for both: BuildHintAnnotationReader collects only the `///` run, and only the
+    // one immediately preceding the declaration, so a `//` comment ABOVE it is invisible
+    // to the table. Below it would be worse than invisible: a non-`///` line discards the
+    // pending comment, and the attribute would reach the guide with no description at all.
     /// Which native theme a desktop build installs, and the one hint that decides
     /// whether a desktop application looks like the platform it's running on.
     ///
@@ -115,10 +124,7 @@ public @interface DesktopBuild {
     ///
     /// The per-value and per-platform tables, and how this relates to the iOS,
     /// Android, macOS and cross-platform theme hints, are on the `@DesktopBuild`
-    /// annotation itself. (Javadoc link syntax is deliberately not used in this
-    /// paragraph: an attribute's prose is harvested verbatim into the developer
-    /// guide's hint table, where a bracketed reference reaches the reader as
-    /// literal text pointing at a symbol the guide does not publish.)
+    /// annotation itself.
     ///
     /// Read by the JavaSE port at runtime rather than by a builder, so unlike most
     /// hints here it changes what the running application does rather than what's
