@@ -88,6 +88,52 @@ class DesktopNativeThemeSelectionTest {
         }
     }
 
+    /// nativeTheme=native is the one cross-platform value that also reaches desktop.
+    /// The test above pins the other half of the rule -- that modern, legacy and custom
+    /// do not -- and the two together are the whole contract, so neither is complete
+    /// without the other.
+    @Test
+    void theSharedNativeValueAlsoSelectsTheDesktopTheme() throws Exception {
+        String[] keys = {"codename1.arg.desktop.themeMode", "codename1.arg.nativeTheme",
+                "codename1.arg.cn1.nativeTheme"};
+        String[] previous = new String[keys.length];
+        for (int i = 0; i < keys.length; i++) {
+            previous[i] = System.getProperty(keys[i]);
+            System.clearProperty(keys[i]);
+        }
+        java.lang.reflect.Method resolver = JavaSEPort.class.getDeclaredMethod("resolveAutoNativeTheme", String.class);
+        resolver.setAccessible(true);
+        try {
+            for (String hint : new String[]{keys[1], keys[2]}) {
+                System.setProperty(hint, "native");
+                assertEquals("WindowsFluentTheme", resolver.invoke(null, "win"), hint);
+                assertEquals("MacOSAquaTheme", resolver.invoke(null, "mac"), hint);
+                assertEquals("GnomeAdwaitaTheme", resolver.invoke(null, "linux"), hint);
+                assertEquals("/WindowsFluentTheme.res",
+                        JavaSEPort.resolvePackagedDesktopNativeTheme("win", new Properties()), hint);
+                // The mobile half of the hint is unchanged: native is modern plus desktop,
+                // not a different mobile theme.
+                assertEquals("iOSModernTheme", resolver.invoke(null, "ios"), hint);
+                assertEquals("AndroidMaterialTheme", resolver.invoke(null, "and"), hint);
+                // An explicit desktop hint still decides, in both directions.
+                System.setProperty(keys[0], "legacy");
+                assertNull(resolver.invoke(null, "win"), hint);
+                System.setProperty(keys[0], "aqua");
+                assertEquals("MacOSAquaTheme", resolver.invoke(null, "win"), hint);
+                System.clearProperty(keys[0]);
+                System.clearProperty(hint);
+            }
+        } finally {
+            for (int i = 0; i < keys.length; i++) {
+                if (previous[i] == null) {
+                    System.clearProperty(keys[i]);
+                } else {
+                    System.setProperty(keys[i], previous[i]);
+                }
+            }
+        }
+    }
+
     @Test
     void packagedHintSelectsTheHostThemeWithoutSourceSettings() {
         String previous = System.getProperty("codename1.arg.desktop.themeMode");

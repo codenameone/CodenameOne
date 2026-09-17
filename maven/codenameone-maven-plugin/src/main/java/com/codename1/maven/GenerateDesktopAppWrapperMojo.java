@@ -74,8 +74,7 @@ public class GenerateDesktopAppWrapperMojo extends AbstractCN1Mojo {
     // have no source settings file; JavaSEPort reads this beside the bundled NativeTheme.res.
     void generateThemeConfiguration() throws MojoExecutionException {
         Properties theme = new Properties();
-        // Shared nativeTheme hints select mobile themes; desktop must opt in independently.
-        theme.setProperty("desktop.themeMode", arg("desktop.themeMode", "legacy"));
+        theme.setProperty("desktop.themeMode", arg("desktop.themeMode", sharedThemeModeDefault()));
         File output = new File(project.getBuild().getOutputDirectory(), "codenameone-desktop.properties");
         try {
             Files.createDirectories(output.toPath().getParent());
@@ -216,6 +215,23 @@ public class GenerateDesktopAppWrapperMojo extends AbstractCN1Mojo {
         }
         getLog().warn("Invalid desktop.titleBar build hint: '" + value + "'. Using 'native'.");
         return "native";
+    }
+
+    /// What `desktop.themeMode` resolves to when the project does not set it.
+    ///
+    /// The cross-platform `nativeTheme` hint selects the mobile themes, and only its
+    /// `native` value also asks for the desktop one -- `modern` deliberately does not,
+    /// because it shipped years before the desktop themes existed and an application
+    /// that set it for its phone builds never asked for its desktop screens to move.
+    /// Every other value, and no value at all, leaves the desktop on what it has always
+    /// had.
+    ///
+    /// Resolved here rather than at runtime because this file IS the packaged answer:
+    /// a packaged desktop app has no codenameone_settings.properties to read the shared
+    /// hint back out of.
+    private String sharedThemeModeDefault() {
+        String shared = arg("nativeTheme", arg("cn1.nativeTheme", null));
+        return "native".equalsIgnoreCase(shared) ? "native" : "legacy";
     }
 
     private String arg(String name, String defaultValue) {

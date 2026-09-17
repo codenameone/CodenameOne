@@ -3261,6 +3261,17 @@ public class JavaSEPort extends CodenameOneImplementation {
     }
 
     private static String resolveDesktopNativeTheme(String platformName, String mode) {
+        if (mode == null || mode.trim().isEmpty()) {
+            // The cross-platform nativeTheme hint reaches desktop through exactly one of
+            // its values. "native" says "the platform's own look, everywhere", and desktop
+            // is part of everywhere. "modern" does not, and must not: it predates the
+            // desktop themes by years, so every application that set it for its phone
+            // builds would otherwise have its desktop screens redrawn by a hint it set for
+            // another platform. That is the whole difference between the two constants.
+            if ("native".equalsIgnoreCase(sharedNativeThemeHint())) {
+                mode = "native";
+            }
+        }
         if (mode == null || "legacy".equalsIgnoreCase(mode)) {
             // What a desktop app has always had. Not a recommendation, just continuity.
             return null;

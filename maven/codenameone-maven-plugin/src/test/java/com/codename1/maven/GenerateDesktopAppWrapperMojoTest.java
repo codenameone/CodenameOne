@@ -152,6 +152,37 @@ class GenerateDesktopAppWrapperMojoTest {
         }
     }
 
+    // The exception to the test above, and the only one: "native" means the platform's
+    // own look on every OS, so the packaged desktop answer follows it. Resolved here
+    // rather than at runtime because a packaged app has no settings file to read the
+    // shared hint back out of -- this properties file IS the answer.
+    @Test
+    void theSharedNativeHintDoesChangeThePackagedDesktopDefault(@TempDir Path root) throws Exception {
+        GenerateDesktopAppWrapperMojo mojo = new GenerateDesktopAppWrapperMojo();
+        mojo.project = new MavenProject();
+        mojo.project.getBuild().setOutputDirectory(root.toString());
+        mojo.properties = new Properties();
+        for (String hint : new String[]{"nativeTheme", "cn1.nativeTheme"}) {
+            mojo.properties.clear();
+            mojo.properties.setProperty("codename1.arg." + hint, "native");
+            mojo.generateThemeConfiguration();
+            Properties packaged = new Properties();
+            try (InputStream in = Files.newInputStream(root.resolve("codenameone-desktop.properties"))) {
+                packaged.load(in);
+            }
+            assertEquals("native", packaged.getProperty("desktop.themeMode"), hint);
+
+            // An explicit desktop hint outranks it.
+            mojo.properties.setProperty("codename1.arg.desktop.themeMode", "legacy");
+            mojo.generateThemeConfiguration();
+            try (InputStream in = Files.newInputStream(root.resolve("codenameone-desktop.properties"))) {
+                packaged.clear();
+                packaged.load(in);
+            }
+            assertEquals("legacy", packaged.getProperty("desktop.themeMode"), hint);
+        }
+    }
+
     @Test
     void defaultWrapperPreservesPlatformFontsAndExplicitOverrides() throws Exception {
         String source = render(null, null);

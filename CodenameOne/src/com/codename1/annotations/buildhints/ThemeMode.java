@@ -47,6 +47,19 @@ public enum ThemeMode {
     @HintValue(value = "modern", accepts = {"liquid", "material"})
     MODERN,
 
+    /// The current platform look on EVERY operating system the application runs
+    /// on, desktop included.
+    ///
+    /// This is what separates it from [#MODERN], which reaches iOS and Android
+    /// only. Desktop is deliberately excluded there: the desktop native themes
+    /// arrived years after the mobile ones, so a desktop application that set
+    /// `nativeTheme = ThemeMode.MODERN` for its phone builds would have had
+    /// every one of its screens redrawn by a hint it set for another platform.
+    /// Asking for the desktop look has to be something you said, which is this
+    /// constant.
+    @HintValue("native")
+    NATIVE,
+
     /// The flat iOS 7 look.
     @HintValue(value = "ios7", accepts = {"flat"})
     IOS7,

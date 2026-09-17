@@ -122,9 +122,9 @@ final class BuildHintSchemaDefaults {
         // Group.
         set("{{@nativeTheme}}.label", "Native Theme");
         set("{{@nativeTheme}}.description",
-                "Controls the Codename One look & feel on iOS, Android, and "
-                + "the JavaScript port (browser OS auto-detection: iOS/Mac "
-                + "browsers get the iOS theme, everything else gets the "
+                "Controls the Codename One look & feel on iOS, Android, the "
+                + "desktop and the JavaScript port (browser OS auto-detection: "
+                + "iOS/Mac browsers get the iOS theme, everything else gets the "
                 + "Android theme). Modern themes are generated from CSS "
                 + "under native-themes/; legacy themes remain selectable "
                 + "via the values below.");
@@ -132,10 +132,13 @@ final class BuildHintSchemaDefaults {
         // Cross-platform meta hint.
         set("{{#nativeTheme#nativeTheme}}.label", "Shared override");
         set("{{#nativeTheme#nativeTheme}}.type", "Select");
-        set("{{#nativeTheme#nativeTheme}}.values", "modern,legacy,custom");
+        set("{{#nativeTheme#nativeTheme}}.values", "native,modern,legacy,custom");
         set("{{#nativeTheme#nativeTheme}}.description",
-                "Overrides both iOS and Android native theme selection. "
-                + "\"modern\" = liquid glass / Material 3. \"legacy\" = iOS 7 "
+                "Overrides the per-platform native theme selection. "
+                + "\"native\" = the platform's own look on every OS, desktop "
+                + "included. \"modern\" = liquid glass / Material 3, on iOS and "
+                + "Android only -- it predates the desktop themes, so it leaves a "
+                + "desktop app's screens where they were. \"legacy\" = iOS 7 "
                 + "flat / Android Holo Light. \"custom\" disables the framework "
                 + "default and expects the app to install its own. "
                 + "(Deprecated alias: cn1.nativeTheme.)");
@@ -158,6 +161,19 @@ final class BuildHintSchemaDefaults {
                 + "hololight = Android Holo Light (API 14+). legacy = pre-Holo "
                 + "Android theme. (Deprecated alias: cn1.androidTheme; "
                 + "and.hololight=true is also accepted for back-compat.)");
+
+        // Desktop (JavaSE). Resolved against the machine the app starts on, because
+        // one desktop binary runs on Windows, macOS and Linux.
+        set("{{#nativeTheme#desktop.themeMode}}.label", "Desktop theme");
+        set("{{#nativeTheme#desktop.themeMode}}.type", "Select");
+        set("{{#nativeTheme#desktop.themeMode}}.values",
+                "legacy,auto,fluent,aqua,adwaita,custom");
+        set("{{#nativeTheme#desktop.themeMode}}.description",
+                "legacy = what desktop apps have always had (default -- these "
+                + "themes arrived after the apps did). auto / native / modern = the "
+                + "host's own look: Fluent on Windows, Aqua on macOS, Adwaita on "
+                + "GNOME. fluent / aqua / adwaita pin that one look on every "
+                + "machine. custom installs no framework theme at all.");
 
         // The wearable build has no build hints: a project declares the watch
         // lifecycle class as codename1.watchMain next to codename1.mainName and

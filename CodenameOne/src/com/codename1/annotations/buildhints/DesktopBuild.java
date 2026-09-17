@@ -38,6 +38,44 @@ import java.lang.annotation.Target;
 ///
 /// The platform is stated once on the annotation, not on every attribute. An
 /// attribute repeats it only to disagree with it.
+///
+/// #### Which theme a desktop application gets
+///
+/// [#themeMode()] is resolved against the machine the application starts on,
+/// because one desktop binary runs on all three operating systems:
+///
+/// | `desktop.themeMode` | Windows | macOS | Linux / GNOME |
+/// | --- | --- | --- | --- |
+/// | unset, or `legacy` | *unchanged* | *unchanged* | *unchanged* |
+/// | `auto`, `native`, `modern` | Windows Fluent | macOS Aqua | GNOME Adwaita |
+/// | `fluent` | Windows Fluent | Windows Fluent | Windows Fluent |
+/// | `aqua` | macOS Aqua | macOS Aqua | macOS Aqua |
+/// | `adwaita` | GNOME Adwaita | GNOME Adwaita | GNOME Adwaita |
+/// | `custom` | *none* | *none* | *none* |
+///
+/// *unchanged* is the default and is deliberate: it is whatever the application was
+/// built and tested against before these themes existed, because flipping it would
+/// move every screen of every desktop application already shipped. `custom` differs
+/// from it by installing no framework theme at all.
+///
+/// #### How that relates to the other theme hints
+///
+/// Each platform has its own hint, and each governs only its own platform:
+///
+/// | hint | governs | see |
+/// | --- | --- | --- |
+/// | `desktop.themeMode` | the JavaSE desktop application, on all three desktops | [#themeMode()] |
+/// | `ios.themeMode` | iOS | [Ios#themeMode()] |
+/// | `and.themeMode` | Android | [Android#themeMode()] |
+/// | `mac.themeMode` | the native macOS build, a separate target from the JavaSE desktop application | [Mac#themeMode()] |
+/// | `nativeTheme` | the default for the three above, where they are unset | [Build#nativeTheme()] |
+///
+/// The one value in that last row that also reaches the desktop is
+/// `nativeTheme = ThemeMode.NATIVE`, which is the single hint for "look like the
+/// platform, everywhere". `ThemeMode.MODERN` reaches iOS and Android only: it
+/// shipped years before the desktop themes, so an application that set it for its
+/// phone builds never asked for its desktop screens to be redrawn. `themeMode` here
+/// outranks both.
 @Hint(platform = "desktop")
 @Retention(RetentionPolicy.CLASS)
 @Target(ElementType.TYPE)
@@ -65,19 +103,28 @@ public @interface DesktopBuild {
     /// Which native theme a desktop build installs, and the one hint that decides
     /// whether a desktop application looks like the platform it's running on.
     ///
-    /// `auto` and `native` both mean "whatever this machine is" -- Fluent on
-    /// Windows, Aqua on macOS, Adwaita on GNOME -- which is the only sensible
-    /// reading on desktop, where one binary runs on all three. A theme can also be
-    /// named outright with `fluent`, `aqua` or `adwaita`, which is what a build
-    /// that wants one look everywhere asks for. `legacy` keeps what desktop
-    /// applications have always had, and `custom` installs nothing so the
-    /// application's own theme is the only one.
+    /// One desktop binary runs on Windows, macOS and Linux, so the value is resolved
+    /// against the machine the application starts on rather than at build time.
+    /// `auto`, `native` and `modern` are one value under three spellings and select
+    /// the host's own look: Fluent, Aqua or Adwaita. Naming a theme outright with
+    /// `fluent`, `aqua` or `adwaita` pins that one look on every machine instead,
+    /// which is what an application with a deliberate cross-platform identity wants.
+    /// `legacy`, which is also the default, keeps whatever the application was built
+    /// and tested against before these themes existed, and `custom` installs no
+    /// framework theme at all so the application's own is the only one loaded.
+    ///
+    /// The per-value and per-platform tables, and how this relates to the iOS,
+    /// Android, macOS and cross-platform theme hints, are on the `@DesktopBuild`
+    /// annotation itself. (Javadoc link syntax is deliberately not used in this
+    /// paragraph: an attribute's prose is harvested verbatim into the developer
+    /// guide's hint table, where a bracketed reference reaches the reader as
+    /// literal text pointing at a symbol the guide does not publish.)
     ///
     /// Read by the JavaSE port at runtime rather than by a builder, so unlike most
     /// hints here it changes what the running application does rather than what's
     /// produced for it.
     @Hint(name = "desktop.themeMode",
-            valuePattern = "auto|native|fluent|aqua|adwaita|legacy|custom")
+            valuePattern = "auto|native|modern|fluent|aqua|adwaita|legacy|custom")
     String themeMode() default "";
 
     /// How the desktop window is framed: native for the OS title bar and menu bar,
