@@ -20,16 +20,41 @@ package java.util;
 /** A resizable sequence whose private backing buffer is owned by the VM. */
 public class ArrayList<E> extends AbstractList<E> implements List<E>, RandomAccess {
     private static final long serialVersionUID = 8683452581122892189L;
-    private transient volatile long cn1Storage;
-    private transient int capacity;
+    /* FIELD ORDER IS LOAD BEARING, and there is no separate capacity field.
+     *
+     * The object was 40 bytes: 16 of header, then AbstractList's modCount, then 4
+     * bytes of padding to align the 8-byte storage handle, then the handle, then
+     * capacity and size. Declaring size before the handle puts it in that padding,
+     * and dropping capacity leaves 16 + modCount + size + handle = 32 exactly --
+     * the next BiBOP size class down, on the most frequently allocated collection
+     * in the VM (a translation of the 5,326-class corpus allocates about three
+     * million of them).
+     *
+     * Capacity is not stored because the block already knows it: every native
+     * reference block carries its own element count in its header, which
+     * cn1RefBlockCount reads with one load, and which the C fast paths in
+     * cn1_intrinsics.h and addAllNative now read the same way. A handle of 0 --
+     * the lazy, never-allocated state -- reports 0.
+     *
+     * Consequence worth knowing: there is nowhere left to park a REQUESTED capacity
+     * that has not been allocated yet. The no-argument constructor used to set
+     * capacity = 10 and allocate nothing; now it allocates nothing and says
+     * nothing, and reserve() applies the same default on the first growth. */
     private transient int size;
+    private transient volatile long cn1Storage;
 
-    public ArrayList() { capacity = 10; }
+    private static final int DEFAULT_CAPACITY = 10;
+
+    /** Element count of the backing block; 0 when nothing is allocated yet. */
+    private int capacity() {
+        return NativeStorage.capacity(cn1Storage);
+    }
+
+    public ArrayList() { }
 
     public ArrayList(int capacity) {
         if (capacity < 0) throw new IllegalArgumentException();
         cn1Storage = NativeStorage.references(capacity);
-        this.capacity = capacity;
     }
 
     public ArrayList(E... elements) {
@@ -41,9 +66,9 @@ public class ArrayList<E> extends AbstractList<E> implements List<E>, RandomAcce
         int nativeResult = initFromNative(collection);
         if (nativeResult >= 0) return;
         if (nativeResult == -2) throw new OutOfMemoryError();
-        capacity = collection.size();
-        if (capacity < 0) throw new IllegalArgumentException();
-        cn1Storage = NativeStorage.references(capacity);
+        int initial = collection.size();
+        if (initial < 0) throw new IllegalArgumentException();
+        cn1Storage = NativeStorage.references(initial);
         addAll(collection);
     }
 
@@ -87,11 +112,17 @@ public class ArrayList<E> extends AbstractList<E> implements List<E>, RandomAcce
 
     private void reserve(int required) {
         if (required < 0) throw new OutOfMemoryError();
-        if (required <= capacity) {
-            if (required != 0 && cn1Storage == 0) resize(capacity);
+        int cap = capacity();
+        if (required <= cap) {
             return;
         }
-        int grown = capacity + (capacity >> 1) + 1;
+        if (cap == 0) {
+            // First growth. DEFAULT_CAPACITY unless more was asked for, which is what
+            // the old `capacity = 10` placeholder produced on the first add.
+            resize(required > DEFAULT_CAPACITY ? required : DEFAULT_CAPACITY);
+            return;
+        }
+        int grown = cap + (cap >> 1) + 1;
         resize(grown < required || grown < 0 ? required : grown);
     }
 
@@ -100,12 +131,11 @@ public class ArrayList<E> extends AbstractList<E> implements List<E>, RandomAcce
         long old = cn1Storage;
         NativeStorage.copy(old, 0, fresh, 0, size);
         cn1Storage = fresh;
-        capacity = newCapacity;
         NativeStorage.retire(old);
     }
 
     public void ensureCapacity(int minimumCapacity) {
-        if (minimumCapacity > capacity) {
+        if (minimumCapacity > capacity()) {
             reserve(minimumCapacity);
             modCount++;
         }
@@ -113,7 +143,7 @@ public class ArrayList<E> extends AbstractList<E> implements List<E>, RandomAcce
 
     public void trimToSize() {
         modCount++;
-        if (capacity != size) resize(size);
+        if (capacity() != size) resize(size);
     }
 
     public boolean add(E value) {
@@ -231,7 +261,12 @@ public class ArrayList<E> extends AbstractList<E> implements List<E>, RandomAcce
 
         @SuppressWarnings("unchecked")
         public E next() {
-            if (modCount != expectedModCount || cursor >= size || cursor >= capacity) return nextSlow();
+            // The capacity term is what keeps an inconsistent size from turning into
+            // an unchecked read past the block -- NativeStorage.get has no bounds
+            // check. It reads the block header, which the very next line touches
+            // anyway, rather than a field that no longer exists.
+            if (modCount != expectedModCount || cursor >= size
+                    || cursor >= NativeStorage.capacity(cn1Storage)) return nextSlow();
             lastReturned = cursor++;
             return (E) NativeStorage.get(cn1Storage, lastReturned);
         }

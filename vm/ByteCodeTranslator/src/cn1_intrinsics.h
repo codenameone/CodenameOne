@@ -102,7 +102,12 @@ static inline JAVA_BOOLEAN cn1InlListAdd(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT 
     struct obj__java_util_ArrayList* list = (struct obj__java_util_ArrayList*)owner;
     JAVA_INT size = list->java_util_ArrayList_size;
     JAVA_LONG block = list->java_util_ArrayList_cn1Storage;
-    if(__builtin_expect(size < list->java_util_ArrayList_capacity && block != 0, 1)) {
+    // The block carries its own element count in its header, so there is no
+    // capacity field to read: cn1RefBlockCount is one load, from the same header
+    // line this fast path is about to write through. It answers 0 for a handle of 0,
+    // which subsumes the block != 0 test -- kept anyway because it is what makes the
+    // unchecked store below safe to read at a glance.
+    if(__builtin_expect(block != 0 && size < cn1RefBlockCount(block), 1)) {
         cn1InlStorageSet(threadStateData, block, size, value);
         list->java_util_ArrayList_size = size + 1;
         list->java_util_AbstractList_modCount++;

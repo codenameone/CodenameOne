@@ -4049,8 +4049,12 @@ JAVA_INT java_util_ArrayList_addAllNative___int_java_util_Collection_R_int(
     int n = source.count, size = list->java_util_ArrayList_size;
     if(n == 0) return 0;
     if(n < 0 || n > INT_MAX - size) return -2;
-    int required = size + n, capacity = list->java_util_ArrayList_capacity;
     JAVA_LONG old = list->java_util_ArrayList_cn1Storage;
+    // From the block header rather than a field -- ArrayList has no capacity field;
+    // see the comment on its declaration order. cn1RefBlockCount(0) is 0, which is
+    // the right answer for the not-yet-allocated state the `old == 0` test below
+    // already handles.
+    int required = size + n, capacity = cn1RefBlockCount(old);
     JAVA_LONG block = old;
     if(required > capacity || old == 0) {
         if(required > capacity) {
@@ -4078,7 +4082,7 @@ JAVA_INT java_util_ArrayList_addAllNative___int_java_util_Collection_R_int(
     }
     if(marking) cn1SatbEnqueueRangeLocked((JAVA_ARRAY_OBJECT*)(data + index), n);
     if(block != old) list->java_util_ArrayList_cn1Storage = block;
-    list->java_util_ArrayList_capacity = capacity;
+    // No capacity store: the block it was describing already records it.
     list->java_util_ArrayList_size = required;
     list->java_util_AbstractList_modCount++;
     cn1SatbBulkEnd();
