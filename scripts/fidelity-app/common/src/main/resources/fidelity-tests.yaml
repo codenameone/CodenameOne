@@ -470,9 +470,15 @@ components:
     cn1_uiid: Separator
     # The thinnest row in the suite, and the one most worth measuring: a separator is
     # nothing but a colour and a thickness, so a theme that gets either wrong has no other
-    # symptom. The tile is short because a taller one would be almost entirely background
-    # on both sides and would score high no matter what the rule says.
-    tile_height_px: 24
+    # symptom.
+    #
+    # It keeps the default 240x56 tile even though a shorter one would put proportionally
+    # more of the rule in frame. tile_height_px is documented as a per-component override
+    # and the CN1 side honours it, but the three reference apps mirror only the DEFAULTS --
+    # TILE_W and TILE_H are constants in each of them -- so a per-component override moves
+    # one side of the comparison and not the other. No desktop row has ever used one. The
+    # measured proof is this row's own first capture: the yaml asked for 24 and all three
+    # references produced 240x56 regardless.
     native_win: winui_separator
     native_mac: appkit_box_separator
     native_gnome: gtk_separator
