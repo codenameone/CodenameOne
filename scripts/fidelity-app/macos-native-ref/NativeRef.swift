@@ -124,7 +124,6 @@ let SPECS: [Spec] = [
     // no Screen Recording consent. Those rows carry a platforms: list in the spec rather than
     // a blank golden that would score 0% forever and read as a theme bug -- the same call
     // already made for Aqua vibrancy.
-    Spec(id: "DesktopSeparator", kind: "appkit_box_separator", states: ["normal"]),
     Spec(id: "DesktopGroupBox", kind: "appkit_box_titled", states: ["normal"]),
     Spec(id: "DesktopStepper", kind: "appkit_stepper", states: ["normal", "disabled"]),
     Spec(id: "DesktopLinkButton", kind: "appkit_link_button", states: ["normal", "hover", "disabled"]),
@@ -142,10 +141,10 @@ let SPECS: [Spec] = [
 /// (39px for "Text"), which is not a control anyone would recognise or ship.
 let FULL_WIDTH_KINDS: Set<String> = [
     "appkit_slider", "appkit_progress", "appkit_textfield",
-    // Second wave, same rule: none of these has a natural width either. A separator
-    // measures to nothing at all, a search field to its placeholder, and a row, a box, a
-    // tab view and a toolbar are all containers that take the width they are given.
-    "appkit_box_separator", "appkit_searchfield", "appkit_tableview_row",
+    // Second wave, same rule: none of these has a natural width either. A search field
+    // measures to its placeholder, and a row, a box, a tab view and a toolbar are all
+    // containers that take the width they are given.
+    "appkit_searchfield", "appkit_tableview_row",
     "appkit_box_titled", "appkit_tabview", "appkit_toolbar",
 ]
 
@@ -251,10 +250,6 @@ final class RefApp: NSObject, NSApplicationDelegate {
             let pop = NSPopUpButton(frame: .zero, pullsDown: false)
             pop.addItem(withTitle: "Option")
             return pop
-        case "appkit_box_separator":
-            let box = NSBox()
-            box.boxType = .separator
-            return box
         case "appkit_box_titled":
             // The label goes INSIDE the default content view. Assigning it AS the content view
             // replaces the view the box draws its frame around, so the frame disappeared and

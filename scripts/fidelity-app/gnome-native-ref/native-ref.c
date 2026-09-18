@@ -163,7 +163,6 @@ static const Spec SPECS[] = {
      * paintable -- but not the tooltip, which is a surface of its own like AppKit's. */
     {"DesktopScrollBar",          "gtk_scrollbar",   {"normal", NULL}},
     {"DesktopScrollBarHighlight", "gtk_scrollbar",   {"normal", "hover", "pressed", NULL}},
-    {"DesktopSeparator",    "gtk_separator",         {"normal", NULL}},
     {"DesktopGroupBox",     "gtk_frame",             {"normal", NULL}},
     {"DesktopStepper",      "gtk_spin_button",       {"normal", "disabled", NULL}},
     {"DesktopLinkButton",   "gtk_link_button",       {"normal", "hover", "disabled", NULL}},
@@ -185,10 +184,9 @@ static int is_full_width(const char *kind) {
     return strcmp(kind, "gtk_scale") == 0
         || strcmp(kind, "gtk_progressbar") == 0
         || strcmp(kind, "gtk_entry") == 0
-        /* Second wave, same rule: a separator measures to nothing at all, a search entry to
-         * its placeholder, and a row, a frame, a notebook, a header bar and a menu bar are
-         * containers that take the width they are given. */
-        || strcmp(kind, "gtk_separator") == 0
+        /* Second wave, same rule: a search entry measures to its placeholder, and a row, a
+         * frame, a notebook, a header bar and a menu bar are containers that take the width
+         * they are given. */
         || strcmp(kind, "gtk_search_entry") == 0
         || strcmp(kind, "gtk_listbox_row") == 0
         || strcmp(kind, "gtk_frame") == 0
@@ -501,9 +499,6 @@ static GtkWidget *make_widget(const char *kind) {
          * where the thumb is before anything about its colour or shape can be compared. */
         GtkAdjustment *adj = gtk_adjustment_new(0.0, 0.0, 100.0, 1.0, 10.0, 40.0);
         return gtk_scrollbar_new(GTK_ORIENTATION_VERTICAL, adj);
-    }
-    if (strcmp(kind, "gtk_separator") == 0) {
-        return gtk_separator_new(GTK_ORIENTATION_HORIZONTAL);
     }
     if (strcmp(kind, "gtk_frame") == 0) {
         /* GtkFrame with a label IS the GNOME group box; there is no separate widget. */

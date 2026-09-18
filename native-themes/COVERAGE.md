@@ -157,13 +157,25 @@ First measured scores, against golden sets captured on hosted runners:
 
 | Theme | Golden set | Pairs | Mean | Gating |
 |---|---|---:|---:|---|
-| Windows Fluent | `windows-11-fluent` | 60 | 82.1% | yes, on master |
-| GNOME Adwaita | `gnome-adwaita` | 60 | 85.9% | yes, on master |
-| macOS Aqua | `macos-aqua` | 60 | 84.6% (local) | yes, on master |
+| Windows Fluent | `windows-11-fluent` | 98 | 85.3% | yes, on master |
+| GNOME Adwaita | `gnome-adwaita` | 102 | 83.8% | yes, on master |
+| macOS Aqua | `macos-aqua` | 86 | 84.0% | yes, on master |
 
 These are starting points, not results. All three themes were written without a
-reference to check them against, so this is the first time any of them has been
-measured, and the ratchet moves them up from here.
+reference to check them against, and the ratchet moves them up from here.
+
+The pair counts differ by platform because three rows are only scorable where the
+reference can be rendered and put into the state; see "Rows that are not scored on
+every platform" below. The means barely moved when the matrix grew from 9 rows to 21
+(82.1 / 85.9 / 84.6 before), so the new rows sit in the same band as the old ones
+rather than dragging the set down -- but four of them are well below it:
+
+| Row | Score | What the gap is |
+|---|---:|---|
+| `DesktopTabs` | 35-68% | The biggest gap in the set. CN1 draws two full-width bordered boxes; WinUI draws a document-tab strip, AppKit a centred segmented pill and GTK an underlined notebook. The `SelectedTab`/`UnselectedTab` rules added here are generic, not per-platform. |
+| `DesktopMenuBar` | 34-50% | CN1's `CommandList` strip against a real menu bar. Only meaningful where CN1 still draws its own menu, which is GNOME's headerbar mode. |
+| `DesktopListRow` | 68-90% | Row height and the selected fill; the CN1 row is taller than a native one on all three. |
+| `DesktopSlider` dark | 73% | Pre-existing, macOS only, and unchanged by this work. |
 
 ### Every desktop port installs one
 

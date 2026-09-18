@@ -447,12 +447,24 @@ components:
     platforms: gnome
     states: normal,hover,pressed
 
-  - id: DesktopSeparator
-    cn1_uiid: Separator
-    native_win: winui_separator
-    native_mac: appkit_box_separator
-    native_gnome: gtk_separator
-    states: normal
+  # No DesktopSeparator row, and the reason is a measurement rather than an omission.
+  #
+  # A separator is a 1px hairline a few levels off the surface, on all three platforms. The
+  # comparator's content mask measures distance from the backdrop, and that contrast does not
+  # clear it: the captured tile is 98.2% backdrop and holds exactly TWO colours, with a
+  # maximum deviation of 14 (Fluent), 23 (Aqua) and 29 (Adwaita) -- against 36 colours and a
+  # deviation of 216 for a Button tile. So the mask comes back empty on both sides, geometry
+  # reports {"empty": true}, and shape and size agreement come out at 1.0 because two empty
+  # masks agree perfectly. Windows light scored 96.45% with both sub-scores at exactly 1.0.
+  #
+  # A row that reports a near-perfect number about something the metric never looked at is
+  # worse than no row. FidelityGate already refuses to baseline it, which is the suite working
+  # as designed. Lowering the content threshold would make it measurable and is not worth
+  # doing for one row: that threshold is shared by every row on every platform, and dropping
+  # it starts admitting anti-aliasing as content.
+  #
+  # The Separator component is still themed by all three desktop themes and is asserted by
+  # DesktopNativeThemeContentTest; it is the overlay COMPARISON that cannot see it.
 
   - id: DesktopGroupBox
     cn1_uiid: GroupBox

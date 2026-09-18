@@ -1785,6 +1785,11 @@ public class Toolbar extends Container {
 
             if (isLeft) {
                 sidemenuDialog = new InteractionDialog(new BorderLayout());
+                // Framework chrome, never an operating system window: this popup is POSITIONED by the
+                // framework, and native window mode documents those margins as ignored, so in a window
+                // it comes out centred and loses the placement that is its whole point. See
+                // TooltipManager for the full note.
+                sidemenuDialog.setNativeWindowMode(false);
 
                 sidemenuDialog.setFormMode(true);
                 sidemenuDialog.setUIID("Container");
@@ -1833,6 +1838,11 @@ public class Toolbar extends Container {
                 }
             } else {
                 rightSidemenuDialog = new InteractionDialog(new BorderLayout());
+                // Framework chrome, never an operating system window: this popup is POSITIONED by the
+                // framework, and native window mode documents those margins as ignored, so in a window
+                // it comes out centred and loses the placement that is its whole point. See
+                // TooltipManager for the full note.
+                rightSidemenuDialog.setNativeWindowMode(false);
 
                 rightSidemenuDialog.setFormMode(true);
                 rightSidemenuDialog.setUIID("Container");

@@ -166,7 +166,6 @@ public partial class App : Application
         // scrollbar is here and not on macOS for the same reason -- see the DesktopScrollBar
         // note in fidelity-tests.yaml for what was measured.
         new("DesktopScrollBar",    "winui_scrollbar",       new[] { "normal" }),
-        new("DesktopSeparator",    "winui_separator",       new[] { "normal" }),
         new("DesktopGroupBox",     "winui_groupbox",        new[] { "normal" }),
         new("DesktopStepper",      "winui_numberbox",       new[] { "normal", "disabled" }),
         new("DesktopLinkButton",   "winui_hyperlinkbutton", new[] { "normal", "hover", "disabled" }),
@@ -186,10 +185,10 @@ public partial class App : Application
     /// other does not, the comparison is between two geometries and the score means nothing.
     private static bool IsFullWidth(string kind) =>
         kind is "winui_slider" or "winui_progressbar" or "winui_textbox"
-            // Second wave, same rule: a separator measures to nothing at all, a search field
-            // to its placeholder, and a row, a box, a tab strip, a command bar and a menu bar
-            // are containers that take the width they are given.
-            or "winui_separator" or "winui_autosuggestbox" or "winui_listviewitem"
+            // Second wave, same rule: a search field measures to its placeholder, and a row,
+            // a box, a tab strip, a command bar and a menu bar are containers that take the
+            // width they are given.
+            or "winui_autosuggestbox" or "winui_listviewitem"
             or "winui_groupbox" or "winui_tabview" or "winui_commandbar" or "winui_menubar";
 
     /// Controls with no natural HEIGHT, the same rule on the other axis. A group box is a
@@ -233,10 +232,6 @@ public partial class App : Application
             IndicatorMode = ScrollingIndicatorMode.MouseIndicator,
             Visibility = Visibility.Visible,
         },
-        // MenuFlyoutSeparator is the system's own rule, not a Rectangle with a hand-picked
-        // colour: it carries the divider brush, the thickness and the margins the platform
-        // draws, which is exactly what the Separator UIID has to match.
-        "winui_separator" => new MenuFlyoutSeparator(),
         "winui_groupbox" => MakeGroupBox(),
         // NumberBox with its spin buttons shown inline, which is the WinUI stepper. Without
         // SpinButtonPlacementMode it is a plain number field and the control under

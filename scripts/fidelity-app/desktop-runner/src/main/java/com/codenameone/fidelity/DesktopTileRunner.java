@@ -211,10 +211,10 @@ public final class DesktopTileRunner {
     private static final java.util.Set<String> FULL_WIDTH_IDS =
             new java.util.HashSet<String>(java.util.Arrays.asList(
                     "DesktopSlider", "DesktopProgressBar", "DesktopTextField",
-                    // Second wave, same rule. A separator measures to nothing at all, a search
-                    // field to its placeholder, and a row, a box, a tab strip, a toolbar and a
-                    // menu bar are containers that take the width they are given.
-                    "DesktopSeparator", "DesktopSearchField", "DesktopListRow",
+                    // Second wave, same rule: a search field measures to its placeholder, and
+                    // a row, a box, a tab strip, a toolbar and a menu bar are containers that
+                    // take the width they are given.
+                    "DesktopSearchField", "DesktopListRow",
                     "DesktopGroupBox", "DesktopTabs", "DesktopToolbar", "DesktopMenuBar"));
 
     /// Controls with no natural HEIGHT, the same rule on the other axis.
