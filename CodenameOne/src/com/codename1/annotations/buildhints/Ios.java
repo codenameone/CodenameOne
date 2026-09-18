@@ -175,10 +175,11 @@ public @interface Ios {
 
     /// true/false (defaults to true). Enables iOS UIScene lifecycle support.
     /// UIScene lets iOS manage one or more app UI sessions independently,
-    /// improving lifecycle handling in modern iOS versions. Apple has indicated
-    /// UIScene will be required starting with iOS 27, so this is now on by
-    /// default; set the flag to `false` only if you need to temporarily fall back
-    /// to the legacy `UIApplicationDelegate` lifecycle.
+    /// improving lifecycle handling in modern iOS versions. Apple requires the
+    /// scene lifecycle of every app linked with the iOS 27 SDK or later, and an
+    /// app built without it fails to launch, so the opt-out is refused at build
+    /// time against those SDKs: setting the flag to `false` only has an effect
+    /// when building against an older SDK.
     Toggle uiscene() default Toggle.DEFAULT;
 
     /// Allows intercepting a URL call using the syntax `<string>urlPrefix<string>`

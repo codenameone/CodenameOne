@@ -23,7 +23,11 @@ If you've access to a Mac, connect the device, open Xcode, and use the device ex
 [[ios-launch-storyboard]]
 === Launch screen storyboard best practices
 
-Launch screen storyboards are the default approach for Codename One iOS builds. Apple requires a storyboard-based launch experience for modern devices, so the legacy screenshot generator was removed in favor of a single adaptive layout. You can still opt back into the old behavior by setting the `ios.generateSplashScreens=true` build hint, but it's best to use a storyboard unless your use case can't be expressed with Auto Layout.
+Launch screen storyboards are the default approach for Codename One iOS builds. Apple requires a storyboard-based launch experience for modern devices, so the legacy screenshot generator was removed in favor of a single adaptive layout.
+
+Every iOS build declares a launch screen. Apps linked with the iOS 27 SDK or later are rejected unless the bundle declares one of `UILaunchStoryboardName`, `UILaunchStoryboards`, `UILaunchScreen` or `UILaunchScreens`, and `UIRequiresFullScreen` isn't a substitute for any of them. The build checks the finished `Info.plist` and fails if none of the four is there, so a `ios.plistInject` that removes the generated key stops the build rather than producing an archive the App Store refuses.
+
+The `ios.generateSplashScreens=true` build hint is deprecated. The generator it named is gone, so it no longer opts back into anything; all it still does is disable iPad multitasking. It no longer suppresses the generated launch screen either, because that only ever produced a bundle with no launch metadata at all. To supply a launch experience of your own, customize the files below or declare your own launch key through `ios.plistInject`.
 
 ==== Key files
 

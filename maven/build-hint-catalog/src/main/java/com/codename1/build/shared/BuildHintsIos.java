@@ -521,8 +521,12 @@ final class BuildHintsIos {
                 .type(HintType.BOOLEAN)
                 .def("false")
                 .platform("ios")
-                .doc("Boolean true/false defaults to false. Enables legacy generation of splash screen images "
-                        + "instead of the current launch storyboards."));
+                .doc("Deprecated, boolean true/false defaults to false. The legacy splash-image "
+                        + "generator this hint named has been removed, and the hint no longer "
+                        + "suppresses the generated launch screen -- an app linked with the iOS 27 "
+                        + "SDK is rejected without one. All it still does is disable iPad "
+                        + "multitasking (UIRequiresFullScreen). Use ios.plistInject to declare a "
+                        + "launch screen of your own."));
 
         h.add(new Hint("ios.glAppDelegateBody")
                 .group(HintGroup.IOS)

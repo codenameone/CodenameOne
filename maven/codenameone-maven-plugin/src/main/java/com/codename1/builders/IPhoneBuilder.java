@@ -140,6 +140,16 @@ public class IPhoneBuilder extends Executor {
     /// not go through getDeploymentTarget().
     private String sdkDeploymentFloor;
 
+    /// The major version of the iOS SDK this build links against, or -1 when it cannot be
+    /// told. Read once in build(); the launch-metadata rules below are conditional on it
+    /// because Apple's are: an SDK 26 bundle is unaffected by either of them.
+    private int iosSdkMajor = -1;
+
+    /// The first iOS SDK that requires a launch screen and the UIScene lifecycle of every
+    /// app linked against it. See iOS & iPadOS 27 release notes, UIKit items 168247372
+    /// (launch screen) and 141837548 (scene lifecycle), and TN3187.
+    static final int FIRST_SDK_REQUIRING_LAUNCH_METADATA = 27;
+
     // StringBuilder used for constructing ruby script with xcodeproj
     // which adds localized strings files to the project.
     private StringBuilder installLocalizedStringsScript = new StringBuilder();
@@ -2155,6 +2165,26 @@ public class IPhoneBuilder extends Executor {
         xcodeVersion = getXcodeVersion(xcodebuild);
         if (xcodeVersion <= 0) {
             xcodeVersion = 10;
+        }
+
+        // The SDK, not the Xcode, is what Apple's launch-screen and scene-lifecycle rules are
+        // conditional on -- so ask for it directly, and only fall back to the Xcode version when
+        // xcrun cannot answer. The fallback is sound in the direction it is used: the two have
+        // only matched since the Xcode 26 renumbering, and every Xcode that predates it reports a
+        // version far below the floor this is compared against, so a wrong answer there can never
+        // turn the rules ON for a build the SDK exempts.
+        iosSdkMajor = iosSdkMajorVersion(activeIosSdkName(request));
+        if (iosSdkMajor < 0) {
+            iosSdkMajor = xcodeVersion;
+        }
+        // Fail here rather than after the natives, the project and the archive have been
+        // generated: ios.uiscene also selects CN1_USE_UI_SCENE in the generated Objective-C, so
+        // by the time injectToPlist could notice, an hour of build has already been spent on a
+        // bundle Apple documents as failing to launch.
+        String lifecycleRejection = sceneLifecycleOptOutRejection(
+                request.getArg("ios.uiscene", "true"), iosSdkMajor);
+        if (lifecycleRejection != null) {
+            throw new BuildException(lifecycleRejection);
         }
 
         String facebookAppId = request.getArg("facebook.appId", null);
@@ -10324,6 +10354,137 @@ public class IPhoneBuilder extends Executor {
         return "iphoneos";
     }
 
+    /// The major version in an SDK name, or -1 when the name carries no version.
+    ///
+    /// activeIosSdkName answers "iphoneos27.2" when xcrun can be asked and the bare
+    /// "iphoneos" when it cannot, and the bare name deliberately matches every version --
+    /// which is right for an [sdk=...] qualifier and wrong here, where it would have to
+    /// stand for some particular version. -1 says "unknown" instead, and the caller
+    /// resolves that rather than guessing high.
+    ///
+    /// Only the major is returned. Apple's launch rules are stated against the SDK major,
+    /// and API 37 has already shown what gathering the digits of a dotted version does:
+    /// "27.2" read as 272 compares greater than every floor in the file at once.
+    static int iosSdkMajorVersion(String sdkName) {
+        if (sdkName == null) {
+            return -1;
+        }
+        int digit = 0;
+        while (digit < sdkName.length() && !Character.isDigit(sdkName.charAt(digit))) {
+            digit++;
+        }
+        int end = digit;
+        while (end < sdkName.length() && Character.isDigit(sdkName.charAt(end))) {
+            end++;
+        }
+        if (end == digit) {
+            return -1;
+        }
+        try {
+            return Integer.parseInt(sdkName.substring(digit, end));
+        } catch (NumberFormatException tooManyDigits) {
+            return -1;
+        }
+    }
+
+    /// Why a build must be refused for turning the scene lifecycle off, or null to proceed.
+    ///
+    /// An app linked with SDK 27 or later that does not adopt the UIScene lifecycle does not
+    /// launch -- Apple documents that as the outcome, not as a warning, so a build that
+    /// honoured the opt-out here would hand the developer an archive that cannot run. The
+    /// alternative to refusing is to force the lifecycle back on, and that is worse: it is a
+    /// silent override of an explicit hint, and the hint exists precisely because an app can
+    /// have a reason to want the old lifecycle. Refusing says which of the two it is.
+    ///
+    /// Scoped to an explicit `false`. The hint defaults to true, so an absent hint has
+    /// nothing to reject and every ordinary build is untouched.
+    ///
+    /// #### Parameters
+    ///
+    /// - `uisceneArg`: the ios.uiscene hint as the request carries it, defaulted to "true"
+    ///
+    /// - `sdkMajor`: the major version of the SDK being linked against, or -1 if unknown
+    ///
+    /// #### Returns
+    ///
+    /// the message to fail the build with, or null when there is nothing to refuse
+    static String sceneLifecycleOptOutRejection(String uisceneArg, int sdkMajor) {
+        if (sdkMajor < FIRST_SDK_REQUIRING_LAUNCH_METADATA) {
+            return null;
+        }
+        if (uisceneArg == null || !"false".equalsIgnoreCase(uisceneArg.trim())) {
+            return null;
+        }
+        return "ios.uiscene=false cannot be honored against the iOS " + sdkMajor
+                + " SDK. Apple requires the UIScene lifecycle of every app linked with SDK 27 "
+                + "or later; an app built without it fails to launch (iOS & iPadOS 27 release "
+                + "notes, UIKit 141837548). Remove the ios.uiscene build hint to use the "
+                + "supported scene lifecycle; the legacy UIApplicationDelegate lifecycle is "
+                + "only reachable by building against an older SDK. Migration guidance is in "
+                + "Apple TN3187. If your app works under the legacy lifecycle and not under "
+                + "scenes, please report it -- that is a bug in Codename One, and the opt-out "
+                + "is no longer a way around it.";
+    }
+
+    /// Why a finished Info.plist must be refused, or null when it satisfies Apple's rules.
+    ///
+    /// Asked of the document this builder actually wrote, not of the fragments it assembled.
+    /// The keys can arrive from three places -- the translator's template, the injection
+    /// below, and the developer's own ios.plistInject -- and only the finished file knows
+    /// what survived all three. Reading the generator strings instead is how a bundle with
+    /// no launch key at all was produced by a build whose generator looked correct.
+    ///
+    /// #### Parameters
+    ///
+    /// - `plist`: the complete Info.plist document
+    ///
+    /// - `sdkMajor`: the major version of the SDK being linked against, or -1 if unknown
+    ///
+    /// #### Returns
+    ///
+    /// the message to fail the build with, or null when the document is acceptable
+    static String launchMetadataRejection(String plist, int sdkMajor) {
+        if (sdkMajor < FIRST_SDK_REQUIRING_LAUNCH_METADATA) {
+            return null;
+        }
+        int[] root = plistRootDictBody(plist);
+        if (root == null) {
+            // Not a document this parser can read. Xcode will have its own opinion about that
+            // and will say so; inventing a launch-screen failure for it would be a misdiagnosis.
+            return null;
+        }
+        // All four, because Apple accepts all four and an app is entitled to supply whichever
+        // one describes its launch experience. This is a check that a launch experience exists,
+        // never a preference for the one this builder happens to generate.
+        String[] accepted = {
+            "UILaunchStoryboardName", "UILaunchStoryboards", "UILaunchScreen", "UILaunchScreens"
+        };
+        boolean declared = false;
+        for (String key : accepted) {
+            if (plistMemberRange(plist, root[0], root[1], key) != null) {
+                declared = true;
+                break;
+            }
+        }
+        if (!declared) {
+            return "The generated Info.plist declares no launch screen. Apps linked with the "
+                    + "iOS " + sdkMajor + " SDK are rejected unless the bundle declares one of "
+                    + "UILaunchStoryboardName, UILaunchStoryboards, UILaunchScreen or "
+                    + "UILaunchScreens (iOS & iPadOS 27 release notes, UIKit 168247372). "
+                    + "UIRequiresFullScreen is not a substitute (TN3192). Remove any "
+                    + "ios.plistInject that strips the generated launch key, or declare your "
+                    + "own launch screen there.";
+        }
+        if (plistMemberRange(plist, root[0], root[1], "UIApplicationSceneManifest") == null) {
+            return "The generated Info.plist declares no UIApplicationSceneManifest. Apps "
+                    + "linked with the iOS " + sdkMajor + " SDK must adopt the UIScene "
+                    + "lifecycle or they fail to launch (iOS & iPadOS 27 release notes, UIKit "
+                    + "141837548). Remove any ios.plistInject that strips the generated scene "
+                    + "manifest, or declare your own there.";
+        }
+        return null;
+    }
+
     /// A ruby fragment that raises every app-extension target to the SDK's minimum.
     ///
     /// Appended AFTER the fragment that creates the extensions, which is the whole point.
@@ -16239,6 +16400,11 @@ public class IPhoneBuilder extends Executor {
         if(request.getArg("ios.generateSplashScreens", "false").equals(
             "true")) {
             multitasking = false;
+            log("ios.generateSplashScreens is deprecated and no longer suppresses the generated "
+                    + "launch screen: the legacy splash-image generator it named was removed, and "
+                    + "an app linked with the iOS 27 SDK is rejected without a launch screen. The "
+                    + "hint still disables iPad multitasking. Declare your own launch screen via "
+                    + "ios.plistInject if you need a different one.");
         }
         if (multitasking && useMetal && getDeploymentTargetInt(request) < 14) {
             // An explicit ios.deployment_target below 14 cannot satisfy the
@@ -16259,35 +16425,41 @@ public class IPhoneBuilder extends Executor {
                 inject += "\n<key>UIRequiresFullScreen</key><true/>\n";
             }
         }
-        if (!"true".equals(request.getArg("ios.generateSplashScreens", "false"))) {
-            if ("true".equalsIgnoreCase(request.getArg("ios.uiscene", "true"))) {
-                // SplashBoard never renders the launch storyboard for scene-based
-                // CN1 apps -- the system animates from a black frame instead
-                // (issue #5210). The iOS 14+ UILaunchScreen generated launch
-                // screen does work under UIScene: system background color
-                // (light/dark aware) with the launch icon centered, matching the
-                // native launch placeholder the app shows until the first EDT
-                // frame. UILaunchStoryboardName must be OMITTED here: when both
-                // keys are present iOS prefers the storyboard, which is exactly
-                // the broken path (verified on the iOS 26 simulator with a cold
-                // SplashBoard cache). The ios.launchStoryboardName hint is
-                // therefore only honored with ios.uiscene=false; injecting
-                // either key via ios.plistInject overrides this default.
-                // UIImageName points at the loose Launch.Foreground.png in the
-                // bundle root (guaranteed by generateLaunchScreen); SplashBoard
-                // resolves it there but fails to render the same image from an
-                // actool compiled imageset, so do NOT move it into
-                // Images.xcassets.
-                if (!inject.contains("UILaunchScreen") && !inject.contains("UILaunchStoryboardName")) {
-                    inject += "\n<key>UILaunchScreen</key>\n"
-                            + "<dict>\n"
-                            + "    <key>UIImageName</key>\n"
-                            + "    <string>Launch.Foreground</string>\n"
-                            + "</dict>";
-                }
-            } else if (!inject.contains("UILaunchStoryboardName")) {
-                inject += "\n<key>UILaunchStoryboardName</key><string>"+request.getArg("ios.launchStoryboardName", "LaunchScreen")+"</string>";
+        // ios.generateSplashScreens is deliberately NOT read here any more. The hint named the
+        // legacy generator that produced a Default*.png for every screen size, and that
+        // generator is gone -- generateLaunchScreen() runs unconditionally and writes both
+        // Launch.Foreground.png and LaunchScreen.storyboard whatever the hint says. So the
+        // only surviving effect of suppressing this block was a bundle with no launch key in
+        // it at all, which Apple rejects outright for an app linked with SDK 27 (release
+        // notes, UIKit 168247372) and which no other code path here would have filled in.
+        // The hint keeps its other effect, the iPad multitasking opt-out above.
+        if ("true".equalsIgnoreCase(request.getArg("ios.uiscene", "true"))) {
+            // SplashBoard never renders the launch storyboard for scene-based
+            // CN1 apps -- the system animates from a black frame instead
+            // (issue #5210). The iOS 14+ UILaunchScreen generated launch
+            // screen does work under UIScene: system background color
+            // (light/dark aware) with the launch icon centered, matching the
+            // native launch placeholder the app shows until the first EDT
+            // frame. UILaunchStoryboardName must be OMITTED here: when both
+            // keys are present iOS prefers the storyboard, which is exactly
+            // the broken path (verified on the iOS 26 simulator with a cold
+            // SplashBoard cache). The ios.launchStoryboardName hint is
+            // therefore only honored with ios.uiscene=false; injecting
+            // either key via ios.plistInject overrides this default.
+            // UIImageName points at the loose Launch.Foreground.png in the
+            // bundle root (guaranteed by generateLaunchScreen); SplashBoard
+            // resolves it there but fails to render the same image from an
+            // actool compiled imageset, so do NOT move it into
+            // Images.xcassets.
+            if (!inject.contains("UILaunchScreen") && !inject.contains("UILaunchStoryboardName")) {
+                inject += "\n<key>UILaunchScreen</key>\n"
+                        + "<dict>\n"
+                        + "    <key>UIImageName</key>\n"
+                        + "    <string>Launch.Foreground</string>\n"
+                        + "</dict>";
             }
+        } else if (!inject.contains("UILaunchStoryboardName")) {
+            inject += "\n<key>UILaunchStoryboardName</key><string>"+request.getArg("ios.launchStoryboardName", "LaunchScreen")+"</string>";
         }
         boolean useUISceneManifest = "true".equalsIgnoreCase(request.getArg("ios.uiscene", "true"));
         // com.codename1.ui.Window needs multiple scenes, and a Window only exists on
@@ -16917,9 +17089,20 @@ public class IPhoneBuilder extends Executor {
             line = infoReader.readLine();
         }
         infoReader.close();
-        
+
         try(FileOutputStream fo = new FileOutputStream(infoPlist)) {
             fo.write(b.toString().getBytes(StandardCharsets.UTF_8));
+        }
+
+        // The last word on Apple's launch rules, and the only one that sees what the developer's
+        // own ios.plistInject did. Every producer above decides whether to ADD a key, and each of
+        // them steps aside when the injection already names it -- so a plistInject that mentions
+        // UILaunchScreen inside a comment, or declares it somewhere other than the root
+        // dictionary, silences the generator without leaving UIKit anything to read. Asking the
+        // finished document is what distinguishes those from a real declaration.
+        String rejection = launchMetadataRejection(b.toString(), iosSdkMajor);
+        if (rejection != null) {
+            throw new BuildException(rejection);
         }
     }
 
