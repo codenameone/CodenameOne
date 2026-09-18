@@ -11,6 +11,20 @@ series: ["release-2026-09-18"]
 
 ![Small servers, one Java stack](/blog/why-another-java-server.jpg)
 
+## Why Build Another Java Server?
+
+The last thing we wanted to build was another Java server framework. We have Spring, Micronaut, Quarkus, and enough ways to answer an HTTP request to fill a conference schedule.
+
+Yet we know Java developers who pick Node.js or Go for their newer projects. Why?
+
+The answers varied, but two kept coming up: size and performance, especially for microservices and serverless deployments; and full stack development. A process that starts for one request has a different budget from a server that stays up for a month. For full stack development, Codename One lets the app and server share entity classes and validation rules. One REST contract generates the app client and server dispatcher, while the same ORM annotations generate data access objects (DAOs) for local SQLite and the server database.
+
+We've been using GraalVM in our backend for a while. It's an amazing tool for Spring development. But our CI takes about 30 minutes for a server that isn't huge. The resulting binary is hundreds of megabytes, and the process uses hundreds of megabytes of RAM. That's our application and build pipeline, but it's the bill we have to pay.
+
+So we started benchmarking Go to see whether we could do better. We can. More interestingly, we already had much of what we needed to make a small server useful: a native Java runtime, generated REST clients, shared models, and an ORM. Bringing those pieces together gives us something we would want to use for a new project.
+
+**Codename One now has an experimental native backend.** Write a Java controller, run it on the JVM while developing, and compile it to a native executable for deployment. The database layer supports SQLite, PostgreSQL, MySQL, and MariaDB. The app and backend can share their business rules, entity classes, and API contracts.
+
 ## Coming This Week
 
 Today we're introducing the native backend and the thinking behind it. Over the next six days, we'll work through the shared stack and the other features in this release:
@@ -22,25 +36,13 @@ Today we're introducing the native backend and the thinking behind it. Over the 
 - **Wednesday, September 23:** {{< post-link path="/blog/native-desktop-themes-experiment" text="A Desktop Theme Has to Know About the Mouse" >}}. Try the experimental native desktop themes, including hover behavior and light and dark appearances.
 - **Thursday, September 24:** {{< post-link path="/blog/parparvm-compiles-itself" text="The Java Compiler That Became Its Own Test Case" >}}. See what self-hosting exposed in our runtime and where we're still chasing HotSpot.
 
-## Why Build Another Java Server?
-
-The last thing I wanted to build was another Java server framework. We have Spring, Micronaut, Quarkus, and enough ways to answer an HTTP request to fill a conference schedule.
-
-Yet I personally know Java developers who pick Node.js or Go for their newer projects. Why?
-
-The answers varied, but two kept coming up: size and performance, especially for microservices and serverless deployments; and full stack development. A process that starts for one request has a different budget from a server that stays up for a month. For full stack development, Codename One lets the app and server share entity classes and validation rules. One REST contract generates the app client and server dispatcher, while the same ORM annotations generate data access objects (DAOs) for local SQLite and the server database.
-
-We've been using GraalVM in our backend for a while. It's an amazing tool for Spring development. But our CI takes about 30 minutes for a server that isn't huge. The resulting binary is hundreds of megabytes, and the process uses hundreds of megabytes of RAM. That's our application and build pipeline, but it's the bill we have to pay.
-
-So we started benchmarking Go to see whether we could do better. We can. More interestingly, we already had much of what we needed to make a small server useful: a native Java runtime, generated REST clients, shared models, and an ORM. Bringing those pieces together gives us something I would want to use for a new project.
-
-**Codename One now has an experimental native backend.** Write a Java controller, run it on the JVM while developing, and compile it to a native executable for deployment. The database layer supports SQLite, PostgreSQL, MySQL, and MariaDB. The app and backend can share their business rules, entity classes, and API contracts.
-
 ## A server is another constrained device
 
 Most Java server work starts with a large runtime and asks how much of it can be removed. We started with the runtime we use on phones.
 
 ParparVM translates Java bytecode to C, then compiles and links the reachable program into a native executable. It already has to care about startup time, memory pressure, and code size. Taking that runtime to a small server is a fairly natural move once you stop treating the server as an unlimited machine.
+
+Our runtime is deeply optimized for ARM. Years of running on phones and Apple Silicon have made that architecture central to our work, including [NEON paths for UTF-8 conversion](https://github.com/codenameone/CodenameOne/blob/2697dcfa2f0425170efd08655243032571b65869/vm/ByteCodeTranslator/src/nativeMethods.m) and [ARM64 assembly for virtual-thread switching](https://github.com/codenameone/CodenameOne/blob/2697dcfa2f0425170efd08655243032571b65869/vm/ByteCodeTranslator/src/cn1_virtual_thread_asm.S). As ARM becomes more important on servers, with offerings such as [AWS Graviton](https://aws.amazon.com/ec2/graviton/), that investment has another place to pay off.
 
 GraalVM makes a large Java application much smaller relative to what it does. We want to start lower: a small native process that grows as you add the behavior your service needs.
 
@@ -85,7 +87,7 @@ Java 25's [AOT cache](https://docs.oracle.com/en/java/javase/25/migrate/signific
 
 ## How small is a Java Hello World?
 
-I also wanted a baseline with almost no application in it:
+We also wanted a baseline with almost no application in it:
 
 ```java
 public class Hello {
@@ -107,11 +109,13 @@ The ParparVM executable is **392 KB**. The GraalVM executable is **8.18 MB**. Fo
 
 ![Hello World deployment size and peak resident memory across three Java runtimes](/blog/java-hello-footprint.svg)
 
-That's the lower starting point I mean when I say we think about the server as a constrained device. Adding HTTP, TLS, and database support grows the binary, as the server measurements above show. Starting with 392 KB leaves a lot of room.
+That's the lower starting point we mean when we say we think about the server as a constrained device. Adding HTTP, TLS, and database support grows the binary, as the server measurements above show. Starting with 392 KB leaves a lot of room.
 
 The [source, commands, and individual measurements](/blog/java-hello-benchmark.zip) are included so you can repeat the comparison. These are local process measurements with the runtime versions shown, separate from both the Linux HTTP experiment and our Spring application's CI time.
 
 ## Start with one endpoint
+
+We tried to make the API feel familiar to Spring developers. You'll recognize `@RestController`, `@GetMapping`, and the idea of declaring routes on ordinary Java methods. The annotations live in Codename One's packages, and the build generates the routing code.
 
 A freshly generated Codename One project includes a `backend` module. Put this class in `backend/src/main/java/com/example/backend/Health.java`:
 
@@ -151,7 +155,7 @@ For native packaging, use:
 mvn -pl backend -Dcodename1.platform=backend cn1:backend-package
 ```
 
-That command uses a JDK 8 frontend and a native C toolchain; the {{< post-link path="/blog/java-backend-shared-models" text="backend tutorial" >}} expands the setup, database code, and deployment commands.
+The {{< post-link path="/blog/java-backend-shared-models" text="backend tutorial" >}} expands the setup, database code, and deployment commands.
 
 ## One model reaches the database
 
@@ -188,11 +192,13 @@ This is still a small backend. Relationships use explicit foreign-key fields, an
 
 ## Where Is This Going?
 
-I'm committed to keeping Codename One backend agnostic. If Spring, Node.js, Go, or another service works for your app, keep using it. You will never have to adopt our backend to build a Codename One app. That choice stays yours.
+We're committed to keeping Codename One backend agnostic. If Spring, Node.js, Go, or another service works for your app, keep using it. You will never have to adopt our backend to build a Codename One app. That choice stays yours.
 
-I think the backend is an important extension of what we already offer. We've spent years making Java work in small, constrained environments. A service that needs to start quickly and fit into a small deployment belongs in that world. And we can bring the integration with us: shared models and validation, generated REST clients and server dispatchers, and DAOs built from the same entity definitions. That's less code for an app team to duplicate and keep in sync.
+We see the backend as an important extension of what we already offer. We've spent years making Java work in small, constrained environments. A service that needs to start quickly and fit into a small deployment belongs in that world. And we can bring the integration with us: shared models and validation, generated REST clients and server dispatchers, and DAOs built from the same entity definitions. That's less code for an app team to duplicate and keep in sync.
 
-I also want our runtime to handle more demanding workloads. A busy server gives us another way to find costs that matter on a phone, even when the two targets need different features.
+We also see potential in embedded Linux systems: a gateway collecting sensor readings, a local service inside an appliance, or an industrial device that needs an API without a large runtime. A small ARM64 executable with HTTP and database access is a useful starting point for those applications. The same shared Java models could connect that device to its mobile app.
+
+We also want our runtime to handle more demanding workloads. A busy server gives us another way to find costs that matter on a phone, even when the two targets need different features.
 
 We added virtual threads to the backend because thousands of connections need somewhere to wait. Giving every waiting connection its own OS thread brings stack and scheduling costs. Giving it a resumable stack lets a small number of host threads keep serving other connections.
 
@@ -200,7 +206,7 @@ These are ParparVM's own virtual threads. On the supported native backend builds
 
 We aren't bringing that server concurrency model to mobile. It doesn't solve a useful mobile workload for us, and mobile system restrictions make its implementation harder. Other improvements travel very well. The backend work exposed collector buffers that grew during a busy period and retained their peak allocation afterward. The runtime now trims those buffers. A phone also benefits when yesterday's burst stops occupying today's memory.
 
-That's why I want to keep investing in the backend. It gives developers a useful deployment target, makes a shared Java application easier to build, and puts more real work through the compiler and runtime our client apps depend on.
+That's why we want to keep investing in the backend. It gives developers a useful deployment target, makes a shared Java application easier to build, and puts more real work through the compiler and runtime our client apps depend on.
 
 ---
 

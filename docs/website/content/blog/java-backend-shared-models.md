@@ -21,7 +21,7 @@ Use a current project from the [Codename One Initializr](/initializr/). Its `bac
 
 Run commands from the project root. The backend is activated with `-Dcodename1.platform=backend`, so it doesn't enter an ordinary client build.
 
-The local loop runs on Java. Native packaging also needs a working JDK 8, selected through `JDK_8_HOME`, and a host C compiler with the development libraries needed by the enabled native features. Linux cross-packaging uses Docker or Podman. The [packaging implementation](https://github.com/codenameone/CodenameOne/blob/2697dcfa2f0425170efd08655243032571b65869/maven/codenameone-maven-plugin/src/main/java/com/codename1/maven/BackendPackageMojo.java) checks those dependencies and names what's missing.
+The local loop runs on Java. Linux cross-packaging uses Docker or Podman. The [packaging implementation](https://github.com/codenameone/CodenameOne/blob/2697dcfa2f0425170efd08655243032571b65869/maven/codenameone-maven-plugin/src/main/java/com/codename1/maven/BackendPackageMojo.java) checks those dependencies and names what's missing.
 
 ## Give the model one rule
 
@@ -69,6 +69,8 @@ There are no UI imports in either class. The client can call `ReminderRules.titl
 The annotations are the same `com.codename1.annotations` types used by the client ORM. The backend build generates metadata and field access for its own DAO. It doesn't discover entity fields through reflection at startup.
 
 ## Put a controller over the DAO
+
+We tried to make this API as familiar as possible to Spring developers. `@RestController`, `@RequestMapping`, `@GetMapping`, and `@PostMapping` describe the controller and its routes. `@PathVariable` and `@RequestBody` bind incoming data, and constructor injection supplies the `EntityManager`. These are Codename One annotations; the build generates the router and the code that constructs the controller.
 
 Create `ReminderController.java` in the same directory:
 

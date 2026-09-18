@@ -103,7 +103,7 @@ The recorded release-build comparison translated about 570 classes containing AS
 
 The native translator had improved from roughly six times slower, but JDK 25 still led this recorded wall-clock result and used much less memory. The subsequent investigation found avoidable collection objects and retained strings worth attacking. Those gaps give us specific runtime work to do.
 
-I like this milestone partly because it refuses to let us hide behind a friendly benchmark. The compiler needs the answer to be correct, and it needs enough memory to construct it. A fast server loop doesn't make those requirements disappear.
+We like this milestone partly because it refuses to let us hide behind a friendly benchmark. The compiler needs the answer to be correct, and it needs enough memory to construct it. A fast server loop doesn't make those requirements disappear.
 
 ## Run the comparison
 
