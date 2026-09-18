@@ -24,9 +24,7 @@
 #if !TARGET_OS_WATCH
 
 #import "CodenameOne_GLAppDelegate.h"
-#ifdef CN1_USE_UI_SCENE
 #import "CodenameOne_GLSceneDelegate.h"
-#endif
 #import "CN1JailbreakDetector.h"
 #include "xmlvm.h"
 #import <objc/message.h>
@@ -586,9 +584,9 @@ static NSUserActivity *cn1PendingLaunchActivity = nil;
     cn1_debugger_start();
 #endif
     [self cn1EnsureViewController];
-#ifndef CN1_USE_UI_SCENE
-    [self cn1InstallRootViewControllerIntoWindow:self.window];
-#endif
+    // The root view controller is installed by CodenameOne_GLSceneDelegate, not here: under
+    // the scene lifecycle self.window is nil at this point, because UIKit has not connected
+    // a scene yet.
     NSURL *url = (NSURL *)[launchOptions valueForKey:UIApplicationLaunchOptionsURLKey];
     [self cn1StoreAppArgForURL:url];
     if (@available(iOS 8, *)) {
@@ -767,20 +765,18 @@ static NSUserActivity *cn1PendingLaunchActivity = nil;
     return YES;
 }
 
-#ifdef CN1_USE_UI_SCENE
 - (UISceneConfiguration *)application:(UIApplication *)application configurationForConnectingSceneSession:(UISceneSession *)connectingSceneSession options:(UISceneConnectionOptions *)options API_AVAILABLE(ios(13.0))
 {
     UISceneConfiguration *sceneConfiguration = [UISceneConfiguration configurationWithName:@"Default Configuration" sessionRole:connectingSceneSession.role];
     sceneConfiguration.delegateClass = [CodenameOne_GLSceneDelegate class];
     return sceneConfiguration;
 }
-#endif
 
-// Compiled for universal links OR intents OR continuity: without the second and third conditions
-// a Spotlight tap, or a handoff from the user's other device, on a legacy-lifecycle build
-// (ios.uiscene=false) would silently do nothing, since the scene delegate is what routes this on
-// a default build. Continuity was added here for exactly the reason intents was: the branch it
-// needs inside cn1ContinueUserActivity: is compiled, and on a legacy build nothing ever calls it.
+// Compiled for universal links OR intents OR continuity. The scene delegate is what routes this
+// on a live app, so this app-level callback is the path UIKit takes when it hands the activity
+// to the application rather than to a scene -- a Spotlight tap or a handoff from the user's
+// other device. Intents and continuity are in the condition because the branch each needs inside
+// cn1ContinueUserActivity: has to be compiled for that call to do anything.
 #if defined(CN1_HANDLE_UNIVERSAL_LINKS) || defined(CN1_USE_INTENTS) \
         || defined(CN1_USE_CONTINUITY)
 // https://developer.apple.com/documentation/uikit/core_app/allowing_apps_and_websites_to_link_to_your_content?language=objc

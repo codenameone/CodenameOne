@@ -66,8 +66,6 @@ bia_log "Java version for baseline toolchain:"
 "$JAVA_HOME/bin/java" -version
 bia_log "Using JAVAC from JAVA17_HOME for demo compilation:"
 "$JAVA17_HOME/bin/javac" -version
-IOS_UISCENE="${IOS_UISCENE:-true}"
-bia_log "Building sample app with ios.uiscene=${IOS_UISCENE}"
 EXTRA_IOS_ARGS=()
 if [ -n "${IOS_DEPENDENCY_ARGS:-}" ]; then
   # shellcheck disable=SC2206
@@ -208,7 +206,6 @@ bia_log "Running $APP_MAIN_NAME Maven build with JAVA_HOME=$JAVA17_HOME"
     -Dcodename1.buildTarget=ios-source
     -Dmaven.compiler.fork=true
     -Dmaven.compiler.executable="$JAVA17_HOME/bin/javac"
-    -Dcodename1.arg.ios.uiscene="${IOS_UISCENE}"
     -Dopen=false
   )
   if [ ${#EXTRA_IOS_ARGS[@]} -gt 0 ]; then

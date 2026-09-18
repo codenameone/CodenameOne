@@ -264,11 +264,9 @@ class IPhoneBuilderSceneManifestValidationTest {
 
     @Test
     void aPlistWithNoManifestGetsAWholeOneForTheMacSlice() {
-        // The default Catalyst build: ios.uiscene is off and there is no CarPlay, so
-        // the shared plist carries no manifest at all -- declaring one there would
-        // activate the UIScene lifecycle for the iPhone/iPad artifact while it still
-        // carries its main NIB, which FrontBoard terminates at launch. The manifest
-        // has to appear only in the Mac slice's copy.
+        // A shared plist with no manifest is what an ios.plistInject that replaced the
+        // whole thing can leave behind -- the generator steps aside for an injected
+        // manifest, and an injection can declare none. The Mac slice needs one either way.
         String shared = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
                 + "<plist version=\"1.0\">\n<dict>\n"
                 + "    <key>CFBundleName</key>\n    <string>Demo</string>\n"
@@ -358,10 +356,9 @@ class IPhoneBuilderSceneManifestValidationTest {
 
     @Test
     void aCarPlayOnlyManifestGainsTheWindowRoleOnTheMacSlice() {
-        // macNative with CarPlay and ios.uiscene off: the build emits a manifest for
-        // CarPlay's sake, and it carries only the CarPlay role. Flipping the support
-        // key is not enough -- the Catalyst bundle would say multiple scenes are
-        // supported and describe no configuration to create a window from.
+        // A manifest carrying only the CarPlay role, which ios.plistInject can supply.
+        // Flipping the support key is not enough -- the Catalyst bundle would say multiple
+        // scenes are supported and describe no configuration to create a window from.
         String carPlayRole =
                 "        <key>CPTemplateApplicationSceneSessionRoleApplication</key>\n"
                 + "        <array>\n"
@@ -626,15 +623,14 @@ class IPhoneBuilderSceneManifestValidationTest {
 
     @Test
     void theMacSliceDropsTheMainNibItWouldOtherwisePairWithAScene() {
-        // The default Catalyst build: ios.uiscene is off, so the shared plist keeps
-        // NSMainNibFile -- its removal there is gated on that hint. The Mac copy always
-        // gains a scene manifest, and a scene lifecycle beside a legacy main NIB is the
-        // orphan window FrontBoard terminates at launch. It is also excluded from the
-        // Mac slice's compilation, so the key names a NIB that is not in that bundle.
+        // Nothing generates NSMainNibFile any more, so what this defends against is an
+        // ios.plistInject that declares one. The Mac copy always gains a scene manifest,
+        // and a scene lifecycle beside a legacy main NIB is the orphan window FrontBoard
+        // terminates at launch.
         String shared = document(
                 "    <key>NSMainNibFile</key>\n    <string>MainWindow</string>\n");
         assertTrue(shared.contains("NSMainNibFile"),
-                "the shared plist keeps it, which is what the iOS slice needs");
+                "the injected key is not removed from the shared plist by this transform");
 
         String mac = IPhoneBuilder.plistForMacSlice(shared);
         assertFalse(mac.contains("NSMainNibFile"),

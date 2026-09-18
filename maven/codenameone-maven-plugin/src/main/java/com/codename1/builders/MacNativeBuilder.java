@@ -764,8 +764,8 @@ class MacNativeBuilder {
         // time is safe. The iOS slice keeps loading them normally.
         s.append("  bs['EXCLUDED_SOURCE_FILE_NAMES[sdk=macosx*]'] = ")
                 .append("'CN1ES2compat.m CN1ES1compat.m EAGLView.m ")
-                .append("CodenameOne_GLViewController.xib MainWindow.xib ")
-                .append("CodenameOne_METALViewController.xib MainWindowMETAL.xib'\n");
+                .append("CodenameOne_GLViewController.xib ")
+                .append("CodenameOne_METALViewController.xib'\n");
         // Header search path stubs for the Mac slice: the iOS port ships an
         // umbrella set of empty/stub GLKit and OpenGLES headers under
         // macCatalystStubs/.

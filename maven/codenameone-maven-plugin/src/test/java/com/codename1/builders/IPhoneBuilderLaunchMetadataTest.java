@@ -22,9 +22,14 @@
  */
 package com.codename1.builders;
 
+import java.util.Arrays;
+import java.util.HashSet;
+import java.util.Set;
+
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -87,31 +92,68 @@ class IPhoneBuilderLaunchMetadataTest {
     }
 
     @Test
-    void sceneLifecycleOptOutIsRefusedAgainstSdk27() {
-        String rejection = IPhoneBuilder.sceneLifecycleOptOutRejection("false", 27);
+    void everyRemovedHintIsRefusedByName() {
+        for (String removed : new String[] {
+                "ios.uiscene", "ios.generateSplashScreens", "ios.launchStoryboardName"}) {
+            Set<String> supplied = new HashSet<String>(Arrays.asList("ios.multitasking", removed));
+            String rejection = IPhoneBuilder.removedHintRejection(supplied);
+            assertNotNull(rejection, removed);
+            assertTrue(rejection.contains(removed), rejection);
+        }
+    }
+
+    @Test
+    void aRequestThatSuppliesNoneOfThemIsNotRefused() {
+        // The whole point of removing them by name: a build that never mentioned one is
+        // untouched, and there is no hint left whose value has to be interpreted.
+        assertNull(IPhoneBuilder.removedHintRejection(new HashSet<String>(
+                Arrays.asList("ios.multitasking", "ios.plistInject", "ios.deployment_target"))));
+        assertNull(IPhoneBuilder.removedHintRejection(new HashSet<String>()));
+        assertNull(IPhoneBuilder.removedHintRejection(null));
+    }
+
+    @Test
+    void refusingIsAboutTheNameAndNotTheValue() {
+        // ios.uiscene=true asked for what the build now always does, and is still refused:
+        // leaving it accepted means leaving a name in the catalog nothing reads, which is the
+        // failure the catalog exists to prevent. The message says the hint is gone, not that
+        // its value was wrong.
+        String rejection = IPhoneBuilder.removedHintRejection(
+                new HashSet<String>(Arrays.asList("ios.uiscene")));
+        assertNotNull(rejection);
+        assertTrue(rejection.contains("has been removed"), rejection);
+        assertTrue(rejection.contains("TN3187"), rejection);
+    }
+
+    @Test
+    void everyRemovedHintIsNamedInOneMessage() {
+        // A build that carries all three gets told about all three. Failing on the first one
+        // makes the developer re-run the build to discover the next.
+        String rejection = IPhoneBuilder.removedHintRejection(new HashSet<String>(Arrays.asList(
+                "ios.uiscene", "ios.generateSplashScreens", "ios.launchStoryboardName")));
         assertNotNull(rejection);
         assertTrue(rejection.contains("ios.uiscene"), rejection);
-        assertTrue(rejection.contains("TN3187"), rejection);
-        assertNotNull(IPhoneBuilder.sceneLifecycleOptOutRejection("false", 28));
-        // Case and surrounding space come straight from a properties file, so neither can be
-        // the difference between refusing the build and shipping one that will not launch.
-        assertNotNull(IPhoneBuilder.sceneLifecycleOptOutRejection("FALSE", 27));
-        assertNotNull(IPhoneBuilder.sceneLifecycleOptOutRejection("  false  ", 27));
+        assertTrue(rejection.contains("ios.generateSplashScreens"), rejection);
+        assertTrue(rejection.contains("ios.launchStoryboardName"), rejection);
     }
 
     @Test
-    void sceneLifecycleOptOutStillWorksOnTheSdksApplePermitsItOn() {
-        assertNull(IPhoneBuilder.sceneLifecycleOptOutRejection("false", 26));
-        assertNull(IPhoneBuilder.sceneLifecycleOptOutRejection("false", 16));
-        // Unknown SDK: nothing is known to require the lifecycle, so nothing is refused. The
-        // build() fallback resolves -1 before this is reached; this is the belt to that brace.
-        assertNull(IPhoneBuilder.sceneLifecycleOptOutRejection("false", -1));
+    void anInjectionThatNamesAnyLaunchKeyIsLeftAlone() {
+        // All four, not just the two this builder can emit. A project that supplies
+        // UILaunchStoryboards or UILaunchScreens has declared its launch experience, and
+        // appending ours beside it leaves iOS to choose between two.
+        for (String key : IPhoneBuilder.ACCEPTED_LAUNCH_KEYS) {
+            assertTrue(IPhoneBuilder.plistNamesAnyLaunchKey(
+                    "<key>" + key + "</key>\n<dict/>"), key);
+        }
     }
 
     @Test
-    void theDefaultAndAnExplicitTrueAreNeverRefused() {
-        assertNull(IPhoneBuilder.sceneLifecycleOptOutRejection("true", 27));
-        assertNull(IPhoneBuilder.sceneLifecycleOptOutRejection(null, 27));
+    void anInjectionThatNamesNoLaunchKeyGetsTheGeneratedOne() {
+        assertFalse(IPhoneBuilder.plistNamesAnyLaunchKey(
+                "<key>UIRequiresFullScreen</key><true/>"));
+        assertFalse(IPhoneBuilder.plistNamesAnyLaunchKey(""));
+        assertFalse(IPhoneBuilder.plistNamesAnyLaunchKey(null));
     }
 
     @Test

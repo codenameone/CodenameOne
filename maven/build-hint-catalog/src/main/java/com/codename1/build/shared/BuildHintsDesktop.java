@@ -45,16 +45,6 @@ final class BuildHintsDesktop {
 
     static void register(List<Hint> h) {
 
-        h.add(new Hint("desktop.themeMode")
-                .group(HintGroup.DESKTOP)
-                .type(HintType.STRING)
-                .def("legacy")
-                .platform("desktop")
-                .doc("`legacy` (default) or `native`. Selects the theme the packaged desktop app "
-                        + "starts with: `native` loads the generated native desktop theme for the "
-                        + "host platform, `legacy` keeps the existing cross-platform look. Unset, "
-                        + "it follows the shared `nativeTheme` hint."));
-
         h.add(new Hint("desktop.title")
                 .group(HintGroup.DESKTOP)
                 .type(HintType.STRING)

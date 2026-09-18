@@ -148,13 +148,13 @@ class WatchNativeBuilder {
     // one. Everything that CAN be guarded is guarded in the source instead, with
     // `#if !TARGET_OS_WATCH` wrapping the whole file, so a new GL/Metal/UIKit
     // source carries its own exclusion and cannot silently break the watch build
-    // by being forgotten here. These five have no preprocessor to run:
+    // by being forgotten here. These three have no preprocessor to run:
     // a .metal shader is compiled by the Metal compiler (absent on watchOS) and a
     // .xib is Interface Builder data.
     private static final String[] EXCLUDED_WATCH_SOURCES = {
         "CN1MetalShaders.metal",
-        "CodenameOne_GLViewController.xib", "MainWindow.xib",
-        "CodenameOne_METALViewController.xib", "MainWindowMETAL.xib"
+        "CodenameOne_GLViewController.xib",
+        "CodenameOne_METALViewController.xib"
     };
 
     // Frameworks the watch target must not link; ParparVM weak-links these (see
