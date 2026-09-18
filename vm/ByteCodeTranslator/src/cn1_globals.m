@@ -2319,13 +2319,63 @@ static size_t cn1BlockPadding(void) {
 #endif
 }
 
+/* A LARGE collection block is taken from the OS and given straight back to it,
+ * instead of passing through malloc.
+ *
+ * Measured over a translation of the 5,326-class corpus: collection storage churns
+ * about 1.2GB through here, and while 87% of the COUNT is tiny blocks, half the
+ * BYTES are 14,694 blocks averaging 40KB. Those are exactly the size malloc keeps:
+ * it only maps large allocations directly at 128KB and above, so everything between
+ * a few KB and that lands in a size-segregated region that is never returned. The
+ * process report shows the result -- MALLOC idle 428.92MB against a Java live set of
+ * 585.71MB, a third of the footprint held by the allocator rather than by the heap.
+ * Trimming cannot reach it; that has been tried, and the pages sit in malloc's free
+ * lists where only owning the mapping gets them back.
+ *
+ * So blocks at or above the threshold are mapped and unmapped. Freeing one returns
+ * its pages to the OS in the same call, which is what the collections that grow and
+ * are discarded need. Below the threshold malloc is left alone: its small-size path
+ * is a good pooling allocator and mapping a 160-byte block would cost a whole page.
+ *
+ * The threshold is 32KB rather than malloc's own 128KB precisely to cover the band
+ * malloc retains. Anonymous maps are zero-filled, so the calloc contract below is
+ * preserved, and they are page-aligned, so the 16-byte alignment step is a no-op.
+ *
+ * Which path a block came from is INFERRED from its recorded size rather than
+ * flagged, so the header stays 32 bytes. That only works while the threshold is a
+ * compile-time constant -- if it ever becomes tunable at run time, the block has to
+ * carry the answer. */
+#ifndef CN1_BLOCK_MMAP_THRESHOLD
+#define CN1_BLOCK_MMAP_THRESHOLD (32 * 1024)
+#endif
+
+/* Zero-filled by the OS on both platforms, matching calloc. */
+static void* cn1BlockOsAlloc(size_t bytes) {
+#ifdef _WIN32
+    return VirtualAlloc(NULL, bytes, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
+#else
+    void* mem = mmap(NULL, bytes, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANON, -1, 0);
+    return mem == MAP_FAILED ? NULL : mem;
+#endif
+}
+
+static void cn1BlockOsFree(void* allocation, size_t bytes) {
+#ifdef _WIN32
+    (void)bytes;
+    VirtualFree(allocation, 0, MEM_RELEASE);
+#else
+    munmap(allocation, bytes);
+#endif
+}
+
 static JAVA_LONG cn1BlockAlloc(JAVA_INT capacity, size_t width) {
     const size_t padding = cn1BlockPadding();
     if(capacity <= 0 || width == 0 || (size_t)capacity > (SIZE_MAX - sizeof(CN1NativeBlock) - padding) / width) {
         return 0;
     }
     size_t bytes = sizeof(CN1NativeBlock) + (size_t)capacity * width + padding;
-    void* allocation = calloc(1, bytes);
+    void* allocation = bytes >= CN1_BLOCK_MMAP_THRESHOLD ? cn1BlockOsAlloc(bytes)
+                                                         : calloc(1, bytes);
     if(allocation == NULL) return 0;
     // Also align on 32-bit allocators whose natural alignment can be only 8.
     CN1NativeBlock* block = (CN1NativeBlock*)(((uintptr_t)allocation + 15) & ~(uintptr_t)15);
@@ -2431,7 +2481,13 @@ void cn1RefBlockFree(JAVA_LONG block) {
         CN1NativeBlock* header = cn1BlockHeader(block);
         atomic_fetch_sub_explicit(&cn1NativeBlockLiveBytes, header->bytes, memory_order_relaxed);
         atomic_fetch_add_explicit(&cn1NativeBlockReleasedBytes, header->bytes, memory_order_relaxed);
-        free(header->allocation);
+        // Same test the allocator used; see CN1_BLOCK_MMAP_THRESHOLD for why the
+        // path is inferred from the size rather than recorded in the header.
+        if(header->bytes >= CN1_BLOCK_MMAP_THRESHOLD) {
+            cn1BlockOsFree(header->allocation, header->bytes);
+        } else {
+            free(header->allocation);
+        }
     }
 }
 
@@ -2452,7 +2508,19 @@ JAVA_LONG cn1PrimitiveBlockResize(JAVA_LONG block, JAVA_INT bytes) {
     if(block == 0) return cn1BlockAlloc(bytes, 1);
     CN1NativeBlock* old = cn1BlockHeader(block);
     if(old->capacity == bytes) return block;
-    if(cn1BlockPadding() != 0) {
+    size_t newBytesPlanned = sizeof(CN1NativeBlock) + (size_t)bytes;
+    /* realloc is only usable while BOTH the old and the new block belong to malloc.
+     * Above CN1_BLOCK_MMAP_THRESHOLD they are mappings, and handing one to realloc is
+     * not a slow path, it is an abort: libmalloc reports the pointer as never having
+     * been allocated and kills the process. StringBuilder's buffer grows through here,
+     * so every build that produced a long string found it immediately.
+     *
+     * The copy path below already existed for platforms that need padding, and it is
+     * correct for a mapping too -- cn1BlockAlloc and cn1RefBlockFree each pick the
+     * matching side of the threshold. */
+    if(cn1BlockPadding() != 0
+            || old->bytes >= CN1_BLOCK_MMAP_THRESHOLD
+            || newBytesPlanned >= CN1_BLOCK_MMAP_THRESHOLD) {
         JAVA_LONG fresh = cn1BlockAlloc(bytes, 1);
         if(fresh == 0) return 0;
         memcpy((void*)(uintptr_t)fresh, (void*)(uintptr_t)block,
@@ -2461,7 +2529,7 @@ JAVA_LONG cn1PrimitiveBlockResize(JAVA_LONG block, JAVA_INT bytes) {
         return fresh;
     }
     size_t oldBytes = old->bytes;
-    size_t newBytes = sizeof(CN1NativeBlock) + (size_t)bytes;
+    size_t newBytes = newBytesPlanned;
     CN1NativeBlock* fresh = (CN1NativeBlock*)realloc(old->allocation, newBytes);
     if(fresh == NULL) return 0;
     fresh->allocation = fresh;
