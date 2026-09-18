@@ -276,6 +276,10 @@ static GtkWidget* cn1DrawingArea = 0;
 static GtkWidget* cn1Overlay = 0;       /* GtkOverlay: drawing area + native widget layer */
 static GtkWidget* cn1RootBox = 0;       /* GtkBox: optional menu bar above the overlay */
 static GtkWidget* cn1MenuBar = 0;       /* the native menu bar, when commands published one */
+/* Created ONCE and reused. A fresh group per rebuild would leak one per published form and
+ * leave the window holding every group it had ever been given -- the menu items go away
+ * with the bar, but the groups themselves do not. */
+static GtkAccelGroup* cn1MenuAccels = 0;
 static GtkWidget* cn1Fixed = 0;         /* GtkFixed overlay hosting positioned native peers */
 static GtkWidget* cn1AccessibilityFixed = 0; /* transparent GTK/ATK semantic hierarchy */
 static CN1Graphics cn1WindowG;          /* the on-screen / headless back buffer */
@@ -1174,8 +1178,11 @@ static void cn1MenuRebuild(void* arg) {
     }
 
     GtkWidget* bar = gtk_menu_bar_new();
-    GtkAccelGroup* accels = gtk_accel_group_new();
-    gtk_window_add_accel_group(GTK_WINDOW(cn1Window), accels);
+    if (cn1MenuAccels == 0) {
+        cn1MenuAccels = gtk_accel_group_new();
+        gtk_window_add_accel_group(GTK_WINDOW(cn1Window), cn1MenuAccels);
+    }
+    GtkAccelGroup* accels = cn1MenuAccels;
 
     GtkWidget* popups[CN1_MENU_MAX_POPUPS];
     char titles[CN1_MENU_MAX_POPUPS][64];

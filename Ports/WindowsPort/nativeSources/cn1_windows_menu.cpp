@@ -169,10 +169,14 @@ static HMENU popupNamed(HMENU bar, const char* title, HMENU* popups, char titles
         return NULL;
     }
     WCHAR* wide = widen(title);
-    if (wide != NULL) {
-        AppendMenuW(bar, MF_POPUP, (UINT_PTR) popup, wide);
-        free(wide);
+    if (wide == NULL) {
+        /* Never appended, so DestroyMenu on the bar will not reach it. Destroyed here or it
+         * leaks for the life of the process. */
+        DestroyMenu(popup);
+        return NULL;
     }
+    AppendMenuW(bar, MF_POPUP, (UINT_PTR) popup, wide);
+    free(wide);
     popups[*popupCount] = popup;
     strncpy(titles[*popupCount], title, 63);
     titles[*popupCount][63] = '\0';
