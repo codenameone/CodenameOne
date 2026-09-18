@@ -11,13 +11,24 @@ series: ["release-2026-09-18"]
 
 ![Small servers, one Java stack](/blog/why-another-java-server.jpg)
 
+## Coming This Week
+
+Today we're introducing the native backend and the thinking behind it. Over the next six days, we'll work through the shared stack and the other features in this release:
+
+- **Saturday, September 19:** {{< post-link path="/blog/java-backend-shared-models" text="One Java Model from the App to PostgreSQL" >}}. Build a reminder service with shared validation, generated DAOs, and database transactions.
+- **Sunday, September 20:** {{< post-link path="/blog/vault-encryption-browser-phone" text="One Vault, from Your Phone to the Browser" >}}. Encrypt synchronized records and choose how users unlock them, including browser passkeys.
+- **Monday, September 21:** {{< post-link path="/blog/invite-link-through-app-store" text="The Hard Part of Invite a Friend Is the Install" >}}. Follow an invitation through installation to the activity and purchases it brings into your app.
+- **Tuesday, September 22:** {{< post-link path="/blog/xcode-27-build-settings" text="Xcode 27: The Build Settings That Can Stop a Release" >}}. Remove obsolete build hints and understand the deployment and launch checks in the updated builder.
+- **Wednesday, September 23:** {{< post-link path="/blog/native-desktop-themes-experiment" text="A Desktop Theme Has to Know About the Mouse" >}}. Try the experimental native desktop themes, including hover behavior and light and dark appearances.
+- **Thursday, September 24:** {{< post-link path="/blog/parparvm-compiles-itself" text="The Java Compiler That Became Its Own Test Case" >}}. See what self-hosting exposed in our runtime and where we're still chasing HotSpot.
+
+## Why Build Another Java Server?
+
 The last thing I wanted to build was another Java server framework. We have Spring, Micronaut, Quarkus, and enough ways to answer an HTTP request to fill a conference schedule.
 
 Yet I personally know Java developers who pick Node.js or Go for their newer projects. Why?
 
 The answers varied, but two kept coming up: size and performance, especially for microservices and serverless deployments; and full stack development. A process that starts for one request has a different budget from a server that stays up for a month. For full stack development, Codename One lets the app and server share entity classes and validation rules. One REST contract generates the app client and server dispatcher, while the same ORM annotations generate data access objects (DAOs) for local SQLite and the server database.
-
-Tomorrow's {{< post-link path="/blog/java-backend-shared-models" text="backend tutorial" >}} puts that integration to work, from a shared Java model to database transactions. The rest of this week's series follows {{< post-link path="/blog/vault-encryption-browser-phone" text="encrypted data from the phone to the browser" >}}, {{< post-link path="/blog/invite-link-through-app-store" text="invitations through app installation" >}}, and {{< post-link path="/blog/xcode-27-build-settings" text="the build settings that can stop an Xcode 27 release" >}}. We'll also try {{< post-link path="/blog/native-desktop-themes-experiment" text="native desktop themes" >}} and close with {{< post-link path="/blog/parparvm-compiles-itself" text="ParparVM compiling itself" >}}, including the runtime bugs and performance gaps we found along the way.
 
 We've been using GraalVM in our backend for a while. It's an amazing tool for Spring development. But our CI takes about 30 minutes for a server that isn't huge. The resulting binary is hundreds of megabytes, and the process uses hundreds of megabytes of RAM. That's our application and build pipeline, but it's the bill we have to pay.
 
