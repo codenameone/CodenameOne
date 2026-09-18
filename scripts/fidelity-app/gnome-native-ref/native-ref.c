@@ -158,13 +158,14 @@ static const Spec SPECS[] = {
     /* Second wave. GNOME carries the scrollbar, the menu bar and the menu item that AppKit
      * cannot -- a GtkScrollbar is an ordinary widget and GtkPopoverMenuBar renders into the
      * paintable -- but not the tooltip, which is a surface of its own like AppKit's. */
-    {"DesktopScrollBar",    "gtk_scrollbar",         {"normal", "hover", "pressed", NULL}},
+    {"DesktopScrollBar",          "gtk_scrollbar",   {"normal", NULL}},
+    {"DesktopScrollBarHighlight", "gtk_scrollbar",   {"normal", "hover", "pressed", NULL}},
     {"DesktopSeparator",    "gtk_separator",         {"normal", NULL}},
     {"DesktopGroupBox",     "gtk_frame",             {"normal", NULL}},
     {"DesktopStepper",      "gtk_spin_button",       {"normal", "disabled", NULL}},
     {"DesktopLinkButton",   "gtk_link_button",       {"normal", "hover", "disabled", NULL}},
     {"DesktopSearchField",  "gtk_search_entry",      {"normal", "disabled", NULL}},
-    {"DesktopListRow",      "gtk_listbox_row",       {"normal", "selected", "hover", NULL}},
+    {"DesktopListRow",      "gtk_listbox_row",       {"normal", "selected", NULL}},
     {"DesktopTabs",         "gtk_notebook",          {"normal", NULL}},
     {"DesktopToolbar",      "adw_header_bar",        {"normal", NULL}},
     {"DesktopDisclosure",   "gtk_expander",          {"normal", NULL}},

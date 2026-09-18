@@ -59,7 +59,7 @@ public final class Cn1WidgetRenderer {
     /// Desktop rows that build something of their own rather than reusing a mobile branch.
     private static final java.util.Set<String> SECOND_WAVE =
             new java.util.HashSet<String>(java.util.Arrays.asList(
-                    "DesktopScrollBar", "DesktopSeparator", "DesktopGroupBox", "DesktopStepper",
+                    "DesktopScrollBar", "DesktopScrollBarHighlight", "DesktopSeparator", "DesktopGroupBox", "DesktopStepper",
                     "DesktopLinkButton", "DesktopSearchField", "DesktopListRow", "DesktopTabs",
                     "DesktopToolbar", "DesktopDisclosure", "DesktopMenuBar", "DesktopMenuItem",
                     "DesktopTooltip"));
@@ -125,7 +125,8 @@ public final class Cn1WidgetRenderer {
                 || "DesktopSlider".equals(id) || "DesktopProgressBar".equals(id)
                 || "DesktopComboBox".equals(id)
                 // The second wave: the chrome and the controls the first nine did not reach.
-                || "DesktopScrollBar".equals(id) || "DesktopSeparator".equals(id)
+                || "DesktopScrollBar".equals(id) || "DesktopScrollBarHighlight".equals(id)
+                || "DesktopSeparator".equals(id)
                 || "DesktopGroupBox".equals(id) || "DesktopStepper".equals(id)
                 || "DesktopLinkButton".equals(id) || "DesktopSearchField".equals(id)
                 || "DesktopListRow".equals(id) || "DesktopTabs".equals(id)
@@ -539,7 +540,7 @@ public final class Cn1WidgetRenderer {
             spinner.setRenderingPrototype("Value 0");
             spinner.setValue("Value 3");
             c = spinner;
-        } else if ("DesktopScrollBar".equals(id)) {
+        } else if ("DesktopScrollBar".equals(id) || "DesktopScrollBarHighlight".equals(id)) {
             // The bar itself, not a scrolling container. LookAndFeel.drawVerticalScroll takes
             // any component and paints the theme's track and thumb across it, which is exactly
             // the bare NSScroller / GtkScrollbar / WinUI ScrollBar the reference apps build --

@@ -418,22 +418,33 @@ components:
   # capture paths these apps use. A blank golden scores 0% forever and reads as a theme bug,
   # so the honest answer is to say where the reference exists and score it there.
 
-  # Windows and GNOME only. AppKit's scrollbar cannot be captured by this path, and that was
-  # measured rather than assumed: an NSScroller reports usableParts=allScrollerParts, a
-  # knobProportion of 0.4, isHidden=false and a 17x56 frame -- and renders NOTHING through
-  # NSView.cacheDisplay. Tried detached and inside a real NSScrollView, in both .legacy and
-  # .overlay styles, with AppleShowScrollBars=Always already set by the capture script. The
-  # tile comes back holding one colour, the backdrop, every time.
+  # Two rows, because the three platforms can express different amounts of one control and
+  # every boundary below was MEASURED on a capture run rather than guessed.
   #
-  # That is the same limitation as Aqua vibrancy: composited somewhere cacheDisplay does not
-  # see. And cacheDisplay is the capture path that needs no Screen Recording consent, which
-  # cannot be granted on a hosted runner at all. A blank golden would score 0% forever and
-  # read as a theme bug, so the row says where the reference exists instead.
+  # macOS cannot render a scrollbar into a view at all: an NSScroller reports
+  # usableParts=allScrollerParts, knobProportion 0.4, isHidden=false and a 17x56 frame, and
+  # renders NOTHING through NSView.cacheDisplay. Tried detached and inside a real NSScrollView,
+  # in both .legacy and .overlay styles, with AppleShowScrollBars=Always already set by the
+  # capture script; the tile comes back holding one colour, the backdrop, every time. Same
+  # class of limitation as Aqua vibrancy, and cacheDisplay is the path that needs no Screen
+  # Recording consent, which a hosted runner cannot grant.
+  #
+  # Windows renders the bar but cannot express its highlight: none of PointerOver,
+  # UncheckedPointerOver, CheckedPointerOver or MouseOver is a visual state of a WinUI
+  # ScrollBar, and neither is Pressed or Dragging. GTK can -- PRELIGHT and ACTIVE are what the
+  # CSS pseudo-classes resolve from -- and its captured hover and pressed tiles are genuinely
+  # different from normal, so the highlight is scored where the reference can state it.
   - id: DesktopScrollBar
     cn1_uiid: DesktopScrollThumb
     native_win: winui_scrollbar
     native_gnome: gtk_scrollbar
     platforms: windows,gnome
+    states: normal
+
+  - id: DesktopScrollBarHighlight
+    cn1_uiid: DesktopScrollThumb
+    native_gnome: gtk_scrollbar
+    platforms: gnome
     states: normal,hover,pressed
 
   - id: DesktopSeparator
@@ -480,7 +491,10 @@ components:
     native_mac: appkit_tableview_row
     native_gnome: gtk_listbox_row
     text: Row
-    states: normal,selected,hover
+    # No hover: a WinUI ListViewItem draws through ListViewItemPresenter, which paints its
+    # own pointer-over chrome rather than exposing a visual state GoToState can reach --
+    # measured, the capture blocked on it. Selected is a real property on all three.
+    states: normal,selected
 
   - id: DesktopTabs
     cn1_uiid: Tabs

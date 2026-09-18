@@ -244,6 +244,7 @@ That property is now asserted rather than remembered
 | DesktopToolbar | CommandBar | title-bar strip | AdwHeaderBar |
 | DesktopDisclosure | Expander | disclosure triangle + label | GtkExpander |
 | DesktopScrollBar | ScrollBar | -- | GtkScrollbar |
+| DesktopScrollBarHighlight | -- | -- | GtkScrollbar (PRELIGHT / ACTIVE) |
 | DesktopMenuBar | MenuBar | -- | GtkPopoverMenuBar |
 | DesktopMenuItem | MenuFlyoutItem | -- | menu row (`.model` button) |
 | DesktopTooltip | ToolTip | -- | -- |
@@ -260,6 +261,8 @@ as a theme bug.
 | Row | Missing on | Why |
 |---|---|---|
 | DesktopScrollBar | macOS | Measured, not assumed. An `NSScroller` reports `usableParts=allScrollerParts`, `knobProportion` 0.4, `isHidden=false` and a 17x56 frame -- and renders nothing through `NSView.cacheDisplay`. Tried detached and inside a real `NSScrollView`, in both `.legacy` and `.overlay` styles, with `AppleShowScrollBars=Always` already set by the capture script. The tile comes back holding one colour, the backdrop, every time. Same class of limitation as Aqua vibrancy. |
+| DesktopScrollBarHighlight | macOS, Windows | The scrollbar's hover and drag states. Measured on a capture run: none of `PointerOver`, `UncheckedPointerOver`, `CheckedPointerOver` or `MouseOver` is a visual state of a WinUI `ScrollBar`, and neither is `Pressed` or `Dragging`. GTK can state it -- `PRELIGHT` and `ACTIVE` are what the CSS pseudo-classes resolve from -- and its captured tiles genuinely differ from normal, so the row scores there and nowhere else rather than not existing. |
+| DesktopListRow hover | all three | A WinUI `ListViewItem` draws through `ListViewItemPresenter`, which paints its own pointer-over chrome rather than exposing a state `GoToState` can reach. Dropped from the row rather than scored on two platforms and blocked on the third; `selected` is a real property everywhere and is scored. |
 | DesktopMenuBar, DesktopMenuItem | macOS | An `NSMenu` belongs to the window server, not to a view. |
 | DesktopTooltip | macOS, GNOME | Both platforms' tooltips are separate windows. A WinUI `ToolTip` is an ordinary `Control`, which is why the row exists at all. |
 

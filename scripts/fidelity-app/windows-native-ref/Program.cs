@@ -165,13 +165,13 @@ public partial class App : Application
         // ToolTip, where the AppKit and GTK equivalents are window-server surfaces. The
         // scrollbar is here and not on macOS for the same reason -- see the DesktopScrollBar
         // note in fidelity-tests.yaml for what was measured.
-        new("DesktopScrollBar",    "winui_scrollbar",       new[] { "normal", "hover", "pressed" }),
+        new("DesktopScrollBar",    "winui_scrollbar",       new[] { "normal" }),
         new("DesktopSeparator",    "winui_separator",       new[] { "normal" }),
         new("DesktopGroupBox",     "winui_groupbox",        new[] { "normal" }),
         new("DesktopStepper",      "winui_numberbox",       new[] { "normal", "disabled" }),
         new("DesktopLinkButton",   "winui_hyperlinkbutton", new[] { "normal", "hover", "disabled" }),
         new("DesktopSearchField",  "winui_autosuggestbox",  new[] { "normal", "disabled" }),
-        new("DesktopListRow",      "winui_listviewitem",    new[] { "normal", "selected", "hover" }),
+        new("DesktopListRow",      "winui_listviewitem",    new[] { "normal", "selected" }),
         new("DesktopTabs",         "winui_tabview",         new[] { "normal" }),
         new("DesktopToolbar",      "winui_commandbar",      new[] { "normal" }),
         new("DesktopDisclosure",   "winui_expander",        new[] { "normal" }),

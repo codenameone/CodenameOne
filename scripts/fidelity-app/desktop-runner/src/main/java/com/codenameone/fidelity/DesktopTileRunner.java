@@ -225,7 +225,7 @@ public final class DesktopTileRunner {
     /// through their own FULL_HEIGHT lists, kept in step by hand exactly as the width ones are.
     private static final java.util.Set<String> FULL_HEIGHT_IDS =
             new java.util.HashSet<String>(java.util.Arrays.asList(
-                    "DesktopGroupBox", "DesktopScrollBar"));
+                    "DesktopGroupBox", "DesktopScrollBar", "DesktopScrollBarHighlight"));
 
     private static int tileBackground() {
         return UIManager.getInstance().getComponentStyle("Form").getBgColor();

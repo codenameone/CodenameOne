@@ -129,7 +129,7 @@ let SPECS: [Spec] = [
     Spec(id: "DesktopStepper", kind: "appkit_stepper", states: ["normal", "disabled"]),
     Spec(id: "DesktopLinkButton", kind: "appkit_link_button", states: ["normal", "hover", "disabled"]),
     Spec(id: "DesktopSearchField", kind: "appkit_searchfield", states: ["normal", "disabled"]),
-    Spec(id: "DesktopListRow", kind: "appkit_tableview_row", states: ["normal", "selected", "hover"]),
+    Spec(id: "DesktopListRow", kind: "appkit_tableview_row", states: ["normal", "selected"]),
     Spec(id: "DesktopTabs", kind: "appkit_tabview", states: ["normal"]),
     Spec(id: "DesktopToolbar", kind: "appkit_toolbar", states: ["normal"]),
     Spec(id: "DesktopDisclosure", kind: "appkit_disclosure", states: ["normal"]),
