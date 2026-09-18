@@ -37,15 +37,27 @@
     </extensions>
 
     <!--
-      Ship the Codename One authoring skill inside the archetype JAR under
-      archetype-resources/.claude/skills/codename-one/** so projects generated
-      via `mvn archetype:generate` get the same skill bundle the initializr
-      drops into start.codenameone.com output. The skill source of truth lives
-      under scripts/initializr/common/src/main/resources/skill/**; we copy it
-      in at build time rather than duplicating it in this module. The
-      generated project's archetype-post-generate.groovy deletes the .claude/
-      tree when the resolved javaVersion is 8, so only Java 17 projects end
-      up shipping the skill.
+      Ship the Codename One authoring skill inside the archetype JAR so projects
+      generated via `mvn archetype:generate` get the same three-part layout the
+      initializr drops into start.codenameone.com output, and the SAME layout
+      rather than merely the same content. An agent that only reads the generated files
+      finds the skill through whichever convention it knows:
+
+          AGENTS.md                              root pointer, vendor neutral
+          .agent-skills/codename-one/**          the skill itself
+          .claude/skills/codename-one/SKILL.md   thin stub, redirects to the above
+
+      Shipping the full skill under .claude/ instead (which this module did until
+      issue #5699) leaves a project generated from the archetype with no AGENTS.md
+      and no vendor-neutral copy, so Codex and anything else that does not know
+      Claude Code's directory layout never finds it.
+
+      All three sources of truth live under
+      scripts/initializr/common/src/main/resources/; we copy them in at build time
+      rather than duplicating them here, because a second copy is exactly how the
+      two generators drifted apart in the first place. The generated project's
+      archetype-post-generate.groovy deletes all three when the resolved
+      javaVersion is 8, so only Java 17 projects end up shipping the skill.
     -->
     <resources>
       <resource>
@@ -53,8 +65,16 @@
       </resource>
       <resource>
         <directory>${project.basedir}/../../scripts/initializr/common/src/main/resources/skill</directory>
-        <targetPath>archetype-resources/.claude/skills/codename-one</targetPath>
+        <targetPath>archetype-resources/.agent-skills/codename-one</targetPath>
         <filtering>false</filtering>
+      </resource>
+      <resource>
+        <directory>${project.basedir}/../../scripts/initializr/common/src/main/resources</directory>
+        <targetPath>archetype-resources</targetPath>
+        <filtering>false</filtering>
+        <includes>
+          <include>AGENTS.md</include>
+        </includes>
       </resource>
     </resources>
 
@@ -78,5 +98,35 @@
         </plugin>
       </plugins>
     </pluginManagement>
+
+    <plugins>
+      <!--
+        The Claude Code stub is the one staged file whose published name differs
+        from its source name (agent-skill-claude-stub.md -> SKILL.md), which
+        maven-resources cannot express, so it is copied by ant instead. Same
+        source directory as the two <resource> entries above; the point is that
+        nothing here is authored twice.
+      -->
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-antrun-plugin</artifactId>
+        <executions>
+          <execution>
+            <id>stage-claude-skill-stub</id>
+            <phase>process-resources</phase>
+            <goals>
+              <goal>run</goal>
+            </goals>
+            <configuration>
+              <target>
+                <copy file="${project.basedir}/../../scripts/initializr/common/src/main/resources/agent-skill-claude-stub.md"
+                      tofile="${project.build.outputDirectory}/archetype-resources/.claude/skills/codename-one/SKILL.md"
+                      overwrite="true"/>
+              </target>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+    </plugins>
   </build>
 </project>
