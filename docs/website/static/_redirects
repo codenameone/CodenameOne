@@ -125,7 +125,6 @@
 /manual/game-builder/ /developer-guide/game-builder/ 301
 /manual/game-builder.html /developer-guide/game-builder/ 301
 /manual/game-builder.html/ /developer-guide/game-builder/ 301
-/manual/* /developer-guide/ 301
 /developer-guide /developer-guide/ 301
 /developer-guide.html/ /developer-guide/ 301
 /blog.html /blog/ 301
@@ -1116,6 +1115,7 @@
 # END: WP sitemap migration redirects (generated)
 
 # Dynamic placeholder/splat redirects (must stay at end for Cloudflare Pages)
+/manual/* /developer-guide/ 301
 /files/cn1libs/* https://github.com/codenameone/CodenameOneLibs/raw/refs/heads/master/cn1libs/:splat 302
 /files/updates/* https://download.codenameone.com/files/updates/:splat 302
 /files/pr/* https://download.codenameone.com/files/pr/:splat 302

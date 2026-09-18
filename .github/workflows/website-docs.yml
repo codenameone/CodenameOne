@@ -162,6 +162,9 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ github.token }}
 
+      - name: Check redirect rule ordering
+        run: python3 scripts/website/test_redirect_order.py
+
       - name: Test developer guide chapter generation
         run: ruby scripts/website/test_generate_developer_guide.rb
 
