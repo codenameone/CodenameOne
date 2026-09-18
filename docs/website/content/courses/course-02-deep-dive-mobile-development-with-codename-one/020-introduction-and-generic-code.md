@@ -27,6 +27,6 @@ One modern point worth stating explicitly: if there is already a maintained Code
 
 ## Further Reading
 
-- [Developer Guide](/developer-guide/)
+- [Developer Guide](/developer-guide/advanced-topics-under-the-hood/#_native_interfaces)
 - [How Do I Access Native Device Functionality, Invoke Native Interfaces](/how-do-i/how-do-i-access-native-device-functionality-invoke-native-interfaces/)
 - [How Do I Take A Picture With The Camera](/how-do-i/how-do-i-take-a-picture-with-the-camera/)

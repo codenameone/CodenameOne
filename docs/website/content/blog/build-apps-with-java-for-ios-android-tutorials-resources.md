@@ -14,7 +14,7 @@ There are many Codename One resources for building native mobile apps but they a
 ### Written Docs and Tutorials
 
   * [• Create an Uber Clone in 7 Days](https://uber.cn1.co/) – Even if you don’t purchase the full book, the free chapters available to download will help you get started quickly.
-  *   * [• Developer Guide](https://www.codenameone.com/manual/) – if you haven’t read the developer guide you should! Notice that it also comes in a [PDF](https://www.codenameone.com/files/developer-guide.pdf).
+  *   * [• Developer Guide](/developer-guide/) – if you haven’t read the developer guide you should! Notice that it also comes in a [PDF](https://www.codenameone.com/files/developer-guide.pdf).
   *   * [• JavaDocs](https://www.codenameone.com/javadoc/) – our JavaDocs include some hidden features such as the [component gallery](/javadoc/com/codename1/ui/package-summary/) & [layout gallery](/javadoc/com/codename1/ui/layouts/package-summary/).
   *   * [• Sviluppare app multipiattaforma – Indice del corso introduttivo](https://www.informatica-libera.net/content/sviluppare-app-multipiattaforma-indice-del-corso-introduttivo) – Italian language free course for mobile cross-platform development by Francesco Galgani.
   *   * [• Port an Android app to iOS (iPhone)](/blog/port-native-android-app-ios-iphone-guide.html) – a step by step guide on porting a real world Android app to Codename One and getting it onto all the major stores.

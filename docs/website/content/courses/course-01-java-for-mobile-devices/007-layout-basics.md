@@ -32,6 +32,6 @@ The modern adjustment is not in the layout system itself so much as in how you s
 ## Further Reading
 
 - [Layout Basics](/layout-basics/)
-- [Developer Guide](/developer-guide/)
+- [Developer Guide](/developer-guide/basics/#layout-managers)
 - [Themeing](/themeing/)
 - [Getting Started](/getting-started/)

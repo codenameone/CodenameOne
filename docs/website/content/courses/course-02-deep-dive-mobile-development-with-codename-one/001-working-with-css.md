@@ -37,6 +37,6 @@ Once you approach the topic that way, the rest falls into place. Layouts define 
 
 - [Themeing](/themeing/)
 - [Designer](/designer/)
-- [Developer Guide](/developer-guide/)
+- [Developer Guide](/developer-guide/css/)
 - [Layout Basics](/layout-basics/)
 - [Moving To Maven](/blog/moving-to-maven/)

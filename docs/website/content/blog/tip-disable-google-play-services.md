@@ -29,7 +29,7 @@ In fact one of the services we include is the ads service and Google notices tha
 produces a warning if you add an app with the ads framework but declare that you don’t have ads, this small  
 trick removes it.
 
-Check out the [build hints](/manual/advanced-topics.html) section in the developer guide for more information on how you can deeply customize  
+Check out the [build hints](/developer-guide/advanced-topics-under-the-hood/#_sending_arguments_to_the_build_server) section in the developer guide for more information on how you can deeply customize\
 Codename One.
 ---
 

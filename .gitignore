@@ -180,3 +180,8 @@ cn1-build-hints.json
 # runs `xcodegen generate` from the checked-in project.yml. A committed pbxproj
 # would be a second source of truth for the same target.
 /scripts/input-validation-app/ios-tests/*.xcodeproj/
+
+# Chapter Markdown and navigation are regenerated from the AsciiDoc book.
+/docs/website/content/developer-guide/chapters/
+/docs/website/data/developer-guide.json
+/docs/website/data/guide-links.json

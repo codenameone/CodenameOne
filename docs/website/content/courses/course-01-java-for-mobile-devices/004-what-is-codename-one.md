@@ -31,7 +31,7 @@ If you are trying to decide whether Codename One is "just Java for mobile", the 
 
 ## Further Reading
 
-- [Developer Guide](/developer-guide/)
+- [Developer Guide](/developer-guide/introduction/)
 - [Getting Started](/getting-started/)
 - [Build Server](/build-server/)
 - [Moving To Maven](/blog/moving-to-maven/)

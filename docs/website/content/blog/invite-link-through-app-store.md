@@ -114,7 +114,7 @@ Enable Associated Domains and the App Clip on your App ID. Register the App Grou
 
 Finally, register an **Advanced App Clip Experience** in App Store Connect for the invite prefix shown by the console. Authorizing a domain and mapping its URL to an App Clip are separate steps. Without the experience, the link won't offer the expected clip card.
 
-If you already ship your own App Clip, `ios.invite.appClip=false` disables generation. Your clip then needs to write the expected handoff. The [Analytics guide](https://www.codenameone.com/developer-guide/) covers the build hints and lifecycle in its invitation section.
+If you already ship your own App Clip, `ios.invite.appClip=false` disables generation. Your clip then needs to write the expected handoff. The [Analytics guide](/developer-guide/analytics/#analytics-invites) covers the build hints and lifecycle in its invitation section.
 
 ## Attribute what happened after installation
 

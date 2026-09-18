@@ -122,7 +122,7 @@ Performance is a chase that never ends. It’s non-trivial and always changes on
 
 The nice thing about cross platform tools is that once you optimize something on Android this often maps back to iOS etc. giving you a nice cross platform boost.
 
-Some performance tips are generic and you can check them out in [our developer guide](/manual/) but performance is basically application specific. We wouldn’t have seen the `ShareButton` issue since the overhead is so small. But once we used `ShareButton` in an app where we created hundreds of buttons it became an issue…​
+Some performance tips are generic and you can check them out in [our developer guide](/developer-guide/performance/) but performance is basically application specific. We wouldn’t have seen the `ShareButton` issue since the overhead is so small. But once we used `ShareButton` in an app where we created hundreds of buttons it became an issue…​
 ---
 
 ## Archived Comments

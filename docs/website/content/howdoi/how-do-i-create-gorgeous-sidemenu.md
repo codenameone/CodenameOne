@@ -29,7 +29,7 @@ The main modern caution is not to over-invest in ornament if the menu is no long
 ## Further Reading
 
 - [Themeing](/themeing/)
-- [Developer Guide](/developer-guide/)
+- [Developer Guide](/developer-guide/the-components-of-codename-one/)
 - [Layout Basics](/layout-basics/)
 - [How Do I Create A Simple Theme](/how-do-i/how-do-i-create-a-simple-theme/)
 

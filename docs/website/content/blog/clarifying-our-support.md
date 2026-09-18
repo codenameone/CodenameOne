@@ -25,7 +25,7 @@ treasure trove of Codename One information thanks to your questions!
   * [Github issue tracker](/blog/issue-submission-guideline.html) – If you are new to Codename One I would  
 suggest asking in the [discussion group](/discussion-forum.html) first and reading the blog post linked here
 
-  * This blog – the comments section in the blog posts and even in the [developer guide](/manual/) is a  
+  * This blog – the comments section in the blog posts and even in the [developer guide](/developer-guide/) is a\
 good place for questions relevant to a specific entry
 
   * [Discussion Group](/discussion-forum.html) – Our venerable Google group isn’t an ideal tool but it works as  

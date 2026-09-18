@@ -1,0 +1,43 @@
+{
+  "chapters": {
+    "index": "introduction",
+    "basics": "basics",
+    "theme-basics": "basics",
+    "components": "the-components-of-codename-one",
+    "component-selector": "component-selector",
+    "edt": "the-edt-event-dispatch-thread",
+    "events": "events",
+    "animations": "animations",
+    "advanced-theming": "advanced-theming",
+    "css": "css",
+    "graphics": "graphics",
+    "files-storage-networking": "io",
+    "misc-features": "miscellaneous-features",
+    "push": "push-notifications",
+    "security": "security",
+    "performance": "performance",
+    "retrace": "performance",
+    "advanced-topics": "advanced-topics-under-the-hood",
+    "appendix-javascript": "working-with-javascript",
+    "appendix-ios": "working-with-ios",
+    "appendix-android": "on-device-debugging-android",
+    "appendix-mac": "working-with-mac-os-x",
+    "appendix-uwp": "working-with-uwp",
+    "signing": "signing",
+    "game-builder": "game-builder"
+  },
+  "anchors": {
+    "_authentication_and_identity": "authentication-and-identity",
+    "_network_connectivity": "_deeper_network_connectivity",
+    "_appendix_goal_generate_openapi_client": "_generate_openapi_client_generate_openapi",
+    "_svg_transcoder": "_build_time_vector_animation_images",
+    "_routing_and_deep_links": "_deep_link_routing",
+    "_the_background_behavior_image": "cn1-background-type",
+    "_theme_constants": "theme-constants-section",
+    "_title_animations": "title-animations-section",
+    "_invoke_and_block": "invoke-And-Block-section",
+    "_layout_managers": "layout-managers",
+    "_table_layout": "table-layout-section",
+    "_lead_component": "lead-component-section"
+  }
+}

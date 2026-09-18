@@ -27,6 +27,6 @@ So the main value here is architectural. A desktop wrapper is just one more exam
 
 ## Further Reading
 
-- [Developer Guide](/developer-guide/)
+- [Developer Guide](/developer-guide/maven-project-workflow/)
 - [Running the Kitchen Sink in the Simulator](/courses/course-02-deep-dive-mobile-development-with-codename-one/034-running-the-kitchen-sink-in-the-simulator/)
 - [How Do I Use Desktop Javascript Ports](/how-do-i/how-do-i-use-desktop-javascript-ports/)

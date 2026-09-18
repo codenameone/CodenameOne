@@ -26,5 +26,5 @@ This is another reason direct-source work should be treated as an advanced mode.
 ## Further Reading
 
 - [Introduction and Setup](/courses/course-02-deep-dive-mobile-development-with-codename-one/033-introduction-and-setup/)
-- [Developer Guide](/developer-guide/)
+- [Developer Guide](/developer-guide/maven-project-workflow/)
 - [Hello World](/hello-world/)

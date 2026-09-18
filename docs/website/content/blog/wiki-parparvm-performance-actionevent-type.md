@@ -129,7 +129,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > We already got a great set of edits there from [https://github.com/Isborg](<https://github.com/Isborg>) who did an amazing job at fixing a lot of my mistakes! So I’m pretty happy.
 >
-> This wasn’t clear in the article above but [https://www.codenameone.com…](<https://www.codenameone.com/manual/>) and the generated PDF will still work exactly as before. The only difference is that we now generate them from the wiki sources. So the source in the wiki won’t necessarily be 100% correct since they didn’t go thru our validation but the manual should still work as expected. I explained our PDF generation workflow and placed the code back in the day within the jbake user group but it might warrant better docs especially with the work we’d like to do moving forward. I think we need to invest a lot in the look and feel of the developer guide/javadocs.
+> This wasn’t clear in the article above but [https://www.codenameone.com…](</developer-guide/>) and the generated PDF will still work exactly as before. The only difference is that we now generate them from the wiki sources. So the source in the wiki won’t necessarily be 100% correct since they didn’t go thru our validation but the manual should still work as expected. I explained our PDF generation workflow and placed the code back in the day within the jbake user group but it might warrant better docs especially with the work we’d like to do moving forward. I think we need to invest a lot in the look and feel of the developer guide/javadocs.
 >
 > I placed a right side navigation panel very similar to the existing manual which should be pretty intuitive too.
 >

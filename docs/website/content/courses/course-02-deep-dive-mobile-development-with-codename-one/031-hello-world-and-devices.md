@@ -28,5 +28,5 @@ So the real goal here is not just to get a map on screen. It is to make sure the
 ## Further Reading
 
 - [Introduction and Installation](/courses/course-02-deep-dive-mobile-development-with-codename-one/030-introduction-and-installation/)
-- [Developer Guide](/developer-guide/)
+- [Developer Guide](/developer-guide/maps/)
 - [Markers, Lightweight Overlays and Map Layout](/courses/course-02-deep-dive-mobile-development-with-codename-one/032-markers-lightweight-overlays-and-map-layout/)

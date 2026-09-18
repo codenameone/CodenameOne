@@ -43,7 +43,7 @@ Wire it into the project's `pom.xml`:
 </plugin>
 ```
 
-`mvn generate-sources` picks the spec up, downloads it, and writes one file per schema and one per tag under `target/generated-sources/`. The Petstore reference spec exercised end-to-end produces six model classes (`Pet`, `Order`, `Customer`, `Tag`, `Category`, `User`) and three Api classes (`PetApi`, `StoreApi`, `UserApi`), and the nine generated `.class` files compile cleanly against `codenameone-core`. Documented at [the OpenAPI codegen Maven goal](https://www.codenameone.com/developer-guide/#_appendix_goal_generate_openapi_client).
+`mvn generate-sources` picks the spec up, downloads it, and writes one file per schema and one per tag under `target/generated-sources/`. The Petstore reference spec exercised end-to-end produces six model classes (`Pet`, `Order`, `Customer`, `Tag`, `Category`, `User`) and three Api classes (`PetApi`, `StoreApi`, `UserApi`), and the nine generated `.class` files compile cleanly against `codenameone-core`. Documented at [the OpenAPI codegen Maven goal](/developer-guide/maven-appendix-goals/#_generate_openapi_client_generate_openapi).
 
 In application code you call the generated `Api` class the same way you would call any other Java method:
 
@@ -240,7 +240,7 @@ What is still not supported: SVG `filter` primitives, `<mask>` (treated as a cli
 
 **Caveat on iOS:** the transcoded SVGs use the framework's shape API (`fillShape`, `drawShape`, `LinearGradientPaint`). The full surface is implemented on the Metal renderer. The deprecated GL ES 2 pipeline does not have parity on every operation, so an SVG drawn under `ios.metal=false` will often render with visible artifacts (missing gradients, clipped fills, distorted paths) rather than the placeholder you might expect. Now that Metal is the default for new iOS builds [as of last Friday](/blog/metal-default-new-build-cloud-and-a-new-format/#metal-is-the-default-on-ios), this is a non-issue on most apps; if you have explicitly pinned `ios.metal=false`, expect some visual regressions on SVG content and let us know which.
 
-The coverage matrix and troubleshooting are at [SVG Transcoder](https://www.codenameone.com/developer-guide/#_svg_transcoder) in the developer guide.
+The coverage matrix and troubleshooting are at [SVG Transcoder](/developer-guide/svg-transcoder/#_build_time_vector_animation_images) in the developer guide.
 
 ## Lottie at build time
 
@@ -341,7 +341,7 @@ The rest of the router surface covers the kind of thing that has become table st
 
 The API is opt-in. Apps that prefer the existing `Form.show()` / `Form.showBack()` flow keep using that; nothing changes.
 
-For the link-publishing side, an `AasaBuilder` emits the iOS `apple-app-site-association` JSON and an `AssetLinksBuilder` emits the Android `assetlinks.json`. The full setup walk-through (entitlements, the Android `intent-filter`, the `.well-known/` upload on your origin server) is at [Routing and Deep Links](https://www.codenameone.com/developer-guide/#_routing_and_deep_links) in the developer guide.
+For the link-publishing side, an `AasaBuilder` emits the iOS `apple-app-site-association` JSON and an `AssetLinksBuilder` emits the Android `assetlinks.json`. The full setup walk-through (entitlements, the Android `intent-filter`, the `.well-known/` upload on your origin server) is at [Routing and Deep Links](/developer-guide/deep-links-routing/#_deep_link_routing) in the developer guide.
 
 The JavaScript port bridges the router into `window.history` so navigating the in-app router pushes a real entry into the browser's session history. Back and forward in the browser drive the router; reloading the page lands at the deep-link URL; sharing the URL out of the address bar takes a colleague to the same in-app location.
 

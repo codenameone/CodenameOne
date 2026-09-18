@@ -134,9 +134,9 @@ The problem with this approach becomes obvious when we try to add an event liste
 
 We can make `name` into a `Button` but then what happens when a user clicks `email`?
 
-We can make all the entries into buttons but that isn’t practical. That’s what [lead component](/manual/components/#lead-component-sidebar) is for, we can make one component into a button and it "takes the lead". If we make name into a button and set it as the lead of the `Container` it will handle all the events and state changes for the entire row!
+We can make all the entries into buttons but that isn’t practical. That’s what [lead component](/developer-guide/the-components-of-codename-one/#lead-component-sidebar) is for, we can make one component into a button and it "takes the lead". If we make name into a button and set it as the lead of the `Container` it will handle all the events and state changes for the entire row!
 
-__ |  For more information on lead components check out [the sidebar](/manual/components/#lead-component-sidebar) in the developer guide.   
+__ |  For more information on lead components check out [the sidebar](/developer-guide/the-components-of-codename-one/#lead-component-sidebar) in the developer guide.\
 ---|---  
   
 We can change the code above like this and support lead components:

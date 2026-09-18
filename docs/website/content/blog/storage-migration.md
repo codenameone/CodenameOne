@@ -48,7 +48,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > Shai Almog says:
 >
 > Yes it should be true/false (notice its not yet on the servers and will be there before the weekend).  
-> We already documented it in the manual section: [http://www.codenameone.com/…](<http://www.codenameone.com/manual/advanced-topics.html#_sending_arguments_to_the_build_server>)
+> We already documented it in the manual section: [http://www.codenameone.com/…](</developer-guide/advanced-topics-under-the-hood/#_sending_arguments_to_the_build_server>)
 >
 
 

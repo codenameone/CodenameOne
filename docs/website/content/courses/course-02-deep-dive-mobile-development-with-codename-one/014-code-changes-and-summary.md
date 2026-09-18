@@ -29,7 +29,7 @@ So the summary of this lesson is that extending a UI from mockup to working app 
 
 ## Further Reading
 
-- [Developer Guide](/developer-guide/)
+- [Developer Guide](/developer-guide/the-components-of-codename-one/)
 - [How Do I Access Native Device Functionality, Invoke Native Interfaces](/how-do-i/how-do-i-access-native-device-functionality-invoke-native-interfaces/)
 - [How Do I Use Properties To Speed Development](/how-do-i/how-do-i-use-properties-to-speed-development/)
 - [How Do I Take A Picture With The Camera](/how-do-i/how-do-i-take-a-picture-with-the-camera/)

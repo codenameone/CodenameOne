@@ -15,7 +15,7 @@ Steve has been pretty busy. We have new support for Mac Appstore builds as part 
 
 ### Mac Builds
 
-In order to use these changes you’ll need to install the latest release candidate for Codename One which includes an updated version of Codename One Settings. Once you do that check out [this new section](/manual/appendix-mac.html) of the developer guide that covers the process of building and signing the Mac app.
+In order to use these changes you’ll need to install the latest release candidate for Codename One which includes an updated version of Codename One Settings. Once you do that check out [this new section](/developer-guide/working-with-mac-os-x/) of the developer guide that covers the process of building and signing the Mac app.
 
 Mac OS is locked down to some degree and if you ship an app outside of the app store you might run into problems. With this you can get the same benefit as you would get with itunes for iOS app sales on the Mac desktop. Since we already support UWP shipping through the Microsoft Windows Store is already possible.
 

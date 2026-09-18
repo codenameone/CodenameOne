@@ -46,7 +46,7 @@ pdftohtml.net
 which did a pretty decent job except for our logo. We now removed the scribd document and are only maintaining the  
 [  
 guide here  
-](/manual/)  
+](/developer-guide/)\
 . 
 
   

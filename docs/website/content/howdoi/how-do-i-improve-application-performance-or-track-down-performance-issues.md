@@ -30,7 +30,7 @@ The right workflow is to measure first, then optimize. Use the performance tools
 ## Further Reading
 
 - [Performance Network Monitors](/performance-network-monitors/)
-- [Developer Guide](/developer-guide/)
+- [Developer Guide](/developer-guide/performance/)
 - [How Do I Find Problems In My Application, Using The Codename One Tools And The Standard IDE Tools](/how-do-i/how-do-i-find-problems-in-my-application-using-the-codename-one-tools-and-the-standard-ide-tools/)
 - [In A Pinch](/blog/in-a-pinch/)
 

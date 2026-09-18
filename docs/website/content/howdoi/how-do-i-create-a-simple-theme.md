@@ -34,7 +34,7 @@ Theme constants and other lower-level theme settings still matter, especially wh
 ## Further Reading
 
 - [Themeing](/themeing/)
-- [Developer Guide](/developer-guide/)
+- [Developer Guide](/developer-guide/basics/)
 - [Layout Basics](/layout-basics/)
 - [Designer](/designer/)
 - [Hello World](/hello-world/)

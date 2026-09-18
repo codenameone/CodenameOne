@@ -252,7 +252,7 @@ This week stretches Codename One in both directions. Calls, VPN profiles, AppKit
 
 Secure-by-default programming depends on small public APIs, generated native integration, explicit platform limits, and fewer opportunities to turn a convenience feature into permanent access. You still own the application UI and the protocol choices. The builders absorb the native product plumbing needed to ship them.
 
-Start with the [Call Management](/developer-guide/#_call_management) or [VPN](/developer-guide/#_vpn) chapter, then test the failure path in the simulator before sending a native build.
+Start with the [Call Management](/developer-guide/call-management/#_call_management) or [VPN](/developer-guide/vpn/#_vpn) chapter, then test the failure path in the simulator before sending a native build.
 
 ---
 

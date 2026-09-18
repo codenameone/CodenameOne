@@ -1,0 +1,18 @@
+{{ $page := .page }}
+{{ $pages := (where site.RegularPages "Layout" "guide-chapter").ByWeight }}
+<nav class="cn1-guide-pagination cn1-guide-pagination--{{ .position }}" aria-label="Chapter navigation ({{ .position }})">
+  {{ if eq $page.Layout "guide-index" }}
+    {{ range first 1 $pages }}
+    <a rel="next" href="{{ .RelPermalink }}"><span class="cn1-guide-pagination-label">Start reading <span aria-hidden="true">→</span></span><span>{{ .Title }}</span></a>
+    {{ end }}
+  {{ else }}
+    {{ with $pages.Next $page }}
+    <a rel="prev" href="{{ .RelPermalink }}"><span class="cn1-guide-pagination-label"><span aria-hidden="true">←</span> Previous chapter</span><span>{{ .Title }}</span></a>
+    {{ else }}
+    <a href="/developer-guide/"><span class="cn1-guide-pagination-label"><span aria-hidden="true">←</span> Contents</span><span>Developer Guide</span></a>
+    {{ end }}
+    {{ with $pages.Prev $page }}
+    <a rel="next" href="{{ .RelPermalink }}"><span class="cn1-guide-pagination-label">Next chapter <span aria-hidden="true">→</span></span><span>{{ .Title }}</span></a>
+    {{ end }}
+  {{ end }}
+</nav>

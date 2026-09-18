@@ -30,7 +30,7 @@ This means that by default the new permission mode is still off and you won’t 
 
 We will probably change this to be the default in the future but at the moment the target SDK defaults to 21. To  
 activate this functionality you will need to set the target SDK to level 23 by using the  
-[build hint](/manual/advanced-topics.html)  
+[build hint](/developer-guide/advanced-topics-under-the-hood/#_sending_arguments_to_the_build_server)\
 `android.targetSDKVersion=23`.
 
 ### How Does This Look?

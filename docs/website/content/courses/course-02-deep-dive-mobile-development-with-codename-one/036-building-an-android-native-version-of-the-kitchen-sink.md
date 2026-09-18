@@ -25,6 +25,6 @@ This is one more reason the normal hosted or standard build flow remains the rig
 
 ## Further Reading
 
-- [Developer Guide](/developer-guide/)
+- [Developer Guide](/developer-guide/maven-project-workflow/)
 - [Introduction and Setup](/courses/course-02-deep-dive-mobile-development-with-codename-one/033-introduction-and-setup/)
 - [How Do I Use Offline Build](/how-do-i/how-do-i-use-offline-build/)

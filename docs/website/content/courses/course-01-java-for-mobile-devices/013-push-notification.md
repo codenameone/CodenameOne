@@ -31,7 +31,7 @@ Push types also need to be chosen deliberately. Visible notification types are u
 
 ## Further Reading
 
-- [Developer Guide](/developer-guide/)
+- [Developer Guide](/developer-guide/push-notifications/)
 - [Build Hints](/build-hints/)
 - [Build Server](/build-server/)
 - [How Do I Use Crash Protection? Get Device Logs?](/how-do-i/how-do-i-use-crash-protection-get-device-logs/)

@@ -28,7 +28,7 @@ The best way to choose between these ports is not to ask which one is more power
 
 ## Further Reading
 
-- [Developer Guide](/developer-guide/)
+- [Developer Guide](/developer-guide/working-with-javascript/)
 - [Introduction For Android Developers](/introduction-for-android-developers/)
 - [Hello World](/hello-world/)
 

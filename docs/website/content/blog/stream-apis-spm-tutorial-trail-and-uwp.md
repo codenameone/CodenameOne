@@ -56,7 +56,7 @@ Third, this removes one of the obvious "yes, but..." answers when discussing mod
 
 ## Swift Package Manager Support
 
-The other big update is that we added Swift Package Manager support to Codename One, and documented it in the [Working with iOS section of the developer guide](/developer-guide/#_using_swift_package_manager).
+The other big update is that we added Swift Package Manager support to Codename One, and documented it in the [Working with iOS section of the developer guide](/developer-guide/working-with-ios/#_using_swift_package_manager).
 
 The first thing to understand is that for existing projects, nothing should suddenly change. The default behavior is the compatibility mode, `auto`, so older projects that already use CocoaPods should just keep working.
 
@@ -114,7 +114,7 @@ It also helps to think of the SPM hints as the rough equivalent of the CocoaPods
 
 The mapping is not one-to-one because CocoaPods thinks in terms of pods and pod sources, while SPM thinks in terms of packages and exported products. But conceptually they solve the same problem: bringing an external native dependency into the generated iOS project.
 
-Another important detail is debugging. As documented in the [native source debugging section](/developer-guide/#_on_device_debugging), you should now open the `.xcworkspace` whenever it is generated, not just for CocoaPods builds. That workspace is no longer exclusive to CocoaPods. It can also be the right entry point for SPM-based or mixed dependency setups.
+Another important detail is debugging. As documented in the [native source debugging section](/developer-guide/advanced-topics-under-the-hood/#_on_device_debugging), you should now open the `.xcworkspace` whenever it is generated, not just for CocoaPods builds. That workspace is no longer exclusive to CocoaPods. It can also be the right entry point for SPM-based or mixed dependency setups.
 
 ## Tutorial Trail Refresh
 
@@ -142,7 +142,7 @@ With Codename One `7.0.229`, released on March 20, 2026, we are officially remov
 
 This is really an acknowledgment of reality more than a sudden functional change.
 
-The UWP port has already been treated as historical in the updated documentation, including the [developer guide](/developer-guide/), the [historical UWP chapter](/developer-guide/#_working_with_uwp), and the related notes in push documentation. New Maven templates and current project generation flows should not keep advertising a target that we no longer consider part of the supported day to day path.
+The UWP port has already been treated as historical in the updated documentation, including the [developer guide](/developer-guide/working-with-uwp/), the [historical UWP chapter](/developer-guide/working-with-uwp/#_working_with_uwp), and the related notes in push documentation. New Maven templates and current project generation flows should not keep advertising a target that we no longer consider part of the supported day to day path.
 
 That said, it is important to highlight one subtle point: the UWP build servers are still functioning for legacy cases. So if you have an older codebase and you absolutely need to keep it alive, this is not a statement that those servers suddenly vanished overnight.
 
