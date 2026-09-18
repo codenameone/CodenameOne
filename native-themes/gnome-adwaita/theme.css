@@ -676,10 +676,28 @@ ToolbarSearch { color: #2e3436; background-color: #ffffff; border: 0.26mm solid 
 AccordionHeader { color: #2e3436; background-color: transparent; border-radius: 1.59mm; padding: 1.6mm 3.2mm 1.6mm 3.2mm; margin: 0; }
 AccordionItem { background-color: transparent; border: none; padding: 0 3.2mm 1.6mm 3.2mm; margin: 0; }
 Tabs { background-color: transparent; padding: 0; margin: 0; }
-SelectedTab { color: #2e3436; background-color: #ffffff; border-radius: 1.59mm; padding: 1.6mm 3.2mm 1.6mm 3.2mm; margin: 0; }
-UnselectedTab { color: #5e5c64; background-color: transparent; border-radius: 1.59mm; padding: 1.6mm 3.2mm 1.6mm 3.2mm; margin: 0; }
 AccordionHeader.hover { color: #2e3436; background-color: #ededed; border-radius: 1.59mm; padding: 1.6mm 3.2mm 1.6mm 3.2mm; margin: 0; }
-UnselectedTab.hover { color: #2e3436; background-color: #ededed; border-radius: 1.59mm; padding: 1.6mm 3.2mm 1.6mm 3.2mm; margin: 0; }
+
+
+/* --- Tabs ------------------------------------------------------------------------------- */
+/*
+ * The UIID a tab button actually gets is `Tab`, and its selected state is that button's own
+ * selected style. This theme previously defined SelectedTab and UnselectedTab, which nothing in
+ * the framework writes -- so the rules were dead and the tab strip fell through to
+ * UIManager.resetThemeProps, which seeds `Tab.sel#derive: Tab`. That seed makes the selected tab
+ * IDENTICAL to an unselected one: the captured Linux screenshot showed three plain boxes with no
+ * indication of which was open, and the DesktopTabs fidelity row scored 35-68%.
+ *
+ * TabbedPane is the content pane below the strip, TabsContainer the strip itself and
+ * TabsContainerHost its wrapper; all three are named by Tabs and none was defined here.
+ */
+TabbedPane { background-color: transparent; padding: 0; margin: 0; }
+TabsContainer { background-color: #fafafa; padding: 0; margin: 0; }
+TabsContainerHost { background-color: #fafafa; padding: 0; margin: 0; }
+Tab { color: #5e5c64; background-color: transparent; border: none; padding: 1.6mm 3.2mm 1.6mm 3.2mm; margin: 0; }
+Tab.selected { color: #2e3436; background-color: transparent; border-bottom: 0.79mm solid #3584e4; padding: 1.6mm 3.2mm 1.6mm 3.2mm; margin: 0; }
+Tab.pressed { color: #2e3436; background-color: #ededed; padding: 1.6mm 3.2mm 1.6mm 3.2mm; margin: 0; }
+Tab.hover { color: #2e3436; background-color: #ededed; padding: 1.6mm 3.2mm 1.6mm 3.2mm; margin: 0; }
 
 @media (prefers-color-scheme: dark) {
     Form { background-color: #242424; color: #ffffff; }
@@ -790,9 +808,14 @@ UnselectedTab.hover { color: #2e3436; background-color: #ededed; border-radius: 
     AccordionHeader { color: #ffffff; background-color: transparent; border-radius: 1.59mm; padding: 1.6mm 3.2mm 1.6mm 3.2mm; margin: 0; }
     AccordionItem { background-color: transparent; border: none; padding: 0 3.2mm 1.6mm 3.2mm; margin: 0; }
     Tabs { background-color: transparent; padding: 0; margin: 0; }
-    SelectedTab { color: #ffffff; background-color: #1e1e1e; border-radius: 1.59mm; padding: 1.6mm 3.2mm 1.6mm 3.2mm; margin: 0; }
-    UnselectedTab { color: #c0bfbc; background-color: transparent; border-radius: 1.59mm; padding: 1.6mm 3.2mm 1.6mm 3.2mm; margin: 0; }
     AccordionHeader.hover { color: #ffffff; background-color: #353535; border-radius: 1.59mm; padding: 1.6mm 3.2mm 1.6mm 3.2mm; margin: 0; }
-    UnselectedTab.hover { color: #ffffff; background-color: #353535; border-radius: 1.59mm; padding: 1.6mm 3.2mm 1.6mm 3.2mm; margin: 0; }
+
+    TabbedPane { background-color: transparent; padding: 0; margin: 0; }
+    TabsContainer { background-color: #242424; padding: 0; margin: 0; }
+    TabsContainerHost { background-color: #242424; padding: 0; margin: 0; }
+    Tab { color: #c0bfbc; background-color: transparent; border: none; padding: 1.6mm 3.2mm 1.6mm 3.2mm; margin: 0; }
+    Tab.selected { color: #ffffff; background-color: transparent; border-bottom: 0.79mm solid #3584e4; padding: 1.6mm 3.2mm 1.6mm 3.2mm; margin: 0; }
+    Tab.pressed { color: #ffffff; background-color: #353535; padding: 1.6mm 3.2mm 1.6mm 3.2mm; margin: 0; }
+    Tab.hover { color: #ffffff; background-color: #353535; padding: 1.6mm 3.2mm 1.6mm 3.2mm; margin: 0; }
 
 }

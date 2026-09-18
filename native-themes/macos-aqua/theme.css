@@ -599,8 +599,26 @@ ToolbarSearch { color: #000000; background-color: #ffffff; border: 0.26mm solid 
 AccordionHeader { color: #000000; background-color: transparent; border-radius: 1.59mm; padding: 1.1mm 2.6mm 1.1mm 2.6mm; margin: 0; }
 AccordionItem { background-color: transparent; border: none; padding: 0 2.6mm 1.1mm 2.6mm; margin: 0; }
 Tabs { background-color: transparent; padding: 0; margin: 0; }
-SelectedTab { color: #000000; background-color: #ffffff; border-radius: 1.59mm; padding: 1.1mm 2.6mm 1.1mm 2.6mm; margin: 0; }
-UnselectedTab { color: #7f7f7f; background-color: transparent; border-radius: 1.59mm; padding: 1.1mm 2.6mm 1.1mm 2.6mm; margin: 0; }
+
+
+/* --- Tabs ------------------------------------------------------------------------------- */
+/*
+ * The UIID a tab button actually gets is `Tab`, and its selected state is that button's own
+ * selected style. This theme previously defined SelectedTab and UnselectedTab, which nothing in
+ * the framework writes -- so the rules were dead and the tab strip fell through to
+ * UIManager.resetThemeProps, which seeds `Tab.sel#derive: Tab`. That seed makes the selected tab
+ * IDENTICAL to an unselected one: the captured Linux screenshot showed three plain boxes with no
+ * indication of which was open, and the DesktopTabs fidelity row scored 35-68%.
+ *
+ * TabbedPane is the content pane below the strip, TabsContainer the strip itself and
+ * TabsContainerHost its wrapper; all three are named by Tabs and none was defined here.
+ */
+TabbedPane { background-color: transparent; padding: 0; margin: 0; }
+TabsContainer { background-color: #ececec; padding: 0; margin: 0; }
+TabsContainerHost { background-color: #ececec; padding: 0; margin: 0; }
+Tab { color: #7f7f7f; background-color: transparent; border: none; padding: 1.6mm 3.2mm 1.6mm 3.2mm; margin: 0; }
+Tab.selected { color: #ffffff; background-color: #007aff; border-radius: 1.59mm; padding: 1.6mm 3.2mm 1.6mm 3.2mm; margin: 0; }
+Tab.pressed { color: #ffffff; background-color: #e8e8e8; padding: 1.6mm 3.2mm 1.6mm 3.2mm; margin: 0; }
 
 @media (prefers-color-scheme: dark) {
     Form { background-color: #323232; color: #ffffff; }
@@ -696,7 +714,12 @@ UnselectedTab { color: #7f7f7f; background-color: transparent; border-radius: 1.
     AccordionHeader { color: #ffffff; background-color: transparent; border-radius: 1.59mm; padding: 1.1mm 2.6mm 1.1mm 2.6mm; margin: 0; }
     AccordionItem { background-color: transparent; border: none; padding: 0 2.6mm 1.1mm 2.6mm; margin: 0; }
     Tabs { background-color: transparent; padding: 0; margin: 0; }
-    SelectedTab { color: #ffffff; background-color: #1e1e1e; border-radius: 1.59mm; padding: 1.1mm 2.6mm 1.1mm 2.6mm; margin: 0; }
-    UnselectedTab { color: #98989d; background-color: transparent; border-radius: 1.59mm; padding: 1.1mm 2.6mm 1.1mm 2.6mm; margin: 0; }
+
+    TabbedPane { background-color: transparent; padding: 0; margin: 0; }
+    TabsContainer { background-color: #323232; padding: 0; margin: 0; }
+    TabsContainerHost { background-color: #323232; padding: 0; margin: 0; }
+    Tab { color: #98989d; background-color: transparent; border: none; padding: 1.6mm 3.2mm 1.6mm 3.2mm; margin: 0; }
+    Tab.selected { color: #ffffff; background-color: #007aff; border-radius: 1.59mm; padding: 1.6mm 3.2mm 1.6mm 3.2mm; margin: 0; }
+    Tab.pressed { color: #ffffff; background-color: #3a3a3a; padding: 1.6mm 3.2mm 1.6mm 3.2mm; margin: 0; }
 
 }

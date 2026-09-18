@@ -172,7 +172,7 @@ rather than dragging the set down -- but four of them are well below it:
 
 | Row | Score | What the gap is |
 |---|---:|---|
-| `DesktopTabs` | 35-68% | The biggest gap in the set. CN1 draws two full-width bordered boxes; WinUI draws a document-tab strip, AppKit a centred segmented pill and GTK an underlined notebook. The `SelectedTab`/`UnselectedTab` rules added here are generic, not per-platform. |
+| `DesktopTabs` | 35-68% at the time of the baseline | Diagnosed after the baseline was recorded: the themes styled `SelectedTab` and `UnselectedTab`, and `Tabs` writes neither -- it writes `Tab` and marks the open one with that button's own selected style. So the rules were dead and the strip fell through to `UIManager`'s `Tab.sel#derive: Tab` seed, which makes the selected tab pixel-identical to the others. The captured Linux screenshot showed three plain boxes with no indication of which was open. Now styled per platform; the next scoring run re-anchors the number. |
 | `DesktopMenuBar` | 34-50% | CN1's `CommandList` strip against a real menu bar. Only meaningful where CN1 still draws its own menu, which is GNOME's headerbar mode. |
 | `DesktopListRow` | 68-90% | Row height and the selected fill; the CN1 row is taller than a native one on all three. |
 | `DesktopSlider` dark | 73% | Pre-existing, macOS only, and unchanged by this work. |

@@ -144,7 +144,13 @@ public class DesktopNativeThemeContentTest extends UITestBase {
             "Separator.fgColor", "GroupBox.border", "GroupBoxTitle.fgColor",
             "Link.fgColor", "Stepper.margin", "StepperField.bgColor", "StepperButton.bgColor",
             "ToolbarSearch.bgColor", "AccordionHeader.padding", "AccordionItem.padding",
-            "SelectedTab.bgColor", "UnselectedTab.fgColor",
+            // Tab, not SelectedTab: Tabs writes the `Tab` UIID onto every tab button and marks
+            // the open one with that button's own selected style. The themes carried
+            // SelectedTab/UnselectedTab rules that nothing in the framework writes, so the
+            // strip fell through to UIManager's `Tab.sel#derive: Tab` seed and the selected tab
+            // was pixel-identical to the others -- no indication at all of which was open.
+            "Tab.fgColor", "TabbedPane.margin", "TabsContainer.bgColor",
+            "TabsContainerHost.bgColor",
         };
         for (String name : DESKTOP_THEMES) {
             Hashtable theme = loadTheme(name);
@@ -169,7 +175,7 @@ public class DesktopNativeThemeContentTest extends UITestBase {
             "$DarkPopupContentPane.bgColor", "$DarkCommand.fgColor", "$DarkTooltip.fgColor",
             "$DarkTooltipDialog.bgColor", "$DarkSeparator.fgColor", "$DarkGroupBoxTitle.fgColor",
             "$DarkLink.fgColor", "$DarkStepperField.bgColor", "$DarkStepperButton.bgColor",
-            "$DarkToolbarSearch.bgColor", "$DarkSelectedTab.bgColor", "$DarkUnselectedTab.fgColor",
+            "$DarkToolbarSearch.bgColor", "$DarkTab.fgColor", "$DarkTabsContainer.bgColor",
         };
         for (String name : DESKTOP_THEMES) {
             Hashtable theme = loadTheme(name);
@@ -191,6 +197,39 @@ public class DesktopNativeThemeContentTest extends UITestBase {
      * <p>The scrollbar knob is the deliberate exception: {@code NSScroller} does darken under
      * the pointer, and it expresses that through sel#/press#, not hover#.</p>
      */
+    /// The open tab has to be VISIBLY open.
+    ///
+    /// Asserted as a difference rather than as a key, for the same reason the scrollbar
+    /// highlight is: `UIManager.resetThemeProps` seeds `Tab.sel#derive: Tab`, so the selected
+    /// entry is present in every compiled theme whether or not anything styled it. Present and
+    /// equal is exactly the defect -- a tab strip with no indication of which tab is open.
+    @Test
+    public void everyDesktopThemeMarksTheOpenTab() throws Exception {
+        for (String name : DESKTOP_THEMES) {
+            Hashtable theme = loadTheme(name);
+            if (theme == null) {
+                return;
+            }
+            boolean fillDiffers = differs(theme, "Tab.bgColor", "Tab.sel#bgColor");
+            boolean textDiffers = differs(theme, "Tab.fgColor", "Tab.sel#fgColor");
+            boolean borderDiffers = theme.get("Tab.sel#border") != null
+                    && !String.valueOf(theme.get("Tab.sel#border"))
+                            .equals(String.valueOf(theme.get("Tab.border")));
+            assertTrue(fillDiffers || textDiffers || borderDiffers,
+                    name + ": the selected tab is indistinguishable from an unselected one --"
+                            + " it needs a different fill, text colour or border");
+        }
+    }
+
+    private static boolean differs(Hashtable theme, String a, String b) {
+        Object va = theme.get(a);
+        Object vb = theme.get(b);
+        if (vb == null) {
+            return false;
+        }
+        return !String.valueOf(va).equals(String.valueOf(vb));
+    }
+
     @Test
     public void aquaAddsNoHoverRules() throws Exception {
         Hashtable theme = loadTheme("MacOSAquaTheme.res");
