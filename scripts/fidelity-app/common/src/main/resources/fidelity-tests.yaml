@@ -466,6 +466,18 @@ components:
   # The Separator component is still themed by all three desktop themes and is asserted by
   # DesktopNativeThemeContentTest; it is the overlay COMPARISON that cannot see it.
 
+  - id: DesktopSeparator
+    cn1_uiid: Separator
+    # The thinnest row in the suite, and the one most worth measuring: a separator is
+    # nothing but a colour and a thickness, so a theme that gets either wrong has no other
+    # symptom. The tile is short because a taller one would be almost entirely background
+    # on both sides and would score high no matter what the rule says.
+    tile_height_px: 24
+    native_win: winui_separator
+    native_mac: appkit_box_separator
+    native_gnome: gtk_separator
+    states: normal
+
   - id: DesktopGroupBox
     cn1_uiid: GroupBox
     native_win: winui_groupbox

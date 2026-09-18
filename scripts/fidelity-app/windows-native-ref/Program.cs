@@ -166,6 +166,7 @@ public partial class App : Application
         // scrollbar is here and not on macOS for the same reason -- see the DesktopScrollBar
         // note in fidelity-tests.yaml for what was measured.
         new("DesktopScrollBar",    "winui_scrollbar",       new[] { "normal" }),
+        new("DesktopSeparator",    "winui_separator",       new[] { "normal" }),
         new("DesktopGroupBox",     "winui_groupbox",        new[] { "normal" }),
         new("DesktopStepper",      "winui_numberbox",       new[] { "normal", "disabled" }),
         new("DesktopLinkButton",   "winui_hyperlinkbutton", new[] { "normal", "hover", "disabled" }),
@@ -189,7 +190,8 @@ public partial class App : Application
             // a box, a tab strip, a command bar and a menu bar are containers that take the
             // width they are given.
             or "winui_autosuggestbox" or "winui_listviewitem"
-            or "winui_groupbox" or "winui_tabview" or "winui_commandbar" or "winui_menubar";
+            or "winui_groupbox" or "winui_tabview" or "winui_commandbar" or "winui_menubar"
+            or "winui_separator";
 
     /// Controls with no natural HEIGHT, the same rule on the other axis. A group box is a
     /// frame around other things -- left to measure itself it collapses onto its own header
@@ -232,6 +234,7 @@ public partial class App : Application
             IndicatorMode = ScrollingIndicatorMode.MouseIndicator,
             Visibility = Visibility.Visible,
         },
+        "winui_separator" => MakeSeparator(),
         "winui_groupbox" => MakeGroupBox(),
         // NumberBox with its spin buttons shown inline, which is the WinUI stepper. Without
         // SpinButtonPlacementMode it is a plain number field and the control under
@@ -261,6 +264,21 @@ public partial class App : Application
         "winui_tooltip" => new ToolTip { Content = "Tooltip" },
         _ => null,
     };
+
+    private static FrameworkElement MakeSeparator()
+    {
+        // WinUI has no Separator control for content: the platform draws a horizontal rule as a
+        // one-pixel Border in DividerStrokeColorDefaultBrush, which is what its own settings
+        // pages use between groups. MenuFlyoutSeparator exists but is a menu primitive with
+        // menu insets, so it would be measuring the wrong thing.
+        return new Border
+        {
+            Height = 1,
+            HorizontalAlignment = HorizontalAlignment.Stretch,
+            VerticalAlignment = VerticalAlignment.Center,
+            Background = (Brush)Application.Current.Resources["DividerStrokeColorDefaultBrush"],
+        };
+    }
 
     private static FrameworkElement MakeGroupBox()
     {

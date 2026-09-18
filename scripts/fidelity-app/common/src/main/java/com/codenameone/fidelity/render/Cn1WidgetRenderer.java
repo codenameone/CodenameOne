@@ -59,7 +59,8 @@ public final class Cn1WidgetRenderer {
     /// Desktop rows that build something of their own rather than reusing a mobile branch.
     private static final java.util.Set<String> SECOND_WAVE =
             new java.util.HashSet<String>(java.util.Arrays.asList(
-                    "DesktopScrollBar", "DesktopScrollBarHighlight", "DesktopGroupBox", "DesktopStepper",
+                    "DesktopScrollBar", "DesktopScrollBarHighlight", "DesktopSeparator",
+                    "DesktopGroupBox", "DesktopStepper",
                     "DesktopLinkButton", "DesktopSearchField", "DesktopListRow", "DesktopTabs",
                     "DesktopToolbar", "DesktopDisclosure", "DesktopMenuBar", "DesktopMenuItem",
                     "DesktopTooltip"));
@@ -126,6 +127,7 @@ public final class Cn1WidgetRenderer {
                 || "DesktopComboBox".equals(id)
                 // The second wave: the chrome and the controls the first nine did not reach.
                 || "DesktopScrollBar".equals(id) || "DesktopScrollBarHighlight".equals(id)
+                || "DesktopSeparator".equals(id)
                 || "DesktopGroupBox".equals(id) || "DesktopStepper".equals(id)
                 || "DesktopLinkButton".equals(id) || "DesktopSearchField".equals(id)
                 || "DesktopListRow".equals(id) || "DesktopTabs".equals(id)
@@ -550,6 +552,10 @@ public final class Cn1WidgetRenderer {
             // drawScroll reads to pick the thumb's selected or pressed style, so this renders
             // the same pixels a real hover does, and it needs no test-only hook in the product.
             c = new ScrollBarProbe("hover".equals(state), "pressed".equals(state));
+        } else if ("DesktopSeparator".equals(id)) {
+            com.codename1.components.Separator sep = new com.codename1.components.Separator();
+            sep.setUIID(uiid);
+            c = sep;
         } else if ("DesktopGroupBox".equals(id)) {
             com.codename1.components.GroupBox box =
                     new com.codename1.components.GroupBox(text);

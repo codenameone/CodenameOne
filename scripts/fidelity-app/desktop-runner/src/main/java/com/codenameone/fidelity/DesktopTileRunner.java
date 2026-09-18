@@ -215,7 +215,10 @@ public final class DesktopTileRunner {
                     // a row, a box, a tab strip, a toolbar and a menu bar are containers that
                     // take the width they are given.
                     "DesktopSearchField", "DesktopListRow",
-                    "DesktopGroupBox", "DesktopTabs", "DesktopToolbar", "DesktopMenuBar"));
+                    "DesktopGroupBox", "DesktopTabs", "DesktopToolbar", "DesktopMenuBar",
+                    // A separator is a rule across whatever it divides; it has no width of
+                    // its own on either side.
+                    "DesktopSeparator"));
 
     /// Controls with no natural HEIGHT, the same rule on the other axis.
     ///

@@ -124,6 +124,7 @@ let SPECS: [Spec] = [
     // no Screen Recording consent. Those rows carry a platforms: list in the spec rather than
     // a blank golden that would score 0% forever and read as a theme bug -- the same call
     // already made for Aqua vibrancy.
+    Spec(id: "DesktopSeparator", kind: "appkit_box_separator", states: ["normal"]),
     Spec(id: "DesktopGroupBox", kind: "appkit_box_titled", states: ["normal"]),
     Spec(id: "DesktopStepper", kind: "appkit_stepper", states: ["normal", "disabled"]),
     Spec(id: "DesktopLinkButton", kind: "appkit_link_button", states: ["normal", "hover", "disabled"]),
@@ -146,6 +147,7 @@ let FULL_WIDTH_KINDS: Set<String> = [
     // containers that take the width they are given.
     "appkit_searchfield", "appkit_tableview_row",
     "appkit_box_titled", "appkit_tabview", "appkit_toolbar",
+    "appkit_box_separator",
 ]
 
 /// Controls that own the full tile HEIGHT rather than sizing to their content.
@@ -250,6 +252,13 @@ final class RefApp: NSObject, NSApplicationDelegate {
             let pop = NSPopUpButton(frame: .zero, pullsDown: false)
             pop.addItem(withTitle: "Option")
             return pop
+        case "appkit_box_separator":
+            // NSBox in .separator mode IS AppKit's horizontal rule -- the same object as the
+            // titled box above, which is why both are NSBox here rather than one of them being
+            // a hand-drawn line. It has no natural width, so it is in FULL_WIDTH_KINDS.
+            let sep = NSBox(frame: NSRect(x: 0, y: 0, width: TILE_W, height: 1))
+            sep.boxType = .separator
+            return sep
         case "appkit_box_titled":
             // The label goes INSIDE the default content view. Assigning it AS the content view
             // replaces the view the box draws its frame around, so the frame disappeared and

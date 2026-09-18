@@ -163,6 +163,7 @@ static const Spec SPECS[] = {
      * paintable -- but not the tooltip, which is a surface of its own like AppKit's. */
     {"DesktopScrollBar",          "gtk_scrollbar",   {"normal", NULL}},
     {"DesktopScrollBarHighlight", "gtk_scrollbar",   {"normal", "hover", "pressed", NULL}},
+    {"DesktopSeparator",    "gtk_separator",         {"normal", NULL}},
     {"DesktopGroupBox",     "gtk_frame",             {"normal", NULL}},
     {"DesktopStepper",      "gtk_spin_button",       {"normal", "disabled", NULL}},
     {"DesktopLinkButton",   "gtk_link_button",       {"normal", "hover", "disabled", NULL}},
@@ -189,6 +190,7 @@ static int is_full_width(const char *kind) {
          * they are given. */
         || strcmp(kind, "gtk_search_entry") == 0
         || strcmp(kind, "gtk_listbox_row") == 0
+        || strcmp(kind, "gtk_separator") == 0
         || strcmp(kind, "gtk_frame") == 0
         || strcmp(kind, "gtk_notebook") == 0
         || strcmp(kind, "adw_header_bar") == 0
@@ -500,6 +502,13 @@ static GtkWidget *make_widget(const char *kind) {
         GtkAdjustment *adj = gtk_adjustment_new(0.0, 0.0, 100.0, 1.0, 10.0, 40.0);
         return gtk_scrollbar_new(GTK_ORIENTATION_VERTICAL, adj);
     }
+    if (strcmp(kind, "gtk_separator") == 0) {
+        /* GtkSeparator is the real thing rather than a drawn line: its thickness and colour
+           come from the Adwaita stylesheet, which is exactly what the Separator UIID has to
+           match. It has no natural width, so it is in the full-width set. */
+        return gtk_separator_new(GTK_ORIENTATION_HORIZONTAL);
+    }
+
     if (strcmp(kind, "gtk_frame") == 0) {
         /* GtkFrame with a label IS the GNOME group box; there is no separate widget. */
         GtkWidget *frame = gtk_frame_new("Group");

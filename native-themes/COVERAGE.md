@@ -246,7 +246,7 @@ That property is now asserted rather than remembered
 | DesktopSlider | Slider | NSSlider | GtkScale |
 | DesktopProgressBar | ProgressBar | NSProgressIndicator | GtkProgressBar |
 | DesktopComboBox | ComboBox | NSPopUpButton | GtkDropDown |
-| DesktopSeparator | MenuFlyoutSeparator | NSBox (separator) | GtkSeparator |
+| DesktopSeparator | Border in `DividerStrokeColorDefaultBrush` | NSBox (separator) | GtkSeparator |
 | DesktopGroupBox | headered Border | NSBox (titled) | GtkFrame |
 | DesktopStepper | NumberBox (inline spin) | NSTextField + NSStepper | GtkSpinButton |
 | DesktopLinkButton | HyperlinkButton | NSButton (link) | GtkLinkButton |
