@@ -74,12 +74,28 @@ change into a green build.
    two consecutive grabs agree.
 
    **The measured residual, recorded rather than tolerated:** the Windows set
-   reproduces byte-for-byte except for 2-3 pixels on the slider thumb's
-   anti-aliased edge in dark mode, which differ by +/-1 in a channel between runs.
-   That is GPU rasterizer rounding; nothing in the app or the environment pins it.
-   It is far below the comparator's content threshold and does not move a score.
-   It is written down here so the next person does not spend a run discovering it,
-   and it is NOT a licence to accept a larger one.
+   reproduces byte-for-byte except for 2-3 pixels on an anti-aliased EDGE, which
+   differ by +/-1 in a channel between runs. That is GPU rasterizer rounding;
+   nothing in the app or the environment pins it. It is far below the comparator's
+   content threshold and does not move a score. It is written down here so the next
+   person does not spend a run discovering it, and it is NOT a licence to accept a
+   larger one.
+
+   Measured again when the second wave of rows landed, and the shape held: two runs
+   of identical code differed on `DesktopSlider_normal_dark` (2px),
+   `DesktopSlider_hover_dark` (3px) and `DesktopTooltip_normal_light` (2px), every
+   one of them +/-1 in a channel on a rounded border or a thumb edge. So it is a
+   property of anti-aliased edges on this runner rather than of the slider, which is
+   the only control the first measurement happened to have.
+
+   GNOME, by contrast, reproduced **byte-for-byte across two runs, all 104 tiles**,
+   including the manifest -- so the residual is not a property of the suite.
+
+   The Windows set also carries one PNG that is NOT a tile: `Button_normal_light.png`,
+   the self-check the app BitBlts to prove the Mica backdrop reached its window. It is
+   excluded from `tiles_written` and must be excluded from the committed set too --
+   it has no CN1 counterpart, so leaving it in makes the golden count disagree with
+   the number of pairs the gate can score.
 5. **Record the first baseline separately**, with `FIDELITY_UPDATE_BASELINE=1`, so
    the commit that defines the goldens and the commit that defines the ratchet are
    two reviewable changes rather than one.
