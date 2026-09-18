@@ -405,3 +405,127 @@ components:
     native_gnome: gtk_dropdown
     text: Option
     states: normal,hover,disabled
+
+  # --- Desktop, second wave -----------------------------------------------------
+  # The chrome and the controls the first nine rows did not reach. Same 240x56 tile,
+  # deliberately: a per-row tile size would have to be taught to three standalone capture
+  # apps that each hard-code one, and nothing here needs a bigger canvas.
+  #
+  # Three rows carry a platforms: list rather than all three native keys, and the reason is
+  # the same one that keeps Aqua vibrancy out of the suite: the reference has to be
+  # RENDERABLE into a view. A macOS NSMenu and a GTK or AppKit tooltip are window-server
+  # surfaces, invisible to NSView.cacheDisplay and to GtkWidgetPaintable, which are the
+  # capture paths these apps use. A blank golden scores 0% forever and reads as a theme bug,
+  # so the honest answer is to say where the reference exists and score it there.
+
+  # Windows and GNOME only. AppKit's scrollbar cannot be captured by this path, and that was
+  # measured rather than assumed: an NSScroller reports usableParts=allScrollerParts, a
+  # knobProportion of 0.4, isHidden=false and a 17x56 frame -- and renders NOTHING through
+  # NSView.cacheDisplay. Tried detached and inside a real NSScrollView, in both .legacy and
+  # .overlay styles, with AppleShowScrollBars=Always already set by the capture script. The
+  # tile comes back holding one colour, the backdrop, every time.
+  #
+  # That is the same limitation as Aqua vibrancy: composited somewhere cacheDisplay does not
+  # see. And cacheDisplay is the capture path that needs no Screen Recording consent, which
+  # cannot be granted on a hosted runner at all. A blank golden would score 0% forever and
+  # read as a theme bug, so the row says where the reference exists instead.
+  - id: DesktopScrollBar
+    cn1_uiid: DesktopScrollThumb
+    native_win: winui_scrollbar
+    native_gnome: gtk_scrollbar
+    platforms: windows,gnome
+    states: normal,hover,pressed
+
+  - id: DesktopSeparator
+    cn1_uiid: Separator
+    native_win: winui_separator
+    native_mac: appkit_box_separator
+    native_gnome: gtk_separator
+    states: normal
+
+  - id: DesktopGroupBox
+    cn1_uiid: GroupBox
+    native_win: winui_groupbox
+    native_mac: appkit_box_titled
+    native_gnome: gtk_frame
+    text: Group
+    states: normal
+
+  - id: DesktopStepper
+    cn1_uiid: Stepper
+    native_win: winui_numberbox
+    native_mac: appkit_stepper
+    native_gnome: gtk_spin_button
+    states: normal,disabled
+
+  - id: DesktopLinkButton
+    cn1_uiid: Link
+    native_win: winui_hyperlinkbutton
+    native_mac: appkit_link_button
+    native_gnome: gtk_link_button
+    text: Link
+    states: normal,hover,disabled
+
+  - id: DesktopSearchField
+    cn1_uiid: ToolbarSearch
+    native_win: winui_autosuggestbox
+    native_mac: appkit_searchfield
+    native_gnome: gtk_search_entry
+    text: Search
+    states: normal,disabled
+
+  - id: DesktopListRow
+    cn1_uiid: ListRenderer
+    native_win: winui_listviewitem
+    native_mac: appkit_tableview_row
+    native_gnome: gtk_listbox_row
+    text: Row
+    states: normal,selected,hover
+
+  - id: DesktopTabs
+    cn1_uiid: Tabs
+    native_win: winui_tabview
+    native_mac: appkit_tabview
+    native_gnome: gtk_notebook
+    states: normal
+
+  - id: DesktopToolbar
+    cn1_uiid: Toolbar
+    native_win: winui_commandbar
+    native_mac: appkit_toolbar
+    native_gnome: adw_header_bar
+    states: normal
+
+  - id: DesktopDisclosure
+    cn1_uiid: AccordionHeader
+    native_win: winui_expander
+    native_mac: appkit_disclosure
+    native_gnome: gtk_expander
+    text: Details
+    states: normal
+
+  # Windows and GNOME only: AppKit's menu bar is an NSMenu owned by the window server.
+  - id: DesktopMenuBar
+    cn1_uiid: CommandList
+    native_win: winui_menubar
+    native_gnome: gtk_popover_menubar
+    platforms: windows,gnome
+    text: File
+    states: normal
+
+  - id: DesktopMenuItem
+    cn1_uiid: Command
+    native_win: winui_menuflyoutitem
+    native_gnome: gtk_popover_menu_item
+    platforms: windows,gnome
+    text: Open
+    states: normal,hover,disabled
+
+  # Windows only: a WinUI ToolTip is an ordinary Control and renders into a view. The GTK
+  # and AppKit tooltips are separate windows the capture path cannot see.
+  - id: DesktopTooltip
+    cn1_uiid: Tooltip
+    native_win: winui_tooltip
+    platforms: windows
+    text: Tooltip
+    states: normal

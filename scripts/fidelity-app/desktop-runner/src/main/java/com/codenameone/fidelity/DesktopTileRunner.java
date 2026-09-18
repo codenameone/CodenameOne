@@ -210,7 +210,22 @@ public final class DesktopTileRunner {
     /// comparison is between two different geometries and the score means nothing.
     private static final java.util.Set<String> FULL_WIDTH_IDS =
             new java.util.HashSet<String>(java.util.Arrays.asList(
-                    "DesktopSlider", "DesktopProgressBar", "DesktopTextField"));
+                    "DesktopSlider", "DesktopProgressBar", "DesktopTextField",
+                    // Second wave, same rule. A separator measures to nothing at all, a search
+                    // field to its placeholder, and a row, a box, a tab strip, a toolbar and a
+                    // menu bar are containers that take the width they are given.
+                    "DesktopSeparator", "DesktopSearchField", "DesktopListRow",
+                    "DesktopGroupBox", "DesktopTabs", "DesktopToolbar", "DesktopMenuBar"));
+
+    /// Controls with no natural HEIGHT, the same rule on the other axis.
+    ///
+    /// The group box is a frame around other things: left to measure itself it collapses onto
+    /// its own title and draws no frame, which is a heading rather than a group box. The
+    /// scrollbar is defined by its length. Both native reference apps apply the same rule
+    /// through their own FULL_HEIGHT lists, kept in step by hand exactly as the width ones are.
+    private static final java.util.Set<String> FULL_HEIGHT_IDS =
+            new java.util.HashSet<String>(java.util.Arrays.asList(
+                    "DesktopGroupBox", "DesktopScrollBar"));
 
     private static int tileBackground() {
         return UIManager.getInstance().getComponentStyle("Form").getBgColor();
@@ -263,6 +278,9 @@ public final class DesktopTileRunner {
         // would recognise -- AppKit gives 39px for the string "Text".
         if (FULL_WIDTH_IDS.contains(c.getId())) {
             comp.setPreferredW(w);
+        }
+        if (FULL_HEIGHT_IDS.contains(c.getId())) {
+            comp.setPreferredH(h);
         }
         comp.getAllStyles().setMargin(0, 0, 0, 0);
         // getAllStyles() deliberately EXCLUDES the hover style, so it is zeroed here as well

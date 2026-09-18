@@ -234,9 +234,45 @@ That property is now asserted rather than remembered
 | DesktopSlider | Slider | NSSlider | GtkScale |
 | DesktopProgressBar | ProgressBar | NSProgressIndicator | GtkProgressBar |
 | DesktopComboBox | ComboBox | NSPopUpButton | GtkDropDown |
+| DesktopSeparator | MenuFlyoutSeparator | NSBox (separator) | GtkSeparator |
+| DesktopGroupBox | headered Border | NSBox (titled) | GtkFrame |
+| DesktopStepper | NumberBox (inline spin) | NSTextField + NSStepper | GtkSpinButton |
+| DesktopLinkButton | HyperlinkButton | NSButton (link) | GtkLinkButton |
+| DesktopSearchField | AutoSuggestBox | NSSearchField | GtkSearchEntry |
+| DesktopListRow | ListViewItem | NSTableRowView | GtkListBoxRow |
+| DesktopTabs | TabView | NSTabView | GtkNotebook |
+| DesktopToolbar | CommandBar | title-bar strip | AdwHeaderBar |
+| DesktopDisclosure | Expander | disclosure triangle + label | GtkExpander |
+| DesktopScrollBar | ScrollBar | -- | GtkScrollbar |
+| DesktopMenuBar | MenuBar | -- | GtkPopoverMenuBar |
+| DesktopMenuItem | MenuFlyoutItem | -- | menu row (`.model` button) |
+| DesktopTooltip | ToolTip | -- | -- |
 
 States: normal, hover, pressed, selected and disabled as each control supports them, in
-both appearances. 30 tiles per appearance, 60 per platform.
+both appearances.
+
+### Rows that are not scored on every platform
+
+A reference has to be RENDERABLE into a view, and three of these are not everywhere. Saying
+where the reference exists is the honest answer: a blank golden scores 0% forever and reads
+as a theme bug.
+
+| Row | Missing on | Why |
+|---|---|---|
+| DesktopScrollBar | macOS | Measured, not assumed. An `NSScroller` reports `usableParts=allScrollerParts`, `knobProportion` 0.4, `isHidden=false` and a 17x56 frame -- and renders nothing through `NSView.cacheDisplay`. Tried detached and inside a real `NSScrollView`, in both `.legacy` and `.overlay` styles, with `AppleShowScrollBars=Always` already set by the capture script. The tile comes back holding one colour, the backdrop, every time. Same class of limitation as Aqua vibrancy. |
+| DesktopMenuBar, DesktopMenuItem | macOS | An `NSMenu` belongs to the window server, not to a view. |
+| DesktopTooltip | macOS, GNOME | Both platforms' tooltips are separate windows. A WinUI `ToolTip` is an ordinary `Control`, which is why the row exists at all. |
+
+Three things the second wave found in the references themselves, each caught by the capture
+apps' own blockers rather than by eye:
+
+- An `NSTableRowView` has no intrinsic size in either axis and laid out to 240x0, producing
+  no image. Given the standard 24pt row height a table would have given it.
+- An `NSStackView`'s `fittingSize` came back with no width, so the stepper tile showed the
+  chevrons and no field -- half a control.
+- A `CGColor` read from a dynamic `NSColor` freezes at whatever appearance was in force, so
+  the toolbar's light tile was painted with the dark window background. Drawn rather than
+  layer-backed now, which is why `TileView` draws its own fill too.
 
 ### Known visual gaps (tracked, honest list)
 
@@ -247,8 +283,10 @@ both appearances. 30 tiles per appearance, 60 per platform.
 | Aqua vibrancy | `NSVisualEffectView` is composited by the window server and is invisible to `NSView.cacheDisplay`, which is the capture path that needs no Screen Recording consent. A missing golden is honest; a blank one scores 0% forever and reads as a theme bug. |
 | macOS hover | AppKit draws no rollover state for any control in this matrix. The Aqua theme leaves hover equal to normal, the captured reference says the same, and the gate holds it there. Not a gap in the theme -- a property of the platform. |
 | Adwaita has no Mica analogue | By design. Recorded so nobody goes looking for one. |
-| Window chrome | The tile contract is a widget in a tile. Desktop design languages are half window chrome, and none of it is scored yet. |
+| Window chrome | The tile contract is a widget in a tile. `DesktopToolbar` now scores the title-bar strip, but the rest -- borders, shadows, corner radii, the traffic lights -- is not scored. |
+| Dialog | Not scored: an alert needs a bigger tile than 240x56, and the tile size is a constant in each of the three standalone capture apps rather than a per-row value. Teaching all three per-row tiles is the prerequisite. |
 | Native menu bar on Windows and Linux | Neither port implements `setNativeCommands`, so their commands stay in the CN1-drawn Toolbar, which the themes now style. Real `HMENU` / `GMenu` menus are follow-up work. |
+| Fluent `ScrollBar` visual-state names | The WinUI `ScrollBar` template predates the `PointerOver` vocabulary, so `MouseOver` and `Dragging` are tried after the modern names. A capture where none of them matched reports a blocker rather than writing a tile identical to normal. |
 
 ### Fonts are the honest ceiling
 
@@ -259,7 +297,13 @@ residual is named rather than dismissed as anti-aliasing.
 
 ### Golden sets
 
-All three are captured, reviewed, committed and gating on master.
+All three are captured, reviewed, committed and gating on master. The second-wave rows have
+no goldens yet: they are captured by dispatching
+`fidelity-desktop-native-ref.yml -f targets=all -f mode=capture`, reviewed frame by frame,
+committed in one commit naming the run, then re-dispatched and required to come back
+byte-identical. Until that happens the desktop fidelity legs report those pairs as
+`missing_expected` and fail, which is the correct behaviour -- a new row is not silently
+skipped.
 
 A baseline is recorded from the runner that SCORES it, never locally. The CN1 side renders
 on the leg's own OS, and a Mac-recorded baseline failed the gnome gate on eighteen pairs --
