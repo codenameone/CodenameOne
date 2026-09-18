@@ -157,6 +157,38 @@ class IPhoneBuilderLaunchMetadataTest {
     }
 
     @Test
+    void theTemplatesOwnLaunchMetadataComesOutBeforeThisBuildWritesItsOwn() {
+        // The translator template declares both so a project it produces alone can launch.
+        // This build writes its own pair, and a plist takes the LAST of a duplicated key --
+        // so shipping two would make the one UIKit reads depend on where the injection landed.
+        String template = document(LAUNCH_SCREEN + SCENE_MANIFEST
+                + "    <key>LSRequiresIPhoneOS</key>\n    <true/>\n");
+        String stripped = IPhoneBuilder.plistStrippedOfGeneratedLaunchMetadata(template);
+        assertFalse(stripped.contains("UIApplicationSceneManifest"), stripped);
+        assertFalse(stripped.contains("UILaunchScreen"), stripped);
+        assertTrue(stripped.contains("<key>LSRequiresIPhoneOS</key>"),
+                "nothing else is disturbed");
+        assertTrue(stripped.contains("<key>CFBundleName</key>"),
+                "nothing else is disturbed");
+        // And a document that declares neither is returned untouched, so a build whose
+        // template predates this is not rewritten for nothing.
+        String bare = document("    <key>LSRequiresIPhoneOS</key>\n    <true/>\n");
+        assertEquals(bare, IPhoneBuilder.plistStrippedOfGeneratedLaunchMetadata(bare));
+    }
+
+    @Test
+    void everyLaunchKeyKindComesOutNotJustTheOneTheTemplateUses() {
+        // Whichever of the four is in that file is ours -- ios.plistInject is a separate
+        // fragment added after the strip -- so leaving a second kind behind is the same
+        // duplication under another name.
+        for (String key : IPhoneBuilder.ACCEPTED_LAUNCH_KEYS) {
+            String template = document("    <key>" + key + "</key>\n    <dict/>\n");
+            assertFalse(IPhoneBuilder.plistStrippedOfGeneratedLaunchMetadata(template)
+                    .contains("<key>" + key + "</key>"), key);
+        }
+    }
+
+    @Test
     void aBundleWithLaunchScreenAndSceneManifestPasses() {
         assertNull(IPhoneBuilder.launchMetadataRejection(
                 document(LAUNCH_SCREEN + SCENE_MANIFEST), 27));

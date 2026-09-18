@@ -10454,6 +10454,33 @@ public class IPhoneBuilder extends Executor {
         "UILaunchStoryboardName", "UILaunchStoryboards", "UILaunchScreen", "UILaunchScreens"
     };
 
+    /// The same plist without the scene manifest or any launch key of its root dictionary.
+    ///
+    /// The translator template declares a manifest and a UILaunchScreen so that a project it
+    /// produces on its own can launch. This build is about to write its own pair, so the
+    /// template's come out first: a property list takes the LAST of a duplicated key, which
+    /// would make the one UIKit reads depend on where the injection was spliced.
+    ///
+    /// All four launch keys, not only the one the template declares: whichever of them is
+    /// there, it is ours, and leaving a second kind behind is the same duplication by another
+    /// name. Nothing a developer wrote reaches this text -- ios.plistInject is a separate
+    /// fragment, added after this runs.
+    ///
+    /// #### Parameters
+    ///
+    /// - `plist`: the template plist document
+    ///
+    /// #### Returns
+    ///
+    /// the document with those keys removed, or the input when it declared none
+    static String plistStrippedOfGeneratedLaunchMetadata(String plist) {
+        String stripped = plistWithoutRootMembers(plist, "UIApplicationSceneManifest");
+        for (String launchKey : ACCEPTED_LAUNCH_KEYS) {
+            stripped = plistWithoutRootMembers(stripped, launchKey);
+        }
+        return stripped;
+    }
+
     /// Whether an injected plist fragment names any of Apple's launch-screen keys.
     ///
     /// Deliberately `contains`, not a parse. This decides only whether to ADD a key of our
@@ -16359,6 +16386,25 @@ public class IPhoneBuilder extends Executor {
         // UIApplicationMain(..., @"CodenameOne_GLAppDelegate") creates the delegate from the
         // class name. A developer who injects the key through ios.plistInject still gets it
         // stripped from the Mac slice, which is a different concern; see plistForMacSlice.
+
+        // What replaced it lives in the template as well: the scene manifest and UILaunchScreen
+        // are unconditional now, so the translator template declares both and a project produced
+        // by ByteCodeTranslator alone -- without this builder ever running -- has a lifecycle and
+        // a launch screen of its own. The port's natives stopped being able to launch without a
+        // scene manifest the moment the legacy lifecycle was deleted from them, and a native that
+        // depends on a plist key only one of its two producers writes is a key it can lose.
+        //
+        // This build writes its own, because CarPlay adds a second role and ios.plistInject can
+        // replace either outright, so the template's copies come out first: a property list takes
+        // the LAST of a duplicated key, and shipping two of these would make which one UIKit
+        // reads a function of where the injection happened to be spliced.
+        if (infoPlist.exists()) {
+            PlistText template = readPlistText(infoPlist);
+            String withoutGenerated = plistStrippedOfGeneratedLaunchMetadata(template.text);
+            if (!withoutGenerated.equals(template.text)) {
+                writePlistText(infoPlist, template, withoutGenerated);
+            }
+        }
 
         // nothing to inject here? move along
         String inject = request.getArg("ios.plistInject", "<key>CFBundleShortVersionString</key> 	<string>" + buildVersion +"</string>");
