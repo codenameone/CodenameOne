@@ -126,3 +126,9 @@ recents
 worklist
 premultiplication
 Goldmark
+
+# Runtime, theme, container, and retired-tool names used in the September 18 release series.
+fasthttp
+Adwaita
+Podman
+retrolambda
