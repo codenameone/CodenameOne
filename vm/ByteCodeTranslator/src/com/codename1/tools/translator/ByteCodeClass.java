@@ -777,7 +777,43 @@ public class ByteCodeClass {
         b.append(".h\"\n");
         
 
+        /* INCLUDE-ONLY dependencies, kept apart from dependsClassesInterfaces on
+         * purpose. That set drives two unrelated things at once -- which headers this
+         * file includes, and which classes the dead code pass must keep -- and a
+         * guarded dispatch needs the first without the second.
+         *
+         * A guarded site names two to four concrete implementations directly and falls
+         * back to the ordinary virtual thunk, so it keeps NOTHING alive that the
+         * virtual call did not already keep: the thunk still marks the whole family
+         * used. Adding the targets to dependsClassesInterfaces to get their headers was
+         * measured at 853 to 951 emitted classes and 136B to 245B instructions, because
+         * forcing one class alive enlarges other sites' cones and keeps their targets
+         * alive in turn.
+         *
+         * Collected before the bodies are emitted because the includes are written
+         * first. The queries are memoised, so the extra pass is a map lookup per site. */
+        java.util.Set<String> guardIncludes = new java.util.TreeSet<String>();
+        for(BytecodeMethod m : methods) {
+            if(m.isEliminated()) {
+                continue;
+            }
+            for(com.codename1.tools.translator.bytecodes.Instruction i : m.getInstructions()) {
+                if(i instanceof com.codename1.tools.translator.bytecodes.Invoke) {
+                    ((com.codename1.tools.translator.bytecodes.Invoke)i).collectGuardIncludes(guardIncludes);
+                }
+            }
+        }
         for(String s : dependsClassesInterfaces) {
+            if (exportsClassesInterfaces.contains(s)) {
+                continue;
+            }
+            guardIncludes.remove(s);
+            b.append("#include \"");
+            b.append(s);
+            b.append(".h\"\n");
+        }
+        guardIncludes.remove(clsName);
+        for(String s : guardIncludes) {
             if (exportsClassesInterfaces.contains(s)) {
                 continue;
             }

@@ -158,6 +158,72 @@ public class Invoke extends Instruction {
      *
      * @return mangled class name of the only reachable implementation, or null
      */
+    /* Upper bound on the compare chain. Past a handful the chain costs more than the
+     * indirect branch it replaces, and inlining that many callees at one site stops
+     * paying for itself in i-cache pressure. */
+    private static final int CN1_MAX_GUARDS = 4;
+
+    /**
+     * Class-id guards for a virtual site whose receiver can only be a few concrete
+     * classes: the id to compare against, and the function that receiver would run.
+     *
+     * @param suffix mangled signature suffix shared by every target
+     * @return guards, or null when the site is not a candidate
+     */
+    java.util.List<String[]> buildGuards(String suffix) {
+        if (opcode != Opcodes.INVOKEVIRTUAL && opcode != Opcodes.INVOKEINTERFACE) {
+            return null;
+        }
+        ByteCodeClass bc = Parser.getClassObject(Util.mangle(owner));
+        java.util.List<ByteCodeClass> cone = Parser.concreteReceiverCone(bc);
+        if (cone == null || cone.size() < 2 || cone.size() > CN1_MAX_GUARDS) {
+            return null;
+        }
+        java.util.List<String[]> guards = new java.util.ArrayList<String[]>(cone.size());
+        for (ByteCodeClass c : cone) {
+            ByteCodeClass d = c;
+            while (d != null && !d.hasDeclaredNonAbstractMethod(name, desc)) {
+                String b = d.getBaseClass();
+                d = b == null ? null : Parser.getClassObject(b.replace('/', '_').replace('$', '_'));
+            }
+            if (d == null || d.isEliminated()) {
+                // A receiver whose implementation cannot be named here: a default
+                // interface method, or a target the dead code pass removed. The site is
+                // then left alone entirely rather than partially guarded.
+                return null;
+            }
+            guards.add(new String[] {
+                "cn1_class_id_" + Util.mangle(c.getClsName()),
+                Util.mangle(d.getClsName()) + "_" + getCMethodName() + suffix,
+                Util.mangle(d.getClsName()) });
+        }
+        return guards;
+    }
+
+    /**
+     * The classes a guarded form of this call would name directly, so the emitting
+     * class can INCLUDE their headers.
+     *
+     * Include-only, never a liveness dependency. Guarding keeps nothing alive that was
+     * not already alive: the chain still ends in the ordinary virtual thunk, which
+     * marks the whole virtual family used exactly as before. Putting these on the
+     * dependency list instead was measured at 853 to 951 emitted classes and 136B to
+     * 245B instructions, because forcing a class alive enlarges other sites' cones and
+     * keeps their targets alive in turn.
+     *
+     * @param out receives the mangled class names
+     */
+    public void collectGuardIncludes(java.util.Set<String> out) {
+        StringBuilder sfx = new StringBuilder("__");
+        BytecodeMethod.appendMethodSignatureSuffixFromDesc(desc, sfx, new ArrayList<String>());
+        java.util.List<String[]> guards = buildGuards(sfx.toString());
+        if (guards != null) {
+            for (String[] g : guards) {
+                out.add(g[2]);
+            }
+        }
+    }
+
     String resolveSingleTarget() {
         ByteCodeClass bc = Parser.getClassObject(Util.mangle(owner));
         if (bc == null) {
@@ -500,7 +566,18 @@ public class Invoke extends Instruction {
             }
 
         }
-        NativeInvocation.append(b, bld.toString(), receiver, args, null, args.size(), getProvenDirectOwner() != null);
+        java.util.List<String[]> guards = null;
+        if (isVirtualCall && receiver != null) {
+            StringBuilder sfx = new StringBuilder("__");
+            BytecodeMethod.appendMethodSignatureSuffixFromDesc(desc, sfx, new ArrayList<String>());
+            guards = buildGuards(sfx.toString());
+        }
+        if (guards != null) {
+            NativeInvocation.appendGuarded(b, guards, bld.toString(), receiver, args, null,
+                    args.size(), returnVal == null);
+        } else {
+            NativeInvocation.append(b, bld.toString(), receiver, args, null, args.size(), getProvenDirectOwner() != null);
+        }
         if(noPop) {
             b.append(");\n");
             return;
