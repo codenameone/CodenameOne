@@ -772,7 +772,10 @@ public class ByteCodeClass {
      * implementors would trade the dispatch for code size. Interfaces that wide are
      * also the ones whose receivers are genuinely unpredictable, where the indirect
      * form loses nothing. */
-    private static final int CN1_MAX_THUNK_CASES = 24;
+    private static final int CN1_MAX_THUNK_CASES = 16;
+    // Bound on the cone we are willing to walk at all -- compile-time insurance,
+    // not a codegen judgement; the real limit is CN1_MAX_THUNK_CASES above.
+    private static final int CN1_MAX_THUNK_CONE = 1024;
 
     /**
      * Class-id switch cases for one interface method: every concrete implementor of
@@ -786,7 +789,7 @@ public class ByteCodeClass {
             return null;
         }
         List<ByteCodeClass> cone = Parser.concreteReceiverCone(this);
-        if (cone == null || cone.isEmpty() || cone.size() > CN1_MAX_THUNK_CASES) {
+        if (cone == null || cone.isEmpty() || cone.size() > CN1_MAX_THUNK_CONE) {
             return null;
         }
         String name = m.getMethodName();
@@ -814,6 +817,25 @@ public class ByteCodeClass {
                 d.getClsName() + "_" + m.getCMethodName() + sig.toString(),
                 d.getClsName() });
         }
+        // The cost that matters is the number of DISTINCT bodies, not the number of
+        // classes: a wide cone whose members all inherit one implementation collapses to
+        // a couple of arms, and refusing it for its width is what left Iterator (116
+        // implementors), Iterable (129), Comparable (52) and Collection (756) -- the
+        // hottest interfaces in the VM -- dispatching indirectly. Group the labels, then
+        // judge the table by how many arms it really has.
+        java.util.Set<String> targets = new java.util.HashSet<String>();
+        for (String[] c : cases) {
+            targets.add(c[1]);
+        }
+        if (targets.size() > CN1_MAX_THUNK_CASES) {
+            return null;
+        }
+        java.util.Collections.sort(cases, new java.util.Comparator<String[]>() {
+            public int compare(String[] a, String[] b) {
+                int r = a[1].compareTo(b[1]);
+                return r != 0 ? r : a[0].compareTo(b[0]);
+            }
+        });
         return cases;
     }
 

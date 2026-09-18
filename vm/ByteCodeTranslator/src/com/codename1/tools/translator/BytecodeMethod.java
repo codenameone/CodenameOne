@@ -2418,8 +2418,19 @@ public class BytecodeMethod implements SignatureSet {
          * list -- see the note in ByteCodeClass.generateCCode. */
         if (thunkCases != null && !thunkCases.isEmpty()) {
             b.append("switch(cn1__cls->classId) {\n");
-            for (String[] c : thunkCases) {
-                b.append("        case ").append(c[0]).append(": ");
+            for (int ci = 0 ; ci < thunkCases.size() ; ci++) {
+                String[] c = thunkCases.get(ci);
+                // The cases arrive grouped by target, so a run of classes that share one
+                // implementation shares one arm. 116 classes implementing Iterator do not
+                // mean 116 bodies -- they inherit from a handful, and stacking the labels
+                // is what keeps a hot interface under the distinct-target cap instead of
+                // being refused for having a wide cone.
+                b.append("        case ").append(c[0]).append(":");
+                if (ci + 1 < thunkCases.size() && thunkCases.get(ci + 1)[1].equals(c[1])) {
+                    b.append("\n");
+                    continue;
+                }
+                b.append(" ");
                 if (!returnType.isVoid()) {
                     b.append("return ");
                 }
