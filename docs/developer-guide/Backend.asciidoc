@@ -570,7 +570,11 @@ no TLS, and what it does need is exactly what a translated binary is good at.
 * The packaging goal compiles Java. It recompiles the module's sources against the
   backend's class library instead of reusing the jar Maven built, which is what
   keeps a server off classes the runtime doesn't have, and is also why Kotlin is
-  not wired into this path yet even though the client ports support it.
+  not wired into this path yet even though the client ports support it. It uses
+  the JDK running Maven -- any release from 8 up -- and `-Dcn1.backend.jdk` names
+  a different one. What it can't change is the language level: the module's
+  sources are compiled at Java 8, because that's the bytecode the translator
+  reads.
 * A virtual thread parks on the socket it's SERVING, and not on any other. An
   outbound read -- a database query, an HTTP call to another service -- blocks the
   host thread that's running it, because only the server's own descriptors are
