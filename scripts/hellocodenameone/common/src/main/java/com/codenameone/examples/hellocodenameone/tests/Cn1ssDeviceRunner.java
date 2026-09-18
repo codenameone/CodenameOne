@@ -405,6 +405,12 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
             new PaletteOverrideThemeScreenshotTest(),
             new CssGradientsScreenshotTest(),
             new CssFilterBlurScreenshotTest(),
+            // The desktop surface this release turned on. Every port that stages a desktop
+            // native theme renders these, so the three of them are what stands between a
+            // theme rule going missing and nobody noticing until a user reports it.
+            new DesktopWidgetsThemeScreenshotTest(),
+            new DesktopChromeThemeScreenshotTest(),
+            new DesktopScrollbarThemeScreenshotTest(),
             // External surfaces (com.codename1.surfaces): a deterministic widget descriptor
             // rendered through the shared SurfaceRasterizer (the JavaSE/Windows/Linux desktop
             // widget renderer) with a pinned clock, so the node-tree -> wire-JSON -> pixels
