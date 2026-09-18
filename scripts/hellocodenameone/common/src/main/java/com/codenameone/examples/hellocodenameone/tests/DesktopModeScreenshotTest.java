@@ -45,12 +45,15 @@ import com.codename1.ui.plaf.Style;
 ///   commands are in the platform's menu rather than a hamburger, and the scrollbar shows an
 ///   always-visible, draggable thumb with a reserved gutter that the mobile ports never display.
 ///
-/// Where those commands actually land differs by port, and that is the point of capturing this
-/// screen on all of them. macOS and the Java SE desktop build have a real menu bar, so the
-/// in-app Toolbar is hidden and the commands move into it -- which is why they are not in the
-/// raster. Windows and Linux have no native menu bar yet, so the Toolbar stays and draws them:
-/// {@code Form.isDesktopHideToolbar()} will not hide the only place the commands exist. Both
-/// outcomes are correct, and the difference between the two baselines is what records it.
+/// The commands are not in the raster on any desktop port, and that is the point of capturing
+/// this screen on all of them. Every one has a real menu bar now -- a Swing {@code JMenuBar} on
+/// the Java SE build, an {@code NSMenu} on macOS, a Win32 {@code HMENU} on Windows and a
+/// {@code GtkMenuBar} on Linux -- so the {@code native} title-bar mode hides the in-app Toolbar
+/// and the commands move into chrome the screenshot does not cover.
+///
+/// A port that had none would keep its Toolbar instead: {@code Form.isDesktopHideToolbar()}
+/// will not hide the only place the commands are drawn. That branch is asserted by
+/// {@code DesktopChromeTest} rather than by this screenshot, because no port takes it today.
 ///
 /// The command keyboard accelerators are exercised on the desktop too, though a still screenshot
 /// cannot show them.

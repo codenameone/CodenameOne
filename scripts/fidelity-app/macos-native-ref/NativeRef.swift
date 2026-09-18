@@ -156,7 +156,7 @@ let FULL_WIDTH_KINDS: Set<String> = [
 /// heading, not a group box. The CN1 side applies the same rule through
 /// DesktopTileRunner.FULL_HEIGHT_IDS, and the two lists are kept in step by hand exactly as
 /// the full-width ones are.
-let FULL_HEIGHT_KINDS: Set<String> = ["appkit_box_titled"]
+let FULL_HEIGHT_KINDS: Set<String> = ["appkit_box_titled", "appkit_tabview"]
 
 final class RefApp: NSObject, NSApplicationDelegate {
     var window: NSWindow!
@@ -323,12 +323,23 @@ final class RefApp: NSObject, NSApplicationDelegate {
             // what a table would have given it.
             let rowHeight: CGFloat = 24
             let row = NSTableRowView(frame: NSRect(x: 0, y: 0, width: TILE_W, height: rowHeight))
+            // Emphasized, so a selected row draws the ACCENT fill rather than the grey one.
+            // An NSTableRowView outside a focused table is unemphasized by default, and grey
+            // is what macOS shows for a selection in a window the user is not working in --
+            // not what a selected row looks like while they are. Measured: the unemphasized
+            // reference scored the CN1 row at 67%, against a CN1 style that is correctly
+            // accent-filled.
+            row.isEmphasized = true
             let label = NSTextField(labelWithString: "Row")
             label.sizeToFit()
             label.setFrameOrigin(NSPoint(x: 4, y: (rowHeight - label.frame.height) / 2))
             row.addSubview(label)
             return row
         case "appkit_tabview":
+            // Full height as well as full width (see FULL_HEIGHT_KINDS). Left to its fitting
+            // size an NSTabView is taller than the tile and its tab strip came out clipped
+            // through its own top edge -- a reference that is cut in half measures nothing,
+            // whatever the number underneath says.
             let tv = NSTabView()
             let one = NSTabViewItem(identifier: "one")
             one.label = "One"
