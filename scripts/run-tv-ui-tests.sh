@@ -151,15 +151,33 @@ MAX_WAIT="${CN1SS_TV_TIMEOUT:-1200}"
 TV_REF_DIR="${SCREENSHOT_REF_DIR:-$SCRIPT_DIR/ios/screenshots-tv}"
 EXPECTED="$(/usr/bin/find "$TV_REF_DIR" -name '*.png' 2>/dev/null | wc -l | tr -d ' ')"
 rt_log "Expecting $EXPECTED screenshots (golden set)"
-stable=0; waited=0
+stable=0; waited=0; prev=-1
 while [ "$waited" -lt "$MAX_WAIT" ]; do
   sleep 8; waited=$((waited+8))
   cur="$(/usr/bin/find "$WS_RAW_DIR" -name '*.png' 2>/dev/null | wc -l | tr -d ' ')"
-  if [ "$EXPECTED" -gt 0 ] && [ "$cur" -ge "$EXPECTED" ]; then
-    stable=$((stable+1)); [ "$stable" -ge 2 ] && break
+  # The count alone is not an exit condition: EXPECTED counts the GOLDENS on disk, and a
+  # suite that captures more screenshots than there are goldens -- which is every run that
+  # adds a test, before its golden exists -- reaches EXPECTED while earlier captures are
+  # still in flight. Breaking there snapshots the directory mid-stream and reports whatever
+  # had not arrived as "Actual screenshot missing (test did not produce output)", naming
+  # tests that ran perfectly.
+  #
+  # Measured on tvOS run 35395173010: the comparison ran at 22:34:33 and called DesktopMode
+  # and Media360Panorama missing; the WebSocket sink logged both delivered, status=ok, at
+  # 22:35:04. Six new captures with no goldens had pushed the count to EXPECTED six
+  # screenshots early.
+  #
+  # So require the count to have STOPPED CHANGING as well. While captures are still
+  # arriving it keeps rising and this never fires; once it plateaus, two confirmations give
+  # the final writes their flush window. That also makes seeding a new golden possible at
+  # all, which it was not: the wait ended before the new captures landed.
+  if [ "$EXPECTED" -gt 0 ] && [ "$cur" -ge "$EXPECTED" ] && [ "$cur" -eq "$prev" ]; then
+    stable=$((stable+1)); prev="$cur"
+    [ "$stable" -ge 2 ] && break
     continue
   fi
   stable=0
+  prev="$cur"
   # The suite emits CN1SS:SUITE:FINISHED when done; bail early on that (covers
   # the seed run where EXPECTED=0) or on an obvious native crash. Do not infer
   # a hang from screenshot inactivity: the trailing assertion and performance
