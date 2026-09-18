@@ -5006,6 +5006,24 @@ public abstract class CodenameOneImplementation {
         return "toolbar";
     }
 
+    /// The desktop title-bar mode this platform was explicitly asked for, or null when nobody
+    /// asked. Distinct from {@link #getDesktopTitleBarMode()}, which is documented to answer a
+    /// usable mode and therefore cannot express "unset" - it answers {@code "toolbar"} both for
+    /// a port with no opinion and for a project that deliberately chose the legacy look.
+    ///
+    /// That distinction is the whole point: it is what lets a native theme carry a
+    /// {@code desktopTitleBarMode} constant (Windows and macOS keep a system title bar and want
+    /// {@code native}; GNOME's HeaderBar IS the title bar and wants {@code custom}) without
+    /// overriding a project that set the build hint by hand. A build hint answers here; a theme
+    /// constant only gets consulted when this returns null.
+    ///
+    /// #### Returns
+    ///
+    /// the explicitly configured mode, or null when nothing configured one
+    public String getConfiguredDesktopTitleBarMode() {
+        return null;
+    }
+
     /// Minimizes the native desktop window when the application draws its own (custom mode)
     /// window chrome on an undecorated window. No-op on platforms without a native window.
     public void minimizeNativeWindow() {

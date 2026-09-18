@@ -2705,12 +2705,33 @@ public class Dialog extends Form implements AbstractDialog {
         // Vetoed so the dialog owns the teardown. Letting the window dispose itself
         // first would leave the dialog believing it was still showing.
         evt.consume();
+        cancel();
+    }
+
+    /// Every way a user says "not this one" -- the window's close control, the platform back
+    /// gesture, and Escape on a desktop keyboard -- means the same thing, so they resolve it in
+    /// one place: the back command when there is one, and disposal when there isn't.
+    ///
+    /// Written three times before this existed, which is how the three drifted apart: add a
+    /// fourth entry point and the next one is written a fourth time.
+    void cancel() {
         Command back = getBackCommand();
         if (back != null) {
             dispatchCommand(back, new ActionEvent(back, ActionEvent.Type.Command));
             return;
         }
         dispose();
+    }
+
+    /// @inheritDoc
+    ///
+    /// Escape closes a dialog, which is what its window's close control already means. An
+    /// anchored popup is included: it is the one surface where Escape is the ONLY way out that
+    /// does not also click something underneath.
+    @Override
+    boolean escapePressed() {
+        cancel();
+        return true;
     }
 
     /// Takes this dialog back out of its window. Idempotent, and marshalled onto the
@@ -3164,12 +3185,7 @@ public class Dialog extends Form implements AbstractDialog {
             return;
         }
         evt.consume();
-        Command back = getBackCommand();
-        if (back != null) {
-            dispatchCommand(back, new ActionEvent(back, ActionEvent.Type.Command));
-            return;
-        }
-        dispose();
+        cancel();
     }
 
     /// Whether this is the last dialog added to its host's shared layer, which is the

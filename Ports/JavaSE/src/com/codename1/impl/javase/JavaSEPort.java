@@ -1149,7 +1149,15 @@ public class JavaSEPort extends CodenameOneImplementation {
     private static Resources nativeThemeRes;
     // Desktop window-chrome configuration. Defaults preserve the legacy behavior (CN1 Toolbar,
     // no interactive scrollbars); the generated desktop Stub opts a new app in.
-    private static String desktopTitleBarMode = "toolbar";
+    //
+    // null means "nobody asked", NOT "toolbar". The two have to be distinguishable because a
+    // desktop native theme carries its own desktopTitleBarMode constant, and that constant may
+    // only speak when the project did not. Every reader below coalesces null to "toolbar" for
+    // its own answer, so nothing outside this class sees the sentinel -- except
+    // getConfiguredDesktopTitleBarMode, which exists to report it, and
+    // injectDesktopThemeConstants, which must not inject a mode nobody chose or it would
+    // overwrite the theme's own constant with this default.
+    private static String desktopTitleBarMode;
     private static boolean desktopInteractiveScrollbars = false;
     // Caches the last command-name signature pushed to the native menu bar to avoid rebuilding
     // (and flickering the macOS screen menu) when an unchanged form is re-shown.
@@ -3062,7 +3070,7 @@ public class JavaSEPort extends CodenameOneImplementation {
 
     /// @return the configured desktop title-bar mode (defaults to {@code "toolbar"}).
     public static String getDesktopTitleBarModeSetting() {
-        return desktopTitleBarMode;
+        return desktopTitleBarMode == null ? "toolbar" : desktopTitleBarMode;
     }
 
     /// The desktop title-bar mode core consults to decide whether to suppress the CN1 Toolbar.
@@ -3090,7 +3098,24 @@ public class JavaSEPort extends CodenameOneImplementation {
     /// Resolves the effective desktop title-bar mode, honoring the
     /// {@code codename1.arg.desktop.titleBar} system property fallback.
     private String resolveDesktopTitleBarMode() {
+        String mode = configuredDesktopTitleBarMode();
+        return mode == null ? "toolbar" : mode;
+    }
+
+    /// The mode the project actually asked for, or null when it asked for nothing. Kept
+    /// separate from {@link #resolveDesktopTitleBarMode()} so the "unset" case survives all the
+    /// way to Form, where a desktop native theme's own constant gets to answer instead.
+    private static String configuredDesktopTitleBarMode() {
         return System.getProperty("codename1.arg.desktop.titleBar", desktopTitleBarMode);
+    }
+
+    /// @inheritDoc
+    @Override
+    public String getConfiguredDesktopTitleBarMode() {
+        if (!isDesktop()) {
+            return null;
+        }
+        return configuredDesktopTitleBarMode();
     }
 
     /// @return true when running on the desktop with a title-bar mode that hides the CN1
@@ -3166,8 +3191,11 @@ public class JavaSEPort extends CodenameOneImplementation {
         if (h == null || !isDesktop()) {
             return;
         }
-        String mode = System.getProperty("codename1.arg.desktop.titleBar", desktopTitleBarMode);
+        String mode = configuredDesktopTitleBarMode();
         if (mode != null && mode.length() > 0) {
+            // Only when the project asked. Injecting the default here would write
+            // "toolbar" over a desktop native theme's own constant and put the in-app
+            // Toolbar back on every screen the theme meant to hand to the window.
             h.put("@desktopTitleBarMode", mode);
         }
         boolean interactive = desktopInteractiveScrollbars

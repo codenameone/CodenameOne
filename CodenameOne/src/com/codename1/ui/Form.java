@@ -899,9 +899,29 @@ public class Form extends Container implements TopLevelContainer {
     }
 
     /// Returns the configured desktop title-bar mode ({@code native}, {@code custom} or
-    /// {@code toolbar}). Sourced from the implementation (desktop ports report the real mode;
-    /// everything else returns {@code toolbar}).
+    /// {@code toolbar}).
+    ///
+    /// Three sources in order. The build hint wins: a project that spelled out
+    /// {@code desktop.titleBar} means it, and a theme must not talk it out of that. Then the
+    /// installed theme's {@code desktopTitleBarMode} constant, which is how the desktop native
+    /// themes express the convention of the platform they model -- Windows and macOS keep a
+    /// system title bar and ask for {@code native}, GNOME's HeaderBar is the title bar and asks
+    /// for {@code custom}. Then whatever the port reports, which is {@code toolbar} everywhere
+    /// that is not a desktop.
+    ///
+    /// The theme step is gated on {@link Display#isDesktop()} so a mobile port that somehow
+    /// loaded a desktop theme still renders its ordinary chrome.
     String getDesktopTitleBarMode() {
+        String configured = Display.impl.getConfiguredDesktopTitleBarMode();
+        if (configured != null && configured.length() > 0) {
+            return configured;
+        }
+        if (Display.getInstance().isDesktop()) {
+            String themed = getUIManager().getThemeConstant("desktopTitleBarMode", null);
+            if (themed != null && themed.length() > 0) {
+                return themed;
+            }
+        }
         return Display.impl.getDesktopTitleBarMode();
     }
 
@@ -3842,10 +3862,45 @@ public class Form extends Container implements TopLevelContainer {
         return new TabIterator(out, start);
     }
 
+    /// The traversal order a desktop keyboard walks with Tab.
+    ///
+    /// Deliberately NOT `#buildTabIterator(Container, Component)`, whose filter is opt-in:
+    /// `Component#getPreferredTabIndex()` defaults to -1 and `TextArea` is the only class in the
+    /// framework that ever calls `setPreferredTabIndex(0)`, so that iterator holds text areas and
+    /// nothing else. That is right for what built it -- "next field while editing", which is what
+    /// `TextEditUtil` and `Picker` use it for -- and wrong for Tab, which would then walk between
+    /// a form's text fields and skip every button, checkbox and slider between them.
+    ///
+    /// A desktop keyboard should reach whatever the pointer reaches, so the filter here is
+    /// focusability itself. An explicit `preferredTabIndex` still wins: those components sort to
+    /// the front in the order they were numbered, which is the whole point of setting one.
+    /// Everything else keeps document order, because `Collections#sort` is stable and
+    /// `ComponentSelector` walks the tree in the order the form reads.
+    ///
+    /// #### Parameters
+    ///
+    /// - `root`: the top level to walk
+    ///
+    /// - `start`: the component to start from
+    ///
+    /// #### Returns
+    ///
+    /// the desktop traversal iterator
+    static TabIterator buildDesktopTabIterator(Container root, Component start) {
+        root.updateTabIndices(0);
+        java.util.List<Component> out = new ArrayList<Component>();
+        out.addAll(ComponentSelector.select("*", root).filter(new DesktopTabIteratorFilter()));
+        Collections.sort(out, new DesktopTabIteratorComparator());
+        return new TabIterator(out, start);
+    }
+
     /// {@inheritDoc}
     @Override
     public void keyPressed(int keyCode) {
         int game = Display.getInstance().getGameAction(keyCode);
+        if (desktopKeyPressed(keyCode)) {
+            return;
+        }
         if (menuBar.handlesKeycode(keyCode) && !focusedHandlesInput(keyCode)) {
             menuBar.keyPressed(keyCode);
             return;
@@ -3939,6 +3994,97 @@ public class Form extends Container implements TopLevelContainer {
         }
         return focused != null && focused.consumesRawTextInput() && focused.isEnabled()
                 && focused.getComponentForm() == this; //NOPMD CompareObjectsWithEquals
+    }
+
+    /// Horizontal tab. Ports deliver Tab as its character code, which is what
+    /// `JavaSEPort.C.getCode` returns for a key event whose `getKeyChar()` is defined -- Tab's
+    /// is, so it arrives here as 9 rather than as an AWT virtual key.
+    private static final int KEY_TAB = 9;
+
+    /// Escape, likewise delivered as its character code.
+    private static final int KEY_ESCAPE = 27;
+
+    /// The two keyboard conventions every desktop toolkit has and Codename One never had.
+    ///
+    /// **Tab / Shift-Tab moves focus.** The traversal order itself is not new -- `TabIterator`,
+    /// `getNextComponent` and `preferredTabIndex` have been here for years -- but nothing was
+    /// ever wired to the key, so the only consumers were "next field while editing" paths in
+    /// the ports. On a desktop a form that cannot be operated from the keyboard is not a
+    /// desktop form.
+    ///
+    /// **Escape means cancel.** On a `Dialog` it does what the window's own close control does,
+    /// which is already written as "the back command, or dispose when there isn't one". On a
+    /// plain form it fires the back command and does nothing at all when there is none -- Escape
+    /// must never be able to exit an application.
+    ///
+    /// Enter needs nothing here: ports already map it to `GAME_KEY_CODE_FIRE` and
+    /// `keyReleased` already fires `getDefaultCommand()` on `GAME_FIRE`.
+    ///
+    /// The whole method is gated on `Display#isDesktop()`, so no mobile key dispatch and no
+    /// mobile screenshot baseline moves. Returning true means the key was consumed.
+    ///
+    /// #### Parameters
+    ///
+    /// - `keyCode`: the code being dispatched
+    ///
+    /// #### Returns
+    ///
+    /// true when this form handled the key and dispatch should stop
+    private boolean desktopKeyPressed(int keyCode) {
+        if (!Display.getInstance().isDesktop()) {
+            return false;
+        }
+        if (keyCode == KEY_TAB) {
+            return moveFocusByTab(Display.getInstance().isShiftKeyDown());
+        }
+        if (keyCode == KEY_ESCAPE) {
+            return escapePressed();
+        }
+        return false;
+    }
+
+    /// Moves focus one step along the tab order, wrapping at either end so the keyboard can
+    /// never strand itself. Answers false when there is nothing else focusable, leaving the key
+    /// to ordinary dispatch.
+    ///
+    /// #### Parameters
+    ///
+    /// - `backwards`: true for Shift-Tab
+    boolean moveFocusByTab(boolean backwards) {
+        Component from = focused;
+        if (from == null || from.getComponentForm() != this) { //NOPMD CompareObjectsWithEquals
+            initFocused();
+            from = focused;
+        }
+        TabIterator order = buildDesktopTabIterator(this, from);
+        Component next = backwards ? order.getPrevious() : order.getNext();
+        if (next == null) {
+            // Ran off the end. Wrap, so the keyboard can never strand itself at the last
+            // control of a form with no way back except the pointer.
+            java.util.List<Component> all = order.getComponents();
+            if (all.isEmpty()) {
+                return false;
+            }
+            next = backwards ? all.get(all.size() - 1) : all.get(0);
+        }
+        if (next == from) { //NOPMD CompareObjectsWithEquals
+            return false;
+        }
+        setFocused(next);
+        next.scrollRectToVisible(0, 0, next.getWidth(), next.getHeight(), next);
+        return true;
+    }
+
+    /// Escape on an ordinary form: the back command when there is one, nothing otherwise.
+    /// `Dialog` overrides this to close itself.
+    boolean escapePressed() {
+        Command back = getBackCommand();
+        if (back == null) {
+            return false;
+        }
+        back.actionPerformed(new ActionEvent(back, ActionEvent.Type.Command));
+        actionCommandImpl(back);
+        return true;
     }
 
     /// Space, the lowest code that stands for a character a text component can receive.
@@ -5594,6 +5740,18 @@ public class Form extends Container implements TopLevelContainer {
             return current;
         }
 
+        /// The components in traversal order, unmodifiable.
+        ///
+        /// Exposed so a caller that ran off either end can wrap round to the other one without
+        /// rebuilding the order it just walked.
+        ///
+        /// #### Returns
+        ///
+        /// the traversal order
+        public java.util.List<Component> getComponents() {
+            return Collections.unmodifiableList(components);
+        }
+
         /// Sets the current component in the iterator.  This reposition the iterator
         /// to the given component.
         ///
@@ -5795,6 +5953,37 @@ public class Form extends Container implements TopLevelContainer {
         @Override
         public boolean filter(Component c) {
             return c.getTabIndex() >= 0 && c.isVisible() && c.isFocusable() && c.isEnabled() && !c.isHidden(true);
+        }
+    }
+
+    /// Everything a pointer could reach, which is what a desktop keyboard must reach too.
+    /// Note the absence of the `getTabIndex() >= 0` test the mobile filter opens with: that test
+    /// is what makes the ordinary iterator opt-in, and opting in is exactly what nothing except
+    /// `TextArea` does.
+    private static class DesktopTabIteratorFilter implements Filter {
+        @Override
+        public boolean filter(Component c) {
+            return c.isVisible() && c.isFocusable() && c.isEnabled() && !c.isHidden(true);
+        }
+    }
+
+    /// Orders the desktop traversal: an explicitly numbered component first, in its number's
+    /// order, and everything else in document order behind it.
+    ///
+    /// Zero counts as unnumbered, not as first. `setPreferredTabIndex(0)` is how
+    /// `Component#setTraversable(boolean)` says "join the order", never "be the first" --
+    /// reading it as a position would put every `TextArea` ahead of the label above it.
+    private static class DesktopTabIteratorComparator implements Comparator<Component> {
+        @Override
+        public int compare(Component o1, Component o2) {
+            int i1 = positionOf(o1);
+            int i2 = positionOf(o2);
+            return i1 < i2 ? -1 : i2 < i1 ? 1 : 0;
+        }
+
+        private int positionOf(Component c) {
+            int idx = c.getPreferredTabIndex();
+            return idx > 0 ? idx : Integer.MAX_VALUE;
         }
     }
 }

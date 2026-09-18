@@ -1173,6 +1173,18 @@ public class IOSImplementation extends CodenameOneImplementation {
         return Display.getInstance().getProperty("desktop.titleBar", "toolbar");
     }
 
+    /// @inheritDoc
+    ///
+    /// Null, not "toolbar", when the stub surfaced no property: the Aqua theme carries its own
+    /// desktopTitleBarMode and may only answer when the project asked for nothing.
+    @Override
+    public String getConfiguredDesktopTitleBarMode() {
+        if (!isDesktop()) {
+            return null;
+        }
+        return Display.getInstance().getProperty("desktop.titleBar", null);
+    }
+
     @Override
     public void refreshNativeTitle() {
         Form f = getCurrentForm();

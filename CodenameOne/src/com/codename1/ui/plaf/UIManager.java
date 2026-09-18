@@ -1281,6 +1281,46 @@ public class UIManager {
             themeProps.put("ScrollThumb.bgColor", foreground);
         }
 
+        // The interactive desktop scrollbar draws through its own four UIIDs
+        // (LookAndFeel.initScroll picks them when interactiveScrollBool is on) so that turning
+        // it on never restyles the mobile bar. Nothing seeded them, which meant a theme that
+        // enabled the constant without also defining all four got a track and a thumb built
+        // from the blank default style: an invisible scrollbar, drawn, reserving a gutter, with
+        // nothing reporting a problem. The seeds below are the mobile ones plus the two things
+        // the desktop bar needs and the mobile one does not -- a gutter wide enough to grab
+        // (the track UIID's horizontal padding is what reserves it) and thumb hover/pressed
+        // states, so the highlight exists even before a theme styles it.
+        //
+        // Guarded like every other seed here, so a theme that defines these suppresses them
+        // rather than fighting them. All three desktop native themes do.
+        if (installedTheme == null || !installedTheme.containsKey("DesktopScroll.derive")) {
+            themeProps.put("DesktopScroll.margin", "0,0,0,0");
+            int gutter = Math.max(2, Display.getInstance().convertToPixels(3, true) / 2);
+            themeProps.put("DesktopScroll.padding", "0," + gutter + ",0," + gutter);
+            themeProps.put("DesktopScroll.transparency", "0");
+        }
+        if (installedTheme == null || !installedTheme.containsKey("DesktopScrollThumb.derive")) {
+            themeProps.put("DesktopScrollThumb.padding", "0,0,0,0");
+            themeProps.put("DesktopScrollThumb.margin", "0,0,0,0");
+            themeProps.put("DesktopScrollThumb.bgColor", foreground);
+            themeProps.put("DesktopScrollThumb.sel#derive", "DesktopScrollThumb");
+            themeProps.put("DesktopScrollThumb.press#derive", "DesktopScrollThumb");
+        }
+        if (installedTheme == null || !installedTheme.containsKey("DesktopHorizontalScroll.derive")) {
+            themeProps.put("DesktopHorizontalScroll.margin", "0,0,0,0");
+            int gutter = Math.max(2, Display.getInstance().convertToPixels(3, true) / 2);
+            themeProps.put("DesktopHorizontalScroll.padding", gutter + ",0," + gutter + ",0");
+            themeProps.put("DesktopHorizontalScroll.transparency", "0");
+        }
+        if (installedTheme == null
+                || !installedTheme.containsKey("DesktopHorizontalScrollThumb.derive")) {
+            themeProps.put("DesktopHorizontalScrollThumb.padding", "0,0,0,0");
+            themeProps.put("DesktopHorizontalScrollThumb.margin", "0,0,0,0");
+            themeProps.put("DesktopHorizontalScrollThumb.bgColor", foreground);
+            themeProps.put("DesktopHorizontalScrollThumb.sel#derive", "DesktopHorizontalScrollThumb");
+            themeProps.put("DesktopHorizontalScrollThumb.press#derive", "DesktopHorizontalScrollThumb");
+        }
+
         if (installedTheme == null || !installedTheme.containsKey("SliderFull.derive")) {
             themeProps.put("SliderFull.bgColor", foreground);
         }

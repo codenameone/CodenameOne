@@ -1011,6 +1011,78 @@ public class Window extends Container implements TopLevelContainer {
         return Form.buildTabIterator(this, start);
     }
 
+    /// Horizontal tab, as a port delivers it. Same value `Form` uses; see its note.
+    private static final int KEY_TAB = 9;
+
+    /// Escape, likewise.
+    private static final int KEY_ESCAPE = 27;
+
+    /// Tab traversal and Escape inside a window, the same two conventions `Form` gained.
+    ///
+    /// A window needs its own copy rather than inheriting one because it is not a `Form` -- it
+    /// extends `Container` -- and because it owns a keyboard scope that a form does not. Both
+    /// keys are therefore resolved after `focusWithinKeyScope()`, so an overlay that has claimed
+    /// the keyboard keeps it.
+    ///
+    /// Escape closes the window when its close operation allows, which is what the platform's own
+    /// close control does. A window whose close operation is DO_NOTHING_ON_CLOSE ignores it, for
+    /// the same reason it ignores the close button.
+    ///
+    /// #### Parameters
+    ///
+    /// - `keyCode`: the code being dispatched
+    ///
+    /// #### Returns
+    ///
+    /// true when the window handled the key and dispatch should stop
+    private boolean desktopKeyPressed(int keyCode) {
+        if (!Display.getInstance().isDesktop()) {
+            return false;
+        }
+        if (keyCode == KEY_TAB) {
+            return moveFocusByTab(Display.getInstance().isShiftKeyDown());
+        }
+        if (keyCode == KEY_ESCAPE) {
+            return escapePressed();
+        }
+        return false;
+    }
+
+    /// Moves focus one step along this window's desktop traversal order, wrapping at either end.
+    ///
+    /// #### Parameters
+    ///
+    /// - `backwards`: true for Shift-Tab
+    boolean moveFocusByTab(boolean backwards) {
+        Component from = getFocused();
+        Form.TabIterator order = Form.buildDesktopTabIterator(this, from);
+        Component next = backwards ? order.getPrevious() : order.getNext();
+        if (next == null) {
+            java.util.List<Component> all = order.getComponents();
+            if (all.isEmpty()) {
+                return false;
+            }
+            next = backwards ? all.get(all.size() - 1) : all.get(0);
+        }
+        if (next == from) { //NOPMD CompareObjectsWithEquals
+            return false;
+        }
+        setFocused(next);
+        next.scrollRectToVisible(0, 0, next.getWidth(), next.getHeight(), next);
+        return true;
+    }
+
+    /// Escape asks the window to close, which is what its own close control asks. Honours the
+    /// close operation, so a window that refuses the close button refuses this too.
+    boolean escapePressed() {
+        if (getCloseOperation() == DO_NOTHING_ON_CLOSE) {
+            return false;
+        }
+        closeRequested();
+        return true;
+    }
+
+
     /// {@inheritDoc}
     @Override
     public void scrollComponentToVisible(Component c) {
@@ -4502,6 +4574,9 @@ public class Window extends Container implements TopLevelContainer {
             keyPressScopes.put(Integer.valueOf(keyCode), keyInputScope);
         }
         if (!focusWithinKeyScope()) {
+            return;
+        }
+        if (desktopKeyPressed(keyCode)) {
             return;
         }
         int game = Display.getInstance().getGameAction(keyCode);
