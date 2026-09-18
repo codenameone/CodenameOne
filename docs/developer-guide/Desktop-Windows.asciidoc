@@ -391,7 +391,10 @@ there being a windowing system at all.
 The three desktop native themes declare that constant, so an application using one gets
 window dialogs by default and doesn't have to ask. An application that wants the old
 in-surface dialogs back on those themes says so with
-`Dialog.setDefaultNativeWindowMode(false)`, or per dialog with `setNativeWindowMode(false)`. On iOS, Android, JavaScript, headless and in the
+`Dialog.setDefaultNativeWindowMode(false)`, or per dialog with
+`setNativeWindowMode(false)`.
+
+On iOS, Android, JavaScript, headless and in the
 phone-skinned simulator the request is ignored and the dialog shows the ordinary way, so
 shared code doesn't have to guard it. `InteractionDialog` takes the same setting.
 
@@ -413,10 +416,10 @@ keeps naming the main form rather than the dialog.
 
 An anchored popup - `showPopupDialog(Component)`, `showPopupDialog(Rectangle)`, and so
 the `ComboBox`, `Picker` and `ContextMenu` popups with them - never opens a window even
-with the option on for the whole application. The rectangle it points at is in its host's coordinate
-space, nothing exposes where a window's drawable begins on the desktop, a separate
-window would never receive the click meant to dismiss it, and it would steal focus from
-its opener every time it appeared.
+with the option on for the whole application. The rectangle it points at is in its
+host's coordinate space, nothing exposes where a window's drawable begins on the
+desktop, a separate window would never receive the click meant to dismiss it, and it
+would steal focus from its opener every time it appeared.
 
 [[window-transitions]]
 === Transitions in a window
