@@ -3183,3 +3183,69 @@ So: check `uptime` AND `ps` before believing a page-heap A/B, and do not conclud
 from three rounds. The earlier version of this note would have recorded a 11%
 improvement that does not exist.
 
+
+## Round 29: the interface thunk becomes a switch, and what the bench can say about it
+
+An interface call site cannot see its receiver when the receiver was stored
+somewhere first, which is every `addActionListener(e -> ...)` in Codename One: the
+lambda goes into a collection and `fireActionEvent` invokes it later through
+`Iterator` and `ActionListener`. Call-site devirtualization is structurally blind
+to that. The thunk is not -- in a closed world it sees every implementation of the
+interface, and a lambda is just another class in the set.
+
+So the thunk now leads with `switch(cn1__cls->classId)` whose arms are direct
+calls, falling through to the original indirect dispatch for anything it did not
+enumerate. 27 files, 1691 arms, emitted class set unchanged at 424 (the arms
+travel over the include-only dependency channel from round 27, so naming a class
+does not resurrect it from the cull). Gate A byte-identical at 855 files;
+gauntlet and gc-verify green.
+
+Two design mistakes worth keeping, because both were silent:
+
+- **A void arm ended in `break`.** That leaves the switch and falls straight into
+  the indirect dispatch below -- calling the method a SECOND time. Invisible for a
+  query, state corruption for a mutator. MapTorture, SetTorture and IdmTorture
+  diverged and Gate A reported 151 of 853 paths different.
+- **Capping on cone size refused the interfaces that matter.** Collection (756
+  implementors), Iterable (129), Iterator (116) and Comparable (52) all blew past
+  a 24-implementor limit. But a wide cone is not a wide table: those 756 classes
+  share a handful of `equals` bodies, so grouping the labels by target and capping
+  on DISTINCT TARGETS brought Collection in at 10 switches over 380 labels.
+  Iterator and Iterable are still out and genuinely are wide -- every iterator
+  class really does have its own `next()`.
+
+### What the benchmark could and could not measure
+
+Wall clock was unusable: someone else's GraalVM job held 334% CPU throughout, and
+`perf-guard` refused to gate at an elapsed spread of 107%. That refusal is the
+harness working -- the same conditions produced a fictitious 11% in round 28.
+
+Instructions retired is load independent, so the arms were A/B'd on that instead,
+interleaved, switch-on against a `CN1_MAX_THUNK_CASES = 0` build of the same tree:
+
+| round | switch | no switch |
+|---|---:|---:|
+| 1 | 14.53B | 14.04B |
+| 2 | 14.53B | 14.31B |
+| 3 | 14.63B | 14.49B |
+| 4 | 14.62B | 14.39B |
+| 5 | 11.71B | 13.91B |
+
+**Min-of-N is the wrong statistic here and round 5 shows why.** Instructions
+retired is near-deterministic for a single-threaded program, but this one runs
+concurrent GC marker threads whose work varies with timing, so the count carries
+real spread. Taking the min reports 0.842x -- a 16% win -- on the strength of one
+outlier. Rounds 1-4 are flat to about 1.6% in the other direction. The honest
+reading is that this benchmark cannot resolve the change.
+
+There is also a structural reason to distrust it even when quiet: **the benchmark
+is the translator, so analysis the translator performs is charged to the number
+the optimization is meant to reduce.** Building the tables twice per method cost
+enough to show; caching it is a separate commit. A shipped application pays that
+cost once at build time and never again, so the self-hosting corpus is
+systematically pessimistic about any optimization that thinks harder at translate
+time. Round 22's devirtualization read as 19% slower for exactly this reason.
+
+What is not in doubt: the binary got 24KB SMALLER with the switches in, the arms
+are direct calls where five dependent loads used to be, and those direct calls are
+inlinable where an indirect one never was.
