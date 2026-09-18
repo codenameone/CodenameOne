@@ -24,7 +24,23 @@ final class NativeTraversal {
         @Override public void addDependencies(List<String> out) { out.addAll(dependencies); }
     }
     private enum Layout {
-        ARRAY(1, "java_util_ArrayList"), SET(2, "java_util_HashSet"), ORDERED_SET(3, "java_util_LinkedHashSet"), IDENTITY(4, "java_util_IdentityHashMap");
+        /* SET and HASH_SET are both java.util.HashSet and that is deliberate: they are
+         * two different RECEIVERS, and the distinction is which object the emitted field
+         * reads come from.
+         *
+         * SET is a map-backed view -- a HashMap's keySet() or values() -- where root is
+         * assigned the MAP and every field read is a HashMap field. HASH_SET is a plain
+         * HashSet iterated directly, where root is the SET and the fields are its own
+         * keys+meta table. They cannot share a mode id for exactly that reason: next()
+         * and remove() pick their field owner from the id at run time, and reading
+         * HashMap fields off a HashSet would be a wrong-offset load, not a miss.
+         *
+         * A plain HashSet stopped renting a HashMap, which is why HASH_SET exists at
+         * all. Until it did, the dispatch loop skipped SET for a direct receiver and
+         * every for-each over a HashSet allocated a real iterator: 517,043 of them over
+         * a translation of the 5,326-class corpus. */
+        ARRAY(1, "java_util_ArrayList"), SET(2, "java_util_HashSet"), ORDERED_SET(3, "java_util_LinkedHashSet"),
+        IDENTITY(4, "java_util_IdentityHashMap"), HASH_SET(5, "java_util_HashSet");
         final int id;
         final String type;
         Layout(int id, String type) { this.id = id; this.type = type; }
@@ -100,8 +116,16 @@ final class NativeTraversal {
         return "get_field_" + owner + "_" + field + "(" + object + ")";
     }
     private String map(String field) { return field("java_util_HashMap", field, root); }
+    /* The table fields for a layout. Identical names on both classes, different owner:
+     * HASH_SET reads the HashSet's own table, everything else reads a map's. */
+    private String table(Layout layout, String field) {
+        return layout == Layout.HASH_SET ? field("java_util_HashSet", field, root) : map(field);
+    }
     private String modification(Layout layout) {
-        return layout == Layout.ARRAY ? field("java_util_AbstractList", "modCount", root) : layout == Layout.IDENTITY ? field("java_util_IdentityHashMap", "modCount", root) : map("modCount");
+        return layout == Layout.ARRAY ? field("java_util_AbstractList", "modCount", root)
+                : layout == Layout.IDENTITY ? field("java_util_IdentityHashMap", "modCount", root)
+                : layout == Layout.HASH_SET ? field("java_util_HashSet", "cn1ModCount", root)
+                : map("modCount");
     }
     private String check(Layout layout) {
         return "if(" + expected + " != " + modification(layout) + ") CN1_THROW_CME();\n";
@@ -112,11 +136,11 @@ final class NativeTraversal {
         // owns its table directly and carries no such field. Layout.SET is excluded
         // from `proven` above and skipped in the dispatch loop, and a map receiver
         // uses __c itself, so nothing else can land here.
-        String owner = mapReceiver || layout == Layout.ARRAY ? "__c"
+        String owner = mapReceiver || layout == Layout.ARRAY || layout == Layout.HASH_SET ? "__c"
                 : field("java_util_LinkedHashSet", "backingMap", "__c");
         String first = layout == Layout.ARRAY || layout == Layout.IDENTITY ? "0" : layout == Layout.ORDERED_SET
                 ? field("java_util_LinkedHashMap", "cn1Head", root)
-                : "cn1InlTableNext(" + map("cn1MetaBlock") + ", 0, " + map("cn1Cap") + ")";
+                : "cn1InlTableNext(" + table(layout, "cn1MetaBlock") + ", 0, " + table(layout, "cn1Cap") + ")";
         return root + " = " + owner + ";\n" + index + " = " + first + ";\n"
                 + expected + " = " + modification(layout) + ";\n"
                 + (layout == Layout.IDENTITY ? nullObject + " = get_static_java_util_IdentityHashMap_NULL_OBJECT();\n" : "");
@@ -158,7 +182,12 @@ final class NativeTraversal {
         code.append(viewClass).append(") {\n").append(root).append(" = ")
                 .append(field(viewClass, "map", "__c")).append(";\n");
         for (Layout layout : layouts) {
-            if (layout == Layout.ARRAY || viewClass.startsWith("java_util_IdentityHashMap") != (layout == Layout.IDENTITY)) continue;
+            // HASH_SET is a receiver, not a view backing: a keySet() or values() view is
+            // always backed by a MAP, so a plain HashSet cannot be what stands behind one.
+            // Letting it through here would emit a LinkedHashMap class test that sets the
+            // HASH_SET mode, and next() would then read HashSet fields off a map.
+            if (layout == Layout.ARRAY || layout == Layout.HASH_SET
+                    || viewClass.startsWith("java_util_IdentityHashMap") != (layout == Layout.IDENTITY)) continue;
             String mapClass = layout == Layout.IDENTITY ? "java_util_IdentityHashMap"
                     : layout == Layout.SET ? "java_util_HashMap" : "java_util_LinkedHashMap";
             code.append("if((*").append(root).append(").__codenameOneParentClsReference == &class__")
@@ -200,11 +229,15 @@ final class NativeTraversal {
                 + field("java_util_ArrayList", "cn1Storage", root) + ", " + last + " = " + index + "++))";
         String advance = layout == Layout.ORDERED_SET
                 ? "cn1IntBlockGet(" + field("java_util_LinkedHashMap", "cn1Next", root) + ", " + index + ")"
-                : "cn1InlTableNext(" + map("cn1MetaBlock") + ", " + index + " + 1, " + map("cn1Cap") + ")";
+                : "cn1InlTableNext(" + table(layout, "cn1MetaBlock") + ", " + index + " + 1, "
+                        + table(layout, "cn1Cap") + ")";
+        // A plain HashSet has keys only, so the values half of the mode never applies
+        // to it -- there is no cn1ValsBlock field on the class to name.
+        String slots = layout == Layout.HASH_SET ? table(layout, "cn1KeysBlock")
+                : exact != null ? map(mapValues ? "cn1ValsBlock" : "cn1KeysBlock")
+                : "(" + mode + " & 8 ? " + map("cn1ValsBlock") + " : " + map("cn1KeysBlock") + ")";
         return "({ " + check(layout) + last + " = " + index + "; " + index + " = " + advance
-                + "; cn1RefBlockGet(" + (exact != null ? map(mapValues ? "cn1ValsBlock" : "cn1KeysBlock")
-                        : "(" + mode + " & 8 ? " + map("cn1ValsBlock") + " : " + map("cn1KeysBlock") + ")")
-                + ", " + last + "); })";
+                + "; cn1RefBlockGet(" + slots + ", " + last + "); })";
     }
     String next() {
         String expression = "virtual_java_util_Iterator_next___R_java_lang_Object(threadStateData, " + root + ")";
@@ -244,11 +277,18 @@ final class NativeTraversal {
                         .append("if(__n >= 0) cn1IntBlockSet(").append(prev).append(", __n, __p); else ")
                         .append(set("java_util_LinkedHashMap", "cn1Tail", "__p"));
             }
-            code.append("cn1IntBlockSet(").append(map("cn1MetaBlock")).append(", ").append(last).append(", 1);\n")
-                    .append("cn1RefBlockSet(threadStateData, ").append(map("cn1KeysBlock")).append(", ").append(last).append(", JAVA_NULL);\n")
-                    .append("cn1RefBlockSet(threadStateData, ").append(map("cn1ValsBlock")).append(", ").append(last).append(", JAVA_NULL);\n")
-                    .append(set("java_util_HashMap", "elementCount", map("elementCount") + " - 1"))
-                    .append(set("java_util_HashMap", "modCount", modification(layout) + " + 1"));
+            // 1 is META_TOMB: the slot stays occupied for probing but holds nothing.
+            code.append("cn1IntBlockSet(").append(table(layout, "cn1MetaBlock")).append(", ").append(last).append(", 1);\n")
+                    .append("cn1RefBlockSet(threadStateData, ").append(table(layout, "cn1KeysBlock")).append(", ").append(last).append(", JAVA_NULL);\n");
+            if (layout == Layout.HASH_SET) {
+                // A set stores no values, and its count and modCount are its own fields.
+                code.append(set("java_util_HashSet", "cn1Size", field("java_util_HashSet", "cn1Size", root) + " - 1"))
+                        .append(set("java_util_HashSet", "cn1ModCount", modification(layout) + " + 1"));
+            } else {
+                code.append("cn1RefBlockSet(threadStateData, ").append(map("cn1ValsBlock")).append(", ").append(last).append(", JAVA_NULL);\n")
+                        .append(set("java_util_HashMap", "elementCount", map("elementCount") + " - 1"))
+                        .append(set("java_util_HashMap", "modCount", modification(layout) + " + 1"));
+            }
         }
         return code.append(last).append(" = -1; ").append(expected).append(" = ").append(modification(layout)).append(";\n").toString();
     }

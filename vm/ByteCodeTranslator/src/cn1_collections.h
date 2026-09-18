@@ -158,23 +158,31 @@ static inline int cn1CollectionOpen(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT colle
 #endif
 #ifdef CN1_COLL_SET
     if(collection->__codenameOneParentClsReference == &class__java_util_HashSet) {
-        // A PLAIN HashSet HAS NO BACKING MAP. It owns a keys+meta table directly and
-        // stores no values, so there is nothing here to view as a map; only
-        // LinkedHashSet delegates to one. Returning 0 is the documented "not a
-        // layout I know" answer and sends the caller down the generic iterator path.
+        // A plain HashSet owns a keys+meta table of its own -- it stopped renting a
+        // HashMap -- and that table is the SAME shape cn1CollectionMap describes for a
+        // map: an occupied slot is one whose marker has the sign bit set, which is the
+        // single encoding cn1HmMarker produces for both. So it is opened directly here
+        // rather than reported as an unknown layout.
         //
-        // This used to read java_util_HashSet_backingMap for BOTH classes and test
-        // it for null. The field now exists only on LinkedHashSet -- holding it on
-        // HashSet cost 8 bytes on every one of them and a branch on every operation
-        // -- so a plain HashSet is answered by its class, with no field read at all.
+        // It used to be exactly that, an unknown layout, because the branch was
+        // written when a HashSet still delegated and the field it read was gone. The
+        // cost was a real iterator object per traversal: 517,043 HashSetIterator
+        // allocations over a translation of the 5,326-class corpus, for loops that
+        // need no object at all.
         //
-        // Before the null test existed, the recursion below was handed JAVA_NULL and
-        // dereferenced it at the top of this function: a SIGSEGV from
-        // `new ArrayList<>(aSet)` through ArrayList.addAllNative, which an -O3 +
-        // ThinLTO build attributed to a completely unrelated function because the
-        // linker had folded identical code, and which only reproduced on a large
-        // corpus. Answering by class cannot regress into that.
-        return 0;
+        // A set has keys only; cn1CollectionOpen has no values mode to answer.
+        struct obj__java_util_HashSet* set = (struct obj__java_util_HashSet*)collection;
+        out->owner = collection;
+        out->data = (JAVA_OBJECT*)(uintptr_t)set->java_util_HashSet_cn1KeysBlock;
+        out->metadata = (JAVA_INT*)(uintptr_t)set->java_util_HashSet_cn1MetaBlock;
+        out->capacity = set->java_util_HashSet_cn1Cap;
+        out->count = set->java_util_HashSet_cn1Size;
+        out->kind = CN1_COLL_HASH;
+        // A set that has never had an element added has no table at all. Report it
+        // as an unrecognised layout rather than a view over null pointers -- there is
+        // nothing to walk, and every caller already handles the miss.
+        if(out->data == NULL || out->metadata == NULL) return 0;
+        return 1;
     }
 #endif
 #ifdef CN1_COLL_ORDERED_SET
