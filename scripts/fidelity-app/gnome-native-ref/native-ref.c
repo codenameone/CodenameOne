@@ -799,7 +799,20 @@ static gboolean on_ready(gpointer data) {
         }
     }
 
-    write_manifest(win, probe_widget ? probe_widget : GTK_WIDGET(win));
+    /* Re-fetch rather than reuse `probe_widget`. That pointer was taken before the capture
+     * loop, and the loop builds a tile into `content` and DESTROYS it for every spec and
+     * state, so by here it names freed memory. write_manifest calls
+     * gtk_widget_get_pango_context on it, which is a read straight through the dangling
+     * pointer -- the NULL check above cannot see that, because the pointer is not null, it
+     * is stale.
+     *
+     * This is the intermittent GNOME capture segfault: it depended on what the allocator
+     * had put back in that memory, which is why it reproduced roughly once in three runs
+     * and looked like flakiness. Adding a spec changed the allocation pattern enough to
+     * make it fire every time, which is the only reason it stopped being intermittent and
+     * became findable. */
+    GtkWidget *manifest_probe = content ? gtk_widget_get_first_child(content) : NULL;
+    write_manifest(win, manifest_probe ? manifest_probe : GTK_WIDGET(win));
 
     for (int i = 0; i < blocker_count; i++) {
         fprintf(stderr, "NATIVEREF:BLOCKER %s\n", blockers[i]);
