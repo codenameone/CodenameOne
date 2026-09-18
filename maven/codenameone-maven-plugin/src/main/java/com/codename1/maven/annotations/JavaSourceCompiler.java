@@ -67,6 +67,18 @@ public final class JavaSourceCompiler {
     /// Pass a level explicitly through the overload below to compile a source that
     /// needs a newer language than 8 -- a record, say. Only a test has reason to:
     /// generated source that cannot be translated is of no use to a build.
+    ///
+    /// THE COMPILER IS ALWAYS THE JDK RUNNING MAVEN. JSR 199 hands back the one
+    /// inside this JVM and offers no way to redirect it, so
+    /// `-Dcn1.backend.jdk` -- which selects the javac and the java that
+    /// `cn1:backend-package` FORKS -- does not reach this line. That costs nothing
+    /// while every JDK from 8 up accepts `-source 8`, since all of them emit the
+    /// same class file version 52. On a release that has dropped the option this
+    /// fails, and the remedy is to run Maven on a JDK that still has it, which
+    /// BackendPackageMojo's error message says; a release like that takes
+    /// `-source 8` from every compile in this build, including the 1.5 that
+    /// codenameone-core still asks for, so forking one call here would rescue
+    /// nothing.
     public static void compile(Map<String, String> sources, File outputClassDir, List<File> extraClasspath)
             throws IOException {
         compile(sources, outputClassDir, extraClasspath, GENERATED_SOURCE_LEVEL);

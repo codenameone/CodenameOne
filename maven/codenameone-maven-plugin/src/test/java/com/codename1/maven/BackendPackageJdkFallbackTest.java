@@ -147,6 +147,25 @@ class BackendPackageJdkFallbackTest {
         }
     }
 
+    /// The remedy the hint names has to be one that WORKS. `-Dcn1.backend.jdk`
+    /// selects the two FORKED steps -- the javac that compiles for translation and
+    /// the java that runs the translator -- and not the in-process compile of the
+    /// generated router and entry point, which JSR 199 takes from the JDK running
+    /// Maven and offers no way to redirect. An earlier wording sent the developer
+    /// to that property, which would have moved the failure by one step and no
+    /// further.
+    @Test
+    void theSourceEightRemedyIsTheJdkRunningMaven() {
+        String hint = BackendPackageMojo.SOURCE_EIGHT_REMOVED_HINT;
+        assertTrue(hint.contains("Run Maven itself on a JDK"),
+                "the remedy has to be the JDK running Maven: " + hint);
+        // Named, but as the thing that does NOT cover the generated sources. The
+        // assertion is that the sentence saying so is still there, because
+        // deleting it leaves the property reading like the whole answer.
+        assertTrue(hint.contains("compiled in process by the JDK running Maven"),
+                "and it has to say why the property is not the answer: " + hint);
+    }
+
     /// The hint added to javac's own wording fires on that wording and nothing
     /// else -- a compile error in the developer's sources must not be reported as
     /// a JDK problem.

@@ -427,13 +427,29 @@ public class BackendPackageMojo extends AbstractMojo {
         // of the compiler running here: every javac from 8 up emits the same class
         // file version 52 for it. A javac that has dropped the option says so in
         // its own words and names no remedy, so the remedy is added to it.
+        //
+        // THE REMEDY IS THE JDK RUNNING MAVEN, not -Dcn1.backend.jdk, even though
+        // that property is what selects the compiler on this line. Only the two
+        // FORKED steps read it -- this javac and the translator's java.
+        // generateControllers() compiles the router and the entry point in
+        // process, through ToolProvider.getSystemJavaCompiler(), which is the
+        // Maven JVM's compiler and cannot be pointed anywhere; it asks for
+        // -source 1.8 as well, so it fails next on a compiler that has dropped
+        // it. Naming the property here would send a developer to a setting that
+        // moves the failure by one step and no further.
+        //
+        // Routing that in-process compile through the selected JDK is not the
+        // answer either. A release that removes -source 8 takes it away from the
+        // Maven JVM too, and this build needs a javac that emits class file
+        // version 52 in many more places than this goal -- codenameone-core
+        // compiles at 1.5. The whole toolchain moves then, not one mojo.
         try {
             run(command, project.getBasedir(), "compile the backend sources");
         } catch (MojoFailureException err) {
-            throw dropsSourceEight(err) ? new MojoFailureException(err.getMessage()
-                    + "\n\nThis javac no longer accepts -source 8, which is the format "
-                    + "the translator reads. Point -Dcn1.backend.jdk at a JDK that "
-                    + "still does.", err) : err;
+            throw dropsSourceEight(err)
+                    ? new MojoFailureException(err.getMessage() + "\n\n"
+                            + SOURCE_EIGHT_REMOVED_HINT, err)
+                    : err;
         }
         stageResources(classes);
     }
@@ -885,6 +901,14 @@ public class BackendPackageMojo extends AbstractMojo {
      * The two properties are tried before the running JDK so an explicit choice
      * still wins, and cn1.backend.jdk8 is among them so the setups that were
      * required to set it keep working.
+     *
+     * WHAT THEY SELECT IS THE TWO FORKED STEPS -- {@link #compile}'s javac and
+     * {@link #translate}'s java -- and nothing else. The router and entry point
+     * that {@link #generateControllers} produces are compiled in process by the
+     * JDK running Maven, which JSR 199 gives no way to redirect. That costs
+     * nothing today, because every JDK from 8 up emits the class file version 52
+     * the translator reads; see {@link #compile} for why it is also not worth
+     * forking, and why the error message there names Maven's own JDK.
      */
     private File resolveJdk() throws MojoFailureException {
         String[] configured = {jdkHome, jdk8Home};
@@ -993,6 +1017,22 @@ public class BackendPackageMojo extends AbstractMojo {
             return -1;
         }
     }
+
+    /**
+     * What to do about a javac that has dropped -source 8.
+     *
+     * Package private so a test can hold the wording to a remedy that WORKS. An
+     * earlier version of this sent the developer to -Dcn1.backend.jdk, which
+     * selects the two forked steps and not the in-process compile of the
+     * generated router and entry point, so following it moved the failure by one
+     * step and no further. See #compile.
+     */
+    static final String SOURCE_EIGHT_REMOVED_HINT =
+            "This javac no longer accepts -source 8, which is the format the "
+            + "translator reads. Run Maven itself on a JDK that still does: "
+            + "-Dcn1.backend.jdk selects the compiler for this step and the "
+            + "translator, but the generated router and entry point are compiled "
+            + "in process by the JDK running Maven.";
 
     /**
      * Whether a failed compile is javac refusing -source 8 outright, rather than
