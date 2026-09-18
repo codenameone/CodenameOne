@@ -23,6 +23,21 @@ These behaviors are *opt-in*. They're switched on by default for newly generated
 inert on phones/tablets - all the new behavior is gated on `CN.isDesktop()`, so a mobile
 build of the same project is unaffected.
 
+Alongside them a desktop build also gets, without asking for anything:
+
+* Keyboard conventions. Tab and Shift-Tab move focus through the form, Enter fires the
+  default command, and Escape fires the back command - or closes a dialog or window that has
+  no back command, the same thing the platform's own close control does. On a phone none of
+  these keys exist, so every one of them is gated on `CN.isDesktop()`.
+* A right-click menu. Give a component its commands with
+  `Component.setContextMenuCommands(Command...)` and one opens on a secondary mouse button,
+  a stylus barrel button or a long press. Where the commands depend on what was clicked,
+  register a `Component.addContextMenuListener(ActionListener)` and call
+  `ContextMenu.show(...)` from it.
+* Dialogs in a window of their own, when the installed theme asks for it. The three desktop
+  native themes do; see <<native-window-dialogs>>.
+* Three controls that only make sense here: `Separator`, `GroupBox` and `Stepper`.
+
 === Title-bar modes
 
 The window chrome is selected by the `desktop.titleBar` setting, which takes one of three values:
@@ -112,6 +127,14 @@ Each port maps the hint to its native structure: on the native macOS build the c
 into the application's real `NSMenu` under the application, File, Edit, View, Window and Help
 submenus; on the Java SE build a top-level `JMenu` is created per hint group.
 
+NOTE: The native Windows and Linux ports don't have a native menu bar yet. On those two the
+commands stay in the Codename One `Toolbar`, which the Fluent and Adwaita themes style - the
+`native` title-bar mode puts the form title in the OS title bar but doesn't hide the Toolbar,
+because hiding it would take away the only place the commands are drawn. Asking for
+`Display.COMMAND_BEHAVIOR_NATIVE` there is likewise normalized back to the default rather than
+dropping every command without a word. Nothing in application code needs to branch on this: the
+placement hints and accelerators stay inert where there is no menu to put them on.
+
 TIP: The hint is a plain client property (`Command.DESKTOP_MENU`), so it's inert on platforms that
 don't have a native menu bar - it's safe to set it unconditionally in shared code.
 
@@ -167,9 +190,18 @@ sets the scrollbar gutter width. The thumb UIID's `.selected` and `.pressed` sty
 hover and drag highlight respectively.
 |===
 
-The modern native themes ship platform-conventional defaults for these UIIDs (macOS-style in the iOS
-theme, Material-style in the Android theme), including the `.selected` / `.pressed` thumb highlight
-states; see <<native-modern-themes>>. Override them in your app's `theme.css` like any other UIID.
+All the native themes ship platform-conventional defaults for these UIIDs, including the
+`.selected` / `.pressed` thumb highlight states; see <<native-modern-themes>>. The three desktop
+themes also turn `interactiveScrollBool` on themselves, so a desktop build using one gets the
+real scrollbar without setting the build hint. Override the UIIDs in your app's `theme.css` like
+any other UIID.
+
+WARNING: The highlight states are `.selected` and `.pressed`, not `.hover`. The interactive
+thumb reads its selected style while the pointer is over it and its pressed style while it's
+being dragged, so a `.hover` rule on `DesktopScrollThumb` compiles and is never painted. For the
+same reason, don't write these UIIDs as `cn1-derive: ScrollThumb`: a derive produces the whole
+state family by copying the base, so the highlight ends up identical to the resting colour -
+present in the compiled theme and invisible on screen.
 The minimum thumb length is the `scrollThumbMinSizeInt` theme constant (pixels). In `custom` mode the
 title bar is just the regular CN1 `Toolbar`, so it's themed through the usual `Toolbar` / `Title`
 UIIDs.

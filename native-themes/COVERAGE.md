@@ -165,25 +165,48 @@ These are starting points, not results. All three themes were written without a
 reference to check them against, so this is the first time any of them has been
 measured, and the ratchet moves them up from here.
 
-### No port installs one by default yet
+### Every desktop port installs one
 
-The themes are built, measured and selectable, and every desktop port still
-installs what it installed before: Windows and Linux stage the Material
-placeholder, macOS installs the iOS theme unless `macos.themeMode=aqua` asks for
-Aqua.
+| Port | Installs | Where |
+|---|---|---|
+| Windows (native) | Windows Fluent | `<copy file=` in `maven/windows/pom.xml` |
+| Linux (native) | GNOME Adwaita | `<copy file=` in `maven/linux/pom.xml` |
+| macOS (native) | macOS Aqua | the unset branch of `MacOSBuildHints.getThemeMode()` |
+| Java SE desktop | legacy, unless asked | `JavaSEPort.resolveDesktopNativeTheme` |
 
-That is sequencing, not an oversight. Flipping a port's theme restyles every
-screen and reseeds its committed screenshot baselines -- about 154 on the Windows
-port alone -- which deserves its own review rather than riding along inside the
-change that introduces the theme, and wants doing once the themes reach their
-fidelity targets rather than now and again later.
+The Java SE default is deliberately still legacy. That one default reaches every desktop
+application ever built with Codename One rather than only ours, and an application that
+wants the platform look already asks with `desktop.themeMode` or the cross-platform
+`nativeTheme=native`. The three native ports have no such history -- none has shipped.
 
-Each flip is one line: the `<copy file=` in `maven/windows/pom.xml` and
-`maven/linux/pom.xml`, and the unset branch of
-`MacOSBuildHints.getThemeMode()`.
+Flipping the three restyles every screen and reseeds their committed screenshot baselines
+(166 Windows, 166 + 166 Linux x64/arm64, 160 macOS), which is why it was deferred when the
+themes landed. They are reseeded in the same change as the flip, from the CI runners that
+capture them.
 
-What the first round of measurement actually found is worth recording, because
-only one of the four was a CSS problem:
+### What the themes now turn on
+
+Each desktop theme declares these, so they are behaviours of the theme rather than hooks a
+port has to be told about separately. The three files install only on a desktop, so an
+application still on the legacy theme is untouched.
+
+| Constant | Effect |
+|---|---|
+| `interactiveScrollBool` | a grab-able thumb, a track that pages on click, a reserved gutter, no fade |
+| `scrollThumbMinSizeInt` | 24px, so the thumb stays grabbable on content far taller than the viewport |
+| `defaultNativeWindowModeBool` | a `Dialog` opens as a real operating system window |
+| `desktopTitleBarMode` | `native` on Windows and macOS, `custom` on GNOME, whose HeaderBar IS the title bar |
+| `commandBehavior: Native` | commands go to the platform's menu where there is one |
+| `separatorThicknessMM` | the `Separator` rule, 1px on all three |
+
+`commandBehavior: Native` is safe on a port with no menu bar because
+`CodenameOneImplementation.setCommandBehavior` normalises it away there, the same way it
+normalises `BUTTON_BAR` to `SOFTKEY` on a non-touch device. Before that it was a silent way
+to lose every command: `MenuBar.updateCommands` handed them to a no-op `setNativeCommands`
+and returned without drawing anything.
+
+What the first round of measurement actually found is worth recording, because only one of
+the four was a CSS problem:
 
 | Finding | Effect |
 |---|---|
@@ -192,81 +215,60 @@ only one of the four was a CSS problem:
 | The two sides sat at different widget values (slider 0.5, progress 0.6) | The CN1 knob sat 24px right of the reference's. |
 | Three theme constants never set: `progressTrackThicknessMM`, `sliderThumbWidth/HeightMM`, `sliderContinuousTrackBool` | Progress bar 60% -> 75%; slider gained a round knob on a continuous track. |
 
-The macOS hover rows were the exception that proves the reference is worth having:
-they were the six worst tiles in the set, and the manifest already said why --
-AppKit restyles none of those controls on hover, so eighteen `.hover` rules were
-removed rather than tuned.
+The macOS hover rows were the exception that proves the reference is worth having: they
+were the six worst tiles in the set, and the manifest already said why -- AppKit restyles
+none of those controls on hover, so eighteen `.hover` rules were removed rather than tuned.
+That property is now asserted rather than remembered
+(`DesktopNativeThemeContentTest.aquaAddsNoHoverRules`).
 
 ### Covered components
 
-| Native control | CN1 building block | Fidelity test | Score (min-max) | Notes |
-|---|---|---|---:|---|
-| UIButton .glass | `Button` | Button | 90.9-93.4 | frosted capsule, backdrop-filter glass |
-| UIButton .prominentGlass | `RaisedButton` UIID | RaisedButton | 87.8-92.5 | geometry: ~10% wider than native (tracked) |
-| UIButton .plain | `FlatButton` UIID | FlatButton | 86.7-88.2 | geometry: native pill radius 92px vs CN1 44px (tracked) |
-| UITextField | `TextField` | TextField | 97.3-97.6 | |
-| Check glyph (Reminders style) | `CheckBox` | CheckBox | 92.2-97.5 | SF Symbol glyphs (iosSFStateIconsBool); iOS has no native checkbox |
-| Radio glyph | `RadioButton` | RadioButton | 92.2-95.5 | SF largecircle.fill.circle glyph |
-| UISwitch | `Switch` | Switch | 92.1-96.8 | + liquid droplet thumb morph (frame-validated) |
-| UISlider | `Slider` | Slider | 92.4-95.1 | |
-| UIProgressView | `Slider` (ProgressBar UIID) | ProgressBar | 94.4-95.4 | |
-| UITabBar (floating pill) | `Tabs` | Tabs | 84.8-86.4 | + selection-lens morph (frame-validated); residual = frost texture, worst iOS rows |
-| UINavigationBar | Toolbar UIID bar | Toolbar | 87.6-87.7 | residual = frost texture; still bottom-quartile |
-| UIAlertController (alert) | Dialog UIID card | Dialog | 97.0-97.1 | |
-| UIPickerView | `GenericSpinner` | Spinner | 91.5-91.8 | whole-row perspective; CN1 wheel wraps short models (native does not); dark off-row contrast tracked |
-| UIVisualEffectView / UIGlassEffect | GlassPanel UIID | GlassPanel{Grey,Red,Grad,Photo} | 96.1-98.6 | glass-blend isolation over 4 backdrops (see scope note above) |
+| Fidelity test | WinUI 3 | AppKit | GTK4 / libadwaita |
+|---|---|---|---|
+| DesktopButton | Button | NSButton (rounded) | GtkButton |
+| DesktopAccentButton | Button + AccentButtonStyle | NSButton (default) | GtkButton `.suggested-action` |
+| DesktopTextField | TextBox | NSTextField | GtkEntry |
+| DesktopCheckBox | CheckBox | NSButton (checkbox) | GtkCheckButton |
+| DesktopRadioButton | RadioButton | NSButton (radio) | GtkCheckButton in a group |
+| DesktopSwitch | ToggleSwitch | NSSwitch | GtkSwitch |
+| DesktopSlider | Slider | NSSlider | GtkScale |
+| DesktopProgressBar | ProgressBar | NSProgressIndicator | GtkProgressBar |
+| DesktopComboBox | ComboBox | NSPopUpButton | GtkDropDown |
 
-Isolation/ladder cases (not user-facing components): TabOne 95.6-96.1
-(geometry OFF: w 0.75 / h 0.54 -- see scope note), TabsGeom 93.0-93.5,
-GlassText/GlassIcon 98.6-98.7.
-
-Animated glass (validated per-frame at fixed progress, no native golden):
-TabsMorph (selection lens: travel, overshoot, lens size, tint timing),
-SwitchMorph (droplet stretch/squash).
-
-### Missing components (to reach a complete theme)
-
-| Native control | Suggested CN1 building block | Status |
-|---|---|---|
-| UISegmentedControl | ButtonGroup / Tabs pill variant | `ToggleButton` themed (capsule track); not in the fidelity suite |
-| UIStepper | Stepper composite (2 glass buttons) | not started |
-| UISearchBar / searchable nav | Toolbar search mode | not started |
-| UIActivityIndicatorView | InfiniteProgress | not started (UIID exists, untested) |
-| UIPageControl | Tabs page indicator | not started |
-| UIDatePicker (wheels) | Picker (date/time spinner) | partially themed (DateSpinner UIIDs), not in suite |
-| UIDatePicker (calendar) | Calendar | not started |
-| UIMenu / context menu | ActionSheet / Command menu | not started |
-| Action sheet (bottom) | Sheet / ActionSheet | not started |
-| Bottom sheet (detents) | Sheet | not started |
-| UITableView cell chrome | MultiButton / list rows | not started |
-| Toast / HUD | ToastBar | not started |
-| Pull-to-refresh spinner | pull-to-refresh (themed) | not started |
-| Large-title navigation bar | Toolbar large-title mode | not started |
-| Tab bar badge | Tabs badge | not started |
-| UISlider liquid thumb morph | Slider droplet (reuse SwitchThumbDroplet) | planned (task tracked) |
+States: normal, hover, pressed, selected and disabled as each control supports them, in
+both appearances. 30 tiles per appearance, 60 per platform.
 
 ### Known visual gaps (tracked, honest list)
 
-- iOS `Tabs`/`Toolbar` frost texture: the two worst iOS families; theme knobs
-  are at measured optima and two material-level tweaks (saturation, edge
-  feather) measured flat -- closing this requires a closer reproduction of the
-  native Liquid Glass material in the Metal patch, not tuning.
-- `TabOne` geometry (w 0.75 / h 0.54 vs native) despite its high overlay score.
-- iOS `Spinner` dark: off-row text contrast is low (uniform ~0.32 fade matches
-  the native tone but the dark-sheet contrast is tracked for another pass).
-- Android `ProgressBar`: ~1.5x native track height (geometry-tracked).
-- Android disabled dark `Button`: lower contrast than native.
-- Android FAB/switch small geometry deltas (geometry-tracked).
+| Gap | Why it is open |
+|---|---|
+| Fluent reveal highlight | The gradient that follows the cursor across a control. Needs per-pixel pointer position at paint time; no CN1 primitive expresses it. |
+| Mica / Acrylic | A WINDOW attribute (`DwmSetWindowAttribute`), not a region operation, so it is not a theme rule at all. The right shape is a `desktopWindowBackdrop` theme constant read at window creation. |
+| Aqua vibrancy | `NSVisualEffectView` is composited by the window server and is invisible to `NSView.cacheDisplay`, which is the capture path that needs no Screen Recording consent. A missing golden is honest; a blank one scores 0% forever and reads as a theme bug. |
+| macOS hover | AppKit draws no rollover state for any control in this matrix. The Aqua theme leaves hover equal to normal, the captured reference says the same, and the gate holds it there. Not a gap in the theme -- a property of the platform. |
+| Adwaita has no Mica analogue | By design. Recorded so nobody goes looking for one. |
+| Window chrome | The tile contract is a widget in a tile. Desktop design languages are half window chrome, and none of it is scored yet. |
+| Native menu bar on Windows and Linux | Neither port implements `setNativeCommands`, so their commands stay in the CN1-drawn Toolbar, which the themes now style. Real `HMENU` / `GMenu` menus are follow-up work. |
 
-### Feature-level gaps
+### Fonts are the honest ceiling
 
-- Live glass while scrolling: composed-patch cache recomposes per frame when
-  the backdrop moves (policy documented in `Component.internalPaintImpl` and
-  the METALView glass patch cache); a pure-GPU two-pass material (like the
-  selection lens shader) is the tracked follow-up.
-- Tab icons: CN1 renders Apple SF Symbols on iOS (`FontImage.createSFOrMaterial`);
-  a handful of glyphs still differ from the exact native weights.
-- RTL mirroring of the glass morphs is untested.
+Segoe UI Variable and SF Pro are system-only and not redistributable, so the Windows and
+macOS sets can never be reproduced away from those platforms. Only GNOME can be made fully
+honest, Cantarell being redistributable and pinnable. Where a face cannot be matched the
+residual is named rather than dismissed as anti-aliasing.
+
+### Golden sets
+
+All three are captured, reviewed, committed and gating on master.
+
+A baseline is recorded from the runner that SCORES it, never locally. The CN1 side renders
+on the leg's own OS, and a Mac-recorded baseline failed the gnome gate on eighteen pairs --
+the slider comes out one pixel taller on Linux. That is the "measured on its own OS runner"
+rule applying to the baseline as well as the reference, and it is easy to miss because a
+locally recorded baseline passes locally forever.
+
+The protocol, including the measured reproducibility residual on the Windows set, is in
+`scripts/fidelity-app/goldens/README.md`.
 
 ## UIIDs the framework assigns
 
