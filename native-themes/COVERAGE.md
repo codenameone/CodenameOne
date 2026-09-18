@@ -157,9 +157,9 @@ First measured scores, against golden sets captured on hosted runners:
 
 | Theme | Golden set | Pairs | Mean | Gating |
 |---|---|---:|---:|---|
-| Windows Fluent | `windows-11-fluent` | 98 | 85.3% | yes, on master |
-| GNOME Adwaita | `gnome-adwaita` | 102 | 83.8% | yes, on master |
-| macOS Aqua | `macos-aqua` | 86 | 84.0% | yes, on master |
+| Windows Fluent | `windows-11-fluent` | 98 | 85.9% | yes, on master |
+| GNOME Adwaita | `gnome-adwaita` | 102 | 84.2% | yes, on master |
+| macOS Aqua | `macos-aqua` | 86 | 84.2% | yes, on master |
 
 These are starting points, not results. All three themes were written without a
 reference to check them against, and the ratchet moves them up from here.
@@ -172,7 +172,7 @@ rather than dragging the set down -- but four of them are well below it:
 
 | Row | Score | What the gap is |
 |---|---:|---|
-| `DesktopTabs` | 35-68% at the time of the baseline | Two separate problems, and only the first was a defect. **The defect:** the themes styled `SelectedTab` and `UnselectedTab`, and `Tabs` writes neither -- it writes `Tab` and marks the open one with that button's own selected style. The rules were dead, the strip fell through to `UIManager`'s `Tab.sel#derive: Tab` seed, and the selected tab was pixel-identical to the others; a captured Linux screenshot showed three plain boxes with no indication of which was open. Fixed, and the light score moved 68 -> 82. **What remains is shape:** CN1 draws a left-aligned row of tabs, AppKit a centred rounded pill inside a grey track, WinUI a document-tab strip and GTK an underlined notebook. The dark row is still 49% and the geometry moved further from native (height ratio 0.53 -> 0.25) because the styled tab is shorter than the unstyled box it replaced. Tracked; it wants a per-platform tab SHAPE, not more tuning of the colours. |
+| `DesktopTabs` | dark: 87.4 Fluent, 71.0 Adwaita, 49.0 Aqua | Two separate problems, and only the first was a defect. **The defect:** the themes styled `SelectedTab` and `UnselectedTab`, and `Tabs` writes neither -- it writes `Tab` and marks the open one with that button's own selected style. The rules were dead, the strip fell through to `UIManager`'s `Tab.sel#derive: Tab` seed, and the selected tab was pixel-identical to the others; a captured Linux screenshot showed three plain boxes with no indication of which was open. Fixed: the dark row went 35.3 -> 87.4 on Fluent and 35.7 -> 71.0 on Adwaita. Adding the divider those two platforms draw under the strip took GNOME's geometry regressions to zero and Fluent's width ratio from 0.64 to 0.96. **What remains is Aqua**, at 49.0: `NSTabView` is a centred rounded pill on the bare window background and CN1 draws a left-aligned row, so the shapes genuinely differ and the narrower bounding box there is CORRECT rather than a regression. That one wants a per-platform tab shape, not more colour tuning, and it is the reason Aqua deliberately has no divider rule. |
 | `DesktopMenuBar` | 34-50% | CN1's `CommandList` strip against a real menu bar. Only meaningful where CN1 still draws its own menu, which is GNOME's headerbar mode. |
 | `DesktopListRow` | 68-90% | Row height and the selected fill; the CN1 row is taller than a native one on all three. |
 | `DesktopSlider` dark | 73% | Pre-existing, macOS only, and unchanged by this work. |
