@@ -717,7 +717,17 @@ AccordionHeader.hover { color: #1a1a1a; background-color: #f0f0f0; border-radius
  * TabsContainerHost its wrapper; all three are named by Tabs and none was defined here.
  */
 TabbedPane { background-color: transparent; padding: 0; margin: 0; }
-TabsContainer { background-color: #f3f3f3; padding: 0; margin: 0; }
+/* The divider under the tab strip. GtkNotebook draws one and so does a WinUI TabView;
+   NSTabView does not, which is why the Aqua theme has no such rule -- its pill sits on
+   the bare window background.
+
+   It is also what makes the row MEASURE like the native one. A Tab is transparent until
+   it is selected, so without the divider the only content in the tile is the selected
+   tab's fill and the two labels: the comparator's bbox came out 64%% of the native
+   width where it had been 100%%. Drawing the line the platform actually draws fixes the
+   look and the measurement together, which is the only kind of fix worth making to a
+   geometry number. */
+TabsContainer { background-color: #f3f3f3; border-bottom: 0.26mm solid #e5e5e5; padding: 0; margin: 0; }
 TabsContainerHost { background-color: #f3f3f3; padding: 0; margin: 0; }
 Tab { color: #5d5d5d; background-color: transparent; border: none; padding: 1.6mm 3.2mm 1.6mm 3.2mm; margin: 0; }
 Tab.selected { color: #1a1a1a; background-color: #fbfbfb; border-radius: 1.06mm; padding: 1.6mm 3.2mm 1.6mm 3.2mm; margin: 0; }
@@ -851,7 +861,7 @@ Tab.hover { color: #1a1a1a; background-color: #f0f0f0; padding: 1.6mm 3.2mm 1.6m
     AccordionHeader.hover { color: #ffffff; background-color: #323232; border-radius: 1.06mm; padding: 1.6mm 2.6mm 1.6mm 2.6mm; margin: 0; }
 
     TabbedPane { background-color: transparent; padding: 0; margin: 0; }
-    TabsContainer { background-color: #202020; padding: 0; margin: 0; }
+    TabsContainer { background-color: #202020; border-bottom: 0.26mm solid #2d2d2d; padding: 0; margin: 0; }
     TabsContainerHost { background-color: #202020; padding: 0; margin: 0; }
     Tab { color: #cfcfcf; background-color: transparent; border: none; padding: 1.6mm 3.2mm 1.6mm 3.2mm; margin: 0; }
     Tab.selected { color: #ffffff; background-color: #2c2c2c; border-radius: 1.06mm; padding: 1.6mm 3.2mm 1.6mm 3.2mm; margin: 0; }
