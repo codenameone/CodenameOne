@@ -294,9 +294,13 @@ public partial class App : Application
 
     private static TabView MakeTabView()
     {
+        // Not closable, and no add button. A WinUI TabView is a document-tab control and
+        // shows a close affordance on every tab by default; a Codename One Tabs has no such
+        // thing, so leaving them on compares two tabs against two tabs plus two buttons and
+        // charges the difference to the theme.
         var tv = new TabView { IsAddTabButtonVisible = false };
-        tv.TabItems.Add(new TabViewItem { Header = "One" });
-        tv.TabItems.Add(new TabViewItem { Header = "Two" });
+        tv.TabItems.Add(new TabViewItem { Header = "One", IsClosable = false });
+        tv.TabItems.Add(new TabViewItem { Header = "Two", IsClosable = false });
         tv.SelectedIndex = 0;
         return tv;
     }
