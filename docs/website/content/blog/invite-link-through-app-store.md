@@ -11,9 +11,11 @@ series: ["release-2026-09-18"]
 
 ![An invitation that survives installation](/blog/invite-link-through-app-store.jpg)
 
-“Can we add an invitation button?” is one of those requests that sounds like an afternoon. Then you discover that the person receiving the link doesn't have your app installed, and the next program in the conversation is an app store.
+You spend $100 on ads for your app. How do you know whether you got your money's worth? The ad platform can count clicks, but you need to know what happened afterward. Did those people install the app? Did they use it? Did any of them pay? Without that connection, you can keep spending money on ads that bring very little business.
 
-There are companies whose whole product lives in that gap. [This week's release](/blog/why-another-java-server/) puts the invitation flow into Codename One, including exact attribution and integration with the existing analytics stack.
+An invitation has the same problem. A user shares a link with a friend, and the friend may pass through an app store before your app can receive anything. If the invitation code disappears during installation, the later signup or purchase loses its connection to the invitation that started it.
+
+There are companies whose whole product lives in that gap. [This week's release](/blog/why-another-java-server/) puts the invitation flow into Codename One, carrying an exact code through installation and into the existing analytics stack. With analytics consent, later conversion and purchase events retain the invitation's campaign and channel, so you can follow what happened after the click.
 
 The difficult part is getting the same code through every handoff. A link moves from your app to a messaging app, then to a browser or an installed application. If installation intervenes, the code has to survive that too. It's a volleyball rally where the players keep changing courts.
 

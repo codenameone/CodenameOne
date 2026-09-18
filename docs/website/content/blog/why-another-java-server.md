@@ -175,7 +175,13 @@ That query names a Java field. The ORM resolves its column and binds the value f
 
 This is still a small backend. Relationships use explicit foreign-key fields, and production schema migrations belong in your deployment process. But a service with persistent objects, transactions, and a shared app contract is already a useful place to start. Tomorrow's {{< post-link path="/blog/java-backend-shared-models" text="One Java Model from the App to PostgreSQL" >}} builds that service step by step.
 
-## The server work comes back to the phone
+## Where Is This Going?
+
+I'm committed to keeping Codename One backend agnostic. If Spring, Node.js, Go, or another service works for your app, keep using it. You will never have to adopt our backend to build a Codename One app. That choice stays yours.
+
+I think the backend is an important extension of what we already offer. We've spent years making Java work in small, constrained environments. A service that needs to start quickly and fit into a small deployment belongs in that world. And we can bring the integration with us: shared models and validation, generated REST clients and server dispatchers, and DAOs built from the same entity definitions. That's less code for an app team to duplicate and keep in sync.
+
+I also want our runtime to handle more demanding workloads. A busy server gives us another way to find costs that matter on a phone, even when the two targets need different features.
 
 We added virtual threads to the backend because thousands of connections need somewhere to wait. Giving every waiting connection its own OS thread brings stack and scheduling costs. Giving it a resumable stack lets a small number of host threads keep serving other connections.
 
@@ -183,7 +189,11 @@ These are ParparVM's own virtual threads. On the supported native backend builds
 
 We aren't bringing that server concurrency model to mobile. It doesn't solve a useful mobile workload for us, and mobile system restrictions make its implementation harder. Other improvements travel very well. The backend work exposed collector buffers that grew during a busy period and retained their peak allocation afterward. The runtime now trims those buffers. A phone also benefits when yesterday's burst stops occupying today's memory.
 
-**Codename One will remain backend agnostic.** You can keep using Spring, Node.js, Go, or any HTTP service. The native backend is an additional target, and it is serious work: it exercises the same compiler and runtime that ship in our client applications.
+That's why I want to keep investing in the backend. It gives developers a useful deployment target, makes a shared Java application easier to build, and puts more real work through the compiler and runtime our client apps depend on.
+
+---
+
+The rest of this week's release covers client APIs, platform updates, and the compiler itself. Let's start with encrypted storage on phones and in the browser.
 
 ## A vault that reaches the browser
 
@@ -209,9 +219,11 @@ The browser implementation uses authenticated encryption and non-extractable key
 
 ## An invitation has to survive the app store
 
-“Invite a friend” sounds like a button. Entire startups have been built around everything that happens after you press it.
+You spend $100 on ads for your app. Did you get your money's worth? A click count won't tell you whether those people installed the app, used it, or bought anything. If you can't follow that path, it's easy to keep paying for ads that don't work.
 
-A link leaves one app, appears in another, opens a browser, and may send the recipient through an app store before the destination app exists on their phone. Keeping one invitation code in play through that sequence is a game of volleyball with several courts and very little agreement about the rules.
+“Invite a friend” has the same attribution problem. Someone shares a link, a friend installs the app, and that friend might eventually become a paying customer. You want to know which invitation led to that activity. Entire startups have been built around keeping those connections intact.
+
+The difficult part is carrying the invitation code through every handoff. The link leaves one app, opens a browser, and may send the recipient through an app store before your app exists on their phone. Keeping that code in play is a game of volleyball with several courts and very little agreement about the rules.
 
 Codename One now handles that journey through `com.codename1.analytics.invite`:
 
@@ -227,7 +239,7 @@ Invites.share(invite, "Come and try this with me");
 
 Android carries the code through the Play install referrer. On iOS, a generated App Clip receives the link and passes the code to the full app through an App Group. An already installed app receives the link directly. These are exact code handoffs, so the system doesn't need to guess which click belongs to which installation.
 
-Attribution joins the existing analytics consent and identity lifecycle. Monday's {{< post-link path="/blog/invite-link-through-app-store" text="The Hard Part of Invite a Friend Is the Install" >}} covers the Java API and the platform setup that makes those handoffs work. The implementation is in [PR #5751](https://github.com/codenameone/CodenameOne/pull/5751).
+When the user grants analytics consent, later conversion and purchase events carry the invitation's campaign and channel. You can follow an invitation beyond the installation to the activity it brought into your app. Monday's {{< post-link path="/blog/invite-link-through-app-store" text="The Hard Part of Invite a Friend Is the Install" >}} covers the Java API and the platform setup that makes those handoffs work. The implementation is in [PR #5751](https://github.com/codenameone/CodenameOne/pull/5751).
 
 ## Xcode 27, and the next round of iOS work
 
