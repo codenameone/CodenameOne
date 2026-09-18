@@ -44,7 +44,7 @@ static void HandleInputBuffer (
     enteringNativeAllocations();
     
     JAVA_ARRAY convertedSampleBuffer = [audioUnit convertedSampleBuffer];
-    JAVA_ARRAY_FLOAT* sampleData = (JAVA_ARRAY_FLOAT*)convertedSampleBuffer->data;
+    JAVA_ARRAY_FLOAT* sampleData = (JAVA_ARRAY_FLOAT*)CN1_ARRAY_DATA(convertedSampleBuffer);
     int len = convertedSampleBuffer->length;
 
     JAVA_OBJECT audioBuffer = com_codename1_media_MediaManager_getAudioBuffer___java_lang_String_boolean_int_R_com_codename1_media_AudioBuffer(CN1_THREAD_GET_STATE_PASS_ARG fromNSString(CN1_THREAD_GET_STATE_PASS_ARG [audioUnit path]), JAVA_TRUE, 64);

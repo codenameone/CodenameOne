@@ -205,7 +205,7 @@ final class StreamFusion {
                     .append("for (JAVA_INT __sfIndex = 0; __sfIndex < ((JAVA_ARRAY)").append(root(roots)).append(")->length; __sfIndex++) {\n");
             for (int i = 0; i < stages.size(); i++) if ("limit".equals(stages.get(i).operation.getName()))
                 out.append("if (__sfRemaining").append(i).append(" == 0) break;\n");
-            save(out, roots + 1, "((JAVA_OBJECT*)((JAVA_ARRAY)" + root(roots) + ")->data)[__sfIndex]");
+            save(out, roots + 1, "((JAVA_OBJECT*)CN1_ARRAY_DATA((JAVA_ARRAY)" + root(roots) + "))[__sfIndex]");
             for (int i = 0; i < stages.size(); i++) {
                 Stage stage = stages.get(i);
                 String name = stage.operation.getName();

@@ -599,7 +599,7 @@ static CN1TextInputView* cn1TextInputView = nil;
         return result;
     }
     int len = (int)((JAVA_ARRAY)arr)->length;
-    JAVA_ARRAY_INT* data = (JAVA_ARRAY_INT*)((JAVA_ARRAY)arr)->data;
+    JAVA_ARRAY_INT* data = (JAVA_ARRAY_INT*)CN1_ARRAY_DATA((JAVA_ARRAY)arr);
     CGFloat scale = [UIScreen mainScreen].scale;
     if (scale <= 0) {
         scale = 1;

@@ -166,7 +166,7 @@ static JAVA_OBJECT cn1DbBlobToByteArray(CODENAME_ONE_THREAD_STATE, const void* b
     /* A zero length blob is a blob, not SQL NULL: SQLite may hand back a null pointer for it, and
      * turning that into null would disagree with the column type and with wasNull(). */
     arr = allocArray(threadStateData, length, &class_array1__JAVA_BYTE, sizeof(JAVA_ARRAY_BYTE), 1);
-    data = (JAVA_ARRAY_BYTE*)((JAVA_ARRAY)arr)->data;
+    data = (JAVA_ARRAY_BYTE*)CN1_ARRAY_DATA((JAVA_ARRAY)arr);
     if (length > 0) {
         memcpy(data, bytes, (size_t)length);
     }

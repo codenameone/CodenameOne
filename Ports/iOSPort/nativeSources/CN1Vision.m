@@ -1065,7 +1065,7 @@ JAVA_OBJECT com_codename1_impl_ios_IOSNative_cn1VisionAnalyze___byte_1ARRAY_int_
                 @"{\"error\":\"Image data is null\"}");
     }
     JAVA_ARRAY bytes = (JAVA_ARRAY) encodedImage;
-    NSData *data = [NSData dataWithBytes:bytes->data length:(NSUInteger) bytes->length];
+    NSData *data = [NSData dataWithBytes:CN1_ARRAY_DATA(bytes) length:(NSUInteger) bytes->length];
     CGImageRef rawImage = cn1VisionCreateRawImage(
             data, width, height, frameFormat);
     if (frameFormat != 0 && rawImage == NULL) {

@@ -313,7 +313,7 @@ JAVA_OBJECT com_codename1_impl_ios_IOSNative_cn1InferenceOpen___byte_1ARRAY_int_
                 @"{\"error\":\"Model data is null\"}");
     }
     JAVA_ARRAY bytes = (JAVA_ARRAY)model;
-    NSData *data = [NSData dataWithBytes:bytes->data
+    NSData *data = [NSData dataWithBytes:CN1_ARRAY_DATA(bytes)
                                   length:(NSUInteger)bytes->length];
     return fromNSString(CN1_THREAD_GET_STATE_PASS_ARG
             cn1InferenceOpen(data, threads, accelerator, allowFallback));
@@ -355,7 +355,7 @@ JAVA_OBJECT com_codename1_impl_ios_IOSNative_cn1InferenceCopyInput___int_int_byt
                 @"{\"error\":\"Input data is null\"}");
     }
     JAVA_ARRAY bytes = (JAVA_ARRAY)input;
-    NSData *data = [NSData dataWithBytes:bytes->data
+    NSData *data = [NSData dataWithBytes:CN1_ARRAY_DATA(bytes)
                                   length:(NSUInteger)bytes->length];
     return fromNSString(CN1_THREAD_GET_STATE_PASS_ARG
             cn1InferenceCopyInput(handle, index, data));
@@ -393,7 +393,7 @@ JAVA_OBJECT com_codename1_impl_ios_IOSNative_cn1InferenceResize___int_int_int_1A
                 @"{\"error\":\"Shape is null\"}");
     }
     JAVA_ARRAY array = (JAVA_ARRAY)shape;
-    JAVA_ARRAY_INT *values = (JAVA_ARRAY_INT *)array->data;
+    JAVA_ARRAY_INT *values = (JAVA_ARRAY_INT *)CN1_ARRAY_DATA(array);
     NSMutableArray<NSNumber *> *nativeShape =
             [NSMutableArray arrayWithCapacity:(NSUInteger)array->length];
     for (int i = 0; i < array->length; i++) {

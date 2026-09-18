@@ -396,7 +396,7 @@ void com_codename1_impl_ios_IOSNative_gl3dRequestRender___long(
 }
 
 // Builds a MTLBuffer over the SIMD aligned Java array. The payload sits at
-// ((JAVA_ARRAY)arr)->data. newBufferWithBytesNoCopy needs page (4096 byte)
+// CN1_ARRAY_DATA((JAVA_ARRAY)arr). newBufferWithBytesNoCopy needs page (4096 byte)
 // alignment, which the 16-byte SIMD allocator does not guarantee, so we use a
 // single cheap copy unless the pointer happens to be page aligned (true zero
 // copy path).
@@ -418,7 +418,7 @@ static id<MTLBuffer> CN1GL3DMakeBuffer(id<MTLDevice> device, void *ptr, int byte
 
 JAVA_LONG com_codename1_impl_ios_IOSNative_gl3dCreateFloatBuffer___float_1ARRAY_int_R_long(
         CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT data, JAVA_INT floatCount) {
-    JAVA_ARRAY_FLOAT *ptr = (JAVA_ARRAY_FLOAT *)((JAVA_ARRAY) data)->data;
+    JAVA_ARRAY_FLOAT *ptr = (JAVA_ARRAY_FLOAT *)CN1_ARRAY_DATA((JAVA_ARRAY)data);
     id<MTLDevice> device = MTLCreateSystemDefaultDevice();
     id<MTLBuffer> buf = CN1GL3DMakeBuffer(device, ptr, (int)(floatCount * sizeof(JAVA_ARRAY_FLOAT)));
     return (JAVA_LONG)(__bridge_retained void *) buf;
@@ -428,7 +428,7 @@ void com_codename1_impl_ios_IOSNative_gl3dUpdateFloatBuffer___long_float_1ARRAY_
         CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG bufferPeer, JAVA_OBJECT data, JAVA_INT floatCount) {
     if (bufferPeer == 0) return;
     id<MTLBuffer> buf = (__bridge id<MTLBuffer>)(void *) bufferPeer;
-    JAVA_ARRAY_FLOAT *ptr = (JAVA_ARRAY_FLOAT *)((JAVA_ARRAY) data)->data;
+    JAVA_ARRAY_FLOAT *ptr = (JAVA_ARRAY_FLOAT *)CN1_ARRAY_DATA((JAVA_ARRAY)data);
     int byteLength = (int)(floatCount * sizeof(JAVA_ARRAY_FLOAT));
     if ((int) buf.length >= byteLength && buf.contents != NULL) {
         memcpy(buf.contents, ptr, byteLength);
@@ -437,7 +437,7 @@ void com_codename1_impl_ios_IOSNative_gl3dUpdateFloatBuffer___long_float_1ARRAY_
 
 JAVA_LONG com_codename1_impl_ios_IOSNative_gl3dCreateShortBuffer___short_1ARRAY_int_R_long(
         CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT data, JAVA_INT indexCount) {
-    JAVA_ARRAY_SHORT *ptr = (JAVA_ARRAY_SHORT *)((JAVA_ARRAY) data)->data;
+    JAVA_ARRAY_SHORT *ptr = (JAVA_ARRAY_SHORT *)CN1_ARRAY_DATA((JAVA_ARRAY)data);
     id<MTLDevice> device = MTLCreateSystemDefaultDevice();
     id<MTLBuffer> buf = CN1GL3DMakeBuffer(device, ptr, (int)(indexCount * sizeof(JAVA_ARRAY_SHORT)));
     return (JAVA_LONG)(__bridge_retained void *) buf;
@@ -447,7 +447,7 @@ void com_codename1_impl_ios_IOSNative_gl3dUpdateShortBuffer___long_short_1ARRAY_
         CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG bufferPeer, JAVA_OBJECT data, JAVA_INT indexCount) {
     if (bufferPeer == 0) return;
     id<MTLBuffer> buf = (__bridge id<MTLBuffer>)(void *) bufferPeer;
-    JAVA_ARRAY_SHORT *ptr = (JAVA_ARRAY_SHORT *)((JAVA_ARRAY) data)->data;
+    JAVA_ARRAY_SHORT *ptr = (JAVA_ARRAY_SHORT *)CN1_ARRAY_DATA((JAVA_ARRAY)data);
     int byteLength = (int)(indexCount * sizeof(JAVA_ARRAY_SHORT));
     if ((int) buf.length >= byteLength && buf.contents != NULL) {
         memcpy(buf.contents, ptr, byteLength);
@@ -457,7 +457,7 @@ void com_codename1_impl_ios_IOSNative_gl3dUpdateShortBuffer___long_short_1ARRAY_
 JAVA_LONG com_codename1_impl_ios_IOSNative_gl3dCreateTexture___int_1ARRAY_int_int_R_long(
         CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT argb, JAVA_INT width, JAVA_INT height) {
     if (width <= 0 || height <= 0) return 0;
-    JAVA_ARRAY_INT *src = (JAVA_ARRAY_INT *)((JAVA_ARRAY) argb)->data;
+    JAVA_ARRAY_INT *src = (JAVA_ARRAY_INT *)CN1_ARRAY_DATA((JAVA_ARRAY)argb);
     id<MTLDevice> device = MTLCreateSystemDefaultDevice();
     MTLTextureDescriptor *td = [MTLTextureDescriptor texture2DDescriptorWithPixelFormat:MTLPixelFormatBGRA8Unorm
                                                                                   width:width height:height mipmapped:NO];
@@ -565,7 +565,7 @@ static void CN1GL3DBindCommon(CN1GL3DView *view, CN1GL3DPipeline *p,
     [enc setFrontFacingWinding:MTLWindingCounterClockwise];
     [enc setVertexBuffer:vbo offset:0 atIndex:0];
 
-    JAVA_ARRAY_FLOAT *uptr = (JAVA_ARRAY_FLOAT *)((JAVA_ARRAY) uniforms)->data;
+    JAVA_ARRAY_FLOAT *uptr = (JAVA_ARRAY_FLOAT *)CN1_ARRAY_DATA((JAVA_ARRAY)uniforms);
     int ubytes = (int)(uniformFloats * sizeof(JAVA_ARRAY_FLOAT));
     [enc setVertexBytes:uptr length:ubytes atIndex:1];
     [enc setFragmentBytes:uptr length:ubytes atIndex:1];
