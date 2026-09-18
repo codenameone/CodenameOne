@@ -68,11 +68,20 @@ public abstract class AbstractCollection<E> implements Collection<E> {
      *                {@code null} elements and this {@code Collection} does not support
      *                such elements.
      */
+    /* for-each, NOT an explicit iterator. The translator lowers a for-each over a
+     * collection whose runtime layout it recognises into an index walk of the backing
+     * storage -- no iterator object, no interface dispatch per element. It matches on
+     * the BYTECODE SHAPE javac emits for for-each, so the equivalent
+     * `Iterator it = c.iterator(); while (it.hasNext())` that used to be here is not
+     * recognised and allocates a real iterator every call.
+     *
+     * These are the base implementations every collection inherits, so each one that
+     * still spells the loop out by hand costs an allocation on every call for every
+     * collection that does not override it. */
     public boolean addAll(Collection<? extends E> collection) {
         boolean result = false;
-        Iterator<? extends E> it = collection.iterator();
-        while (it.hasNext()) {
-            if (add(it.next())) {
+        for (E element : collection) {
+            if (add(element)) {
                 result = true;
             }
         }
@@ -123,16 +132,17 @@ public abstract class AbstractCollection<E> implements Collection<E> {
      *                {@code Collection} doesn't support {@code null} elements.
      */
     public boolean contains(Object object) {
-        Iterator<E> it = iterator();
+        // The null test stays hoisted out of the loop, as it was: it is loop
+        // invariant and equals must not be called on a null.
         if (object != null) {
-            while (it.hasNext()) {
-                if (object.equals(it.next())) {
+            for (E element : this) {
+                if (object.equals(element)) {
                     return true;
                 }
             }
         } else {
-            while (it.hasNext()) {
-                if (it.next() == null) {
+            for (E element : this) {
+                if (element == null) {
                     return true;
                 }
             }
@@ -161,9 +171,8 @@ public abstract class AbstractCollection<E> implements Collection<E> {
      *                if {@code collection} is {@code null}.
      */
     public boolean containsAll(Collection<?> collection) {
-        Iterator<?> it = collection.iterator();
-        while (it.hasNext()) {
-            if (!contains(it.next())) {
+        for (Object element : collection) {
+            if (!contains(element)) {
                 return false;
             }
         }
@@ -349,16 +358,20 @@ public abstract class AbstractCollection<E> implements Collection<E> {
 
         StringBuffer buffer = new StringBuffer(size() * 16);
         buffer.append('[');
-        Iterator<?> it = iterator();
-        while (it.hasNext()) {
-            Object next = it.next();
+        // The separator used to be decided by asking the iterator whether another
+        // element follows. A for-each cannot ask that, and does not need to: writing
+        // the separator BEFORE every element except the first produces the same
+        // string, and lets the loop be the shape the translator lowers.
+        boolean first = true;
+        for (Object next : this) {
+            if (!first) {
+                buffer.append(", "); //$NON-NLS-1$
+            }
+            first = false;
             if (next != this) {
                 buffer.append(next);
             } else {
                 buffer.append("(this Collection)"); //$NON-NLS-1$
-            }
-            if (it.hasNext()) {
-                buffer.append(", "); //$NON-NLS-1$
             }
         }
         buffer.append(']');
@@ -395,13 +408,21 @@ public abstract class AbstractCollection<E> implements Collection<E> {
     @Override
     @SuppressWarnings("unchecked")
     public <T> T[] toArray(T[] contents) {
+        int size = size();
         Object[] arr = contents;
-        if (size() > arr.length) {
-            arr = (Object[])java.lang.reflect.Array.newInstance(contents.getClass().getComponentType(), size());
+        if (size > arr.length) {
+            arr = (Object[])java.lang.reflect.Array.newInstance(contents.getClass().getComponentType(), size);
         }
-        Iterator it = iterator();
-        for(int iter = 0 ; iter < arr.length ; iter++) {
-            arr[iter] = it.next();
+        int at = 0;
+        for (E element : this) {
+            arr[at++] = element;
+        }
+        // The contract this method's own javadoc states: when the supplied array is
+        // longer than the collection, the element AFTER the last is set to null. The
+        // previous loop ran to arr.length and kept calling next(), so a caller passing
+        // an oversized array got a NoSuchElementException instead of their array back.
+        if (arr.length > size) {
+            arr[size] = null;
         }
         return (T[])arr;
     }
