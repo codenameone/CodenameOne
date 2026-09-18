@@ -123,6 +123,11 @@ public class LinuxImplementation extends CodenameOneImplementation {
     /// nativeSources/cn1_linux.h -- the two tables are the wire protocol and a
     /// mismatch routes an event to the wrong handler rather than failing.
     private static final int EVENT_POINTER_HOVER = 22;
+    /// A native menu bar item was chosen; the key field carries the command id
+    /// setNativeCommands handed out. Must match CN1_EVENT_MENU_COMMAND in cn1_linux.h,
+    /// which shares its number with the Windows port's so the two desktop wire protocols
+    /// do not drift apart.
+    private static final int EVENT_MENU_COMMAND = 23;
     private static final int EVENT_ROTATE = 11;
     private static final int EVENT_ACCESSIBILITY_ACTION = 12;
     // Additional desktop windows. These always carry a non-zero window id.
@@ -926,6 +931,9 @@ public class LinuxImplementation extends CodenameOneImplementation {
                     if (actionTarget != null) {
                         performAccessibilityAction(actionTarget.nodeId, actionTarget.actionId, null);
                     }
+                    break;
+                case EVENT_MENU_COMMAND:
+                    fireNativeMenuCommand(key);
                     break;
                 default:
                     break;
@@ -3228,9 +3236,133 @@ public class LinuxImplementation extends CodenameOneImplementation {
     /// layer, no `device-desktop-` theme layer, no @defaultDesktopFontSizeInt, no
     /// @desktopTitleBarMode, and the mobile branch of Button.pointerHover,
     /// TextSelection and SplitPane.
+    ///
+    /// The list in that paragraph is now shorter by one: @desktopTitleBarMode is read here,
+    /// because this port has a native menu bar to hand the commands to.
     @Override
     public boolean isDesktop() {
         return true;
+    }
+
+    // ---- native menu bar ----------------------------------------------------
+
+    /// Commands published to the native menu bar, keyed by the id the bar echoes back.
+    private java.util.Map<Integer, com.codename1.ui.Command> nativeMenuCommands =
+            new java.util.HashMap<Integer, com.codename1.ui.Command>();
+
+    /// The previous generation, kept one round.
+    ///
+    /// A menu selection arrives through the event queue, so it can be drained AFTER the form
+    /// that published it has been replaced and the map rebuilt. Without this the command a
+    /// user clicked on the way out of a screen resolves to nothing and silently does not run.
+    private java.util.Map<Integer, com.codename1.ui.Command> supersededMenuCommands;
+
+    private int nextMenuCommandId = 1;
+
+    /// @inheritDoc
+    ///
+    /// True on this port: cn1_linux_window.c builds a real GtkMenuBar above the drawing
+    /// area, so commandBehavior Native and the native title-bar mode both have somewhere to
+    /// put the commands. Without this the framework normalises both away and keeps drawing
+    /// the Toolbar.
+    @Override
+    public boolean isNativeCommandsSupported() {
+        return isDesktop();
+    }
+
+    /// @inheritDoc
+    ///
+    /// Null, not "toolbar", when nothing asked: the Adwaita theme carries its own
+    /// desktopTitleBarMode -- `custom`, because GNOME's HeaderBar IS the title bar -- and it
+    /// may only answer when the project did not.
+    @Override
+    public String getConfiguredDesktopTitleBarMode() {
+        if (!isDesktop()) {
+            return null;
+        }
+        return Display.getInstance().getProperty("desktop.titleBar", null);
+    }
+
+    /// @inheritDoc
+    @Override
+    public String getDesktopTitleBarMode() {
+        if (!isDesktop()) {
+            return "toolbar";
+        }
+        return Display.getInstance().getProperty("desktop.titleBar", "toolbar");
+    }
+
+    /// @inheritDoc
+    ///
+    /// Encodes one row per command as
+    /// `"<menuHint>\t<label>\t<shortcutKeyChar>\t<shortcutModifiers>\t<commandId>"`, rows
+    /// separated by newline -- the encoding the macOS and Windows ports use, so the three
+    /// ParparVM desktop ports share one format rather than each inventing its own alongside
+    /// Command's placement constants.
+    ///
+    /// Tabs and newlines are stripped from the two text fields rather than escaped: they are
+    /// the delimiters, neither means anything in a menu item, and an escape would need the
+    /// native parser to unescape in step with this.
+    @Override
+    public void setNativeCommands(java.util.Vector commands) {
+        if (!isDesktop()) {
+            return;
+        }
+        java.util.Map<Integer, com.codename1.ui.Command> published =
+                new java.util.HashMap<Integer, com.codename1.ui.Command>();
+        StringBuilder sb = new StringBuilder();
+        if (commands != null) {
+            for (int i = 0; i < commands.size(); i++) {
+                Object o = commands.elementAt(i);
+                if (!(o instanceof com.codename1.ui.Command)) {
+                    continue;
+                }
+                com.codename1.ui.Command c = (com.codename1.ui.Command) o;
+                String name = c.getCommandName();
+                if (name == null || name.length() == 0) {
+                    continue;
+                }
+                String hint = c.getDesktopMenu();
+                if (hint == null) {
+                    hint = "";
+                }
+                if (sb.length() > 0) {
+                    sb.append('\n');
+                }
+                int commandId = nextMenuCommandId++;
+                sb.append(menuField(hint)).append('\t').append(menuField(name)).append('\t')
+                        .append(c.getDesktopShortcutKeyChar()).append('\t')
+                        .append(c.getDesktopShortcutModifiers()).append('\t')
+                        .append(commandId);
+                published.put(Integer.valueOf(commandId), c);
+            }
+        }
+        supersededMenuCommands = nativeMenuCommands;
+        nativeMenuCommands = published;
+        LinuxNative.menuSetCommands(sb.toString());
+    }
+
+    private static String menuField(String value) {
+        if (value == null) {
+            return "";
+        }
+        return value.replace('\n', ' ').replace('\r', ' ').replace('\t', ' ');
+    }
+
+    /// Runs the command the user chose from the native menu bar.
+    ///
+    /// Already on the EDT: the selection travels through the ordinary event queue, which the
+    /// EDT drains, so nothing is marshalled here.
+    private void fireNativeMenuCommand(int commandId) {
+        Integer key = Integer.valueOf(commandId);
+        com.codename1.ui.Command resolved = nativeMenuCommands.get(key);
+        if (resolved == null && supersededMenuCommands != null) {
+            resolved = supersededMenuCommands.get(key);
+        }
+        if (resolved == null) {
+            return;
+        }
+        resolved.actionPerformed(new com.codename1.ui.events.ActionEvent(resolved));
     }
 
     /// @inheritDoc

@@ -285,7 +285,6 @@ apps' own blockers rather than by eye:
 | Adwaita has no Mica analogue | By design. Recorded so nobody goes looking for one. |
 | Window chrome | The tile contract is a widget in a tile. `DesktopToolbar` now scores the title-bar strip, but the rest -- borders, shadows, corner radii, the traffic lights -- is not scored. |
 | Dialog | Not scored: an alert needs a bigger tile than 240x56, and the tile size is a constant in each of the three standalone capture apps rather than a per-row value. Teaching all three per-row tiles is the prerequisite. |
-| Native menu bar on Windows and Linux | Neither port implements `setNativeCommands`, so their commands stay in the CN1-drawn Toolbar, which the themes now style. Real `HMENU` / `GMenu` menus are follow-up work. |
 | Fluent `ScrollBar` visual-state names | The WinUI `ScrollBar` template predates the `PointerOver` vocabulary, so `MouseOver` and `Dragging` are tried after the modern names. A capture where none of them matched reports a blocker rather than writing a tile identical to normal. |
 
 ### Fonts are the honest ceiling

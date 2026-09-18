@@ -127,13 +127,14 @@ Each port maps the hint to its native structure: on the native macOS build the c
 into the application's real `NSMenu` under the application, File, Edit, View, Window and Help
 submenus; on the Java SE build a top-level `JMenu` is created per hint group.
 
-NOTE: The native Windows and Linux ports don't have a native menu bar yet. On those two the
-commands stay in the Codename One `Toolbar`, which the Fluent and Adwaita themes style - the
-`native` title-bar mode puts the form title in the OS title bar but doesn't hide the Toolbar,
-because hiding it would take away the only place the commands are drawn. Asking for
-`Display.COMMAND_BEHAVIOR_NATIVE` there is likewise normalized back to the default rather than
-dropping every command without a word. Nothing in application code needs to branch on this: the
-placement hints and accelerators stay inert where there is no menu to put them on.
+All four desktop ports have one: a Swing `JMenuBar` on the Java SE build, an `NSMenu` on the
+native macOS build, a Win32 `HMENU` on the Windows port and a `GtkMenuBar` on the Linux port.
+The three ParparVM ports encode a command the same way, so one format serves every one.
+
+NOTE: A port with no native menu bar is handled rather than assumed away. `Form` keeps its
+Toolbar there instead of hiding it - hiding it would take away the only place the commands are
+drawn - and `Display.COMMAND_BEHAVIOR_NATIVE` normalizes back to the default rather than
+dropping every command without a word. Nothing in application code branches on this.
 
 TIP: The hint is a plain client property (`Command.DESKTOP_MENU`), so it's inert on platforms that
 don't have a native menu bar - it's safe to set it unconditionally in shared code.

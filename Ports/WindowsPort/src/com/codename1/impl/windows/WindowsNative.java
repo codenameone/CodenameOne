@@ -165,6 +165,23 @@ public final class WindowsNative {
      */
     public static native boolean pollEvent(int[] out);
 
+    // ---- native menu bar (cn1_windows_menu.cpp) ------------------------------
+
+    /**
+     * Rebuilds the window's native menu bar from one encoded row per command:
+     * {@code "<menuHint>\t<label>\t<shortcutKeyChar>\t<shortcutModifiers>\t<commandId>"},
+     * rows separated by {@code '\n'}.
+     *
+     * <p>The same encoding IOSImplementation uses for the macOS menu, deliberately: the
+     * three ParparVM desktop ports share it so a second format is not a second thing to
+     * keep in step with Command's placement constants.</p>
+     *
+     * <p>An empty or null spec removes the menu bar. A selection comes back as a
+     * {@code CN1_EVENT_MENU_COMMAND} through pollEvent carrying the command id, so the
+     * command runs on the EDT rather than on the message pump.</p>
+     */
+    public static native void menuSetCommands(String spec);
+
     // ---- additional desktop windows (cn1_windows_desktopwindow.cpp) ----------
     //
     // A window is addressed by the slot index returned from desktopWindowCreate;

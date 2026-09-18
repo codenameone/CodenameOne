@@ -868,6 +868,16 @@ LRESULT CALLBACK cn1WinWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam
             }
             return DefWindowProcW(hwnd, msg, wParam, lParam);
         }
+        case WM_CN1_MENU:
+            /* On the window's own thread, which is the whole reason this is a message:
+             * SetMenu is not legal from the EDT. */
+            cn1WinMenuSetCommands((const char*) lParam);
+            return 0;
+        case WM_COMMAND:
+            if (cn1WinMenuHandleCommand(wParam)) {
+                return 0;
+            }
+            return DefWindowProcW(hwnd, msg, wParam, lParam);
         case WM_CLOSE:
             cn1WinPushEvent(CN1_EVENT_CLOSE, 0, 0, 0);
             DestroyWindow(hwnd);
