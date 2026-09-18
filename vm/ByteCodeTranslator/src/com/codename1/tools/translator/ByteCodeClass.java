@@ -767,6 +767,56 @@ public class ByteCodeClass {
     // runs only until the buffer reaches the largest class, then never again.
     private static final StringBuilder EMIT_BUFFER = new StringBuilder(1 << 20);
 
+    /* Cap on the interface-thunk switch. A jump table is O(1) however wide it is, but
+     * every arm is a call the compiler may inline, so an interface with hundreds of
+     * implementors would trade the dispatch for code size. Interfaces that wide are
+     * also the ones whose receivers are genuinely unpredictable, where the indirect
+     * form loses nothing. */
+    private static final int CN1_MAX_THUNK_CASES = 24;
+
+    /**
+     * Class-id switch cases for one interface method: every concrete implementor of
+     * this interface, paired with the function that implementor runs.
+     *
+     * @param m the interface method
+     * @return cases, or null when there are none or too many to be worth a switch
+     */
+    private List<String[]> thunkCasesFor(BytecodeMethod m) {
+        if (!isInterface) {
+            return null;
+        }
+        List<ByteCodeClass> cone = Parser.concreteReceiverCone(this);
+        if (cone == null || cone.isEmpty() || cone.size() > CN1_MAX_THUNK_CASES) {
+            return null;
+        }
+        String name = m.getMethodName();
+        String desc = m.getDesc();
+        List<String[]> cases = new ArrayList<String[]>(cone.size());
+        StringBuilder sig = new StringBuilder("__");
+        BytecodeMethod.appendMethodSignatureSuffixFromDesc(desc, sig, new ArrayList<String>());
+        for (ByteCodeClass c : cone) {
+            ByteCodeClass d = c;
+            while (d != null && !d.hasDeclaredNonAbstractMethod(name, desc)) {
+                String base = d.getBaseClass();
+                d = base == null ? null : Parser.getClassObject(base.replace('/', '_').replace('$', '_'));
+            }
+            if (d == null || d.isEliminated()) {
+                // One implementor whose body cannot be named here -- a default method on
+                // the interface itself, or something the dead code pass removed. SKIP
+                // it rather than abandoning the table: the default arm below is the
+                // original indirect dispatch, so a receiver with no case still reaches
+                // the right implementation. Refusing the whole table for one such
+                // implementor produced ZERO switches on this corpus.
+                continue;
+            }
+            cases.add(new String[] {
+                "cn1_class_id_" + c.getClsName(),
+                d.getClsName() + "_" + m.getCMethodName() + sig.toString(),
+                d.getClsName() });
+        }
+        return cases;
+    }
+
     public String generateCCode(List<ByteCodeClass> allClasses) {
 
         StringBuilder b = EMIT_BUFFER;
@@ -793,6 +843,19 @@ public class ByteCodeClass {
          * Collected before the bodies are emitted because the includes are written
          * first. The queries are memoised, so the extra pass is a map lookup per site. */
         java.util.Set<String> guardIncludes = new java.util.TreeSet<String>();
+        if(isInterface && virtualMethodList != null) {
+            for(BytecodeMethod m : virtualMethodList) {
+                if(m.getClsName().equals("java_lang_Object") || m.isVirtualOverriden()) {
+                    continue;
+                }
+                List<String[]> cases = thunkCasesFor(m);
+                if(cases != null) {
+                    for(String[] c : cases) {
+                        guardIncludes.add(c[2]);
+                    }
+                }
+            }
+        }
         for(BytecodeMethod m : methods) {
             if(m.isEliminated()) {
                 continue;
@@ -1682,8 +1745,10 @@ public class ByteCodeClass {
                     } else {
                         // we pretend to have a virtual method here but the optimizer says its not really needed
                         if(!m.isVirtualOverriden()) {
+                            m.setThunkCases(thunkCasesFor(m));
                             m.appendVirtualMethodC(clsName, b, "classToInterfaceMap_" + clsName +
                                     "[cn1__cls->classId][" + offset + "]", true);
+                            m.setThunkCases(null);
                         }
                         offset++;
                     }

@@ -2304,6 +2304,15 @@ public class BytecodeMethod implements SignatureSet {
         return this.clsName + "_"+this.getCMethodName();
     }
     
+    /* Cases for the class-id switch in an interface thunk: {classIdToken, function}.
+     * Set by the interface's emitter right before the thunk is written, and cleared
+     * after, because one BytecodeMethod is shared across the classes that inherit it. */
+    private List<String[]> thunkCases;
+
+    void setThunkCases(List<String[]> cases) {
+        this.thunkCases = cases;
+    }
+
     public void appendVirtualMethodC(String cls, StringBuilder b, String offset, boolean includeStaticInitializer) {
         if(virtualOverriden) {
             return;
@@ -2386,6 +2395,50 @@ public class BytecodeMethod implements SignatureSet {
         // classToInterfaceMap -- so resolving it once here removes that work from
         // every interface dispatch, which is the hottest indirect call the VM makes.
         b.append("struct clazz* cn1__cls = CN1_CLASS_OF(__cn1ThisObject);\n    ");
+
+        /* A SWITCH ON THE CLASS ID, ahead of the indirect dispatch below.
+         *
+         * The indirect form is six dependent loads -- class pointer, class id, the
+         * classToInterfaceMap row, the offset within it, the vtable, the slot -- and
+         * then a branch the C compiler cannot see through, so nothing on either side
+         * of the call is optimised across it. The switch is ONE load and a jump table,
+         * and every arm is a named callee that ThinLTO can inline.
+         *
+         * This is the dispatch lambdas need. A lambda becomes its own synthetic class
+         * implementing the functional interface, so a listener invoked out of a
+         * collection -- addActionListener(e -> ...) and then fireActionEvent -- has no
+         * provable receiver at the CALL SITE and no per-site analysis can help it. The
+         * thunk is the one place that sees every implementation, and every lambda is
+         * simply another case here.
+         *
+         * Nothing is kept alive by this: the thunk already reached all of these
+         * through the vtable, and the indirect form remains as the default arm, so a
+         * receiver from a path the analysis did not see still dispatches correctly.
+         * Their headers come in through the include-only channel, never the dependency
+         * list -- see the note in ByteCodeClass.generateCCode. */
+        if (thunkCases != null && !thunkCases.isEmpty()) {
+            b.append("switch(cn1__cls->classId) {\n");
+            for (String[] c : thunkCases) {
+                b.append("        case ").append(c[0]).append(": ");
+                if (!returnType.isVoid()) {
+                    b.append("return ");
+                }
+                b.append(c[1]).append("(threadStateData, __cn1ThisObject");
+                for (int iter = 0 ; iter < arguments.size() ; iter++) {
+                    b.append(", __cn1Arg").append(iter + 1);
+                }
+                b.append(");");
+                if (returnType.isVoid()) {
+                    // RETURN, not break. A break leaves the switch and falls straight
+                    // into the indirect dispatch below, which would call the method a
+                    // SECOND time -- invisible for a query, state corruption for a
+                    // mutator. MapTorture, SetTorture and IdmTorture all caught it.
+                    b.append(" return;");
+                }
+                b.append("\n");
+            }
+            b.append("    }\n    ");
+        }
         if(!returnType.isVoid()) {
             b.append("return (*(functionPtr_");
         } else {
