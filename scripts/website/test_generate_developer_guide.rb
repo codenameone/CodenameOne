@@ -39,6 +39,21 @@ Dir.mktmpdir('guide-pages') do |dir|
 
     TIP: A useful tip.
 
+    CAUTION: Take care.
+
+    IMPORTANT: Read this first.
+
+    [#warning-anchor]
+    .Before continuing
+    [WARNING]
+    ====
+    Review <<destination>>.
+
+    * Keep this list.
+
+    TIP: Nested advice.
+    ====
+
     Inline XML: `<profile id="example-not-anchor">` and `<a href="#example-link">`.
 
 
@@ -78,6 +93,13 @@ Dir.mktmpdir('guide-pages') do |dir|
   check(first.include?('```java'), 'Plain code is not Markdown')
   check(first.include?('src="/developer-guide/img/example.png"'), 'Image path is chapter-relative')
   check(!first.include?('images/icons/'), 'Admonition tried to load an icon image')
+  %w[Note Tip Caution Important Warning].each do |label|
+    check(first.include?(%(role="img" aria-label="#{label}")), "#{label} icon has no accessible label")
+  end
+  check(first.scan('<svg ').length == 6, 'Top-level or nested admonition icon missing')
+  check(!first.include?('<table'), 'Admonition still uses a layout table')
+  check(first.include?('Before continuing') && first.include?('Keep this list.'), 'Complex admonition content lost')
+  check(guide.anchors['warning-anchor'] == '/developer-guide/first/#warning-anchor', 'Admonition anchor lost')
   check(first.include?('Only the first chapter needs this definition.'), 'Footnote definition missing')
   check(!second.include?('Only the first chapter needs this definition.'), 'Footnotes leaked between chapters')
   check(second.include?('## A code heading {#destination}'), 'Heading ID changed')

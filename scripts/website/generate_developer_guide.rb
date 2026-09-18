@@ -5,6 +5,7 @@ require 'asciidoctor'
 require 'cgi'
 require 'json'
 require 'fileutils'
+require_relative 'guide_html_converter'
 
 ROOT = File.expand_path('../..', __dir__)
 SITE = File.join(ROOT, 'docs/website')
@@ -15,7 +16,7 @@ class GuidePages
   def initialize(source, legacy: JSON.parse(File.read(File.join(__dir__, 'guide-legacy-links.json'))))
     @legacy = legacy
     logger = Asciidoctor::MemoryLogger.new
-    @doc = Asciidoctor.load_file(source, safe: :unsafe, sourcemap: true, logger: logger,
+    @doc = Asciidoctor.load_file(source, safe: :unsafe, sourcemap: true, logger: logger, converter: GuideHtmlConverter,
       attributes: { 'source-highlighter' => nil, 'sectnums!' => '', 'icons' => nil, 'tip-caption' => 'Tip' })
     @chapters, @anchors, @groups = [], {}, []
     @doc.sections.each do |part|

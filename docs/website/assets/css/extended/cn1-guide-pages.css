@@ -45,9 +45,11 @@
 .cn1-guide-content .imageblock { margin: 1.5rem 0; }
 .cn1-guide-content .imageblock .title { font-size: .85rem; color: var(--cn1-muted); }
 .cn1-guide-content .admonitionblock, .cn1-guide-content .sidebarblock { border-left: 3px solid var(--cn1-accent); background: var(--entry); padding: .75rem 1rem; margin: 1.5rem 0; border-radius: 6px; }
-.cn1-guide-content .admonitionblock table { margin: 0; display: table; }
-.cn1-guide-content .admonitionblock td { border: 0; }
-.cn1-guide-content .admonitionblock .icon { width: 4rem; font-weight: 700; }
+.cn1-guide-content .admonitionblock { display: flex; align-items: flex-start; gap: .85rem; }
+.cn1-guide-admonition-icon { flex: 0 0 24px; color: var(--cn1-accent); margin-top: .2rem; }
+.cn1-guide-admonition-icon svg { display: block; }
+.cn1-guide-content .admonitionblock > .content { min-width: 0; flex: 1; }
+.cn1-guide-content .admonitionblock .content > :first-child { margin-top: 0; }
 .cn1-guide-content .admonitionblock .content > :last-child { margin-bottom: 0; }
 .cn1-guide-content .tableblock { max-width: 100%; }
 .cn1-guide-content pre { overflow: auto; overflow-wrap: normal; }
@@ -56,7 +58,6 @@
 .cn1-guide-content .conum { font-style: normal; font-weight: 700; }
 .cn1-guide-content .conum[data-value]::after { content: attr(data-value); }
 .cn1-guide-content .footnotes { border-top: 1px solid var(--cn1-border); padding-top: 1rem; font-size: .85rem; }
-.post-single .cn1-guide-content .admonitionblock td { border-bottom: 0; }
 .cn1-guide-content pre code { font-size: .85rem; }
 @media (max-width: 1000px) {
   .cn1-guide-layout { grid-template-columns: 220px minmax(0, 1fr); gap: 1.5rem; }
