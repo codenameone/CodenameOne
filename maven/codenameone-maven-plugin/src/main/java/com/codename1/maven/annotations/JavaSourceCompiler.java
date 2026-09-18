@@ -45,12 +45,41 @@ import java.util.Map;
 
 public final class JavaSourceCompiler {
 
+    /// The level every generated source is compiled at. See #compile.
+    private static final String GENERATED_SOURCE_LEVEL = "1.8";
+
     private JavaSourceCompiler() { }
 
     /// Compiles the given `fullyQualifiedName -> source` map into `.class` files
     /// rooted at `outputClassDir`. Adds `extraClasspath` (typically the plugin's
     /// own test-classes directory so the @Route + Form + Router stubs resolve).
+    ///
+    /// JAVA 8 BYTECODE, WHATEVER JDK IS RUNNING. Everything the annotation
+    /// processors generate is Codename One code, and every consumer of it reads
+    /// class file version 52: ParparVM translates an app's generated routers,
+    /// mappers and bindings, and `cn1:backend-package` hands the generated entry
+    /// point straight to the translator. The class file version used to be the
+    /// running JDK's default, so packaging a backend on a JDK 25 died inside the
+    /// translator with "Unsupported class file major version 69" -- naming ASM and
+    /// no source, on a class the developer never wrote. It stayed invisible
+    /// because that goal demanded a JDK 8 until this was fixed.
+    ///
+    /// Pass a level explicitly through the overload below to compile a source that
+    /// needs a newer language than 8 -- a record, say. Only a test has reason to:
+    /// generated source that cannot be translated is of no use to a build.
     public static void compile(Map<String, String> sources, File outputClassDir, List<File> extraClasspath)
+            throws IOException {
+        compile(sources, outputClassDir, extraClasspath, GENERATED_SOURCE_LEVEL);
+    }
+
+    /// As #compile, at a named `-source`/`-target` level. A null level leaves both
+    /// out, which compiles at the running JDK's own default.
+    ///
+    /// -source/-target rather than --release, because this plugin still compiles
+    /// and runs on a JDK 8. The obsolete-option warning newer compilers print for
+    /// -source 8 is a lint warning, and -Xlint:none below turns those off.
+    public static void compile(Map<String, String> sources, File outputClassDir,
+            List<File> extraClasspath, String sourceLevel)
             throws IOException {
         JavaCompiler compiler = ToolProvider.getSystemJavaCompiler();
         if (compiler == null) {
@@ -104,9 +133,16 @@ public final class JavaSourceCompiler {
                 compilationUnits.add(new InMemorySource(e.getKey(), e.getValue()));
             }
             StringWriter compilerOut = new StringWriter();
+            List<String> options = new ArrayList<String>(
+                    Arrays.asList("-Xlint:none", "-proc:none"));
+            if (sourceLevel != null) {
+                options.add("-source");
+                options.add(sourceLevel);
+                options.add("-target");
+                options.add(sourceLevel);
+            }
             JavaCompiler.CompilationTask task = compiler.getTask(
-                    compilerOut, fm, diags,
-                    Arrays.asList("-Xlint:none", "-proc:none"),
+                    compilerOut, fm, diags, options,
                     /*classes*/ null, compilationUnits);
             Boolean ok = task.call();
             if (ok == null || !ok.booleanValue()) {

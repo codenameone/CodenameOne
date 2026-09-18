@@ -19,6 +19,7 @@ on:
       - 'maven/codenameone-maven-plugin/**'
       - 'maven/cn1app-archetype/**'
       - 'maven/cn1lib-archetype/**'
+      - 'maven/backend/**'
       - 'maven/integration-tests/cn1app-archetype-test.sh'
       - 'maven/integration-tests/inc/**'
       - '.github/workflows/archetype-smoke.yml'
@@ -32,6 +33,7 @@ on:
       - 'maven/codenameone-maven-plugin/**'
       - 'maven/cn1app-archetype/**'
       - 'maven/cn1lib-archetype/**'
+      - 'maven/backend/**'
       - 'maven/integration-tests/cn1app-archetype-test.sh'
       - 'maven/integration-tests/inc/**'
       - '.github/workflows/archetype-smoke.yml'
@@ -50,14 +52,25 @@ jobs:
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v6
+      # A JDK that is NOT 8, for the `cn1:backend-package` check at the end of the
+      # test. Installed FIRST so the JDK 8 below is the one JAVA_HOME names -- the
+      # framework build needs 8, and only that one check wants a modern JDK.
+      - name: Set up JDK 21
+        uses: actions/setup-java@v5
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+      - run: echo "CN1_BACKEND_PACKAGE_JDK=$JAVA_HOME" >> $GITHUB_ENV
       - name: Set up JDK 8
         uses: actions/setup-java@v5
         with:
           java-version: '8'
           distribution: 'temurin'
           cache: 'maven'
-      - name: Install xvfb
-        run: bash scripts/ci/apt-get-install.sh xvfb
+      # clang compiles the C the translator emits. Required rather than optional
+      # here: the packaging check skips without it, and a skip reads like a pass.
+      - name: Install xvfb and clang
+        run: bash scripts/ci/apt-get-install.sh xvfb clang
       - name: Build Codename One Maven artifacts (includes archetypes)
         # Through the retry wrapper, narrowed to resolution failures: this died with
         # "Plugin maven-install-plugin:2.5.2 or one of its dependencies could not be resolved"
@@ -81,6 +94,9 @@ jobs:
           xvfb-run -a mvn archetype:update-local-catalog -Plocal-dev-javase
           xvfb-run -a mvn archetype:crawl -Plocal-dev-javase
       - name: Run archetype simulator smoke (auto-bundle pref forced on)
+        env:
+          # The packaging check must not be skipped on a runner that has clang.
+          CN1_BACKEND_PACKAGE_REQUIRED: '1'
         run: |
           cd maven/integration-tests
           xvfb-run -a bash cn1app-archetype-test.sh
