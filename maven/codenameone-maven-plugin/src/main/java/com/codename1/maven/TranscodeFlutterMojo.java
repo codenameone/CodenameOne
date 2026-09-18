@@ -46,13 +46,13 @@ import java.nio.file.StandardCopyOption;
  * Transpiles Flutter/Dart sources under {@code src/main/flutter} into Java
  * source targeting the Codename One Flutter runtime
  * ({@code codenameone-flutter-runtime}), so Flutter UI code runs as plain
- * Codename One components at native speed — no Dart VM or Flutter engine.
+ * Codename One components at native speed -- no Dart VM or Flutter engine.
  *
  * <h3>Source layout</h3>
  * <ul>
- *   <li>{@code src/main/flutter/**&#47;*.dart} — Dart sources (whole-program
+ *   <li>{@code src/main/flutter/**&#47;*.dart} -- Dart sources (whole-program
  *       transpile; subdirectories allowed)</li>
- *   <li>{@code src/main/flutter/assets/**} and {@code src/main/flutter/packages/**} —
+ *   <li>{@code src/main/flutter/assets/**} and {@code src/main/flutter/packages/**} --
  *       bundled assets, flattened into the
  *       build output (Codename One resources are flat on every port) so
  *       {@code Image.asset(...)} resolves</li>
@@ -61,7 +61,7 @@ import java.nio.file.StandardCopyOption;
  * <p>When the directory does not exist the goal is a silent no-op. When it
  * exists, generated sources land in {@code target/generated-sources/flutter}
  * (registered as a compile source root). Generated code is Java 17 source,
- * so the build must run on JDK 17+ — checked here with a friendly error.
+ * so the build must run on JDK 17+ -- checked here with a friendly error.
  * The transpile is whole-program with a digest-based fast skip; unchanged
  * outputs are not rewritten, keeping incremental javac warm.</p>
  */
@@ -119,7 +119,7 @@ public class TranscodeFlutterMojo extends AbstractCN1Mojo {
         if (result.hasErrors()) {
             throw new MojoFailureException("Flutter transpilation failed with "
                     + result.errors().size() + " error(s); see log above. "
-                    + "Confirm the Dart files pass `dart analyze` — constructs outside the "
+                    + "Confirm the Dart files pass `dart analyze` -- constructs outside the "
                     + "currently supported subset are reported with a milestone code.");
         }
         if (result.isUpToDate()) {
@@ -165,8 +165,8 @@ public class TranscodeFlutterMojo extends AbstractCN1Mojo {
     /**
      * Copies {@code src/main/flutter/assets} into the build output, <em>flattened</em>.
      *
-     * <p>Codename One resources are flat on every port — {@code getResourceAsStream}
-     * rejects a name containing a {@code '/'} past the leading one — so the asset
+     * <p>Codename One resources are flat on every port -- {@code getResourceAsStream}
+     * rejects a name containing a {@code '/'} past the leading one -- so the asset
      * tree cannot be mirrored. Each asset is written to the output root under the
      * name produced by {@link #flatAssetName}, which the Flutter runtime's
      * {@code FlutterAssets} recomputes when resolving {@code Image.asset(...)}.</p>
@@ -226,7 +226,7 @@ public class TranscodeFlutterMojo extends AbstractCN1Mojo {
      * in the source path (extensions survive for native bundlers).
      *
      * <p><b>Keep in sync</b> with {@code com.codename1.flutter.FlutterAssets} in
-     * the Flutter runtime — deliberately duplicated rather than shared, because
+     * the Flutter runtime -- deliberately duplicated rather than shared, because
      * this plugin must not depend on the runtime it builds against.</p>
      */
     static String flatAssetName(String assetKey) {
