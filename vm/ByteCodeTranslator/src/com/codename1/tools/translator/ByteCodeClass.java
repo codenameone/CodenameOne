@@ -784,10 +784,27 @@ public class ByteCodeClass {
      * @param m the interface method
      * @return cases, or null when there are none or too many to be worth a switch
      */
+    // generateCCode asks for every table TWICE -- once to collect the include-only
+    // dependencies its arms name, once to emit it -- and building one walks the cone,
+    // climbs a superclass chain per member and formats a symbol per arm. On Collection
+    // that is 756 classes across fifteen methods, and the translator is itself the
+    // benchmark, so the second pass showed up as retired instructions.
+    private java.util.Map<BytecodeMethod, List<String[]>> thunkCaseCache =
+            new java.util.HashMap<BytecodeMethod, List<String[]>>();
+
     private List<String[]> thunkCasesFor(BytecodeMethod m) {
         if (!isInterface) {
             return null;
         }
+        if (thunkCaseCache.containsKey(m)) {
+            return thunkCaseCache.get(m);
+        }
+        List<String[]> computed = computeThunkCasesFor(m);
+        thunkCaseCache.put(m, computed);
+        return computed;
+    }
+
+    private List<String[]> computeThunkCasesFor(BytecodeMethod m) {
         List<ByteCodeClass> cone = Parser.concreteReceiverCone(this);
         if (cone == null || cone.isEmpty() || cone.size() > CN1_MAX_THUNK_CONE) {
             return null;
