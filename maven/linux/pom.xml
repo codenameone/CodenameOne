@@ -38,6 +38,11 @@
             <groupId>com.codenameone</groupId>
             <artifactId>codenameone-core</artifactId>
         </dependency>
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <scope>test</scope>
+        </dependency>
     </dependencies>
 
     <build>
@@ -78,9 +83,18 @@
             <plugin>
                 <artifactId>maven-antrun-plugin</artifactId>
                 <executions>
-                    <!-- The port has no built-in native look, so its native theme is
-                         the full material theme (the same one Android ships). Stage it
-                         as a classpath resource (linuxNativeTheme.res) so the linux
+                    <!-- STILL the Material theme, deliberately, even though GnomeAdwaitaTheme.res
+                         now exists and is measured. Staging it here is the DEFAULT FLIP for
+                         this port, and that restyles every screen: it reseeds ~154 committed
+                         screenshot baselines, which is a change that deserves its own review
+                         rather than riding along inside the one that introduces the theme.
+                         It also wants doing once, after the theme reaches its fidelity
+                         target, rather than now and again later.
+
+                         Flipping it is this one line plus the reseed.
+
+                         Stage the port's native theme as a classpath resource
+                         (linuxNativeTheme.res) so the linux
                          translator target embeds it into the binary and the
                          getResourceAsStream call in installNativeTheme() serves it
                          straight from the executable. Mirrors how the Windows port

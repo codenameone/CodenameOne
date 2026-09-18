@@ -149,6 +149,125 @@ SwitchMorph (droplet stretch/squash).
 | Menu / ExposedDropdown | ComboBox / Command menu | not started |
 | Card / ElevatedCard | Container card UIIDs | not started |
 
+## Desktop: Windows Fluent, macOS Aqua, GNOME Adwaita
+
+The three desktop themes share one matrix, so they share one table.
+
+First measured scores, against golden sets captured on hosted runners:
+
+| Theme | Golden set | Pairs | Mean | Gating |
+|---|---|---:|---:|---|
+| Windows Fluent | `windows-11-fluent` | 60 | 82.1% | yes, on master |
+| GNOME Adwaita | `gnome-adwaita` | 60 | 85.9% | yes, on master |
+| macOS Aqua | `macos-aqua` | 60 | 84.6% (local) | yes, on master |
+
+These are starting points, not results. All three themes were written without a
+reference to check them against, so this is the first time any of them has been
+measured, and the ratchet moves them up from here.
+
+### No port installs one by default yet
+
+The themes are built, measured and selectable, and every desktop port still
+installs what it installed before: Windows and Linux stage the Material
+placeholder, macOS installs the iOS theme unless `macos.themeMode=aqua` asks for
+Aqua.
+
+That is sequencing, not an oversight. Flipping a port's theme restyles every
+screen and reseeds its committed screenshot baselines -- about 154 on the Windows
+port alone -- which deserves its own review rather than riding along inside the
+change that introduces the theme, and wants doing once the themes reach their
+fidelity targets rather than now and again later.
+
+Each flip is one line: the `<copy file=` in `maven/windows/pom.xml` and
+`maven/linux/pom.xml`, and the unset branch of
+`MacOSBuildHints.getThemeMode()`.
+
+What the first round of measurement actually found is worth recording, because
+only one of the four was a CSS problem:
+
+| Finding | Effect |
+|---|---|
+| Three copies of every theme in a built tree (`Themes/`, the staged copy, one inside the javase jar) and the class loader reaching a stale one | A theme edit scored identically to no edit. Two conclusions in this work were wrong because of it. |
+| The two sides rendered different label text on all six rows that carry text | Text field 65% -> 92%. Now gated by `scripts/check-fidelity-spec.py` in both directions. |
+| The two sides sat at different widget values (slider 0.5, progress 0.6) | The CN1 knob sat 24px right of the reference's. |
+| Three theme constants never set: `progressTrackThicknessMM`, `sliderThumbWidth/HeightMM`, `sliderContinuousTrackBool` | Progress bar 60% -> 75%; slider gained a round knob on a continuous track. |
+
+The macOS hover rows were the exception that proves the reference is worth having:
+they were the six worst tiles in the set, and the manifest already said why --
+AppKit restyles none of those controls on hover, so eighteen `.hover` rules were
+removed rather than tuned.
+
+### Covered components
+
+| Native control | CN1 building block | Fidelity test | Score (min-max) | Notes |
+|---|---|---|---:|---|
+| UIButton .glass | `Button` | Button | 90.9-93.4 | frosted capsule, backdrop-filter glass |
+| UIButton .prominentGlass | `RaisedButton` UIID | RaisedButton | 87.8-92.5 | geometry: ~10% wider than native (tracked) |
+| UIButton .plain | `FlatButton` UIID | FlatButton | 86.7-88.2 | geometry: native pill radius 92px vs CN1 44px (tracked) |
+| UITextField | `TextField` | TextField | 97.3-97.6 | |
+| Check glyph (Reminders style) | `CheckBox` | CheckBox | 92.2-97.5 | SF Symbol glyphs (iosSFStateIconsBool); iOS has no native checkbox |
+| Radio glyph | `RadioButton` | RadioButton | 92.2-95.5 | SF largecircle.fill.circle glyph |
+| UISwitch | `Switch` | Switch | 92.1-96.8 | + liquid droplet thumb morph (frame-validated) |
+| UISlider | `Slider` | Slider | 92.4-95.1 | |
+| UIProgressView | `Slider` (ProgressBar UIID) | ProgressBar | 94.4-95.4 | |
+| UITabBar (floating pill) | `Tabs` | Tabs | 84.8-86.4 | + selection-lens morph (frame-validated); residual = frost texture, worst iOS rows |
+| UINavigationBar | Toolbar UIID bar | Toolbar | 87.6-87.7 | residual = frost texture; still bottom-quartile |
+| UIAlertController (alert) | Dialog UIID card | Dialog | 97.0-97.1 | |
+| UIPickerView | `GenericSpinner` | Spinner | 91.5-91.8 | whole-row perspective; CN1 wheel wraps short models (native does not); dark off-row contrast tracked |
+| UIVisualEffectView / UIGlassEffect | GlassPanel UIID | GlassPanel{Grey,Red,Grad,Photo} | 96.1-98.6 | glass-blend isolation over 4 backdrops (see scope note above) |
+
+Isolation/ladder cases (not user-facing components): TabOne 95.6-96.1
+(geometry OFF: w 0.75 / h 0.54 -- see scope note), TabsGeom 93.0-93.5,
+GlassText/GlassIcon 98.6-98.7.
+
+Animated glass (validated per-frame at fixed progress, no native golden):
+TabsMorph (selection lens: travel, overshoot, lens size, tint timing),
+SwitchMorph (droplet stretch/squash).
+
+### Missing components (to reach a complete theme)
+
+| Native control | Suggested CN1 building block | Status |
+|---|---|---|
+| UISegmentedControl | ButtonGroup / Tabs pill variant | `ToggleButton` themed (capsule track); not in the fidelity suite |
+| UIStepper | Stepper composite (2 glass buttons) | not started |
+| UISearchBar / searchable nav | Toolbar search mode | not started |
+| UIActivityIndicatorView | InfiniteProgress | not started (UIID exists, untested) |
+| UIPageControl | Tabs page indicator | not started |
+| UIDatePicker (wheels) | Picker (date/time spinner) | partially themed (DateSpinner UIIDs), not in suite |
+| UIDatePicker (calendar) | Calendar | not started |
+| UIMenu / context menu | ActionSheet / Command menu | not started |
+| Action sheet (bottom) | Sheet / ActionSheet | not started |
+| Bottom sheet (detents) | Sheet | not started |
+| UITableView cell chrome | MultiButton / list rows | not started |
+| Toast / HUD | ToastBar | not started |
+| Pull-to-refresh spinner | pull-to-refresh (themed) | not started |
+| Large-title navigation bar | Toolbar large-title mode | not started |
+| Tab bar badge | Tabs badge | not started |
+| UISlider liquid thumb morph | Slider droplet (reuse SwitchThumbDroplet) | planned (task tracked) |
+
+### Known visual gaps (tracked, honest list)
+
+- iOS `Tabs`/`Toolbar` frost texture: the two worst iOS families; theme knobs
+  are at measured optima and two material-level tweaks (saturation, edge
+  feather) measured flat -- closing this requires a closer reproduction of the
+  native Liquid Glass material in the Metal patch, not tuning.
+- `TabOne` geometry (w 0.75 / h 0.54 vs native) despite its high overlay score.
+- iOS `Spinner` dark: off-row text contrast is low (uniform ~0.32 fade matches
+  the native tone but the dark-sheet contrast is tracked for another pass).
+- Android `ProgressBar`: ~1.5x native track height (geometry-tracked).
+- Android disabled dark `Button`: lower contrast than native.
+- Android FAB/switch small geometry deltas (geometry-tracked).
+
+### Feature-level gaps
+
+- Live glass while scrolling: composed-patch cache recomposes per frame when
+  the backdrop moves (policy documented in `Component.internalPaintImpl` and
+  the METALView glass patch cache); a pure-GPU two-pass material (like the
+  selection lens shader) is the tracked follow-up.
+- Tab icons: CN1 renders Apple SF Symbols on iOS (`FontImage.createSFOrMaterial`);
+  a handful of glyphs still differ from the exact native weights.
+- RTL mirroring of the glass morphs is untested.
+
 ## UIIDs the framework assigns
 
 `ToggleButton` shipped unstyled for as long as both themes existed: the UIID is

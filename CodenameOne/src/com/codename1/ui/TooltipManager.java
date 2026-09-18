@@ -85,6 +85,14 @@ public class TooltipManager {
         currentComponent = null;
     }
 
+    void clearTooltipFor(Component removed) {
+        // The manager is shared across windows: unrelated removals must not
+        // cancel the current anchor's timer or visible tooltip.
+        if (HoverTracker.isInSubtree(removed, currentComponent)) {
+            clearTooltip();
+        }
+    }
+
     /// Gets ready to show the tooltip, this method implements the delay
     /// before the actual showing of the tooltip. It's invoked internally
     /// by the framework

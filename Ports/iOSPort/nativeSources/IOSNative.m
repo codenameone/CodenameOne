@@ -13538,6 +13538,37 @@ void com_codename1_impl_ios_IOSNative_registerBundledFont___java_lang_String(CN1
     POOL_END();
 }
 
+#if TARGET_OS_OSX
+static NSFont *cn1MacSystemFontForAlias(NSString *name, CGFloat size) {
+    BOOL italic = [name hasPrefix:@"native:Italic"];
+    NSString *weightName;
+    if (italic) {
+        weightName = [name substringFromIndex:[@"native:Italic" length]];
+    } else if ([name hasPrefix:@"native:Main"]) {
+        weightName = [name substringFromIndex:[@"native:Main" length]];
+    } else {
+        return nil;
+    }
+    CGFloat weight;
+    if ([weightName isEqualToString:@"Thin"]) {
+        weight = NSFontWeightThin;
+    } else if ([weightName isEqualToString:@"Light"]) {
+        weight = NSFontWeightLight;
+    } else if ([weightName isEqualToString:@"Regular"]) {
+        weight = NSFontWeightRegular;
+    } else if ([weightName isEqualToString:@"Bold"]) {
+        weight = NSFontWeightBold;
+    } else if ([weightName isEqualToString:@"Black"]) {
+        weight = NSFontWeightBlack;
+    } else {
+        return nil;
+    }
+    NSFont *font = [NSFont systemFontOfSize:size weight:weight];
+    return italic ? [[NSFontManager sharedFontManager] convertFont:font
+                     toHaveTrait:NSItalicFontMask] : font;
+}
+#endif
+
 JAVA_LONG com_codename1_impl_ios_IOSNative_createTruetypeFont___java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT name) {
     int pSize = 14;
 
@@ -13545,8 +13576,13 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_createTruetypeFont___java_lang_String
     POOL_BEGIN();
     NSString* str = toNSString(CN1_THREAD_STATE_PASS_ARG name);
 
-    CN1Font* fnt;
-    if(isIOS8_2() && [str hasPrefix:@"HelveticaNeue"]) {
+    CN1Font* fnt = nil;
+#if TARGET_OS_OSX
+    // Native Mac aliases use AppKit weights, including regular and italic.
+    // Explicit font names continue through the existing shared loader.
+    fnt = cn1MacSystemFontForAlias(str, pSize);
+#endif
+    if(fnt == nil && isIOS8_2() && [str hasPrefix:@"HelveticaNeue"]) {
         if([str isEqualToString:@"HelveticaNeue-UltraLight"]) {
             fnt = [CN1Font systemFontOfSize:pSize weight:UIFontWeightUltraLight];
         } else {
@@ -13569,7 +13605,7 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_createTruetypeFont___java_lang_String
                 }
             }
         }
-    } else {
+    } else if (fnt == nil) {
         fnt = [CN1Font fontWithName:str size:pSize];
     }
 

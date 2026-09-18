@@ -166,6 +166,9 @@
             <fileset dir="../../Themes">
                 <include name="iOSModernTheme.res"/>
                 <include name="AndroidMaterialTheme.res"/>
+                <include name="GnomeAdwaitaTheme.res"/>
+                <include name="WindowsFluentTheme.res"/>
+                <include name="MacOSAquaTheme.res"/>
                 <include name="iPhoneTheme.res"/>
                 <include name="androidTheme.res"/>
                 <include name="android_holo_light.res"/>
@@ -175,6 +178,9 @@
             <fileset dir="../../Themes">
                 <include name="iOSModernTheme.res"/>
                 <include name="AndroidMaterialTheme.res"/>
+                <include name="GnomeAdwaitaTheme.res"/>
+                <include name="WindowsFluentTheme.res"/>
+                <include name="MacOSAquaTheme.res"/>
                 <include name="iPhoneTheme.res"/>
                 <include name="androidTheme.res"/>
                 <include name="android_holo_light.res"/>

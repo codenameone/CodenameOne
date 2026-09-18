@@ -16,6 +16,9 @@
 #   cn1_uiid        CN1 UIID to apply to the CN1 render (defaults to id).
 #   native          iOS native widget key (see NativeWidgetFactoryImpl .m switch).
 #   native_android  Android native widget key (see NativeWidgetFactoryImpl.java).
+#   native_win      Windows native widget key (WinUI 3; windows-native-ref/Program.cs).
+#   native_mac      macOS native widget key (AppKit; macos-native-ref/NativeRef.swift).
+#   native_gnome    GNOME native widget key (GTK4 + libadwaita; gnome-native-ref/native-ref.c).
 #   text            label text for widgets that show text.
 #   backdrop        tile background behind the widget (iOS only): a 6-hex colour
 #                   (e.g. 808080) = solid fill; "gradient" = vertical blue->green
@@ -47,13 +50,27 @@
 #                   Frames have no native golden: they are regression-compared
 #                   against committed CN1 frame goldens (goldens/<platform>-frames)
 #                   and property-validated against the motion model on the host.
-#   platforms       comma-separated allow-list (ios, android). Omit = both.
-#   tile_width_mm   per-component width override (logical mm).
-#   tile_height_mm  per-component height override (logical mm).
+#   platforms       comma-separated allow-list (ios, android, windows, macos, gnome).
+#                   Omit = every platform for which the row declares a native key. A row
+#                   with no key for a platform never runs there, so the mobile rows below
+#                   are excluded from the desktop ones by construction rather than by
+#                   listing.
+#   tile_width_mm   per-component width override (logical mm), MOBILE.
+#   tile_height_mm  per-component height override (logical mm), MOBILE.
+#   tile_width_px   per-component width override (logical px), DESKTOP.
+#   tile_height_px  per-component height override (logical px), DESKTOP.
+#
+# Millimetres are right on a phone, where physical size is the design unit and a control
+# has to occupy the same amount of thumb on every device. Desktop toolkits are specified
+# the other way round -- WinUI in effective pixels at 96dpi, GTK in logical pixels, AppKit
+# in points -- so a desktop tile sized in mm describes a control no desktop toolkit would
+# ever draw. The two units coexist; each row uses the one for its platform.
 
 defaults:
   tile_width_mm: 60
   tile_height_mm: 14
+  tile_width_px: 240
+  tile_height_px: 56
   bg: ffffff
   appearances: light,dark
 
@@ -302,3 +319,89 @@ components:
     tile_width_mm: 60
     tile_height_mm: 14
     states: normal
+
+  # --- Desktop ---------------------------------------------------------------
+  # Windows 11 Fluent (WinUI 3), macOS (AppKit) and GNOME (GTK4 + libadwaita).
+  #
+  # These rows carry desktop native keys only, so appliesToPlatform excludes them from iOS
+  # and Android, and excludes every mobile row above from the desktop platforms, without
+  # either side needing a platforms: list.
+  #
+  # HOVER is the state mobile never had. It is most of what distinguishes a desktop design
+  # language, and Codename One had no hover style at all until one was added for this work.
+  # FOCUS is listed separately from selected because a desktop control can be focused
+  # without being selected, which is the distinction a keyboard user navigates by.
+  #
+  # Text fields deliberately have no focused state here: a focused field blinks a caret, and
+  # a blinking caret cannot be captured deterministically. Suppressing the caret to get a
+  # stable frame would make the reference a lie about what a focused field looks like, so
+  # the state is left out until it can be captured honestly.
+
+  - id: DesktopButton
+    cn1_uiid: Button
+    native_win: winui_button
+    native_mac: appkit_push_button
+    native_gnome: adw_button
+    text: Button
+    states: normal,hover,pressed,disabled
+
+  - id: DesktopAccentButton
+    cn1_uiid: RaisedButton
+    native_win: winui_button_accent
+    native_mac: appkit_push_button_default
+    native_gnome: adw_button_suggested
+    text: Button
+    states: normal,hover,pressed,disabled
+
+  - id: DesktopTextField
+    cn1_uiid: TextField
+    native_win: winui_textbox
+    native_mac: appkit_textfield
+    native_gnome: gtk_entry
+    text: Text
+    states: normal,hover,disabled
+
+  - id: DesktopCheckBox
+    cn1_uiid: CheckBox
+    native_win: winui_checkbox
+    native_mac: appkit_checkbox
+    native_gnome: gtk_check_button
+    text: Check
+    states: normal,selected,hover,disabled
+
+  - id: DesktopRadioButton
+    cn1_uiid: RadioButton
+    native_win: winui_radiobutton
+    native_mac: appkit_radio
+    native_gnome: gtk_radio_button
+    text: Radio
+    states: normal,selected,hover,disabled
+
+  - id: DesktopSwitch
+    cn1_uiid: Switch
+    native_win: winui_toggleswitch
+    native_mac: appkit_switch
+    native_gnome: gtk_switch
+    states: normal,selected,hover,disabled
+
+  - id: DesktopSlider
+    cn1_uiid: Slider
+    native_win: winui_slider
+    native_mac: appkit_slider
+    native_gnome: gtk_scale
+    states: normal,hover,disabled
+
+  - id: DesktopProgressBar
+    cn1_uiid: ProgressBar
+    native_win: winui_progressbar
+    native_mac: appkit_progress
+    native_gnome: gtk_progressbar
+    states: normal
+
+  - id: DesktopComboBox
+    cn1_uiid: ComboBox
+    native_win: winui_combobox
+    native_mac: appkit_popupbutton
+    native_gnome: gtk_dropdown
+    text: Option
+    states: normal,hover,disabled

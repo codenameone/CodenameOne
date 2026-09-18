@@ -2213,7 +2213,14 @@ public class IPhoneBuilder extends Executor {
                     request.getArg("cn1.nativeTheme", null));
             if ("legacy".equalsIgnoreCase(sharedMode)) {
                 iosMode = "ios7";
-            } else if ("modern".equalsIgnoreCase(sharedMode)) {
+            } else if ("modern".equalsIgnoreCase(sharedMode)
+                    || "native".equalsIgnoreCase(sharedMode)) {
+                // "native" is "modern plus the desktop". The desktop half is the
+                // JavaSE port's to resolve; iOS's own answer to "the platform's own
+                // look" is the same theme either way. Without this arm it fell to the
+                // else below and iOS got "auto", which installNativeTheme() resolves
+                // to the FLAT iOS 7 theme -- the exact opposite of what was asked for,
+                // and silently, because an unrecognised mode is not an error here.
                 iosMode = "modern";
             } else {
                 iosMode = "auto";

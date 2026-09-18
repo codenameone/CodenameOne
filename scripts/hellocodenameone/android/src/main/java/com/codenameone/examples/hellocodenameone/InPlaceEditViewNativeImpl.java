@@ -1,3 +1,25 @@
+/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
 package com.codenameone.examples.hellocodenameone;
 
 import com.codename1.ui.Display;
@@ -33,30 +55,18 @@ public class InPlaceEditViewNativeImpl {
                     try {
                         for (int i = 0; i < 50; i++) {
                             // Start editing
-                            Display.getInstance().callSeriallyAndWait(() -> {
-                                try {
-                                    InPlaceEditView.edit(androidImpl, ta, ta.getConstraint());
-                                } catch (Exception e) {
-                                    e.printStackTrace();
-                                }
-                            });
+                            callOnEdtAndWait(() -> InPlaceEditView.edit(androidImpl, ta, ta.getConstraint()));
 
                             // Schedule reLayoutEdit calls
                             for (int j = 0; j < 5; j++) {
-                                try {
-                                    InPlaceEditView.reLayoutEdit();
-                                    Thread.sleep(10);
-                                } catch (Exception ex) {}
+                                callOnEdtAndWait(() -> InPlaceEditView.reLayoutEdit());
+                                Thread.sleep(10);
                             }
 
-                            // Stop editing
-                            Display.getInstance().callSeriallyAndWait(() -> {
-                                try {
-                                    InPlaceEditView.stopEdit();
-                                } catch (Exception e) {
-                                    e.printStackTrace();
-                                }
-                            });
+                            // stopEdit removes Android views and requires Android's UI thread,
+                            // not the CN1 EDT. The production wrapper performs that handoff
+                            // and waits for teardown while queued relayouts can still race it.
+                            callOnEdtAndWait(() -> AndroidImplementation.stopEditing());
                         }
                         Display.getInstance().callSerially(() -> InPlaceEditViewTest.onSuccess());
                     } catch (Throwable t) {
@@ -70,6 +80,23 @@ public class InPlaceEditViewNativeImpl {
                 Display.getInstance().callSerially(() -> InPlaceEditViewTest.onError(t.toString()));
             }
         });
+    }
+
+    private static void callOnEdtAndWait(Runnable action) throws Throwable {
+        final java.util.concurrent.atomic.AtomicReference<Throwable> failure =
+                new java.util.concurrent.atomic.AtomicReference<Throwable>();
+        Display.getInstance().callSeriallyAndWait(() -> {
+            try {
+                action.run();
+            } catch (Throwable t) {
+                failure.set(t);
+            }
+        });
+        // callSeriallyAndWait does not propagate EDT exceptions to the worker.
+        // Forward them so a failed iteration cannot become a successful test.
+        if (failure.get() != null) {
+            throw failure.get();
+        }
     }
 
     public boolean isSupported() {

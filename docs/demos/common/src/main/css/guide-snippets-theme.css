@@ -834,3 +834,9 @@ Separator {
     border: none;
 }
 /* end::psd-theme[] */
+
+/* tag::native-themes-css-hover[] */
+Button.hover {
+    background-color: #f6f6f6;
+}
+/* end::native-themes-css-hover[] */

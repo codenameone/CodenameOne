@@ -34,6 +34,8 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.OutputStream;
+import java.util.Properties;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 
@@ -63,8 +65,25 @@ public class GenerateDesktopAppWrapperMojo extends AbstractCN1Mojo {
     @Override
     protected void executeImpl() throws MojoExecutionException, MojoFailureException {
         generateIcons();
+        generateThemeConfiguration();
         generateStub();
         registerCustomStubSourceRoot();
+    }
+
+    // Written even when a custom/archetype stub suppresses source generation. Packaged apps
+    // have no source settings file; JavaSEPort reads this beside the bundled NativeTheme.res.
+    void generateThemeConfiguration() throws MojoExecutionException {
+        Properties theme = new Properties();
+        theme.setProperty("desktop.themeMode", arg("desktop.themeMode", sharedThemeModeDefault()));
+        File output = new File(project.getBuild().getOutputDirectory(), "codenameone-desktop.properties");
+        try {
+            Files.createDirectories(output.toPath().getParent());
+            try (OutputStream stream = Files.newOutputStream(output.toPath())) {
+                theme.store(stream, "Packaged desktop theme selection");
+            }
+        } catch (IOException ex) {
+            throw new MojoExecutionException("Failed to write desktop theme configuration", ex);
+        }
     }
 
     private void generateIcons() throws MojoExecutionException {
@@ -196,6 +215,23 @@ public class GenerateDesktopAppWrapperMojo extends AbstractCN1Mojo {
         }
         getLog().warn("Invalid desktop.titleBar build hint: '" + value + "'. Using 'native'.");
         return "native";
+    }
+
+    /// What `desktop.themeMode` resolves to when the project does not set it.
+    ///
+    /// The cross-platform `nativeTheme` hint selects the mobile themes, and only its
+    /// `native` value also asks for the desktop one -- `modern` deliberately does not,
+    /// because it shipped years before the desktop themes existed and an application
+    /// that set it for its phone builds never asked for its desktop screens to move.
+    /// Every other value, and no value at all, leaves the desktop on what it has always
+    /// had.
+    ///
+    /// Resolved here rather than at runtime because this file IS the packaged answer:
+    /// a packaged desktop app has no codenameone_settings.properties to read the shared
+    /// hint back out of.
+    private String sharedThemeModeDefault() {
+        String shared = arg("nativeTheme", arg("cn1.nativeTheme", null));
+        return "native".equalsIgnoreCase(shared) ? "native" : "legacy";
     }
 
     private String arg(String name, String defaultValue) {

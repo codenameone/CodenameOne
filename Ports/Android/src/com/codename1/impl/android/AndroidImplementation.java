@@ -5977,7 +5977,12 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             if (mode == null) {
                 String shared = d.getProperty("nativeTheme",
                         d.getProperty("cn1.nativeTheme", null));
-                if ("modern".equalsIgnoreCase(shared)) {
+                // "native" is "modern plus the desktop": the desktop half belongs to
+                // the JavaSE port, and Android's own answer to "the platform's own
+                // look" is Material either way. Without it the value fell through to
+                // the hololight default below, so asking for the native look got the
+                // legacy one.
+                if ("modern".equalsIgnoreCase(shared) || "native".equalsIgnoreCase(shared)) {
                     mode = "material";
                 } else if ("legacy".equalsIgnoreCase(shared)) {
                     mode = "hololight";

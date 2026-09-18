@@ -601,6 +601,10 @@ public class MacOSBuildHintsTest {
     @Test
     public void theNativeThemeDefaultsToModernAndIsConstrainedToKnownModes() {
         assertEquals("modern", parse(raw(), "p").getThemeMode());
+        // aqua and native have to survive the whitelist or the hint cannot select the
+        // theme it names.
+        assertEquals("aqua", parse(raw("macos.themeMode", "aqua"), "p").getThemeMode());
+        assertEquals("native", parse(raw("macos.themeMode", "native"), "p").getThemeMode());
         assertEquals("ios7", parse(raw("macos.themeMode", "ios7"), "p").getThemeMode());
         assertEquals("ios7", parse(raw("macNative.themeMode", "ios7"), "p").getThemeMode());
 
@@ -609,6 +613,11 @@ public class MacOSBuildHintsTest {
         assertEquals("ios7", parse(raw("nativeTheme", "legacy"), "p").getThemeMode());
         assertEquals("modern", parse(raw("nativeTheme", "modern"), "p").getThemeMode());
         assertEquals("ios7", parse(raw("cn1.nativeTheme", "legacy"), "p").getThemeMode());
+        // "native" means the platform's own look on every OS. On macOS that is Aqua,
+        // and it reaches MacImplementation.nativeThemeResourceName() only if the
+        // whitelist above lets it through unchanged.
+        assertEquals("native", parse(raw("nativeTheme", "native"), "p").getThemeMode());
+        assertEquals("native", parse(raw("cn1.nativeTheme", "native"), "p").getThemeMode());
 
         // The value is interpolated into generated Java source, so it is
         // constrained to what the runtime understands rather than passed

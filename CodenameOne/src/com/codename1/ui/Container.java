@@ -548,6 +548,7 @@ public class Container extends Component implements Iterable<Component> {
         if (lead == leadComponent) { //NOPMD CompareObjectsWithEquals
             return;
         }
+        HoverTracker tracker = HoverTracker.prepareLeadChange(this);
         leadComponent = lead;
         if (lead == null) {
             // clear the lead component from the hierarchy
@@ -564,6 +565,9 @@ public class Container extends Component implements Iterable<Component> {
             if (isInitialized()) {
                 initLead();
             }
+        }
+        if (tracker != null) {
+            tracker.finishLeadChange(this);
         }
     }
 
@@ -1464,6 +1468,11 @@ public class Container extends Component implements Iterable<Component> {
             Component c = getComponentAt(i);
             c.cancelRepaints();
         }
+    }
+
+    // Only top-level containers own pointer hover tracking.
+    HoverTracker getHoverTracker() {
+        return null;
     }
 
     /// Cleansup the initialization flags in the hierachy

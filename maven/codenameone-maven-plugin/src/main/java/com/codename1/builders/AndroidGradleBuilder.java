@@ -91,8 +91,24 @@ public class AndroidGradleBuilder extends Executor {
     private static final String DESUGAR_JDK_LIBS_VERSION = "2.1.5";
     private static final String GRADLE_8_DISTRIBUTION_URL =
             "https://services.gradle.org/distributions/gradle-" + GRADLE_8_VERSION + "-bin.zip";
-    private static final int GRADLE_DOWNLOAD_ATTEMPTS = 3;
-    private static final long GRADLE_DOWNLOAD_RETRY_DELAY_MS = 2000L;
+    // Four attempts with a GROWING wait -- 10s, 40s, 160s -- rather than three a couple
+    // of seconds apart.
+    //
+    // The distribution is served by GitHub releases, and what fails there is an outage
+    // with a duration, not a blip: an Android job died on three HTTP 500s inside six
+    // seconds, then the same URL served a range request perfectly a few minutes later.
+    // Three closely spaced attempts all land inside the same outage window, so they cost
+    // the runner six seconds and buy nothing -- and then a sixteen-minute job is thrown
+    // away over a transient upstream error. This is the lesson scripts/ci/retry.sh
+    // already records for Maven Central 403s, applied to the other download this build
+    // cannot proceed without.
+    //
+    // The worst case adds about three and a half minutes before the build gives up,
+    // which is cheap next to the job it saves and next to a developer re-running it.
+    private static final int GRADLE_DOWNLOAD_ATTEMPTS = 4;
+    private static final long GRADLE_DOWNLOAD_RETRY_DELAY_MS = 10000L;
+    private static final long GRADLE_DOWNLOAD_RETRY_DELAY_FACTOR = 4L;
+    private static final long GRADLE_DOWNLOAD_MAX_RETRY_DELAY_MS = 180000L;
     private static final int GRADLE_DOWNLOAD_CONNECT_TIMEOUT_MS = 30000;
     private static final int GRADLE_DOWNLOAD_READ_TIMEOUT_MS = 300000;
 
@@ -10216,6 +10232,7 @@ public class AndroidGradleBuilder extends Executor {
     private void downloadGradleDistribution(File gradleZip) throws BuildException {
         File partialGradleZip = new File(gradleZip.getAbsolutePath() + ".part");
         Exception lastFailure = null;
+        long retryDelayMs = GRADLE_DOWNLOAD_RETRY_DELAY_MS;
         for (int attempt = 1; attempt <= GRADLE_DOWNLOAD_ATTEMPTS; attempt++) {
             if (partialGradleZip.exists() && !partialGradleZip.delete()) {
                 throw new BuildException("Failed to remove partial gradle distribution at " + partialGradleZip);
@@ -10239,13 +10256,16 @@ public class AndroidGradleBuilder extends Executor {
                     gradleZip.deleteOnExit();
                 }
                 if (attempt < GRADLE_DOWNLOAD_ATTEMPTS) {
-                    log("Gradle distribution download failed: " + ex.getMessage() + ". Retrying...");
+                    log("Gradle distribution download failed: " + ex.getMessage()
+                            + ". Retrying in " + (retryDelayMs / 1000L) + "s...");
                     try {
-                        Thread.sleep(GRADLE_DOWNLOAD_RETRY_DELAY_MS * attempt);
+                        Thread.sleep(retryDelayMs);
                     } catch (InterruptedException interrupted) {
                         Thread.currentThread().interrupt();
                         throw new BuildException("Interrupted while retrying gradle distribution download", interrupted);
                     }
+                    retryDelayMs = Math.min(retryDelayMs * GRADLE_DOWNLOAD_RETRY_DELAY_FACTOR,
+                            GRADLE_DOWNLOAD_MAX_RETRY_DELAY_MS);
                 }
             }
         }

@@ -1,5 +1,24 @@
 /*
  * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
  */
 package com.codename1.ui.css;
 
@@ -19,6 +38,7 @@ import java.util.Hashtable;
 /// - `UIID:selected`
 /// - `UIID:pressed`
 /// - `UIID:disabled`
+/// - `UIID:hover`
 /// - `*` (mapped to `Component`)
 /// - `:root` (for constants only)
 ///
@@ -63,8 +83,100 @@ public class CSSThemeCompiler {
         for (Rule rule : rules) {
             applyRule(theme, resources, rule);
         }
+        inheritHoverDerivations(theme);
         resolveThemeConstantVars(theme);
         resources.setTheme(themeName, theme);
+    }
+
+    private void inheritHoverDerivations(Hashtable theme) {
+        ArrayList<String> ids = new ArrayList<String>();
+        for (Object keyObj : theme.keySet()) {
+            String key = String.valueOf(keyObj);
+            int dot = key.indexOf('.');
+            if (key.startsWith("@") || dot < 0) {
+                continue;
+            }
+            String id = key.substring(0, dot);
+            if (id.startsWith("$Dark")) {
+                id = id.substring(5);
+            }
+            if (!ids.contains(id)) {
+                ids.add(id);
+            }
+        }
+        // Prefixed style lookup does not follow the normal derive key. Materialize
+        // only hover derivations whose base actually declares that state.
+        for (int appearance = 0; appearance < 2; appearance++) {
+            boolean dark = appearance == 1;
+            String prefix = dark ? "$Dark" : "";
+            // Each pass can expose another link in a derive chain; this is a
+            // convergence bound, not an iteration over individual component IDs.
+            int remainingPasses = ids.size();
+            while (remainingPasses-- > 0) {
+                boolean changed = false;
+                for (String id : ids) {
+                    String base = hoverBase(theme, id, dark);
+                    String key = prefix + id + ".hover#derive";
+                    if (base == null || theme.containsKey(key) || cyclicDerivation(theme, id, dark)) {
+                        continue;
+                    }
+                    boolean baseHasHover = hasHoverDefinition(theme, prefix + base);
+                    if (dark && theme.containsKey("$Dark" + id + ".derive")) {
+                        baseHasHover |= hasHoverDefinition(theme, base);
+                    }
+                    if (baseHasHover) {
+                        if (dark) {
+                            // An explicit dark derive bypasses UIManager's light-style
+                            // fallback, so retain the child's own light hover overrides.
+                            ArrayList<Object> keys = new ArrayList<Object>(theme.keySet());
+                            String lightPrefix = id + ".hover#";
+                            for (Object property : keys) {
+                                String lightKey = String.valueOf(property);
+                                if (lightKey.startsWith(lightPrefix) && !lightKey.endsWith("#derive")
+                                        && !theme.containsKey("$Dark" + lightKey)) {
+                                    theme.put("$Dark" + lightKey, theme.get(property));
+                                }
+                            }
+                        }
+                        theme.put(key, base + ".hover");
+                        changed = true;
+                    }
+                }
+                if (!changed) {
+                    break;
+                }
+            }
+        }
+    }
+
+    private String hoverBase(Hashtable theme, String id, boolean dark) {
+        Object base = dark ? theme.get("$Dark" + id + ".derive") : null;
+        if (base == null) {
+            base = theme.get(id + ".derive");
+        }
+        return base instanceof String ? (String) base : null;
+    }
+
+    private boolean cyclicDerivation(Hashtable theme, String id, boolean dark) {
+        ArrayList<String> seen = new ArrayList<String>();
+        while (id != null) {
+            if (seen.contains(id)) {
+                return true;
+            }
+            seen.add(id);
+            id = hoverBase(theme, id, dark);
+        }
+        return false;
+    }
+
+    private boolean hasHoverDefinition(Hashtable theme, String id) {
+        String prefix = id + ".hover#";
+        for (Object key : theme.keySet()) {
+            if (String.valueOf(key).startsWith(prefix)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private void resolveThemeConstantVars(Hashtable theme) {
@@ -332,6 +444,13 @@ public class CSSThemeCompiler {
         }
         if ("disabled".equals(pseudo)) {
             return "dis#";
+        }
+        // The desktop state. This runtime compiler is a separate implementation from the
+        // build-time one in maven/css-compiler and shares none of its code, so a sheet using
+        // .hover compiled at run time -- CSS live reload, a theme built by an application --
+        // threw "Unsupported pseudo state" until it was taught the same prefix.
+        if ("hover".equals(pseudo)) {
+            return "hover#";
         }
         throw new CSSSyntaxException("Unsupported pseudo state: " + pseudo);
     }

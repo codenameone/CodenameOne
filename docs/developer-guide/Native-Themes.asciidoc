@@ -53,6 +53,79 @@ legacy alias `cn1.nativeTheme` is still honored for back-compat.
 The legacy `and.hololight=true` hint still works and maps to
 `and.themeMode=hololight`.
 
+=== Desktop themes
+
+Windows, macOS and GNOME have their own native themes, selected with
+`desktop.themeMode` on the JavaSE desktop build and with
+`macos.themeMode` on the native macOS port.
+
+[cols="1,2,3", options="header"]
+|===
+|Hint |Values |Description
+
+|`desktop.themeMode`
+|`legacy` (default) +
+`auto` / `native` +
+`fluent` / `aqua` / `adwaita` +
+`custom`
+|Unset is `legacy`: an existing desktop project keeps the theme it has
+always loaded, so upgrading the framework doesn't restyle an application
+nobody asked to restyle. `auto` and `native` opt in and both mean
+"whatever this machine is" -- Windows 11 Fluent, macOS Aqua or GNOME
+Adwaita -- which is the only sensible reading on desktop, where one binary
+runs on all three. Naming a theme outright is what a build that wants one
+look everywhere asks for. `custom` installs no framework theme so your own
+`theme.css` is the only one.
+
+|`macos.themeMode`
+|`modern` (default) +
+`aqua` / `native` +
+`liquid` +
+`ios7` / `flat`
+|The native macOS port. `aqua` selects the macOS theme; `modern` / `liquid`
+is the iOS Liquid Glass theme, which is what the port shipped before an Aqua
+theme existed and what it still installs unless asked otherwise. The default
+moves to `aqua` in the change that reseeds this port's screenshot baselines,
+which is kept separate from the one that introduces the theme.
+|===
+
+The three desktop themes are generated from `native-themes/windows-fluent`,
+`native-themes/macos-aqua` and `native-themes/gnome-adwaita`. They're
+separate files rather than one file with per-platform blocks, and they're
+held to the same surface by `DesktopNativeThemeParityTest`: the same UIIDs,
+the same `#Constants`, and a `$Dark` counterpart for everything that paints
+a color. That matters to you and not only to the themes -- an application
+retunes a parent theme by redeclaring `#Constants`, so one vocabulary means
+the same CSS retunes all three platforms rather than only the one it was
+written against.
+
+==== Hover
+
+Desktop themes carry a state mobile ones have no use for. A `.hover` rule
+styles a component while the pointer is over it:
+
+[source,css]
+----
+include::../demos/common/src/main/css/guide-snippets-theme.css[tag=native-themes-css-hover,indent=0]
+----
+
+It compiles to `hover#` entries the same way `.pressed` compiles to
+`press#`, and `Component.getHoverStyle()` returns `null` when the theme
+declares none -- so a component with no hover rule keeps its normal style
+rather than falling back to a blank one.
+
+Hover has no meaning on a touch device and isn't delivered there. On
+desktop it's driven by real pointer motion: the JavaSE, Windows and Linux
+ports all report motion with no button held, which is what
+`Form.pointerHover` resolves against.
+
+NOTE: macOS is the exception, and the reason belongs to AppKit rather than
+to Codename One. AppKit draws no rollover state for buttons, fields,
+sliders, switches or popup buttons, so the Aqua theme leaves hover equal to
+normal. The
+captured native reference says the same, and the fidelity gate holds it
+there.
+
 === Light and dark mode
 
 Both modern themes ship a dark variant via a

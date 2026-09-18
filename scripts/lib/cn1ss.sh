@@ -862,6 +862,37 @@ cn1ss_process_fidelity() {
     return $comment_rc
   fi
 
+  # An ABSENT baseline file cannot ratchet anything. FidelityGate reads a missing file as
+  # an empty map, so every pair is "new", its score is printed, and the run exits 0. That
+  # is the right behaviour for a set whose numbers have never been recorded -- an invented
+  # baseline is worse than none, because it is a contract measured on the wrong machine --
+  # but left silent it means a leg listed as gated stays green for good without ever
+  # gating a regression, which is indistinguishable from a leg that works.
+  #
+  # So say it out loud, and write the baseline this run WOULD record into the artifact
+  # directory, through FidelityGate's own writer so the file is committable verbatim.
+  # Seeding the set is then downloading that file into the baseline directory. Note the
+  # writer refuses to record a partial or broken run, so a seed only appears for a run
+  # that scored cleanly; the real gate below still runs and still fails on broken pairs.
+  if [ -n "${baseline_file:-}" ] && [ ! -f "$baseline_file" ]; then
+    local seed_file="$artifacts_dir/$(basename "$baseline_file")"
+    cn1ss_log "NOTICE: no baseline at $baseline_file -- this run MEASURES but does not GATE regressions."
+    if cn1ss_java_run "$CN1SS_FIDELITY_GATE_CLASS" "${gate_args[@]}" --update-baseline "$seed_file"; then
+      cn1ss_log "NOTICE: candidate baseline written to $seed_file -- commit it as $baseline_file to arm the ratchet."
+      if [ -n "${GITHUB_STEP_SUMMARY:-}" ]; then
+        {
+          echo "### $platform_title: no fidelity baseline yet"
+          echo
+          echo "There is no baseline at \`$baseline_file\`, so this leg scored every pair and"
+          echo "gated none of them. A candidate baseline measured by THIS runner is in the job"
+          echo "artifact as \`$(basename "$baseline_file")\`; commit it to arm the ratchet."
+        } >> "$GITHUB_STEP_SUMMARY"
+      fi
+    else
+      cn1ss_log "WARNING: no candidate baseline written -- the run did not score cleanly enough to record one."
+    fi
+  fi
+
   cn1ss_log "STAGE:FIDELITY_GATE -> Enforcing the fidelity ratchet against the baseline"
   if cn1ss_java_run "$CN1SS_FIDELITY_GATE_CLASS" "${gate_args[@]}"; then
     cn1ss_log "Fidelity gate passed."

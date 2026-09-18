@@ -69,3 +69,16 @@ Start with none, and add one only when a test is shown to be nondeterministic
 between two runs of the same binary. "AppKit rasterizes text differently from
 Catalyst" is deterministic and permanent: the answer is this baseline, which is
 what this directory is for.
+
+## Window layout progress references
+
+The three `Window-Layout-*.png` references come from
+[run 35169743013](https://github.com/codenameone/CodenameOne/actions/runs/35169743013)
+at `e1a67fc944`. This fixture uses a generic `Slider`, whose rounded rectangle
+border retains its legacy height and painting. The thin native capsule remains
+available through the `ProgressBar` styles; treating every border as a capsule
+would discard application border geometry.
+
+All 157 other captures matched. In these three images, every changed pixel is
+inside the progress strip at rows 193 through 208; text, surrounding layout, and
+window dimensions are unchanged. No tolerance was changed.

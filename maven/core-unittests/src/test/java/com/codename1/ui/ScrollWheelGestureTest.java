@@ -386,6 +386,50 @@ class ScrollWheelGestureTest extends UITestBase {
     }
 
     @FormTest
+    void aWheelRestartsScrollbarFadeWhileTheHoverBackgroundAnimates() {
+        class AnimatedPainter implements Painter, com.codename1.ui.animations.Animation {
+            int ticks;
+            public void paint(Graphics g, com.codename1.ui.geom.Rectangle rect) { }
+            public void paint(Graphics g) { }
+            public boolean animate() { ticks++; return true; }
+        }
+        boolean pureTouch = Display.getInstance().isPureTouch();
+        Form form = scrollingForm();
+        Container page = form.getContentPane();
+        boolean fading = page.getUIManager().getLookAndFeel().isFadeScrollBar();
+        try {
+            page.getUIManager().getLookAndFeel().setFadeScrollBar(true);
+            Display.getInstance().setPureTouch(true);
+            fadeOut(page);
+            assertEquals(0, page.getScrollOpacity());
+            assertFalse(form.hasAnimations());
+            AnimatedPainter painter = new AnimatedPainter();
+            com.codename1.ui.plaf.Style hover = new com.codename1.ui.plaf.Style(page.getUnselectedStyle());
+            hover.setBgPainter(painter);
+            page.setHoverStyle(hover);
+            page.setHovered(true);
+            assertFalse(page.internalRegisteredAnimated, "only the hover background starts registered");
+
+            wheelAt(page.getAbsoluteX() + page.getWidth() / 2,
+                    page.getAbsoluteY() + page.getHeight() / 2, 0, -px(30));
+            assertEquals(0xff, page.getScrollOpacity());
+            assertTrue(page.internalRegisteredAnimated, "wheel restoration must also register the fade");
+            for (int i = 0; i < 300; i++) {
+                form.repaintAnimations();
+            }
+            assertEquals(0, page.getScrollOpacity(), "the real animation loop must fade the restored scrollbar");
+            assertFalse(page.internalRegisteredAnimated);
+            assertTrue(painter.ticks > 0, "the background continues animating during the fade");
+            page.setHovered(false);
+            assertFalse(form.hasAnimations());
+        } finally {
+            page.setHovered(false);
+            page.getUIManager().getLookAndFeel().setFadeScrollBar(fading);
+            Display.getInstance().setPureTouch(pureTouch);
+        }
+    }
+
+    @FormTest
     void aListenerAboveTheComponentStillBeatsItsBuiltInHandling() {
         Form f = new Form("ancestor listener", new BorderLayout());
         final WheelHandlingComponent target = new WheelHandlingComponent();

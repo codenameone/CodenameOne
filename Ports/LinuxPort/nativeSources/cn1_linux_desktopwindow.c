@@ -304,10 +304,23 @@ static gboolean cn1DesktopOnButton(GtkWidget* widget, GdkEventButton* e, gpointe
     }
     if (e->type == GDK_BUTTON_PRESS) {
         cn1LinuxPushWindowEvent(w->windowId, CN1_EVENT_POINTER_PRESSED,
-                (int) e->x, (int) e->y, cn1DesktopButtonMask(e->button));
+                (int) e->x, (int) e->y, cn1DesktopButtonMask(e->button) | cn1LinuxPointerSourceFlag((GdkEvent*) e));
     } else if (e->type == GDK_BUTTON_RELEASE) {
         cn1LinuxPushWindowEvent(w->windowId, CN1_EVENT_POINTER_RELEASED,
-                (int) e->x, (int) e->y, cn1DesktopButtonMask(e->button));
+                (int) e->x, (int) e->y, cn1DesktopButtonMask(e->button) | cn1LinuxPointerSourceFlag((GdkEvent*) e));
+    }
+    return FALSE;
+}
+
+/* The pointer left a SECONDARY window: clear its hover. -1,-1 is the agreed "nothing is
+ * under the pointer" coordinate, the same one the main window and the Windows port use.
+ * GDK_NOTIFY_INFERIOR is the pointer moving onto a child, which has not left at all. */
+static gboolean cn1DesktopOnLeave(GtkWidget* widget, GdkEventCrossing* e, gpointer data) {
+    CN1LinuxWindow* w = (CN1LinuxWindow*) data;
+    (void) widget;
+    if (w != 0 && e->detail != GDK_NOTIFY_INFERIOR) {
+        cn1LinuxPushWindowEvent(w->windowId, CN1_EVENT_POINTER_HOVER, -1, -1,
+                cn1LinuxPointerSourceFlag((GdkEvent*) e));
     }
     return FALSE;
 }
@@ -328,7 +341,14 @@ static gboolean cn1DesktopOnMotion(GtkWidget* widget, GdkEventMotion* e, gpointe
     if (e->state & GDK_BUTTON3_MASK) { mask |= CN1_PE_MASK_SECONDARY; }
     if (mask != 0) {
         cn1LinuxPushWindowEvent(w->windowId, CN1_EVENT_POINTER_DRAGGED,
-                (int) e->x, (int) e->y, mask);
+                (int) e->x, (int) e->y, mask | cn1LinuxPointerSourceFlag((GdkEvent*) e));
+    } else {
+        /* Buttonless motion in a SECONDARY window is hover, dropped here for the same
+         * reason it was dropped in the main window: a mobile port has no use for it.
+         * windowPointerHover routes by window id, so a control in a secondary window
+         * reaches the hover state like any other. */
+        cn1LinuxPushWindowEvent(w->windowId, CN1_EVENT_POINTER_HOVER,
+                (int) e->x, (int) e->y, cn1LinuxPointerSourceFlag((GdkEvent*) e));
     }
     return FALSE;
 }
@@ -540,8 +560,7 @@ static gboolean cn1DesktopOnDelete(GtkWidget* widget, GdkEvent* e, gpointer data
  * the touch handler drives the pointer instead -- otherwise every contact
  * dispatches twice, once unflagged. Same rule the main window applies. */
 static int cn1DesktopIsTouchSource(GdkEvent* e) {
-    GdkDevice* dev = gdk_event_get_source_device(e);
-    return dev != NULL && gdk_device_get_source(dev) == GDK_SOURCE_TOUCHSCREEN;
+    return cn1LinuxPointerSourceFlag(e) == CN1_PE_TOUCH_FLAG;
 }
 
 /* Real touch sequences, mirroring the main window's cn1OnTouch with the window id
@@ -715,7 +734,7 @@ static void cn1DesktopCreateOnMain(void* arg) {
 
     gtk_widget_add_events(w->drawingArea,
             GDK_BUTTON_PRESS_MASK | GDK_BUTTON_RELEASE_MASK
-            | GDK_POINTER_MOTION_MASK | GDK_SCROLL_MASK
+            | GDK_POINTER_MOTION_MASK | GDK_LEAVE_NOTIFY_MASK | GDK_SCROLL_MASK
             | GDK_SMOOTH_SCROLL_MASK
             | GDK_TOUCHPAD_GESTURE_MASK | GDK_TOUCH_MASK);
 
@@ -727,6 +746,7 @@ static void cn1DesktopCreateOnMain(void* arg) {
     g_signal_connect(w->drawingArea, "button-press-event", G_CALLBACK(cn1DesktopOnButton), w);
     g_signal_connect(w->drawingArea, "button-release-event", G_CALLBACK(cn1DesktopOnButton), w);
     g_signal_connect(w->drawingArea, "motion-notify-event", G_CALLBACK(cn1DesktopOnMotion), w);
+    g_signal_connect(w->drawingArea, "leave-notify-event", G_CALLBACK(cn1DesktopOnLeave), w);
     g_signal_connect(w->drawingArea, "scroll-event", G_CALLBACK(cn1DesktopOnScroll), w);
     g_signal_connect(w->drawingArea, "touch-event", G_CALLBACK(cn1DesktopOnTouch), w);
     /* Touchpad gestures arrive through the generic "event" signal rather than one

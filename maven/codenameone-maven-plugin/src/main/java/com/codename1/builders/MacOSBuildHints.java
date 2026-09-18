@@ -726,8 +726,29 @@ public class MacOSBuildHints {
     public String getThemeMode() {
         String mode = hint(source, "themeMode", null);
         if (mode == null) {
+            // Aqua by default on macOS, which is where this target parts company with iOS.
+            // iOS keeps its legacy theme so applications already shipped, and their
+            // screenshot baselines, keep rendering as before; this port has no such
+            // history with an Aqua theme, and defaulting to "modern" put an iPhone design
+            // language on a desktop. The cross-platform `nativeTheme` hint is still
+            // honoured, with `legacy` mapping to ios7.
             String shared = source.get("nativeTheme", source.get("cn1.nativeTheme", null));
-            mode = "legacy".equalsIgnoreCase(shared) ? "ios7" : "modern";
+            if ("legacy".equalsIgnoreCase(shared)) {
+                mode = "ios7";
+            } else if (shared != null) {
+                // An explicit cross-platform request is honoured as written. Only the
+                // UNSET case changes to aqua: someone who asked for `nativeTheme=modern`
+                // asked for the modern iOS look and still gets it.
+                mode = shared;
+            } else {
+                // NOT aqua yet, and that is the same sequencing as the Windows and Linux
+                // poms: making Aqua the default restyles every screen and reseeds this
+                // port's committed screenshot baselines, which deserves its own review and
+                // wants doing once, after the theme reaches its fidelity target. Until
+                // then macos.themeMode=aqua selects it explicitly, which is what the
+                // whitelist above is for and what the review asked for.
+                mode = "modern";
+            }
         }
         // Interpolated into generated Java source, so it is constrained to the
         // vocabulary the runtime understands rather than passed through. A hint
@@ -738,11 +759,17 @@ public class MacOSBuildHints {
                 return THEME_MODES[iter];
             }
         }
+        // A value the whitelist rejects behaves as if the hint were unset.
         return "modern";
     }
 
     /// Every value IOSImplementation.installNativeTheme() acts on.
     private static final String[] THEME_MODES = {
+        // aqua / native select the macOS theme. Without them in this list the documented
+        // macos.themeMode=aqua was sanitized to "modern" and reached
+        // MacImplementation.nativeThemeResourceName() as a value it answers null for, so
+        // the Aqua theme could not be selected at all -- by a hint or by default.
+        "aqua", "native",
         "modern", "liquid", "material", "ios7", "flat", "auto",
     };
 

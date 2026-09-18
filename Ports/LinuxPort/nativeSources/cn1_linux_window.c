@@ -83,13 +83,16 @@ void cn1LinuxPushEvent(int type, int x, int y, int keyCode) {
  * Note the asymmetry with presses, which stay droppable: a release that arrives with
  * no press behind it finds no recorded target and is discarded harmlessly, so when
  * something has to go it must never be the release. */
-static int cn1LinuxIsProtectedEvent(int type) {
+/* Unlike hover motion, leave has no later motion outside the window to repair
+ * a dropped notification. Protect only the terminal sentinel, not the motion stream. */
+static int cn1LinuxIsProtectedEvent(int type, int x, int y) {
     return type == CN1_EVENT_WINDOW_SHOWN || type == CN1_EVENT_WINDOW_HIDDEN
             || type == CN1_EVENT_WINDOW_CLOSE
             || type == CN1_EVENT_KEY_RELEASED
             || type == CN1_EVENT_POINTER_RELEASED
             || type == CN1_EVENT_WINDOW_FOCUS
-            || type == CN1_EVENT_SIZE_CHANGED;
+            || type == CN1_EVENT_SIZE_CHANGED
+            || (type == CN1_EVENT_POINTER_HOVER && x == -1 && y == -1);
 }
 
 /* Visibility only. A close request is protected from eviction like any other
@@ -155,7 +158,8 @@ static void cn1LinuxRemoveAtLocked(int idx) {
 static int cn1LinuxEvictInputLocked(void) {
     int idx = cn1EventHead;
     while (idx != cn1EventTail) {
-        if (!cn1LinuxIsProtectedEvent(cn1EventRing[idx].type)) {
+        if (!cn1LinuxIsProtectedEvent(cn1EventRing[idx].type,
+                cn1EventRing[idx].x, cn1EventRing[idx].y)) {
             cn1LinuxRemoveAtLocked(idx);
             return 1;
         }
@@ -203,7 +207,9 @@ static int cn1LinuxEvictOldestTerminationLocked(void) {
     while (idx != cn1EventTail) {
         int t = cn1EventRing[idx].type;
         if (t == CN1_EVENT_KEY_RELEASED || t == CN1_EVENT_POINTER_RELEASED
-                || t == CN1_EVENT_WINDOW_FOCUS) {
+                || t == CN1_EVENT_WINDOW_FOCUS
+                || (t == CN1_EVENT_POINTER_HOVER && cn1EventRing[idx].x == -1
+                        && cn1EventRing[idx].y == -1)) {
             cn1LinuxRemoveAtLocked(idx);
             return 1;
         }
@@ -215,7 +221,7 @@ static int cn1LinuxEvictOldestTerminationLocked(void) {
 void cn1LinuxPushWindowEvent(int windowId, int type, int x, int y, int keyCode) {
     pthread_mutex_lock(&cn1EventLock);
     int next = (cn1EventTail + 1) % CN1_EVENT_RING;
-    if (next == cn1EventHead && cn1LinuxIsProtectedEvent(type)) {
+    if (next == cn1EventHead && cn1LinuxIsProtectedEvent(type, x, y)) {
         /* Full, and this one must not be the casualty. Supersede this window's own
          * queued transition if it has one, otherwise take the room from an input event,
          * and failing that from a transition that a later one already supersedes. Never
@@ -484,12 +490,31 @@ static int cn1LinuxStateMask(guint state) {
     return mask;
 }
 
+/* Hover and contact must retain the same physical source. GDK_SOURCE_CURSOR
+ * is a tablet puck, not a pen; pen and eraser retain their distinct pointer types. */
+int cn1LinuxPointerSourceFlag(GdkEvent* event) {
+    GdkDevice* device = gdk_event_get_source_device(event);
+    if (device == NULL) {
+        return 0;
+    }
+    GdkInputSource source = gdk_device_get_source(device);
+    if (source == GDK_SOURCE_TOUCHSCREEN) {
+        return CN1_PE_TOUCH_FLAG;
+    }
+    if (source == GDK_SOURCE_ERASER) {
+        return CN1_PE_ERASER_FLAG;
+    }
+    if (source == GDK_SOURCE_PEN) {
+        return CN1_PE_PEN_FLAG;
+    }
+    return 0;
+}
+
 /* True when an event originated from a touchscreen. GTK also synthesizes button
  * / motion events from touch for widgets that ignore touch, so we drop those
  * here and let cn1OnTouch drive the pointer instead (avoids double dispatch). */
 static int cn1LinuxIsTouchSource(GdkEvent* e) {
-    GdkDevice* dev = gdk_event_get_source_device(e);
-    return dev != NULL && gdk_device_get_source(dev) == GDK_SOURCE_TOUCHSCREEN;
+    return cn1LinuxPointerSourceFlag(e) == CN1_PE_TOUCH_FLAG;
 }
 
 static gboolean cn1OnButton(GtkWidget* widget, GdkEventButton* e, gpointer data) {
@@ -499,7 +524,7 @@ static gboolean cn1OnButton(GtkWidget* widget, GdkEventButton* e, gpointer data)
         return TRUE;
     }
     cn1LinuxPushEvent(e->type == GDK_BUTTON_PRESS ? CN1_EVENT_POINTER_PRESSED : CN1_EVENT_POINTER_RELEASED,
-            (int) e->x, (int) e->y, cn1LinuxButtonMask(e->button));
+            (int) e->x, (int) e->y, cn1LinuxButtonMask(e->button) | cn1LinuxPointerSourceFlag((GdkEvent*) e));
     return TRUE;
 }
 
@@ -511,7 +536,16 @@ static gboolean cn1OnMotion(GtkWidget* widget, GdkEventMotion* e, gpointer data)
     }
     int mask = cn1LinuxStateMask(e->state);
     if (mask != 0) {
-        cn1LinuxPushEvent(CN1_EVENT_POINTER_DRAGGED, (int) e->x, (int) e->y, mask);
+        cn1LinuxPushEvent(CN1_EVENT_POINTER_DRAGGED, (int) e->x, (int) e->y,
+                mask | cn1LinuxPointerSourceFlag((GdkEvent*) e));
+    } else {
+        /* No button held: this is hover, and it used to be dropped here.
+         * Component's hover style is driven by Form.pointerHover, which has
+         * nothing else to fire it, so every hover rule in a desktop theme was
+         * inert. Droppable rather than protected: a lost hover costs nothing
+         * because hover is idempotent and the next motion re-establishes it. */
+        cn1LinuxPushEvent(CN1_EVENT_POINTER_HOVER, (int) e->x, (int) e->y,
+                cn1LinuxPointerSourceFlag((GdkEvent*) e));
     }
     return TRUE;
 }
@@ -519,6 +553,26 @@ static gboolean cn1OnMotion(GtkWidget* widget, GdkEventMotion* e, gpointer data)
 /* The primary touch sequence currently driving the pointer (single-touch
  * model). Additional concurrent fingers are ignored until it ends. */
 static GdkEventSequence* cn1TouchSeq = NULL;
+
+/* The pointer left the drawing area: clear hover.
+ *
+ * Without this the cursor can move straight off the window and the last hovered control
+ * stays lit -- motion simply stops, and Form only clears its tracked hover when a
+ * DIFFERENT component is reported. -1,-1 is the agreed "nothing is under the pointer"
+ * coordinate, the same one the Windows port sends from WM_MOUSELEAVE; a real coordinate
+ * is never negative, so the two cannot be confused.
+ *
+ * GDK_NOTIFY_INFERIOR is ignored: that is the pointer moving onto a CHILD of the drawing
+ * area, which has not left the window at all, and treating it as a leave would blink the
+ * hover off and on again. */
+static gboolean cn1OnLeave(GtkWidget* widget, GdkEventCrossing* e, gpointer data) {
+    (void) widget;
+    (void) data;
+    if (e->detail != GDK_NOTIFY_INFERIOR) {
+        cn1LinuxPushEvent(CN1_EVENT_POINTER_HOVER, -1, -1, cn1LinuxPointerSourceFlag((GdkEvent*) e));
+    }
+    return FALSE;
+}
 
 static gboolean cn1OnTouch(GtkWidget* widget, GdkEventTouch* e, gpointer data) {
     (void) widget;
@@ -938,6 +992,10 @@ JAVA_VOID com_codename1_impl_linux_LinuxNative_initDisplay___java_lang_String_in
     cn1DrawingArea = gtk_drawing_area_new();
     gtk_widget_set_events(cn1DrawingArea,
             GDK_BUTTON_PRESS_MASK | GDK_BUTTON_RELEASE_MASK | GDK_POINTER_MOTION_MASK |
+            /* LEAVE_NOTIFY drives the hover clear (cn1OnLeave). A g_signal_connect for
+             * an event the mask does not select is never called, so the handler would
+             * have been dead code without this bit. */
+            GDK_LEAVE_NOTIFY_MASK |
             GDK_KEY_PRESS_MASK | GDK_KEY_RELEASE_MASK | GDK_SCROLL_MASK |
             GDK_SMOOTH_SCROLL_MASK | GDK_TOUCH_MASK |
             GDK_TOUCHPAD_GESTURE_MASK | GDK_STRUCTURE_MASK);
@@ -963,6 +1021,7 @@ JAVA_VOID com_codename1_impl_linux_LinuxNative_initDisplay___java_lang_String_in
     g_signal_connect(cn1DrawingArea, "button-press-event", G_CALLBACK(cn1OnButton), 0);
     g_signal_connect(cn1DrawingArea, "button-release-event", G_CALLBACK(cn1OnButton), 0);
     g_signal_connect(cn1DrawingArea, "motion-notify-event", G_CALLBACK(cn1OnMotion), 0);
+    g_signal_connect(cn1DrawingArea, "leave-notify-event", G_CALLBACK(cn1OnLeave), 0);
     g_signal_connect(cn1DrawingArea, "touch-event", G_CALLBACK(cn1OnTouch), 0);
     g_signal_connect(cn1DrawingArea, "event", G_CALLBACK(cn1OnGenericEvent), 0);
     g_signal_connect(cn1Window, "key-press-event", G_CALLBACK(cn1OnKey), 0);
@@ -1410,4 +1469,57 @@ JAVA_OBJECT com_codename1_impl_linux_LinuxNative_captureWindowToPngBytes___R_byt
     arr = cn1LinuxNewByteArray(threadStateData, data, len);
     free(data);
     return arr;
+}
+
+/* ------------------------------------------------------------- colour scheme */
+
+/* The desktop's colour scheme: 1 dark, 0 light, -1 unknown.
+ *
+ * Asked of the DESKTOP's setting, not of GTK's. The obvious-looking
+ * gtk-application-prefer-dark-theme is the wrong source: it expresses whether the
+ * application is ASKING for a dark GTK theme, and stays false unless the application sets
+ * it -- so reading it reported light on a GNOME desktop in dark mode, and every $Dark
+ * entry in the Adwaita theme stayed unreachable.
+ *
+ * org.gnome.desktop.interface color-scheme is what the user's toggle actually writes, and
+ * what the XDG appearance portal reports to sandboxed apps. Queried through GSettings
+ * rather than over D-Bus so there is no round trip and no portal dependency.
+ *
+ * The schema is looked up before it is opened. g_settings_new ABORTS the process when the
+ * schema is not installed, which is a real configuration on a minimal container or a
+ * non-GNOME desktop, and a theme query has no business killing the application.
+ *
+ * -1 is a real answer, not an error smuggled into the return: a session with no such
+ * schema has no preference to report, and calling that "light" would be a guess presented
+ * as a fact. The Java side maps it to null.
+ *
+ * The signature is ParparVM's and is checked by nothing at build time -- a wrong name
+ * compiles, links, and leaves the Java method looking unused to the dead-code pass,
+ * which then removes it. scripts/check-native-signatures.sh is what catches that.
+ */
+JAVA_INT com_codename1_impl_linux_LinuxNative_systemColorScheme___R_int(CODENAME_ONE_THREAD_STATE) {
+    GSettingsSchemaSource* source = g_settings_schema_source_get_default();
+    if (source == NULL) {
+        return -1;
+    }
+    GSettingsSchema* schema = g_settings_schema_source_lookup(source,
+            "org.gnome.desktop.interface", TRUE);
+    if (schema == NULL) {
+        return -1;
+    }
+    int result = -1;
+    /* has_key as well as the schema lookup: color-scheme arrived in GNOME 42, and the
+     * schema exists without it on older desktops. g_settings_get_string on a missing key
+     * aborts the same way a missing schema does. */
+    if (g_settings_schema_has_key(schema, "color-scheme")) {
+        GSettings* settings = g_settings_new("org.gnome.desktop.interface");
+        gchar* scheme = g_settings_get_string(settings, "color-scheme");
+        if (scheme != NULL) {
+            result = strcmp(scheme, "prefer-dark") == 0 ? 1 : 0;
+            g_free(scheme);
+        }
+        g_object_unref(settings);
+    }
+    g_settings_schema_unref(schema);
+    return result;
 }

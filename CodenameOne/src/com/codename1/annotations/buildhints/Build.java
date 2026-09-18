@@ -49,12 +49,21 @@ public @interface Build {
     @Hint(name = "gcm.sender_id")
     String gcmSenderId() default "";
 
-    /// `modern`, `legacy`, `custom` (default unset). Cross-platform override that
-    /// sets both `ios.themeMode` and `and.themeMode` together when those aren't
-    /// set explicitly. `modern` = liquid glass + Material 3, `legacy` = iOS 7 flat
-    /// + Holo Light, `custom` disables the framework native theme entirely. The
-    /// legacy alias `cn1.nativeTheme` is still accepted.
-    @Hint(valuePattern = "modern|legacy|custom")
+    /// `native`, `modern`, `legacy`, `custom` (default unset). Cross-platform
+    /// override that sets `ios.themeMode` and `and.themeMode` together when those
+    /// aren't set explicitly. `modern` = liquid glass + Material 3, `legacy` =
+    /// iOS 7 flat + Holo Light, `custom` disables the framework native theme
+    /// entirely. The legacy alias `cn1.nativeTheme` is still accepted.
+    ///
+    /// `native` is `modern` plus the desktop: it additionally selects the host's
+    /// own desktop theme -- Fluent, Aqua or Adwaita -- the way
+    /// `desktop.themeMode = auto` does. `modern` stops short of the desktop on
+    /// purpose, because it predates the desktop themes by years and an application
+    /// that set it for its phone builds never asked for its desktop screens to be
+    /// redrawn.
+    /// `desktop.themeMode` overrides this hint either way, and the full per-platform
+    /// table is on the `@DesktopBuild` annotation.
+    @Hint(valuePattern = "native|modern|legacy|custom")
     ThemeMode nativeTheme() default ThemeMode.DEFAULT;
 
     /// true/false (defaults to false). Blocks codename one from injecting its own

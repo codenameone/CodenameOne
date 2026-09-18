@@ -1,0 +1,43 @@
+{
+  "schema": 1,
+  "platform": "windows",
+  "golden_set": "windows-11-fluent",
+  "mode": "capture",
+  "os": {
+    "version": "10.0.26200.0",
+    "description": "Microsoft Windows 10.0.26200",
+    "architecture": "Arm64",
+    "product": "Windows 10 Enterprise",
+    "display_version": "25H2",
+    "build": "26200",
+    "installation_type": "Client"
+  },
+  "toolkit": {
+    "name": "WinUI3",
+    "deployment": "unpackaged-self-contained",
+    "dotnet": ".NET 9.0.20"
+  },
+  "display": {
+    "rasterization_scale": 1
+  },
+  "appearance": {
+    "mica_supported": true,
+    "transparency_effects": true,
+    "animations_enabled": true,
+    "accent_color": "#0078D4"
+  },
+  "capture": {
+    "occluded": false,
+    "was_foreground": false,
+    "client_background": "#F3F3F3"
+  },
+  "fonts": {
+    "control_family": "Segoe UI Variable",
+    "segoe_ui_variable_installed": true
+  },
+  "tiles_written": 60,
+  "animations_disabled_by_app": true,
+  "backdrop_by_appearance": {"light": "#F3F3F3", "dark": "#202020"},
+  "states_identical_to_normal": [],
+  "blockers": []
+}

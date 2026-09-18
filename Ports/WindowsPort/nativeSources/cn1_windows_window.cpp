@@ -361,13 +361,16 @@ void cn1WinPushEvent(CN1EventType type, int x, int y, int keyCode) {
  * Note the asymmetry with presses, which stay droppable: a release that arrives with
  * no press behind it finds no recorded target and is discarded harmlessly, so when
  * something has to go it must never be the release. */
-static int cn1WinIsProtectedEvent(CN1EventType type) {
+/* Unlike hover motion, leave has no later motion outside the window to repair
+ * a dropped notification. Protect only the terminal sentinel, not the motion stream. */
+static int cn1WinIsProtectedEvent(CN1EventType type, int x, int y) {
     return type == CN1_EVENT_WINDOW_SHOWN || type == CN1_EVENT_WINDOW_HIDDEN
             || type == CN1_EVENT_WINDOW_CLOSE
             || type == CN1_EVENT_KEY_RELEASED
             || type == CN1_EVENT_POINTER_RELEASED
             || type == CN1_EVENT_WINDOW_FOCUS
-            || type == CN1_EVENT_SIZE_CHANGED;
+            || type == CN1_EVENT_SIZE_CHANGED
+            || (type == CN1_EVENT_POINTER_HOVER && x == -1 && y == -1);
 }
 
 /* Visibility only. A close request is protected from eviction like any other
@@ -433,7 +436,8 @@ static void cn1WinRemoveAtLocked(LONG idx) {
 static int cn1WinEvictInputLocked(void) {
     LONG idx = cn1Win.eventHead;
     while (idx != cn1Win.eventTail) {
-        if (!cn1WinIsProtectedEvent((CN1EventType) cn1Win.events[idx].type)) {
+        if (!cn1WinIsProtectedEvent((CN1EventType) cn1Win.events[idx].type,
+                cn1Win.events[idx].x, cn1Win.events[idx].y)) {
             cn1WinRemoveAtLocked(idx);
             return 1;
         }
@@ -483,7 +487,9 @@ static int cn1WinEvictOldestTerminationLocked(void) {
     while (idx != cn1Win.eventTail) {
         CN1EventType t = (CN1EventType) cn1Win.events[idx].type;
         if (t == CN1_EVENT_KEY_RELEASED || t == CN1_EVENT_POINTER_RELEASED
-                || t == CN1_EVENT_WINDOW_FOCUS) {
+                || t == CN1_EVENT_WINDOW_FOCUS
+                || (t == CN1_EVENT_POINTER_HOVER && cn1Win.events[idx].x == -1
+                        && cn1Win.events[idx].y == -1)) {
             cn1WinRemoveAtLocked(idx);
             return 1;
         }
@@ -495,7 +501,7 @@ static int cn1WinEvictOldestTerminationLocked(void) {
 void cn1WinPushWindowEvent(int windowId, CN1EventType type, int x, int y, int keyCode) {
     EnterCriticalSection(&cn1Win.eventLock);
     LONG next = (cn1Win.eventTail + 1) % CN1_EVENT_QUEUE_CAPACITY;
-    if (next == cn1Win.eventHead && cn1WinIsProtectedEvent(type)) {
+    if (next == cn1Win.eventHead && cn1WinIsProtectedEvent(type, x, y)) {
         /* Full, and this one must not be the casualty. Supersede this window's own
          * queued transition if it has one, otherwise take the room from an input event,
          * and failing that from a transition that a later one already supersedes. Never
@@ -588,7 +594,10 @@ static int cn1WinMoveMask(WPARAM wParam) {
 int cn1WinTouchFlag(void) {
     LONG_PTR extra = GetMessageExtraInfo();
     if ((extra & 0xFFFFFF00) == 0xFF515700) {
-        return (extra & 0x80) ? CN1_PE_PEN_FLAG : CN1_PE_TOUCH_FLAG;
+        /* Microsoft defines bit 0x80 as TOUCH, not pen. Reversing it makes a
+         * touch-only hover filter admit fingers and discard hovering pens.
+         * https://learn.microsoft.com/en-us/windows/win32/tablet/system-events-and-mouse-messages */
+        return (extra & 0x80) ? CN1_PE_TOUCH_FLAG : CN1_PE_PEN_FLAG;
     }
     return 0;
 }
@@ -711,7 +720,44 @@ LRESULT CALLBACK cn1WinWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam
             if (moveMask != 0) {
                 cn1WinPushEvent(CN1_EVENT_POINTER_DRAGGED, GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam),
                         moveMask | cn1WinTouchFlag());
+            } else {
+                /* No button held: this is hover, and it used to be dropped here.
+                 * Component's hover style is driven by Form.pointerHover, which
+                 * has nothing else to fire it, so every hover rule in a desktop
+                 * theme was inert.
+                 *
+                 * Droppable rather than protected, which is the right side of
+                 * that line: on overflow the ring discards the newest event, and
+                 * a lost hover costs nothing because hover is idempotent -- the
+                 * next motion re-establishes it. A lost RELEASE, by contrast,
+                 * leaves a button held for good, which is why that one is
+                 * protected. */
+                /* A hovering pen is valid hover; only touch-promoted motion is excluded.
+                 * Keep the source flag so Java callbacks receive stylus metadata. */
+                int source = cn1WinTouchFlag();
+                if ((source & CN1_PE_TOUCH_FLAG) == 0) {
+                    cn1WinPushEvent(CN1_EVENT_POINTER_HOVER, GET_X_LPARAM(lParam),
+                            GET_Y_LPARAM(lParam), source);
+                }
+                /* Ask for one WM_MOUSELEAVE. Without it the cursor can move straight off
+                 * the window and the last hovered control stays lit: motion simply stops,
+                 * and Form only clears its tracked hover when a DIFFERENT component is
+                 * reported. TrackMouseEvent is one-shot, so it is re-armed on every hover
+                 * rather than once at creation. */
+                TRACKMOUSEEVENT tme;
+                tme.cbSize = sizeof(tme);
+                tme.dwFlags = TME_LEAVE;
+                tme.hwndTrack = hwnd;
+                tme.dwHoverTime = HOVER_DEFAULT;
+                TrackMouseEvent(&tme);
             }
+            return 0;
+        }
+        case WM_MOUSELEAVE: {
+            /* -1,-1 is the agreed "nothing is under the pointer" coordinate: the Java side
+             * turns it into pointerHover over no component, which clears the hover style.
+             * A real client coordinate is never negative, so the two cannot be confused. */
+            cn1WinPushEvent(CN1_EVENT_POINTER_HOVER, -1, -1, cn1WinTouchFlag());
             return 0;
         }
 #ifdef WM_GESTURE
@@ -1264,3 +1310,51 @@ JAVA_VOID com_codename1_impl_windows_WindowsNative_parkMainThread___int(
 } /* extern "C" */
 
 #endif /* _WIN32 */
+
+/* ---------------------------------------------------------------- dark mode */
+
+/* INSIDE extern "C", and that is not decoration. This file is C++ and wraps its whole
+ * body in an extern "C" block that closes above; a ParparVM native appended after it
+ * gets C++ name mangling, and the generated C calls the unmangled name. It compiles, and
+ * the LINKER fails:
+ *
+ *   lld-link: error: undefined symbol:
+ *     com_codename1_impl_windows_WindowsNative_systemUsesDarkTheme___R_boolean
+ *
+ * Note scripts/check-native-signatures.sh does NOT catch this. It verifies that the
+ * NAME matches the Java signature, which it did; linkage is a different property and the
+ * only thing that reports it is a real device build. */
+extern "C" {
+
+/* True when the user has chosen the dark app theme.
+ *
+ * AppsUseLightTheme under HKCU\...\Themes\Personalize is what the Settings app writes
+ * and what every Windows application reads. The name is the trap: it says "use LIGHT",
+ * so 0 is dark and 1 is light, and a MISSING value is light -- the key does not exist
+ * before Windows 10 1607, and reading a failure as "dark" would put every older system
+ * on a dark theme it cannot render.
+ *
+ * RegGetValueW rather than RegOpenKeyEx + RegQueryValueEx: it opens, queries, type
+ * checks and closes in one call, so there is no key handle to leak on an error path.
+ *
+ * The signature is ParparVM's and is checked by nothing at build time -- a wrong name
+ * compiles, links, and leaves the Java method looking unused to the dead-code pass,
+ * which then removes it. scripts/check-native-signatures.sh is what catches that.
+ */
+JAVA_BOOLEAN com_codename1_impl_windows_WindowsNative_systemUsesDarkTheme___R_boolean(CODENAME_ONE_THREAD_STATE) {
+    DWORD value = 1;
+    DWORD size = sizeof(value);
+    LSTATUS st = RegGetValueW(HKEY_CURRENT_USER,
+            L"Software\\Microsoft\\Windows\\CurrentVersion\\Themes\\Personalize",
+            L"AppsUseLightTheme",
+            RRF_RT_REG_DWORD,
+            NULL,
+            &value,
+            &size);
+    if (st != ERROR_SUCCESS) {
+        return JAVA_FALSE;
+    }
+    return value == 0 ? JAVA_TRUE : JAVA_FALSE;
+}
+
+} /* extern "C" */

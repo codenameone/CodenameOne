@@ -134,7 +134,13 @@ public class Form extends Container implements TopLevelContainer {
     private Component dragged;
     // Last component whose interactive scrollbar showed a hover highlight, so the highlight can be
     // cleared when the pointer moves to a different scrollable (desktop interactive scrollbars only)
-    private Component lastInteractiveScrollHover;
+    private final HoverTracker hoverTracker = new HoverTracker();
+
+    @Override
+    HoverTracker getHoverTracker() {
+        return hoverTracker;
+    }
+
     private boolean enableCursors;
     private TextSelection textSelection;
     private ArrayList<Component> componentsAwaitingRelease;
@@ -2836,6 +2842,10 @@ public class Form extends Container implements TopLevelContainer {
         componentsAwaitingRelease = null;
         pressedCmp = null;
         dragged = null;
+        // A form that is going away must not leave a component believing the pointer is still
+        // over it: the flag would survive into the next time the form is shown, and the
+        // component would paint hovered with the pointer somewhere else entirely.
+        hoverTracker.pointerOver(null, -1, -1);
     }
 
     /// The four kinds of pointer listener an embedded form hands to its host.
@@ -4566,6 +4576,24 @@ public class Form extends Container implements TopLevelContainer {
         }
     }
 
+    /// The component a hover at these coordinates resolves to: the deepest one that accepts
+    /// pointer events, mapped to its lead parent. Resolution only -- nothing is dispatched --
+    /// so a caller that just needs to know what is under the pointer does not also fire a
+    /// component's hover callback or start a tooltip timer.
+    Component hoverTargetAt(int x, int y) {
+        Container actual = getActualPane(formLayeredPane, x, y);
+        // getComponentAt returns the container itself for an outside point. A window
+        // leave must resolve to nothing, even when the root pane has a hover style.
+        if (actual == null || !actual.contains(x, y)) {
+            return null;
+        }
+        Component cmp = actual.getComponentAt(x, y);
+        while (cmp != null && cmp.isIgnorePointerEvents()) {
+            cmp = cmp.getParent();
+        }
+        return cmp == null ? null : LeadUtil.leadParentImpl(cmp);
+    }
+
     /// {@inheritDoc}
     @Override
     public void pointerHover(int[] x, int[] y) {
@@ -4575,51 +4603,32 @@ public class Form extends Container implements TopLevelContainer {
             return;
         }
 
-        Container actual = getActualPane(formLayeredPane, x[0], y[0]);
-        if (actual != null) {
-            Component cmp = actual.getComponentAt(x[0], y[0]);
-            while (cmp != null && cmp.isIgnorePointerEvents()) {
-                cmp = cmp.getParent();
-            }
+        Component cmp = hoverTargetAt(x[0], y[0]);
+        // Callbacks must observe the entered/left states, and navigation inside a
+        // callback must be able to clear them without a later update restoring them.
+        // Null also clears the previous target when the pointer leaves the surface.
+        hoverTracker.pointerOver(cmp, x[0], y[0]);
+        try {
             if (cmp != null) {
-                cmp = LeadUtil.leadParentImpl(cmp);
-
                 if (!isScrollWheeling && cmp.isFocusable() && cmp.isEnabled() && !Display.getInstance().isDesktop()) {
                     setFocused(cmp);
                 }
                 LeadUtil.pointerHover(cmp, x, y);
-                updateInteractiveScrollHover(cmp, x[0], y[0]);
             }
-            if (TooltipManager.getInstance() != null) {
-                String tip = cmp.getTooltip();
-                if (tip != null && tip.length() > 0) {
-                    TooltipManager.getInstance().prepareTooltip(tip, cmp);
-                } else {
-                    TooltipManager.getInstance().clearTooltip();
-                }
+        } finally {
+            hoverTracker.clearDetached(this);
+        }
+        TooltipManager tm = TooltipManager.getInstance();
+        if (tm != null) {
+            String tip = hoverTracker.isOver(cmp) ? cmp.getTooltip() : null;
+            if (tip != null && tip.length() > 0) {
+                tm.prepareTooltip(tip, cmp);
+            } else {
+                tm.clearTooltip();
             }
         }
     }
 
-    /// Routes a hover to the nearest scrollable ancestor of the hovered component so an interactive
-    /// (desktop) scrollbar can highlight its thumb, and clears the highlight on the previously
-    /// hovered scrollable. Inert unless interactive scrollbars are enabled.
-    private void updateInteractiveScrollHover(Component cmp, int x, int y) {
-        if (!getUIManager().getLookAndFeel().isInteractiveScroll()) {
-            return;
-        }
-        Component scrollable = cmp;
-        while (scrollable != null && !scrollable.isScrollableY() && !scrollable.isScrollableX()) {
-            scrollable = scrollable.getParent();
-        }
-        if (lastInteractiveScrollHover != null && lastInteractiveScrollHover != scrollable) { //NOPMD CompareObjectsWithEquals
-            lastInteractiveScrollHover.clearInteractiveScrollHover();
-        }
-        if (scrollable != null) {
-            scrollable.updateInteractiveScrollHover(x, y);
-        }
-        lastInteractiveScrollHover = scrollable;
-    }
 
     /// Returns true if there is only one focusable member in this form. This is useful
     /// so setHandlesInput would always be true for this case.
@@ -4692,6 +4701,7 @@ public class Form extends Container implements TopLevelContainer {
     /// {@inheritDoc}
     @Override
     public void pointerReleased(int x, int y) {
+        final boolean hoverOnRelease = HoverTracker.canHoverOnRelease();
         // A press that never became a drag releases the operation the press staged, so a
         // later gesture somewhere else cannot start the drag this one declined to.
         //
@@ -4886,6 +4896,22 @@ public class Form extends Container implements TopLevelContainer {
             }
         } finally {
             currentPointerPress = null;
+            // Hover is deliberately NOT tracked during a drag -- pointerHover returns early
+            // while dragged is set -- so the release is where it has to be caught up. If the
+            // pointer then stays put no further motion event arrives (Windows sends none for
+            // a stationary cursor), which left whatever was hovered when the drag began still
+            // lit and whatever is under the pointer now never lit. Resolved rather than
+            // dispatched, so the release does not also fire a hover callback or a tooltip.
+            //
+            // In the finally, beside the other piece of end-of-gesture bookkeeping, because
+            // this method returns from six places inside the try above and a catch-up after
+            // the block is reached by none of them.
+            // A release callback may navigate and deinitialize this form. Do not
+            // restore the hover that deinitialization just cleared on a hidden form.
+            // During a transition, getCurrent() can still name that deinitialized source.
+            if (hoverOnRelease && isInitialized() && isTopLevelShowing()) {
+                hoverTracker.pointerOver(hoverTargetAt(x, y), x, y);
+            }
         }
     }
 

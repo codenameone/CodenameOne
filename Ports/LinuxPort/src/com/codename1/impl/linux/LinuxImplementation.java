@@ -119,6 +119,10 @@ public class LinuxImplementation extends CodenameOneImplementation {
 
     private static final int EVENT_PINCH_BEGIN = 20;
     private static final int EVENT_PINCH_END = 21;
+    /// Pointer motion with no button held. Must match CN1_EVENT_POINTER_HOVER in
+    /// nativeSources/cn1_linux.h -- the two tables are the wire protocol and a
+    /// mismatch routes an event to the wrong handler rather than failing.
+    private static final int EVENT_POINTER_HOVER = 22;
     private static final int EVENT_ROTATE = 11;
     private static final int EVENT_ACCESSIBILITY_ACTION = 12;
     // Additional desktop windows. These always carry a non-zero window id.
@@ -761,20 +765,28 @@ public class LinuxImplementation extends CodenameOneImplementation {
         // not pump or drain on its own (it is not the window's owning thread).
     }
 
-    // High bit the native layer ORs into a pointer event's key field to flag a touch
-    // digitizer (see cn1_linux.h CN1_PE_TOUCH_FLAG); the low byte is the button
-    // bitmask (PointerEvent.MASK_*).
+    // High bits in the native key flag touch, pen, or eraser input (see cn1_linux.h);
+    // the low byte is the button bitmask (PointerEvent.MASK_*).
     private static final int POINTER_BUTTON_BITS = 0xFF;
     private static final int POINTER_TOUCH_FLAG = 256;
+    private static final int POINTER_PEN_FLAG = 512;
+    private static final int POINTER_ERASER_FLAG = 1024;
 
-    // Decodes the native pointer key field (button mask + touch flag) into the
+    // Decodes the native pointer key field (button mask + pointer source flags) into the
     // cross-platform PointerEvent metadata for the next dispatched pointer event, so
     // the rich pointer / context-menu APIs report the real button and device type.
     private void markPointer(int keyField) {
         int mask = keyField & POINTER_BUTTON_BITS;
-        int type = (keyField & POINTER_TOUCH_FLAG) != 0
-                ? com.codename1.ui.events.PointerEvent.TYPE_TOUCH
-                : com.codename1.ui.events.PointerEvent.TYPE_MOUSE;
+        int type;
+        if ((keyField & POINTER_ERASER_FLAG) != 0) {
+            type = com.codename1.ui.events.PointerEvent.TYPE_ERASER;
+        } else if ((keyField & POINTER_PEN_FLAG) != 0) {
+            type = com.codename1.ui.events.PointerEvent.TYPE_STYLUS;
+        } else if ((keyField & POINTER_TOUCH_FLAG) != 0) {
+            type = com.codename1.ui.events.PointerEvent.TYPE_TOUCH;
+        } else {
+            type = com.codename1.ui.events.PointerEvent.TYPE_MOUSE;
+        }
         int button;
         if (mask == 0) {
             mask = com.codename1.ui.events.PointerEvent.MASK_PRIMARY;
@@ -791,6 +803,16 @@ public class LinuxImplementation extends CodenameOneImplementation {
             button = com.codename1.ui.events.PointerEvent.BUTTON_FORWARD;
         }
         setPointerEventMetadata(button, mask, type, 1f, 0, 0, 0, 0, false);
+    }
+
+    void dispatchPointerHover(int windowId, int x, int y, int keyField) {
+        // Preserve the native source while clearing all earlier contact metadata.
+        // Hover is pressure-free for both mice and pens.
+        markPointer(keyField);
+        setPointerButton(com.codename1.ui.events.PointerEvent.BUTTON_NONE, 0);
+        setPointerPressure(0f);
+        setPointerHovering(true);
+        windowPointerHover(windowId, x, y);
     }
 
     private void drainInput() {
@@ -840,6 +862,14 @@ public class LinuxImplementation extends CodenameOneImplementation {
                 case EVENT_POINTER_DRAGGED:
                     markPointer(key);
                     windowPointerDragged(windowId, x, y);
+                    break;
+                case EVENT_POINTER_HOVER:
+                    // Routed by window id rather than restricted to the main one.
+                    // windowPointerHover hands a secondary window's event to that
+                    // window's own Desktop instance, so a control in one reaches the
+                    // hover state like any other; the earlier main-window-only guard
+                    // made hover unreachable there.
+                    dispatchPointerHover(windowId, x, y, key);
                     break;
                 case EVENT_KEY_PRESSED:
                     windowKeyPressed(windowId, key);
@@ -3188,6 +3218,48 @@ public class LinuxImplementation extends CodenameOneImplementation {
     @Override
     public String getPlatformName() {
         return "linux";
+    }
+
+    /// Linux is a desktop, always.
+    ///
+    /// CodenameOneImplementation.isDesktop() answers false, and this port never
+    /// overrode it, so a linux application was a mobile one as far as the framework
+    /// was concerned. That reached further than it looks: no `_desktop.ovr` resource
+    /// layer, no `device-desktop-` theme layer, no @defaultDesktopFontSizeInt, no
+    /// @desktopTitleBarMode, and the mobile branch of Button.pointerHover,
+    /// TextSelection and SplitPane.
+    @Override
+    public boolean isDesktop() {
+        return true;
+    }
+
+    /// @inheritDoc
+    ///
+    /// Desktop layers. Matches the JavaSE desktop port and the macOS port
+    /// (`desktop`, `tablet`, ...) so one override written for the desktop covers all
+    /// three, with `linux` last so a layer can name this port specifically.
+    @Override
+    public String[] getPlatformOverrides() {
+        return new String[] {"desktop", "tablet", "linux"};
+    }
+
+    /// @inheritDoc
+    ///
+    /// CodenameOneImplementation.isDarkMode() answers false and this port never
+    /// overrode it, so every $Dark entry in a desktop theme was dead weight in the
+    /// .res: the Adwaita theme's whole dark palette could never be selected.
+    ///
+    /// Returns Boolean rather than boolean because the contract distinguishes "the
+    /// platform does not know" (null) from "light" (FALSE) -- UIManager's dark-mode
+    /// resolution tests for null explicitly -- and on Linux that distinction is real:
+    /// a session with no desktop settings daemon has no answer to give.
+    @Override
+    public Boolean isDarkMode() {
+        int v = LinuxNative.systemColorScheme();
+        if (v < 0) {
+            return null;
+        }
+        return v == 1 ? Boolean.TRUE : Boolean.FALSE;
     }
 
     @Override

@@ -2877,6 +2877,10 @@ public class IOSImplementation extends CodenameOneImplementation {
     public static void setIosMode(String l) {
         iosMode = l;
     }
+
+    protected String nativeThemeMode() {
+        return iosMode == null ? "auto" : iosMode.toLowerCase();
+    }
     
     private static boolean waitForAnimationLock(Form f) {
         while (!f.grabAnimationLock()) {
@@ -2899,10 +2903,41 @@ public class IOSImplementation extends CodenameOneImplementation {
      * Installs the native theme, this is only applicable if hasNativeTheme() returned true. Notice that this method
      * might replace the DefaultLookAndFeel instance and the default transitions.
      */
+
+    /// The native theme resource a SUBCLASS wants for this theme mode, without the ".res",
+    /// or null to use the iOS chain.
+    ///
+    /// Exists because the macOS port extends this class. It ships MacOSAquaTheme.res, which
+    /// installNativeTheme() below knows nothing about, so before this hook a native Mac
+    /// application installed an iOS theme however its build hints were set -- an iPhone
+    /// design language on a desktop.
+    ///
+    /// Returning null is the iOS behaviour unchanged, which is what this class does.
+    protected String nativeThemeResourceName(String mode) {
+        return null;
+    }
+
     public void installNativeTheme() {
         try {
             Resources r;
-            String mode = iosMode == null ? "auto" : iosMode.toLowerCase();
+            String mode = nativeThemeMode();
+            // A subclass may own a theme this class knows nothing about. The macOS port
+            // extends this one and ships Aqua, which is not in the list below; without the
+            // hook it inherited the iOS chain and installed an iPhone theme on a Mac.
+            // Returning null keeps the iOS behaviour exactly as it was.
+            String subclassTheme = nativeThemeResourceName(mode);
+            if (subclassTheme != null) {
+                InputStream sub = getResourceAsStream("/" + subclassTheme + ".res");
+                if (sub != null) {
+                    r = Resources.open(sub);
+                    Hashtable tp = r.getTheme(r.getThemeResourceNames()[0]);
+                    injectDesktopThemeConstants(tp);
+                    UIManager.getInstance().setThemeProps(tp);
+                    return;
+                }
+                // Not in the bundle (a framework build that has not generated it yet):
+                // fall through to the iOS chain so the application still boots.
+            }
             // Modern (liquid-glass) theme is opt-in via ios.themeMode=modern /
             // liquid / material. Keep the default ("auto" or unset) on the
             // legacy iOS 7 / pre-flat theme so existing apps and screenshot
@@ -11023,7 +11058,7 @@ public class IOSImplementation extends CodenameOneImplementation {
     
     
 
-    private String nativeFontName(String fontName) {
+    protected String nativeFontName(String fontName) {
         if(fontName != null && fontName.startsWith("native:")) {
             if("native:MainThin".equals(fontName)) {
                 return "HelveticaNeue-UltraLight";

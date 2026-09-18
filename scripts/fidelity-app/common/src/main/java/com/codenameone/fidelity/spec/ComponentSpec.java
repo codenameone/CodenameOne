@@ -36,6 +36,11 @@ public class ComponentSpec {
     private String cn1Uiid;
     private String nativeKind;
     private String nativeAndroidKind;
+    private int tileWidthPx = -1;
+    private int tileHeightPx = -1;
+    private String nativeWindowsKind;
+    private String nativeMacKind;
+    private String nativeGnomeKind;
     private String text;
     private String backdrop;
     private String material;
@@ -61,12 +66,84 @@ public class ComponentSpec {
         this.cn1Uiid = cn1Uiid;
     }
 
-    /** Native widget key for the given platform name ("ios" or "and"/"android"). */
+    /**
+     * Native widget key for the given platform, or null when this component has none there.
+     *
+     * <p>Every platform is named explicitly and an unrecognised one returns null. The
+     * previous form fell through to the iOS key for anything that was not Android, which was
+     * harmless while iOS and Android were the only platforms and becomes a trap the moment a
+     * third exists: {@code appliesToPlatform} treats a non-null key as "this component runs
+     * here", so every mobile row would have claimed to run on every desktop platform, against
+     * a UIKit widget key that means nothing there.</p>
+     */
     public String getNativeKind(String platformName) {
-        if (platformName != null && platformName.startsWith("and")) {
+        if (platformName == null) {
+            return null;
+        }
+        if (platformName.startsWith("ios")) {
+            return nativeKind;
+        }
+        if (platformName.startsWith("and")) {
             return nativeAndroidKind;
         }
-        return nativeKind;
+        if (platformName.startsWith("win")) {
+            return nativeWindowsKind;
+        }
+        if (platformName.startsWith("mac")) {
+            return nativeMacKind;
+        }
+        if (platformName.startsWith("gnome") || platformName.startsWith("linux")) {
+            return nativeGnomeKind;
+        }
+        return null;
+    }
+
+    /// Tile size in LOGICAL PIXELS, for the desktop platforms.
+    ///
+    /// Millimetres are the right unit on a phone, where physical size is the design unit and
+    /// the same widget must occupy the same amount of thumb. Desktop toolkits are specified
+    /// the other way round: WinUI in effective pixels at 96dpi, GTK in logical pixels, AppKit
+    /// in points. Sizing a desktop tile in mm produces a plausible number that describes a
+    /// control no desktop toolkit would ever draw, so the desktop rows carry their own unit
+    /// and the mobile rows are left exactly as they were.
+    public int getTileWidthPx() {
+        return tileWidthPx;
+    }
+
+    public void setTileWidthPx(int tileWidthPx) {
+        this.tileWidthPx = tileWidthPx;
+    }
+
+    public int getTileHeightPx() {
+        return tileHeightPx;
+    }
+
+    public void setTileHeightPx(int tileHeightPx) {
+        this.tileHeightPx = tileHeightPx;
+    }
+
+    public String getNativeKindWindows() {
+        return nativeWindowsKind;
+    }
+
+    public void setNativeKindWindows(String nativeWindowsKind) {
+        this.nativeWindowsKind = nativeWindowsKind;
+    }
+
+    public String getNativeKindMac() {
+        return nativeMacKind;
+    }
+
+    public void setNativeKindMac(String nativeMacKind) {
+        this.nativeMacKind = nativeMacKind;
+    }
+
+    public String getNativeKindGnome() {
+        return nativeGnomeKind;
+    }
+
+    public void setNativeKindGnome(String nativeGnomeKind) {
+        this.nativeGnomeKind = nativeGnomeKind;
     }
 
     public String getNativeKindIos() {

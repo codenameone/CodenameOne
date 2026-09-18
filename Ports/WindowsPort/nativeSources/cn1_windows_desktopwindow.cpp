@@ -378,7 +378,31 @@ static LRESULT CALLBACK cn1WinDesktopWndProc(HWND hwnd, UINT msg, WPARAM wParam,
                 if (wParam & MK_XBUTTON2) { mask |= CN1_PE_MASK_FORWARD; }
                 cn1WinDesktopPushPointer(w, CN1_EVENT_POINTER_DRAGGED, lParam,
                         mask | cn1WinTouchFlag());
+            } else {
+                /* Buttonless motion in a SECONDARY window is hover, dropped here for the
+                 * same reason it was dropped in the main window: a mobile port has no use
+                 * for it. windowPointerHover routes by window id, so a control in a
+                 * secondary window reaches the hover state like any other. */
+                /* Touch-promoted motion is not hover; see the main window's handler. */
+                int source = cn1WinTouchFlag();
+                if ((source & CN1_PE_TOUCH_FLAG) == 0) {
+                    cn1WinDesktopPushPointer(w, CN1_EVENT_POINTER_HOVER, lParam, source);
+                }
+                /* One-shot, so re-armed on every hover. Without it the pointer can leave
+                 * this window and the last control stays lit. */
+                TRACKMOUSEEVENT tme;
+                tme.cbSize = sizeof(tme);
+                tme.dwFlags = TME_LEAVE;
+                tme.hwndTrack = hwnd;
+                tme.dwHoverTime = HOVER_DEFAULT;
+                TrackMouseEvent(&tme);
             }
+            return 0;
+        case WM_MOUSELEAVE:
+            /* -1,-1 is the agreed "nothing is under the pointer" coordinate; a real client
+             * coordinate is never negative. */
+            cn1WinDesktopPushPointer(w, CN1_EVENT_POINTER_HOVER, MAKELPARAM(-1, -1),
+                    cn1WinTouchFlag());
             return 0;
         case WM_MOUSEWHEEL:
         case WM_MOUSEHWHEEL: {

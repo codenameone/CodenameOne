@@ -108,6 +108,10 @@ public class WindowsImplementation extends CodenameOneImplementation {
     /// gesture cannot inherit the previous one's zoom.
     private float pinchScale = 1f;
 
+    /// Pointer motion with no button held. Must match CN1_EVENT_POINTER_HOVER in
+    /// nativeSources/cn1_windows.h -- the two tables are the wire protocol and a
+    /// mismatch routes an event to the wrong handler rather than failing.
+    private static final int EVENT_POINTER_HOVER = 22;
     private static final int EVENT_PINCH_BEGIN = 20;
     private static final int EVENT_PINCH_END = 21;
     private static final int EVENT_ROTATE = 11;
@@ -792,6 +796,16 @@ public class WindowsImplementation extends CodenameOneImplementation {
         setPointerEventMetadata(button, mask, type, 1f, 0, 0, 0, 0, false);
     }
 
+    void dispatchPointerHover(int windowId, int x, int y, int keyField) {
+        // Keep the native mouse/pen source, but hover has no contact pressure.
+        // markPointer resets the other fields so earlier contact metadata cannot leak in.
+        markPointer(keyField);
+        setPointerButton(com.codename1.ui.events.PointerEvent.BUTTON_NONE, 0);
+        setPointerPressure(0f);
+        setPointerHovering(true);
+        windowPointerHover(windowId, x, y);
+    }
+
     private void drainInput() {
         while (WindowsNative.pollEvent(eventScratch)) {
             int type = eventScratch[0];
@@ -813,6 +827,14 @@ public class WindowsImplementation extends CodenameOneImplementation {
                 case EVENT_POINTER_DRAGGED:
                     markPointer(key);
                     windowPointerDragged(windowId, x, y);
+                    break;
+                case EVENT_POINTER_HOVER:
+                    // Routed by window id rather than restricted to the main one.
+                    // windowPointerHover hands a secondary window's event to that
+                    // window's own Desktop instance, so a control in one reaches the
+                    // hover state like any other; the earlier main-window-only guard
+                    // made hover unreachable there.
+                    dispatchPointerHover(windowId, x, y, key);
                     break;
                 case EVENT_KEY_PRESSED:
                     windowKeyPressed(windowId, key);
@@ -3202,6 +3224,49 @@ public class WindowsImplementation extends CodenameOneImplementation {
     @Override
     public String getPlatformName() {
         return "win";
+    }
+
+    /// Windows is a desktop, always.
+    ///
+    /// CodenameOneImplementation.isDesktop() answers false, and this port never
+    /// overrode it, so a windows application was a mobile one as far as the framework
+    /// was concerned. That reached further than it looks: no `_desktop.ovr` resource
+    /// layer, no `device-desktop-` theme layer, no @defaultDesktopFontSizeInt, no
+    /// @desktopTitleBarMode, and the mobile branch of Button.pointerHover,
+    /// TextSelection and SplitPane.
+    @Override
+    public boolean isDesktop() {
+        return true;
+    }
+
+    /// @inheritDoc
+    ///
+    /// Desktop layers. Matches the JavaSE desktop port and the macOS port
+    /// (`desktop`, `tablet`, ...) so one override written for the desktop covers all
+    /// three, with the port's own name last so a layer can name this port specifically.
+    ///
+    /// That last entry is `win`, spelled exactly as getPlatformName() reports it above:
+    /// Resources.openLayered appends the value literally as `<resource>_<name>.ovr`, and the
+    /// resource editor writes the Windows override as `_win.ovr`. Spelling it `windows` here
+    /// asked for a file nothing produces, so the layer this method exists to load would never
+    /// have been found. The macOS and Linux ports pair the same two the same way.
+    @Override
+    public String[] getPlatformOverrides() {
+        return new String[] {"desktop", "tablet", "win"};
+    }
+
+    /// @inheritDoc
+    ///
+    /// CodenameOneImplementation.isDarkMode() answers false and this port never
+    /// overrode it, so every $Dark entry in a desktop theme was dead weight in the
+    /// .res: the Fluent theme's whole dark palette could never be selected.
+    ///
+    /// Returns Boolean rather than boolean because the contract distinguishes "the
+    /// platform does not know" (null) from "light" (FALSE), and callers such as
+    /// UIManager's dark-mode resolution treat the two differently.
+    @Override
+    public Boolean isDarkMode() {
+        return WindowsNative.systemUsesDarkTheme() ? Boolean.TRUE : Boolean.FALSE;
     }
 
     @Override

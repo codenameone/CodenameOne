@@ -4534,7 +4534,10 @@ public class HTML5Implementation extends CodenameOneImplementation {
         if (iosLike) {
             String iosMode = d.getProperty("ios.themeMode", null);
             if (iosMode == null && shared != null) {
-                if ("modern".equalsIgnoreCase(shared) || "auto".equalsIgnoreCase(shared)) {
+                // "native" joins modern/auto here: it means the platform's own look on
+                // every OS, and on an iOS-like browser that is the modern theme.
+                if ("modern".equalsIgnoreCase(shared) || "auto".equalsIgnoreCase(shared)
+                        || "native".equalsIgnoreCase(shared)) {
                     iosMode = "modern";
                 } else if ("legacy".equalsIgnoreCase(shared)) {
                     iosMode = "ios7";
@@ -4556,7 +4559,8 @@ public class HTML5Implementation extends CodenameOneImplementation {
         }
         String androidMode = d.getProperty("and.themeMode", d.getProperty("cn1.androidTheme", null));
         if (androidMode == null && shared != null) {
-            if ("modern".equalsIgnoreCase(shared) || "auto".equalsIgnoreCase(shared)) {
+            if ("modern".equalsIgnoreCase(shared) || "auto".equalsIgnoreCase(shared)
+                    || "native".equalsIgnoreCase(shared)) {
                 androidMode = "material";
             } else if ("legacy".equalsIgnoreCase(shared)) {
                 androidMode = "hololight";

@@ -24,6 +24,7 @@
 package com.codename1.ui;
 
 import com.codename1.junit.UITestBase;
+import com.codename1.junit.FormTest;
 import com.codename1.ui.animations.ComponentAnimation;
 import com.codename1.ui.layouts.BoxLayout;
 import com.codename1.ui.plaf.UIManager;
@@ -365,7 +366,8 @@ class ComponentGroupSegmentedTest extends UITestBase {
                         + "snapshot the first membership took");
     }
 
-    @Test
+    // A shown form drains its animation queue on the EDT; mutate/flush it there too.
+    @FormTest
     void testRemovalDuringAnAnimationStillRestoresTheMember() {
         // Container.removeComponentImpl queues the physical removal while the
         // AnimationManager is animating and leaves the child in the component list, so a
@@ -402,7 +404,8 @@ class ComponentGroupSegmentedTest extends UITestBase {
                 "and its UIID with it");
     }
 
-    @Test
+    // A shown form drains its animation queue on the EDT; mutate/flush it there too.
+    @FormTest
     void testSurvivorsAreRegroupedAfterAnAnimatedRemovalCompletes() {
         // removeComponentImpl runs while the AnimationManager still has the departing
         // member queued, so positional UIIDs recomputed there count it and the survivor
@@ -462,7 +465,8 @@ class ComponentGroupSegmentedTest extends UITestBase {
                         + "insertComponentAt");
     }
 
-    @Test
+    // A shown form drains its animation queue on the EDT; mutate/flush it there too.
+    @FormTest
     void testAnInsertionDuringAnAnimationIsGroupedWhenItCompletes() {
         // insertComponentAt only queues the insertion while the AnimationManager is
         // animating, so recomputing positions there does not count the arriving member

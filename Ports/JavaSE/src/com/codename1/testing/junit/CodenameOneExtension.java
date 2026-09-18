@@ -30,6 +30,7 @@ import com.codename1.ui.plaf.UIManager;
 import com.codename1.ui.util.Resources;
 
 import org.junit.jupiter.api.extension.BeforeAllCallback;
+import org.junit.jupiter.api.extension.AfterEachCallback;
 import org.junit.jupiter.api.extension.BeforeEachCallback;
 import org.junit.jupiter.api.extension.ExtensionContext;
 import org.junit.jupiter.api.extension.InvocationInterceptor;
@@ -71,9 +72,11 @@ import java.util.concurrent.atomic.AtomicReference;
  * in {@code @AfterEach}.
  */
 public class CodenameOneExtension
-        implements BeforeAllCallback, BeforeEachCallback, InvocationInterceptor {
+        implements BeforeAllCallback, BeforeEachCallback, AfterEachCallback, InvocationInterceptor {
 
     private static final Object DISPLAY_BOOT_LOCK = new Object();
+    private static final ExtensionContext.Namespace FONT_STATE =
+            ExtensionContext.Namespace.create(CodenameOneExtension.class, "themeFonts");
 
     @Override
     public void beforeAll(ExtensionContext context) {
@@ -112,13 +115,33 @@ public class CodenameOneExtension
         final ResolvedVisualConfig config = ResolvedVisualConfig.resolve(testClass, method);
         if (config.hasAny()) {
             try {
-                applyVisualConfigOnEdt(config);
+                applyVisualConfigOnEdt(config, context);
             } catch (Exception e) {
                 throw e;
             } catch (Throwable t) {
                 // Errors thrown from the EDT-dispatched apply step bubble up as
                 // Throwable; rewrap so JUnit's beforeEach contract (throws
                 // Exception only) is satisfied without losing the cause.
+                throw new RuntimeException(t);
+            }
+        }
+    }
+
+    @Override
+    public void afterEach(ExtensionContext context) throws Exception {
+        final Runnable restore = context.getStore(FONT_STATE).remove("restore", Runnable.class);
+        if (restore != null) {
+            try {
+                dispatchOnEdt(new Invocation<Void>() {
+                    @Override
+                    public Void proceed() {
+                        restore.run();
+                        return null;
+                    }
+                }, 10000L, "restore theme fonts");
+            } catch (Exception e) {
+                throw e;
+            } catch (Throwable t) {
                 throw new RuntimeException(t);
             }
         }
@@ -224,7 +247,7 @@ public class CodenameOneExtension
      * Mirrors the body of {@code JavaSEPort.applyThemeOnlyRefresh} via the
      * publicly visible {@link UIManager}/{@link Form} APIs.
      */
-    private static void applyVisualConfigOnEdt(final ResolvedVisualConfig cfg) throws Throwable {
+    private static void applyVisualConfigOnEdt(final ResolvedVisualConfig cfg, final ExtensionContext context) throws Throwable {
         final AtomicReference<Throwable> thrown = new AtomicReference<Throwable>();
         final Object lock = new Object();
         final boolean[] done = new boolean[1];
@@ -234,7 +257,7 @@ public class CodenameOneExtension
             public void run() {
                 try {
                     if (cfg.theme != null) {
-                        installTheme(cfg.theme);
+                        installTheme(cfg.theme, context);
                     }
                     if (cfg.darkMode != null) {
                         Display.getInstance().setDarkMode(cfg.darkMode);
@@ -288,15 +311,24 @@ public class CodenameOneExtension
         }
     }
 
-    private static void installTheme(String resourcePath) throws java.io.IOException {
-        Resources r = Resources.open(resourcePath);
-        String[] names = r.getThemeResourceNames();
-        if (names == null || names.length == 0) {
-            throw new IllegalStateException(
-                    "Theme resource " + resourcePath + " contains no themes");
+    private static void installTheme(String resourcePath, ExtensionContext context) throws java.io.IOException {
+        // Resources resolve native aliases while opening, before setThemeProps.
+        // Scope the font mode to this test, including failures and later mobile tests.
+        Runnable restore = JavaSEPort.pushNativeThemeFontConfiguration(resourcePath);
+        try {
+            Resources r = Resources.open(resourcePath);
+            String[] names = r.getThemeResourceNames();
+            if (names == null || names.length == 0) {
+                throw new IllegalStateException(
+                        "Theme resource " + resourcePath + " contains no themes");
+            }
+            Hashtable themeProps = r.getTheme(names[0]);
+            UIManager.getInstance().setThemeProps(themeProps);
+            context.getStore(FONT_STATE).put("restore", restore);
+        } catch (java.io.IOException | RuntimeException | Error e) {
+            restore.run();
+            throw e;
         }
-        Hashtable themeProps = r.getTheme(names[0]);
-        UIManager.getInstance().setThemeProps(themeProps);
     }
 
     /**

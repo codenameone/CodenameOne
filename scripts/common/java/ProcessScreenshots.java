@@ -1,3 +1,25 @@
+/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
 import java.awt.Graphics2D;
 import java.awt.RenderingHints;
 import java.awt.image.BufferedImage;
@@ -195,6 +217,17 @@ public class ProcessScreenshots {
         // over a declared solid/gradient/photo backdrop are masked against that
         // backdrop, so their widget bbox is real instead of the full tile.
         Map<String, String[]> specByComponent = loadSpecInfo(specPath, referenceDir, specPlatform);
+        // Per-directory cache of the backdrop colour each appearance's tiles were
+        // painted on. See resolveTileBackground().
+        Map<Path, Map<String, Integer>> tileBackgrounds = new java.util.HashMap<>();
+        // ...and the SEPARATE one the NATIVE golden was captured on. The two are
+        // not the same colour and must not be assumed to be: the macOS Aqua set
+        // is captured on #E7E7E7/#262626 (the real NSWindow backdrop) while the
+        // CN1 theme paints AppKit's nominal windowBackgroundColor #ECECEC/#323232.
+        // Masking the native tile with the CN1 colour puts 12 levels between them
+        // in dark mode -- past CONTENT_TAU -- so every backdrop pixel is classified
+        // as widget and the whole tile, not the control, dominates every score.
+        Map<Path, Map<String, Integer>> nativeBackgrounds = new java.util.HashMap<>();
         java.util.Set<String> deliveredTests = new java.util.LinkedHashSet<>();
         for (Map.Entry<String, Path> entry : actualEntries) {
             String testName = entry.getKey();
@@ -262,7 +295,11 @@ public class ProcessScreenshots {
                         // background colour is known from the appearance (the tile
                         // backdrop we render), so a near-white CN1 fill still counts
                         // as widget content rather than being mistaken for blank bg.
-                        int bg = testName.contains("_dark") ? 0x000000 : 0xffffff;
+                        int bg = resolveTileBackground(tileBackgrounds, cn1Path, testName);
+                        int nativeBg = resolveNativeTileBackground(nativeBackgrounds, referenceDir,
+                                testName, bg);
+                        details.put("tile_bg", String.format("#%06X", bg));
+                        details.put("native_tile_bg", String.format("#%06X", nativeBg));
                         double[] sf;
                         boolean glass = false;
                         String[] specInfo = resolveSpecInfo(specByComponent, testName);
@@ -282,7 +319,7 @@ public class ProcessScreenshots {
                                     details.put("material_note",
                                             "material=" + material + " but no backdrop reference was found; scored whole-tile");
                                 }
-                                sf = structuralFidelity(natc, cn1c, bg);
+                                sf = structuralFidelity(natc, cn1c, bg, nativeBg);
                             }
                         } else if (refArr != null && isGlassTile(natc, refArr, cw, ch)) {
                             // Legacy fallback: infer glass from the golden's corners
@@ -291,10 +328,11 @@ public class ProcessScreenshots {
                             glass = true;
                             sf = structuralFidelityGlass(natc, cn1c, refArr);
                         } else {
-                            sf = structuralFidelity(natc, cn1c, bg);
+                            sf = structuralFidelity(natc, cn1c, bg, nativeBg);
                         }
                         double meanDelta = meanChannelDelta(natc, cn1c);
-                        details.put("fidelity_percent", round2(sf[0]));
+                        boolean blankPair = sf[0] == BOTH_BLANK;
+                        details.put("fidelity_percent", blankPair ? 0.0d : round2(sf[0]));
                         details.put("shape_sim", round4(sf[1]));
                         details.put("size_agreement", round4(sf[2]));
                         details.put("glass", glass);
@@ -313,11 +351,29 @@ public class ProcessScreenshots {
                         // bbox on exactly the geometry-isolation tiles.
                         int[] geoRef = glass ? refArr : geometryReference(
                                 specInfo != null ? specInfo[SPEC_BACKDROP] : null,
-                                backdropImg, cn1.width(), cn1.height(), cw, ch);
-                        details.put("geometry", geometryMetrics(natc, cn1c, bg, geoRef));
+                                backdropImg, cn1.width(), cn1.height(), cw, ch, testName.contains("_dark"));
+                        // Grouped white cells differ from their light backdrop by only
+                        // 11 mean channel levels; the glass threshold would erase them.
+                        int geometryTau = specInfo != null && "grouped".equals(specInfo[SPEC_BACKDROP])
+                                ? CONTENT_TAU : GLASS_TAU;
+                        details.put("geometry", geometryMetrics(natc, cn1c, bg, nativeBg, geoRef, geometryTau));
                         details.put("ssim", round4(computeSsim(natc, cn1c)));
                         details.put("mean_channel_delta", round2(meanDelta));
-                        record.put("status", "compared");
+                        if (blankPair) {
+                            // Reported as an uncomparable pair, which FidelityGate already
+                            // fails on and already refuses to write a baseline for. It still
+                            // falls through to the preview emission below -- a blank pair is
+                            // precisely the case where someone needs to SEE both tiles.
+                            record.put("status", "blank_pair");
+                            record.put("message", "Neither the native golden nor the CN1 render"
+                                    + " has any widget content against the tile background "
+                                    + String.format("#%06X", bg) + " / native "
+                                    + String.format("#%06X", nativeBg) + ". That is a harness failure"
+                                    + " (an empty render, a capture taken before first paint, or"
+                                    + " a widget positioned outside its tile), not a match.");
+                        } else {
+                            record.put("status", "compared");
+                        }
                     }
                     record.put("details", details);
                     if (emitBase64) {
@@ -442,17 +498,35 @@ public class ProcessScreenshots {
     /// differently or off by a few pixels -> high 90s; a genuinely different or
     /// mis-sized widget -> lower, in proportion to the mismatched area.
     private static final int CONTENT_TAU = 10;
+
+    /// Sentinel returned by structuralFidelity() when NEITHER tile has widget content.
+    /// Negative so it can never be confused with a score, and handled by the caller as
+    /// a status rather than a number. See the both-blank branch.
+    private static final double BOTH_BLANK = -1.0d;
     private static final int MIN_CONTENT_PIXELS = 4;
 
-    private static double[] structuralFidelity(PNGImage nativeImg, PNGImage cn1, int bgRgb) {
+    /// `bgRgb` is the backdrop the CN1 tile was painted on; `nativeBgRgb` is the one
+    /// the native golden was CAPTURED on. Each render is masked against its own --
+    /// they are independent facts about two different machines and coincide only by
+    /// luck (they do on Fluent and Adwaita; they differ by 12 levels on Aqua dark).
+    private static double[] structuralFidelity(PNGImage nativeImg, PNGImage cn1, int bgRgb,
+                                               int nativeBgRgb) {
         BufferedImage bn = toRgbImage(nativeImg);
         BufferedImage bc = toRgbImage(cn1);
-        int[] boxN = contentBBox(bn, bgRgb);
+        int[] boxN = contentBBox(bn, nativeBgRgb);
         int[] boxC = contentBBox(bc, bgRgb);
         boolean emptyN = boxN[2] <= 0;
         boolean emptyC = boxC[2] <= 0;
         if (emptyN && emptyC) {
-            return new double[]{100.0d, 1.0d, 1.0d};   // both blank -> trivially identical
+            // NOT "trivially identical", which is what this used to return, at 100%.
+            // Two tiles with no widget in either of them is the signature of a harness
+            // failure -- a renderer that produced empty frames, a capture that ran
+            // before first paint, a widget positioned outside its tile -- and the one
+            // thing it is not is a perfect render. Scoring it 100 puts the highest
+            // possible number on the case where nothing was measured, and because the
+            // ratchet only fails on a DROP, that number then becomes a baseline no
+            // real render can reach.
+            return new double[]{BOTH_BLANK, 0.0d, 0.0d};
         }
         if (emptyN || emptyC) {
             return new double[]{0.0d, 0.0d, 0.0d};      // one has a widget, the other does not
@@ -492,12 +566,59 @@ public class ProcessScreenshots {
         // min(fillSim, squared-salience structSim) is kept ONLY as a diagnostic:
         // its structural term could not tell "same widget, text a few px off" from
         // "different widget" and so crushed genuinely-faithful renders.
-        double fillSim = absoluteShapeSim(bn, bc, bgRgb);
-        double structSim = structuralSalienceSim(bn, bc, bgRgb);   // diagnostic only
-        double ssim = computeSsim(nativeImg, cn1);
+        double fillSim = absoluteShapeSim(bn, bc, bgRgb, nativeBgRgb);
+        double structSim = structuralSalienceSim(bn, bc, bgRgb);   // diagnostic only (gradient-based, bg unused)
+        // SSIM sees the WHOLE tile, and the backdrop is most of it. When the two backdrops
+        // are different colours -- Aqua dark is #262626 against the theme's #323232 -- SSIM's
+        // luminance term is depressed across every flat region, so the headline carries a
+        // constant penalty that has nothing to do with the widget, and a change to the Form
+        // background alone would move every score on the set. Masking fillSim was not enough
+        // on its own because the headline multiplies the two.
+        //
+        // So the native tile's backdrop is repainted in the CN1 backdrop colour before SSIM,
+        // which leaves the widget pixels untouched and makes the flat regions agree. Only
+        // when the colours actually differ: where they are equal (every mobile set, Fluent,
+        // Adwaita) nothing is rewritten at all, so no committed baseline moves.
+        PNGImage ssimNative = nativeBgRgb == bgRgb
+                ? nativeImg
+                : repaintBackdrop(nativeImg, nativeBgRgb, bgRgb);
+        double ssim = computeSsim(ssimNative, cn1);
         double headline = Math.sqrt(Math.max(0.0d, fillSim) * Math.max(0.0d, ssim));
         double fidelity = 100.0d * headline;
         return new double[]{fidelity, structSim, fillSim};
+    }
+
+    /// Returns a copy of `img` with every pixel within CONTENT_TAU of `fromRgb` replaced by
+    /// `toRgb`, so two tiles captured on different backdrops can be compared by a whole-tile
+    /// metric without the backdrop difference dominating it.
+    ///
+    /// CONTENT_TAU is the same threshold the content mask uses, so exactly the pixels the
+    /// mask calls background are the ones rewritten -- a pixel that counts as widget is never
+    /// touched, including the antialiased edge where a widget meets the backdrop.
+    private static PNGImage repaintBackdrop(PNGImage img, int fromRgb, int toRgb) {
+        BufferedImage src = toRgbImage(img);
+        int w = src.getWidth(), h = src.getHeight();
+        int fr = (fromRgb >> 16) & 0xff, fg = (fromRgb >> 8) & 0xff, fb = fromRgb & 0xff;
+        int tr = (toRgb >> 16) & 0xff, tg = (toRgb >> 8) & 0xff, tb = toRgb & 0xff;
+        // Emitted as a plain 8-bit RGB PNGImage (colorType 2): toRgbImage has already
+        // composited any alpha away, so the result carries exactly what every consumer of
+        // this record reads.
+        byte[] out = new byte[w * h * 3];
+        int offset = 0;
+        for (int y = 0; y < h; y++) {
+            for (int x = 0; x < w; x++) {
+                int p = src.getRGB(x, y);
+                int r = (p >> 16) & 0xff, g = (p >> 8) & 0xff, b = p & 0xff;
+                boolean background = Math.abs(r - fr) <= CONTENT_TAU
+                        && Math.abs(g - fg) <= CONTENT_TAU
+                        && Math.abs(b - fb) <= CONTENT_TAU;
+                out[offset] = (byte) (background ? tr : r);
+                out[offset + 1] = (byte) (background ? tg : g);
+                out[offset + 2] = (byte) (background ? tb : b);
+                offset += 3;
+            }
+        }
+        return new PNGImage(w, h, 8, 2, out, 3);
     }
 
     /// A pixel further than this (mean channel delta) from the backdrop reference
@@ -594,7 +715,22 @@ public class ProcessScreenshots {
             }
             return null;
         }
-        boolean android = platform != null && platform.startsWith("and");
+        // Whether this platform has the translucent-material model the glass masking
+        // implements. Only iOS does. This used to ask "is it Android?" and give the
+        // iOS treatment to everything else, which was correct while iOS and Android
+        // were the only two platforms and became wrong the moment a desktop platform
+        // name could reach here: a desktop row declaring material: glass would be
+        // masked against the iOS photo backdrop, which is not the surface behind it.
+        // Fluent's Mica and Aqua's vibrancy are declared out of scope in
+        // native-themes/COVERAGE.md, so the right answer for desktop today is the
+        // conservative one -- and an unrecognised platform gets it too, rather than
+        // inheriting iOS's by falling through.
+        // A null platform means --spec-platform was not passed, which happens when an
+        // archived artifact set is re-scored by hand (cn1ss.sh only passes the flag when
+        // CN1SS_FIDELITY_PLATFORM is set; the iOS and Android runners always set it).
+        // Keep the historical iOS answer there rather than silently restating an old
+        // set's numbers -- the fall-through this fixes is about NAMED platforms.
+        boolean glassPlatform = platform == null || platform.startsWith("ios");
         Map<String, String[]> out = new LinkedHashMap<>();
         try {
             boolean inComponents = false;
@@ -618,8 +754,8 @@ public class ProcessScreenshots {
                 }
                 if (trimmed.startsWith("- ")) {
                     if (id != null && platformOk) {
-                        String mat = normalizeMaterial(material, android);
-                        String bd = android ? null : effectiveBackdrop(backdrop, mat);
+                        String mat = normalizeMaterial(material, glassPlatform);
+                        String bd = glassPlatform ? effectiveBackdrop(backdrop, mat) : null;
                         out.put(id, new String[]{mat, bd});
                     }
                     id = null;
@@ -687,7 +823,7 @@ public class ProcessScreenshots {
 
     /// A spec entry without a material declaration maps to null so that test
     /// keeps the legacy heuristic; glass/lens degrade to normal on Android.
-    private static String normalizeMaterial(String material, boolean android) {
+    private static String normalizeMaterial(String material, boolean glassPlatform) {
         if (material == null || material.isEmpty()) {
             return null;
         }
@@ -695,7 +831,7 @@ public class ProcessScreenshots {
             System.err.println("WARNING: unknown material '" + material + "' in spec; treating as normal");
             return "normal";
         }
-        if (android && !material.equals("normal")) {
+        if (!glassPlatform && !material.equals("normal")) {
             return "normal";
         }
         return material;
@@ -806,9 +942,9 @@ public class ProcessScreenshots {
             }
         }
         if (count == 0) {
-            // Neither render put anything over the backdrop -> identical (both bare
-            // backdrop). Treat as a perfect match rather than dividing by zero.
-            return new double[]{100.0d, 1.0d, 1.0d};
+            // Matching backdrops contain no widget to compare. Use the same blank
+            // sentinel as ordinary tiles so a new row cannot pass as a perfect match.
+            return new double[]{BOTH_BLANK, 0.0d, 0.0d};
         }
         double fillSim = 1.0d - (double) sum / (count * 255.0d);
         if (fillSim < 0) {
@@ -853,7 +989,8 @@ public class ProcessScreenshots {
     /// identical (clipped) numbers on both sides.
     private static final int GEOMETRY_EDGE_TRIM = 2;
 
-    private static Map<String, Object> geometryMetrics(PNGImage nativeImg, PNGImage cn1, int bgRgb, int[] refArr) {
+    private static Map<String, Object> geometryMetrics(PNGImage nativeImg, PNGImage cn1, int bgRgb,
+            int nativeBgRgb, int[] refArr, int referenceTau) {
         Map<String, Object> geo = new LinkedHashMap<>();
         BufferedImage bn = toRgbImage(nativeImg);
         BufferedImage bc = toRgbImage(cn1);
@@ -870,10 +1007,10 @@ public class ProcessScreenshots {
         boolean[] maskN;
         boolean[] maskC;
         if (refArr != null) {
-            maskN = contentMaskRef(nArr, refArr, GLASS_TAU);
-            maskC = contentMaskRef(cArr, refArr, GLASS_TAU);
+            maskN = contentMaskRef(nArr, refArr, referenceTau);
+            maskC = contentMaskRef(cArr, refArr, referenceTau);
         } else {
-            maskN = contentMaskBg(nArr, bgRgb, CONTENT_TAU);
+            maskN = contentMaskBg(nArr, nativeBgRgb, CONTENT_TAU);
             maskC = contentMaskBg(cArr, bgRgb, CONTENT_TAU);
         }
         trimEdges(maskN, w, h, GEOMETRY_EDGE_TRIM);
@@ -908,11 +1045,12 @@ public class ProcessScreenshots {
     /// widget pixels are the ones that differ from it. Mirrors the device
     /// renderer's applyBackdrop: a 6-hex value is a solid fill, "gradient" is a
     /// vertical #1e64ff -> #28c850 ramp over the full tile, "photo" is the
-    /// shared backdrop PNG (scaleToFill). Returns null when the tile has no
+    /// shared backdrop PNG (scaleToFill), and "grouped" uses the appearance-specific
+    /// systemGroupedBackground fill. Returns null when the tile has no
     /// backdrop (callers fall back to the plain bg-colour mask) or the photo
     /// asset is unavailable.
     private static int[] geometryReference(String backdrop, BufferedImage backdropImg,
-            int fullW, int fullH, int cw, int ch) {
+            int fullW, int fullH, int cw, int ch, boolean dark) {
         if (backdrop == null) {
             return null;
         }
@@ -920,6 +1058,12 @@ public class ProcessScreenshots {
             return backdropImg != null ? stretchCropTopLeft(backdropImg, fullW, fullH, cw, ch) : null;
         }
         int[] out = new int[cw * ch];
+        if ("grouped".equals(backdrop)) {
+            // A full-tile bbox can still be correct for an edge-to-edge field;
+            // mask the actual backdrop without forcing margins or a smaller bbox.
+            java.util.Arrays.fill(out, dark ? 0x1c1c1e : 0xf2f2f7);
+            return out;
+        }
         if ("gradient".equals(backdrop)) {
             int sr = 0x1e, sg = 0x64, sb = 0xff;
             int er = 0x28, eg = 0xc8, eb = 0x50;
@@ -1081,6 +1225,138 @@ public class ProcessScreenshots {
 
     /// Bounding box {x, y, w, h} of the widget (pixels >CONTENT_TAU off bg).
     /// Returns w=0 when there is no meaningful content.
+    /// The colour the tiles were painted on, which the content mask uses to tell
+    /// widget pixels from empty backdrop.
+    ///
+    /// Mobile tiles are painted on white or black and this used to be hardcoded to
+    /// exactly that. No desktop platform paints on either: Fluent's light surface is
+    /// #F3F3F3 and its dark one #202020, Aqua's is #ECECEC, Adwaita's #FAFAFA. Only
+    /// Adwaita's light surface is within the mask's 10-per-channel tolerance of white,
+    /// so for five of the six desktop appearance/platform pairs every backdrop pixel
+    /// was classified as widget -- measured at roughly 80% of each tile.
+    ///
+    /// That does not fail loudly. It INFLATES the score, because the two tiles agree
+    /// about the backdrop that now makes up most of what is being compared, which is
+    /// the worst way for a measurement to be wrong.
+    ///
+    /// DesktopTileRunner writes tile-backgrounds.properties beside the tiles, reading
+    /// the value back out of the theme it installed rather than from a second copy
+    /// that could drift. When the file is absent -- every mobile set, and any older
+    /// artifact set being re-scored -- the historical white/black assumption applies
+    /// unchanged.
+    private static int resolveTileBackground(Map<Path, Map<String, Integer>> cache,
+                                             Path cn1Path, String testName) {
+        Path dir = cn1Path.getParent();
+        Map<String, Integer> byAppearance = dir == null ? null : cache.get(dir);
+        if (byAppearance == null && dir != null) {
+            byAppearance = loadTileBackgrounds(dir);
+            cache.put(dir, byAppearance);
+        }
+        Integer hit = matchAppearance(byAppearance, testName);
+        if (hit != null) {
+            return hit.intValue();
+        }
+        return testName.contains("_dark") ? 0x000000 : 0xffffff;
+    }
+
+    /// The backdrop the NATIVE golden was captured on, which is a property of the
+    /// machine that captured it and NOT of the CN1 theme. Read from the golden
+    /// set's own capture-manifest.json (`backdrop_by_appearance`), which the
+    /// reference apps write from the real window backdrop they rendered into.
+    ///
+    /// Falls back to the CN1 value, which is what every mobile set wants: the iOS
+    /// and Android goldens are captured on the same white/black the CN1 tiles use,
+    /// they ship no manifest backdrops, and this must not change their scores.
+    private static int resolveNativeTileBackground(Map<Path, Map<String, Integer>> cache,
+                                                   Path referenceDir, String testName, int cn1Bg) {
+        Map<String, Integer> byAppearance = cache.get(referenceDir);
+        if (byAppearance == null) {
+            // A sidecar beside the goldens wins, so a set can correct itself without
+            // a manifest rewrite; otherwise the manifest the capture job produced.
+            byAppearance = loadTileBackgrounds(referenceDir);
+            if (byAppearance.isEmpty()) {
+                byAppearance = loadCaptureManifestBackdrops(referenceDir);
+            }
+            cache.put(referenceDir, byAppearance);
+        }
+        Integer hit = matchAppearance(byAppearance, testName);
+        return hit != null ? hit.intValue() : cn1Bg;
+    }
+
+    /// Longest key first, so an appearance named "dark" cannot shadow one named
+    /// "high-contrast-dark". Null when no appearance suffix matches.
+    private static Integer matchAppearance(Map<String, Integer> byAppearance, String testName) {
+        if (byAppearance == null || byAppearance.isEmpty()) {
+            return null;
+        }
+        List<String> keys = new ArrayList<>(byAppearance.keySet());
+        keys.sort((a, b) -> b.length() - a.length());
+        for (String k : keys) {
+            if (testName.endsWith("_" + k)) {
+                return byAppearance.get(k);
+            }
+        }
+        return null;
+    }
+
+    private static Map<String, Integer> loadCaptureManifestBackdrops(Path dir) {
+        Map<String, Integer> out = new LinkedHashMap<>();
+        Path f = dir.resolve("capture-manifest.json");
+        if (!Files.exists(f)) {
+            return out;
+        }
+        try {
+            Object root = JsonUtil.parse(new String(Files.readAllBytes(f),
+                    java.nio.charset.StandardCharsets.UTF_8));
+            // asObject() answers an EMPTY map for anything that is not an object,
+            // so a manifest without the key simply yields no entries and the caller
+            // falls back -- no null handling needed here.
+            Map<String, Object> byApp = JsonUtil.asObject(
+                    JsonUtil.asObject(root).get("backdrop_by_appearance"));
+            for (Map.Entry<String, Object> e : byApp.entrySet()) {
+                String val = String.valueOf(e.getValue()).trim();
+                if (val.startsWith("#")) {
+                    val = val.substring(1);
+                }
+                out.put(e.getKey(), Integer.valueOf((int) (Long.parseLong(val, 16) & 0xffffffL)));
+            }
+        } catch (Exception ex) {
+            // Same rule as loadTileBackgrounds: a manifest we cannot read must not
+            // silently fall back to the wrong colour, which is the bug this exists
+            // to fix.
+            throw new IllegalStateException("unreadable " + f + ": " + ex.getMessage(), ex);
+        }
+        return out;
+    }
+
+    private static Map<String, Integer> loadTileBackgrounds(Path dir) {
+        Map<String, Integer> out = new LinkedHashMap<>();
+        Path f = dir.resolve("tile-backgrounds.properties");
+        if (!Files.exists(f)) {
+            return out;
+        }
+        try {
+            for (String line : Files.readAllLines(f, java.nio.charset.StandardCharsets.UTF_8)) {
+                String t = line.trim();
+                int eq = t.indexOf('=');
+                if (t.isEmpty() || t.startsWith("#") || eq <= 0) {
+                    continue;
+                }
+                String key = t.substring(0, eq).trim();
+                String val = t.substring(eq + 1).trim();
+                if (val.startsWith("#")) {
+                    val = val.substring(1);
+                }
+                out.put(key, Integer.valueOf((int) (Long.parseLong(val, 16) & 0xffffffL)));
+            }
+        } catch (Exception ex) {
+            // A malformed sidecar must not silently restore the wrong hardcoded
+            // background, which is the bug this exists to fix.
+            throw new IllegalStateException("unreadable " + f + ": " + ex.getMessage(), ex);
+        }
+        return out;
+    }
+
     private static int[] contentBBox(BufferedImage img, int bgRgb) {
         int w = img.getWidth(), h = img.getHeight();
         int bgR = (bgRgb >> 16) & 0xff, bgG = (bgRgb >> 8) & 0xff, bgB = bgRgb & 0xff;
@@ -1120,8 +1396,10 @@ public class ProcessScreenshots {
     /// a different place (a wrong margin) the content simply does not line up and is
     /// scored as mismatch. Symmetric: each side searches the other and the worse
     /// direction is taken so content present on only one side is penalized.
-    private static double absoluteShapeSim(BufferedImage bn, BufferedImage bc, int bgRgb) {
+    private static double absoluteShapeSim(BufferedImage bn, BufferedImage bc, int bgRgb,
+                                           int nativeBgRgb) {
         int bgR = (bgRgb >> 16) & 0xff, bgG = (bgRgb >> 8) & 0xff, bgB = bgRgb & 0xff;
+        int nbR = (nativeBgRgb >> 16) & 0xff, nbG = (nativeBgRgb >> 8) & 0xff, nbB = nativeBgRgb & 0xff;
         int w = Math.min(bn.getWidth(), bc.getWidth());
         int h = Math.min(bn.getHeight(), bc.getHeight());
         int[] nArr = new int[w * h];
@@ -1132,7 +1410,7 @@ public class ProcessScreenshots {
                 cArr[y * w + x] = bc.getRGB(x, y) & 0xffffff;
             }
         }
-        boolean[] nC = contentMask(nArr, bgR, bgG, bgB);
+        boolean[] nC = contentMask(nArr, nbR, nbG, nbB);
         boolean[] cC = contentMask(cArr, bgR, bgG, bgB);
         long sum = 0;
         long count = 0;

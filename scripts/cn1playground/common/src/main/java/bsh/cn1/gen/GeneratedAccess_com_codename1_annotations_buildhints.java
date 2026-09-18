@@ -855,6 +855,7 @@ public final class GeneratedAccess_com_codename1_annotations_buildhints {
         if ("IOS7".equals(name)) return com.codename1.annotations.buildhints.ThemeMode.IOS7;
         if ("LEGACY".equals(name)) return com.codename1.annotations.buildhints.ThemeMode.LEGACY;
         if ("MODERN".equals(name)) return com.codename1.annotations.buildhints.ThemeMode.MODERN;
+        if ("NATIVE".equals(name)) return com.codename1.annotations.buildhints.ThemeMode.NATIVE;
         throw unsupportedStaticField(com.codename1.annotations.buildhints.ThemeMode.class, name);
     }
 

@@ -102,6 +102,17 @@ public class Window extends Container implements TopLevelContainer {
     /// caps how many windows can be dragged at once.
     private final com.codename1.impl.PointerDragActivation dragActivation =
             new com.codename1.impl.PointerDragActivation();
+    /// Which component the pointer is over, and the scrollbar thumb it lit. Shared with Form
+    /// rather than reimplemented: a window that tracked this differently would be a second
+    /// definition of what hover means.
+    private final HoverTracker hoverTracker = new HoverTracker();
+
+    @Override
+    HoverTracker getHoverTracker() {
+        return hoverTracker;
+    }
+
+
     private Graphics windowGraphics;
     /// Set as soon as dispose() begins, so re-entering it is a no-op.
     private boolean disposing;
@@ -2728,6 +2739,10 @@ public class Window extends Container implements TopLevelContainer {
         }
         nativePeer = null;
         windowGraphics = null;
+        // A window that is going away must not leave a component believing the pointer is
+        // still over it -- the flag outlives the window and the component would paint
+        // hovered the next time it is shown. Same reason Form clears it in deinitialize.
+        hoverTracker.pointerOver(null, -1, -1);
         // showModal parks on Display.lock and wakes on this flag, so publish it under
         // the very monitor the waiter is blocked on
         synchronized (Display.lock) {
@@ -3395,6 +3410,7 @@ public class Window extends Container implements TopLevelContainer {
     /// {@inheritDoc}
     @Override
     public void pointerReleased(int x, int y) {
+        final boolean hoverOnRelease = HoverTracker.canHoverOnRelease();
         // Not once the gesture has been taken away. This resolves the component under
         // the pointer afresh, so after an overlay took the pointer it hit tested into
         // that overlay and handed it the rest of a gesture whose press it never saw --
@@ -3440,6 +3456,7 @@ public class Window extends Container implements TopLevelContainer {
                 // Still cleared: the gesture is over regardless of who handled it,
                 // and leaving these set would strand the next press.
                 endGesture(releasing);
+                refreshHoverAfterRelease(x, y, hoverOnRelease);
                 return;
             }
         }
@@ -3452,6 +3469,7 @@ public class Window extends Container implements TopLevelContainer {
                 LeadUtil.dragFinished(releasingDragged, x, y);
             }
             endGesture(releasing);
+            refreshHoverAfterRelease(x, y, hoverOnRelease);
             return;
         }
         Component target = releasingDragged != null ? releasingDragged : releasingPressed;
@@ -3468,6 +3486,27 @@ public class Window extends Container implements TopLevelContainer {
             }
         }
         endGesture(releasing);
+        refreshHoverAfterRelease(x, y, hoverOnRelease);
+    }
+
+    /// Catches hover up at the end of a gesture, the way Form.pointerReleased does.
+    ///
+    /// Hover is not tracked while a drag is in progress, and a pointer that stops moving
+    /// after the release produces no further motion event, so the component hovered when the
+    /// drag began would stay lit and the one under the pointer now would never light up.
+    /// Resolved rather than dispatched, so a release raises no tooltip of its own.
+    ///
+    /// Called from each of this method's three exits rather than once at the bottom: two of
+    /// them return early, and a single call after the last endGesture is reached by neither
+    /// -- which is exactly how the same catch-up in Form started out as dead code.
+    private void refreshHoverAfterRelease(int x, int y, boolean hoverOnRelease) {
+        // A release callback can hide a reusable window; cancellation has already
+        // cleared its hover, and catch-up must not restore it on the hidden surface.
+        if (!hoverOnRelease || !isTopLevelShowing()) {
+            return;
+        }
+        Component after = hoverTargetAt(x, y);
+        hoverTracker.pointerOver(after == null ? null : LeadUtil.leadParentImpl(after), x, y);
     }
 
     /// Clears the pressed state for the gesture identified by `token`, and only that
@@ -3821,6 +3860,14 @@ public class Window extends Container implements TopLevelContainer {
     /// pressed state with no release coming; and the framework's own recorded targets
     /// and timers, which otherwise keep firing into a tree nobody can see.
     void cancelPendingInput() {
+        // Hide/minimize shares this path with disposal, including HIDE_ON_CLOSE.
+        hoverTracker.pointerOver(null, -1, -1);
+        TooltipManager tooltip = TooltipManager.getInstance();
+        if (tooltip != null) {
+            // Hidden/reusable windows retain their tree; cancel its tooltip now,
+            // without dismissing an anchor in another window sharing the manager.
+            tooltip.clearTooltipFor(this);
+        }
         // Held keys never arrive as releases once the window has gone, so their
         // recorded scopes would sit here until some later press happened to reuse the
         // same key code.
@@ -3850,6 +3897,13 @@ public class Window extends Container implements TopLevelContainer {
         // kind of cancellation; this is the one for a window going away.
         NativeDragAndDrop.topLevelInputCancelled(this);
         Display.getInstance().windowInputCancelled(this);
+    }
+
+    Component hoverTargetAt(int x, int y) {
+        // Keep this check specific to hover: captured drag/release dispatch can still
+        // target a pressed component outside the window. A leave must not hover its root.
+        Container actual = getActualPane(x, y);
+        return actual != null && actual.contains(x, y) ? resolveComponentAt(x, y) : null;
     }
 
     private Component resolveComponentAt(int x, int y) {
@@ -4290,18 +4344,28 @@ public class Window extends Container implements TopLevelContainer {
             LeadUtil.pointerHover(dragged, x, y);
             return;
         }
-        Component cmp = resolveComponentAt(x[0], y[0]);
+        Component cmp = hoverTargetAt(x[0], y[0]);
         if (cmp != null) {
-            LeadUtil.pointerHover(cmp, x, y);
+            cmp = LeadUtil.leadParentImpl(cmp);
+        }
+        // Publish the new state before callbacks, which can hide the window or
+        // remove the target. Null clears the old state on pointer leave.
+        hoverTracker.pointerOver(cmp, x[0], y[0]);
+        try {
+            if (cmp != null) {
+                LeadUtil.pointerHover(cmp, x, y);
+            }
+        } finally {
+            hoverTracker.clearDetached(this);
         }
         // The tooltip timer starts here or it never starts at all: this is the only
         // hover dispatch a window has. The manager resolves the surface through
         // getTopLevelContainer() and hosts the tooltip on it, so a tooltip raised from
-        // a window appears on that window. Guarded on cmp, which the Form path is not
-        // -- a hover over empty space there would already have been a null dereference.
+        // a window appears on that window. Leaving the window must also cancel a pending
+        // timer or dismiss a visible tooltip, even though there is no component to query.
         TooltipManager tm = TooltipManager.getInstance();
-        if (tm != null && cmp != null) {
-            String tip = cmp.getTooltip();
+        if (tm != null) {
+            String tip = hoverTracker.isOver(cmp) ? cmp.getTooltip() : null;
             if (tip != null && tip.length() > 0) {
                 tm.prepareTooltip(tip, cmp);
             } else {

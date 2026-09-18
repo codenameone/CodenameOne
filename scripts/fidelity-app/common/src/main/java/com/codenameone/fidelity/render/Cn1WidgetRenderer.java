@@ -39,6 +39,7 @@ import com.codename1.ui.layouts.GridLayout;
 import com.codename1.ui.layouts.LayeredLayout;
 import com.codename1.ui.Slider;
 import com.codename1.ui.Tabs;
+import com.codename1.ui.Form;
 import com.codename1.ui.TextField;
 import com.codename1.ui.Toolbar;
 import com.codename1.ui.plaf.Border;
@@ -55,6 +56,35 @@ public final class Cn1WidgetRenderer {
     private Cn1WidgetRenderer() {
     }
 
+    /// Maps a desktop row id onto the component kind that builds it.
+    ///
+    /// A desktop Button is still a Button; what makes the row different is its UIID, its tile
+    /// geometry and the states it is asked for, none of which live here. Mapping at the top
+    /// of the dispatch means every existing branch is reached unchanged, rather than being
+    /// duplicated with a "Desktop" prefix.
+    private static String desktopToMobileId(String id) {
+        if (id == null || !id.startsWith("Desktop")) {
+            return id;
+        }
+        String rest = id.substring("Desktop".length());
+        if ("AccentButton".equals(rest)) {
+            return "RaisedButton";
+        }
+        if ("ComboBox".equals(rest)) {
+            // No dedicated ComboBox branch; a popup button reads as a Button with a label,
+            // which is what the CN1 side has to offer against a native NSPopUpButton /
+            // GtkDropDown / WinUI ComboBox. Tracked as an approximation rather than hidden.
+            return "Button";
+        }
+        return rest;
+    }
+
+    /// True when this row is one of the desktop rows, i.e. before desktopToMobileId()
+    /// rewrote its id onto the mobile kind that builds it.
+    private static boolean isDesktopRow(ComponentSpec spec) {
+        return spec != null && spec.getId() != null && spec.getId().startsWith("Desktop");
+    }
+
     /** Returns true when this renderer knows how to build the given component id. */
     public static boolean isSupported(String id) {
         return "Button".equals(id) || "RaisedButton".equals(id) || "FlatButton".equals(id)
@@ -67,7 +97,17 @@ public final class Cn1WidgetRenderer {
                 || "SwitchMorph".equals(id)                    // animation-frame validation: frozen droplet slide
                 || "TabOne".equals(id)                         // minimal: one tab with a transparent icon slot
                 || "GlassText".equals(id) || "GlassIcon".equals(id) // ladder rungs: glass + one element
-                || (id != null && id.startsWith("GlassPanel")); // glass-blend isolation panels
+                || (id != null && id.startsWith("GlassPanel")) // glass-blend isolation panels
+                // The desktop rows. They build the same components as the mobile ones -- a
+                // Button is a Button -- and differ in their UIID, their tile geometry and the
+                // states they are asked for. Named separately rather than reusing the mobile
+                // ids because one screenshot name has to identify one row, and a desktop
+                // Button and a mobile Button are different references.
+                || "DesktopButton".equals(id) || "DesktopAccentButton".equals(id)
+                || "DesktopTextField".equals(id) || "DesktopCheckBox".equals(id)
+                || "DesktopRadioButton".equals(id) || "DesktopSwitch".equals(id)
+                || "DesktopSlider".equals(id) || "DesktopProgressBar".equals(id)
+                || "DesktopComboBox".equals(id);
     }
 
     /**
@@ -79,7 +119,19 @@ public final class Cn1WidgetRenderer {
     }
 
     public static Component build(ComponentSpec spec, String state, String appearance) {
-        String id = spec.getId();
+        Component built = buildImpl(spec, state, appearance);
+        // Applied here rather than inside each branch. Every widget grew its own state
+        // handling, so adding hover to the Button path left CheckBox, RadioButton, Switch and
+        // Slider silently ignoring it -- the tiles rendered, looked plausible, and were
+        // pixel-identical to their normal state. One place means one behaviour.
+        if (built != null) {
+            applyDesktopState(built, state);
+        }
+        return built;
+    }
+
+    private static Component buildImpl(ComponentSpec spec, String state, String appearance) {
+        String id = desktopToMobileId(spec.getId());
         String uiid = spec.getCn1Uiid();
         boolean dark = "dark".equals(appearance);
         String text = spec.getText() != null ? spec.getText() : "";
@@ -97,7 +149,14 @@ public final class Cn1WidgetRenderer {
             // iOS 26 prominentGlass (RaisedButton) is a translucent fill -- the
             // backdrop shows faintly through the blue. Drop the fill alpha a touch
             // so the CN1 raised button reads as glass rather than a flat opaque blue.
-            if ("RaisedButton".equals(id)) {
+            //
+            // Keyed on the SPEC's own id, not the mapped kind: DesktopAccentButton maps
+            // onto RaisedButton to reuse this branch, but all three desktop themes give
+            // their accent button an OPAQUE fill, so applying the glass alpha there made
+            // the normal/pressed/disabled tiles artificially translucent -- and, because
+            // getAllStyles() excludes hover, left hover opaque, inventing a state
+            // difference the native controls do not have.
+            if ("RaisedButton".equals(id) && !isDesktopRow(spec)) {
                 b.getAllStyles().setBgTransparency(225);
             }
             c = b;
@@ -166,7 +225,19 @@ public final class Cn1WidgetRenderer {
             s.setEditable("Slider".equals(id));
             s.setMinValue(0);
             s.setMaxValue(100);
-            s.setProgress(50);
+            // Every value here mirrors what the matching native reference app sets, and
+            // the DESKTOP apps disagree with the mobile ones, so this is scoped by row
+            // rather than shared:
+            //
+            //   mobile  slider 0.5, progress 0.5   (RefWidgets.java, NativeRef.swift)
+            //   desktop slider 0.5, progress 0.6   (the three desktop reference apps)
+            //
+            // Both sides must sit at the same value or the comparison is between two
+            // different states. Setting progress to 60 everywhere moved the MOBILE bar off
+            // its golden, which was captured at 0.5 -- a regression in the iOS and Android
+            // suites introduced while fixing the desktop one.
+            boolean desktopRow = spec.getId() != null && spec.getId().startsWith("Desktop");
+            s.setProgress("ProgressBar".equals(id) && desktopRow ? 60 : 50);
             if ("disabled".equals(state)) {
                 s.setEnabled(false);
             }
@@ -456,6 +527,37 @@ public final class Cn1WidgetRenderer {
         } else if ("pressed".equals(state)) {
             // Force the pressed visual state so the pressed style is painted.
             b.pressed();
+        }
+    }
+
+    /// Applies state that requires an attached component, after the host Form is shown.
+    /// Build cannot assign focus: neither runner has attached the widget at that point.
+    public static void applyAttachedState(Component c, String state) {
+        if ("focus".equals(state)) {
+            Form form = c.getComponentForm();
+            if (form == null) {
+                throw new IllegalStateException("Focus capture requires an attached component");
+            }
+            form.setFocused(c);
+        }
+    }
+
+    /// Applies the two states that only exist on the desktop.
+    ///
+    /// Both are set on the MODEL rather than synthesised as input, which is how every other
+    /// state here is driven: the runner never moves a pointer or presses a key, because a
+    /// capture that depends on input timing is a capture that differs between runs. Hover is
+    /// the state Codename One gained for these themes; focus is the existing selected style,
+    /// which is what a focused component renders with.
+    private static void applyDesktopState(Component c, String state) {
+        if ("hover".equals(state)) {
+            // Margin normalisation is NOT done here. The tile runner zeroes margins AFTER
+            // build() returns, so anything copied at this point is overwritten a line later;
+            // DesktopTileRunner owns it for every component, hover style included.
+            c.setHovered(true);
+        } else if ("focus".equals(state)) {
+            c.setFocusable(true);
+            // applyAttachedState assigns the focus owner after attachment and show.
         }
     }
 }
