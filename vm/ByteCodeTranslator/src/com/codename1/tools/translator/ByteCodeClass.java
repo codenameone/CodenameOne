@@ -1676,7 +1676,7 @@ public class ByteCodeClass {
             b.append("JAVA_OBJECT __VALUE_OF_").append(clsName).append("(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT value) {\n    ");
             if (enumValuesField != null) {
                 b.append("    JAVA_ARRAY values = (JAVA_ARRAY)get_static_").append(clsName).append("_").append(enumValuesField.replace('$', '_')).append("();\n");
-                b.append("    JAVA_ARRAY_OBJECT* data = (JAVA_ARRAY_OBJECT*)values->data;\n");
+                b.append("    JAVA_ARRAY_OBJECT* data = (JAVA_ARRAY_OBJECT*)CN1_ARRAY_DATA(values);\n");
                 b.append("    int len = values->length;\n");
                 b.append("    for (int i=0; i<len; i++) {\n");
                 b.append("        JAVA_OBJECT name = (*(struct obj__").append(clsName).append("*)data[i]).java_lang_Enum_name;\n");

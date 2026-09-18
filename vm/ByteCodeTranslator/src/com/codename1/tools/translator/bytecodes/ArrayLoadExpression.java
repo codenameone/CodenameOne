@@ -202,7 +202,7 @@ public class ArrayLoadExpression extends Instruction implements AssignableExpres
             if (!isBoundsSafe() && (getMethod() == null || !getMethod().isDisableNullAndArrayBoundsChecks())) {
                 b.append("    CHECK_ARRAY_ACCESS_WITH_ARGS(__cn1ArrayTmp, __cn1IndexTmp);\n");
             }
-            b.append("    ").append(varName).append(" = ((").append(arrayDataType).append("*) (*(JAVA_ARRAY)__cn1ArrayTmp).data)[__cn1IndexTmp];\n");
+            b.append("    ").append(varName).append(" = ((").append(arrayDataType).append("*) CN1_ARRAY_DATA((JAVA_ARRAY)__cn1ArrayTmp))[__cn1IndexTmp];\n");
             b.append("}\n");
             sb.append(b);
             return true;
@@ -306,7 +306,7 @@ public class ArrayLoadExpression extends Instruction implements AssignableExpres
                .append(tempName).append("_i, ").append(retvalText).append(");\n    ");
         }
         out.append(elemType).append(' ').append(tempName).append(" = ((").append(dataType)
-           .append("*) (*(JAVA_ARRAY)").append(tempName).append("_a).data)[").append(tempName).append("_i];\n    ");
+           .append("*) CN1_ARRAY_DATA((JAVA_ARRAY)").append(tempName).append("_a))[").append(tempName).append("_i];\n    ");
         return true;
     }
 

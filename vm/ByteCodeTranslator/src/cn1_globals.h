@@ -411,14 +411,41 @@ struct JavaArrayPrototype {
     int length;
     unsigned char dimensions;
     unsigned char primitiveSize;
-    void* data;
+    /* Byte distance from THIS HEADER to the payload, not a pointer to it.
+     *
+     * The pointer was 8 of the header's 32 bytes, and this header is 20% of the
+     * VM's allocation volume -- so it was 5% of everything the collector ever has
+     * to sweep, spent re-storing a value that is a small constant away from the
+     * object it sits in. An offset makes the header 24 bytes:
+     *
+     *     16 object header | length 4 | dimensions 1 | primitiveSize 1 | offset 2
+     *
+     * and turns every array access from a dependent load into an add, which the
+     * address-generation unit does for free alongside the index arithmetic.
+     *
+     * Two bytes rather than one because the offset is not always
+     * CN1_ARRAY_PAYLOAD_OFFSET: allocArrayAligned and the SIMD stack path round the
+     * payload start up to an alignment that is a PARAMETER, so the distance can be
+     * the header plus up to alignment-1. One byte covers alignments to 224 and
+     * silently truncates above that; two covers any alignment this VM could ask for
+     * and costs nothing, because dimensions and primitiveSize leave exactly two
+     * bytes before the next 4-byte boundary.
+     *
+     * Read it through CN1_ARRAY_DATA, never directly. */
+    unsigned short dataOffset;
 };
 
 #ifndef DEBUG_GC_ALLOCATIONS
 /* DEBUG_GC_VARIABLES adds two ints to BOTH structs, so the prefix assertions below hold
    in that configuration too, but the absolute sizes do not -- hence the guard. */
-_Static_assert(sizeof(struct JavaArrayPrototype) == 32,
-               "array header must stay 32 bytes; it is 20% of this VM's allocation volume");
+_Static_assert(sizeof(struct JavaArrayPrototype) == 24,
+               "array header must stay 24 bytes; it is 20% of this VM's allocation volume");
+/* The payload sits at sizeof(header) from the base, so a long[] or double[] element
+ * is 8-aligned only if that offset is a multiple of 8. 24 is; 20 or 28 would not be,
+ * and the failure would be a misaligned 64-bit load on some targets and a silent
+ * performance cliff on the rest. */
+_Static_assert(sizeof(struct JavaArrayPrototype) % 8 == 0,
+               "array payload offset must stay 8-aligned for long[] and double[]");
 _Static_assert(sizeof(struct JavaObjectPrototype) == 16, "object header must stay 16 bytes");
 #endif
 _Static_assert(offsetof(struct JavaArrayPrototype, __codenameOneParentClsReference)
@@ -430,11 +457,17 @@ _Static_assert(offsetof(struct JavaArrayPrototype, __codenameOneGcMark)
 _Static_assert(offsetof(struct JavaArrayPrototype, __heapPosition)
                == offsetof(struct JavaObjectPrototype, __heapPosition),
                "array and object headers are cast to each other; heapPosition must align");
-_Static_assert(offsetof(struct JavaArrayPrototype, data) + sizeof(void*)
+_Static_assert(offsetof(struct JavaArrayPrototype, dataOffset) + sizeof(unsigned short)
                == sizeof(struct JavaArrayPrototype),
-               "data must stay the LAST header member: allocArray sizes the block from "
-               "sizeof(struct) while every placement site computes the address from "
-               "&a->data + sizeof(void*), and the two must be the same byte");
+               "dataOffset must stay the LAST header member: allocArray sizes the block "
+               "from sizeof(struct) while every placement site computes the payload "
+               "address from the same value, and the two must be the same byte");
+
+/* The payload of an array that already exists. Equals CN1_ARRAY_PAYLOAD_PTR for every
+ * ordinarily allocated array, and differs only for the aligned and stack paths, which
+ * push the start up to an alignment boundary. This replaced a `data` pointer field --
+ * see the comment on dataOffset. */
+#define CN1_ARRAY_DATA(a) ((void*)((char*)(a) + ((JAVA_ARRAY)(a))->dataOffset))
 
 typedef union {
     JAVA_OBJECT  o;
@@ -1243,7 +1276,7 @@ static inline struct clazz* cn1ClassOf(JAVA_OBJECT o) {
 
 #define BC_IALOAD() { CHECK_ARRAY_ACCESS(2, SP[-1].data.i); \
     SP--; SP[-1].type = CN1_TYPE_INT; \
-    SP[-1].data.i = ((JAVA_ARRAY_INT*) (*(JAVA_ARRAY)SP[-1].data.o).data)[(*SP).data.i]; \
+    SP[-1].data.i = ((JAVA_ARRAY_INT*) CN1_ARRAY_DATA((JAVA_ARRAY)SP[-1].data.o))[(*SP).data.i]; \
     }
 
 #define BC_LALOAD() { CHECK_ARRAY_ACCESS(2, SP[-1].data.i); \
@@ -1263,36 +1296,36 @@ static inline struct clazz* cn1ClassOf(JAVA_OBJECT o) {
 
 #define BC_AALOAD() { CHECK_ARRAY_ACCESS(2, SP[-1].data.i); \
     SP--; SP[-1].type = CN1_TYPE_INVALID; \
-    SP[-1].data.o = ((JAVA_ARRAY_OBJECT*) (*(JAVA_ARRAY)SP[-1].data.o).data)[(*SP).data.i]; \
+    SP[-1].data.o = ((JAVA_ARRAY_OBJECT*) CN1_ARRAY_DATA((JAVA_ARRAY)SP[-1].data.o))[(*SP).data.i]; \
     SP[-1].type = CN1_TYPE_OBJECT;  }
 
 #define BC_BALOAD() { CHECK_ARRAY_ACCESS(2, SP[-1].data.i); \
     SP--; SP[-1].type = CN1_TYPE_INT; \
-    SP[-1].data.i = ((JAVA_ARRAY_BYTE*) (*(JAVA_ARRAY)SP[-1].data.o).data)[(*SP).data.i]; \
+    SP[-1].data.i = ((JAVA_ARRAY_BYTE*) CN1_ARRAY_DATA((JAVA_ARRAY)SP[-1].data.o))[(*SP).data.i]; \
     }
 
 #define BC_CALOAD() { CHECK_ARRAY_ACCESS(2, SP[-1].data.i); \
     SP--; SP[-1].type = CN1_TYPE_INT; \
-    SP[-1].data.i = ((JAVA_ARRAY_CHAR*) (*(JAVA_ARRAY)SP[-1].data.o).data)[(*SP).data.i]; \
+    SP[-1].data.i = ((JAVA_ARRAY_CHAR*) CN1_ARRAY_DATA((JAVA_ARRAY)SP[-1].data.o))[(*SP).data.i]; \
     }
 
 #define BC_SALOAD() { CHECK_ARRAY_ACCESS(2, SP[-1].data.i); \
     SP--; SP[-1].type = CN1_TYPE_INT; \
-    SP[-1].data.i = ((JAVA_ARRAY_SHORT*) (*(JAVA_ARRAY)SP[-1].data.o).data)[(*SP).data.i]; \
+    SP[-1].data.i = ((JAVA_ARRAY_SHORT*) CN1_ARRAY_DATA((JAVA_ARRAY)SP[-1].data.o))[(*SP).data.i]; \
     }
 
 
 #define BC_BASTORE() CHECK_ARRAY_ACCESS(3, SP[-2].data.i); \
-    ((JAVA_ARRAY_BYTE*) (*(JAVA_ARRAY)SP[-3].data.o).data)[SP[-2].data.i] = SP[-1].data.i; SP-=3
+    ((JAVA_ARRAY_BYTE*) CN1_ARRAY_DATA((JAVA_ARRAY)SP[-3].data.o))[SP[-2].data.i] = SP[-1].data.i; SP-=3
 
 #define BC_CASTORE() CHECK_ARRAY_ACCESS(3, SP[-2].data.i); \
-    ((JAVA_ARRAY_CHAR*) (*(JAVA_ARRAY)SP[-3].data.o).data)[SP[-2].data.i] = SP[-1].data.i; SP-=3
+    ((JAVA_ARRAY_CHAR*) CN1_ARRAY_DATA((JAVA_ARRAY)SP[-3].data.o))[SP[-2].data.i] = SP[-1].data.i; SP-=3
 
 #define BC_SASTORE() CHECK_ARRAY_ACCESS(3, SP[-2].data.i); \
-    ((JAVA_ARRAY_SHORT*) (*(JAVA_ARRAY)SP[-3].data.o).data)[SP[-2].data.i] = SP[-1].data.i; SP-=3
+    ((JAVA_ARRAY_SHORT*) CN1_ARRAY_DATA((JAVA_ARRAY)SP[-3].data.o))[SP[-2].data.i] = SP[-1].data.i; SP-=3
 
 #define BC_IASTORE() CHECK_ARRAY_ACCESS(3, SP[-2].data.i); \
-    ((JAVA_ARRAY_INT*) (*(JAVA_ARRAY)SP[-3].data.o).data)[SP[-2].data.i] = SP[-1].data.i; SP-=3
+    ((JAVA_ARRAY_INT*) CN1_ARRAY_DATA((JAVA_ARRAY)SP[-3].data.o))[SP[-2].data.i] = SP[-1].data.i; SP-=3
 
 #define BC_LASTORE() CHECK_ARRAY_ACCESS(3, SP[-2].data.i); \
     LONG_ARRAY_LOOKUP((JAVA_ARRAY)SP[-3].data.o, SP[-2].data.i) = SP[-1].data.l; SP-=3
@@ -1306,29 +1339,29 @@ static inline struct clazz* cn1ClassOf(JAVA_OBJECT o) {
 #define BC_AASTORE() CHECK_ARRAY_ACCESS(3, SP[-2].data.i); { \
     JAVA_OBJECT aastoreTmp = SP[-3].data.o; \
     CN1_WRITE_BARRIER(aastoreTmp, SP[-1].data.o); \
-    ((JAVA_ARRAY_OBJECT*) (*(JAVA_ARRAY)aastoreTmp).data)[SP[-2].data.i] = SP[-1].data.o; \
+    ((JAVA_ARRAY_OBJECT*) CN1_ARRAY_DATA((JAVA_ARRAY)aastoreTmp))[SP[-2].data.i] = SP[-1].data.o; \
     SP-=3; \
 }
 #define BC_AASTORE_WITH_ARGS(array, index, value) CHECK_ARRAY_ACCESS(3, SP[-2].data.i); { \
     JAVA_OBJECT aastoreTmp = SP[-3].data.o; \
     CN1_WRITE_BARRIER(aastoreTmp, SP[-1].data.o); \
-    ((JAVA_ARRAY_OBJECT*) (*(JAVA_ARRAY)aastoreTmp).data)[SP[-2].data.i] = SP[-1].data.o; \
+    ((JAVA_ARRAY_OBJECT*) CN1_ARRAY_DATA((JAVA_ARRAY)aastoreTmp))[SP[-2].data.i] = SP[-1].data.o; \
     SP-=3; \
 }
 
 
-//#define BYTE_ARRAY_LOOKUP(array, offset) ((JAVA_ARRAY_BYTE*) (*array).data)[offset]
-//#define SHORT_ARRAY_LOOKUP(array, offset) ((JAVA_ARRAY_SHORT*) (*array).data)[offset]
-//#define CHAR_ARRAY_LOOKUP(array, offset) ((JAVA_ARRAY_CHAR*) (*array).data)[offset]
-//#define INT_ARRAY_LOOKUP(array, offset) ((JAVA_ARRAY_INT*) (*array).data)[offset]
+//#define BYTE_ARRAY_LOOKUP(array, offset) ((JAVA_ARRAY_BYTE*) CN1_ARRAY_DATA(array))[offset]
+//#define SHORT_ARRAY_LOOKUP(array, offset) ((JAVA_ARRAY_SHORT*) CN1_ARRAY_DATA(array))[offset]
+//#define CHAR_ARRAY_LOOKUP(array, offset) ((JAVA_ARRAY_CHAR*) CN1_ARRAY_DATA(array))[offset]
+//#define INT_ARRAY_LOOKUP(array, offset) ((JAVA_ARRAY_INT*) CN1_ARRAY_DATA(array))[offset]
 
-#define LONG_ARRAY_LOOKUP(array, offset) ((JAVA_ARRAY_LONG*) (*array).data)[offset]
+#define LONG_ARRAY_LOOKUP(array, offset) ((JAVA_ARRAY_LONG*) CN1_ARRAY_DATA(array))[offset]
 
-#define FLOAT_ARRAY_LOOKUP(array, offset) ((JAVA_ARRAY_FLOAT*) (*array).data)[offset]
+#define FLOAT_ARRAY_LOOKUP(array, offset) ((JAVA_ARRAY_FLOAT*) CN1_ARRAY_DATA(array))[offset]
 
-#define DOUBLE_ARRAY_LOOKUP(array, offset) ((JAVA_ARRAY_DOUBLE*) (*array).data)[offset]
+#define DOUBLE_ARRAY_LOOKUP(array, offset) ((JAVA_ARRAY_DOUBLE*) CN1_ARRAY_DATA(array))[offset]
 
-//#define OBJECT_ARRAY_LOOKUP(array, offset) ((JAVA_ARRAY_OBJECT*) (*array).data)[offset]
+//#define OBJECT_ARRAY_LOOKUP(array, offset) ((JAVA_ARRAY_OBJECT*) CN1_ARRAY_DATA(array))[offset]
 
 // Native buffers owned by an escape-proven C stack object. Java exceptions
 // unwind this chain before longjmp; C cleanup attributes handle ordinary returns.
@@ -2456,7 +2489,7 @@ extern JAVA_OBJECT __NEW_INSTANCE_java_lang_OutOfMemoryError(CODENAME_ONE_THREAD
 //
 // The noreturn attribute is also what makes bounds checks cheap: without it clang
 // must assume the (cold, never-taken) throw call may return and clobber memory, so
-// it reloads the array header -- both ->length and ->data -- on EVERY iteration of
+// it reloads the array header -- both ->length and ->dataOffset -- on EVERY iteration of
 // a scanning loop rather than hoisting them into registers once.
 extern CN1_NORETURN void cn1ThrowArrayIndexOrDie(CODENAME_ONE_THREAD_STATE, int index);
 
@@ -2574,91 +2607,91 @@ static inline JAVA_INT cn1_array_element_int(CODENAME_ONE_THREAD_STATE, JAVA_OBJ
     if (!cn1_array_access_in_bounds(array, index) && !cn1_array_access_validate(threadStateData, array, index)) {
         return 0;
     }
-    return ((JAVA_ARRAY_INT*) (*(JAVA_ARRAY)array).data)[index];
+    return ((JAVA_ARRAY_INT*) CN1_ARRAY_DATA((JAVA_ARRAY)array))[index];
 }
 
 static inline JAVA_BYTE cn1_array_element_byte(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT array, JAVA_INT index) {
     if (!cn1_array_access_in_bounds(array, index) && !cn1_array_access_validate(threadStateData, array, index)) {
         return 0;
     }
-    return ((JAVA_ARRAY_BYTE*) (*(JAVA_ARRAY)array).data)[index];
+    return ((JAVA_ARRAY_BYTE*) CN1_ARRAY_DATA((JAVA_ARRAY)array))[index];
 }
 
 static inline JAVA_FLOAT cn1_array_element_float(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT array, JAVA_INT index) {
     if (!cn1_array_access_in_bounds(array, index) && !cn1_array_access_validate(threadStateData, array, index)) {
         return 0;
     }
-    return ((JAVA_ARRAY_FLOAT*) (*(JAVA_ARRAY)array).data)[index];
+    return ((JAVA_ARRAY_FLOAT*) CN1_ARRAY_DATA((JAVA_ARRAY)array))[index];
 }
 
 static inline JAVA_DOUBLE cn1_array_element_double(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT array, JAVA_INT index) {
     if (!cn1_array_access_in_bounds(array, index) && !cn1_array_access_validate(threadStateData, array, index)) {
         return 0;
     }
-    return ((JAVA_ARRAY_DOUBLE*) (*(JAVA_ARRAY)array).data)[index];
+    return ((JAVA_ARRAY_DOUBLE*) CN1_ARRAY_DATA((JAVA_ARRAY)array))[index];
 }
 
 static inline JAVA_LONG cn1_array_element_long(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT array, JAVA_INT index) {
     if (!cn1_array_access_in_bounds(array, index) && !cn1_array_access_validate(threadStateData, array, index)) {
         return 0;
     }
-    return ((JAVA_ARRAY_LONG*) (*(JAVA_ARRAY)array).data)[index];
+    return ((JAVA_ARRAY_LONG*) CN1_ARRAY_DATA((JAVA_ARRAY)array))[index];
 }
 
 static inline JAVA_OBJECT cn1_array_element_object(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT array, JAVA_INT index) {
     if (!cn1_array_access_in_bounds(array, index) && !cn1_array_access_validate(threadStateData, array, index)) {
         return JAVA_NULL;
     }
-    return ((JAVA_ARRAY_OBJECT*) (*(JAVA_ARRAY)array).data)[index];
+    return ((JAVA_ARRAY_OBJECT*) CN1_ARRAY_DATA((JAVA_ARRAY)array))[index];
 }
 
 static inline JAVA_SHORT cn1_array_element_short(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT array, JAVA_INT index) {
     if (!cn1_array_access_in_bounds(array, index) && !cn1_array_access_validate(threadStateData, array, index)) {
         return 0;
     }
-    return ((JAVA_ARRAY_SHORT*) (*(JAVA_ARRAY)array).data)[index];
+    return ((JAVA_ARRAY_SHORT*) CN1_ARRAY_DATA((JAVA_ARRAY)array))[index];
 }
 
 static inline JAVA_CHAR cn1_array_element_char(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT array, JAVA_INT index) {
     if (!cn1_array_access_in_bounds(array, index) && !cn1_array_access_validate(threadStateData, array, index)) {
         return 0;
     }
-    return ((JAVA_ARRAY_CHAR*) (*(JAVA_ARRAY)array).data)[index];
+    return ((JAVA_ARRAY_CHAR*) CN1_ARRAY_DATA((JAVA_ARRAY)array))[index];
 }
 
 static inline JAVA_VOID cn1_set_array_element_int(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT array, JAVA_INT index, JAVA_INT value) {
     if (!cn1_array_access_in_bounds(array, index) && !cn1_array_access_validate(threadStateData, array, index)) {
         return;
     }
-    ((JAVA_ARRAY_INT*) (*(JAVA_ARRAY)array).data)[index] = value;
+    ((JAVA_ARRAY_INT*) CN1_ARRAY_DATA((JAVA_ARRAY)array))[index] = value;
 }
 
 static inline JAVA_VOID cn1_set_array_element_byte(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT array, JAVA_INT index, JAVA_BYTE value) {
     if (!cn1_array_access_in_bounds(array, index) && !cn1_array_access_validate(threadStateData, array, index)) {
         return;
     }
-    ((JAVA_ARRAY_BYTE*) (*(JAVA_ARRAY)array).data)[index] = value;
+    ((JAVA_ARRAY_BYTE*) CN1_ARRAY_DATA((JAVA_ARRAY)array))[index] = value;
 }
 
 static inline JAVA_VOID cn1_set_array_element_float(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT array, JAVA_INT index, JAVA_FLOAT value) {
     if (!cn1_array_access_in_bounds(array, index) && !cn1_array_access_validate(threadStateData, array, index)) {
         return;
     }
-    ((JAVA_ARRAY_FLOAT*) (*(JAVA_ARRAY)array).data)[index] = value;
+    ((JAVA_ARRAY_FLOAT*) CN1_ARRAY_DATA((JAVA_ARRAY)array))[index] = value;
 }
 
 static inline JAVA_VOID cn1_set_array_element_double(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT array, JAVA_INT index, JAVA_DOUBLE value) {
     if (!cn1_array_access_in_bounds(array, index) && !cn1_array_access_validate(threadStateData, array, index)) {
         return;
     }
-    ((JAVA_ARRAY_DOUBLE*) (*(JAVA_ARRAY)array).data)[index] = value;
+    ((JAVA_ARRAY_DOUBLE*) CN1_ARRAY_DATA((JAVA_ARRAY)array))[index] = value;
 }
 
 static inline JAVA_VOID cn1_set_array_element_long(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT array, JAVA_INT index, JAVA_LONG value) {
     if (!cn1_array_access_in_bounds(array, index) && !cn1_array_access_validate(threadStateData, array, index)) {
         return;
     }
-    ((JAVA_ARRAY_LONG*) (*(JAVA_ARRAY)array).data)[index] = value;
+    ((JAVA_ARRAY_LONG*) CN1_ARRAY_DATA((JAVA_ARRAY)array))[index] = value;
 }
 
 static inline JAVA_VOID cn1_set_array_element_object(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT array, JAVA_INT index, JAVA_OBJECT value) {
@@ -2666,22 +2699,22 @@ static inline JAVA_VOID cn1_set_array_element_object(CODENAME_ONE_THREAD_STATE, 
         return;
     }
     CN1_WRITE_BARRIER(array, value); // SATB: record the ref being stored
-    CN1_SATB_DELETE(&((JAVA_ARRAY_OBJECT*) (*(JAVA_ARRAY)array).data)[index]); // SATB: preserve overwritten ref
-    ((JAVA_ARRAY_OBJECT*) (*(JAVA_ARRAY)array).data)[index] = value;
+    CN1_SATB_DELETE(&((JAVA_ARRAY_OBJECT*) CN1_ARRAY_DATA((JAVA_ARRAY)array))[index]); // SATB: preserve overwritten ref
+    ((JAVA_ARRAY_OBJECT*) CN1_ARRAY_DATA((JAVA_ARRAY)array))[index] = value;
 }
 
 static inline JAVA_VOID cn1_set_array_element_short(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT array, JAVA_INT index, JAVA_SHORT value) {
     if (!cn1_array_access_in_bounds(array, index) && !cn1_array_access_validate(threadStateData, array, index)) {
         return;
     }
-    ((JAVA_ARRAY_SHORT*) (*(JAVA_ARRAY)array).data)[index] = value;
+    ((JAVA_ARRAY_SHORT*) CN1_ARRAY_DATA((JAVA_ARRAY)array))[index] = value;
 }
 
 static inline JAVA_VOID cn1_set_array_element_char(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT array, JAVA_INT index, JAVA_CHAR value) {
     if (!cn1_array_access_in_bounds(array, index) && !cn1_array_access_validate(threadStateData, array, index)) {
         return;
     }
-    ((JAVA_ARRAY_CHAR*) (*(JAVA_ARRAY)array).data)[index] = value;
+    ((JAVA_ARRAY_CHAR*) CN1_ARRAY_DATA((JAVA_ARRAY)array))[index] = value;
 }
 
 #define CN1_ARRAY_ELEMENT_INT(array, index) cn1_array_element_int(threadStateData, array, index)
@@ -2699,14 +2732,14 @@ static inline JAVA_VOID cn1_set_array_element_char(CODENAME_ONE_THREAD_STATE, JA
 // bounded by arr.length). No null/bounds branch -> the C compiler is free to keep
 // the load in registers and auto-vectorize. If the proof is ever wrong this reads
 // out of bounds, so the pass is deliberately conservative and fail-closed.
-#define CN1_ARRAY_ELEMENT_INT_NOCHK(array, index) (((JAVA_ARRAY_INT*) (*(JAVA_ARRAY)(array)).data)[(index)])
-#define CN1_ARRAY_ELEMENT_BYTE_NOCHK(array, index) (((JAVA_ARRAY_BYTE*) (*(JAVA_ARRAY)(array)).data)[(index)])
-#define CN1_ARRAY_ELEMENT_FLOAT_NOCHK(array, index) (((JAVA_ARRAY_FLOAT*) (*(JAVA_ARRAY)(array)).data)[(index)])
-#define CN1_ARRAY_ELEMENT_DOUBLE_NOCHK(array, index) (((JAVA_ARRAY_DOUBLE*) (*(JAVA_ARRAY)(array)).data)[(index)])
-#define CN1_ARRAY_ELEMENT_LONG_NOCHK(array, index) (((JAVA_ARRAY_LONG*) (*(JAVA_ARRAY)(array)).data)[(index)])
-#define CN1_ARRAY_ELEMENT_OBJECT_NOCHK(array, index) (((JAVA_ARRAY_OBJECT*) (*(JAVA_ARRAY)(array)).data)[(index)])
-#define CN1_ARRAY_ELEMENT_SHORT_NOCHK(array, index) (((JAVA_ARRAY_SHORT*) (*(JAVA_ARRAY)(array)).data)[(index)])
-#define CN1_ARRAY_ELEMENT_CHAR_NOCHK(array, index) (((JAVA_ARRAY_CHAR*) (*(JAVA_ARRAY)(array)).data)[(index)])
+#define CN1_ARRAY_ELEMENT_INT_NOCHK(array, index) (((JAVA_ARRAY_INT*) CN1_ARRAY_DATA(array))[(index)])
+#define CN1_ARRAY_ELEMENT_BYTE_NOCHK(array, index) (((JAVA_ARRAY_BYTE*) CN1_ARRAY_DATA(array))[(index)])
+#define CN1_ARRAY_ELEMENT_FLOAT_NOCHK(array, index) (((JAVA_ARRAY_FLOAT*) CN1_ARRAY_DATA(array))[(index)])
+#define CN1_ARRAY_ELEMENT_DOUBLE_NOCHK(array, index) (((JAVA_ARRAY_DOUBLE*) CN1_ARRAY_DATA(array))[(index)])
+#define CN1_ARRAY_ELEMENT_LONG_NOCHK(array, index) (((JAVA_ARRAY_LONG*) CN1_ARRAY_DATA(array))[(index)])
+#define CN1_ARRAY_ELEMENT_OBJECT_NOCHK(array, index) (((JAVA_ARRAY_OBJECT*) CN1_ARRAY_DATA(array))[(index)])
+#define CN1_ARRAY_ELEMENT_SHORT_NOCHK(array, index) (((JAVA_ARRAY_SHORT*) CN1_ARRAY_DATA(array))[(index)])
+#define CN1_ARRAY_ELEMENT_CHAR_NOCHK(array, index) (((JAVA_ARRAY_CHAR*) CN1_ARRAY_DATA(array))[(index)])
 
 #define CN1_SET_ARRAY_ELEMENT_INT(array, index, value) cn1_set_array_element_int(threadStateData, array, index, value)
 #define CN1_SET_ARRAY_ELEMENT_BYTE(array, index, value) cn1_set_array_element_byte(threadStateData, array, index, value)
@@ -2733,7 +2766,7 @@ extern void gcReleaseObj(JAVA_OBJECT o);
 // ARRAY PAYLOAD PLACEMENT, IN ONE PLACE, BECAUSE THE SIZE AND THE ADDRESS DISAGREED.
 //
 // `data` is the LAST member of the header, so the two spellings of "where the
-// elements start" -- (char*)&a->data + sizeof(void*), which every placement site
+// elements start" -- (char*)a + a->dataOffset, which every placement site
 // uses, and (char*)a + sizeof(struct JavaArrayPrototype), which the sweep uses --
 // are the SAME address. The static assert below is what makes that a fact rather
 // than a coincidence of the current field order.
@@ -2799,7 +2832,9 @@ static inline JAVA_OBJECT cn1FusedInstallPrimArray(JAVA_OBJECT owner, int off, s
     a->length = len;
     a->dimensions = 1;
     a->primitiveSize = esz;
-    a->data = len > 0 ? CN1_ARRAY_PAYLOAD_PTR(a) : 0;
+    /* Set unconditionally, including for a zero-length array: there is nothing to
+     * read there, and an offset of 0 would make CN1_ARRAY_DATA point at the header. */
+    a->dataOffset = (unsigned short)CN1_ARRAY_PAYLOAD_OFFSET;
     return (JAVA_OBJECT)a;
 }
 // Register an object referenced only from C globals as a permanent GC root.
@@ -2841,17 +2876,18 @@ extern JAVA_OBJECT allocMultiArray(int* lengths, struct clazz* type, int primiti
             /* instead of method-local), which is harmless for callers. */ \
             __cn1Result = allocArrayAligned(threadStateData, __cn1StackLength, (arrayClass), (primitiveSize), 1, __cn1Alignment); \
         } else { \
-            /* header + embedded data pointer slot + payload + alignment slack for the payload start */ \
+            /* header + payload + alignment slack for the payload start */ \
             char* __cn1StackMem = (char*)__builtin_alloca(CN1_ARRAY_ALLOC_BYTES(__cn1ActualSize) + __cn1Alignment - 1); \
             JAVA_ARRAY __cn1StackArray = (JAVA_ARRAY)__cn1StackMem; \
-            *__cn1StackArray = (struct JavaArrayPrototype){DEBUG_GC_INIT (arrayClass), 0, 0, __cn1StackLength, 1, (primitiveSize), 0}; \
+            *__cn1StackArray = (struct JavaArrayPrototype){DEBUG_GC_INIT (arrayClass), 0, 0, __cn1StackLength, 1, (primitiveSize), (unsigned short)CN1_ARRAY_PAYLOAD_OFFSET}; \
             if (__cn1ActualSize > 0) { \
                 char* __cn1Data = (char*)CN1_ARRAY_PAYLOAD_PTR(__cn1StackArray); \
                 /* round the payload start up by adding alignment-1 then masking off the low bits */ \
                 uintptr_t __cn1Aligned = (((uintptr_t)__cn1Data) + ((uintptr_t)__cn1Alignment - 1)) & ~((uintptr_t)__cn1Alignment - 1); \
-                __cn1StackArray->data = (void*)__cn1Aligned; \
-            } else { \
-                __cn1StackArray->data = 0; \
+                /* Stored as a DISTANCE from the header, which is what makes the header \
+                 * 24 bytes instead of 32. The slack above is what can push it past \
+                 * CN1_ARRAY_PAYLOAD_OFFSET, and it is bounded by alignment-1. */ \
+                __cn1StackArray->dataOffset = (unsigned short)(__cn1Aligned - (uintptr_t)__cn1StackArray); \
             } \
             __cn1Result = (JAVA_OBJECT)__cn1StackArray; \
         } \
@@ -2865,7 +2901,7 @@ extern JAVA_OBJECT allocMultiArray(int* lengths, struct clazz* type, int primiti
         int __cn1InitLength = (length); \
         JAVA_ARRAY __cn1StackArray = (JAVA_ARRAY)CN1_SIMD_ALLOCA_BYTE(__cn1InitLength); \
         if (__cn1InitLength > 0) { \
-            memset(__cn1StackArray->data, 0, (size_t)__cn1InitLength); \
+            memset(CN1_ARRAY_DATA(__cn1StackArray), 0, (size_t)__cn1InitLength); \
         } \
         (JAVA_OBJECT)__cn1StackArray; \
     })
@@ -2874,7 +2910,7 @@ extern JAVA_OBJECT allocMultiArray(int* lengths, struct clazz* type, int primiti
         int __cn1InitLength = (length); \
         JAVA_ARRAY __cn1StackArray = (JAVA_ARRAY)CN1_SIMD_ALLOCA_INT(__cn1InitLength); \
         if (__cn1InitLength > 0) { \
-            memset(__cn1StackArray->data, 0, (size_t)__cn1InitLength * sizeof(JAVA_ARRAY_INT)); \
+            memset(CN1_ARRAY_DATA(__cn1StackArray), 0, (size_t)__cn1InitLength * sizeof(JAVA_ARRAY_INT)); \
         } \
         (JAVA_OBJECT)__cn1StackArray; \
     })
@@ -2883,7 +2919,7 @@ extern JAVA_OBJECT allocMultiArray(int* lengths, struct clazz* type, int primiti
         int __cn1InitLength = (length); \
         JAVA_ARRAY __cn1StackArray = (JAVA_ARRAY)CN1_SIMD_ALLOCA_FLOAT(__cn1InitLength); \
         if (__cn1InitLength > 0) { \
-            memset(__cn1StackArray->data, 0, (size_t)__cn1InitLength * sizeof(JAVA_ARRAY_FLOAT)); \
+            memset(CN1_ARRAY_DATA(__cn1StackArray), 0, (size_t)__cn1InitLength * sizeof(JAVA_ARRAY_FLOAT)); \
         } \
         (JAVA_OBJECT)__cn1StackArray; \
     })
@@ -2892,7 +2928,7 @@ extern JAVA_OBJECT allocMultiArray(int* lengths, struct clazz* type, int primiti
         int __cn1InitLength = (length); \
         JAVA_ARRAY __cn1StackArray = (JAVA_ARRAY)CN1_SIMD_ALLOCA_BYTE(__cn1InitLength); \
         if (__cn1InitLength > 0) { \
-            memset(__cn1StackArray->data, (value), (size_t)__cn1InitLength); \
+            memset(CN1_ARRAY_DATA(__cn1StackArray), (value), (size_t)__cn1InitLength); \
         } \
         (JAVA_OBJECT)__cn1StackArray; \
     })
@@ -2901,9 +2937,9 @@ extern JAVA_OBJECT allocMultiArray(int* lengths, struct clazz* type, int primiti
         int __cn1InitLength = (length); \
         JAVA_ARRAY_INT __cn1InitValue = (value); \
         JAVA_ARRAY __cn1StackArray = (JAVA_ARRAY)CN1_SIMD_ALLOCA_INT(__cn1InitLength); \
-        JAVA_ARRAY_INT* __cn1Data = (JAVA_ARRAY_INT*)__cn1StackArray->data; \
+        JAVA_ARRAY_INT* __cn1Data = (JAVA_ARRAY_INT*)CN1_ARRAY_DATA(__cn1StackArray); \
         if (__cn1InitValue == 0 && __cn1InitLength > 0) { \
-            memset(__cn1StackArray->data, 0, (size_t)__cn1InitLength * sizeof(JAVA_ARRAY_INT)); \
+            memset(CN1_ARRAY_DATA(__cn1StackArray), 0, (size_t)__cn1InitLength * sizeof(JAVA_ARRAY_INT)); \
         } else { \
             for (int __cn1FillIndex = 0; __cn1FillIndex < __cn1InitLength; __cn1FillIndex++) { \
                 __cn1Data[__cn1FillIndex] = __cn1InitValue; \
@@ -2916,9 +2952,9 @@ extern JAVA_OBJECT allocMultiArray(int* lengths, struct clazz* type, int primiti
         int __cn1InitLength = (length); \
         JAVA_ARRAY_FLOAT __cn1InitValue = (value); \
         JAVA_ARRAY __cn1StackArray = (JAVA_ARRAY)CN1_SIMD_ALLOCA_FLOAT(__cn1InitLength); \
-        JAVA_ARRAY_FLOAT* __cn1Data = (JAVA_ARRAY_FLOAT*)__cn1StackArray->data; \
+        JAVA_ARRAY_FLOAT* __cn1Data = (JAVA_ARRAY_FLOAT*)CN1_ARRAY_DATA(__cn1StackArray); \
         if (__cn1InitValue == 0.0f && __cn1InitLength > 0) { \
-            memset(__cn1StackArray->data, 0, (size_t)__cn1InitLength * sizeof(JAVA_ARRAY_FLOAT)); \
+            memset(CN1_ARRAY_DATA(__cn1StackArray), 0, (size_t)__cn1InitLength * sizeof(JAVA_ARRAY_FLOAT)); \
         } else { \
             for (int __cn1FillIndex = 0; __cn1FillIndex < __cn1InitLength; __cn1FillIndex++) { \
                 __cn1Data[__cn1FillIndex] = __cn1InitValue; \
@@ -3426,7 +3462,7 @@ static inline JAVA_INT cn1RefBlockCount(JAVA_LONG block) {
 }
 
 // READ is inline and unchecked on purpose: it is the operation the for-each lowering
-// emits per element, and a C block has no header and no ->data indirection to chase, so
+// emits per element, and a C block has no header and no payload offset to add, so
 // this is strictly cheaper than the array access it replaces.
 static inline JAVA_OBJECT cn1RefBlockGet(JAVA_LONG block, JAVA_INT index) {
     return ((JAVA_OBJECT*)(uintptr_t)block)[index];

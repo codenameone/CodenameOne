@@ -5833,7 +5833,7 @@ public class BytecodeMethod implements SignatureSet {
                                         "        JAVA_INT __cn1IndexTmp = " + indexLiteral + ";\n" +
                                         "        " + valueType + " __cn1ValueTmp = " + valueLiteral + ";\n" +
                                         check +
-                                        "        ((JAVA_ARRAY_" + elementType + "*) (*(JAVA_ARRAY)__cn1ArrayTmp).data)[__cn1IndexTmp] = __cn1ValueTmp;\n" +
+                                        "        ((JAVA_ARRAY_" + elementType + "*) CN1_ARRAY_DATA((JAVA_ARRAY)__cn1ArrayTmp))[__cn1IndexTmp] = __cn1ValueTmp;\n" +
                                         "    }\n";
                             } else {
                                 code = "    {\n" +

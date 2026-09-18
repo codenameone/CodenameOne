@@ -5374,7 +5374,7 @@ void codenameOneGCSweep() {
                     if(o->__codenameOneParentClsReference->isArray) {
                         JAVA_ARRAY arr = (JAVA_ARRAY)o;
                         if(arr->__codenameOneParentClsReference == &class_array1__JAVA_CHAR) {
-                            JAVA_ARRAY_CHAR* ch = (JAVA_ARRAY_CHAR*)arr->data;
+                            JAVA_ARRAY_CHAR* ch = (JAVA_ARRAY_CHAR*)CN1_ARRAY_DATA(arr);
                             char data[arr->length + 1];
                             for(int iter = 0 ; iter < arr->length ; iter++) {
                                 data[iter] = ch[iter];
@@ -9930,8 +9930,11 @@ static void cn1ConsExtAdd(JAVA_OBJECT o) {
         JAVA_ARRAY a = (JAVA_ARRAY)o;
         char* hdrEnd = base + sizeof(struct JavaArrayPrototype);
         char* dataEnd = hdrEnd;
-        if(a->data != 0 && a->length > 0 && a->primitiveSize > 0) {
-            dataEnd = (char*)a->data + (long)a->length * a->primitiveSize;
+        /* The data test that used to lead this is gone with the pointer: the payload
+         * of a live array is always a fixed distance away, so length and
+         * primitiveSize are the whole question. */
+        if(a->length > 0 && a->primitiveSize > 0) {
+            dataEnd = (char*)CN1_ARRAY_DATA(a) + (long)a->length * a->primitiveSize;
         }
         hi = hdrEnd > dataEnd ? hdrEnd : dataEnd;
     } else {
@@ -12970,7 +12973,7 @@ void gcMarkArrayObject(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj, JAVA_BOOLEAN 
     // (and with the winning worker's CAS) under ThreadSanitizer.
     JAVA_ARRAY arr = (JAVA_ARRAY)obj;
     if(arr->length > 0) {
-        cn1GcMarkReferenceRange(threadStateData, (JAVA_OBJECT*)arr->data, arr->length, force);
+        cn1GcMarkReferenceRange(threadStateData, (JAVA_OBJECT*)CN1_ARRAY_DATA(arr), arr->length, force);
     }
 }
 
@@ -13693,7 +13696,9 @@ JAVA_OBJECT allocArray(CODENAME_ONE_THREAD_STATE, int length, struct clazz* type
     (*array).length = length;
     (*array).dimensions = dim;
     (*array).primitiveSize = primitiveSize;
-    (*array).data = actualSize > 0 ? CN1_ARRAY_PAYLOAD_PTR(array) : 0;
+    /* Unconditional, zero-length included: nothing reads a zero-length payload, and
+     * an offset of 0 would aim CN1_ARRAY_DATA at the header itself. */
+    (*array).dataOffset = (unsigned short)CN1_ARRAY_PAYLOAD_OFFSET;
     return (JAVA_OBJECT)array;
 }
 
@@ -13720,16 +13725,21 @@ JAVA_OBJECT allocArrayAligned(CODENAME_ONE_THREAD_STATE, int length, struct claz
     if (actualSize > 0) {
         char* arr = (char*)CN1_ARRAY_PAYLOAD_PTR(array);
         uintptr_t aligned = (((uintptr_t)arr) + ((uintptr_t)requestedAlignment - 1)) & ~((uintptr_t)requestedAlignment - 1);
-        (*array).data = (void*)aligned;
+        /* A DISTANCE from the header, not a pointer -- that is what took the header
+         * from 32 bytes to 24. It is bounded by CN1_ARRAY_PAYLOAD_OFFSET plus
+         * requestedAlignment - 1, which is why the field is two bytes wide and why
+         * the assertion below is worth stating rather than assuming. */
+        CODENAME_ONE_ASSERT(aligned - (uintptr_t)array <= 0xFFFF);
+        (*array).dataOffset = (unsigned short)(aligned - (uintptr_t)array);
     } else {
-        (*array).data = 0;
+        (*array).dataOffset = (unsigned short)CN1_ARRAY_PAYLOAD_OFFSET;
     }
     return (JAVA_OBJECT)array;
 }
 
 JAVA_OBJECT alloc2DArray(CODENAME_ONE_THREAD_STATE, int length2, int length1, struct clazz* parentType, struct clazz* childType, int primitiveSize) {
     JAVA_ARRAY base = (JAVA_ARRAY)allocArray(threadStateData, length1, parentType, sizeof(JAVA_OBJECT), 2);
-    JAVA_ARRAY_OBJECT* objs = base->data;
+    JAVA_ARRAY_OBJECT* objs = CN1_ARRAY_DATA(base);
     if(length2 > -1) {
         for(int iter = 0 ; iter < length1 ; iter++) {
             objs[iter] = allocArray(threadStateData, length2, childType, primitiveSize, 1);
@@ -13740,12 +13750,12 @@ JAVA_OBJECT alloc2DArray(CODENAME_ONE_THREAD_STATE, int length2, int length1, st
 
 JAVA_OBJECT alloc3DArray(CODENAME_ONE_THREAD_STATE, int length3, int length2, int length1, struct clazz* parentType, struct clazz* childType, struct clazz* grandChildType, int primitiveSize) {
     JAVA_ARRAY base = (JAVA_ARRAY)allocArray(threadStateData, length1, parentType, sizeof(JAVA_OBJECT), 3);
-    JAVA_ARRAY_OBJECT* objs = base->data;
+    JAVA_ARRAY_OBJECT* objs = CN1_ARRAY_DATA(base);
     if(length2 > -1) {
         for(int iter = 0 ; iter < length1 ; iter++) {
             objs[iter] = allocArray(threadStateData, length2, childType, sizeof(JAVA_OBJECT), 2);
             if(length3 > -1) {
-                JAVA_ARRAY_OBJECT* internal = (JAVA_ARRAY_OBJECT*)((JAVA_ARRAY)objs[iter])->data;
+                JAVA_ARRAY_OBJECT* internal = (JAVA_ARRAY_OBJECT*)CN1_ARRAY_DATA((JAVA_ARRAY)objs[iter]);
                 for(int inner = 0 ; inner < length2 ; inner++) {
                     internal[inner] = allocArray(threadStateData, length3, grandChildType, primitiveSize, 1);
                 }
@@ -13757,16 +13767,16 @@ JAVA_OBJECT alloc3DArray(CODENAME_ONE_THREAD_STATE, int length3, int length2, in
 
 JAVA_OBJECT alloc4DArray(CODENAME_ONE_THREAD_STATE, int length4, int length3, int length2, int length1, struct clazz* parentType, struct clazz* childType, struct clazz* grandChildType, struct clazz* greatGrandChildType, int primitiveSize) {
     JAVA_ARRAY base = (JAVA_ARRAY)allocArray(threadStateData, length1, parentType, sizeof(JAVA_OBJECT), 4);
-    JAVA_ARRAY_OBJECT* objs = base->data;
+    JAVA_ARRAY_OBJECT* objs = CN1_ARRAY_DATA(base);
     if(length2 > -1) {
         for(int iter = 0 ; iter < length1 ; iter++) {
             objs[iter] = allocArray(threadStateData, length2, childType, sizeof(JAVA_OBJECT), 3);
             if(length3 > -1) {
-                JAVA_ARRAY_OBJECT* internal = (JAVA_ARRAY_OBJECT*)((JAVA_ARRAY)objs[iter])->data;
+                JAVA_ARRAY_OBJECT* internal = (JAVA_ARRAY_OBJECT*)CN1_ARRAY_DATA((JAVA_ARRAY)objs[iter]);
                 for(int inner = 0 ; inner < length2 ; inner++) {
                     internal[inner] = allocArray(threadStateData, length3, grandChildType, sizeof(JAVA_OBJECT), 2);
                     if(length4 > -1) {
-                        JAVA_ARRAY_OBJECT* deep = (JAVA_ARRAY_OBJECT*)((JAVA_ARRAY)internal[inner])->data;
+                        JAVA_ARRAY_OBJECT* deep = (JAVA_ARRAY_OBJECT*)CN1_ARRAY_DATA((JAVA_ARRAY)internal[inner]);
                         for(int deepInner = 0 ; deepInner < length3 ; deepInner++) {
                             deep[deepInner] = allocArray(threadStateData, length4, greatGrandChildType, primitiveSize, 1);
                         }
@@ -13817,12 +13827,12 @@ static JAVA_OBJECT cn1StringFromUnits(CODENAME_ONE_THREAD_STATE, const JAVA_ARRA
     if(latin1) {
         JAVA_ARRAY_BYTE* b;
         dat = (JAVA_ARRAY)allocArray(threadStateData, count, &class_array1__JAVA_BYTE, sizeof(JAVA_ARRAY_BYTE), 1);
-        b = (JAVA_ARRAY_BYTE*) (*dat).data;
+        b = (JAVA_ARRAY_BYTE*) CN1_ARRAY_DATA(dat);
         for(i = 0 ; i < count ; i++) { b[i] = (JAVA_ARRAY_BYTE)units[i]; }
     } else {
         JAVA_ARRAY_CHAR* a;
         dat = (JAVA_ARRAY)allocArray(threadStateData, count, &class_array1__JAVA_CHAR, sizeof(JAVA_ARRAY_CHAR), 1);
-        a = (JAVA_ARRAY_CHAR*) (*dat).data;
+        a = (JAVA_ARRAY_CHAR*) CN1_ARRAY_DATA(dat);
         for(i = 0 ; i < count ; i++) { a[i] = units[i]; }
     }
     o = __NEW_java_lang_String(threadStateData);
@@ -14052,13 +14062,13 @@ JAVA_OBJECT newStringFromCString(CODENAME_ONE_THREAD_STATE, const char *str) {
     if(latin1) {
         // compact Latin-1: one byte per code unit, (byte & 0xff) IS the char.
         dat = (JAVA_ARRAY)allocArray(threadStateData, offset, &class_array1__JAVA_BYTE, sizeof(JAVA_ARRAY_BYTE), 1);
-        JAVA_ARRAY_BYTE* b = (JAVA_ARRAY_BYTE*) (*dat).data;
+        JAVA_ARRAY_BYTE* b = (JAVA_ARRAY_BYTE*) CN1_ARRAY_DATA(dat);
         for(int i = 0 ; i < offset ; i++) {
             b[i] = (JAVA_ARRAY_BYTE)tmp[i];
         }
     } else {
         dat = (JAVA_ARRAY)allocArray(threadStateData, offset, &class_array1__JAVA_CHAR, sizeof(JAVA_ARRAY_CHAR), 1);
-        JAVA_ARRAY_CHAR* a = (JAVA_ARRAY_CHAR*) (*dat).data;
+        JAVA_ARRAY_CHAR* a = (JAVA_ARRAY_CHAR*) CN1_ARRAY_DATA(dat);
         for(int i = 0 ; i < offset ; i++) {
             a[i] = tmp[i];
         }
@@ -14106,7 +14116,7 @@ JAVA_OBJECT cn1FusedLatin1Begin(CODENAME_ONE_THREAD_STATE, int len, JAVA_ARRAY_B
             if(so != JAVA_NULL) {
                 JAVA_OBJECT arr = cn1FusedInstallPrimArray(so, off, &class_array1__JAVA_BYTE, sizeof(JAVA_ARRAY_BYTE), len);
                 ((struct obj__java_lang_String*)so)->java_lang_String_value = arr; // count stays 0 until End
-                *dst = (JAVA_ARRAY_BYTE*)((JAVA_ARRAY)arr)->data;
+                *dst = (JAVA_ARRAY_BYTE*)CN1_ARRAY_DATA((JAVA_ARRAY)arr);
 #ifdef CN1_GC_CONFORM
                 // Attribute the two halves separately: the fused block is one
                 // allocation but the profile is read to find out WHAT is being
@@ -14143,7 +14153,7 @@ JAVA_OBJECT newStringFromAsciiLen(CODENAME_ONE_THREAD_STATE, const char *src, in
     // Fallback: separate byte[] + String (oversize / BiBOP unavailable).
     enteringNativeAllocations();
     JAVA_ARRAY dat = (JAVA_ARRAY)allocArray(threadStateData, len, &class_array1__JAVA_BYTE, sizeof(JAVA_ARRAY_BYTE), 1);
-    JAVA_ARRAY_BYTE* b = (JAVA_ARRAY_BYTE*) (*dat).data;
+    JAVA_ARRAY_BYTE* b = (JAVA_ARRAY_BYTE*) CN1_ARRAY_DATA(dat);
     for(int i = 0 ; i < len ; i++) {
         b[i] = (JAVA_ARRAY_BYTE)src[i];
     }
@@ -15211,7 +15221,7 @@ JAVA_OBJECT cn1MainArgs(CODENAME_ONE_THREAD_STATE, int argc, char* argv[]) {
     int count = argc > 1 ? argc - 1 : 0;
     enteringNativeAllocations();
     JAVA_OBJECT arrObj = allocArray(threadStateData, count, &class_array1__java_lang_String, sizeof(JAVA_OBJECT), 1);
-    JAVA_ARRAY_OBJECT* dest = (JAVA_ARRAY_OBJECT*)((JAVA_ARRAY)arrObj)->data;
+    JAVA_ARRAY_OBJECT* dest = (JAVA_ARRAY_OBJECT*)CN1_ARRAY_DATA((JAVA_ARRAY)arrObj);
     for(int iter = 0 ; iter < count ; iter++) {
         /* Decoded, not widened: an argument is outside text. A UTF-8 "e-acute" is
            two bytes, and widening them hands main(String[]) two garbage chars --
@@ -15230,7 +15240,7 @@ void initConstantPool() {
     struct ThreadLocalData* threadStateData = getThreadLocalData();
     enteringNativeAllocations();
     JAVA_ARRAY arr = (JAVA_ARRAY)allocArray(threadStateData, CN1_CONSTANT_POOL_SIZE, &class_array1__java_lang_String, sizeof(JAVA_OBJECT), 1);
-    JAVA_OBJECT* tmpConstantPoolObjects = (JAVA_ARRAY_OBJECT*)(*arr).data;
+    JAVA_OBJECT* tmpConstantPoolObjects = (JAVA_ARRAY_OBJECT*)CN1_ARRAY_DATA(arr);
     
     // the constant pool should not be deleted...
     for(int iter = 0 ; iter < threadStateData->heapAllocationSize ; iter++) {
@@ -15315,7 +15325,7 @@ JAVA_OBJECT fromNSString(CODENAME_ONE_THREAD_STATE, NSString* str) {
     int length = (int)strlen(chars);
     
     JAVA_ARRAY dat = (JAVA_ARRAY)allocArray(threadStateData, length, &class_array1__JAVA_BYTE, sizeof(JAVA_ARRAY_BYTE), 1);
-    memcpy((*dat).data, chars, length * sizeof(JAVA_ARRAY_BYTE));
+    memcpy(CN1_ARRAY_DATA(dat), chars, length * sizeof(JAVA_ARRAY_BYTE));
     java_lang_String___INIT_____byte_1ARRAY_java_lang_String(threadStateData, s, (JAVA_OBJECT)dat, utf8String);
     struct obj__java_lang_String* nnn = (struct obj__java_lang_String*)s;
     // The field is a JAVA_LONG carrying a retained NSString peer -- the read side
@@ -15354,7 +15364,7 @@ const char* stringToUTF8Len(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT str, JAVA_INT
     }
 
     JAVA_ARRAY byteArray = (JAVA_ARRAY)java_lang_String_getBytes___java_lang_String_R_byte_1ARRAY(threadStateData, str, utf8String);
-    JAVA_ARRAY_BYTE* data = (*byteArray).data;
+    JAVA_ARRAY_BYTE* data = CN1_ARRAY_DATA(byteArray);
 
     JAVA_INT len = byteArray->length;
 
@@ -15770,11 +15780,11 @@ JAVA_OBJECT cloneArray(JAVA_OBJECT array) {
     if(!cls->primitiveType) {
         cn1__satbReg = JAVA_TRUE;
         if(cn1SatbBulkBegin()) {
-            cn1SatbEnqueueRangeLocked((JAVA_ARRAY_OBJECT*)(*src).data, src->length);
+            cn1SatbEnqueueRangeLocked((JAVA_ARRAY_OBJECT*)CN1_ARRAY_DATA(src), src->length);
         }
     }
 #endif
-    memcpy( (*arr).data, (*src).data, arr->length * byteSize);
+    memcpy( CN1_ARRAY_DATA(arr), CN1_ARRAY_DATA(src), arr->length * byteSize);
 #ifndef CN1_NO_BULK_INSERTION_BARRIER
     if(cn1__satbReg) {
         cn1SatbBulkEnd();

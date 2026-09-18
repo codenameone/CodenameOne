@@ -106,9 +106,9 @@ static inline JAVA_CHAR cn1StrCharAtRaw(JAVA_OBJECT s, JAVA_INT i) {
     JAVA_ARRAY a = (JAVA_ARRAY)t->java_lang_String_value;
     JAVA_INT o = i;
     if (a->__codenameOneParentClsReference == &class_array1__JAVA_BYTE) {
-        return (JAVA_CHAR)(((JAVA_ARRAY_BYTE*)a->data)[o] & 0xff);
+        return (JAVA_CHAR)(((JAVA_ARRAY_BYTE*)CN1_ARRAY_DATA(a))[o] & 0xff);
     }
-    return ((JAVA_ARRAY_CHAR*)a->data)[o];
+    return ((JAVA_ARRAY_CHAR*)CN1_ARRAY_DATA(a))[o];
 }
 static inline int cn1StrIsLatin1(JAVA_OBJECT s) {
     return ((JAVA_ARRAY)((struct obj__java_lang_String*)s)->java_lang_String_value)->__codenameOneParentClsReference == &class_array1__JAVA_BYTE;
@@ -421,25 +421,25 @@ static inline __attribute__((always_inline)) JAVA_BOOLEAN cn1StringEquals(CODENA
     }
 
     if(cn1StrIsLatin1(__cn1ThisObject) && cn1StrIsLatin1(__cn1Arg1)) {
-        const uint8_t* a = (const uint8_t*)((JAVA_ARRAY)t->java_lang_String_value)->data;
-        const uint8_t* b = (const uint8_t*)((JAVA_ARRAY)o->java_lang_String_value)->data;
+        const uint8_t* a = (const uint8_t*)CN1_ARRAY_DATA((JAVA_ARRAY)t->java_lang_String_value);
+        const uint8_t* b = (const uint8_t*)CN1_ARRAY_DATA((JAVA_ARRAY)o->java_lang_String_value);
         return cn1CompactBytesEqual(a, b, (size_t)t->java_lang_String_count);
     }
     // Fast path: both backing arrays are char[] -- byte-equality of UTF-16 code
     // units == string equality; libc memcmp is the SIMD-optimized comparison on
     // every target.
     if(!cn1StrIsLatin1(__cn1ThisObject) && !cn1StrIsLatin1(__cn1Arg1)) {
-        JAVA_ARRAY_CHAR* oa = ((JAVA_ARRAY_CHAR*)((JAVA_ARRAY)o->java_lang_String_value)->data);
-        JAVA_ARRAY_CHAR* ta = ((JAVA_ARRAY_CHAR*)((JAVA_ARRAY)t->java_lang_String_value)->data);
+        JAVA_ARRAY_CHAR* oa = ((JAVA_ARRAY_CHAR*)CN1_ARRAY_DATA((JAVA_ARRAY)o->java_lang_String_value));
+        JAVA_ARRAY_CHAR* ta = ((JAVA_ARRAY_CHAR*)CN1_ARRAY_DATA((JAVA_ARRAY)t->java_lang_String_value));
         return cn1CompactBytesEqual(ta, oa, (size_t)t->java_lang_String_count * sizeof(JAVA_ARRAY_CHAR));
     }
     JAVA_ARRAY av = (JAVA_ARRAY)t->java_lang_String_value;
     JAVA_ARRAY bv = (JAVA_ARRAY)o->java_lang_String_value;
     return cn1StrIsLatin1(__cn1ThisObject)
-        ? cn1CompactMixedEquals((const uint8_t*)av->data,
-                (const uint16_t*)bv->data, (size_t)t->java_lang_String_count)
-        : cn1CompactMixedEquals((const uint8_t*)bv->data,
-                (const uint16_t*)av->data, (size_t)t->java_lang_String_count);
+        ? cn1CompactMixedEquals((const uint8_t*)CN1_ARRAY_DATA(av),
+                (const uint16_t*)CN1_ARRAY_DATA(bv), (size_t)t->java_lang_String_count)
+        : cn1CompactMixedEquals((const uint8_t*)CN1_ARRAY_DATA(bv),
+                (const uint16_t*)CN1_ARRAY_DATA(av), (size_t)t->java_lang_String_count);
 
 }
 
@@ -457,8 +457,8 @@ JAVA_INT java_lang_String_compareTo___java_lang_String_R_int(CODENAME_ONE_THREAD
     JAVA_INT oc = o->java_lang_String_count;
     JAVA_INT minL = tc < oc ? tc : oc;
     if(cn1StrIsLatin1(__cn1ThisObject) && cn1StrIsLatin1(__cn1Arg1)) {
-        const uint8_t* a = (const uint8_t*)((JAVA_ARRAY)t->java_lang_String_value)->data;
-        const uint8_t* b = (const uint8_t*)((JAVA_ARRAY)o->java_lang_String_value)->data;
+        const uint8_t* a = (const uint8_t*)CN1_ARRAY_DATA((JAVA_ARRAY)t->java_lang_String_value);
+        const uint8_t* b = (const uint8_t*)CN1_ARRAY_DATA((JAVA_ARRAY)o->java_lang_String_value);
         JAVA_INT i = 0;
         // memcmp only promises the sign of its answer. Skip equal blocks, then
         // return the exact unsigned character difference required by Java.
@@ -474,8 +474,8 @@ JAVA_INT java_lang_String_compareTo___java_lang_String_R_int(CODENAME_ONE_THREAD
     // 4-char block with 64-bit compares, then resolve the exact code unit inside
     // it (UTF-16 code-unit order, like Java).
     if(!cn1StrIsLatin1(__cn1ThisObject) && !cn1StrIsLatin1(__cn1Arg1)) {
-        const JAVA_ARRAY_CHAR* ta = ((JAVA_ARRAY_CHAR*)((JAVA_ARRAY)t->java_lang_String_value)->data);
-        const JAVA_ARRAY_CHAR* oa = ((JAVA_ARRAY_CHAR*)((JAVA_ARRAY)o->java_lang_String_value)->data);
+        const JAVA_ARRAY_CHAR* ta = ((JAVA_ARRAY_CHAR*)CN1_ARRAY_DATA((JAVA_ARRAY)t->java_lang_String_value));
+        const JAVA_ARRAY_CHAR* oa = ((JAVA_ARRAY_CHAR*)CN1_ARRAY_DATA((JAVA_ARRAY)o->java_lang_String_value));
         JAVA_INT i = 0;
         for(; i + 4 <= minL; i += 4) {
             uint64_t a, b;
@@ -537,8 +537,8 @@ JAVA_BOOLEAN java_lang_String_equalsIgnoreCase___java_lang_String_R_boolean(CODE
     
     // Fast path: both backing arrays are char[]; index directly.
     if(!cn1StrIsLatin1(__cn1ThisObject) && !cn1StrIsLatin1(__cn1Arg1)) {
-        JAVA_ARRAY_CHAR* oa = (JAVA_ARRAY_CHAR*)((JAVA_ARRAY)o->java_lang_String_value)->data;
-        JAVA_ARRAY_CHAR* ta = (JAVA_ARRAY_CHAR*)((JAVA_ARRAY)t->java_lang_String_value)->data;
+        JAVA_ARRAY_CHAR* oa = (JAVA_ARRAY_CHAR*)CN1_ARRAY_DATA((JAVA_ARRAY)o->java_lang_String_value);
+        JAVA_ARRAY_CHAR* ta = (JAVA_ARRAY_CHAR*)CN1_ARRAY_DATA((JAVA_ARRAY)t->java_lang_String_value);
         JAVA_INT oo = 0;
         JAVA_INT to = 0;
 
@@ -592,7 +592,7 @@ JAVA_INT java_lang_String_hashCode___R_int(CODENAME_ONE_THREAD_STATE, JAVA_OBJEC
         if(arr->__codenameOneParentClsReference == &class_array1__JAVA_BYTE) {
             // Latin-1: (b & 0xff) IS the char value, so the hash is bit-identical
             // to the same text stored as char[]. Mirrors cn1_intrinsics.h.
-            JAVA_ARRAY_BYTE* b = (JAVA_ARRAY_BYTE*)arr->data;
+            JAVA_ARRAY_BYTE* b = (JAVA_ARRAY_BYTE*)CN1_ARRAY_DATA(arr);
             for (; i + 4 <= end; i += 4) {
                 hash = hash * 923521
                      + (b[i] & 0xff) * 29791
@@ -604,7 +604,7 @@ JAVA_INT java_lang_String_hashCode___R_int(CODENAME_ONE_THREAD_STATE, JAVA_OBJEC
                 hash = 31 * hash + (b[i] & 0xff);
             }
         } else {
-            JAVA_ARRAY_CHAR* chars = (JAVA_ARRAY_CHAR*)arr->data;
+            JAVA_ARRAY_CHAR* chars = (JAVA_ARRAY_CHAR*)CN1_ARRAY_DATA(arr);
             for (; i + 4 <= end; i += 4) {
                 hash = hash * 923521
                      + chars[i] * 29791
@@ -638,7 +638,7 @@ JAVA_OBJECT java_lang_reflect_Array_newInstanceImpl___java_lang_Class_int_R_java
 
 JAVA_OBJECT java_lang_String_bytesToChars___byte_1ARRAY_int_int_java_lang_String_R_char_1ARRAY(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT b, JAVA_INT off, JAVA_INT len, JAVA_OBJECT encoding) {
     enteringNativeAllocations();
-    JAVA_ARRAY_BYTE* sourceData = (JAVA_ARRAY_BYTE*)((JAVA_ARRAY)b)->data + off;
+    JAVA_ARRAY_BYTE* sourceData = (JAVA_ARRAY_BYTE*)CN1_ARRAY_DATA((JAVA_ARRAY)b) + off;
 
     // `encoding` is a java.lang.String whose backing array may be a compact
     // Latin-1 byte[]; decode the (short, ASCII) encoding name logically into a
@@ -663,7 +663,7 @@ JAVA_OBJECT java_lang_String_bytesToChars___byte_1ARRAY_int_int_java_lang_String
     // matches JDK CharsetDecoder.REPLACE on StandardCharsets.US_ASCII.
     if (enc == CN1_ENC_US_ASCII) {
         JAVA_OBJECT destArr = __NEW_ARRAY_JAVA_CHAR(threadStateData, len);
-        JAVA_ARRAY_CHAR* dest = (JAVA_ARRAY_CHAR*)((JAVA_ARRAY)destArr)->data;
+        JAVA_ARRAY_CHAR* dest = (JAVA_ARRAY_CHAR*)CN1_ARRAY_DATA((JAVA_ARRAY)destArr);
         for (int iter = 0; iter < len; iter++) {
             uint8_t v = (uint8_t)sourceData[iter];
             dest[iter] = (v < 0x80) ? (JAVA_ARRAY_CHAR)v : (JAVA_ARRAY_CHAR)CN1_REPLACEMENT_CHAR;
@@ -675,7 +675,7 @@ JAVA_OBJECT java_lang_String_bytesToChars___byte_1ARRAY_int_int_java_lang_String
     // ISO-8859-1: every byte maps 1:1 to char.
     if (enc == CN1_ENC_ISO_8859_1) {
         JAVA_OBJECT destArr = __NEW_ARRAY_JAVA_CHAR(threadStateData, len);
-        JAVA_ARRAY_CHAR* dest = (JAVA_ARRAY_CHAR*)((JAVA_ARRAY)destArr)->data;
+        JAVA_ARRAY_CHAR* dest = (JAVA_ARRAY_CHAR*)CN1_ARRAY_DATA((JAVA_ARRAY)destArr);
         for (int iter = 0; iter < len; iter++) {
             dest[iter] = (JAVA_ARRAY_CHAR)(uint8_t)sourceData[iter];
         }
@@ -697,7 +697,7 @@ JAVA_OBJECT java_lang_String_bytesToChars___byte_1ARRAY_int_int_java_lang_String
         if (asciiPrefix == srcLen) {
             // Whole input is ASCII -- single allocation + vector widen.
             JAVA_OBJECT destArr = __NEW_ARRAY_JAVA_CHAR(threadStateData, (JAVA_INT)srcLen);
-            JAVA_ARRAY_CHAR* dest = (JAVA_ARRAY_CHAR*)((JAVA_ARRAY)destArr)->data;
+            JAVA_ARRAY_CHAR* dest = (JAVA_ARRAY_CHAR*)CN1_ARRAY_DATA((JAVA_ARRAY)destArr);
 #if defined(__ARM_NEON)
             cn1_utf8_widen_ascii_neon(src, dest, srcLen);
 #else
@@ -713,7 +713,7 @@ JAVA_OBJECT java_lang_String_bytesToChars___byte_1ARRAY_int_int_java_lang_String
         size_t tailLen = cn1_utf8_decode_replace(src + asciiPrefix, srcLen - asciiPrefix, NULL);
         size_t total = asciiPrefix + tailLen;
         JAVA_OBJECT destArr = __NEW_ARRAY_JAVA_CHAR(threadStateData, (JAVA_INT)total);
-        JAVA_ARRAY_CHAR* dest = (JAVA_ARRAY_CHAR*)((JAVA_ARRAY)destArr)->data;
+        JAVA_ARRAY_CHAR* dest = (JAVA_ARRAY_CHAR*)CN1_ARRAY_DATA((JAVA_ARRAY)destArr);
         if (asciiPrefix > 0) {
 #if defined(__ARM_NEON)
             cn1_utf8_widen_ascii_neon(src, dest, asciiPrefix);
@@ -739,7 +739,7 @@ JAVA_OBJECT java_lang_String_bytesToChars___byte_1ARRAY_int_int_java_lang_String
     if (nsStr == nil) {
         [pool release];
         JAVA_OBJECT destArr = __NEW_ARRAY_JAVA_CHAR(threadStateData, len);
-        JAVA_ARRAY_CHAR* dest = (JAVA_ARRAY_CHAR*)((JAVA_ARRAY)destArr)->data;
+        JAVA_ARRAY_CHAR* dest = (JAVA_ARRAY_CHAR*)CN1_ARRAY_DATA((JAVA_ARRAY)destArr);
         for (int iter = 0; iter < len; iter++) {
             uint8_t v = (uint8_t)sourceData[iter];
             dest[iter] = (v < 0x80) ? (JAVA_ARRAY_CHAR)v : (JAVA_ARRAY_CHAR)CN1_REPLACEMENT_CHAR;
@@ -749,7 +749,7 @@ JAVA_OBJECT java_lang_String_bytesToChars___byte_1ARRAY_int_int_java_lang_String
     }
 
     JAVA_OBJECT destArr = __NEW_ARRAY_JAVA_CHAR(threadStateData, [nsStr length]);
-    __block JAVA_ARRAY_CHAR* dest = (JAVA_ARRAY_CHAR*)((JAVA_ARRAY)destArr)->data;
+    __block JAVA_ARRAY_CHAR* dest = (JAVA_ARRAY_CHAR*)CN1_ARRAY_DATA((JAVA_ARRAY)destArr);
     __block int length = 0;
     [nsStr enumerateSubstringsInRange:NSMakeRange(0, [nsStr length])
                                options:NSStringEnumerationByComposedCharacterSequences
@@ -774,7 +774,7 @@ JAVA_OBJECT java_lang_String_bytesToChars___byte_1ARRAY_int_int_java_lang_String
     // through here. Widen bytes 1:1 (Latin-1-ish) so test coverage stays
     // exercised without pulling in Apple's full encoding catalogue.
     JAVA_OBJECT destArr = __NEW_ARRAY_JAVA_CHAR(threadStateData, len);
-    JAVA_ARRAY_CHAR* dest = (JAVA_ARRAY_CHAR*)((JAVA_ARRAY)destArr)->data;
+    JAVA_ARRAY_CHAR* dest = (JAVA_ARRAY_CHAR*)CN1_ARRAY_DATA((JAVA_ARRAY)destArr);
     for (int iter = 0; iter < len; iter++) {
         dest[iter] = (JAVA_ARRAY_CHAR)(uint8_t)sourceData[iter];
     }
@@ -788,7 +788,7 @@ JAVA_OBJECT java_io_InputStreamReader_bytesToChars___byte_1ARRAY_int_int_java_la
 }
 
 JAVA_BOOLEAN isAsciiArray(JAVA_ARRAY sourceArr) {
-    JAVA_ARRAY_CHAR* arr = (JAVA_ARRAY_CHAR*)((JAVA_ARRAY)sourceArr)->data;
+    JAVA_ARRAY_CHAR* arr = (JAVA_ARRAY_CHAR*)CN1_ARRAY_DATA((JAVA_ARRAY)sourceArr);
     for(int iter = 0 ; iter < sourceArr->length ; iter++) {
         if(arr[iter] > 127) {
             return JAVA_FALSE;
@@ -818,13 +818,13 @@ JAVA_OBJECT java_lang_String_compactBytes___java_lang_String_R_byte_1ARRAY(
     if(enc != CN1_ENC_UTF8 && enc != CN1_ENC_US_ASCII && enc != CN1_ENC_ISO_8859_1) return JAVA_NULL;
     int count = string->java_lang_String_count;
     if(count > INT_MAX / 2) return JAVA_NULL;
-    const uint8_t* input = (const uint8_t*)source->data;
+    const uint8_t* input = (const uint8_t*)CN1_ARRAY_DATA(source);
     int length = count;
     if(enc == CN1_ENC_UTF8) {
         for(int i = 0; i < count; i++) length += input[i] >> 7;
     }
     JAVA_OBJECT result = __NEW_ARRAY_JAVA_BYTE(threadStateData, length);
-    uint8_t* output = (uint8_t*)((JAVA_ARRAY)result)->data;
+    uint8_t* output = (uint8_t*)CN1_ARRAY_DATA((JAVA_ARRAY)result);
     if(enc == CN1_ENC_ISO_8859_1 || (enc == CN1_ENC_UTF8 && length == count)) {
         memcpy(output, input, (size_t)count);
     } else if(enc == CN1_ENC_US_ASCII) {
@@ -841,13 +841,13 @@ JAVA_OBJECT java_lang_String_compactBytes___java_lang_String_R_byte_1ARRAY(
 
 JAVA_OBJECT java_lang_String_charsToBytes___char_1ARRAY_char_1ARRAY_R_byte_1ARRAY(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT arr, JAVA_OBJECT encoding) {
     JAVA_ARRAY sourceArr = (JAVA_ARRAY)arr;
-    JAVA_ARRAY_CHAR* src = (JAVA_ARRAY_CHAR*)((JAVA_ARRAY)sourceArr)->data;
+    JAVA_ARRAY_CHAR* src = (JAVA_ARRAY_CHAR*)CN1_ARRAY_DATA((JAVA_ARRAY)sourceArr);
     int srcLen = sourceArr->length;
 
     JAVA_ARRAY_CHAR* encChars = NULL;
     int encLen = 0;
     if (encoding != JAVA_NULL) {
-        encChars = (JAVA_ARRAY_CHAR*)((JAVA_ARRAY)encoding)->data;
+        encChars = (JAVA_ARRAY_CHAR*)CN1_ARRAY_DATA((JAVA_ARRAY)encoding);
         encLen = ((JAVA_ARRAY)encoding)->length;
     }
     cn1_encoding_t enc = cn1_resolve_encoding_from_chars(encChars, encLen);
@@ -857,7 +857,7 @@ JAVA_OBJECT java_lang_String_charsToBytes___char_1ARRAY_char_1ARRAY_R_byte_1ARRA
     // shortcut without checking the requested encoding.
     if (isAsciiArray(sourceArr)) {
         JAVA_OBJECT destArr = __NEW_ARRAY_JAVA_BYTE(threadStateData, srcLen);
-        JAVA_ARRAY_BYTE* dest = (JAVA_ARRAY_BYTE*)((JAVA_ARRAY)destArr)->data;
+        JAVA_ARRAY_BYTE* dest = (JAVA_ARRAY_BYTE*)CN1_ARRAY_DATA((JAVA_ARRAY)destArr);
         for (int iter = 0; iter < srcLen; iter++) {
             dest[iter] = (JAVA_ARRAY_BYTE)src[iter];
         }
@@ -867,7 +867,7 @@ JAVA_OBJECT java_lang_String_charsToBytes___char_1ARRAY_char_1ARRAY_R_byte_1ARRA
     if (enc == CN1_ENC_UTF8 || enc == CN1_ENC_UNKNOWN) {
         size_t outLen = cn1_utf8_encode_chars(src, (size_t)srcLen, NULL);
         JAVA_OBJECT destArr = __NEW_ARRAY_JAVA_BYTE(threadStateData, (JAVA_INT)outLen);
-        JAVA_ARRAY_BYTE* dest = (JAVA_ARRAY_BYTE*)((JAVA_ARRAY)destArr)->data;
+        JAVA_ARRAY_BYTE* dest = (JAVA_ARRAY_BYTE*)CN1_ARRAY_DATA((JAVA_ARRAY)destArr);
         cn1_utf8_encode_chars(src, (size_t)srcLen, dest);
         return destArr;
     }
@@ -881,7 +881,7 @@ JAVA_OBJECT java_lang_String_charsToBytes___char_1ARRAY_char_1ARRAY_R_byte_1ARRA
             }
         }
         JAVA_OBJECT destArr = __NEW_ARRAY_JAVA_BYTE(threadStateData, outLen);
-        JAVA_ARRAY_BYTE* dest = (JAVA_ARRAY_BYTE*)((JAVA_ARRAY)destArr)->data;
+        JAVA_ARRAY_BYTE* dest = (JAVA_ARRAY_BYTE*)CN1_ARRAY_DATA((JAVA_ARRAY)destArr);
         unsigned int max = (enc == CN1_ENC_US_ASCII) ? 0x80u : 0x100u;
         for (int iter = 0, out = 0; iter < srcLen; iter++) {
             unsigned int c = (unsigned int)src[iter];
@@ -896,13 +896,13 @@ JAVA_OBJECT java_lang_String_charsToBytes___char_1ARRAY_char_1ARRAY_R_byte_1ARRA
     // UTF-16, ISO-8859-2 etc. -- defer to NSString for the unusual encodings.
     NSStringEncoding nsEnc = cn1_nsencoding_for(enc);
     NSAutoreleasePool* pool = [[NSAutoreleasePool alloc] init];
-    NSString* nsStr = [[NSString alloc] initWithCharacters:sourceArr->data length:srcLen];
+    NSString* nsStr = [[NSString alloc] initWithCharacters:CN1_ARRAY_DATA(sourceArr) length:srcLen];
     NSData* data = [nsStr dataUsingEncoding:nsEnc allowLossyConversion:YES];
     if (data == nil) {
         data = [nsStr dataUsingEncoding:NSUTF8StringEncoding allowLossyConversion:YES];
     }
     JAVA_OBJECT destArr = __NEW_ARRAY_JAVA_BYTE(threadStateData, [data length]);
-    JAVA_ARRAY_BYTE* dest = (JAVA_ARRAY_BYTE*)((JAVA_ARRAY)destArr)->data;
+    JAVA_ARRAY_BYTE* dest = (JAVA_ARRAY_BYTE*)CN1_ARRAY_DATA((JAVA_ARRAY)destArr);
     [data getBytes:dest length:[data length]];
     [nsStr release];
     [pool release];
@@ -912,7 +912,7 @@ JAVA_OBJECT java_lang_String_charsToBytes___char_1ARRAY_char_1ARRAY_R_byte_1ARRA
     // fallback at least round-trips a Unicode payload cleanly.
     size_t outLen = cn1_utf8_encode_chars(src, (size_t)srcLen, NULL);
     JAVA_OBJECT destArr = __NEW_ARRAY_JAVA_BYTE(threadStateData, (JAVA_INT)outLen);
-    JAVA_ARRAY_BYTE* dest = (JAVA_ARRAY_BYTE*)((JAVA_ARRAY)destArr)->data;
+    JAVA_ARRAY_BYTE* dest = (JAVA_ARRAY_BYTE*)CN1_ARRAY_DATA((JAVA_ARRAY)destArr);
     cn1_utf8_encode_chars(src, (size_t)srcLen, dest);
     return destArr;
 #endif
@@ -1012,7 +1012,7 @@ JAVA_VOID java_io_NSLogOutputStream_write___byte_1ARRAY_int_int(CODENAME_ONE_THR
     if(off < 0 || len < 0 || off > a->length - len) { THROW_ARRAY_INDEX_EXCEPTION(off); return; }
     if(len == 0) return;
     CN1_KEEP_NATIVE_OWNER(outputOwner, b);
-    JAVA_ARRAY_BYTE* arr = (JAVA_ARRAY_BYTE*)a->data + off;
+    JAVA_ARRAY_BYTE* arr = (JAVA_ARRAY_BYTE*)CN1_ARRAY_DATA(a) + off;
 #if defined(__APPLE__) && defined(__OBJC__)
     NSAutoreleasePool* pool = [[NSAutoreleasePool alloc] init];
     NSData * data = [NSData dataWithBytes:arr length:len];
@@ -1089,9 +1089,9 @@ JAVA_VOID java_lang_System_arraycopy___java_lang_Object_int_java_lang_Object_int
             // One acquisition of the SATB mutex per 256 references rather than per
             // reference; this used to be two locked enqueues per element. See
             // cn1SatbEnqueueRangeLocked.
-            cn1SatbEnqueueRangeLocked(((JAVA_ARRAY_OBJECT*)(*dstArr).data) + dstOffset, length);
+            cn1SatbEnqueueRangeLocked(((JAVA_ARRAY_OBJECT*)CN1_ARRAY_DATA(dstArr)) + dstOffset, length);
 #ifndef CN1_NO_BULK_INSERTION_BARRIER
-            cn1SatbEnqueueRangeLocked(((JAVA_ARRAY_OBJECT*)(*srcArr).data) + srcOffset, length);
+            cn1SatbEnqueueRangeLocked(((JAVA_ARRAY_OBJECT*)CN1_ARRAY_DATA(srcArr)) + srcOffset, length);
 #endif
         }
     }
@@ -1102,7 +1102,7 @@ JAVA_VOID java_lang_System_arraycopy___java_lang_Object_int_java_lang_Object_int
      * the downward shift, but AArch64's optimized memcpy corrupts it (observed as
      * heap corruption on the arm64 clean target). memmove is the correct,
      * overlap-safe primitive. */
-    memmove( (*dstArr).data + (dstOffset * byteSize), (*srcArr).data  + (srcOffset * byteSize), length * byteSize);
+    memmove( CN1_ARRAY_DATA(dstArr) + (dstOffset * byteSize), CN1_ARRAY_DATA(srcArr)  + (srcOffset * byteSize), length * byteSize);
     if(cn1__satbReg) {
         cn1SatbBulkEnd();
     }
@@ -1280,7 +1280,7 @@ JAVA_INT java_io_FileInputStream_readImpl___long_byte_1ARRAY_int_int_R_int(CODEN
     if(f == NULL || buffer == JAVA_NULL) {
         return -2;
     }
-    JAVA_ARRAY_BYTE* data = (JAVA_ARRAY_BYTE*)((JAVA_ARRAY)buffer)->data;
+    JAVA_ARRAY_BYTE* data = (JAVA_ARRAY_BYTE*)CN1_ARRAY_DATA((JAVA_ARRAY)buffer);
     size_t n;
     int atEof;
     /* A "file" is not always a file: a FIFO, a device or a network-backed path can
@@ -1438,7 +1438,7 @@ JAVA_INT java_io_FileOutputStream_writeImpl___long_byte_1ARRAY_int_int_R_int(COD
     if(f == NULL || buffer == JAVA_NULL) {
         return -1;
     }
-    JAVA_ARRAY_BYTE* data = (JAVA_ARRAY_BYTE*)((JAVA_ARRAY)buffer)->data;
+    JAVA_ARRAY_BYTE* data = (JAVA_ARRAY_BYTE*)CN1_ARRAY_DATA((JAVA_ARRAY)buffer);
     size_t written;
     /* Blocks for the same reasons the read does -- a full pipe, a slow device -- and
        strands the collector the same way. */
@@ -1487,7 +1487,7 @@ JAVA_INT java_io_StandardInputStream_readImpl___byte_1ARRAY_int_int_R_int(CODENA
     if(buffer == JAVA_NULL) {
         return -2;
     }
-    JAVA_ARRAY_BYTE* data = (JAVA_ARRAY_BYTE*)((JAVA_ARRAY)buffer)->data;
+    JAVA_ARRAY_BYTE* data = (JAVA_ARRAY_BYTE*)CN1_ARRAY_DATA((JAVA_ARRAY)buffer);
     size_t n;
     int atEof;
     /* System.in.read() on a terminal or pipe waits for as long as nobody types. With
@@ -1816,13 +1816,13 @@ JAVA_OBJECT java_lang_Long_toString___long_int_R_java_lang_String(CODENAME_ONE_T
 // part is a Latin-1 (byte[]-backed) String, so we read raw bytes and build a SINGLE fused block
 // (byte[] inline in the String) -- one allocation and no byte<->char conversion, vs StringBuilder's
 // four allocations + two conversions. Args are guaranteed non-null (String.cn1c handled null).
-#define CN1_SB_PTR(s) ((JAVA_ARRAY_BYTE*)((JAVA_ARRAY)((struct obj__java_lang_String*)(s))->java_lang_String_value)->data)
+#define CN1_SB_PTR(s) ((JAVA_ARRAY_BYTE*)CN1_ARRAY_DATA((JAVA_ARRAY)((struct obj__java_lang_String*)(s))->java_lang_String_value))
 #define CN1_SB_LEN(s) (((struct obj__java_lang_String*)(s))->java_lang_String_count)
 
 static JAVA_OBJECT cn1ConcatFallback(CODENAME_ONE_THREAD_STATE, JAVA_ARRAY_BYTE* const* parts, const int* lens, int n, int total) {
     enteringNativeAllocations();
     JAVA_ARRAY dat = (JAVA_ARRAY)allocArray(threadStateData, total, &class_array1__JAVA_BYTE, sizeof(JAVA_ARRAY_BYTE), 1);
-    JAVA_ARRAY_BYTE* d = (JAVA_ARRAY_BYTE*) (*dat).data;
+    JAVA_ARRAY_BYTE* d = (JAVA_ARRAY_BYTE*) CN1_ARRAY_DATA(dat);
     int o = 0;
     for(int p = 0 ; p < n ; p++) { for(int i = 0 ; i < lens[p] ; i++) d[o + i] = parts[p][i]; o += lens[p]; }
     JAVA_OBJECT so = __NEW_java_lang_String(threadStateData);
@@ -2028,7 +2028,7 @@ JAVA_BOOLEAN isClassNameEqual(const char * clsName, JAVA_ARRAY_CHAR* chrs, int l
 JAVA_OBJECT java_lang_Class_forNameImpl___java_lang_String_R_java_lang_Class(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT className) {
     int length = java_lang_String_length___R_int(threadStateData, className);
     JAVA_ARRAY arrayData = (JAVA_ARRAY)java_lang_String_toCharNoCopy___R_char_1ARRAY(threadStateData, className);
-    JAVA_ARRAY_CHAR* chrs = arrayData->data;
+    JAVA_ARRAY_CHAR* chrs = CN1_ARRAY_DATA(arrayData);
     
     for(int iter = 0 ; iter < classListSize ; iter++) {
         if(strlen(classesList[iter]->clsName) == length) {
@@ -3534,7 +3534,7 @@ JAVA_BOOLEAN java_lang_Thread_isInterrupted___boolean_R_boolean(CODENAME_ONE_THR
 JAVA_DOUBLE java_lang_StringToReal_parseDblImpl___java_lang_String_int_R_double(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT s, JAVA_INT e) {
     int length = java_lang_String_length___R_int(threadStateData, s);
     JAVA_ARRAY arrayData = (JAVA_ARRAY)java_lang_String_toCharNoCopy___R_char_1ARRAY(threadStateData, s);
-    JAVA_ARRAY_CHAR* chrs = arrayData->data;
+    JAVA_ARRAY_CHAR* chrs = CN1_ARRAY_DATA(arrayData);
     char data[length + 1];
     for(int iter = 0 ; iter < length ; iter++) {
         data[iter] = (char)chrs[iter];
@@ -4721,7 +4721,7 @@ JAVA_INT java_lang_String_indexOf___int_int_R_int(CODENAME_ONE_THREAD_STATE, JAV
     int count = encString->java_lang_String_count;
     if(arr->__codenameOneParentClsReference == &class_array1__JAVA_BYTE) {
         // Latin-1: (b & 0xff) IS the char value; matches char[] scan bit-identically.
-        JAVA_ARRAY_BYTE* encArr = (JAVA_ARRAY_BYTE*)arr->data;
+        JAVA_ARRAY_BYTE* encArr = (JAVA_ARRAY_BYTE*)CN1_ARRAY_DATA(arr);
         int endOff = off+count;
         for (int i=off+fromIndex; i<endOff; i++) {
             if ((encArr[i] & 0xff) == ch) {
@@ -4730,7 +4730,7 @@ JAVA_INT java_lang_String_indexOf___int_int_R_int(CODENAME_ONE_THREAD_STATE, JAV
         }
         return -1;
     }
-    JAVA_ARRAY_CHAR* encArr = (JAVA_ARRAY_CHAR*)arr->data;
+    JAVA_ARRAY_CHAR* encArr = (JAVA_ARRAY_CHAR*)CN1_ARRAY_DATA(arr);
     int endOff = off+count;
     for (int i=off+fromIndex; i<endOff; i++) {
         if (encArr[i] == ch) {
@@ -4873,7 +4873,7 @@ JAVA_OBJECT java_lang_StringBuilder_append___java_lang_String_R_java_lang_String
     JAVA_ARRAY input = (JAVA_ARRAY)source->java_lang_String_value;
     int sourceLatin1 = input->__codenameOneParentClsReference == &class_array1__JAVA_BYTE;
     if(!sourceLatin1 && cn1BuilderIsLatin1(builder)) {
-        JAVA_ARRAY_CHAR* units = (JAVA_ARRAY_CHAR*)input->data;
+        JAVA_ARRAY_CHAR* units = (JAVA_ARRAY_CHAR*)CN1_ARRAY_DATA(input);
         for(int i = 0; i < length; i++) if(units[i] > 255) {
             java_lang_StringBuilder_widen__(threadStateData, builder);
             break;
@@ -4883,14 +4883,14 @@ JAVA_OBJECT java_lang_StringBuilder_append___java_lang_String_R_java_lang_String
     void* output = cn1BuilderData(builder);
     if(sourceLatin1 && cn1BuilderIsLatin1(builder)) {
         memcpy((JAVA_ARRAY_BYTE*)output + count,
-               (JAVA_ARRAY_BYTE*)input->data, (size_t)length);
+               (JAVA_ARRAY_BYTE*)CN1_ARRAY_DATA(input), (size_t)length);
     } else if(!sourceLatin1 && !cn1BuilderIsLatin1(builder)) {
         cn1CharCopy((JAVA_ARRAY_CHAR*)output + count,
-                   (JAVA_ARRAY_CHAR*)input->data, length);
+                   (JAVA_ARRAY_CHAR*)CN1_ARRAY_DATA(input), length);
     } else {
         for(int i = 0; i < length; i++) {
-            JAVA_CHAR ch = sourceLatin1 ? (JAVA_CHAR)((uint8_t*)input->data)[i]
-                : ((JAVA_ARRAY_CHAR*)input->data)[i];
+            JAVA_CHAR ch = sourceLatin1 ? (JAVA_CHAR)((uint8_t*)CN1_ARRAY_DATA(input))[i]
+                : ((JAVA_ARRAY_CHAR*)CN1_ARRAY_DATA(input))[i];
             cn1BuilderStore(builder, count + i, ch);
         }
     }
@@ -4924,7 +4924,7 @@ JAVA_BOOLEAN java_lang_StringBuilder_tryAppendRange___java_lang_CharSequence_int
         struct obj__java_lang_String* string = (struct obj__java_lang_String*)text;
         JAVA_ARRAY array = (JAVA_ARRAY)string->java_lang_String_value;
         sourceLatin1 = array->__codenameOneParentClsReference == &class_array1__JAVA_BYTE;
-        input = array->data;
+        input = CN1_ARRAY_DATA(array);
         start += 0;
     }
     if(!sourceLatin1 && cn1BuilderIsLatin1(builder)) {
@@ -4972,7 +4972,7 @@ JAVA_OBJECT java_lang_StringBuilder_append___char_1ARRAY_int_int_R_java_lang_Str
     int needed = count + length;
     if(needed < 0 || needed > target->java_lang_StringBuilder_capacity)
         java_lang_StringBuilder_enlargeBuffer___int(threadStateData, builder, needed);
-    const JAVA_ARRAY_CHAR* input = (const JAVA_ARRAY_CHAR*)array->data + offset;
+    const JAVA_ARRAY_CHAR* input = (const JAVA_ARRAY_CHAR*)CN1_ARRAY_DATA(array) + offset;
     if(cn1BuilderIsLatin1(builder)) {
         for(int i = 0; i < length; i++) if(input[i] > 255) {
             java_lang_StringBuilder_widen__(threadStateData, builder);
@@ -5002,7 +5002,7 @@ static JAVA_OBJECT cn1BuilderStringCopy(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT b
     text->java_lang_String_value = value;
     text->java_lang_String_count = count;
     if(count > 0) {
-        void* destination = ((JAVA_ARRAY)value)->data;
+        void* destination = CN1_ARRAY_DATA((JAVA_ARRAY)value);
         if(!latin1 || cn1BuilderIsLatin1(builder)) {
             memcpy(destination, cn1BuilderData(builder), (size_t)count * (latin1 ? 1 : sizeof(JAVA_ARRAY_CHAR)));
         } else {
@@ -5072,11 +5072,11 @@ JAVA_OBJECT java_lang_String_cn1SubstringFused___int_int_R_java_lang_String(CODE
         // this correct against a future where it does.
         src = (JAVA_ARRAY)me->java_lang_String_value;
         if(latin1) {
-            memcpy((JAVA_ARRAY_BYTE*)((JAVA_ARRAY)arr)->data,
-                   ((JAVA_ARRAY_BYTE*)src->data) + off, (size_t)n);
+            memcpy((JAVA_ARRAY_BYTE*)CN1_ARRAY_DATA((JAVA_ARRAY)arr),
+                   ((JAVA_ARRAY_BYTE*)CN1_ARRAY_DATA(src)) + off, (size_t)n);
         } else {
-            memcpy((JAVA_ARRAY_CHAR*)((JAVA_ARRAY)arr)->data,
-                   ((JAVA_ARRAY_CHAR*)src->data) + off, (size_t)n * sizeof(JAVA_ARRAY_CHAR));
+            memcpy((JAVA_ARRAY_CHAR*)CN1_ARRAY_DATA((JAVA_ARRAY)arr),
+                   ((JAVA_ARRAY_CHAR*)CN1_ARRAY_DATA(src)) + off, (size_t)n * sizeof(JAVA_ARRAY_CHAR));
         }
     }
     finishedNativeAllocations();
@@ -5145,7 +5145,7 @@ JAVA_OBJECT java_lang_StringBuilder_toString___R_java_lang_String(CODENAME_ONE_T
         // re-read the buffer AFTER the allocation (it can run a GC handshake;
         // non-moving heap, but the value field itself is re-loadable for free)
         JAVA_ARRAY_CHAR* src = (JAVA_ARRAY_CHAR*)cn1BuilderData(__cn1ThisObject);
-        cn1CharCopy((JAVA_ARRAY_CHAR*)((JAVA_ARRAY)arr)->data, src, count);
+        cn1CharCopy((JAVA_ARRAY_CHAR*)CN1_ARRAY_DATA((JAVA_ARRAY)arr), src, count);
     }
     if(!published) {
         so->__codenameOneParentClsReference = &class__java_lang_String; // PUBLISH
@@ -5161,7 +5161,7 @@ JAVA_VOID java_lang_StringBuilder_getChars___int_int_char_1ARRAY_int(CODENAME_ON
     if(destinationStart < 0 || destinationStart > dst->length - (end - start)) THROW_ARRAY_INDEX_EXCEPTION(destinationStart);
     if(end == start) return;
     void* src = cn1BuilderData(builder);
-    JAVA_ARRAY_CHAR* chars = (JAVA_ARRAY_CHAR*)dst->data + destinationStart;
+    JAVA_ARRAY_CHAR* chars = (JAVA_ARRAY_CHAR*)CN1_ARRAY_DATA(dst) + destinationStart;
     if(cn1BuilderIsLatin1(builder)) {
         for(int i = start; i < end; i++) chars[i - start] = (JAVA_CHAR)((uint8_t*)src)[i];
     } else cn1CharCopy(chars, (JAVA_ARRAY_CHAR*)src + start, end - start);
@@ -5237,16 +5237,16 @@ JAVA_VOID java_lang_String_getChars___int_int_char_1ARRAY_int(CODENAME_ONE_THREA
     
     JAVA_INT offset = 0;
     JAVA_ARRAY srcArr = (JAVA_ARRAY)get_field_java_lang_String_value(__cn1ThisObject);
-    JAVA_ARRAY_CHAR* dst = (JAVA_ARRAY_CHAR*)((JAVA_ARRAY)__cn1Arg3)->data;
+    JAVA_ARRAY_CHAR* dst = (JAVA_ARRAY_CHAR*)CN1_ARRAY_DATA((JAVA_ARRAY)__cn1Arg3);
     if(srcArr->__codenameOneParentClsReference == &class_array1__JAVA_BYTE) {
         // Latin-1: widen each byte (& 0xff) into the destination char[].
-        JAVA_ARRAY_BYTE* src = (JAVA_ARRAY_BYTE*)srcArr->data;
+        JAVA_ARRAY_BYTE* src = (JAVA_ARRAY_BYTE*)CN1_ARRAY_DATA(srcArr);
         for(JAVA_INT k = 0 ; k < __cn1Arg2 - __cn1Arg1 ; k++) {
             dst[__cn1Arg4 + k] = (JAVA_ARRAY_CHAR)(src[offset + __cn1Arg1 + k] & 0xff);
         }
         return;
     }
-    JAVA_ARRAY_CHAR* src = (JAVA_ARRAY_CHAR*)srcArr->data;
+    JAVA_ARRAY_CHAR* src = (JAVA_ARRAY_CHAR*)CN1_ARRAY_DATA(srcArr);
     // memmove: String and destination can only overlap through VM-internal
     // aliasing tricks, but the safe spelling costs nothing here
     memmove(dst + __cn1Arg4, src + offset + __cn1Arg1, (size_t)(__cn1Arg2 - __cn1Arg1) * sizeof(JAVA_ARRAY_CHAR));
@@ -5276,7 +5276,7 @@ static JAVA_OBJECT cn1StringConvertCase(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT m
     JAVA_BOOLEAN changed = JAVA_FALSE;
     if(cn1StrIsLatin1(me)) {
         JAVA_OBJECT barr = allocArray(threadStateData, count, &class_array1__JAVA_BYTE, sizeof(JAVA_ARRAY_BYTE), 1);
-        JAVA_ARRAY_BYTE* bd = (JAVA_ARRAY_BYTE*)((JAVA_ARRAY)barr)->data;
+        JAVA_ARRAY_BYTE* bd = (JAVA_ARRAY_BYTE*)CN1_ARRAY_DATA((JAVA_ARRAY)barr);
         JAVA_BOOLEAN fits = JAVA_TRUE;
         for(int i = 0 ; i < count ; i++) {
             JAVA_ARRAY_CHAR c = cn1StrCharAtRaw(me, i);
@@ -5302,7 +5302,7 @@ static JAVA_OBJECT cn1StringConvertCase(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT m
     JAVA_OBJECT arr = allocArray(threadStateData, count, &class_array1__JAVA_CHAR, sizeof(JAVA_ARRAY_CHAR), 1);
     // read the source AFTER the allocation (non-moving GC, `me` rooted by the
     // caller). Coder-aware: cn1StrCharAtRaw decodes Latin-1(byte[]) or UTF-16(char[]).
-    JAVA_ARRAY_CHAR* dst = (JAVA_ARRAY_CHAR*)((JAVA_ARRAY)arr)->data;
+    JAVA_ARRAY_CHAR* dst = (JAVA_ARRAY_CHAR*)CN1_ARRAY_DATA((JAVA_ARRAY)arr);
     for(int i = 0 ; i < count ; i++) {
         JAVA_ARRAY_CHAR c = cn1StrCharAtRaw(me, i);
         JAVA_ARRAY_CHAR m = (JAVA_ARRAY_CHAR)(toUpper ? towupper(c) : towlower(c));

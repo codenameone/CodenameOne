@@ -184,11 +184,11 @@ static inline JAVA_OBJECT cn1InlSbAppendStr(CODENAME_ONE_THREAD_STATE, JAVA_OBJE
                 return java_lang_StringBuilder_append___java_lang_String_R_java_lang_StringBuilder(threadStateData, sb, str);
             }
             if(destinationLatin1) {
-                memcpy((JAVA_ARRAY_BYTE*)data + count, (JAVA_ARRAY_BYTE*)sarr->data + so, (size_t)len);
+                memcpy((JAVA_ARRAY_BYTE*)data + count, (JAVA_ARRAY_BYTE*)CN1_ARRAY_DATA(sarr) + so, (size_t)len);
             } else {
                 JAVA_ARRAY_CHAR* d = (JAVA_ARRAY_CHAR*)data + count;
                 for(int i = 0; i < len; i++) d[i] = sourceLatin1
-                    ? (JAVA_CHAR)((uint8_t*)sarr->data)[so + i] : ((JAVA_ARRAY_CHAR*)sarr->data)[so + i];
+                    ? (JAVA_CHAR)((uint8_t*)CN1_ARRAY_DATA(sarr))[so + i] : ((JAVA_ARRAY_CHAR*)CN1_ARRAY_DATA(sarr))[so + i];
             }
             t->java_lang_StringBuilder_count = count + len;
             return sb;
@@ -215,7 +215,7 @@ static inline JAVA_OBJECT cn1InlSbToString(CODENAME_ONE_THREAD_STATE, JAVA_OBJEC
             JAVA_OBJECT result = cn1BibopFastAllocNoZero(threadStateData, (int)total, &class__java_lang_String, CN1_BIBOP_CIDX(total));
             if(result != JAVA_NULL) {
                 JAVA_OBJECT array = cn1FusedInstallPrimArray(result, off, &class_array1__JAVA_BYTE, sizeof(JAVA_ARRAY_BYTE), count);
-                if(count > 0) memcpy(((JAVA_ARRAY)array)->data, source, (size_t)count);
+                if(count > 0) memcpy(CN1_ARRAY_DATA((JAVA_ARRAY)array), source, (size_t)count);
                 struct obj__java_lang_String* string = (struct obj__java_lang_String*)result;
                 string->java_lang_String_value = array;
                 string->java_lang_String_count = count;
@@ -240,14 +240,14 @@ static inline JAVA_OBJECT cn1InlStrReplace(CODENAME_ONE_THREAD_STATE, JAVA_OBJEC
     JAVA_ARRAY source = (JAVA_ARRAY)s->java_lang_String_value;
     if(source->__codenameOneParentClsReference == &class_array1__JAVA_BYTE) {
         int count = s->java_lang_String_count;
-        const uint8_t* input = (const uint8_t*)source->data;
+        const uint8_t* input = (const uint8_t*)CN1_ARRAY_DATA(source);
         if(oldChar > 255 || memchr(input, oldChar, (size_t)count) == 0) return str;
         if(newChar <= 255) {
             JAVA_ARRAY_BYTE* output;
             JAVA_OBJECT result = cn1FusedLatin1Begin(threadStateData, count, &output);
             if(result == JAVA_NULL) {
                 result = newStringFromAsciiLen(threadStateData, (const char*)input, count);
-                output = (JAVA_ARRAY_BYTE*)((JAVA_ARRAY)((struct obj__java_lang_String*)result)->java_lang_String_value)->data;
+                output = (JAVA_ARRAY_BYTE*)CN1_ARRAY_DATA((JAVA_ARRAY)((struct obj__java_lang_String*)result)->java_lang_String_value);
             }
             for(int i = 0; i < count; i++) {
                 uint8_t ch = input[i];
@@ -284,19 +284,19 @@ static inline __attribute__((always_inline)) JAVA_BOOLEAN cn1InlStrEquals(
     int al = av->__codenameOneParentClsReference == &class_array1__JAVA_BYTE;
     int bl = bv->__codenameOneParentClsReference == &class_array1__JAVA_BYTE;
     if(al && bl) {
-        const uint8_t* x = (const uint8_t*)av->data;
-        const uint8_t* y = (const uint8_t*)bv->data;
+        const uint8_t* x = (const uint8_t*)CN1_ARRAY_DATA(av);
+        const uint8_t* y = (const uint8_t*)CN1_ARRAY_DATA(bv);
         return cn1CompactBytesEqual(x, y, (size_t)count);
     }
-    const uint16_t* ax = (const uint16_t*)av->data;
-    const uint16_t* bx = (const uint16_t*)bv->data;
+    const uint16_t* ax = (const uint16_t*)CN1_ARRAY_DATA(av);
+    const uint16_t* bx = (const uint16_t*)CN1_ARRAY_DATA(bv);
     if(!al && !bl) {
         return cn1CompactBytesEqual(ax,
                 bx, (size_t)count * sizeof(uint16_t));
     }
-    return al ? cn1CompactMixedEquals((const uint8_t*)av->data,
+    return al ? cn1CompactMixedEquals((const uint8_t*)CN1_ARRAY_DATA(av),
                     bx, (size_t)count)
-              : cn1CompactMixedEquals((const uint8_t*)bv->data,
+              : cn1CompactMixedEquals((const uint8_t*)CN1_ARRAY_DATA(bv),
                     ax, (size_t)count);
 
 }
@@ -318,7 +318,7 @@ static inline JAVA_INT cn1InlStrHash(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT s) {
         if(arr->__codenameOneParentClsReference == &class_array1__JAVA_BYTE) {
             // Latin-1: (b & 0xff) IS the char value, so the hash is bit-identical to
             // the same text stored as char[]. 4-way reassociation mirrors the char path.
-            JAVA_ARRAY_BYTE* b = (JAVA_ARRAY_BYTE*)arr->data;
+            JAVA_ARRAY_BYTE* b = (JAVA_ARRAY_BYTE*)CN1_ARRAY_DATA(arr);
             for (; i + 4 <= end; i += 4) {
                 hash = hash * 923521
                      + (b[i] & 0xff) * 29791
@@ -330,7 +330,7 @@ static inline JAVA_INT cn1InlStrHash(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT s) {
                 hash = 31 * hash + (b[i] & 0xff);
             }
         } else {
-            JAVA_ARRAY_CHAR* chars = (JAVA_ARRAY_CHAR*)arr->data;
+            JAVA_ARRAY_CHAR* chars = (JAVA_ARRAY_CHAR*)CN1_ARRAY_DATA(arr);
             for (; i + 4 <= end; i += 4) {
                 hash = hash * 923521
                      + chars[i] * 29791
@@ -358,9 +358,9 @@ static inline JAVA_CHAR cn1InlStrCharAt(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT s
         JAVA_INT o = index;
         // Latin-1 (byte[]) vs UTF-16 (char[]) chosen by the backing array's class.
         if(arr->__codenameOneParentClsReference == &class_array1__JAVA_BYTE) {
-            return (JAVA_CHAR)(((JAVA_ARRAY_BYTE*)arr->data)[o] & 0xff);
+            return (JAVA_CHAR)(((JAVA_ARRAY_BYTE*)CN1_ARRAY_DATA(arr))[o] & 0xff);
         }
-        return ((JAVA_ARRAY_CHAR*)arr->data)[o];
+        return ((JAVA_ARRAY_CHAR*)CN1_ARRAY_DATA(arr))[o];
     }
     return java_lang_String_charAt___int_R_char(threadStateData, s, index); // throws
 }

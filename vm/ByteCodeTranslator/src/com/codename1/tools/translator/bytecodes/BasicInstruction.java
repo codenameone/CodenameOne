@@ -202,7 +202,7 @@ public class BasicInstruction extends Instruction implements AssignableExpressio
                 }
                 b.append("/* BALOAD */ \n" +
                     "    SP--; SP[-1].type = CN1_TYPE_INT; \n" +
-                    "    SP[-1].data.i = ((JAVA_ARRAY_BYTE*) (*(JAVA_ARRAY)SP[-1].data.o).data)[(*SP).data.i]; \n" +
+                    "    SP[-1].data.i = ((JAVA_ARRAY_BYTE*) CN1_ARRAY_DATA((JAVA_ARRAY)SP[-1].data.o))[(*SP).data.i]; \n" +
                     "    }\n");
                 break;
 
@@ -214,7 +214,7 @@ public class BasicInstruction extends Instruction implements AssignableExpressio
                 }
                 b.append("/* CALOAD */\n" +
                     "    SP--; SP[-1].type = CN1_TYPE_INT; \n" +
-                    "    SP[-1].data.i = ((JAVA_ARRAY_CHAR*) (*(JAVA_ARRAY)SP[-1].data.o).data)[(*SP).data.i];\n");
+                    "    SP[-1].data.i = ((JAVA_ARRAY_CHAR*) CN1_ARRAY_DATA((JAVA_ARRAY)SP[-1].data.o))[(*SP).data.i];\n");
                 break;
                 
             case Opcodes.IALOAD:
@@ -225,7 +225,7 @@ public class BasicInstruction extends Instruction implements AssignableExpressio
                 }
                 b.append("/* IALOAD */\n" +
                         "    SP--; SP[-1].type = CN1_TYPE_INT; \n" +
-                        "    SP[-1].data.i = ((JAVA_ARRAY_INT*) (*(JAVA_ARRAY)SP[-1].data.o).data)[(*SP).data.i];\n");
+                        "    SP[-1].data.i = ((JAVA_ARRAY_INT*) CN1_ARRAY_DATA((JAVA_ARRAY)SP[-1].data.o))[(*SP).data.i];\n");
                 break;
 
             case Opcodes.SALOAD:
@@ -234,7 +234,7 @@ public class BasicInstruction extends Instruction implements AssignableExpressio
                 }
                 b.append(
                         "    SP--; SP[-1].type = CN1_TYPE_INT; \n" +
-                        "    SP[-1].data.i = ((JAVA_ARRAY_SHORT*) (*(JAVA_ARRAY)SP[-1].data.o).data)[(*SP).data.i]; /* SALOAD */\n");
+                        "    SP[-1].data.i = ((JAVA_ARRAY_SHORT*) CN1_ARRAY_DATA((JAVA_ARRAY)SP[-1].data.o))[(*SP).data.i]; /* SALOAD */\n");
                 break;
 
             case Opcodes.LALOAD:
@@ -278,7 +278,7 @@ public class BasicInstruction extends Instruction implements AssignableExpressio
                 }
                 b.append("/* AALOAD */\n" +
                         "    SP--; SP[-1].type = CN1_TYPE_INVALID; \n" +
-                        "    SP[-1].data.o = ((JAVA_ARRAY_OBJECT*) (*(JAVA_ARRAY)SP[-1].data.o).data)[(*SP).data.i]; \n" +
+                        "    SP[-1].data.o = ((JAVA_ARRAY_OBJECT*) CN1_ARRAY_DATA((JAVA_ARRAY)SP[-1].data.o))[(*SP).data.i]; \n" +
                         "    SP[-1].type = CN1_TYPE_OBJECT; \n");
                 break;
 
@@ -289,7 +289,7 @@ public class BasicInstruction extends Instruction implements AssignableExpressio
                     b.append("    ");
                 }
                 b.append("/* BASTORE */\n" +
-                        "    ((JAVA_ARRAY_BYTE*) (*(JAVA_ARRAY)SP[-3].data.o).data)[SP[-2].data.i] = SP[-1].data.i; SP -= 3;\n");
+                        "    ((JAVA_ARRAY_BYTE*) CN1_ARRAY_DATA((JAVA_ARRAY)SP[-3].data.o))[SP[-2].data.i] = SP[-1].data.i; SP -= 3;\n");
                 break;
 
             case Opcodes.CASTORE:
@@ -299,7 +299,7 @@ public class BasicInstruction extends Instruction implements AssignableExpressio
                     b.append("    ");
                 }
                 b.append("/* CASTORE */\n" +
-                        "    ((JAVA_ARRAY_CHAR*) (*(JAVA_ARRAY)SP[-3].data.o).data)[SP[-2].data.i] = SP[-1].data.i; SP -= 3;\n\n");
+                        "    ((JAVA_ARRAY_CHAR*) CN1_ARRAY_DATA((JAVA_ARRAY)SP[-3].data.o))[SP[-2].data.i] = SP[-1].data.i; SP -= 3;\n\n");
                 break;
 
             case Opcodes.SASTORE:
@@ -309,7 +309,7 @@ public class BasicInstruction extends Instruction implements AssignableExpressio
                     b.append("    ");
                 }
                 b.append("/* SASTORE */\n" +
-                        "    ((JAVA_ARRAY_SHORT*) (*(JAVA_ARRAY)SP[-3].data.o).data)[SP[-2].data.i] = SP[-1].data.i; SP -= 3;\n");
+                        "    ((JAVA_ARRAY_SHORT*) CN1_ARRAY_DATA((JAVA_ARRAY)SP[-3].data.o))[SP[-2].data.i] = SP[-1].data.i; SP -= 3;\n");
                 break;
 
             case Opcodes.IASTORE:
@@ -319,7 +319,7 @@ public class BasicInstruction extends Instruction implements AssignableExpressio
                     b.append("    ");
                 }
                 b.append("/* IASTORE */\n" +
-                        "    ((JAVA_ARRAY_INT*) (*(JAVA_ARRAY)SP[-3].data.o).data)[SP[-2].data.i] = SP[-1].data.i; SP -= 3;\n");
+                        "    ((JAVA_ARRAY_INT*) CN1_ARRAY_DATA((JAVA_ARRAY)SP[-3].data.o))[SP[-2].data.i] = SP[-1].data.i; SP -= 3;\n");
                 break;
 
             case Opcodes.LASTORE:
@@ -362,8 +362,8 @@ public class BasicInstruction extends Instruction implements AssignableExpressio
                         (ByteCodeTranslator.isCheckedCastsEnabled()
                                 ? "    CN1_ARRAY_STORE_CHECK(aastoreTmp, SP[-1].data.o); \n" : "") +
                         "    CN1_WRITE_BARRIER(aastoreTmp, SP[-1].data.o); \n" +
-                        "    CN1_SATB_DELETE(&((JAVA_ARRAY_OBJECT*) (*(JAVA_ARRAY)aastoreTmp).data)[SP[-2].data.i]); \n" +
-                        "    ((JAVA_ARRAY_OBJECT*) (*(JAVA_ARRAY)aastoreTmp).data)[SP[-2].data.i] = SP[-1].data.o; \n" +
+                        "    CN1_SATB_DELETE(&((JAVA_ARRAY_OBJECT*) CN1_ARRAY_DATA((JAVA_ARRAY)aastoreTmp))[SP[-2].data.i]); \n" +
+                        "    ((JAVA_ARRAY_OBJECT*) CN1_ARRAY_DATA((JAVA_ARRAY)aastoreTmp))[SP[-2].data.i] = SP[-1].data.o; \n" +
                         "    SP -= 3; }\n");
                 break;
 
