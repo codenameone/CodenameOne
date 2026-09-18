@@ -1,7 +1,21 @@
 /* Fragments never reach the server. Resolve old book bookmarks in the browser. */
 (() => {
   const menu = document.querySelector('.cn1-guide-menu');
-  if (menu) menu.open = window.matchMedia('(min-width: 721px)').matches;
+  const desktop = window.matchMedia('(min-width: 721px)');
+  const updateMenu = () => {
+    if (!menu) return;
+    menu.open = desktop.matches;
+    if (desktop.matches) {
+      const sidebar = document.querySelector('.cn1-guide-sidebar');
+      const current = menu.querySelector('[aria-current="page"]');
+      if (sidebar && current) {
+        const below = current.getBoundingClientRect().bottom - sidebar.getBoundingClientRect().bottom;
+        if (below > 0) sidebar.scrollTop += below + 24;
+      }
+    }
+  };
+  updateMenu();
+  desktop.addEventListener('change', updateMenu);
   async function resolveBookmark() {
     if (!location.hash) return;
     let id;

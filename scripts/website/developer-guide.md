@@ -16,7 +16,8 @@ avoids a second AsciiDoc parser and does not enable raw HTML for the whole site.
 Chapter URLs derive from source filenames, so editing a heading does not move its
 page. Existing section IDs are retained. Navigation follows the book's part and
 chapter order. Generated files are ignored by Git. Hugo provides the shared page
-shell, table of contents, previous/next links, and search content. Search excludes
+shell, a shared chapter sidebar, a numbered contents page, previous/next links
+at the top and bottom of each chapter, and search content. Search excludes
 the full-book duplicate at `/developer-guide/single-page/`.
 
 The Markdown link render hook also resolves legacy links in generated API comments

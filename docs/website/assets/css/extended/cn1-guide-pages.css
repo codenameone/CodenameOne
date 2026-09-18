@@ -1,28 +1,44 @@
-.cn1-guide-index { max-width: var(--cn1-shell); }
-.cn1-guide-tools { display: flex; flex-wrap: wrap; gap: .75rem 1.5rem; margin: 1.25rem 0 2rem; font-size: .9rem; }
-.cn1-guide-tools a, .cn1-guide-sidebar a, .cn1-guide-crumbs a, .cn1-guide-pagination a { color: var(--cn1-accent); }
-.cn1-guide-groups { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1.25rem; }
-.cn1-guide-groups section { border: 1px solid var(--cn1-border); border-radius: 12px; padding: 1.25rem; background: var(--entry); }
-.cn1-guide-groups h2 { font-size: 1.15rem; margin: 0 0 .75rem; }
-.cn1-guide-groups ul { list-style: none; padding: 0; }
-.cn1-guide-groups li { margin: .65rem 0; line-height: 1.4; }
-.cn1-guide-groups a:hover, .cn1-guide-sidebar a:hover { text-decoration: underline; }
-.cn1-guide-layout { display: grid; grid-template-columns: 255px minmax(0, 1fr); gap: 2.5rem; max-width: var(--cn1-shell); margin: auto; }
-.cn1-guide-sidebar { position: sticky; top: 5.5rem; align-self: start; max-height: calc(100vh - 6.5rem); overflow: auto; font-size: .86rem; padding: 1rem; border: 1px solid var(--cn1-border); border-radius: 12px; }
-.cn1-guide-home { display: block; font-weight: 700; font-size: 1.05rem; margin-bottom: .5rem; }
-.cn1-guide-sidebar details { margin-top: 1rem; }
-.cn1-guide-sidebar summary, .cn1-guide-toc summary { cursor: pointer; font-weight: 600; }
-.cn1-guide-sidebar ul { list-style: none; padding: 0 0 0 .7rem; }
-.cn1-guide-sidebar li { margin: .6rem 0; line-height: 1.4; }
-.cn1-guide-sidebar [aria-current=page] { color: var(--primary); font-weight: 700; border-left: 3px solid var(--cn1-accent); padding-left: .5rem; }
-.cn1-guide-chapter { min-width: 0; width: 100%; }
-.cn1-guide-crumbs { font-size: .85rem; color: var(--cn1-muted); margin-bottom: 1rem; }
-.cn1-guide-toc { border: 1px solid var(--cn1-border); border-radius: 10px; padding: 1rem 1.25rem; margin: 1.5rem 0; font-size: .9rem; }
-.cn1-guide-toc ul { padding-left: 1.2rem; }
-.cn1-guide-toc li { margin: .45rem 0; }
-.cn1-guide-toc nav { margin-top: .75rem; }
-.cn1-guide-pagination { display: flex; justify-content: space-between; gap: 1.5rem; padding: 1.5rem 0; border-top: 1px solid var(--cn1-border); }
+/* The guide uses one documentation shell for its contents and every chapter. */
+.main:has(> .cn1-guide-layout) { max-width: min(1320px, calc(100vw - 32px)); padding-inline: 24px; }
+.cn1-guide-layout { display: grid; grid-template-columns: 260px minmax(0, 1fr); gap: 3rem; max-width: var(--cn1-shell); margin: auto; }
+.cn1-guide-sidebar { position: sticky; top: 5.5rem; align-self: start; max-height: calc(100vh - 6.5rem); overflow-y: auto; overscroll-behavior: contain; padding: .25rem 1.25rem 1rem 0; border-right: 1px solid var(--cn1-border); font-size: .85rem; }
+.cn1-guide-home { display: block; font-size: 1rem; font-weight: 700; margin-bottom: .8rem; }
+.cn1-guide-sidebar-tools { display: grid; gap: .6rem; padding-bottom: 1rem; margin-bottom: 1rem; border-bottom: 1px solid var(--cn1-border); }
+.cn1-guide-part { margin: .85rem 0; }
+.cn1-guide-sidebar summary, .cn1-guide-toc summary { cursor: pointer; font-weight: 600; line-height: 1.5; }
+.cn1-guide-sidebar ul { list-style: none; padding: .3rem 0 0 .8rem; }
+.cn1-guide-sidebar li { margin: .55rem 0; line-height: 1.5; }
+.cn1-guide-sidebar a { display: block; color: var(--cn1-muted); }
+.cn1-guide-sidebar .cn1-guide-home, .cn1-guide-sidebar [aria-current=page] { color: var(--cn1-accent); }
+.cn1-guide-sidebar [aria-current=page] { font-weight: 600; border-left: 2px solid var(--cn1-accent); padding-left: .65rem; }
+.cn1-guide-menu > summary { margin-bottom: .75rem; }
+.cn1-guide-layout .post-single { min-width: 0; width: 100%; }
+.cn1-guide-layout .post-single .post-title { font-size: clamp(30px, 3vw, 42px); line-height: 1.18; }
+.cn1-guide-layout .post-header { margin-bottom: 1rem; }
+.cn1-guide-crumbs { font-size: .82rem; color: var(--cn1-muted); margin: 0 0 .75rem; }
+.cn1-guide-tools { display: flex; flex-wrap: wrap; gap: .6rem 1.4rem; margin: 1rem 0 1.5rem; font-size: .85rem; }
+.cn1-guide-tools a, .cn1-guide-crumbs a, .cn1-guide-pagination a, .cn1-guide-contents a, .cn1-guide-topic-index a { color: var(--cn1-accent); }
+.cn1-guide-layout a:hover { text-decoration: underline; }
+.cn1-guide-layout a:focus-visible, .cn1-guide-layout summary:focus-visible { outline: 2px solid var(--cn1-accent); outline-offset: 4px; }
+.cn1-guide-pagination { display: flex; justify-content: space-between; gap: 1.5rem; font-size: .85rem; line-height: 1.45; }
+.cn1-guide-pagination a { display: flex; flex-direction: column; gap: .25rem; max-width: 47%; }
 .cn1-guide-pagination [rel=next] { margin-left: auto; text-align: right; }
+.cn1-guide-pagination-label { color: var(--cn1-muted); font-size: .75rem; font-weight: 600; }
+.cn1-guide-pagination-label [aria-hidden] { font-size: 1.15rem; color: var(--cn1-accent); }
+.cn1-guide-pagination--top { padding: 0 0 1rem; margin-bottom: 1.5rem; border-bottom: 1px solid var(--cn1-border); }
+.cn1-guide-pagination--bottom { padding: 1.25rem 0; margin-top: 2rem; border-top: 1px solid var(--cn1-border); }
+.cn1-guide-topic-index { margin: 2rem 0 2.5rem; }
+.cn1-guide-topic-index h2, .cn1-guide-contents h2 { font-size: 1.2rem; font-weight: 600; margin-bottom: .8rem; }
+.cn1-guide-topic-index ul { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: 2rem; row-gap: .5rem; padding-left: 1rem; font-size: .88rem; }
+.cn1-guide-contents section { margin: 0 0 1.75rem; scroll-margin-top: 6rem; }
+.cn1-guide-contents h2 { padding-bottom: .55rem; border-bottom: 1px solid var(--cn1-border); }
+.cn1-guide-contents ol { padding-left: 2rem; }
+.cn1-guide-contents li { padding-left: .4rem; margin: .55rem 0; font-size: .95rem; line-height: 1.5; }
+.cn1-guide-contents li::marker { color: var(--cn1-muted); font-size: .8rem; }
+.cn1-guide-toc { padding: .75rem 0; margin: 1.25rem 0; border-top: 1px solid var(--cn1-border); border-bottom: 1px solid var(--cn1-border); font-size: .85rem; }
+.cn1-guide-toc ul { padding-left: 1.2rem; }
+.cn1-guide-toc li { margin: .4rem 0; }
+.cn1-guide-toc nav { margin: .75rem 0 .25rem; max-height: 15rem; overflow: auto; }
 .cn1-guide-content { overflow-wrap: anywhere; }
 .cn1-guide-content :is(h2,h3,h4,h5,h6,[id]) { scroll-margin-top: 6rem; }
 .cn1-guide-content .title { font-weight: 600; margin: .5rem 0; }
@@ -40,24 +56,23 @@
 .cn1-guide-content .conum { font-style: normal; font-weight: 700; }
 .cn1-guide-content .conum[data-value]::after { content: attr(data-value); }
 .cn1-guide-content .footnotes { border-top: 1px solid var(--cn1-border); padding-top: 1rem; font-size: .85rem; }
-@media (max-width: 1000px) {
-  .cn1-guide-groups { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .cn1-guide-layout { grid-template-columns: 210px minmax(0, 1fr); gap: 1.25rem; }
-}
-@media (max-width: 720px) {
-  .cn1-guide-groups, .cn1-guide-layout { grid-template-columns: 1fr; }
-  .cn1-guide-sidebar { position: static; max-height: 15rem; }
-  .cn1-guide-chapter .post-title { font-size: 1.9rem; }
-}
-@media print {
-  .cn1-guide-sidebar, .cn1-guide-tools, .cn1-guide-pagination, .cn1-guide-toc { display: none; }
-  .cn1-guide-layout { display: block; }
-}
-.main:has(> .cn1-guide-layout) { max-width: min(1320px, calc(100vw - 32px)); padding-inline: 24px; }
-@media (max-width: 720px) { .main:has(> .cn1-guide-layout) { padding-inline: 0; } }
-.cn1-guide-toc nav { max-height: 22rem; overflow: auto; }
-.cn1-guide-menu > summary { margin-bottom: 1rem; }
-@media (min-width: 721px) { .cn1-guide-menu > summary { display: none; } }
-
 .post-single .cn1-guide-content .admonitionblock td { border-bottom: 0; }
 .cn1-guide-content pre code { font-size: .85rem; }
+@media (max-width: 1000px) {
+  .cn1-guide-layout { grid-template-columns: 220px minmax(0, 1fr); gap: 1.5rem; }
+  .cn1-guide-topic-index ul { grid-template-columns: 1fr; }
+}
+@media (min-width: 721px) { .cn1-guide-menu > summary { display: none; } }
+@media (max-width: 720px) {
+  .main:has(> .cn1-guide-layout) { padding-inline: 0; }
+  .cn1-guide-layout { grid-template-columns: 1fr; gap: 1.5rem; }
+  .cn1-guide-sidebar { position: static; max-height: none; padding: .5rem 0; border-right: 0; border-bottom: 1px solid var(--cn1-border); }
+  .cn1-guide-menu > nav { max-height: 55vh; overflow-y: auto; padding: .5rem; }
+  .cn1-guide-menu > summary { margin: 0; }
+  .cn1-guide-pagination { gap: 1rem; font-size: .8rem; }
+  .cn1-guide-pagination a { overflow-wrap: anywhere; }
+}
+@media print {
+  .cn1-guide-sidebar, .cn1-guide-tools, .cn1-guide-pagination, .cn1-guide-toc, .cn1-guide-topic-index { display: none; }
+  .cn1-guide-layout { display: block; }
+}
