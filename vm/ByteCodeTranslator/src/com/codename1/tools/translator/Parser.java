@@ -1955,6 +1955,15 @@ public class Parser extends ClassVisitor {
         private final BytecodeMethod mtd;
         String dupAnalysisOwner;
         MethodNode dupAnalysisNode;
+        // One entry per invokedynamic in this method, in visit order: the synthetic
+        // lambda class it becomes, or null for an indy that is not a lambda (string
+        // concat). The analysis below walks a SEPARATE MethodNode whose nodes are not
+        // the ones visited here, so position is what ties the two together.
+        final java.util.List<String> indyLambdas = new java.util.ArrayList<String>();
+        // A lambda cannot be invoked through a local before it is created, so a SAM
+        // call only becomes worth analysing once one has been seen in this method.
+        // This keeps the dataflow off the overwhelming majority of methods.
+        boolean sawLambdaIndy;
         final java.util.Map<org.objectweb.asm.tree.AbstractInsnNode, com.codename1.tools.translator.bytecodes.Invoke> flowInvokes =
                 new java.util.IdentityHashMap<org.objectweb.asm.tree.AbstractInsnNode, com.codename1.tools.translator.bytecodes.Invoke>();
         public MethodVisitorWrapper(MethodVisitor mv, BytecodeMethod mtd) {
@@ -1969,7 +1978,8 @@ public class Parser extends ClassVisitor {
             // list now, before optimize() (run later, per-class) folds the PUTFIELDs.
             mtd.computeRawMethodPlans();
             Frame<? extends org.objectweb.asm.tree.analysis.Value>[] flowFrames = BytecodeMethod.optimizerOn
-                    ? LocalReceiverTypes.capture(dupAnalysisOwner, dupAnalysisNode, flowInvokes, mtd) : null;
+                    ? LocalReceiverTypes.capture(dupAnalysisOwner, dupAnalysisNode, flowInvokes, mtd,
+                            indyLambdas) : null;
             resolveDupForms(dupAnalysisOwner, dupAnalysisNode, mtd, flowFrames);
             // MethodNode uses Label.info as its label-to-tree-node map. These
             // Labels survive in our IR, so leaving that map installed retains
@@ -1982,6 +1992,8 @@ public class Parser extends ClassVisitor {
                 }
             }
             flowInvokes.clear();
+            indyLambdas.clear();
+            sawLambdaIndy = false;
             dupAnalysisNode = null;
         }
 
@@ -2075,6 +2087,7 @@ public class Parser extends ClassVisitor {
         @Override
         public void visitInvokeDynamicInsn(String name, String desc, Handle bsm, Object... bsmArgs) {
             super.visitInvokeDynamicInsn(name, desc, bsm, bsmArgs);
+            indyLambdas.add(null);
             if ("java/lang/invoke/StringConcatFactory".equals(bsm.getOwner()) &&
                 ("makeConcatWithConstants".equals(bsm.getName()) || "makeConcat".equals(bsm.getName()))) {
 
@@ -2250,6 +2263,8 @@ public class Parser extends ClassVisitor {
 
                 // 1. Generate a unique class name for the lambda
                 String lambdaClassName = clsName + "_lambda_" + (lambdaCounter++);
+                indyLambdas.set(indyLambdas.size() - 1, lambdaClassName);
+                sawLambdaIndy = true;
 
                 // 2. Create the ByteCodeClass for the lambda
                 ByteCodeClass lambdaClass = new ByteCodeClass(lambdaClassName, lambdaClassName.replace('_', '/'));
@@ -2686,7 +2701,8 @@ public class Parser extends ClassVisitor {
         public void visitMethodInsn(int opcode, String owner, String name, String desc, boolean itf) {
             mtd.addInvoke(opcode, owner, name, desc, itf);
             super.visitMethodInsn(opcode, owner, name, desc, itf);
-            if (dupAnalysisNode != null && LocalReceiverTypes.isCandidate(opcode, owner, name, desc)) {
+            if (dupAnalysisNode != null && (LocalReceiverTypes.isCandidate(opcode, owner, name, desc)
+                    || sawLambdaIndy && LocalReceiverTypes.isLambdaCandidate(opcode))) {
                 java.util.List<com.codename1.tools.translator.bytecodes.Instruction> body = mtd.getInstructions();
                 flowInvokes.put(dupAnalysisNode.instructions.getLast(),
                         (com.codename1.tools.translator.bytecodes.Invoke) body.get(body.size() - 1));

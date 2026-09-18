@@ -225,7 +225,12 @@ final class LocalReceiverTypes {
             if (kind == 'V') return null;
             if (kind == 'J' || kind == 'D') return TWO;
             if (kind == '[') return UNKNOWN;
-            if (kind == 'L') return node instanceof MethodInsnNode ? new SourceValue(1, node) : UNKNOWN;
+            // An invokedynamic used to dissolve into top. A lambda's indy is the most
+            // precise allocation site in the whole program -- the closure's class is
+            // decided right there -- so it carries provenance like NEW does. Consumers
+            // that do not recognise it still see a source whose opcode is not NEW and
+            // stay conservative, which is what they did with top.
+            if (kind == 'L') return new SourceValue(1, node);
             return ONE;
         }
     }
@@ -238,7 +243,38 @@ final class LocalReceiverTypes {
                 || "values".equals(name) && "()Ljava/util/Collection;".equals(descriptor));
     }
 
-    static Frame<SourceValue>[] capture(String owner, MethodNode code, Map<AbstractInsnNode, Invoke> invokes, BytecodeMethod method) {
+    static boolean isLambdaCandidate(int opcode) {
+        return opcode == Opcodes.INVOKEINTERFACE;
+    }
+
+    /**
+     * Ties each InvokeDynamicInsnNode in the analysis tree to the synthetic lambda
+     * class the parser made for it. The parser visits a different node object for the
+     * same instruction, so the two are matched by their order within the method --
+     * which is exact, because both walk the same post-JSR-inlined stream.
+     */
+    private static Map<AbstractInsnNode, String> lambdaSites(MethodNode code, List<String> indyLambdas) {
+        Map<AbstractInsnNode, String> sites = new HashMap<AbstractInsnNode, String>();
+        int index = 0;
+        for (AbstractInsnNode node = code.instructions.getFirst(); node != null; node = node.getNext()) {
+            if (node instanceof InvokeDynamicInsnNode) {
+                if (index >= indyLambdas.size()) {
+                    // The two walks disagree on how many indy instructions this method
+                    // has, so position no longer identifies anything. Prove nothing.
+                    return java.util.Collections.emptyMap();
+                }
+                String lambda = indyLambdas.get(index++);
+                if (lambda != null) {
+                    sites.put(node, lambda);
+                }
+            }
+        }
+        return index == indyLambdas.size() ? sites : java.util.Collections.<AbstractInsnNode, String>emptyMap();
+    }
+
+    static Frame<SourceValue>[] capture(String owner, MethodNode code, Map<AbstractInsnNode, Invoke> invokes,
+            BytecodeMethod method, List<String> indyLambdas) {
+        Map<AbstractInsnNode, String> lambdaSites = lambdaSites(code, indyLambdas);
         boolean factory = allocationFactory(code);
         boolean hasWrites = false;
         for (AbstractInsnNode node = code.instructions.getFirst(); node != null; node = node.getNext()) {
@@ -286,7 +322,15 @@ final class LocalReceiverTypes {
                 List<Call> calls = new ArrayList<Call>();
                 List<FieldKey> fields = new ArrayList<FieldKey>();
                 for (AbstractInsnNode source : receiver.insns) {
-                    if (source.getOpcode() == Opcodes.NEW) {
+                    String lambda = lambdaSites.get(source);
+                    if (lambda != null) {
+                        // The receiver is the closure this very method built. Its class
+                        // was decided at the indy and cannot be anything else, so the
+                        // interface call collapses to a direct one -- this is the
+                        // addActionListener(e -> ...) shape, seen from the side where
+                        // the type is still known.
+                        types.add(lambda);
+                    } else if (source.getOpcode() == Opcodes.NEW) {
                         types.add(((TypeInsnNode) source).desc.replace('/', '_').replace('$', '_'));
                     } else if (source instanceof MethodInsnNode) {
                         calls.add(new Call((MethodInsnNode) source));
