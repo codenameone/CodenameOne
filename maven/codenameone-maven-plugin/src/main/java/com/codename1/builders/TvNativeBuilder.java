@@ -69,13 +69,13 @@ class TvNativeBuilder {
     // OpenGL-only source files with no tvOS substitute (tvOS has no OpenGL ES /
     // GLKit). Excluded from the tvOS target exactly as MacNativeBuilder excludes
     // them from the Mac Catalyst slice; the rendering-op .m files take their
-    // internal `#elif defined(CN1_USE_METAL)` branch on tvOS. The four iOS XIBs
+    // internal `#elif defined(CN1_USE_METAL)` branch on tvOS. The two iOS XIBs
     // are excluded for the same reason they are on Mac (IBAgent UIKit errors /
     // the runtime never loads them by name on the non-iPhone slice).
     private static final String EXCLUDED_TV_SOURCES =
             "CN1ES2compat.m CN1ES1compat.m EAGLView.m "
-            + "CodenameOne_GLViewController.xib MainWindow.xib "
-            + "CodenameOne_METALViewController.xib MainWindowMETAL.xib "
+            + "CodenameOne_GLViewController.xib "
+            + "CodenameOne_METALViewController.xib "
             // App Intents and the snippet renderer are staged into <Main>-src for the iOS
             // app target, and this builder copies that directory wholesale -- so declaring
             // an intent made the tvOS slice compile App Intents types that need tvOS 16

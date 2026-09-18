@@ -35,7 +35,6 @@ extern void CN1MacWindowDeliverFocus(int windowId, BOOL gained);
 extern void CN1MacWindowDeliverVisibility(int windowId, BOOL shown);
 #endif
 
-#ifdef CN1_USE_UI_SCENE
 @implementation CodenameOne_GLSceneDelegate
 
 @synthesize window=_window;
@@ -351,7 +350,6 @@ static void cn1MacResignActiveIfApplicationInactive(void) {
 }
 
 @end
-#endif
 
 #else
 // Compiled out on watchOS: this file is OpenGL ES / Metal / UIKit-only and the watch

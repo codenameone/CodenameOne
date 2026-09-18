@@ -21,9 +21,7 @@
  * need additional information or have any questions.
  */
 #import "CN1AppleUI.h"
-#ifdef CN1_USE_UI_SCENE
 #import <UIKit/UIScene.h>
-#endif
 //#define CN1_INCLUDE_NOTIFICATIONS
 #ifdef CN1_INCLUDE_NOTIFICATIONS
 #import <UserNotifications/UserNotifications.h>
@@ -51,11 +49,17 @@
 
 }
 
-@property (nonatomic, retain) IBOutlet UIWindow *window;
+// No IBOutlet on either: nothing loads a nib into this class any more. MainWindow.xib wired
+// both, and it went away with NSMainNibFile -- UIApplicationMain creates the delegate from the
+// class name, the scene delegate hands it the window, and cn1EnsureViewController builds the
+// view controller.
+@property (nonatomic, retain) UIWindow *window;
 
-@property (nonatomic, retain) IBOutlet CodenameOne_GLViewController *viewController;
+@property (nonatomic, retain) CodenameOne_GLViewController *viewController;
 
-#ifdef CN1_USE_UI_SCENE
+// Called by CodenameOne_GLSceneDelegate, which is the only lifecycle there is: UIKit
+// creates the window from the scene, and these are the app-level steps the delegate used
+// to run itself when it owned the window.
 - (void)cn1InstallRootViewControllerIntoWindow:(UIWindow *)window;
 - (void)cn1ApplicationWillResignActive;
 - (void)cn1ApplicationDidEnterBackground;
@@ -66,6 +70,5 @@
                url:(NSURL *)url
  sourceApplication:(NSString *)sourceApplication
         annotation:(id)annotation;
-#endif
 
 @end

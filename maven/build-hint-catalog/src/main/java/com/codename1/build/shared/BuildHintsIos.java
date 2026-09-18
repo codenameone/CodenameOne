@@ -516,14 +516,6 @@ final class BuildHintsIos {
                 .def("false")
                 .platform("ios"));
 
-        h.add(new Hint("ios.generateSplashScreens")
-                .group(HintGroup.IOS)
-                .type(HintType.BOOLEAN)
-                .def("false")
-                .platform("ios")
-                .doc("Boolean true/false defaults to false. Enables legacy generation of splash screen images "
-                        + "instead of the current launch storyboards."));
-
         h.add(new Hint("ios.glAppDelegateBody")
                 .group(HintGroup.IOS)
                 .type(HintType.STRING)
@@ -652,12 +644,6 @@ final class BuildHintsIos {
                 .group(HintGroup.IOS)
                 .type(HintType.BOOLEAN)
                 .def("true")
-                .platform("ios"));
-
-        h.add(new Hint("ios.launchStoryboardName")
-                .group(HintGroup.IOS)
-                .type(HintType.STRING)
-                .def("LaunchScreen")
                 .platform("ios"));
 
         h.add(new Hint("ios.locationUsageDescription")

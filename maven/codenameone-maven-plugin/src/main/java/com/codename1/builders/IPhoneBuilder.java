@@ -140,6 +140,16 @@ public class IPhoneBuilder extends Executor {
     /// not go through getDeploymentTarget().
     private String sdkDeploymentFloor;
 
+    /// The major version of the iOS SDK this build links against, or -1 when it cannot be
+    /// told. Read once in build(); the launch-metadata rules below are conditional on it
+    /// because Apple's are: an SDK 26 bundle is unaffected by either of them.
+    private int iosSdkMajor = -1;
+
+    /// The first iOS SDK that requires a launch screen and the UIScene lifecycle of every
+    /// app linked against it. See iOS & iPadOS 27 release notes, UIKit items 168247372
+    /// (launch screen) and 141837548 (scene lifecycle), and TN3187.
+    static final int FIRST_SDK_REQUIRING_LAUNCH_METADATA = 27;
+
     // StringBuilder used for constructing ruby script with xcodeproj
     // which adds localized strings files to the project.
     private StringBuilder installLocalizedStringsScript = new StringBuilder();
@@ -2157,6 +2167,21 @@ public class IPhoneBuilder extends Executor {
             xcodeVersion = 10;
         }
 
+        // The SDK, not the Xcode, is what Apple's launch-screen rule is conditional on -- so ask
+        // for it directly, and only fall back to the Xcode version when xcrun cannot answer. The
+        // fallback is sound in the direction it is used: the two have only matched since the
+        // Xcode 26 renumbering, and every Xcode that predates it reports a version far below the
+        // floor this is compared against, so a wrong answer there can never turn the rule ON for
+        // a build the SDK exempts.
+        iosSdkMajor = iosSdkMajorVersion(activeIosSdkName(request));
+        if (iosSdkMajor < 0) {
+            iosSdkMajor = xcodeVersion;
+        }
+        String removedHintRejection = removedHintRejection(request.getArgs());
+        if (removedHintRejection != null) {
+            throw new BuildException(removedHintRejection);
+        }
+
         String facebookAppId = request.getArg("facebook.appId", null);
         boolean usePodsForFacebook = !request.getArg("ios.facebook.usePods", "true").equals("false") && facebookAppId != null && facebookAppId.length() > 0;
         if (usePodsForFacebook) {
@@ -3361,6 +3386,15 @@ public class IPhoneBuilder extends Executor {
         } catch (IOException ex) {
             throw new BuildException("Failed to extract nativeios.jar",ex);
         }
+        String portSkew;
+        try {
+            portSkew = sceneLifecyclePortSkewRejection(buildinRes);
+        } catch (IOException ex) {
+            throw new BuildException("Failed to read the extracted iOS port natives", ex);
+        }
+        if (portSkew != null) {
+            throw new BuildException(portSkew);
+        }
         stopwatch.split("Extract Libs");
 
         if(request.getArg("noExtraResources", "false").equals("true")) {
@@ -3449,13 +3483,11 @@ public class IPhoneBuilder extends Executor {
                 replaceInFile(CN1ES2compat, "//#define CN1_USE_METAL", "#define CN1_USE_METAL");
                 String colorSpaceDefine = resolveMetalColorSpaceDefine(request.getArg("ios.metal.colorSpace", "sRGB"));
                 replaceInFile(CN1ES2compat, "//#define CN1_METAL_COLORSPACE_PLACEHOLDER", colorSpaceDefine);
-                copy(new File(buildinRes, "MainWindowMETAL.xib"), new File(buildinRes, "MainWindow.xib"));
                 copy(new File(buildinRes, "CodenameOne_METALViewController.xib"), new File(buildinRes, "CodenameOne_GLViewController.xib"));
             } catch (Exception ex) {
                 throw new BuildException("Failed to inject Metal controllers", ex);
             }
         } else {
-            new File(buildinRes, "MainWindowMETAL.xib").delete();
             new File(buildinRes, "CodenameOne_METALViewController.xib").delete();
             // The .metal shader file isn't guarded by an #ifdef like the
             // companion .m files, so leaving it in the project forces Xcode
@@ -3507,7 +3539,6 @@ public class IPhoneBuilder extends Executor {
         }
         
         File glAppDelegate = new File(buildinRes, "CodenameOne_GLAppDelegate.m");
-        boolean useUIScene = "true".equalsIgnoreCase(request.getArg("ios.uiscene", "true"));
         String integrateFacebook = "";
         
 
@@ -3683,14 +3714,6 @@ public class IPhoneBuilder extends Executor {
                 replaceInFile(new File(buildinRes, "CodenameOne_GLViewController.h"), "//#define CN1_BLOCK_SCREENSHOTS_ON_ENTER_BACKGROUND", "#define CN1_BLOCK_SCREENSHOTS_ON_ENTER_BACKGROUND");
             } catch (IOException ex) {
                 throw new BuildException("Failure while processing ios.blockScreenshotsOnEnterBackground build hint", ex);
-            }
-        }
-
-        if (useUIScene) {
-            try {
-                replaceInFile(new File(buildinRes, "CodenameOne_GLAppDelegate.h"), "#ifdef CN1_USE_UI_SCENE", "#define CN1_USE_UI_SCENE\n#ifdef CN1_USE_UI_SCENE");
-            } catch (IOException ex) {
-                throw new BuildException("Failure while processing ios.uiscene build hint", ex);
             }
         }
         
@@ -8014,8 +8037,15 @@ public class IPhoneBuilder extends Executor {
                     tvNativeBuilder.applyXcodeSettings(request, tmpFile, buildVersion);
                 }
 
+            } catch (BuildException alreadyDiagnosed) {
+                // A BuildException raised in here is a refusal this builder decided on and
+                // already worded -- "your bundle declares no launch screen, here is how to fix
+                // it". Wrapping it below replaced that with "Failed to inject into plist" and
+                // dropped the cause, so the developer was told a build step failed and nothing
+                // about which one or why.
+                throw alreadyDiagnosed;
             } catch (Exception ex) {
-                throw new BuildException("Failed to inject into plist");
+                throw new BuildException("Failed to inject into plist", ex);
             }
 
 
@@ -10322,6 +10352,277 @@ public class IPhoneBuilder extends Executor {
             // Not a Mac, or no Xcode: the bare platform name still matches every version of it.
         }
         return "iphoneos";
+    }
+
+    /// The major version in an SDK name, or -1 when the name carries no version.
+    ///
+    /// activeIosSdkName answers "iphoneos27.2" when xcrun can be asked and the bare
+    /// "iphoneos" when it cannot, and the bare name deliberately matches every version --
+    /// which is right for an [sdk=...] qualifier and wrong here, where it would have to
+    /// stand for some particular version. -1 says "unknown" instead, and the caller
+    /// resolves that rather than guessing high.
+    ///
+    /// Only the major is returned. Apple's launch rules are stated against the SDK major,
+    /// and API 37 has already shown what gathering the digits of a dotted version does:
+    /// "27.2" read as 272 compares greater than every floor in the file at once.
+    static int iosSdkMajorVersion(String sdkName) {
+        if (sdkName == null) {
+            return -1;
+        }
+        int digit = 0;
+        while (digit < sdkName.length() && !Character.isDigit(sdkName.charAt(digit))) {
+            digit++;
+        }
+        int end = digit;
+        while (end < sdkName.length() && Character.isDigit(sdkName.charAt(end))) {
+            end++;
+        }
+        if (end == digit) {
+            return -1;
+        }
+        try {
+            return Integer.parseInt(sdkName.substring(digit, end));
+        } catch (NumberFormatException tooManyDigits) {
+            return -1;
+        }
+    }
+
+    /// Build hints this builder used to read and no longer does, each with the reason.
+    ///
+    /// A hint nothing reads is accepted, ignored, and silent -- the exact failure the build-hint
+    /// catalog exists to prevent -- and these three are worse than merely inert: every one of
+    /// them asks for a bundle Apple no longer accepts. So they are refused by name rather than
+    /// dropped, and the message says what replaced them.
+    ///
+    /// Read off the request's supplied keys, not through getArg, because getArg is how a hint is
+    /// *read* -- and a removed hint has no reader. That also keeps the catalog honest: these
+    /// names are gone from it, and a getArg site for a name it does not describe is what
+    /// check-build-hint-catalog fails on.
+    private static final String[][] REMOVED_HINTS = {
+        {"ios.uiscene",
+            "ios.uiscene has been removed and the UIScene lifecycle is now the only one this "
+            + "builder generates. Apple requires it of every app linked with the iOS 27 SDK or "
+            + "later -- an app built without it does not launch (iOS & iPadOS 27 release notes, "
+            + "UIKit 141837548) -- so there is nothing left for the hint to select. Delete it "
+            + "from your build hints. Migration guidance for app code is in Apple TN3187, and if "
+            + "your app worked under the legacy UIApplicationDelegate lifecycle and not under "
+            + "scenes, please report it: that is a bug in Codename One and no longer has a way "
+            + "around it."},
+        {"ios.generateSplashScreens",
+            "ios.generateSplashScreens has been removed. It selected the legacy Default*.png "
+            + "splash-image generator, which iOS stopped using long ago and which this builder no "
+            + "longer contains; all the hint still did was suppress the launch screen, and an app "
+            + "linked with the iOS 27 SDK is rejected without one (iOS & iPadOS 27 release notes, "
+            + "UIKit 168247372). Delete it from your build hints. Every build now declares "
+            + "UILaunchScreen and shows Launch.Foreground.png -- drop your own Launch.Foreground.png "
+            + "into the project to replace the image, or declare your own launch key through "
+            + "ios.plistInject."},
+        {"ios.launchStoryboardName",
+            "ios.launchStoryboardName has been removed. It named the storyboard for the "
+            + "UILaunchStoryboardName key, which is only emitted on the legacy lifecycle the "
+            + "ios.uiscene hint used to select: SplashBoard does not render a launch storyboard "
+            + "for a scene-based app, so on every build this builder now produces the key would "
+            + "mean a black launch (issue #5210). Delete it from your build hints. To point the "
+            + "launch at a storyboard of your own anyway, declare UILaunchStoryboardName through "
+            + "ios.plistInject, which overrides the generated UILaunchScreen."},
+    };
+
+    /// Why a build must be refused for asking for a hint that no longer exists, or null.
+    ///
+    /// #### Parameters
+    ///
+    /// - `suppliedHints`: every build-hint name the request carries
+    ///
+    /// #### Returns
+    ///
+    /// the message to fail the build with, or null when none of them was supplied
+    static String removedHintRejection(Set<String> suppliedHints) {
+        if (suppliedHints == null) {
+            return null;
+        }
+        StringBuilder message = new StringBuilder();
+        for (String[] removed : REMOVED_HINTS) {
+            if (suppliedHints.contains(removed[0])) {
+                if (message.length() > 0) {
+                    message.append("\n\n");
+                }
+                message.append(removed[1]);
+            }
+        }
+        return message.length() == 0 ? null : message.toString();
+    }
+
+    /// Why the extracted iOS port cannot service the lifecycle this build declares, or null.
+    ///
+    /// The port's natives and this plugin ship as one unit: `codenameone-ios` is a dependency
+    /// OF the plugin, version-managed to the plugin's own version, and
+    /// `Executor.getResourceAsStream` reads the plugin realm -- so nothing a generated project
+    /// configures, `cn1.version` included, can steer which bundle is unzipped here. A
+    /// hand-written `<dependencies>` override on the plugin declaration can, and Maven honours
+    /// it.
+    ///
+    /// That combination used to be merely odd and is now fatal, silently. The scene delegate is
+    /// what installs the window, and an older bundle either predates it entirely (7.0.214 ships
+    /// no CodenameOne_GLSceneDelegate.m at all) or guards it behind `#ifdef CN1_USE_UI_SCENE`, a
+    /// define this plugin stopped injecting when the legacy lifecycle was deleted. Measured on
+    /// the guarded sources against the iOS 27 SDK: 19432 bytes of object code with the define,
+    /// 1248 without -- no class, no methods. Meanwhile the Info.plist this build writes names
+    /// `CodenameOne_GLSceneDelegate` as the scene delegate, so UIKit looks up a class the binary
+    /// does not contain. Nothing fails at build time; the app fails at launch.
+    ///
+    /// Note the main NIB is NOT the fallback it looks like. An older bundle still carries
+    /// MainWindow.xib -- 7.0.214 does -- but `NSMainNibFile` comes from the translator template,
+    /// which is `codenameone-parparvm` at the PLUGIN's version, so the key that would load it is
+    /// gone whatever the port says.
+    ///
+    /// #### Parameters
+    ///
+    /// - `nativeSources`: the directory nativeios.jar was extracted into
+    ///
+    /// #### Returns
+    ///
+    /// the message to fail the build with, or null when the port matches this plugin
+    static String sceneLifecyclePortSkewRejection(File nativeSources) throws IOException {
+        File sceneDelegate = new File(nativeSources, "CodenameOne_GLSceneDelegate.m");
+        String reason;
+        if (!sceneDelegate.exists()) {
+            reason = "it contains no CodenameOne_GLSceneDelegate.m at all";
+        } else if (new String(readFileBytes(sceneDelegate), StandardCharsets.UTF_8)
+                .contains("CN1_USE_UI_SCENE")) {
+            // Present but compiled out: the define that used to enable it is gone from this
+            // plugin, so the class would vanish from the binary with the build still green.
+            reason = "its CodenameOne_GLSceneDelegate is still behind #ifdef CN1_USE_UI_SCENE, "
+                    + "a define this version no longer sets";
+        } else {
+            return null;
+        }
+        return "The iOS port bundle on this build's classpath is older than the Codename One "
+                + "Maven plugin running it: " + reason + ". The scene delegate is what creates "
+                + "the application window, and the Info.plist this build writes names it, so the "
+                + "result would be an app that builds cleanly and fails to launch. These two "
+                + "artifacts are released together and are not meant to be mixed -- remove the "
+                + "<dependencies> override pinning com.codenameone:codenameone-ios under the "
+                + "codenameone-maven-plugin declaration in your pom, or move the plugin back to "
+                + "the version that matches it. Note cn1.version is not what selects this: the "
+                + "port is a dependency of the plugin, not of your project.";
+    }
+
+    /// The launch-screen keys Apple accepts, in the order its release notes name them.
+    ///
+    /// All four, because an app is entitled to supply whichever one describes its launch
+    /// experience. Everything here that asks about a launch screen asks about the whole set:
+    /// a check that knows only the two this builder can emit would append a second launch
+    /// experience beside a UILaunchStoryboards the developer supplied, and would fail a build
+    /// whose launch screen is perfectly valid.
+    static final String[] ACCEPTED_LAUNCH_KEYS = {
+        "UILaunchStoryboardName", "UILaunchStoryboards", "UILaunchScreen", "UILaunchScreens"
+    };
+
+    /// The same plist without the scene manifest or any launch key of its root dictionary.
+    ///
+    /// The translator template declares a manifest and a UILaunchScreen so that a project it
+    /// produces on its own can launch. This build is about to write its own pair, so the
+    /// template's come out first: a property list takes the LAST of a duplicated key, which
+    /// would make the one UIKit reads depend on where the injection was spliced.
+    ///
+    /// All four launch keys, not only the one the template declares: whichever of them is
+    /// there, it is ours, and leaving a second kind behind is the same duplication by another
+    /// name. Nothing a developer wrote reaches this text -- ios.plistInject is a separate
+    /// fragment, added after this runs.
+    ///
+    /// #### Parameters
+    ///
+    /// - `plist`: the template plist document
+    ///
+    /// #### Returns
+    ///
+    /// the document with those keys removed, or the input when it declared none
+    static String plistStrippedOfGeneratedLaunchMetadata(String plist) {
+        String stripped = plistWithoutRootMembers(plist, "UIApplicationSceneManifest");
+        for (String launchKey : ACCEPTED_LAUNCH_KEYS) {
+            stripped = plistWithoutRootMembers(stripped, launchKey);
+        }
+        return stripped;
+    }
+
+    /// Whether an injected plist fragment names any of Apple's launch-screen keys.
+    ///
+    /// Deliberately `contains`, not a parse. This decides only whether to ADD a key of our
+    /// own, and matching too eagerly there just leaves the developer's fragment alone -- the
+    /// safe direction. The finished document is parsed properly by launchMetadataRejection,
+    /// which is what fails a build, and it is the one that has to tell a real declaration
+    /// from a mention.
+    ///
+    /// #### Parameters
+    ///
+    /// - `inject`: the injected plist fragment
+    ///
+    /// #### Returns
+    ///
+    /// true when the fragment already names a launch key
+    static boolean plistNamesAnyLaunchKey(String inject) {
+        if (inject == null) {
+            return false;
+        }
+        for (String key : ACCEPTED_LAUNCH_KEYS) {
+            if (inject.contains(key)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /// Why a finished Info.plist must be refused, or null when it satisfies Apple's rules.
+    ///
+    /// Asked of the document this builder actually wrote, not of the fragments it assembled.
+    /// The keys can arrive from three places -- the translator's template, the injection
+    /// below, and the developer's own ios.plistInject -- and only the finished file knows
+    /// what survived all three. Reading the generator strings instead is how a bundle with
+    /// no launch key at all was produced by a build whose generator looked correct.
+    ///
+    /// #### Parameters
+    ///
+    /// - `plist`: the complete Info.plist document
+    ///
+    /// - `sdkMajor`: the major version of the SDK being linked against, or -1 if unknown
+    ///
+    /// #### Returns
+    ///
+    /// the message to fail the build with, or null when the document is acceptable
+    static String launchMetadataRejection(String plist, int sdkMajor) {
+        if (sdkMajor < FIRST_SDK_REQUIRING_LAUNCH_METADATA) {
+            return null;
+        }
+        int[] root = plistRootDictBody(plist);
+        if (root == null) {
+            // Not a document this parser can read. Xcode will have its own opinion about that
+            // and will say so; inventing a launch-screen failure for it would be a misdiagnosis.
+            return null;
+        }
+        boolean declared = false;
+        for (String key : ACCEPTED_LAUNCH_KEYS) {
+            if (plistMemberRange(plist, root[0], root[1], key) != null) {
+                declared = true;
+                break;
+            }
+        }
+        if (!declared) {
+            return "The generated Info.plist declares no launch screen. Apps linked with the "
+                    + "iOS " + sdkMajor + " SDK are rejected unless the bundle declares one of "
+                    + "UILaunchStoryboardName, UILaunchStoryboards, UILaunchScreen or "
+                    + "UILaunchScreens (iOS & iPadOS 27 release notes, UIKit 168247372). "
+                    + "UIRequiresFullScreen is not a substitute (TN3192). Remove any "
+                    + "ios.plistInject that strips the generated launch key, or declare your "
+                    + "own launch screen there.";
+        }
+        if (plistMemberRange(plist, root[0], root[1], "UIApplicationSceneManifest") == null) {
+            return "The generated Info.plist declares no UIApplicationSceneManifest. Apps "
+                    + "linked with the iOS " + sdkMajor + " SDK must adopt the UIScene "
+                    + "lifecycle or they fail to launch (iOS & iPadOS 27 release notes, UIKit "
+                    + "141837548). Remove any ios.plistInject that strips the generated scene "
+                    + "manifest, or declare your own there.";
+        }
+        return null;
     }
 
     /// A ruby fragment that raises every app-extension target to the SDK's minimum.
@@ -15369,16 +15670,17 @@ public class IPhoneBuilder extends Executor {
     /// The Mac slice's version of a finished plist: one that supports multiple scenes
     /// and declares the window role to create them with.
     ///
-    /// The shared plist is left exactly as the iOS slice needs it, which for a default
-    /// Catalyst build means it carries no scene manifest at all -- declaring one
-    /// activates the UIScene lifecycle, and the iPhone/iPad artifact still carries its
-    /// main NIB, which is a window with no scene and a launch FrontBoard terminates.
-    /// So this adds whatever is missing, and only the Mac slice ever reads the result:
+    /// The shared plist is left exactly as the iOS slice needs it, which means
+    /// UIApplicationSupportsMultipleScenes stays false: it is ONE Info.plist, and the same
+    /// build ships the iPhone/iPad slice, which never asked for multiple windows. Only the
+    /// Mac slice reads the result of this, so this is where windows are turned on.
+    ///
+    /// It still handles a manifest it did not generate, because ios.plistInject can supply
+    /// one and then the generator steps aside entirely:
     ///
     /// - no manifest at all: a whole one is added to the root dictionary;
     /// - a manifest without multiple-scene support: the key is set, or added;
-    /// - a manifest whose scene configurations have no window role -- which is what a
-    ///   CarPlay build with ios.uiscene off produces -- the role is added to them.
+    /// - a manifest whose scene configurations have no window role: the role is added.
     ///
     /// That last case is why this cannot simply flip a boolean: a manifest can exist
     /// and still describe no window UIKit could create.
@@ -15397,14 +15699,10 @@ public class IPhoneBuilder extends Executor {
             return null;
         }
         plist = plistWithExpandedDict(plist, 0);
-        // The Mac slice always ends up with a scene manifest, and a scene lifecycle
-        // beside a legacy main NIB is the orphan window FrontBoard terminates -- the
-        // very pairing that keeps the manifest out of the shared plist. The shared
-        // plist only drops NSMainNibFile under ios.uiscene, so for the default Catalyst
-        // build it is still there and has to go here.
-        //
-        // The Mac build settings exclude MainWindow.xib from compilation anyway, so the
-        // key names a NIB that is not in this bundle even before the lifecycle argument.
+        // Nothing this builder generates declares NSMainNibFile any more -- the key left the
+        // translator template with the main NIB it named. What can still put one here is
+        // ios.plistInject, and a scene lifecycle beside a legacy main NIB is an orphan window
+        // FrontBoard terminates at launch, so it goes.
         plist = plistWithoutRootMembers(plist, "NSMainNibFile");
         int[] root = plistRootDictBody(plist);
         if (root == null) {
@@ -16145,12 +16443,31 @@ public class IPhoneBuilder extends Executor {
             replaceAllInFile(infoPlist, "<string>English</string>", "<string>"  + lang + "</string>");
         }
 
-        if ("true".equalsIgnoreCase(request.getArg("ios.uiscene", "true"))) {
-            // MainWindow.xib auto-instantiates a UIWindow with visibleAtLaunch=YES; under
-            // UIScene the window has no scene and FrontBoard kills the launch in iOS 26.
-            // UIApplicationMain(..., @"CodenameOne_GLAppDelegate") still creates the
-            // delegate from the class name, so the NIB is no longer needed.
-            replaceAllInFile(infoPlist, "<key>NSMainNibFile</key>\\s*<string>[^<]*</string>", "");
+        // No NSMainNibFile strip here any more, and none in the template either. MainWindow.xib
+        // auto-instantiated a UIWindow with visibleAtLaunch=YES; under the scene lifecycle that
+        // window has no scene and FrontBoard kills the launch, so the key had to go on every
+        // build this produces -- and the nib it named went with it.
+        // UIApplicationMain(..., @"CodenameOne_GLAppDelegate") creates the delegate from the
+        // class name. A developer who injects the key through ios.plistInject still gets it
+        // stripped from the Mac slice, which is a different concern; see plistForMacSlice.
+
+        // What replaced it lives in the template as well: the scene manifest and UILaunchScreen
+        // are unconditional now, so the translator template declares both and a project produced
+        // by ByteCodeTranslator alone -- without this builder ever running -- has a lifecycle and
+        // a launch screen of its own. The port's natives stopped being able to launch without a
+        // scene manifest the moment the legacy lifecycle was deleted from them, and a native that
+        // depends on a plist key only one of its two producers writes is a key it can lose.
+        //
+        // This build writes its own, because CarPlay adds a second role and ios.plistInject can
+        // replace either outright, so the template's copies come out first: a property list takes
+        // the LAST of a duplicated key, and shipping two of these would make which one UIKit
+        // reads a function of where the injection happened to be spliced.
+        if (infoPlist.exists()) {
+            PlistText template = readPlistText(infoPlist);
+            String withoutGenerated = plistStrippedOfGeneratedLaunchMetadata(template.text);
+            if (!withoutGenerated.equals(template.text)) {
+                writePlistText(infoPlist, template, withoutGenerated);
+            }
         }
 
         // nothing to inject here? move along
@@ -16236,10 +16553,6 @@ public class IPhoneBuilder extends Executor {
         }
         
         boolean multitasking = "true".equals(request.getArg("ios.multitasking", "true"));
-        if(request.getArg("ios.generateSplashScreens", "false").equals(
-            "true")) {
-            multitasking = false;
-        }
         if (multitasking && useMetal && getDeploymentTargetInt(request) < 14) {
             // An explicit ios.deployment_target below 14 cannot satisfy the
             // App Store launch screen rule for iPad multitasking apps via the
@@ -16259,67 +16572,45 @@ public class IPhoneBuilder extends Executor {
                 inject += "\n<key>UIRequiresFullScreen</key><true/>\n";
             }
         }
-        if (!"true".equals(request.getArg("ios.generateSplashScreens", "false"))) {
-            if ("true".equalsIgnoreCase(request.getArg("ios.uiscene", "true"))) {
-                // SplashBoard never renders the launch storyboard for scene-based
-                // CN1 apps -- the system animates from a black frame instead
-                // (issue #5210). The iOS 14+ UILaunchScreen generated launch
-                // screen does work under UIScene: system background color
-                // (light/dark aware) with the launch icon centered, matching the
-                // native launch placeholder the app shows until the first EDT
-                // frame. UILaunchStoryboardName must be OMITTED here: when both
-                // keys are present iOS prefers the storyboard, which is exactly
-                // the broken path (verified on the iOS 26 simulator with a cold
-                // SplashBoard cache). The ios.launchStoryboardName hint is
-                // therefore only honored with ios.uiscene=false; injecting
-                // either key via ios.plistInject overrides this default.
-                // UIImageName points at the loose Launch.Foreground.png in the
-                // bundle root (guaranteed by generateLaunchScreen); SplashBoard
-                // resolves it there but fails to render the same image from an
-                // actool compiled imageset, so do NOT move it into
-                // Images.xcassets.
-                if (!inject.contains("UILaunchScreen") && !inject.contains("UILaunchStoryboardName")) {
-                    inject += "\n<key>UILaunchScreen</key>\n"
-                            + "<dict>\n"
-                            + "    <key>UIImageName</key>\n"
-                            + "    <string>Launch.Foreground</string>\n"
-                            + "</dict>";
-                }
-            } else if (!inject.contains("UILaunchStoryboardName")) {
-                inject += "\n<key>UILaunchStoryboardName</key><string>"+request.getArg("ios.launchStoryboardName", "LaunchScreen")+"</string>";
-            }
+        // SplashBoard never renders a launch storyboard for a scene-based CN1 app -- the
+        // system animates from a black frame instead (issue #5210) -- and every build is
+        // scene-based now, so UILaunchStoryboardName is never what this generates.
+        // UILaunchScreen does work under UIScene: system background color (light/dark aware)
+        // with the launch icon centered, matching the native launch placeholder the app shows
+        // until the first EDT frame. When both keys are present iOS prefers the storyboard,
+        // which is exactly the broken path (verified on the iOS 26 simulator with a cold
+        // SplashBoard cache), so this generates one key and only one.
+        //
+        // UIImageName points at the loose Launch.Foreground.png in the bundle root (guaranteed
+        // by generateLaunchScreen); SplashBoard resolves it there but fails to render the same
+        // image from an actool compiled imageset, so do NOT move it into Images.xcassets.
+        //
+        // All four of Apple's launch keys are consulted before adding this one, not just the
+        // two this builder can emit. A project that declares UILaunchStoryboards or
+        // UILaunchScreens through ios.plistInject has supplied a launch experience, and
+        // appending ours next to it produces two -- with iOS picking between them rather than
+        // the developer.
+        if (!plistNamesAnyLaunchKey(inject)) {
+            inject += "\n<key>UILaunchScreen</key>\n"
+                    + "<dict>\n"
+                    + "    <key>UIImageName</key>\n"
+                    + "    <string>Launch.Foreground</string>\n"
+                    + "</dict>";
         }
-        boolean useUISceneManifest = "true".equalsIgnoreCase(request.getArg("ios.uiscene", "true"));
         // com.codename1.ui.Window needs multiple scenes, and a Window only exists on
         // the Mac Catalyst slice, so the key follows macNative.enabled exactly.
         boolean multiWindow = macNativeBuilder.isMultiWindow();
-        // CarPlay requires the UIScene lifecycle and a dedicated
-        // CPTemplateApplicationSceneSessionRoleApplication scene wired to
-        // CodenameOne_CarPlaySceneDelegate. Emit the manifest when either UIScene is on or the app
-        // uses CarPlay; include the phone window role only under UIScene, and the CarPlay role only
-        // when the app references com.codename1.car.
-        // multiWindow is in the condition as well as the value below. A Catalyst build
-        // with ios.uiscene=false and no CarPlay skipped the whole block, so the bundle
-        // got neither UIApplicationSupportsMultipleScenes nor a scene configuration --
-        // and getWindowManager() reads that key back out of the bundle, so windows were
-        // reported unsupported and constructing one threw, in the very build that had
-        // just asked for them.
         if (multiWindow) {
             String rejection = sceneManifestRejection(inject);
             if (rejection != null) {
                 throw new BuildException(rejection);
             }
         }
-        // multiWindow is deliberately NOT in this condition. Declaring
-        // UIApplicationSceneManifest activates the UIScene lifecycle, and the
-        // NSMainNibFile removal above runs only under ios.uiscene -- so putting a
-        // manifest in the shared plist for a Catalyst build would hand the iPhone/iPad
-        // artifact a scene lifecycle while it still carries its main NIB, which is a
-        // window with no scene and a launch FrontBoard terminates on iOS 26. The Mac
-        // slice's copy is where a manifest appears for windows; see
+        // multiWindow is deliberately NOT in this condition -- it decides the VALUE of
+        // UIApplicationSupportsMultipleScenes below, never whether a manifest is written at
+        // all. The Mac slice's copy is where multi-window support appears; see
         // plistForMacSlice.
-        if ((useUISceneManifest || usesCar)
-                && !plistDeclaresKey(inject, "UIApplicationSceneManifest")) {
+        if (!plistDeclaresKey(inject, "UIApplicationSceneManifest")) {
             String carPlayScene = usesCar
                     ? "        <key>CPTemplateApplicationSceneSessionRoleApplication</key>\n"
                     + "        <array>\n"
@@ -16331,7 +16622,6 @@ public class IPhoneBuilder extends Executor {
                     + "            </dict>\n"
                     + "        </array>\n"
                     : "";
-            String windowScene = useUISceneManifest ? WINDOW_SCENE_ROLE : "";
             inject += "\n<key>UIApplicationSceneManifest</key>\n"
                     + "<dict>\n"
                     + "    <key>UIApplicationSupportsMultipleScenes</key>\n"
@@ -16354,7 +16644,10 @@ public class IPhoneBuilder extends Executor {
                     + "    <false/>\n"
                     + "    <key>UISceneConfigurations</key>\n"
                     + "    <dict>\n"
-                    + windowScene
+                    // Unconditional: the app role is what UIKit creates the main window from,
+                    // and a manifest that configures nothing for it describes an app with no
+                    // window. CarPlay is a second, distinct role beside it, never instead of it.
+                    + WINDOW_SCENE_ROLE
                     + carPlayScene
                     + "    </dict>\n"
                     + "</dict>";
@@ -16917,9 +17210,20 @@ public class IPhoneBuilder extends Executor {
             line = infoReader.readLine();
         }
         infoReader.close();
-        
+
         try(FileOutputStream fo = new FileOutputStream(infoPlist)) {
             fo.write(b.toString().getBytes(StandardCharsets.UTF_8));
+        }
+
+        // The last word on Apple's launch rules, and the only one that sees what the developer's
+        // own ios.plistInject did. Every producer above decides whether to ADD a key, and each of
+        // them steps aside when the injection already names it -- so a plistInject that mentions
+        // UILaunchScreen inside a comment, or declares it somewhere other than the root
+        // dictionary, silences the generator without leaving UIKit anything to read. Asking the
+        // finished document is what distinguishes those from a real declaration.
+        String rejection = launchMetadataRejection(b.toString(), iosSdkMajor);
+        if (rejection != null) {
+            throw new BuildException(rejection);
         }
     }
 

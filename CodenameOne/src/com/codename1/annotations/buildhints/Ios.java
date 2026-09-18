@@ -173,14 +173,6 @@ public @interface Ios {
     @Hint(valuePattern = "auto|modern|ios7|legacy")
     ThemeMode themeMode() default ThemeMode.DEFAULT;
 
-    /// true/false (defaults to true). Enables iOS UIScene lifecycle support.
-    /// UIScene lets iOS manage one or more app UI sessions independently,
-    /// improving lifecycle handling in modern iOS versions. Apple has indicated
-    /// UIScene will be required starting with iOS 27, so this is now on by
-    /// default; set the flag to `false` only if you need to temporarily fall back
-    /// to the legacy `UIApplicationDelegate` lifecycle.
-    Toggle uiscene() default Toggle.DEFAULT;
-
     /// Allows intercepting a URL call using the syntax `<string>urlPrefix<string>`
     String urlScheme() default "";
 }

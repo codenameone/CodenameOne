@@ -1070,6 +1070,27 @@ class BytecodeInstructionIntegrationTest {
             assertTrue(Files.exists(srcRoot.resolve("Images.xcassets")));
             assertTrue(Files.exists(dist.resolve("MyAppIOS.xcodeproj")));
             assertTrue(Files.exists(srcRoot.resolve("MyAppIOS-Info.plist")));
+
+            // The plist this writes has to stand on its own, because nothing downstream of
+            // the translator is guaranteed to run: IPhoneBuilder rewrites it on a Codename One
+            // build, and a project translated directly gets exactly what is written here.
+            //
+            // Both keys are load-bearing since the legacy lifecycle was deleted from the port's
+            // natives. Without the scene manifest UIKit never creates CodenameOne_GLSceneDelegate,
+            // so no window is ever installed and the app launches to nothing; without a launch
+            // key Apple rejects any app linked with the iOS 27 SDK. Neither failure is visible
+            // at build time.
+            String iosPlist = new String(Files.readAllBytes(
+                    srcRoot.resolve("MyAppIOS-Info.plist")), StandardCharsets.UTF_8);
+            assertTrue(iosPlist.contains("<key>UIApplicationSceneManifest</key>"),
+                    "a translated project with no scene manifest launches without a window");
+            assertTrue(iosPlist.contains("<string>CodenameOne_GLSceneDelegate</string>"),
+                    "the window scene role has to name the delegate that installs the window");
+            assertTrue(iosPlist.contains("<key>UILaunchScreen</key>"),
+                    "apps linked with the iOS 27 SDK are rejected without a launch screen");
+            assertFalse(iosPlist.contains("NSMainNibFile"),
+                    "the main nib is a window with no scene, which FrontBoard terminates");
+
             String pbxproj = new String(Files.readAllBytes(
                     dist.resolve("MyAppIOS.xcodeproj/project.pbxproj")), StandardCharsets.UTF_8);
             assertTrue(pbxproj.contains("CoreText.framework"),
