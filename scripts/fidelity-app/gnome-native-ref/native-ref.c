@@ -47,6 +47,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <execinfo.h>
+#include <signal.h>
+#include <unistd.h>
 
 static const char *out_dir = NULL;
 static int is_probe = 1;
@@ -562,14 +565,27 @@ static GtkWidget *make_widget(const char *kind) {
         return gtk_expander_new("Details");
     }
     if (strcmp(kind, "gtk_popover_menubar") == 0) {
-        GMenu *model = g_menu_new();
-        GMenu *file = g_menu_new();
-        g_menu_append(file, "Open", "app.open");
-        g_menu_append_submenu(model, "File", G_MENU_MODEL(file));
-        GtkWidget *bar = gtk_popover_menu_bar_new_from_model(G_MENU_MODEL(model));
-        g_object_unref(file);
-        g_object_unref(model);
-        return bar;
+        /* The models are held for the life of the process, deliberately.
+         *
+         * GtkPopoverMenuBar keeps a reference to the model it was built from and rebuilds
+         * its items from it while it lives, and the popovers it creates hold on to the
+         * submenu. Dropping our references here made the lifetime depend on GTK's teardown
+         * order rather than on ours -- and the capture then segfaulted partway through the
+         * DARK pass, several widgets after this one had been written, which is exactly the
+         * shape of a deferred free. Two earlier runs of the same binary completed, so it is
+         * intermittent, which is the other half of that shape.
+         *
+         * Holding them costs two objects in a tool that writes a hundred PNGs and exits. A
+         * capture that crashes one run in three costs a run. */
+        static GMenu *model = NULL;
+        static GMenu *file = NULL;
+        if (model == NULL) {
+            model = g_menu_new();
+            file = g_menu_new();
+            g_menu_append(file, "Open", "app.open");
+            g_menu_append_submenu(model, "File", G_MENU_MODEL(file));
+        }
+        return gtk_popover_menu_bar_new_from_model(G_MENU_MODEL(model));
     }
     if (strcmp(kind, "gtk_popover_menu_item") == 0) {
         /* A menu item is a GtkButton with the "model" style class inside a popover menu:
@@ -789,7 +805,32 @@ static gboolean on_ready(gpointer data) {
     return G_SOURCE_REMOVE;
 }
 
+/* Turns a crash into something diagnosable.
+ *
+ * A capture that dies mid-set reports exit 139 and nothing else, and a segfault inside a
+ * toolkit teardown is the kind that appears one run in three -- so the run that shows it is
+ * not necessarily the run anyone is watching. The handler prints the frames and re-raises,
+ * so the shell still sees the real signal and the job still fails.
+ *
+ * async-signal-safe: backtrace_symbols_fd writes straight to the fd and allocates nothing,
+ * unlike backtrace_symbols.
+ */
+static void on_fatal_signal(int sig) {
+    void *frames[64];
+    int n = backtrace(frames, 64);
+    const char *msg = "NATIVEREF:BLOCKER fatal signal, backtrace follows\n";
+    ssize_t ignored = write(STDERR_FILENO, msg, strlen(msg));
+    (void) ignored;
+    backtrace_symbols_fd(frames, n, STDERR_FILENO);
+    signal(sig, SIG_DFL);
+    raise(sig);
+}
+
 int main(int argc, char **argv) {
+    signal(SIGSEGV, on_fatal_signal);
+    signal(SIGABRT, on_fatal_signal);
+    signal(SIGBUS, on_fatal_signal);
+
     out_dir = g_getenv("NATIVEREF_OUT");
     if (!out_dir) {
         fprintf(stderr, "NATIVEREF:ERR NATIVEREF_OUT is not set\n");
