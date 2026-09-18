@@ -22,11 +22,15 @@
  */
 package com.codename1.builders;
 
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.Set;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -186,6 +190,48 @@ class IPhoneBuilderLaunchMetadataTest {
             assertFalse(IPhoneBuilder.plistStrippedOfGeneratedLaunchMetadata(template)
                     .contains("<key>" + key + "</key>"), key);
         }
+    }
+
+    @Test
+    void aPortOlderThanThisPluginIsRefusedRatherThanShippedUnlaunchable(@TempDir Path nativeSources)
+            throws Exception {
+        // codenameone-ios is a dependency OF the plugin, so a generated project cannot select
+        // it -- cn1.version governs the compile classpath, not this. A hand-written
+        // <dependencies> override on the plugin declaration can, and Maven honours it.
+        //
+        // 7.0.214's nativeios.jar ships no CodenameOne_GLSceneDelegate.m at all. The window
+        // comes from that delegate and the plist this build writes names it, so the result is
+        // an app that builds clean and never shows a window.
+        String rejection = IPhoneBuilder.sceneLifecyclePortSkewRejection(nativeSources.toFile());
+        assertNotNull(rejection);
+        assertTrue(rejection.contains("no CodenameOne_GLSceneDelegate.m"), rejection);
+        assertTrue(rejection.contains("codenameone-ios"), rejection);
+        // The message has to say what does NOT select it, because that is where someone will
+        // look first.
+        assertTrue(rejection.contains("cn1.version"), rejection);
+    }
+
+    @Test
+    void aPortWhoseSceneDelegateIsStillCompiledOutIsRefused(@TempDir Path nativeSources)
+            throws Exception {
+        // The 8.0 bundle from before the legacy lifecycle was deleted: the class is in the
+        // sources but behind #ifdef CN1_USE_UI_SCENE, and this plugin no longer sets that
+        // define. Measured against the iOS 27 SDK on those exact sources: 19432 bytes of
+        // object code with the define, 1248 without -- no class, no methods, no warning.
+        Files.write(nativeSources.resolve("CodenameOne_GLSceneDelegate.m"),
+                ("#ifdef CN1_USE_UI_SCENE\n@implementation CodenameOne_GLSceneDelegate\n"
+                        + "@end\n#endif\n").getBytes(StandardCharsets.UTF_8));
+        String rejection = IPhoneBuilder.sceneLifecyclePortSkewRejection(nativeSources.toFile());
+        assertNotNull(rejection);
+        assertTrue(rejection.contains("CN1_USE_UI_SCENE"), rejection);
+    }
+
+    @Test
+    void aPortThatMatchesThisPluginIsNotRefused(@TempDir Path nativeSources) throws Exception {
+        Files.write(nativeSources.resolve("CodenameOne_GLSceneDelegate.m"),
+                "@implementation CodenameOne_GLSceneDelegate\n@end\n"
+                        .getBytes(StandardCharsets.UTF_8));
+        assertNull(IPhoneBuilder.sceneLifecyclePortSkewRejection(nativeSources.toFile()));
     }
 
     @Test

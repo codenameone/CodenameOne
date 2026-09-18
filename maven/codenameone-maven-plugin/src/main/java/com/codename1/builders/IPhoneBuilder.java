@@ -3386,6 +3386,15 @@ public class IPhoneBuilder extends Executor {
         } catch (IOException ex) {
             throw new BuildException("Failed to extract nativeios.jar",ex);
         }
+        String portSkew;
+        try {
+            portSkew = sceneLifecyclePortSkewRejection(buildinRes);
+        } catch (IOException ex) {
+            throw new BuildException("Failed to read the extracted iOS port natives", ex);
+        }
+        if (portSkew != null) {
+            throw new BuildException(portSkew);
+        }
         stopwatch.split("Extract Libs");
 
         if(request.getArg("noExtraResources", "false").equals("true")) {
@@ -10441,6 +10450,61 @@ public class IPhoneBuilder extends Executor {
             }
         }
         return message.length() == 0 ? null : message.toString();
+    }
+
+    /// Why the extracted iOS port cannot service the lifecycle this build declares, or null.
+    ///
+    /// The port's natives and this plugin ship as one unit: `codenameone-ios` is a dependency
+    /// OF the plugin, version-managed to the plugin's own version, and
+    /// `Executor.getResourceAsStream` reads the plugin realm -- so nothing a generated project
+    /// configures, `cn1.version` included, can steer which bundle is unzipped here. A
+    /// hand-written `<dependencies>` override on the plugin declaration can, and Maven honours
+    /// it.
+    ///
+    /// That combination used to be merely odd and is now fatal, silently. The scene delegate is
+    /// what installs the window, and an older bundle either predates it entirely (7.0.214 ships
+    /// no CodenameOne_GLSceneDelegate.m at all) or guards it behind `#ifdef CN1_USE_UI_SCENE`, a
+    /// define this plugin stopped injecting when the legacy lifecycle was deleted. Measured on
+    /// the guarded sources against the iOS 27 SDK: 19432 bytes of object code with the define,
+    /// 1248 without -- no class, no methods. Meanwhile the Info.plist this build writes names
+    /// `CodenameOne_GLSceneDelegate` as the scene delegate, so UIKit looks up a class the binary
+    /// does not contain. Nothing fails at build time; the app fails at launch.
+    ///
+    /// Note the main NIB is NOT the fallback it looks like. An older bundle still carries
+    /// MainWindow.xib -- 7.0.214 does -- but `NSMainNibFile` comes from the translator template,
+    /// which is `codenameone-parparvm` at the PLUGIN's version, so the key that would load it is
+    /// gone whatever the port says.
+    ///
+    /// #### Parameters
+    ///
+    /// - `nativeSources`: the directory nativeios.jar was extracted into
+    ///
+    /// #### Returns
+    ///
+    /// the message to fail the build with, or null when the port matches this plugin
+    static String sceneLifecyclePortSkewRejection(File nativeSources) throws IOException {
+        File sceneDelegate = new File(nativeSources, "CodenameOne_GLSceneDelegate.m");
+        String reason;
+        if (!sceneDelegate.exists()) {
+            reason = "it contains no CodenameOne_GLSceneDelegate.m at all";
+        } else if (new String(readFileBytes(sceneDelegate), StandardCharsets.UTF_8)
+                .contains("CN1_USE_UI_SCENE")) {
+            // Present but compiled out: the define that used to enable it is gone from this
+            // plugin, so the class would vanish from the binary with the build still green.
+            reason = "its CodenameOne_GLSceneDelegate is still behind #ifdef CN1_USE_UI_SCENE, "
+                    + "a define this version no longer sets";
+        } else {
+            return null;
+        }
+        return "The iOS port bundle on this build's classpath is older than the Codename One "
+                + "Maven plugin running it: " + reason + ". The scene delegate is what creates "
+                + "the application window, and the Info.plist this build writes names it, so the "
+                + "result would be an app that builds cleanly and fails to launch. These two "
+                + "artifacts are released together and are not meant to be mixed -- remove the "
+                + "<dependencies> override pinning com.codenameone:codenameone-ios under the "
+                + "codenameone-maven-plugin declaration in your pom, or move the plugin back to "
+                + "the version that matches it. Note cn1.version is not what selects this: the "
+                + "port is a dependency of the plugin, not of your project.";
     }
 
     /// The launch-screen keys Apple accepts, in the order its release notes name them.
