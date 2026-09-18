@@ -1238,6 +1238,16 @@ public class IOSImplementation extends CodenameOneImplementation {
         return value.replace('\n', ' ').replace('\r', ' ').replace('\t', ' ');
     }
 
+    /// @inheritDoc
+    ///
+    /// True on the desktop -- the native macOS build's real NSMenu, and Catalyst's
+    /// UIMenuBuilder. False on a phone or tablet, where setNativeCommands below returns
+    /// without doing anything and the commands belong in the Toolbar.
+    @Override
+    public boolean isNativeCommandsSupported() {
+        return isDesktop();
+    }
+
     @Override
     public void setNativeCommands(Vector commands) {
         if (!isDesktop()) {

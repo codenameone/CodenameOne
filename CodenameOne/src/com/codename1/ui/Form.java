@@ -939,8 +939,17 @@ public class Form extends Container implements TopLevelContainer {
     /// Indicates the {@code native} desktop title-bar mode, where the CN1 Toolbar is hidden entirely:
     /// the form title goes into the real OS window title bar and the commands are bridged to a native
     /// menu bar. Inert (false) on mobile.
+    ///
+    /// Conditional on the platform actually HAVING a native menu bar. Hiding the Toolbar takes
+    /// away the side menu, which is the only place the commands are drawn, so doing it on a
+    /// port whose `setNativeCommands` discards them removes every command from the
+    /// application. The title still goes to the OS title bar on such a port -- that part
+    /// works everywhere -- and the Toolbar stays, which is the legacy look rather than a
+    /// broken one.
     boolean isDesktopHideToolbar() {
-        return Display.getInstance().isDesktop() && "native".equals(getDesktopTitleBarMode());
+        return Display.getInstance().isDesktop()
+                && "native".equals(getDesktopTitleBarMode())
+                && Display.impl.isNativeCommandsSupported();
     }
 
     /// Indicates the {@code custom} desktop title-bar mode, where the CN1 Toolbar stays visible and

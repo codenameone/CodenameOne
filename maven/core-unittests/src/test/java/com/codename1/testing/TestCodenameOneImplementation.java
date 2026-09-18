@@ -643,6 +643,20 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
         this.lastNativeCommands = commands;
     }
 
+    /// Defaults TRUE so the existing desktop-chrome tests, which were written when every
+    /// implementation was assumed to have a menu bar, keep asserting what they always did.
+    /// The fallback tests set it false, which is what a port with no native menu reports.
+    @Override
+    public boolean isNativeCommandsSupported() {
+        return nativeCommandsSupported;
+    }
+
+    public void setNativeCommandsSupported(boolean nativeCommandsSupported) {
+        this.nativeCommandsSupported = nativeCommandsSupported;
+    }
+
+    private boolean nativeCommandsSupported = true;
+
     /** @return the commands last pushed via setNativeCommands, for desktop-chrome assertions. */
     public java.util.Vector getLastNativeCommands() {
         return lastNativeCommands;
@@ -1481,6 +1495,7 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
         desktopTitleBarMode = "toolbar";
         configuredDesktopTitleBarMode = null;
         shiftKeyDown = false;
+        nativeCommandsSupported = true;
         lastNativeCommands = null;
         clearFileSystem();
         clearSockets();

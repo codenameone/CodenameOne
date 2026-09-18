@@ -2737,6 +2737,17 @@ public class JavaSEPort extends CodenameOneImplementation {
         }
     }
 
+    /// @inheritDoc
+    ///
+    /// True on the desktop, where setNativeCommands below builds a real Swing JMenuBar
+    /// (which becomes the macOS screen menu). False elsewhere, including the phone-skinned
+    /// simulator, where there is no menu bar to put anything on and the commands belong in
+    /// whatever Codename One draws.
+    @Override
+    public boolean isNativeCommandsSupported() {
+        return isDesktop();
+    }
+
     @Override
     public void setNativeCommands(Vector commands) {
         if (!isDesktopNativeChromeMode()) {
