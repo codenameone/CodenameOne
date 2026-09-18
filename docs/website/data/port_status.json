@@ -1286,6 +1286,18 @@
       "test": "ToastBarTopPositionScreenshotTest"
     },
     {
+      "pattern": "DesktopWidgetsTheme_*",
+      "test": "DesktopWidgetsThemeScreenshotTest"
+    },
+    {
+      "pattern": "DesktopChromeTheme_*",
+      "test": "DesktopChromeThemeScreenshotTest"
+    },
+    {
+      "pattern": "DesktopScrollbarTheme_*",
+      "test": "DesktopScrollbarThemeScreenshotTest"
+    },
+    {
       "pattern": "ButtonTheme_*",
       "test": "ButtonThemeScreenshotTest"
     },
