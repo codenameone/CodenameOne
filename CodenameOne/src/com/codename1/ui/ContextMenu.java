@@ -151,8 +151,10 @@ public final class ContextMenu {
         Container items = new Container(BoxLayout.y());
         items.setUIID("CommandList");
         items.setScrollableY(true);
-        for (int iter = 0; iter < commands.length; iter++) {
-            final Command cmd = commands[iter];
+        // `final` on the loop variable, not merely convention: the core compiles at Java 5
+        // source level, where a foreach variable is NOT implicitly final and so cannot be
+        // captured by the listener below without it.
+        for (final Command cmd : commands) {
             if (cmd == null) {
                 continue;
             }
