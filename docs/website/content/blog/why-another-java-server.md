@@ -82,7 +82,7 @@ public class Hello {
 }
 ```
 
-We built that program three ways on an Apple M4 Max running macOS 26.6.2. The table reports 31 interleaved launches after five warm-up launches per runtime, with the files already in the OS cache. Elapsed time includes process launch, printing, exit, and the common measurement wrapper.
+We built that program three ways on an Apple M4 Max running macOS 26.6.2. The table reports 31 interleaved launches after five warm-up launches per runtime, with the files already in the OS cache. Elapsed time includes process launch, printing, exit, and the common measurement wrapper. The host was not isolated from other activity: its recorded one-, five-, and fifteen-minute load averages were 3.75, 6.17, and 4.94. These elapsed times describe that run; a quiet machine can produce different results.
 
 | Build | Files to deploy | Median elapsed | Median peak RSS |
 | --- | ---: | ---: | ---: |
@@ -231,7 +231,7 @@ Attribution joins the existing analytics consent and identity lifecycle. Monday'
 
 Our builders support Xcode 27. As of this release, it isn't on our cloud build servers; we're waiting for Apple's updates before deciding how to proceed with that rollout.
 
-Some developers have already encountered submission problems tied to older minimum versions in their build settings. [PR #5788](https://github.com/codenameone/CodenameOne/pull/5788) reads the selected SDK's deployment floor and raises generated targets as needed. [PR #5855](https://github.com/codenameone/CodenameOne/pull/5855) also handles the iOS 27 launch-screen and scene-lifecycle requirements, including older build hints that bypassed the normal metadata.
+Some developers have already encountered submission problems tied to older minimum versions in their build settings. [PR #5788](https://github.com/codenameone/CodenameOne/pull/5788) reads the selected SDK's deployment floor and raises generated targets as needed. [PR #5855](https://github.com/codenameone/CodenameOne/pull/5855) also handles the iOS 27 launch-screen and scene-lifecycle requirements. It rejects three removed hints, `ios.generateSplashScreens`, `ios.uiscene`, and `ios.launchStoryboardName`, on every SDK and regardless of their values. Delete those hints entirely before rebuilding.
 
 If Apple rejects your submission for minimum-version or launch configuration reasons, let us know and include the rejection text and build hints. We raised the minimums, but the range of existing project configurations makes your reports useful.
 

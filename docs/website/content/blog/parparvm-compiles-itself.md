@@ -110,11 +110,11 @@ I like this milestone partly because it refuses to let us hide behind a friendly
 From `vm/selfhost`, with `JDK_8_HOME` pointing to a working JDK 8 and Maven using that JDK:
 
 ```bash
-./build-selfhost.sh -O3
+./build-selfhost.sh
 ./verify-selfhost.sh /path/to/application/classes AppName com.example
 ```
 
-The build produces `target/parpar`. The verification script compares emitted output for the supplied class directory. Use a complete input corpus and the application name and package expected by the translator.
+The default build uses `-O1` and produces `target/parpar`, which is the executable the verification script expects. The `-O3` build used for the performance comparison produces a separate `target/parpar-O3`; it does not replace `target/parpar`. The verification script compares emitted output for the supplied class directory. Use a complete input corpus and the application name and package expected by the translator.
 
 The benchmark scripts interleave runtimes over the same input and check generated output before reporting performance ratios. A compiler that returns quickly after doing different work has not won that comparison.
 

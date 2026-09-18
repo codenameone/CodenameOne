@@ -43,31 +43,27 @@ flowchart TD
 
 Using the SDK's answer matters more than adding another version to a table. It also covers a future SDK whose floor we haven't hardcoded yet.
 
-## A splash image is not launch metadata
+## Delete the three removed build hints
 
-Some older projects have this hint:
+[PR #5855](https://github.com/codenameone/CodenameOne/pull/5855) removes three build hints. If your project supplies any of these names, the builder stops with an error explaining what replaced it:
 
-```properties
-codename1.arg.ios.generateSplashScreens=true
-```
+| Remove from `codenameone_settings.properties` | What to use now |
+| --- | --- |
+| `codename1.arg.ios.generateSplashScreens` | The generated `UILaunchScreen`, with `Launch.Foreground.png` for a custom image. |
+| `codename1.arg.ios.uiscene` | The UIScene lifecycle is always enabled; no selector is needed. |
+| `codename1.arg.ios.launchStoryboardName` | For a custom launch declaration, use `ios.plistInject` and test it on your target devices. |
 
-Historically, it selected a legacy splash-image path. The image-generation behavior changed over time, but the hint still suppressed normal launch metadata. An app could therefore contain generated artwork and still have no launch declaration where UIKit expects one.
+**Delete the entries entirely.** Changing `ios.uiscene=false` to `ios.uiscene=true` still fails. The check rejects the hint name, regardless of its value or the selected SDK. An iOS 26 SDK build is subject to the same check.
 
-[PR #5855](https://github.com/codenameone/CodenameOne/pull/5855) removes that suppression and logs a deprecation notice. The hint retains its iPad multitasking effect. A full-screen setting doesn't substitute for a launch screen.
+The splash hint originally selected the legacy `Default*.png` generator. Before its removal, it could still suppress normal launch metadata even though that generator was gone. It now causes a build failure, with no retained iPad multitasking effect.
 
-The builder then reads the **finished `Info.plist`**. That's essential when an application uses `ios.plistInject`: finding the name of a key in a comment, or inside the wrong dictionary, doesn't mean the app declared that key at the root. The check accepts the supported launch-key forms, including a valid application-supplied launch experience.
+For the default launch screen, put your image at `ios/src/main/resources/Launch.Foreground.png`. The [iOS guide](https://github.com/codenameone/CodenameOne/blob/2697dcfa2f0425170efd08655243032571b65869/docs/developer-guide/Working-With-iOS.asciidoc) explains the generated launch screen and custom launch declarations. The builder generates the scene lifecycle for every iOS build. If your app depended on the old lifecycle, report the incompatibility so we can fix it.
 
-## Scene lifecycle can no longer be switched off for SDK 27
+## Check the finished launch metadata
 
-The normal Maven build already uses the scene lifecycle. An older project may explicitly opt out:
+A separate check reads the **finished `Info.plist`** for builds linked against iOS SDK 27 or later. It requires a supported root launch declaration and `UIApplicationSceneManifest`. This check uses the SDK the build actually links against; the removed-hint check above applies to every SDK.
 
-```properties
-codename1.arg.ios.uiscene=false
-```
-
-Against iOS SDK 27 or later, the builder refuses that configuration early. It doesn't spend the rest of the build producing an archive that cannot launch under the documented requirement.
-
-Remove that opt-out when migrating such a project, and review any custom scene manifest at the same time. The validation follows the SDK the build actually links against. Building with an older SDK doesn't accidentally inherit the new restriction just because a different Xcode is installed nearby.
+Checking the finished document matters when an application uses `ios.plistInject`: finding a key's name in a comment or in the wrong dictionary doesn't mean the app declared it at the root. The builder accepts the supported launch-key forms, including an application-supplied launch experience. A full-screen setting doesn't substitute for a launch screen.
 
 You can inspect a built app's metadata locally:
 
@@ -81,7 +77,7 @@ Look for the root launch declaration and `UIApplicationSceneManifest`. A valid p
 
 Some developers have encountered rejections tied to older minimum-version settings. We've updated the generated minimums and added the launch checks, but existing apps have many combinations of build hints, extensions, and custom plist content.
 
-Rebuild with the updated tools. Check the SDK selected in the build log, the effective deployment targets, and any explicit scene or splash hints. If the submission is still rejected, send us the rejection text, relevant build hints, and the build log identifying the toolchain. That gives us the actual configuration to fix.
+Rebuild with the updated tools. Check the SDK selected in the build log, the effective deployment targets, and whether any of the three removed hints remain in your project. If the submission is still rejected, send us the rejection text, relevant build hints, and the build log identifying the toolchain. That gives us the actual configuration to fix.
 
 As of the September 18 release, **Xcode 27 is supported by the builders but isn't installed on our cloud build servers**. We're waiting for further Apple updates before deciding how to proceed with the server rollout. Local builder support and the cloud toolchain rollout are separate steps.
 
@@ -97,7 +93,7 @@ Codename One gives you control over the UI you ship. Matching new platform conve
 
 The new backend, Vault API, and invitation flow expand how much application behavior can live in shared Java. This Apple work has the same practical purpose at the packaging boundary: remove another configuration trap each app would otherwise have to rediscover.
 
-The builder can read the SDK's floor, reject an incompatible opt-out, and inspect the final metadata before upload. Those checks make a failed configuration actionable while the developer still has the build in front of them. Together with the security APIs, they continue our work on defaults that developers can rely on across targets.
+The builder can read the SDK's floor, reject removed hints, and inspect the final metadata before upload. Those checks make a failed configuration actionable while the developer still has the build in front of them. Together with the security APIs, they continue our work on defaults that developers can rely on across targets.
 
 ---
 
