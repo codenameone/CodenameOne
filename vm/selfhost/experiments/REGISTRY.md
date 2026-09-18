@@ -3146,3 +3146,40 @@ differ) and printed raw for LinkedHashSet (specified).
 It did not catch the crash -- the failing path was `new ArrayList<>(aSet)`, which is
 a collection CONSTRUCTOR reading the set through the native bulk-copy path, not any
 set operation. Worth adding.
+
+
+## Round 28: four page-heap knobs, all already at their best
+
+Peak footprint against JDK 25 stood at ~1.21x after large native blocks moved to
+mmap, and the heap report showed `resident 772MB` against `live 585MB` -- 187MB
+dirty and dead. Four cheap knobs were A/B'd against that, interleaved, same source
+with only the define changed. **None of them is worth taking**, and the reason is
+the same in every case: what is left is not idle memory, it is PARTIALLY FILLED
+pages, which a non-moving collector cannot reclaim without evacuating the survivors.
+
+| knob | result |
+|---|---|
+| `CN1_BIBOP_FREE_POOL_KEEP` 64 -> 8, `MAJOR_SWEEP_CYCLES` 16 -> 4 | no gain, slightly worse |
+| `CN1_BLOCK_MMAP_THRESHOLD` 32KB -> 8KB | indistinguishable |
+| `CN1_BLOCK_MMAP_THRESHOLD` 32KB -> 128KB | worse in every round; confirms 32KB |
+| `CN1_BIBOP_PAGE_SIZE` 64KB -> 32KB | +83.7MB on the median over 6 rounds |
+
+Page release was verified to be FIRING before any of this, with
+`CN1_LOG_PAGE_RELEASE=1`: five major sweeps released 720 pages (45MB), with
+`rejected=0` and `releaseErrno=0`, so `MADV_FREE_REUSABLE` is being accepted and is
+decrementing `phys_footprint`. There was never a stuck release path to fix.
+
+### The page-size result is the one to remember, and not for its sign
+
+Three interleaved rounds said 32KB pages were **11% BETTER**. Six rounds said they
+are 6.1% worse, on both the median and the min. Nothing changed but the round count.
+
+This machine was carrying someone else's GraalVM build at 436% CPU throughout, and
+peak footprint is not independent of CPU contention the way it looks -- GC pacing
+moves with available cores, and the peak moves with the pacing. Three rounds of a
+64KB arm spanned 1285MB to 1442MB, which is wider than every effect measured here.
+
+So: check `uptime` AND `ps` before believing a page-heap A/B, and do not conclude
+from three rounds. The earlier version of this note would have recorded a 11%
+improvement that does not exist.
+
