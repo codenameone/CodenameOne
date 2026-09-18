@@ -135,7 +135,7 @@ static inline int cn1CollectionOpen(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT colle
         JAVA_ARRAY array = (JAVA_ARRAY)((struct obj__java_util_Arrays_ArrayList*)collection)->java_util_Arrays_ArrayList_a;
         out->owner = collection;
         out->kind = CN1_COLL_DENSE;
-        out->data = (JAVA_OBJECT*)array->data;
+        out->data = (JAVA_OBJECT*)CN1_ARRAY_DATA(array);
         out->count = array->length;
         return 1;
     }
