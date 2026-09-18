@@ -69,8 +69,17 @@ jobs:
           cache: 'maven'
       # clang compiles the C the translator emits. Required rather than optional
       # here: the packaging check skips without it, and a skip reads like a pass.
-      - name: Install xvfb and clang
-        run: bash scripts/ci/apt-get-install.sh xvfb clang
+      #
+      # clang alone is not enough. The generated backend links -lcurl -lssl
+      # -lcrypto -lnghttp2 -- outbound TLS is libcurl's, the auth primitives are
+      # OpenSSL's, the HTTP/2 framing is nghttp2's -- and the natives that call
+      # them need those headers to compile at all: without them this failed on
+      # "'curl/curl.h' file not found" after translating perfectly well. The same
+      # four packages, for the same reason, are in parparvm-tests.yml.
+      - name: Install xvfb and the native backend toolchain
+        run: |
+          bash scripts/ci/apt-get-install.sh xvfb clang \
+            libcurl4-openssl-dev libssl-dev libnghttp2-dev
       - name: Build Codename One Maven artifacts (includes archetypes)
         # Through the retry wrapper, narrowed to resolution failures: this died with
         # "Plugin maven-install-plugin:2.5.2 or one of its dependencies could not be resolved"
