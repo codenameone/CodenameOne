@@ -28,7 +28,7 @@ complex details very clearly and because this is a game the course is both enter
 
 ### Other Resources
 
-We have a lot of documentation, but picking up a 900 page [developer guide](/manual/) might be intimidating  
+We have a lot of documentation, but picking up a 900 page [developer guide](/developer-guide/) might be intimidating\
 when you are completely new to Java.
 
 Here are some helpful resources to get you started:

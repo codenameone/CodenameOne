@@ -140,7 +140,7 @@ One caveat is italic which still uses the Helvetica Neue font. The syntax for ge
 
 One of the reasons I gave for the new skins lack of status bar is the trend OS’s have taken to hide the status bar from view. Since iOS 7 developers were expected to deliver an app that runs under the status bar. Our solution for that was including a bit of default padding on the top of the `Form` in iOS to push the content down.
 
-Android still has a status bar and most apps still use it, you can customize the colors of the Android status bar using the `colors.xml` as explained [here](/manual/advanced-topics.html). However, up until now we didn’t support hidden status bars.
+Android still has a status bar and most apps still use it, you can customize the colors of the Android status bar using the `colors.xml` as explained [here](/developer-guide/advanced-topics-under-the-hood/). However, up until now we didn’t support hidden status bars.
 
 We just introduced the build hint `android.hideStatusBar` which you can set to `true`. This will make the status bar seem transparent which will allow a more consistent UX with your iOS version.
 

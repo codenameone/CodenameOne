@@ -66,7 +66,7 @@ You do not need this for every build during day-to-day development. It becomes v
 
 - [Build Server](/build-server/)
 - [Moving To Maven](/blog/moving-to-maven/)
-- [Developer Guide](/developer-guide/)
+- [Developer Guide](/developer-guide/advanced-topics-under-the-hood/#_versioned_builds)
 - [How Do I Use Offline Build](/how-do-i/how-do-i-use-offline-build/)
 
 ## Discussion

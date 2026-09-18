@@ -27,6 +27,6 @@ So the lesson here is that built-in markers are fine when they are enough, but d
 
 ## Further Reading
 
-- [Developer Guide](/developer-guide/)
+- [Developer Guide](/developer-guide/maps/)
 - [Introduction and Installation](/courses/course-02-deep-dive-mobile-development-with-codename-one/030-introduction-and-installation/)
 - [Hello World and Devices](/courses/course-02-deep-dive-mobile-development-with-codename-one/031-hello-world-and-devices/)

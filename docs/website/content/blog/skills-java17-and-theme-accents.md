@@ -56,7 +56,7 @@ Override the constants inside the `#Constants` block of your own `theme.css`:
 
 That is it. Every accent-bearing UIID picks up the new color. Light and dark are independent (`--accent-color` vs `--accent-color-dark`), and partial overrides are fine; anything you do not redeclare stays at the framework default. Material 3 has a couple of additional container-tier constants for the elevated-surface tone; iOS ignores those.
 
-There is also a runtime path for dynamic theming (in-app accent toggles, branded flavors, A/B tests). It uses the same constants. The Native Themes chapter of the developer guide covers it in detail, along with the full iOS and Android constant tables and the places where the binding system intentionally does not apply: [Accent palette override](https://github.com/codenameone/CodenameOne/blob/master/docs/developer-guide/Native-Themes.asciidoc#accent-palette-override).
+There is also a runtime path for dynamic theming (in-app accent toggles, branded flavors, A/B tests). It uses the same constants. The Native Themes chapter of the developer guide covers it in detail, along with the full iOS and Android constant tables and the places where the binding system intentionally does not apply: [Accent palette override](/developer-guide/native-themes/#_accent_palette_override).
 
 The point worth pulling out: the parts of theming that do not change per app (which UIIDs participate in the accent palette, which states they expose, which dark-mode counterparts they have) live inside the framework and stay there. The parts that do change per app (your colors) live in your project as five constants and nothing else. That is the whole reason this change exists.
 
@@ -90,7 +90,7 @@ Accepted values are `sRGB` (default), `displayP3`, `deviceRGB`, `linearSRGB`, `e
 codename1.arg.ios.metal.colorSpace=displayP3
 ```
 
-The hint is dormant when `ios.metal=false`, so existing GL builds are unchanged. Unrecognized values produce a warning log and fall back to sRGB. Documented under [Working-With-iOS.asciidoc](https://github.com/codenameone/CodenameOne/blob/master/docs/developer-guide/Working-With-iOS.asciidoc).
+The hint is dormant when `ios.metal=false`, so existing GL builds are unchanged. Unrecognized values produce a warning log and fall back to sRGB. Documented under [Working-With-iOS.asciidoc](/developer-guide/working-with-ios/).
 
 ### The new `translateMatrix` API
 
@@ -132,7 +132,7 @@ If you have an app that needs the legacy launch-time behavior, a backwards-compa
 codename1.arg.ios.notificationPermissionAtLaunch=true
 ```
 
-The default is `false`, so existing apps that did not opt in pick up the new behavior on next rebuild. Documented in [Push-Notifications.asciidoc](https://github.com/codenameone/CodenameOne/blob/master/docs/developer-guide/Push-Notifications.asciidoc). The cloud-side build server change shipped as [BuildDaemon #71](https://github.com/codenameone/BuildDaemon/pull/71), so local and cloud builds match.
+The default is `false`, so existing apps that did not opt in pick up the new behavior on next rebuild. Documented in [Push-Notifications.asciidoc](/developer-guide/push-notifications/). The cloud-side build server change shipped as [BuildDaemon #71](https://github.com/codenameone/BuildDaemon/pull/71), so local and cloud builds match.
 
 One thing to flag if you are updating an existing iOS app: if your onboarding flow was relying on the launch-time prompt happening automatically, your prompt now never fires unless `Push.register()` or `LocalNotification.schedule()` is invoked somewhere. That is almost certainly what you want, but check that the call lands.
 

@@ -30,7 +30,7 @@ The new Initializr now generates localization bundles as part of project creatio
 
 That means i18n starts as part of the default app flow instead of becoming cleanup work later on. We also fixed follow-up l10n path issues and updated CSS tooling so localization directories are detected and passed correctly to the compiler/watch workflow.
 
-If you haven’t looked at localization recently, we now support property resource bundles as part of the standard workflow. This is documented in the [Developer Guide](/manual/), and it aligns much better with modern project structure.
+If you haven’t looked at localization recently, we now support property resource bundles as part of the standard workflow. This is documented in the [Developer Guide](/developer-guide/miscellaneous-features/#_localization_manager), and it aligns much better with modern project structure.
 
 Another detail that is easy to miss: Codename One has implicit localization behavior. When a resource bundle is installed, `Label` text (and subclasses of [`Label`](/javadoc/com/codename1/ui/Label/)) is localized automatically by key unless you explicitly disable it for a specific component.
 

@@ -29,6 +29,6 @@ The practical takeaway is that mobile security should be layered. Protect transp
 
 ## Further Reading
 
-- [Developer Guide](/developer-guide/)
+- [Developer Guide](/developer-guide/security/)
 - [Storage Encryption and Misc Security Features](/courses/course-02-deep-dive-mobile-development-with-codename-one/029-storage-encryption-and-misc-security-features/)
 - [How Do I Access Remote Webservices, Perform Operations On The Server](/how-do-i/how-do-i-access-remote-webservices-perform-operations-on-the-server/)

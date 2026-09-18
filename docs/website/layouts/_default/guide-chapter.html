@@ -1,0 +1,41 @@
+{{ define "main" }}
+<div class="cn1-guide-layout">
+  <aside class="cn1-guide-sidebar">
+    <details class="cn1-guide-menu" open>
+    <summary>Browse chapters</summary>
+    <nav aria-label="Developer Guide chapters">
+      <a class="cn1-guide-home" href="/developer-guide/">Developer Guide</a>
+      <a href="/search/">Search documentation</a>
+      {{ $page := . }}
+      {{ range index site.Data "developer-guide" }}
+      <details {{ if eq .title $page.Params.guide_group }}open{{ end }}>
+        <summary>{{ .title }}</summary>
+        <ul>{{ range .chapters }}<li><a href="{{ .url }}" {{ if eq .url $page.RelPermalink }}aria-current="page"{{ end }}>{{ .title }}</a></li>{{ end }}</ul>
+      </details>
+      {{ end }}
+    </nav>
+    </details>
+  </aside>
+  <article class="post-single cn1-guide-chapter">
+    <header class="post-header">
+      <nav class="cn1-guide-crumbs" aria-label="Breadcrumb"><a href="/developer-guide/">Developer Guide</a> / {{ .Params.guide_group }}</nav>
+      <h1 class="post-title" id="{{ .Params.guide_id }}">{{ .Title }}</h1>
+    </header>
+    {{ if .Fragments.Headings }}
+    <details class="cn1-guide-toc" open><summary>On this page</summary>{{ .TableOfContents }}</details>
+    {{ end }}
+    <div class="post-content cn1-guide-content">{{ .Content }}</div>
+    <nav class="cn1-guide-pagination" aria-label="Previous and next chapters">
+      {{ $pages := where site.RegularPages "Layout" "guide-chapter" }}
+      {{ with $pages.ByWeight.Next . }}<a rel="prev" href="{{ .RelPermalink }}">← {{ .Title }}</a>{{ end }}
+      {{ with $pages.ByWeight.Prev . }}<a rel="next" href="{{ .RelPermalink }}">{{ .Title }} →</a>{{ end }}
+    </nav>
+    <footer class="cn1-guide-tools">
+      <a href="https://github.com/codenameone/CodenameOne/blob/master/{{ .Params.guide_source }}">Edit this chapter</a>
+      <a href="/developer-guide/single-page/#{{ .Params.guide_id }}">Full book</a>
+      <a href="/files/developer-guide.pdf">PDF</a>
+    </footer>
+  </article>
+</div>
+{{ partial "guide-legacy-links.html" . }}
+{{ end }}

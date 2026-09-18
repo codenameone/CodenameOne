@@ -304,7 +304,7 @@ The community got there first. The combination of bug reports, screenshots from 
 
 So instead of forcing the flip on a deadline, we are now going to flip it when the regression list reads zero. That will not be very long — within one to three weeks at the pace we are closing things — and the apps that flip first will land on a Metal default that has been tested against more real screens than any rendering migration we have done before.
 
-If you are one of the developers who flipped the hint, took screenshots, and filed issues over the past two weeks: **thank you**. Keep doing it. The Metal pipeline is going to ship as the default in materially better shape than it would have without you. If you have not flipped it yet, [the build hint is still](https://github.com/codenameone/CodenameOne/blob/master/docs/developer-guide/Working-With-iOS.asciidoc) `ios.metal=true`. We would still love your screens through it.
+If you are one of the developers who flipped the hint, took screenshots, and filed issues over the past two weeks: **thank you**. Keep doing it. The Metal pipeline is going to ship as the default in materially better shape than it would have without you. If you have not flipped it yet, [the build hint is still](/developer-guide/working-with-ios/) `ios.metal=true`. We would still love your screens through it.
 
 ## Wrapping up
 

@@ -89,7 +89,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 > Shai Almog says:
 >
-> I understood that. I don’t understand what’s the problem with our sample code: [https://www.codenameone.com…](</manual/graphics/>)
+> I understood that. I don’t understand what’s the problem with our sample code: [https://www.codenameone.com…](</developer-guide/graphics/>)
 >
 
 

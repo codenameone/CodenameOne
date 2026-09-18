@@ -1,5 +1,6 @@
 {{- define "main" -}}
 <article class="post-single post-single--developer-guide">
+  <nav class="cn1-guide-tools" aria-label="Guide tools"><a href="/developer-guide/">Browse chapters</a><a href="/files/developer-guide.pdf">Download PDF</a></nav>
   <div class="post-content cn1-developer-guide" id="developer-guide">
     {{- $guideFragment := "generated/developer-guide-content.html" -}}
     {{- if fileExists $guideFragment -}}

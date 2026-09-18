@@ -15,14 +15,14 @@ When building to the JavaScript target there are many build options and configur
 issues like cross origin need server side code that would be able to proxy such requests to make the  
 client side code seamless… 
 
-Steve wrote a rather detailed [appendix to the developer guide](/manual/appendix-javascript.html)  
+Steve wrote a rather detailed [appendix to the developer guide](/developer-guide/working-with-javascript/)\
 covering all of those options from startup splash screen configuration to servlet proxy logic. The build also generates  
 a ready to deploy WAR file which should make setting this up on any Java servlet container a nobrainer. 
 
 During our work on the developer guide for 3.0 we updated the  
-[build hints section](/manual/advanced-topics.html) with many  
+[build hints section](/developer-guide/advanced-topics-under-the-hood/#_sending_arguments_to_the_build_server) with many\
 previously undocumented hints and also updated the  
-[theme constants section](/manual/advanced-theming.html#_theme_constants) in a similar way.  
+[theme constants section](/developer-guide/advanced-theming/#theme-constants-section) in a similar way.\
 Hopefully, this will allow us to keep them up to date more easily as we add them in the future. This week  
 we also updated the Codename One Designer constants combo box with all the documented constants. 
 
@@ -101,7 +101,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 > shannah78 says:
 >
-> Are the POST requests being sent to the same host as the index.html file is being served on, or a different server? If a different server, you’ll need to set a proxy servlet as described here [https://www.codenameone.com…](</manual/appendix-javascript/>)
+> Are the POST requests being sent to the same host as the index.html file is being served on, or a different server? If a different server, you’ll need to set a proxy servlet as described here [https://www.codenameone.com…](</developer-guide/working-with-javascript/>)
 >
 > The Javascript port will be in beta by July.
 >

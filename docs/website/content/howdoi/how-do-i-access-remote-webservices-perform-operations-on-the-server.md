@@ -27,7 +27,7 @@ For a current Codename One project, the practical advice is to design a normal s
 
 ## Further Reading
 
-- [Developer Guide](/developer-guide/)
+- [Developer Guide](/developer-guide/io/)
 - [How Do I Use HTTP, Sockets, Webservices And Websockets](/how-do-i/how-do-i-use-http-sockets-webservices-websockets/)
 - [Terse REST API](/blog/terse-rest-api/)
 - [REST API Design](/courses/course-03-build-real-world-full-stack-mobile-apps-java/rest-api-design/)

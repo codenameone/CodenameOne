@@ -34,7 +34,7 @@ For deeper debugging, the include-sources workflow is still useful. When native 
 
 ## Further Reading
 
-- [Developer Guide](/developer-guide/)
+- [Developer Guide](/developer-guide/advanced-topics-under-the-hood/#_native_interfaces)
 - [Build Hints](/build-hints/)
 - [Build Server](/build-server/)
 - [Introduction for Android Developers](/introduction-for-android-developers/)

@@ -26,7 +26,7 @@ The modern advice here is mostly about restraint. Capture the image you need, no
 
 ## Further Reading
 
-- [Developer Guide](/developer-guide/)
+- [Developer Guide](/developer-guide/miscellaneous-features/#_capture_photos_video_audio)
 - [How Do I Improve Application Performance Or Track Down Performance Issues](/how-do-i/how-do-i-improve-application-performance-or-track-down-performance-issues/)
 - [How Do I Use Storage, File System And SQL](/how-do-i/how-do-i-use-storage-file-system-sql/)
 

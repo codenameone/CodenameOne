@@ -31,7 +31,7 @@ The modern decision tree is fairly simple. If you are calling a normal backend A
 
 ## Further Reading
 
-- [Developer Guide](/developer-guide/)
+- [Developer Guide](/developer-guide/io/)
 - [Terse REST API](/blog/terse-rest-api/)
 - [How Do I Access Remote Webservices? Perform Operations On The Server?](/how-do-i/how-do-i-access-remote-webservices-perform-operations-on-the-server/)
 - [Performance Network Monitors](/performance-network-monitors/)

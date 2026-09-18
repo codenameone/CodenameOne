@@ -1,0 +1,2 @@
+{{ $script := resources.Get "js/cn1-guide-links.js" | minify | fingerprint }}
+<script defer src="{{ $script.RelPermalink }}"></script>

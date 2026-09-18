@@ -32,6 +32,6 @@ Theme constants and other lower-level theme settings still matter, especially wh
 ## Further Reading
 
 - [Themeing](/themeing/)
-- [Developer Guide](/developer-guide/)
+- [Developer Guide](/developer-guide/basics/)
 - [How Do I Create A Simple Theme](/how-do-i/how-do-i-create-a-simple-theme/)
 - [Work With Multi Images And Device Densities](/how-do-i/how-do-i-fetch-an-image-from-the-resource-file-add-a-multiimage/)

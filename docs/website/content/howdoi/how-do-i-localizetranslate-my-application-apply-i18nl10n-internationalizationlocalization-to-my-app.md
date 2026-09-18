@@ -31,7 +31,7 @@ The practical goal is not just "translated text". It is an application that feel
 
 ## Further Reading
 
-- [Developer Guide](/developer-guide/)
+- [Developer Guide](/developer-guide/miscellaneous-features/#_localization_manager)
 - [Themeing](/themeing/)
 - [Layout Basics](/layout-basics/)
 - [Hello World](/hello-world/)

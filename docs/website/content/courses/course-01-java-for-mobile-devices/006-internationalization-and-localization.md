@@ -31,7 +31,7 @@ The video uses the older designer workflow to define bundles and RTL markers. Th
 
 ## Further Reading
 
-- [Developer Guide](/developer-guide/)
+- [Developer Guide](/developer-guide/miscellaneous-features/#_localization_manager)
 - [Themeing](/themeing/)
 - [Layout Basics](/layout-basics/)
 - [Properties Are Amazing](/blog/properties-are-amazing/)

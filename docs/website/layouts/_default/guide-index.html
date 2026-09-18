@@ -1,0 +1,22 @@
+{{ define "main" }}
+<article class="post-single cn1-guide-index">
+  <header class="post-header">
+    <h1 class="post-title">{{ .Title }}</h1>
+    <p class="post-description">Build and ship Codename One apps. Browse by topic or search for a specific API, feature, or task.</p>
+  </header>
+  <nav class="cn1-guide-tools" aria-label="Guide tools">
+    <a href="/search/">Search documentation</a>
+    <a href="/developer-guide/single-page/">Read as one page</a>
+    <a href="/files/developer-guide.pdf">Download PDF</a>
+  </nav>
+  <div class="cn1-guide-groups">
+    {{ range index site.Data "developer-guide" }}
+    <section id="{{ .id }}">
+      <h2>{{ .title }}</h2>
+      <ul>{{ range .chapters }}<li><a href="{{ .url }}">{{ .title }}</a></li>{{ end }}</ul>
+    </section>
+    {{ end }}
+  </div>
+</article>
+{{ partial "guide-legacy-links.html" . }}
+{{ end }}

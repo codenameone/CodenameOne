@@ -28,7 +28,7 @@ The modern caveat is that new Codename One projects are usually less GUI-builder
 
 ## Further Reading
 
-- [Developer Guide](/developer-guide/)
+- [Developer Guide](/developer-guide/events/)
 - [Layout Basics](/layout-basics/)
 - [How Do I Create A Gorgeous Sidemenu](/how-do-i/how-do-i-create-gorgeous-sidemenu/)
 - [How Do I Create A List Of Items](/how-do-i/how-do-i-create-a-list-of-items-the-easy-way/)

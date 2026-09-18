@@ -30,7 +30,7 @@ The broader lesson is that visual styling should be deliberate. Use the right bo
 ## Further Reading
 
 - [Themeing](/themeing/)
-- [Developer Guide](/developer-guide/)
+- [Developer Guide](/developer-guide/advanced-theming/)
 - [How Do I Create A Simple Theme](/how-do-i/how-do-i-create-a-simple-theme/)
 - [Work With Multi Images And Device Densities](/how-do-i/how-do-i-fetch-an-image-from-the-resource-file-add-a-multiimage/)
 

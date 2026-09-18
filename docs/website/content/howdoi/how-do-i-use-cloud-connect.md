@@ -23,7 +23,7 @@ So while the original Cloud Connect workflow is mostly historical now, the reaso
 
 ## Further Reading
 
-- [Developer Guide](/developer-guide/)
+- [Developer Guide](/developer-guide/io/)
 - [Themeing](/themeing/)
 - [Hello World](/hello-world/)
 

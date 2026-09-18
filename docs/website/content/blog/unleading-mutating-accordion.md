@@ -16,7 +16,7 @@ it in a demo for which it was very suitable. As we were working with it we disco
 core methods to remove an `Accordion` entry or change its title. But worse, was the fact that a delete button in  
 the title wouldn’t work!  
 The crux of the issue is in the fact that  
-[lead component](/manual/misc-features/#lead-component-section)  
+[lead component](/developer-guide/miscellaneous-features/#lead-component-section)\
 doesn’t support excluding a specific component within the hierarchy from its behavior so we set about to fix that…​
 
 We added two new methods to the `Component` class: `setBlockLead(boolean)` & `isBlockLead()`.

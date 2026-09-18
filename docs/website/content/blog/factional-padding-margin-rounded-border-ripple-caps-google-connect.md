@@ -31,7 +31,7 @@ Google has pretty much ended support for the old Google+ login API’s and Steve
 
   * Download the GoogleService-Info.plist file into your project’s native/ios directory
 
-This is the super short version…​ Steve updated the [developer guide section on Google connect](/manual/misc-features.html) with a longer more detailed explanation of the steps.
+This is the super short version…​ Steve updated the [developer guide section on Google connect](/developer-guide/miscellaneous-features/) with a longer more detailed explanation of the steps.
 
 ### Fractional Padding/Margin
 

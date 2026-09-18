@@ -40,7 +40,7 @@ to get this to the smoothness enjoyed by other platforms. We will also need to r
 settings for UWP builds have become far more challenging.
 
 This level of complexity justified a new developer guide section dedicated to UWP, this is still under active  
-development but you can follow it on [our website here](/manual/appendix-uwp.html) or in the  
+development but you can follow it on [our website here](/developer-guide/working-with-uwp/) or in the\
 [wiki](https://github.com/codenameone/CodenameOne/wiki/Working-with-UWP)  
 that hosts the entire developer guide (which you can  
 [help us write/edit](/blog/wiki-parparvm-performance-actionevent-type.html) !).
