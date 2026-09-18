@@ -1,0 +1,4 @@
+# Keep local reports and CI diagnostics out of the public repository.
+*
+!.gitignore
+!syndication-screenshots/
