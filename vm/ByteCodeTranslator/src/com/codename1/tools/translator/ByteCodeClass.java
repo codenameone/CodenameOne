@@ -476,6 +476,24 @@ public class ByteCodeClass {
         return null;
     }
 
+    /**
+     * Whether this class declares the method, it is not abstract, AND the dead code
+     * pass has not eliminated it -- so a direct call naming it will actually find a
+     * generated function.
+     *
+     * hasDeclaredNonAbstractMethod is not enough on its own: elimination is per
+     * METHOD, so a surviving class can have a culled method, and a call emitted to it
+     * fails at the C compiler as an implicit declaration rather than degrading.
+     *
+     * @param name method name
+     * @param desc method descriptor
+     * @return true when a direct call to it can be emitted
+     */
+    public boolean hasLiveNonAbstractMethod(String name, String desc) {
+        BytecodeMethod m = findDeclaredMethod(name, desc);
+        return m != null && !m.isAbstract() && !m.isEliminated();
+    }
+
     public boolean hasDeclaredNonAbstractMethod(String name, String desc) {
         BytecodeMethod declaredMethod = findDeclaredMethod(name, desc);
         return declaredMethod != null && !declaredMethod.isAbstract();
@@ -1962,7 +1980,16 @@ public class ByteCodeClass {
         return 'L';
     }
 
-    private boolean doesImplement(ByteCodeClass interfaceObj) {
+    /**
+     * Whether this class implements the given interface, directly or through a
+     * superclass or a super-interface. Package visible so the devirtualizer can build
+     * an interface-to-implementors index; it used to be private because only the
+     * interface-map emitter asked.
+     *
+     * @param interfaceObj the interface to test
+     * @return true when this class is assignable to it
+     */
+    boolean doesImplement(ByteCodeClass interfaceObj) {
         if(baseInterfacesObject != null) {
             if(baseInterfacesObject.contains(interfaceObj)) {
                 return true;

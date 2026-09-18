@@ -107,6 +107,226 @@ public class Parser extends ClassVisitor {
      * class whose non-abstract declaration implements it (owner or an
      * ancestor); otherwise null (the call must stay a vtable dispatch).
      */
+    /* Memo for the devirtualization queries.
+     *
+     * These are asked once per call site PER ROUND of the dead code pass, which is
+     * four passes over every method, and each answer walks a class cone. Uncached
+     * that is not a small cost on the thing being measured: the translator is the
+     * benchmark, so a more thorough analysis shows up directly as a slower run. It
+     * measured at 162B instructions against 136B before the memo -- the analysis was
+     * costing more than the better code it produced was saving.
+     *
+     * Cleared at the start of every round, because the answers depend on what has
+     * been eliminated so far and that is exactly what each round changes. */
+    private static final Map<String, java.util.List<ByteCodeClass>> cn1DevirtMemo =
+            new HashMap<String, java.util.List<ByteCodeClass>>();
+    private static final Map<String, java.util.List<ByteCodeClass>> cn1ConeMemo =
+            new HashMap<String, java.util.List<ByteCodeClass>>();
+
+    static void cn1InvalidateDevirtMemo() {
+        cn1DevirtMemo.clear();
+        cn1ConeMemo.clear();
+    }
+
+    /* Interface -> the reachable classes implementing it. Built once, the same way
+     * and for the same reason as the subclass index: the devirtualizer asks this per
+     * call site, and a scan of every class per site is quadratic on a real corpus. */
+    private static java.util.Map<String, java.util.List<ByteCodeClass>> cn1ImplementorIndex;
+    private static int cn1ImplementorIndexSize = -1;
+
+    private static void cn1EnsureImplementorIndex() {
+        if (cn1ImplementorIndex != null && cn1ImplementorIndexSize == classes.size()) {
+            return;
+        }
+        cn1ImplementorIndex = new HashMap<String, java.util.List<ByteCodeClass>>();
+        java.util.List<ByteCodeClass> interfaces = new java.util.ArrayList<ByteCodeClass>();
+        for (ByteCodeClass c : classes) {
+            if (c.isIsInterface()) {
+                interfaces.add(c);
+            }
+        }
+        for (ByteCodeClass c : classes) {
+            if (c.isIsInterface() || c.isEliminated()) {
+                continue;
+            }
+            for (ByteCodeClass i : interfaces) {
+                if (c.doesImplement(i)) {
+                    java.util.List<ByteCodeClass> l = cn1ImplementorIndex.get(i.getClsName());
+                    if (l == null) {
+                        l = new java.util.ArrayList<ByteCodeClass>();
+                        cn1ImplementorIndex.put(i.getClsName(), l);
+                    }
+                    l.add(c);
+                }
+            }
+        }
+        cn1ImplementorIndexSize = classes.size();
+    }
+
+    /**
+     * Every reachable implementation of {@code (name, desc)} reachable through an
+     * INTERFACE call on {@code iface}: the declaring class of the method in each
+     * class that implements the interface, plus the interface's own default
+     * implementation when a class inherits it rather than declaring one.
+     *
+     * Interface dispatch is the most expensive call this VM makes -- a class id, a
+     * map row, an offset, a vtable slot and then an indirect branch -- so a site with
+     * a single reachable implementation is worth far more to resolve than a virtual
+     * one, and INVOKEINTERFACE was not being resolved at all.
+     *
+     * @param iface the interface named by the call site
+     * @param name method name
+     * @param desc method descriptor
+     * @return distinct implementing classes, or null when the interface is unknown
+     */
+    /**
+     * The concrete, non-eliminated classes a receiver of static type {@code owner}
+     * can actually be at run time.
+     *
+     * This, not the number of implementations, is what decides whether a site can be
+     * dispatched by comparing class ids: the guard tests the RECEIVER's id, and
+     * several receiver classes can share one inherited implementation.
+     *
+     * @param owner static receiver type, class or interface
+     * @return concrete assignable classes, or null when the type is unknown
+     */
+    public static synchronized java.util.List<ByteCodeClass> concreteReceiverCone(ByteCodeClass owner) {
+        if (owner == null) {
+            return null;
+        }
+        java.util.List<ByteCodeClass> coneMemo = cn1ConeMemo.get(owner.getClsName());
+        if (coneMemo != null) {
+            return coneMemo;
+        }
+        java.util.List<ByteCodeClass> cone = new java.util.ArrayList<ByteCodeClass>(4);
+        if (owner.isIsInterface()) {
+            cn1EnsureImplementorIndex();
+            java.util.List<ByteCodeClass> impls = cn1ImplementorIndex.get(owner.getClsName());
+            if (impls != null) {
+                for (ByteCodeClass c : impls) {
+                    if (!c.isEliminated() && !c.isIsAbstract()) {
+                        cone.add(c);
+                    }
+                }
+            }
+            cn1ConeMemo.put(owner.getClsName(), cone);
+            return cone;
+        }
+        cn1EnsureSubclassIndex();
+        java.util.ArrayDeque<ByteCodeClass> stack = new java.util.ArrayDeque<ByteCodeClass>();
+        stack.add(owner);
+        while (!stack.isEmpty()) {
+            ByteCodeClass c = stack.pop();
+            if (!c.isEliminated() && !c.isIsAbstract()) {
+                cone.add(c);
+            }
+            java.util.List<ByteCodeClass> kids = cn1SubclassIndex.get(c.getClsName());
+            if (kids != null) {
+                stack.addAll(kids);
+            }
+        }
+        cn1ConeMemo.put(owner.getClsName(), cone);
+        return cone;
+    }
+
+    public static synchronized java.util.List<ByteCodeClass> resolveInterfaceTargets(
+            ByteCodeClass iface, String name, String desc) {
+        if (iface == null || !iface.isIsInterface()) {
+            return null;
+        }
+        String memoKey = "I" + iface.getClsName() + '#' + name + desc;
+        java.util.List<ByteCodeClass> memo = cn1DevirtMemo.get(memoKey);
+        if (memo != null) {
+            return memo;
+        }
+        cn1EnsureImplementorIndex();
+        java.util.List<ByteCodeClass> impls = cn1ImplementorIndex.get(iface.getClsName());
+        java.util.List<ByteCodeClass> targets = new java.util.ArrayList<ByteCodeClass>(4);
+        if (impls != null) {
+            for (ByteCodeClass c : impls) {
+                ByteCodeClass d = c;
+                while (d != null) {
+                    if (d.hasDeclaredNonAbstractMethod(name, desc)) {
+                        if (!targets.contains(d)) {
+                            targets.add(d);
+                        }
+                        break;
+                    }
+                    String b = d.getBaseClass();
+                    d = b == null ? null : getClassObject(b.replace('/', '_').replace('$', '_'));
+                }
+                if (d == null) {
+                    // Inherited from the interface as a default method, or not found at
+                    // all. Either way this receiver does not resolve to a class, so the
+                    // site cannot be reduced to one target.
+                    return null;
+                }
+            }
+        }
+        cn1DevirtMemo.put(memoKey, targets);
+        return targets;
+    }
+
+    /**
+     * Every reachable implementation of {@code (name, desc)} that a virtual call on
+     * {@code owner} could land in -- the class hierarchy cone below the static type,
+     * restricted to classes the dead code pass kept.
+     *
+     * resolveDevirtualizedOwner answers the same question but collapses it to
+     * "exactly one, or give up". That throws away the case a closed world makes
+     * cheap: a site with two or three possible targets does not need a vtable at
+     * all, it needs a compare and a direct call, which the C compiler can then
+     * inline through. Only the count of targets decides which, so the set is what
+     * this returns.
+     *
+     * @param owner static receiver type
+     * @param name method name
+     * @param desc method descriptor
+     * @return the implementing classes, or null when the receiver type is unknown
+     */
+    public static synchronized java.util.List<ByteCodeClass> resolveVirtualTargets(
+            ByteCodeClass owner, String name, String desc) {
+        if (owner == null) {
+            return null;
+        }
+        String memoKey = owner.getClsName() + '#' + name + desc;
+        java.util.List<ByteCodeClass> memo = cn1DevirtMemo.get(memoKey);
+        if (memo != null) {
+            return memo;
+        }
+        cn1EnsureSubclassIndex();
+        java.util.List<ByteCodeClass> targets = new java.util.ArrayList<ByteCodeClass>(4);
+        // The implementation inherited at or above the static type, which is what a
+        // receiver of exactly that type runs.
+        ByteCodeClass c = owner;
+        while (c != null) {
+            if (c.hasDeclaredNonAbstractMethod(name, desc)) {
+                targets.add(c);
+                break;
+            }
+            String b = c.getBaseClass();
+            c = b == null ? null : getClassObject(b.replace('/', '_').replace('$', '_'));
+        }
+        // Plus every override below it.
+        java.util.ArrayDeque<ByteCodeClass> stack = new java.util.ArrayDeque<ByteCodeClass>();
+        java.util.List<ByteCodeClass> kids = cn1SubclassIndex.get(owner.getClsName());
+        if (kids != null) {
+            stack.addAll(kids);
+        }
+        while (!stack.isEmpty()) {
+            ByteCodeClass k = stack.pop();
+            if (!k.isEliminated() && k.hasDeclaredNonAbstractMethod(name, desc) && !targets.contains(k)) {
+                targets.add(k);
+            }
+            kids = cn1SubclassIndex.get(k.getClsName());
+            if (kids != null) {
+                stack.addAll(kids);
+            }
+        }
+        cn1DevirtMemo.put(memoKey, targets);
+        return targets;
+    }
+
     public static synchronized String resolveDevirtualizedOwner(ByteCodeClass owner, String name, String desc) {
         if (owner == null) {
             return null;
@@ -1278,6 +1498,7 @@ public class Parser extends ClassVisitor {
     }
 
     private static int cullMethods() {
+        cn1InvalidateDevirtMemo();
         int nfound = 0;
         for(ByteCodeClass bc : classes) {
             bc.unmark();

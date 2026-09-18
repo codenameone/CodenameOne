@@ -144,13 +144,54 @@ public class Invoke extends Instruction {
         BytecodeMethod.addVirtualMethodsInvoked(str);
     }
     
+    /**
+     * The single class a virtual or interface call at this site must land in, or null
+     * when more than one implementation is reachable and the dispatch has to stay
+     * indirect.
+     *
+     * ONE resolver, asked by both the dependency pass and the emitter. They used to
+     * ask different questions -- the dependency pass via resolveDevirtualizedOwner,
+     * the emitter via its own chain -- and the moment the two disagreed the emitter
+     * devirtualized to a method the dead code pass had already culled, which fails at
+     * the C compiler with an implicitly declared function. Keeping one answer is what
+     * makes the two passes consistent by construction.
+     *
+     * @return mangled class name of the only reachable implementation, or null
+     */
+    String resolveSingleTarget() {
+        ByteCodeClass bc = Parser.getClassObject(Util.mangle(owner));
+        if (bc == null) {
+            return null;
+        }
+        java.util.List<ByteCodeClass> impls = opcode == Opcodes.INVOKEINTERFACE
+                ? Parser.resolveInterfaceTargets(bc, name, desc)
+                : Parser.resolveVirtualTargets(bc, name, desc);
+        if (impls == null) {
+            return null;
+        }
+        if (impls.size() != 1) {
+            return null;
+        }
+        ByteCodeClass target = impls.get(0);
+        // The set is recomputed as elimination proceeds, so a target that was single
+        // when dependencies were collected can be culled before emission. Emitting a
+        // call to it then does not compile. Re-checking here costs a lookup and turns
+        // that into an ordinary virtual dispatch instead.
+        if (target.isEliminated() || !target.hasDeclaredNonAbstractMethod(name, desc)) {
+            return null;
+        }
+        return target.getClsName();
+    }
+
     public void addResolvedDependencies(List<String> dependencyList) {
         String proven = getProvenDirectOwner();
         if (proven != null && !dependencyList.contains(proven)) dependencyList.add(proven);
-        if (opcode != Opcodes.INVOKEVIRTUAL) return;
+        if (opcode != Opcodes.INVOKEVIRTUAL && opcode != Opcodes.INVOKEINTERFACE) return;
         ByteCodeClass bc = Parser.getClassObject(Util.mangle(owner));
-        String resolved = resolveConcreteInvokeOwner(bc, true);
-        if (resolved == null) resolved = Parser.resolveDevirtualizedOwner(bc, name, desc);
+        String resolved = opcode == Opcodes.INVOKEVIRTUAL
+                ? resolveConcreteInvokeOwner(bc, true) : null;
+        // Same resolver the emitter uses, so whatever it will call directly is kept.
+        if (resolved == null) resolved = resolveSingleTarget();
         if (resolved != null) {
             String dependency = unarray(Util.mangle(resolved));
             if (dependency != null && !dependencyList.contains(dependency)) dependencyList.add(dependency);
@@ -339,15 +380,44 @@ public class Invoke extends Instruction {
                             invokeOwner = resolvedConcreteOwner;
                             isVirtual = false;
                         } else {
-                            // CLOSED-WORLD DEVIRT: no reachable override -> direct call
-                            // (and ThinLTO can then inline it).
-                            String devirt = Parser.resolveDevirtualizedOwner(bc, name, desc);
-                            if (devirt != null) {
-                                invokeOwner = devirt;
+                            // CLOSED-WORLD DEVIRT: one reachable implementation -> direct
+                            // call, which ThinLTO can then inline through.
+                            //
+                            // This asks for the SET of implementations rather than
+                            // resolveDevirtualizedOwner's "exactly one or give up", because
+                            // that one bails as soon as any subclass DECLARES the method --
+                            // including an ABSTRACT re-declaration, which can never be the
+                            // target of a call. An abstract class cannot be instantiated, and
+                            // a concrete subclass below it must declare the method itself, in
+                            // which case it shows up here as a second implementation and the
+                            // site correctly stays virtual.
+                            String single = resolveSingleTarget();
+                            if (single != null) {
+                                invokeOwner = single;
                                 isVirtual = false;
                             }
                         }
                     }
+                }
+            }
+            if (isVirtual && opcode == Opcodes.INVOKEINTERFACE) {
+                // CLOSED-WORLD DEVIRT FOR INTERFACES. This was not attempted at all --
+                // the block above is gated on INVOKEVIRTUAL -- and interface dispatch is
+                // the most expensive call this VM makes: a class id load, a
+                // classToInterfaceMap row, an offset, a vtable slot, then an indirect
+                // branch, none of which the C compiler can see through.
+                //
+                // A closed world does not have to guess. If exactly one reachable class
+                // implements the interface's method, that is where the call lands, and
+                // it becomes a direct call that ThinLTO can inline.
+                //
+                // The null receiver is still checked: the direct form emits its own
+                // test (see NativeInvocation), so a null does not silently skip to the
+                // callee the way it would if the check lived only in the thunk.
+                String single = resolveSingleTarget();
+                if (single != null) {
+                    invokeOwner = single;
+                    isVirtual = false;
                 }
             }
             if (isVirtual) {
