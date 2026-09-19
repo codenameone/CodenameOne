@@ -1686,6 +1686,12 @@ class CN1HealthConnectBridge(private val context: Context)
         "resting_heart_rate" to "RESTING_HEART_RATE",
         "walking_heart_rate_average" to "HEART_RATE",
         "heart_rate_variability_sdnn" to "HEART_RATE_VARIABILITY",
+        // Health Connect's only HRV record is HeartRateVariabilityRmssdRecord
+        // (verified against connect-client 1.1.0-alpha07: there is no SDNN
+        // record class at all), so RMSSD is the one that is honestly named
+        // here. The sdnn entry above keeps its mapping for backwards
+        // compatibility with applications already reading it.
+        "heart_rate_variability_rmssd" to "HEART_RATE_VARIABILITY",
         "oxygen_saturation" to "OXYGEN_SATURATION",
         "respiratory_rate" to "RESPIRATORY_RATE",
         "body_temperature" to "BODY_TEMPERATURE",

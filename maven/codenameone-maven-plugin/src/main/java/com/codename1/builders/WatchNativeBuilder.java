@@ -197,8 +197,13 @@ class WatchNativeBuilder {
             // CN1_USE_INTENTS define is explicitly undone for TARGET_OS_WATCH, so the intent
             // natives compile to their unsupported stubs there and nothing calls into it.
             + "CoreSpotlight.framework;"
-            // ARKit and SceneKit are absent on watchOS; they are linked on the iOS slice when the
-            // app references com.codename1.ar, so weak-link them for the watch slice.
+            // Linked on the iOS slice when the app references com.codename1.ar.
+            // ARKit really is absent from watchOS. SceneKit is NOT -- it is in
+            // both watch SDKs and always has been (checked against WatchOS26.2,
+            // WatchSimulator26.2, WatchOS27.0 and WatchSimulator27.0). It stays
+            // here anyway, as the "present but unreferenced" case the header
+            // describes: CN1AR.m is compiled out for the watch, so nothing on
+            // the watch slice calls into it.
             + "ARKit.framework;SceneKit.framework;"
             // The three com.codename1.nearby frameworks, linked on the iOS slice when the app
             // references the matching package.
@@ -224,21 +229,29 @@ class WatchNativeBuilder {
             // watch slice calls into it.
             + "ContactsUI.framework;"
             + "AdSupport.framework;CoreImage.framework;CoreNFC.framework;"
+            // Vision arrived ON the watch in watchOS 27 -- absent from
+            // WatchOS26.2, present in WatchOS27.0 and WatchSimulator27.0. It
+            // moves from "absent, must be weak-linked" to "present but
+            // unreferenced", which is the same side of this list either way, so
+            // nothing changes here. Making com.codename1.ai.vision actually
+            // reach the watch is a feature, not a classification: CN1Vision.m
+            // would have to compile for TARGET_OS_WATCH first.
             + "CoreTelephony.framework;JavaScriptCore.framework;Vision.framework;"
             // Named by PlatformFeatureCatalog rather than written in IPhoneBuilder, so they are
             // built as `name + ".framework"` and no quoted literal exists to grep for. That blind
             // spot is why they survived the audit that caught the six above; the partition test
             // now reads the catalog too.
             + "VisionKit.framework;Speech.framework;"
-            // The ONLY framework whose availability differs between the two watch SDKs: present
-            // for the device, absent for the simulator. A single declared list cannot be right
-            // both ways, so the question is which side the watch actually needs -- and it needs
-            // neither. Every BGTaskScheduler use in the port is #if !TARGET_OS_WATCH, with no-op
-            // natives on the watch side, so the framework is dead weight on device and a broken
-            // link on the simulator. Dropping it is correct for both.
+            // On watchOS 26 this was the ONLY framework whose availability differed between the
+            // two watch SDKs: present for the device, absent for the simulator. That asymmetry is
+            // GONE in watchOS 27 -- it is in WatchOS27.0.sdk and WatchSimulator27.0.sdk alike.
+            //
+            // The entry stays, because the reasoning never rested on the asymmetry: every
+            // BGTaskScheduler use in the port is #if !TARGET_OS_WATCH, with no-op natives on the
+            // watch side, so the watch slice references nothing here on either SDK.
             //
             // This is the "device-only framework" the SDK probe was once written to protect. It
-            // never needed protecting.
+            // never needed protecting, and as of watchOS 27 it is not device-only either.
             + "BackgroundTasks.framework;"
             // MatterSupport IS in the watchOS SDK -- verified with the ls above -- but the watch
             // slice compiles the add-device flow out (CN1SmartHome.h #undefs

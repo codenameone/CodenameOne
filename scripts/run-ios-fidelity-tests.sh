@@ -18,6 +18,15 @@ fi
 APP_BUNDLE="$1"
 SIM_UDID="${2:-}"
 
+# Toolchain selection lives in one place; see scripts/lib/xcode.sh. Every simctl
+# call below used to run through a bare `xcrun`, i.e. whatever `xcode-select`
+# pointed at, while the app under test was built by a PINNED Xcode -- so on a
+# machine with two installed the suite could score a build from one toolchain on
+# a simulator driven by another.
+# shellcheck source=lib/xcode.sh
+source "$(dirname "${BASH_SOURCE[0]}")/lib/xcode.sh"
+cn1_select_xcode rf_log || exit 1
+
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 cd "$REPO_ROOT"
@@ -60,14 +69,21 @@ fi
 [ -x "$TARGET_JAVA_BIN" ] || { rf_log "java not found"; exit 3; }
 cn1ss_setup "$TARGET_JAVA_BIN" "$CN1SS_HELPER_SOURCE_DIR"
 
-# Pick a booted simulator if none was given.
+# Pick a simulator if none was given. NOT "whatever is booted": the golden set
+# names the OS design generation this run is scored against, and a booted
+# simulator of another generation produces phantom regressions out of nothing
+# but a different SF font revision. The old fallback also grepped for the device
+# NAME "iPhone 16", which does not match the devices this repo actually captures
+# on (they are named iPhone16-iOS26 / iPhone16-fidelity).
 if [ -z "$SIM_UDID" ]; then
-  SIM_UDID="$(xcrun simctl list devices booted 2>/dev/null | grep -Eo '[0-9A-F-]{36}' | head -n1 || true)"
+  # shellcheck source=lib/ios-sim.sh
+  source "$SCRIPT_DIR/lib/ios-sim.sh"
+  SIM_UDID="$(cn1_resolve_ios_sim_udid "$GOLDEN_SET" rf_log)" || exit 1
+  rf_log "Resolved simulator for $GOLDEN_SET: $SIM_UDID"
 fi
-if [ -z "$SIM_UDID" ]; then
-  rf_log "No booted simulator and none specified; booting iPhone 16"
-  SIM_UDID="$(xcrun simctl list devices available | grep -E 'iPhone 16 \(' | grep -Eo '[0-9A-F-]{36}' | head -n1)"
-  xcrun simctl boot "$SIM_UDID"
+if ! xcrun simctl list devices booted 2>/dev/null | grep -q "$SIM_UDID"; then
+  rf_log "Booting $SIM_UDID"
+  xcrun simctl boot "$SIM_UDID" 2>/dev/null || true
   xcrun simctl bootstatus "$SIM_UDID" -b
 fi
 rf_log "Using simulator $SIM_UDID"

@@ -8,9 +8,16 @@
 # CN1 side and diffs it against these committed goldens.
 #
 # Usage: build-ios-native-ref.sh [simulator_udid]
+#
+# With no UDID, the simulator is derived from CN1SS_FIDELITY_GOLDEN_SET: the
+# golden set names the OS design generation, and the capture has to run on a
+# runtime of that generation or it scores a different OS's widgets. Override the
+# device model with NATIVEREF_DEVICE_TYPE (default: the iPhone 16 device type,
+# the model ios-26-metal was captured on -- keep it the same across generations
+# or the comparison also picks up a screen-size change).
 set -euo pipefail
 
-UDID="${1:-17853196-A8A7-45F2-8F06-24E8257945E6}"
+UDID="${1:-}"
 BUNDLE_ID="com.codenameone.fidelity.nativeref"
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 SRC="$ROOT/scripts/fidelity-app/ios-native-ref/NativeRef.swift"
@@ -23,10 +30,33 @@ GOLDEN_SET="${CN1SS_FIDELITY_GOLDEN_SET:-ios-26-metal}"
 GOLDENS="$ROOT/scripts/fidelity-app/goldens/$GOLDEN_SET"
 mkdir -p "$GOLDENS"
 BUILD="$(mktemp -d)/NativeRef.app"
-XCODE_APP="${XCODE_APP:-/Applications/Xcode.app}"
-DEV="$XCODE_APP/Contents/Developer"
 
 log() { echo "[native-ref] $*"; }
+
+# Toolchain selection lives in one place; see scripts/lib/xcode.sh for the
+# resolution order and for CN1_XCODE_MAJOR, the single knob that moves the
+# whole tree to the next Xcode.
+#
+# This script used to set XCODE_APP/DEV and then never use them: every call was
+# a bare `xcrun`, so the capture ran under whatever `xcode-select` happened to
+# point at while every PINNED build used a different Xcode. On a machine with
+# both installed that is not hypothetical -- it is the "golden reseeded from a
+# different toolchain" hazard scripts/lib/xcode.sh warns about, silently
+# producing references no build in the tree was compiled against.
+# shellcheck source=lib/xcode.sh
+source "$(dirname "${BASH_SOURCE[0]}")/lib/xcode.sh"
+cn1_select_xcode log || exit 1
+log "Using Xcode $CN1_XCODE_VERSION ($DEVELOPER_DIR)"
+
+# The simulator a golden set must be captured on is derived from the set name;
+# see scripts/lib/ios-sim.sh for why a hardcoded UDID could not express it.
+# shellcheck source=lib/ios-sim.sh
+source "$(dirname "${BASH_SOURCE[0]}")/lib/ios-sim.sh"
+
+if [ -z "$UDID" ]; then
+    UDID="$(cn1_resolve_ios_sim_udid "$GOLDEN_SET" log)" || exit 1
+    log "Resolved simulator for $GOLDEN_SET: $UDID"
+fi
 
 SDK="$(xcrun --sdk iphonesimulator --show-sdk-path)"
 log "Compiling NativeRef.swift (sdk=$SDK)"
