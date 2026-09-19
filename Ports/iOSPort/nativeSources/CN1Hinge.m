@@ -59,24 +59,84 @@ extern void cn1RunSyncOnMainQueue(void (^block)(void));
 // ---------------------------------------------------------------------
 // Cached fold state.
 //
-// Everything here is written on the MAIN thread -- from the interaction's
-// update handler, which UIKit declares NS_SWIFT_UI_ACTOR, and from the one-shot
-// seeding in cn1HingeStart. Readers are the EDT.
+// Written on the MAIN thread -- from the interaction's update handler, which
+// UIKit declares NS_SWIFT_UI_ACTOR, and from the seeding in cn1HingeStart. Read
+// from the EDT.
 //
-// There is no lock, and that is deliberate rather than an oversight: Codename
-// One is single threaded on the EDT and the framework adds no locks, so the
-// marshalling belongs at the native boundary. These are separately-written ints,
-// so the worst a reader can observe is one update's status next to the previous
-// update's angle -- a frame of skew in a value that is already a live physical
-// measurement, not a torn value. Bundling them behind a lock would buy a
-// consistency the hardware does not offer anyway.
+// An earlier version of this block left them as plain C scalars, on the
+// reasoning that a frame of skew in a live physical measurement is harmless.
+// That reasoning was wrong twice over:
+//
+//   - It is not about torn words, it is about VISIBILITY. Nothing in
+//     cn1HingeIsFoldableDisplay's wait loop writes cn1HingeDisplayIsFoldable,
+//     so a compiler is entitled to hoist the load out of the loop entirely and
+//     spin the full 300ms on a stale false -- on exactly the foldable device
+//     the loop exists to detect.
+//
+//   - The region is FIVE values that only mean anything together. A reader
+//     can otherwise pick up the new kind beside the old rectangle.
+//
+// So: atomics for the scalars, and a seqlock for the region. This is not the
+// "add a lock to core" that Codename One rules out -- there is no lock here,
+// nothing blocks, and none of it is core. It is the marshalling that belongs
+// at a native boundary where UIKit genuinely owns one side.
 // ---------------------------------------------------------------------
 
-static int cn1HingeStatusValue = -1;        // -1 = no hinge observed yet
-static int cn1HingeAngleValue = -1;         // whole degrees, -1 = unknown
+#include <stdatomic.h>
+
+static _Atomic int cn1HingeStatusValue = -1;   // -1 = no hinge observed yet
+static _Atomic int cn1HingeAngleValue = -1;    // whole degrees, -1 = unknown
+static _Atomic bool cn1HingeDisplayIsFoldable = false;
+
+/// Seqlock over the region below: even is stable, odd means a write is in
+/// flight. Single writer (the main thread), many readers, no blocking -- a
+/// reader that catches a write simply reads again. The fields are ordinary
+/// ints because the sequence, not the field, carries the ordering.
+static _Atomic unsigned cn1HingeRegionSeq = 0;
 static int cn1HingeRegionKind = 0;          // 0 none, 2 division (see below)
 static int cn1HingeRegionPx[4] = {0, 0, 0, 0};
-static bool cn1HingeDisplayIsFoldable = false;
+
+/// Publish a region. Main thread only, which is what makes one writer enough.
+///
+/// Guarded because only the hinge implementation ever publishes: on an SDK
+/// without the hinge API the region stays at its zero initialiser forever, and
+/// an unguarded definition would be an unused static.
+#ifdef CN1_HAS_HINGE_SDK
+static void cn1HingePublishRegion(int kind, int x, int y, int w, int h) {
+    unsigned seq = atomic_load_explicit(&cn1HingeRegionSeq, memory_order_relaxed);
+    atomic_store_explicit(&cn1HingeRegionSeq, seq + 1, memory_order_relaxed);
+    atomic_thread_fence(memory_order_release);
+    cn1HingeRegionKind = kind;
+    cn1HingeRegionPx[0] = x;
+    cn1HingeRegionPx[1] = y;
+    cn1HingeRegionPx[2] = w;
+    cn1HingeRegionPx[3] = h;
+    atomic_thread_fence(memory_order_release);
+    atomic_store_explicit(&cn1HingeRegionSeq, seq + 2, memory_order_relaxed);
+}
+#endif /* CN1_HAS_HINGE_SDK */
+
+/// Read a consistent snapshot. Returns the kind; fills `out` when non-zero.
+static int cn1HingeReadRegion(int *out) {
+    for (;;) {
+        unsigned before = atomic_load_explicit(&cn1HingeRegionSeq, memory_order_relaxed);
+        if (before & 1u) {
+            continue;   // a write is in flight
+        }
+        atomic_thread_fence(memory_order_acquire);
+        int kind = cn1HingeRegionKind;
+        int x = cn1HingeRegionPx[0], y = cn1HingeRegionPx[1];
+        int w = cn1HingeRegionPx[2], h = cn1HingeRegionPx[3];
+        atomic_thread_fence(memory_order_acquire);
+        if (atomic_load_explicit(&cn1HingeRegionSeq, memory_order_relaxed) != before) {
+            continue;   // it changed under us
+        }
+        if (kind != 0 && out != NULL) {
+            out[0] = x; out[1] = y; out[2] = w; out[3] = h;
+        }
+        return kind;
+    }
+}
 
 #ifdef CN1_HAS_HINGE_SDK
 
@@ -134,8 +194,8 @@ static CGFloat cn1HingeScale(UIView *view) {
 /// which would be a rule about camera cutouts rather than about folds.
 static void cn1HingeRefreshRegionOnMain(void) API_AVAILABLE(ios(27.1)) {
     UIView *view = cn1HingeRootView();
-    cn1HingeRegionKind = 0;
     if (view == nil) {
+        cn1HingePublishRegion(0, 0, 0, 0, 0);
         return;
     }
     CGFloat scale = cn1HingeScale(view);
@@ -147,20 +207,21 @@ static void cn1HingeRefreshRegionOnMain(void) API_AVAILABLE(ios(27.1)) {
         [view reservedRegionsOfKind:division
                             options:UIViewReservedRegionQueryOptionsIncludeInactive];
     if (all.count > 0) {
-        cn1HingeDisplayIsFoldable = true;
+        atomic_store(&cn1HingeDisplayIsFoldable, true);
     }
     for (UIViewReservedRegion *region in all) {
         if (!region.isActive) {
             continue;
         }
         CGRect f = region.frame;
-        cn1HingeRegionPx[0] = (int)lround(f.origin.x * scale);
-        cn1HingeRegionPx[1] = (int)lround(f.origin.y * scale);
-        cn1HingeRegionPx[2] = (int)lround(f.size.width * scale);
-        cn1HingeRegionPx[3] = (int)lround(f.size.height * scale);
-        cn1HingeRegionKind = 2;
-        break;
+        cn1HingePublishRegion(2,
+                              (int)lround(f.origin.x * scale),
+                              (int)lround(f.origin.y * scale),
+                              (int)lround(f.size.width * scale),
+                              (int)lround(f.size.height * scale));
+        return;
     }
+    cn1HingePublishRegion(0, 0, 0, 0, 0);
 }
 
 #endif /* CN1_HAS_HINGE_SDK */
@@ -198,17 +259,17 @@ void cn1HingeStart(void) {
                         // updates. That is not "the device stopped folding", so
                         // the display's foldability is left alone and only the
                         // live reading is dropped.
-                        cn1HingeStatusValue = -1;
-                        cn1HingeAngleValue = -1;
+                        atomic_store(&cn1HingeStatusValue, -1);
+                        atomic_store(&cn1HingeAngleValue, -1);
                     } else {
-                        cn1HingeStatusValue = (int)hinge.status;
+                        atomic_store(&cn1HingeStatusValue, (int)hinge.status);
                         // UIHinge reports RADIANS; DevicePosture documents whole
                         // degrees from 0 (closed) to 180 (flat). Converting here
                         // keeps one unit on each side of the boundary instead of
                         // two in play.
-                        cn1HingeAngleValue =
-                            (int)lround(hinge.angle * 180.0 / M_PI);
-                        cn1HingeDisplayIsFoldable = true;
+                        atomic_store(&cn1HingeAngleValue,
+                            (int)lround(hinge.angle * 180.0 / M_PI));
+                        atomic_store(&cn1HingeDisplayIsFoldable, true);
                     }
                     cn1HingeRefreshRegionOnMain();
                     com_codename1_impl_ios_IOSFoldablePosture_postureChangedFromNative__(
@@ -230,7 +291,7 @@ void cn1HingeStart(void) {
 bool cn1HingeIsFoldableDisplay(void) {
 #ifdef CN1_HAS_HINGE_SDK
     cn1HingeStart();
-    if (cn1HingeDisplayIsFoldable) {
+    if (atomic_load(&cn1HingeDisplayIsFoldable)) {
         return true;
     }
     if (cn1HingeProbed) {
@@ -264,7 +325,7 @@ bool cn1HingeIsFoldableDisplay(void) {
             cn1HingeRefreshRegionOnMain();
         }
     });
-    if (cn1HingeDisplayIsFoldable) {
+    if (atomic_load(&cn1HingeDisplayIsFoldable)) {
         cn1HingeProbed = true;
         return true;
     }
@@ -288,33 +349,53 @@ bool cn1HingeIsFoldableDisplay(void) {
     // delivery (the handler fires within the first runloop turns after
     // addInteraction:) and short enough that a non-foldable device pays it once
     // and never again.
-    for (int waited = 0; waited < 300 && !cn1HingeDisplayIsFoldable; waited += 10) {
+    for (int waited = 0; waited < 300 && !atomic_load(&cn1HingeDisplayIsFoldable); waited += 10) {
         [NSThread sleepForTimeInterval:0.01];
     }
     cn1HingeProbed = true;
-    return cn1HingeDisplayIsFoldable;
+    return atomic_load(&cn1HingeDisplayIsFoldable);
 #else
-    return false;
+    // Reads the flag rather than a literal false so the declaration is used on
+    // every SDK. It can only ever be false here -- nothing publishes without
+    // the hinge API -- but "the answer is the state" beats a second spelling of
+    // it that a later edit could let drift.
+    return atomic_load(&cn1HingeDisplayIsFoldable);
 #endif
 }
 
 int cn1HingeStatus(void) {
-    return cn1HingeStatusValue;
+    return atomic_load(&cn1HingeStatusValue);
 }
 
 int cn1HingeAngleDegrees(void) {
-    return cn1HingeAngleValue;
+    return atomic_load(&cn1HingeAngleValue);
 }
 
 int cn1HingeFoldRegion(int *out) {
-    if (cn1HingeRegionKind == 0 || out == NULL) {
-        return 0;
+#ifdef CN1_HAS_HINGE_SDK
+    // Refresh before answering, not just when the hinge moves.
+    //
+    // DevicePosture#getFoldBounds promises live display coordinates, and the
+    // fold's rectangle can change with no hinge event at all: an interface
+    // rotation or a scene resize moves it in the root view's coordinate space
+    // while the hinge angle and status stay exactly where they were. Answering
+    // from a cache that is only refreshed on startup, on the foldability probe
+    // and on hinge callbacks would hand back the previous layout's rectangle --
+    // and getFoldOrientation() derives from the same numbers, so it would agree
+    // with itself and still be wrong.
+    //
+    // Only a device that actually folds pays for this. Everything else has no
+    // division region, never sets cn1HingeDisplayIsFoldable, and returns below
+    // without touching UIKit.
+    if (atomic_load(&cn1HingeDisplayIsFoldable)) {
+        cn1RunSyncOnMainQueue(^{
+            if (@available(iOS 27.1, *)) {
+                cn1HingeRefreshRegionOnMain();
+            }
+        });
     }
-    out[0] = cn1HingeRegionPx[0];
-    out[1] = cn1HingeRegionPx[1];
-    out[2] = cn1HingeRegionPx[2];
-    out[3] = cn1HingeRegionPx[3];
-    return cn1HingeRegionKind;
+#endif
+    return cn1HingeReadRegion(out);
 }
 
 // ---------------------------------------------------------------------
