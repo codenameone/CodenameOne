@@ -84,6 +84,17 @@ cat > "$BUILD/Info.plist" <<PLIST
   <key>MinimumOSVersion</key><string>15.0</string>
   <key>UIDeviceFamily</key><array><integer>1</integer></array>
   <key>UILaunchScreen</key><dict/>
+  <!-- iOS 27 REFUSES to launch an app built with its SDK that has not adopted
+       the scene life cycle: "Application failed to launch: UIScene life cycle
+       is required for apps built with this SDK" (UIApplication_RuntimeIssues.m).
+       Measured: the same binary produced 68 goldens on the iOS 26.3 runtime and
+       ZERO on 27.0, with a completely silent capture -- the app process starts,
+       UIKit comes up, and didFinishLaunchingWithOptions never runs.
+       NativeRef.swift declares the matching UIWindowSceneDelegate. -->
+  <key>UIApplicationSceneManifest</key>
+  <dict>
+    <key>UIApplicationSupportsMultipleScenes</key><false/>
+  </dict>
   <key>DTPlatformName</key><string>iphonesimulator</string>
 </dict>
 </plist>
