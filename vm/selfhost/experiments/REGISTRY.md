@@ -3866,3 +3866,70 @@ meaningless results, and separately a gauntlet ran against a stale translator an
 reported a failure that a direct run of the same test did not reproduce. Run the
 gates ONCE, serially, and confirm no gate process is alive before starting
 another -- `mvn clean` in one run removes target/ under the other.
+
+## Round 41: the tagged resolve, and ten things the disassembly says
+
+CN1_CLASS_OF masks, tests the tag, indexes a proxy table and selects -- five
+instructions before it loads anything -- and only ever finds something for a
+boxed Integer/Long/Double/Float/Character/Short. A thunk named virtual_X_m only
+receives an X or below, so where no taggable class is assignable to X the test is
+dead. 7,387 thunks untagged, 133 left, and the 133 are exactly java_lang_Object
+and the boxed types.
+
+1.145x against JDK 25 at a 1.4% spread -- the tightest measurement taken here.
+The sequence is 1.158 (r30), 1.171 (r35), 1.154 (r40), 1.145 now.
+
+### BytecodeMethod.equals, ours against C2, measured
+
+| | ours | C2 |
+|---|---:|---:|
+| instructions | 379 | 466 |
+| loads | 85 | 70 |
+| calls (bl/blr) | **10** | 31 |
+| stack spills | **4** | 28 |
+| adrp/movk constants | **8** | 91 |
+| csel/ccmp predication | **9** | 0 |
+| explicit null checks | 26 | **13** |
+| nops (safepoint patching) | 0 | 34 |
+
+### Five things C2 does that we do not
+
+1. **Implicit null checks.** 12 sites annotated "implicit exception": it
+   dereferences and lets a SIGSEGV handler synthesise the NPE. We emit 26
+   explicit cbz/cbnz. This is the single clearest remaining item -- a compare and
+   a branch removed per null check, and the mechanism (a signal handler that maps
+   a faulting address to a throw) is one this VM already has the shape for.
+2. **Uncommon traps.** 26 UncommonTrapBlob calls. C2 compiles the common path
+   only and deoptimises to the interpreter for the rest, so cold code costs
+   nothing in the hot body. We must emit every path, always.
+3. **Optimized virtual calls.** 4 sites: a monomorphic call site becomes a direct
+   call plus a class guard, patched from the observed receiver. Our closed-world
+   devirtualization is the static analogue and covers the provable cases; this
+   covers the ones that are merely true in practice.
+4. **Profile-guided block layout.** C2 places the measured-hot path as
+   fall-through. We have no profile and are not taking one, but static heuristics
+   are available and unused: an exception path is cold, a null check is
+   overwhelmingly not-taken.
+5. **Safepoint polls as patchable nops**, 34 of them -- polling that costs
+   nothing until armed.
+
+### Four things we already do BETTER, worth not "fixing"
+
+6. **We inline more** -- 10 calls against 31.
+7. **We spill far less** -- 4 stack stores against 28. That is frameless codegen
+   earning its keep, and it is the clearest win in the table.
+8. **We address constants better** -- 8 adrp/movk against 91. A link-time
+   constant beats a 64-bit address materialised at runtime.
+9. **We predicate more** -- 9 csel/ccmp against 0.
+
+### One neither of us does
+
+10. **String.hashCode is not vectorized in our build** (0 SIMD instructions in
+    104). Recent HotSpot has a hand-written vectorizedHashCode intrinsic; whether
+    it fires here is unverified and worth checking before assuming a gap. The
+    same question applies to String.equals and compareTo, where HotSpot ships
+    SIMD intrinsics and we ship byte loops.
+
+The shape of the answer: we are not losing on code quality in the ordinary sense
+-- we inline more, spill less and address constants better. We lose on LOADS and
+on work that C2 simply does not emit because it may deoptimise.
