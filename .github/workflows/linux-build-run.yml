@@ -42,6 +42,17 @@ on:
       - 'maven/linux/**'
       - 'scripts/linux/**'
       - 'scripts/hellocodenameone/**'
+      # The screenshots these legs compare are produced by the core renderer and
+      # the port's native theme, so a change to either can move them. Without
+      # these the leg does not run on the pull request that changes them and the
+      # baselines only go stale on master - which is how the Sheet and
+      # AppReviewDialog captures were left recording a double paint (issue
+      # #5606). scripts/linux holds the baselines themselves, so a reseed is
+      # verified by the leg that produced it.
+      - 'CodenameOne/src/**'
+      - '!CodenameOne/src/**/*.md'
+      - 'native-themes/gnome-adwaita/**'
+      - '!native-themes/gnome-adwaita/**/*.md'
       - '!vm/**/README.md'
       - '!vm/**/readme.md'
       - '!vm/**/docs/**'
@@ -54,6 +65,19 @@ on:
       - 'vm/**'
       - 'Ports/LinuxPort/**'
       - 'maven/linux/**'
+      - 'scripts/linux/**'
+      - 'scripts/hellocodenameone/**'
+      # The screenshots these legs compare are produced by the core renderer and
+      # the port's native theme, so a change to either can move them. Without
+      # these the leg does not run on the pull request that changes them and the
+      # baselines only go stale on master - which is how the Sheet and
+      # AppReviewDialog captures were left recording a double paint (issue
+      # #5606). scripts/linux holds the baselines themselves, so a reseed is
+      # verified by the leg that produced it.
+      - 'CodenameOne/src/**'
+      - '!CodenameOne/src/**/*.md'
+      - 'native-themes/gnome-adwaita/**'
+      - '!native-themes/gnome-adwaita/**/*.md'
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
