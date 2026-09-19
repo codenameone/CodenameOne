@@ -42,6 +42,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assumptions.assumeFalse;
 
 /**
  * The Skins menu is built by resolving every entry of the {@code skins} preference
@@ -207,6 +208,71 @@ public class SkinPathTest {
         File resolved = SkinPath.toFile("file:" + skin.getAbsolutePath());
         assertNotNull(resolved, "an unencoded file: entry must still resolve");
         assertTrue(resolved.exists());
+    }
+
+    /**
+     * A URI scheme is case-insensitive, and {@code new URL("FILE://...")} resolves as a
+     * local file -- entries arriving from {@code -Dskin}, {@code CN1_SIMULATOR_SKIN} or a
+     * hand-edited preference are not necessarily the lowercase form {@code File.toURI()}
+     * emits. A case-sensitive prefix test classifies those as remote and the menu drops
+     * them.
+     */
+    @Test
+    public void fileUrisResolveWhateverTheSchemesCase(@TempDir Path tmp) throws Exception {
+        File skin = write(new File(tmp.toFile(), "Pixel 9.skin"));
+        String lower = SkinPath.toEntry(skin);
+        assertTrue(lower.startsWith("file:"), lower);
+        String rest = lower.substring("file:".length());
+        for (String scheme : new String[] {"FILE:", "File:", "fILe:"}) {
+            String entry = scheme + rest;
+            File resolved = SkinPath.toFile(entry);
+            assertNotNull(resolved, "dropped as remote: " + entry);
+            assertTrue(resolved.exists(), "dropped as remote: " + entry);
+            assertEquals(skin.getAbsoluteFile(), resolved.getAbsoluteFile(), entry);
+            assertEquals("Pixel 9.skin", SkinPath.displayName(entry), entry);
+        }
+        File plain = write(new File(tmp.toFile(), "Plain.skin"));
+        String absolute = SkinPath.toEntry(plain).substring("file:".length());
+        // Empty authority (the three-slash form new File(URI) accepts) ...
+        String emptyAuthority = "FILE://" + absolute;
+        assertNotNull(SkinPath.toFile(emptyAuthority), emptyAuthority);
+        assertTrue(SkinPath.toFile(emptyAuthority).exists(), emptyAuthority);
+        // ... and a named one, which new File(URI) refuses outright ("URI has an
+        // authority component") and only the legacy reading can resolve.
+        String namedAuthority = "FILE://localhost" + absolute;
+        assertNotNull(SkinPath.toFile(namedAuthority), namedAuthority);
+        assertTrue(SkinPath.toFile(namedAuthority).exists(), namedAuthority);
+    }
+
+    /**
+     * A colon is a legal character in a relative filename everywhere but Windows, so an
+     * entry can look like a scheme and still be a file on disk. {@code loadSkinFile}
+     * accepted those before this class existed, via a plain {@code new File(f).exists()}.
+     */
+    @Test
+    public void aColonInARelativeNameIsNotAScheme() throws Exception {
+        // ':' is illegal in a Windows filename, so the shape cannot occur there.
+        assumeFalse(System.getProperty("os.name", "").toLowerCase().contains("win"),
+                "a colon cannot appear in a Windows filename");
+        // The colon has to precede any separator for the entry to look like a scheme
+        // at all, so the file has to sit directly in the working directory a relative
+        // -Dskin would resolve against. Named for this test and deleted below.
+        File skin = new File("skinpathtest:probe.skin").getAbsoluteFile();
+        skin.deleteOnExit();
+        try {
+            write(skin);
+            assertTrue(skin.exists(), "could not create the fixture: " + skin);
+            File resolved = SkinPath.toFile("skinpathtest:probe.skin");
+            assertNotNull(resolved, "an existing file was rejected as remote");
+            assertTrue(resolved.exists(), "an existing file was rejected as remote");
+            assertEquals(skin, resolved.getAbsoluteFile());
+        } finally {
+            assertTrue(!skin.exists() || skin.delete(), "left a fixture behind: " + skin);
+        }
+        // And the guard cannot reclassify a genuinely remote entry, because none of
+        // them exist on disk.
+        assertNull(SkinPath.toFile("http://www.codenameone.com/OTA/Nexus5.skin"));
+        assertNull(SkinPath.toFile("skinpathtest:missing.skin"));
     }
 
     @Test

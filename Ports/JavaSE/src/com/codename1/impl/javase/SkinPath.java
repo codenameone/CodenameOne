@@ -73,7 +73,7 @@ final class SkinPath {
         if (entry == null || entry.length() == 0) {
             return null;
         }
-        if (entry.startsWith("file:")) {
+        if (isFileUri(entry)) {
             try {
                 return new File(new URI(entry));
             } catch (Exception uriFailed) {
@@ -89,9 +89,30 @@ final class SkinPath {
             }
         }
         if (hasRemoteScheme(entry)) {
+            // It parses as a scheme, but a colon is a legal character in a relative
+            // filename on every platform except Windows, so `theme:blue.skin` is a
+            // scheme to the eye and a file on disk. Ask the disk before rejecting it;
+            // a real remote entry never answers yes (`new File("http://host/x")` does
+            // not exist), so this cannot reclassify one.
+            File onDisk = new File(entry);
+            if (onDisk.exists()) {
+                return onDisk;
+            }
             return null;
         }
         return new File(entry);
+    }
+
+    /// Whether the entry is a `file:` URI. Matched **case-insensitively**: a URI scheme
+    /// is case-insensitive by RFC 3986, `new URL("FILE://...")` resolves as a local file,
+    /// and entries reaching us from `-Dskin`, `CN1_SIMULATOR_SKIN` or a hand-edited
+    /// preference are not necessarily the lowercase form `File.toURI()` emits.
+    ///
+    /// `regionMatches` rather than `toLowerCase().startsWith(..)`: case folding is locale
+    /// sensitive, and a device set to Turkish folds `I` to a dotless i, so the comparison
+    /// against an ASCII constant would fail for those users.
+    private static boolean isFileUri(String entry) {
+        return entry.regionMatches(true, 0, "file:", 0, 5);
     }
 
     /// Whether the entry carries a URI scheme other than `file:` -- `http:`, `https:`,
@@ -125,7 +146,7 @@ final class SkinPath {
             return entry;
         }
         File f = toFile(entry);
-        if (f != null && (entry.startsWith("file:") || f.exists())) {
+        if (f != null && (isFileUri(entry) || f.exists())) {
             return f.getName();
         }
         if (entry.startsWith("/")) {
