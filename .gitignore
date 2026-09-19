@@ -185,3 +185,7 @@ cn1-build-hints.json
 /docs/website/content/developer-guide/chapters/
 /docs/website/data/developer-guide.json
 /docs/website/data/guide-links.json
+
+# Concatenated CSS the native-theme build feeds the compiler. Regenerated on
+# every run; the parts under native-themes/<theme>/*.css are the source.
+native-themes/*/target/
