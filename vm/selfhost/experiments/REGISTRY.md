@@ -3579,3 +3579,37 @@ acquisition never calls into libsystem_pthread, and closed-world escape
 information so a monitor on a provably unshared object is elided outright.
 
 Not started; recorded so the number is not re-derived.
+
+## Round 35: frameless constructors -- correct, and below this benchmark's resolution
+
+The largest exclusion the frameless census found was constructors: 3,850 of
+23,445 methods, against 357 for try/catch that the old plan D6 had nominated as
+the biggest codegen item left. The exclusion was a deferral, not a proof, and it
+turns out to need no more care than an instance method: the receiver is a C
+parameter either way, allocation zeroes the object before the constructor runs,
+so a partially built receiver traces as itself plus null fields.
+
+Coverage 18,062 -> 21,247 methods (77% -> 90.6%), ctorOrClinit exclusions to zero.
+
+| | round 30 | round 35 |
+|---|---:|---:|
+| parpar elapsed (median of 7) | 5.475s | 5.365s |
+| jdk25 elapsed (median of 7) | 4.730s | 4.581s |
+| ratio | 1.158x | 1.171x |
+
+**No measurable change.** Both arms moved -- parpar 2.0% faster in absolute terms,
+jdk25 3.2% faster -- and the 1.1% ratio difference is inside the combined spread.
+That is the expected size, not a disappointment to explain away: frame setup and
+teardown is a few pointer bumps, and roughly 4M constructor calls at ~10
+instructions each is ~0.3% of 14B. Kept because it is correct and because
+frameless is the precondition for bounds-check elimination and StringBuilder
+stack allocation in those 3,185 methods, which is where the value actually is.
+
+Peak was not gateable this run (14.0% spread), so no memory claim is made.
+
+One process note, from a correction taken mid-round: this was first built behind
+`cn1.frameless.constructors`, defaulting off. That is the wrong shape for a
+feature -- a flag defaulting off is a change nobody runs and a path CI never
+exercises. Gating is for debug code. The flag was removed and the behaviour is
+unconditional; __CLINIT__ stays excluded on a semantic criterion (entered through
+the class-init guard, can re-enter arbitrary other clinits), not on caution.
