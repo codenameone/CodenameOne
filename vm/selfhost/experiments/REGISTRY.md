@@ -3294,3 +3294,80 @@ The trajectory across this branch, all against JDK 25 on this corpus:
 
 The 1.147x and 1.158x are the same number to this harness's resolution; do not read
 a regression into it.
+
+## Round 31: both paradoxes have the same answer, and it is the write barrier
+
+Two things that "make no sense" were put to this branch: HotSpot holds the JIT, its
+profile data and a far larger class library yet fits in the same bytes, and we
+retire fewer instructions and burn fewer cycles yet take longer. Both were
+measured this round, and they turn out to be the same mechanism seen twice.
+
+### The mutator, not the collector, is the critical path
+
+`sample` attributes per thread. Read across all threads the collector looks
+dominant -- gcMarkObject 947, cn1ConservativeResolve 590, sweep 265 -- and that
+reading is wrong. On the MAIN thread, self time:
+
+| | share of main thread |
+|---|---:|
+| markDependent (the corpus's own dependency walk) | 57.1% |
+| open(2) for the 853 output files | 11.4% |
+| BytecodeMethod.equals | 10.9% |
+| **all GC and allocation** | **9.5%** |
+
+Marking really is on otherwise-idle cores. So the elapsed gap is not collector
+work stealing mutator time, and no amount of making marking faster moves it.
+
+### String is already ahead, and was the wrong suspect
+
+The live census says java.lang.String is the largest class at 86-88 B/obj -- but
+that is the WHOLE string, payload inline, because @Fused already packs it. Only
+49K separate byte[] exist against 475K Strings. HotSpot spends 24 + 16 + payload
+across two objects for the same content. There is no String deficit to close.
+java.util.HashMap at 96 B/obj is the next target and has ~16 bytes of derivable
+fields (cn1Cap, threshold) plus three native blocks that could be one.
+
+### Peak is 42% collector headroom, and the trade is governed by the barrier
+
+Live is ~828MB against a 1422MB peak. Pinning the trigger (CN1_GC_TRIGGER_MB,
+3 rounds, quiet machine):
+
+| trigger | elapsed | peak |
+|---|---:|---:|
+| default (adaptive) | 5.34-5.48s | 1448-1528MB |
+| 48MB | 5.94-6.05s | ~1230MB |
+| 24MB | 6.09-6.17s | ~1210MB |
+| 12MB | 6.24-6.31s | ~1150-1270MB |
+| 6MB | 6.50-6.75s | ~1190-1285MB |
+
+**At trigger=12 we are 19% BELOW JDK 25 on peak** -- the memory target, available
+today -- and 17% slower, which is not. The adaptive trigger has run away toward
+speed and buys 1500MB where 1150MB would do.
+
+Profiling the tight arm says the penalty is DIFFUSE, and that is the finding. GC
+and lock share of the main thread rises only 5.5% -> 7.4% across a run that is 10%
+longer; the rest is spread in thin slices over every mutator symbol. That is the
+signature of the SATB write barrier being ACTIVE a far larger fraction of the
+time, not of any one routine getting slower.
+
+And the barrier is expensive by construction: `cn1SatbEnqueue` takes a GLOBAL
+`pthread_mutex_lock(&gcSatbMutex)` **per object**. The range form already filters
+lock-free and flushes 256 at a time, but the scalar form -- the one every ordinary
+reference store goes through -- serializes on one mutex against the marker threads
+draining the same log. Under tight pacing the contention is visible directly:
+_pthread_mutex_firstfit_lock_wait, __psynch_mutexwait and lock_slow together rise
++1.3 points while cn1SatbEnqueueRangeLocked rises +0.4.
+
+So the memory win is not blocked by pacing policy. It is blocked by a barrier too
+expensive to leave on, which is exactly the lever HotSpot pushes and we do not:
+G1 gives every thread its OWN SATB buffer and touches shared state only to hand a
+full one off. Per-thread buffers make cycles cheap enough to afford, which buys
+the 15-19% peak reduction that is already sitting there.
+
+The correctness constraint is the whole design problem: marking terminates on a
+fixpoint over the global log, so a thread-local buffer that is never flushed is a
+reference the mark never sees and an object swept while live. The flush therefore
+has to hang off the points where a thread is already known stopped -- the
+handshake park and the uncooperative force-stop -- not off a hope that every
+thread reaches a safepoint. gc-verify's self-test4 (injected half-traced block) is
+the check that this is right.
