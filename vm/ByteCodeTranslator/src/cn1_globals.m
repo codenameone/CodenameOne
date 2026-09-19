@@ -13803,7 +13803,14 @@ void cn1RecordAllocSite(void* pc, struct clazz* cls, int size) {
     if(!cn1AllocSiteEnabled) {
         return;
     }
-    size_t h = (((uintptr_t)pc) >> 2) * 2654435761u;
+    // Keyed on (pc, class), NOT pc alone. The first version keyed on the address and
+    // kept the class of whichever allocation claimed the slot first, on the reasoning
+    // that a site allocates one array class. cloneArray is the counter-example that
+    // matters: ONE call site that clones every array class in the program, so its row
+    // reported 135,074 allocations of whatever was cloned first -- an enum's VALUES --
+    // and sent a reader hunting an enum problem that did not exist. The real population
+    // was boolean[] from ASM's Subroutine copy constructor, and the enum was cloned once.
+    size_t h = ((((uintptr_t)pc) >> 2) ^ (((uintptr_t)cls) >> 4)) * 2654435761u;
     for(int probe = 0 ; probe < CN1_ALLOC_SITE_PROBES ; probe++) {
         size_t i = (h + (size_t)probe) & (CN1_ALLOC_SITE_SLOTS - 1);
         void* cur = atomic_load_explicit(&cn1AllocSiteRows[i].pc, memory_order_relaxed);
@@ -13819,7 +13826,7 @@ void cn1RecordAllocSite(void* pc, struct clazz* cls, int size) {
                 cur = expected;
             }
         }
-        if(cur == pc) {
+        if(cur == pc && atomic_load_explicit(&cn1AllocSiteRows[i].cls, memory_order_relaxed) == cls) {
             atomic_fetch_add_explicit(&cn1AllocSiteRows[i].count, 1, memory_order_relaxed);
             atomic_fetch_add_explicit(&cn1AllocSiteRows[i].bytes, size, memory_order_relaxed);
             return;
@@ -16022,6 +16029,21 @@ JAVA_OBJECT cloneArray(JAVA_OBJECT array) {
     struct clazz* cls = array->__codenameOneParentClsReference;
     int byteSize = byteSizeForArray(cls);
 
+#ifdef CN1_ALLOC_CENSUS
+    // Who clones? The site profiler keys on allocArray's return address, which for a
+    // clone is always inside this function and says nothing. CN1_LOG_CLONE_SITES names
+    // the caller instead, for the first few of each run.
+    if(getenv("CN1_LOG_CLONE_SITES")) {
+        static _Atomic int cn1CloneLogged = 0;
+        if(atomic_fetch_add_explicit(&cn1CloneLogged, 1, memory_order_relaxed) < 25) {
+            Dl_info cn1CloneInfo;
+            if(dladdr(__builtin_return_address(0), &cn1CloneInfo) != 0 && cn1CloneInfo.dli_sname != 0) {
+                fprintf(stderr, "[CLONE] %s <- %s\n",
+                        cls->clsName ? cls->clsName : "?", cn1CloneInfo.dli_sname);
+            }
+        }
+    }
+#endif
     JAVA_ARRAY arr = (JAVA_ARRAY)allocArray(getThreadLocalData(), src->length, cls, byteSize, src->dimensions);
     // SATB INSERTION barrier, BEFORE the copy that publishes the references -- which is
     // what java_lang_System_arraycopy does and what this originally did not.
