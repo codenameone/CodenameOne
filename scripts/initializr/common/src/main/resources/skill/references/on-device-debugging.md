@@ -77,6 +77,8 @@ codename1.arg.ios.onDeviceDebug.waitForAttach=true
 
 `proxyHost` stays `127.0.0.1` for the **native iOS simulator**, which shares your machine's loopback. For a **physical iPhone** it must be your machine's LAN address (`ifconfig` / `ipconfig`), reachable from the phone's Wi-Fi network — the phone opens the connection, so a host that only answers on loopback will never be reached.
 
+A LAN address means the app is reaching the **local network**, which iOS 14 gates behind a consent prompt. The build declares the purpose string for you (it injects `NSLocalNetworkUsageDescription` whenever the proxy host is not loopback), but the prompt still has to be **accepted on the device** the first time the app launches, or it never reaches the proxy. If the proxy sits there reporting nothing connected, check the phone for a dialog before you check anything else. The simulator never asks, because loopback is not the local network.
+
 **2. Build:**
 
 ```bash
