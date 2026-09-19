@@ -110,6 +110,21 @@ static inline JAVA_CHAR cn1StrCharAtRaw(JAVA_OBJECT s, JAVA_INT i) {
     }
     return ((JAVA_ARRAY_CHAR*)CN1_ARRAY_DATA(a))[o];
 }
+/* Start of a String's characters, whatever backs them.
+ *
+ * Every read of the characters goes through here so the backing store is named in
+ * ONE place. That matters because the store is about to shrink: a fused String
+ * carries a 24-byte JavaArrayPrototype for a payload only that String can reach,
+ * and length duplicates count, dimensions is always 1, primitiveSize is the coder
+ * the class pointer already gives, dataOffset is a constant for the shape, and
+ * two of the fields are GC sentinels. Across the self-hosting corpus that header
+ * is ~27MB, and it is what keeps a typical String in size class 96 instead of 64.
+ *
+ * The coder still comes from cn1StrIsLatin1 below, which reads the class pointer
+ * -- the one piece of that header carrying information. */
+static inline void* cn1StrChars(JAVA_OBJECT s) {
+    return CN1_ARRAY_DATA((JAVA_ARRAY)((struct obj__java_lang_String*)s)->java_lang_String_value);
+}
 static inline int cn1StrIsLatin1(JAVA_OBJECT s) {
     return ((JAVA_ARRAY)((struct obj__java_lang_String*)s)->java_lang_String_value)->__codenameOneParentClsReference == &class_array1__JAVA_BYTE;
 }
@@ -421,16 +436,16 @@ static inline __attribute__((always_inline)) JAVA_BOOLEAN cn1StringEquals(CODENA
     }
 
     if(cn1StrIsLatin1(__cn1ThisObject) && cn1StrIsLatin1(__cn1Arg1)) {
-        const uint8_t* a = (const uint8_t*)CN1_ARRAY_DATA((JAVA_ARRAY)t->java_lang_String_value);
-        const uint8_t* b = (const uint8_t*)CN1_ARRAY_DATA((JAVA_ARRAY)o->java_lang_String_value);
+        const uint8_t* a = (const uint8_t*)cn1StrChars((JAVA_OBJECT)t);
+        const uint8_t* b = (const uint8_t*)cn1StrChars((JAVA_OBJECT)o);
         return cn1CompactBytesEqual(a, b, (size_t)t->java_lang_String_count);
     }
     // Fast path: both backing arrays are char[] -- byte-equality of UTF-16 code
     // units == string equality; libc memcmp is the SIMD-optimized comparison on
     // every target.
     if(!cn1StrIsLatin1(__cn1ThisObject) && !cn1StrIsLatin1(__cn1Arg1)) {
-        JAVA_ARRAY_CHAR* oa = ((JAVA_ARRAY_CHAR*)CN1_ARRAY_DATA((JAVA_ARRAY)o->java_lang_String_value));
-        JAVA_ARRAY_CHAR* ta = ((JAVA_ARRAY_CHAR*)CN1_ARRAY_DATA((JAVA_ARRAY)t->java_lang_String_value));
+        JAVA_ARRAY_CHAR* oa = ((JAVA_ARRAY_CHAR*)cn1StrChars((JAVA_OBJECT)o));
+        JAVA_ARRAY_CHAR* ta = ((JAVA_ARRAY_CHAR*)cn1StrChars((JAVA_OBJECT)t));
         return cn1CompactBytesEqual(ta, oa, (size_t)t->java_lang_String_count * sizeof(JAVA_ARRAY_CHAR));
     }
     JAVA_ARRAY av = (JAVA_ARRAY)t->java_lang_String_value;
@@ -457,8 +472,8 @@ JAVA_INT java_lang_String_compareTo___java_lang_String_R_int(CODENAME_ONE_THREAD
     JAVA_INT oc = o->java_lang_String_count;
     JAVA_INT minL = tc < oc ? tc : oc;
     if(cn1StrIsLatin1(__cn1ThisObject) && cn1StrIsLatin1(__cn1Arg1)) {
-        const uint8_t* a = (const uint8_t*)CN1_ARRAY_DATA((JAVA_ARRAY)t->java_lang_String_value);
-        const uint8_t* b = (const uint8_t*)CN1_ARRAY_DATA((JAVA_ARRAY)o->java_lang_String_value);
+        const uint8_t* a = (const uint8_t*)cn1StrChars((JAVA_OBJECT)t);
+        const uint8_t* b = (const uint8_t*)cn1StrChars((JAVA_OBJECT)o);
         JAVA_INT i = 0;
         // memcmp only promises the sign of its answer. Skip equal blocks, then
         // return the exact unsigned character difference required by Java.
@@ -474,8 +489,8 @@ JAVA_INT java_lang_String_compareTo___java_lang_String_R_int(CODENAME_ONE_THREAD
     // 4-char block with 64-bit compares, then resolve the exact code unit inside
     // it (UTF-16 code-unit order, like Java).
     if(!cn1StrIsLatin1(__cn1ThisObject) && !cn1StrIsLatin1(__cn1Arg1)) {
-        const JAVA_ARRAY_CHAR* ta = ((JAVA_ARRAY_CHAR*)CN1_ARRAY_DATA((JAVA_ARRAY)t->java_lang_String_value));
-        const JAVA_ARRAY_CHAR* oa = ((JAVA_ARRAY_CHAR*)CN1_ARRAY_DATA((JAVA_ARRAY)o->java_lang_String_value));
+        const JAVA_ARRAY_CHAR* ta = ((JAVA_ARRAY_CHAR*)cn1StrChars((JAVA_OBJECT)t));
+        const JAVA_ARRAY_CHAR* oa = ((JAVA_ARRAY_CHAR*)cn1StrChars((JAVA_OBJECT)o));
         JAVA_INT i = 0;
         for(; i + 4 <= minL; i += 4) {
             uint64_t a, b;
@@ -537,8 +552,8 @@ JAVA_BOOLEAN java_lang_String_equalsIgnoreCase___java_lang_String_R_boolean(CODE
     
     // Fast path: both backing arrays are char[]; index directly.
     if(!cn1StrIsLatin1(__cn1ThisObject) && !cn1StrIsLatin1(__cn1Arg1)) {
-        JAVA_ARRAY_CHAR* oa = (JAVA_ARRAY_CHAR*)CN1_ARRAY_DATA((JAVA_ARRAY)o->java_lang_String_value);
-        JAVA_ARRAY_CHAR* ta = (JAVA_ARRAY_CHAR*)CN1_ARRAY_DATA((JAVA_ARRAY)t->java_lang_String_value);
+        JAVA_ARRAY_CHAR* oa = (JAVA_ARRAY_CHAR*)cn1StrChars((JAVA_OBJECT)o);
+        JAVA_ARRAY_CHAR* ta = (JAVA_ARRAY_CHAR*)cn1StrChars((JAVA_OBJECT)t);
         JAVA_INT oo = 0;
         JAVA_INT to = 0;
 
@@ -1816,7 +1831,7 @@ JAVA_OBJECT java_lang_Long_toString___long_int_R_java_lang_String(CODENAME_ONE_T
 // part is a Latin-1 (byte[]-backed) String, so we read raw bytes and build a SINGLE fused block
 // (byte[] inline in the String) -- one allocation and no byte<->char conversion, vs StringBuilder's
 // four allocations + two conversions. Args are guaranteed non-null (String.cn1c handled null).
-#define CN1_SB_PTR(s) ((JAVA_ARRAY_BYTE*)CN1_ARRAY_DATA((JAVA_ARRAY)((struct obj__java_lang_String*)(s))->java_lang_String_value))
+#define CN1_SB_PTR(s) ((JAVA_ARRAY_BYTE*)cn1StrChars((JAVA_OBJECT)(s)))
 #define CN1_SB_LEN(s) (((struct obj__java_lang_String*)(s))->java_lang_String_count)
 
 static JAVA_OBJECT cn1ConcatFallback(CODENAME_ONE_THREAD_STATE, JAVA_ARRAY_BYTE* const* parts, const int* lens, int n, int total) {
