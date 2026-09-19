@@ -24,7 +24,6 @@
 package com.codename1.flutter.widgets;
 
 import com.codename1.flutter.BuildContext;
-import com.codename1.flutter.StatelessWidget;
 import com.codename1.flutter.Widget;
 
 import dart.runtime.Funcs;
@@ -35,7 +34,7 @@ import dart.runtime.Funcs;
  * reveal of {@code background}/{@code secondaryBackground} and the resize
  * animation are deferred. {@code onDismissed} carries a {@link DismissDirection}.
  */
-public class Dismissible extends StatelessWidget {
+public class Dismissible extends Widget {
 
     private Widget child;
     private Widget background;
@@ -96,8 +95,36 @@ public class Dismissible extends StatelessWidget {
     public void behavior(Object v) {
     }
 
+    public Widget getChild() {
+        return child;
+    }
+
+    public Widget getBackground() {
+        return background;
+    }
+
+    public Widget getSecondaryBackground() {
+        return secondaryBackground;
+    }
+
+    public Funcs.VoidFunc1<DismissDirection> getOnDismissed() {
+        return onDismissed;
+    }
+
+    public Funcs.Func1<DismissDirection, Object> getConfirmDismiss() {
+        return confirmDismiss;
+    }
+
+    public Object getDismissThresholds() {
+        return dismissThresholds;
+    }
+
+    public Object getDirection() {
+        return direction;
+    }
+
     @Override
-    public Widget build(BuildContext context) {
-        return child != null ? child : new SizedBox();
+    public com.codename1.flutter.Element createElement() {
+        return new DismissibleRenderElement(this);
     }
 }
