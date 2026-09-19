@@ -1916,7 +1916,28 @@ public class Form extends Container implements TopLevelContainer {
             formLayeredPane = new Container(new LayeredLayout()) {
                 @Override
                 protected void paintBackground(Graphics g) {
-                    if (getComponentCount() > 0) {
+                    // The form underneath this overlay only has to be drawn when the
+                    // overlay is painted on its own: a repaint targeting just the layered
+                    // pane would otherwise composite its children over stale pixels.
+                    //
+                    // During the form's own paint pass the form has already drawn
+                    // everything beneath us - this pane is one of its children - so
+                    // drawing it again here paints the whole tree a second time into the
+                    // same frame. Opaque fills survive that unchanged, which is why it
+                    // stayed hidden, but every translucent pixel composites twice:
+                    // antialiased glyphs and drop shadows come out visibly darker.
+                    //
+                    // The guard above is why this was never seen. The pane is empty until
+                    // something adds itself to it, and the one thing that does -
+                    // InteractionDialog, the lightweight Picker popup among others -
+                    // arrives through Container's deferred insertion, which was dropped
+                    // entirely until issue #5606 was fixed. A pane that never had children
+                    // never ran this painter.
+                    //
+                    // inInternalPaint marks the form's own pass, and is the same
+                    // discriminator Form.paint() already uses to avoid drawing its
+                    // background twice.
+                    if (getComponentCount() > 0 && !inInternalPaint) {
                         if (super.isVisible()) {
                             super.setVisible(false);
                             Form.this.paint(g);
