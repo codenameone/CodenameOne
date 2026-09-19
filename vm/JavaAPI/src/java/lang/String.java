@@ -76,6 +76,36 @@ public final class String implements java.lang.CharSequence, Comparable<String> 
     private long nsString;
     private static final char[] ZERO_CHAR = new char[0];
 
+    /* ---- BACKING-STORE PREDICATES -------------------------------------------
+     * Every question about HOW the characters are stored goes through these four,
+     * so the representation is decided in one place rather than at each use. The
+     * array kind is the coder today -- a byte[] means Latin-1 -- but the inner
+     * array is 24 bytes of header (length duplicating count, dimensions always 1,
+     * primitiveSize the coder, dataOffset a constant, and two GC sentinels) on
+     * every fused String, and only the class pointer in it carries information.
+     * Consolidating the accesses is what lets that change without touching each
+     * caller.
+     */
+    /** Latin-1 storage: one byte per character, the character IS the byte. */
+    private boolean isLatin1() {
+        return value instanceof byte[];
+    }
+
+    /** The Latin-1 bytes. Valid only under isLatin1(). */
+    private byte[] latin1Value() {
+        return (byte[]) value;
+    }
+
+    /** UTF-16 storage whose length is EXACTLY count -- the only shape shareable without a copy. */
+    private boolean isUtf16Exact() {
+        return value instanceof char[] && ((char[]) value).length == count;
+    }
+
+    /** The UTF-16 units. Valid only when the store is a char[]. */
+    private char[] utf16Value() {
+        return (char[]) value;
+    }
+
     /** Character at logical index i (0-based); offset is applied here. */
     private char charInternal(int i) {
         Object v = value;
@@ -120,7 +150,7 @@ public final class String implements java.lang.CharSequence, Comparable<String> 
 
     static String cn1Concat2(String a, String b) {
         a = cn1c(a); b = cn1c(b);
-        if (a.value instanceof byte[] && b.value instanceof byte[]) {
+        if (a.isLatin1() && b.isLatin1()) {
             return cn1FusedConcat2(a, b);
         }
         char[] r = new char[a.count + b.count];
@@ -131,7 +161,7 @@ public final class String implements java.lang.CharSequence, Comparable<String> 
 
     static String cn1Concat3(String a, String b, String c) {
         a = cn1c(a); b = cn1c(b); c = cn1c(c);
-        if (a.value instanceof byte[] && b.value instanceof byte[] && c.value instanceof byte[]) {
+        if (a.isLatin1() && b.isLatin1() && c.isLatin1()) {
             return cn1FusedConcat3(a, b, c);
         }
         int ca = a.count, cb = b.count;
@@ -144,8 +174,8 @@ public final class String implements java.lang.CharSequence, Comparable<String> 
 
     static String cn1Concat4(String a, String b, String c, String d) {
         a = cn1c(a); b = cn1c(b); c = cn1c(c); d = cn1c(d);
-        if (a.value instanceof byte[] && b.value instanceof byte[]
-                && c.value instanceof byte[] && d.value instanceof byte[]) {
+        if (a.isLatin1() && b.isLatin1()
+                && c.isLatin1() && d.isLatin1()) {
             return cn1FusedConcat4(a, b, c, d);
         }
         int ca = a.count, cb = b.count, cc = c.count;
@@ -159,8 +189,8 @@ public final class String implements java.lang.CharSequence, Comparable<String> 
 
     static String cn1Concat5(String a, String b, String c, String d, String e) {
         a = cn1c(a); b = cn1c(b); c = cn1c(c); d = cn1c(d); e = cn1c(e);
-        if (a.value instanceof byte[] && b.value instanceof byte[] && c.value instanceof byte[]
-                && d.value instanceof byte[] && e.value instanceof byte[]) {
+        if (a.isLatin1() && b.isLatin1() && c.isLatin1()
+                && d.isLatin1() && e.isLatin1()) {
             return cn1FusedConcat5(a, b, c, d, e);
         }
         int ca = a.count, cb = b.count, cc = c.count, cd = d.count;
@@ -282,7 +312,7 @@ public final class String implements java.lang.CharSequence, Comparable<String> 
      * calls this on an array it is about to replace.
      */
     private boolean packLatin1(char[] data, int offset, int n) {
-        byte[] out = (byte[]) value;
+        byte[] out = latin1Value();
         for (int i = 0; i < n; i++) {
             char c = data[offset + i];
             if (c > 0xFF) {
@@ -582,11 +612,11 @@ public final class String implements java.lang.CharSequence, Comparable<String> 
      * Convert this String into bytes according to the specified character encoding, storing the result into a new byte array.
      */
     public byte[] getBytes(java.lang.String enc) throws java.io.UnsupportedEncodingException{
-        if(value instanceof byte[]) {
+        if(isLatin1()) {
             byte[] compact = compactBytes(enc);
             if(compact != null) return compact;
         }
-        if(value instanceof char[] && ((char[])value).length == count) {
+        if(isUtf16Exact()) {
             if(enc == null) {
                 return charsToBytes(toCharNoCopy(), null);
             }
@@ -934,9 +964,9 @@ public final class String implements java.lang.CharSequence, Comparable<String> 
         if (oldChar == newChar) return this;
         int first = indexOf(oldChar);
         if (first < 0) return this;
-        if (value instanceof byte[] && newChar <= 255) {
+        if (isLatin1() && newChar <= 255) {
             byte[] result = new byte[count];
-            byte[] input = (byte[]) value;
+            byte[] input = latin1Value();
             for (int i = 0; i < count; i++) {
                 int ch = input[i] & 255;
                 result[i] = (byte) (ch == oldChar ? newChar : ch);
@@ -1049,8 +1079,8 @@ public final class String implements java.lang.CharSequence, Comparable<String> 
     }
 
     private char[] toCharNoCopy() {
-        if(value instanceof char[] && ((char[])value).length == count) {
-            return (char[])value;
+        if(isUtf16Exact()) {
+            return utf16Value();
         }
         return toCharArray();
     }
@@ -1060,13 +1090,13 @@ public final class String implements java.lang.CharSequence, Comparable<String> 
      */
     public char[] toCharArray(){
         char[] buffer = new char[count];
-        if (value instanceof byte[]) {
-            byte[] b = (byte[]) value;
+        if (isLatin1()) {
+            byte[] b = latin1Value();
             for (int i = 0; i < count; i++) {
                 buffer[i] = (char) (b[i] & 0xff);
             }
         } else {
-            System.arraycopy((char[]) value, 0, buffer, 0, count);
+            System.arraycopy(utf16Value(), 0, buffer, 0, count);
         }
         return buffer;
     }
