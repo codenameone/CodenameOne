@@ -122,32 +122,42 @@ which places the fault between deactivation and unmount -- and that is `visitChi
 The bug CLASS is closed, not just this instance: a census of every element that owns
 children finds no other that fails to override `visitChildren`. Two tests pin it.
 
-## 2c. BLOCKING: a nested GestureDetector never receives its release
+## 2c. RETRACTED: the nested GestureDetector was the instrument
 
-`/demo/cupertino-picker` is inert: tapping any of its five rows changes 0.0% of the
-screen and raises no error. Each row is `MouseRegion > GestureDetector(onTap:)` calling
-`showCupertinoModalPopup`, and every part of that is present -- the transpiler emits the
-call, `showCupertinoModalPopup` delegates to `Dialogs.showDialog`, and that builds and
-presents a real Codename One dialog.
+Recorded here as blocking, and wrong. `/demo/cupertino-picker` is not inert: every row
+opens its picker, and always did.
 
-The gesture is what fails, and only when detectors NEST:
+`bench_pointer`'s `steps` defaulted to **8**, so a tap injected without naming steps
+carried eight `pointerDragged` events at the SAME coordinates. A zero-distance drag has
+no dominant axis -- `draggedOnX` is `0 > 0`, false -- so `shouldGrabScrollEvents` reduces
+to `isScrollableY()`, a scrollable ancestor claims the gesture, and `Form.pointerReleased`
+then takes the `dragged != null` path and never delivers to what was pressed.
 
-| Observed | |
+Proved by instrumenting `Form.pointerReleased` rather than by reading it:
+
+```text
+picker, steps default (8)   dragged=ScrollPane   origPressedCmp=OverlayComponent enabled=true
+home,   steps default (8)   dragged=null         origPressedCmp=OverlayComponent enabled=true
+picker, steps: 0            dragged=null   -> the popup opens, 99.5% of the screen changes
+```
+
+The floor had been fixed once so `steps: 0` could express a tap; the DEFAULT was left at
+8. It now depends on the gesture: a tap defaults to zero steps, a drag to eight.
+
+**Every "changed 0.0%" verdict taken with a defaulted tap is void.** Re-checked since:
+
+| Route | With a real tap |
 |---|---|
-| press | reaches BOTH overlays -- the outer one covering the page, then the row's, which reports `forwardTo=null` and so owns the tap |
-| release | reaches **neither**; `pointerReleased` is never called on any overlay |
-| the same code on `/` | release arrives normally (`RELEASED on overlay @96,1211 forwardTo=null`) and the tap fires |
+| `/demo/cupertino-picker` | opens its popup -- works |
+| `/demo/chip` action chip | still 0.0%, and CORRECT: the gallery passes `onPressed: () {}`, an empty callback |
 
-The difference is the outer, page-covering `GestureDetector`. On the home screen there is
-none, the row's overlay is the press target, and the tap works. Where one forwards to
-another, both call `super.pointerPressed` and the release then goes to neither.
+The Dismissible verdict stands -- it was taken with a genuine multi-step swipe.
 
-Taps on that screen are not dead in general -- the app bar's back chevron navigates,
-because it is a Codename One Button rather than a gesture overlay.
+### Open, and real: the Cupertino picker's popup renders wrong
 
-This blocks the Cupertino picker family (three demo routes) and anything else built on a
-nested detector, so it comes before the callbacks themselves: `onSelectedItemChanged`
-cannot be reached while the tap that opens the picker does not fire.
+The popup opens and presents, but the picker inside it draws as a narrow vertical white
+pill rather than a wheel. The tap, the route to `showCupertinoModalPopup` and
+`Dialogs.showDialog` are all sound; this is a layout defect in the picker's content.
 
 ## 3. Structural gaps
 
