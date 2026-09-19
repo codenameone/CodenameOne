@@ -67,12 +67,19 @@ public abstract class AbstractTransitionScreenshotTest extends AbstractAnimation
         // is a no-op, leaving every transition frame empty.
         sourceForm.setVisible(true);
         buildSourceForm(sourceForm);
+        // Both forms are sized with the raw setters, which invalidate nothing, so neither
+        // would lay out -- see BaseTest.layoutOffScreen. This class never called
+        // layoutContainer at all and got its layout entirely by accident, which is why it
+        // was the one transition base the first sweep missed: that sweep looked for files
+        // calling BOTH setWidth and layoutContainer.
+        layoutOffScreen(sourceForm);
 
         destForm = new Form(getDestTitle());
         destForm.setWidth(frameWidth);
         destForm.setHeight(frameHeight);
         destForm.setVisible(true);
         buildDestForm(destForm);
+        layoutOffScreen(destForm);
 
         transition = createTransition(getAnimationDurationMillis());
         transition.init(sourceForm, destForm);
