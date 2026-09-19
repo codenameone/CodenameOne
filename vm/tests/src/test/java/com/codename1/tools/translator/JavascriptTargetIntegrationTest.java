@@ -85,9 +85,10 @@ class JavascriptTargetIntegrationTest {
         // public web root, so a suspension report or a directory of host configuration written
         // there is uploaded to every visitor unless the developer remembers to delete it.
         Path sidecar = outputDir.resolve("dist");
-        assertTrue(Files.exists(sidecar.resolve("suspension-report.txt")),
+        String bundle = distDir.getFileName().toString();
+        assertTrue(Files.exists(sidecar.resolve(bundle + "-suspension-report.txt")),
                 "the suspension report should be written beside the bundle");
-        assertTrue(Files.isDirectory(sidecar.resolve("cn1-security")),
+        assertTrue(Files.isDirectory(sidecar.resolve(bundle + "-cn1-security")),
                 "the deployment configuration should be written beside the bundle");
         assertFalse(Files.exists(distDir.resolve("suspension-report.txt")),
                 "the suspension report must not be published in the web root");

@@ -66,13 +66,25 @@ import java.util.List;
  */
 final class JavascriptSecurityHeaders {
 
-    /// The directory this configuration goes in. It is created NEXT TO the bundle directory,
-    /// not inside it -- see {@link JavascriptBundleWriter#sidecarDirectory}. Named so it is
-    /// obvious in a file listing that it is for the person deploying the application and not
-    /// for the application.
+    /// The base name of the directory this configuration goes in. It is created NEXT TO the
+    /// bundle directory rather than inside it, and prefixed with the bundle's own name --
+    /// `MyApp-js-cn1-security` beside `MyApp-js`; see {@link JavascriptBundleWriter#sidecar}.
+    /// Named so it is obvious in a file listing that it is for the person deploying the
+    /// application and not for the application.
     static final String DEPLOYMENT_DIRECTORY = "cn1-security";
 
     private JavascriptSecurityHeaders() {
+    }
+
+    /// The names {@link #write} produces, in the order their contents are built below. Returned
+    /// rather than held in a static array so nothing can edit the list in place, and read by
+    /// {@code JavascriptBundleWriter.removeLegacyArtifacts} to clean up the copies older builds
+    /// wrote inside the bundle -- a name that drifts out of this list is a file that stays
+    /// published forever.
+    static String[] generatedFiles() {
+        return new String[] {
+            "_headers", "cn1-security.nginx.conf", "cn1-security.htaccess", "README.md",
+        };
     }
 
     /**
@@ -110,19 +122,20 @@ final class JavascriptSecurityHeaders {
         //
         // So the build generates the policy and the developer activates it, by copying one file.
         // The README beside it says which, and says what to edit first.
-        File guidance = new File(JavascriptBundleWriter.sidecarDirectory(outputDirectory),
-                DEPLOYMENT_DIRECTORY);
+        File guidance = JavascriptBundleWriter.sidecar(outputDirectory, DEPLOYMENT_DIRECTORY);
         if (!guidance.isDirectory() && !guidance.mkdirs()) {
             throw new IOException("could not create " + guidance);
         }
-        Files.write(new File(guidance, "_headers").toPath(),
-                netlifyHeaders(csp).getBytes(StandardCharsets.UTF_8));
-        Files.write(new File(guidance, "cn1-security.nginx.conf").toPath(),
-                nginxHeaders(csp).getBytes(StandardCharsets.UTF_8));
-        Files.write(new File(guidance, "cn1-security.htaccess").toPath(),
-                apacheHeaders(csp).getBytes(StandardCharsets.UTF_8));
-        Files.write(new File(guidance, "README.md").toPath(),
-                readme(csp).getBytes(StandardCharsets.UTF_8));
+        // Positionally paired with generatedFiles(): entry N above is the name of content N
+        // here, which is what keeps the two from drifting apart.
+        String[] names = generatedFiles();
+        String[] contents = new String[] {
+            netlifyHeaders(csp), nginxHeaders(csp), apacheHeaders(csp), readme(csp),
+        };
+        for (int iter = 0; iter < names.length; iter++) {
+            Files.write(new File(guidance, names[iter]).toPath(),
+                    contents[iter].getBytes(StandardCharsets.UTF_8));
+        }
     }
 
     /**
@@ -326,8 +339,8 @@ final class JavascriptSecurityHeaders {
         // Named by the directory this file was GENERATED in, which is beside the bundle -- by
         // the time the file is doing anything it has been copied to the publish root, where no
         // relative path back to the README exists.
-        b.append("# Netlify and Cloudflare Pages read this file verbatim; see README.md in the "
-                + "build's cn1-security directory.\n");
+        b.append("# Netlify and Cloudflare Pages read this file verbatim; see the README.md "
+                + "beside it in the build output.\n");
         b.append("/*\n");
         String[] lines = commonHeaders().split("\n");
         for (int iter = 0; iter < lines.length; iter++) {
@@ -437,9 +450,9 @@ final class JavascriptSecurityHeaders {
                 + "- `cn1-security.htaccess` -- Apache, renamed to `.htaccess`\n"
                 + "\n"
                 + "This directory is written **beside** the application bundle rather than\n"
-                + "inside it, so uploading the bundle never carries it along. Keep it that way:\n"
-                + "it is for you, the application reads none of it, and a web root is not the\n"
-                + "place for a host\'s configuration.\n"
+                + "inside it, and named after it, so uploading the bundle never carries it\n"
+                + "along. Keep it that way: it is for you, the application reads none of it,\n"
+                + "and a web root is not the place for a host\'s configuration.\n"
                 + "\n"
                 + "## Read this before you activate it: connect-src\n"
                 + "\n"

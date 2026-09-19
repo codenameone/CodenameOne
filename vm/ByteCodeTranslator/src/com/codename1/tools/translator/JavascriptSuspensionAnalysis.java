@@ -193,7 +193,8 @@ final class JavascriptSuspensionAnalysis {
     // -verbose) that could not say WHICH rule was responsible for the
     // suspending half. It is a report about the build and not part of the
     // application, and the bundle directory is a public web root, so it goes
-    // in the sibling position JavascriptBundleWriter.sidecarDirectory picks.
+    // in the sibling position JavascriptBundleWriter.sidecar picks, named
+    // after the bundle it describes.
     // Null only when no output directory was supplied, which is the in-memory
     // unit-test path.
     private String reportPath;
@@ -239,8 +240,8 @@ final class JavascriptSuspensionAnalysis {
         // both read it. The build output is the ``dist`` directory; the bundle
         // directory inside it is the deployed web root and is not.
         if (outputDirectory != null) {
-            a.reportPath = new File(JavascriptBundleWriter.sidecarDirectory(outputDirectory),
-                    "suspension-report.txt").getAbsolutePath();
+            a.reportPath = JavascriptBundleWriter.sidecar(
+                    outputDirectory, JavascriptBundleWriter.SUSPENSION_REPORT).getAbsolutePath();
         }
         a.rta = JavascriptReachability.modelFor(classes);
         a.index(classes);
