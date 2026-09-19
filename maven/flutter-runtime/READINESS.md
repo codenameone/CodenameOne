@@ -96,6 +96,36 @@ and are not listed.
 | `Form` | `autovalidateMode` |
 | `WillPopScope` | `onWillPop` |
 
+## 2b. BLOCKING: a virtualised list mis-renders when it loses an item
+
+Found by implementing swipe-to-dismiss, which made removing an item possible for the
+first time. Deleting a mail in `/reply` leaves every row below it drawing its new
+content **over its old**, and a provider lookup in a rebuilt row answers null
+(`EmailStore.isEmailStarred ... emailStore is null`).
+
+It is two live component sets, not stale pixels: it survives a `revalidate()`, a full
+form repaint, and scrolling away and back.
+
+Ruled out so far, each by measurement rather than reading:
+
+| Suspect | Verdict |
+|---|---|
+| The dismissed row staying mounted | no -- unmounting its subtree explicitly changes nothing |
+| Firing `onDismissed` mid-frame | no -- deferring it a frame, then two, changes nothing |
+| Repaint ordering | no -- revalidate plus repaint after the rebuild changes nothing |
+| Keys not emitted | no -- `$t1.key(new ObjectKey(this.email))` is emitted |
+| `ObjectKey` equality | no -- identity on the wrapped value, with a matching `hashCode` |
+| `updateChildren` | no -- it is Flutter's keyed algorithm, leading run, trailing run, keyed middle |
+| `RenderHost.detach` failing its `parent == container` guard | no -- instrumented; it is skipped zero times |
+
+So the old elements are not orphans being left behind: they are still mounted and still
+considered current. The remaining candidate is `ListViewRenderElement`'s windowed
+rebuild -- it builds `[top spacer, items..., bottom spacer]`, and the spacers carry no
+key -- but that is a hypothesis, not yet a finding.
+
+This blocks Phase 1: any list that loses an item is affected, so the callbacks below
+that remove things cannot be finished until it is understood.
+
 ## 3. Structural gaps
 
 | Gap | Consequence |
