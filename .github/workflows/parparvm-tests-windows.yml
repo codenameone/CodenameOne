@@ -29,6 +29,19 @@ on:
       - 'vm/**'
       - 'Ports/WindowsPort/**'
       - 'scripts/hellocodenameone/**'
+      # The screenshots this leg compares are produced by the core renderer and
+      # the port's native theme, so a change to either can move them. Without
+      # these the leg does not run on the pull request that changes them and the
+      # baselines only go stale on master - which is how the Sheet and
+      # AppReviewDialog captures were left recording a double paint (issue
+      # #5606). scripts/windows holds the baselines themselves, so a reseed is
+      # verified by the leg that produced it.
+      - 'CodenameOne/src/**'
+      - '!CodenameOne/src/**/*.md'
+      - 'native-themes/windows-fluent/**'
+      - '!native-themes/windows-fluent/**/*.md'
+      - 'scripts/windows/**'
+      - '!scripts/windows/**/*.md'
       - '!vm/**/README.md'
       - '!vm/**/readme.md'
       - '!vm/**/docs/**'
@@ -39,6 +52,19 @@ on:
       - 'vm/**'
       - 'Ports/WindowsPort/**'
       - 'scripts/hellocodenameone/**'
+      # The screenshots this leg compares are produced by the core renderer and
+      # the port's native theme, so a change to either can move them. Without
+      # these the leg does not run on the pull request that changes them and the
+      # baselines only go stale on master - which is how the Sheet and
+      # AppReviewDialog captures were left recording a double paint (issue
+      # #5606). scripts/windows holds the baselines themselves, so a reseed is
+      # verified by the leg that produced it.
+      - 'CodenameOne/src/**'
+      - '!CodenameOne/src/**/*.md'
+      - 'native-themes/windows-fluent/**'
+      - '!native-themes/windows-fluent/**/*.md'
+      - 'scripts/windows/**'
+      - '!scripts/windows/**/*.md'
       - '!vm/**/README.md'
       - '!vm/**/readme.md'
       - '!vm/**/docs/**'
