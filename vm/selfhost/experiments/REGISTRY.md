@@ -3822,3 +3822,47 @@ Two costs are ours alone and both are addressable:
 
 Neither is a codegen rewrite. Both are the closed world telling us something the
 emitted code currently declines to use.
+
+## Round 40: the leaf instanceof, and what the ASM comparison was worth
+
+Round 39 read C2's output beside ours for BytecodeMethod.equals and found the
+shape fine -- 371 instructions against 466, 4 stores against 30 -- but 31% more
+LOADS. The single biggest contributor was instanceof: we load the class word,
+then load classId out of it (a DEPENDENT load), then index the type-test bitmap.
+C2 compares the klass word directly, because for HotSpot the klass IS the
+identity.
+
+In a closed world we can be too. Nothing live extends a leaf class, so an object
+is an instance of it exactly when its class word IS that class. 433 of 529
+instanceof sites qualify (82%). On BytecodeMethod.equals loads fall 92 -> 85,
+narrowing the gap to C2 from +31% to +21%.
+
+Whole-program: 1.154x against JDK 25, from 1.171x. **Not resolvable** -- parpar's
+own elapsed spread was 9.5% that run. The honest statement is that the change
+does what the disassembly says it does and the benchmark cannot see it, which is
+the expected outcome for one instruction pattern among many.
+
+### Two ways it was wrong, both caught
+
+  - A BOXED type is final, so it passes the subclass test, and the leaf form is
+    still wrong: a tagged immediate IS an Integer and has no class word. BoxEdge,
+    HtTorture and InstanceOfT failed together. The reasoning that "a tagged
+    value's class is never a leaf anyone tests for" was false -- final is exactly
+    what those classes are.
+  - String is a leaf whose class word is NOT unique, because a fused String
+    carries a twin clazz. A plain identity compare answers FALSE for the Strings
+    this VM creates most. Round 36's commit said explicitly that identity
+    comparisons must ask cn1IsStringClass; this was new code doing the thing that
+    warning was written for, three commits later. TwinProbe caught it, alone, in
+    a run where the other 26 tortures were green.
+
+The second is the more useful lesson: a warning in a commit message does not
+constrain code written afterwards. The test does.
+
+### Process note
+
+Two gate runs overlapped and produced a status file with duplicate lines and
+meaningless results, and separately a gauntlet ran against a stale translator and
+reported a failure that a direct run of the same test did not reproduce. Run the
+gates ONCE, serially, and confirm no gate process is alive before starting
+another -- `mvn clean` in one run removes target/ under the other.
