@@ -117,6 +117,8 @@ final class HealthManifestFragments {
         PERMISSION_SUFFIX.put("walking_heart_rate_average", "HEART_RATE");
         PERMISSION_SUFFIX.put("heart_rate_variability_sdnn",
                 "HEART_RATE_VARIABILITY");
+        PERMISSION_SUFFIX.put("heart_rate_variability_rmssd",
+                "HEART_RATE_VARIABILITY");
         PERMISSION_SUFFIX.put("oxygen_saturation", "OXYGEN_SATURATION");
         PERMISSION_SUFFIX.put("respiratory_rate", "RESPIRATORY_RATE");
         PERMISSION_SUFFIX.put("body_temperature", "BODY_TEMPERATURE");

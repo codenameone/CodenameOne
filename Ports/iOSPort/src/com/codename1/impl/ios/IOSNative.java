@@ -2582,4 +2582,46 @@ public final class IOSNative {
      */
     native boolean clearAppClipInviteHandoff(String appGroup);
 
+    // --- Foldable / hinge (UIHinge), implemented in nativeSources/CN1Hinge.m ---
+    //
+    // Apple's foldable API is API_AVAILABLE(ios(27.1)) -- 27.1, not 27.0 -- and
+    // is absent from the Xcode 26 SDK the tree still builds with by default.
+    // CN1Hinge.m compiles the whole implementation out on such an SDK and keeps
+    // these symbols answering "no hinge", so the port links either way and
+    // nothing here is conditional.
+
+    /**
+     * Installs the hinge observer on the root view, once. Idempotent, safe from
+     * any thread, and a no-op on a device or SDK without the hinge API.
+     */
+    native void startHingeMonitoring();
+
+    /**
+     * Whether this display reports a fold at all -- asked of the reserved
+     * regions rather than of the hinge observer, so a caller that arrives
+     * before the first update still gets a real answer instead of a premature
+     * "not foldable".
+     */
+    native boolean isFoldableDisplay();
+
+    /**
+     * The last UIHingeStatus: 0 unknown, 1 closed, 2 partially open, 3 fully
+     * open, or -1 when no hinge has been observed.
+     */
+    native int getHingeStatus();
+
+    /**
+     * The last hinge angle in whole degrees, or -1 when unknown. UIHinge reports
+     * radians; the conversion happens natively so only one unit crosses the
+     * boundary.
+     */
+    native int getHingeAngleDegrees();
+
+    /**
+     * Fills {@code out} with the active fold region in display pixels
+     * (x, y, width, height) and returns its kind: 0 none, 1 occlusion,
+     * 2 division. {@code out} is left untouched when the answer is 0.
+     */
+    native int getFoldRegion(int[] out);
+
 }
