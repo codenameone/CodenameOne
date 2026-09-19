@@ -122,6 +122,33 @@ which places the fault between deactivation and unmount -- and that is `visitChi
 The bug CLASS is closed, not just this instance: a census of every element that owns
 children finds no other that fails to override `visitChildren`. Two tests pin it.
 
+## 2c. BLOCKING: a nested GestureDetector never receives its release
+
+`/demo/cupertino-picker` is inert: tapping any of its five rows changes 0.0% of the
+screen and raises no error. Each row is `MouseRegion > GestureDetector(onTap:)` calling
+`showCupertinoModalPopup`, and every part of that is present -- the transpiler emits the
+call, `showCupertinoModalPopup` delegates to `Dialogs.showDialog`, and that builds and
+presents a real Codename One dialog.
+
+The gesture is what fails, and only when detectors NEST:
+
+| Observed | |
+|---|---|
+| press | reaches BOTH overlays -- the outer one covering the page, then the row's, which reports `forwardTo=null` and so owns the tap |
+| release | reaches **neither**; `pointerReleased` is never called on any overlay |
+| the same code on `/` | release arrives normally (`RELEASED on overlay @96,1211 forwardTo=null`) and the tap fires |
+
+The difference is the outer, page-covering `GestureDetector`. On the home screen there is
+none, the row's overlay is the press target, and the tap works. Where one forwards to
+another, both call `super.pointerPressed` and the release then goes to neither.
+
+Taps on that screen are not dead in general -- the app bar's back chevron navigates,
+because it is a Codename One Button rather than a gesture overlay.
+
+This blocks the Cupertino picker family (three demo routes) and anything else built on a
+nested detector, so it comes before the callbacks themselves: `onSelectedItemChanged`
+cannot be reached while the tap that opens the picker does not fire.
+
 ## 3. Structural gaps
 
 | Gap | Consequence |
