@@ -147,8 +147,25 @@ reconciler, double-attach of an already-parented component, `attachOrder` drifti
 the container's child count (they match exactly everywhere), and `RenderHost.detach`'s
 container guard (fixed separately as wrong on its own terms; it is not this).
 
-NEXT: find the path that replaces `ScrollRenderElement.content` without deactivating
-the previous element.
+Narrowed further, and the scroll view is NOT the culprit:
+
+- The duplication is **created by the deletion**, not pre-existing: a census on a plain
+  press before any swipe reports 19 labels, 19 distinct, 0 duplicated.
+- No element is mounted twice -- instrumenting `RenderElement.mount` for an element that
+  already owns a component reports zero.
+- The list's own scroll element never replaces its content. The single content change
+  during a deletion is `before=null ... builtWidget=Row` on a scroll element seen for the
+  first time -- an inner image-row scroller inside a mail row, not the list.
+
+So the second `EffectPane` is not a replacement content subtree. It is attached to the
+LIST's host by some other element, which means the fault is in **which host a newly
+mounted element attaches to**. A `RenderHost` is flat: every component-owning element
+attaches into one container, and an `EffectRenderElement` opens a NESTED host whose
+container is its own pane. An element that should have joined the inner host joining the
+outer one instead puts a second pane beside the first.
+
+NEXT: instrument how `host` is chosen when an element mounts, and find the element that
+takes the outer host while its parent chain passes through an effect pane.
 
 This blocks Phase 1: any list that loses an item is affected, so the callbacks below
 that remove things cannot be finished until it is understood.
