@@ -25,6 +25,7 @@ package com.codename1.ui;
 import com.codename1.junit.FormTest;
 import com.codename1.junit.UITestBase;
 import com.codename1.ui.events.ActionEvent;
+import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.layouts.BoxLayout;
 import com.codename1.ui.plaf.UIManager;
 
@@ -210,6 +211,86 @@ class DesktopKeyboardConventionsTest extends UITestBase {
             assertEquals(2, fired[0],
                     "two Escape keystrokes must invoke the back command twice; one means the "
                     + "release suppression stayed set after the first keystroke");
+        } finally {
+            backField.setInt(null, originalBack);
+        }
+    }
+
+    @FormTest
+    void aPopGuardVetoesEscapeBeforeTheBackCommandRuns() throws Exception {
+        // The guard exists to stop a pop before it happens. Consulting it after the back
+        // command has run means the veto lands once the command has already navigated away or
+        // discarded what the guard was protecting -- MenuBar's hardware-back path checks
+        // first, and on the desktop Escape IS the hardware back key.
+        Field backField = MenuBar.class.getDeclaredField("backSK");
+        backField.setAccessible(true);
+        int originalBack = backField.getInt(null);
+        try {
+            backField.setInt(null, KEY_ESCAPE);
+            implementation.setDesktop(true);
+            Form f = threeButtonForm();
+            final int[] fired = new int[1];
+            Command back = new Command("Back") {
+                @Override
+                public void actionPerformed(ActionEvent evt) {
+                    fired[0]++;
+                }
+            };
+            f.setBackCommand(back);
+            f.setPopGuard(new com.codename1.router.PopGuard() {
+                @Override
+                public boolean canPop(Form form, com.codename1.router.PopReason reason) {
+                    return false;
+                }
+            });
+            f.show();
+            DisplayTest.flushEdt();
+
+            f.keyPressed(KEY_ESCAPE);
+            f.keyReleased(KEY_ESCAPE);
+            DisplayTest.flushEdt();
+
+            assertEquals(0, fired[0],
+                    "a vetoing pop guard must stop the back command from running at all");
+        } finally {
+            backField.setInt(null, originalBack);
+        }
+    }
+
+    @FormTest
+    void aConsumedEscapeEventSuppressesTheFormRouting() throws Exception {
+        // One event has to travel through the dispatch. Building a second one for the
+        // form-level routing meant a command that consumed the event could not stop it.
+        Field backField = MenuBar.class.getDeclaredField("backSK");
+        backField.setAccessible(true);
+        int originalBack = backField.getInt(null);
+        try {
+            backField.setInt(null, KEY_ESCAPE);
+            implementation.setDesktop(true);
+            Form f = threeButtonForm();
+            final int[] routed = new int[1];
+            Command back = new Command("Back") {
+                @Override
+                public void actionPerformed(ActionEvent evt) {
+                    evt.consume();
+                }
+            };
+            f.setBackCommand(back);
+            f.addCommandListener(new ActionListener() {
+                @Override
+                public void actionPerformed(ActionEvent evt) {
+                    routed[0]++;
+                }
+            });
+            f.show();
+            DisplayTest.flushEdt();
+
+            f.keyPressed(KEY_ESCAPE);
+            f.keyReleased(KEY_ESCAPE);
+            DisplayTest.flushEdt();
+
+            assertEquals(0, routed[0],
+                    "a back command that consumed the event must suppress the form routing");
         } finally {
             backField.setInt(null, originalBack);
         }

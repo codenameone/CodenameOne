@@ -7276,8 +7276,27 @@ public class Component implements Animation, StyleListener, Editable {
             contextMenuCommands = null;
             return;
         }
-        contextMenuCommands = new Command[commands.length];
-        System.arraycopy(commands, 0, contextMenuCommands, 0, commands.length);
+        // Nulls are dropped HERE rather than at every use, so `length > 0` keeps meaning "has a
+        // menu" wherever it is asked. It did not: an all-null array is nonempty, so the walk in
+        // fireContextMenu treated the component as having a menu, consumed the right click and
+        // opened nothing -- and an ancestor that did have a menu never got to answer.
+        int kept = 0;
+        for (Command cmd : commands) {
+            if (cmd != null) {
+                kept++;
+            }
+        }
+        if (kept == 0) {
+            contextMenuCommands = null;
+            return;
+        }
+        contextMenuCommands = new Command[kept];
+        int at = 0;
+        for (Command cmd : commands) {
+            if (cmd != null) {
+                contextMenuCommands[at++] = cmd;
+            }
+        }
     }
 
     private Command[] contextMenuCommands;

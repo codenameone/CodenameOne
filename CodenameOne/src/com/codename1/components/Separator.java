@@ -141,6 +141,16 @@ public class Separator extends Component {
             // platform that wants a two-tone bevel needs. Painting over it would double it.
             return;
         }
+        if ((s.getBgTransparency() & 0xff) == 0xff) {
+            // An opaque background IS the rule, and Component.paintBackground has already
+            // drawn it. The component is exactly as thick as the rule, so filling over it with
+            // the foreground would repaint the whole visible area in the text colour -- which
+            // is what the Android Material and iOS Modern themes would have got, since both
+            // define Separator through background-color and never set a foreground.
+            //
+            // Same reasoning as the border case above: whoever already drew the rule owns it.
+            return;
+        }
         int thickness = getThickness();
         g.setColor(s.getFgColor());
         int alpha = g.concatenateAlpha(s.getFgAlpha());

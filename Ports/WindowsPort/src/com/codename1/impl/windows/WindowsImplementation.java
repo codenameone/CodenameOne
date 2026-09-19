@@ -3289,21 +3289,6 @@ public class WindowsImplementation extends CodenameOneImplementation {
     /// One generation is enough: the click cannot outlive two form changes.
     private java.util.Map<Integer, com.codename1.ui.Command> supersededMenuCommands;
 
-    /// The form the live menu was published for, and the one before it -- mirroring the two
-    /// command maps above.
-    ///
-    /// A native menu selection has to go through the owning Form's dispatchCommand, not
-    /// straight to Command.actionPerformed. dispatchCommand calls actionPerformed first and
-    /// then, if the event was not consumed, runs the form-level routing: listeners registered
-    /// with Form.addCommandListener, an actionCommand() override, and the pop guard. Calling
-    /// the command directly skips all of it.
-    ///
-    /// That gap was survivable while the Toolbar was still on screen, because the same command
-    /// was reachable through it. Installing a desktop native theme hides the Toolbar, so the
-    /// native menu becomes the ONLY way to reach these commands and the skipped routing simply
-    /// stops happening.
-    private com.codename1.ui.Form nativeMenuHost;
-    private com.codename1.ui.Form supersededMenuHost;
 
 
     private int nextMenuCommandId = 1;
@@ -3385,10 +3370,6 @@ public class WindowsImplementation extends CodenameOneImplementation {
                 published.put(Integer.valueOf(commandId), c);
             }
         }
-        supersededMenuHost = nativeMenuHost;
-        // The form the menu was built from. MenuBar.updateCommands publishes for the
-        // form being shown, so the current form is that form.
-        nativeMenuHost = com.codename1.ui.Display.getInstance().getCurrent();
         supersededMenuCommands = nativeMenuCommands;
         nativeMenuCommands = published;
         WindowsNative.menuSetCommands(sb.toString());
@@ -3408,31 +3389,13 @@ public class WindowsImplementation extends CodenameOneImplementation {
     private void fireNativeMenuCommand(int commandId) {
         Integer key = Integer.valueOf(commandId);
         com.codename1.ui.Command resolved = nativeMenuCommands.get(key);
-        com.codename1.ui.Form host = nativeMenuHost;
         if (resolved == null && supersededMenuCommands != null) {
             resolved = supersededMenuCommands.get(key);
-            host = supersededMenuHost;
         }
-        if (resolved == null) {
-            return;
-        }
-        if (!resolved.isEnabled()) {
-            // A disabled Command must not run just because its menu item was clicked. The
-            // encoding carries no enabled flag, so the native item is created enabled and
-            // stays clickable -- the item looks available and does nothing, which is wrong but
-            // harmless, where invoking a disabled action is neither. Greying the item out as
-            // well means a sixth field in the row format and a matching change in all three
-            // native parsers; this guard is the half that prevents the damage.
-            return;
-        }
-        com.codename1.ui.events.ActionEvent ev =
-                new com.codename1.ui.events.ActionEvent(resolved);
-        if (host != null) {
-            // Runs actionPerformed and then the form-level routing; see nativeMenuHost.
-            host.dispatchCommand(resolved, ev);
-            return;
-        }
-        resolved.actionPerformed(ev);
+        // The owning form is resolved inside dispatchNativeMenuCommand, at selection time.
+        // Capturing it when the menu was published does not work: MenuBar publishes from
+        // addCommand, while the form is still being built and before show() makes it current.
+        dispatchNativeMenuCommand(resolved);
     }
 
     /// @inheritDoc

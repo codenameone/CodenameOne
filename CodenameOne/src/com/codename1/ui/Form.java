@@ -4143,8 +4143,26 @@ public class Form extends Container implements TopLevelContainer {
         if (back == null) {
             return false;
         }
-        back.actionPerformed(new ActionEvent(back, ActionEvent.Type.Command));
-        actionCommandImpl(back);
+        // Exactly the order the hardware back key uses in MenuBar.keyReleased, because on the
+        // desktop this IS the hardware back key -- JavaSEPort.getBackKeyCode() returns
+        // VK_ESCAPE. Two things follow from that and both were wrong here:
+        //
+        // The guard is consulted BEFORE the command runs. Asking afterwards means a veto
+        // arrives once the back command has already navigated away or discarded the state it
+        // was guarding. A vetoed Escape still counts as handled, so the caller suppresses the
+        // matching release and the MenuBar path does not get to retry it.
+        //
+        // And one event is carried through the dispatch, so a command that consumes it
+        // suppresses the form-level routing. Building a second event for actionCommandImpl
+        // meant consumption could not be seen there.
+        if (!checkPopGuard(com.codename1.router.PopReason.HARDWARE_BACK)) {
+            return true;
+        }
+        ActionEvent ev = new ActionEvent(back, ActionEvent.Type.Command);
+        back.actionPerformed(ev);
+        if (!ev.isConsumed()) {
+            actionCommandImpl(back, ev);
+        }
         return true;
     }
 

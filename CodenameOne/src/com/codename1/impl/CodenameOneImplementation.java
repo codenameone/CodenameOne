@@ -5017,6 +5017,73 @@ public abstract class CodenameOneImplementation {
         return false;
     }
 
+    /// Runs a command the platform's native menu bar just reported, through the form that owns
+    /// it so the form-level routing is not skipped.
+    ///
+    /// `Command#actionPerformed` alone is not enough. `Form#dispatchCommand` calls it and then,
+    /// if the event was not consumed, runs the listeners registered with
+    /// `Form#addCommandListener`, an `actionCommand()` override and the pop guard. While the
+    /// Toolbar was still on screen the same command was reachable through it and the difference
+    /// did not show; a desktop native theme hides the Toolbar, which makes the native menu the
+    /// only route and the skipped routing simply stop happening.
+    ///
+    /// The owning form is resolved HERE, when the item is chosen, rather than when the menu was
+    /// published. Publishing happens from `MenuBar#addCommand`, which runs while a form is being
+    /// built and before `show()` makes it current -- so a form captured at that moment is the
+    /// PREVIOUS one, and showing the new form does not republish. At selection time the form
+    /// whose menu is on screen is simply the current one.
+    ///
+    /// Ownership is then confirmed rather than assumed: a command that the current form does not
+    /// carry -- a stale click during a transition, say -- is run directly rather than dispatched
+    /// through a form it does not belong to.
+    ///
+    /// #### Parameters
+    ///
+    /// - `cmd`: the command the native menu reported; ignored when null or disabled
+    protected void dispatchNativeMenuCommand(com.codename1.ui.Command cmd) {
+        if (cmd == null) {
+            return;
+        }
+        if (!cmd.isEnabled()) {
+            // A disabled Command must not run because its menu item was clicked. The row format
+            // carries no enabled flag, so the native item is created enabled and stays
+            // clickable; greying it out as well needs another field and a matching change in
+            // every native parser. This is the half that prevents the damage.
+            return;
+        }
+        com.codename1.ui.Form current = com.codename1.ui.Display.getInstance().getCurrent();
+        com.codename1.ui.events.ActionEvent ev = new com.codename1.ui.events.ActionEvent(cmd);
+        if (current != null && formCarriesCommand(current, cmd)) {
+            current.dispatchCommand(cmd, ev);
+            return;
+        }
+        cmd.actionPerformed(ev);
+    }
+
+    /// True when the form lists this command, including as its back command.
+    ///
+    /// #### Parameters
+    ///
+    /// - `f`: the form to search
+    ///
+    /// - `cmd`: the command
+    ///
+    /// #### Returns
+    ///
+    /// true when the command belongs to the form
+    private static boolean formCarriesCommand(com.codename1.ui.Form f, com.codename1.ui.Command cmd) {
+        if (f.getBackCommand() == cmd) { //NOPMD CompareObjectsWithEquals
+            return true;
+        }
+        int count = f.getCommandCount();
+        for (int i = 0; i < count; i++) {
+            if (f.getCommand(i) == cmd) { //NOPMD CompareObjectsWithEquals
+                return true;
+            }
+        }
+        return false;
+    }
+
     /// Returns the desktop title-bar mode for this platform: one of {@code "native"} (OS title
     /// bar + native menu bar), {@code "custom"} (undecorated window where the CN1 Toolbar acts as
     /// the title bar) or {@code "toolbar"} (legacy in-app CN1 Toolbar). Returns {@code "toolbar"}

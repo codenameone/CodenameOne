@@ -42,6 +42,8 @@ import java.util.Hashtable;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -356,5 +358,52 @@ class DesktopComponentsTest extends UITestBase {
                 "a null caption is the untitled case, not a null title");
         assertTrue(new GroupBox(null).getTitleComponent().isHidden(),
                 "and it still hides the caption");
+    }
+
+    @FormTest
+    void aStepperRestoresUnusableTextWhenEditingEnds() throws Exception {
+        // Permitting '-' so a negative range is typable means the field can legitimately hold
+        // "-" mid-edit. When editing ends it must not stay that way: getValue() still reports
+        // the last good number, so the control would show one thing and report another.
+        Stepper s = new Stepper(3, -10, 10);
+        Form f = new Form("Stepper", BoxLayout.y());
+        f.add(s);
+        f.show();
+        DisplayTest.flushEdt();
+
+        s.getField().setText("-");
+        DisplayTest.flushEdt();
+        assertEquals("-", s.getField().getText(),
+                "mid-edit the partial sign is left alone, or typing -5 would be impossible");
+        assertEquals(3, s.getValue(), "and the value has not moved");
+
+        // The edit-completion event TextField fires on focus loss. Not public across
+        // packages, so reached the way this suite already reaches MenuBar's soft-key fields.
+        java.lang.reflect.Method fire =
+                com.codename1.ui.TextArea.class.getDeclaredMethod("fireActionEvent");
+        fire.setAccessible(true);
+        fire.invoke(s.getField());
+        DisplayTest.flushEdt();
+
+        assertEquals("3", s.getField().getText(),
+                "when editing ends the field must go back to the value it reports");
+        assertEquals(3, s.getValue(), "which is unchanged");
+    }
+
+    @FormTest
+    void anAllNullContextMenuArrayIsNoMenuAtAll() {
+        // An all-null array is nonempty, so a length test called it a menu: the component
+        // consumed the right click, opened nothing, and an ancestor that did have a menu never
+        // got to answer.
+        Label child = new Label("child");
+        child.setContextMenuCommands((com.codename1.ui.Command) null);
+        assertNull(child.getContextMenuCommands(),
+                "an array with no usable command is not a menu");
+
+        Label real = new Label("real");
+        real.setContextMenuCommands(new com.codename1.ui.Command("Cut"), null);
+        assertNotNull(real.getContextMenuCommands(), "a usable command still makes a menu");
+        assertEquals(1, real.getContextMenuCommands().length,
+                "and the null beside it is dropped rather than carried");
     }
 }

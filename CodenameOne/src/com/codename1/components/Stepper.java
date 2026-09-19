@@ -115,13 +115,17 @@ public class Stepper extends Container {
         field.addActionListener(new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent evt) {
-                commitTypedText();
+                // Editing is over -- the field lost focus or the user confirmed. Text that is
+                // not a number cannot be left on screen now.
+                commitTypedText(true);
             }
         });
         field.addDataChangedListener(new com.codename1.ui.events.DataChangedListener() {
             @Override
             public void dataChanged(int type, int index) {
-                commitTypedText();
+                // Mid-edit. "-" and "" are legitimate things to be holding on the way to a
+                // number, so they are tolerated here and only settled above.
+                commitTypedText(false);
             }
         });
 
@@ -285,15 +289,33 @@ public class Stepper extends Container {
     /// to retype it would otherwise watch it fill itself in under the caret. Anything that
     /// is not a number is ignored the same way -- the field is corrected when the value is
     /// next set, which is what leaving the field does.
-    private void commitTypedText() {
+    /// Reads the field and adopts it when it holds a usable number.
+    ///
+    /// #### Parameters
+    ///
+    /// - `editingFinished`: true when the edit is over, in which case unusable text is
+    ///   replaced with the current value rather than left on screen. While editing is still in
+    ///   progress it is left alone: on a stepper whose range includes negatives, "-" is what
+    ///   the field holds after the first keystroke of "-5", and correcting it there would undo
+    ///   the user's typing as they went.
+    private void commitTypedText(boolean editingFinished) {
         String text = field.getText();
         if (text == null || text.length() == 0) {
+            if (editingFinished) {
+                syncField();
+            }
             return;
         }
         int typed;
         try {
             typed = Integer.parseInt(text.trim());
         } catch (NumberFormatException err) {
+            if (editingFinished) {
+                // Left mid-edit on something like "-" or "12x". getValue() still reports the
+                // last good number, so leaving the text as it is would show one value and
+                // report another for as long as the form is up.
+                syncField();
+            }
             return;
         }
         if (typed == value) {
