@@ -118,10 +118,37 @@ Ruled out so far, each by measurement rather than reading:
 | `updateChildren` | no -- it is Flutter's keyed algorithm, leading run, trailing run, keyed middle |
 | `RenderHost.detach` failing its `parent == container` guard | no -- instrumented; it is skipped zero times |
 
-So the old elements are not orphans being left behind: they are still mounted and still
-considered current. The remaining candidate is `ListViewRenderElement`'s windowed
-rebuild -- it builds `[top spacer, items..., bottom spacer]`, and the spacers carry no
-key -- but that is a hypothesis, not yet a finding.
+### Root cause, found
+
+**The scroll view's old content subtree is never deactivated, so a second content pane
+is built and populated beside it.** Both then render, which is the doubling.
+
+Traced by identity rather than by class name -- printing the ancestor chain as class
+names alone was misleading, because two different panes print the same path:
+
+```text
+copy0  /EffectPane#65c5bb81/ScrollPane#566c8191/...
+copy1  /EffectPane#34127c5 /ScrollPane#566c8191/...      <- same ScrollPane
+```
+
+Two content `EffectPane`s under ONE `ScrollPane`, each populated in the attach trace
+(`ATT ... into 65c5bb81`, `ATT ... into 34127c5`), and exactly one `DET` in the whole
+trace -- for an unrelated pane. So the old content element is not unmounted at all:
+`ScrollRenderElement.syncChildren` does `content = updateChild(content, buildContent(),
+0)`, and `updateChild` does call `deactivateChild` on the replace path, so the field is
+being overwritten by a route that skips it.
+
+That is the conflict between the two trees: the element tree is correct and the
+Codename One component tree keeps the previous subtree.
+
+Ruled out along the way, each by measurement: the dismissed row staying mounted,
+the callback's timing, repaint ordering, missing keys, `ObjectKey` equality, the keyed
+reconciler, double-attach of an already-parented component, `attachOrder` drifting from
+the container's child count (they match exactly everywhere), and `RenderHost.detach`'s
+container guard (fixed separately as wrong on its own terms; it is not this).
+
+NEXT: find the path that replaces `ScrollRenderElement.content` without deactivating
+the previous element.
 
 This blocks Phase 1: any list that loses an item is affected, so the callbacks below
 that remove things cannot be finished until it is understood.
