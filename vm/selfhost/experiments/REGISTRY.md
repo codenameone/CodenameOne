@@ -3677,3 +3677,54 @@ rather than the embedded child's header, and the Java accessors given native
 fallbacks -- with no array object, latin1Value()/utf16Value() cannot hand back an
 array and their callers (replace, toCharArray, toCharNoCopy) need rewriting in
 terms of charInternal.
+
+## Round 37: the String store, finished -- 88 bytes per String becomes 63
+
+The twin clazz of round 36 carries the coder in a word every object already has,
+so the 24-byte JavaArrayPrototype a fused String wrapped around its payload had
+nothing left to say: length duplicated count, dimensions was always 1,
+primitiveSize was the coder, dataOffset was a constant, two fields were GC
+sentinels. It is gone. An inline String has value == JAVA_NULL and its characters
+at the first 8-aligned byte after the fields; the coder is _i8 or _i16. Large and
+aliased Strings keep a real array, so value is either null or an array.
+
+| | before | after |
+|---|---:|---:|
+| java.lang.String | 99.56MB | **70.97MB** |
+| bytes per String | 88 | **63** |
+| total allocation | 415.85MB | **386.60MB (-7.0%)** |
+
+Whole-program, 7 interleaved rounds, quiet machine: 1.168x elapsed and 1.073x
+peak against JDK 25. **The peak did not move, and that is expected rather than
+disappointing**: round 31 established that peak is set by collector headroom --
+live was ~828MB against a 1422MB peak -- and pacing is deliberately unchanged.
+Allocating 29MB less per run lowers the rate at which that headroom refills; it
+does not lower the headroom. Peak spread was 9.8% this run, so the harness
+refused to gate memory at all, which is the right answer for a 4% difference.
+
+### Four bugs, none of them visible to the compiler
+
+  - Two copying constructors read another String's array directly: an inline
+    source was a NullPointerException, and Latin1T died on its first line.
+  - getChars dereferenced the backing array's class word -- segfault, SbTorture.
+  - The lazy twin copy was armed only in cn1FusedLatin1Begin. Whichever of the
+    other two paths ran first allocated with an all-zero clazz, so the first
+    virtual call went through vtable[5] off a NULL vtable.
+  - getClassImpl returns the clazz struct AS the Class object, which is the ONE
+    place a twin's address becomes visible to Java. `s.getClass() ==
+    String.class` answered false for a fused String and true for an array-backed
+    one -- a real observable difference between two Strings of the same class.
+
+### The one that matters for next time
+
+The whole gauntlet was GREEN while getClass() was wrong. 26 tortures comparing
+byte-identical output against JDK 25, and not one of them asked whether a String
+was still String.class. It was found by a throwaway probe written to answer a
+different question, and it is now TwinProbe: both shapes asked the same questions
+-- instanceof String/CharSequence/Comparable, getClass identity and name, equals
+and compareTo across representations, every read that used to hand back an array,
+the copying constructors, survival across 20 collections -- and diffed against
+JDK 25.
+
+A representation change needs a test that interrogates the representation. The
+existing suite tests what the VM COMPUTES; nothing tested what it IS.
