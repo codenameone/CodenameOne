@@ -207,7 +207,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 > Shai Almog says:
 >
-> I was thinking more about this: [https://www.codenameone.com…](</manual/theme-basics/#_the_background_behavior_image>)
+> I was thinking more about this: [https://www.codenameone.com…](</developer-guide/css/#cn1-background-type>)
 >
 > Notice that the article you linked appeared here first: [http://www.codenameone.com/…](<http://www.codenameone.com/blog/building-a-chat-app-with-codename-one-part-4.html>)
 >

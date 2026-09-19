@@ -1,0 +1,23 @@
+{{ define "main" }}
+<div class="cn1-guide-layout">
+  {{ partial "guide-sidebar.html" . }}
+  <article class="post-single cn1-guide-chapter">
+    {{ partial "guide-pagination.html" (dict "page" . "position" "top") }}
+    <header class="post-header">
+      <nav class="cn1-guide-crumbs" aria-label="Breadcrumb"><a href="/developer-guide/">Developer Guide</a> / {{ .Params.guide_group }}</nav>
+      <h1 class="post-title" id="{{ .Params.guide_id }}">{{ .Title }}</h1>
+    </header>
+    {{ if .Fragments.Headings }}
+    <details class="cn1-guide-toc" open><summary>On this page</summary>{{ .TableOfContents }}</details>
+    {{ end }}
+    <div class="post-content cn1-guide-content">{{ .Content }}</div>
+    {{ partial "guide-pagination.html" (dict "page" . "position" "bottom") }}
+    <footer class="cn1-guide-tools">
+      <a href="https://github.com/codenameone/CodenameOne/blob/master/{{ .Params.guide_source }}">Edit this chapter</a>
+      <a href="/developer-guide/single-page/#{{ .Params.guide_id }}">Full book</a>
+      <a href="/files/developer-guide.pdf">PDF</a>
+    </footer>
+  </article>
+</div>
+{{ partial "guide-legacy-links.html" . }}
+{{ end }}

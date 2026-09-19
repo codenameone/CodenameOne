@@ -31,7 +31,7 @@ Once you adopt that model, threading stops being an abstract theory lesson and b
 
 ## Further Reading
 
-- [Developer Guide](/developer-guide/)
+- [Developer Guide](/developer-guide/the-edt-event-dispatch-thread/)
 - [How Do I Access Remote Webservices, Perform Operations On The Server](/how-do-i/how-do-i-access-remote-webservices-perform-operations-on-the-server/)
 - [How Do I Improve Application Performance Or Track Down Performance Issues](/how-do-i/how-do-i-improve-application-performance-or-track-down-performance-issues/)
 - [How Do I Find Problems In My Application Using The Codename One Tools And The Standard IDE Tools](/how-do-i/how-do-i-find-problems-in-my-application-using-the-codename-one-tools-and-the-standard-ide-tools/)

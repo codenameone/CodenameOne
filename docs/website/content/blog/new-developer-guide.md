@@ -11,7 +11,7 @@ author: Shai Almog
 
 ![Header Image](/blog/new-developer-guide/new-developer-guide.png)
 
-We are rebuilding the [developer guide](/manual/) using JBake and asciidoc which means the guide would be better integrated  
+We are rebuilding the [developer guide](/developer-guide/) using JBake and asciidoc which means the guide would be better integrated\
 into the website thus providing more accessible hyperlinkable information. This is already making its way into  
 the site and into the PDF so we’d appreciate feedback. 
 

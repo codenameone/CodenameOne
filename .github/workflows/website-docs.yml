@@ -162,6 +162,12 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ github.token }}
 
+      - name: Check redirect rule ordering
+        run: python3 scripts/website/test_redirect_order.py
+
+      - name: Test developer guide chapter generation
+        run: ruby scripts/website/test_generate_developer_guide.rb
+
       - name: Test developer guide PDF redirect resolver
         run: scripts/website/test_update_developer_guide_redirect.sh
 
@@ -383,6 +389,7 @@ jobs:
           set -euo pipefail
           test -f docs/website/public/_redirects
           test -f docs/website/public/developer-guide/index.html
+          python3 scripts/website/check_developer_guide.py docs/website/public
           grep -Eq '^/files/developer-guide\.pdf https://github\.com/codenameone/CodenameOne/releases/download/.+/developer-guide\.pdf 302$' docs/website/public/_redirects
           grep -Eq '^/manual /developer-guide/ 301$' docs/website/public/_redirects
           grep -Eq '^/manual/ /developer-guide/ 301$' docs/website/public/_redirects

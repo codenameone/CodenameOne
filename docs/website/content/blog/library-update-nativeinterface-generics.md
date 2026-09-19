@@ -58,7 +58,7 @@ result is really nice.
 We are on the brink of 700 pages for the developer guide and I think we’ll finish just shy of 1000 for this iteration.
 
 This work is taking some time but it’s totally worth the effort as the level of the documentation is at a league  
-of its own. E.g. check out the IO section in the guide [here](/manual/files-storage-networking/).  
+of its own. E.g. check out the IO section in the guide [here](/developer-guide/io/).\
 The original was remarkably bare and didn’t cover so many basic things that should be covered e.g.  
 the webservice wizard, [SliderBridge](/javadoc/com/codename1/components/SliderBridge/)  
 etc…​

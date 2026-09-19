@@ -2454,6 +2454,43 @@ public final class HttpServer {
             return fd >= 0 && fd < connByFd.length ? connByFd[fd] : null;
         }
 
+        /**
+         * Drop the handle slot for a virtual thread that has just finished, but only
+         * if the slot still names it.
+         *
+         * A connection closes itself -- drop() runs inside the virtual thread, before
+         * it returns here -- so by the time this is reached the kernel may already
+         * have handed the descriptor NUMBER to a connection accepted since. Host 0
+         * accepts while every other host runs its own virtual threads, so that new
+         * connection can be arriving on this very host, in these very arrays. Clearing
+         * unconditionally then throws away the new connection's handle rather than the
+         * finished one's.
+         */
+        void releaseHandle(int fd, long handle) {
+            if(fd >= 0 && fd < vtByFd.length && vtByFd[fd] == handle) {
+                vtByFd[fd] = 0;
+            }
+        }
+
+        /**
+         * Forget everything this host knows about a descriptor, EXCEPT the handle.
+         *
+         * Called from drop() while the descriptor is still open, which is what makes
+         * it safe: the number cannot be reused until close(2), so these slots are
+         * certainly still this connection's. The handle is left because the virtual
+         * thread that owns it is usually the caller -- it is still running on that
+         * stack, and freeing it here would be a use-after-free. advance() releases it
+         * when the thread actually finishes.
+         */
+        void forget(int fd) {
+            if(fd < 0 || fd >= deadlineByFd.length) {
+                return;
+            }
+            deadlineByFd[fd] = 0;
+            connByFd[fd] = null;
+            armedByFd[fd] = false;
+        }
+
         void setHandle(int fd, long handle) {
             ensureCapacity(fd);
             vtByFd[fd] = handle;
@@ -2658,7 +2695,15 @@ public final class HttpServer {
             privatiseBorrowedBuffer(me.connOf(fd));
         }
         if(state == VirtualThread.FINISHED) {
-            me.setHandle(fd, 0);
+            // Only the handle, and only if it is still ours. Everything else this
+            // host held for the descriptor was cleared by drop() BEFORE the close,
+            // which is the only moment at which the number is still guaranteed to
+            // mean this connection. Clearing it here instead wiped the arm flag of
+            // whatever connection had since been given the number, and the next time
+            // that one parked it was re-added to an epoll set that already held it --
+            // EEXIST, an IOException, and a connection dropped with no response at
+            // all. See drop().
+            me.releaseHandle(fd, handle);
             VirtualThread.free(handle);
             return;
         }
@@ -2688,6 +2733,18 @@ public final class HttpServer {
                 me.setArmed(fd, true);
             }
         } catch (IOException err) {
+            // SAID OUT LOUD, because the alternative was two CI runs lost to
+            // "expected: <200> but was: <-1>" with an empty body and nothing else:
+            // this path drops a connection that has already been accepted and read
+            // from, without writing a response, so from the client it is
+            // indistinguishable from a server that died. It should now be
+            // unreachable -- it meant the descriptor was already in this host's
+            // epoll set, which only happened when a finishing connection cleared
+            // the arm flag of the connection that had been handed its number --
+            // and if it ever fires again, the message is the thread to pull.
+            System.err.println("could not re-arm fd=" + fd
+                    + " for its next read, so the connection was dropped without a "
+                    + "response: " + err);
             me.setHandle(fd, 0);
             VirtualThread.free(handle);
             drop(fd);
@@ -2933,6 +2990,12 @@ public final class HttpServer {
         // closed, so an entry left behind here would time out the NEXT connection
         // to be handed that number.
         pooledDeadlines.remove(new Integer(fd));
+        // The same rule for the virtual-thread tables, which had no equivalent and
+        // were cleared AFTER the close instead, from advance(). The descriptor is
+        // still open on this line, so ownerOf() still names this connection's host
+        // and the slots are certainly still this connection's; one line later the
+        // number can belong to somebody else.
+        forgetVtState(fd);
         Object h2 = http2Sessions.remove(new Integer(fd));
         if(h2 != null) {
             ((Http2)h2).close();
@@ -2943,6 +3006,23 @@ public final class HttpServer {
         }
         ServerSocket.closeFd(fd);
         openConnections.decrementAndGet();
+    }
+
+    /**
+     * Clear the per-descriptor state the owning virtual-thread host holds, if this
+     * server is running that way at all.
+     *
+     * Deliberately called with the descriptor still open. ownerOf() reads the owner
+     * table, and that table is only rewritten when a descriptor is ACCEPTED -- so
+     * asking after the close could name the host of a different connection that had
+     * been handed the same number, and clear its state instead of ours.
+     */
+    private void forgetVtState(int fd) {
+        VtHost[] hosts = vtHosts;
+        if(hosts == null) {
+            return;     // pool mode: pooledDeadlines above is the whole of it
+        }
+        ownerOf(fd).forget(fd);
     }
 
     /** 0 when this connection is plaintext. */

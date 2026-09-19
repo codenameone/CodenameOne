@@ -112,7 +112,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > Shai Almog says:
 >
 > Hi Diamond,  
-> we haven’t made it into a full fledged demo but I did add a shorter standalone section on this into the Toolbar javadocs and the developer guide: [https://www.codenameone.com…](</manual/components/#_title_animations>)
+> we haven’t made it into a full fledged demo but I did add a shorter standalone section on this into the Toolbar javadocs and the developer guide: [https://www.codenameone.com…](</developer-guide/the-components-of-codename-one/#title-animations-section>)
 >
 
 

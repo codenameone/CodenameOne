@@ -160,7 +160,7 @@ Switch to **CN1 Attach Android** and click 🐞 Debug. IntelliJ connects to `loc
 
 Source resolution covers both the `codenameone-core` and `codenameone-android` sources jars, so breakpoints inside the framework or inside the Android port resolve to the right files. On Android, **native interfaces are themselves Java**, so a breakpoint inside the `Impl` class of your own native interface fires just like a breakpoint anywhere else in your code; you can step through the implementation, inspect locals, and evaluate expressions the same way.
 
-The dev guide has the full reference, including the wireless-pairing flows, the VS Code and Eclipse equivalents, and a troubleshooting section: [iOS on-device debugging](https://www.codenameone.com/developer-guide/#_on_device_debugging_ios) and [Android on-device debugging](https://www.codenameone.com/developer-guide/#_on_device_debugging_android).
+The dev guide has the full reference, including the wireless-pairing flows, the VS Code and Eclipse equivalents, and a troubleshooting section: [iOS on-device debugging](/developer-guide/on-device-debugging/#_on_device_debugging_ios) and [Android on-device debugging](/developer-guide/on-device-debugging-android/#_on_device_debugging_android).
 
 ### When to use it (and when not to)
 
@@ -291,7 +291,7 @@ void newCodePathRunsWhenFlagIsOn() {
 
 Class-level `@SimulatorProperty` applies to every method in the class. Method-level overrides class-level. Use the container `@SimulatorProperties` for more than one (the package source level rules out `@Repeatable`).
 
-The full reference, including the dependency-block YAML for `common/pom.xml` and `javase/pom.xml` and the `@Theme` / `@Orientation` / `@RTL` details, is at [Testing with JUnit 5](https://www.codenameone.com/developer-guide/#_testing_with_junit_5) in the developer guide.
+The full reference, including the dependency-block YAML for `common/pom.xml` and `javase/pom.xml` and the `@Theme` / `@Orientation` / `@RTL` details, is at [Testing with JUnit 5](/developer-guide/testing-with-junit/#_testing_with_junit_5) in the developer guide.
 
 ## Wrapping up
 

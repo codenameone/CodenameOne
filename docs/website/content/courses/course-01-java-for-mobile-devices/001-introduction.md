@@ -28,5 +28,5 @@ The best way to use this course is to keep a project open while you read. Run th
 
 - [Getting Started](/getting-started/)
 - [Initializr](/initializr/)
-- [Developer Guide](/developer-guide/)
+- [Developer Guide](/developer-guide/introduction/)
 - [Hello World](/hello-world/)

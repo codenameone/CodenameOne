@@ -30,7 +30,7 @@ The main thing that changed since the video is not the underlying idea but the b
 ## Further Reading
 
 - [Layout Basics](/layout-basics/)
-- [Developer Guide](/developer-guide/)
+- [Developer Guide](/developer-guide/the-components-of-codename-one/#_list_multilist_renderers_models)
 - [How Do I Positioning Components Using Layout Managers](/how-do-i/how-do-i-positioning-components-using-layout-managers/)
 - [How Do I Improve Application Performance Or Track Down Performance Issues](/how-do-i/how-do-i-improve-application-performance-or-track-down-performance-issues/)
 

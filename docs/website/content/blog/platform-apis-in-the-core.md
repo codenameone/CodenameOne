@@ -250,7 +250,7 @@ view.setInputListener(userText -> {
 > shipped when this post was published. Vision, language services, and LiteRT
 > inference have since moved into core with builder-selected native
 > dependencies; Whisper and Stable Diffusion remain cn1libs. See
-> [AI, Chat UI, and Speech](https://www.codenameone.com/developer-guide/#_ai_chat_ui_and_speech)
+> [AI, Chat UI, and Speech](/developer-guide/ai-and-speech/#_ai_chat_ui_and_speech)
 > for the current APIs and migration guidance.
 
 The core LLM stack is paired with a set of opt-in cn1libs that wrap specific on-device capabilities: Google ML Kit features, the TensorFlow Lite runtime, a local Whisper transcription engine, and an on-device Stable Diffusion model. Thirteen new cn1libs ship this release.
@@ -481,7 +481,7 @@ The cn1libs above are specialized verticals. Barcode scanning, document scanning
 
 The Stable Diffusion cn1lib in particular is large enough that the cloud build server cannot accept the upload at all (it trips the 2 GB pre-upload guard). That kind of opt-in does not belong in a dependency every app inherits.
 
-The corresponding chapter, including the full `LlmClient` API table, the `ChatView` reference, the `SecureStorage` overloads, the simulator Ollama redirect, and the full cn1lib coverage, is at [AI, Chat UI, and Speech](https://www.codenameone.com/developer-guide/#_ai_chat_ui_and_speech) in the developer guide.
+The corresponding chapter, including the full `LlmClient` API table, the `ChatView` reference, the `SecureStorage` overloads, the simulator Ollama redirect, and the full cn1lib coverage, is at [AI, Chat UI, and Speech](/developer-guide/ai-and-speech/#_ai_chat_ui_and_speech) in the developer guide.
 
 ## OAuth and OIDC: the modern identity stack
 
@@ -602,7 +602,7 @@ W3C JSON wire format in both directions, so the response can be POSTed verbatim 
 
 One thing worth pulling out before you reach for it: if you sign in via OIDC against Google, Apple, Microsoft, Auth0, or Firebase, you usually already *get* passkeys for free. The identity provider runs the WebAuthn ceremony inside the system browser; OIDC just hands you the resulting tokens. So you do not need `WebAuthnClient` for that case. You need it for apps that run their own relying-party backend, and for apps driving the Auth0 or Firebase passkey grants directly.
 
-Full chapter: [Authentication and Identity](https://www.codenameone.com/developer-guide/#_authentication_and_identity).
+Full chapter: [Authentication and Identity](/developer-guide/authentication-and-identity/#authentication-and-identity).
 
 ## Connectivity: WiFi, Bonjour, USB, network-type listeners
 
@@ -637,7 +637,7 @@ iOS does not expose programmatic WiFi scanning to third-party apps; `scan()` thr
 
 Three new compile-time defines (`CN1_INCLUDE_WIFI_INFO`, `CN1_INCLUDE_HOTSPOT`, `CN1_INCLUDE_BONJOUR`) wrap the iOS native code, set only when the classpath scanner sees the matching Java API in use. Apps that do not use these APIs do not pay for them at App Store review time. Same pattern as the NFC gating from the previous release.
 
-Full reference: [Network Connectivity](https://www.codenameone.com/developer-guide/#_network_connectivity).
+Full reference: [Network Connectivity](/developer-guide/network-connectivity/#_deeper_network_connectivity).
 
 ## Share-sheet result callbacks
 

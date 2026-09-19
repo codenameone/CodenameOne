@@ -30,7 +30,7 @@ which reduces CPU usage and potential stuttering.
 #### JavaScript Native
 
 We’ve made some updates to the developer guide specifically a lot of details related to the  
-[JavaScript section](/manual/appendix-javascript.html) and information on the native interfaces  
+[JavaScript section](/developer-guide/working-with-javascript/) and information on the native interfaces\
 for JavaScript. This is important if you want to access the JavaScript code directly which means you need to  
 regenerate native interfaces for older cn1libs to be compatible. If you don’t do that compilation with such  
 libraries can result in a compilation error.

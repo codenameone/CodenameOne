@@ -27,6 +27,6 @@ So the right starting point for maps in Codename One is not "drop in a map widge
 
 ## Further Reading
 
-- [Developer Guide](/developer-guide/)
+- [Developer Guide](/developer-guide/maps/)
 - [How Do I Access Native Device Functionality, Invoke Native Interfaces](/how-do-i/how-do-i-access-native-device-functionality-invoke-native-interfaces/)
 - [Communicating with the Server](/courses/course-02-deep-dive-mobile-development-with-codename-one/025-communicating-with-the-server/)

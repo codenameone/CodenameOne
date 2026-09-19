@@ -82,7 +82,7 @@ Image locking is an esoteric performance implementation detail that most of you 
 
 If you don’t care about the nitty gritty skip this section, for those of you who care and don’t know what I’m talking  
 about you can  
-[read this section and sidebar in the developer guide](/manual/graphics/#_encodedimage).
+[read this section and sidebar in the developer guide](/developer-guide/graphics/#_encodedimage).
 
 In the coming update we fixed issue [#1746](https://github.com/codenameone/CodenameOne/issues/1746) to  
 also lock other button states (this was very visible with things like toggle buttons). But the main change was  

@@ -29,7 +29,7 @@ The key point is that crash reporting works best when it is part of a broader lo
 
 ## Further Reading
 
-- [Developer Guide](/developer-guide/)
+- [Developer Guide](/developer-guide/crash-protection/)
 - [How Do I Find Problems In My Application, Using The Codename One Tools And The Standard IDE Tools](/how-do-i/how-do-i-find-problems-in-my-application-using-the-codename-one-tools-and-the-standard-ide-tools/)
 - [How Do I Debug On An Android Device](/how-do-i/how-do-i-debug-on-an-android-device/)
 

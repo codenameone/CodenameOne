@@ -318,6 +318,7 @@ If you cannot run the simulator (e.g. headless environment), **say so explicitly
 | "Store an LLM API key" / non-prompting SecureStorage | `references/ai-and-speech.md` |
 | "Build against a Codename One SNAPSHOT from git" | `references/snapshot-builds.md` |
 | "Debug a faulty screen — attach `jdb` to the simulator" | `references/debugging.md` |
+| "It only breaks on the phone" / "attach a debugger to the Android/iOS build" / `android.onDeviceDebug`, `ios.onDeviceDebug` / drive the app on a device over MCP | `references/on-device-debugging.md` |
 | "Try the flow" / "fill in this form and press submit" / "drive the running app" / MCP | `references/mcp-agent-control.md` |
 | Quick yes/no check: "is this `java.*` class supported", "does my `theme.css` compile" | `tools/` directory — `java tools/IsApiSupported.java <class>` / `java tools/IsCssValid.java <file>` |
 | "Score this screen against a mockup" / "Import a Figma/Sketch/XD design" | `tools/` directory — `java tools/CompareToMockup.java <render> <mockup>` / `java tools/DesignImport.java <design>` (see `references/mockup-comparison.md`) |

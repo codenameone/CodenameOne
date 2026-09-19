@@ -27,6 +27,6 @@ So this lesson is best read as an anatomy-of-the-platform walkthrough for advanc
 
 ## Further Reading
 
-- [Developer Guide](/developer-guide/)
+- [Developer Guide](/developer-guide/maven-project-workflow/)
 - [How Do I Get Repeatable Builds, Build Against A Consistent Version Of Codename One & Use The Versioning Feature](/how-do-i/how-do-i-get-repeatable-builds-build-against-a-consistent-version-of-codename-one-use-the-versioning-feature/)
 - [How Do I Use Offline Build](/how-do-i/how-do-i-use-offline-build/)

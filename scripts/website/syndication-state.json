@@ -2165,6 +2165,35 @@
         "tags_set": true,
         "canonical_set": true,
         "syndicated_at": "2026-09-18T00:01:08+00:00"
+      },
+      "devto": {
+        "id": 4687125,
+        "url": "https://dev.to/codenameone/lies-damn-lies-and-benchmarks-1f4p",
+        "syndicated_at": "2026-09-18T17:04:19+00:00"
+      },
+      "foojay": {
+        "id": 62,
+        "url": "https://github.com/foojayio/website/pull/62",
+        "pull_request_url": "https://github.com/foojayio/website/pull/62",
+        "status": "submitted",
+        "published": false,
+        "syndicated_at": "2026-09-18T17:04:35+00:00"
+      },
+      "medium": {
+        "url": "https://medium.com/p/335c13fda7d8/edit",
+        "syndicated_at": "2026-09-18T19:02:23+00:00"
+      }
+    },
+    "parparvm-gc-small-heaps": {
+      "hashnode": {
+        "url": "https://debugagent.com/what-go-taught-us-about-java-garbage-collection",
+        "published": true,
+        "draft_url": "https://hashnode.com/draft/6aadd08dbef4ed95a6696337",
+        "cover_set": true,
+        "subheading_set": true,
+        "tags_set": true,
+        "canonical_set": true,
+        "syndicated_at": "2026-09-19T00:01:08+00:00"
       }
     }
   }

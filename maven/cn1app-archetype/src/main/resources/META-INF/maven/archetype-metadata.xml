@@ -55,14 +55,24 @@
       </includes>
     </fileSet>
     <!--
-      .claude/skills/codename-one/** is staged into the archetype JAR at
-      build time from scripts/initializr/common/src/main/resources/skill/**
-      (see maven/cn1app-archetype/pom.xml). It always extracts; the post-
-      generate groovy deletes it when the resolved javaVersion is 8 so
-      only Java 17 projects ship the Codename One authoring skill.
+      The Codename One authoring skill, in the same three-part layout the
+      initializr generates: .agent-skills/codename-one/** is the skill itself,
+      .claude/skills/codename-one/SKILL.md is a thin stub that redirects to it,
+      and AGENTS.md (in the root fileSet below) is the vendor-neutral pointer.
+      All three are staged into the archetype JAR at build time from
+      scripts/initializr/common/src/main/resources/** (see
+      maven/cn1app-archetype/pom.xml). They always extract; the post-generate
+      groovy deletes all three when the resolved javaVersion is 8 so only Java 17
+      projects ship the skill.
       filtered="false" — skill markdown has $foo placeholders that Velocity
       would otherwise misinterpret.
     -->
+    <fileSet encoding="UTF-8">
+      <directory>.agent-skills</directory>
+      <includes>
+        <include>**</include>
+      </includes>
+    </fileSet>
     <fileSet encoding="UTF-8">
       <directory>.claude</directory>
       <includes>
@@ -82,6 +92,8 @@
       <directory></directory>
       <includes>
         <include>.gitignore</include>
+        <!-- Root pointer to .agent-skills/; see the skill fileSets above. -->
+        <include>AGENTS.md</include>
         <include>*.sh</include>
         <include>*.bat</include>
         <include>*.adoc</include>

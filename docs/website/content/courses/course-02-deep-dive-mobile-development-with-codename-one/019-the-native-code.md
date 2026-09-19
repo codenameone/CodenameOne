@@ -29,7 +29,7 @@ So the modern version of this advice is: prototype in the native IDE when needed
 
 ## Further Reading
 
-- [Developer Guide](/developer-guide/)
+- [Developer Guide](/developer-guide/advanced-topics-under-the-hood/#_native_interfaces)
 - [How Do I Access Native Device Functionality, Invoke Native Interfaces](/how-do-i/how-do-i-access-native-device-functionality-invoke-native-interfaces/)
 - [How Do I Use The Include Sources Feature To Debug The Native Code On iOS/Android](/how-do-i/how-do-i-use-the-include-sources-feature-to-debug-the-native-code-on-iosandroid-etc/)
 - [Threading and the EDT](/courses/course-01-java-for-mobile-devices/011-threading-and-the-edt/)

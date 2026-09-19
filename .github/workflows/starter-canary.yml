@@ -94,6 +94,14 @@ jobs:
           java-version: '17'
           distribution: 'temurin'
 
+      # The Maven CSS goal initializes Java AWT while compiling theme.css.
+      # GitHub's Linux runner has no display, so without Xvfb a healthy starter
+      # fails locally before it can submit its cloud build. Windows already has
+      # a desktop session and must not try to install or invoke xvfb-run.
+      - name: Install Xvfb for CSS compilation
+        if: runner.os == 'Linux'
+        run: bash scripts/ci/apt-get-install.sh xvfb
+
       - name: Run the canary
         id: canary
         continue-on-error: true
@@ -115,10 +123,14 @@ jobs:
         run: |
           set -u
           skip=""
+          command=(python)
+          if [ "$RUNNER_OS" = "Linux" ]; then
+            command=(xvfb-run -a python)
+          fi
           if [ "$CANARY_SKIP_BUILD" = "true" ]; then
             skip="--skip-build"
           fi
-          python scripts/ci/starter-canary/starter_canary.py \
+          "${command[@]}" scripts/ci/starter-canary/starter_canary.py \
             --target "$CANARY_TARGET" \
             $skip \
             --report "$CANARY_REPORT"

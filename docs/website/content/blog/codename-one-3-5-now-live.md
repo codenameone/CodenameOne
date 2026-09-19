@@ -17,7 +17,7 @@ Version 3.5 is a **huge** release that includes the long awaited Windows Univers
 
 ### Highlights of this Release
 
-  * **Beta version of the UWP (Universal Windows Platform) Port** – Codename One [supports native Windows 10 universal apps](/manual/appendix-uwp/) that you can sell thru the Windows Store
+  * **Beta version of the UWP (Universal Windows Platform) Port** – Codename One [supports native Windows 10 universal apps](/developer-guide/working-with-uwp/) that you can sell thru the Windows Store
 
   * **New GUI Builder Release** – We released the [new GUI builder](/blog/using-the-new-gui-builder/). It still has rough edges but is improving at a rapid pace
 

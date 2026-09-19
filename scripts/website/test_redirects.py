@@ -170,6 +170,19 @@ def parse_redirects_file(path: pathlib.Path) -> list[RedirectRule]:
         if status < 300 or status > 399:
             continue
         rules.append(RedirectRule(source=src, target=tgt, status=status, line_no=i))
+    # Pages counts every rule after the first dynamic source against the
+    # 100-rule dynamic limit, even if later sources contain no wildcards.
+    # A misplaced catch-all can therefore discard unrelated redirects below it.
+    first_dynamic = None
+    for rule in rules:
+        if "*" in rule.source or re.search(r":[A-Za-z]\w*", rule.source):
+            first_dynamic = first_dynamic or rule
+        elif first_dynamic:
+            raise ValueError(
+                f"{path}:{rule.line_no}: static redirect {rule.source} follows "
+                f"dynamic redirect {first_dynamic.source} on line {first_dynamic.line_no}; "
+                "keep all static redirects before dynamic redirects"
+            )
     return rules
 
 

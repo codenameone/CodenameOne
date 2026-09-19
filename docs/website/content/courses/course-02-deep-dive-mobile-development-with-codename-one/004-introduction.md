@@ -27,7 +27,7 @@ In the lessons that follow, the design gets broken down into manageable parts: a
 
 ## Further Reading
 
-- [Developer Guide](/developer-guide/)
+- [Developer Guide](/developer-guide/basics/)
 - [Themeing](/themeing/)
 - [Layout Basics](/layout-basics/)
 - [How Do I Create A 9 Piece Image Border](/how-do-i/how-do-i-create-a-9-piece-image-border/)

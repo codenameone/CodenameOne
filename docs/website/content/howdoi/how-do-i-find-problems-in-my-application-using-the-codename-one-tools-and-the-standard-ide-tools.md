@@ -31,7 +31,7 @@ The practical lesson is to debug with evidence. Use the debugger for logic, the 
 
 ## Further Reading
 
-- [Developer Guide](/developer-guide/)
+- [Developer Guide](/developer-guide/performance/)
 - [Performance Network Monitors](/performance-network-monitors/)
 - [How Do I Improve Application Performance Or Track Down Performance Issues](/how-do-i/how-do-i-improve-application-performance-or-track-down-performance-issues/)
 - [How Do I Use Crash Protection? Get Device Logs?](/how-do-i/how-do-i-use-crash-protection-get-device-logs/)

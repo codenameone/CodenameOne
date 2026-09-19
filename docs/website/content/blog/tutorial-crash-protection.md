@@ -41,7 +41,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > 1\. Is there a code that automatically catches (and reports by e-mail) all exceptions in all threads, not only in the EDT?
 >
-> 2\. In the manual, section "Logging & Crash Protection", at the page: [https://www.codenameone.com…](</manual/files-storage-networking/#_logging_crash_protection>) , there are the following two lines of code: I don’t understood if it makes sense use them in conjunction with Log.bindCrashProtection(true)
+> 2\. In the manual, section "Logging & Crash Protection", at the page: [https://www.codenameone.com…](</developer-guide/io/#_logging_crash_protection>) , there are the following two lines of code: I don’t understood if it makes sense use them in conjunction with Log.bindCrashProtection(true)
 >
 > Log.setReportingLevel(Log.REPORTING_DEBUG);  
 > DefaultCrashReporter.init(true, 2);

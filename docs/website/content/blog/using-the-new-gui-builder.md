@@ -197,7 +197,7 @@ UI is represented as:
 
 In this section we won’t try to discuss layouts in depth as this is a deep and complex subject. You can read  
 more about the properties of the Codename One layouts in  
-[the developer guide](/manual/basics/).
+[the developer guide](/developer-guide/basics/).
 
 In general layouts define the mathematical logic for component positions that we can then apply to the  
 resolutions supported by the devices. If we didn’t have layouts the UI wouldn’t fit on the multitude of devices  
@@ -911,7 +911,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 > Shai Almog says:
 >
-> Sure, it’s in the developer guide: [https://www.codenameone.com…](</manual/theme-basics/>) just open it Images -> Add
+> Sure, it’s in the developer guide: [https://www.codenameone.com…](</developer-guide/basics/>) just open it Images -> Add
 >
 
 

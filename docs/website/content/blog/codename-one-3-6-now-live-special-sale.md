@@ -44,7 +44,7 @@ __ |  The special deal has elapsed, thanks for all of you who signed up!
 
   * **Offline Build Support** – Building thru the cloud is one of the "defining features" of Codename One, but some government level customers need the [ability to build offline](/blog/offline-build/) due to regulatory concerns
 
-  * **Production grade UWP (Universal Windows Platform) Port** – [UWP](/manual/appendix-uwp/) allows seamless native support for Windows 10 on Intel/ARM devices & PC’s such as the very popular Surface line
+  * **Production grade UWP (Universal Windows Platform) Port** – [UWP](/developer-guide/working-with-uwp/) allows seamless native support for Windows 10 on Intel/ARM devices & PC’s such as the very popular Surface line
 
   * **New GUI Builder Release** – We released the [new GUI builder](/blog/using-the-new-gui-builder/). It still has rough edges but is improving at a rapid pace
 

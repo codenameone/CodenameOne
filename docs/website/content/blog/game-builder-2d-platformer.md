@@ -10,7 +10,7 @@ feed_html: '<img src="https://www.codenameone.com/blog/gamebuilder/game-platform
 
 ![Duke's Coffee Run, a 2D platformer built with the Game Builder](/blog/gamebuilder/platformer-hero.jpg)
 
-Most game tutorials make you hand-place every sprite in code. The [Game Builder](/manual/game-builder/) flips that around: you **draw** the level visually, tag objects with the numbers your game needs (`lives`, `value`, `speed`), and the editor saves it as a small data file that the runtime plays. Your code shrinks to the part that's actually *yours* — the rules.
+Most game tutorials make you hand-place every sprite in code. The [Game Builder](/developer-guide/game-builder/) flips that around: you **draw** the level visually, tag objects with the numbers your game needs (`lives`, `value`, `speed`), and the editor saves it as a small data file that the runtime plays. Your code shrinks to the part that's actually *yours* — the rules.
 
 This is the first of three tutorials. We'll build **Duke's Coffee Run**: a side-scroller where Java's mascot **Duke** dashes right across a grassy floor, collects **coffee cups** for points, dodges roaming **exception monsters**, and reaches a flag to win. Along the way we'll do the part most tutorials quietly skip — **bringing in real art**, including slicing an animated sprite sheet for Duke. By the end you'll have a *running game* and understand every moving part: the assets, the level file, the generated companion class, the built-in arcade behavior, and where your own logic goes. Tutorials [2 (board game)](/blog/game-builder-board-game/) and [3 (3D dungeon)](/blog/game-builder-3d-dungeon/) continue the story.
 
@@ -24,7 +24,7 @@ A Codename One game is a `GameView` holding a `Scene` of sprites, driven by a `G
 
 ## Step 0 — Create the project and scaffold a scene
 
-The builder attaches to a **Java 17** Codename One project. Creating that project and installing the toolchain are covered in the [getting-started guide](/manual/) — generate one from the [Codename One initializr](https://start.codenameone.com) (pick Java 17) and you're ready. Then scaffold a scene and open the editor:
+The builder attaches to a **Java 17** Codename One project. Creating that project and installing the toolchain are covered in the [getting-started guide](/developer-guide/maven-project-workflow/) — generate one from the [Codename One initializr](https://start.codenameone.com) (pick Java 17) and you're ready. Then scaffold a scene and open the editor:
 
 ```bash
 mvn cn1:create-game-scene -DclassName=com.example.coffeerun.CoffeeRun

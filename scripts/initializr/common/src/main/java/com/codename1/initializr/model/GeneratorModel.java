@@ -43,7 +43,7 @@ import java.util.Map;
 import static com.codename1.ui.CN.*;
 
 public class GeneratorModel {
-    private static final String CN1_PLUGIN_VERSION = "7.0.271";
+    private static final String CN1_PLUGIN_VERSION = "7.0.272";
     private static final String PREVIEW_BUTTON_SELECTOR =
             "Button, InitializrLiveButtonDarkClean, "
                     + "InitializrLiveButtonLightTealRound, InitializrLiveButtonLightTealSquare, "
@@ -69,52 +69,24 @@ public class GeneratorModel {
 
     private static final String AGENT_SKILL_TARGET_PREFIX = ".agent-skills/codename-one/";
     private static final String CLAUDE_SKILL_STUB_PATH = ".claude/skills/codename-one/SKILL.md";
-    private static final String CLAUDE_SKILL_STUB_BODY =
-            "---\n"
-            + "name: codename-one\n"
-            + "description: Build and modify Codename One cross-platform mobile apps (Java 17, Maven, ParparVM/Android/iOS/JavaScript). Use when the project contains a `common/codenameone_settings.properties`, depends on `com.codenameone:codenameone-core`, edits CSS files under `common/src/main/css/`, calls `cn1:run`, `cn1:test`, `cn1:build`, references `com.codename1.ui.*` / `com.codename1.testing.*`, or when the user asks to build a UI, write screen tests, generate screenshots, or compare to Swing/HTML/Android.\n"
-            + "metadata:\n"
-            + "  type: skill\n"
-            + "---\n"
-            + "\n"
-            + "# Codename One — App and UI Authoring Skill (Claude Code stub)\n"
-            + "\n"
-            + "This file exists so Claude Code can index the Codename One authoring skill.\n"
-            + "The actual skill content is **vendor-neutral** and lives in this repository at:\n"
-            + "\n"
-            + "- `.agent-skills/codename-one/SKILL.md` — top-level cheat sheet\n"
-            + "- `.agent-skills/codename-one/references/*.md` — deep-dive references\n"
-            + "- `.agent-skills/codename-one/tools/` — runnable Java 17 utilities (`isApiSupported`, `isCssValid`, ...)\n"
-            + "\n"
-            + "**Read `.agent-skills/codename-one/SKILL.md` next.** All the guidance you need to\n"
-            + "build, style, test, debug, and port to Codename One is in that directory.\n";
-    private static final String AGENTS_MD_BODY =
-            "# AGENTS.md\n"
-            + "\n"
-            + "This project is a Codename One cross-platform mobile app (Java 17 / Maven /\n"
-            + "ParparVM-iOS / Android / JavaScript / desktop). A vendor-neutral authoring skill\n"
-            + "is bundled in this repository for any AI agent:\n"
-            + "\n"
-            + "- **Start here:** `.agent-skills/codename-one/SKILL.md`\n"
-            + "- **Topical references:** `.agent-skills/codename-one/references/`\n"
-            + "- **Runnable utilities (Java 17 single-file source mode):** `.agent-skills/codename-one/tools/`\n"
-            + "\n"
-            + "Tool integrations (Claude Code, Cursor, etc.) may also pick this skill up via\n"
-            + "their own conventions; the canonical source of truth is `.agent-skills/`.\n"
-            + "\n"
-            + "## Quick orientation for an agent\n"
-            + "\n"
-            + "- App source lives in `common/src/main/java/`.\n"
-            + "- Theme/styling lives in `common/src/main/css/theme.css` (Codename One CSS — a\n"
-            + "  deliberate subset, see `.agent-skills/codename-one/references/css.md`).\n"
-            + "- Run the simulator with `mvn -pl common cn1:run`.\n"
-            + "- Run tests with `mvn -pl common cn1:test` (on Linux CI use `xvfb-run -a`).\n"
-            + "- You can drive the RUNNING simulator yourself over MCP (read the screen, type,\n"
-            + "  tap) - see `.agent-skills/codename-one/references/mcp-agent-control.md`.\n"
-            + "- Native cloud builds use `mvn -pl <ios|android|javascript|javase> package -Dcodename1.platform=... -Dcodename1.buildTarget=...`.\n"
-            + "\n"
-            + "When in doubt, open `.agent-skills/codename-one/SKILL.md` and follow the\n"
-            + "reference table at the bottom.\n";
+    // The AGENTS.md pointer and the Claude Code stub are FILES rather than string
+    // constants because maven/cn1app-archetype stages the very same two files into
+    // archetype-resources/ (see its pom). A project generated from the archetype and one
+    // downloaded from the Initializr have to hand an agent the same layout, and the only
+    // way to guarantee that is one copy on disk.
+    //
+    // They sit flat at the root of src/main/resources for the same reason skill/ is
+    // repackaged into skill.zip: Codename One's classloader rejects nested directories
+    // under src/main/resources at runtime.
+    //
+    // Neither is stored under the name it is published as. AGENTS.md is a name agents
+    // look for on their own, so a file called that here would be read as instructions
+    // for THIS repository -- and it says things like "run the simulator with
+    // mvn -pl common cn1:run", which is true of a generated app and false of the
+    // Codename One tree. The Claude stub already had to be renamed on staging because
+    // its published name is SKILL.md; this one is renamed for the opposite reason.
+    private static final String CLAUDE_SKILL_STUB_RESOURCE = "/agent-skill-claude-stub.md";
+    private static final String AGENTS_MD_RESOURCE = "/agent-skill-agents-md.md";
 
     private final IDE ide;
     private final Template template;
@@ -433,10 +405,11 @@ public class GeneratorModel {
         }
         // Top-level AGENTS.md so agents that follow the (emerging) AGENTS.md convention
         // discover the skill without having to know our directory layout.
-        copySingleTextEntryToMap("AGENTS.md", AGENTS_MD_BODY, mergedEntries, ZipEntryType.COMMON);
+        copySingleTextEntryToMap("AGENTS.md", readResourceToString(AGENTS_MD_RESOURCE),
+                mergedEntries, ZipEntryType.COMMON);
         // Claude Code stub. Frontmatter so the skill shows up in /skills, body redirects
         // to the canonical vendor-neutral content.
-        copySingleTextEntryToMap(CLAUDE_SKILL_STUB_PATH, CLAUDE_SKILL_STUB_BODY,
+        copySingleTextEntryToMap(CLAUDE_SKILL_STUB_PATH, readResourceToString(CLAUDE_SKILL_STUB_RESOURCE),
                 mergedEntries, ZipEntryType.COMMON);
     }
 

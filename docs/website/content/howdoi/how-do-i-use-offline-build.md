@@ -15,7 +15,7 @@ Offline build exists for the cases where the Codename One cloud build servers ar
 
 The important mental model is that offline build is not a full replacement for your local native toolchain. It reproduces the translation and project-generation parts of the Codename One build process on your own machine, then hands you native projects that you continue with in Xcode or Android Studio. In other words, offline build gets you from a Codename One project to platform-native project output without using the cloud.
 
-That means the toolchain requirements matter a lot. You need the native tools installed and working, and you need versions that are compatible with the builder snapshot you are using. The exact list changes over time, so the current [Developer Guide](/developer-guide/) should be treated as the source of truth instead of the version numbers mentioned in the old video.
+That means the toolchain requirements matter a lot. You need the native tools installed and working, and you need versions that are compatible with the builder snapshot you are using. The exact list changes over time, so the current [Developer Guide](/developer-guide/maven-project-workflow/) should be treated as the source of truth instead of the version numbers mentioned in the old video.
 
 The video is also a product of an older setup era, so the specific versions it names for Gradle, Xcode, and related tools should be treated as historical. The durable lessons are different. First, offline build is operationally heavier than cloud build. Second, it depends on more moving parts on your own machine. Third, once you do generate the native projects, you debug and compile them with the platform-native tools exactly as you would expect.
 
@@ -30,7 +30,7 @@ The main reason to choose offline build is policy, not convenience. It is usuall
 ## Further Reading
 
 - [Build Server](/build-server/)
-- [Developer Guide](/developer-guide/)
+- [Developer Guide](/developer-guide/maven-project-workflow/)
 - [How Do I Use The Include Sources Feature To Debug The Native Code On iOS/Android Etc.](/how-do-i/how-do-i-use-the-include-sources-feature-to-debug-the-native-code-on-iosandroid-etc/)
 - [How Do I Get Repeatable Builds?](/how-do-i/how-do-i-get-repeatable-builds-build-against-a-consistent-version-of-codename-one-use-the-versioning-feature/)
 

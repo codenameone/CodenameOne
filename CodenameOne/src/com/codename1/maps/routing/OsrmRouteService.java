@@ -77,6 +77,26 @@ public class OsrmRouteService implements RouteService {
     /// Suitable for development and demos only -- see the class documentation.
     public static final String DEMO_BASE_URL = "https://router.project-osrm.org";
 
+    /// The `User-Agent` every routing request identifies itself with.
+    ///
+    /// Routing has to send one of its own because the platform default breaks
+    /// the service on Android: the port answers
+    /// `Display.getProperty("User-Agent")` with `System.getProperty(
+    /// "http.agent")`, which is `Dalvik/2.1.0 (Linux; U; Android ...)`, and
+    /// `CodenameOneImplementation.initDefaultUserAgent()` makes that the
+    /// default for every `ConnectionRequest`. The OSRM demo server's nginx
+    /// blocklists the `Dalvik/2.1.0` token and answers 403 to it -- measured
+    /// against the live server, where the identical URL answers 200 for any
+    /// other agent, including the bare `Dalvik` with no version. So keyless
+    /// routing worked in the simulator (JavaSEPort sends a Mozilla string) and
+    /// on iOS (its agent comes from the web view) and was dead on device for
+    /// every Android app (issue #5854).
+    ///
+    /// The contact URL is there because the OpenStreetMap-family services this
+    /// speaks to ask a client to be identifiable, and an agent of just a
+    /// product name is what their own policies discourage.
+    static final String USER_AGENT = "CodenameOne (+https://www.codenameone.com)";
+
     private String baseUrl = DEMO_BASE_URL;
 
     /// Creates a service pointing at the OSRM public demo server.
@@ -138,10 +158,17 @@ public class OsrmRouteService implements RouteService {
             fail(callback, unusable, null);
             return;
         }
+        newConnection(request, callback).start();
+    }
+
+    /// Builds the request a [#findRoutes] call would send, without queueing
+    /// it. Package visible so the headers it carries can be asserted without
+    /// hitting the network.
+    RouteConnection newConnection(RouteRequest request, RouteCallback callback) {
         RouteConnection req = new RouteConnection(callback);
         req.setUrl(buildUrl(request));
         req.setPost(false);
-        req.start();
+        return req;
     }
 
     /// Names the first coordinate in `request` that cannot be routed from, or
@@ -545,7 +572,7 @@ public class OsrmRouteService implements RouteService {
     /// unsuppressable hook left is a getter the network manager happens to
     /// call, and depending on that side effect would be far more fragile than
     /// the case it guards against.
-    private static final class RouteConnection extends ConnectionRequest
+    static final class RouteConnection extends ConnectionRequest
             implements ActionListener<NetworkEvent> {
 
         private final RouteCallback callback;
@@ -560,6 +587,16 @@ public class OsrmRouteService implements RouteService {
 
         RouteConnection(RouteCallback callback) {
             this.callback = callback;
+            setUserAgent(USER_AGENT);
+            // The error body is nginx's HTML 403 page, an OSRM JSON error, or
+            // whatever a proxy substitutes -- never something worth reading
+            // here, because handleErrorResponseCode already has the status and
+            // builds the message from it. Left on (the framework default),
+            // readResponse runs over that body first and JSONParser logs a
+            // complaint per unexpected character, so a single refused route
+            // buried the real one-line reason under a screenful of parser
+            // noise in logcat.
+            setReadResponseForErrors(false);
         }
 
         /// Queues the request, watching for its completion so the callback is

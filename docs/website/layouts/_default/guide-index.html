@@ -1,0 +1,37 @@
+{{ define "main" }}
+<div class="cn1-guide-layout">
+  {{ partial "guide-sidebar.html" . }}
+  <article class="post-single cn1-guide-index">
+    <header class="post-header">
+      <p class="cn1-guide-crumbs">Documentation / Contents</p>
+      <h1 class="post-title">{{ .Title }}</h1>
+      <p class="post-description">Read the guide in order, or jump to the chapter you need.</p>
+    </header>
+    <nav class="cn1-guide-tools" aria-label="Guide tools">
+      <a href="/developer-guide/single-page/">Read as one page</a>
+      <a href="/files/developer-guide.pdf">Download PDF</a>
+    </nav>
+    {{ partial "guide-pagination.html" (dict "page" . "position" "top") }}
+    <nav class="cn1-guide-topic-index" aria-labelledby="guide-topics-title">
+      <h2 id="guide-topics-title">Jump to a topic</h2>
+      <ul>{{ range index site.Data "developer-guide" }}
+        <li><a href="#{{ .id }}">{{ .title }}</a></li>
+      {{ end }}</ul>
+    </nav>
+    <div class="cn1-guide-contents">
+      {{ $number := 0 }}
+      {{ range index site.Data "developer-guide" }}
+      <section id="{{ .id }}">
+        <h2>{{ .title }}</h2>
+        <ol start="{{ add $number 1 }}">{{ range .chapters }}
+          {{ $number = add $number 1 }}
+          <li><a href="{{ .url }}">{{ .title }}</a></li>
+        {{ end }}</ol>
+      </section>
+      {{ end }}
+    </div>
+    {{ partial "guide-pagination.html" (dict "page" . "position" "bottom") }}
+  </article>
+</div>
+{{ partial "guide-legacy-links.html" . }}
+{{ end }}

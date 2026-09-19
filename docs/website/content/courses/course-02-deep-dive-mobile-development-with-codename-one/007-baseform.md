@@ -29,7 +29,7 @@ So the practical lesson is simple: if several screens share the same top bar, ba
 
 ## Further Reading
 
-- [Developer Guide](/developer-guide/)
+- [Developer Guide](/developer-guide/the-components-of-codename-one/)
 - [Layout Basics](/layout-basics/)
 - [Adapting a UI Design](/courses/course-01-java-for-mobile-devices/009-adapting-a-ui-design/)
 - [CSS](/courses/course-02-deep-dive-mobile-development-with-codename-one/006-css/)

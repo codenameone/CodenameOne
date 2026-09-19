@@ -18,7 +18,7 @@ and intend to carry on to version 3.5.
 
 ### Highlights of this Release
 
-  * **Rewritten documentation** – the [developer guide](https://www.codenameone.com/manual/) was  
+  * **Rewritten documentation** – the [developer guide](/developer-guide/) was\
 [written from the ground up](https://www.codenameone.com/files/developer-guide.pdf)  
 and the [JavaDocs](https://www.codenameone.com/javadoc/) were significantly improved
 

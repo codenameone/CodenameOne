@@ -18,7 +18,7 @@ SKIP_PREFIXES = (
     "/tags/",
     "/categories/",
     "/page/",
-    "/developer-guide/",
+    "/developer-guide/single-page/",
 )
 
 WS_RE = re.compile(r"\s+")

@@ -31,7 +31,7 @@ So the real anatomy of a Codename One application is simpler than it first appea
 
 ## Further Reading
 
-- [Developer Guide](/developer-guide/)
+- [Developer Guide](/developer-guide/maven-project-workflow/)
 - [Getting Started](/getting-started/)
 - [Build Server](/build-server/)
 - [Hello World](/hello-world/)

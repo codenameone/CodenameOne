@@ -28,5 +28,5 @@ So the architectural lesson here is not complicated, but it is important. Establ
 ## Further Reading
 
 - [Base Navigation Form and Shape Effects](/courses/course-03-build-real-world-full-stack-mobile-apps-java/005-base-navigation-form-and-shape-effects/)
-- [Developer Guide](/developer-guide/)
+- [Developer Guide](/developer-guide/basics/)
 - [Layout Basics](/layout-basics/)

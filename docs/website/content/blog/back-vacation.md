@@ -21,12 +21,12 @@ During the month of August Google finally removed their old GCM servers. We’ve
 
 Users who still used the old style of push notifications (prior to the `google-services.json` file approach) had push messages blocked. That was expected.
 
-__ |  You can read about the modern approach to push [here](/manual/push/)  
+__ |  You can read about the modern approach to push [here](/developer-guide/push-notifications/)\
 ---|---  
   
 Because that no longer works anyway we switched the default build mode to FCM. This solves an issue for developers who neglected to define the `android.messagingService=fcm` build hint (which you no longer need). However, this causes a build error if you don’t have that JSON file in place. You can get this to compile for now by explicitly stating the build hint `android.messagingService=gcm`. However, push won’t work if you do that since the Google run GCM push servers are no longer there. But it will compile which is a start.
 
-To migrate to the new FCM approach check out the [developer guide section on push](/manual/push/).
+To migrate to the new FCM approach check out the [developer guide section on push](/developer-guide/push-notifications/).
 
 ### API Level 28 and HTTPS Requirement
 

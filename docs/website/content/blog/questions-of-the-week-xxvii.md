@@ -51,7 +51,7 @@ We just showed how deeply you can customize the sidemenu in the
 
 ### Codenameone app version issue
 
-When you use a [build hint](/manual/advanced-topics.html) like `android.versionCode` you need to pay close  
+When you use a [build hint](/developer-guide/advanced-topics-under-the-hood/#_sending_arguments_to_the_build_server) like `android.versionCode` you need to pay close\
 attention. It’s best to avoid that specific hint…​
 
 [Read on stackoverflow…​](http://stackoverflow.com/questions/39946836/codenameone-app-version-issue)
