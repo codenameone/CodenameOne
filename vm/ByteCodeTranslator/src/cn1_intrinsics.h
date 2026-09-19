@@ -209,18 +209,20 @@ static inline JAVA_OBJECT cn1InlSbToString(CODENAME_ONE_THREAD_STATE, JAVA_OBJEC
     if(__builtin_expect(class__java_lang_String.initialized && !t->java_lang_StringBuilder_wide, 1)) {
         JAVA_INT count = t->java_lang_StringBuilder_count;
         int off = (int)((sizeof(struct obj__java_lang_String) + 7) & ~(size_t)7);
-        size_t total = off + CN1_FUSED_ARR_BYTES((size_t)count, sizeof(JAVA_ARRAY_BYTE));
+        cn1InitStringTwin();
+        // No array header: the characters follow the fields, the coder is the twin.
+        size_t total = off + (size_t)count;
         if(total <= CN1_BIBOP_MAX_OBJECT) {
-            JAVA_OBJECT result = cn1BibopFastAllocNoZero(threadStateData, (int)total, &class__java_lang_String, CN1_BIBOP_CIDX(total));
+            JAVA_OBJECT result = cn1BibopFastAllocNoZero(threadStateData, (int)total, &class__java_lang_String_i8, CN1_BIBOP_CIDX(total));
             if(result != JAVA_NULL) {
-                JAVA_OBJECT array = cn1FusedInstallPrimArray(result, off, &class_array1__JAVA_BYTE, sizeof(JAVA_ARRAY_BYTE), count);
-                if(count > 0) memcpy(CN1_ARRAY_DATA((JAVA_ARRAY)array), source, (size_t)count);
+                if(count > 0) memcpy((char*)result + off, source, (size_t)count);
                 struct obj__java_lang_String* string = (struct obj__java_lang_String*)result;
-                string->java_lang_String_value = array;
+                // NoZero: value must be nulled by hand, and NULL is the inline marker.
+                string->java_lang_String_value = JAVA_NULL;
                 string->java_lang_String_count = count;
                 string->java_lang_String_hashCode = 0;
                 CN1_STRING_CLEAR_PEER(string);
-                result->__codenameOneParentClsReference = &class__java_lang_String;
+                result->__codenameOneParentClsReference = &class__java_lang_String_i8;
                 return result;
             }
         }

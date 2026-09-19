@@ -12697,6 +12697,10 @@ void cn1GcVerifyFieldType(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT owner, JAVA_OBJ
 
 static int cn1GcStringIsFusedLeaf(JAVA_OBJECT obj) {
 #ifndef CN1_DISABLE_BIBOP
+    // An inline String carries its characters in its own block and holds no
+    // reference at all, so there is nothing to trace and no embedded child header
+    // to inspect. This is the cheap case and it comes first.
+    if (cn1IsInlineStringClass(obj->__codenameOneParentClsReference)) return 1;
     int position = obj->__heapPosition;
     if (position != CN1_BIBOP_HEAP_POS && position != CN1_BIBOP_ADOPTED) return 0;
     size_t offset = (sizeof(struct obj__java_lang_String) + 7) & ~(size_t)7;
@@ -14308,9 +14312,10 @@ JAVA_OBJECT newStringFromCString(CODENAME_ONE_THREAD_STATE, const char *str) {
  * null vtable and dispatch through the twin would crash.
  */
 struct clazz class__java_lang_String_i8;
+struct clazz class__java_lang_String_i16;
 static _Atomic int cn1StringTwinReady = 0;
 
-static void cn1InitStringTwin(void) {
+void cn1InitStringTwin(void) {
     if(atomic_load_explicit(&cn1StringTwinReady, memory_order_acquire)) {
         return;
     }
@@ -14330,11 +14335,15 @@ static void cn1InitStringTwin(void) {
     // allocated with it stops looking like an object. Measured, not theorised:
     // that is exactly what happened -- FusedTest aborted under gc-verify and
     // diverged in the gauntlet, while the build was perfectly clean.
+    memcpy(&class__java_lang_String_i16, &class__java_lang_String, sizeof(struct clazz));
     class__java_lang_String_i8.cn1ClazzRegistered = JAVA_FALSE;
+    class__java_lang_String_i16.cn1ClazzRegistered = JAVA_FALSE;
 #ifdef CN1_ALLOC_CENSUS
     // Same reasoning for the census counters: they belong to the primary's history.
     class__java_lang_String_i8.cn1AllocCount = 0;
     class__java_lang_String_i8.cn1AllocBytes = 0;
+    class__java_lang_String_i16.cn1AllocCount = 0;
+    class__java_lang_String_i16.cn1AllocBytes = 0;
 #endif
     atomic_store_explicit(&cn1StringTwinReady, 1, memory_order_release);
 }
@@ -14344,7 +14353,10 @@ JAVA_OBJECT cn1FusedLatin1Begin(CODENAME_ONE_THREAD_STATE, int len, JAVA_ARRAY_B
     if(__builtin_expect(class__java_lang_String.initialized, 1)) {
         cn1InitStringTwin();
         int off = (int)((sizeof(struct obj__java_lang_String) + 7) & ~(size_t)7);
-        int total = off + CN1_FUSED_ARR_BYTES(len, sizeof(JAVA_ARRAY_BYTE));
+        // No JavaArrayPrototype: the characters follow the fields directly. length is
+        // count, dimensions is 1, the coder is the twin class and dataOffset is this
+        // constant, so the 24 bytes that used to carry them are gone.
+        int total = off + len;
         // Full BiBOP alloc (handles freeList / bump / page-acquire) so the fused path stays effective
         // for the WHOLE run. The no-zero fast path only bump-allocates FRESH pages and degrades to the
         // 2-object fallback once pages go partial -- which made an earlier version REGRESS (try-fused-
@@ -14355,9 +14367,10 @@ JAVA_OBJECT cn1FusedLatin1Begin(CODENAME_ONE_THREAD_STATE, int len, JAVA_ARRAY_B
         if(total <= CN1_BIBOP_MAX_OBJECT) {
             JAVA_OBJECT so = cn1BibopAlloc(threadStateData, total, &class__java_lang_String_i8);
             if(so != JAVA_NULL) {
-                JAVA_OBJECT arr = cn1FusedInstallPrimArray(so, off, &class_array1__JAVA_BYTE, sizeof(JAVA_ARRAY_BYTE), len);
-                ((struct obj__java_lang_String*)so)->java_lang_String_value = arr; // count stays 0 until End
-                *dst = (JAVA_ARRAY_BYTE*)CN1_ARRAY_DATA((JAVA_ARRAY)arr);
+                // cn1BibopAlloc zeroes, so value is already JAVA_NULL -- which IS the
+                // inline marker, and also leaves a partially built String traceable as
+                // an empty one until cn1FusedLatin1End publishes the count.
+                *dst = (JAVA_ARRAY_BYTE*)((char*)so + off);
 #ifdef CN1_GC_CONFORM
                 // CHARGED WHOLE TO String, like cn1AllocFused and cn1SubstringFused.
                 // Splitting it was the older behaviour and it is a trap this tree has

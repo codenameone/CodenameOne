@@ -1265,8 +1265,25 @@ static inline struct clazz* cn1ClassOf(JAVA_OBJECT o) {
  */
 extern struct clazz class__java_lang_String;
 extern struct clazz class__java_lang_String_i8;
+extern struct clazz class__java_lang_String_i16;
 static inline int cn1IsStringClass(const struct clazz* c) {
-    return c == &class__java_lang_String || c == &class__java_lang_String_i8;
+    return c == &class__java_lang_String
+        || c == &class__java_lang_String_i8
+        || c == &class__java_lang_String_i16;
+}
+/* MUST be called before either twin is used as an allocation class. The twins are
+ * filled by a lazy memcpy from the primary -- lazy so it lands after
+ * java.lang.String's clinit, where the vtable pointer is real -- and until that
+ * runs they are all zeros: null vtable, classId 0. Every path that allocates with
+ * a twin calls this first. Getting it wrong is not subtle but it IS remote: the
+ * first virtual call on such a String dereferences vtable[n] off NULL, which is
+ * where this was found. */
+extern void cn1InitStringTwin(void);
+
+/* A String whose characters sit INSIDE it: value is JAVA_NULL and the payload
+ * begins at the first 8-aligned byte after the fields. The coder is the twin. */
+static inline int cn1IsInlineStringClass(const struct clazz* c) {
+    return c == &class__java_lang_String_i8 || c == &class__java_lang_String_i16;
 }
 
 /* How a String's characters are reached. DECLARED here and defined in

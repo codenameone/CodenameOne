@@ -113,10 +113,21 @@ extern _Atomic JAVA_BOOLEAN lowMemoryMode;
  * The coder still comes from cn1StrIsLatin1 below, which reads the class pointer
  * -- the one piece of that header carrying information. */
 void* cn1StrChars(JAVA_OBJECT s) {
-    return CN1_ARRAY_DATA((JAVA_ARRAY)((struct obj__java_lang_String*)s)->java_lang_String_value);
+    JAVA_OBJECT v = ((struct obj__java_lang_String*)s)->java_lang_String_value;
+    if(v == JAVA_NULL) {
+        // Inline: the characters begin at the first 8-aligned byte after the fields.
+        return (void*)((char*)s + ((sizeof(struct obj__java_lang_String) + 7) & ~(size_t)7));
+    }
+    return CN1_ARRAY_DATA((JAVA_ARRAY)v);
 }
 int cn1StrIsLatin1(JAVA_OBJECT s) {
-    return ((JAVA_ARRAY)((struct obj__java_lang_String*)s)->java_lang_String_value)->__codenameOneParentClsReference == &class_array1__JAVA_BYTE;
+    JAVA_OBJECT v = ((struct obj__java_lang_String*)s)->java_lang_String_value;
+    if(v == JAVA_NULL) {
+        // The twin IS the coder -- that is the whole point of carrying it in the
+        // class word instead of a header around the payload.
+        return s->__codenameOneParentClsReference == &class__java_lang_String_i8;
+    }
+    return ((JAVA_ARRAY)v)->__codenameOneParentClsReference == &class_array1__JAVA_BYTE;
 }
 
 // Compact-string: logical char at index i of String s, decoding Latin-1 or UTF-16.
@@ -2203,11 +2214,21 @@ JAVA_OBJECT java_lang_Object_getClassImpl___R_java_lang_Class(CODENAME_ONE_THREA
         return (JAVA_OBJECT)cn1__tagCls;
     }
 #endif
-    if(!obj->__codenameOneParentClsReference) {
+    struct clazz* cn1__cls = obj->__codenameOneParentClsReference;
+    if(!cn1__cls) {
         return (JAVA_OBJECT)(&ClazzClazz);
     }
-    obj->__codenameOneParentClsReference->__codenameOneParentClsReference = &ClazzClazz;
-    return (JAVA_OBJECT)obj->__codenameOneParentClsReference;
+    // A String's twin is the SAME class -- same classId, name, vtable, type-test row
+    // -- and differs only in address, which is how it carries the coder for free. This
+    // function is the one place that address becomes visible to Java, because the Class
+    // object IS the clazz struct: without this, `s.getClass() == String.class` answers
+    // false for a fused String and true for an array-backed one. Found by TwinProbe,
+    // which compares both shapes against the JDK; nothing else in the suite asked.
+    if(cn1IsInlineStringClass(cn1__cls)) {
+        cn1__cls = &class__java_lang_String;
+    }
+    cn1__cls->__codenameOneParentClsReference = &ClazzClazz;
+    return (JAVA_OBJECT)cn1__cls;
 }
 
 JAVA_INT java_lang_Class_hashCode___R_int(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj) {
@@ -5041,25 +5062,40 @@ static JAVA_OBJECT cn1BuilderStringCopy(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT b
  * correct for any length. That keeps this native free of bounds checking and exception
  * construction -- substring has already done both before calling.
  */
+/* The inline store, seen from Java.
+ *
+ * Only meaningful when value == null, which the callers all check. The coder is
+ * the class word -- cn1StrIsLatin1 reads it -- and the characters follow the
+ * fields, which cn1StrChars knows. Java asks through these two and nothing else.
+ */
+JAVA_BOOLEAN java_lang_String_cn1InlineLatin1___R_boolean(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject) {
+    return cn1StrIsLatin1(__cn1ThisObject) ? JAVA_TRUE : JAVA_FALSE;
+}
+
+JAVA_CHAR java_lang_String_cn1InlineCharAt___int_R_char(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject, JAVA_INT index) {
+    return cn1StrCharAtRaw(__cn1ThisObject, index);
+}
+
 JAVA_OBJECT java_lang_String_cn1SubstringFused___int_int_R_java_lang_String(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject, JAVA_INT off, JAVA_INT n) {
     struct obj__java_lang_String* me = (struct obj__java_lang_String*)__cn1ThisObject;
-    JAVA_ARRAY src = (JAVA_ARRAY)me->java_lang_String_value;
-    if(src == JAVA_NULL || n < 0) {
+    if(n < 0) {
         return JAVA_NULL;
     }
-    JAVA_BOOLEAN latin1 = (src->__codenameOneParentClsReference == &class_array1__JAVA_BYTE);
-    struct clazz* acls = latin1 ? &class_array1__JAVA_BYTE : &class_array1__JAVA_CHAR;
+    // NOT "value == NULL means no source": a NULL store is now the INLINE marker,
+    // and an inline parent is the common case this native exists to serve.
+    cn1InitStringTwin();
+    JAVA_BOOLEAN latin1 = cn1StrIsLatin1(__cn1ThisObject);
     int esz = latin1 ? (int)sizeof(JAVA_ARRAY_BYTE) : (int)sizeof(JAVA_ARRAY_CHAR);
 
     enteringNativeAllocations();
     int fieldsEnd = (int)((sizeof(struct obj__java_lang_String) + 7) & ~(size_t)7);
-    int total = fieldsEnd + CN1_FUSED_ARR_BYTES(n, esz);
-    JAVA_OBJECT so = cn1AllocFused(threadStateData, total, &class__java_lang_String);
+    int total = fieldsEnd + n * esz;
+    JAVA_OBJECT so = cn1AllocFused(threadStateData, total,
+            latin1 ? &class__java_lang_String_i8 : &class__java_lang_String_i16);
     if(so == JAVA_NULL) {
         finishedNativeAllocations();
         return JAVA_NULL;   // caller falls back to the two-object path
     }
-    JAVA_OBJECT arr = cn1FusedInstallPrimArray(so, fieldsEnd, acls, esz, n);
     // DELIBERATELY NOT RE-ATTRIBUTED TO THE ARRAY CLASS. cn1AllocFused charges the
     // whole block to java.lang.String, which is the truth: a fused substring is ONE
     // allocation, and the characters are inside it. An earlier version of this split
@@ -5068,21 +5104,21 @@ JAVA_OBJECT java_lang_String_cn1SubstringFused___int_int_R_java_lang_String(CODE
     // exists for, and made the object total look unchanged. The census reports what
     // happened; it is not the place to preserve an old shape.
     struct obj__java_lang_String* rs = (struct obj__java_lang_String*)so;
-    rs->java_lang_String_value = arr;
+    rs->java_lang_String_value = JAVA_NULL;   // inline
     rs->java_lang_String_count = n;
     rs->java_lang_String_hashCode = 0;
     CN1_STRING_CLEAR_PEER(rs);
     if(n > 0) {
-        // Re-read the parent's array AFTER the allocation: cn1AllocFused can run a GC
-        // handshake. The heap does not move, but re-loading the field is free and keeps
-        // this correct against a future where it does.
-        src = (JAVA_ARRAY)me->java_lang_String_value;
+        // Re-read the parent's characters AFTER the allocation: cn1AllocFused can run a
+        // GC handshake. The heap does not move, but re-loading is free and keeps this
+        // correct against a future where it does.
+        void* dst = (void*)((char*)so + fieldsEnd);
         if(latin1) {
-            memcpy((JAVA_ARRAY_BYTE*)CN1_ARRAY_DATA((JAVA_ARRAY)arr),
-                   ((JAVA_ARRAY_BYTE*)CN1_ARRAY_DATA(src)) + off, (size_t)n);
+            memcpy((JAVA_ARRAY_BYTE*)dst,
+                   ((JAVA_ARRAY_BYTE*)cn1StrChars(__cn1ThisObject)) + off, (size_t)n);
         } else {
-            memcpy((JAVA_ARRAY_CHAR*)CN1_ARRAY_DATA((JAVA_ARRAY)arr),
-                   ((JAVA_ARRAY_CHAR*)CN1_ARRAY_DATA(src)) + off, (size_t)n * sizeof(JAVA_ARRAY_CHAR));
+            memcpy((JAVA_ARRAY_CHAR*)dst,
+                   ((JAVA_ARRAY_CHAR*)cn1StrChars(__cn1ThisObject)) + off, (size_t)n * sizeof(JAVA_ARRAY_CHAR));
         }
     }
     finishedNativeAllocations();
@@ -5242,17 +5278,16 @@ JAVA_OBJECT java_lang_StringBuilder_append___char_R_java_lang_StringBuilder(CODE
 JAVA_VOID java_lang_String_getChars___int_int_char_1ARRAY_int(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT  __cn1ThisObject, JAVA_INT __cn1Arg1, JAVA_INT __cn1Arg2, JAVA_OBJECT __cn1Arg3, JAVA_INT __cn1Arg4) {
     
     JAVA_INT offset = 0;
-    JAVA_ARRAY srcArr = (JAVA_ARRAY)get_field_java_lang_String_value(__cn1ThisObject);
     JAVA_ARRAY_CHAR* dst = (JAVA_ARRAY_CHAR*)CN1_ARRAY_DATA((JAVA_ARRAY)__cn1Arg3);
-    if(srcArr->__codenameOneParentClsReference == &class_array1__JAVA_BYTE) {
+    if(cn1StrIsLatin1(__cn1ThisObject)) {
         // Latin-1: widen each byte (& 0xff) into the destination char[].
-        JAVA_ARRAY_BYTE* src = (JAVA_ARRAY_BYTE*)CN1_ARRAY_DATA(srcArr);
+        JAVA_ARRAY_BYTE* src = (JAVA_ARRAY_BYTE*)cn1StrChars(__cn1ThisObject);
         for(JAVA_INT k = 0 ; k < __cn1Arg2 - __cn1Arg1 ; k++) {
             dst[__cn1Arg4 + k] = (JAVA_ARRAY_CHAR)(src[offset + __cn1Arg1 + k] & 0xff);
         }
         return;
     }
-    JAVA_ARRAY_CHAR* src = (JAVA_ARRAY_CHAR*)CN1_ARRAY_DATA(srcArr);
+    JAVA_ARRAY_CHAR* src = (JAVA_ARRAY_CHAR*)cn1StrChars(__cn1ThisObject);
     // memmove: String and destination can only overlap through VM-internal
     // aliasing tricks, but the safe spelling costs nothing here
     memmove(dst + __cn1Arg4, src + offset + __cn1Arg1, (size_t)(__cn1Arg2 - __cn1Arg1) * sizeof(JAVA_ARRAY_CHAR));

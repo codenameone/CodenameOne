@@ -86,12 +86,19 @@ public final class String implements java.lang.CharSequence, Comparable<String> 
      * Consolidating the accesses is what lets that change without touching each
      * caller.
      */
+    /* An INLINE String keeps its characters inside its own object and holds no
+     * array at all, so value is null and the coder lives in the VM's class word.
+     * These two natives are the only way Java can ask about that storage; every
+     * other method here goes through them or through charInternal. */
+    private native boolean cn1InlineLatin1();
+    private native char cn1InlineCharAt(int index);
+
     /** Latin-1 storage: one byte per character, the character IS the byte. */
     private boolean isLatin1() {
-        return value instanceof byte[];
+        return value == null ? cn1InlineLatin1() : value instanceof byte[];
     }
 
-    /** The Latin-1 bytes. Valid only under isLatin1(). */
+    /** The Latin-1 bytes. Valid only under isLatin1() AND a non-inline store. */
     private byte[] latin1Value() {
         return (byte[]) value;
     }
@@ -109,6 +116,9 @@ public final class String implements java.lang.CharSequence, Comparable<String> 
     /** Character at logical index i (0-based); offset is applied here. */
     private char charInternal(int i) {
         Object v = value;
+        if (v == null) {
+            return cn1InlineCharAt(i);
+        }
         return v instanceof byte[] ? (char) (((byte[]) v)[i] & 0xff) : ((char[]) v)[i];
     }
 
@@ -360,6 +370,26 @@ public final class String implements java.lang.CharSequence, Comparable<String> 
 
     private String(String parent, int newOffset, int newCount) {
         Object parentValue = parent.value;
+        if (parentValue == null) {
+            // Parent keeps its characters inline, so there is no array to copy from.
+            // Match the parent's coder rather than widening: a Latin-1 source must
+            // not become UTF-16 just because it was fused.
+            if (parent.isLatin1()) {
+                byte[] copy = new byte[newCount];
+                for (int i = 0; i < newCount; i++) {
+                    copy[i] = (byte) parent.charInternal(newOffset + i);
+                }
+                this.value = copy;
+            } else {
+                char[] copy = new char[newCount];
+                for (int i = 0; i < newCount; i++) {
+                    copy[i] = parent.charInternal(newOffset + i);
+                }
+                this.value = copy;
+            }
+            this.count = newCount;
+            return;
+        }
         if (parentValue instanceof byte[]) {
             byte[] copy = new byte[newCount];
             System.arraycopy((byte[]) parentValue, newOffset, copy, 0, newCount);
@@ -391,6 +421,23 @@ public final class String implements java.lang.CharSequence, Comparable<String> 
         // be pushed off a fast path it was on.
         this.count = value.count;
         Object src = value.value;
+        if (src == null) {
+            // Same as the substring constructor above: an inline source has no array.
+            if (value.isLatin1()) {
+                byte[] copy = new byte[count];
+                for (int i = 0; i < count; i++) {
+                    copy[i] = (byte) value.charInternal(i);
+                }
+                this.value = copy;
+            } else {
+                char[] copy = new char[count];
+                for (int i = 0; i < count; i++) {
+                    copy[i] = value.charInternal(i);
+                }
+                this.value = copy;
+            }
+            return;
+        }
         if (src instanceof byte[]) {
             byte[] copy = new byte[count];
             System.arraycopy((byte[]) src, 0, copy, 0, count);
@@ -965,10 +1012,12 @@ public final class String implements java.lang.CharSequence, Comparable<String> 
         int first = indexOf(oldChar);
         if (first < 0) return this;
         if (isLatin1() && newChar <= 255) {
+            // Reads through charInternal rather than the backing array: an inline
+            // String has no array to take. cn1InlStrReplace is the fast path for
+            // both shapes; this stays correct for whatever it declines.
             byte[] result = new byte[count];
-            byte[] input = latin1Value();
             for (int i = 0; i < count; i++) {
-                int ch = input[i] & 255;
+                int ch = charInternal(i);
                 result[i] = (byte) (ch == oldChar ? newChar : ch);
             }
             return latin1(result, count);
@@ -1090,6 +1139,13 @@ public final class String implements java.lang.CharSequence, Comparable<String> 
      */
     public char[] toCharArray(){
         char[] buffer = new char[count];
+        if (value == null) {
+            // Inline: no array exists to copy from, so decode through the VM.
+            for (int i = 0; i < count; i++) {
+                buffer[i] = cn1InlineCharAt(i);
+            }
+            return buffer;
+        }
         if (isLatin1()) {
             byte[] b = latin1Value();
             for (int i = 0; i < count; i++) {
