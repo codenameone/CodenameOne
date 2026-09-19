@@ -59,6 +59,20 @@ in the runtime. Counts are how many times the gallery's generated code passes th
 | `Listener` | `onPointerDown` | 1 |
 | `Dismissible` | `onDismissed` | 1 |
 
+### Verified by use, not by counting
+
+The census counts call sites; it does not know whether anything compensates. Two
+checked so far, by driving the running app:
+
+- **`MaterialApp.onGenerateRoute` -- compensated, NOT a live defect.** It is the
+  gallery's whole route factory (`main.dart:69`) and reads as the largest gap in the
+  table, but `Navigator` resolves named routes through its own table. Tapping a
+  category, then a demo, navigates and renders correctly with zero errors. Latent
+  risk: a route only the factory can produce would not resolve.
+- **`Dismissible.onDismissed` -- LIVE DEFECT, confirmed.** A full left swipe across a
+  mail card in `/reply` changes **0.0%** of the list. Swipe-to-dismiss does nothing at
+  all; the reference dismisses the mail.
+
 A further **40** inert callbacks exist that the gallery never passes. They are latent
 rather than broken and are not tracked here until something needs them.
 
