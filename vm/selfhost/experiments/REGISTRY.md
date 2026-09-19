@@ -3371,3 +3371,100 @@ has to hang off the points where a thread is already known stopped -- the
 handshake park and the uncooperative force-stop -- not off a hope that every
 thread reaches a safepoint. gc-verify's self-test4 (injected half-traced block) is
 the check that this is right.
+
+## Round 32: ArrayList inline storage is measured to LOSE, and where the 20% actually is
+
+Cumulative allocation over the corpus, 414MB total (CN1_GC_CONFORM + CN1_ALLOC_CENSUS):
+
+| class | MB | count | avg |
+|---|---:|---:|---:|
+| byte[] | 97.5 | 647,383 | 150 |
+| java.lang.String | 61.8 | 1,120,857 | 55 |
+| asm Value[] | 32.2 | 208,346 | 154 |
+| StringBuilder | 19.8 | 308,637 | 64 |
+| HashMap | 16.8 | 190,793 | 88 |
+| ArrayList | 15.5 | 483,251 | 32 |
+
+Frame count equals Value[] count exactly (208,346) and LabelNode equals Label
+(97,104 vs 97,109): one Value[] per analyzer Frame, one LabelNode per Label. Both
+are ASM's tree and analysis machinery, driven by our two Analyzer passes.
+
+### Inline storage for ArrayList does not pay, and [CAPHIST] says why
+
+[CAPHIST] already existed under CN1_ALLOC_CENSUS. Reference blocks by element
+capacity, stable across two runs:
+
+| capacity | blocks | MB |
+|---|---:|---:|
+| <=1 | 146,382 | 5.6 |
+| <=2 | 8,111 | 0.4 |
+| <=4 | 22,283 | 1.3 |
+| <=8 | 24,952 | 1.8 |
+| **<=16** | **242,595** | **30.0** |
+| <=32 .. >1024 | ~35,300 | 32.3 |
+
+The dominant population is the <=16 bucket -- ArrayList's DEFAULT_CAPACITY of 10
+on first growth. Those need a real block whatever we do, and inline slots are paid
+for by EVERY instance:
+
+| inline slots | cost (483,251 instances) | blocks removed | net |
+|---|---:|---:|---:|
+| 2 (+16B) | 7.7MB | 154,493 = 6.0MB | **+1.7MB worse** |
+| 4 (+32B) | 15.5MB | 176,776 = 7.3MB | **+8.2MB worse** |
+
+So the idea is refuted for this workload, and refuted for the reason that makes it
+attractive elsewhere: it wins only when most instances stay tiny, and here most
+grow to 10. StringBuilder's 16 inline bytes pay precisely because most builders
+never exceed them. NOT BUILT.
+
+### A claim of mine to retract
+
+"byte[] + String = 38% of allocation, so substring fusion is the big prize" was
+wrong, by lumping two unlike things. The byte[] SIZE histogram separates them:
+the small modes -- 168,021 at 40 bytes (24-byte array header + 16 payload), 47,706
+at 56, 29,956 at 32, 21,357 at 104 -- come to ~12.6MB. That is the substring
+fallback (String.java:312, when cn1SubstringFused declines), and it is 3% of
+allocation, not 38%. The remaining ~85MB of byte[] is large buffers: reading 5,326
+class files and writing 853 outputs. That traffic is inherent to the job.
+
+There is no single 20% item in the allocation profile. It is 414MB spread thin.
+
+### Where the 20% actually is: the representation, not any one site
+
+org.objectweb.asm.Label, measured at 104 B/obj, is the clearest case because it is
+nothing but pointers -- 7 reference fields (info, otherLineNumbers,
+forwardReferences, frame, nextBasicBlock, outgoingEdges, nextListElement), 6 shorts
+and 2 ints:
+
+| | ours | HotSpot |
+|---|---:|---:|
+| header | 16 (clazz* 8 + mark 4 + heapPosition 4) | 12 (mark 8 + compressed klass 4) |
+| 7 references | 56 | 28 (compressed oops) |
+| total | ~104 | ~56 |
+
+**1.85x on the same object.** That is the whole answer to "HotSpot holds the JIT,
+its profile data and the entire JDK yet fits in the same bytes": not better
+algorithms, a denser representation. And it is a multiplier over the whole heap
+rather than one allocation site, which is why nothing in the per-class table can
+match it.
+
+Two steps, in increasing order of blast radius:
+
+  - **Header 16 -> 12.** Replace the 8-byte `struct clazz*` with a 4-byte class
+    index. We already assign dense class ids and the thunk switch already reads
+    `cn1__cls->classId`; CN1_CLASS_OF becomes an indexed load into a table small
+    enough to stay hot. 4 bytes off EVERY object.
+  - **References 8 -> 4.** Needs every BiBOP object inside one reserved window so a
+    reference can be a 32-bit offset. The page heap already takes its pages from
+    mmap (round 26), which is the half of that this needs. Legacy-heap objects
+    (>512 bytes) fall outside and need a second encoding, and every iOS port native
+    that reads a reference field out of a struct obj__X changes. This is the large
+    one and it should be prototyped behind a measurement, not begun on the analogy.
+
+Also real, and much smaller: CN1NativeBlock is a 32-byte header (next 8,
+allocation 8, bytes 8, capacity 4, aligned 16) in front of every collection block,
+and there are ~653,000 of them -- 21MB, which for the 146,382 capacity-1 blocks is
+32 bytes of header on 8 bytes of data. `allocation` is derivable from the published
+pointer (both are 16-byte aligned by construction) and `next` only matters while
+the block is retired, when its payload is already dead and can hold the link. That
+is 32 -> 16 and about 10MB, 2.5%.
