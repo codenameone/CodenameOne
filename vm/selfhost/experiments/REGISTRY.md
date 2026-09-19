@@ -3468,3 +3468,68 @@ and there are ~653,000 of them -- 21MB, which for the 146,382 capacity-1 blocks 
 pointer (both are 16-byte aligned by construction) and `next` only matters while
 the block is retired, when its payload is already dead and can hold the link. That
 is 32 -> 16 and about 10MB, 2.5%.
+
+## Round 33: the byte[] population was a miscount, and round 32's premise is retracted
+
+Round 32 read the [ALLOCPROF] table as 647,383 byte[] against 1,120,857 Strings
+and concluded that most Strings still allocate a separate array. **That is false.**
+cn1FusedLatin1Begin was charging each fused block to TWO census rows -- String for
+the fields and byte[] for the payload -- while cn1AllocFused and cn1SubstringFused
+charge the whole block to String. The great majority of those byte[] rows were
+fused payloads counted a second time.
+
+The tree had already found this exact bug once. cn1SubstringFused carries the
+note that an earlier version "split the bytes and added a second COUNT for the
+array class so the census would read like the two-object path, which silently
+cancelled the very saving this native exists for". The fix never reached the
+other copy, and nothing compared the two.
+
+### What found it: an allocation-SITE profiler
+
+CN1_ALLOC_SITES keys a table on the RETURN ADDRESS of the allocation call, so no
+call site is touched and generated C is covered like the runtime's own natives.
+It reported 33,054 byte[] from allocArray against a census total of 647,383, with
+overflow=0. A 95% shortfall in an instrument that says it dropped nothing is not a
+coverage hole; it is two instruments disagreeing about what an allocation IS.
+
+Caveat worth keeping: under -O3 -flto=thin an inlined call has no frame, so the
+address names the outermost function that was NOT inlined. The report prints the
+raw address beside the symbol so `atos -o <binary> <addr>` can resolve the chain.
+
+### The corrected profile, fused blocks counted once
+
+| class | MB | count | avg |
+|---|---:|---:|---:|
+| java.lang.String | 99.6 | 1,121,715 | 88 |
+| byte[] | 61.2 | 42,005 | 1455 |
+| asm Value[] | 32.2 | 208,346 | 154 |
+| StringBuilder | 19.8 | 308,607 | 64 |
+| HashMap | 16.9 | 191,514 | 88 |
+| ArrayList | 15.5 | 483,247 | 32 |
+
+byte[] is 42k LARGE buffers -- 5,326 class files read, 853 outputs written --
+averaging 1455 bytes, not 647k small ones. The "168,021 arrays of 16 bytes" that
+three separate hypotheses chased (substring fallback, StringBuilder, the char[]
+constructor) were fused String payloads that were already one object. There was
+never a missing-fusion problem.
+
+### What survives
+
+The char[] constructor fusion of the previous commit stands on its own: it turned
+~32,438 genuinely two-object constructions into one, which the site profiler
+confirms independently of the miscounted table. Its predicted large win never
+existed.
+
+### Where String actually sits
+
+String is 24% of all allocation, 1.12M objects, avg 88 bytes -- and each is
+ALREADY one fused object. So the lever is not fusion, it is the ~56 bytes of
+overhead per String: 16 object header + 8 value reference + 4 count + 4 hash, and
+then a 24-BYTE ARRAY HEADER on a payload that only that String references. That
+inner header alone is ~27MB across the corpus.
+
+It exists because `value` has to remain a real array object: Java code does
+`value instanceof byte[]` and casts it, and natives read it as an array. Removing
+it means teaching every one of those readers to address a payload that is not an
+object -- which is a representation change of the same family as 4-byte
+references, and should be scoped the same way.
