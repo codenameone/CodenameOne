@@ -2194,6 +2194,11 @@
         "tags_set": true,
         "canonical_set": true,
         "syndicated_at": "2026-09-19T00:01:08+00:00"
+      },
+      "devto": {
+        "id": 4695229,
+        "url": "https://dev.to/codenameone/what-go-taught-us-about-java-garbage-collection-25ha",
+        "syndicated_at": "2026-09-19T16:28:01+00:00"
       }
     }
   }
