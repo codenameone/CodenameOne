@@ -96,79 +96,31 @@ and are not listed.
 | `Form` | `autovalidateMode` |
 | `WillPopScope` | `onWillPop` |
 
-## 2b. BLOCKING: a virtualised list mis-renders when it loses an item
+## 2b. RESOLVED: a list mis-rendered when it lost an item
 
-Found by implementing swipe-to-dismiss, which made removing an item possible for the
-first time. Deleting a mail in `/reply` leaves every row below it drawing its new
-content **over its old**, and a provider lookup in a rebuilt row answers null
-(`EmailStore.isEmailStarred ... emailStore is null`).
+Deleting a mail left every row below it drawing its new content over its old, and a
+provider lookup in a rebuilt row answered null.
 
-It is two live component sets, not stale pixels: it survives a `revalidate()`, a full
-form repaint, and scrolling away and back.
+**Cause: `DismissibleRenderElement` did not override `visitChildren`.**
+`Element.visitChildren` is empty by default, so an element that owns children and does
+not override it owns them invisibly -- and the walk that unmounts a subtree is the one
+that suffers. Deleting a mail deactivated five Dismissible elements and reached none of
+their subtrees: their elements stayed mounted, their components stayed in the scene, and
+the lists inside those rows were never unmounted at all.
 
-Ruled out so far, each by measurement rather than reading:
+It was introduced with swipe-to-dismiss, which is why nothing had shown it before.
 
-| Suspect | Verdict |
-|---|---|
-| The dismissed row staying mounted | no -- unmounting its subtree explicitly changes nothing |
-| Firing `onDismissed` mid-frame | no -- deferring it a frame, then two, changes nothing |
-| Repaint ordering | no -- revalidate plus repaint after the rebuild changes nothing |
-| Keys not emitted | no -- `$t1.key(new ObjectKey(this.email))` is emitted |
-| `ObjectKey` equality | no -- identity on the wrapped value, with a matching `hashCode` |
-| `updateChildren` | no -- it is Flutter's keyed algorithm, leading run, trailing run, keyed middle |
-| `RenderHost.detach` failing its `parent == container` guard | no -- instrumented; it is skipped zero times |
+Worth keeping, because the symptom pointed everywhere but at the cause. The element tree
+looked right at every level -- keys emitted, `ObjectKey` equality sound, the keyed
+reconciler faithful, `attachOrder` matching the container's child count exactly, no
+element mounted twice, no component attached while already parented, and
+`RenderHost.detach` never once skipping its guard. That last fact was the tell rather
+than an acquittal: detach was not skipping, it was never being CALLED. Logging every
+deactivation showed five Dismissibles going while the lists inside them never unmounted,
+which places the fault between deactivation and unmount -- and that is `visitChildren`.
 
-### Root cause, found
-
-**The scroll view's old content subtree is never deactivated, so a second content pane
-is built and populated beside it.** Both then render, which is the doubling.
-
-Traced by identity rather than by class name -- printing the ancestor chain as class
-names alone was misleading, because two different panes print the same path:
-
-```text
-copy0  /EffectPane#65c5bb81/ScrollPane#566c8191/...
-copy1  /EffectPane#34127c5 /ScrollPane#566c8191/...      <- same ScrollPane
-```
-
-Two content `EffectPane`s under ONE `ScrollPane`, each populated in the attach trace
-(`ATT ... into 65c5bb81`, `ATT ... into 34127c5`), and exactly one `DET` in the whole
-trace -- for an unrelated pane. So the old content element is not unmounted at all:
-`ScrollRenderElement.syncChildren` does `content = updateChild(content, buildContent(),
-0)`, and `updateChild` does call `deactivateChild` on the replace path, so the field is
-being overwritten by a route that skips it.
-
-That is the conflict between the two trees: the element tree is correct and the
-Codename One component tree keeps the previous subtree.
-
-Ruled out along the way, each by measurement: the dismissed row staying mounted,
-the callback's timing, repaint ordering, missing keys, `ObjectKey` equality, the keyed
-reconciler, double-attach of an already-parented component, `attachOrder` drifting from
-the container's child count (they match exactly everywhere), and `RenderHost.detach`'s
-container guard (fixed separately as wrong on its own terms; it is not this).
-
-Narrowed further, and the scroll view is NOT the culprit:
-
-- The duplication is **created by the deletion**, not pre-existing: a census on a plain
-  press before any swipe reports 19 labels, 19 distinct, 0 duplicated.
-- No element is mounted twice -- instrumenting `RenderElement.mount` for an element that
-  already owns a component reports zero.
-- The list's own scroll element never replaces its content. The single content change
-  during a deletion is `before=null ... builtWidget=Row` on a scroll element seen for the
-  first time -- an inner image-row scroller inside a mail row, not the list.
-
-So the second `EffectPane` is not a replacement content subtree. It is attached to the
-LIST's host by some other element, which means the fault is in **which host a newly
-mounted element attaches to**. A `RenderHost` is flat: every component-owning element
-attaches into one container, and an `EffectRenderElement` opens a NESTED host whose
-container is its own pane. An element that should have joined the inner host joining the
-outer one instead puts a second pane beside the first.
-
-NEXT: instrument how `host` is chosen when an element mounts, and find the element that
-takes the outer host while its parent chain passes through an effect pane.
-
-This blocks Phase 1: any list that loses an item is affected, so the callbacks below
-that remove things cannot be finished until it is understood.
+The bug CLASS is closed, not just this instance: a census of every element that owns
+children finds no other that fails to override `visitChildren`. Two tests pin it.
 
 ## 3. Structural gaps
 
