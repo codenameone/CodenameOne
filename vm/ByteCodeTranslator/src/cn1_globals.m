@@ -6523,6 +6523,89 @@ static size_t bibopArenaCap = 0;
 static pthread_mutex_t bibopArenaMutex = PTHREAD_MUTEX_INITIALIZER;
 
 static long long bibopArenaTotalBytes = 0;
+
+/* ---- ONE RESERVED WINDOW FOR THE PAGE HEAP ---------------------------------
+ *
+ * Arenas are carved out of a single large anonymous reservation instead of being
+ * taken from malloc one at a time. The point is not the allocation -- arenas
+ * already batch that -- it is the ADDRESSES: every BiBOP object then lies within
+ * one known window, so a reference to it can be expressed as a 32-bit offset
+ * from the base rather than a 64-bit pointer. That is the precondition for
+ * compressed references, which is the only remaining item that halves the size of
+ * a reference-shaped heap.
+ *
+ * Reserving costs nothing real. MAP_ANON is lazily faulted, so resident memory
+ * tracks the pages actually touched and not the reservation -- the same property
+ * the arena comment above already relies on, one level up.
+ *
+ * This commit changes ADDRESSES ONLY. No reference changes width here; that is a
+ * separate step, and it is separate so that if it goes wrong the two are
+ * distinguishable.
+ *
+ * The window is bounded, so exhaustion has to be handled rather than asserted
+ * away: past the end we fall back to posix_memalign exactly as before, and such
+ * pages simply lie outside the window. A later compressed-reference step must
+ * therefore either keep them addressable or refuse to place objects there -- it
+ * cannot assume the window always won.
+ */
+#ifndef CN1_HEAP_WINDOW_BYTES
+#define CN1_HEAP_WINDOW_BYTES (32ULL * 1024 * 1024 * 1024)
+#endif
+static char* cn1HeapWindowBase = 0;
+static char* cn1HeapWindowEnd = 0;
+static size_t cn1HeapWindowUsed = 0;
+static int cn1HeapWindowTried = 0;
+static long long cn1HeapWindowFallbacks = 0;
+
+/* Caller holds bibopArenaMutex. */
+static void* cn1HeapWindowCarve(size_t sz) {
+#ifdef _WIN32
+    return 0;
+#else
+    if(!cn1HeapWindowTried) {
+        cn1HeapWindowTried = 1;
+        // Ladder rather than one size: a host that refuses 32GB of address space
+        // should get a smaller window, not no window and a silent loss of the
+        // property the whole scheme rests on.
+        for(unsigned long long want = CN1_HEAP_WINDOW_BYTES; want >= (1ULL << 30); want >>= 1) {
+            size_t slack = (size_t)CN1_BIBOP_PAGE_SIZE;
+            void* raw = mmap(NULL, (size_t)want + slack, PROT_READ | PROT_WRITE,
+                             MAP_PRIVATE | MAP_ANON, -1, 0);
+            if(raw == MAP_FAILED) {
+                continue;
+            }
+            // 64KB alignment is not optional: the page resolve masks an object
+            // address down to its page, so a misaligned window would hand back
+            // pages whose header is not where the mask says it is.
+            uintptr_t aligned = ((uintptr_t)raw + (CN1_BIBOP_PAGE_SIZE - 1))
+                                & ~((uintptr_t)CN1_BIBOP_PAGE_SIZE - 1);
+            cn1HeapWindowBase = (char*)aligned;
+            cn1HeapWindowEnd = cn1HeapWindowBase + want;
+            cn1HeapWindowUsed = 0;
+            break;
+        }
+    }
+    if(cn1HeapWindowBase == 0 || cn1HeapWindowBase + cn1HeapWindowUsed + sz > cn1HeapWindowEnd) {
+        return 0;
+    }
+    void* out = cn1HeapWindowBase + cn1HeapWindowUsed;
+    cn1HeapWindowUsed += sz;
+    return out;
+#endif
+}
+
+void cn1HeapWindowReport(void) {
+    if(!getenv("CN1_LOG_HEAP_WINDOW")) {
+        return;
+    }
+    fprintf(stderr, "[WINDOW] base=%p size=%lluMB used=%lluMB fallbacks=%lld\n",
+            (void*)cn1HeapWindowBase,
+            (unsigned long long)(cn1HeapWindowEnd - cn1HeapWindowBase) / (1024 * 1024),
+            (unsigned long long)cn1HeapWindowUsed / (1024 * 1024),
+            cn1HeapWindowFallbacks);
+    fflush(stderr);
+}
+
 static void* cn1BibopRawPage(void) {
 #ifdef CN1_BIBOP_NO_ARENA
     void* mem = 0;
@@ -6532,10 +6615,14 @@ static void* cn1BibopRawPage(void) {
     pthread_mutex_lock(&bibopArenaMutex);
     if(bibopArenaBase == 0 || bibopArenaUsed + CN1_BIBOP_PAGE_SIZE > bibopArenaCap) {
         size_t sz = (size_t)CN1_BIBOP_PAGE_SIZE * CN1_BIBOP_ARENA_PAGES;
-        void* mem = 0;
-        if(posix_memalign(&mem, CN1_BIBOP_PAGE_SIZE, sz) != 0 || mem == 0) {
-            pthread_mutex_unlock(&bibopArenaMutex);
-            return 0;
+        void* mem = cn1HeapWindowCarve(sz);
+        if(mem == 0) {
+            // Window exhausted or unavailable. Same arena as before, just outside it.
+            cn1HeapWindowFallbacks++;
+            if(posix_memalign(&mem, CN1_BIBOP_PAGE_SIZE, sz) != 0 || mem == 0) {
+                pthread_mutex_unlock(&bibopArenaMutex);
+                return 0;
+            }
         }
         bibopArenaBase = (char*)mem;
         bibopArenaUsed = 0;
@@ -15575,6 +15662,7 @@ void initConstantPool() {
     // Low-memory throttle diagnostics and the CN1_SIMULATE_MEMORY_WARNING_MS test
     // hook. Both are no-ops unless their environment variable is set.
     atexit(cn1ReportBlockSyscalls);
+    atexit(cn1HeapWindowReport);
     atexit(cn1ReportLowMemoryParks);
     atexit(cn1ReportPacingParks);
     atexit(cn1ReportGcOverflow);
