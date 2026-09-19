@@ -6068,6 +6068,10 @@ _Atomic int cn1GcCycleState = CN1_GC_CYCLE_IDLE;
 // =========================================================================
 
 #include <stdatomic.h>
+#if !defined(_WIN32)
+/* dladdr, for the allocation-site report only. */
+#include <dlfcn.h>
+#endif
 
 #ifndef CN1_BIBOP_PAGE_SIZE
 #define CN1_BIBOP_PAGE_SIZE (64*1024)
@@ -13749,6 +13753,131 @@ JAVA_OBJECT cn1AllocFused(CODENAME_ONE_THREAD_STATE, int totalSize, struct clazz
     return JAVA_NULL;
 }
 
+#ifdef CN1_ALLOC_CENSUS
+/* ---- allocation SITE profile -------------------------------------------------
+ *
+ * The per-class table says WHAT is allocated. It cannot say WHO allocated it, and
+ * for a class like byte[] -- one class, a dozen unrelated call sites -- that is
+ * the only question worth asking. The size histogram beside it was added as a
+ * proxy for exactly this and is not enough: a population of 168,021 arrays of
+ * one size was traced to three wrong suspects in a row before anyone could name
+ * its caller.
+ *
+ * The key is the RETURN ADDRESS of the allocation call, so NO call site has to be
+ * touched and generated C is covered on the same footing as the runtime's own
+ * natives. Keyed on the address alone, because a site in generated C allocates
+ * one array class; the class is recorded for display, first writer winning.
+ *
+ * WHAT -O3 -flto=thin DOES TO THIS, because it will mislead a reader who does not
+ * know: an inlined call has no frame of its own, so the address names the
+ * outermost function that was NOT inlined, not necessarily the line that wrote
+ * `new byte[n]`. That still finds a population, which is the job. The raw address
+ * is printed beside the symbol so `atos -o <binary> <addr>` can resolve the
+ * inline chain when the enclosing function is not a specific enough answer.
+ *
+ * Off unless CN1_ALLOC_SITES is set: one env read via pthread_once, then a
+ * relaxed load, so a census build that does not ask for it pays a branch.
+ */
+#define CN1_ALLOC_SITE_SLOTS 8192
+#define CN1_ALLOC_SITE_PROBES 64
+struct CN1AllocSiteRow {
+    _Atomic(void*) pc;
+    _Atomic(struct clazz*) cls;
+    _Atomic long count;
+    _Atomic long long bytes;
+};
+static struct CN1AllocSiteRow cn1AllocSiteRows[CN1_ALLOC_SITE_SLOTS];
+static _Atomic long long cn1AllocSiteOverflow = 0;
+static pthread_once_t cn1AllocSiteOnce = PTHREAD_ONCE_INIT;
+static int cn1AllocSiteEnabled = 0;
+
+static void cn1ResolveAllocSiteFlag(void) {
+    cn1AllocSiteEnabled = getenv("CN1_ALLOC_SITES") != 0;
+}
+
+void cn1RecordAllocSite(void* pc, struct clazz* cls, int size) {
+    pthread_once(&cn1AllocSiteOnce, cn1ResolveAllocSiteFlag);
+    if(!cn1AllocSiteEnabled) {
+        return;
+    }
+    size_t h = (((uintptr_t)pc) >> 2) * 2654435761u;
+    for(int probe = 0 ; probe < CN1_ALLOC_SITE_PROBES ; probe++) {
+        size_t i = (h + (size_t)probe) & (CN1_ALLOC_SITE_SLOTS - 1);
+        void* cur = atomic_load_explicit(&cn1AllocSiteRows[i].pc, memory_order_relaxed);
+        if(cur == 0) {
+            /* Claim with a compare-exchange, not a store: two threads allocating
+             * from different sites can read the same zero, and a plain store would
+             * let one row absorb both sites' counts under the loser's address. */
+            void* expected = 0;
+            if(atomic_compare_exchange_strong(&cn1AllocSiteRows[i].pc, &expected, pc)) {
+                atomic_store_explicit(&cn1AllocSiteRows[i].cls, cls, memory_order_relaxed);
+                cur = pc;
+            } else {
+                cur = expected;
+            }
+        }
+        if(cur == pc) {
+            atomic_fetch_add_explicit(&cn1AllocSiteRows[i].count, 1, memory_order_relaxed);
+            atomic_fetch_add_explicit(&cn1AllocSiteRows[i].bytes, size, memory_order_relaxed);
+            return;
+        }
+    }
+    /* Counted rather than folded into some other row: a silently misattributed
+     * site is worse than a missing one, and a non-zero overflow names the bound. */
+    atomic_fetch_add_explicit(&cn1AllocSiteOverflow, 1, memory_order_relaxed);
+}
+
+static void cn1ReportAllocSites(void) {
+    if(!cn1AllocSiteEnabled) {
+        return;
+    }
+    fprintf(stderr, "[ALLOCSITE] allocation sites by bytes (return address of the alloc call)\n");
+    long long snapBytes[CN1_ALLOC_SITE_SLOTS];
+    long snapCount[CN1_ALLOC_SITE_SLOTS];
+    void* snapPc[CN1_ALLOC_SITE_SLOTS];
+    struct clazz* snapCls[CN1_ALLOC_SITE_SLOTS];
+    for(int i = 0 ; i < CN1_ALLOC_SITE_SLOTS ; i++) {
+        snapBytes[i] = atomic_load_explicit(&cn1AllocSiteRows[i].bytes, memory_order_relaxed);
+        snapCount[i] = atomic_load_explicit(&cn1AllocSiteRows[i].count, memory_order_relaxed);
+        snapPc[i] = atomic_load_explicit(&cn1AllocSiteRows[i].pc, memory_order_relaxed);
+        snapCls[i] = atomic_load_explicit(&cn1AllocSiteRows[i].cls, memory_order_relaxed);
+    }
+    for(int shown = 0 ; shown < 40 ; shown++) {
+        int best = -1;
+        long long bestBytes = 0;
+        for(int i = 0 ; i < CN1_ALLOC_SITE_SLOTS ; i++) {
+            if(snapPc[i] != 0 && snapBytes[i] > bestBytes) {
+                bestBytes = snapBytes[i];
+                best = i;
+            }
+        }
+        if(best < 0) {
+            break;
+        }
+        const char* sym = "?";
+        long off = 0;
+#if !defined(_WIN32)
+        {
+            Dl_info info;
+            if(dladdr(snapPc[best], &info) != 0 && info.dli_sname != 0) {
+                sym = info.dli_sname;
+                off = (long)((char*)snapPc[best] - (char*)info.dli_saddr);
+            }
+        }
+#endif
+        fprintf(stderr, "[ALLOCSITE] bytes=%-10lld count=%-8ld %-12s pc=%p %s+%ld\n",
+                snapBytes[best], snapCount[best],
+                snapCls[best] != 0 && snapCls[best]->clsName != 0 ? snapCls[best]->clsName : "?",
+                snapPc[best], sym, off);
+        snapBytes[best] = 0;
+        snapPc[best] = 0;
+    }
+    fprintf(stderr, "[ALLOCSITE] overflow=%lld (sites that found no free slot)\n",
+            atomic_load_explicit(&cn1AllocSiteOverflow, memory_order_relaxed));
+    fflush(stderr);
+}
+#endif
+
 JAVA_OBJECT allocArray(CODENAME_ONE_THREAD_STATE, int length, struct clazz* type, int primitiveSize, int dim) {
     // primitiveSize and dim are stored in a BYTE each (see struct JavaArrayPrototype).
     // Every in-tree caller passes a sizeof() of at most 8 and a dimension of at most 4, so
@@ -13760,6 +13889,9 @@ JAVA_OBJECT allocArray(CODENAME_ONE_THREAD_STATE, int length, struct clazz* type
     int actualSize = length * primitiveSize;
     // Size and address both come from CN1_ARRAY_* so they cannot drift apart; the
     // eight bytes this used to add on top were dead (see cn1_globals.h).
+#ifdef CN1_ALLOC_CENSUS
+    cn1RecordAllocSite(__builtin_return_address(0), type, CN1_ARRAY_ALLOC_BYTES(actualSize));
+#endif
     JAVA_ARRAY array = (JAVA_ARRAY)codenameOneGcMalloc(threadStateData, CN1_ARRAY_ALLOC_BYTES(actualSize), type);
     (*array).length = length;
     (*array).dimensions = dim;
@@ -14186,12 +14318,21 @@ JAVA_OBJECT cn1FusedLatin1Begin(CODENAME_ONE_THREAD_STATE, int len, JAVA_ARRAY_B
                 ((struct obj__java_lang_String*)so)->java_lang_String_value = arr; // count stays 0 until End
                 *dst = (JAVA_ARRAY_BYTE*)CN1_ARRAY_DATA((JAVA_ARRAY)arr);
 #ifdef CN1_GC_CONFORM
-                // Attribute the two halves separately: the fused block is one
-                // allocation but the profile is read to find out WHAT is being
-                // allocated, and "String" alone would hide the byte[] payload
-                // that dominates the block for long strings.
-                cn1RecordAllocation(&class__java_lang_String, off);
-                cn1RecordAllocation(&class_array1__JAVA_BYTE, total - off);
+                // CHARGED WHOLE TO String, like cn1AllocFused and cn1SubstringFused.
+                // Splitting it was the older behaviour and it is a trap this tree has
+                // already sprung once -- see the note in cn1SubstringFused, where an
+                // earlier version "split the bytes and added a second COUNT for the
+                // array class so the census would read like the two-object path, which
+                // silently cancelled the very saving this native exists for".
+                //
+                // This copy survived that fix, and it cost a whole round of work: the
+                // [ALLOCPROF] table showed 647,383 byte[] against 1,120,857 Strings,
+                // which reads as "most Strings still allocate a separate array" and is
+                // false -- the great majority of those byte[] rows ARE fused payloads
+                // counted a second time. A fused block is one allocation and one
+                // object; what it is made of is a question for the size histogram,
+                // which can still be asked of String.
+                cn1RecordAllocation(&class__java_lang_String, total);
 #endif
 #ifdef CN1_ALLOC_CENSUS
                 // The other instrument, same hole -- see cn1AllocFused. Charged whole to
@@ -15352,6 +15493,12 @@ void initConstantPool() {
     atexit(cn1ReportLowMemoryParks);
     atexit(cn1ReportPacingParks);
     atexit(cn1ReportGcOverflow);
+#ifdef CN1_ALLOC_CENSUS
+    // Under the census define rather than CN1_GC_CONFORM: the site profile answers
+    // a question the per-class census raises, so it has to be available in the same
+    // build that raises it. Still inert unless CN1_ALLOC_SITES is set.
+    atexit(cn1ReportAllocSites);
+#endif
     cn1StartSimulatedMemoryWarnings();
 #ifdef CN1_GC_CONFORM
     atexit(cn1ReportStalls);
