@@ -3770,3 +3770,55 @@ Each cost a round of work aimed at a target that was not there. An instrument
 that cannot be wrong in a way its own output reveals will eventually send
 somebody somewhere expensive, and all three were found by cross-checking one
 instrument against another rather than by reading either.
+
+## Round 39: reading C2's output beside ours, for one hot method
+
+hsdis is shipped by no JDK, so -XX:+PrintAssembly had been quietly useless and
+this comparison was unavailable. Built from the JDK tree's own capstone backend;
+vm/selfhost/jit-disasm.sh makes it repeatable.
+
+BytecodeMethod.equals -- 10.9% of our main thread, 198 bytes of bytecode, C2
+compiled it six times and inlined it elsewhere as well. Its last C2 compile
+against our AOT C:
+
+| | total | loads | stores | branches |
+|---|---:|---:|---:|---:|
+| ours | **371** | **92** | **4** | 98 |
+| C2 | 466 | 70 | 30 | 96 |
+
+We emit FEWER instructions, and the frameless work shows where it should: 4
+stores against 30. C2's 466 also carries 91 movk (64-bit constant chains) and 34
+nop (safepoint padding) that do no work. So on shape we are in the same place or
+ahead, which is the question that was asked.
+
+**We issue 31% more LOADS, and that is where the time goes.** Loads are what
+sets IPC, and the profile's mutator gap is a throughput gap, not a stall.
+
+### Where the extra loads come from, exactly
+
+`o instanceof BytecodeMethod`, as we emit it:
+
+    adrp/add   x8, <tagged class table>
+    ands  x9, x2, #0x7        ; is it a tagged immediate?
+    add   x8, x8, x9, lsl #4
+    csel  x8, x2, x8, eq      ; object pointer, or tagged-class entry
+    ldr   x8, [x8]            ; load 1: the clazz pointer
+    ldrsw x8, [x8, #0x2c]     ; load 2: classId -- DEPENDENT on load 1
+    cmp   w8, #0x1a3
+
+C2 does the same test with one compare against a klass already in a register.
+
+Two costs are ours alone and both are addressable:
+
+  - **The tagged check is 5 instructions on every CN1_CLASS_OF**, including every
+    instanceof and every virtual dispatch, and it is paid even where the operand
+    cannot be tagged. The translator often knows: a receiver whose declared type
+    is not Object/Number/Comparable/Serializable can never be a boxed immediate.
+  - **classId is a second dependent load.** We compare IDs where HotSpot compares
+    the klass word. For a class with no live subclasses -- which a closed world
+    can decide -- `CN1_CLASS_OF(o) == &class__X` is ONE load and no bitset
+    lookup. The type-test bitset from round 20 made instanceof O(1); this would
+    make the common case O(1) with half the loads.
+
+Neither is a codegen rewrite. Both are the closed world telling us something the
+emitted code currently declines to use.
