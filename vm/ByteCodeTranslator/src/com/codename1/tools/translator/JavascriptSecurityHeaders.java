@@ -66,8 +66,10 @@ import java.util.List;
  */
 final class JavascriptSecurityHeaders {
 
-    /// Where everything except `_headers` goes. Named so it is obvious in a file listing that it
-    /// is for the person deploying the application and not for the application.
+    /// The directory this configuration goes in. It is created NEXT TO the bundle directory,
+    /// not inside it -- see {@link JavascriptBundleWriter#sidecarDirectory}. Named so it is
+    /// obvious in a file listing that it is for the person deploying the application and not
+    /// for the application.
     static final String DEPLOYMENT_DIRECTORY = "cn1-security";
 
     private JavascriptSecurityHeaders() {
@@ -88,8 +90,8 @@ final class JavascriptSecurityHeaders {
                 ? new String(Files.readAllBytes(bridge.toPath()), StandardCharsets.UTF_8) : "";
         String csp = contentSecurityPolicy(html, bridgeSource);
 
-        // Everything goes in a subdirectory, including `_headers`, and that last part is the
-        // important one.
+        // Everything goes in a directory of its own, including `_headers`, and that directory
+        // sits OUTSIDE the bundle. Both halves of that matter.
         //
         // `_headers` at the publish root is the name Netlify and Cloudflare Pages read, and they
         // read it *automatically*. Writing it there would mean an application that had never
@@ -99,9 +101,17 @@ final class JavascriptSecurityHeaders {
         // taken their networking away with no diagnostic beyond a console error in a browser
         // nobody was watching.
         //
+        // And the bundle directory IS the publish root: it is what gets uploaded, and what the
+        // build server zips flat for exactly that purpose. A directory of host configuration
+        // written inside it is a directory the developer publishes by default and has to
+        // remember to delete -- the README asking them not to upload it cannot be read in time
+        // by anyone who has already dragged the folder to their host. One level up it cannot be
+        // uploaded by accident at all.
+        //
         // So the build generates the policy and the developer activates it, by copying one file.
         // The README beside it says which, and says what to edit first.
-        File guidance = new File(outputDirectory, DEPLOYMENT_DIRECTORY);
+        File guidance = new File(JavascriptBundleWriter.sidecarDirectory(outputDirectory),
+                DEPLOYMENT_DIRECTORY);
         if (!guidance.isDirectory() && !guidance.mkdirs()) {
             throw new IOException("could not create " + guidance);
         }
@@ -313,8 +323,11 @@ final class JavascriptSecurityHeaders {
     private static String netlifyHeaders(String csp) {
         StringBuilder b = new StringBuilder();
         b.append("# Codename One JavaScript port -- security headers.\n");
-        b.append("# Netlify and Cloudflare Pages read this file verbatim; see "
-                + "cn1-security/README.md.\n");
+        // Named by the directory this file was GENERATED in, which is beside the bundle -- by
+        // the time the file is doing anything it has been copied to the publish root, where no
+        // relative path back to the README exists.
+        b.append("# Netlify and Cloudflare Pages read this file verbatim; see README.md in the "
+                + "build's cn1-security directory.\n");
         b.append("/*\n");
         String[] lines = commonHeaders().split("\n");
         for (int iter = 0; iter < lines.length; iter++) {
@@ -423,9 +436,10 @@ final class JavascriptSecurityHeaders {
                 + "- `cn1-security.nginx.conf` -- nginx, included from the serving block\n"
                 + "- `cn1-security.htaccess` -- Apache, renamed to `.htaccess`\n"
                 + "\n"
-                + "**Do not upload this `cn1-security/` directory itself.** It is for you; the\n"
-                + "application reads none of it, and a web root is not the place for a host\'s\n"
-                + "configuration.\n"
+                + "This directory is written **beside** the application bundle rather than\n"
+                + "inside it, so uploading the bundle never carries it along. Keep it that way:\n"
+                + "it is for you, the application reads none of it, and a web root is not the\n"
+                + "place for a host\'s configuration.\n"
                 + "\n"
                 + "## Read this before you activate it: connect-src\n"
                 + "\n"

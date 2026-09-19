@@ -112,12 +112,14 @@ class JavascriptSecurityHeadersTest {
 
     @Test
     void thePolicyCoversOnlyTheDocumentItsHashesCameFrom() throws Exception {
-        java.io.File out = java.nio.file.Files.createTempDirectory("cn1-csp").toFile();
+        java.io.File dist = java.nio.file.Files.createTempDirectory("cn1-csp").toFile();
+        java.io.File out = new java.io.File(dist, "MyApp-js");
+        assertTrue(out.mkdirs());
         java.nio.file.Files.write(new java.io.File(out, "index.html").toPath(),
                 indexTemplate().getBytes(java.nio.charset.StandardCharsets.UTF_8));
         JavascriptSecurityHeaders.write(out);
 
-        java.io.File guidance = new java.io.File(out, "cn1-security");
+        java.io.File guidance = new java.io.File(dist, "cn1-security");
         String netlify = new String(java.nio.file.Files.readAllBytes(
                 new java.io.File(guidance, "_headers").toPath()),
                 java.nio.charset.StandardCharsets.UTF_8);
@@ -143,11 +145,13 @@ class JavascriptSecurityHeadersTest {
 
     @Test
     void everyNginxLocationCarriesTheCommonHeaders() throws Exception {
-        java.io.File out = java.nio.file.Files.createTempDirectory("cn1-nginx").toFile();
+        java.io.File dist = java.nio.file.Files.createTempDirectory("cn1-nginx").toFile();
+        java.io.File out = new java.io.File(dist, "MyApp-js");
+        assertTrue(out.mkdirs());
         java.nio.file.Files.write(new java.io.File(out, "index.html").toPath(),
                 indexTemplate().getBytes(java.nio.charset.StandardCharsets.UTF_8));
         JavascriptSecurityHeaders.write(out);
-        java.io.File guidance = new java.io.File(out, "cn1-security");
+        java.io.File guidance = new java.io.File(dist, "cn1-security");
         String nginx = null;
         java.io.File[] files = guidance.listFiles();
         for (int iter = 0; files != null && iter < files.length; iter++) {
@@ -304,5 +308,31 @@ class JavascriptSecurityHeadersTest {
                 "the policy must not grant unsafe-eval: " + csp);
         assertTrue(csp.indexOf("'unsafe-inline'") < 0,
                 "inline script is covered by hashes, never by unsafe-inline: " + csp);
+    }
+
+    @Test
+    void theConfigurationIsWrittenBesideTheBundleAndNotInsideIt() throws Exception {
+        // The bundle directory is the application's public web root: it is what a developer
+        // uploads, and what the build server zips FLAT for exactly that purpose. Host
+        // configuration written inside it is published by default -- and a README asking for
+        // it to be deleted first is read, if at all, after the upload. One level up it cannot
+        // be uploaded by accident.
+        java.io.File dist = java.nio.file.Files.createTempDirectory("cn1-location").toFile();
+        java.io.File out = new java.io.File(dist, "MyApp-js");
+        assertTrue(out.mkdirs());
+        java.nio.file.Files.write(new java.io.File(out, "index.html").toPath(),
+                indexTemplate().getBytes(StandardCharsets.UTF_8));
+        JavascriptSecurityHeaders.write(out);
+
+        assertFalse(new java.io.File(out, JavascriptSecurityHeaders.DEPLOYMENT_DIRECTORY).exists(),
+                "nothing may be written into the web root");
+        java.io.File guidance = new java.io.File(dist, JavascriptSecurityHeaders.DEPLOYMENT_DIRECTORY);
+        assertTrue(new java.io.File(guidance, "_headers").isFile());
+        assertTrue(new java.io.File(guidance, "README.md").isFile());
+
+        // The bundle still holds only what the browser asks for.
+        String[] published = out.list();
+        assertNotNull(published);
+        assertEquals(1, published.length, "index.html and nothing else: " + java.util.Arrays.toString(published));
     }
 }

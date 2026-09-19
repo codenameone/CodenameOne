@@ -81,6 +81,19 @@ class JavascriptTargetIntegrationTest {
         assertTrue(Files.exists(distDir.resolve(Paths.get("js", "fontmetrics.js"))), "Translator should copy JavaScript port font metrics support");
         assertTrue(Files.exists(distDir.resolve("style.css")), "Translator should copy the JavaScript port stylesheet");
 
+        // Build artifacts go NEXT TO the bundle, never in it: distDir is the application's
+        // public web root, so a suspension report or a directory of host configuration written
+        // there is uploaded to every visitor unless the developer remembers to delete it.
+        Path sidecar = outputDir.resolve("dist");
+        assertTrue(Files.exists(sidecar.resolve("suspension-report.txt")),
+                "the suspension report should be written beside the bundle");
+        assertTrue(Files.isDirectory(sidecar.resolve("cn1-security")),
+                "the deployment configuration should be written beside the bundle");
+        assertFalse(Files.exists(distDir.resolve("suspension-report.txt")),
+                "the suspension report must not be published in the web root");
+        assertFalse(Files.exists(distDir.resolve("cn1-security")),
+                "the deployment configuration must not be published in the web root");
+
         String translatedApp = new String(Files.readAllBytes(distDir.resolve("translated_app.js")), StandardCharsets.UTF_8);
         String runtime = new String(Files.readAllBytes(distDir.resolve("parparvm_runtime.js")), StandardCharsets.UTF_8);
         String worker = new String(Files.readAllBytes(distDir.resolve("worker.js")), StandardCharsets.UTF_8);

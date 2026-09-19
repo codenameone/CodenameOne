@@ -85,6 +85,28 @@ final class JavascriptBundleWriter {
     }
 
     /**
+     * Where an artifact that is <em>about</em> the bundle belongs: the
+     * directory the bundle directory itself sits in, never inside it.
+     *
+     * <p>The output directory is the application's public web root -- it is
+     * what gets uploaded, and what the build server zips flat for the
+     * developer to unpack into one. Anything written there is published, so
+     * a build report or a host configuration file put there either ships to
+     * every visitor or has to be deleted by hand before every deploy. One
+     * level up is the build's own {@code dist} directory, which is where the
+     * person reading the report already is and which nothing uploads.</p>
+     *
+     * @param outputDirectory the directory the bundle is written to
+     * @return the sibling directory, or the output directory itself when it
+     * has no parent, which cannot happen for a real translation
+     */
+    static File sidecarDirectory(File outputDirectory) {
+        File absolute = outputDirectory.getAbsoluteFile();
+        File parent = absolute.getParentFile();
+        return parent == null ? absolute : parent;
+    }
+
+    /**
      * Emit a sidecar manifest listing every signature-based dispatch id
      * (``cn1_s_<method>_<sig>``) that corresponds to a method declared on
      * a JSO bridge class — i.e. any class transitively assignable to
