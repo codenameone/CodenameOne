@@ -55,7 +55,26 @@ import com.codename1.ui.util.EventDispatcher;
 /// platforms, and it is deliberately not this one: doing it properly means a format, a
 /// locale and a parse policy, and guessing those is worse than not offering them.
 public class Stepper extends Container {
-    private final TextField field = new TextField();
+    /// The editable field.
+    ///
+    /// A plain NUMERIC TextField would make a negative range untypable: TextField.validChar
+    /// answers `c >= '0' && c <= '9'` for NUMERIC, so in a -10..10 stepper the decrement
+    /// button can reach -5 while the user cannot type it. DECIMAL is not the answer either --
+    /// it admits '.' and ',', which this control cannot represent.
+    ///
+    /// So the minus is permitted here, and only when the range actually contains a negative
+    /// value. validChar is asked about one character with no position, so it cannot insist the
+    /// sign is leading; it does not need to. Text that is not an integer simply fails
+    /// Integer.parseInt in commitTypedText, which returns without changing anything.
+    private final TextField field = new TextField() {
+        @Override
+        public boolean validChar(String c) {
+            if (c != null && c.length() == 1 && c.charAt(0) == '-' && minValue < 0) {
+                return true;
+            }
+            return super.validChar(c);
+        }
+    };
     private final Button decrement = new Button("-", "StepperButton");
     private final Button increment = new Button("+", "StepperButton");
     private final EventDispatcher listeners = new EventDispatcher();
@@ -109,13 +128,13 @@ public class Stepper extends Container {
         decrement.addActionListener(new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent evt) {
-                setValue(Stepper.this.value - step);
+                setValue(saturate((long) Stepper.this.value - Stepper.this.step));
             }
         });
         increment.addActionListener(new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent evt) {
-                setValue(Stepper.this.value + step);
+                setValue(saturate((long) Stepper.this.value + Stepper.this.step));
             }
         });
 
@@ -281,12 +300,20 @@ public class Stepper extends Container {
             return;
         }
         int clamped = clamp(typed);
+        boolean moved = clamped != value;
         value = clamped;
         updateButtonState();
         if (clamped != typed) {
             // Out of range. Correct the field now rather than at focus loss, because the
             // number under the caret is not one this control can produce.
             syncField();
+        }
+        if (!moved) {
+            // The typed text differed but clamping put the value back where it already was --
+            // at 10 in a 1..10 stepper, typing 11 means 10. The documented value did not
+            // change, so no event, which is the rule setValue already follows. The field has
+            // still been corrected above.
+            return;
         }
         listeners.fireActionEvent(new ActionEvent(this));
     }
@@ -303,6 +330,32 @@ public class Stepper extends Container {
     private void updateButtonState() {
         decrement.setEnabled(value > minValue);
         increment.setEnabled(value < maxValue);
+    }
+
+    /// Narrows a value computed in `long` back to `int` without wrapping.
+    ///
+    /// The step arithmetic has to happen in `long`. A Stepper may legitimately span
+    /// `Integer.MIN_VALUE`..`Integer.MAX_VALUE`, and in that range `value + step` overflows
+    /// in `int` before `#setValue(int)` ever sees it -- incrementing near the maximum wraps to
+    /// a negative number and the value jumps to the other end of the range instead of stopping
+    /// at the top. Saturating here means clamp() receives the number the user asked for, and
+    /// does its own job.
+    ///
+    /// #### Parameters
+    ///
+    /// - `candidate`: the value in long arithmetic
+    ///
+    /// #### Returns
+    ///
+    /// candidate, saturated to the int range
+    private static int saturate(long candidate) {
+        if (candidate > Integer.MAX_VALUE) {
+            return Integer.MAX_VALUE;
+        }
+        if (candidate < Integer.MIN_VALUE) {
+            return Integer.MIN_VALUE;
+        }
+        return (int) candidate;
     }
 
     private int clamp(int v) {

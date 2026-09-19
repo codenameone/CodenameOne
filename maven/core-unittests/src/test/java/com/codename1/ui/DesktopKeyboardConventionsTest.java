@@ -28,6 +28,7 @@ import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.layouts.BoxLayout;
 import com.codename1.ui.plaf.UIManager;
 
+import java.lang.reflect.Field;
 import java.util.Hashtable;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -127,6 +128,91 @@ class DesktopKeyboardConventionsTest extends UITestBase {
         DisplayTest.flushEdt();
 
         assertTrue(fired[0], "Escape must fire the back command on the desktop");
+    }
+
+    @FormTest
+    void oneEscapeKeystrokeFiresTheBackCommandOnlyOnce() throws Exception {
+        // Escape is the back key on the desktop, not merely a convention beside it:
+        // JavaSEPort.getBackKeyCode() returns VK_ESCAPE and Display.init assigns it to
+        // MenuBar.backSK. So the PRESS runs the back command through the desktop path and the
+        // RELEASE satisfies menuBar.handlesKeycode(backSK) and runs it a second time -- one
+        // keystroke, two screens popped.
+        //
+        // backSK has to be forced to Escape for this to be a real test. The test
+        // implementation reports -1 as its back key, so a press/release pair would take the
+        // desktop path and never reach the MenuBar branch at all, and the test would pass with
+        // the bug present. Reflection matches what MenuBarTest already does with these fields.
+        Field backField = MenuBar.class.getDeclaredField("backSK");
+        backField.setAccessible(true);
+        int originalBack = backField.getInt(null);
+        try {
+            backField.setInt(null, KEY_ESCAPE);
+            implementation.setDesktop(true);
+            Form f = threeButtonForm();
+            final int[] fired = new int[1];
+            Command back = new Command("Back") {
+                @Override
+                public void actionPerformed(ActionEvent evt) {
+                    fired[0]++;
+                }
+            };
+            f.setBackCommand(back);
+            f.show();
+            DisplayTest.flushEdt();
+
+            f.keyPressed(KEY_ESCAPE);
+            f.keyReleased(KEY_ESCAPE);
+            DisplayTest.flushEdt();
+
+            assertEquals(1, fired[0],
+                    "one Escape keystroke must invoke the back command exactly once; twice means "
+                    + "the release reached the MenuBar back-key path after the press had already "
+                    + "been consumed");
+        } finally {
+            backField.setInt(null, originalBack);
+        }
+    }
+
+    @FormTest
+    void theEscapeSuppressionIsNotSticky() throws Exception {
+        // The suppression must last exactly one release. If the flag were left set, the NEXT
+        // Escape's release would be swallowed too and the back command would run once per two
+        // keystrokes -- trading a double fire for a missed one.
+        //
+        // Note what this deliberately does not assert: that a release with no matching press
+        // reaches the back command. Measured, it does not, and it did not before this change
+        // either -- the suppression cannot affect it, because the flag is only ever set by a
+        // press. Asserting that would be inventing a contract rather than testing one.
+        Field backField = MenuBar.class.getDeclaredField("backSK");
+        backField.setAccessible(true);
+        int originalBack = backField.getInt(null);
+        try {
+            backField.setInt(null, KEY_ESCAPE);
+            implementation.setDesktop(true);
+            Form f = threeButtonForm();
+            final int[] fired = new int[1];
+            Command back = new Command("Back") {
+                @Override
+                public void actionPerformed(ActionEvent evt) {
+                    fired[0]++;
+                }
+            };
+            f.setBackCommand(back);
+            f.show();
+            DisplayTest.flushEdt();
+
+            f.keyPressed(KEY_ESCAPE);
+            f.keyReleased(KEY_ESCAPE);
+            f.keyPressed(KEY_ESCAPE);
+            f.keyReleased(KEY_ESCAPE);
+            DisplayTest.flushEdt();
+
+            assertEquals(2, fired[0],
+                    "two Escape keystrokes must invoke the back command twice; one means the "
+                    + "release suppression stayed set after the first keystroke");
+        } finally {
+            backField.setInt(null, originalBack);
+        }
     }
 
     @FormTest

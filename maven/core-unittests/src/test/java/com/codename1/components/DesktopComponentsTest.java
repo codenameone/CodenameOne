@@ -277,4 +277,84 @@ class DesktopComponentsTest extends UITestBase {
         assertTrue(s.getDecrementButton().isFocusable(), "so does the decrement button");
         assertTrue(s.getIncrementButton().isFocusable(), "and the increment button");
     }
+
+    @FormTest
+    void aStepperDoesNotFireWhenClampingLeavesTheValueWhereItWas() {
+        // At the top of the range, typing something above it is not a change: the value was
+        // 10 and clamping makes it 10 again. setValue already refuses to fire in that case;
+        // the typed path used to fire anyway, so a listener saw a change event for a value
+        // that never moved.
+        Stepper s = new Stepper(10, 1, 10);
+        Form f = new Form("Stepper", BoxLayout.y());
+        f.add(s);
+        f.show();
+        DisplayTest.flushEdt();
+
+        final int[] events = new int[1];
+        s.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent evt) {
+                events[0]++;
+            }
+        });
+
+        s.getField().setText("11");
+        DisplayTest.flushEdt();
+
+        assertEquals(10, s.getValue(), "11 clamps back to the maximum");
+        assertEquals(0, events[0],
+                "no event: the documented value did not move, which is the rule setValue follows");
+        assertEquals("10", s.getField().getText(), "the field is still corrected");
+    }
+
+    @FormTest
+    void stepperArithmeticSaturatesInsteadOfWrapping() {
+        // A legitimate full-int range. Incrementing near the top used to overflow in int
+        // before clamp ever saw the number, so the value jumped to the bottom of the range
+        // instead of stopping at the top.
+        Stepper s = new Stepper(Integer.MAX_VALUE - 1, Integer.MIN_VALUE, Integer.MAX_VALUE);
+        s.setStep(10);
+        Form f = new Form("Stepper", BoxLayout.y());
+        f.add(s);
+        f.show();
+        DisplayTest.flushEdt();
+
+        s.getIncrementButton().released();
+        DisplayTest.flushEdt();
+        assertEquals(Integer.MAX_VALUE, s.getValue(),
+                "incrementing past the maximum must stop at it, not wrap to the minimum");
+
+        s.setValue(Integer.MIN_VALUE + 1);
+        s.getDecrementButton().released();
+        DisplayTest.flushEdt();
+        assertEquals(Integer.MIN_VALUE, s.getValue(),
+                "and the same on the way down");
+    }
+
+    @FormTest
+    void aNegativeStepperRangeAcceptsATypedMinusSign() {
+        // TextField.validChar answers digits only for NUMERIC, so a -10..10 stepper could
+        // reach -5 with the button and never by typing. The minus is permitted only when the
+        // range actually contains a negative value.
+        Stepper negative = new Stepper(0, -10, 10);
+        Stepper positive = new Stepper(5, 1, 10);
+
+        assertTrue(negative.getField().validChar("-"),
+                "a range that includes negatives must accept the sign");
+        assertTrue(negative.getField().validChar("4"), "digits still pass");
+        assertFalse(positive.getField().validChar("-"),
+                "a range with no negative value has no use for it");
+        assertFalse(negative.getField().validChar("."),
+                "and this is still an integer control -- DECIMAL would have allowed a point");
+    }
+
+    @FormTest
+    void anUntitledGroupBoxReportsAnEmptyTitleRatherThanNull() {
+        // getTitle() documents a non-null result and setTitle(null) already normalises;
+        // the constructor stored the null it was given.
+        assertEquals("", new GroupBox(null).getTitle(),
+                "a null caption is the untitled case, not a null title");
+        assertTrue(new GroupBox(null).getTitleComponent().isHidden(),
+                "and it still hides the caption");
+    }
 }

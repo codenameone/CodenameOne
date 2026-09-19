@@ -4039,6 +4039,21 @@ public class Form extends Container implements TopLevelContainer {
     /// #### Returns
     ///
     /// true when this form handled the key and dispatch should stop
+    /// Set when an Escape PRESS was consumed here, so the matching RELEASE can be swallowed.
+    ///
+    /// Escape is not merely a desktop convention, it is the back key: JavaSEPort's
+    /// getBackKeyCode returns VK_ESCAPE and Display.init assigns that to MenuBar.backSK. So
+    /// without this the one keystroke acts twice -- the press invokes the back command here,
+    /// and the release satisfies menuBar.handlesKeycode(backSK) in keyReleased and invokes it
+    /// again. Two screens pop for one Escape.
+    ///
+    /// Static, not per instance, because the release does not necessarily arrive at the form
+    /// that consumed the press: a Dialog disposes on the press and the release is then
+    /// delivered to its owner, which is exactly the case where a second back would fire on the
+    /// wrong screen. One keystroke is in flight at a time and this is EDT-only state, so a
+    /// plain static is the whole mechanism -- no locking, per this codebase's threading model.
+    private static boolean escapeConsumedOnPress;
+
     private boolean desktopKeyPressed(int keyCode) {
         if (!Display.getInstance().isDesktop()) {
             return false;
@@ -4047,7 +4062,31 @@ public class Form extends Container implements TopLevelContainer {
             return moveFocusByTab(Display.getInstance().isShiftKeyDown());
         }
         if (keyCode == KEY_ESCAPE) {
-            return escapePressed();
+            if (escapePressed()) {
+                escapeConsumedOnPress = true;
+                return true;
+            }
+            // Not consumed -- no back command to run. Fall through so the existing MenuBar
+            // path keeps whatever it did before, including minimizeOnBack.
+            return false;
+        }
+        return false;
+    }
+
+    /// True when the Escape release belongs to a press this class already acted on, in which
+    /// case the caller must not let it reach the MenuBar back-key path as well.
+    ///
+    /// #### Parameters
+    ///
+    /// - `keyCode`: the key being released
+    ///
+    /// #### Returns
+    ///
+    /// true when the release has been swallowed
+    private boolean desktopKeyReleased(int keyCode) {
+        if (keyCode == KEY_ESCAPE && escapeConsumedOnPress) {
+            escapeConsumedOnPress = false;
+            return true;
         }
         return false;
     }
@@ -4106,6 +4145,9 @@ public class Form extends Container implements TopLevelContainer {
     @Override
     public void keyReleased(int keyCode) {
         int game = Display.getInstance().getGameAction(keyCode);
+        if (desktopKeyReleased(keyCode)) {
+            return;
+        }
         if (menuBar.handlesKeycode(keyCode) && !focusedHandlesInput(keyCode)) {
             menuBar.keyReleased(keyCode);
             return;

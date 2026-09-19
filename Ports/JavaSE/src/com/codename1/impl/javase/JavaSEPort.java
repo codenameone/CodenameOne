@@ -3101,7 +3101,22 @@ public class JavaSEPort extends CodenameOneImplementation {
     /// {@code codename1.arg.desktop.titleBar} system property fallback.
     private String resolveDesktopTitleBarMode() {
         String mode = configuredDesktopTitleBarMode();
-        return mode == null ? "toolbar" : mode;
+        if (mode != null) {
+            return mode;
+        }
+        // The installed theme gets to answer before the default does, because Form already
+        // asks it: Form.getDesktopTitleBarMode consults the theme's desktopTitleBarMode
+        // constant when the project configured nothing. Resolving "toolbar" here regardless
+        // made the two disagree, and the disagreement cost the application its commands --
+        // Form read "native" from the theme and hid the Toolbar, while isDesktopNativeChromeMode
+        // read "toolbar" and returned from setNativeCommands without installing a menu, so the
+        // commands had nowhere left to be.
+        String themed = com.codename1.ui.plaf.UIManager.getInstance()
+                .getThemeConstant("desktopTitleBarMode", null);
+        if (themed != null && themed.length() > 0) {
+            return themed;
+        }
+        return "toolbar";
     }
 
     /// The mode the project actually asked for, or null when it asked for nothing. Kept

@@ -1212,6 +1212,10 @@ public class IOSImplementation extends CodenameOneImplementation {
     // nothing rather than to something arbitrary.
     private static volatile java.util.HashMap<Integer, com.codename1.ui.Command> macNativeCommands;
     private static volatile java.util.HashMap<Integer, com.codename1.ui.Command> macSupersededCommands;
+
+    /// The form each generation of the menu was published for; see fireMacMenuCommand.
+    private static volatile com.codename1.ui.Form macNativeMenuHost;
+    private static volatile com.codename1.ui.Form macSupersededMenuHost;
     private static int nextMacCommandId = 1;
 
     /**
@@ -1288,6 +1292,10 @@ public class IOSImplementation extends CodenameOneImplementation {
                 published.put(Integer.valueOf(commandId), c);
             }
         }
+        macSupersededMenuHost = macNativeMenuHost;
+        // The form the menu was built from; MenuBar.updateCommands publishes for the form
+        // being shown.
+        macNativeMenuHost = Display.getInstance().getCurrent();
         macSupersededCommands = macNativeCommands;
         macNativeCommands = published;
         nativeInstance.setNativeMenuCommands(sb.toString());
@@ -1308,11 +1316,30 @@ public class IOSImplementation extends CodenameOneImplementation {
         if (resolved == null) {
             return;
         }
+        if (!resolved.isEnabled()) {
+            // See the Windows/Linux ports: the row format carries no enabled flag, so the
+            // native item is clickable even for a disabled Command. Refuse to run it.
+            return;
+        }
         final com.codename1.ui.Command c = resolved;
+        final com.codename1.ui.Form host =
+                live != null && live.containsKey(key) ? macNativeMenuHost : macSupersededMenuHost;
         Display.getInstance().callSerially(new Runnable() {
             @Override
             public void run() {
-                c.actionPerformed(new ActionEvent(c));
+                ActionEvent ev = new ActionEvent(c);
+                if (host != null) {
+                    // Through the owning form, so listeners registered with
+                    // Form.addCommandListener, an actionCommand() override and the pop guard
+                    // all still run. dispatchCommand calls actionPerformed itself first.
+                    //
+                    // This matters more than it used to: the macOS port now installs the Aqua
+                    // theme by default, which hides the Toolbar, so this menu is the only way
+                    // to reach these commands.
+                    host.dispatchCommand(c, ev);
+                    return;
+                }
+                c.actionPerformed(ev);
             }
         });
     }

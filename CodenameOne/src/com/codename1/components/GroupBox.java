@@ -79,7 +79,10 @@ public class GroupBox extends Container {
         setUIID("GroupBox");
         content = new Container(contentLayout);
         content.setUIID("Container");
-        title.setText(titleText);
+        // Normalised here for the same reason setTitle does it: getTitle() documents a
+        // non-null result, and a null caption is an accepted way to ask for an untitled group.
+        // Storing the null made new GroupBox(null).getTitle() return one.
+        title.setText(titleText == null ? "" : titleText);
         // An empty caption must not reserve a strip: an untitled group is a plain box, and a
         // blank label with the title style's padding would leave a gap nothing explains.
         title.setHidden(titleText == null || titleText.length() == 0);

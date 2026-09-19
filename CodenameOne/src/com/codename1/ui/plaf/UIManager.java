@@ -1303,8 +1303,22 @@ public class UIManager {
             themeProps.put("DesktopScrollThumb.padding", "0,0,0,0");
             themeProps.put("DesktopScrollThumb.margin", "0,0,0,0");
             themeProps.put("DesktopScrollThumb.bgColor", foreground);
+            // Distinct states, not three derives of one style. The point of this fallback is
+            // that hover and drag are VISIBLE before a theme styles them, and deriving both
+            // from the unchanged base gave three identical appearances -- the highlight the
+            // comment above promises never appeared.
+            //
+            // Opacity rather than colour, because there is no darker shade available to move
+            // to: `foreground` here is pure black in light mode and pure white in dark, so a
+            // "darker on hover" rule has nowhere to go and would have to branch on the
+            // appearance. A thumb that is partly transparent at rest, more opaque under the
+            // pointer and fully opaque while dragged reads correctly in both, and is what the
+            // platforms themselves do.
+            themeProps.put("DesktopScrollThumb.transparency", "140");
             themeProps.put("DesktopScrollThumb.sel#derive", "DesktopScrollThumb");
+            themeProps.put("DesktopScrollThumb.sel#transparency", "200");
             themeProps.put("DesktopScrollThumb.press#derive", "DesktopScrollThumb");
+            themeProps.put("DesktopScrollThumb.press#transparency", "255");
         }
         if (installedTheme == null || !installedTheme.containsKey("DesktopHorizontalScroll.derive")) {
             themeProps.put("DesktopHorizontalScroll.margin", "0,0,0,0");
@@ -1317,8 +1331,12 @@ public class UIManager {
             themeProps.put("DesktopHorizontalScrollThumb.padding", "0,0,0,0");
             themeProps.put("DesktopHorizontalScrollThumb.margin", "0,0,0,0");
             themeProps.put("DesktopHorizontalScrollThumb.bgColor", foreground);
+            // Same three states as the vertical thumb above, for the same reason.
+            themeProps.put("DesktopHorizontalScrollThumb.transparency", "140");
             themeProps.put("DesktopHorizontalScrollThumb.sel#derive", "DesktopHorizontalScrollThumb");
+            themeProps.put("DesktopHorizontalScrollThumb.sel#transparency", "200");
             themeProps.put("DesktopHorizontalScrollThumb.press#derive", "DesktopHorizontalScrollThumb");
+            themeProps.put("DesktopHorizontalScrollThumb.press#transparency", "255");
         }
 
         if (installedTheme == null || !installedTheme.containsKey("SliderFull.derive")) {

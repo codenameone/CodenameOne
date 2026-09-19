@@ -81,7 +81,7 @@ public final class ContextMenu {
     ///
     /// the command the user chose, or null if the menu was dismissed or never opened
     public static Command show(Component anchor, int x, int y, Command... commands) {
-        if (anchor == null || commands == null || commands.length == 0) {
+        if (anchor == null || !hasAnyCommand(commands)) {
             return null;
         }
         Command[] chosen = new Command[1];
@@ -111,12 +111,39 @@ public final class ContextMenu {
     ///
     /// the command the user chose, or null
     public static Command show(Component anchor, Command... commands) {
-        if (anchor == null || commands == null || commands.length == 0) {
+        if (anchor == null || !hasAnyCommand(commands)) {
             return null;
         }
         Command[] chosen = new Command[1];
         build(commands, chosen).showPopupDialog(anchor);
         return chosen[0];
+    }
+
+    /// True when the array holds at least one command to show.
+    ///
+    /// Length alone is not the question. `build` skips null entries, so an array that is
+    /// nonempty but all nulls produced a popup with no buttons in it -- a modal rectangle the
+    /// user has to dismiss to discover it was empty. That is the same outcome the class
+    /// documents for a null or empty array, where the contract is to open nothing, so the
+    /// check is about content rather than length.
+    ///
+    /// #### Parameters
+    ///
+    /// - `commands`: the candidate menu items, possibly null
+    ///
+    /// #### Returns
+    ///
+    /// true when at least one entry is non-null
+    private static boolean hasAnyCommand(Command[] commands) {
+        if (commands == null) {
+            return false;
+        }
+        for (Command cmd : commands) {
+            if (cmd != null) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /// Builds the popup: one left-aligned button per command, stacked, in a dialog with no
