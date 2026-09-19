@@ -1,0 +1,263 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>RecordedWorkoutSession.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.health.workout</a> &gt; <span class="el_source">RecordedWorkoutSession.java</span></div><h1>RecordedWorkoutSession.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.health.workout;
+
+import com.codename1.health.AggregateMetric;
+import com.codename1.health.Health;
+import com.codename1.health.HealthDataType;
+import com.codename1.health.HealthQuantity;
+import com.codename1.health.HealthSample;
+import com.codename1.impl.health.HealthWire;
+import com.codename1.health.HealthStore;
+import com.codename1.health.HealthUnit;
+import com.codename1.health.HealthWriteResult;
+import com.codename1.health.WorkoutSample;
+import com.codename1.util.AsyncResource;
+import com.codename1.util.AsyncResult;
+
+import java.util.ArrayList;
+import java.util.List;
+
+/// A workout recorded by the framework rather than by the operating
+/// system.
+///
+/// Used wherever the platform has no live workout session -- Android
+/// phones, and iOS before version 26. The state machine, the elapsed clock
+/// and the statistics rollup all come from [WorkoutSession]; this class
+/// adds the part that is genuinely different: it accumulates the samples
+/// the app feeds in and, on [WorkoutSession#end()], writes them to the
+/// health store together with the workout record.
+///
+/// That is precisely the flow Google documents for Health Connect on
+/// phones -- record the session yourself, batch the associated data, write
+/// it when the session ends -- so on Android this is the correct design
+/// rather than a fallback.
+final class RecordedWorkoutSession extends WorkoutSession {
+
+<span class="fc" id="L57">    private final List&lt;HealthSample&gt; collected = new ArrayList&lt;HealthSample&gt;();</span>
+
+    RecordedWorkoutSession(WorkoutConfiguration configuration) {
+<span class="fc" id="L60">        super(configuration);</span>
+<span class="fc" id="L61">    }</span>
+
+    @Override
+    protected void doStart(AsyncResource&lt;Boolean&gt; out) {
+<span class="fc" id="L65">        out.complete(Boolean.TRUE);</span>
+<span class="fc" id="L66">    }</span>
+
+    @Override
+    protected void doPause(AsyncResource&lt;Boolean&gt; out) {
+<span class="fc" id="L70">        out.complete(Boolean.TRUE);</span>
+<span class="fc" id="L71">    }</span>
+
+    @Override
+    protected void doResume(AsyncResource&lt;Boolean&gt; out) {
+<span class="fc" id="L75">        out.complete(Boolean.TRUE);</span>
+<span class="fc" id="L76">    }</span>
+
+    @Override
+    protected void doAddSamples(List&lt;HealthSample&gt; samples,
+            AsyncResource&lt;Boolean&gt; out) {
+        // Copies. What is kept here is written when the workout ends,
+        // which can be an hour later, and an app that edited or reused a
+        // sample after handing it over changed the child record the
+        // workout persists -- its source, its identifier, its metadata --
+        // rather than the reading it fed in.
+<span class="fc" id="L86">        synchronized (collected) {</span>
+<span class="fc bfc" id="L87" title="All 2 branches covered.">            for (HealthSample s : samples) {</span>
+<span class="fc" id="L88">                HealthSample copy = HealthWire.copyOf(s);</span>
+<span class="pc bpc" id="L89" title="1 of 2 branches missed.">                collected.add(copy == null ? s : copy);</span>
+<span class="fc" id="L90">            }</span>
+<span class="fc" id="L91">        }</span>
+<span class="fc" id="L92">        out.complete(Boolean.TRUE);</span>
+<span class="fc" id="L93">    }</span>
+
+    @Override
+    protected void doDiscard() {
+<span class="fc" id="L97">        synchronized (collected) {</span>
+<span class="fc" id="L98">            collected.clear();</span>
+<span class="fc" id="L99">        }</span>
+<span class="fc" id="L100">    }</span>
+
+    /// The markers live on [WorkoutSample] because this class is not
+    /// public: an app told to check for one has to be able to name it.
+    private static final String SAMPLES_NOT_PERSISTED =
+            WorkoutSample.SAMPLES_NOT_PERSISTED;
+
+    private static final String WORKOUT_NOT_PERSISTED =
+            WorkoutSample.WORKOUT_NOT_PERSISTED;
+
+    @Override
+    protected void doEnd(final AsyncResource&lt;WorkoutSample&gt; out) {
+<span class="fc" id="L112">        final WorkoutSample workout = WorkoutSample.create(</span>
+<span class="fc" id="L113">                configuration().getActivityType(), getStartedAtMillis(),</span>
+<span class="fc" id="L114">                getEndedAtMillis());</span>
+        // Clamped only against the two clock reads inside end(): the
+        // accumulated total and the end timestamp are taken a few
+        // instructions apart, and a wall clock that steps backwards
+        // between them can make the first exceed the second by a
+        // millisecond. The setter rejects anything larger, which is the
+        // right answer for a caller supplying its own figure and the
+        // wrong one for losing a real workout to an NTP correction.
+<span class="fc" id="L122">        workout.setActiveDurationMillis(Math.min(getElapsedMillis(),</span>
+<span class="fc" id="L123">                workout.getDurationMillis()));</span>
+<span class="fc" id="L124">        workout.setTitle(configuration().getTitle());</span>
+<span class="fc" id="L125">        applyTotals(workout);</span>
+
+<span class="fc" id="L127">        final HealthStore store = Health.getInstance().getStore();</span>
+        // Only what this platform can actually store. Neither HealthKit nor
+        // the Health Connect bridge accepts a workout *session* through the
+        // sample write path yet, and sending one made shared validation
+        // reject the whole batch -- failing the session and discarding the
+        // child samples that would have been written perfectly well.
+<span class="fc" id="L133">        List&lt;HealthSample&gt; toWrite = new ArrayList&lt;HealthSample&gt;();</span>
+        // A workout that began and ended inside the same millisecond has
+        // no interval to record, and WORKOUT is an interval-only type, so
+        // shared validation refuses it -- and refuses the whole batch with
+        // it, taking the child samples that were perfectly writable. That
+        // is the failure this list exists to avoid, so the same treatment
+        // applies: leave it out and say so.
+<span class="fc" id="L140">        final boolean workoutWritable =</span>
+<span class="fc bfc" id="L141" title="All 2 branches covered.">                store.isWritable(HealthDataType.WORKOUT)</span>
+<span class="pc bpc" id="L142" title="1 of 2 branches missed.">                        &amp;&amp; !workout.isInstantaneous();</span>
+<span class="pc bpc" id="L143" title="1 of 2 branches missed.">        if (workoutWritable) {</span>
+<span class="nc" id="L144">            toWrite.add(workout);</span>
+        } else {
+<span class="fc" id="L146">            workout.putMetadata(WORKOUT_NOT_PERSISTED, &quot;true&quot;);</span>
+        }
+<span class="fc" id="L148">        StringBuilder rejected = new StringBuilder();</span>
+<span class="fc" id="L149">        synchronized (collected) {</span>
+<span class="fc bfc" id="L150" title="All 2 branches covered.">            for (HealthSample s : collected) {</span>
+<span class="fc bfc" id="L151" title="All 2 branches covered.">                if (store.isWritable(s.getType())) {</span>
+<span class="fc" id="L152">                    toWrite.add(s);</span>
+                } else {
+<span class="fc" id="L154">                    noteRejected(rejected, s.getType().getId());</span>
+                }
+<span class="fc" id="L156">            }</span>
+<span class="fc" id="L157">        }</span>
+<span class="fc bfc" id="L158" title="All 2 branches covered.">        if (rejected.length() &gt; 0) {</span>
+<span class="fc" id="L159">            workout.putMetadata(SAMPLES_NOT_PERSISTED, rejected.toString());</span>
+        }
+        // Released once they have been rolled up and queued for the write.
+        // discard() already did this; ending did not, so a long heart-rate
+        // workout kept every copied sample alive for as long as anything
+        // held the session -- and the manager holds it until another one
+        // starts, which for an app with a single workout is the rest of the
+        // process. The samples are in toWrite by now and the statistics are
+        // computed, so nothing here reads the list again.
+<span class="fc" id="L168">        synchronized (collected) {</span>
+<span class="fc" id="L169">            collected.clear();</span>
+<span class="fc" id="L170">        }</span>
+
+<span class="fc bfc" id="L172" title="All 4 branches covered.">        if (!store.isSupported() || toWrite.isEmpty()) {</span>
+            // Nowhere to persist it, but the record itself is still real
+            // and the caller may want to upload it themselves. Report the
+            // workout rather than failing the whole session.
+            //
+            // The marker goes on here too. A workout with no writable
+            // child samples -- the ordinary no-sensor case on both mobile
+            // platforms -- took this path and came back with neither an id
+            // nor the signal that says why, which is the one thing a
+            // caller needs in order to keep the record itself.
+<span class="fc" id="L182">            setState(WorkoutSessionState.ENDED);</span>
+<span class="fc" id="L183">            out.complete(workout);</span>
+<span class="fc" id="L184">            return;</span>
+        }
+<span class="fc" id="L186">        store.write(toWrite).onResult(new AsyncResult&lt;HealthWriteResult&gt;() {</span>
+            @Override
+            public void onReady(HealthWriteResult value, Throwable err) {
+<span class="pc bpc" id="L189" title="1 of 2 branches missed.">                if (err != null) {</span>
+<span class="nc" id="L190">                    setState(WorkoutSessionState.FAILED);</span>
+<span class="nc" id="L191">                    out.error(err);</span>
+<span class="nc" id="L192">                    return;</span>
+                }
+                // The captured decision, not the store's general
+                // capability: a workout can be left out of a batch the
+                // store would otherwise accept -- an instantaneous one
+                // is -- and asking the store again stamped the first
+                // child sample's identifier onto a workout that was
+                // never written, and had just been marked as not
+                // persisted. The marker itself is set where that
+                // decision is made, so there is nothing to add here.
+<span class="pc bpc" id="L202" title="3 of 4 branches missed.">                if (workoutWritable &amp;&amp; !value.getSampleIds().isEmpty()) {</span>
+                    // The first id belongs to the workout only when the
+                    // workout was part of the batch.
+<span class="nc" id="L205">                    workout.setId(value.getSampleIds().get(0));</span>
+                }
+<span class="fc" id="L207">                setState(WorkoutSessionState.ENDED);</span>
+<span class="fc" id="L208">                out.complete(workout);</span>
+<span class="fc" id="L209">            }</span>
+        });
+<span class="fc" id="L211">    }</span>
+
+    /// Adds `typeId` to the comma-separated rejected list, once.
+    private static void noteRejected(StringBuilder rejected, String typeId) {
+<span class="fc" id="L215">        String needle = &quot;,&quot; + typeId + &quot;,&quot;;</span>
+<span class="pc bpc" id="L216" title="1 of 2 branches missed.">        if ((&quot;,&quot; + rejected.toString() + &quot;,&quot;).indexOf(needle) &gt;= 0) {</span>
+<span class="nc" id="L217">            return;</span>
+        }
+<span class="pc bpc" id="L219" title="1 of 2 branches missed.">        if (rejected.length() &gt; 0) {</span>
+<span class="nc" id="L220">            rejected.append(',');</span>
+        }
+<span class="fc" id="L222">        rejected.append(typeId);</span>
+<span class="fc" id="L223">    }</span>
+
+    /// Copies the rolled-up energy and distance onto the record, leaving
+    /// them null when nothing was fed in -- see
+    /// [WorkoutSession#getStatistic(HealthDataType,AggregateMetric)].
+    private void applyTotals(WorkoutSample workout) {
+<span class="fc" id="L229">        HealthQuantity energy = getStatistic(HealthDataType.ACTIVE_ENERGY,</span>
+                AggregateMetric.TOTAL);
+<span class="fc bfc" id="L231" title="All 2 branches covered.">        if (energy != null) {</span>
+<span class="fc" id="L232">            workout.setTotalEnergy(energy.in(HealthUnit.KILOCALORIE));</span>
+        }
+        // Summed across every distance category, not the first one that
+        // answers. Picking one dropped a swim entirely -- nothing here
+        // looked at DISTANCE_SWIMMING at all, so a recorded swim came
+        // back with no total despite the samples that produced it being
+        // right there -- and in a triathlon it reported the walk and
+        // silently discarded the ride.
+<span class="fc" id="L240">        double metres = 0;</span>
+<span class="fc" id="L241">        boolean any = false;</span>
+<span class="fc" id="L242">        HealthDataType[] categories = {</span>
+            HealthDataType.DISTANCE_WALKING_RUNNING,
+            HealthDataType.DISTANCE_CYCLING,
+            HealthDataType.DISTANCE_SWIMMING,
+        };
+<span class="fc bfc" id="L247" title="All 2 branches covered.">        for (HealthDataType category : categories) {</span>
+<span class="fc" id="L248">            HealthQuantity leg = getStatistic(category,</span>
+                    AggregateMetric.TOTAL);
+<span class="fc bfc" id="L250" title="All 2 branches covered.">            if (leg != null) {</span>
+<span class="fc" id="L251">                metres += leg.getValue(HealthUnit.METER);</span>
+<span class="fc" id="L252">                any = true;</span>
+            }
+        }
+        // Still null when nothing was fed in: a workout with no distance
+        // samples and one covering zero metres are different facts.
+<span class="fc bfc" id="L257" title="All 2 branches covered.">        if (any) {</span>
+<span class="fc" id="L258">            workout.setTotalDistance(</span>
+                    new HealthQuantity(metres, HealthUnit.METER));
+        }
+<span class="fc" id="L261">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

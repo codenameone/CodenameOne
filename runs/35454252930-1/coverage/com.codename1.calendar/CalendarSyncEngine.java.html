@@ -1,0 +1,377 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>CalendarSyncEngine.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.calendar</a> &gt; <span class="el_source">CalendarSyncEngine.java</span></div><h1>CalendarSyncEngine.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.calendar;
+
+import com.codename1.util.AsyncResource;
+import com.codename1.util.SuccessCallback;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+
+/// Opt-in local-first mutation queue. It deliberately does not own credentials
+/// or silently schedule work; applications call `sync()` or connect it to a
+/// platform background-work callback.
+public final class CalendarSyncEngine {
+
+    private static final String MUTATIONS = &quot;mutations&quot;;
+
+    private final CalendarSource source;
+
+    private final CalendarCache cache;
+
+    private Map&lt;String, Object&gt; state;
+
+    private long nextId;
+
+    private AsyncResource&lt;CalendarSyncResult&gt; syncInFlight;
+
+<span class="fc" id="L51">    public CalendarSyncEngine(CalendarSource source, CalendarCache cache) throws CalendarException {</span>
+<span class="pc bpc" id="L52" title="2 of 4 branches missed.">        if (source == null || cache == null) {</span>
+<span class="nc" id="L53">            throw new IllegalArgumentException(&quot;source and cache required&quot;);</span>
+        }
+<span class="fc" id="L55">        this.source = source;</span>
+<span class="fc" id="L56">        this.cache = cache;</span>
+<span class="fc" id="L57">        state = cache.load(source.getId());</span>
+<span class="pc bpc" id="L58" title="1 of 2 branches missed.">        if (!(state.get(MUTATIONS) instanceof List)) {</span>
+<span class="fc" id="L59">            state.put(MUTATIONS, new ArrayList&lt;Object&gt;());</span>
+        }
+        // Seed above every persisted mutation id: reseeding from the clock
+        // alone can mint duplicate ids after a restart (queue bursts advance
+        // nextId past the clock) or after a clock rollback, and duplicate ids
+        // break find()/resolveConflict and the cn1.mutationId dedup key.
+<span class="fc" id="L65">        long seed = System.currentTimeMillis();</span>
+<span class="fc" id="L66">        String prefix = source.getId() + &quot;-&quot;;</span>
+<span class="pc bpc" id="L67" title="1 of 2 branches missed.">        for (Object value : mutations()) {</span>
+<span class="nc" id="L68">            Object id = ((Map&lt;String, Object&gt;) value).get(&quot;id&quot;);</span>
+<span class="nc bnc" id="L69" title="All 4 branches missed.">            if (id instanceof String &amp;&amp; ((String) id).startsWith(prefix)) {</span>
+                try {
+<span class="nc" id="L71">                    long suffix = Long.parseLong(((String) id).substring(prefix.length()));</span>
+<span class="nc bnc" id="L72" title="All 2 branches missed.">                    if (suffix &gt;= seed) {</span>
+<span class="nc" id="L73">                        seed = suffix + 1;</span>
+                    }
+<span class="nc" id="L75">                } catch (NumberFormatException ignored) {</span>
+<span class="nc" id="L76">                }</span>
+            }
+<span class="nc" id="L78">        }</span>
+<span class="fc" id="L79">        nextId = seed;</span>
+<span class="fc" id="L80">    }</span>
+
+    public synchronized String queueEventSave(CalendarEvent event, CalendarMutationScope scope) throws CalendarException {
+<span class="fc bfc" id="L83" title="All 2 branches covered.">        if (event == null) {</span>
+<span class="fc" id="L84">            throw new IllegalArgumentException(&quot;event required&quot;);</span>
+        }
+<span class="fc bfc" id="L86" title="All 2 branches covered.">        if (event.getCalendarId() == null) {</span>
+<span class="fc" id="L87">            throw new IllegalArgumentException(&quot;event calendarId required&quot;);</span>
+        }
+<span class="fc" id="L89">        return queue(&quot;saveEvent&quot;, event.getCalendarId(), event.getId(), event.getVersion(), CalendarModelCodec.encodeEvent(event), scope);</span>
+    }
+
+    public synchronized String queueEventDelete(String calendarId, String eventId, String version, CalendarMutationScope scope) throws CalendarException {
+<span class="fc bfc" id="L93" title="All 2 branches covered.">        if (calendarId == null) {</span>
+<span class="fc" id="L94">            throw new IllegalArgumentException(&quot;calendarId required&quot;);</span>
+        }
+<span class="pc bpc" id="L96" title="1 of 2 branches missed.">        if (eventId == null) {</span>
+<span class="fc" id="L97">            throw new IllegalArgumentException(&quot;eventId required&quot;);</span>
+        }
+<span class="nc" id="L99">        return queue(&quot;deleteEvent&quot;, calendarId, eventId, version, null, scope);</span>
+    }
+
+    public synchronized String queueTaskSave(CalendarTask task, CalendarMutationScope scope) throws CalendarException {
+<span class="fc bfc" id="L103" title="All 2 branches covered.">        if (task == null) {</span>
+<span class="fc" id="L104">            throw new IllegalArgumentException(&quot;task required&quot;);</span>
+        }
+<span class="pc bpc" id="L106" title="1 of 2 branches missed.">        if (task.getCalendarId() == null) {</span>
+<span class="fc" id="L107">            throw new IllegalArgumentException(&quot;task calendarId required&quot;);</span>
+        }
+<span class="nc" id="L109">        return queue(&quot;saveTask&quot;, task.getCalendarId(), task.getId(), task.getVersion(), CalendarModelCodec.encodeTask(task), scope);</span>
+    }
+
+    public synchronized String queueTaskDelete(String calendarId, String taskId, String version, CalendarMutationScope scope) throws CalendarException {
+<span class="fc bfc" id="L113" title="All 2 branches covered.">        if (calendarId == null) {</span>
+<span class="fc" id="L114">            throw new IllegalArgumentException(&quot;calendarId required&quot;);</span>
+        }
+<span class="pc bpc" id="L116" title="1 of 2 branches missed.">        if (taskId == null) {</span>
+<span class="fc" id="L117">            throw new IllegalArgumentException(&quot;taskId required&quot;);</span>
+        }
+<span class="nc" id="L119">        return queue(&quot;deleteTask&quot;, calendarId, taskId, version, null, scope);</span>
+    }
+
+    private String queue(String type, String calendarId, String itemId, String version, Map&lt;String, Object&gt; payload, CalendarMutationScope scope) throws CalendarException {
+<span class="fc" id="L123">        String id = source.getId() + &quot;-&quot; + (++nextId);</span>
+<span class="fc" id="L124">        Map&lt;String, Object&gt; mutation = new HashMap&lt;String, Object&gt;();</span>
+<span class="fc" id="L125">        mutation.put(&quot;id&quot;, id);</span>
+<span class="fc" id="L126">        mutation.put(&quot;type&quot;, type);</span>
+<span class="fc" id="L127">        mutation.put(&quot;calendarId&quot;, calendarId);</span>
+<span class="fc" id="L128">        mutation.put(&quot;itemId&quot;, itemId);</span>
+<span class="fc" id="L129">        mutation.put(&quot;version&quot;, version);</span>
+<span class="fc" id="L130">        mutation.put(&quot;payload&quot;, payload);</span>
+<span class="pc bpc" id="L131" title="1 of 4 branches missed.">        if (payload != null &amp;&amp; itemId == null) {</span>
+<span class="fc" id="L132">            Map providerData = (Map) payload.get(&quot;providerData&quot;);</span>
+<span class="pc bpc" id="L133" title="1 of 2 branches missed.">            if (providerData == null) {</span>
+<span class="nc" id="L134">                providerData = new HashMap();</span>
+<span class="nc" id="L135">                payload.put(&quot;providerData&quot;, providerData);</span>
+            }
+<span class="fc" id="L137">            providerData.put(&quot;cn1.mutationId&quot;, id);</span>
+        }
+<span class="pc bpc" id="L139" title="1 of 2 branches missed.">        mutation.put(&quot;scope&quot;, (scope == null ? CalendarMutationScope.ALL : scope).name());</span>
+<span class="fc" id="L140">        mutations().add(mutation);</span>
+<span class="fc" id="L141">        persist();</span>
+<span class="fc" id="L142">        return id;</span>
+    }
+
+    public synchronized int getPendingCount() {
+<span class="fc" id="L146">        return mutations().size();</span>
+    }
+
+    public synchronized AsyncResource&lt;CalendarSyncResult&gt; sync() {
+<span class="fc bfc" id="L150" title="All 2 branches covered.">        if (syncInFlight != null) {</span>
+<span class="fc" id="L151">            return syncInFlight;</span>
+        }
+<span class="fc" id="L153">        final AsyncResource&lt;CalendarSyncResult&gt; out = new AsyncResource&lt;CalendarSyncResult&gt;();</span>
+<span class="fc" id="L154">        syncInFlight = out;</span>
+<span class="fc" id="L155">        out.ready(new SuccessCallback&lt;CalendarSyncResult&gt;() {</span>
+            @Override
+            public void onSucess(CalendarSyncResult value) {
+<span class="fc" id="L158">                clearSync(out);</span>
+<span class="fc" id="L159">            }</span>
+<span class="fc" id="L160">        }).except(new SuccessCallback&lt;Throwable&gt;() {</span>
+            @Override
+            public void onSucess(Throwable error) {
+<span class="nc" id="L163">                clearSync(out);</span>
+<span class="nc" id="L164">            }</span>
+        });
+<span class="fc" id="L166">        final CalendarSyncResult result = new CalendarSyncResult();</span>
+<span class="fc" id="L167">        syncNext(out, result);</span>
+<span class="fc" id="L168">        return out;</span>
+    }
+
+    private synchronized void clearSync(AsyncResource&lt;CalendarSyncResult&gt; completed) {
+<span class="pc bpc" id="L172" title="1 of 2 branches missed.">        if (syncInFlight == completed) { //NOPMD CompareObjectsWithEquals</span>
+<span class="fc" id="L173">            syncInFlight = null;</span>
+        }
+<span class="fc" id="L175">    }</span>
+
+    private void syncNext(final AsyncResource&lt;CalendarSyncResult&gt; out, final CalendarSyncResult result) {
+        final Map&lt;String, Object&gt; mutation;
+<span class="fc" id="L179">        synchronized (this) {</span>
+<span class="fc" id="L180">            mutation = firstRunnableMutation();</span>
+<span class="fc bfc" id="L181" title="All 2 branches covered.">            if (mutation == null) {</span>
+<span class="fc" id="L182">                result.setRemaining(mutations().size());</span>
+<span class="fc" id="L183">                out.complete(result);</span>
+<span class="fc" id="L184">                return;</span>
+            }
+<span class="fc" id="L186">        }</span>
+<span class="fc" id="L187">        AsyncResource operation = execute(mutation);</span>
+<span class="fc" id="L188">        operation.ready(new SuccessCallback&lt;Object&gt;() {</span>
+
+            @Override
+            public void onSucess(Object value) {
+<span class="fc" id="L192">                synchronized (CalendarSyncEngine.this) {</span>
+<span class="fc" id="L193">                    mutations().remove(mutation);</span>
+<span class="fc" id="L194">                    result.applied();</span>
+                    try {
+<span class="fc" id="L196">                        persist();</span>
+<span class="nc" id="L197">                    } catch (CalendarException ex) {</span>
+<span class="nc" id="L198">                        out.error(ex);</span>
+<span class="nc" id="L199">                        return;</span>
+<span class="fc" id="L200">                    }</span>
+<span class="fc" id="L201">                }</span>
+<span class="fc" id="L202">                syncNext(out, result);</span>
+<span class="fc" id="L203">            }</span>
+<span class="fc" id="L204">        }).except(new SuccessCallback&lt;Throwable&gt;() {</span>
+
+            @Override
+            public void onSucess(Throwable error) {
+<span class="pc bpc" id="L208" title="2 of 4 branches missed.">                if (error instanceof CalendarException &amp;&amp; ((CalendarException) error).getError() == CalendarError.CONFLICT) {</span>
+<span class="fc" id="L209">                    loadConflict(mutation, out, result);</span>
+<span class="fc" id="L210">                    return;</span>
+                }
+<span class="nc" id="L212">                result.setRemaining(getPendingCount());</span>
+<span class="nc" id="L213">                out.error(error);</span>
+<span class="nc" id="L214">            }</span>
+        });
+<span class="fc" id="L216">    }</span>
+
+    private AsyncResource execute(Map&lt;String, Object&gt; m) {
+<span class="fc" id="L219">        String type = string(m, &quot;type&quot;);</span>
+<span class="fc" id="L220">        String cal = string(m, &quot;calendarId&quot;);</span>
+<span class="fc" id="L221">        String item = string(m, &quot;itemId&quot;);</span>
+<span class="fc" id="L222">        String version = string(m, &quot;version&quot;);</span>
+        CalendarMutationScope scope;
+        try {
+<span class="fc" id="L225">            scope = CalendarMutationScope.valueOf(string(m, &quot;scope&quot;));</span>
+<span class="nc" id="L226">        } catch (Exception e) {</span>
+<span class="nc" id="L227">            scope = CalendarMutationScope.ALL;</span>
+<span class="fc" id="L228">        }</span>
+<span class="pc bpc" id="L229" title="1 of 2 branches missed.">        if (&quot;saveEvent&quot;.equals(type)) {</span>
+<span class="fc" id="L230">            return source.saveEvent(CalendarModelCodec.decodeEvent((Map) m.get(&quot;payload&quot;)), scope);</span>
+        }
+<span class="nc bnc" id="L232" title="All 2 branches missed.">        if (&quot;deleteEvent&quot;.equals(type)) {</span>
+<span class="nc" id="L233">            return source.deleteEvent(cal, item, scope, version);</span>
+        }
+<span class="nc bnc" id="L235" title="All 2 branches missed.">        if (&quot;saveTask&quot;.equals(type)) {</span>
+<span class="nc" id="L236">            return source.saveTask(CalendarModelCodec.decodeTask((Map) m.get(&quot;payload&quot;)), scope);</span>
+        }
+<span class="nc bnc" id="L238" title="All 2 branches missed.">        if (&quot;deleteTask&quot;.equals(type)) {</span>
+<span class="nc" id="L239">            return source.deleteTask(cal, item, scope, version);</span>
+        }
+<span class="nc" id="L241">        return CalendarSource.unsupported(&quot;Unknown offline mutation&quot;);</span>
+    }
+
+    private void loadConflict(final Map&lt;String, Object&gt; mutation, final AsyncResource&lt;CalendarSyncResult&gt; out, final CalendarSyncResult result) {
+<span class="fc" id="L245">        String type = string(mutation, &quot;type&quot;);</span>
+<span class="pc bpc" id="L246" title="1 of 2 branches missed.">        AsyncResource remote = type.indexOf(&quot;Event&quot;) &gt;= 0 ? source.getEvent(string(mutation, &quot;calendarId&quot;), string(mutation, &quot;itemId&quot;)) : source.getTask(string(mutation, &quot;calendarId&quot;), string(mutation, &quot;itemId&quot;));</span>
+<span class="fc" id="L247">        remote.ready(new SuccessCallback&lt;Object&gt;() {</span>
+
+            @Override
+            public void onSucess(Object value) {
+<span class="pc bpc" id="L251" title="3 of 4 branches missed.">                Map&lt;String, Object&gt; remoteMap = value instanceof CalendarEvent ? CalendarModelCodec.encodeEvent((CalendarEvent) value) : value instanceof CalendarTask ? CalendarModelCodec.encodeTask((CalendarTask) value) : null;</span>
+<span class="fc" id="L252">                synchronized (CalendarSyncEngine.this) {</span>
+<span class="fc" id="L253">                    mutation.put(&quot;paused&quot;, Boolean.TRUE);</span>
+<span class="fc" id="L254">                    mutation.put(&quot;remote&quot;, remoteMap);</span>
+                    try {
+<span class="fc" id="L256">                        persist();</span>
+<span class="nc" id="L257">                    } catch (CalendarException ex) {</span>
+<span class="nc" id="L258">                        out.error(ex);</span>
+<span class="nc" id="L259">                        return;</span>
+<span class="fc" id="L260">                    }</span>
+<span class="fc" id="L261">                }</span>
+<span class="fc" id="L262">                result.addConflict(new CalendarConflict(string(mutation, &quot;id&quot;), (Map) mutation.get(&quot;payload&quot;), remoteMap));</span>
+<span class="fc" id="L263">                syncNext(out, result);</span>
+<span class="fc" id="L264">            }</span>
+<span class="fc" id="L265">        }).except(new SuccessCallback&lt;Throwable&gt;() {</span>
+
+            @Override
+            public void onSucess(Throwable error) {
+<span class="nc bnc" id="L269" title="All 2 branches missed.">                if (error instanceof CalendarException</span>
+<span class="nc bnc" id="L270" title="All 2 branches missed.">                        &amp;&amp; ((CalendarException) error).getError() == CalendarError.NOT_FOUND) {</span>
+<span class="nc" id="L271">                    synchronized (CalendarSyncEngine.this) {</span>
+<span class="nc" id="L272">                        mutation.put(&quot;paused&quot;, Boolean.TRUE);</span>
+<span class="nc" id="L273">                        mutation.put(&quot;remote&quot;, null);</span>
+                        try {
+<span class="nc" id="L275">                            persist();</span>
+<span class="nc" id="L276">                        } catch (CalendarException ex) {</span>
+<span class="nc" id="L277">                            out.error(ex);</span>
+<span class="nc" id="L278">                            return;</span>
+<span class="nc" id="L279">                        }</span>
+<span class="nc" id="L280">                    }</span>
+<span class="nc" id="L281">                    result.addConflict(new CalendarConflict(string(mutation, &quot;id&quot;),</span>
+<span class="nc" id="L282">                            (Map) mutation.get(&quot;payload&quot;), null));</span>
+<span class="nc" id="L283">                    syncNext(out, result);</span>
+<span class="nc" id="L284">                    return;</span>
+                }
+<span class="nc" id="L286">                out.error(error);</span>
+<span class="nc" id="L287">            }</span>
+        });
+<span class="fc" id="L289">    }</span>
+
+    public synchronized void resolveConflict(String mutationId, CalendarConflict.Resolution resolution, Map&lt;String, Object&gt; merged) throws CalendarException {
+<span class="fc" id="L292">        Map&lt;String, Object&gt; found = find(mutationId);</span>
+<span class="pc bpc" id="L293" title="1 of 2 branches missed.">        if (found == null) {</span>
+<span class="nc" id="L294">            throw new CalendarException(CalendarError.NOT_FOUND, &quot;Conflict not found&quot;);</span>
+        }
+<span class="pc bpc" id="L296" title="1 of 2 branches missed.">        if (resolution == CalendarConflict.Resolution.KEEP_REMOTE) {</span>
+<span class="nc" id="L297">            mutations().remove(found);</span>
+        } else {
+<span class="fc" id="L299">            Map remote = (Map) found.get(&quot;remote&quot;);</span>
+<span class="pc bpc" id="L300" title="3 of 4 branches missed.">            if (remote == null &amp;&amp; string(found, &quot;type&quot;).startsWith(&quot;delete&quot;)) {</span>
+<span class="nc" id="L301">                mutations().remove(found);</span>
+<span class="nc" id="L302">                persist();</span>
+<span class="nc" id="L303">                return;</span>
+            }
+<span class="pc bpc" id="L305" title="1 of 2 branches missed.">            if (resolution == CalendarConflict.Resolution.MERGED) {</span>
+<span class="nc bnc" id="L306" title="All 2 branches missed.">                if (merged == null) {</span>
+<span class="nc" id="L307">                    throw new IllegalArgumentException(&quot;merged value required&quot;);</span>
+                }
+<span class="nc" id="L309">                found.put(&quot;payload&quot;, merged);</span>
+            }
+<span class="pc bpc" id="L311" title="1 of 2 branches missed.">            if (remote != null) {</span>
+<span class="fc" id="L312">                found.put(&quot;version&quot;, remote.get(&quot;version&quot;));</span>
+<span class="fc" id="L313">                Map payload = (Map) found.get(&quot;payload&quot;);</span>
+<span class="pc bpc" id="L314" title="1 of 2 branches missed.">                if (payload != null) {</span>
+<span class="fc" id="L315">                    payload.put(&quot;version&quot;, remote.get(&quot;version&quot;));</span>
+                }
+<span class="fc" id="L317">            } else {</span>
+<span class="nc" id="L318">                found.put(&quot;itemId&quot;, null);</span>
+<span class="nc" id="L319">                found.put(&quot;version&quot;, null);</span>
+<span class="nc" id="L320">                Map payload = (Map) found.get(&quot;payload&quot;);</span>
+<span class="nc bnc" id="L321" title="All 2 branches missed.">                if (payload != null) {</span>
+<span class="nc" id="L322">                    payload.put(&quot;id&quot;, null);</span>
+<span class="nc" id="L323">                    payload.put(&quot;version&quot;, null);</span>
+                }
+            }
+<span class="fc" id="L326">            found.remove(&quot;paused&quot;);</span>
+<span class="fc" id="L327">            found.remove(&quot;remote&quot;);</span>
+        }
+<span class="fc" id="L329">        persist();</span>
+<span class="fc" id="L330">    }</span>
+
+    private Map&lt;String, Object&gt; firstRunnableMutation() {
+<span class="fc" id="L333">        Set&lt;String&gt; blocked = new HashSet&lt;String&gt;();</span>
+<span class="fc bfc" id="L334" title="All 2 branches covered.">        for (Object value : mutations()) {</span>
+<span class="fc" id="L335">            Map&lt;String, Object&gt; m = (Map&lt;String, Object&gt;) value;</span>
+<span class="fc" id="L336">            String key = mutationKey(m);</span>
+<span class="fc bfc" id="L337" title="All 2 branches covered.">            if (Boolean.TRUE.equals(m.get(&quot;paused&quot;))) {</span>
+<span class="fc" id="L338">                blocked.add(key);</span>
+<span class="fc" id="L339">                continue;</span>
+            }
+<span class="pc bpc" id="L341" title="1 of 2 branches missed.">            if (!blocked.contains(key)) {</span>
+<span class="fc" id="L342">                return m;</span>
+            }
+<span class="nc" id="L344">        }</span>
+<span class="fc" id="L345">        return null;</span>
+    }
+
+    private static String mutationKey(Map&lt;String, Object&gt; mutation) {
+<span class="fc" id="L349">        Object item = mutation.get(&quot;itemId&quot;);</span>
+<span class="fc bfc" id="L350" title="All 2 branches covered.">        return String.valueOf(mutation.get(&quot;calendarId&quot;)) + &quot;\n&quot;</span>
+<span class="fc" id="L351">                + (item == null ? String.valueOf(mutation.get(&quot;id&quot;)) : String.valueOf(item));</span>
+    }
+
+    private Map&lt;String, Object&gt; find(String id) {
+<span class="pc bpc" id="L355" title="1 of 2 branches missed.">        for (Object value : mutations()) {</span>
+<span class="fc" id="L356">            Map&lt;String, Object&gt; m = (Map&lt;String, Object&gt;) value;</span>
+<span class="pc bpc" id="L357" title="1 of 2 branches missed.">            if (id.equals(m.get(&quot;id&quot;))) {</span>
+<span class="fc" id="L358">                return m;</span>
+            }
+<span class="nc" id="L360">        }</span>
+<span class="nc" id="L361">        return null;</span>
+    }
+
+    private List&lt;Object&gt; mutations() {
+<span class="fc" id="L365">        return (List&lt;Object&gt;) state.get(MUTATIONS);</span>
+    }
+
+    private void persist() throws CalendarException {
+<span class="fc" id="L369">        cache.store(source.getId(), state);</span>
+<span class="fc" id="L370">    }</span>
+
+    private static String string(Map m, String k) {
+<span class="fc" id="L373">        Object v = m.get(k);</span>
+<span class="fc bfc" id="L374" title="All 2 branches covered.">        return v == null ? null : String.valueOf(v);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

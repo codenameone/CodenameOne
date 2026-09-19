@@ -1,0 +1,163 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>Material.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.gpu</a> &gt; <span class="el_source">Material.java</span></div><h1>Material.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ */
+package com.codename1.gpu;
+
+/// A declarative description of how a surface should be shaded. The 3D engine is
+/// responsible for translating a material into a platform shader (GLSL on OpenGL
+/// ES and WebGL, Metal Shading Language on iOS); applications never write shader
+/// source. A material combines a lighting model (`Type`), a base color, an
+/// optional texture and pipeline `RenderState`.
+public final class Material {
+    /// The built in lighting model used to shade a surface.
+<span class="fc" id="L19">    public enum Type {</span>
+        /// Flat, unlit shading. The fragment color is the base color modulated
+        /// by the texture and vertex color. Ideal for UI, sprites and emissive
+        /// surfaces.
+<span class="fc" id="L23">        UNLIT,</span>
+        /// Diffuse only (Lambert) lighting using a single directional light.
+<span class="fc" id="L25">        LAMBERT,</span>
+        /// Diffuse and specular (Blinn-Phong) lighting using a single
+        /// directional light and the `shininess` property.
+<span class="fc" id="L28">        PHONG,</span>
+        /// Unlit shading intended for screen aligned sprites and billboards.
+<span class="fc" id="L30">        SPRITE,</span>
+        /// Unlit shading sampling a background cube/sky texture, rendered behind
+        /// all other geometry.
+<span class="fc" id="L33">        SKYBOX</span>
+    }
+
+<span class="fc" id="L36">    private Type type = Type.UNLIT;</span>
+<span class="fc" id="L37">    private int color = 0xffffffff;</span>
+    private Texture texture;
+<span class="fc" id="L39">    private float shininess = 32.0f;</span>
+<span class="fc" id="L40">    private RenderState renderState = RenderState.opaque();</span>
+
+    /// Creates an unlit white material.
+<span class="fc" id="L43">    public Material() {</span>
+<span class="fc" id="L44">    }</span>
+
+    /// Creates a material of the supplied type.
+    ///
+    /// #### Parameters
+    ///
+    /// - `type`: the lighting model
+<span class="fc" id="L51">    public Material(Type type) {</span>
+<span class="fc" id="L52">        this.type = type;</span>
+<span class="fc" id="L53">    }</span>
+
+    /// Returns the lighting model.
+    public Type getType() {
+<span class="nc" id="L57">        return type;</span>
+    }
+
+    /// Sets the lighting model.
+    ///
+    /// #### Parameters
+    ///
+    /// - `type`: the lighting model
+    ///
+    /// #### Returns
+    ///
+    /// this material for chaining
+    public Material setType(Type type) {
+<span class="nc" id="L70">        this.type = type;</span>
+<span class="nc" id="L71">        return this;</span>
+    }
+
+    /// Returns the base color as a packed ARGB integer.
+    public int getColor() {
+<span class="nc" id="L76">        return color;</span>
+    }
+
+    /// Sets the base color as a packed ARGB integer (0xAARRGGBB).
+    ///
+    /// #### Parameters
+    ///
+    /// - `argb`: the packed ARGB color
+    ///
+    /// #### Returns
+    ///
+    /// this material for chaining
+    public Material setColor(int argb) {
+<span class="nc" id="L89">        this.color = argb;</span>
+<span class="nc" id="L90">        return this;</span>
+    }
+
+    /// Returns the diffuse texture, or null when the material is untextured.
+    public Texture getTexture() {
+<span class="nc" id="L95">        return texture;</span>
+    }
+
+    /// Sets the diffuse texture. Pass null for an untextured material.
+    ///
+    /// #### Parameters
+    ///
+    /// - `texture`: the diffuse texture or null
+    ///
+    /// #### Returns
+    ///
+    /// this material for chaining
+    public Material setTexture(Texture texture) {
+<span class="nc" id="L108">        this.texture = texture;</span>
+<span class="nc" id="L109">        return this;</span>
+    }
+
+    /// Returns the Phong specular exponent.
+    public float getShininess() {
+<span class="nc" id="L114">        return shininess;</span>
+    }
+
+    /// Sets the Phong specular exponent (used only by `Type.PHONG`).
+    ///
+    /// #### Parameters
+    ///
+    /// - `shininess`: the specular exponent
+    ///
+    /// #### Returns
+    ///
+    /// this material for chaining
+    public Material setShininess(float shininess) {
+<span class="nc" id="L127">        this.shininess = shininess;</span>
+<span class="nc" id="L128">        return this;</span>
+    }
+
+    /// Returns the pipeline render state.
+    public RenderState getRenderState() {
+<span class="nc" id="L133">        return renderState;</span>
+    }
+
+    /// Sets the pipeline render state.
+    ///
+    /// #### Parameters
+    ///
+    /// - `renderState`: the render state
+    ///
+    /// #### Returns
+    ///
+    /// this material for chaining
+    public Material setRenderState(RenderState renderState) {
+<span class="nc" id="L146">        this.renderState = renderState;</span>
+<span class="nc" id="L147">        return this;</span>
+    }
+
+    /// Returns a stable string identifying the shader variant required by this
+    /// material. Backends use it together with the mesh `VertexFormat` to cache
+    /// generated and compiled shader programs. The key intentionally depends
+    /// only on properties that change the generated source, not on values such
+    /// as the color which are passed as uniforms.
+    ///
+    /// #### Returns
+    ///
+    /// a shader variant cache key
+    public String getShaderKey() {
+<span class="nc bnc" id="L160" title="All 2 branches missed.">        return type.name() + (texture != null ? &quot;|tex&quot; : &quot;|notex&quot;);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

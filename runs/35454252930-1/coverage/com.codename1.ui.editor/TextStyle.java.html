@@ -1,0 +1,178 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>TextStyle.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.ui.editor</a> &gt; <span class="el_source">TextStyle.java</span></div><h1>TextStyle.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+
+package com.codename1.ui.editor;
+
+/// An immutable inline text style (bold / italic / underline / strike, foreground color, highlight color
+/// and relative font size) used by the pure rich text editor. Instances are value objects; the
+/// `#with*` methods return a possibly new instance leaving the original untouched, which makes them safe
+/// to share across runs.
+public final class TextStyle {
+    /// The default (unstyled) text style.
+<span class="fc" id="L32">    public static final TextStyle DEFAULT = new TextStyle(false, false, false, false, false, -1, -1, 0, -1);</span>
+
+    private final boolean bold;
+    private final boolean italic;
+    private final boolean underline;
+    private final boolean strike;
+    private final boolean monospace;
+    private final int foreColor;
+    private final int highlight;
+    private final int fontSizeLevel;
+    private final int fontSizePx;
+
+    private TextStyle(boolean bold, boolean italic, boolean underline, boolean strike, boolean monospace,
+<span class="fc" id="L45">                      int foreColor, int highlight, int fontSizeLevel, int fontSizePx) {</span>
+<span class="fc" id="L46">        this.bold = bold;</span>
+<span class="fc" id="L47">        this.italic = italic;</span>
+<span class="fc" id="L48">        this.underline = underline;</span>
+<span class="fc" id="L49">        this.strike = strike;</span>
+<span class="fc" id="L50">        this.monospace = monospace;</span>
+<span class="fc" id="L51">        this.foreColor = foreColor;</span>
+<span class="fc" id="L52">        this.highlight = highlight;</span>
+<span class="fc" id="L53">        this.fontSizeLevel = fontSizeLevel;</span>
+<span class="fc" id="L54">        this.fontSizePx = fontSizePx;</span>
+<span class="fc" id="L55">    }</span>
+
+    /// True when bold.
+    public boolean isBold() {
+<span class="fc" id="L59">        return bold;</span>
+    }
+
+    /// True when italic.
+    public boolean isItalic() {
+<span class="fc" id="L64">        return italic;</span>
+    }
+
+    /// True when underlined.
+    public boolean isUnderline() {
+<span class="fc" id="L69">        return underline;</span>
+    }
+
+    /// True when struck through.
+    public boolean isStrike() {
+<span class="fc" id="L74">        return strike;</span>
+    }
+
+    /// True when the run represents inline code / monospaced text.
+    public boolean isMonospace() {
+<span class="fc" id="L79">        return monospace;</span>
+    }
+
+    /// The foreground color as 0xRRGGBB, or -1 to inherit.
+    public int getForeColor() {
+<span class="fc" id="L84">        return foreColor;</span>
+    }
+
+    /// The highlight (background) color as 0xRRGGBB, or -1 for none.
+    public int getHighlight() {
+<span class="fc" id="L89">        return highlight;</span>
+    }
+
+    /// The relative font size level (1..7), or 0 for the default size.
+    public int getFontSizeLevel() {
+<span class="fc" id="L94">        return fontSizeLevel;</span>
+    }
+
+    /// The absolute font size in pixels, or -1 to inherit / use {@link #getFontSizeLevel()}.
+    /// When set (&amp;gt; 0) it takes precedence over the relative level.
+    public int getFontSizePx() {
+<span class="fc" id="L100">        return fontSizePx;</span>
+    }
+
+    /// Returns a style with bold set to the given value.
+    public TextStyle withBold(boolean v) {
+<span class="fc" id="L105">        return new TextStyle(v, italic, underline, strike, monospace, foreColor, highlight, fontSizeLevel, fontSizePx);</span>
+    }
+
+    /// Returns a style with italic set to the given value.
+    public TextStyle withItalic(boolean v) {
+<span class="fc" id="L110">        return new TextStyle(bold, v, underline, strike, monospace, foreColor, highlight, fontSizeLevel, fontSizePx);</span>
+    }
+
+    /// Returns a style with underline set to the given value.
+    public TextStyle withUnderline(boolean v) {
+<span class="fc" id="L115">        return new TextStyle(bold, italic, v, strike, monospace, foreColor, highlight, fontSizeLevel, fontSizePx);</span>
+    }
+
+    /// Returns a style with strike-through set to the given value.
+    public TextStyle withStrike(boolean v) {
+<span class="fc" id="L120">        return new TextStyle(bold, italic, underline, v, monospace, foreColor, highlight, fontSizeLevel, fontSizePx);</span>
+    }
+
+    /// Returns a style with inline-code / monospaced rendering enabled or disabled.
+    public TextStyle withMonospace(boolean v) {
+<span class="fc" id="L125">        return new TextStyle(bold, italic, underline, strike, v, foreColor, highlight, fontSizeLevel, fontSizePx);</span>
+    }
+
+    /// Returns a style with the given foreground color (or -1 to inherit).
+    public TextStyle withForeColor(int v) {
+<span class="fc" id="L130">        return new TextStyle(bold, italic, underline, strike, monospace, v, highlight, fontSizeLevel, fontSizePx);</span>
+    }
+
+    /// Returns a style with the given highlight color (or -1 for none).
+    public TextStyle withHighlight(int v) {
+<span class="nc" id="L135">        return new TextStyle(bold, italic, underline, strike, monospace, foreColor, v, fontSizeLevel, fontSizePx);</span>
+    }
+
+    /// Returns a style with the given font size level (1..7, or 0 for default).
+    public TextStyle withFontSizeLevel(int v) {
+<span class="nc" id="L140">        return new TextStyle(bold, italic, underline, strike, monospace, foreColor, highlight, v, fontSizePx);</span>
+    }
+
+    /// Returns a style with the given absolute font size in pixels (or -1 to inherit / use the level).
+    public TextStyle withFontSizePx(int v) {
+<span class="fc" id="L145">        return new TextStyle(bold, italic, underline, strike, monospace, foreColor, highlight, fontSizeLevel, v);</span>
+    }
+
+    @Override
+    public boolean equals(Object o) {
+<span class="fc bfc" id="L150" title="All 2 branches covered.">        if (this == o) {</span>
+<span class="fc" id="L151">            return true;</span>
+        }
+<span class="pc bpc" id="L153" title="1 of 2 branches missed.">        if (!(o instanceof TextStyle)) {</span>
+<span class="nc" id="L154">            return false;</span>
+        }
+<span class="fc" id="L156">        TextStyle t = (TextStyle) o;</span>
+<span class="pc bpc" id="L157" title="5 of 18 branches missed.">        return bold == t.bold &amp;&amp; italic == t.italic &amp;&amp; underline == t.underline &amp;&amp; strike == t.strike</span>
+                &amp;&amp; monospace == t.monospace
+                &amp;&amp; foreColor == t.foreColor &amp;&amp; highlight == t.highlight &amp;&amp; fontSizeLevel == t.fontSizeLevel
+                &amp;&amp; fontSizePx == t.fontSizePx;
+    }
+
+    @Override
+    public int hashCode() {
+<span class="nc" id="L165">        int h = 0;</span>
+<span class="nc bnc" id="L166" title="All 2 branches missed.">        h = h * 31 + (bold ? 1 : 0);</span>
+<span class="nc bnc" id="L167" title="All 2 branches missed.">        h = h * 31 + (italic ? 1 : 0);</span>
+<span class="nc bnc" id="L168" title="All 2 branches missed.">        h = h * 31 + (underline ? 1 : 0);</span>
+<span class="nc bnc" id="L169" title="All 2 branches missed.">        h = h * 31 + (strike ? 1 : 0);</span>
+<span class="nc bnc" id="L170" title="All 2 branches missed.">        h = h * 31 + (monospace ? 1 : 0);</span>
+<span class="nc" id="L171">        h = h * 31 + foreColor;</span>
+<span class="nc" id="L172">        h = h * 31 + highlight;</span>
+<span class="nc" id="L173">        h = h * 31 + fontSizeLevel;</span>
+<span class="nc" id="L174">        h = h * 31 + fontSizePx;</span>
+<span class="nc" id="L175">        return h;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

@@ -1,0 +1,287 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>SurfaceDiagnostics.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.surfaces</a> &gt; <span class="el_source">SurfaceDiagnostics.java</span></div><h1>SurfaceDiagnostics.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.surfaces;
+
+import com.codename1.io.Log;
+import com.codename1.ui.Display;
+
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Map;
+import java.util.Set;
+
+/// Simulator-only guard rails for the surfaces API.
+///
+/// The surfaces wire format is deliberately cheap in the simulator: publishing serializes to JSON,
+/// encodes PNG blobs through Java2D and writes them to the local filesystem, all in microseconds.
+/// The same code on a device writes into a shared app-group container, hands the payload to
+/// WidgetKit or ActivityKit over IPC and, when an image still has to be rasterized, blocks on the
+/// platform UI thread to read pixels back off the GPU. Mistakes that are invisible in the
+/// simulator therefore surface as an unresponsive app on hardware, which is the worst possible
+/// place to discover them.
+///
+/// These checks close that gap. They run ONLY in the simulator (or when a test forces them on with
+/// [Surfaces#setDiagnosticsEnabled(Boolean)]), so they cost nothing in a shipped build. Conditions
+/// that are certain to misbehave on a device throw [IllegalStateException] with a description of
+/// the fix; conditions that merely degrade log a one-time warning.
+///
+/// @see Surfaces#setDiagnosticsEnabled(Boolean)
+final class SurfaceDiagnostics {
+    /// Rolling window for the republish rate warning.
+    private static final long RATE_WINDOW_MILLIS = 60000L;
+
+    /// Republishes of one kind (or updates of one activity) per window before warning. WidgetKit
+    /// gives an app roughly 40-70 reloads per day per widget, so a steady stream this dense is
+    /// always a bug rather than a tight but legitimate loop.
+    private static final int RATE_LIMIT = 20;
+
+    /// null = follow the platform (simulator on, everything else off), non-null = forced.
+    private static Boolean override;
+
+    /// null = ask the real Display, non-null = forced (tests only, see [#setEdtForTests(Boolean)]).
+    private static Boolean edtForTests;
+
+<span class="fc" id="L64">    private static final Set&lt;String&gt; warnedOnce = new HashSet&lt;String&gt;();</span>
+
+    /// key -&gt; {window start millis, count in window}
+<span class="fc" id="L67">    private static final Map&lt;String, long[]&gt; rateWindows = new HashMap&lt;String, long[]&gt;();</span>
+
+    private SurfaceDiagnostics() {
+    }
+
+    static void setEnabled(Boolean value) {
+<span class="fc" id="L73">        override = value;</span>
+<span class="fc" id="L74">        clearCaches();</span>
+<span class="fc" id="L75">    }</span>
+
+    static boolean enabled() {
+<span class="fc bfc" id="L78" title="All 2 branches covered.">        if (override != null) {</span>
+<span class="fc" id="L79">            return override.booleanValue();</span>
+        }
+        // Display may not be initialized at all (unit tests, a static initializer racing init):
+        // absence of a platform is not a diagnostics failure, it just means there is nothing to
+        // check against.
+        try {
+<span class="pc bpc" id="L85" title="3 of 4 branches missed.">            return Display.isInitialized() &amp;&amp; Display.getInstance().isSimulator();</span>
+<span class="nc" id="L86">        } catch (Throwable t) {</span>
+<span class="nc" id="L87">            return false;</span>
+        }
+    }
+
+    static void reset() {
+<span class="fc" id="L92">        override = null;</span>
+<span class="fc" id="L93">        edtForTests = null;</span>
+<span class="fc" id="L94">        clearCaches();</span>
+<span class="fc" id="L95">    }</span>
+
+    private static void clearCaches() {
+<span class="fc" id="L98">        synchronized (warnedOnce) {</span>
+<span class="fc" id="L99">            warnedOnce.clear();</span>
+<span class="fc" id="L100">        }</span>
+<span class="fc" id="L101">        synchronized (rateWindows) {</span>
+<span class="fc" id="L102">            rateWindows.clear();</span>
+<span class="fc" id="L103">        }</span>
+<span class="fc" id="L104">    }</span>
+
+    /// Fails when an image that still has to be rasterized is serialized on the EDT. Called only
+    /// for images that are not already `EncodedImage`s.
+    ///
+    /// `SurfaceSerializer` ships an `EncodedImage` by handing over its existing PNG bytes, but any
+    /// other `Image` has to go through `ImageIO.save`. On iOS that native call drains the render
+    /// queue and does a `dispatch_sync` onto the main thread to read the pixels back, so calling it
+    /// from the EDT stalls the UI thread on the platform UI thread for as long as the readback
+    /// takes. In the simulator the same call is a Java2D encode that returns immediately, which is
+    /// exactly why this only ever reproduces on hardware.
+    static void beforeRasterizingImageEncode() {
+<span class="fc bfc" id="L116" title="All 4 branches covered.">        if (!enabled() || !isEdt()) {</span>
+<span class="fc" id="L117">            return;</span>
+        }
+<span class="fc" id="L119">        throw new IllegalStateException(&quot;Surfaces: a surface image is being encoded on the EDT. &quot;</span>
+                + &quot;SurfaceImage was given a com.codename1.ui.Image that is not an EncodedImage, so &quot;
+                + &quot;publishing has to rasterize it to PNG. On a device (iOS in particular) that &quot;
+                + &quot;encode blocks the calling thread on the platform UI thread while the pixels are &quot;
+                + &quot;read back off the GPU, so doing it on the EDT freezes the app even though the &quot;
+                + &quot;simulator handles it instantly. Fix it either way: publish off the EDT, or hand &quot;
+                + &quot;SurfaceImage an EncodedImage, which ships the PNG bytes with no native work at &quot;
+                + &quot;all. For bundled art that is EncodedImage.create(\&quot;/icon.png\&quot;). For generated &quot;
+                + &quot;art, convert ONCE with EncodedImage.createFromImage(img, false) and cache the &quot;
+                + &quot;result - and run that conversion off the EDT (inside invokeAndBlock or on a &quot;
+                + &quot;background thread), because it performs this very same encode: converting here &quot;
+                + &quot;on the EDT would pay the stall this check is stopping and hide it from the &quot;
+                + &quot;check. This check runs only in the simulator; see &quot;
+                + &quot;Surfaces.setDiagnosticsEnabled(Boolean).&quot;);
+    }
+
+    /// Fails when a timeline is published for a kind that was never registered.
+    ///
+    /// A widget kind has to be declared twice: at build time in `surfaces.json` (the native widget
+    /// galleries are compiled into the app) and at runtime with
+    /// [Surfaces#registerWidgetKind(WidgetKind)]. Publishing to an unregistered id silently
+    /// produces a timeline no renderer will ever pick up, and on a device that looks like &quot;the
+    /// widget never appears&quot; with nothing in the log.
+    static void requireRegisteredKind(String kindId) {
+<span class="fc bfc" id="L143" title="All 4 branches covered.">        if (!enabled() || Surfaces.isKindRegistered(kindId)) {</span>
+<span class="fc" id="L144">            return;</span>
+        }
+<span class="fc" id="L146">        throw new IllegalStateException(&quot;Surfaces: publish(\&quot;&quot; + kindId + &quot;\&quot;, ...) was called but &quot;</span>
+                + &quot;no widget kind with that id is registered, so nothing will render it. Call &quot;
+                + &quot;Surfaces.registerWidgetKind(new WidgetKind(\&quot;&quot; + kindId + &quot;\&quot;)...) once, &quot;
+                + &quot;typically from init(), and declare the same id in the project's surfaces.json &quot;
+                + &quot;so the native widget gallery is built for it. Registered kinds: &quot;
+<span class="fc" id="L151">                + describeRegisteredKinds() + &quot;. This check runs only in the simulator; see &quot;</span>
+                + &quot;Surfaces.setDiagnosticsEnabled(Boolean).&quot;);
+    }
+
+    /// Warns once per API when a publishing call is made on the EDT.
+    ///
+    /// Unlike [#beforeRasterizingImageEncode()] this is not certain to hang: the surfaces API is
+    /// documented as callable from any thread and a single publish of an already-encoded payload
+    /// is quick. It is still the wrong thread. On a device the call writes JSON and PNG blobs into
+    /// the shared container and makes a native round trip (`Activity.request` is a synchronous XPC
+    /// hop on iOS), none of which the simulator's local filesystem makes you pay for.
+    static void offEdtPreferred(String api) {
+<span class="pc bpc" id="L163" title="1 of 4 branches missed.">        if (!enabled() || !isEdt()) {</span>
+<span class="fc" id="L164">            return;</span>
+        }
+<span class="nc" id="L166">        warnOnce(&quot;edt:&quot; + api, api + &quot; was called on the EDT. Surface publishing is data only and &quot;</span>
+                + &quot;is callable from any thread; on a device it writes the payload into the shared &quot;
+                + &quot;container and makes a synchronous native call, so running it on the EDT stalls &quot;
+                + &quot;the UI for as long as that takes. Move it to a background thread - there is no &quot;
+                + &quot;reason to wrap these calls in callSerially(). This warning appears only in the &quot;
+                + &quot;simulator.&quot;);
+<span class="nc" id="L172">    }</span>
+
+    /// Warns when one kind or activity is republished far too often.
+    ///
+    /// Both WidgetKit and the Android app-widget host throttle reloads against a daily budget, so
+    /// a republish-per-tick loop does not merely waste work: once the budget is gone the surface
+    /// stops updating for the rest of the day, on the device only.
+    ///
+    /// #### Parameters
+    ///
+    /// - `key`: identity of the thing being republished, used to scope the window
+    /// - `description`: how to name it in the warning
+    static void noteRepublish(String key, String description) {
+<span class="fc bfc" id="L185" title="All 2 branches covered.">        if (!enabled()) {</span>
+<span class="fc" id="L186">            return;</span>
+        }
+<span class="fc" id="L188">        long now = System.currentTimeMillis();</span>
+        int count;
+<span class="fc" id="L190">        synchronized (rateWindows) {</span>
+<span class="fc" id="L191">            long[] window = rateWindows.get(key);</span>
+<span class="pc bpc" id="L192" title="1 of 4 branches missed.">            if (window == null || now - window[0] &gt; RATE_WINDOW_MILLIS) {</span>
+<span class="fc" id="L193">                window = new long[]{now, 0L};</span>
+<span class="fc" id="L194">                rateWindows.put(key, window);</span>
+            }
+<span class="fc" id="L196">            window[1]++;</span>
+<span class="fc" id="L197">            count = (int) window[1];</span>
+<span class="fc" id="L198">        }</span>
+<span class="fc bfc" id="L199" title="All 2 branches covered.">        if (count != RATE_LIMIT) {</span>
+            // Warn on the crossing only, so a genuinely busy app does not drown its own log.
+<span class="fc" id="L201">            return;</span>
+        }
+<span class="fc" id="L203">        warn(&quot;Surfaces: &quot; + description + &quot; has been published &quot; + RATE_LIMIT + &quot; times in under &quot;</span>
+                + (RATE_WINDOW_MILLIS / 1000) + &quot; seconds. WidgetKit and the Android app-widget &quot;
+                + &quot;host both throttle reloads against a daily budget, so on a device most of these &quot;
+                + &quot;updates are dropped and the surface then stops refreshing entirely. Publish &quot;
+                + &quot;only when the underlying data actually changes: SurfaceDynamicText timers and &quot;
+                + &quot;countdowns tick on the OS clock with no republish at all, and a WidgetTimeline &quot;
+                + &quot;can carry future entries the renderer applies on its own. This warning appears &quot;
+                + &quot;only in the simulator.&quot;);
+<span class="fc" id="L211">    }</span>
+
+    /// Warns once when an inert live activity handle is used.
+    ///
+    /// `LiveActivity.start` returns an inert handle rather than throwing when the platform refuses
+    /// (live activities disabled by the user, ActivityKit rejecting the request), and `update` and
+    /// `end` on that handle are documented no-ops. That is the right production behaviour and a
+    /// terrible debugging experience, because an app that never checks `isActive()` sees nothing at
+    /// all and usually goes on to start a second activity.
+    static void inertActivity(String api) {
+<span class="fc bfc" id="L221" title="All 2 branches covered.">        if (!enabled()) {</span>
+<span class="fc" id="L222">            return;</span>
+        }
+<span class="fc" id="L224">        warnOnce(&quot;inert:&quot; + api, api + &quot; was called on an inert LiveActivity handle and did &quot;</span>
+                + &quot;nothing. Either LiveActivity.start(...) never created an activity (the platform &quot;
+                + &quot;does not support live activities, or the user disabled them - check &quot;
+                + &quot;LiveActivity.isSupported() and the returned handle's isActive()), or end(...) &quot;
+                + &quot;already ran on this handle. Track the handle's isActive() rather than your own &quot;
+                + &quot;persisted flag, otherwise the next start(...) leaves an orphan activity the app &quot;
+                + &quot;can no longer end. This warning appears only in the simulator.&quot;);
+<span class="fc" id="L231">    }</span>
+
+    // --- internals ------------------------------------------------------------
+
+    /// Test seam: the checks that matter most are the ones that only fire on the EDT, and the
+    /// portable unit tests run with no platform at all. Null follows the real Display.
+    static void setEdtForTests(Boolean value) {
+<span class="fc" id="L238">        edtForTests = value;</span>
+<span class="fc" id="L239">    }</span>
+
+    private static boolean isEdt() {
+<span class="fc bfc" id="L242" title="All 2 branches covered.">        if (edtForTests != null) {</span>
+<span class="fc" id="L243">            return edtForTests.booleanValue();</span>
+        }
+        try {
+<span class="pc bpc" id="L246" title="3 of 4 branches missed.">            return Display.isInitialized() &amp;&amp; Display.getInstance().isEdt();</span>
+<span class="nc" id="L247">        } catch (Throwable t) {</span>
+<span class="nc" id="L248">            return false;</span>
+        }
+    }
+
+    private static void warnOnce(String key, String message) {
+<span class="fc" id="L253">        synchronized (warnedOnce) {</span>
+<span class="pc bpc" id="L254" title="1 of 2 branches missed.">            if (!warnedOnce.add(key)) {</span>
+<span class="nc" id="L255">                return;</span>
+            }
+<span class="fc" id="L257">        }</span>
+<span class="fc" id="L258">        warn(&quot;Surfaces: &quot; + message);</span>
+<span class="fc" id="L259">    }</span>
+
+    /// A diagnostic must never be the thing that breaks the app, and `Log` needs a platform
+    /// implementation it does not always have (a test forcing diagnostics on, a warning raised
+    /// before `Display.init` finished). Falling back to stdout keeps the message rather than
+    /// trading it for a stack trace.
+    private static void warn(String message) {
+        try {
+<span class="fc" id="L267">            Log.p(message);</span>
+<span class="nc" id="L268">        } catch (Throwable t) {</span>
+<span class="nc" id="L269">            System.out.println(message);</span>
+<span class="fc" id="L270">        }</span>
+<span class="fc" id="L271">    }</span>
+
+    private static String describeRegisteredKinds() {
+<span class="fc" id="L274">        StringBuilder b = new StringBuilder();</span>
+<span class="fc bfc" id="L275" title="All 2 branches covered.">        for (WidgetKind k : Surfaces.getRegisteredKinds()) {</span>
+<span class="pc bpc" id="L276" title="1 of 2 branches missed.">            if (b.length() &gt; 0) {</span>
+<span class="nc" id="L277">                b.append(&quot;, &quot;);</span>
+            }
+<span class="fc" id="L279">            b.append('&quot;').append(k.getId()).append('&quot;');</span>
+<span class="fc" id="L280">        }</span>
+<span class="pc bpc" id="L281" title="1 of 2 branches missed.">        if (b.length() == 0) {</span>
+<span class="nc" id="L282">            return &quot;none&quot;;</span>
+        }
+<span class="fc" id="L284">        return b.toString();</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

@@ -1,0 +1,268 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>RopeJoint.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.gaming.physics.box2d.dynamics.joints</a> &gt; <span class="el_source">RopeJoint.java</span></div><h1>RopeJoint.java</h1><pre class="source lang-java linenums">package com.codename1.gaming.physics.box2d.dynamics.joints;
+
+import com.codename1.gaming.physics.box2d.common.MathUtils;
+import com.codename1.gaming.physics.box2d.common.Rot;
+import com.codename1.gaming.physics.box2d.common.Settings;
+import com.codename1.gaming.physics.box2d.common.Vec2;
+import com.codename1.gaming.physics.box2d.dynamics.SolverData;
+import com.codename1.gaming.physics.box2d.pooling.IWorldPool;
+
+/// A rope joint enforces a maximum distance between two points on two bodies. It has no other
+/// effect. Warning: if you attempt to change the maximum length during the simulation you will get
+/// some non-physical behavior. A model that would allow you to dynamically modify the length would
+/// have some sponginess, so I chose not to implement it that way. See DistanceJoint if you want to
+/// dynamically control length.
+///
+/// @author Daniel Murphy
+public class RopeJoint extends Joint {
+  // Solver shared
+<span class="fc" id="L19">  private final Vec2 m_localAnchorA = new Vec2();</span>
+<span class="fc" id="L20">  private final Vec2 m_localAnchorB = new Vec2();</span>
+  private float m_maxLength;
+  private float m_length;
+  private float m_impulse;
+
+  // Solver temp
+  private int m_indexA;
+  private int m_indexB;
+<span class="fc" id="L28">  private final Vec2 m_u = new Vec2();</span>
+<span class="fc" id="L29">  private final Vec2 m_rA = new Vec2();</span>
+<span class="fc" id="L30">  private final Vec2 m_rB = new Vec2();</span>
+<span class="fc" id="L31">  private final Vec2 m_localCenterA = new Vec2();</span>
+<span class="fc" id="L32">  private final Vec2 m_localCenterB = new Vec2();</span>
+  private float m_invMassA;
+  private float m_invMassB;
+  private float m_invIA;
+  private float m_invIB;
+  private float m_mass;
+  private LimitState m_state;
+
+  protected RopeJoint(IWorldPool worldPool, RopeJointDef def) {
+<span class="fc" id="L41">    super(worldPool, def);</span>
+<span class="fc" id="L42">    m_localAnchorA.set(def.localAnchorA);</span>
+<span class="fc" id="L43">    m_localAnchorB.set(def.localAnchorB);</span>
+
+<span class="fc" id="L45">    m_maxLength = def.maxLength;</span>
+
+<span class="fc" id="L47">    m_mass = 0.0f;</span>
+<span class="fc" id="L48">    m_impulse = 0.0f;</span>
+<span class="fc" id="L49">    m_state = LimitState.INACTIVE;</span>
+<span class="fc" id="L50">    m_length = 0.0f;</span>
+<span class="fc" id="L51">  }</span>
+
+  public void initVelocityConstraints(final SolverData data) {
+<span class="fc" id="L54">    m_indexA = m_bodyA.m_islandIndex;</span>
+<span class="fc" id="L55">    m_indexB = m_bodyB.m_islandIndex;</span>
+<span class="fc" id="L56">    m_localCenterA.set(m_bodyA.m_sweep.localCenter);</span>
+<span class="fc" id="L57">    m_localCenterB.set(m_bodyB.m_sweep.localCenter);</span>
+<span class="fc" id="L58">    m_invMassA = m_bodyA.m_invMass;</span>
+<span class="fc" id="L59">    m_invMassB = m_bodyB.m_invMass;</span>
+<span class="fc" id="L60">    m_invIA = m_bodyA.m_invI;</span>
+<span class="fc" id="L61">    m_invIB = m_bodyB.m_invI;</span>
+
+<span class="fc" id="L63">    Vec2 cA = data.positions[m_indexA].c;</span>
+<span class="fc" id="L64">    float aA = data.positions[m_indexA].a;</span>
+<span class="fc" id="L65">    Vec2 vA = data.velocities[m_indexA].v;</span>
+<span class="fc" id="L66">    float wA = data.velocities[m_indexA].w;</span>
+
+<span class="fc" id="L68">    Vec2 cB = data.positions[m_indexB].c;</span>
+<span class="fc" id="L69">    float aB = data.positions[m_indexB].a;</span>
+<span class="fc" id="L70">    Vec2 vB = data.velocities[m_indexB].v;</span>
+<span class="fc" id="L71">    float wB = data.velocities[m_indexB].w;</span>
+
+<span class="fc" id="L73">    final Rot qA = pool.popRot();</span>
+<span class="fc" id="L74">    final Rot qB = pool.popRot();</span>
+<span class="fc" id="L75">    final Vec2 temp = pool.popVec2();</span>
+
+<span class="fc" id="L77">    qA.set(aA);</span>
+<span class="fc" id="L78">    qB.set(aB);</span>
+
+    // Compute the effective masses.
+<span class="fc" id="L81">    Rot.mulToOutUnsafe(qA, temp.set(m_localAnchorA).subLocal(m_localCenterA), m_rA);</span>
+<span class="fc" id="L82">    Rot.mulToOutUnsafe(qB, temp.set(m_localAnchorB).subLocal(m_localCenterB), m_rB);</span>
+
+<span class="fc" id="L84">    m_u.set(cB).addLocal(m_rB).subLocal(cA).subLocal(m_rA);</span>
+
+<span class="fc" id="L86">    m_length = m_u.length();</span>
+
+<span class="fc" id="L88">    float C = m_length - m_maxLength;</span>
+<span class="pc bpc" id="L89" title="1 of 2 branches missed.">    if (C &gt; 0.0f) {</span>
+<span class="nc" id="L90">      m_state = LimitState.AT_UPPER;</span>
+    } else {
+<span class="fc" id="L92">      m_state = LimitState.INACTIVE;</span>
+    }
+
+<span class="pc bpc" id="L95" title="1 of 2 branches missed.">    if (m_length &gt; Settings.linearSlop) {</span>
+<span class="fc" id="L96">      m_u.mulLocal(1.0f / m_length);</span>
+    } else {
+<span class="nc" id="L98">      m_u.setZero();</span>
+<span class="nc" id="L99">      m_mass = 0.0f;</span>
+<span class="nc" id="L100">      m_impulse = 0.0f;</span>
+<span class="nc" id="L101">      return;</span>
+    }
+
+    // Compute effective mass.
+<span class="fc" id="L105">    float crA = Vec2.cross(m_rA, m_u);</span>
+<span class="fc" id="L106">    float crB = Vec2.cross(m_rB, m_u);</span>
+<span class="fc" id="L107">    float invMass = m_invMassA + m_invIA * crA * crA + m_invMassB + m_invIB * crB * crB;</span>
+
+<span class="pc bpc" id="L109" title="1 of 2 branches missed.">    m_mass = invMass != 0.0f ? 1.0f / invMass : 0.0f;</span>
+
+<span class="pc bpc" id="L111" title="1 of 2 branches missed.">    if (data.step.warmStarting) {</span>
+      // Scale the impulse to support a variable time step.
+<span class="fc" id="L113">      m_impulse *= data.step.dtRatio;</span>
+
+<span class="fc" id="L115">      float Px = m_impulse * m_u.x;</span>
+<span class="fc" id="L116">      float Py = m_impulse * m_u.y;</span>
+<span class="fc" id="L117">      vA.x -= m_invMassA * Px;</span>
+<span class="fc" id="L118">      vA.y -= m_invMassA * Py;</span>
+<span class="fc" id="L119">      wA -= m_invIA * (m_rA.x * Py - m_rA.y * Px);</span>
+
+<span class="fc" id="L121">      vB.x += m_invMassB * Px;</span>
+<span class="fc" id="L122">      vB.y += m_invMassB * Py;</span>
+<span class="fc" id="L123">      wB += m_invIB * (m_rB.x * Py - m_rB.y * Px);</span>
+<span class="fc" id="L124">    } else {</span>
+<span class="nc" id="L125">      m_impulse = 0.0f;</span>
+    }
+
+<span class="fc" id="L128">    pool.pushRot(2);</span>
+<span class="fc" id="L129">    pool.pushVec2(1);</span>
+
+    // data.velocities[m_indexA].v = vA;
+<span class="fc" id="L132">    data.velocities[m_indexA].w = wA;</span>
+    // data.velocities[m_indexB].v = vB;
+<span class="fc" id="L134">    data.velocities[m_indexB].w = wB;</span>
+<span class="fc" id="L135">  }</span>
+
+  public void solveVelocityConstraints(final SolverData data) {
+<span class="fc" id="L138">    Vec2 vA = data.velocities[m_indexA].v;</span>
+<span class="fc" id="L139">    float wA = data.velocities[m_indexA].w;</span>
+<span class="fc" id="L140">    Vec2 vB = data.velocities[m_indexB].v;</span>
+<span class="fc" id="L141">    float wB = data.velocities[m_indexB].w;</span>
+
+    // Cdot = dot(u, v + cross(w, r))
+<span class="fc" id="L144">    Vec2 vpA = pool.popVec2();</span>
+<span class="fc" id="L145">    Vec2 vpB = pool.popVec2();</span>
+<span class="fc" id="L146">    Vec2 temp = pool.popVec2();</span>
+
+<span class="fc" id="L148">    Vec2.crossToOutUnsafe(wA, m_rA, vpA);</span>
+<span class="fc" id="L149">    vpA.addLocal(vA);</span>
+<span class="fc" id="L150">    Vec2.crossToOutUnsafe(wB, m_rB, vpB);</span>
+<span class="fc" id="L151">    vpB.addLocal(vB);</span>
+
+<span class="fc" id="L153">    float C = m_length - m_maxLength;</span>
+<span class="fc" id="L154">    float Cdot = Vec2.dot(m_u, temp.set(vpB).subLocal(vpA));</span>
+
+    // Predictive constraint.
+<span class="pc bpc" id="L157" title="1 of 2 branches missed.">    if (C &lt; 0.0f) {</span>
+<span class="nc" id="L158">      Cdot += data.step.inv_dt * C;</span>
+    }
+
+<span class="fc" id="L161">    float impulse = -m_mass * Cdot;</span>
+<span class="fc" id="L162">    float oldImpulse = m_impulse;</span>
+<span class="fc" id="L163">    m_impulse = MathUtils.min(0.0f, m_impulse + impulse);</span>
+<span class="fc" id="L164">    impulse = m_impulse - oldImpulse;</span>
+
+<span class="fc" id="L166">    float Px = impulse * m_u.x;</span>
+<span class="fc" id="L167">    float Py = impulse * m_u.y;</span>
+<span class="fc" id="L168">    vA.x -= m_invMassA * Px;</span>
+<span class="fc" id="L169">    vA.y -= m_invMassA * Py;</span>
+<span class="fc" id="L170">    wA -= m_invIA * (m_rA.x * Py - m_rA.y * Px);</span>
+<span class="fc" id="L171">    vB.x += m_invMassB * Px;</span>
+<span class="fc" id="L172">    vB.y += m_invMassB * Py;</span>
+<span class="fc" id="L173">    wB += m_invIB * (m_rB.x * Py - m_rB.y * Px);</span>
+
+<span class="fc" id="L175">    pool.pushVec2(3);</span>
+
+    // data.velocities[m_indexA].v = vA;
+<span class="fc" id="L178">    data.velocities[m_indexA].w = wA;</span>
+    // data.velocities[m_indexB].v = vB;
+<span class="fc" id="L180">    data.velocities[m_indexB].w = wB;</span>
+<span class="fc" id="L181">  }</span>
+
+  public boolean solvePositionConstraints(final SolverData data) {
+<span class="fc" id="L184">    Vec2 cA = data.positions[m_indexA].c;</span>
+<span class="fc" id="L185">    float aA = data.positions[m_indexA].a;</span>
+<span class="fc" id="L186">    Vec2 cB = data.positions[m_indexB].c;</span>
+<span class="fc" id="L187">    float aB = data.positions[m_indexB].a;</span>
+
+<span class="fc" id="L189">    final Rot qA = pool.popRot();</span>
+<span class="fc" id="L190">    final Rot qB = pool.popRot();</span>
+<span class="fc" id="L191">    final Vec2 u = pool.popVec2();</span>
+<span class="fc" id="L192">    final Vec2 rA = pool.popVec2();</span>
+<span class="fc" id="L193">    final Vec2 rB = pool.popVec2();</span>
+<span class="fc" id="L194">    final Vec2 temp = pool.popVec2();</span>
+
+<span class="fc" id="L196">    qA.set(aA);</span>
+<span class="fc" id="L197">    qB.set(aB);</span>
+
+    // Compute the effective masses.
+<span class="fc" id="L200">    Rot.mulToOutUnsafe(qA, temp.set(m_localAnchorA).subLocal(m_localCenterA), rA);</span>
+<span class="fc" id="L201">    Rot.mulToOutUnsafe(qB, temp.set(m_localAnchorB).subLocal(m_localCenterB), rB);</span>
+<span class="fc" id="L202">    u.set(cB).addLocal(rB).subLocal(cA).subLocal(rA);</span>
+
+<span class="fc" id="L204">    float length = u.normalize();</span>
+<span class="fc" id="L205">    float C = length - m_maxLength;</span>
+
+<span class="fc" id="L207">    C = MathUtils.clamp(C, 0.0f, Settings.maxLinearCorrection);</span>
+
+<span class="fc" id="L209">    float impulse = -m_mass * C;</span>
+<span class="fc" id="L210">    float Px = impulse * u.x;</span>
+<span class="fc" id="L211">    float Py = impulse * u.y;</span>
+
+<span class="fc" id="L213">    cA.x -= m_invMassA * Px;</span>
+<span class="fc" id="L214">    cA.y -= m_invMassA * Py;</span>
+<span class="fc" id="L215">    aA -= m_invIA * (rA.x * Py - rA.y * Px);</span>
+<span class="fc" id="L216">    cB.x += m_invMassB * Px;</span>
+<span class="fc" id="L217">    cB.y += m_invMassB * Py;</span>
+<span class="fc" id="L218">    aB += m_invIB * (rB.x * Py - rB.y * Px);</span>
+
+<span class="fc" id="L220">    pool.pushRot(2);</span>
+<span class="fc" id="L221">    pool.pushVec2(4);</span>
+
+    // data.positions[m_indexA].c = cA;
+<span class="fc" id="L224">    data.positions[m_indexA].a = aA;</span>
+    // data.positions[m_indexB].c = cB;
+<span class="fc" id="L226">    data.positions[m_indexB].a = aB;</span>
+
+<span class="pc bpc" id="L228" title="1 of 2 branches missed.">    return length - m_maxLength &lt; Settings.linearSlop;</span>
+  }
+
+  public void getAnchorA(Vec2 argOut) {
+<span class="fc" id="L232">    m_bodyA.getWorldPointToOut(m_localAnchorA, argOut);</span>
+<span class="fc" id="L233">  }</span>
+
+  public void getAnchorB(Vec2 argOut) {
+<span class="nc" id="L236">    m_bodyB.getWorldPointToOut(m_localAnchorB, argOut);</span>
+<span class="nc" id="L237">  }</span>
+
+  public void getReactionForce(float inv_dt, Vec2 argOut) {
+<span class="nc" id="L240">    argOut.set(m_u).mulLocal(inv_dt).mulLocal(m_impulse);</span>
+<span class="nc" id="L241">  }</span>
+
+  public float getReactionTorque(float inv_dt) {
+<span class="nc" id="L244">    return 0f;</span>
+  }
+
+  public Vec2 getLocalAnchorA() {
+<span class="nc" id="L248">    return m_localAnchorA;</span>
+  }
+
+  public Vec2 getLocalAnchorB() {
+<span class="nc" id="L252">    return m_localAnchorB;</span>
+  }
+
+  public float getMaxLength() {
+<span class="nc" id="L256">    return m_maxLength;</span>
+  }
+
+  public void setMaxLength(float maxLength) {
+<span class="nc" id="L260">    this.m_maxLength = maxLength;</span>
+<span class="nc" id="L261">  }</span>
+
+  public LimitState getLimitState() {
+<span class="nc" id="L264">    return m_state;</span>
+  }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

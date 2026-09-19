@@ -1,0 +1,131 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>CarScreen.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.car</a> &gt; <span class="el_source">CarScreen.java</span></div><h1>CarScreen.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.car;
+
+/// One screen of the in-car experience -- the unit of the head-unit back stack. A screen produces a
+/// single `CarTemplate` from [#onCreateTemplate()]; the framework pulls it when the screen is pushed
+/// or invalidated. Conceptually equivalent to `androidx.car.app.Screen`; on CarPlay a screen
+/// corresponds to one pushed `CPTemplate`.
+///
+/// ```java
+/// class AlbumsScreen extends CarScreen {
+///     protected CarTemplate onCreateTemplate() {
+///         CarListTemplate t = new CarListTemplate().setTitle(&quot;Albums&quot;);
+///         for (Album a : albums) {
+///             t.addRow(new CarRow(a.name).setImage(a.art)
+///                 .setBrowsable(true)
+///                 .setOnAction(ctx -&gt; ctx.pushScreen(new TracksScreen(a))));
+///         }
+///         return t;
+///     }
+/// }
+/// ```
+<span class="fc" id="L43">public abstract class CarScreen {</span>
+    private CarContext context;
+
+    /// Builds the template to display for this screen. Called by the framework when the screen is
+    /// pushed and again after [#invalidate()]. Must return a non-null `CarTemplate`.
+    ///
+    /// #### Returns
+    ///
+    /// the template to render on the head unit
+    protected abstract CarTemplate onCreateTemplate();
+
+    /// Lifecycle hook invoked once, when the screen is first pushed onto the stack, before its
+    /// template is built. Default is a no-op.
+    protected void onCreate() {
+<span class="nc" id="L57">    }</span>
+
+    /// Lifecycle hook invoked when the screen becomes the visible top of stack. Default is a no-op.
+    protected void onResume() {
+<span class="nc" id="L61">    }</span>
+
+    /// Lifecycle hook invoked when the screen is covered by a pushed screen. Default is a no-op.
+    protected void onPause() {
+<span class="nc" id="L65">    }</span>
+
+    /// Lifecycle hook invoked when the screen is popped and discarded. Default is a no-op.
+    protected void onDestroy() {
+<span class="nc" id="L69">    }</span>
+
+    /// Returns the context this screen is attached to, or null if it has not been pushed yet.
+    ///
+    /// #### Returns
+    ///
+    /// the car context, or null
+    public final CarContext getContext() {
+<span class="fc" id="L77">        return context;</span>
+    }
+
+    /// Rebuilds and re-renders this screen's template (after the model behind it changed). No-op when
+    /// the screen is not currently attached or no head unit is connected.
+    public final void invalidate() {
+<span class="fc bfc" id="L83" title="All 2 branches covered.">        if (context != null) {</span>
+<span class="fc" id="L84">            context.invalidateScreen(this);</span>
+        }
+<span class="fc" id="L86">    }</span>
+
+    /// Pops this screen off the stack (equivalent to `getContext().popScreen()` when this is the top
+    /// screen). No-op when not attached.
+    public final void finish() {
+<span class="nc bnc" id="L91" title="All 2 branches missed.">        if (context != null) {</span>
+<span class="nc" id="L92">            context.popScreen();</span>
+        }
+<span class="nc" id="L94">    }</span>
+
+    // --- framework internals -------------------------------------------------
+
+    final void attach(CarContext ctx) {
+<span class="fc" id="L99">        this.context = ctx;</span>
+<span class="fc" id="L100">    }</span>
+
+    final void detach() {
+<span class="fc" id="L103">        this.context = null;</span>
+<span class="fc" id="L104">    }</span>
+
+    /// Framework entry point -- pulls the template, used by the platform `CarBridge`.
+    public final CarTemplate dispatchCreateTemplate() {
+<span class="nc" id="L108">        return onCreateTemplate();</span>
+    }
+
+    /// Framework entry point -- dispatches the {@code onCreate} lifecycle callback.
+    public final void dispatchCreate() {
+<span class="fc" id="L113">        onCreate();</span>
+<span class="fc" id="L114">    }</span>
+
+    /// Framework entry point -- dispatches the {@code onResume} lifecycle callback.
+    public final void dispatchResume() {
+<span class="fc" id="L118">        onResume();</span>
+<span class="fc" id="L119">    }</span>
+
+    /// Framework entry point -- dispatches the {@code onPause} lifecycle callback.
+    public final void dispatchPause() {
+<span class="fc" id="L123">        onPause();</span>
+<span class="fc" id="L124">    }</span>
+
+    /// Framework entry point -- dispatches the {@code onDestroy} lifecycle callback.
+    public final void dispatchDestroy() {
+<span class="fc" id="L128">        onDestroy();</span>
+<span class="fc" id="L129">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

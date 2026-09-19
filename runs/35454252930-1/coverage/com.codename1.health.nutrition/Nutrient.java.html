@@ -1,0 +1,181 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>Nutrient.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.health.nutrition</a> &gt; <span class="el_source">Nutrient.java</span></div><h1>Nutrient.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.health.nutrition;
+
+import com.codename1.health.HealthUnit;
+
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+/// A single nutrient that a [NutritionSample] can carry -- a macronutrient,
+/// a vitamin, a mineral.
+///
+/// Interned constants, like [com.codename1.health.HealthDataType], so `==`
+/// is a valid identity test and [#forId(String)] stays total across
+/// framework versions.
+///
+/// Each nutrient declares the unit its amounts are expressed in. That is
+/// not cosmetic: sodium is conventionally logged in milligrams and protein
+/// in grams, and a food database that mixes them up is off by a thousand.
+public final class Nutrient {
+
+<span class="fc" id="L45">    private static final Map&lt;String, Nutrient&gt; BY_ID =</span>
+            new HashMap&lt;String, Nutrient&gt;();
+<span class="fc" id="L47">    private static final List&lt;Nutrient&gt; ALL = new ArrayList&lt;Nutrient&gt;();</span>
+
+    private final String id;
+    private final HealthUnit unit;
+
+<span class="fc" id="L52">    private Nutrient(String id, HealthUnit unit) {</span>
+<span class="fc" id="L53">        this.id = id;</span>
+<span class="fc" id="L54">        this.unit = unit;</span>
+<span class="fc" id="L55">    }</span>
+
+    private static Nutrient define(String id, HealthUnit unit) {
+<span class="fc" id="L58">        Nutrient n = new Nutrient(id, unit);</span>
+<span class="fc" id="L59">        BY_ID.put(id, n);</span>
+<span class="fc" id="L60">        ALL.add(n);</span>
+<span class="fc" id="L61">        return n;</span>
+    }
+
+    // --- energy and macronutrients ---
+
+    /// Food energy. Note that this is also available as a standalone type,
+    /// [com.codename1.health.HealthDataType#DIETARY_ENERGY]; writing a
+    /// [NutritionSample] that carries it makes it part of a logged meal
+    /// rather than a bare total.
+<span class="fc" id="L70">    public static final Nutrient ENERGY =</span>
+<span class="fc" id="L71">            define(&quot;energy&quot;, HealthUnit.KILOCALORIE);</span>
+<span class="fc" id="L72">    public static final Nutrient PROTEIN = define(&quot;protein&quot;, HealthUnit.GRAM);</span>
+<span class="fc" id="L73">    public static final Nutrient TOTAL_FAT =</span>
+<span class="fc" id="L74">            define(&quot;total_fat&quot;, HealthUnit.GRAM);</span>
+<span class="fc" id="L75">    public static final Nutrient SATURATED_FAT =</span>
+<span class="fc" id="L76">            define(&quot;saturated_fat&quot;, HealthUnit.GRAM);</span>
+<span class="fc" id="L77">    public static final Nutrient MONOUNSATURATED_FAT =</span>
+<span class="fc" id="L78">            define(&quot;monounsaturated_fat&quot;, HealthUnit.GRAM);</span>
+<span class="fc" id="L79">    public static final Nutrient POLYUNSATURATED_FAT =</span>
+<span class="fc" id="L80">            define(&quot;polyunsaturated_fat&quot;, HealthUnit.GRAM);</span>
+<span class="fc" id="L81">    public static final Nutrient TRANS_FAT =</span>
+<span class="fc" id="L82">            define(&quot;trans_fat&quot;, HealthUnit.GRAM);</span>
+<span class="fc" id="L83">    public static final Nutrient CHOLESTEROL =</span>
+<span class="fc" id="L84">            define(&quot;cholesterol&quot;, HealthUnit.MILLIGRAM);</span>
+<span class="fc" id="L85">    public static final Nutrient TOTAL_CARBOHYDRATE =</span>
+<span class="fc" id="L86">            define(&quot;total_carbohydrate&quot;, HealthUnit.GRAM);</span>
+<span class="fc" id="L87">    public static final Nutrient DIETARY_FIBER =</span>
+<span class="fc" id="L88">            define(&quot;dietary_fiber&quot;, HealthUnit.GRAM);</span>
+<span class="fc" id="L89">    public static final Nutrient SUGAR = define(&quot;sugar&quot;, HealthUnit.GRAM);</span>
+<span class="fc" id="L90">    public static final Nutrient WATER = define(&quot;water&quot;, HealthUnit.LITER);</span>
+
+    // --- minerals ---
+
+<span class="fc" id="L94">    public static final Nutrient SODIUM =</span>
+<span class="fc" id="L95">            define(&quot;sodium&quot;, HealthUnit.MILLIGRAM);</span>
+<span class="fc" id="L96">    public static final Nutrient POTASSIUM =</span>
+<span class="fc" id="L97">            define(&quot;potassium&quot;, HealthUnit.MILLIGRAM);</span>
+<span class="fc" id="L98">    public static final Nutrient CALCIUM =</span>
+<span class="fc" id="L99">            define(&quot;calcium&quot;, HealthUnit.MILLIGRAM);</span>
+<span class="fc" id="L100">    public static final Nutrient IRON = define(&quot;iron&quot;, HealthUnit.MILLIGRAM);</span>
+<span class="fc" id="L101">    public static final Nutrient MAGNESIUM =</span>
+<span class="fc" id="L102">            define(&quot;magnesium&quot;, HealthUnit.MILLIGRAM);</span>
+<span class="fc" id="L103">    public static final Nutrient ZINC = define(&quot;zinc&quot;, HealthUnit.MILLIGRAM);</span>
+<span class="fc" id="L104">    public static final Nutrient PHOSPHORUS =</span>
+<span class="fc" id="L105">            define(&quot;phosphorus&quot;, HealthUnit.MILLIGRAM);</span>
+<span class="fc" id="L106">    public static final Nutrient IODINE =</span>
+<span class="fc" id="L107">            define(&quot;iodine&quot;, HealthUnit.MICROGRAM);</span>
+<span class="fc" id="L108">    public static final Nutrient SELENIUM =</span>
+<span class="fc" id="L109">            define(&quot;selenium&quot;, HealthUnit.MICROGRAM);</span>
+<span class="fc" id="L110">    public static final Nutrient COPPER =</span>
+<span class="fc" id="L111">            define(&quot;copper&quot;, HealthUnit.MILLIGRAM);</span>
+<span class="fc" id="L112">    public static final Nutrient MANGANESE =</span>
+<span class="fc" id="L113">            define(&quot;manganese&quot;, HealthUnit.MILLIGRAM);</span>
+<span class="fc" id="L114">    public static final Nutrient CHROMIUM =</span>
+<span class="fc" id="L115">            define(&quot;chromium&quot;, HealthUnit.MICROGRAM);</span>
+<span class="fc" id="L116">    public static final Nutrient MOLYBDENUM =</span>
+<span class="fc" id="L117">            define(&quot;molybdenum&quot;, HealthUnit.MICROGRAM);</span>
+<span class="fc" id="L118">    public static final Nutrient CHLORIDE =</span>
+<span class="fc" id="L119">            define(&quot;chloride&quot;, HealthUnit.MILLIGRAM);</span>
+
+    // --- vitamins ---
+
+<span class="fc" id="L123">    public static final Nutrient VITAMIN_A =</span>
+<span class="fc" id="L124">            define(&quot;vitamin_a&quot;, HealthUnit.MICROGRAM);</span>
+<span class="fc" id="L125">    public static final Nutrient THIAMIN =</span>
+<span class="fc" id="L126">            define(&quot;thiamin&quot;, HealthUnit.MILLIGRAM);</span>
+<span class="fc" id="L127">    public static final Nutrient RIBOFLAVIN =</span>
+<span class="fc" id="L128">            define(&quot;riboflavin&quot;, HealthUnit.MILLIGRAM);</span>
+<span class="fc" id="L129">    public static final Nutrient NIACIN =</span>
+<span class="fc" id="L130">            define(&quot;niacin&quot;, HealthUnit.MILLIGRAM);</span>
+<span class="fc" id="L131">    public static final Nutrient PANTOTHENIC_ACID =</span>
+<span class="fc" id="L132">            define(&quot;pantothenic_acid&quot;, HealthUnit.MILLIGRAM);</span>
+<span class="fc" id="L133">    public static final Nutrient VITAMIN_B6 =</span>
+<span class="fc" id="L134">            define(&quot;vitamin_b6&quot;, HealthUnit.MILLIGRAM);</span>
+<span class="fc" id="L135">    public static final Nutrient BIOTIN =</span>
+<span class="fc" id="L136">            define(&quot;biotin&quot;, HealthUnit.MICROGRAM);</span>
+<span class="fc" id="L137">    public static final Nutrient VITAMIN_B12 =</span>
+<span class="fc" id="L138">            define(&quot;vitamin_b12&quot;, HealthUnit.MICROGRAM);</span>
+<span class="fc" id="L139">    public static final Nutrient VITAMIN_C =</span>
+<span class="fc" id="L140">            define(&quot;vitamin_c&quot;, HealthUnit.MILLIGRAM);</span>
+<span class="fc" id="L141">    public static final Nutrient VITAMIN_D =</span>
+<span class="fc" id="L142">            define(&quot;vitamin_d&quot;, HealthUnit.MICROGRAM);</span>
+<span class="fc" id="L143">    public static final Nutrient VITAMIN_E =</span>
+<span class="fc" id="L144">            define(&quot;vitamin_e&quot;, HealthUnit.MILLIGRAM);</span>
+<span class="fc" id="L145">    public static final Nutrient VITAMIN_K =</span>
+<span class="fc" id="L146">            define(&quot;vitamin_k&quot;, HealthUnit.MICROGRAM);</span>
+<span class="fc" id="L147">    public static final Nutrient FOLATE =</span>
+<span class="fc" id="L148">            define(&quot;folate&quot;, HealthUnit.MICROGRAM);</span>
+
+    // --- other ---
+
+<span class="fc" id="L152">    public static final Nutrient CAFFEINE =</span>
+<span class="fc" id="L153">            define(&quot;caffeine&quot;, HealthUnit.MILLIGRAM);</span>
+
+    /// The stable, portable identifier for this nutrient.
+    public String getId() {
+<span class="fc" id="L157">        return id;</span>
+    }
+
+    /// The unit amounts of this nutrient are expressed in.
+    public HealthUnit getUnit() {
+<span class="fc" id="L162">        return unit;</span>
+    }
+
+    /// Looks a nutrient up by [#getId()], or `null` when unknown to this
+    /// version of the framework.
+    public static Nutrient forId(String id) {
+<span class="fc bfc" id="L168" title="All 2 branches covered.">        return id == null ? null : BY_ID.get(id);</span>
+    }
+
+    /// Every nutrient this framework understands.
+    public static List&lt;Nutrient&gt; values() {
+<span class="fc" id="L173">        return Collections.unmodifiableList(ALL);</span>
+    }
+
+    @Override
+    public String toString() {
+<span class="nc" id="L178">        return id;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

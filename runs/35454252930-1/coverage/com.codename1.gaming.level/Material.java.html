@@ -1,0 +1,149 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>Material.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.gaming.level</a> &gt; <span class="el_source">Material.java</span></div><h1>Material.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.gaming.level;
+
+import java.util.HashMap;
+import java.util.Map;
+
+/// A pluggable surface material used by terrain cells and `TerrainFeature`s. A material is
+/// referenced everywhere by its string `#getId()` and resolved through the `MaterialRegistry`,
+/// so applications can register their own materials (sand, lava, ice, ...) without changing the
+/// level format. Carries authoring + light-runtime hints (base colour, whether it blocks
+/// movement, friction) plus an optional `#getArtId()` for textured rendering.
+public class Material {
+    private String id;
+    private String name;
+<span class="pc" id="L36">    private int color = 0x808080;</span>
+    private boolean solid;
+<span class="pc" id="L38">    private double friction = 1.0;</span>
+    private String artId;
+<span class="pc" id="L40">    private final Map&lt;String, Object&gt; props = new HashMap&lt;String, Object&gt;();</span>
+
+<span class="nc" id="L42">    public Material() {</span>
+<span class="nc" id="L43">    }</span>
+
+<span class="fc" id="L45">    public Material(String id, String name, int color) {</span>
+<span class="fc" id="L46">        this.id = id;</span>
+<span class="fc" id="L47">        this.name = name;</span>
+<span class="fc" id="L48">        this.color = color;</span>
+<span class="fc" id="L49">    }</span>
+
+    public String getId() {
+<span class="fc" id="L52">        return id;</span>
+    }
+
+    public Material setId(String id) {
+<span class="nc" id="L56">        this.id = id;</span>
+<span class="nc" id="L57">        return this;</span>
+    }
+
+    public String getName() {
+<span class="nc" id="L61">        return name;</span>
+    }
+
+    public Material setName(String name) {
+<span class="nc" id="L65">        this.name = name;</span>
+<span class="nc" id="L66">        return this;</span>
+    }
+
+    /// Base RGB colour (0xRRGGBB) used to render the material before art is applied.
+    public int getColor() {
+<span class="fc" id="L71">        return color;</span>
+    }
+
+    public Material setColor(int color) {
+<span class="nc" id="L75">        this.color = color;</span>
+<span class="nc" id="L76">        return this;</span>
+    }
+
+    /// Whether walkers are blocked by this material (e.g. water, lava).
+    public boolean isSolid() {
+<span class="fc" id="L81">        return solid;</span>
+    }
+
+    public Material setSolid(boolean solid) {
+<span class="fc" id="L85">        this.solid = solid;</span>
+<span class="fc" id="L86">        return this;</span>
+    }
+
+    /// Movement friction multiplier (1 = normal, &lt;1 = slippery like ice).
+    public double getFriction() {
+<span class="fc" id="L91">        return friction;</span>
+    }
+
+    public Material setFriction(double friction) {
+<span class="fc" id="L95">        this.friction = friction;</span>
+<span class="fc" id="L96">        return this;</span>
+    }
+
+    /// Optional asset id supplying the material's texture art (resolved via `AssetCatalog`).
+    public String getArtId() {
+<span class="nc" id="L101">        return artId;</span>
+    }
+
+    public Material setArtId(String artId) {
+<span class="nc" id="L105">        this.artId = artId;</span>
+<span class="nc" id="L106">        return this;</span>
+    }
+
+    /// Free-form authoring properties for app-specific material data.
+    public Map&lt;String, Object&gt; props() {
+<span class="nc" id="L111">        return props;</span>
+    }
+
+    void write(StringBuilder sb) {
+<span class="nc" id="L115">        sb.append('{');</span>
+<span class="nc" id="L116">        sb.append(&quot;\&quot;id\&quot;:&quot;);</span>
+<span class="nc" id="L117">        Json.writeString(sb, id);</span>
+<span class="nc" id="L118">        sb.append(&quot;,\&quot;name\&quot;:&quot;);</span>
+<span class="nc" id="L119">        Json.writeString(sb, name);</span>
+<span class="nc" id="L120">        sb.append(&quot;,\&quot;color\&quot;:&quot;);</span>
+<span class="nc" id="L121">        Json.writeNumber(sb, color);</span>
+<span class="nc" id="L122">        sb.append(&quot;,\&quot;solid\&quot;:&quot;).append(solid);</span>
+<span class="nc" id="L123">        sb.append(&quot;,\&quot;friction\&quot;:&quot;);</span>
+<span class="nc" id="L124">        Json.writeNumber(sb, friction);</span>
+<span class="nc bnc" id="L125" title="All 2 branches missed.">        if (artId != null) {</span>
+<span class="nc" id="L126">            sb.append(&quot;,\&quot;artId\&quot;:&quot;);</span>
+<span class="nc" id="L127">            Json.writeString(sb, artId);</span>
+        }
+<span class="nc bnc" id="L129" title="All 2 branches missed.">        if (!props.isEmpty()) {</span>
+<span class="nc" id="L130">            sb.append(&quot;,\&quot;props\&quot;:&quot;);</span>
+<span class="nc" id="L131">            Json.writeValue(sb, props);</span>
+        }
+<span class="nc" id="L133">        sb.append('}');</span>
+<span class="nc" id="L134">    }</span>
+
+    static Material read(Map&lt;String, Object&gt; m) {
+<span class="nc" id="L137">        Material mat = new Material(Json.str(m.get(&quot;id&quot;), null), Json.str(m.get(&quot;name&quot;), null),</span>
+<span class="nc" id="L138">                Json.intval(m.get(&quot;color&quot;), 0x808080));</span>
+<span class="nc" id="L139">        mat.solid = Json.bool(m.get(&quot;solid&quot;), false);</span>
+<span class="nc" id="L140">        mat.friction = Json.num(m.get(&quot;friction&quot;), 1.0);</span>
+<span class="nc" id="L141">        mat.artId = Json.str(m.get(&quot;artId&quot;), null);</span>
+<span class="nc" id="L142">        Map&lt;String, Object&gt; p = Json.asMap(m.get(&quot;props&quot;));</span>
+<span class="nc bnc" id="L143" title="All 2 branches missed.">        if (p != null) {</span>
+<span class="nc" id="L144">            mat.props.putAll(p);</span>
+        }
+<span class="nc" id="L146">        return mat;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

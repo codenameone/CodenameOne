@@ -1,0 +1,182 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>PinSet.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.security.shield</a> &gt; <span class="el_source">PinSet.java</span></div><h1>PinSet.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.security.shield;
+
+import java.util.Hashtable;
+import java.util.Vector;
+
+/// An immutable set of certificate pins, keyed by host, as published by the attestation service.
+///
+/// Pins are over the **subject public key info**, not the whole certificate, so a host can renew
+/// its certificate on the same key pair without invalidating the pin. A chain matches if *any*
+/// certificate in it matches *any* pin for the host, which is what makes it safe to pin an issuing
+/// CA as the backup.
+///
+/// #### The never-brick rules
+///
+/// Client-side pinning is the one part of the shield that can take an app offline for reasons the
+/// developer cannot fix without an app store release, so the failure behaviour is deliberately
+/// asymmetric:
+///
+/// - A host with **no pins** is never enforced. That covers first run, a cold start with no
+///   network, and any host the service has not published pins for.
+/// - A **failed pin fetch** never fails a request. The last known set is kept.
+/// - Pins carry a soft expiry, after which a refresh is attempted, and a much later hard expiry.
+///   Past the hard expiry the set is dropped and enforcement stops. A device that cannot reach the
+///   service for weeks loses pinning; it does not lose the app.
+/// - Only an actual mismatch -- a host that *has* pins presenting a chain that matches none of
+///   them -- fails a request, and it fails before any request body is written.
+public final class PinSet {
+
+    /// A pin set with no hosts. Enforces nothing.
+<span class="fc" id="L52">    public static final PinSet EMPTY = new PinSet(new Hashtable(), 0, 0, 0);</span>
+
+    private final Hashtable hostToPins;
+    private final int version;
+    private final long softExpiry;
+    private final long hardExpiry;
+
+    /// @param hostToPins host (lowercase) to a `Vector` of base64 SHA-256 SPKI digests
+    /// @param version monotonic version from the service, used to detect a newer published set
+    /// @param softExpiry local millis after which a refresh should be attempted, 0 for never
+    /// @param hardExpiry local millis after which the set is discarded entirely, 0 for never
+<span class="fc" id="L63">    public PinSet(Hashtable hostToPins, int version, long softExpiry, long hardExpiry) {</span>
+        // Deep copy. The set is reachable through the public AppShield.getPinSet(),
+        // and a caller that cleared the backing vectors would leave every host
+        // looking unpinned -- which silently disables enforcement rather than
+        // failing visibly.
+<span class="fc" id="L68">        this.hostToPins = copyOf(hostToPins);</span>
+<span class="fc" id="L69">        this.version = version;</span>
+<span class="fc" id="L70">        this.softExpiry = softExpiry;</span>
+<span class="fc" id="L71">        this.hardExpiry = hardExpiry;</span>
+<span class="fc" id="L72">    }</span>
+
+    public int getVersion() {
+<span class="nc" id="L75">        return version;</span>
+    }
+
+    /// True once the set should be refreshed. Does not mean it has stopped being enforced.
+    public boolean isStale() {
+<span class="pc bpc" id="L80" title="2 of 4 branches missed.">        return softExpiry &gt; 0 &amp;&amp; System.currentTimeMillis() &gt; softExpiry;</span>
+    }
+
+    /// True once the set is too old to keep enforcing. At this point pinning disables itself
+    /// rather than risk locking a long-offline device out of its own app.
+    public boolean isExpired() {
+<span class="fc bfc" id="L86" title="All 4 branches covered.">        return hardExpiry &gt; 0 &amp;&amp; System.currentTimeMillis() &gt; hardExpiry;</span>
+    }
+
+    /// True when this set has at least one pin for the host and has not hard-expired, i.e. when a
+    /// chain for this host is actually going to be checked.
+    public boolean isEnforcedFor(String host) {
+<span class="pc bpc" id="L92" title="1 of 4 branches missed.">        if (host == null || isExpired()) {</span>
+<span class="fc" id="L93">            return false;</span>
+        }
+<span class="fc" id="L95">        Vector pins = pinsFor(host);</span>
+<span class="pc bpc" id="L96" title="1 of 4 branches missed.">        return pins != null &amp;&amp; !pins.isEmpty();</span>
+    }
+
+    /// Number of hosts with at least one pin. Used by tests and diagnostics.
+    public int hostCount() {
+<span class="fc" id="L101">        return hostToPins.size();</span>
+    }
+
+    /// The pins registered for a host, honouring a leading `*.` wildcard, or null when the host is
+    /// not pinned.
+    public Vector pinsFor(String host) {
+<span class="pc bpc" id="L107" title="1 of 2 branches missed.">        if (host == null) {</span>
+<span class="nc" id="L108">            return null;</span>
+        }
+<span class="fc" id="L110">        String h = ShieldHosts.normalize(host);</span>
+<span class="fc" id="L111">        Object exact = hostToPins.get(h);</span>
+<span class="fc bfc" id="L112" title="All 2 branches covered.">        if (exact != null) {</span>
+<span class="fc" id="L113">            return copyOf((Vector) exact);</span>
+        }
+        // Walk up the labels so a &quot;*.example.com&quot; entry covers &quot;api.example.com&quot;.
+<span class="fc" id="L116">        int dot = h.indexOf('.');</span>
+<span class="pc bpc" id="L117" title="1 of 4 branches missed.">        while (dot &gt;= 0 &amp;&amp; dot &lt; h.length() - 1) {</span>
+<span class="fc" id="L118">            Object wild = hostToPins.get(&quot;*.&quot; + h.substring(dot + 1));</span>
+<span class="fc bfc" id="L119" title="All 2 branches covered.">            if (wild != null) {</span>
+<span class="fc" id="L120">                return copyOf((Vector) wild);</span>
+            }
+<span class="fc" id="L122">            dot = h.indexOf('.', dot + 1);</span>
+<span class="fc" id="L123">        }</span>
+<span class="fc" id="L124">        return null;</span>
+    }
+
+    private static Hashtable copyOf(Hashtable in) {
+<span class="fc" id="L128">        Hashtable out = new Hashtable();</span>
+<span class="pc bpc" id="L129" title="1 of 2 branches missed.">        if (in == null) {</span>
+<span class="nc" id="L130">            return out;</span>
+        }
+<span class="fc" id="L132">        java.util.Enumeration keys = in.keys();</span>
+<span class="fc bfc" id="L133" title="All 2 branches covered.">        while (keys.hasMoreElements()) {</span>
+<span class="fc" id="L134">            Object key = keys.nextElement();</span>
+<span class="fc" id="L135">            Object value = in.get(key);</span>
+<span class="pc bpc" id="L136" title="1 of 2 branches missed.">            out.put(key, value instanceof Vector ? copyOf((Vector) value) : value);</span>
+<span class="fc" id="L137">        }</span>
+<span class="fc" id="L138">        return out;</span>
+    }
+
+    private static Vector copyOf(Vector in) {
+<span class="fc" id="L142">        Vector out = new Vector();</span>
+<span class="pc bpc" id="L143" title="1 of 2 branches missed.">        if (in != null) {</span>
+<span class="fc bfc" id="L144" title="All 2 branches covered.">            for (int i = 0; i &lt; in.size(); i++) {</span>
+<span class="fc" id="L145">                out.addElement(in.elementAt(i));</span>
+            }
+        }
+<span class="fc" id="L148">        return out;</span>
+    }
+
+    /// True when at least one of the supplied chain digests matches a pin for the host.
+    ///
+    /// Returns true when the host is not pinned at all -- &quot;no opinion&quot; must never be reported as a
+    /// mismatch, or an unpinned host would start failing.
+    public boolean matches(String host, String[] chainSpkiDigests) {
+<span class="fc bfc" id="L156" title="All 2 branches covered.">        if (!isEnforcedFor(host)) {</span>
+<span class="fc" id="L157">            return true;</span>
+        }
+<span class="fc bfc" id="L159" title="All 4 branches covered.">        if (chainSpkiDigests == null || chainSpkiDigests.length == 0) {</span>
+<span class="fc" id="L160">            return false;</span>
+        }
+<span class="fc" id="L162">        Vector pins = pinsFor(host);</span>
+<span class="fc bfc" id="L163" title="All 2 branches covered.">        for (String digest : chainSpkiDigests) {</span>
+<span class="pc bpc" id="L164" title="1 of 4 branches missed.">            if (digest != null &amp;&amp; pins.contains(digest)) {</span>
+<span class="fc" id="L165">                return true;</span>
+            }
+        }
+<span class="fc" id="L168">        return false;</span>
+    }
+
+    /// True when no host is pinned.
+    public boolean isEmpty() {
+<span class="nc" id="L173">        return hostToPins.isEmpty();</span>
+    }
+
+    @Override
+    public String toString() {
+<span class="nc" id="L178">        return &quot;PinSet[version=&quot; + version + &quot;, hosts=&quot; + hostToPins.size()</span>
+<span class="nc" id="L179">                + &quot;, stale=&quot; + isStale() + &quot;, expired=&quot; + isExpired() + &quot;]&quot;;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

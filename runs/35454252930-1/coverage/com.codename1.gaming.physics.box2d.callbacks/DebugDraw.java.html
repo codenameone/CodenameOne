@@ -1,0 +1,219 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>DebugDraw.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.gaming.physics.box2d.callbacks</a> &gt; <span class="el_source">DebugDraw.java</span></div><h1>DebugDraw.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2013, Daniel Murphy
+ * All rights reserved.
+ * 
+ * Redistribution and use in source and binary forms, with or without modification,
+ * are permitted provided that the following conditions are met:
+ * 	* Redistributions of source code must retain the above copyright notice,
+ * 	  this list of conditions and the following disclaimer.
+ * 	* Redistributions in binary form must reproduce the above copyright notice,
+ * 	  this list of conditions and the following disclaimer in the documentation
+ * 	  and/or other materials provided with the distribution.
+ * 
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS &quot;AS IS&quot; AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+ * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
+ * IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT,
+ * INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT
+ * NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+ * PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
+ * WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+ * POSSIBILITY OF SUCH DAMAGE.
+ ******************************************************************************/
+/// Created at 4:35:29 AM Jul 15, 2010
+package com.codename1.gaming.physics.box2d.callbacks;
+
+import com.codename1.gaming.physics.box2d.common.Color3f;
+import com.codename1.gaming.physics.box2d.common.IViewportTransform;
+import com.codename1.gaming.physics.box2d.common.Transform;
+import com.codename1.gaming.physics.box2d.common.Vec2;
+
+// updated to rev 100
+/// Implement this abstract class to allow JBox2d to
+/// automatically draw your physics for debugging purposes.
+/// Not intended to replace your own custom rendering
+/// routines!
+/// @author Daniel Murphy
+public abstract class DebugDraw {
+
+	public static final int e_shapeBit				= 0x0001; ///&lt; draw shapes
+	public static final int e_jointBit				= 0x0002; ///&lt; draw joint connections
+	public static final int e_aabbBit				= 0x0004; ///&lt; draw core (TOI) shapes
+	public static final int e_pairBit				= 0x0008; ///&lt; draw axis aligned bounding boxes
+	public static final int e_centerOfMassBit		= 0x0010; ///&lt; draw center of mass frame
+	public static final int e_dynamicTreeBit		= 0x0020; ///&lt; draw dynamic tree.
+	
+	protected int m_drawFlags;
+	protected final IViewportTransform viewportTransform;
+
+<span class="fc" id="L50">	public DebugDraw(IViewportTransform viewport) {</span>
+<span class="fc" id="L51">		m_drawFlags = 0;</span>
+<span class="fc" id="L52">		viewportTransform = viewport;</span>
+<span class="fc" id="L53">	}</span>
+
+	public void setFlags(int flags) {
+<span class="fc" id="L56">		m_drawFlags = flags;</span>
+<span class="fc" id="L57">	}</span>
+
+	public int getFlags() {
+<span class="fc" id="L60">		return m_drawFlags;</span>
+	}
+
+	public void appendFlags(int flags) {
+<span class="nc" id="L64">		m_drawFlags |= flags;</span>
+<span class="nc" id="L65">	}</span>
+
+	public void clearFlags(int flags) {
+<span class="nc" id="L68">		m_drawFlags &amp;= ~flags;</span>
+<span class="nc" id="L69">	}</span>
+
+	/// Draw a closed polygon provided in CCW order.  This implementation
+	/// uses {@link #drawSegment(Vec2, Vec2, Color3f)} to draw each side of the
+	/// polygon.
+	/// @param vertices
+	/// @param vertexCount
+	/// @param color
+	public void drawPolygon(Vec2[] vertices, int vertexCount, Color3f color){
+<span class="nc bnc" id="L78" title="All 2 branches missed.">		if(vertexCount == 1){</span>
+<span class="nc" id="L79">			drawSegment(vertices[0], vertices[0], color);</span>
+<span class="nc" id="L80">			return;</span>
+		}
+		
+<span class="nc bnc" id="L83" title="All 2 branches missed.">		for(int i=0; i&lt;vertexCount-1; i+=1){</span>
+<span class="nc" id="L84">			drawSegment(vertices[i], vertices[i+1], color);</span>
+		}
+		
+<span class="nc bnc" id="L87" title="All 2 branches missed.">		if(vertexCount &gt; 2){</span>
+<span class="nc" id="L88">			drawSegment(vertices[vertexCount-1], vertices[0], color);</span>
+		}
+<span class="nc" id="L90">	}</span>
+	
+	public abstract void drawPoint(Vec2 argPoint, float argRadiusOnScreen, Color3f argColor);
+
+	/// Draw a solid closed polygon provided in CCW order.
+	/// @param vertices
+	/// @param vertexCount
+	/// @param color
+	public abstract void drawSolidPolygon(Vec2[] vertices, int vertexCount, Color3f color);
+
+	/// Draw a circle.
+	/// @param center
+	/// @param radius
+	/// @param color
+	public abstract void drawCircle(Vec2 center, float radius, Color3f color);
+	
+	/// Draw a solid circle.
+	/// @param center
+	/// @param radius
+	/// @param axis
+	/// @param color
+	public abstract void drawSolidCircle(Vec2 center, float radius, Vec2 axis, Color3f color);
+	
+	/// Draw a line segment.
+	/// @param p1
+	/// @param p2
+	/// @param color
+	public abstract void drawSegment(Vec2 p1, Vec2 p2, Color3f color);
+
+	/// Draw a transform.  Choose your own length scale
+	/// @param xf
+	public abstract void drawTransform(Transform xf);
+
+	/// Draw a string.
+	/// @param x
+	/// @param y
+	/// @param s
+	/// @param color
+	public abstract void drawString(float x, float y, String s, Color3f color);
+	
+	public void drawString(Vec2 pos, String s, Color3f color) {
+<span class="nc" id="L131">	  drawString(pos.x, pos.y, s, color);</span>
+<span class="nc" id="L132">	}</span>
+		
+	public IViewportTransform getViewportTranform(){
+<span class="nc" id="L135">		return viewportTransform;</span>
+	}
+	
+	/// @param x
+	/// @param y
+	/// @param scale
+	/// @see IViewportTransform#setCamera(float, float, float)
+	public void setCamera(float x, float y, float scale){
+<span class="nc" id="L143">		viewportTransform.setCamera(x,y,scale);</span>
+<span class="nc" id="L144">	}</span>
+	
+	
+	/// @param argScreen
+	/// @param argWorld
+	/// @see com.codename1.gaming.physics.box2d.common.IViewportTransform#getScreenToWorld(com.codename1.gaming.physics.box2d.common.Vec2, com.codename1.gaming.physics.box2d.common.Vec2)
+	public void getScreenToWorldToOut(Vec2 argScreen, Vec2 argWorld) {
+<span class="nc" id="L151">		viewportTransform.getScreenToWorld(argScreen, argWorld);</span>
+<span class="nc" id="L152">	}</span>
+
+	/// @param argWorld
+	/// @param argScreen
+	/// @see com.codename1.gaming.physics.box2d.common.IViewportTransform#getWorldToScreen(com.codename1.gaming.physics.box2d.common.Vec2, com.codename1.gaming.physics.box2d.common.Vec2)
+	public void getWorldToScreenToOut(Vec2 argWorld, Vec2 argScreen) {
+<span class="nc" id="L158">		viewportTransform.getWorldToScreen(argWorld, argScreen);</span>
+<span class="nc" id="L159">	}</span>
+	
+	/// Takes the world coordinates and puts the corresponding screen
+	/// coordinates in argScreen.
+	/// @param worldX
+	/// @param worldY
+	/// @param argScreen
+	public void getWorldToScreenToOut(float worldX, float worldY, Vec2 argScreen){
+<span class="nc" id="L167">		argScreen.set(worldX,worldY);</span>
+<span class="nc" id="L168">		viewportTransform.getWorldToScreen(argScreen, argScreen);</span>
+<span class="nc" id="L169">	}</span>
+	
+	/// takes the world coordinate (argWorld) and returns
+	/// the screen coordinates.
+	/// @param argWorld
+	public Vec2 getWorldToScreen(Vec2 argWorld){
+<span class="nc" id="L175">		Vec2 screen = new Vec2();</span>
+<span class="nc" id="L176">		viewportTransform.getWorldToScreen( argWorld, screen);</span>
+<span class="nc" id="L177">		return screen;</span>
+	}
+	
+	/// Takes the world coordinates and returns the screen
+	/// coordinates.
+	/// @param worldX
+	/// @param worldY
+	public Vec2 getWorldToScreen(float worldX, float worldY){
+<span class="nc" id="L185">		Vec2 argScreen = new Vec2(worldX, worldY);</span>
+<span class="nc" id="L186">		viewportTransform.getWorldToScreen( argScreen, argScreen);</span>
+<span class="nc" id="L187">		return argScreen;</span>
+	}
+	
+	/// takes the screen coordinates and puts the corresponding
+	/// world coordinates in argWorld.
+	/// @param screenX
+	/// @param screenY
+	/// @param argWorld
+	public void getScreenToWorldToOut(float screenX, float screenY, Vec2 argWorld){
+<span class="nc" id="L196">		argWorld.set(screenX,screenY);</span>
+<span class="nc" id="L197">		viewportTransform.getScreenToWorld(argWorld, argWorld);</span>
+<span class="nc" id="L198">	}</span>
+	
+	/// takes the screen coordinates (argScreen) and returns
+	/// the world coordinates
+	/// @param argScreen
+	public Vec2 getScreenToWorld(Vec2 argScreen){
+<span class="nc" id="L204">		Vec2 world = new Vec2();</span>
+<span class="nc" id="L205">		viewportTransform.getScreenToWorld(argScreen, world);</span>
+<span class="nc" id="L206">		return world;</span>
+	}
+	
+	/// takes the screen coordinates and returns the
+	/// world coordinates.
+	/// @param screenX
+	/// @param screenY
+	public Vec2 getScreenToWorld(float screenX, float screenY){
+<span class="nc" id="L214">		Vec2 screen = new Vec2(screenX, screenY);</span>
+<span class="nc" id="L215">		viewportTransform.getScreenToWorld( screen, screen);</span>
+<span class="nc" id="L216">		return screen;</span>
+	}
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

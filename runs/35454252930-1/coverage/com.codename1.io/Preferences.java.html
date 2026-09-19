@@ -1,0 +1,572 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>Preferences.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.io</a> &gt; <span class="el_source">Preferences.java</span></div><h1>Preferences.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.io;
+
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.Hashtable;
+import java.util.Map;
+import java.util.Set;
+
+/// Simple map like class to store application and Codename One preference
+/// settings in the `com.codename1.io.Storage`.
+///
+/// Simple usage of the class for storing a `String` token:
+///
+/// ```java
+/// // save a token to storage
+/// String myToken = &quot;abc123&quot;;
+/// Preferences.set(&quot;token&quot;, myToken);
+///
+/// // get the token from storage or null if it isn't there
+/// String token = Preferences.get(&quot;token&quot;, null);
+/// ```
+///
+/// Notice that this class might get somewhat confusing with primitive numbers e.g. if you use
+/// `Preferences.set(&quot;primitiveLongValue&quot;, myLongNumber)` then invoke
+/// `Preferences.get(&quot;primitiveLongValue&quot;, 0)` you might get an exception!
+///
+/// This would happen because the value is physically a `Long` object but you are trying to get an
+/// `Integer`.
+///
+/// The workaround is to remain consistent and use code like this `Preferences.get(&quot;primitiveLongValue&quot;, (long)0)`.
+///
+/// @author Shai Almog
+/// @author Miguel Mu\u00f1oz
+public final class Preferences {
+<span class="fc" id="L57">    private static final HashMap&lt;String, ArrayList&lt;PreferenceListener&gt;&gt; listenerMap = new HashMap&lt;String, ArrayList&lt;PreferenceListener&gt;&gt;();</span>
+    private static Hashtable&lt;String, Object&gt; p;
+<span class="fc" id="L59">    private static String preferencesLocation = &quot;CN1Preferences&quot;;</span>
+
+    /// Block instantiation of preferences
+    private Preferences() {
+    }
+
+    /// Returns the location within the storage of the preferences file to an arbitrary name. This is useful in a case
+    /// of encryption where we would want preferences to use a different file name.
+    ///
+    /// #### Returns
+    ///
+    /// the storage file name
+    public static String getPreferencesLocation() {
+<span class="fc" id="L72">        return preferencesLocation;</span>
+    }
+
+    /// Sets the location within the storage of the preferences file to an arbitrary name. This is useful in a case
+    /// of encryption where we would want preferences to use a different file name.
+    ///
+    /// #### Parameters
+    ///
+    /// - `storageFileName`: the name of the preferences file
+    public static void setPreferencesLocation(String storageFileName) {
+<span class="fc" id="L82">        preferencesLocation = storageFileName;</span>
+<span class="fc" id="L83">        p = null;</span>
+<span class="fc" id="L84">    }</span>
+
+    private synchronized static Hashtable&lt;String, Object&gt; get() {
+<span class="fc bfc" id="L87" title="All 2 branches covered.">        if (p == null) {</span>
+<span class="fc bfc" id="L88" title="All 2 branches covered.">            if (Storage.getInstance().exists(preferencesLocation)) {</span>
+<span class="fc" id="L89">                p = (Hashtable&lt;String, Object&gt;) Storage.getInstance().readObject(preferencesLocation, false);</span>
+            }
+<span class="fc bfc" id="L91" title="All 2 branches covered.">            if (p == null) {</span>
+<span class="fc" id="L92">                p = new Hashtable&lt;String, Object&gt;();</span>
+            }
+        }
+<span class="fc" id="L95">        return p;</span>
+    }
+
+    private static synchronized void save() {
+<span class="fc" id="L99">        Storage.getInstance().writeObject(preferencesLocation, p, false);</span>
+<span class="fc" id="L100">    }</span>
+
+    /// Sets a preference value, supported values are Strings, numbers and boolean
+    ///
+    /// #### Parameters
+    ///
+    /// - `pref`: the key any unique none null value that doesn't start with cn1
+    ///
+    /// - `o`: a String a number or boolean
+    private static void set(String pref, Object o) {
+        Object prior;
+        // the change and the save that persists it have to be one step. save()
+        // serializes the map by writing an entry count and then walking it, so a
+        // change landing from another thread in between wrote a file whose count did
+        // not match its contents, and every preference in it read back as garbage.
+        // Listeners fire outside the lock, they are free to call back in here.
+<span class="fc" id="L116">        synchronized (Preferences.class) {</span>
+<span class="fc" id="L117">            prior = get(pref, null);</span>
+<span class="fc bfc" id="L118" title="All 2 branches covered.">            if (o == null) {</span>
+<span class="fc" id="L119">                get().remove(pref);</span>
+            } else {
+<span class="fc" id="L121">                get().put(pref, o);</span>
+            }
+<span class="fc" id="L123">            save();</span>
+<span class="fc" id="L124">        }</span>
+<span class="fc" id="L125">        fireChange(pref, prior, o);</span>
+<span class="fc" id="L126">    }</span>
+
+    /// Sets a set of preference values as a batch, and performs a single save.
+    ///
+    /// #### Parameters
+    ///
+    /// - `values`: The key/value pairs to set in preferences.
+    public static void set(Map&lt;String, Object&gt; values) {
+<span class="fc" id="L134">        ArrayList&lt;Object[]&gt; changeParams = new ArrayList&lt;Object[]&gt;();</span>
+<span class="fc" id="L135">        synchronized (Preferences.class) {</span>
+<span class="fc bfc" id="L136" title="All 2 branches covered.">            for (Map.Entry&lt;String, Object&gt; entry : values.entrySet()) {</span>
+<span class="fc" id="L137">                String pref = entry.getKey();</span>
+<span class="fc" id="L138">                Object o = entry.getValue();</span>
+<span class="fc" id="L139">                Object prior = get(pref, null);</span>
+<span class="pc bpc" id="L140" title="1 of 2 branches missed.">                if (o == null) {</span>
+<span class="nc" id="L141">                    get().remove(pref);</span>
+                } else {
+<span class="fc" id="L143">                    get().put(pref, o);</span>
+                }
+<span class="fc" id="L145">                changeParams.add(new Object[]{pref, prior, o});</span>
+<span class="fc" id="L146">            }</span>
+<span class="fc" id="L147">            save();</span>
+<span class="fc" id="L148">        }</span>
+<span class="fc bfc" id="L149" title="All 2 branches covered.">        for (Object[] params : changeParams) {</span>
+<span class="fc" id="L150">            fireChange((String) params[0], params[1], params[2]);</span>
+<span class="fc" id="L151">        }</span>
+<span class="fc" id="L152">    }</span>
+
+    /// Sets a preference value
+    ///
+    /// #### Parameters
+    ///
+    /// - `pref`: the key any unique none null value that doesn't start with cn1
+    ///
+    /// - `s`: a String
+    public static void set(String pref, String s) {
+<span class="fc" id="L162">        set(pref, (Object) s);</span>
+<span class="fc" id="L163">    }</span>
+
+    /// Sets a preference value
+    ///
+    /// #### Parameters
+    ///
+    /// - `pref`: the key any unique none null value that doesn't start with cn1
+    ///
+    /// - `i`: a number
+    public static void set(String pref, int i) {
+<span class="fc" id="L173">        set(pref, Integer.valueOf(i));</span>
+<span class="fc" id="L174">    }</span>
+
+    /// Sets a preference value
+    ///
+    /// #### Parameters
+    ///
+    /// - `pref`: the key any unique none null value that doesn't start with cn1
+    ///
+    /// - `l`: a number
+    public static void set(String pref, long l) {
+<span class="fc" id="L184">        set(pref, Long.valueOf(l));</span>
+<span class="fc" id="L185">    }</span>
+
+    /// Sets a preference value
+    ///
+    /// #### Parameters
+    ///
+    /// - `pref`: the key any unique none null value that doesn't start with cn1
+    ///
+    /// - `d`: a number
+    public static void set(String pref, double d) {
+<span class="fc" id="L195">        set(pref, Double.valueOf(d));</span>
+<span class="fc" id="L196">    }</span>
+
+    /// Sets a preference value
+    ///
+    /// #### Parameters
+    ///
+    /// - `pref`: the key any unique none null value that doesn't start with cn1
+    ///
+    /// - `f`: a number
+    public static void set(String pref, float f) {
+<span class="fc" id="L206">        set(pref, Float.valueOf(f));</span>
+<span class="fc" id="L207">    }</span>
+
+    /// Deletes a value for the given setting
+    ///
+    /// #### Parameters
+    ///
+    /// - `pref`: the preference value
+    public static void delete(String pref) {
+        Object prior;
+<span class="fc" id="L216">        synchronized (Preferences.class) {</span>
+<span class="fc" id="L217">            prior = get(pref, null);</span>
+<span class="fc" id="L218">            get().remove(pref);</span>
+<span class="fc" id="L219">            save();</span>
+<span class="fc" id="L220">        }</span>
+<span class="fc" id="L221">        fireChange(pref, prior, null);</span>
+<span class="fc" id="L222">    }</span>
+
+    /// Remove all preferences
+    public static void clearAll() {
+        // We only need to save prior values for Preferences that actually have listeners.
+<span class="fc" id="L227">        Hashtable&lt;String, Object&gt; priorValues = null;</span>
+<span class="fc" id="L228">        synchronized (Preferences.class) {</span>
+<span class="fc bfc" id="L229" title="All 2 branches covered.">            if (!listenerMap.isEmpty()) {</span>
+
+                // Save all the Preferences for which there are registered listeners.
+<span class="fc" id="L232">                priorValues = new Hashtable&lt;String, Object&gt;();</span>
+<span class="fc bfc" id="L233" title="All 2 branches covered.">                for (String key : listenerMap.keySet()) {</span>
+<span class="fc" id="L234">                    final Object currentValue = get().get(key);</span>
+                    // We can't put null values in the hashtable. But we don't need to, because if we could we'd just be calling
+                    // fireChange(Pref, null, null) and fireChange would do nothing.
+<span class="fc bfc" id="L237" title="All 2 branches covered.">                    if (currentValue != null) {</span>
+<span class="fc" id="L238">                        priorValues.put(key, currentValue);</span>
+                    }
+<span class="fc" id="L240">                }</span>
+            }
+<span class="fc" id="L242">            get().clear();</span>
+<span class="fc" id="L243">            save();</span>
+<span class="fc" id="L244">        }</span>
+<span class="fc bfc" id="L245" title="All 2 branches covered.">        if (priorValues != null) {</span>
+<span class="fc bfc" id="L246" title="All 2 branches covered.">            for (String key : listenerMap.keySet()) {</span>
+<span class="fc" id="L247">                fireChange(key, priorValues.get(key), null);</span>
+<span class="fc" id="L248">            }</span>
+        }
+<span class="fc" id="L250">    }</span>
+
+    static Set&lt;String&gt; keySet() {
+<span class="nc" id="L253">        return p.keySet();</span>
+    }
+
+    /// Sets a preference value
+    ///
+    /// #### Parameters
+    ///
+    /// - `pref`: the key any unique none null value that doesn't start with cn1
+    ///
+    /// - `b`: the value
+    public static void set(String pref, boolean b) {
+<span class="fc bfc" id="L264" title="All 2 branches covered.">        if (b) {</span>
+<span class="fc" id="L265">            set(pref, Boolean.TRUE);</span>
+        } else {
+<span class="fc" id="L267">            set(pref, Boolean.FALSE);</span>
+        }
+<span class="fc" id="L269">    }</span>
+
+    /// Gets the value as a String
+    ///
+    /// #### Parameters
+    ///
+    /// - `pref`: the preference key
+    ///
+    /// - `def`: the default value
+    ///
+    /// #### Returns
+    ///
+    /// the default value or the value
+    public static String get(String pref, String def) {
+<span class="fc" id="L283">        Object t = get().get(pref);</span>
+<span class="fc bfc" id="L284" title="All 2 branches covered.">        if (t == null) {</span>
+<span class="fc" id="L285">            return def;</span>
+        }
+<span class="fc" id="L287">        return t.toString();</span>
+    }
+
+    /// Gets the value as a String if the value is null def is returned and saved
+    ///
+    /// #### Parameters
+    ///
+    /// - `pref`: the preference key
+    ///
+    /// - `def`: the default value
+    ///
+    /// #### Returns
+    ///
+    /// the default value or the value
+    public static String getAndSet(String pref, String def) {
+<span class="fc" id="L302">        Object t = get().get(pref);</span>
+<span class="pc bpc" id="L303" title="1 of 2 branches missed.">        if (t == null) {</span>
+<span class="fc" id="L304">            set(pref, def);</span>
+<span class="fc" id="L305">            return def;</span>
+        }
+<span class="nc" id="L307">        return t.toString();</span>
+    }
+
+    /// Gets the value as a number if the value is null def is returned and saved
+    ///
+    /// #### Parameters
+    ///
+    /// - `pref`: the preference key
+    ///
+    /// - `def`: the default value
+    ///
+    /// #### Returns
+    ///
+    /// the default value or the value
+    public static int getAndSet(String pref, int def) {
+<span class="fc" id="L322">        Integer t = (Integer) get().get(pref);</span>
+<span class="fc bfc" id="L323" title="All 2 branches covered.">        if (t == null) {</span>
+<span class="fc" id="L324">            set(pref, def);</span>
+<span class="fc" id="L325">            return def;</span>
+        }
+<span class="fc" id="L327">        return t.intValue();</span>
+    }
+
+    /// Gets the value as a number
+    ///
+    /// #### Parameters
+    ///
+    /// - `pref`: the preference key
+    ///
+    /// - `def`: the default value
+    ///
+    /// #### Returns
+    ///
+    /// the default value or the value
+    public static int get(String pref, int def) {
+<span class="fc" id="L342">        Integer t = (Integer) get().get(pref);</span>
+<span class="fc bfc" id="L343" title="All 2 branches covered.">        if (t == null) {</span>
+<span class="fc" id="L344">            return def;</span>
+        }
+<span class="fc" id="L346">        return t.intValue();</span>
+    }
+
+    /// Gets the value as a number if the value is null def is returned and saved
+    ///
+    /// #### Parameters
+    ///
+    /// - `pref`: the preference key
+    ///
+    /// - `def`: the default value
+    ///
+    /// #### Returns
+    ///
+    /// the default value or the value
+    public static long getAndSet(String pref, long def) {
+<span class="nc" id="L361">        Long t = (Long) get().get(pref);</span>
+<span class="nc bnc" id="L362" title="All 2 branches missed.">        if (t == null) {</span>
+<span class="nc" id="L363">            set(pref, def);</span>
+<span class="nc" id="L364">            return def;</span>
+        }
+<span class="nc" id="L366">        return t.longValue();</span>
+    }
+
+    /// Gets the value as a number
+    ///
+    /// #### Parameters
+    ///
+    /// - `pref`: the preference key
+    ///
+    /// - `def`: the default value
+    ///
+    /// #### Returns
+    ///
+    /// the default value or the value
+    public static long get(String pref, long def) {
+<span class="fc" id="L381">        Long t = (Long) get().get(pref);</span>
+<span class="fc bfc" id="L382" title="All 2 branches covered.">        if (t == null) {</span>
+<span class="fc" id="L383">            return def;</span>
+        }
+<span class="fc" id="L385">        return t.longValue();</span>
+    }
+
+    /// Gets the value as a number if the value is null def is returned and saved
+    ///
+    /// #### Parameters
+    ///
+    /// - `pref`: the preference key
+    ///
+    /// - `def`: the default value
+    ///
+    /// #### Returns
+    ///
+    /// the default value or the value
+    public static double getAndSet(String pref, double def) {
+<span class="nc" id="L400">        Double t = (Double) get().get(pref);</span>
+<span class="nc bnc" id="L401" title="All 2 branches missed.">        if (t == null) {</span>
+<span class="nc" id="L402">            set(pref, def);</span>
+<span class="nc" id="L403">            return def;</span>
+        }
+<span class="nc" id="L405">        return t.doubleValue();</span>
+    }
+
+    /// Gets the value as a number
+    ///
+    /// #### Parameters
+    ///
+    /// - `pref`: the preference key
+    ///
+    /// - `def`: the default value
+    ///
+    /// #### Returns
+    ///
+    /// the default value or the value
+    public static double get(String pref, double def) {
+<span class="fc" id="L420">        Double t = (Double) get().get(pref);</span>
+<span class="pc bpc" id="L421" title="1 of 2 branches missed.">        if (t == null) {</span>
+<span class="nc" id="L422">            return def;</span>
+        }
+<span class="fc" id="L424">        return t.doubleValue();</span>
+    }
+
+    /// Gets the value as a number if the value is null def is returned and saved
+    ///
+    /// #### Parameters
+    ///
+    /// - `pref`: the preference key
+    ///
+    /// - `def`: the default value
+    ///
+    /// #### Returns
+    ///
+    /// the default value or the value
+    public static float getAndSet(String pref, float def) {
+<span class="nc" id="L439">        Float t = (Float) get().get(pref);</span>
+<span class="nc bnc" id="L440" title="All 2 branches missed.">        if (t == null) {</span>
+<span class="nc" id="L441">            set(pref, def);</span>
+<span class="nc" id="L442">            return def;</span>
+        }
+<span class="nc" id="L444">        return t.floatValue();</span>
+    }
+
+    /// Gets the value as a number
+    ///
+    /// #### Parameters
+    ///
+    /// - `pref`: the preference key
+    ///
+    /// - `def`: the default value
+    ///
+    /// #### Returns
+    ///
+    /// the default value or the value
+    public static float get(String pref, float def) {
+<span class="fc" id="L459">        Float t = (Float) get().get(pref);</span>
+<span class="pc bpc" id="L460" title="1 of 2 branches missed.">        if (t == null) {</span>
+<span class="nc" id="L461">            return def;</span>
+        }
+<span class="fc" id="L463">        return t.floatValue();</span>
+    }
+
+    /// Gets the value as a number if the value is null def is returned and saved
+    ///
+    /// #### Parameters
+    ///
+    /// - `pref`: the preference key
+    ///
+    /// - `def`: the default value
+    ///
+    /// #### Returns
+    ///
+    /// the default value or the value
+    public static boolean getAndSet(String pref, boolean def) {
+<span class="fc" id="L478">        Boolean t = (Boolean) get().get(pref);</span>
+<span class="pc bpc" id="L479" title="1 of 2 branches missed.">        if (t == null) {</span>
+<span class="fc" id="L480">            set(pref, def);</span>
+<span class="fc" id="L481">            return def;</span>
+        }
+<span class="nc" id="L483">        return t.booleanValue();</span>
+    }
+
+
+    /// Gets the value as a number
+    ///
+    /// #### Parameters
+    ///
+    /// - `pref`: the preference key
+    ///
+    /// - `def`: the default value
+    ///
+    /// #### Returns
+    ///
+    /// the default value or the value
+    public static boolean get(String pref, boolean def) {
+<span class="fc" id="L499">        Boolean t = (Boolean) get().get(pref);</span>
+<span class="fc bfc" id="L500" title="All 2 branches covered.">        if (t == null) {</span>
+<span class="fc" id="L501">            return def;</span>
+        }
+<span class="fc" id="L503">        return t.booleanValue();</span>
+    }
+
+    /// Fires the PreferenceListeners if priorValue and value are not equal.
+    ///
+    /// #### Parameters
+    ///
+    /// - `pref`: The preference name
+    ///
+    /// - `priorValue`: The prior value, which may be null
+    ///
+    /// - `value`: The new value, which may be null
+    private static void fireChange(final String pref, final Object priorValue, final Object value) {
+        //noinspection EqualsReplaceableByObjectsCall,ObjectEquality
+<span class="fc bfc" id="L517" title="All 6 branches covered.">        boolean valueChanged = (priorValue != value) &amp;&amp; ((priorValue == null) || !priorValue.equals(value)); //NOPMD CompareObjectsWithEquals</span>
+<span class="fc bfc" id="L518" title="All 2 branches covered.">        if (valueChanged) {</span>
+<span class="fc" id="L519">            ArrayList&lt;PreferenceListener&gt; listenerList = listenerMap.get(pref);</span>
+<span class="fc bfc" id="L520" title="All 2 branches covered.">            if (listenerList != null) {</span>
+                // Loop backwards, in case the listener removes itself.
+<span class="fc bfc" id="L522" title="All 2 branches covered.">                for (int i = listenerList.size() - 1; i &gt;= 0; --i) {</span>
+                    // either value could be null
+<span class="fc" id="L524">                    PreferenceListener listener = listenerList.get(i);</span>
+<span class="fc" id="L525">                    listener.preferenceChanged(pref, priorValue, value);</span>
+                }
+            }
+        }
+<span class="fc" id="L529">    }</span>
+
+    /// Adds a preference listener for the specified property to the list of listeners. When calling this method, it is
+    /// advisable to also read the current value and set it, since the value may have changed since the last time the
+    /// listener was removed. (Should this return the current value of the preference?)
+    ///
+    /// #### Parameters
+    ///
+    /// - `pref`: The preference to listen to
+    ///
+    /// - `listener`: The listener to add, which cannot be null.
+    public static void addPreferenceListener(String pref, PreferenceListener listener) {
+<span class="pc bpc" id="L541" title="1 of 2 branches missed.">        if (listener == null) {</span>
+            // fail fast. Without this, it will fail when the listener is fired, when it's harder to trace back.
+<span class="nc" id="L543">            throw new NullPointerException(&quot;Null PreferenceListener not allowed&quot;);</span>
+        }
+<span class="fc" id="L545">        ArrayList&lt;PreferenceListener&gt; listenerList = listenerMap.get(pref);</span>
+<span class="pc bpc" id="L546" title="1 of 2 branches missed.">        if (listenerList == null) {</span>
+<span class="fc" id="L547">            listenerList = new ArrayList&lt;PreferenceListener&gt;();</span>
+<span class="fc" id="L548">            listenerMap.put(pref, listenerList);</span>
+        }
+<span class="fc" id="L550">        listenerList.add(listener);</span>
+<span class="fc" id="L551">    }</span>
+
+    /// Remove the listener for the specified preference.
+    ///
+    /// #### Parameters
+    ///
+    /// - `pref`: The preference that the listener listens to
+    ///
+    /// - `listener`: The listener to remove
+    ///
+    /// #### Returns
+    ///
+    /// true if the listener was removed, false if it was not found.
+    public static boolean removePreferenceListener(String pref, PreferenceListener listener) {
+<span class="fc" id="L565">        ArrayList&lt;PreferenceListener&gt; listenerList = listenerMap.get(pref);</span>
+<span class="pc bpc" id="L566" title="1 of 2 branches missed.">        if (listenerList != null) {</span>
+<span class="fc" id="L567">            return listenerList.remove(listener);</span>
+        }
+<span class="nc" id="L569">        return false;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

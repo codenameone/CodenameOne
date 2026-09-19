@@ -1,0 +1,111 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>VisionBackends.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.ai.vision</a> &gt; <span class="el_source">VisionBackends.java</span></div><h1>VisionBackends.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.ai.vision;
+
+/// Vision backend selectors. {@link #auto()} chooses Apple Vision on iOS and
+/// ML Kit on Android. Feature-specific ML Kit methods are separate so one
+/// selector never adds unrelated OCR, barcode, face, pose, labeling, or
+/// segmentation pods.
+///
+/// Each ML Kit selector call is also a build-time dependency marker. The
+/// methods intentionally return the same runtime backend id but must remain
+/// distinct so the builder can include only the selected feature. Pass the
+/// selector that corresponds to the analyzer being constructed; for example,
+/// the face-detection selector cannot satisfy a text recognizer and that
+/// mismatched analyzer reports unsupported.
+public final class VisionBackends {
+<span class="fc" id="L37">    private static final VisionBackend AUTO = new NamedBackend(&quot;auto&quot;);</span>
+<span class="fc" id="L38">    private static final VisionBackend APPLE = new NamedBackend(&quot;apple-vision&quot;);</span>
+<span class="fc" id="L39">    private static final VisionBackend ML_KIT = new NamedBackend(&quot;ml-kit&quot;);</span>
+
+    private VisionBackends() {
+    }
+
+    /// @return the dependency-minimal platform default
+    public static VisionBackend auto() {
+<span class="fc" id="L46">        return AUTO;</span>
+    }
+
+    /// Selects Apple Vision/Core Image without adding a third-party dependency.
+    /// @return Apple-native backend selector
+    public static VisionBackend appleVision() {
+<span class="nc" id="L52">        return APPLE;</span>
+    }
+
+    /// Selects ML Kit for text recognition on iOS. Android already uses ML
+    /// Kit for the automatic backend.
+    ///
+    /// @return the ML Kit backend selector
+    public static VisionBackend mlKitTextRecognition() {
+<span class="nc" id="L60">        return ML_KIT;</span>
+    }
+
+    /// Selects ML Kit for barcode scanning on iOS.
+    /// @return the ML Kit backend selector
+    public static VisionBackend mlKitBarcodeScanning() {
+<span class="fc" id="L66">        return ML_KIT;</span>
+    }
+
+    /// Selects ML Kit for face detection on iOS.
+    /// @return the ML Kit backend selector
+    public static VisionBackend mlKitFaceDetection() {
+<span class="nc" id="L72">        return ML_KIT;</span>
+    }
+
+    /// Selects ML Kit for image labeling on iOS.
+    /// @return the ML Kit backend selector
+    public static VisionBackend mlKitImageLabeling() {
+<span class="nc" id="L78">        return ML_KIT;</span>
+    }
+
+    /// Selects ML Kit for pose detection on iOS.
+    /// @return the ML Kit backend selector
+    public static VisionBackend mlKitPoseDetection() {
+<span class="nc" id="L84">        return ML_KIT;</span>
+    }
+
+    /// Selects ML Kit for selfie segmentation on iOS.
+    /// @return the ML Kit backend selector
+    public static VisionBackend mlKitSelfieSegmentation() {
+<span class="nc" id="L90">        return ML_KIT;</span>
+    }
+
+    private static final class NamedBackend implements VisionBackend {
+        private final String id;
+
+<span class="fc" id="L96">        private NamedBackend(String id) {</span>
+<span class="fc" id="L97">            this.id = id;</span>
+<span class="fc" id="L98">        }</span>
+
+        @Override
+        public String getId() {
+<span class="fc" id="L102">            return id;</span>
+        }
+
+        @Override
+        public String toString() {
+<span class="nc" id="L107">            return id;</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

@@ -1,0 +1,101 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>HeatingCoolingMode.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.home</a> &gt; <span class="el_source">HeatingCoolingMode.java</span></div><h1>HeatingCoolingMode.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.home;
+
+/// What a thermostat is doing, for [Trait#CURRENT_HEATING_COOLING], or what it
+/// has been asked to do, for [Trait#TARGET_HEATING_COOLING].
+<span class="fc" id="L27">public enum HeatingCoolingMode {</span>
+
+    /// Idle.
+<span class="fc" id="L30">    OFF,</span>
+
+    /// Heating.
+<span class="fc" id="L33">    HEAT,</span>
+
+    /// Cooling.
+<span class="fc" id="L36">    COOL,</span>
+
+    /// Maintaining a band between [Trait#TARGET_HEATING_TEMPERATURE] and
+    /// [Trait#TARGET_COOLING_TEMPERATURE], choosing for itself which to run.
+    ///
+    /// A **target** only. [Trait#CURRENT_HEATING_COOLING] never reports it,
+    /// because at any given moment the thermostat is heating, cooling or
+    /// idle -- &quot;auto&quot; describes the policy, not the state.
+    ///
+    /// While this is the target, [Trait#TARGET_TEMPERATURE] reports no value:
+    /// there is no single setpoint to report, and answering with either
+    /// threshold would silently be the wrong one half the time.
+<span class="fc" id="L48">    AUTO,</span>
+
+    /// A mode this API cannot name, carried so it is not misreported as
+    /// something it is not.
+    ///
+    /// Matter's thermostat has `EmergencyHeat`, `Precooling`, `FanOnly`,
+    /// `Dry` and `Sleep`, none of which HomeKit can express and none of which
+    /// have a portable meaning. Folding them into [#OFF] would tell an app a
+    /// running dehumidifier is idle. Read
+    /// [TraitValue#getRawPlatformValue()] for Matter's own ordinal when you
+    /// need to know which.
+    ///
+    /// **Writing this is rejected** with [HomeError#INVALID_ARGUMENT] -- an
+    /// API that cannot name a mode cannot ask for it either.
+<span class="fc" id="L62">    OTHER;</span>
+
+    /// Reads a mode out of a trait value, total: a value that is not an enum,
+    /// or whose ordinal is outside this set, answers [#OFF].
+    ///
+    /// [#OFF] rather than [#OTHER] as the fallback, deliberately: [#OTHER]
+    /// means &quot;the accessory named a mode we cannot express&quot;, which is a claim
+    /// about the accessory. A value this code could not read at all is not
+    /// evidence of that.
+    ///
+    /// #### Parameters
+    ///
+    /// - `value`: a value read from one of the heating-cooling traits, or
+    ///   `null`
+    ///
+    /// #### Returns
+    ///
+    /// the mode, never `null`
+    public static HeatingCoolingMode of(TraitValue value) {
+<span class="pc bpc" id="L81" title="2 of 4 branches missed.">        if (value == null || value.getKind() != TraitValueKind.ENUM) {</span>
+<span class="nc" id="L82">            return OFF;</span>
+        }
+<span class="fc" id="L84">        int ordinal = value.getEnumOrdinal();</span>
+<span class="fc" id="L85">        HeatingCoolingMode[] all = values();</span>
+<span class="pc bpc" id="L86" title="2 of 4 branches missed.">        if (ordinal &lt; 0 || ordinal &gt;= all.length) {</span>
+<span class="nc" id="L87">            return OFF;</span>
+        }
+<span class="fc" id="L89">        return all[ordinal];</span>
+    }
+
+    /// Whether this mode may be written to [Trait#TARGET_HEATING_COOLING].
+    ///
+    /// #### Returns
+    ///
+    /// `true` for everything except [#OTHER]
+    public boolean isWritable() {
+<span class="nc bnc" id="L98" title="All 2 branches missed.">        return this != OTHER;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

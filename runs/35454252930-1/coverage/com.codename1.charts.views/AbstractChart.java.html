@@ -1,0 +1,678 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>AbstractChart.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.charts.views</a> &gt; <span class="el_source">AbstractChart.java</span></div><h1>AbstractChart.java</h1><pre class="source lang-java linenums">/// Copyright (C) 2009 - 2013 SC 4ViewSoft SRL
+///
+/// Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+/// you may not use this file except in compliance with the License.
+/// You may obtain a copy of the License at
+///
+/// http://www.apache.org/licenses/LICENSE-2.0
+///
+/// Unless required by applicable law or agreed to in writing, software
+/// distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+/// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+/// See the License for the specific language governing permissions and
+/// limitations under the License.
+package com.codename1.charts.views;
+
+import com.codename1.charts.compat.Canvas;
+import com.codename1.charts.compat.Paint;
+import com.codename1.charts.compat.Paint.Style;
+import com.codename1.charts.models.Point;
+import com.codename1.charts.models.SeriesSelection;
+import com.codename1.charts.renderers.DefaultRenderer;
+import com.codename1.charts.renderers.SimpleSeriesRenderer;
+import com.codename1.charts.renderers.XYMultipleSeriesRenderer;
+import com.codename1.charts.renderers.XYMultipleSeriesRenderer.Orientation;
+import com.codename1.charts.util.ColorUtil;
+import com.codename1.charts.util.MathHelper;
+import com.codename1.charts.util.NumberFormat;
+import com.codename1.ui.Component;
+import com.codename1.ui.geom.GeneralPath;
+import com.codename1.ui.geom.Rectangle2D;
+import com.codename1.ui.plaf.UIManager;
+
+import java.util.List;
+
+
+/// An abstract class to be implemented by the chart rendering classes.
+<span class="fc" id="L37">public abstract class AbstractChart {</span>
+<span class="fc" id="L38">    private static final char[] stopCharCandidates = &quot;!@#$%^&amp;*()?&gt;&lt;,./+-qwertyuiop[zxcvbnm,./\\|}{&quot;.toCharArray();</span>
+
+    protected static float[] calculateDrawPoints(float p1x, float p1y, float p2x, float p2y,
+                                                 int screenHeight, int screenWidth) {
+        float drawP1x;
+        float drawP1y;
+        float drawP2x;
+        float drawP2y;
+
+<span class="pc bpc" id="L47" title="1 of 2 branches missed.">        if (p1y &gt; screenHeight) {</span>
+            // Intersection with the top of the screen
+<span class="nc" id="L49">            float m = (p2y - p1y) / (p2x - p1x);</span>
+<span class="nc" id="L50">            drawP1x = (screenHeight - p1y + m * p1x) / m;</span>
+<span class="nc" id="L51">            drawP1y = screenHeight;</span>
+
+<span class="nc bnc" id="L53" title="All 2 branches missed.">            if (drawP1x &lt; 0) {</span>
+                // If Intersection is left of the screen we calculate the intersection
+                // with the left border
+<span class="nc" id="L56">                drawP1x = 0;</span>
+<span class="nc" id="L57">                drawP1y = p1y - m * p1x;</span>
+<span class="nc bnc" id="L58" title="All 2 branches missed.">            } else if (drawP1x &gt; screenWidth) {</span>
+                // If Intersection is right of the screen we calculate the intersection
+                // with the right border
+<span class="nc" id="L61">                drawP1x = screenWidth;</span>
+<span class="nc" id="L62">                drawP1y = m * screenWidth + p1y - m * p1x;</span>
+            }
+<span class="pc bpc" id="L64" title="1 of 2 branches missed.">        } else if (p1y &lt; 0) {</span>
+<span class="nc" id="L65">            float m = (p2y - p1y) / (p2x - p1x);</span>
+<span class="nc" id="L66">            drawP1x = (-p1y + m * p1x) / m;</span>
+<span class="nc" id="L67">            drawP1y = 0;</span>
+<span class="nc bnc" id="L68" title="All 2 branches missed.">            if (drawP1x &lt; 0) {</span>
+<span class="nc" id="L69">                drawP1x = 0;</span>
+<span class="nc" id="L70">                drawP1y = p1y - m * p1x;</span>
+<span class="nc bnc" id="L71" title="All 2 branches missed.">            } else if (drawP1x &gt; screenWidth) {</span>
+<span class="nc" id="L72">                drawP1x = screenWidth;</span>
+<span class="nc" id="L73">                drawP1y = m * screenWidth + p1y - m * p1x;</span>
+            }
+<span class="nc" id="L75">        } else {</span>
+            // If the point is in the screen use it
+<span class="fc" id="L77">            drawP1x = p1x;</span>
+<span class="fc" id="L78">            drawP1y = p1y;</span>
+        }
+
+<span class="pc bpc" id="L81" title="1 of 2 branches missed.">        if (p2y &gt; screenHeight) {</span>
+<span class="nc" id="L82">            float m = (p2y - p1y) / (p2x - p1x);</span>
+<span class="nc" id="L83">            drawP2x = (screenHeight - p1y + m * p1x) / m;</span>
+<span class="nc" id="L84">            drawP2y = screenHeight;</span>
+<span class="nc bnc" id="L85" title="All 2 branches missed.">            if (drawP2x &lt; 0) {</span>
+<span class="nc" id="L86">                drawP2x = 0;</span>
+<span class="nc" id="L87">                drawP2y = p1y - m * p1x;</span>
+<span class="nc bnc" id="L88" title="All 2 branches missed.">            } else if (drawP2x &gt; screenWidth) {</span>
+<span class="nc" id="L89">                drawP2x = screenWidth;</span>
+<span class="nc" id="L90">                drawP2y = m * screenWidth + p1y - m * p1x;</span>
+            }
+<span class="pc bpc" id="L92" title="1 of 2 branches missed.">        } else if (p2y &lt; 0) {</span>
+<span class="nc" id="L93">            float m = (p2y - p1y) / (p2x - p1x);</span>
+<span class="nc" id="L94">            drawP2x = (-p1y + m * p1x) / m;</span>
+<span class="nc" id="L95">            drawP2y = 0;</span>
+<span class="nc bnc" id="L96" title="All 2 branches missed.">            if (drawP2x &lt; 0) {</span>
+<span class="nc" id="L97">                drawP2x = 0;</span>
+<span class="nc" id="L98">                drawP2y = p1y - m * p1x;</span>
+<span class="nc bnc" id="L99" title="All 2 branches missed.">            } else if (drawP2x &gt; screenWidth) {</span>
+<span class="nc" id="L100">                drawP2x = screenWidth;</span>
+<span class="nc" id="L101">                drawP2y = m * screenWidth + p1y - m * p1x;</span>
+            }
+<span class="nc" id="L103">        } else {</span>
+            // If the point is in the screen use it
+<span class="fc" id="L105">            drawP2x = p2x;</span>
+<span class="fc" id="L106">            drawP2y = p2y;</span>
+        }
+
+<span class="fc" id="L109">        return new float[]{drawP1x, drawP1y, drawP2x, drawP2y};</span>
+    }
+
+    private static String[] split(String input, String sep) {
+<span class="pc bpc" id="L113" title="1 of 2 branches missed.">        if (sep.length() &gt; 1) {</span>
+<span class="nc" id="L114">            int clen = stopCharCandidates.length;</span>
+<span class="nc bnc" id="L115" title="All 2 branches missed.">            for (int i = 0; i &lt; clen; i++) {</span>
+<span class="nc bnc" id="L116" title="All 2 branches missed.">                if (input.indexOf(stopCharCandidates[i]) == -1) {</span>
+<span class="nc" id="L117">                    input = com.codename1.util.StringUtil.replaceAll(input, sep, String.valueOf(stopCharCandidates[i]));</span>
+<span class="nc" id="L118">                    sep = String.valueOf(stopCharCandidates[i]);</span>
+                }
+            }
+        }
+<span class="pc bpc" id="L122" title="1 of 2 branches missed.">        if (sep.length() &gt; 1) {</span>
+<span class="nc" id="L123">            throw new RuntimeException(&quot;Failed to find appropriate stop character&quot;);</span>
+        }
+<span class="fc" id="L125">        List&lt;String&gt; parts = com.codename1.util.StringUtil.tokenize(input, sep);</span>
+<span class="fc" id="L126">        String[] out = new String[parts.size()];</span>
+<span class="fc" id="L127">        return parts.toArray(out);</span>
+    }
+
+    /// The graphical representation of the chart.
+    ///
+    /// #### Parameters
+    ///
+    /// - `canvas`: the canvas to paint to
+    ///
+    /// - `x`: the top left x value of the view to draw to
+    ///
+    /// - `y`: the top left y value of the view to draw to
+    ///
+    /// - `width`: the width of the view to draw to
+    ///
+    /// - `height`: the height of the view to draw to
+    ///
+    /// - `paint`: the paint
+    public abstract void draw(Canvas canvas, int x, int y, int width, int height, Paint paint);
+
+    /// Draws the chart background.
+    ///
+    /// #### Parameters
+    ///
+    /// - `renderer`: the chart renderer
+    ///
+    /// - `canvas`: the canvas to paint to
+    ///
+    /// - `x`: the top left x value of the view to draw to
+    ///
+    /// - `y`: the top left y value of the view to draw to
+    ///
+    /// - `width`: the width of the view to draw to
+    ///
+    /// - `height`: the height of the view to draw to
+    ///
+    /// - `paint`: the paint used for drawing
+    ///
+    /// - `newColor`: if a new color is to be used
+    ///
+    /// - `color`: the color to be used
+    protected void drawBackground(DefaultRenderer renderer, Canvas canvas, int x, int y, int width,
+                                  int height, Paint paint, boolean newColor, int color) {
+<span class="pc bpc" id="L170" title="1 of 4 branches missed.">        if (renderer.isApplyBackgroundColor() || newColor) {</span>
+<span class="pc bpc" id="L171" title="1 of 2 branches missed.">            if (newColor) {</span>
+<span class="fc" id="L172">                paint.setColor(color);</span>
+            } else {
+<span class="nc" id="L174">                paint.setColor(renderer.getBackgroundColor());</span>
+            }
+<span class="fc" id="L176">            paint.setStyle(Style.FILL);</span>
+<span class="fc" id="L177">            canvas.drawRect(x, y, x + width, y + height, paint);</span>
+        }
+<span class="fc" id="L179">    }</span>
+
+    /// Draws the chart legend.
+    ///
+    /// #### Parameters
+    ///
+    /// - `canvas`: the canvas to paint to
+    ///
+    /// - `renderer`: the series renderer
+    ///
+    /// - `titles`: the titles to go to the legend
+    ///
+    /// - `left`: the left X value of the area to draw to
+    ///
+    /// - `right`: the right X value of the area to draw to
+    ///
+    /// - `y`: the y value of the area to draw to
+    ///
+    /// - `width`: the width of the area to draw to
+    ///
+    /// - `height`: the height of the area to draw to
+    ///
+    /// - `legendSize`: the legend size
+    ///
+    /// - `paint`: the paint to be used for drawing
+    ///
+    /// - `calculate`: if only calculating the legend size
+    ///
+    /// #### Returns
+    ///
+    /// the legend height
+    protected int drawLegend(Canvas canvas, DefaultRenderer renderer, String[] titles, int left,
+                             int right, int y, int width, int height, int legendSize, Paint paint, boolean calculate) {
+<span class="fc" id="L212">        float size = 32;</span>
+<span class="pc bpc" id="L213" title="1 of 2 branches missed.">        if (renderer.isShowLegend()) {</span>
+<span class="fc" id="L214">            float currentX = left;</span>
+<span class="fc" id="L215">            float currentY = y + height - legendSize + size;</span>
+<span class="fc" id="L216">            paint.setTextAlign(Component.LEFT);</span>
+<span class="fc" id="L217">            paint.setTextSize(renderer.getLegendTextSize());</span>
+<span class="fc" id="L218">            int sLength = Math.min(titles.length, renderer.getSeriesRendererCount());</span>
+<span class="fc bfc" id="L219" title="All 2 branches covered.">            for (int i = 0; i &lt; sLength; i++) {</span>
+<span class="fc" id="L220">                SimpleSeriesRenderer r = renderer.getSeriesRendererAt(i);</span>
+<span class="fc" id="L221">                final float lineSize = getLegendShapeWidth(i);</span>
+<span class="pc bpc" id="L222" title="1 of 2 branches missed.">                if (r.isShowLegendItem()) {</span>
+<span class="fc" id="L223">                    String text = titles[i];</span>
+<span class="pc bpc" id="L224" title="1 of 2 branches missed.">                    if (titles.length == renderer.getSeriesRendererCount()) {</span>
+<span class="fc" id="L225">                        paint.setColor(r.getColor());</span>
+                    } else {
+<span class="nc" id="L227">                        paint.setColor(ColorUtil.LTGRAY);</span>
+                    }
+<span class="fc" id="L229">                    float[] widths = new float[text.length()];</span>
+<span class="fc" id="L230">                    paint.getTextWidths(text, widths);</span>
+<span class="fc" id="L231">                    float sum = 0;</span>
+<span class="fc bfc" id="L232" title="All 2 branches covered.">                    for (float value : widths) {</span>
+<span class="fc" id="L233">                        sum += value;</span>
+                    }
+<span class="fc" id="L235">                    float extraSize = lineSize + 10 + sum;</span>
+<span class="fc" id="L236">                    float currentWidth = currentX + extraSize;</span>
+
+<span class="fc bfc" id="L238" title="All 4 branches covered.">                    if (i &gt; 0 &amp;&amp; getExceed(currentWidth, renderer, right, width)) {</span>
+<span class="fc" id="L239">                        currentX = left;</span>
+<span class="fc" id="L240">                        currentY += renderer.getLegendTextSize();</span>
+<span class="fc" id="L241">                        size += renderer.getLegendTextSize();</span>
+<span class="fc" id="L242">                        currentWidth = currentX + extraSize;</span>
+                    }
+<span class="fc bfc" id="L244" title="All 2 branches covered.">                    if (getExceed(currentWidth, renderer, right, width)) {</span>
+<span class="fc" id="L245">                        float maxWidth = right - currentX - lineSize - 10;</span>
+<span class="pc bpc" id="L246" title="1 of 2 branches missed.">                        if (isVertical(renderer)) {</span>
+<span class="nc" id="L247">                            maxWidth = width - currentX - lineSize - 10;</span>
+                        }
+<span class="fc" id="L249">                        int nr = paint.breakText(text, true, maxWidth, widths);</span>
+<span class="fc" id="L250">                        text = text.substring(0, nr) + &quot;...&quot;;</span>
+                    }
+<span class="pc bpc" id="L252" title="1 of 2 branches missed.">                    if (!calculate) {</span>
+<span class="fc" id="L253">                        drawLegendShape(canvas, r, currentX, currentY, i, paint);</span>
+<span class="fc" id="L254">                        drawString(canvas, text, currentX + lineSize + 5, currentY + 5, paint);</span>
+                    }
+<span class="fc" id="L256">                    currentX += extraSize;</span>
+                }
+            }
+        }
+<span class="fc" id="L260">        return Math.round(size + renderer.getLegendTextSize());</span>
+    }
+
+    /// Draw a multiple lines string.
+    ///
+    /// #### Parameters
+    ///
+    /// - `canvas`: the canvas to paint to
+    ///
+    /// - `text`: the text to be painted
+    ///
+    /// - `x`: the x value of the area to draw to
+    ///
+    /// - `y`: the y value of the area to draw to
+    ///
+    /// - `paint`: the paint to be used for drawing
+    protected void drawString(Canvas canvas, String text, float x, float y, Paint paint) {
+<span class="pc bpc" id="L277" title="1 of 2 branches missed.">        if (text != null) {</span>
+<span class="fc" id="L278">            String[] lines = split(text, &quot;\n&quot;);</span>
+<span class="fc" id="L279">            Rectangle2D rect = new Rectangle2D();</span>
+<span class="fc" id="L280">            int yOff = 0;</span>
+<span class="fc" id="L281">            int llen = lines.length;</span>
+<span class="fc bfc" id="L282" title="All 2 branches covered.">            for (int i = 0; i &lt; llen; ++i) {</span>
+<span class="fc" id="L283">                canvas.drawText(lines[i], x, y + yOff, paint);</span>
+<span class="fc" id="L284">                paint.getTextBounds(lines[i], 0, lines[i].length(), rect);</span>
+<span class="fc" id="L285">                yOff = yOff + (int) rect.getHeight() + 5; // space between lines is 5</span>
+            }
+        }
+<span class="fc" id="L288">    }</span>
+
+    /// Calculates if the current width exceeds the total width.
+    ///
+    /// #### Parameters
+    ///
+    /// - `currentWidth`: the current width
+    ///
+    /// - `renderer`: the renderer
+    ///
+    /// - `right`: the right side pixel value
+    ///
+    /// - `width`: the total width
+    ///
+    /// #### Returns
+    ///
+    /// if the current width exceeds the total width
+    protected boolean getExceed(float currentWidth, DefaultRenderer renderer, int right, int width) {
+<span class="fc bfc" id="L306" title="All 2 branches covered.">        boolean exceed = currentWidth &gt; right;</span>
+<span class="pc bpc" id="L307" title="1 of 2 branches missed.">        if (isVertical(renderer)) {</span>
+<span class="nc bnc" id="L308" title="All 2 branches missed.">            exceed = currentWidth &gt; width;</span>
+        }
+<span class="fc" id="L310">        return exceed;</span>
+    }
+
+    /// Checks if the current chart is rendered as vertical.
+    ///
+    /// #### Parameters
+    ///
+    /// - `renderer`: the renderer
+    ///
+    /// #### Returns
+    ///
+    /// if the chart is rendered as a vertical one
+    public boolean isVertical(DefaultRenderer renderer) {
+<span class="fc bfc" id="L323" title="All 2 branches covered.">        return renderer instanceof XYMultipleSeriesRenderer</span>
+<span class="pc bpc" id="L324" title="1 of 2 branches missed.">                &amp;&amp; ((XYMultipleSeriesRenderer) renderer).getOrientation() == Orientation.VERTICAL;</span>
+    }
+
+    /// Makes sure the fraction digit is not displayed, if not needed.
+    ///
+    /// #### Parameters
+    ///
+    /// - `format`: the number format for the label
+    ///
+    /// - `label`: the input label value
+    ///
+    /// #### Returns
+    ///
+    /// the label without the useless fraction digit
+    protected String getLabel(NumberFormat format, double label) {
+<span class="fc" id="L339">        String text = &quot;&quot;;</span>
+<span class="fc bfc" id="L340" title="All 2 branches covered.">        if (format != null) {</span>
+<span class="fc" id="L341">            text = format.format(label);</span>
+<span class="fc bfc" id="L342" title="All 2 branches covered.">        } else if (label == Math.round(label)) {</span>
+<span class="fc" id="L343">            text = Math.round(label) + &quot;&quot;;</span>
+        } else {
+<span class="fc" id="L345">            text = label + &quot;&quot;;</span>
+        }
+<span class="fc" id="L347">        return text;</span>
+    }
+
+    /// The graphical representation of a path.
+    ///
+    /// #### Parameters
+    ///
+    /// - `canvas`: the canvas to paint to
+    ///
+    /// - `points`: the points that are contained in the path to paint
+    ///
+    /// - `paint`: the paint to be used for painting
+    ///
+    /// - `circular`: if the path ends with the start point
+    protected void drawPath(Canvas canvas, List&lt;Float&gt; points, Paint paint, boolean circular) {
+<span class="fc" id="L362">        GeneralPath path = new GeneralPath();</span>
+<span class="fc" id="L363">        int height = canvas.getHeight();</span>
+<span class="fc" id="L364">        int width = canvas.getWidth();</span>
+
+        float[] tempDrawPoints;
+<span class="pc bpc" id="L367" title="1 of 2 branches missed.">        if (points.size() &lt; 4) {</span>
+<span class="nc" id="L368">            return;</span>
+        }
+<span class="fc" id="L370">        tempDrawPoints = calculateDrawPoints(points.get(0), points.get(1), points.get(2),</span>
+<span class="fc" id="L371">                points.get(3), height, width);</span>
+<span class="fc" id="L372">        path.moveTo(tempDrawPoints[0], tempDrawPoints[1]);</span>
+<span class="fc" id="L373">        path.lineTo(tempDrawPoints[2], tempDrawPoints[3]);</span>
+
+        // Track the running endpoint of the open subpath so we can emit a
+        // moveTo only when the data actually skips a segment (an off-screen
+        // point was filtered out via `continue`). The original loop emitted
+        // `path.moveTo(tempDrawPoints[0..1])` before EVERY lineTo, which
+        // produces N disjoint single-segment subpaths for an N-point line.
+        // The iOS GL+Metal form-Graphics drawShape -&gt; TextureAlphaMask path
+        // crashes the on-screen frame buffer when fed a multi-subpath stroke
+        // covering most of the form (the chart fills BorderLayout.CENTER) --
+        // every other port (Skia / JavaFX / mutable-image NativeGraphics)
+        // happily collapses the redundant moveTos but iOS form-Graphics
+        // ends up with the entire frame dropped (form title bar disappears
+        // along with the chart). Emit moveTo only when the previous segment
+        // was skipped or the next segment doesn't continue from the running
+        // endpoint, so an unfiltered line series renders as a single
+        // continuous polyline -- byte-equivalent to the historical output on
+        // every port that handled the multi-subpath form, and the form
+        // actually paints on iOS.
+<span class="fc" id="L392">        float lastEndX = tempDrawPoints[2];</span>
+<span class="fc" id="L393">        float lastEndY = tempDrawPoints[3];</span>
+<span class="fc" id="L394">        boolean haveOpenSubpath = true;</span>
+
+<span class="fc" id="L396">        int length = points.size();</span>
+<span class="pc bpc" id="L397" title="1 of 2 branches missed.">        for (int i = 4; i &lt; length; i += 2) {</span>
+<span class="nc bnc" id="L398" title="All 4 branches missed.">            if ((points.get(i - 1) &lt; 0 &amp;&amp; points.get(i + 1) &lt; 0)</span>
+<span class="nc bnc" id="L399" title="All 4 branches missed.">                    || (points.get(i - 1) &gt; height &amp;&amp; points.get(i + 1) &gt; height)) {</span>
+<span class="nc" id="L400">                haveOpenSubpath = false;</span>
+<span class="nc" id="L401">                continue;</span>
+            }
+<span class="nc" id="L403">            tempDrawPoints = calculateDrawPoints(points.get(i - 2), points.get(i - 1), points.get(i),</span>
+<span class="nc" id="L404">                    points.get(i + 1), height, width);</span>
+<span class="nc bnc" id="L405" title="All 2 branches missed.">            if (!circular) {</span>
+<span class="nc bnc" id="L406" title="All 6 branches missed.">                if (!haveOpenSubpath</span>
+                        || tempDrawPoints[0] != lastEndX
+                        || tempDrawPoints[1] != lastEndY) {
+<span class="nc" id="L409">                    path.moveTo(tempDrawPoints[0], tempDrawPoints[1]);</span>
+                }
+            }
+<span class="nc" id="L412">            path.lineTo(tempDrawPoints[2], tempDrawPoints[3]);</span>
+<span class="nc" id="L413">            lastEndX = tempDrawPoints[2];</span>
+<span class="nc" id="L414">            lastEndY = tempDrawPoints[3];</span>
+<span class="nc" id="L415">            haveOpenSubpath = true;</span>
+        }
+<span class="pc bpc" id="L417" title="1 of 2 branches missed.">        if (circular) {</span>
+<span class="nc" id="L418">            path.lineTo(points.get(0), points.get(1));</span>
+        }
+<span class="fc" id="L420">        canvas.drawPath(path, paint);</span>
+<span class="fc" id="L421">    }</span>
+
+    /// The graphical representation of a path.
+    ///
+    /// #### Parameters
+    ///
+    /// - `canvas`: the canvas to paint to
+    ///
+    /// - `points`: the points that are contained in the path to paint
+    ///
+    /// - `paint`: the paint to be used for painting
+    ///
+    /// - `circular`: if the path ends with the start point
+    protected void drawPath(Canvas canvas, float[] points, Paint paint, boolean circular) {
+<span class="nc" id="L435">        GeneralPath path = new GeneralPath();</span>
+<span class="nc" id="L436">        int height = canvas.getHeight();</span>
+<span class="nc" id="L437">        int width = canvas.getWidth();</span>
+
+        float[] tempDrawPoints;
+<span class="nc bnc" id="L440" title="All 2 branches missed.">        if (points.length &lt; 4) {</span>
+<span class="nc" id="L441">            return;</span>
+        }
+<span class="nc" id="L443">        tempDrawPoints = calculateDrawPoints(points[0], points[1], points[2], points[3], height, width);</span>
+<span class="nc" id="L444">        path.moveTo(tempDrawPoints[0], tempDrawPoints[1]);</span>
+<span class="nc" id="L445">        path.lineTo(tempDrawPoints[2], tempDrawPoints[3]);</span>
+
+        // See the List&lt;Float&gt; overload above for the rationale: collapse
+        // redundant moveTos so an unfiltered line series renders as a
+        // single continuous polyline rather than N disjoint single-segment
+        // subpaths. iOS form-Graphics drawShape -&gt; TextureAlphaMask drops
+        // the entire frame when fed the multi-subpath form.
+<span class="nc" id="L452">        float lastEndX = tempDrawPoints[2];</span>
+<span class="nc" id="L453">        float lastEndY = tempDrawPoints[3];</span>
+<span class="nc" id="L454">        boolean haveOpenSubpath = true;</span>
+
+<span class="nc" id="L456">        int length = points.length;</span>
+<span class="nc bnc" id="L457" title="All 2 branches missed.">        for (int i = 4; i &lt; length; i += 2) {</span>
+<span class="nc bnc" id="L458" title="All 8 branches missed.">            if ((points[i - 1] &lt; 0 &amp;&amp; points[i + 1] &lt; 0)</span>
+                    || (points[i - 1] &gt; height &amp;&amp; points[i + 1] &gt; height)) {
+<span class="nc" id="L460">                haveOpenSubpath = false;</span>
+<span class="nc" id="L461">                continue;</span>
+            }
+<span class="nc" id="L463">            tempDrawPoints = calculateDrawPoints(points[i - 2], points[i - 1], points[i], points[i + 1],</span>
+                    height, width);
+<span class="nc bnc" id="L465" title="All 2 branches missed.">            if (!circular) {</span>
+<span class="nc bnc" id="L466" title="All 6 branches missed.">                if (!haveOpenSubpath</span>
+                        || tempDrawPoints[0] != lastEndX
+                        || tempDrawPoints[1] != lastEndY) {
+<span class="nc" id="L469">                    path.moveTo(tempDrawPoints[0], tempDrawPoints[1]);</span>
+                }
+            }
+<span class="nc" id="L472">            path.lineTo(tempDrawPoints[2], tempDrawPoints[3]);</span>
+<span class="nc" id="L473">            lastEndX = tempDrawPoints[2];</span>
+<span class="nc" id="L474">            lastEndY = tempDrawPoints[3];</span>
+<span class="nc" id="L475">            haveOpenSubpath = true;</span>
+        }
+<span class="nc bnc" id="L477" title="All 2 branches missed.">        if (circular) {</span>
+<span class="nc" id="L478">            path.lineTo(points[0], points[1]);</span>
+        }
+<span class="nc" id="L480">        canvas.drawPath(path, paint);</span>
+<span class="nc" id="L481">    }</span>
+
+    /// Returns the legend shape width.
+    ///
+    /// #### Parameters
+    ///
+    /// - `seriesIndex`: the series index
+    ///
+    /// #### Returns
+    ///
+    /// the legend shape width
+    public abstract int getLegendShapeWidth(int seriesIndex);
+
+    /// The graphical representation of the legend shape.
+    ///
+    /// #### Parameters
+    ///
+    /// - `canvas`: the canvas to paint to
+    ///
+    /// - `renderer`: the series renderer
+    ///
+    /// - `x`: the x value of the point the shape should be drawn at
+    ///
+    /// - `y`: the y value of the point the shape should be drawn at
+    ///
+    /// - `seriesIndex`: the series index
+    ///
+    /// - `paint`: the paint to be used for drawing
+    public abstract void drawLegendShape(Canvas canvas, SimpleSeriesRenderer renderer, float x,
+                                         float y, int seriesIndex, Paint paint);
+
+    /// Calculates the best text to fit into the available space.
+    ///
+    /// #### Parameters
+    ///
+    /// - `text`: the entire text
+    ///
+    /// - `width`: the width to fit the text into
+    ///
+    /// - `paint`: the paint
+    ///
+    /// #### Returns
+    ///
+    /// the text to fit into the space
+    private String getFitText(String text, float width, Paint paint) {
+<span class="pc bpc" id="L526" title="1 of 2 branches missed.">        if (UIManager.getInstance().getLookAndFeel().isDefaultEndsWith3Points()) {</span>
+<span class="nc" id="L527">            String newText = text;</span>
+<span class="nc" id="L528">            int length = text.length();</span>
+<span class="nc" id="L529">            int diff = 0;</span>
+<span class="nc bnc" id="L530" title="All 4 branches missed.">            while (paint.measureText(newText) &gt; width &amp;&amp; diff &lt; length) {</span>
+<span class="nc" id="L531">                diff++;</span>
+<span class="nc" id="L532">                newText = text.substring(0, length - diff) + &quot;...&quot;;</span>
+            }
+<span class="nc bnc" id="L534" title="All 2 branches missed.">            if (diff == length) {</span>
+<span class="nc" id="L535">                newText = &quot;...&quot;;</span>
+            }
+<span class="nc" id="L537">            return newText;</span>
+        }
+<span class="fc" id="L539">        return text;</span>
+    }
+
+    /// Calculates the current legend size.
+    ///
+    /// #### Parameters
+    ///
+    /// - `renderer`: the renderer
+    ///
+    /// - `defaultHeight`: the default height
+    ///
+    /// - `extraHeight`: the added extra height
+    ///
+    /// #### Returns
+    ///
+    /// the legend size
+    protected int getLegendSize(DefaultRenderer renderer, int defaultHeight, float extraHeight) {
+<span class="fc" id="L556">        int legendSize = renderer.getLegendHeight();</span>
+<span class="pc bpc" id="L557" title="2 of 4 branches missed.">        if (renderer.isShowLegend() &amp;&amp; legendSize == 0) {</span>
+<span class="fc" id="L558">            legendSize = defaultHeight;</span>
+        }
+<span class="pc bpc" id="L560" title="3 of 4 branches missed.">        if (!renderer.isShowLegend() &amp;&amp; renderer.isShowLabels()) {</span>
+<span class="nc" id="L561">            legendSize = (int) (renderer.getLabelsTextSize() * 4 / 3 + extraHeight);</span>
+        }
+<span class="fc" id="L563">        return legendSize;</span>
+    }
+
+    /// Draws a text label.
+    ///
+    /// #### Parameters
+    ///
+    /// - `canvas`: the canvas
+    ///
+    /// - `labelText`: the label text
+    ///
+    /// - `renderer`: the renderer
+    ///
+    /// - `prevLabelsBounds`: the previous rendered label bounds
+    ///
+    /// - `centerX`: the round chart center on X axis
+    ///
+    /// - `centerY`: the round chart center on Y axis
+    ///
+    /// - `shortRadius`: the short radius for the round chart
+    ///
+    /// - `longRadius`: the long radius for the round chart
+    ///
+    /// - `currentAngle`: the current angle
+    ///
+    /// - `angle`: the label extra angle
+    ///
+    /// - `left`: the left side
+    ///
+    /// - `right`: the right side
+    ///
+    /// - `color`: the label color
+    ///
+    /// - `paint`: the paint
+    ///
+    /// - `line`: if a line to the label should be drawn
+    ///
+    /// - `display`: display the label anyway
+    protected void drawLabel(Canvas canvas, String labelText, DefaultRenderer renderer,
+                             List&lt;Rectangle2D&gt; prevLabelsBounds, int centerX, int centerY, float shortRadius, float longRadius,
+                             float currentAngle, float angle, int left, int right, int color, Paint paint, boolean line,
+                             boolean display) {
+<span class="pc bpc" id="L605" title="3 of 4 branches missed.">        if (renderer.isShowLabels() || display) {</span>
+<span class="fc" id="L606">            paint.setColor(color);</span>
+<span class="fc" id="L607">            double rAngle = Math.toRadians(90 - (currentAngle + angle / 2));</span>
+<span class="fc" id="L608">            double sinValue = Math.sin(rAngle);</span>
+<span class="fc" id="L609">            double cosValue = Math.cos(rAngle);</span>
+<span class="fc" id="L610">            int x1 = Math.round(centerX + (float) (shortRadius * sinValue));</span>
+<span class="fc" id="L611">            int y1 = Math.round(centerY + (float) (shortRadius * cosValue));</span>
+<span class="fc" id="L612">            int x2 = Math.round(centerX + (float) (longRadius * sinValue));</span>
+<span class="fc" id="L613">            int y2 = Math.round(centerY + (float) (longRadius * cosValue));</span>
+
+<span class="fc" id="L615">            float size = renderer.getLabelsTextSize();</span>
+<span class="fc" id="L616">            float extra = Math.max(size / 2, 10);</span>
+<span class="fc" id="L617">            paint.setTextAlign(Component.LEFT);</span>
+<span class="fc bfc" id="L618" title="All 2 branches covered.">            if (x1 &gt; x2) {</span>
+<span class="fc" id="L619">                extra = -extra;</span>
+<span class="fc" id="L620">                paint.setTextAlign(Component.RIGHT);</span>
+            }
+<span class="fc" id="L622">            float xLabel = x2 + extra;</span>
+<span class="fc" id="L623">            float yLabel = y2;</span>
+<span class="fc" id="L624">            float width = right - xLabel;</span>
+<span class="fc bfc" id="L625" title="All 2 branches covered.">            if (x1 &gt; x2) {</span>
+<span class="fc" id="L626">                width = xLabel - left;</span>
+            }
+<span class="fc" id="L628">            labelText = getFitText(labelText, width, paint);</span>
+<span class="fc" id="L629">            float widthLabel = paint.measureText(labelText);</span>
+<span class="fc" id="L630">            boolean okBounds = false;</span>
+<span class="pc bpc" id="L631" title="1 of 4 branches missed.">            while (!okBounds &amp;&amp; line) {</span>
+<span class="fc" id="L632">                boolean intersects = false;</span>
+<span class="fc" id="L633">                int length = prevLabelsBounds.size();</span>
+<span class="pc bpc" id="L634" title="1 of 4 branches missed.">                for (int j = 0; j &lt; length &amp;&amp; !intersects; j++) {</span>
+<span class="fc" id="L635">                    Rectangle2D prevLabelBounds = prevLabelsBounds.get(j);</span>
+<span class="pc bpc" id="L636" title="1 of 2 branches missed.">                    if (prevLabelBounds.intersects(xLabel, yLabel, widthLabel, size)) {</span>
+<span class="nc" id="L637">                        intersects = true;</span>
+<span class="nc" id="L638">                        yLabel = (float) Math.max(yLabel, prevLabelBounds.getY() + prevLabelBounds.getHeight());</span>
+                    }
+                }
+
+<span class="pc bpc" id="L642" title="1 of 2 branches missed.">                okBounds = !intersects;</span>
+<span class="fc" id="L643">            }</span>
+
+<span class="pc bpc" id="L645" title="1 of 2 branches missed.">            if (line) {</span>
+<span class="fc" id="L646">                y2 = (int) (yLabel - size / 2);</span>
+<span class="fc" id="L647">                canvas.drawLine(x1, y1, x2, y2, paint);</span>
+<span class="fc" id="L648">                canvas.drawLine(x2, y2, x2 + extra, y2, paint);</span>
+            } else {
+<span class="nc" id="L650">                paint.setTextAlign(Component.CENTER);</span>
+            }
+<span class="fc" id="L652">            canvas.drawText(labelText, xLabel, yLabel, paint);</span>
+<span class="pc bpc" id="L653" title="1 of 2 branches missed.">            if (line) {</span>
+<span class="fc" id="L654">                prevLabelsBounds.add(PkgUtils.makeRect(xLabel, yLabel, xLabel + widthLabel, yLabel + size));</span>
+            }
+        }
+<span class="fc" id="L657">    }</span>
+
+    public boolean isNullValue(double value) {
+<span class="pc bpc" id="L660" title="3 of 6 branches missed.">        return Double.isNaN(value) || Double.isInfinite(value) || value == MathHelper.NULL_VALUE;</span>
+    }
+
+    /// Given screen coordinates, returns the series and point indexes of a chart
+    /// element. If there is no chart element (line, point, bar, etc) at those
+    /// coordinates, null is returned.
+    ///
+    /// #### Parameters
+    ///
+    /// - `screenPoint`
+    ///
+    /// #### Returns
+    ///
+    /// the series and point indexes
+    public SeriesSelection getSeriesAndPointForScreenCoordinate(Point screenPoint) {
+<span class="nc" id="L675">        return null;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

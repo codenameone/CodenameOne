@@ -1,0 +1,118 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>SleepStageInterval.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.health</a> &gt; <span class="el_source">SleepStageInterval.java</span></div><h1>SleepStageInterval.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.health;
+
+/// A contiguous span of one [SleepStage] inside a [SleepSample].
+public final class SleepStageInterval {
+
+    private final SleepStage stage;
+    private final long startMillis;
+    private final long endMillis;
+
+    /// A copy of `other`, carrying its platform code.
+    ///
+    /// Exists because the platform code is mutable, which is what made the
+    /// shallow list copies visible: [SleepSample#create] and
+    /// `HealthWire.copyOf` copied the list and kept the elements, so a caller
+    /// holding an interval it had written -- or one handed back by a read --
+    /// could change a stored record by setting a code on it, with no write
+    /// and no persistence. The list being unmodifiable stopped the shape of
+    /// the session changing and not the contents of its parts.
+    public SleepStageInterval(SleepStageInterval other) {
+<span class="fc" id="L42">        this(other.getStage(), other.getStartMillis(), other.getEndMillis());</span>
+<span class="fc" id="L43">        this.platformCode = other.getPlatformCode();</span>
+<span class="fc" id="L44">    }</span>
+
+    /// The platform's own value for this span, or [#NO_PLATFORM_CODE].
+    ///
+    /// The fidelity escape hatch. A portable [SleepStage] is a
+    /// lowest-common-denominator of two vendors' vocabularies, and an app
+    /// that needs exactly what HealthKit or Health Connect said -- to match
+    /// another tool, or to handle a value this build predates -- would
+    /// otherwise have to give up the portable API entirely to get it.
+<span class="fc" id="L53">    private int platformCode = NO_PLATFORM_CODE;</span>
+
+    /// Returned by [#getPlatformCode()] when the port did not record one.
+    public static final int NO_PLATFORM_CODE = -1;
+
+    /// The raw platform value, or [#NO_PLATFORM_CODE].
+    ///
+    /// `HKCategoryValueSleepAnalysis` on iOS, the Health Connect stage
+    /// constant on Android. Meaningless across platforms by design: read it
+    /// only after checking which one you are on.
+    public int getPlatformCode() {
+<span class="fc" id="L64">        return platformCode;</span>
+    }
+
+    /// Records the platform's own value. Called by ports while reading.
+    public void setPlatformCode(int platformCode) {
+<span class="fc" id="L69">        this.platformCode = platformCode;</span>
+<span class="fc" id="L70">    }</span>
+
+    /// Creates a stage interval.
+    ///
+    /// #### Throws
+    ///
+    /// - `IllegalArgumentException`: if `stage` is null or the end
+    ///   precedes the start.
+    public SleepStageInterval(SleepStage stage, long startMillis,
+<span class="fc" id="L79">            long endMillis) {</span>
+<span class="pc bpc" id="L80" title="1 of 2 branches missed.">        if (stage == null) {</span>
+<span class="nc" id="L81">            throw new IllegalArgumentException(</span>
+                    &quot;a stage interval requires a stage&quot;);
+        }
+<span class="pc bpc" id="L84" title="1 of 2 branches missed.">        if (endMillis &lt; startMillis) {</span>
+<span class="nc" id="L85">            throw new IllegalArgumentException(</span>
+                    &quot;stage interval ends before it starts&quot;);
+        }
+<span class="fc" id="L88">        this.stage = stage;</span>
+<span class="fc" id="L89">        this.startMillis = startMillis;</span>
+<span class="fc" id="L90">        this.endMillis = endMillis;</span>
+<span class="fc" id="L91">    }</span>
+
+    /// The stage this span was classified as.
+    public SleepStage getStage() {
+<span class="fc" id="L95">        return stage;</span>
+    }
+
+    /// Inclusive start, epoch millis UTC.
+    public long getStartMillis() {
+<span class="fc" id="L100">        return startMillis;</span>
+    }
+
+    /// Exclusive end, epoch millis UTC.
+    public long getEndMillis() {
+<span class="fc" id="L105">        return endMillis;</span>
+    }
+
+    /// The length of this span in milliseconds.
+    public long getDurationMillis() {
+<span class="nc" id="L110">        return endMillis - startMillis;</span>
+    }
+
+    @Override
+    public String toString() {
+<span class="nc" id="L115">        return stage + &quot;[&quot; + startMillis + &quot;..&quot; + endMillis + &quot;]&quot;;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

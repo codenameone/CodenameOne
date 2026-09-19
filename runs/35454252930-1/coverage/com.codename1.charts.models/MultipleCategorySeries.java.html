@@ -1,0 +1,153 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>MultipleCategorySeries.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.charts.models</a> &gt; <span class="el_source">MultipleCategorySeries.java</span></div><h1>MultipleCategorySeries.java</h1><pre class="source lang-java linenums">/// Copyright (C) 2009 - 2013 SC 4ViewSoft SRL
+///
+/// Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+/// you may not use this file except in compliance with the License.
+/// You may obtain a copy of the License at
+///
+/// http://www.apache.org/licenses/LICENSE-2.0
+///
+/// Unless required by applicable law or agreed to in writing, software
+/// distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+/// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+/// See the License for the specific language governing permissions and
+/// limitations under the License.
+package com.codename1.charts.models;
+
+import java.util.ArrayList;
+import java.util.List;
+
+/// A series for the multiple category charts like the doughnut.
+public class MultipleCategorySeries {
+    /// The series title.
+    private final String mTitle;
+    /// The series local keys.
+<span class="fc" id="L24">    private final List&lt;String&gt; mCategories = new ArrayList&lt;String&gt;();</span>
+    /// The series name.
+<span class="fc" id="L26">    private final List&lt;String[]&gt; mTitles = new ArrayList&lt;String[]&gt;();</span>
+    /// The series values.
+<span class="fc" id="L28">    private final List&lt;double[]&gt; mValues = new ArrayList&lt;double[]&gt;();</span>
+
+    /// Builds a new category series.
+    ///
+    /// #### Parameters
+    ///
+    /// - `title`: the series title
+<span class="fc" id="L35">    public MultipleCategorySeries(String title) {</span>
+<span class="fc" id="L36">        mTitle = title;</span>
+<span class="fc" id="L37">    }</span>
+
+    /// Adds a new value to the series
+    ///
+    /// #### Parameters
+    ///
+    /// - `titles`: the titles to be used as labels
+    ///
+    /// - `values`: the new value
+    public void add(String[] titles, double[] values) {
+<span class="nc" id="L47">        add(mCategories.size() + &quot;&quot;, titles, values);</span>
+<span class="nc" id="L48">    }</span>
+
+    /// Adds a new value to the series.
+    ///
+    /// #### Parameters
+    ///
+    /// - `category`: the category name
+    ///
+    /// - `titles`: the titles to be used as labels
+    ///
+    /// - `values`: the new value
+    public void add(String category, String[] titles, double[] values) {
+<span class="fc" id="L60">        mCategories.add(category);</span>
+<span class="fc" id="L61">        mTitles.add(titles);</span>
+<span class="fc" id="L62">        mValues.add(values);</span>
+<span class="fc" id="L63">    }</span>
+
+    /// Removes an existing value from the series.
+    ///
+    /// #### Parameters
+    ///
+    /// - `index`: the index in the series of the value to remove
+    public void remove(int index) {
+<span class="nc" id="L71">        mCategories.remove(index);</span>
+<span class="nc" id="L72">        mTitles.remove(index);</span>
+<span class="nc" id="L73">        mValues.remove(index);</span>
+<span class="nc" id="L74">    }</span>
+
+    /// Removes all the existing values from the series.
+    public void clear() {
+<span class="nc" id="L78">        mCategories.clear();</span>
+<span class="nc" id="L79">        mTitles.clear();</span>
+<span class="nc" id="L80">        mValues.clear();</span>
+<span class="nc" id="L81">    }</span>
+
+    /// Returns the values at the specified index.
+    ///
+    /// #### Parameters
+    ///
+    /// - `index`: the index
+    ///
+    /// #### Returns
+    ///
+    /// the value at the index
+    public double[] getValues(int index) {
+<span class="nc" id="L93">        return mValues.get(index);</span>
+    }
+
+    /// Returns the category name at the specified index.
+    ///
+    /// #### Parameters
+    ///
+    /// - `index`: the index
+    ///
+    /// #### Returns
+    ///
+    /// the category name at the index
+    public String getCategory(int index) {
+<span class="nc" id="L106">        return mCategories.get(index);</span>
+    }
+
+    /// Returns the categories count.
+    ///
+    /// #### Returns
+    ///
+    /// the categories count
+    public int getCategoriesCount() {
+<span class="nc" id="L115">        return mCategories.size();</span>
+    }
+
+    /// Returns the series item count.
+    ///
+    /// #### Parameters
+    ///
+    /// - `index`: the index
+    ///
+    /// #### Returns
+    ///
+    /// the series item count
+    public int getItemCount(int index) {
+<span class="nc" id="L128">        return mValues.get(index).length;</span>
+    }
+
+    /// Returns the series titles.
+    ///
+    /// #### Parameters
+    ///
+    /// - `index`: the index
+    ///
+    /// #### Returns
+    ///
+    /// the series titles
+    public String[] getTitles(int index) {
+<span class="nc" id="L141">        return mTitles.get(index);</span>
+    }
+
+    /// Transforms the category series to an XY series.
+    ///
+    /// #### Returns
+    ///
+    /// the XY series
+    public XYSeries toXYSeries() {
+<span class="nc" id="L150">        return new XYSeries(mTitle);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

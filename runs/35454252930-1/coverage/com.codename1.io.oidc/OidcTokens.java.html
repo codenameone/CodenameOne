@@ -1,0 +1,254 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>OidcTokens.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.io.oidc</a> &gt; <span class="el_source">OidcTokens.java</span></div><h1>OidcTokens.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012-2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ *
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation. Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.io.oidc;
+
+import com.codename1.io.AccessToken;
+import com.codename1.io.JSONParser;
+import com.codename1.util.Base64;
+import com.codename1.util.regex.StringReader;
+
+import java.util.Collections;
+import java.util.Date;
+import java.util.HashMap;
+import java.util.Map;
+
+/// The tokens returned by an OpenID Connect token endpoint, with convenience
+/// accessors for the OIDC ID token claims. Immutable.
+///
+/// To bridge into the older [AccessToken] API used by [com.codename1.social.Login],
+/// call [#toAccessToken()].
+///
+public final class OidcTokens {
+
+    private final String accessToken;
+    private final String idToken;
+    private final String refreshToken;
+    private final String tokenType;
+    private final String scope;
+    private final Date expiresAt;
+    private final Map&lt;String, Object&gt; idTokenClaims;
+    private final Map&lt;String, Object&gt; raw;
+
+    OidcTokens(String accessToken,
+               String idToken,
+               String refreshToken,
+               String tokenType,
+               String scope,
+               Date expiresAt,
+               Map&lt;String, Object&gt; idTokenClaims,
+<span class="fc" id="L60">               Map&lt;String, Object&gt; raw) {</span>
+<span class="fc" id="L61">        this.accessToken = accessToken;</span>
+<span class="fc" id="L62">        this.idToken = idToken;</span>
+<span class="fc" id="L63">        this.refreshToken = refreshToken;</span>
+<span class="fc" id="L64">        this.tokenType = tokenType;</span>
+<span class="fc" id="L65">        this.scope = scope;</span>
+<span class="fc" id="L66">        this.expiresAt = expiresAt;</span>
+<span class="fc bfc" id="L67" title="All 2 branches covered.">        this.idTokenClaims = idTokenClaims == null</span>
+<span class="fc" id="L68">                ? Collections.&lt;String, Object&gt;emptyMap()</span>
+<span class="fc" id="L69">                : Collections.unmodifiableMap(new HashMap&lt;String, Object&gt;(idTokenClaims));</span>
+<span class="pc bpc" id="L70" title="1 of 2 branches missed.">        this.raw = raw == null</span>
+<span class="pc" id="L71">                ? Collections.&lt;String, Object&gt;emptyMap()</span>
+<span class="fc" id="L72">                : Collections.unmodifiableMap(new HashMap&lt;String, Object&gt;(raw));</span>
+<span class="fc" id="L73">    }</span>
+
+    /// Builds an [OidcTokens] from a parsed JSON token-endpoint response,
+    /// optionally merging in a refresh token from a previous response (token
+    /// endpoints are allowed to omit `refresh_token` on a refresh call).
+    public static OidcTokens fromTokenResponse(Map&lt;String, Object&gt; json,
+                                               String refreshTokenFallback) {
+<span class="pc bpc" id="L80" title="1 of 2 branches missed.">        if (json == null) {</span>
+<span class="nc" id="L81">            throw new IllegalArgumentException(&quot;json must not be null&quot;);</span>
+        }
+<span class="fc" id="L83">        String accessToken = stringOrNull(json.get(&quot;access_token&quot;));</span>
+<span class="fc" id="L84">        String idToken = stringOrNull(json.get(&quot;id_token&quot;));</span>
+<span class="fc" id="L85">        String refreshToken = stringOrNull(json.get(&quot;refresh_token&quot;));</span>
+<span class="fc bfc" id="L86" title="All 2 branches covered.">        if (refreshToken == null) {</span>
+<span class="fc" id="L87">            refreshToken = refreshTokenFallback;</span>
+        }
+<span class="fc" id="L89">        String tokenType = stringOrNull(json.get(&quot;token_type&quot;));</span>
+<span class="fc" id="L90">        String scope = stringOrNull(json.get(&quot;scope&quot;));</span>
+<span class="fc" id="L91">        Date expiresAt = null;</span>
+<span class="fc" id="L92">        Object expiresIn = json.get(&quot;expires_in&quot;);</span>
+<span class="fc bfc" id="L93" title="All 2 branches covered.">        if (expiresIn != null) {</span>
+            try {
+<span class="fc" id="L95">                String raw = expiresIn.toString().trim();</span>
+<span class="fc" id="L96">                int dot = raw.indexOf('.');</span>
+<span class="fc bfc" id="L97" title="All 2 branches covered.">                if (dot &gt;= 0) {</span>
+<span class="fc" id="L98">                    raw = raw.substring(0, dot);</span>
+                }
+<span class="fc" id="L100">                long seconds = Long.parseLong(raw);</span>
+<span class="fc" id="L101">                expiresAt = new Date(System.currentTimeMillis() + seconds * 1000L);</span>
+<span class="nc" id="L102">            } catch (NumberFormatException ignored) {</span>
+                // Provider returned a non-numeric `expires_in`; treat the
+                // expiry as unknown rather than failing the whole token
+                // response. `expiresAt` stays null and callers fall back to
+                // a 401 retry.
+<span class="fc" id="L107">            }</span>
+        }
+<span class="fc bfc" id="L109" title="All 2 branches covered.">        Map&lt;String, Object&gt; claims = idToken != null ? decodeIdTokenClaims(idToken) : null;</span>
+<span class="fc" id="L110">        return new OidcTokens(accessToken, idToken, refreshToken, tokenType, scope,</span>
+                expiresAt, claims, json);
+    }
+
+    /// Decodes the payload of a compact JWS without verifying the signature.
+    /// Suitable for reading OIDC ID-token claims; do NOT use the returned
+    /// values for authorization decisions on the server.
+    public static Map&lt;String, Object&gt; decodeIdTokenClaims(String compactJwt) {
+<span class="fc bfc" id="L118" title="All 2 branches covered.">        if (compactJwt == null) {</span>
+<span class="fc" id="L119">            return Collections.emptyMap();</span>
+        }
+<span class="fc" id="L121">        int firstDot = compactJwt.indexOf('.');</span>
+<span class="fc bfc" id="L122" title="All 2 branches covered.">        int secondDot = firstDot &gt;= 0 ? compactJwt.indexOf('.', firstDot + 1) : -1;</span>
+<span class="fc bfc" id="L123" title="All 4 branches covered.">        if (firstDot &lt; 0 || secondDot &lt; 0) {</span>
+<span class="fc" id="L124">            return Collections.emptyMap();</span>
+        }
+<span class="fc" id="L126">        String payloadB64 = compactJwt.substring(firstDot + 1, secondDot);</span>
+        // Pad to a multiple of 4 for the decoder. Append via StringBuilder
+        // rather than `+= &quot;=&quot;` so SpotBugs SBSC_USE_STRINGBUFFER_CONCATENATION
+        // stays quiet (and we avoid up to 3 String allocations on the hot path).
+<span class="fc" id="L130">        int pad = (4 - (payloadB64.length() &amp; 0x3)) &amp; 0x3;</span>
+<span class="fc bfc" id="L131" title="All 2 branches covered.">        if (pad != 0) {</span>
+<span class="fc" id="L132">            StringBuilder padded = new StringBuilder(payloadB64.length() + pad)</span>
+<span class="fc" id="L133">                    .append(payloadB64);</span>
+<span class="fc bfc" id="L134" title="All 2 branches covered.">            for (int i = 0; i &lt; pad; i++) {</span>
+<span class="fc" id="L135">                padded.append('=');</span>
+            }
+<span class="fc" id="L137">            payloadB64 = padded.toString();</span>
+        }
+        byte[] payload;
+        try {
+<span class="fc" id="L141">            payload = Base64.decodeUrlSafe(payloadB64);</span>
+<span class="nc" id="L142">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L143">            return Collections.emptyMap();</span>
+<span class="fc" id="L144">        }</span>
+<span class="pc bpc" id="L145" title="1 of 2 branches missed.">        if (payload == null) {</span>
+<span class="nc" id="L146">            return Collections.emptyMap();</span>
+        }
+        try {
+<span class="fc" id="L149">            String json = new String(payload, &quot;UTF-8&quot;);</span>
+<span class="fc" id="L150">            Map&lt;String, Object&gt; parsed = new JSONParser().parseJSON(new StringReader(json));</span>
+<span class="pc bpc" id="L151" title="1 of 2 branches missed.">            return parsed != null ? parsed : Collections.&lt;String, Object&gt;emptyMap();</span>
+<span class="nc" id="L152">        } catch (java.io.UnsupportedEncodingException e) {</span>
+            // UTF-8 always available -- defensive only.
+<span class="nc" id="L154">            return Collections.emptyMap();</span>
+<span class="nc" id="L155">        } catch (java.io.IOException e) {</span>
+            // JSONParser surfaces IOException for malformed payloads.
+<span class="nc" id="L157">            return Collections.emptyMap();</span>
+        }
+    }
+
+    public String getAccessToken() {
+<span class="fc" id="L162">        return accessToken;</span>
+    }
+
+    public String getIdToken() {
+<span class="nc" id="L166">        return idToken;</span>
+    }
+
+    public String getRefreshToken() {
+<span class="fc" id="L170">        return refreshToken;</span>
+    }
+
+    public String getTokenType() {
+<span class="fc" id="L174">        return tokenType;</span>
+    }
+
+    public String getScope() {
+<span class="fc" id="L178">        return scope;</span>
+    }
+
+    /// Absolute expiry instant, or `null` if the token endpoint did not
+    /// return `expires_in`.
+    public Date getExpiresAt() {
+<span class="fc" id="L184">        return expiresAt;</span>
+    }
+
+    /// `true` if [#getExpiresAt()] is non-null and in the past.
+    public boolean isExpired() {
+<span class="nc bnc" id="L189" title="All 4 branches missed.">        return expiresAt != null &amp;&amp; expiresAt.getTime() &lt; System.currentTimeMillis();</span>
+    }
+
+    /// `true` if [#getExpiresAt()] is non-null and within `leewaySeconds` of
+    /// the current time. Pass a small leeway (60 -- 120 seconds) when deciding
+    /// whether to refresh proactively.
+    public boolean isExpiringWithin(int leewaySeconds) {
+<span class="nc bnc" id="L196" title="All 2 branches missed.">        return expiresAt != null &amp;&amp;</span>
+<span class="nc bnc" id="L197" title="All 2 branches missed.">                expiresAt.getTime() - System.currentTimeMillis() &lt; leewaySeconds * 1000L;</span>
+    }
+
+    /// Read-only view of the ID token claims (empty if no ID token was returned).
+    public Map&lt;String, Object&gt; getIdTokenClaims() {
+<span class="fc" id="L202">        return idTokenClaims;</span>
+    }
+
+    /// Convenience accessor for a single ID-token claim. Returns `null` when
+    /// the claim is absent or the ID token is missing.
+    public Object getClaim(String name) {
+<span class="nc" id="L208">        return idTokenClaims.get(name);</span>
+    }
+
+    /// Convenience accessor for a string-valued claim.
+    public String getStringClaim(String name) {
+<span class="fc" id="L213">        Object v = idTokenClaims.get(name);</span>
+<span class="pc bpc" id="L214" title="1 of 2 branches missed.">        return v == null ? null : v.toString();</span>
+    }
+
+    /// The full, unmodified token-endpoint JSON. Useful for inspecting
+    /// provider-specific fields (e.g. `nonce_supported` from Apple).
+    public Map&lt;String, Object&gt; getRawResponse() {
+<span class="fc" id="L220">        return raw;</span>
+    }
+
+    /// `sub` claim from the ID token -- the stable, opaque user identifier
+    /// within the issuer.
+    public String getSubject() {
+<span class="fc" id="L226">        return getStringClaim(&quot;sub&quot;);</span>
+    }
+
+    /// `email` claim from the ID token, when present.
+    public String getEmail() {
+<span class="nc" id="L231">        return getStringClaim(&quot;email&quot;);</span>
+    }
+
+    /// `name` claim from the ID token, when present.
+    public String getName() {
+<span class="nc" id="L236">        return getStringClaim(&quot;name&quot;);</span>
+    }
+
+    /// Bridges into the legacy [AccessToken] API used by
+    /// [com.codename1.social.Login]. The expiry is the absolute instant from
+    /// [#getExpiresAt()].
+    public AccessToken toAccessToken() {
+<span class="nc" id="L243">        AccessToken t = new AccessToken(accessToken, null, refreshToken, idToken);</span>
+<span class="nc bnc" id="L244" title="All 2 branches missed.">        if (expiresAt != null) {</span>
+<span class="nc" id="L245">            t.setExpiryDate(expiresAt);</span>
+        }
+<span class="nc" id="L247">        return t;</span>
+    }
+
+    private static String stringOrNull(Object o) {
+<span class="fc bfc" id="L251" title="All 2 branches covered.">        return o instanceof String ? (String) o : null;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

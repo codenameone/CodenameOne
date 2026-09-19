@@ -1,0 +1,241 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>AssetCatalog.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.gaming.level</a> &gt; <span class="el_source">AssetCatalog.java</span></div><h1>AssetCatalog.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.gaming.level;
+
+import com.codename1.gaming.SpriteSheet;
+import com.codename1.io.JSONParser;
+import com.codename1.ui.Display;
+import com.codename1.ui.Image;
+
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.io.Reader;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+
+/// The registry that turns an `GameElement#getAssetId()` into something a
+/// `LevelRealizer` can draw.
+///
+/// It indexes one or more `AssetPack`s and resolves each asset's art by its
+/// `AssetDef#getType()`: `#image(String)` for a static image or a sprite-sheet still,
+/// `#sheet(String)` for the `com.codename1.gaming.SpriteSheet` of an animated asset, and
+/// `#meshData(String)` for the glTF/glb bytes of a 3D asset. `#resolveArt()` loads those
+/// from each def's `AssetDef#getSource()` resource; until art is supplied `#image(String)`
+/// returns a cached solid-color placeholder sized from the def, so a level always realizes
+/// to something visible.
+<span class="fc" id="L51">public class AssetCatalog {</span>
+<span class="fc" id="L52">    private final Map&lt;String, AssetPack&gt; packs = new LinkedHashMap&lt;String, AssetPack&gt;();</span>
+    /// flat assetId -&gt; def index across all packs (first pack wins on a clash).
+<span class="fc" id="L54">    private final Map&lt;String, AssetDef&gt; byId = new HashMap&lt;String, AssetDef&gt;();</span>
+<span class="fc" id="L55">    private final Map&lt;String, Image&gt; images = new HashMap&lt;String, Image&gt;();</span>
+<span class="fc" id="L56">    private final Map&lt;String, Image&gt; placeholders = new HashMap&lt;String, Image&gt;();</span>
+<span class="fc" id="L57">    private final Map&lt;String, SpriteSheet&gt; sheets = new HashMap&lt;String, SpriteSheet&gt;();</span>
+<span class="fc" id="L58">    private final Map&lt;String, byte[]&gt; meshes = new HashMap&lt;String, byte[]&gt;();</span>
+
+    /// Parses one or more `AssetPack`s from a JSON document of the form
+    /// `{&quot;packs&quot;:[{&quot;id&quot;:..,&quot;name&quot;:..,&quot;assets&quot;:[{&quot;id&quot;:..,&quot;kind&quot;:&quot;tile|actor&quot;,&quot;w&quot;:..,
+    /// &quot;h&quot;:..,&quot;color&quot;:&quot;#rrggbb&quot;,&quot;unique&quot;:false,&quot;source&quot;:..,&quot;defaults&quot;:{..}}]}]}` and
+    /// adds them to a new catalog. The same format the editor ships its starter packs in.
+    public static AssetCatalog load(String json) throws IOException {
+<span class="fc" id="L65">        return fromMap(JSONParser.parseJSON(json));</span>
+    }
+
+    /// Parses packs from a UTF-8 JSON stream and closes it.
+    public static AssetCatalog load(InputStream in) throws IOException {
+<span class="nc" id="L70">        Reader r = new InputStreamReader(in, &quot;UTF-8&quot;);</span>
+        try {
+<span class="nc" id="L72">            return fromMap(new JSONParser().parseJSON(r));</span>
+        } finally {
+            try {
+<span class="nc" id="L75">                r.close();</span>
+<span class="nc" id="L76">            } catch (IOException ignore) { //NOPMD - closing the reader is best-effort</span>
+<span class="nc" id="L77">            }</span>
+        }
+    }
+
+    static AssetCatalog fromMap(Map&lt;String, Object&gt; root) {
+<span class="fc" id="L82">        AssetCatalog catalog = new AssetCatalog();</span>
+<span class="pc bpc" id="L83" title="1 of 2 branches missed.">        if (root == null) {</span>
+<span class="nc" id="L84">            return catalog;</span>
+        }
+<span class="fc" id="L86">        List&lt;Object&gt; packList = Json.asList(root.get(&quot;packs&quot;));</span>
+<span class="pc bpc" id="L87" title="1 of 2 branches missed.">        if (packList != null) {</span>
+<span class="fc bfc" id="L88" title="All 2 branches covered.">            for (Object packEntry : packList) {</span>
+<span class="fc" id="L89">                Map&lt;String, Object&gt; pm = Json.asMap(packEntry);</span>
+<span class="pc bpc" id="L90" title="1 of 2 branches missed.">                if (pm != null) {</span>
+<span class="fc" id="L91">                    catalog.addPack(AssetPack.fromMap(pm));</span>
+                }
+<span class="fc" id="L93">            }</span>
+        }
+<span class="fc" id="L95">        return catalog;</span>
+    }
+
+    public AssetCatalog addPack(AssetPack pack) {
+<span class="fc" id="L99">        packs.put(pack.getId(), pack);</span>
+<span class="fc" id="L100">        List&lt;AssetDef&gt; defs = pack.assets();</span>
+<span class="fc bfc" id="L101" title="All 2 branches covered.">        for (AssetDef d : defs) {</span>
+<span class="pc bpc" id="L102" title="1 of 2 branches missed.">            if (!byId.containsKey(d.getId())) {</span>
+<span class="fc" id="L103">                byId.put(d.getId(), d);</span>
+            }
+<span class="fc" id="L105">        }</span>
+<span class="fc" id="L106">        return this;</span>
+    }
+
+    public AssetPack getPack(String id) {
+<span class="fc" id="L110">        return packs.get(id);</span>
+    }
+
+    public List&lt;AssetPack&gt; packs() {
+<span class="nc" id="L114">        return new ArrayList&lt;AssetPack&gt;(packs.values());</span>
+    }
+
+    /// The definition for an asset id, or null if no pack defines it.
+    public AssetDef def(String assetId) {
+<span class="fc" id="L119">        return byId.get(assetId);</span>
+    }
+
+    /// Supplies real artwork for an asset id, overriding the placeholder.
+    public AssetCatalog setImage(String assetId, Image image) {
+<span class="nc" id="L124">        images.put(assetId, image);</span>
+<span class="nc" id="L125">        return this;</span>
+    }
+
+    public boolean hasImage(String assetId) {
+<span class="nc" id="L129">        return images.containsKey(assetId);</span>
+    }
+
+    /// Supplies the sprite sheet for an animated (`AssetDef.Type#SHEET`) asset.
+    public AssetCatalog setSheet(String assetId, SpriteSheet sheet) {
+<span class="nc" id="L134">        sheets.put(assetId, sheet);</span>
+<span class="nc" id="L135">        return this;</span>
+    }
+
+    /// The sprite sheet for an animated asset, or null if it has none.
+    public SpriteSheet sheet(String assetId) {
+<span class="nc" id="L140">        return sheets.get(assetId);</span>
+    }
+
+    /// Supplies the glTF/glb bytes for a 3D (`AssetDef.Type#MESH`) asset.
+    public AssetCatalog setMeshData(String assetId, byte[] data) {
+<span class="nc" id="L145">        meshes.put(assetId, data);</span>
+<span class="nc" id="L146">        return this;</span>
+    }
+
+    /// The glTF/glb bytes for a 3D asset (load with `com.codename1.gpu.GltfLoader`), or
+    /// null if it has none.
+    public byte[] meshData(String assetId) {
+<span class="nc" id="L152">        return meshes.get(assetId);</span>
+    }
+
+    /// Resolves the image for an asset id: the explicit art if one was supplied, else the
+    /// first frame of a sprite sheet, else a cached solid-color placeholder sized from the
+    /// def. Returns null only when the id is unknown to every pack and no art was set.
+    public Image image(String assetId) {
+<span class="nc" id="L159">        Image img = images.get(assetId);</span>
+<span class="nc bnc" id="L160" title="All 2 branches missed.">        if (img != null) {</span>
+<span class="nc" id="L161">            return img;</span>
+        }
+<span class="nc" id="L163">        SpriteSheet sh = sheets.get(assetId);</span>
+<span class="nc bnc" id="L164" title="All 2 branches missed.">        if (sh != null) {</span>
+<span class="nc" id="L165">            return sh.getFrame(0);</span>
+        }
+<span class="nc" id="L167">        Image ph = placeholders.get(assetId);</span>
+<span class="nc bnc" id="L168" title="All 2 branches missed.">        if (ph != null) {</span>
+<span class="nc" id="L169">            return ph;</span>
+        }
+<span class="nc" id="L171">        AssetDef d = byId.get(assetId);</span>
+<span class="nc bnc" id="L172" title="All 2 branches missed.">        if (d == null) {</span>
+<span class="nc" id="L173">            return null;</span>
+        }
+<span class="nc" id="L175">        ph = Image.createImage(Math.max(1, d.getWidth()), Math.max(1, d.getHeight()), d.getColor());</span>
+<span class="nc" id="L176">        placeholders.put(assetId, ph);</span>
+<span class="nc" id="L177">        return ph;</span>
+    }
+
+    /// Loads each asset's art from its `AssetDef#getSource()` resource: a static image,
+    /// a sprite sheet (`AssetDef.Type#SHEET`), or glTF/glb mesh bytes (`AssetDef.Type#MESH`).
+    /// Best-effort -- an asset whose source is missing keeps its placeholder. Tries the
+    /// source path as-is and, for the flat device bundle, by file name. Returns `this`.
+    public AssetCatalog resolveArt() {
+<span class="nc bnc" id="L185" title="All 2 branches missed.">        for (AssetDef d : byId.values()) {</span>
+<span class="nc" id="L186">            String src = d.getSource();</span>
+<span class="nc bnc" id="L187" title="All 4 branches missed.">            if (src == null || images.containsKey(d.getId())</span>
+<span class="nc bnc" id="L188" title="All 4 branches missed.">                    || sheets.containsKey(d.getId()) || meshes.containsKey(d.getId())) {</span>
+<span class="nc" id="L189">                continue;</span>
+            }
+<span class="nc" id="L191">            InputStream in = openResource(src);   //NOPMD CloseResource - closed in the finally below (no try-with-resources at -source 1.5)</span>
+<span class="nc bnc" id="L192" title="All 2 branches missed.">            if (in == null) {</span>
+<span class="nc" id="L193">                continue;</span>
+            }
+            try {
+<span class="nc bnc" id="L196" title="All 2 branches missed.">                if (d.isMesh()) {</span>
+<span class="nc" id="L197">                    meshes.put(d.getId(), readBytes(in));</span>
+                } else {
+<span class="nc" id="L199">                    Image img = Image.createImage(in);   // never null: throws on a bad stream</span>
+<span class="nc bnc" id="L200" title="All 4 branches missed.">                    if (d.isSheet() &amp;&amp; d.getFrameWidth() &gt; 0) {</span>
+<span class="nc bnc" id="L201" title="All 2 branches missed.">                        int fh = d.getFrameHeight() &gt; 0 ? d.getFrameHeight() : img.getHeight();</span>
+<span class="nc" id="L202">                        sheets.put(d.getId(), new SpriteSheet(img, d.getFrameWidth(), fh));</span>
+<span class="nc" id="L203">                    } else {</span>
+<span class="nc" id="L204">                        images.put(d.getId(), img);</span>
+                    }
+                }
+<span class="nc" id="L207">            } catch (IOException ignore) { //NOPMD - a missing/bad art file just keeps the placeholder</span>
+            } finally {
+                try {
+<span class="nc" id="L210">                    in.close();</span>
+<span class="nc" id="L211">                } catch (IOException ignore) { //NOPMD - closing is best-effort</span>
+<span class="nc" id="L212">                }</span>
+            }
+<span class="nc" id="L214">        }</span>
+<span class="nc" id="L215">        return this;</span>
+    }
+
+    /// Opens an art resource, trying the full path then the bare file name (the CN1
+    /// device bundle is a flat namespace).
+    private static InputStream openResource(String src) {
+<span class="nc bnc" id="L221" title="All 2 branches missed.">        String path = src.startsWith(&quot;/&quot;) ? src : &quot;/&quot; + src;</span>
+<span class="nc" id="L222">        InputStream in = Display.getInstance().getResourceAsStream(AssetCatalog.class, path);</span>
+<span class="nc bnc" id="L223" title="All 2 branches missed.">        if (in != null) {</span>
+<span class="nc" id="L224">            return in;</span>
+        }
+<span class="nc" id="L226">        int slash = src.lastIndexOf('/');</span>
+<span class="nc bnc" id="L227" title="All 2 branches missed.">        String base = slash &gt;= 0 ? src.substring(slash + 1) : src;</span>
+<span class="nc" id="L228">        return Display.getInstance().getResourceAsStream(AssetCatalog.class, &quot;/&quot; + base);</span>
+    }
+
+    private static byte[] readBytes(InputStream in) throws IOException {
+<span class="nc" id="L232">        ByteArrayOutputStream out = new ByteArrayOutputStream();</span>
+<span class="nc" id="L233">        byte[] buf = new byte[4096];</span>
+        int n;
+<span class="nc bnc" id="L235" title="All 2 branches missed.">        while ((n = in.read(buf)) &gt; 0) {</span>
+<span class="nc" id="L236">            out.write(buf, 0, n);</span>
+        }
+<span class="nc" id="L238">        return out.toByteArray();</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

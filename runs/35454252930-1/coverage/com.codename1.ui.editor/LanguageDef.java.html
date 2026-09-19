@@ -1,0 +1,180 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>LanguageDef.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.ui.editor</a> &gt; <span class="el_source">LanguageDef.java</span></div><h1>LanguageDef.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+
+package com.codename1.ui.editor;
+
+import java.util.HashSet;
+import java.util.Set;
+
+/// Describes the lexical rules of a programming language for the pure code editor's tokenizer: its
+/// keyword set, comment styles, string delimiters and number syntax. The keyword lists match the ones
+/// the previous `BrowserComponent` highlighter used.
+public final class LanguageDef {
+    static final int GENERIC = 0;
+    static final int PYTHON_GRAMMAR = 1;
+    static final int CSS_GRAMMAR = 2;
+    static final int JSON_GRAMMAR = 3;
+    static final int XML_GRAMMAR = 4;
+
+    private final Set&lt;String&gt; keywords;
+    private final boolean lineCommentSlash;
+    private final boolean lineCommentHash;
+    private final boolean blockComment;
+    private final boolean templateString;
+    private final boolean plain;
+    private final int grammar;
+
+    private LanguageDef(String[] keywords, boolean lineCommentSlash, boolean lineCommentHash,
+<span class="fc" id="L48">                        boolean blockComment, boolean templateString, boolean plain, int grammar) {</span>
+<span class="fc" id="L49">        this.keywords = new HashSet&lt;String&gt;();</span>
+<span class="fc bfc" id="L50" title="All 2 branches covered.">        for (String keyword : keywords) {</span>
+<span class="fc" id="L51">            this.keywords.add(keyword);</span>
+        }
+<span class="fc" id="L53">        this.lineCommentSlash = lineCommentSlash;</span>
+<span class="fc" id="L54">        this.lineCommentHash = lineCommentHash;</span>
+<span class="fc" id="L55">        this.blockComment = blockComment;</span>
+<span class="fc" id="L56">        this.templateString = templateString;</span>
+<span class="fc" id="L57">        this.plain = plain;</span>
+<span class="fc" id="L58">        this.grammar = grammar;</span>
+<span class="fc" id="L59">    }</span>
+
+    /// True for plain text (no syntax highlighting at all).
+    public boolean isPlain() {
+<span class="fc" id="L63">        return plain;</span>
+    }
+
+    /// True when `word` is a keyword in this language.
+    public boolean isKeyword(String word) {
+<span class="fc" id="L68">        return keywords.contains(word);</span>
+    }
+
+    /// True when `//` starts a line comment.
+    public boolean hasLineCommentSlash() {
+<span class="fc" id="L73">        return lineCommentSlash;</span>
+    }
+
+    /// True when `#` starts a line comment.
+    public boolean hasLineCommentHash() {
+<span class="fc" id="L78">        return lineCommentHash;</span>
+    }
+
+    /// True when `/* */` block comments are supported.
+    public boolean hasBlockComment() {
+<span class="fc" id="L83">        return blockComment;</span>
+    }
+
+    /// True when backtick template strings (which may span lines) are supported.
+    public boolean hasTemplateString() {
+<span class="fc" id="L88">        return templateString;</span>
+    }
+
+    int getGrammar() {
+<span class="fc" id="L92">        return grammar;</span>
+    }
+
+<span class="fc" id="L95">    private static final String[] JAVA = {</span>
+        &quot;abstract&quot;, &quot;assert&quot;, &quot;boolean&quot;, &quot;break&quot;, &quot;byte&quot;, &quot;case&quot;, &quot;catch&quot;, &quot;char&quot;, &quot;class&quot;, &quot;const&quot;,
+        &quot;continue&quot;, &quot;default&quot;, &quot;do&quot;, &quot;double&quot;, &quot;else&quot;, &quot;enum&quot;, &quot;extends&quot;, &quot;final&quot;, &quot;finally&quot;, &quot;float&quot;,
+        &quot;for&quot;, &quot;goto&quot;, &quot;if&quot;, &quot;implements&quot;, &quot;import&quot;, &quot;instanceof&quot;, &quot;int&quot;, &quot;interface&quot;, &quot;long&quot;, &quot;native&quot;,
+        &quot;new&quot;, &quot;package&quot;, &quot;private&quot;, &quot;protected&quot;, &quot;public&quot;, &quot;return&quot;, &quot;short&quot;, &quot;static&quot;, &quot;strictfp&quot;,
+        &quot;super&quot;, &quot;switch&quot;, &quot;synchronized&quot;, &quot;this&quot;, &quot;throw&quot;, &quot;throws&quot;, &quot;transient&quot;, &quot;try&quot;, &quot;void&quot;,
+        &quot;volatile&quot;, &quot;while&quot;, &quot;true&quot;, &quot;false&quot;, &quot;null&quot;, &quot;var&quot;, &quot;record&quot;, &quot;sealed&quot;
+    };
+
+<span class="fc" id="L104">    private static final String[] KOTLIN = {</span>
+        &quot;as&quot;, &quot;break&quot;, &quot;by&quot;, &quot;class&quot;, &quot;continue&quot;, &quot;do&quot;, &quot;else&quot;, &quot;false&quot;, &quot;for&quot;, &quot;fun&quot;, &quot;if&quot;, &quot;in&quot;,
+        &quot;interface&quot;, &quot;is&quot;, &quot;null&quot;, &quot;object&quot;, &quot;package&quot;, &quot;return&quot;, &quot;super&quot;, &quot;this&quot;, &quot;throw&quot;, &quot;true&quot;,
+        &quot;try&quot;, &quot;typealias&quot;, &quot;val&quot;, &quot;var&quot;, &quot;when&quot;, &quot;while&quot;, &quot;abstract&quot;, &quot;final&quot;, &quot;open&quot;, &quot;override&quot;,
+        &quot;private&quot;, &quot;protected&quot;, &quot;public&quot;, &quot;internal&quot;, &quot;companion&quot;, &quot;data&quot;, &quot;sealed&quot;, &quot;suspend&quot;
+    };
+
+<span class="fc" id="L111">    private static final String[] JAVASCRIPT = {</span>
+        &quot;await&quot;, &quot;async&quot;, &quot;break&quot;, &quot;case&quot;, &quot;catch&quot;, &quot;class&quot;, &quot;const&quot;, &quot;continue&quot;, &quot;debugger&quot;, &quot;default&quot;,
+        &quot;delete&quot;, &quot;do&quot;, &quot;else&quot;, &quot;export&quot;, &quot;extends&quot;, &quot;false&quot;, &quot;finally&quot;, &quot;for&quot;, &quot;function&quot;, &quot;if&quot;,
+        &quot;import&quot;, &quot;in&quot;, &quot;instanceof&quot;, &quot;let&quot;, &quot;new&quot;, &quot;null&quot;, &quot;return&quot;, &quot;super&quot;, &quot;switch&quot;, &quot;this&quot;, &quot;throw&quot;,
+        &quot;true&quot;, &quot;try&quot;, &quot;typeof&quot;, &quot;var&quot;, &quot;void&quot;, &quot;while&quot;, &quot;with&quot;, &quot;yield&quot;, &quot;of&quot;, &quot;static&quot;, &quot;get&quot;, &quot;set&quot;
+    };
+
+<span class="fc" id="L118">    private static final String[] PYTHON = {</span>
+        &quot;and&quot;, &quot;as&quot;, &quot;assert&quot;, &quot;async&quot;, &quot;await&quot;, &quot;break&quot;, &quot;class&quot;, &quot;continue&quot;, &quot;def&quot;, &quot;del&quot;, &quot;elif&quot;,
+        &quot;else&quot;, &quot;except&quot;, &quot;False&quot;, &quot;finally&quot;, &quot;for&quot;, &quot;from&quot;, &quot;global&quot;, &quot;if&quot;, &quot;import&quot;, &quot;in&quot;, &quot;is&quot;,
+        &quot;lambda&quot;, &quot;None&quot;, &quot;nonlocal&quot;, &quot;not&quot;, &quot;or&quot;, &quot;pass&quot;, &quot;raise&quot;, &quot;return&quot;, &quot;True&quot;, &quot;try&quot;, &quot;while&quot;,
+        &quot;with&quot;, &quot;yield&quot;, &quot;self&quot;
+    };
+
+<span class="fc" id="L125">    private static final String[] CSS = {</span>
+        &quot;important&quot;, &quot;inherit&quot;, &quot;initial&quot;, &quot;unset&quot;, &quot;auto&quot;, &quot;none&quot;, &quot;flex&quot;, &quot;grid&quot;, &quot;block&quot;, &quot;inline&quot;,
+        &quot;absolute&quot;, &quot;relative&quot;, &quot;fixed&quot;, &quot;static&quot;
+    };
+
+<span class="fc" id="L130">    private static final String[] JSON = {&quot;true&quot;, &quot;false&quot;, &quot;null&quot;};</span>
+
+<span class="fc" id="L132">    private static final String[] XML = {};</span>
+
+<span class="fc" id="L134">    private static final String[] C = {</span>
+        &quot;auto&quot;, &quot;break&quot;, &quot;case&quot;, &quot;char&quot;, &quot;const&quot;, &quot;continue&quot;, &quot;default&quot;, &quot;do&quot;, &quot;double&quot;, &quot;else&quot;, &quot;enum&quot;,
+        &quot;extern&quot;, &quot;float&quot;, &quot;for&quot;, &quot;goto&quot;, &quot;if&quot;, &quot;int&quot;, &quot;long&quot;, &quot;register&quot;, &quot;return&quot;, &quot;short&quot;, &quot;signed&quot;,
+        &quot;sizeof&quot;, &quot;static&quot;, &quot;struct&quot;, &quot;switch&quot;, &quot;typedef&quot;, &quot;union&quot;, &quot;unsigned&quot;, &quot;void&quot;, &quot;volatile&quot;, &quot;while&quot;
+    };
+
+<span class="fc" id="L140">    private static final LanguageDef DEF_JAVA = new LanguageDef(JAVA, true, false, true, false, false, GENERIC);</span>
+<span class="fc" id="L141">    private static final LanguageDef DEF_KOTLIN = new LanguageDef(KOTLIN, true, false, true, false, false, GENERIC);</span>
+<span class="fc" id="L142">    private static final LanguageDef DEF_JAVASCRIPT = new LanguageDef(JAVASCRIPT, true, false, true, true, false, GENERIC);</span>
+<span class="fc" id="L143">    private static final LanguageDef DEF_PYTHON = new LanguageDef(PYTHON, false, true, false, false, false, PYTHON_GRAMMAR);</span>
+<span class="fc" id="L144">    private static final LanguageDef DEF_CSS = new LanguageDef(CSS, false, false, true, false, false, CSS_GRAMMAR);</span>
+<span class="fc" id="L145">    private static final LanguageDef DEF_JSON = new LanguageDef(JSON, false, false, false, false, false, JSON_GRAMMAR);</span>
+<span class="fc" id="L146">    private static final LanguageDef DEF_XML = new LanguageDef(XML, false, false, false, false, false, XML_GRAMMAR);</span>
+<span class="fc" id="L147">    private static final LanguageDef DEF_C = new LanguageDef(C, true, false, true, false, false, GENERIC);</span>
+<span class="fc" id="L148">    private static final LanguageDef DEF_TEXT = new LanguageDef(XML, false, false, false, false, true, GENERIC);</span>
+
+    /// Returns the language definition for the given language id, defaulting to a plain text definition
+    /// (no highlighting) for unknown ids.
+    public static LanguageDef forName(String language) {
+<span class="fc bfc" id="L153" title="All 2 branches covered.">        if (&quot;java&quot;.equals(language)) {</span>
+<span class="fc" id="L154">            return DEF_JAVA;</span>
+        }
+<span class="pc bpc" id="L156" title="1 of 2 branches missed.">        if (&quot;kotlin&quot;.equals(language)) {</span>
+<span class="nc" id="L157">            return DEF_KOTLIN;</span>
+        }
+<span class="pc bpc" id="L159" title="2 of 4 branches missed.">        if (&quot;javascript&quot;.equals(language) || &quot;js&quot;.equals(language)) {</span>
+<span class="nc" id="L160">            return DEF_JAVASCRIPT;</span>
+        }
+<span class="pc bpc" id="L162" title="1 of 4 branches missed.">        if (&quot;python&quot;.equals(language) || &quot;py&quot;.equals(language)) {</span>
+<span class="fc" id="L163">            return DEF_PYTHON;</span>
+        }
+<span class="fc bfc" id="L165" title="All 2 branches covered.">        if (&quot;css&quot;.equals(language)) {</span>
+<span class="fc" id="L166">            return DEF_CSS;</span>
+        }
+<span class="fc bfc" id="L168" title="All 2 branches covered.">        if (&quot;json&quot;.equals(language)) {</span>
+<span class="fc" id="L169">            return DEF_JSON;</span>
+        }
+<span class="pc bpc" id="L171" title="1 of 4 branches missed.">        if (&quot;xml&quot;.equals(language) || &quot;html&quot;.equals(language)) {</span>
+<span class="fc" id="L172">            return DEF_XML;</span>
+        }
+<span class="pc bpc" id="L174" title="3 of 6 branches missed.">        if (&quot;c&quot;.equals(language) || &quot;cpp&quot;.equals(language) || &quot;c++&quot;.equals(language)) {</span>
+<span class="nc" id="L175">            return DEF_C;</span>
+        }
+<span class="fc" id="L177">        return DEF_TEXT;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

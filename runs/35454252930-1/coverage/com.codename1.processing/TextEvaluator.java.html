@@ -1,0 +1,210 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>TextEvaluator.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.processing</a> &gt; <span class="el_source">TextEvaluator.java</span></div><h1>TextEvaluator.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Eric Coolman, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.processing;
+
+/// Internal class, do not use.
+///
+/// This evaluator handles expressions that involve child text. Examples:
+///
+/// `Get last names of all players named 'Andre'
+///
+///  /tournament/player[name='Andre']/lastname
+///
+///  Get all lineitem numbers with a price over 35
+///
+///  //order/lineitem[price&gt;35]/@linenum
+///
+///  Get all PO numbers of orders that contain a lineitem with a price over 35
+///
+///  //order/lineitem[price&gt;35]/../order/@ponum`
+///
+/// @author Eric Coolman
+class TextEvaluator extends AbstractEvaluator {
+    static final String FUNC_TEXT = &quot;text()&quot;;
+
+    /// Construct with a full predicate expression.
+    ///
+    /// #### Parameters
+    ///
+    /// - `expr`: a full predicate expression.
+    public TextEvaluator(String expr) {
+<span class="fc" id="L51">        super(expr);</span>
+<span class="fc" id="L52">    }</span>
+
+    private String[] getLeftValue(StructuredContent element, String lvalue) {
+        String[] v;
+<span class="fc bfc" id="L56" title="All 2 branches covered.">        if (FUNC_TEXT.equals(lvalue)) {</span>
+<span class="fc" id="L57">            v = new String[]{element.getText()};</span>
+        } else {
+            // getChild() is a bit of a hack here because the content object
+            // calls getParent()
+<span class="fc" id="L61">            StructuredContent child = element.getChild(0);</span>
+<span class="fc" id="L62">            Result result = Result.fromContent(child);</span>
+<span class="fc" id="L63">            v = result.getAsStringArray(lvalue);</span>
+        }
+<span class="fc" id="L65">        return v;</span>
+    }
+
+    /*
+     * (non-Javadoc)
+     *
+     * @see
+     * com.codename1.path.impl.AbstractEvaluator#evaluateLeftLessRight(com.codename1
+     * .path.impl.StructuredContent, java.lang.String, java.lang.String)
+     */
+    @Override
+    protected Object evaluateLeftLessRight(StructuredContent element,
+                                           String lvalue, String rvalue) {
+<span class="fc" id="L78">        String[] v = getLeftValue(element, lvalue);</span>
+<span class="fc" id="L79">        int vlen = v.length;</span>
+        // Quotes off first, then doubles: the same order and the same
+        // arithmetic the attribute comparisons use, so a predicate means one
+        // thing whether it names an attribute or a child. Integer.parseInt
+        // here threw outright on &quot;[price=2.5]&quot; once isNumeric learned to read
+        // a decimal.
+<span class="fc" id="L85">        rvalue = stripQuotes(rvalue);</span>
+<span class="fc bfc" id="L86" title="All 2 branches covered.">        for (int i = 0; i &lt; vlen; i++) {</span>
+<span class="pc bpc" id="L87" title="1 of 2 branches missed.">            if (v[i] == null) {</span>
+                // A node with no text of its own -- an empty nested array is
+                // one -- has nothing to compare, the same way the attribute
+                // evaluator treats a name it cannot resolve.
+<span class="nc" id="L91">                continue;</span>
+            }
+<span class="pc bpc" id="L93" title="3 of 4 branches missed.">            if (isNumeric(rvalue) &amp;&amp; isNumeric(v[i])) {</span>
+<span class="nc bnc" id="L94" title="All 2 branches missed.">                if (compareNumbers(v[i], rvalue) &lt; 0) {</span>
+<span class="nc" id="L95">                    return element;</span>
+                }
+                // On to the next value rather than out: an element
+                // can carry several children of one name, and the
+                // text branch below has always walked all of them.
+                // Returning here meant &lt;price&gt;1.5&lt;/price&gt; hid
+                // &lt;price&gt;2.5&lt;/price&gt; from [price=2.5].
+                continue;
+            }
+            // Backwards: this is the LESS-than method and it answered when the
+            // value sorted AFTER the operand.
+<span class="fc bfc" id="L106" title="All 2 branches covered.">            if (v[i].compareTo(rvalue) &lt; 0) {</span>
+<span class="fc" id="L107">                return element;</span>
+            }
+        }
+<span class="fc" id="L110">        return null;</span>
+    }
+
+    /*
+     * (non-Javadoc)
+     *
+     * @see
+     * com.codename1.path.impl.AbstractEvaluator#evaluateLeftGreaterRight(com
+     * .codename1.path.impl.StructuredContent, java.lang.String,
+     * java.lang.String)
+     */
+    @Override
+    protected Object evaluateLeftGreaterRight(StructuredContent element,
+                                              String lvalue, String rvalue) {
+<span class="fc" id="L124">        String[] v = getLeftValue(element, lvalue);</span>
+<span class="fc" id="L125">        int vlen = v.length;</span>
+<span class="fc" id="L126">        rvalue = stripQuotes(rvalue);</span>
+<span class="fc bfc" id="L127" title="All 2 branches covered.">        for (int i = 0; i &lt; vlen; i++) {</span>
+<span class="pc bpc" id="L128" title="1 of 2 branches missed.">            if (v[i] == null) {</span>
+                // A node with no text of its own -- an empty nested array is
+                // one -- has nothing to compare, the same way the attribute
+                // evaluator treats a name it cannot resolve.
+<span class="nc" id="L132">                continue;</span>
+            }
+<span class="pc bpc" id="L134" title="3 of 4 branches missed.">            if (isNumeric(rvalue) &amp;&amp; isNumeric(v[i])) {</span>
+<span class="nc bnc" id="L135" title="All 2 branches missed.">                if (compareNumbers(v[i], rvalue) &gt; 0) {</span>
+<span class="nc" id="L136">                    return element;</span>
+                }
+                // On to the next value rather than out: an element
+                // can carry several children of one name, and the
+                // text branch below has always walked all of them.
+                // Returning here meant &lt;price&gt;1.5&lt;/price&gt; hid
+                // &lt;price&gt;2.5&lt;/price&gt; from [price=2.5].
+                continue;
+            }
+            // Backwards, the same way the less-than method was.
+<span class="fc bfc" id="L146" title="All 2 branches covered.">            if (v[i].compareTo(rvalue) &gt; 0) {</span>
+<span class="fc" id="L147">                return element;</span>
+            }
+        }
+<span class="fc" id="L150">        return null;</span>
+    }
+
+    /*
+     * (non-Javadoc)
+     *
+     * @see
+     * com.codename1.path.impl.AbstractEvaluator#evaluateLeftEqualsRight(com
+     * .codename1.path.impl.StructuredContent, java.lang.String,
+     * java.lang.String)
+     */
+    @Override
+    protected Object evaluateLeftEqualsRight(StructuredContent element,
+                                             String lvalue, String rvalue) {
+<span class="fc" id="L164">        String[] v = getLeftValue(element, lvalue);</span>
+<span class="fc" id="L165">        int vlen = v.length;</span>
+<span class="fc" id="L166">        rvalue = stripQuotes(rvalue);</span>
+<span class="fc bfc" id="L167" title="All 2 branches covered.">        for (int i = 0; i &lt; vlen; i++) {</span>
+<span class="fc bfc" id="L168" title="All 2 branches covered.">            if (v[i] == null) {</span>
+                // A node with no text of its own -- an empty nested array is
+                // one -- has nothing to compare, the same way the attribute
+                // evaluator treats a name it cannot resolve.
+<span class="fc" id="L172">                continue;</span>
+            }
+<span class="pc bpc" id="L174" title="2 of 4 branches missed.">            if (isNumeric(rvalue) &amp;&amp; isNumeric(v[i])) {</span>
+<span class="fc bfc" id="L175" title="All 2 branches covered.">                if (compareNumbers(v[i], rvalue) == 0) {</span>
+<span class="fc" id="L176">                    return element;</span>
+                }
+                // On to the next value rather than out: an element
+                // can carry several children of one name, and the
+                // text branch below has always walked all of them.
+                // Returning here meant &lt;price&gt;1.5&lt;/price&gt; hid
+                // &lt;price&gt;2.5&lt;/price&gt; from [price=2.5].
+                continue;
+            }
+<span class="nc bnc" id="L185" title="All 2 branches missed.">            if (v[i].compareTo(rvalue) == 0) {</span>
+<span class="nc" id="L186">                return element;</span>
+            }
+        }
+<span class="fc" id="L189">        return null;</span>
+    }
+
+    /*
+     * (non-Javadoc)
+     *
+     * @see
+     * com.codename1.processing.AbstractEvaluator#evaluateSingle(java.util.List
+     * , java.lang.String)
+     */
+    @Override
+    protected Object evaluateSingle(StructuredContent element, String expr) {
+<span class="nc" id="L201">        Result result = Result.fromContent(element.getChild(0));</span>
+<span class="nc" id="L202">        String v = result.getAsString(expr);</span>
+<span class="nc bnc" id="L203" title="All 2 branches missed.">        if (v == null) {</span>
+<span class="nc" id="L204">            return null;</span>
+        }
+<span class="nc" id="L206">        return element;</span>
+    }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

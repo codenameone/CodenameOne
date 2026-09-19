@@ -1,0 +1,92 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>PointerDragHistory.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.ui</a> &gt; <span class="el_source">PointerDragHistory.java</span></div><h1>PointerDragHistory.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.ui;
+
+import com.codename1.impl.CodenameOneImplementation;
+
+/// The recent path of one pointer gesture, which is what a fling's speed is computed
+/// from.
+///
+/// This is the only piece of gesture bookkeeping involved enough to be worth sharing:
+/// a ring of positions and timestamps, plus the wrap arithmetic around it. Everything
+/// else a top level tracks during a gesture -- the pressed component, whether a drag
+/// happened, the long press timer -- is a field, and a field on the right object needs
+/// no sharing.
+///
+/// One of these belongs to each top level that dispatches pointer events: `Display`
+/// owns the main surface's, and every `Window` owns its own. That is deliberately not
+/// a table keyed by window: a per-window slot table has to be leased, reclaimed and
+/// bounded, and getting any of that wrong loses a gesture or leaks a slot. An object
+/// the window holds is created when the window is and collected with it.
+///
+/// @author Shai Almog
+final class PointerDragHistory {
+
+    private final float[] pathX;
+    private final float[] pathY;
+    private final long[] pathTime;
+    private int offset;
+    private int length;
+
+    /// The moment the display started, which recorded timestamps are relative to.
+    private final long baseTime;
+
+<span class="fc" id="L54">    PointerDragHistory(int pathLength, long baseTime) {</span>
+<span class="pc bpc" id="L55" title="1 of 2 branches missed.">        int len = pathLength &gt; 0 ? pathLength : 1;</span>
+<span class="fc" id="L56">        pathX = new float[len];</span>
+<span class="fc" id="L57">        pathY = new float[len];</span>
+<span class="fc" id="L58">        pathTime = new long[len];</span>
+<span class="fc" id="L59">        this.baseTime = baseTime;</span>
+<span class="fc" id="L60">    }</span>
+
+    /// Records one position in the gesture.
+    void record(int x, int y, int timestamp) {
+<span class="fc" id="L64">        pathX[offset] = x;</span>
+<span class="fc" id="L65">        pathY[offset] = y;</span>
+<span class="fc" id="L66">        pathTime[offset] = baseTime + (long) timestamp;</span>
+<span class="pc bpc" id="L67" title="1 of 2 branches missed.">        if (length &lt; pathX.length) {</span>
+<span class="fc" id="L68">            length++;</span>
+        }
+<span class="fc" id="L70">        offset++;</span>
+<span class="pc bpc" id="L71" title="1 of 2 branches missed.">        if (offset &gt;= pathX.length) {</span>
+<span class="nc" id="L72">            offset = 0;</span>
+        }
+<span class="fc" id="L74">    }</span>
+
+    /// Forgets the gesture, so the next one starts from nothing rather than flinging
+    /// with the previous gesture's speed.
+    void reset() {
+<span class="nc" id="L79">        offset = 0;</span>
+<span class="nc" id="L80">        length = 0;</span>
+<span class="nc" id="L81">    }</span>
+
+    /// The speed of the recorded gesture along one axis, as the implementation
+    /// computes it.
+    float speed(CodenameOneImplementation impl, boolean yAxis) {
+<span class="nc bnc" id="L86" title="All 2 branches missed.">        if (yAxis) {</span>
+<span class="nc" id="L87">            return impl.getDragSpeed(pathY, pathTime, offset, length);</span>
+        }
+<span class="nc" id="L89">        return impl.getDragSpeed(pathX, pathTime, offset, length);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

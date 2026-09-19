@@ -1,0 +1,761 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>MicrosoftCalendarSource.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.calendar</a> &gt; <span class="el_source">MicrosoftCalendarSource.java</span></div><h1>MicrosoftCalendarSource.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.calendar;
+
+import com.codename1.io.Util;
+import com.codename1.util.AsyncResource;
+import com.codename1.util.SuccessCallback;
+import java.time.Duration;
+import java.time.Instant;
+import java.time.LocalDate;
+import java.time.ZoneId;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+/// Microsoft Graph calendar and Microsoft To Do source. No client secret or
+/// refresh token is stored by this class.
+public class MicrosoftCalendarSource extends OAuthCalendarSource {
+
+    public static final String SCOPE_CALENDARS = &quot;Calendars.ReadWrite&quot;;
+
+    public static final String SCOPE_TASKS = &quot;Tasks.ReadWrite&quot;;
+
+    private static final String GRAPH = &quot;https://graph.microsoft.com/v1.0&quot;;
+
+    public MicrosoftCalendarSource(CalendarTokenProvider tokens) {
+<span class="nc" id="L48">        this(tokens, null);</span>
+<span class="nc" id="L49">    }</span>
+
+    public MicrosoftCalendarSource(CalendarTokenProvider tokens, CalendarHttpTransport transport) {
+<span class="fc" id="L52">        super(&quot;microsoft&quot;, &quot;Microsoft 365&quot;, tokens, transport, new String[] { SCOPE_CALENDARS, SCOPE_TASKS, &quot;offline_access&quot; });</span>
+<span class="fc" id="L53">    }</span>
+
+    @Override
+    public CalendarCapabilities getCapabilities() {
+<span class="nc" id="L57">        return CalendarCapabilities.of(CalendarCapability.READ_CALENDARS, CalendarCapability.MANAGE_CALENDARS, CalendarCapability.READ_EVENTS, CalendarCapability.WRITE_EVENTS, CalendarCapability.DELETE_EVENTS, CalendarCapability.READ_TASKS, CalendarCapability.WRITE_TASKS, CalendarCapability.DELETE_TASKS, CalendarCapability.RECURRENCE, CalendarCapability.ATTENDEES_READ, CalendarCapability.ATTENDEES_WRITE, CalendarCapability.RESPOND_TO_INVITATIONS, CalendarCapability.ALARMS, CalendarCapability.FREE_BUSY, CalendarCapability.ATTACHMENTS, CalendarCapability.CONFERENCING, CalendarCapability.OFFLINE_MUTATIONS);</span>
+    }
+
+    @Override
+    public AsyncResource&lt;CalendarPage&lt;CalendarInfo&gt;&gt; listCalendars(final CalendarInfo.ContentType type, String pageToken) {
+<span class="nc" id="L62">        final AsyncResource&lt;CalendarPage&lt;CalendarInfo&gt;&gt; out = new AsyncResource&lt;CalendarPage&lt;CalendarInfo&gt;&gt;();</span>
+<span class="nc bnc" id="L63" title="All 2 branches missed.">        if (invalidPageToken(pageToken)) {</span>
+<span class="nc" id="L64">            return fail(out, &quot;Invalid page token&quot;);</span>
+        }
+<span class="nc bnc" id="L66" title="All 4 branches missed.">        String url = pageToken != null ? pageToken : (type == CalendarInfo.ContentType.TASKS ? GRAPH + &quot;/me/todo/lists&quot; : GRAPH + &quot;/me/calendars&quot;);</span>
+<span class="nc" id="L67">        json(&quot;GET&quot;, url, null, null).ready(new SuccessCallback&lt;Map&lt;String, Object&gt;&gt;() {</span>
+
+            @Override
+            public void onSucess(Map&lt;String, Object&gt; root) {
+<span class="nc" id="L71">                List&lt;CalendarInfo&gt; items = new ArrayList&lt;CalendarInfo&gt;();</span>
+<span class="nc bnc" id="L72" title="All 2 branches missed.">                for (Map&lt;String, Object&gt; m : maps(root.get(&quot;value&quot;))) {</span>
+<span class="nc" id="L73">                    items.add(calendar(m, type));</span>
+<span class="nc" id="L74">                }</span>
+<span class="nc" id="L75">                out.complete(new CalendarPage&lt;CalendarInfo&gt;(items, string(root, &quot;@odata.nextLink&quot;), null));</span>
+<span class="nc" id="L76">            }</span>
+<span class="nc" id="L77">        }).except(error(out));</span>
+<span class="nc" id="L78">        return out;</span>
+    }
+
+    @Override
+    public AsyncResource&lt;CalendarInfo&gt; saveCalendar(final CalendarInfo calendar) {
+<span class="nc" id="L83">        final AsyncResource&lt;CalendarInfo&gt; out = new AsyncResource&lt;CalendarInfo&gt;();</span>
+<span class="nc bnc" id="L84" title="All 2 branches missed.">        boolean task = calendar.getContentType() == CalendarInfo.ContentType.TASKS;</span>
+<span class="nc" id="L85">        Map&lt;String, Object&gt; body = new HashMap&lt;String, Object&gt;();</span>
+<span class="nc bnc" id="L86" title="All 2 branches missed.">        body.put(task ? &quot;displayName&quot; : &quot;name&quot;, calendar.getName());</span>
+<span class="nc bnc" id="L87" title="All 2 branches missed.">        String base = task ? GRAPH + &quot;/me/todo/lists&quot; : GRAPH + &quot;/me/calendars&quot;;</span>
+<span class="nc bnc" id="L88" title="All 2 branches missed.">        String url = calendar.getId() == null ? base : base + &quot;/&quot; + e(calendar.getId());</span>
+<span class="nc" id="L89">        final CalendarInfo.ContentType type = calendar.getContentType();</span>
+<span class="nc bnc" id="L90" title="All 2 branches missed.">        json(calendar.getId() == null ? &quot;POST&quot; : &quot;PATCH&quot;, url, body, null).ready(new SuccessCallback&lt;Map&lt;String, Object&gt;&gt;() {</span>
+
+            @Override
+            public void onSucess(Map&lt;String, Object&gt; m) {
+<span class="nc" id="L94">                out.complete(calendar(m, type));</span>
+<span class="nc" id="L95">            }</span>
+<span class="nc" id="L96">        }).except(error(out));</span>
+<span class="nc" id="L97">        return out;</span>
+    }
+
+    @Override
+    public AsyncResource&lt;Boolean&gt; deleteCalendar(String calendarId) {
+<span class="nc" id="L102">        final AsyncResource&lt;Boolean&gt; out = new AsyncResource&lt;Boolean&gt;();</span>
+<span class="nc" id="L103">        json(&quot;DELETE&quot;, GRAPH + &quot;/me/calendars/&quot; + e(calendarId), null, null).ready(done(out)).except(error(out));</span>
+<span class="nc" id="L104">        return out;</span>
+    }
+
+    @Override
+    public AsyncResource&lt;Boolean&gt; deleteCalendar(CalendarInfo calendar) {
+<span class="nc bnc" id="L109" title="All 4 branches missed.">        if (calendar == null || calendar.getId() == null) {</span>
+<span class="nc" id="L110">            return fail(new AsyncResource&lt;Boolean&gt;(), &quot;calendar and id required&quot;);</span>
+        }
+<span class="nc" id="L112">        final AsyncResource&lt;Boolean&gt; out = new AsyncResource&lt;Boolean&gt;();</span>
+<span class="nc bnc" id="L113" title="All 2 branches missed.">        String url = calendar.getContentType() == CalendarInfo.ContentType.TASKS</span>
+<span class="nc" id="L114">                ? GRAPH + &quot;/me/todo/lists/&quot; + e(calendar.getId())</span>
+<span class="nc" id="L115">                : GRAPH + &quot;/me/calendars/&quot; + e(calendar.getId());</span>
+<span class="nc" id="L116">        json(&quot;DELETE&quot;, url, null, null).ready(done(out)).except(error(out));</span>
+<span class="nc" id="L117">        return out;</span>
+    }
+
+    @Override
+    public AsyncResource&lt;CalendarPage&lt;CalendarEvent&gt;&gt; queryEvents(CalendarQuery query) {
+<span class="fc" id="L122">        final AsyncResource&lt;CalendarPage&lt;CalendarEvent&gt;&gt; out = new AsyncResource&lt;CalendarPage&lt;CalendarEvent&gt;&gt;();</span>
+<span class="pc bpc" id="L123" title="2 of 4 branches missed.">        if (query == null || query.getCalendarId() == null) {</span>
+<span class="nc" id="L124">            return fail(out, &quot;calendarId required&quot;);</span>
+        }
+        String url;
+<span class="pc bpc" id="L127" title="1 of 2 branches missed.">        if (query.getPageToken() != null) {</span>
+<span class="nc bnc" id="L128" title="All 2 branches missed.">            if (invalidPageToken(query.getPageToken())) {</span>
+<span class="nc" id="L129">                return fail(out, &quot;Invalid page token&quot;);</span>
+            }
+<span class="nc" id="L131">            url = query.getPageToken();</span>
+        } else {
+<span class="pc bpc" id="L133" title="1 of 2 branches missed.">            if (query.getSyncToken() != null) {</span>
+<span class="nc" id="L134">                return fail(out, &quot;Microsoft Graph v1.0 does not support delta tokens for arbitrary calendars&quot;);</span>
+            }
+<span class="pc bpc" id="L136" title="3 of 4 branches missed.">            boolean range = query.getStartTime() != null || query.getEndTime() != null;</span>
+<span class="fc" id="L137">            StringBuilder b = new StringBuilder(GRAPH).append(&quot;/me/calendars/&quot;)</span>
+<span class="pc bpc" id="L138" title="1 of 2 branches missed.">                    .append(e(query.getCalendarId())).append(range ? &quot;/calendarView?&quot; : &quot;/events?$top=&quot; + query.getPageSize());</span>
+<span class="pc bpc" id="L139" title="1 of 2 branches missed.">            if (range) {</span>
+<span class="fc" id="L140">                long now = System.currentTimeMillis();</span>
+<span class="pc bpc" id="L141" title="1 of 2 branches missed.">                Instant start = query.getStartTime() == null ? Instant.ofEpochMilli(now - 315360000000L) : query.getStartTime();</span>
+<span class="pc bpc" id="L142" title="1 of 2 branches missed.">                Instant end = query.getEndTime() == null ? Instant.ofEpochMilli(now + 315360000000L) : query.getEndTime();</span>
+<span class="fc" id="L143">                b.append(&quot;startDateTime=&quot;).append(e(iso(start))).append(&quot;&amp;endDateTime=&quot;).append(e(iso(end)))</span>
+<span class="fc" id="L144">                        .append(&quot;&amp;$top=&quot;).append(query.getPageSize());</span>
+            }
+<span class="fc" id="L146">            url = b.toString();</span>
+        }
+<span class="fc" id="L148">        final String calendarId = query.getCalendarId();</span>
+<span class="fc" id="L149">        json(&quot;GET&quot;, url, null, null).ready(new SuccessCallback&lt;Map&lt;String, Object&gt;&gt;() {</span>
+
+            @Override
+            public void onSucess(Map&lt;String, Object&gt; root) {
+<span class="fc" id="L153">                List&lt;CalendarEvent&gt; items = new ArrayList&lt;CalendarEvent&gt;();</span>
+                try {
+<span class="fc bfc" id="L155" title="All 2 branches covered.">                    for (Map&lt;String, Object&gt; m : maps(root.get(&quot;value&quot;))) {</span>
+<span class="fc" id="L156">                        items.add(event(m, calendarId));</span>
+<span class="fc" id="L157">                    }</span>
+<span class="nc" id="L158">                } catch (CalendarException ex) {</span>
+<span class="nc" id="L159">                    out.error(ex);</span>
+<span class="nc" id="L160">                    return;</span>
+<span class="fc" id="L161">                }</span>
+<span class="fc" id="L162">                out.complete(new CalendarPage&lt;CalendarEvent&gt;(items, string(root, &quot;@odata.nextLink&quot;), null));</span>
+<span class="fc" id="L163">            }</span>
+<span class="fc" id="L164">        }).except(error(out));</span>
+<span class="fc" id="L165">        return out;</span>
+    }
+
+    @Override
+    public AsyncResource&lt;CalendarEvent&gt; getEvent(final String calendarId, String eventId) {
+<span class="nc" id="L170">        final AsyncResource&lt;CalendarEvent&gt; out = new AsyncResource&lt;CalendarEvent&gt;();</span>
+<span class="nc" id="L171">        json(&quot;GET&quot;, GRAPH + &quot;/me/calendars/&quot; + e(calendarId) + &quot;/events/&quot; + e(eventId), null, null).ready(new SuccessCallback&lt;Map&lt;String, Object&gt;&gt;() {</span>
+
+            @Override
+            public void onSucess(Map&lt;String, Object&gt; m) {
+                try {
+<span class="nc" id="L176">                    out.complete(event(m, calendarId));</span>
+<span class="nc" id="L177">                } catch (CalendarException ex) {</span>
+<span class="nc" id="L178">                    out.error(ex);</span>
+<span class="nc" id="L179">                }</span>
+<span class="nc" id="L180">            }</span>
+<span class="nc" id="L181">        }).except(error(out));</span>
+<span class="nc" id="L182">        return out;</span>
+    }
+
+    @Override
+    public AsyncResource&lt;CalendarEvent&gt; saveEvent(final CalendarEvent event, CalendarMutationScope scope) {
+<span class="nc" id="L187">        final AsyncResource&lt;CalendarEvent&gt; out = new AsyncResource&lt;CalendarEvent&gt;();</span>
+<span class="nc bnc" id="L188" title="All 4 branches missed.">        if (event == null || event.getCalendarId() == null) {</span>
+<span class="nc" id="L189">            return fail(out, &quot;event and calendarId required&quot;);</span>
+        }
+<span class="nc" id="L191">        String base = GRAPH + &quot;/me/calendars/&quot; + e(event.getCalendarId()) + &quot;/events&quot;;</span>
+<span class="nc bnc" id="L192" title="All 2 branches missed.">        String url = event.getId() == null ? base : base + &quot;/&quot; + e(event.getId());</span>
+<span class="nc bnc" id="L193" title="All 2 branches missed.">        json(event.getId() == null ? &quot;POST&quot; : &quot;PATCH&quot;, url, eventMap(event), version(event.getVersion())).ready(new SuccessCallback&lt;Map&lt;String, Object&gt;&gt;() {</span>
+
+            @Override
+            public void onSucess(Map&lt;String, Object&gt; m) {
+                try {
+<span class="nc" id="L198">                    CalendarEvent saved = event(m, event.getCalendarId());</span>
+<span class="nc" id="L199">                    out.complete(saved);</span>
+<span class="nc bnc" id="L200" title="All 2 branches missed.">                    fireChange(new CalendarChange(getId(), saved.getCalendarId(), saved.getId(), CalendarChange.EntityType.EVENT, event.getId() == null ? CalendarChange.ChangeType.CREATED : CalendarChange.ChangeType.UPDATED));</span>
+<span class="nc" id="L201">                } catch (CalendarException ex) {</span>
+<span class="nc" id="L202">                    out.error(ex);</span>
+<span class="nc" id="L203">                }</span>
+<span class="nc" id="L204">            }</span>
+<span class="nc" id="L205">        }).except(error(out));</span>
+<span class="nc" id="L206">        return out;</span>
+    }
+
+    @Override
+    public AsyncResource&lt;Boolean&gt; deleteEvent(final String calendarId, final String eventId, CalendarMutationScope scope, String version) {
+<span class="nc" id="L211">        final AsyncResource&lt;Boolean&gt; out = new AsyncResource&lt;Boolean&gt;();</span>
+<span class="nc" id="L212">        json(&quot;DELETE&quot;, GRAPH + &quot;/me/calendars/&quot; + e(calendarId) + &quot;/events/&quot; + e(eventId), null, version(version)).ready(new SuccessCallback&lt;Map&lt;String, Object&gt;&gt;() {</span>
+
+            @Override
+            public void onSucess(Map&lt;String, Object&gt; x) {
+<span class="nc" id="L216">                out.complete(Boolean.TRUE);</span>
+<span class="nc" id="L217">                fireChange(new CalendarChange(getId(), calendarId, eventId, CalendarChange.EntityType.EVENT, CalendarChange.ChangeType.DELETED));</span>
+<span class="nc" id="L218">            }</span>
+<span class="nc" id="L219">        }).except(error(out));</span>
+<span class="nc" id="L220">        return out;</span>
+    }
+
+    @Override
+    public AsyncResource&lt;CalendarEvent&gt; respondToEvent(final String calendarId, final String eventId, CalendarAttendee.Response response, String comment) {
+<span class="nc" id="L225">        final AsyncResource&lt;CalendarEvent&gt; out = new AsyncResource&lt;CalendarEvent&gt;();</span>
+<span class="nc bnc" id="L226" title="All 6 branches missed.">        if (response != CalendarAttendee.Response.ACCEPTED</span>
+                &amp;&amp; response != CalendarAttendee.Response.DECLINED
+                &amp;&amp; response != CalendarAttendee.Response.TENTATIVE) {
+<span class="nc" id="L229">            return fail(out, &quot;response must be ACCEPTED, DECLINED, or TENTATIVE&quot;);</span>
+        }
+<span class="nc bnc" id="L231" title="All 4 branches missed.">        String action = response == CalendarAttendee.Response.ACCEPTED ? &quot;accept&quot; : response == CalendarAttendee.Response.DECLINED ? &quot;decline&quot; : &quot;tentativelyAccept&quot;;</span>
+<span class="nc" id="L232">        Map&lt;String, Object&gt; body = new HashMap&lt;String, Object&gt;();</span>
+<span class="nc" id="L233">        body.put(&quot;comment&quot;, comment);</span>
+<span class="nc" id="L234">        body.put(&quot;sendResponse&quot;, Boolean.TRUE);</span>
+<span class="nc" id="L235">        json(&quot;POST&quot;, GRAPH + &quot;/me/events/&quot; + e(eventId) + &quot;/&quot; + action, body, null).ready(new SuccessCallback&lt;Map&lt;String, Object&gt;&gt;() {</span>
+
+            @Override
+            public void onSucess(Map&lt;String, Object&gt; x) {
+<span class="nc" id="L239">                getEvent(calendarId, eventId).ready(new SuccessCallback&lt;CalendarEvent&gt;() {</span>
+
+                    @Override
+                    public void onSucess(CalendarEvent event) {
+<span class="nc" id="L243">                        out.complete(event);</span>
+<span class="nc" id="L244">                    }</span>
+<span class="nc" id="L245">                }).except(error(out));</span>
+<span class="nc" id="L246">            }</span>
+<span class="nc" id="L247">        }).except(error(out));</span>
+<span class="nc" id="L248">        return out;</span>
+    }
+
+    @Override
+    public AsyncResource&lt;List&lt;FreeBusyInterval&gt;&gt; queryFreeBusy(List&lt;String&gt; ids, Instant start, Instant end) {
+<span class="nc" id="L253">        final AsyncResource&lt;List&lt;FreeBusyInterval&gt;&gt; out = new AsyncResource&lt;List&lt;FreeBusyInterval&gt;&gt;();</span>
+<span class="nc bnc" id="L254" title="All 6 branches missed.">        if (ids == null || start == null || end == null) {</span>
+<span class="nc" id="L255">            return fail(out, &quot;calendar ids, start, and end required&quot;);</span>
+        }
+<span class="nc" id="L257">        collectFreeBusy(ids, 0, start, end, null, new ArrayList&lt;FreeBusyInterval&gt;(), out);</span>
+<span class="nc" id="L258">        return out;</span>
+    }
+
+    private void collectFreeBusy(final List&lt;String&gt; ids, final int index, final Instant start,
+            final Instant end, String pageToken, final List&lt;FreeBusyInterval&gt; result,
+            final AsyncResource&lt;List&lt;FreeBusyInterval&gt;&gt; out) {
+<span class="nc bnc" id="L264" title="All 2 branches missed.">        if (index &gt;= ids.size()) {</span>
+<span class="nc" id="L265">            out.complete(result);</span>
+<span class="nc" id="L266">            return;</span>
+        }
+<span class="nc" id="L268">        CalendarQuery query = new CalendarQuery().setCalendarId(ids.get(index)).setStartTime(start)</span>
+<span class="nc" id="L269">                .setEndTime(end).setPageSize(1000).setPageToken(pageToken);</span>
+<span class="nc" id="L270">        queryEvents(query).ready(new SuccessCallback&lt;CalendarPage&lt;CalendarEvent&gt;&gt;() {</span>
+            @Override
+            public void onSucess(CalendarPage&lt;CalendarEvent&gt; page) {
+<span class="nc bnc" id="L273" title="All 2 branches missed.">                for (CalendarEvent event : page.getItems()) {</span>
+<span class="nc bnc" id="L274" title="All 2 branches missed.">                    if (event.getAvailability() != CalendarEvent.Availability.FREE</span>
+<span class="nc bnc" id="L275" title="All 4 branches missed.">                            &amp;&amp; event.getStart() != null &amp;&amp; event.getEnd() != null</span>
+<span class="nc bnc" id="L276" title="All 4 branches missed.">                            &amp;&amp; !event.getStart().isAllDay() &amp;&amp; !event.getEnd().isAllDay()) {</span>
+<span class="nc" id="L277">                        result.add(new FreeBusyInterval(event.getStart().getDateTime().toInstant(),</span>
+<span class="nc" id="L278">                                event.getEnd().getDateTime().toInstant(), event.getAvailability()));</span>
+                    }
+<span class="nc" id="L280">                }</span>
+<span class="nc bnc" id="L281" title="All 2 branches missed.">                if (page.getNextPageToken() != null) {</span>
+<span class="nc" id="L282">                    collectFreeBusy(ids, index, start, end, page.getNextPageToken(), result, out);</span>
+                } else {
+<span class="nc" id="L284">                    collectFreeBusy(ids, index + 1, start, end, null, result, out);</span>
+                }
+<span class="nc" id="L286">            }</span>
+<span class="nc" id="L287">        }).except(error(out));</span>
+<span class="nc" id="L288">    }</span>
+
+    @Override
+    public AsyncResource&lt;CalendarPage&lt;CalendarTask&gt;&gt; queryTasks(CalendarQuery query) {
+<span class="nc" id="L292">        final AsyncResource&lt;CalendarPage&lt;CalendarTask&gt;&gt; out = new AsyncResource&lt;CalendarPage&lt;CalendarTask&gt;&gt;();</span>
+<span class="nc bnc" id="L293" title="All 4 branches missed.">        if (query == null || query.getCalendarId() == null) {</span>
+<span class="nc" id="L294">            return fail(out, &quot;calendarId required&quot;);</span>
+        }
+<span class="nc bnc" id="L296" title="All 2 branches missed.">        if (invalidPageToken(query.getPageToken())) {</span>
+<span class="nc" id="L297">            return fail(out, &quot;Invalid page token&quot;);</span>
+        }
+<span class="nc bnc" id="L299" title="All 2 branches missed.">        String url = query.getPageToken() != null ? query.getPageToken() : GRAPH + &quot;/me/todo/lists/&quot; + e(query.getCalendarId()) + &quot;/tasks?$top=&quot; + query.getPageSize();</span>
+<span class="nc" id="L300">        final String list = query.getCalendarId();</span>
+<span class="nc" id="L301">        json(&quot;GET&quot;, url, null, null).ready(new SuccessCallback&lt;Map&lt;String, Object&gt;&gt;() {</span>
+
+            @Override
+            public void onSucess(Map&lt;String, Object&gt; root) {
+<span class="nc" id="L305">                List&lt;CalendarTask&gt; items = new ArrayList&lt;CalendarTask&gt;();</span>
+                try {
+<span class="nc bnc" id="L307" title="All 2 branches missed.">                    for (Map&lt;String, Object&gt; m : maps(root.get(&quot;value&quot;))) {</span>
+<span class="nc" id="L308">                        items.add(task(m, list));</span>
+<span class="nc" id="L309">                    }</span>
+<span class="nc" id="L310">                } catch (CalendarException ex) {</span>
+<span class="nc" id="L311">                    out.error(ex);</span>
+<span class="nc" id="L312">                    return;</span>
+<span class="nc" id="L313">                }</span>
+<span class="nc" id="L314">                out.complete(new CalendarPage&lt;CalendarTask&gt;(items, string(root, &quot;@odata.nextLink&quot;), null));</span>
+<span class="nc" id="L315">            }</span>
+<span class="nc" id="L316">        }).except(error(out));</span>
+<span class="nc" id="L317">        return out;</span>
+    }
+
+    @Override
+    public AsyncResource&lt;CalendarTask&gt; getTask(final String list, String id) {
+<span class="nc" id="L322">        final AsyncResource&lt;CalendarTask&gt; out = new AsyncResource&lt;CalendarTask&gt;();</span>
+<span class="nc" id="L323">        json(&quot;GET&quot;, GRAPH + &quot;/me/todo/lists/&quot; + e(list) + &quot;/tasks/&quot; + e(id), null, null).ready(new SuccessCallback&lt;Map&lt;String, Object&gt;&gt;() {</span>
+
+            @Override
+            public void onSucess(Map&lt;String, Object&gt; m) {
+                try {
+<span class="nc" id="L328">                    out.complete(task(m, list));</span>
+<span class="nc" id="L329">                } catch (CalendarException ex) {</span>
+<span class="nc" id="L330">                    out.error(ex);</span>
+<span class="nc" id="L331">                }</span>
+<span class="nc" id="L332">            }</span>
+<span class="nc" id="L333">        }).except(error(out));</span>
+<span class="nc" id="L334">        return out;</span>
+    }
+
+    @Override
+    public AsyncResource&lt;CalendarTask&gt; saveTask(final CalendarTask task, CalendarMutationScope scope) {
+<span class="nc" id="L339">        final AsyncResource&lt;CalendarTask&gt; out = new AsyncResource&lt;CalendarTask&gt;();</span>
+<span class="nc bnc" id="L340" title="All 4 branches missed.">        if (task == null || task.getCalendarId() == null) {</span>
+<span class="nc" id="L341">            return fail(out, &quot;task and calendarId required&quot;);</span>
+        }
+<span class="nc" id="L343">        String base = GRAPH + &quot;/me/todo/lists/&quot; + e(task.getCalendarId()) + &quot;/tasks&quot;;</span>
+<span class="nc bnc" id="L344" title="All 2 branches missed.">        String url = task.getId() == null ? base : base + &quot;/&quot; + e(task.getId());</span>
+<span class="nc bnc" id="L345" title="All 2 branches missed.">        json(task.getId() == null ? &quot;POST&quot; : &quot;PATCH&quot;, url, taskMap(task), version(task.getVersion())).ready(new SuccessCallback&lt;Map&lt;String, Object&gt;&gt;() {</span>
+
+            @Override
+            public void onSucess(Map&lt;String, Object&gt; m) {
+                try {
+<span class="nc" id="L350">                    CalendarTask saved = task(m, task.getCalendarId());</span>
+<span class="nc" id="L351">                    out.complete(saved);</span>
+<span class="nc bnc" id="L352" title="All 2 branches missed.">                    fireChange(new CalendarChange(getId(), saved.getCalendarId(), saved.getId(), CalendarChange.EntityType.TASK, task.getId() == null ? CalendarChange.ChangeType.CREATED : CalendarChange.ChangeType.UPDATED));</span>
+<span class="nc" id="L353">                } catch (CalendarException ex) {</span>
+<span class="nc" id="L354">                    out.error(ex);</span>
+<span class="nc" id="L355">                }</span>
+<span class="nc" id="L356">            }</span>
+<span class="nc" id="L357">        }).except(error(out));</span>
+<span class="nc" id="L358">        return out;</span>
+    }
+
+    @Override
+    public AsyncResource&lt;Boolean&gt; deleteTask(final String list, final String id, CalendarMutationScope scope, String version) {
+<span class="nc" id="L363">        final AsyncResource&lt;Boolean&gt; out = new AsyncResource&lt;Boolean&gt;();</span>
+<span class="nc" id="L364">        json(&quot;DELETE&quot;, GRAPH + &quot;/me/todo/lists/&quot; + e(list) + &quot;/tasks/&quot; + e(id), null, version(version)).ready(new SuccessCallback&lt;Map&lt;String, Object&gt;&gt;() {</span>
+
+            @Override
+            public void onSucess(Map&lt;String, Object&gt; x) {
+<span class="nc" id="L368">                out.complete(Boolean.TRUE);</span>
+<span class="nc" id="L369">                fireChange(new CalendarChange(getId(), list, id, CalendarChange.EntityType.TASK, CalendarChange.ChangeType.DELETED));</span>
+<span class="nc" id="L370">            }</span>
+<span class="nc" id="L371">        }).except(error(out));</span>
+<span class="nc" id="L372">        return out;</span>
+    }
+
+    private CalendarInfo calendar(Map&lt;String, Object&gt; m, CalendarInfo.ContentType type) {
+<span class="nc bnc" id="L376" title="All 2 branches missed.">        boolean taskList = type == CalendarInfo.ContentType.TASKS;</span>
+<span class="nc bnc" id="L377" title="All 8 branches missed.">        return new CalendarInfo().setId(string(m, &quot;id&quot;)).setSourceId(getId()).setName(string(m, taskList ? &quot;displayName&quot; : &quot;name&quot;)).setOwner(string(map(m.get(&quot;owner&quot;)), &quot;address&quot;)).setReadOnly(taskList ? !bool(m, &quot;isOwner&quot;) : !bool(m, &quot;canEdit&quot;)).setPrimary(bool(m, &quot;isDefaultCalendar&quot;)).setContentType(type).setCapabilities(getCapabilities());</span>
+    }
+
+    private CalendarEvent event(Map&lt;String, Object&gt; m, String calendarId) throws CalendarException {
+<span class="fc" id="L381">        CalendarEvent out = new CalendarEvent().setId(string(m, &quot;id&quot;)).setCalendarId(calendarId).setSourceId(getId()).setVersion(string(m, &quot;@odata.etag&quot;)).setTitle(string(m, &quot;subject&quot;)).setDescription(string(map(m.get(&quot;body&quot;)), &quot;content&quot;)).setLocation(string(map(m.get(&quot;location&quot;)), &quot;displayName&quot;)).setUrl(string(m, &quot;webLink&quot;)).setStart(graphDate(map(m.get(&quot;start&quot;)))).setEnd(graphDate(map(m.get(&quot;end&quot;)))).setRecurringEventId(string(m, &quot;seriesMasterId&quot;));</span>
+<span class="fc" id="L382">        out.setRecurrence(readGraphRecurrence(map(m.get(&quot;recurrence&quot;))));</span>
+<span class="pc bpc" id="L383" title="1 of 2 branches missed.">        if (bool(m, &quot;isCancelled&quot;)) {</span>
+<span class="nc" id="L384">            out.setStatus(CalendarEvent.Status.CANCELED);</span>
+        }
+<span class="pc bpc" id="L386" title="1 of 2 branches missed.">        if (bool(m, &quot;isAllDay&quot;)) {</span>
+<span class="nc" id="L387">            out.setStart(toAllDay(out.getStart())).setEnd(toAllDay(out.getEnd()));</span>
+        }
+<span class="fc" id="L389">        String show = string(m, &quot;showAs&quot;);</span>
+<span class="pc bpc" id="L390" title="1 of 2 branches missed.">        if (&quot;free&quot;.equals(show)) {</span>
+<span class="nc" id="L391">            out.setAvailability(CalendarEvent.Availability.FREE);</span>
+<span class="pc bpc" id="L392" title="1 of 2 branches missed.">        } else if (&quot;tentative&quot;.equals(show)) {</span>
+<span class="nc" id="L393">            out.setAvailability(CalendarEvent.Availability.TENTATIVE);</span>
+<span class="pc bpc" id="L394" title="1 of 2 branches missed.">        } else if (&quot;oof&quot;.equals(show)) {</span>
+<span class="nc" id="L395">            out.setAvailability(CalendarEvent.Availability.OUT_OF_OFFICE);</span>
+        }
+<span class="pc bpc" id="L397" title="1 of 2 branches missed.">        for (Map&lt;String, Object&gt; a : maps(m.get(&quot;attendees&quot;))) {</span>
+<span class="nc" id="L398">            Map&lt;String, Object&gt; email = map(a.get(&quot;emailAddress&quot;));</span>
+<span class="nc" id="L399">            CalendarAttendee attendee = new CalendarAttendee().setName(string(email, &quot;name&quot;)).setEmail(string(email, &quot;address&quot;));</span>
+<span class="nc bnc" id="L400" title="All 2 branches missed.">            if (&quot;optional&quot;.equals(string(a, &quot;type&quot;))) {</span>
+<span class="nc" id="L401">                attendee.setRole(CalendarAttendee.Role.OPTIONAL);</span>
+<span class="nc bnc" id="L402" title="All 2 branches missed.">            } else if (&quot;resource&quot;.equals(string(a, &quot;type&quot;))) {</span>
+<span class="nc" id="L403">                attendee.setRole(CalendarAttendee.Role.RESOURCE);</span>
+            }
+<span class="nc" id="L405">            Map&lt;String, Object&gt; status = map(a.get(&quot;status&quot;));</span>
+<span class="nc" id="L406">            String response = string(status, &quot;response&quot;);</span>
+<span class="nc" id="L407">            attendee.setResponse(attendeeResponse(response));</span>
+<span class="nc" id="L408">            out.addAttendee(attendee);</span>
+<span class="nc" id="L409">        }</span>
+<span class="pc bpc" id="L410" title="1 of 2 branches missed.">        if (bool(m, &quot;isReminderOn&quot;)) {</span>
+<span class="nc" id="L411">            Integer minutes = integer(m, &quot;reminderMinutesBeforeStart&quot;);</span>
+<span class="nc bnc" id="L412" title="All 2 branches missed.">            if (minutes != null) {</span>
+<span class="nc" id="L413">                out.addAlarm(new CalendarAlarm().setTimeBefore(Duration.ofMinutes(minutes.intValue())));</span>
+            }
+        }
+<span class="fc" id="L416">        Map&lt;String, Object&gt; meeting = map(m.get(&quot;onlineMeeting&quot;));</span>
+<span class="pc bpc" id="L417" title="1 of 2 branches missed.">        if (!meeting.isEmpty()) {</span>
+<span class="nc" id="L418">            out.setConference(new CalendarConference().setProvider(string(m, &quot;onlineMeetingProvider&quot;)).setJoinUrl(string(meeting, &quot;joinUrl&quot;)));</span>
+        }
+<span class="fc" id="L420">        return out;</span>
+    }
+
+    private Map&lt;String, Object&gt; eventMap(CalendarEvent e) {
+<span class="nc" id="L424">        Map&lt;String, Object&gt; m = new HashMap&lt;String, Object&gt;();</span>
+<span class="nc" id="L425">        m.put(&quot;subject&quot;, e.getTitle());</span>
+<span class="nc bnc" id="L426" title="All 2 branches missed.">        if (e.getRecurrence() != null) {</span>
+<span class="nc" id="L427">            m.put(&quot;recurrence&quot;, writeGraphRecurrence(e));</span>
+        }
+<span class="nc" id="L429">        Map&lt;String, Object&gt; body = new HashMap&lt;String, Object&gt;();</span>
+<span class="nc" id="L430">        body.put(&quot;contentType&quot;, &quot;text&quot;);</span>
+<span class="nc" id="L431">        body.put(&quot;content&quot;, e.getDescription());</span>
+<span class="nc" id="L432">        m.put(&quot;body&quot;, body);</span>
+<span class="nc" id="L433">        Map&lt;String, Object&gt; location = new HashMap&lt;String, Object&gt;();</span>
+<span class="nc" id="L434">        location.put(&quot;displayName&quot;, e.getLocation());</span>
+<span class="nc" id="L435">        m.put(&quot;location&quot;, location);</span>
+<span class="nc" id="L436">        m.put(&quot;start&quot;, dateMap(e.getStart()));</span>
+<span class="nc" id="L437">        m.put(&quot;end&quot;, dateMap(e.getEnd()));</span>
+<span class="nc bnc" id="L438" title="All 4 branches missed.">        m.put(&quot;isAllDay&quot;, Boolean.valueOf(e.getStart() != null &amp;&amp; e.getStart().isAllDay()));</span>
+<span class="nc bnc" id="L439" title="All 6 branches missed.">        m.put(&quot;showAs&quot;, e.getAvailability() == CalendarEvent.Availability.FREE ? &quot;free&quot; : e.getAvailability() == CalendarEvent.Availability.TENTATIVE ? &quot;tentative&quot; : e.getAvailability() == CalendarEvent.Availability.OUT_OF_OFFICE ? &quot;oof&quot; : &quot;busy&quot;);</span>
+<span class="nc" id="L440">        List&lt;Map&lt;String, Object&gt;&gt; attendees = new ArrayList&lt;Map&lt;String, Object&gt;&gt;();</span>
+<span class="nc bnc" id="L441" title="All 2 branches missed.">        for (CalendarAttendee a : e.getAttendees()) {</span>
+<span class="nc" id="L442">            Map&lt;String, Object&gt; x = new HashMap&lt;String, Object&gt;();</span>
+<span class="nc" id="L443">            Map&lt;String, Object&gt; address = new HashMap&lt;String, Object&gt;();</span>
+<span class="nc" id="L444">            address.put(&quot;address&quot;, a.getEmail());</span>
+<span class="nc" id="L445">            address.put(&quot;name&quot;, a.getName());</span>
+<span class="nc" id="L446">            x.put(&quot;emailAddress&quot;, address);</span>
+<span class="nc bnc" id="L447" title="All 4 branches missed.">            x.put(&quot;type&quot;, a.getRole() == CalendarAttendee.Role.OPTIONAL ? &quot;optional&quot; : a.getRole() == CalendarAttendee.Role.RESOURCE ? &quot;resource&quot; : &quot;required&quot;);</span>
+<span class="nc" id="L448">            attendees.add(x);</span>
+<span class="nc" id="L449">        }</span>
+<span class="nc" id="L450">        m.put(&quot;attendees&quot;, attendees);</span>
+<span class="nc bnc" id="L451" title="All 6 branches missed.">        if (!e.getAlarms().isEmpty() &amp;&amp; e.getAlarms().get(0).getTimeBefore() != null &amp;&amp; e.getAlarms().get(0).getTimeBefore().toMillis() % 60000L == 0L) {</span>
+<span class="nc" id="L452">            m.put(&quot;isReminderOn&quot;, Boolean.TRUE);</span>
+<span class="nc" id="L453">            m.put(&quot;reminderMinutesBeforeStart&quot;, Long.valueOf(e.getAlarms().get(0).getTimeBefore().toMillis() / 60000L));</span>
+        }
+<span class="nc bnc" id="L455" title="All 4 branches missed.">        if (e.getConference() != null &amp;&amp; e.getConference().isCreateRequested()) {</span>
+<span class="nc" id="L456">            m.put(&quot;isOnlineMeeting&quot;, Boolean.TRUE);</span>
+<span class="nc bnc" id="L457" title="All 2 branches missed.">            m.put(&quot;onlineMeetingProvider&quot;, e.getConference().getProvider() == null ? &quot;teamsForBusiness&quot; : e.getConference().getProvider());</span>
+        }
+<span class="nc bnc" id="L459" title="All 4 branches missed.">        if (e.getId() == null &amp;&amp; e.getProviderData().get(&quot;cn1.mutationId&quot;) != null) {</span>
+<span class="nc" id="L460">            m.put(&quot;transactionId&quot;, e.getProviderData().get(&quot;cn1.mutationId&quot;));</span>
+        }
+<span class="nc" id="L462">        return m;</span>
+    }
+
+    private CalendarTask task(Map&lt;String, Object&gt; m, String list) throws CalendarException {
+<span class="nc bnc" id="L466" title="All 4 branches missed.">        CalendarTask out = new CalendarTask().setId(string(m, &quot;id&quot;)).setCalendarId(list).setSourceId(getId()).setVersion(string(m, &quot;@odata.etag&quot;)).setTitle(string(m, &quot;title&quot;)).setDescription(string(map(m.get(&quot;body&quot;)), &quot;content&quot;)).setCompleted(&quot;completed&quot;.equals(string(m, &quot;status&quot;))).setPriority(&quot;high&quot;.equals(string(m, &quot;importance&quot;)) ? 1 : &quot;low&quot;.equals(string(m, &quot;importance&quot;)) ? 9 : 5);</span>
+<span class="nc bnc" id="L467" title="All 2 branches missed.">        if (m.get(&quot;startDateTime&quot;) instanceof Map) {</span>
+<span class="nc" id="L468">            out.setStart(graphDate(map(m.get(&quot;startDateTime&quot;))));</span>
+        }
+<span class="nc bnc" id="L470" title="All 2 branches missed.">        if (m.get(&quot;dueDateTime&quot;) instanceof Map) {</span>
+<span class="nc" id="L471">            out.setDue(graphDate(map(m.get(&quot;dueDateTime&quot;))));</span>
+        }
+<span class="nc bnc" id="L473" title="All 2 branches missed.">        if (m.get(&quot;completedDateTime&quot;) instanceof Map) {</span>
+<span class="nc" id="L474">            CalendarDateTime completed = graphDate(map(m.get(&quot;completedDateTime&quot;)));</span>
+<span class="nc bnc" id="L475" title="All 2 branches missed.">            if (completed != null) {</span>
+<span class="nc" id="L476">                out.setCompletionTime(completed.getDateTime().toInstant());</span>
+            }
+        }
+<span class="nc bnc" id="L479" title="All 4 branches missed.">        if (bool(m, &quot;isReminderOn&quot;) &amp;&amp; m.get(&quot;reminderDateTime&quot;) instanceof Map) {</span>
+<span class="nc" id="L480">            CalendarDateTime reminder = graphDate(map(m.get(&quot;reminderDateTime&quot;)));</span>
+<span class="nc bnc" id="L481" title="All 2 branches missed.">            if (reminder != null) {</span>
+<span class="nc" id="L482">                out.addAlarm(new CalendarAlarm().setAbsoluteTime(reminder.getDateTime().toInstant()));</span>
+            }
+        }
+<span class="nc" id="L485">        return out;</span>
+    }
+
+    private Map&lt;String, Object&gt; taskMap(CalendarTask t) {
+<span class="nc" id="L489">        Map&lt;String, Object&gt; m = new HashMap&lt;String, Object&gt;();</span>
+<span class="nc" id="L490">        m.put(&quot;title&quot;, t.getTitle());</span>
+<span class="nc" id="L491">        Map&lt;String, Object&gt; body = new HashMap&lt;String, Object&gt;();</span>
+<span class="nc" id="L492">        body.put(&quot;contentType&quot;, &quot;text&quot;);</span>
+<span class="nc" id="L493">        body.put(&quot;content&quot;, t.getDescription());</span>
+<span class="nc" id="L494">        m.put(&quot;body&quot;, body);</span>
+<span class="nc bnc" id="L495" title="All 2 branches missed.">        m.put(&quot;status&quot;, t.isCompleted() ? &quot;completed&quot; : &quot;notStarted&quot;);</span>
+<span class="nc bnc" id="L496" title="All 6 branches missed.">        m.put(&quot;importance&quot;, t.getPriority() &gt; 0 &amp;&amp; t.getPriority() &lt; 5 ? &quot;high&quot; : t.getPriority() &gt; 5 ? &quot;low&quot; : &quot;normal&quot;);</span>
+<span class="nc bnc" id="L497" title="All 2 branches missed.">        if (t.getStart() != null) {</span>
+<span class="nc" id="L498">            m.put(&quot;startDateTime&quot;, dateMap(t.getStart()));</span>
+        }
+<span class="nc bnc" id="L500" title="All 2 branches missed.">        if (t.getDue() != null) {</span>
+<span class="nc" id="L501">            m.put(&quot;dueDateTime&quot;, dateMap(t.getDue()));</span>
+        }
+<span class="nc bnc" id="L503" title="All 4 branches missed.">        if (!t.getAlarms().isEmpty() &amp;&amp; t.getAlarms().get(0).getAbsoluteTime() != null) {</span>
+<span class="nc" id="L504">            m.put(&quot;isReminderOn&quot;, Boolean.TRUE);</span>
+<span class="nc" id="L505">            m.put(&quot;reminderDateTime&quot;, dateMap(CalendarDateTime.instant(t.getAlarms().get(0).getAbsoluteTime(), ZoneId.of(&quot;UTC&quot;))));</span>
+        }
+<span class="nc" id="L507">        return m;</span>
+    }
+
+    private static CalendarDateTime graphDate(Map&lt;String, Object&gt; m) throws CalendarException {
+<span class="fc" id="L511">        String date = string(m, &quot;dateTime&quot;);</span>
+<span class="fc" id="L512">        String zone = string(m, &quot;timeZone&quot;);</span>
+<span class="pc bpc" id="L513" title="1 of 2 branches missed.">        if (date == null) {</span>
+<span class="nc" id="L514">            return null;</span>
+        }
+<span class="pc bpc" id="L516" title="1 of 2 branches missed.">        String timeZone = zone == null ? &quot;UTC&quot; : zone;</span>
+        try {
+<span class="fc" id="L518">            ZoneId zoneId = CalendarDateUtil.zoneId(timeZone);</span>
+<span class="fc" id="L519">            return CalendarDateTime.instant(CalendarDateUtil.parseDateTime(date, zoneId), zoneId);</span>
+<span class="nc" id="L520">        } catch (IllegalArgumentException ex) {</span>
+<span class="nc" id="L521">            throw new CalendarException(CalendarError.MALFORMED_RESPONSE, &quot;Invalid Graph date: &quot; + date, ex);</span>
+        }
+    }
+
+    private static Map&lt;String, Object&gt; dateMap(CalendarDateTime d) {
+<span class="nc" id="L526">        Map&lt;String, Object&gt; m = new HashMap&lt;String, Object&gt;();</span>
+<span class="nc bnc" id="L527" title="All 2 branches missed.">        if (d == null) {</span>
+<span class="nc" id="L528">            return m;</span>
+        }
+<span class="nc bnc" id="L530" title="All 2 branches missed.">        Instant time = d.isAllDay() ? CalendarDateUtil.allDayInstant(d.getDate()) : d.getDateTime().toInstant();</span>
+<span class="nc bnc" id="L531" title="All 2 branches missed.">        ZoneId zone = d.isAllDay() ? ZoneId.of(&quot;UTC&quot;) : d.getDateTime().getZone();</span>
+<span class="nc" id="L532">        m.put(&quot;dateTime&quot;, CalendarDateUtil.formatIso(time, zone, false));</span>
+<span class="nc" id="L533">        m.put(&quot;timeZone&quot;, zone.getId());</span>
+<span class="nc" id="L534">        return m;</span>
+    }
+
+    private static CalendarDateTime toAllDay(CalendarDateTime d) {
+<span class="nc bnc" id="L538" title="All 2 branches missed.">        if (d == null) {</span>
+<span class="nc" id="L539">            return null;</span>
+        }
+<span class="nc" id="L541">        return CalendarDateTime.allDay(d.getDateTime().toLocalDateTime().toLocalDate());</span>
+    }
+
+    private static String iso(Instant time) {
+<span class="fc" id="L545">        return CalendarDateUtil.formatIso(time, ZoneId.of(&quot;UTC&quot;), false) + &quot;Z&quot;;</span>
+    }
+
+    private static String e(String value) {
+<span class="pc bpc" id="L549" title="1 of 2 branches missed.">        return Util.encodeUrl(value == null ? &quot;&quot; : value);</span>
+    }
+
+    private static Map&lt;String, String&gt; version(String v) {
+<span class="nc bnc" id="L553" title="All 2 branches missed.">        if (v == null) {</span>
+<span class="nc" id="L554">            return null;</span>
+        }
+<span class="nc" id="L556">        Map&lt;String, String&gt; m = new HashMap&lt;String, String&gt;();</span>
+<span class="nc" id="L557">        m.put(&quot;If-Match&quot;, v);</span>
+<span class="nc" id="L558">        return m;</span>
+    }
+
+    private static String string(Map&lt;String, Object&gt; m, String k) {
+<span class="pc bpc" id="L562" title="1 of 2 branches missed.">        Object v = m == null ? null : m.get(k);</span>
+<span class="fc bfc" id="L563" title="All 2 branches covered.">        return v == null ? null : String.valueOf(v);</span>
+    }
+
+    private static boolean bool(Map&lt;String, Object&gt; m, String k) {
+<span class="pc bpc" id="L567" title="1 of 2 branches missed.">        Object v = m == null ? null : m.get(k);</span>
+<span class="pc bpc" id="L568" title="2 of 4 branches missed.">        return Boolean.TRUE.equals(v) || &quot;true&quot;.equals(String.valueOf(v));</span>
+    }
+
+    private static Integer integer(Map&lt;String, Object&gt; m, String k) {
+<span class="fc" id="L572">        Object v = m.get(k);</span>
+<span class="pc bpc" id="L573" title="1 of 4 branches missed.">        return v instanceof Number ? Integer.valueOf(((Number) v).intValue()) : v == null ? null : Integer.valueOf(String.valueOf(v));</span>
+    }
+
+    @SuppressWarnings(&quot;unchecked&quot;)
+    private static Map&lt;String, Object&gt; map(Object v) {
+<span class="fc bfc" id="L578" title="All 2 branches covered.">        return v instanceof Map ? (Map&lt;String, Object&gt;) v : new HashMap&lt;String, Object&gt;();</span>
+    }
+
+    @SuppressWarnings(&quot;unchecked&quot;)
+    private static List&lt;Map&lt;String, Object&gt;&gt; maps(Object v) {
+<span class="fc" id="L583">        List&lt;Map&lt;String, Object&gt;&gt; out = new ArrayList&lt;Map&lt;String, Object&gt;&gt;();</span>
+<span class="fc bfc" id="L584" title="All 2 branches covered.">        if (v instanceof List) {</span>
+<span class="fc bfc" id="L585" title="All 2 branches covered.">            for (Object x : (List&lt;Object&gt;) v) {</span>
+<span class="pc bpc" id="L586" title="1 of 2 branches missed.">                if (x instanceof Map) {</span>
+<span class="fc" id="L587">                    out.add((Map&lt;String, Object&gt;) x);</span>
+                }
+<span class="fc" id="L589">            }</span>
+        }
+<span class="fc" id="L591">        return out;</span>
+    }
+
+    private static String camelEnum(String v) {
+<span class="nc" id="L595">        StringBuilder b = new StringBuilder();</span>
+<span class="nc bnc" id="L596" title="All 2 branches missed.">        for (int i = 0; i &lt; v.length(); i++) {</span>
+<span class="nc" id="L597">            char c = v.charAt(i);</span>
+<span class="nc bnc" id="L598" title="All 2 branches missed.">            if (Character.isUpperCase(c)) {</span>
+<span class="nc" id="L599">                b.append('_').append(c);</span>
+            } else {
+<span class="nc" id="L601">                b.append(Character.toUpperCase(c));</span>
+            }
+        }
+<span class="nc" id="L604">        String out = b.toString();</span>
+<span class="nc bnc" id="L605" title="All 4 branches missed.">        return &quot;NOT_STARTED&quot;.equals(out) ? &quot;NONE&quot; : &quot;TENTATIVELY_ACCEPTED&quot;.equals(out) ? &quot;TENTATIVE&quot; : out;</span>
+    }
+
+    private static CalendarAttendee.Response attendeeResponse(String value) {
+<span class="nc bnc" id="L609" title="All 2 branches missed.">        String name = value == null ? null : camelEnum(value);</span>
+<span class="nc bnc" id="L610" title="All 2 branches missed.">        for (CalendarAttendee.Response candidate : CalendarAttendee.Response.values()) {</span>
+<span class="nc bnc" id="L611" title="All 2 branches missed.">            if (candidate.name().equals(name)) {</span>
+<span class="nc" id="L612">                return candidate;</span>
+            }
+        }
+<span class="nc" id="L615">        return CalendarAttendee.Response.NONE;</span>
+    }
+
+    private static &lt;T&gt; SuccessCallback&lt;Throwable&gt; error(final AsyncResource&lt;T&gt; out) {
+<span class="fc" id="L619">        return new SuccessCallback&lt;Throwable&gt;() {</span>
+
+            @Override
+            public void onSucess(Throwable error) {
+<span class="nc" id="L623">                out.error(error);</span>
+<span class="nc" id="L624">            }</span>
+        };
+    }
+
+    private static SuccessCallback&lt;Map&lt;String, Object&gt;&gt; done(final AsyncResource&lt;Boolean&gt; out) {
+<span class="nc" id="L629">        return new SuccessCallback&lt;Map&lt;String, Object&gt;&gt;() {</span>
+
+            @Override
+            public void onSucess(Map&lt;String, Object&gt; x) {
+<span class="nc" id="L633">                out.complete(Boolean.TRUE);</span>
+<span class="nc" id="L634">            }</span>
+        };
+    }
+
+    private static &lt;T&gt; AsyncResource&lt;T&gt; fail(AsyncResource&lt;T&gt; out, String message) {
+<span class="nc" id="L639">        out.error(new CalendarException(CalendarError.INVALID_ARGUMENT, message));</span>
+<span class="nc" id="L640">        return out;</span>
+    }
+
+    private static boolean invalidPageToken(String pageToken) {
+        // Page tokens are @odata.nextLink URLs that are sent with a Bearer
+        // token attached; only Graph URLs may ever be dispatched.
+<span class="nc bnc" id="L646" title="All 4 branches missed.">        return pageToken != null &amp;&amp; !pageToken.startsWith(GRAPH + &quot;/&quot;);</span>
+    }
+
+    private static CalendarRecurrenceRule readGraphRecurrence(Map&lt;String, Object&gt; recurrence)
+            throws CalendarException {
+<span class="pc bpc" id="L651" title="1 of 2 branches missed.">        if (recurrence.isEmpty()) {</span>
+<span class="nc" id="L652">            return null;</span>
+        }
+<span class="fc" id="L654">        Map&lt;String, Object&gt; pattern = map(recurrence.get(&quot;pattern&quot;));</span>
+<span class="fc" id="L655">        Map&lt;String, Object&gt; range = map(recurrence.get(&quot;range&quot;));</span>
+<span class="fc" id="L656">        String type = string(pattern, &quot;type&quot;);</span>
+<span class="pc bpc" id="L657" title="4 of 6 branches missed.">        CalendarRecurrenceRule.Frequency frequency = &quot;daily&quot;.equals(type) ? CalendarRecurrenceRule.Frequency.DAILY : &quot;weekly&quot;.equals(type) ? CalendarRecurrenceRule.Frequency.WEEKLY : containsIgnoreCase(type, &quot;yearly&quot;) ? CalendarRecurrenceRule.Frequency.YEARLY : CalendarRecurrenceRule.Frequency.MONTHLY;</span>
+<span class="fc" id="L658">        Integer interval = integer(pattern, &quot;interval&quot;);</span>
+<span class="pc bpc" id="L659" title="1 of 2 branches missed.">        CalendarRecurrenceRule out = new CalendarRecurrenceRule().setFrequency(frequency).setInterval(Math.max(1, interval == null ? 1 : interval.intValue()));</span>
+<span class="fc bfc" id="L660" title="All 2 branches covered.">        for (Object day : list(pattern.get(&quot;daysOfWeek&quot;))) {</span>
+<span class="fc" id="L661">            out.addDayOfWeek(graphDay(String.valueOf(day)));</span>
+<span class="fc" id="L662">        }</span>
+<span class="fc" id="L663">        Integer day = integer(pattern, &quot;dayOfMonth&quot;);</span>
+<span class="fc" id="L664">        Integer month = integer(pattern, &quot;month&quot;);</span>
+<span class="pc bpc" id="L665" title="1 of 2 branches missed.">        if (day != null) {</span>
+<span class="nc" id="L666">            out.addDayOfMonth(day.intValue());</span>
+        }
+<span class="pc bpc" id="L668" title="1 of 2 branches missed.">        if (month != null) {</span>
+<span class="nc" id="L669">            out.addMonth(month.intValue());</span>
+        }
+<span class="fc" id="L671">        Integer count = integer(range, &quot;numberOfOccurrences&quot;);</span>
+<span class="pc bpc" id="L672" title="1 of 2 branches missed.">        if (count != null) {</span>
+<span class="fc" id="L673">            out.setCount(count);</span>
+        }
+<span class="fc" id="L675">        String end = string(range, &quot;endDate&quot;);</span>
+<span class="pc bpc" id="L676" title="1 of 2 branches missed.">        if (end != null) {</span>
+            try {
+<span class="nc" id="L678">                out.setUntil(CalendarDateTime.allDay(CalendarDateUtil.parseDate(end)));</span>
+<span class="nc" id="L679">            } catch (IllegalArgumentException ex) {</span>
+<span class="nc" id="L680">                throw new CalendarException(CalendarError.MALFORMED_RESPONSE,</span>
+                        &quot;Invalid Graph recurrence date: &quot; + end, ex);
+<span class="nc" id="L682">            }</span>
+        }
+<span class="fc" id="L684">        return out;</span>
+    }
+
+    private static Map&lt;String, Object&gt; writeGraphRecurrence(CalendarEvent event) {
+<span class="nc" id="L688">        CalendarRecurrenceRule rule = event.getRecurrence();</span>
+<span class="nc" id="L689">        Map&lt;String, Object&gt; out = new HashMap&lt;String, Object&gt;();</span>
+<span class="nc" id="L690">        Map&lt;String, Object&gt; pattern = new HashMap&lt;String, Object&gt;();</span>
+<span class="nc" id="L691">        Map&lt;String, Object&gt; range = new HashMap&lt;String, Object&gt;();</span>
+<span class="nc bnc" id="L692" title="All 6 branches missed.">        String type = rule.getFrequency() == CalendarRecurrenceRule.Frequency.DAILY ? &quot;daily&quot; : rule.getFrequency() == CalendarRecurrenceRule.Frequency.WEEKLY ? &quot;weekly&quot; : rule.getFrequency() == CalendarRecurrenceRule.Frequency.YEARLY ? &quot;absoluteYearly&quot; : &quot;absoluteMonthly&quot;;</span>
+<span class="nc" id="L693">        pattern.put(&quot;type&quot;, type);</span>
+<span class="nc" id="L694">        pattern.put(&quot;interval&quot;, Integer.valueOf(rule.getInterval()));</span>
+<span class="nc" id="L695">        List&lt;String&gt; days = new ArrayList&lt;String&gt;();</span>
+<span class="nc bnc" id="L696" title="All 2 branches missed.">        for (Integer day : rule.getDaysOfWeek()) {</span>
+<span class="nc" id="L697">            days.add(graphDay(day.intValue()));</span>
+<span class="nc" id="L698">        }</span>
+<span class="nc bnc" id="L699" title="All 2 branches missed.">        if (!days.isEmpty()) {</span>
+<span class="nc" id="L700">            pattern.put(&quot;daysOfWeek&quot;, days);</span>
+        }
+<span class="nc bnc" id="L702" title="All 2 branches missed.">        if (!rule.getDaysOfMonth().isEmpty()) {</span>
+<span class="nc" id="L703">            pattern.put(&quot;dayOfMonth&quot;, rule.getDaysOfMonth().get(0));</span>
+        }
+<span class="nc bnc" id="L705" title="All 2 branches missed.">        if (!rule.getMonths().isEmpty()) {</span>
+<span class="nc" id="L706">            pattern.put(&quot;month&quot;, rule.getMonths().get(0));</span>
+        }
+<span class="nc bnc" id="L708" title="All 4 branches missed.">        LocalDate start = event.getStart() != null &amp;&amp; event.getStart().isAllDay() ? event.getStart().getDate() : dateFor(event.getStart());</span>
+<span class="nc bnc" id="L709" title="All 2 branches missed.">        range.put(&quot;startDate&quot;, start == null ? &quot;1970-01-01&quot; : start.toString());</span>
+<span class="nc bnc" id="L710" title="All 2 branches missed.">        if (rule.getCount() != null) {</span>
+<span class="nc" id="L711">            range.put(&quot;type&quot;, &quot;numbered&quot;);</span>
+<span class="nc" id="L712">            range.put(&quot;numberOfOccurrences&quot;, rule.getCount());</span>
+<span class="nc bnc" id="L713" title="All 2 branches missed.">        } else if (rule.getUntil() != null) {</span>
+<span class="nc" id="L714">            range.put(&quot;type&quot;, &quot;endDate&quot;);</span>
+<span class="nc bnc" id="L715" title="All 2 branches missed.">            range.put(&quot;endDate&quot;, rule.getUntil().isAllDay() ? rule.getUntil().getDate().toString() : dateFor(rule.getUntil()).toString());</span>
+        } else {
+<span class="nc" id="L717">            range.put(&quot;type&quot;, &quot;noEnd&quot;);</span>
+        }
+<span class="nc" id="L719">        out.put(&quot;pattern&quot;, pattern);</span>
+<span class="nc" id="L720">        out.put(&quot;range&quot;, range);</span>
+<span class="nc" id="L721">        return out;</span>
+    }
+
+    private static LocalDate dateFor(CalendarDateTime value) {
+<span class="nc bnc" id="L725" title="All 2 branches missed.">        return value == null ? null : value.getDateTime().toLocalDateTime().toLocalDate();</span>
+    }
+
+    private static int graphDay(String value) throws CalendarException {
+<span class="fc" id="L729">        String[] days = { &quot;monday&quot;, &quot;tuesday&quot;, &quot;wednesday&quot;, &quot;thursday&quot;, &quot;friday&quot;, &quot;saturday&quot;, &quot;sunday&quot; };</span>
+<span class="pc bpc" id="L730" title="1 of 2 branches missed.">        for (int i = 0; i &lt; days.length; i++) {</span>
+<span class="pc bpc" id="L731" title="1 of 2 branches missed.">            if (days[i].equalsIgnoreCase(value)) {</span>
+<span class="fc" id="L732">                return i + 1;</span>
+            }
+        }
+<span class="nc" id="L735">        throw new CalendarException(CalendarError.MALFORMED_RESPONSE,</span>
+                &quot;Invalid Graph recurrence weekday: &quot; + value);
+    }
+
+    private static String graphDay(int value) {
+<span class="nc" id="L740">        return new String[] { &quot;monday&quot;, &quot;tuesday&quot;, &quot;wednesday&quot;, &quot;thursday&quot;, &quot;friday&quot;, &quot;saturday&quot;, &quot;sunday&quot; }[value - 1];</span>
+    }
+
+    private static boolean containsIgnoreCase(String value, String target) {
+<span class="nc bnc" id="L744" title="All 2 branches missed.">        if (value == null) {</span>
+<span class="nc" id="L745">            return false;</span>
+        }
+<span class="nc" id="L747">        int limit = value.length() - target.length();</span>
+<span class="nc bnc" id="L748" title="All 2 branches missed.">        for (int i = 0; i &lt;= limit; i++) {</span>
+<span class="nc bnc" id="L749" title="All 2 branches missed.">            if (value.regionMatches(true, i, target, 0, target.length())) {</span>
+<span class="nc" id="L750">                return true;</span>
+            }
+        }
+<span class="nc" id="L753">        return false;</span>
+    }
+
+    @SuppressWarnings(&quot;unchecked&quot;)
+    private static List&lt;Object&gt; list(Object value) {
+<span class="pc bpc" id="L758" title="1 of 2 branches missed.">        return value instanceof List ? (List&lt;Object&gt;) value : new ArrayList&lt;Object&gt;();</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

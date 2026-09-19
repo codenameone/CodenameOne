@@ -1,0 +1,1165 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>Transform.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.ui</a> &gt; <span class="el_source">Transform.java</span></div><h1>Transform.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+
+package com.codename1.ui;
+
+import com.codename1.impl.CodenameOneImplementation;
+
+/// Encapsulates a 3D transform that can be used in `com.codename1.ui.Graphics` contexts
+/// or with `com.codename1.ui.geom.Shape`s to transform in various ways.
+///
+/// Use the `#isSupported` and `#isPerspectiveSupported` to check if transforms and
+/// perspective transforms are supported on this platform.  If they are not supported, this
+/// class will throw RuntimeExceptions if you try to use it.
+///
+/// @author shannah
+public class Transform {
+
+    /// Constant for transform type. Transform is not a special matrix.
+    public static final int TYPE_UNKNOWN = -1;
+    /// Constant for transform type.  Transform is the identity transform.
+    public static final int TYPE_IDENTITY = 0;
+    /// Constant for transform type.  Transform is a translation transform
+    /// only.
+    public static final int TYPE_TRANSLATION = 1;
+    /// Constant for transform type.  Transform is a scale transform only.
+    public static final int TYPE_SCALE = 2;
+    /// Reference to the native transform.  This should only be used by the implementation.
+    private Object nativeTransform;
+    /// The type of transform.  This allows us to cut corners in transformation
+    /// when using a special matrix like a translation, scale, or identity matrix.
+<span class="fc" id="L51">    private int type = TYPE_UNKNOWN;</span>
+    private Transform inverse;
+<span class="fc" id="L53">    private boolean inverseDirty = true;</span>
+<span class="fc" id="L54">    private float translateX = 0;</span>
+<span class="fc" id="L55">    private float translateY = 0;</span>
+<span class="fc" id="L56">    private float translateZ = 0;</span>
+<span class="fc" id="L57">    private float scaleX = 1f;</span>
+<span class="fc" id="L58">    private float scaleY = 1f;</span>
+<span class="fc" id="L59">    private float scaleZ = 1f;</span>
+<span class="fc" id="L60">    private boolean dirty = true;</span>
+<span class="fc" id="L61">    private CodenameOneImplementation impl = null;</span>
+    /// Private constructor
+    ///
+    /// #### Parameters
+    ///
+    /// - `nativeTransform`
+<span class="fc" id="L67">    private Transform(Object nativeTransform) {</span>
+<span class="fc" id="L68">        this.nativeTransform = nativeTransform;</span>
+<span class="fc" id="L69">        impl();</span>
+
+<span class="fc" id="L71">    }</span>
+
+    /// #### Deprecated
+    ///
+    /// Use `#identity()`.
+    @Deprecated
+    @SuppressWarnings(&quot;PMD.MethodNamingConventions&quot;)
+    public static Transform IDENTITY() {
+<span class="fc" id="L79">        return identity();</span>
+    }
+
+    public static Transform identity() {
+<span class="fc" id="L83">        return IdentityHolder.IDENTITY;</span>
+    }
+
+    private static Transform createIdentity() {
+<span class="fc" id="L87">        Transform identity = new ImmutableTransform(Display.impl.makeTransformIdentity());</span>
+<span class="fc" id="L88">        identity.type = TYPE_IDENTITY;</span>
+<span class="fc" id="L89">        return identity;</span>
+    }
+
+    /// Makes a new identity transform.
+    ///
+    /// #### Returns
+    ///
+    /// An identity transform.
+    public static Transform makeIdentity() {
+<span class="fc" id="L98">        Transform out = new Transform(null);</span>
+<span class="fc" id="L99">        out.type = TYPE_IDENTITY;</span>
+<span class="fc" id="L100">        return out;</span>
+    }
+
+    /// Makes a new rotation transformation.
+    ///
+    /// Note: If `#isSupported()` is false, then this will throw a Runtime Exception.
+    ///
+    /// #### Parameters
+    ///
+    /// - `angle`: The angle of the rotation in radians.
+    ///
+    /// - `x`: The x component of the vector around which the rotation occurs.
+    ///
+    /// - `y`: The y component of the vector around which the rotation occurs.
+    ///
+    /// - `z`: The z component of the vector around which the rotation occurs.
+    ///
+    /// #### Returns
+    ///
+    /// A transform that makes the appropriate rotation.
+    ///
+    /// #### Throws
+    ///
+    /// - `RuntimeException`: If `#isSupported()` is false.
+    public static Transform makeRotation(float angle, float x, float y, float z) {
+<span class="nc" id="L125">        Object t = Display.impl.makeTransformRotation(angle, x, y, z);</span>
+<span class="nc" id="L126">        return new Transform(t);</span>
+    }
+
+    public static Transform makeRotation(float angle, float x, float y) {
+<span class="fc" id="L130">        Transform t = makeTranslation(x, y, 0);</span>
+<span class="fc" id="L131">        t.rotate(angle, 0, 0, 1);</span>
+<span class="fc" id="L132">        t.translate(-x, -y, 0);</span>
+<span class="fc" id="L133">        return t;</span>
+
+    }
+
+    /// Makes a new translation transformation.
+    ///
+    /// #### Parameters
+    ///
+    /// - `x`: The x component of the translation.
+    ///
+    /// - `y`: The y component of the translation.
+    ///
+    /// - `z`: The z component of the translation.
+    ///
+    /// #### Returns
+    ///
+    /// A transform that makes the specified translation.
+    public static Transform makeTranslation(float x, float y, float z) {
+<span class="fc" id="L151">        Transform out = new Transform(null);</span>
+<span class="fc" id="L152">        out.translateX = x;</span>
+<span class="fc" id="L153">        out.translateY = y;</span>
+<span class="fc" id="L154">        out.translateZ = z;</span>
+<span class="fc" id="L155">        out.type = TYPE_TRANSLATION;</span>
+<span class="fc" id="L156">        return out;</span>
+    }
+
+    public static Transform makeTranslation(float x, float y) {
+<span class="fc" id="L160">        return makeTranslation(x, y, 0);</span>
+    }
+
+    /// Makes a new scale transformation.
+    ///
+    /// #### Parameters
+    ///
+    /// - `x`: The x scale factor.
+    ///
+    /// - `y`: The y scale factor.
+    ///
+    /// - `z`: The z scale factor.
+    ///
+    /// #### Returns
+    ///
+    /// A transform that scales values according to the provided scale factors.
+    public static Transform makeScale(float x, float y, float z) {
+<span class="pc bpc" id="L177" title="5 of 6 branches missed.">        if (x == 1 &amp;&amp; y == 1 &amp;&amp; z == 1) {</span>
+<span class="nc" id="L178">            return makeIdentity();</span>
+        }
+<span class="fc" id="L180">        Transform out = new Transform(null);</span>
+<span class="fc" id="L181">        out.scaleX = x;</span>
+<span class="fc" id="L182">        out.scaleY = y;</span>
+<span class="fc" id="L183">        out.scaleZ = z;</span>
+<span class="fc" id="L184">        out.type = TYPE_SCALE;</span>
+<span class="fc" id="L185">        return out;</span>
+    }
+
+    /// Creates a new scale transform.
+    ///
+    /// #### Parameters
+    ///
+    /// - `x`: Factor to scale in x axis.
+    ///
+    /// - `y`: Factor to scale by in y axis.
+    ///
+    /// #### Returns
+    ///
+    /// A new transform with the specified scale.
+    public static Transform makeScale(float x, float y) {
+<span class="fc" id="L200">        return makeScale(x, y, 1);</span>
+    }
+
+    public static Transform makeAffine(double m00,
+                                       double m10,
+                                       double m01,
+                                       double m11,
+                                       double m02,
+                                       double m12) {
+<span class="fc" id="L209">        return new Transform(Display.impl.makeTransformAffine(m00, m10, m01, m11, m02, m12));</span>
+
+    }
+
+    /// Makes a new perspective transform.
+    ///
+    /// Note: If `#isPerspectiveSupported()` is false, then this will throw a Runtime Exception.
+    ///
+    /// #### Parameters
+    ///
+    /// - `fovy`: The y field of view angle.
+    ///
+    /// - `aspect`: The aspect ratio.
+    ///
+    /// - `zNear`: The nearest visible z coordinate.
+    ///
+    /// - `zFar`: The farthest z coordinate.
+    ///
+    /// #### Returns
+    ///
+    /// A transform for the given perspective.
+    public static Transform makePerspective(float fovy, float aspect, float zNear, float zFar) {
+<span class="nc" id="L231">        Object t = Display.impl.makeTransformPerspective(fovy, aspect, zNear, zFar);</span>
+<span class="nc" id="L232">        return new Transform(t);</span>
+    }
+
+    /// Makes a new orthographic projection transform.
+    ///
+    /// Note: If `#isPerspectiveSupported()` is false, then this will throw a Runtime Exception.
+    ///
+    /// #### Parameters
+    ///
+    /// - `left`: x-coordinate that is the left edge of the view.
+    ///
+    /// - `right`: The x-coordinate that is the right edge of the view.
+    ///
+    /// - `bottom`: The y-coordinate that is the bottom edge of the view.
+    ///
+    /// - `top`: The y-coordinate that is the top edge of the view.
+    ///
+    /// - `near`: The nearest visible z-coordinate.
+    ///
+    /// - `far`: The farthest visible z-coordinate.
+    ///
+    /// #### Returns
+    ///
+    /// A transform with the provided orthographic projection.
+    public static Transform makeOrtho(float left, float right, float bottom, float top,
+                                      float near, float far) {
+<span class="nc" id="L258">        Object t = Display.impl.makeTransformOrtho(left, right, bottom, top, near, far);</span>
+<span class="nc" id="L259">        return new Transform(t);</span>
+    }
+
+    /// Makes a transform to simulate a camera's perspective at a given location.
+    ///
+    /// Note: If `#isPerspectiveSupported()` is false, then this will throw a Runtime Exception.
+    ///
+    /// #### Parameters
+    ///
+    /// - `eyeX`: The x-coordinate of the camera's eye.
+    ///
+    /// - `eyeY`: The y-coordinate of the camera's eye.
+    ///
+    /// - `eyeZ`: The z-coordinate of the camera's eye.
+    ///
+    /// - `centerX`: The center x coordinate of the view.
+    ///
+    /// - `centerY`: The center y coordinate of the view.
+    ///
+    /// - `centerZ`: The center z coordinate of the view.
+    ///
+    /// - `upX`: The x-coordinate of the up vector for the camera.
+    ///
+    /// - `upY`: The y-coordinate of the up vector for the camera.
+    ///
+    /// - `upZ`: The z-coordinate of the up vector for the camera.
+    ///
+    /// #### Returns
+    ///
+    /// A transform with the provided camera's view perspective.
+    public static Transform makeCamera(float eyeX, float eyeY, float eyeZ,
+                                       float centerX, float centerY, float centerZ, float upX, float upY,
+                                       float upZ) {
+<span class="nc" id="L292">        Object t = Display.impl.makeTransformCamera(eyeX, eyeY, eyeZ, centerX, centerY, centerZ, upX, upY, upZ);</span>
+<span class="nc" id="L293">        return new Transform(t);</span>
+    }
+
+    /// Checks if transforms are supported on this platform.  If this returns false,
+    /// you cannot use this class.
+    ///
+    /// #### Returns
+    ///
+    /// True if and only if this platform supports transforms.
+    public static boolean isSupported() {
+<span class="fc" id="L303">        return Display.impl.isTransformSupported();</span>
+    }
+
+    /// Checks if perspective transforms are supported on this platform.  If this returns false,
+    /// you cannot use this class.
+    ///
+    /// #### Returns
+    ///
+    /// True if and only if this platform supports transforms.
+    public static boolean isPerspectiveSupported() {
+<span class="fc" id="L313">        return Display.impl.isPerspectiveTransformSupported();</span>
+    }
+
+    private CodenameOneImplementation impl() {
+<span class="pc bpc" id="L317" title="1 of 2 branches missed.">        if (impl == null) {</span>
+<span class="fc" id="L318">            impl = Display.impl;</span>
+        }
+<span class="fc" id="L320">        return impl;</span>
+    }
+
+    /// Initializes the native transform with appropriate values.  For efficiency,
+    /// some special kinds of transforms don't keep the native transform in sync
+    /// (or even created at all).  Before accessing, the native transform from the
+    /// implementation, the native transform needs to be initialized.  This method
+    /// is called internally in the appropriate places to ensure that the native
+    /// transform is kept in sync when it is needed.
+    private void initNativeTransform() {
+<span class="fc bfc" id="L330" title="All 2 branches covered.">        if (nativeTransform == null) {</span>
+<span class="fc" id="L331">            nativeTransform = impl.makeTransformIdentity();</span>
+<span class="fc bfc" id="L332" title="All 2 branches covered.">            if (type == TYPE_TRANSLATION) {</span>
+<span class="fc" id="L333">                impl.setTransformTranslation(nativeTransform, translateX, translateY, translateZ);</span>
+<span class="fc bfc" id="L334" title="All 2 branches covered.">            } else if (type == TYPE_SCALE) {</span>
+<span class="fc" id="L335">                impl.setTransformScale(nativeTransform, scaleX, scaleY, scaleZ);</span>
+            }
+        } else {
+<span class="pc bpc" id="L338" title="1 of 4 branches missed.">            switch (type) {</span>
+                case TYPE_TRANSLATION:
+<span class="fc" id="L340">                    impl.setTransformTranslation(nativeTransform, translateX, translateY, translateZ);</span>
+<span class="fc" id="L341">                    break;</span>
+                case TYPE_SCALE:
+<span class="nc" id="L343">                    impl.setTransformScale(nativeTransform, scaleX, scaleY, scaleZ);</span>
+<span class="nc" id="L344">                    break;</span>
+                case TYPE_IDENTITY:
+<span class="fc" id="L346">                    impl.setTransformIdentity(nativeTransform);</span>
+<span class="fc" id="L347">                    break;</span>
+                default:
+                    break;
+            }
+
+        }
+<span class="fc" id="L353">        dirty = false;</span>
+<span class="fc" id="L354">    }</span>
+
+    /// Checks if this transform is the identity transform.
+    ///
+    /// #### Returns
+    ///
+    /// True if the transform is the identity.
+    public boolean isIdentity() {
+<span class="fc bfc" id="L362" title="All 2 branches covered.">        if (type == TYPE_IDENTITY) {</span>
+<span class="fc" id="L363">            return true;</span>
+        }
+<span class="fc bfc" id="L365" title="All 2 branches covered.">        if (this.equals(IDENTITY())) {</span>
+<span class="fc" id="L366">            setIdentity();</span>
+<span class="fc" id="L367">            return true;</span>
+        }
+<span class="fc" id="L369">        return false;</span>
+    }
+
+    /// Checks if this transform is a translation transform.
+    ///
+    /// #### Returns
+    ///
+    /// @return True if this transform performs translation only.  Note that this
+    /// will return false if the transform is the identity (i.e. is actually
+    /// a translation of (0,0,0).
+    public boolean isTranslation() {
+<span class="fc bfc" id="L380" title="All 2 branches covered.">        return (type == TYPE_TRANSLATION);</span>
+    }
+
+    /// Gets the x scale factor of this transformation.  This value is only reliable
+    /// if the transform is a scale transform.
+    ///
+    /// #### Returns
+    ///
+    /// The x scale factor of this transformation.
+    ///
+    /// #### See also
+    ///
+    /// - #isScale()
+    ///
+    /// - #setScale()
+    public float getScaleX() {
+<span class="fc" id="L396">        return scaleX;</span>
+    }
+
+    /// Gets the y scale factor of this transformation.  This value is only reliable
+    /// if the transform is a scale transform.
+    ///
+    /// #### See also
+    ///
+    /// - #isScale()
+    ///
+    /// - #setScale()
+    public float getScaleY() {
+<span class="fc" id="L408">        return scaleY;</span>
+    }
+
+    /// Gets the z scale factor of this transformation.  This value is only reliable
+    /// if the transform is a scale transform.
+    ///
+    /// #### See also
+    ///
+    /// - #isScale()
+    ///
+    /// - #setScale()
+    public float getScaleZ() {
+<span class="nc" id="L420">        return scaleZ;</span>
+    }
+
+    /// Gets the x translation of this transformation.  This value is only reliable
+    /// if the transform is a translation transform.
+    ///
+    /// #### Returns
+    ///
+    /// The x translation of this transform.
+    ///
+    /// #### See also
+    ///
+    /// - #isTranslation()
+    ///
+    /// - #setTranslation()
+    ///
+    /// - #translate()
+    public float getTranslateX() {
+<span class="fc" id="L438">        return translateX;</span>
+    }
+
+    /// Gets the y translation of this transformation.  This value is only reliable
+    /// if the transform is a translation transform.
+    ///
+    /// #### Returns
+    ///
+    /// The y translation of this transform.
+    ///
+    /// #### See also
+    ///
+    /// - #isTranslation()
+    ///
+    /// - #setTranslation()
+    ///
+    /// - #translate()
+    public float getTranslateY() {
+<span class="fc" id="L456">        return translateY;</span>
+    }
+
+    /// Gets the z translation of this transformation.  This value is only reliable
+    /// if the transform is a translation transform.
+    ///
+    /// #### Returns
+    ///
+    /// The z translation of this transform.
+    ///
+    /// #### See also
+    ///
+    /// - #isTranslation()
+    ///
+    /// - #setTranslation()
+    ///
+    /// - #translate()
+    public float getTranslateZ() {
+<span class="nc" id="L474">        return translateZ;</span>
+    }
+
+    /// Checks if this transform is a scale transformation .
+    ///
+    /// #### Returns
+    ///
+    /// Returns true if and only if this is a non-identity scale transformation.
+    public boolean isScale() {
+<span class="nc bnc" id="L483" title="All 2 branches missed.">        return (type == TYPE_SCALE);</span>
+    }
+
+    /// Resets the transformation to a scale transformation.
+    ///
+    /// #### Parameters
+    ///
+    /// - `x`: x-axis scaling
+    ///
+    /// - `y`: y-axis scaling
+    ///
+    /// - `z`: z-axis scaling
+    public void setScale(float x, float y, float z) {
+<span class="pc bpc" id="L496" title="5 of 6 branches missed.">        if (x == 1 &amp;&amp; y == 1 &amp;&amp; z == 1) {</span>
+<span class="nc" id="L497">            setIdentity();</span>
+<span class="nc" id="L498">            return;</span>
+        }
+<span class="fc" id="L500">        Transform out = this;</span>
+<span class="fc" id="L501">        out.scaleX = x;</span>
+<span class="fc" id="L502">        out.scaleY = y;</span>
+<span class="fc" id="L503">        out.scaleZ = z;</span>
+<span class="fc" id="L504">        out.type = TYPE_SCALE;</span>
+<span class="fc" id="L505">    }</span>
+
+    /// Resets the transformation to scale transform.
+    ///
+    /// #### Parameters
+    ///
+    /// - `x`: x-axis scaling.
+    ///
+    /// - `y`: y-axis scaling.
+    public void setScale(float x, float y) {
+<span class="nc" id="L515">        setScale(x, y, 1);</span>
+<span class="nc" id="L516">    }</span>
+
+    /// Rotates the current transform.
+    ///
+    /// Note: If `#isSupported()` is false, then this will throw a Runtime Exception.
+    ///
+    /// #### Parameters
+    ///
+    /// - `angle`: The angle to rotate in radians.
+    ///
+    /// - `x`: The x-coordinate of the vector around which to rotate.
+    ///
+    /// - `y`: The y-coordinate of the vector around which to rotate.
+    ///
+    /// - `z`: The z-coordinate of the vector around which to rotate.
+    ///
+    /// #### See also
+    ///
+    /// - #setRotation
+    public void rotate(float angle, float x, float y, float z) {
+<span class="fc" id="L536">        initNativeTransform();</span>
+<span class="fc" id="L537">        Display.impl.transformRotate(nativeTransform, angle, x, y, z);</span>
+<span class="fc" id="L538">        type = TYPE_UNKNOWN;</span>
+<span class="fc" id="L539">    }</span>
+
+    public void rotate(float angle, float px, float py) {
+<span class="fc" id="L542">        translate(px, py, 0);</span>
+<span class="fc" id="L543">        rotate(angle, 0, 0, 1);</span>
+<span class="fc" id="L544">        translate(-px, -py, 0);</span>
+<span class="fc" id="L545">    }</span>
+
+    /// Sets the transform to be the provided rotation. This replaces the current transform
+    /// whereas `#rotate()` further rotates the current transform.
+    ///
+    /// Note: If `#isSupported()` is false, then this will throw a Runtime Exception.
+    ///
+    /// #### Parameters
+    ///
+    /// - `angle`: The angle to rotate in radians.
+    ///
+    /// - `x`: The x-coordinate of the vector around which to rotate.
+    ///
+    /// - `y`: The y-coordinate of the vector around which to rotate.
+    ///
+    /// - `z`: The z-coordinate of the vector around which to rotate.
+    ///
+    /// #### See also
+    ///
+    /// - #rotate()
+    public void setRotation(float angle, float x, float y, float z) {
+<span class="nc" id="L566">        initNativeTransform();</span>
+<span class="nc" id="L567">        setTransform(makeRotation(angle, x, y, z));</span>
+<span class="nc" id="L568">        type = TYPE_UNKNOWN;</span>
+<span class="nc" id="L569">    }</span>
+
+    public void setRotation(float angle, float px, float py) {
+<span class="nc" id="L572">        initNativeTransform();</span>
+<span class="nc" id="L573">        setTransform(makeRotation(angle, px, py));</span>
+<span class="nc" id="L574">        type = TYPE_UNKNOWN;</span>
+<span class="nc" id="L575">    }</span>
+
+    /// Sets the transform to the identity transform.
+    public void setIdentity() {
+<span class="fc" id="L579">        type = TYPE_IDENTITY;</span>
+<span class="fc" id="L580">        scaleX = 1f;</span>
+<span class="fc" id="L581">        scaleY = 1f;</span>
+<span class="fc" id="L582">        scaleZ = 1f;</span>
+<span class="fc" id="L583">        translateX = 0f;</span>
+<span class="fc" id="L584">        translateY = 0f;</span>
+<span class="fc" id="L585">        translateZ = 0f;</span>
+<span class="fc" id="L586">        dirty = true;</span>
+<span class="fc" id="L587">        inverseDirty = true;</span>
+<span class="fc" id="L588">    }</span>
+
+    @Override
+    public String toString() {
+<span class="fc" id="L592">        getNativeTransform();</span>
+<span class="fc" id="L593">        return &quot;&quot; + nativeTransform;</span>
+    }
+
+    /// Translates the transform by the specified amounts.  This adds additional
+    /// translations to whereas `#setTranslation()` replaces the transform
+    /// with the specified translation.
+    ///
+    /// Note: If `#isSupported()` is false, then this may throw a Runtime Exception.
+    ///
+    /// #### Parameters
+    ///
+    /// - `x`: The x translation.
+    ///
+    /// - `y`: The y translation.
+    ///
+    /// - `z`: The z translation.
+    ///
+    /// #### See also
+    ///
+    /// - #setTranslation()
+    public void translate(float x, float y, float z) {
+<span class="fc bfc" id="L614" title="All 2 branches covered.">        if (type == TYPE_IDENTITY) {</span>
+<span class="fc" id="L615">            type = TYPE_TRANSLATION;</span>
+        }
+<span class="fc" id="L617">        inverseDirty = true;</span>
+<span class="fc bfc" id="L618" title="All 2 branches covered.">        if (type == TYPE_TRANSLATION) {</span>
+<span class="fc" id="L619">            translateX += x;</span>
+<span class="fc" id="L620">            translateY += y;</span>
+<span class="fc" id="L621">            translateZ += z;</span>
+<span class="pc bpc" id="L622" title="1 of 6 branches missed.">            if (translateX == 0 &amp;&amp; translateY == 0 &amp;&amp; translateZ == 0) {</span>
+<span class="fc" id="L623">                type = TYPE_IDENTITY;</span>
+            }
+<span class="fc" id="L625">            dirty = true;</span>
+        } else {
+<span class="fc" id="L627">            initNativeTransform();</span>
+<span class="fc" id="L628">            type = TYPE_UNKNOWN;</span>
+<span class="fc" id="L629">            impl.transformTranslate(nativeTransform, x, y, z);</span>
+        }
+<span class="fc" id="L631">    }</span>
+
+    public void translate(float x, float y) {
+<span class="fc" id="L634">        translate(x, y, 0);</span>
+<span class="fc" id="L635">    }</span>
+
+    /// Sets the current transform to be the specified translation.  This replaces the current
+    /// transform with the given translation whereas `#translate()` adds additional translation
+    /// to the existing translation.
+    ///
+    /// #### Parameters
+    ///
+    /// - `x`: The x translation.
+    ///
+    /// - `y`: The y translation.
+    ///
+    /// - `z`: The z translation.
+    ///
+    /// #### See also
+    ///
+    /// - #translate()
+    public void setTranslation(float x, float y, float z) {
+<span class="fc" id="L653">        type = TYPE_TRANSLATION;</span>
+<span class="fc" id="L654">        inverseDirty = true;</span>
+<span class="pc bpc" id="L655" title="1 of 2 branches missed.">        if (type == TYPE_TRANSLATION) {</span>
+<span class="fc" id="L656">            translateX = x;</span>
+<span class="fc" id="L657">            translateY = y;</span>
+<span class="fc" id="L658">            translateZ = z;</span>
+<span class="pc bpc" id="L659" title="3 of 6 branches missed.">            if (translateX == 0 &amp;&amp; translateY == 0 &amp;&amp; translateZ == 0) {</span>
+<span class="nc" id="L660">                type = TYPE_IDENTITY;</span>
+            }
+<span class="fc" id="L662">            dirty = true;</span>
+        }
+
+<span class="fc" id="L665">    }</span>
+
+    public void setTranslation(float x, float y) {
+<span class="fc" id="L668">        setTranslation(x, y, 0);</span>
+<span class="fc" id="L669">    }</span>
+
+    /// Scales the current transform by the provide scale factors.  Not to be confused with
+    /// `#setScale()` which replaces the transform.
+    ///
+    /// Note: If `#isSupported()` is false, then this may throw a Runtime Exception.
+    ///
+    /// #### Parameters
+    ///
+    /// - `x`: The x-scale factor
+    ///
+    /// - `y`: The y-scale factor
+    ///
+    /// - `z`: The z-scale factor
+    ///
+    /// #### See also
+    ///
+    /// - #setScale()
+    public void scale(float x, float y, float z) {
+<span class="fc bfc" id="L688" title="All 2 branches covered.">        if (type == TYPE_IDENTITY) {</span>
+<span class="fc" id="L689">            type = TYPE_SCALE;</span>
+        }
+<span class="fc" id="L691">        inverseDirty = true;</span>
+<span class="fc bfc" id="L692" title="All 2 branches covered.">        if (type == TYPE_SCALE) {</span>
+<span class="fc" id="L693">            scaleX *= x;</span>
+<span class="fc" id="L694">            scaleY *= y;</span>
+<span class="fc" id="L695">            scaleZ *= z;</span>
+
+<span class="pc bpc" id="L697" title="4 of 6 branches missed.">            if (scaleZ == 1f &amp;&amp; scaleY == 1f &amp;&amp; scaleZ == 1f) {</span>
+<span class="nc" id="L698">                type = TYPE_IDENTITY;</span>
+
+            }
+<span class="fc" id="L701">            dirty = true;</span>
+        } else {
+<span class="fc" id="L703">            initNativeTransform();</span>
+<span class="fc" id="L704">            type = TYPE_UNKNOWN;</span>
+<span class="fc" id="L705">            impl.transformScale(nativeTransform, x, y, z);</span>
+        }
+
+<span class="fc" id="L708">    }</span>
+
+    public void scale(float x, float y) {
+<span class="fc" id="L711">        scale(x, y, 1);</span>
+<span class="fc" id="L712">    }</span>
+
+    /// Gets the inverse transformation for this transform.
+    ///
+    /// Note: If `#isSupported()` is false, then this will throw a Runtime Exception.
+    ///
+    /// #### Returns
+    ///
+    /// The inverse transform.
+    ///
+    /// #### Deprecated
+    ///
+    /// Use `#getInverse(com.codename1.ui.Transform)` instead.
+    public Transform getInverse() {
+<span class="fc" id="L726">        return makeInverse();</span>
+    }
+
+    private Transform makeInverse() {
+<span class="pc bpc" id="L730" title="1 of 2 branches missed.">        if (type == TYPE_IDENTITY) {</span>
+<span class="nc" id="L731">            return makeIdentity();</span>
+<span class="pc bpc" id="L732" title="1 of 2 branches missed.">        } else if (type == TYPE_TRANSLATION) {</span>
+<span class="fc" id="L733">            return makeTranslation(-translateX, -translateY, -translateZ);</span>
+<span class="nc bnc" id="L734" title="All 2 branches missed.">        } else if (type == TYPE_SCALE) {</span>
+<span class="nc" id="L735">            return makeScale(1f / scaleX, 1f / scaleY, 1f / scaleZ);</span>
+        } else {
+<span class="nc" id="L737">            initNativeTransform();</span>
+<span class="nc" id="L738">            Object t = impl.makeTransformInverse(nativeTransform);</span>
+<span class="nc" id="L739">            return new Transform(t);</span>
+        }
+    }
+
+    public void getInverse(Transform inverseOut) throws NotInvertibleException {
+<span class="nc bnc" id="L744" title="All 2 branches missed.">        if (inverse == null) {</span>
+<span class="nc" id="L745">            inverse = makeInverse();</span>
+<span class="nc" id="L746">            inverseDirty = false;</span>
+<span class="nc bnc" id="L747" title="All 2 branches missed.">        } else if (inverseDirty) {</span>
+<span class="nc" id="L748">            inverse.setTransform(this);</span>
+<span class="nc" id="L749">            inverse.invert();</span>
+<span class="nc" id="L750">            inverseDirty = false;</span>
+        }
+<span class="nc" id="L752">        inverseOut.setTransform(inverse);</span>
+<span class="nc" id="L753">    }</span>
+
+    public void invert() throws NotInvertibleException {
+<span class="fc bfc" id="L756" title="All 2 branches covered.">        if (type == TYPE_IDENTITY) {</span>
+<span class="fc" id="L757">            return;</span>
+<span class="pc bpc" id="L758" title="1 of 2 branches missed.">        } else if (type == TYPE_TRANSLATION) {</span>
+<span class="nc" id="L759">            setTranslation(-translateX, -translateY, -translateZ);</span>
+<span class="pc bpc" id="L760" title="1 of 2 branches missed.">        } else if (type == TYPE_SCALE) {</span>
+<span class="fc" id="L761">            setScale(1f / scaleX, 1f / scaleY, 1f / scaleZ);</span>
+        } else {
+<span class="nc" id="L763">            initNativeTransform();</span>
+<span class="nc" id="L764">            impl.setTransformInverse(nativeTransform);</span>
+        }
+<span class="fc" id="L766">    }</span>
+
+    /// Sets the current transform to be identical to the provided transform.
+    ///
+    /// Note: If `#isSupported()` is false, then this will may throw a Runtime Exception.
+    ///
+    /// #### Parameters
+    ///
+    /// - `t`: A transform to copy into the current transform.
+    public void setTransform(Transform t) {
+<span class="fc" id="L776">        type = t.type;</span>
+<span class="fc" id="L777">        scaleX = t.scaleX;</span>
+<span class="fc" id="L778">        scaleY = t.scaleY;</span>
+<span class="fc" id="L779">        scaleZ = t.scaleZ;</span>
+<span class="fc" id="L780">        translateX = t.translateX;</span>
+<span class="fc" id="L781">        translateY = t.translateY;</span>
+<span class="fc" id="L782">        translateZ = t.translateZ;</span>
+<span class="fc" id="L783">        inverseDirty = true;</span>
+<span class="fc bfc" id="L784" title="All 2 branches covered.">        switch (type) {</span>
+            case TYPE_IDENTITY:
+            case TYPE_TRANSLATION:
+            case TYPE_SCALE:
+                // do nothing here
+<span class="fc" id="L789">                dirty = true;</span>
+<span class="fc" id="L790">                break;</span>
+            default:
+<span class="fc" id="L792">                initNativeTransform();</span>
+<span class="fc" id="L793">                t.initNativeTransform();</span>
+<span class="fc" id="L794">                impl.copyTransform(t.nativeTransform, nativeTransform);</span>
+                // Mark the cached native matrix as dirty so subsequent
+                // getNativeTransform() calls re-run initNativeTransform.
+                // For TYPE_UNKNOWN this is a no-op for the matrix data
+                // itself, but it triggers any platform-side code that
+                // listens on initNativeTransform to refresh its cache --
+                // the iOS Metal port has shown that without this flag
+                // setTransform(composed) silently fails to apply on the
+                // form-Graphics screen encoder while the equivalent
+                // g.rotate / g.scale / g.translate path renders correctly.
+<span class="fc" id="L804">                dirty = true;</span>
+                break;
+        }
+
+<span class="fc" id="L808">    }</span>
+
+    /// Sets the current transform to be the concatenation of the current transform and
+    /// the provided transform.
+    ///
+    /// Note: If `#isSupported()` is false, then this will throw a Runtime Exception.
+    ///
+    /// #### Parameters
+    ///
+    /// - `t`: The transform to concatenate to this one.
+    public void concatenate(Transform t) {
+<span class="fc" id="L819">        inverseDirty = true;</span>
+<span class="fc" id="L820">        impl.concatenateTransform(getNativeTransform(), t.getNativeTransform());</span>
+<span class="fc" id="L821">        type = TYPE_UNKNOWN;</span>
+<span class="fc" id="L822">    }</span>
+
+    /// Sets the transform to be the specified perspective transformation.
+    ///
+    /// Note: If `#isPerspectiveSupported()` is false, then this will throw a Runtime Exception.
+    ///
+    /// #### Parameters
+    ///
+    /// - `fovy`: Y-field of view angle.
+    ///
+    /// - `aspect`: Apspect ratio of the view window.
+    ///
+    /// - `zNear`: Nearest visible z-coordinate.
+    ///
+    /// - `zFar`: Farthest visible z-coordinate.
+    ///
+    /// #### See also
+    ///
+    /// - #makePerspective()
+    public void setPerspective(float fovy, float aspect, float zNear, float zFar) {
+<span class="nc" id="L842">        type = TYPE_UNKNOWN;</span>
+<span class="nc" id="L843">        inverseDirty = true;</span>
+<span class="nc" id="L844">        impl.setTransformPerspective(getNativeTransform(), fovy, aspect, zNear, zFar);</span>
+<span class="nc" id="L845">    }</span>
+
+    public void setAffine(double m00,
+                          double m10,
+                          double m01,
+                          double m11,
+                          double m02,
+                          double m12) {
+<span class="fc" id="L853">        type = TYPE_UNKNOWN;</span>
+<span class="fc" id="L854">        inverseDirty = true;</span>
+<span class="fc" id="L855">        impl.setTransformAffine(getNativeTransform(), m00, m10, m01, m11, m02, m12);</span>
+<span class="fc" id="L856">    }</span>
+
+    /// Sets the transform to be the specified orthogonal view.
+    ///
+    /// Note: If `#isPerspectiveSupported()` is false, then this will throw a Runtime Exception.
+    ///
+    /// #### Parameters
+    ///
+    /// - `left`: Left x-coord of view.
+    ///
+    /// - `right`: Right x-coord of view.
+    ///
+    /// - `bottom`: Bottom y-coord of view.
+    ///
+    /// - `top`: Top y-coord of view.
+    ///
+    /// - `near`: Nearest visible z-coordinate
+    ///
+    /// - `far`: Farthest visible z-coordinate
+    public void setOrtho(float left, float right, float bottom, float top,
+                         float near, float far) {
+<span class="nc" id="L877">        type = TYPE_UNKNOWN;</span>
+<span class="nc" id="L878">        inverseDirty = true;</span>
+<span class="nc" id="L879">        impl.setTransformOrtho(getNativeTransform(), left, right, bottom, top, near, far);</span>
+<span class="nc" id="L880">    }</span>
+
+    /// Sets the transform to the specified camera's perspective.
+    ///
+    /// Note: If `#isPerspectiveSupported()` is false, then this will throw a Runtime Exception.
+    ///
+    /// #### Parameters
+    ///
+    /// - `eyeX`: The x-coordinate of the camera's eye.
+    ///
+    /// - `eyeY`: The y-coordinate of the camera's eye.
+    ///
+    /// - `eyeZ`: The z-coordinate of the camera's eye.
+    ///
+    /// - `centerX`: The center x coordinate of the view.
+    ///
+    /// - `centerY`: The center y coordinate of the view.
+    ///
+    /// - `centerZ`: The center z coordinate of the view.
+    ///
+    /// - `upX`: The x-coordinate of the up vector for the camera.
+    ///
+    /// - `upY`: The y-coordinate of the up vector for the camera.
+    ///
+    /// - `upZ`: The z-coordinate of the up vector for the camera.
+    public void setCamera(float eyeX, float eyeY, float eyeZ,
+                          float centerX, float centerY, float centerZ, float upX, float upY,
+                          float upZ) {
+<span class="nc" id="L908">        setTransform(makeCamera(eyeX, eyeY, eyeZ, centerX, centerY, centerZ, upX, upY, upZ));</span>
+<span class="nc" id="L909">    }</span>
+
+    /// Transforms a set of points using the current transform.
+    ///
+    /// #### Parameters
+    ///
+    /// - `pointSize`: The size of the points to transform (2 or 3)
+    ///
+    /// - `in`: Input array of points.
+    ///
+    /// - `srcPos`: Start position in input array
+    ///
+    /// - `out`: Output array of points
+    ///
+    /// - `destPos`: Start position in output array
+    ///
+    /// - `numPoints`: Number of points to transform.
+    public void transformPoints(int pointSize, float[] in, int srcPos, float[] out, int destPos, int numPoints) {
+<span class="pc bpc" id="L927" title="1 of 4 branches missed.">        switch (type) {</span>
+            case TYPE_TRANSLATION:
+<span class="fc" id="L929">                impl.translatePoints(pointSize, translateX, translateY, translateZ, in, srcPos, out, destPos, numPoints);</span>
+<span class="fc" id="L930">                break;</span>
+            case TYPE_SCALE:
+<span class="fc" id="L932">                impl.scalePoints(pointSize, scaleX, scaleY, scaleZ, in, srcPos, out, destPos, numPoints);</span>
+<span class="fc" id="L933">                break;</span>
+            case TYPE_IDENTITY:
+<span class="fc" id="L935">                System.arraycopy(in, srcPos, out, destPos, numPoints * pointSize);</span>
+<span class="fc" id="L936">                break;</span>
+            default:
+<span class="nc" id="L938">                impl.transformPoints(getNativeTransform(), pointSize, in, srcPos, out, destPos, numPoints);</span>
+                break;
+        }
+<span class="fc" id="L941">    }</span>
+
+    /// Transforms a provided point.
+    ///
+    /// Note: If `#isSupported()` is false, then this will throw a Runtime Exception.
+    ///
+    /// #### Parameters
+    ///
+    /// - `point`: 2 or 3 element array representing either an (x,y) or (x,y,z) tuple.
+    ///
+    /// #### Returns
+    ///
+    /// A 3-element array representing transformed (x,y,z) tuple.
+    public float[] transformPoint(float[] point) {
+<span class="fc" id="L955">        float[] out = new float[3];</span>
+<span class="fc" id="L956">        transformPoint(point, out);</span>
+<span class="fc" id="L957">        return out;</span>
+    }
+
+    /// Transforms a provided point and places the result in the provided array.
+    ///
+    /// Note: If `#isSupported()` is false, then this will throw a Runtime Exception.
+    ///
+    /// #### Parameters
+    ///
+    /// - `in`: A 2 or 3 element array representing either an (x,y) or (x,y,z) tuple.
+    ///
+    /// - `out`: A 2 or 3 element array in which the transformed point will be stored.  Should match the length of the in array.
+    public void transformPoint(float[] in, float[] out) {
+<span class="fc" id="L970">        int len = in.length;</span>
+<span class="fc" id="L971">        int olen = out.length;</span>
+<span class="pc bpc" id="L972" title="1 of 4 branches missed.">        switch (type) {</span>
+            case TYPE_TRANSLATION:
+
+<span class="fc" id="L975">                out[0] = in[0] + translateX;</span>
+<span class="fc" id="L976">                out[1] = in[1] + translateY;</span>
+<span class="pc bpc" id="L977" title="1 of 4 branches missed.">                if (len &gt; 2 &amp;&amp; olen &gt; 2) {</span>
+<span class="fc" id="L978">                    out[2] = in[2] + translateZ;</span>
+<span class="pc bpc" id="L979" title="1 of 2 branches missed.">                } else if (olen &gt; 2) {</span>
+<span class="nc" id="L980">                    out[2] = 0;</span>
+                }
+                break;
+            case TYPE_SCALE:
+<span class="fc" id="L984">                out[0] = in[0] * scaleX;</span>
+<span class="fc" id="L985">                out[1] = in[1] * scaleY;</span>
+<span class="pc bpc" id="L986" title="2 of 4 branches missed.">                if (len &gt; 2 &amp;&amp; olen &gt; 2) {</span>
+<span class="fc" id="L987">                    out[2] = in[2] * scaleZ;</span>
+<span class="nc bnc" id="L988" title="All 2 branches missed.">                } else if (olen &gt; 2) {</span>
+<span class="nc" id="L989">                    out[2] = 0;</span>
+                }
+                break;
+            case TYPE_IDENTITY:
+<span class="nc" id="L993">                System.arraycopy(in, 0, out, 0, len);</span>
+<span class="nc bnc" id="L994" title="All 4 branches missed.">                if (len &lt;= 2 &amp;&amp; olen &gt; 2) {</span>
+<span class="nc" id="L995">                    out[2] = 0;</span>
+                }
+                break;
+            default:
+<span class="fc" id="L999">                impl.transformPoint(getNativeTransform(), in, out);</span>
+
+        }
+
+<span class="fc" id="L1003">    }</span>
+
+    /// Gets the native transform object.  This object is implementation dependent so this
+    /// method should really only be used by the implementation.
+    ///
+    /// Note: If `#isSupported()` is false, then this will throw a Runtime Exception.
+    ///
+    /// #### Returns
+    ///
+    /// The native transform object.
+    public Object getNativeTransform() {
+<span class="fc bfc" id="L1014" title="All 2 branches covered.">        if (dirty) {</span>
+<span class="fc" id="L1015">            initNativeTransform();</span>
+        }
+<span class="fc" id="L1017">        return nativeTransform;</span>
+    }
+
+    /// Creates a copy of the current transform.
+    ///
+    /// Note: If `#isSupported()` is false, then this will throw a Runtime Exception.
+    ///
+    /// #### Returns
+    ///
+    /// A copy of the current transform.
+    public Transform copy() {
+<span class="fc" id="L1028">        Transform out = new Transform(null);</span>
+<span class="fc" id="L1029">        out.setTransform(this);</span>
+<span class="fc" id="L1030">        return out;</span>
+
+    }
+
+    @SuppressWarnings(&quot;PMD.SuspiciousEqualsMethodName&quot;)
+    public boolean equals(Transform t2) {
+<span class="pc bpc" id="L1036" title="3 of 4 branches missed.">        if (type == TYPE_IDENTITY &amp;&amp; t2.type == TYPE_IDENTITY) {</span>
+<span class="nc" id="L1037">            return true;</span>
+        }
+<span class="fc" id="L1039">        return impl.transformEqualsImpl(this, t2);</span>
+    }
+
+    @Override
+    public boolean equals(Object o) {
+<span class="nc bnc" id="L1044" title="All 2 branches missed.">        if (o instanceof Transform) {</span>
+<span class="nc" id="L1045">            return equals((Transform) o);</span>
+        }
+<span class="nc" id="L1047">        return false;</span>
+    }
+
+    @Override
+    public int hashCode() {
+<span class="pc bpc" id="L1052" title="1 of 2 branches missed.">        if (type == TYPE_IDENTITY) {</span>
+<span class="nc" id="L1053">            return 0;</span>
+        }
+<span class="fc" id="L1055">        int hash = 7;</span>
+<span class="fc" id="L1056">        hash = 29 * hash + this.type;</span>
+<span class="pc bpc" id="L1057" title="1 of 2 branches missed.">        hash = 29 * hash + (this.nativeTransform != null ? this.nativeTransform.hashCode() : 0);</span>
+<span class="fc" id="L1058">        hash = 29 * hash + Float.floatToIntBits(this.translateX);</span>
+<span class="fc" id="L1059">        hash = 29 * hash + Float.floatToIntBits(this.translateY);</span>
+<span class="fc" id="L1060">        hash = 29 * hash + Float.floatToIntBits(this.translateZ);</span>
+<span class="fc" id="L1061">        hash = 29 * hash + Float.floatToIntBits(this.scaleX);</span>
+<span class="fc" id="L1062">        hash = 29 * hash + Float.floatToIntBits(this.scaleY);</span>
+<span class="fc" id="L1063">        hash = 29 * hash + Float.floatToIntBits(this.scaleZ);</span>
+<span class="fc" id="L1064">        return hash;</span>
+    }
+
+    private static class IdentityHolder {
+<span class="fc" id="L1068">        private static final Transform IDENTITY = createIdentity();</span>
+    }
+
+<span class="fc" id="L1071">    public static class NotInvertibleException extends Exception {</span>
+
+    }
+
+    private static class ImmutableTransform extends Transform {
+
+        public ImmutableTransform(Object nativeTransform) {
+<span class="fc" id="L1078">            super(nativeTransform);</span>
+<span class="fc" id="L1079">        }</span>
+
+        private void unsupported() {
+<span class="nc" id="L1082">            throw new RuntimeException(&quot;Cannot change immutable transform&quot;);</span>
+        }
+
+        @Override
+        public void setCamera(float eyeX, float eyeY, float eyeZ, float centerX, float centerY, float centerZ, float upX, float upY, float upZ) {
+<span class="nc" id="L1087">            unsupported();</span>
+<span class="nc" id="L1088">        }</span>
+
+        @Override
+        public void setIdentity() {
+<span class="nc" id="L1092">            unsupported();</span>
+<span class="nc" id="L1093">        }</span>
+
+        @Override
+        public void setOrtho(float left, float right, float bottom, float top, float near, float far) {
+<span class="nc" id="L1097">            unsupported();</span>
+<span class="nc" id="L1098">        }</span>
+
+        @Override
+        public void setPerspective(float fovy, float aspect, float zNear, float zFar) {
+<span class="nc" id="L1102">            unsupported();</span>
+<span class="nc" id="L1103">        }</span>
+
+        @Override
+        public void setRotation(float angle, float px, float py) {
+<span class="nc" id="L1107">            unsupported();</span>
+<span class="nc" id="L1108">        }</span>
+
+        @Override
+        public void setTransform(Transform t) {
+<span class="nc" id="L1112">            unsupported();</span>
+<span class="nc" id="L1113">        }</span>
+
+        @Override
+        public void setRotation(float angle, float x, float y, float z) {
+<span class="nc" id="L1117">            unsupported();</span>
+<span class="nc" id="L1118">        }</span>
+
+        @Override
+        public void setTranslation(float x, float y) {
+<span class="nc" id="L1122">            unsupported();</span>
+<span class="nc" id="L1123">        }</span>
+
+        @Override
+        public void setTranslation(float x, float y, float z) {
+<span class="nc" id="L1127">            unsupported();</span>
+<span class="nc" id="L1128">        }</span>
+
+        @Override
+        public void rotate(float angle, float px, float py) {
+<span class="nc" id="L1132">            unsupported();</span>
+<span class="nc" id="L1133">        }</span>
+
+        @Override
+        public void rotate(float angle, float x, float y, float z) {
+<span class="nc" id="L1137">            unsupported();</span>
+<span class="nc" id="L1138">        }</span>
+
+
+        @Override
+        public void translate(float x, float y) {
+<span class="nc" id="L1143">            unsupported();</span>
+<span class="nc" id="L1144">        }</span>
+
+        @Override
+        public void translate(float x, float y, float z) {
+<span class="nc" id="L1148">            unsupported();</span>
+<span class="nc" id="L1149">        }</span>
+
+
+        @Override
+        public void scale(float x, float y) {
+<span class="nc" id="L1154">            unsupported();</span>
+<span class="nc" id="L1155">        }</span>
+
+        @Override
+        public void scale(float x, float y, float z) {
+<span class="nc" id="L1159">            unsupported();</span>
+<span class="nc" id="L1160">        }</span>
+
+    }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

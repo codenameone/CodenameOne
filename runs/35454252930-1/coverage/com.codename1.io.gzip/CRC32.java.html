@@ -1,0 +1,196 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>CRC32.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.io.gzip</a> &gt; <span class="el_source">CRC32.java</span></div><h1>CRC32.java</h1><pre class="source lang-java linenums">/* -*-mode:java; c-basic-offset:2; -*- */
+/*
+Copyright (c) 2011 ymnk, JCraft,Inc. All rights reserved.
+
+Redistribution and use in source and binary forms, with or without
+modification, are permitted provided that the following conditions are met:
+
+  1. Redistributions of source code must retain the above copyright notice,
+     this list of conditions and the following disclaimer.
+
+  2. Redistributions in binary form must reproduce the above copyright 
+     notice, this list of conditions and the following disclaimer in 
+     the documentation and/or other materials provided with the distribution.
+
+  3. The names of the authors may not be used to endorse or promote products
+     derived from this software without specific prior written permission.
+
+THIS SOFTWARE IS PROVIDED ``AS IS'' AND ANY EXPRESSED OR IMPLIED WARRANTIES,
+INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND
+FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL JCRAFT,
+INC. OR ANY CONTRIBUTORS TO THIS SOFTWARE BE LIABLE FOR ANY DIRECT, INDIRECT,
+INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA,
+OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
+LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
+NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE,
+EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ */
+/*
+ * This program is based on zlib-1.1.3, so all credit should go authors
+ * Jean-loup Gailly(jloup@gzip.org) and Mark Adler(madler@alumni.caltech.edu)
+ * and contributors of zlib.
+ */
+
+package com.codename1.io.gzip;
+
+<span class="fc" id="L37">final public class CRC32 implements Checksum {</span>
+
+    // The following logic has come from zlib.1.2.
+    private static final int GF2_DIM = 32;
+<span class="fc" id="L41">    private static int[] crc_table = null;</span>
+
+    static {
+<span class="fc" id="L44">        crc_table = new int[256];</span>
+<span class="fc bfc" id="L45" title="All 2 branches covered.">        for (int n = 0; n &lt; 256; n++) {</span>
+<span class="fc" id="L46">            int c = n;</span>
+
+<span class="fc bfc" id="L48" title="All 2 branches covered.">            for (int k = 8; --k &gt;= 0; ) { //NOPMD AssignmentInOperand</span>
+<span class="fc bfc" id="L49" title="All 2 branches covered.">                if ((c &amp; 1) != 0) {</span>
+<span class="fc" id="L50">                    c = 0xedb88320 ^ (c &gt;&gt;&gt; 1);</span>
+                } else {
+<span class="fc" id="L52">                    c = c &gt;&gt;&gt; 1;</span>
+                }
+            }
+<span class="fc" id="L55">            crc_table[n] = c;</span>
+        }
+<span class="fc" id="L57">    }</span>
+
+    /*
+     *  The following logic has come from RFC1952.
+     */
+<span class="fc" id="L62">    private int v = 0;</span>
+
+    static long combine(long crc1, long crc2, long len2) {
+        long row;
+<span class="nc" id="L66">        long[] even = new long[GF2_DIM];</span>
+<span class="nc" id="L67">        long[] odd = new long[GF2_DIM];</span>
+
+        // degenerate case (also disallow negative lengths)
+<span class="nc bnc" id="L70" title="All 2 branches missed.">        if (len2 &lt;= 0) {</span>
+<span class="nc" id="L71">            return crc1;</span>
+        }
+
+        // put operator for one zero bit in odd
+<span class="nc" id="L75">        odd[0] = 0xedb88320L;          // CRC-32 polynomial</span>
+<span class="nc" id="L76">        row = 1;</span>
+<span class="nc bnc" id="L77" title="All 2 branches missed.">        for (int n = 1; n &lt; GF2_DIM; n++) {</span>
+<span class="nc" id="L78">            odd[n] = row;</span>
+<span class="nc" id="L79">            row &lt;&lt;= 1;</span>
+        }
+
+        // put operator for two zero bits in even
+<span class="nc" id="L83">        gf2MatrixSquare(even, odd);</span>
+
+        // put operator for four zero bits in odd
+<span class="nc" id="L86">        gf2MatrixSquare(odd, even);</span>
+
+        // apply len2 zeros to crc1 (first square will put the operator for one
+        // zero byte, eight zero bits, in even)
+        do {
+            // apply zeros operator for this bit of len2
+<span class="nc" id="L92">            gf2MatrixSquare(even, odd);</span>
+<span class="nc bnc" id="L93" title="All 2 branches missed.">            if ((len2 &amp; 1) != 0) {</span>
+<span class="nc" id="L94">                crc1 = gf2MatrixTimes(even, crc1);</span>
+            }
+<span class="nc" id="L96">            len2 &gt;&gt;= 1;</span>
+
+            // if no more bits set, then done
+<span class="nc bnc" id="L99" title="All 2 branches missed.">            if (len2 == 0) {</span>
+<span class="nc" id="L100">                break;</span>
+            }
+
+            // another iteration of the loop with odd and even swapped
+<span class="nc" id="L104">            gf2MatrixSquare(odd, even);</span>
+<span class="nc bnc" id="L105" title="All 2 branches missed.">            if ((len2 &amp; 1) != 0) {</span>
+<span class="nc" id="L106">                crc1 = gf2MatrixTimes(odd, crc1);</span>
+            }
+<span class="nc" id="L108">            len2 &gt;&gt;= 1;</span>
+
+            // if no more bits set, then done
+<span class="nc bnc" id="L111" title="All 2 branches missed.">        } while (len2 != 0);</span>
+
+        /* return combined crc */
+<span class="nc" id="L114">        crc1 ^= crc2;</span>
+<span class="nc" id="L115">        return crc1;</span>
+    }
+
+    private static long gf2MatrixTimes(long[] mat, long vec) {
+<span class="nc" id="L119">        long sum = 0;</span>
+<span class="nc" id="L120">        int index = 0;</span>
+<span class="nc bnc" id="L121" title="All 2 branches missed.">        while (vec != 0) {</span>
+<span class="nc bnc" id="L122" title="All 2 branches missed.">            if ((vec &amp; 1) != 0) {</span>
+<span class="nc" id="L123">                sum ^= mat[index];</span>
+            }
+<span class="nc" id="L125">            vec &gt;&gt;= 1;</span>
+<span class="nc" id="L126">            index++;</span>
+        }
+<span class="nc" id="L128">        return sum;</span>
+    }
+
+    static void gf2MatrixSquare(long[] square, long[] mat) {
+<span class="nc bnc" id="L132" title="All 2 branches missed.">        for (int n = 0; n &lt; GF2_DIM; n++) {</span>
+<span class="nc" id="L133">            square[n] = gf2MatrixTimes(mat, mat[n]);</span>
+        }
+<span class="nc" id="L135">    }</span>
+
+    public static int[] getCRC32Table() {
+<span class="nc" id="L138">        int[] tmp = new int[crc_table.length];</span>
+<span class="nc" id="L139">        System.arraycopy(crc_table, 0, tmp, 0, tmp.length);</span>
+<span class="nc" id="L140">        return tmp;</span>
+    }
+
+    @Override
+    public void update(byte[] buf, int index, int len) {
+<span class="fc" id="L145">        int c = ~v;</span>
+<span class="fc bfc" id="L146" title="All 2 branches covered.">        while (--len &gt;= 0) {</span>
+<span class="fc" id="L147">            c = crc_table[(c ^ buf[index++]) &amp; 0xff] ^ (c &gt;&gt;&gt; 8);</span>
+        }
+<span class="fc" id="L149">        v = ~c;</span>
+<span class="fc" id="L150">    }</span>
+
+    @Override
+    public void reset() {
+<span class="fc" id="L154">        v = 0;</span>
+<span class="fc" id="L155">    }</span>
+
+    @Override
+    public void reset(long vv) {
+<span class="nc" id="L159">        v = (int) (vv &amp; 0xffffffffL);</span>
+<span class="nc" id="L160">    }</span>
+
+    @Override
+    public long getValue() {
+<span class="fc" id="L164">        return v &amp; 0xffffffffL;</span>
+    }
+
+    /*
+    private java.util.zip.CRC32 crc32 = new java.util.zip.CRC32();
+
+    public void update(byte[] buf, int index, int len){
+      if(buf==null) {crc32.reset();}
+      else{crc32.update(buf, index, len);}
+    }
+    public void reset(){
+      crc32.reset();
+    }
+    public void reset(long init){
+      if(init==0L){
+        crc32.reset();
+      }
+      else{
+        System.err.println(&quot;unsupported operation&quot;);
+      }
+    }
+    public long getValue(){
+      return crc32.getValue();
+    }
+  */
+    @Override
+    public CRC32 copy() {
+<span class="nc" id="L191">        CRC32 foo = new CRC32();</span>
+<span class="nc" id="L192">        foo.v = this.v;</span>
+<span class="nc" id="L193">        return foo;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

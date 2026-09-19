@@ -1,0 +1,170 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>Data.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.io</a> &gt; <span class="el_source">Data.java</span></div><h1>Data.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.io;
+
+import java.io.IOException;
+import java.io.OutputStream;
+import java.io.UnsupportedEncodingException;
+
+/// An interface that can be implemented by any object to allow it to be treated as data.  Data
+/// has a size, and can be appended to an OutputStream.  It is useful primarily for adding a custom
+/// body to a ConnectionRequest.
+///
+/// @author shannah
+///
+public interface Data {
+
+    /// Appends the data's content to an output stream.
+    ///
+    /// #### Parameters
+    ///
+    /// - `output`: The output stream to append to.
+    ///
+    /// #### Throws
+    ///
+    /// - `IOException`
+    void appendTo(OutputStream output) throws IOException;
+
+    /// Gets the size of the data content.
+    ///
+    /// #### Returns
+    ///
+    /// Size of content in bytes.
+    ///
+    /// #### Throws
+    ///
+    /// - `IOException`
+    long getSize() throws IOException;
+
+    class StringData implements Data {
+        private final byte[] bytes;
+
+        public StringData(String str) {
+<span class="fc" id="L63">            this(str, &quot;UTF-8&quot;);</span>
+<span class="fc" id="L64">        }</span>
+
+<span class="fc" id="L66">        public StringData(String str, String charset) {</span>
+            try {
+<span class="fc" id="L68">                bytes = str.getBytes(charset);</span>
+<span class="nc" id="L69">            } catch (UnsupportedEncodingException ex) {</span>
+<span class="nc" id="L70">                Log.e(ex);</span>
+<span class="nc" id="L71">                throw new RuntimeException(&quot;Failed to create StringData with encoding &quot; + charset, ex);</span>
+<span class="fc" id="L72">            }</span>
+<span class="fc" id="L73">        }</span>
+
+        @Override
+        public void appendTo(OutputStream output) throws IOException {
+<span class="fc" id="L77">            output.write(bytes);</span>
+<span class="fc" id="L78">        }</span>
+
+        @Override
+        public long getSize() throws IOException {
+<span class="fc" id="L82">            return bytes.length;</span>
+        }
+
+    }
+
+    /// Wraps a File as a Data object.
+    ///
+    class FileData implements Data {
+        private final File file;
+
+        /// Creates a new Data wrapper for a file.
+        ///
+        /// #### Parameters
+        ///
+        /// - `file`: The file to be wrapped.
+<span class="fc" id="L97">        public FileData(File file) {</span>
+<span class="fc" id="L98">            this.file = file;</span>
+<span class="fc" id="L99">        }</span>
+
+        /// {@inheritDoc }
+        @Override
+        public void appendTo(OutputStream output) throws IOException {
+<span class="fc" id="L104">            FileSystemStorage fs = FileSystemStorage.getInstance();</span>
+<span class="fc" id="L105">            Util.copyNoClose(fs.openInputStream(file.getAbsolutePath()), output, 8192);</span>
+<span class="fc" id="L106">        }</span>
+
+        /// {@inheritDoc }
+        @Override
+        public long getSize() throws IOException {
+<span class="fc" id="L111">            return file.length();</span>
+        }
+    }
+
+    /// Wraps a Storage object as a Data object.
+    ///
+    class StorageData implements Data {
+        private final String key;
+
+        /// Creates a new Data wrapper for a storage key.
+        ///
+        /// #### Parameters
+        ///
+        /// - `key`: The storage key.
+<span class="fc" id="L125">        public StorageData(String key) {</span>
+<span class="fc" id="L126">            this.key = key;</span>
+<span class="fc" id="L127">        }</span>
+
+        /// {@inheritDoc }
+        @Override
+        public void appendTo(OutputStream output) throws IOException {
+<span class="fc" id="L132">            Util.copyNoClose(Storage.getInstance().createInputStream(key), output, 8192);</span>
+<span class="fc" id="L133">        }</span>
+
+        /// {@inheritDoc }
+        @Override
+        public long getSize() throws IOException {
+<span class="fc" id="L138">            return Storage.getInstance().entrySize(key);</span>
+        }
+    }
+
+    /// Wraps a byte[] array as a Data object.
+    ///
+    class ByteData implements Data {
+        private final byte[] bytes;
+
+
+        /// Creates a new Data object that wraps a byte array.
+        ///
+        /// #### Parameters
+        ///
+        /// - `bytes`
+<span class="fc" id="L153">        public ByteData(byte[] bytes) {</span>
+<span class="fc" id="L154">            this.bytes = bytes;</span>
+<span class="fc" id="L155">        }</span>
+
+        /// {@inheritDoc }
+        @Override
+        public void appendTo(OutputStream output) throws IOException {
+<span class="fc" id="L160">            output.write(bytes);</span>
+<span class="fc" id="L161">        }</span>
+
+        /// {@inheritDoc }
+        @Override
+        public long getSize() throws IOException {
+<span class="fc" id="L166">            return bytes.length;</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

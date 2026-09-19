@@ -1,0 +1,258 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>LiveActivityDescriptor.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.surfaces</a> &gt; <span class="el_source">LiveActivityDescriptor.java</span></div><h1>LiveActivityDescriptor.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.surfaces;
+
+/// Describes a live activity: an ongoing-state surface (delivery, timer, ride, score) that stays
+/// visible outside the app while it is in progress. The layout is built once from surface nodes
+/// with `${key}` placeholders; each `LiveActivity.update(...)` then ships only a fresh state map.
+///
+/// Platform lowering:
+///
+/// - **iOS**: ActivityKit live activity. `setContent(...)` is the lock screen / banner
+///   presentation; the `set...(...)` region setters fill the Dynamic Island (ignored on devices
+///   without one).
+/// - **Android**: an ongoing notification whose collapsed and expanded views render
+///   `setCompactLeading`/`setCompactTrailing` and `setContent` respectively.
+/// - **Desktop**: a floating always-on-top pill window rendering `setContent`.
+public class LiveActivityDescriptor {
+    private final String activityType;
+    private SurfaceNode content;
+    private SurfaceNode compactLeading;
+    private SurfaceNode compactTrailing;
+    private SurfaceNode minimal;
+    private SurfaceNode expandedLeading;
+    private SurfaceNode expandedTrailing;
+    private SurfaceNode expandedCenter;
+    private SurfaceNode expandedBottom;
+    private SurfaceColor tint;
+    private String androidChannelId;
+
+    /// Creates a live activity descriptor.
+    ///
+    /// #### Parameters
+    ///
+    /// - `activityType`: an app-defined type tag (e.g. `delivery`), delivered back as the source
+    ///   of action events from this activity
+<span class="fc" id="L56">    public LiveActivityDescriptor(String activityType) {</span>
+<span class="fc" id="L57">        this.activityType = activityType;</span>
+<span class="fc" id="L58">    }</span>
+
+    /// Sets the primary presentation: the iOS lock screen / banner layout, the Android expanded
+    /// notification and the desktop pill content.
+    ///
+    /// #### Parameters
+    ///
+    /// - `root`: the layout root node
+    ///
+    /// #### Returns
+    ///
+    /// this descriptor, for chaining
+    public LiveActivityDescriptor setContent(SurfaceNode root) {
+<span class="fc" id="L71">        this.content = root;</span>
+<span class="fc" id="L72">        return this;</span>
+    }
+
+    /// Sets the Dynamic Island compact leading region (left of the camera cutout).
+    ///
+    /// #### Parameters
+    ///
+    /// - `node`: the region content
+    ///
+    /// #### Returns
+    ///
+    /// this descriptor, for chaining
+    public LiveActivityDescriptor setCompactLeading(SurfaceNode node) {
+<span class="fc" id="L85">        this.compactLeading = node;</span>
+<span class="fc" id="L86">        return this;</span>
+    }
+
+    /// Sets the Dynamic Island compact trailing region (right of the camera cutout).
+    ///
+    /// #### Parameters
+    ///
+    /// - `node`: the region content
+    ///
+    /// #### Returns
+    ///
+    /// this descriptor, for chaining
+    public LiveActivityDescriptor setCompactTrailing(SurfaceNode node) {
+<span class="fc" id="L99">        this.compactTrailing = node;</span>
+<span class="fc" id="L100">        return this;</span>
+    }
+
+    /// Sets the Dynamic Island minimal region, shown when multiple activities compete for the
+    /// island.
+    ///
+    /// #### Parameters
+    ///
+    /// - `node`: the region content
+    ///
+    /// #### Returns
+    ///
+    /// this descriptor, for chaining
+    public LiveActivityDescriptor setMinimal(SurfaceNode node) {
+<span class="nc" id="L114">        this.minimal = node;</span>
+<span class="nc" id="L115">        return this;</span>
+    }
+
+    /// Sets the leading region of the expanded (long-pressed) Dynamic Island.
+    ///
+    /// #### Parameters
+    ///
+    /// - `node`: the region content
+    ///
+    /// #### Returns
+    ///
+    /// this descriptor, for chaining
+    public LiveActivityDescriptor setExpandedLeading(SurfaceNode node) {
+<span class="nc" id="L128">        this.expandedLeading = node;</span>
+<span class="nc" id="L129">        return this;</span>
+    }
+
+    /// Sets the trailing region of the expanded (long-pressed) Dynamic Island.
+    ///
+    /// #### Parameters
+    ///
+    /// - `node`: the region content
+    ///
+    /// #### Returns
+    ///
+    /// this descriptor, for chaining
+    public LiveActivityDescriptor setExpandedTrailing(SurfaceNode node) {
+<span class="nc" id="L142">        this.expandedTrailing = node;</span>
+<span class="nc" id="L143">        return this;</span>
+    }
+
+    /// Sets the center region of the expanded (long-pressed) Dynamic Island.
+    ///
+    /// #### Parameters
+    ///
+    /// - `node`: the region content
+    ///
+    /// #### Returns
+    ///
+    /// this descriptor, for chaining
+    public LiveActivityDescriptor setExpandedCenter(SurfaceNode node) {
+<span class="nc" id="L156">        this.expandedCenter = node;</span>
+<span class="nc" id="L157">        return this;</span>
+    }
+
+    /// Sets the bottom region of the expanded (long-pressed) Dynamic Island.
+    ///
+    /// #### Parameters
+    ///
+    /// - `node`: the region content
+    ///
+    /// #### Returns
+    ///
+    /// this descriptor, for chaining
+    public LiveActivityDescriptor setExpandedBottom(SurfaceNode node) {
+<span class="fc" id="L170">        this.expandedBottom = node;</span>
+<span class="fc" id="L171">        return this;</span>
+    }
+
+    /// Sets the accent color of the activity's chrome (island key line, notification accent).
+    ///
+    /// #### Parameters
+    ///
+    /// - `tint`: the accent color
+    ///
+    /// #### Returns
+    ///
+    /// this descriptor, for chaining
+    public LiveActivityDescriptor setTint(SurfaceColor tint) {
+<span class="fc" id="L184">        this.tint = tint;</span>
+<span class="fc" id="L185">        return this;</span>
+    }
+
+    /// Sets the Android notification channel the activity's ongoing notification posts to. When
+    /// unset a default `cn1_live_activities` channel is used.
+    ///
+    /// #### Parameters
+    ///
+    /// - `channelId`: the channel id
+    ///
+    /// #### Returns
+    ///
+    /// this descriptor, for chaining
+    public LiveActivityDescriptor setAndroidChannelId(String channelId) {
+<span class="fc" id="L199">        this.androidChannelId = channelId;</span>
+<span class="fc" id="L200">        return this;</span>
+    }
+
+    /// Returns the app-defined activity type tag.
+    public String getActivityType() {
+<span class="fc" id="L205">        return activityType;</span>
+    }
+
+    /// Returns the primary presentation layout, or null.
+    public SurfaceNode getContent() {
+<span class="fc" id="L210">        return content;</span>
+    }
+
+    /// Returns the compact leading island region, or null.
+    public SurfaceNode getCompactLeading() {
+<span class="fc" id="L215">        return compactLeading;</span>
+    }
+
+    /// Returns the compact trailing island region, or null.
+    public SurfaceNode getCompactTrailing() {
+<span class="fc" id="L220">        return compactTrailing;</span>
+    }
+
+    /// Returns the minimal island region, or null.
+    public SurfaceNode getMinimal() {
+<span class="fc" id="L225">        return minimal;</span>
+    }
+
+    /// Returns the expanded leading island region, or null.
+    public SurfaceNode getExpandedLeading() {
+<span class="fc" id="L230">        return expandedLeading;</span>
+    }
+
+    /// Returns the expanded trailing island region, or null.
+    public SurfaceNode getExpandedTrailing() {
+<span class="fc" id="L235">        return expandedTrailing;</span>
+    }
+
+    /// Returns the expanded center island region, or null.
+    public SurfaceNode getExpandedCenter() {
+<span class="fc" id="L240">        return expandedCenter;</span>
+    }
+
+    /// Returns the expanded bottom island region, or null.
+    public SurfaceNode getExpandedBottom() {
+<span class="fc" id="L245">        return expandedBottom;</span>
+    }
+
+    /// Returns the accent color, or null.
+    public SurfaceColor getTint() {
+<span class="fc" id="L250">        return tint;</span>
+    }
+
+    /// Returns the Android notification channel id, or null for the default channel.
+    public String getAndroidChannelId() {
+<span class="fc" id="L255">        return androidChannelId;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>
