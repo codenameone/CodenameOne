@@ -1056,6 +1056,25 @@ void cn1StallRecord(int cause, long long ns, struct ThreadLocalData* ts) {
 }
 #endif
 
+/* Syscall counters for the block mapper. Every block at or above
+ * CN1_BLOCK_MMAP_THRESHOLD is its OWN mapping, and because realloc on a mapping
+ * aborts, a growing collection maps-copies-unmaps at every doubling. Whether that
+ * matters is a question about counts, so count them. CN1_LOG_BLOCK_SYSCALLS. */
+static _Atomic long long cn1BlockMapCount = 0, cn1BlockMapBytes = 0;
+static _Atomic long long cn1BlockUnmapCount = 0, cn1BlockUnmapBytes = 0;
+
+static void cn1ReportBlockSyscalls(void) {
+    if(!getenv("CN1_LOG_BLOCK_SYSCALLS")) {
+        return;
+    }
+    fprintf(stderr, "[BLOCKSYS] mmap=%lld (%lldMB)  munmap=%lld (%lldMB)\n",
+            atomic_load_explicit(&cn1BlockMapCount, memory_order_relaxed),
+            atomic_load_explicit(&cn1BlockMapBytes, memory_order_relaxed) / 1048576,
+            atomic_load_explicit(&cn1BlockUnmapCount, memory_order_relaxed),
+            atomic_load_explicit(&cn1BlockUnmapBytes, memory_order_relaxed) / 1048576);
+    fflush(stderr);
+}
+
 static void cn1ReportLowMemoryParks(void) {
     if(!cn1LowMemoryTraceOn()) {
         return;
@@ -2350,6 +2369,8 @@ static size_t cn1BlockPadding(void) {
 
 /* Zero-filled by the OS on both platforms, matching calloc. */
 static void* cn1BlockOsAlloc(size_t bytes) {
+    atomic_fetch_add_explicit(&cn1BlockMapCount, 1, memory_order_relaxed);
+    atomic_fetch_add_explicit(&cn1BlockMapBytes, (long long)bytes, memory_order_relaxed);
 #ifdef _WIN32
     return VirtualAlloc(NULL, bytes, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
 #else
@@ -2359,6 +2380,8 @@ static void* cn1BlockOsAlloc(size_t bytes) {
 }
 
 static void cn1BlockOsFree(void* allocation, size_t bytes) {
+    atomic_fetch_add_explicit(&cn1BlockUnmapCount, 1, memory_order_relaxed);
+    atomic_fetch_add_explicit(&cn1BlockUnmapBytes, (long long)bytes, memory_order_relaxed);
 #ifdef _WIN32
     (void)bytes;
     VirtualFree(allocation, 0, MEM_RELEASE);
@@ -15551,6 +15574,7 @@ void initConstantPool() {
 
     // Low-memory throttle diagnostics and the CN1_SIMULATE_MEMORY_WARNING_MS test
     // hook. Both are no-ops unless their environment variable is set.
+    atexit(cn1ReportBlockSyscalls);
     atexit(cn1ReportLowMemoryParks);
     atexit(cn1ReportPacingParks);
     atexit(cn1ReportGcOverflow);
