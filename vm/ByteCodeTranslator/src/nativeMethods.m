@@ -100,16 +100,6 @@
 
 extern _Atomic JAVA_BOOLEAN lowMemoryMode;
 
-// Compact-string: logical char at index i of String s, decoding Latin-1(byte[]) or UTF-16(char[]).
-static inline JAVA_CHAR cn1StrCharAtRaw(JAVA_OBJECT s, JAVA_INT i) {
-    struct obj__java_lang_String* t = (struct obj__java_lang_String*)s;
-    JAVA_ARRAY a = (JAVA_ARRAY)t->java_lang_String_value;
-    JAVA_INT o = i;
-    if (a->__codenameOneParentClsReference == &class_array1__JAVA_BYTE) {
-        return (JAVA_CHAR)(((JAVA_ARRAY_BYTE*)CN1_ARRAY_DATA(a))[o] & 0xff);
-    }
-    return ((JAVA_ARRAY_CHAR*)CN1_ARRAY_DATA(a))[o];
-}
 /* Start of a String's characters, whatever backs them.
  *
  * Every read of the characters goes through here so the backing store is named in
@@ -127,6 +117,15 @@ static inline void* cn1StrChars(JAVA_OBJECT s) {
 }
 static inline int cn1StrIsLatin1(JAVA_OBJECT s) {
     return ((JAVA_ARRAY)((struct obj__java_lang_String*)s)->java_lang_String_value)->__codenameOneParentClsReference == &class_array1__JAVA_BYTE;
+}
+
+// Compact-string: logical char at index i of String s, decoding Latin-1 or UTF-16.
+// Reads the store only through the two helpers above.
+static inline JAVA_CHAR cn1StrCharAtRaw(JAVA_OBJECT s, JAVA_INT i) {
+    if (cn1StrIsLatin1(s)) {
+        return (JAVA_CHAR)(((JAVA_ARRAY_BYTE*)cn1StrChars(s))[i] & 0xff);
+    }
+    return ((JAVA_ARRAY_CHAR*)cn1StrChars(s))[i];
 }
 
 // Copyright (c) 2008-2009 Bjoern Hoehrmann <bjoern@hoehrmann.de>
@@ -448,13 +447,11 @@ static inline __attribute__((always_inline)) JAVA_BOOLEAN cn1StringEquals(CODENA
         JAVA_ARRAY_CHAR* ta = ((JAVA_ARRAY_CHAR*)cn1StrChars((JAVA_OBJECT)t));
         return cn1CompactBytesEqual(ta, oa, (size_t)t->java_lang_String_count * sizeof(JAVA_ARRAY_CHAR));
     }
-    JAVA_ARRAY av = (JAVA_ARRAY)t->java_lang_String_value;
-    JAVA_ARRAY bv = (JAVA_ARRAY)o->java_lang_String_value;
     return cn1StrIsLatin1(__cn1ThisObject)
-        ? cn1CompactMixedEquals((const uint8_t*)CN1_ARRAY_DATA(av),
-                (const uint16_t*)CN1_ARRAY_DATA(bv), (size_t)t->java_lang_String_count)
-        : cn1CompactMixedEquals((const uint8_t*)CN1_ARRAY_DATA(bv),
-                (const uint16_t*)CN1_ARRAY_DATA(av), (size_t)t->java_lang_String_count);
+        ? cn1CompactMixedEquals((const uint8_t*)cn1StrChars((JAVA_OBJECT)t),
+                (const uint16_t*)cn1StrChars((JAVA_OBJECT)o), (size_t)t->java_lang_String_count)
+        : cn1CompactMixedEquals((const uint8_t*)cn1StrChars((JAVA_OBJECT)o),
+                (const uint16_t*)cn1StrChars((JAVA_OBJECT)t), (size_t)t->java_lang_String_count);
 
 }
 
@@ -598,16 +595,15 @@ JAVA_INT java_lang_String_hashCode___R_int(CODENAME_ONE_THREAD_STATE, JAVA_OBJEC
             return 0;
         }
         JAVA_INT end = t->java_lang_String_count;
-        JAVA_ARRAY arr = (JAVA_ARRAY)t->java_lang_String_value;
         JAVA_INT i = 0;
         // 4-way polynomial reassociation: h = h*31^4 + c0*31^3 + c1*31^2 + c2*31 + c3.
         // The naive loop is a serially-dependent multiply chain (one 31*h per char);
         // this breaks the dependency so the four products issue in parallel.
         // -fwrapv makes the int overflow wrap exactly like Java's.
-        if(arr->__codenameOneParentClsReference == &class_array1__JAVA_BYTE) {
+        if(cn1StrIsLatin1(__cn1ThisObject)) {
             // Latin-1: (b & 0xff) IS the char value, so the hash is bit-identical
             // to the same text stored as char[]. Mirrors cn1_intrinsics.h.
-            JAVA_ARRAY_BYTE* b = (JAVA_ARRAY_BYTE*)CN1_ARRAY_DATA(arr);
+            JAVA_ARRAY_BYTE* b = (JAVA_ARRAY_BYTE*)cn1StrChars(__cn1ThisObject);
             for (; i + 4 <= end; i += 4) {
                 hash = hash * 923521
                      + (b[i] & 0xff) * 29791
@@ -619,7 +615,7 @@ JAVA_INT java_lang_String_hashCode___R_int(CODENAME_ONE_THREAD_STATE, JAVA_OBJEC
                 hash = 31 * hash + (b[i] & 0xff);
             }
         } else {
-            JAVA_ARRAY_CHAR* chars = (JAVA_ARRAY_CHAR*)CN1_ARRAY_DATA(arr);
+            JAVA_ARRAY_CHAR* chars = (JAVA_ARRAY_CHAR*)cn1StrChars(__cn1ThisObject);
             for (; i + 4 <= end; i += 4) {
                 hash = hash * 923521
                      + chars[i] * 29791
@@ -818,8 +814,7 @@ JAVA_OBJECT java_lang_String_compactBytes___java_lang_String_R_byte_1ARRAY(
         CODENAME_ONE_THREAD_STATE, JAVA_OBJECT owner, JAVA_OBJECT encoding) {
     CN1_KEEP_NATIVE_OWNER(sourceOwner, owner);
     struct obj__java_lang_String* string = (struct obj__java_lang_String*)owner;
-    JAVA_ARRAY source = (JAVA_ARRAY)string->java_lang_String_value;
-    if(source->__codenameOneParentClsReference != &class_array1__JAVA_BYTE) return JAVA_NULL;
+    if(!cn1StrIsLatin1(owner)) return JAVA_NULL;
     JAVA_ARRAY_CHAR encBuffer[64];
     JAVA_ARRAY_CHAR* encChars = NULL;
     int encLength = 0;
@@ -833,7 +828,7 @@ JAVA_OBJECT java_lang_String_compactBytes___java_lang_String_R_byte_1ARRAY(
     if(enc != CN1_ENC_UTF8 && enc != CN1_ENC_US_ASCII && enc != CN1_ENC_ISO_8859_1) return JAVA_NULL;
     int count = string->java_lang_String_count;
     if(count > INT_MAX / 2) return JAVA_NULL;
-    const uint8_t* input = (const uint8_t*)CN1_ARRAY_DATA(source);
+    const uint8_t* input = (const uint8_t*)cn1StrChars(owner);
     int length = count;
     if(enc == CN1_ENC_UTF8) {
         for(int i = 0; i < count; i++) length += input[i] >> 7;
@@ -4731,12 +4726,11 @@ JAVA_CHAR java_lang_String_charAt___int_R_char(CODENAME_ONE_THREAD_STATE, JAVA_O
 JAVA_INT java_lang_String_indexOf___int_int_R_int(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT  __cn1ThisObject, JAVA_INT ch, JAVA_INT fromIndex) {
     fromIndex = MAX(0, fromIndex);
     struct obj__java_lang_String* encString = (struct obj__java_lang_String*)__cn1ThisObject;
-    JAVA_ARRAY arr = (JAVA_ARRAY)(encString->java_lang_String_value);
     int off = 0;
     int count = encString->java_lang_String_count;
-    if(arr->__codenameOneParentClsReference == &class_array1__JAVA_BYTE) {
+    if(cn1StrIsLatin1(__cn1ThisObject)) {
         // Latin-1: (b & 0xff) IS the char value; matches char[] scan bit-identically.
-        JAVA_ARRAY_BYTE* encArr = (JAVA_ARRAY_BYTE*)CN1_ARRAY_DATA(arr);
+        JAVA_ARRAY_BYTE* encArr = (JAVA_ARRAY_BYTE*)cn1StrChars(__cn1ThisObject);
         int endOff = off+count;
         for (int i=off+fromIndex; i<endOff; i++) {
             if ((encArr[i] & 0xff) == ch) {
@@ -4745,7 +4739,7 @@ JAVA_INT java_lang_String_indexOf___int_int_R_int(CODENAME_ONE_THREAD_STATE, JAV
         }
         return -1;
     }
-    JAVA_ARRAY_CHAR* encArr = (JAVA_ARRAY_CHAR*)CN1_ARRAY_DATA(arr);
+    JAVA_ARRAY_CHAR* encArr = (JAVA_ARRAY_CHAR*)cn1StrChars(__cn1ThisObject);
     int endOff = off+count;
     for (int i=off+fromIndex; i<endOff; i++) {
         if (encArr[i] == ch) {
@@ -4885,27 +4879,25 @@ JAVA_OBJECT java_lang_StringBuilder_append___java_lang_String_R_java_lang_String
     JAVA_INT needed = count + length;
     if(needed < 0 || needed > target->java_lang_StringBuilder_capacity)
         java_lang_StringBuilder_enlargeBuffer___int(threadStateData, builder, needed);
-    JAVA_ARRAY input = (JAVA_ARRAY)source->java_lang_String_value;
-    int sourceLatin1 = input->__codenameOneParentClsReference == &class_array1__JAVA_BYTE;
+    int sourceLatin1 = cn1StrIsLatin1((JAVA_OBJECT)source);
     if(!sourceLatin1 && cn1BuilderIsLatin1(builder)) {
-        JAVA_ARRAY_CHAR* units = (JAVA_ARRAY_CHAR*)CN1_ARRAY_DATA(input);
+        JAVA_ARRAY_CHAR* units = (JAVA_ARRAY_CHAR*)cn1StrChars((JAVA_OBJECT)source);
         for(int i = 0; i < length; i++) if(units[i] > 255) {
             java_lang_StringBuilder_widen__(threadStateData, builder);
             break;
         }
     }
-    input = (JAVA_ARRAY)source->java_lang_String_value;
     void* output = cn1BuilderData(builder);
     if(sourceLatin1 && cn1BuilderIsLatin1(builder)) {
         memcpy((JAVA_ARRAY_BYTE*)output + count,
-               (JAVA_ARRAY_BYTE*)CN1_ARRAY_DATA(input), (size_t)length);
+               (JAVA_ARRAY_BYTE*)cn1StrChars((JAVA_OBJECT)source), (size_t)length);
     } else if(!sourceLatin1 && !cn1BuilderIsLatin1(builder)) {
         cn1CharCopy((JAVA_ARRAY_CHAR*)output + count,
-                   (JAVA_ARRAY_CHAR*)CN1_ARRAY_DATA(input), length);
+                   (JAVA_ARRAY_CHAR*)cn1StrChars((JAVA_OBJECT)source), length);
     } else {
         for(int i = 0; i < length; i++) {
-            JAVA_CHAR ch = sourceLatin1 ? (JAVA_CHAR)((uint8_t*)CN1_ARRAY_DATA(input))[i]
-                : ((JAVA_ARRAY_CHAR*)CN1_ARRAY_DATA(input))[i];
+            JAVA_CHAR ch = sourceLatin1 ? (JAVA_CHAR)((uint8_t*)cn1StrChars((JAVA_OBJECT)source))[i]
+                : ((JAVA_ARRAY_CHAR*)cn1StrChars((JAVA_OBJECT)source))[i];
             cn1BuilderStore(builder, count + i, ch);
         }
     }
@@ -4937,9 +4929,8 @@ JAVA_BOOLEAN java_lang_StringBuilder_tryAppendRange___java_lang_CharSequence_int
         input = cn1BuilderData(text);
     } else {
         struct obj__java_lang_String* string = (struct obj__java_lang_String*)text;
-        JAVA_ARRAY array = (JAVA_ARRAY)string->java_lang_String_value;
-        sourceLatin1 = array->__codenameOneParentClsReference == &class_array1__JAVA_BYTE;
-        input = CN1_ARRAY_DATA(array);
+        sourceLatin1 = cn1StrIsLatin1(text);
+        input = cn1StrChars(text);
         start += 0;
     }
     if(!sourceLatin1 && cn1BuilderIsLatin1(builder)) {
