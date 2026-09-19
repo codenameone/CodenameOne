@@ -76,20 +76,6 @@ public final class String implements java.lang.CharSequence, Comparable<String> 
     private long nsString;
     private static final char[] ZERO_CHAR = new char[0];
 
-    /** Returns a Latin-1 byte[] for c[off..off+len) if every unit is <= 0xFF, else null. */
-    private static byte[] toLatin1(char[] c, int off, int len) {
-        for (int i = 0; i < len; i++) {
-            if (c[off + i] > 0xFF) {
-                return null;
-            }
-        }
-        byte[] b = new byte[len];
-        for (int i = 0; i < len; i++) {
-            b[i] = (byte) c[off + i];
-        }
-        return b;
-    }
-
     /** Character at logical index i (0-based); offset is applied here. */
     private char charInternal(int i) {
         Object v = value;
@@ -263,12 +249,48 @@ public final class String implements java.lang.CharSequence, Comparable<String> 
             throw failedBoundsCheck(data.length, offset, charCount);
         }
         this.count = charCount;
-        byte[] compact = toLatin1(data, offset, charCount);
-        if (compact != null) this.value = compact;
-        else {
-            this.value = new char[charCount];
-            System.arraycopy(data, offset, value, 0, count);
+        // WRITTEN AS ONE UNCONDITIONAL `this.value = new byte[len]` ON PURPOSE. That is
+        // the exact shape FusedConstructor collects -- ALOAD 0; <length over the ctor's
+        // own parameters>; NEWARRAY byte; PUTFIELD value -- and stringCompactValueMatch
+        // already admits String.value for a byte NEWARRAY, so the allocation site packs
+        // the characters INSIDE the String instead of allocating a second object.
+        //
+        // The previous form asked toLatin1() for the array, and a NEWARRAY that happens
+        // inside another method is invisible to a pass that reads this constructor's own
+        // body: every String built from a char[] cost two objects. That is not a rare
+        // path -- ASM's ClassReader calls new String(char[], 0, n) for every constant
+        // pool string of every class it reads (verified: String."<init>":([CII)V in
+        // ClassReader), which on the self-hosting corpus is the largest single source of
+        // byte[] in the program.
+        //
+        // The wide branch below replaces value and leaves the inline bytes unused. That
+        // is the right trade and not a leak -- the unused bytes sit inside the String's
+        // own block, so they are freed with it -- because Latin-1 is the overwhelming
+        // case: the corpus allocates 647,383 byte[] against 3,967 char[].
+        this.value = new byte[charCount];
+        if (!packLatin1(data, offset, charCount)) {
+            char[] wide = new char[charCount];
+            System.arraycopy(data, offset, wide, 0, charCount);
+            this.value = wide;
         }
+    }
+
+    /**
+     * Packs data[offset..offset+n) into the Latin-1 byte[] already installed in
+     * {@code value}, in ONE pass. Returns false at the first code unit above 0xFF,
+     * leaving the partially written bytes for the caller to discard -- it only ever
+     * calls this on an array it is about to replace.
+     */
+    private boolean packLatin1(char[] data, int offset, int n) {
+        byte[] out = (byte[]) value;
+        for (int i = 0; i < n; i++) {
+            char c = data[offset + i];
+            if (c > 0xFF) {
+                return false;
+            }
+            out[i] = (byte) c;
+        }
+        return true;
     }
 
     /**
