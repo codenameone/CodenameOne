@@ -235,8 +235,21 @@ public class RenderHost {
             }
         }
         Component c = owner.component();
-        if (container != null && c != null && c.getParent() == container) {
-            container.removeComponent(c);
+        if (c == null) {
+            return;
+        }
+        // Remove it from WHATEVER container holds it, not only from this host's own.
+        //
+        // An element's component does not always sit in the container of the host that
+        // attached it: a scroll view puts its content pane inside its ScrollPane, and
+        // other effects re-parent as well. Removing it only when the parent happened to
+        // be this host's container meant an unmounted element could keep a live
+        // component on screen -- deleting a row from a list left the whole previous
+        // content pane attached beside the new one, so every surviving row drew twice
+        // and the deleted row was still there.
+        com.codename1.ui.Container parent = c.getParent();
+        if (parent != null) {
+            parent.removeComponent(c);
         }
     }
 
