@@ -141,6 +141,31 @@ public class DismissibleRenderElement extends RenderElement {
         return size;
     }
 
+    /**
+     * Visits the three children.
+     *
+     * <p>{@code Element.visitChildren} is EMPTY by default, so an element that owns
+     * children and does not override it owns them invisibly: the walk that unmounts a
+     * subtree never reaches them. A dismissed row was deactivated and its child,
+     * background and secondary background stayed mounted with their components still in
+     * the scene -- every surviving row then drew its new content over the old, an
+     * orphaned subtree rebuilt with its ancestors gone and its provider lookup answered
+     * null, and the inner lists inside those rows were never unmounted at all.</p>
+     */
+    @Override
+    public void visitChildren(dart.runtime.Funcs.VoidFunc1<com.codename1.flutter.Element>
+            visitor) {
+        if (childEl != null) {
+            visitor.call(childEl);
+        }
+        if (backgroundEl != null) {
+            visitor.call(backgroundEl);
+        }
+        if (secondaryEl != null) {
+            visitor.call(secondaryEl);
+        }
+    }
+
     @Override
     protected void positionChildren(int x, int y) {
         if (background != null) {
