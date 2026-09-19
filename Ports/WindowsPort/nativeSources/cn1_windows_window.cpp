@@ -783,6 +783,14 @@ LRESULT CALLBACK cn1WinWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam
             return 0;
         }
         case WM_KEYDOWN:
+            /* A menu shortcut first. The menu labels advertise accelerators and there is no
+             * accelerator table in this pump, so without this they were decoration. A match
+             * consumes the keystroke: it belongs to the command, not to the focused
+             * component. Only an exact modifier match can match, so ordinary typing and the
+             * Tab/Escape handling below are untouched. */
+            if (cn1WinMenuHandleAccelerator((int) wParam)) {
+                return 0;
+            }
             cn1WinPushEvent(CN1_EVENT_KEY_PRESSED, 0, 0, (int) wParam);
             return 0;
         case WM_KEYUP:
@@ -868,6 +876,16 @@ LRESULT CALLBACK cn1WinWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam
             }
             return DefWindowProcW(hwnd, msg, wParam, lParam);
         }
+        case WM_CN1_MENU:
+            /* On the window's own thread, which is the whole reason this is a message:
+             * SetMenu is not legal from the EDT. */
+            cn1WinMenuSetCommands((const char*) lParam);
+            return 0;
+        case WM_COMMAND:
+            if (cn1WinMenuHandleCommand(wParam)) {
+                return 0;
+            }
+            return DefWindowProcW(hwnd, msg, wParam, lParam);
         case WM_CLOSE:
             cn1WinPushEvent(CN1_EVENT_CLOSE, 0, 0, 0);
             DestroyWindow(hwnd);

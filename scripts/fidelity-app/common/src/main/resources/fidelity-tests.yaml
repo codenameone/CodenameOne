@@ -405,3 +405,171 @@ components:
     native_gnome: gtk_dropdown
     text: Option
     states: normal,hover,disabled
+
+  # --- Desktop, second wave -----------------------------------------------------
+  # The chrome and the controls the first nine rows did not reach. Same 240x56 tile,
+  # deliberately: a per-row tile size would have to be taught to three standalone capture
+  # apps that each hard-code one, and nothing here needs a bigger canvas.
+  #
+  # Three rows carry a platforms: list rather than all three native keys, and the reason is
+  # the same one that keeps Aqua vibrancy out of the suite: the reference has to be
+  # RENDERABLE into a view. A macOS NSMenu and a GTK or AppKit tooltip are window-server
+  # surfaces, invisible to NSView.cacheDisplay and to GtkWidgetPaintable, which are the
+  # capture paths these apps use. A blank golden scores 0% forever and reads as a theme bug,
+  # so the honest answer is to say where the reference exists and score it there.
+
+  # Two rows, because the three platforms can express different amounts of one control and
+  # every boundary below was MEASURED on a capture run rather than guessed.
+  #
+  # macOS cannot render a scrollbar into a view at all: an NSScroller reports
+  # usableParts=allScrollerParts, knobProportion 0.4, isHidden=false and a 17x56 frame, and
+  # renders NOTHING through NSView.cacheDisplay. Tried detached and inside a real NSScrollView,
+  # in both .legacy and .overlay styles, with AppleShowScrollBars=Always already set by the
+  # capture script; the tile comes back holding one colour, the backdrop, every time. Same
+  # class of limitation as Aqua vibrancy, and cacheDisplay is the path that needs no Screen
+  # Recording consent, which a hosted runner cannot grant.
+  #
+  # Windows renders the bar but cannot express its highlight: none of PointerOver,
+  # UncheckedPointerOver, CheckedPointerOver or MouseOver is a visual state of a WinUI
+  # ScrollBar, and neither is Pressed or Dragging. GTK can -- PRELIGHT and ACTIVE are what the
+  # CSS pseudo-classes resolve from -- and its captured hover and pressed tiles are genuinely
+  # different from normal, so the highlight is scored where the reference can state it.
+  - id: DesktopScrollBar
+    cn1_uiid: DesktopScrollThumb
+    native_win: winui_scrollbar
+    native_gnome: gtk_scrollbar
+    platforms: windows,gnome
+    states: normal
+
+  - id: DesktopScrollBarHighlight
+    cn1_uiid: DesktopScrollThumb
+    native_gnome: gtk_scrollbar
+    platforms: gnome
+    states: normal,hover,pressed
+
+  # No DesktopSeparator row, and the reason is a measurement rather than an omission.
+  #
+  # A separator is a 1px hairline a few levels off the surface, on all three platforms. The
+  # comparator's content mask measures distance from the backdrop, and that contrast does not
+  # clear it: the captured tile is 98.2% backdrop and holds exactly TWO colours, with a
+  # maximum deviation of 14 (Fluent), 23 (Aqua) and 29 (Adwaita) -- against 36 colours and a
+  # deviation of 216 for a Button tile. So the mask comes back empty on both sides, geometry
+  # reports {"empty": true}, and shape and size agreement come out at 1.0 because two empty
+  # masks agree perfectly. Windows light scored 96.45% with both sub-scores at exactly 1.0.
+  #
+  # A row that reports a near-perfect number about something the metric never looked at is
+  # worse than no row. FidelityGate already refuses to baseline it, which is the suite working
+  # as designed. Lowering the content threshold would make it measurable and is not worth
+  # doing for one row: that threshold is shared by every row on every platform, and dropping
+  # it starts admitting anti-aliasing as content.
+  #
+  # The Separator component is still themed by all three desktop themes and is asserted by
+  # DesktopNativeThemeContentTest; it is the overlay COMPARISON that cannot see it.
+
+  - id: DesktopSeparator
+    cn1_uiid: Separator
+    # The thinnest row in the suite, and the one most worth measuring: a separator is
+    # nothing but a colour and a thickness, so a theme that gets either wrong has no other
+    # symptom.
+    #
+    # It keeps the default 240x56 tile even though a shorter one would put proportionally
+    # more of the rule in frame. tile_height_px is documented as a per-component override
+    # and the CN1 side honours it, but the three reference apps mirror only the DEFAULTS --
+    # TILE_W and TILE_H are constants in each of them -- so a per-component override moves
+    # one side of the comparison and not the other. No desktop row has ever used one. The
+    # measured proof is this row's own first capture: the yaml asked for 24 and all three
+    # references produced 240x56 regardless.
+    native_win: winui_separator
+    native_mac: appkit_box_separator
+    native_gnome: gtk_separator
+    states: normal
+
+  - id: DesktopGroupBox
+    cn1_uiid: GroupBox
+    native_win: winui_groupbox
+    native_mac: appkit_box_titled
+    native_gnome: gtk_frame
+    text: Group
+    states: normal
+
+  - id: DesktopStepper
+    cn1_uiid: Stepper
+    native_win: winui_numberbox
+    native_mac: appkit_stepper
+    native_gnome: gtk_spin_button
+    states: normal,disabled
+
+  - id: DesktopLinkButton
+    cn1_uiid: Link
+    native_win: winui_hyperlinkbutton
+    native_mac: appkit_link_button
+    native_gnome: gtk_link_button
+    text: Link
+    states: normal,hover,disabled
+
+  - id: DesktopSearchField
+    cn1_uiid: ToolbarSearch
+    native_win: winui_autosuggestbox
+    native_mac: appkit_searchfield
+    native_gnome: gtk_search_entry
+    text: Search
+    states: normal,disabled
+
+  - id: DesktopListRow
+    cn1_uiid: ListRenderer
+    native_win: winui_listviewitem
+    native_mac: appkit_tableview_row
+    native_gnome: gtk_listbox_row
+    text: Row
+    # No hover: a WinUI ListViewItem draws through ListViewItemPresenter, which paints its
+    # own pointer-over chrome rather than exposing a visual state GoToState can reach --
+    # measured, the capture blocked on it. Selected is a real property on all three.
+    states: normal,selected
+
+  - id: DesktopTabs
+    cn1_uiid: Tabs
+    native_win: winui_tabview
+    native_mac: appkit_tabview
+    native_gnome: gtk_notebook
+    states: normal
+
+  - id: DesktopToolbar
+    cn1_uiid: Toolbar
+    native_win: winui_commandbar
+    native_mac: appkit_toolbar
+    native_gnome: adw_header_bar
+    states: normal
+
+  - id: DesktopDisclosure
+    cn1_uiid: AccordionHeader
+    native_win: winui_expander
+    native_mac: appkit_disclosure
+    native_gnome: gtk_expander
+    text: Details
+    states: normal
+
+  # Windows and GNOME only: AppKit's menu bar is an NSMenu owned by the window server.
+  - id: DesktopMenuBar
+    cn1_uiid: CommandList
+    native_win: winui_menubar
+    native_gnome: gtk_popover_menubar
+    platforms: windows,gnome
+    text: File
+    states: normal
+
+  - id: DesktopMenuItem
+    cn1_uiid: Command
+    native_win: winui_menuflyoutitem
+    native_gnome: gtk_popover_menu_item
+    platforms: windows,gnome
+    text: Open
+    states: normal,hover,disabled
+
+  # Windows only: a WinUI ToolTip is an ordinary Control and renders into a view. The GTK
+  # and AppKit tooltips are separate windows the capture path cannot see.
+  - id: DesktopTooltip
+    cn1_uiid: Tooltip
+    native_win: winui_tooltip
+    platforms: windows
+    text: Tooltip
+    states: normal

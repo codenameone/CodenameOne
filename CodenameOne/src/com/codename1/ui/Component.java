@@ -7202,10 +7202,85 @@ public class Component implements Animation, StyleListener, Editable {
                     return true;
                 }
             }
+            // A listener that did not consume the event has not handled it, so the component's
+            // own commands still get to answer. Resolved in the same walk rather than in a
+            // second one, so the nearest ancestor with EITHER wins -- a row inside a table that
+            // has its own commands must not be overruled by the table's listener declining.
+            if (c.contextMenuCommands != null && c.contextMenuCommands.length > 0) {
+                ContextMenu.show(c, x, y, c.contextMenuCommands);
+                return true;
+            }
             c = c.getParent();
         }
         return false;
     }
+
+    /// Which component's commands a context-menu request at this point would open, or null
+    /// when it would open nothing.
+    ///
+    /// The same walk `#fireContextMenu(int, int)` performs, minus the showing. Split out
+    /// because the showing is a modal popup that parks the caller until the user dismisses
+    /// it: the routing is the part worth asserting, and asserting it through the showing
+    /// means a test with no user to dismiss the menu simply hangs.
+    ///
+    /// #### Returns
+    ///
+    /// the component whose commands would open, or null
+    Component resolveContextMenuOwner() {
+        Component c = this;
+        while (c != null) {
+            if (c.contextMenuCommands != null && c.contextMenuCommands.length > 0) {
+                return c;
+            }
+            c = c.getParent();
+        }
+        return null;
+    }
+
+    /// The commands a right click on this component offers.
+    ///
+    /// #### Returns
+    ///
+    /// the commands, or null when this component has no menu of its own
+    public Command[] getContextMenuCommands() {
+        if (contextMenuCommands == null) {
+            return null;
+        }
+        Command[] copy = new Command[contextMenuCommands.length];
+        System.arraycopy(contextMenuCommands, 0, copy, 0, contextMenuCommands.length);
+        return copy;
+    }
+
+    /// Gives this component a right-click menu.
+    ///
+    /// The menu opens by itself on a secondary mouse button, a stylus barrel button or a
+    /// long press, so nothing else is needed:
+    ///
+    /// ```java
+    /// label.setContextMenuCommands(cut, copy, paste);
+    /// ```
+    ///
+    /// The commands are fixed. When they depend on what was clicked -- which row, which
+    /// cell -- register a `#addContextMenuListener(ActionListener)` instead and call
+    /// `ContextMenu#show(Component, int, int, Command...)` from it.
+    ///
+    /// Passing null or an empty array removes the menu. It does not leave an empty one
+    /// behind: a menu with no items is a rectangle the user has to dismiss to learn it was
+    /// empty.
+    ///
+    /// #### Parameters
+    ///
+    /// - `commands`: the menu items in order, or null for none
+    public void setContextMenuCommands(Command... commands) {
+        if (commands == null || commands.length == 0) {
+            contextMenuCommands = null;
+            return;
+        }
+        contextMenuCommands = new Command[commands.length];
+        System.arraycopy(commands, 0, contextMenuCommands, 0, commands.length);
+    }
+
+    private Command[] contextMenuCommands;
 
     /// Dispatches a mouse wheel event to the registered listeners walking up the component
     /// hierarchy until a listener consumes the event. Returns true if a listener consumed it,

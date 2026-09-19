@@ -612,10 +612,50 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
         this.desktopTitleBarMode = mode;
     }
 
+    /// Mirrors the real ports' split between "the project asked for this" and "this is what the
+    /// platform answers when nobody asked", which is the distinction a theme constant is allowed
+    /// to fill. Null unless a test sets it, so every existing test keeps reaching
+    /// getDesktopTitleBarMode as before.
+    @Override
+    public String getConfiguredDesktopTitleBarMode() {
+        return configuredDesktopTitleBarMode;
+    }
+
+    public void setConfiguredDesktopTitleBarMode(String mode) {
+        this.configuredDesktopTitleBarMode = mode;
+    }
+
+    private String configuredDesktopTitleBarMode;
+
+    @Override
+    public boolean isShiftKeyDown() {
+        return shiftKeyDown;
+    }
+
+    public void setShiftKeyDown(boolean shiftKeyDown) {
+        this.shiftKeyDown = shiftKeyDown;
+    }
+
+    private boolean shiftKeyDown;
+
     @Override
     public void setNativeCommands(java.util.Vector commands) {
         this.lastNativeCommands = commands;
     }
+
+    /// Defaults TRUE so the existing desktop-chrome tests, which were written when every
+    /// implementation was assumed to have a menu bar, keep asserting what they always did.
+    /// The fallback tests set it false, which is what a port with no native menu reports.
+    @Override
+    public boolean isNativeCommandsSupported() {
+        return nativeCommandsSupported;
+    }
+
+    public void setNativeCommandsSupported(boolean nativeCommandsSupported) {
+        this.nativeCommandsSupported = nativeCommandsSupported;
+    }
+
+    private boolean nativeCommandsSupported = true;
 
     /** @return the commands last pushed via setNativeCommands, for desktop-chrome assertions. */
     public java.util.Vector getLastNativeCommands() {
@@ -1453,6 +1493,9 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
         desktop = false;
         nativeTitle = false;
         desktopTitleBarMode = "toolbar";
+        configuredDesktopTitleBarMode = null;
+        shiftKeyDown = false;
+        nativeCommandsSupported = true;
         lastNativeCommands = null;
         clearFileSystem();
         clearSockets();

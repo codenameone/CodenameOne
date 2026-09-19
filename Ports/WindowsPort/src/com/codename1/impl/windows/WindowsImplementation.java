@@ -112,6 +112,9 @@ public class WindowsImplementation extends CodenameOneImplementation {
     /// nativeSources/cn1_windows.h -- the two tables are the wire protocol and a
     /// mismatch routes an event to the wrong handler rather than failing.
     private static final int EVENT_POINTER_HOVER = 22;
+    /// A native menu bar item was chosen; the key field carries the command id
+    /// setNativeCommands handed out. Must match CN1_EVENT_MENU_COMMAND in cn1_windows.h.
+    private static final int EVENT_MENU_COMMAND = 23;
     private static final int EVENT_PINCH_BEGIN = 20;
     private static final int EVENT_PINCH_END = 21;
     private static final int EVENT_ROTATE = 11;
@@ -912,6 +915,9 @@ public class WindowsImplementation extends CodenameOneImplementation {
                     if (actionTarget != null) {
                         performAccessibilityAction(actionTarget.nodeId, actionTarget.actionId, null);
                     }
+                    break;
+                case EVENT_MENU_COMMAND:
+                    fireNativeMenuCommand(key);
                     break;
                 default:
                     break;
@@ -3234,9 +3240,199 @@ public class WindowsImplementation extends CodenameOneImplementation {
     /// layer, no `device-desktop-` theme layer, no @defaultDesktopFontSizeInt, no
     /// @desktopTitleBarMode, and the mobile branch of Button.pointerHover,
     /// TextSelection and SplitPane.
+    ///
+    /// The list in that paragraph is now shorter by one: @desktopTitleBarMode is read here,
+    /// because this port has a native menu bar to hand the commands to.
     @Override
     public boolean isDesktop() {
         return true;
+    }
+
+
+    /// @inheritDoc
+    ///
+    /// Without this the core answers false and Shift-Tab traverses forwards like a plain Tab,
+    /// because Form.moveFocusByTab asks Display.isShiftKeyDown for the direction. Only
+    /// JavaSEPort and the macOS port reported modifier state before this.
+    @Override
+    public boolean isShiftKeyDown() {
+        return (WindowsNative.currentModifiers() & 1) != 0;
+    }
+
+    /// @inheritDoc
+    ///
+    /// See `#isShiftKeyDown()`.
+    @Override
+    public boolean isControlKeyDown() {
+        return (WindowsNative.currentModifiers() & 2) != 0;
+    }
+
+    /// @inheritDoc
+    ///
+    /// See `#isShiftKeyDown()`.
+    @Override
+    public boolean isAltKeyDown() {
+        return (WindowsNative.currentModifiers() & 4) != 0;
+    }
+
+    // ---- native menu bar ----------------------------------------------------
+
+    /// Commands published to the native menu bar, keyed by the id the bar echoes back.
+    private java.util.Map<Integer, com.codename1.ui.Command> nativeMenuCommands =
+            new java.util.HashMap<Integer, com.codename1.ui.Command>();
+
+    /// The previous generation, kept one round.
+    ///
+    /// A menu selection arrives through the event queue, so it can be drained AFTER the form
+    /// that published it has been replaced and the map rebuilt. Without this the command a
+    /// user clicked on the way out of a screen resolves to nothing and silently does not run.
+    /// One generation is enough: the click cannot outlive two form changes.
+    private java.util.Map<Integer, com.codename1.ui.Command> supersededMenuCommands;
+
+    /// The form the live menu was published for, and the one before it -- mirroring the two
+    /// command maps above.
+    ///
+    /// A native menu selection has to go through the owning Form's dispatchCommand, not
+    /// straight to Command.actionPerformed. dispatchCommand calls actionPerformed first and
+    /// then, if the event was not consumed, runs the form-level routing: listeners registered
+    /// with Form.addCommandListener, an actionCommand() override, and the pop guard. Calling
+    /// the command directly skips all of it.
+    ///
+    /// That gap was survivable while the Toolbar was still on screen, because the same command
+    /// was reachable through it. Installing a desktop native theme hides the Toolbar, so the
+    /// native menu becomes the ONLY way to reach these commands and the skipped routing simply
+    /// stops happening.
+    private com.codename1.ui.Form nativeMenuHost;
+    private com.codename1.ui.Form supersededMenuHost;
+
+
+    private int nextMenuCommandId = 1;
+
+    /// @inheritDoc
+    ///
+    /// True on this port: cn1_windows_menu.cpp builds a real Win32 HMENU and hangs it on the
+    /// application window, so commandBehavior Native and the native title-bar mode both have
+    /// somewhere to put the commands. Without this the framework normalises both away and
+    /// keeps drawing the Toolbar.
+    @Override
+    public boolean isNativeCommandsSupported() {
+        return isDesktop();
+    }
+
+    /// @inheritDoc
+    ///
+    /// Null, not "toolbar", when nothing asked: the Fluent theme carries its own
+    /// desktopTitleBarMode and may only answer when the project did not.
+    @Override
+    public String getConfiguredDesktopTitleBarMode() {
+        if (!isDesktop()) {
+            return null;
+        }
+        return Display.getInstance().getProperty("desktop.titleBar", null);
+    }
+
+    /// @inheritDoc
+    @Override
+    public String getDesktopTitleBarMode() {
+        if (!isDesktop()) {
+            return "toolbar";
+        }
+        return Display.getInstance().getProperty("desktop.titleBar", "toolbar");
+    }
+
+    /// @inheritDoc
+    ///
+    /// Encodes one row per command as
+    /// `"<menuHint>\t<label>\t<shortcutKeyChar>\t<shortcutModifiers>\t<commandId>"`, rows
+    /// separated by newline -- the same encoding IOSImplementation writes for the macOS menu,
+    /// so the three ParparVM desktop ports share one format rather than each inventing its
+    /// own alongside Command's placement constants.
+    ///
+    /// Tabs and newlines are stripped from the two text fields rather than escaped: they are
+    /// the delimiters, neither means anything in a menu item (which renders on one line), and
+    /// an escape would need the native parser to unescape in step with this.
+    @Override
+    public void setNativeCommands(java.util.Vector commands) {
+        if (!isDesktop()) {
+            return;
+        }
+        java.util.Map<Integer, com.codename1.ui.Command> published =
+                new java.util.HashMap<Integer, com.codename1.ui.Command>();
+        StringBuilder sb = new StringBuilder();
+        if (commands != null) {
+            for (int i = 0; i < commands.size(); i++) {
+                Object o = commands.elementAt(i);
+                if (!(o instanceof com.codename1.ui.Command)) {
+                    continue;
+                }
+                com.codename1.ui.Command c = (com.codename1.ui.Command) o;
+                String name = c.getCommandName();
+                if (name == null || name.length() == 0) {
+                    continue;
+                }
+                String hint = c.getDesktopMenu();
+                if (hint == null) {
+                    hint = "";
+                }
+                if (sb.length() > 0) {
+                    sb.append('\n');
+                }
+                int commandId = nextMenuCommandId++;
+                sb.append(menuField(hint)).append('\t').append(menuField(name)).append('\t')
+                        .append(c.getDesktopShortcutKeyChar()).append('\t')
+                        .append(c.getDesktopShortcutModifiers()).append('\t')
+                        .append(commandId);
+                published.put(Integer.valueOf(commandId), c);
+            }
+        }
+        supersededMenuHost = nativeMenuHost;
+        // The form the menu was built from. MenuBar.updateCommands publishes for the
+        // form being shown, so the current form is that form.
+        nativeMenuHost = com.codename1.ui.Display.getInstance().getCurrent();
+        supersededMenuCommands = nativeMenuCommands;
+        nativeMenuCommands = published;
+        WindowsNative.menuSetCommands(sb.toString());
+    }
+
+    private static String menuField(String value) {
+        if (value == null) {
+            return "";
+        }
+        return value.replace('\n', ' ').replace('\r', ' ').replace('\t', ' ');
+    }
+
+    /// Runs the command the user chose from the native menu bar.
+    ///
+    /// Already on the EDT: the selection travels through the ordinary event queue, which the
+    /// EDT drains, so nothing is marshalled here.
+    private void fireNativeMenuCommand(int commandId) {
+        Integer key = Integer.valueOf(commandId);
+        com.codename1.ui.Command resolved = nativeMenuCommands.get(key);
+        com.codename1.ui.Form host = nativeMenuHost;
+        if (resolved == null && supersededMenuCommands != null) {
+            resolved = supersededMenuCommands.get(key);
+            host = supersededMenuHost;
+        }
+        if (resolved == null) {
+            return;
+        }
+        if (!resolved.isEnabled()) {
+            // A disabled Command must not run just because its menu item was clicked. The
+            // encoding carries no enabled flag, so the native item is created enabled and
+            // stays clickable -- the item looks available and does nothing, which is wrong but
+            // harmless, where invoking a disabled action is neither. Greying the item out as
+            // well means a sixth field in the row format and a matching change in all three
+            // native parsers; this guard is the half that prevents the damage.
+            return;
+        }
+        com.codename1.ui.events.ActionEvent ev =
+                new com.codename1.ui.events.ActionEvent(resolved);
+        if (host != null) {
+            // Runs actionPerformed and then the form-level routing; see nativeMenuHost.
+            host.dispatchCommand(resolved, ev);
+            return;
+        }
+        resolved.actionPerformed(ev);
     }
 
     /// @inheritDoc

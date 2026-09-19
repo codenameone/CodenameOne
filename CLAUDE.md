@@ -482,6 +482,33 @@ calls -- is a warning: it is dead code, not a broken build. Note the offline gat
 reads `target/classes`, so **a stale port build reports natives that no longer
 exist**; rebuild the module before believing a finding.
 
+#### The right name is not enough in C++
+
+A native defined in a `.cpp` or `.mm` file gets its name **mangled** unless it is
+declared `extern "C"`. The file compiles, the symbol it exports is not the one the
+generated code calls, and the link fails on the device in a file nobody touched --
+naming a symbol that is visibly right there in the source.
+
+`NativeSignatureVerifier` cannot see it. It checks that a native's *name* matches
+its Java method, and a mangled function has the right name too; linkage is not part
+of a name. #5845 shipped exactly this in `cn1_windows_window.cpp` and only a real
+Windows build caught it.
+
+`scripts/check-native-cpp-linkage.py` closes that, over every tracked `.cpp`, `.cc`,
+`.cxx` and `.mm`. It needs no compiler and no build output. Like the control-character
+gate it has **no baseline and no exclusions**: a native without C linkage is never
+intentional, and the fix is always one line. The script is re-included in `pr.yml`'s
+`paths` (both triggers) so a change that weakens the gate cannot merge unexercised.
+
+```bash
+scripts/check-native-cpp-linkage.py            # every tracked C++ translation unit
+scripts/check-native-cpp-linkage.py PATH ...   # just these
+```
+
+Note what it deliberately does not report: a port-internal C++ helper, whose mangling
+is correct, and a prototype, which needs no linkage of its own -- only a *definition*
+whose symbol the generated code will call.
+
 #### A framework an app gets by accident is a framework it can lose
 
 The iOS port referenced the `UTType` class while `ByteCodeTranslator` linked

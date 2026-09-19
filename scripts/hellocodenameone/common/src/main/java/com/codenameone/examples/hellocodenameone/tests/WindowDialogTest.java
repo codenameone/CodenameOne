@@ -73,6 +73,16 @@ public class WindowDialogTest extends WindowHostTest {
                 d.setLayout(new BorderLayout());
                 d.add(BorderLayout.CENTER, new Label("Delete the document?"));
                 d.setTopLevelHost(top);
+                // Pinned to the HOSTED path, which is the path this test documents: the
+                // dialog on the window's own surface with the content dimmed behind it. The
+                // desktop native themes set defaultNativeWindowModeBool, so without this the
+                // dialog opens as a separate operating system window, leaves the raster
+                // entirely, and the golden becomes an empty host window -- correct behaviour
+                // for that mode, and no longer a test of the layered pane and the scrim.
+                //
+                // Measured on the reseed captures: Window-Dialog-900x700 went from a dialog
+                // over dimmed content to 99.7% a single colour.
+                d.setNativeWindowMode(false);
                 // Gets the dialog a backdrop without parking anything: the scrim is
                 // installed for either modality or outside-press dismissal, so asking
                 // for the second one renders the tint that a modal dialog would show.

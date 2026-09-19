@@ -180,8 +180,9 @@
       "id": "scrolling-and-pull",
       "category": "Animation and navigation",
       "name": "Scrolling, sticky headers, and pull gestures",
-      "description": "Checks smooth scrolling, sticky-header transitions, pull-to-refresh, and tensile scrolling.",
+      "description": "Checks smooth scrolling, sticky-header transitions, pull-to-refresh, tensile scrolling, and the desktop scrollbar idle, hovered, and dragged.",
       "tests": [
+        "DesktopScrollbarThemeScreenshotTest",
         "PullToRefreshSpinnerScreenshotTest",
         "SmoothScrollScreenshotTest",
         "StickyHeaderFadeTransitionScreenshotTest",
@@ -402,10 +403,11 @@
       "id": "native-theme-controls",
       "category": "Themes and styling",
       "name": "Native-theme controls",
-      "description": "Checks buttons, fields, check boxes, radio buttons, switches, pickers, toolbars, tabs, lists, and multi-buttons in light and dark themes.",
+      "description": "Checks buttons, fields, check boxes, radio buttons, switches, pickers, toolbars, tabs, lists, and multi-buttons in light and dark themes, plus the desktop-only separator, group box, stepper, link, search field, and accordion header.",
       "tests": [
         "ButtonThemeScreenshotTest",
         "CheckBoxRadioThemeScreenshotTest",
+        "DesktopWidgetsThemeScreenshotTest",
         "ListThemeScreenshotTest",
         "MultiButtonThemeScreenshotTest",
         "PickerThemeScreenshotTest",
@@ -785,8 +787,9 @@
       "id": "desktop-mode",
       "category": "Desktop integration",
       "name": "Desktop mode",
-      "description": "Checks desktop-mode layout and native menu integration.",
+      "description": "Checks desktop-mode layout, native menu integration, and the Codename One-drawn desktop chrome: the context menu, the tooltip, and the dialog command area.",
       "tests": [
+        "DesktopChromeThemeScreenshotTest",
         "DesktopModeScreenshotTest"
       ]
     },
@@ -1281,6 +1284,18 @@
     {
       "pattern": "ToastBarTopPosition",
       "test": "ToastBarTopPositionScreenshotTest"
+    },
+    {
+      "pattern": "DesktopWidgetsTheme_*",
+      "test": "DesktopWidgetsThemeScreenshotTest"
+    },
+    {
+      "pattern": "DesktopChromeTheme_*",
+      "test": "DesktopChromeThemeScreenshotTest"
+    },
+    {
+      "pattern": "DesktopScrollbarTheme_*",
+      "test": "DesktopScrollbarThemeScreenshotTest"
     },
     {
       "pattern": "ButtonTheme_*",

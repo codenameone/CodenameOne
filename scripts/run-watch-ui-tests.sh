@@ -206,23 +206,14 @@ MAX_WAIT="${CN1SS_WATCH_TIMEOUT:-1200}"
 WATCH_REF_DIR="${SCREENSHOT_REF_DIR:-$SCRIPT_DIR/ios/screenshots-watch}"
 EXPECTED="$(/usr/bin/find "$WATCH_REF_DIR" -name '*.png' 2>/dev/null | wc -l | tr -d ' ')"
 rw_log "Expecting $EXPECTED screenshots (golden set)"
-stable=0; suite_finished_stable=0; waited=0
+stable=0; suite_finished_stable=0; waited=0; prev=-1
 while [ "$waited" -lt "$MAX_WAIT" ]; do
   sleep 8; waited=$((waited+8))
   cur="$(/usr/bin/find "$WS_RAW_DIR" -name '*.png' 2>/dev/null | wc -l | tr -d ' ')"
-  # Preferred exit: the full golden set has arrived. Confirm once more so the
-  # final PNG writes flush to disk before we snapshot.
-  if [ "$EXPECTED" -gt 0 ] && [ "$cur" -ge "$EXPECTED" ]; then
-    stable=$((stable+1)); [ "$stable" -ge 2 ] && break
-    continue
-  fi
-  stable=0
 
-  # stdout/stderr are attached directly by simctl launch, so the DeviceRunner
-  # completion marker is available here without waiting for unified-log
-  # collection. Confirm it twice to give the ACK-paced WebSocket sink a final
-  # drain window before snapshotting the directory. A genuinely missing
-  # screenshot will then fail comparison; a slow screenshot cannot race it.
+  # stdout/stderr are attached directly by simctl launch, so the DeviceRunner completion
+  # marker is available here without waiting for unified-log collection. It is the authority
+  # and is checked first; confirmed twice to give the ACK-paced WebSocket sink a drain window.
   if grep -qa "CN1SS:SUITE:FINISHED" \
       "$ARTIFACTS_DIR/app-stderr.log" "$ARTIFACTS_DIR/app-stdout.log" \
       "$ARTIFACTS_DIR/app-console.log" 2>/dev/null; then
@@ -231,9 +222,10 @@ while [ "$waited" -lt "$MAX_WAIT" ]; do
       rw_log "Suite reported FINISHED; WebSocket drain confirmed after ${waited}s"
       break
     fi
-  else
-    suite_finished_stable=0
+    prev="$cur"
+    continue
   fi
+  suite_finished_stable=0
 
   if grep -qaE "Fatal|Terminating app due to uncaught exception|EXC_BAD|did crash|libsystem_kernel" \
       "$ARTIFACTS_DIR/app-stderr.log" "$ARTIFACTS_DIR/app-stdout.log" \
@@ -241,6 +233,21 @@ while [ "$waited" -lt "$MAX_WAIT" ]; do
     rw_log "Detected app crash/fatal after ${waited}s"
     break
   fi
+
+  # Count-based exit, a BACKSTOP rather than the primary signal -- see the matching comment
+  # in scripts/run-tv-ui-tests.sh. EXPECTED counts GOLDENS, so a run that captures more than
+  # there are goldens reaches it with captures still in flight, and a short plateau past that
+  # point is not evidence the suite has finished.
+  if [ "$EXPECTED" -gt 0 ] && [ "$cur" -ge "$EXPECTED" ] && [ "$cur" -eq "$prev" ]; then
+    stable=$((stable+1))
+    if [ "$stable" -ge 10 ]; then
+      rw_log "No completion marker, but the capture count has held at or above $EXPECTED for 80s after ${waited}s"
+      break
+    fi
+  else
+    stable=0
+  fi
+  prev="$cur"
 done
 rw_log "Capture settled: $(/usr/bin/find "$WS_RAW_DIR" -name '*.png' 2>/dev/null | wc -l | tr -d ' ') of $EXPECTED screenshots after ${waited}s"
 

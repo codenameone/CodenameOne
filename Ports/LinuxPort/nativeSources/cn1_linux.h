@@ -95,7 +95,12 @@ typedef enum {
      * under the cursor and the theme's hover rules are dead entries in the .res.
      * Deliberately the same number the Windows port uses, so the two desktop wire
      * protocols do not drift apart. */
-    CN1_EVENT_POINTER_HOVER = 22
+    CN1_EVENT_POINTER_HOVER = 22,
+    /* A native menu bar item was chosen. keyCode carries the Codename One command id the
+     * Java side handed out in setNativeCommands. Queued like every other input so the
+     * command runs on the EDT rather than on the GTK thread. Same number as the Windows
+     * port's, so the two desktop wire protocols do not drift apart. */
+    CN1_EVENT_MENU_COMMAND = 23
 } CN1EventType;
 
 /* Fixed-point scale for the gesture keyCode field (see CN1_EVENT_PINCH). */

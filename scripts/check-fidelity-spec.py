@@ -286,6 +286,17 @@ DESKTOP_LABEL_LITERALS = {
     "DesktopCheckBox": "Check",
     "DesktopRadioButton": "Radio",
     "DesktopComboBox": "Option",
+    # Second wave. Every text-bearing row belongs here: this table is what caught all six of
+    # the first wave rendering different strings on the two sides, which capped the text
+    # field at 65% until it was found.
+    "DesktopGroupBox": "Group",
+    "DesktopLinkButton": "Link",
+    "DesktopSearchField": "Search",
+    "DesktopListRow": "Row",
+    "DesktopDisclosure": "Details",
+    "DesktopMenuBar": "File",
+    "DesktopMenuItem": "Open",
+    "DesktopTooltip": "Tooltip",
 }
 
 
@@ -333,31 +344,58 @@ def matched(pattern, source, group=1):
     return match.group(group) if match else None
 
 
+def first_nonempty(pattern, source, group=1):
+    """The first NON-EMPTY capture, not simply the first.
+
+    A composite reference builds more than one labelled thing, and the one that carries the
+    text is not always first: the macOS disclosure is an empty-titled NSButton for the
+    triangle followed by the label that actually says "Details". Taking match one there
+    reads the empty string and reports drift that is not there.
+    """
+    for match in re.finditer(pattern, source, re.S | re.M):
+        if match.group(group):
+            return match.group(group)
+    return None
+
+
 def native_label(platform, src, rid, kind):
     """Read the deliberately small reference-app constructor tables, failing closed on drift."""
     rid, kind = re.escape(rid), re.escape(kind)
     if platform == "windows":
         mapping = matched(r'new\(\s*"' + rid + r'"\s*,\s*"([^"\n]+)"', src)
         body = matched(r'^\s*"' + kind + r'"\s*=>\s*(.*?)(?=^\s*(?:"\w+"|_)\s*=>)', src) or ""
-        if re.fullmatch(r'MakeComboBox\(\),\s*', body):
-            body = matched(r'ComboBox MakeComboBox\(\)\s*\{(.*?)^\s*\}', src) or ""
-            label = matched(r'\.Items\.Add\(\s*"([^"\n]*)"\s*\)', body)
+        # A kind whose arm is just a factory call: follow it into that method's body, so the
+        # literal is still read from the one place that builds this kind and not from a
+        # neighbouring arm.
+        factory = matched(r'^\s*(Make\w+)\(\),\s*$', body)
+        if factory:
+            body = matched(r'\b' + factory + r'\(\)\s*\{(.*?)^\s*\}', src) or ""
+            label = first_nonempty(
+                r'(?:\.Items\.Add\(\s*|\b(?:Content|Text|Header|Title)\s*=\s*)"([^"\n]*)"',
+                body)
         else:
-            label = matched(r'\b(?:Content|Text)\s*=\s*"([^"\n]*)"', body)
+            label = first_nonempty(r'\b(?:Content|Text|Header|Title)\s*=\s*"([^"\n]*)"', body)
     elif platform == "macos":
         mapping = matched(r'Spec\(id:\s*"' + rid + r'",\s*kind:\s*"([^"\n]+)"', src)
         body = matched(r'case "' + kind + r'":(.*?)(?=^\s*(?:case |default:))', src) or ""
-        label = matched(r'(?:NSButton\((?:title|checkboxWithTitle|radioButtonWithTitle):|'
-                        r'NSTextField\(string:|\.addItem\(withTitle:)\s*"([^"\n]*)"', body)
+        label = first_nonempty(
+            r'(?:NS(?:Button|SearchField|TextField)\((?:title|checkboxWithTitle|'
+            r'radioButtonWithTitle|string|labelWithString):|\.addItem\(withTitle:|'
+            r'\w+\.title\s*=)\s*"([^"\n]*)"', body)
     else:
         mapping = matched(r'\{\s*"' + rid + r'",\s*"([^"\n]+)"', src)
         # Scope to make_widget: other functions also branch on these kind strings.
         factory = src.split('static GtkWidget *make_widget(', 1)[-1]
         body = matched(r'if \(strcmp\(kind, "' + kind + r'"\) == 0\) \{(.*?)'
                        r'(?=^    if \(strcmp\(kind,|^    blocker\()', factory) or ""
-        label = matched(r'(?:gtk_(?:button|check_button)_new_with_label\(|'
-                        r'gtk_editable_set_text\(GTK_EDITABLE\(\w+\),|'
-                        r'const char \*items\[\]\s*=\s*\{)\s*"([^"\n]*)"', body)
+        label = first_nonempty(
+            r'(?:gtk_(?:button|check_button)_new_with_label\(|'
+            r'gtk_editable_set_text\(GTK_EDITABLE\(\w+\),|'
+            r'gtk_link_button_new_with_label\("[^"\n]*",\s*|'
+            r'gtk_(?:frame|expander|label)_new\(|'
+            r'g_menu_append_submenu\(\w+,\s*|'
+            r'adw_window_title_new\(|'
+            r'const char \*items\[\]\s*=\s*\{)\s*"([^"\n]*)"', body)
     return mapping, label
 
 

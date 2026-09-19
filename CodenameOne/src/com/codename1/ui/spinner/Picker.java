@@ -350,6 +350,11 @@ public class Picker extends Button {
                     setEnabled(true);
                 } else {
                     Dialog pickerDlg = new Dialog();
+                    // Framework chrome, never an operating system window: this popup is POSITIONED by the
+                    // framework, and native window mode documents those margins as ignored, so in a window
+                    // it comes out centred and loses the placement that is its whole point. See
+                    // TooltipManager for the full note.
+                    pickerDlg.setNativeWindowMode(false);
                     pickerDlg.setDisposeWhenPointerOutOfBounds(true);
                     pickerDlg.setLayout(new BorderLayout());
                     Calendar cld = Calendar.getInstance();
@@ -768,6 +773,15 @@ public class Picker extends Button {
 
 
                 };
+                // Framework chrome, never an operating system window. This one is placed by
+                // hand -- setX/setY/setWidth/setHeight below, then show(top, bottom, left,
+                // right) -- and native window mode documents exactly those margins as
+                // ignored, so in a window the popup comes out centred and every placement
+                // variant collapses onto the same picture. Measured on the Windows port
+                // before this line existed: LightweightPickerButtons captured two of its
+                // four placements, the two it did capture were byte-identical, and the
+                // suite then timed out waiting for the other two.
+                dlg.setNativeWindowMode(false);
                 dlg.setOwner(Picker.this);
                 //dlg.setFormMode(!isTablet);
                 ComponentSelector.select("DialogTitle", dlg).getParent().setPadding(0).setMargin(0).setBorder(Border.createEmpty());

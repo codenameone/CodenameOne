@@ -4992,6 +4992,31 @@ public abstract class CodenameOneImplementation {
     public void setNativeCommands(Vector commands) {
     }
 
+    /// Whether this platform actually has a native menu system for
+    /// `#setNativeCommands(Vector)` to put commands on.
+    ///
+    /// False here, and the default matters: `setNativeCommands` is a no-op on a platform
+    /// that has no menu bar, and `MenuBar.updateCommands` calls it and RETURNS -- it draws
+    /// no soft buttons, because on a platform with a real menu bar drawing them too would
+    /// duplicate every command. So on a platform without one, asking for
+    /// `Display#COMMAND_BEHAVIOR_NATIVE` did not fall back to anything: the commands went to
+    /// a method that discards them and were never drawn at all. Silently, since nothing in
+    /// that path can tell "handled natively" from "dropped".
+    ///
+    /// That was latent until a theme asked for it. The desktop native themes declare
+    /// `commandBehavior: Native`, which is right for the platforms they model and which two
+    /// of the ports that will install them -- Windows and Linux -- cannot honour yet.
+    ///
+    /// A port overrides this to true when it really puts the commands somewhere the user can
+    /// reach them. Everything else keeps whatever Codename One draws itself.
+    ///
+    /// #### Returns
+    ///
+    /// true if this platform has a native menu bar
+    public boolean isNativeCommandsSupported() {
+        return false;
+    }
+
     /// Returns the desktop title-bar mode for this platform: one of {@code "native"} (OS title
     /// bar + native menu bar), {@code "custom"} (undecorated window where the CN1 Toolbar acts as
     /// the title bar) or {@code "toolbar"} (legacy in-app CN1 Toolbar). Returns {@code "toolbar"}
@@ -5004,6 +5029,24 @@ public abstract class CodenameOneImplementation {
     /// the desktop title-bar mode, never null
     public String getDesktopTitleBarMode() {
         return "toolbar";
+    }
+
+    /// The desktop title-bar mode this platform was explicitly asked for, or null when nobody
+    /// asked. Distinct from {@link #getDesktopTitleBarMode()}, which is documented to answer a
+    /// usable mode and therefore cannot express "unset" - it answers {@code "toolbar"} both for
+    /// a port with no opinion and for a project that deliberately chose the legacy look.
+    ///
+    /// That distinction is the whole point: it is what lets a native theme carry a
+    /// {@code desktopTitleBarMode} constant (Windows and macOS keep a system title bar and want
+    /// {@code native}; GNOME's HeaderBar IS the title bar and wants {@code custom}) without
+    /// overriding a project that set the build hint by hand. A build hint answers here; a theme
+    /// constant only gets consulted when this returns null.
+    ///
+    /// #### Returns
+    ///
+    /// the explicitly configured mode, or null when nothing configured one
+    public String getConfiguredDesktopTitleBarMode() {
+        return null;
     }
 
     /// Minimizes the native desktop window when the application draws its own (custom mode)
@@ -10781,6 +10824,23 @@ public abstract class CodenameOneImplementation {
             if (!isTouchDevice()) {
                 commandBehavior = Display.COMMAND_BEHAVIOR_SOFTKEY;
             }
+        }
+        if (commandBehavior == Display.COMMAND_BEHAVIOR_NATIVE && !isNativeCommandsSupported()) {
+            // Normalised here for the same reason BUTTON_BAR is normalised above: this is
+            // where a behaviour the platform cannot honour gets turned into one it can, and
+            // doing it here fixes every reader at once rather than each in turn.
+            //
+            // NATIVE is the one behaviour whose unsupported case is silent. MenuBar.
+            // updateCommands hands the commands to setNativeCommands and returns without
+            // drawing soft buttons -- correct where there is a real menu bar, since drawing
+            // them too would duplicate every command, and on a platform without one it means
+            // the commands go to a method that discards them and are never drawn at all.
+            // Nothing downstream can tell that from "the platform handled it".
+            //
+            // Latent until a theme asked for it, which the desktop native themes now do:
+            // they declare commandBehavior: Native, which is right for the platforms they
+            // model and which the Windows and Linux ports cannot honour yet.
+            commandBehavior = Display.COMMAND_BEHAVIOR_DEFAULT;
         }
         this.commandBehavior = commandBehavior;
         notifyCommandBehavior(commandBehavior);

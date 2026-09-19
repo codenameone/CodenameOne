@@ -141,6 +141,13 @@ public class TooltipManager {
             return;
         }
         currentTooltip = new InteractionDialog(new BorderLayout());
+        // Framework chrome, never an operating system window. This popup is POSITIONED by
+        // the framework -- it is placed relative to the surface it belongs to -- and native
+        // window mode documents those margins as ignored, so in a window it would come out
+        // centred and lose the placement that is its whole point. Dialog.usesNativeWindow
+        // already exempts menus and anchored popups for the same reason; AbstractDialog is a
+        // closed interface (see the comment at its end), so each of these says so itself.
+        currentTooltip.setNativeWindowMode(false);
         // showPopupDialog infers the host from the anchor anyway, but saying it is
         // free and records which surface this tooltip belongs to.
         currentTooltip.setTopLevelHost(f);

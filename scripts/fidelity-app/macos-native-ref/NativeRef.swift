@@ -83,6 +83,22 @@ final class TileView: NSView {
     }
 }
 
+/// The strip a window shows where its title bar is, for the DesktopToolbar row.
+///
+/// NSToolbar belongs to a window and cannot be rendered into a view, so the reference is the
+/// surface the toolbar sits on plus the window title -- which is what the CN1 Toolbar UIID
+/// draws, and what comparing against a detached NSToolbar would NOT be.
+///
+/// Drawn rather than layer-backed, like TileView and for the same reason: a CGColor taken
+/// from a dynamic NSColor freezes at the appearance it was read in.
+final class TitleBarStripView: NSView {
+    override var isFlipped: Bool { true }
+    override func draw(_ dirtyRect: NSRect) {
+        NSColor.windowBackgroundColor.setFill()
+        dirtyRect.fill()
+    }
+}
+
 /// One row of the desktop matrix. `kind` is the native_mac key in fidelity-tests.yaml, and
 /// the ids and states are that file's too: the two lists must agree or the comparator pairs
 /// a CN1 render against nothing.
@@ -102,6 +118,21 @@ let SPECS: [Spec] = [
     Spec(id: "DesktopSlider", kind: "appkit_slider", states: ["normal", "hover", "disabled"]),
     Spec(id: "DesktopProgressBar", kind: "appkit_progress", states: ["normal"]),
     Spec(id: "DesktopComboBox", kind: "appkit_popupbutton", states: ["normal", "hover", "disabled"]),
+
+    // Second wave. No menu bar and no tooltip row here: NSMenu and an AppKit tooltip are
+    // window-server surfaces, invisible to cacheDisplay, which is the capture path that needs
+    // no Screen Recording consent. Those rows carry a platforms: list in the spec rather than
+    // a blank golden that would score 0% forever and read as a theme bug -- the same call
+    // already made for Aqua vibrancy.
+    Spec(id: "DesktopSeparator", kind: "appkit_box_separator", states: ["normal"]),
+    Spec(id: "DesktopGroupBox", kind: "appkit_box_titled", states: ["normal"]),
+    Spec(id: "DesktopStepper", kind: "appkit_stepper", states: ["normal", "disabled"]),
+    Spec(id: "DesktopLinkButton", kind: "appkit_link_button", states: ["normal", "hover", "disabled"]),
+    Spec(id: "DesktopSearchField", kind: "appkit_searchfield", states: ["normal", "disabled"]),
+    Spec(id: "DesktopListRow", kind: "appkit_tableview_row", states: ["normal", "selected"]),
+    Spec(id: "DesktopTabs", kind: "appkit_tabview", states: ["normal"]),
+    Spec(id: "DesktopToolbar", kind: "appkit_toolbar", states: ["normal"]),
+    Spec(id: "DesktopDisclosure", kind: "appkit_disclosure", states: ["normal"]),
 ]
 
 /// Controls that own the full tile width rather than sizing to their content. A slider, a
@@ -109,7 +140,24 @@ let SPECS: [Spec] = [
 /// asked for -- so the tile width is the honest answer, and it is the same rule the CN1
 /// renderer applies. Left to size themselves, a text field measures to its placeholder
 /// (39px for "Text"), which is not a control anyone would recognise or ship.
-let FULL_WIDTH_KINDS: Set<String> = ["appkit_slider", "appkit_progress", "appkit_textfield"]
+let FULL_WIDTH_KINDS: Set<String> = [
+    "appkit_slider", "appkit_progress", "appkit_textfield",
+    // Second wave, same rule: none of these has a natural width either. A search field
+    // measures to its placeholder, and a row, a box, a tab view and a toolbar are all
+    // containers that take the width they are given.
+    "appkit_searchfield", "appkit_tableview_row",
+    "appkit_box_titled", "appkit_tabview", "appkit_toolbar",
+    "appkit_box_separator",
+]
+
+/// Controls that own the full tile HEIGHT rather than sizing to their content.
+///
+/// A group box is a frame around other things, so its height is whatever it is given -- left
+/// to measure itself it collapses onto its own title and draws no frame at all, which is a
+/// heading, not a group box. The CN1 side applies the same rule through
+/// DesktopTileRunner.FULL_HEIGHT_IDS, and the two lists are kept in step by hand exactly as
+/// the full-width ones are.
+let FULL_HEIGHT_KINDS: Set<String> = ["appkit_box_titled", "appkit_tabview"]
 
 final class RefApp: NSObject, NSApplicationDelegate {
     var window: NSWindow!
@@ -204,6 +252,147 @@ final class RefApp: NSObject, NSApplicationDelegate {
             let pop = NSPopUpButton(frame: .zero, pullsDown: false)
             pop.addItem(withTitle: "Option")
             return pop
+        case "appkit_box_separator":
+            // NSBox in .separator mode IS AppKit's horizontal rule -- the same object as the
+            // titled box above, which is why both are NSBox here rather than one of them being
+            // a hand-drawn line. It has no natural width, so it is in FULL_WIDTH_KINDS.
+            let sep = NSBox(frame: NSRect(x: 0, y: 0, width: TILE_W, height: 1))
+            sep.boxType = .separator
+            return sep
+        case "appkit_box_titled":
+            // The label goes INSIDE the default content view. Assigning it AS the content view
+            // replaces the view the box draws its frame around, so the frame disappeared and
+            // the label was clipped by a box that had sized itself to nothing.
+            let box = NSBox(frame: NSRect(x: 0, y: 0, width: TILE_W, height: TILE_H))
+            box.title = "Group"
+            box.titlePosition = .atTop
+            box.boxType = .primary
+            let body = NSTextField(labelWithString: "Item")
+            body.sizeToFit()
+            body.setFrameOrigin(NSPoint(x: 4, y: 4))
+            box.contentView?.addSubview(body)
+            return box
+        case "appkit_stepper":
+            // The NSStepper alone is the two chevrons; the number beside it is a separate
+            // field, and the CN1 Stepper is the pair. Built as the pair so the two sides
+            // compare the same control rather than half of one.
+            //
+            // A plain container with explicit frames, not an NSStackView: a stack view's
+            // fittingSize came back with no width, so the tile showed the chevrons and no
+            // field at all -- half a control, which is exactly what this pairing exists to
+            // avoid.
+            let field = NSTextField(string: "1")
+            field.isBezeled = true
+            field.bezelStyle = .roundedBezel
+            field.sizeToFit()
+            field.setFrameSize(NSSize(width: max(field.frame.width, 48),
+                                      height: field.frame.height))
+            let stepper = NSStepper()
+            stepper.minValue = 0
+            stepper.maxValue = 10
+            stepper.doubleValue = 1
+            stepper.sizeToFit()
+            let h = max(field.frame.height, stepper.frame.height)
+            let row = NSView(frame: NSRect(x: 0, y: 0,
+                                           width: field.frame.width + 2 + stepper.frame.width,
+                                           height: h))
+            field.setFrameOrigin(NSPoint(x: 0, y: (h - field.frame.height) / 2))
+            stepper.setFrameOrigin(NSPoint(x: field.frame.width + 2,
+                                           y: (h - stepper.frame.height) / 2))
+            row.addSubview(field)
+            row.addSubview(stepper)
+            return row
+        case "appkit_link_button":
+            // NSButton's own link style, not a text field with an attributed string: the
+            // latter is what an application writes when the platform has no link control,
+            // and AppKit has one.
+            let b = NSButton(title: "Link", target: nil, action: nil)
+            b.isBordered = false
+            b.contentTintColor = .linkColor
+            b.attributedTitle = NSAttributedString(
+                string: "Link",
+                attributes: [.foregroundColor: NSColor.linkColor,
+                             .underlineStyle: NSUnderlineStyle.single.rawValue])
+            return b
+        case "appkit_searchfield":
+            let f = NSSearchField(string: "Search")
+            f.isEditable = true
+            return f
+        case "appkit_tableview_row":
+            // A row view with a cell in it, which is what a single NSTableView row draws.
+            //
+            // The frame is explicit because NSTableRowView has no intrinsic size in either
+            // axis -- measured: it laid out to 240x0 and produced no image at all, which the
+            // zero-size blocker caught. 24pt is the standard NSTableView row height, which is
+            // what a table would have given it.
+            let rowHeight: CGFloat = 24
+            let row = NSTableRowView(frame: NSRect(x: 0, y: 0, width: TILE_W, height: rowHeight))
+            // Emphasized, so a selected row draws the ACCENT fill rather than the grey one.
+            // An NSTableRowView outside a focused table is unemphasized by default, and grey
+            // is what macOS shows for a selection in a window the user is not working in --
+            // not what a selected row looks like while they are. Measured: the unemphasized
+            // reference scored the CN1 row at 67%, against a CN1 style that is correctly
+            // accent-filled.
+            row.isEmphasized = true
+            let label = NSTextField(labelWithString: "Row")
+            label.sizeToFit()
+            label.setFrameOrigin(NSPoint(x: 4, y: (rowHeight - label.frame.height) / 2))
+            row.addSubview(label)
+            return row
+        case "appkit_tabview":
+            // Full height as well as full width (see FULL_HEIGHT_KINDS). Left to its fitting
+            // size an NSTabView is taller than the tile and its tab strip came out clipped
+            // through its own top edge -- a reference that is cut in half measures nothing,
+            // whatever the number underneath says.
+            let tv = NSTabView()
+            let one = NSTabViewItem(identifier: "one")
+            one.label = "One"
+            let two = NSTabViewItem(identifier: "two")
+            two.label = "Two"
+            tv.addTabViewItem(one)
+            tv.addTabViewItem(two)
+            return tv
+        case "appkit_toolbar":
+            // NSToolbar belongs to a window and cannot be rendered into a view, so the
+            // reference is the strip a window shows in its place: the title bar's own
+            // background with the window title on it. That is what the CN1 Toolbar UIID
+            // draws, and comparing it against a detached NSToolbar would compare two
+            // different things.
+            // The fill is DRAWN, not assigned to a layer. A CGColor taken from a dynamic
+            // NSColor is resolved once, at whatever appearance was in force when it was read,
+            // so the light tile came out with the dark window background painted across it.
+            // TileView draws its own fill for exactly this reason.
+            let strip = TitleBarStripView(frame: NSRect(x: 0, y: 0, width: TILE_W, height: TILE_H))
+            let title = NSTextField(labelWithString: "Title")
+            title.font = NSFont.titleBarFont(ofSize: NSFont.systemFontSize)
+            title.sizeToFit()
+            title.setFrameOrigin(NSPoint(
+                x: (TILE_W - title.frame.width) / 2,
+                y: (TILE_H - title.frame.height) / 2))
+            strip.addSubview(title)
+            return strip
+        case "appkit_disclosure":
+            // The triangle AND its label. AppKit's .disclosure bezel draws the triangle only
+            // and ignores the title outright -- measured: the tile came out as a bare chevron
+            // with no text, against a CN1 accordion header that is a labelled row. A titled
+            // disclosure on macOS is the triangle with a label beside it, which is what a
+            // sidebar or an inspector section actually shows.
+            let triangle = NSButton(title: "", target: nil, action: nil)
+            triangle.setButtonType(.pushOnPushOff)
+            triangle.bezelStyle = .disclosure
+            triangle.sizeToFit()
+            let label = NSTextField(labelWithString: "Details")
+            label.sizeToFit()
+            let h = max(triangle.frame.height, label.frame.height)
+            let row = NSView(frame: NSRect(x: 0, y: 0,
+                                           width: triangle.frame.width + 4 + label.frame.width,
+                                           height: h))
+            triangle.setFrameOrigin(NSPoint(x: 0, y: (h - triangle.frame.height) / 2))
+            label.setFrameOrigin(NSPoint(x: triangle.frame.width + 4,
+                                         y: (h - label.frame.height) / 2))
+            row.addSubview(triangle)
+            row.addSubview(label)
+            return row
         case "appkit_progress":
             let p = NSProgressIndicator()
             p.style = .bar
@@ -238,11 +427,26 @@ final class RefApp: NSObject, NSApplicationDelegate {
             return true
         case "selected":
             if let sw = view as? NSSwitch { sw.state = .on; return true }
+            if let row = view as? NSTableRowView { row.isSelected = true; return true }
             if let b = view as? NSButton { b.state = .on; return true }
+            // A composite: the disclosure is a triangle plus a label, and the state belongs
+            // to the triangle. Recursed rather than special-cased by kind, because the state
+            // is always a property of one control inside the composite and the alternative is
+            // a second table mapping kinds to which subview to reach for.
+            for sub in view.subviews where applyState(sub, state, kind) {
+                _ = sub
+                return true
+            }
             return false
         case "disabled":
             if let c = view as? NSControl { c.isEnabled = false; return true }
-            return false
+            // The stepper is a field plus a stepper and BOTH halves have to grey out; unlike
+            // selected, this is not one control's state, so it does not stop at the first.
+            var reached = false
+            for sub in view.subviews {
+                if applyState(sub, state, kind) { reached = true }
+            }
+            return reached
         default:
             blocker("unknown state '\(state)'")
             return false
@@ -284,6 +488,9 @@ final class RefApp: NSObject, NSApplicationDelegate {
         var size = widget.fittingSize
         if size.height <= 0 { size.height = widget.intrinsicContentSize.height }
         if size.height <= 0 { size.height = widget.frame.height }
+        if FULL_HEIGHT_KINDS.contains(spec.kind) {
+            size.height = TILE_H
+        }
         if FULL_WIDTH_KINDS.contains(spec.kind) {
             size.width = TILE_W
         } else {

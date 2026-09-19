@@ -27,7 +27,7 @@
   "window": {
     "active": true
   },
-  "tiles_written": 60,
+  "tiles_written": 104,
   "backdrop_by_appearance": {"light": "#FAFAFA", "dark": "#242424"},
   "states_identical_to_normal": ["DesktopTextField_hover_light", "DesktopTextField_hover_dark"],
   "blockers": []

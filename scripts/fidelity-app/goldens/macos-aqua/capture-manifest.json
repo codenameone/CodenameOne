@@ -3,7 +3,7 @@
   "platform": "macos",
   "golden_set": "macos-aqua",
   "mode": "capture",
-  "tiles_written": 60,
+  "tiles_written": 88,
   "backdrop_by_appearance": {"dark": "#262626", "light": "#E7E7E7"},
   "os": {
     "version": "15.7.9",
@@ -32,7 +32,7 @@
     "reduce_transparency": false,
     "increase_contrast": false
   },
-  "states_identical_to_normal": ["DesktopButton_hover_light", "DesktopAccentButton_hover_light", "DesktopTextField_hover_light", "DesktopCheckBox_hover_light", "DesktopRadioButton_hover_light", "DesktopSwitch_hover_light", "DesktopSlider_hover_light", "DesktopComboBox_hover_light", "DesktopButton_hover_dark", "DesktopAccentButton_hover_dark", "DesktopTextField_hover_dark", "DesktopCheckBox_hover_dark", "DesktopRadioButton_hover_dark", "DesktopSwitch_hover_dark", "DesktopSlider_hover_dark", "DesktopComboBox_hover_dark"],
+  "states_identical_to_normal": ["DesktopButton_hover_light", "DesktopAccentButton_hover_light", "DesktopTextField_hover_light", "DesktopCheckBox_hover_light", "DesktopRadioButton_hover_light", "DesktopSwitch_hover_light", "DesktopSlider_hover_light", "DesktopComboBox_hover_light", "DesktopLinkButton_hover_light", "DesktopButton_hover_dark", "DesktopAccentButton_hover_dark", "DesktopTextField_hover_dark", "DesktopCheckBox_hover_dark", "DesktopRadioButton_hover_dark", "DesktopSwitch_hover_dark", "DesktopSlider_hover_dark", "DesktopComboBox_hover_dark", "DesktopLinkButton_hover_dark"],
   "capture": {
     "method": "cachedisplay",
     "vibrancy_capturable": false,

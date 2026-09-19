@@ -164,7 +164,7 @@ public class TabsLiquidGlassAnimationScreenshotTest extends BaseTest {
         // width, which lands the themed pill at the native y=0 position.
         tile.add(BorderLayout.NORTH, tabs);
         layoutHost.add(BorderLayout.CENTER, tile);
-        layoutHost.layoutContainer();
+        layoutOffScreen(layoutHost);
         tile.layoutContainer();
         tabs.layoutContainer();
         tabs.getTabsContainer().layoutContainer();
