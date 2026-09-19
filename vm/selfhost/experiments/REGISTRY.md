@@ -3249,3 +3249,48 @@ time. Round 22's devirtualization read as 19% slower for exactly this reason.
 What is not in doubt: the binary got 24KB SMALLER with the switches in, the arms
 are direct calls where five dependent loads used to be, and those direct calls are
 inlinable where an indirect one never was.
+
+## Round 30: a clean baseline at HEAD, on a machine that was actually idle
+
+Round 29 could not score anything -- 107% elapsed spread against someone else's
+334% CPU job. The same harness, same corpus, same binary shape, run at load 1.25
+with nothing else on the box:
+
+| arm | elapsed (min of 7) | spread | peak (min of 7) | spread |
+|---|---:|---:|---:|---:|
+| parpar | 5.372s | 3.1% | 1422MB | 5.7% |
+| jdk25 | 4.557s | 7.6% | 1408MB | 4.3% |
+| jdk8 | 5.650s | 12.8% | 2035MB | 2.6% |
+
+**vs JDK 25: elapsed 1.158x, peak 1.024x. vs JDK 8: elapsed 0.918x, peak 0.720x.**
+
+Two things worth separating, because they are in very different places.
+
+**Memory is done.** 1.024x against JDK 25 is inside the run-to-run spread of either
+arm -- the page heap, the 24-byte array header, the native-block mmap and the
+collection slot sizes between them closed a gap that was 1.19x to 1.21x. There is
+no longer a memory deficit to explain, and further work here is chasing noise.
+
+**Time is 15.8% behind, and the cause is still parallelism, not codegen.** The
+hardware counters from round 21 have not been invalidated by anything since:
+parpar retires 0.619x the instructions JDK 25 does and burns 0.70x the cycles, yet
+loses on wall clock, because HotSpot uses 3.49 cores to our 1.78. Roughly 31% of
+every instruction HotSpot executes is JIT compilation on background threads, and
+it buys the result 0.42s; parallel GC buys another 0.5s. Held to one compiler
+thread it lands at parity with us while executing 15% MORE instructions.
+
+So the remaining gap is not "the generated C is slow". It is that a short-running
+AOT program presents one busy core where HotSpot presents three and a half, and
+the only lever of that size left is doing our own remaining work concurrently.
+
+The trajectory across this branch, all against JDK 25 on this corpus:
+
+| | elapsed | peak |
+|---|---:|---:|
+| start | 1.278x | ~1.20x |
+| after string/collection/iterator work | 1.214x | ~1.19x |
+| after closed-world devirtualization | ~1.147x | -- |
+| HEAD (thunk switch, lambda provenance, memory work) | 1.158x | 1.024x |
+
+The 1.147x and 1.158x are the same number to this harness's resolution; do not read
+a regression into it.
