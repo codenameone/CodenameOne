@@ -112,16 +112,16 @@ extern _Atomic JAVA_BOOLEAN lowMemoryMode;
  *
  * The coder still comes from cn1StrIsLatin1 below, which reads the class pointer
  * -- the one piece of that header carrying information. */
-static inline void* cn1StrChars(JAVA_OBJECT s) {
+void* cn1StrChars(JAVA_OBJECT s) {
     return CN1_ARRAY_DATA((JAVA_ARRAY)((struct obj__java_lang_String*)s)->java_lang_String_value);
 }
-static inline int cn1StrIsLatin1(JAVA_OBJECT s) {
+int cn1StrIsLatin1(JAVA_OBJECT s) {
     return ((JAVA_ARRAY)((struct obj__java_lang_String*)s)->java_lang_String_value)->__codenameOneParentClsReference == &class_array1__JAVA_BYTE;
 }
 
 // Compact-string: logical char at index i of String s, decoding Latin-1 or UTF-16.
 // Reads the store only through the two helpers above.
-static inline JAVA_CHAR cn1StrCharAtRaw(JAVA_OBJECT s, JAVA_INT i) {
+JAVA_CHAR cn1StrCharAtRaw(JAVA_OBJECT s, JAVA_INT i) {
     if (cn1StrIsLatin1(s)) {
         return (JAVA_CHAR)(((JAVA_ARRAY_BYTE*)cn1StrChars(s))[i] & 0xff);
     }

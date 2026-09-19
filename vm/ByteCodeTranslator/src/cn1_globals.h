@@ -1269,6 +1269,27 @@ static inline int cn1IsStringClass(const struct clazz* c) {
     return c == &class__java_lang_String || c == &class__java_lang_String_i8;
 }
 
+/* How a String's characters are reached. DECLARED here and defined in
+ * nativeMethods.m, because a declaration needs no struct while the definition
+ * needs the generated obj__java_lang_String -- and this header is included long
+ * before that one exists.
+ *
+ * Not static inline in a header, which is what the first attempt tried:
+ * cn1_intrinsics.h is pulled into generated .c files that do not necessarily
+ * include java_lang_String.h, and its __has_include guard cannot help because
+ * __has_include asks whether the FILE EXISTS, not whether this translation unit
+ * included it -- and it always exists. Out-of-line is the answer, and costs
+ * nothing where it matters: -O3 ships -flto=thin, so these inline across
+ * translation units anyway.
+ *
+ * String is special-cased in the runtime on purpose. It is the most allocated
+ * class in the VM and the only one whose storage the collector, the intrinsics
+ * and the natives all have opinions about, so its access belongs in one place
+ * rather than re-derived at each. */
+extern void* cn1StrChars(JAVA_OBJECT s);
+extern int cn1StrIsLatin1(JAVA_OBJECT s);
+extern JAVA_CHAR cn1StrCharAtRaw(JAVA_OBJECT s, JAVA_INT i);
+
 
 /* Constant-time instanceof against a type the translator assigned a dense bit
  * index to (see Parser.typeTestIds). One load of the runtime class id, one load
