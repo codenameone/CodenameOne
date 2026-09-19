@@ -3533,3 +3533,49 @@ It exists because `value` has to remain a real array object: Java code does
 it means teaching every one of those readers to address a payload that is not an
 object -- which is a representation change of the same family as 4-byte
 references, and should be scoped the same way.
+
+## Round 34: SATB is worth 0.19%, and the profile names a bigger one
+
+Two claims about per-thread SATB buffers were made on this branch. The first --
+that the global mutex in cn1SatbEnqueue gates the memory win -- was withdrawn in
+round 31 when the tight-pacing penalty turned out to be diffuse. This round
+settles the rest by measuring what it is worth on its OWN, at the DEFAULT pacing
+the VM actually ships, since pacing is not being changed.
+
+Main-thread self time, default pacing, 10,085 samples:
+
+| | share of mutator |
+|---|---:|
+| Java monitor + mutex machinery | **3.50%** |
+| SATB machinery, all of it | 1.12% |
+| -- cn1SatbEnqueueRangeLocked (already filters lock-free, flushes 256 at a time) | 0.91% |
+| -- **cn1SatbEnqueue (the per-object mutex a per-thread buffer would remove)** | **0.19%** |
+
+**0.19%.** The redesign is sound engineering and it is what G1 does, but on this
+VM at its shipping pacing it addresses a fifth of one percent of the critical
+path, for a change whose failure mode is collecting a live object. Dropped from
+the list rather than carried as a maybe. The range form, which is 5x the scalar
+form, was already fixed.
+
+### What the same trace found instead
+
+The mutex waits on the main thread do not come from the collector. Walking each
+one to its nearest named caller, they are monitorEnter, monitorExitBlock and
+java.util.Hashtable.get -- **Java `synchronized`** -- with cn1SatbEnqueue
+appearing exactly once in the whole list.
+
+That is 3.50% of the mutator spent entering and leaving Java monitors in a
+program whose real work is single-threaded, and a meaningful part of it is inside
+the kernel (__psynch_mutexwait 0.84%, _pthread_mutex_firstfit_lock_wait 0.68%),
+not just the userspace fast path. monitorEnter already has a reentrancy fast path
+keyed on ownerThread, but a first acquisition goes straight to
+pthread_mutex_lock.
+
+This is the shape HotSpot answered with biased locking, and it is a better fit
+here than there: CN1 is single-threaded on the EDT by design, so an object that
+is never touched by a second thread is the common case rather than a special one.
+Two ways at it, and they compose: a thin-lock CAS fast path so an uncontended
+acquisition never calls into libsystem_pthread, and closed-world escape
+information so a monitor on a provably unshared object is elided outright.
+
+Not started; recorded so the number is not re-derived.
