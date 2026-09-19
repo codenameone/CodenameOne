@@ -5040,7 +5040,7 @@ public abstract class CodenameOneImplementation {
     /// #### Parameters
     ///
     /// - `cmd`: the command the native menu reported; ignored when null or disabled
-    protected void dispatchNativeMenuCommand(com.codename1.ui.Command cmd) {
+    protected void dispatchNativeMenuCommand(Command cmd) {
         if (cmd == null) {
             return;
         }
@@ -5051,8 +5051,8 @@ public abstract class CodenameOneImplementation {
             // every native parser. This is the half that prevents the damage.
             return;
         }
-        com.codename1.ui.Form current = com.codename1.ui.Display.getInstance().getCurrent();
-        com.codename1.ui.events.ActionEvent ev = new com.codename1.ui.events.ActionEvent(cmd);
+        Form current = Display.getInstance().getCurrent();
+        ActionEvent ev = new ActionEvent(cmd);
         if (current != null && formCarriesCommand(current, cmd)) {
             current.dispatchCommand(cmd, ev);
             return;
@@ -5071,7 +5071,7 @@ public abstract class CodenameOneImplementation {
     /// #### Returns
     ///
     /// true when the command belongs to the form
-    private static boolean formCarriesCommand(com.codename1.ui.Form f, com.codename1.ui.Command cmd) {
+    private static boolean formCarriesCommand(Form f, Command cmd) {
         if (f.getBackCommand() == cmd) { //NOPMD CompareObjectsWithEquals
             return true;
         }
