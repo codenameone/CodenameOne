@@ -210,37 +210,10 @@ stable=0; suite_finished_stable=0; waited=0; prev=-1
 while [ "$waited" -lt "$MAX_WAIT" ]; do
   sleep 8; waited=$((waited+8))
   cur="$(/usr/bin/find "$WS_RAW_DIR" -name '*.png' 2>/dev/null | wc -l | tr -d ' ')"
-  # Preferred exit: the full golden set has arrived and stopped growing. Confirm
-  # once more so the final PNG writes flush to disk before we snapshot.
-  # The count alone is not an exit condition: EXPECTED counts the GOLDENS on disk, and a
-  # suite that captures more screenshots than there are goldens -- which is every run that
-  # adds a test, before its golden exists -- reaches EXPECTED while earlier captures are
-  # still in flight. Breaking there snapshots the directory mid-stream and reports whatever
-  # had not arrived as "Actual screenshot missing (test did not produce output)", naming
-  # tests that ran perfectly.
-  #
-  # Measured on tvOS run 35395173010: the comparison ran at 22:34:33 and called DesktopMode
-  # and Media360Panorama missing; the WebSocket sink logged both delivered, status=ok, at
-  # 22:35:04. Six new captures with no goldens had pushed the count to EXPECTED six
-  # screenshots early.
-  #
-  # So require the count to have STOPPED CHANGING as well. While captures are still
-  # arriving it keeps rising and this never fires; once it plateaus, two confirmations give
-  # the final writes their flush window. That also makes seeding a new golden possible at
-  # all, which it was not: the wait ended before the new captures landed.
-  if [ "$EXPECTED" -gt 0 ] && [ "$cur" -ge "$EXPECTED" ] && [ "$cur" -eq "$prev" ]; then
-    stable=$((stable+1)); prev="$cur"
-    [ "$stable" -ge 2 ] && break
-    continue
-  fi
-  stable=0
-  prev="$cur"
 
-  # stdout/stderr are attached directly by simctl launch, so the DeviceRunner
-  # completion marker is available here without waiting for unified-log
-  # collection. Confirm it twice to give the ACK-paced WebSocket sink a final
-  # drain window before snapshotting the directory. A genuinely missing
-  # screenshot will then fail comparison; a slow screenshot cannot race it.
+  # stdout/stderr are attached directly by simctl launch, so the DeviceRunner completion
+  # marker is available here without waiting for unified-log collection. It is the authority
+  # and is checked first; confirmed twice to give the ACK-paced WebSocket sink a drain window.
   if grep -qa "CN1SS:SUITE:FINISHED" \
       "$ARTIFACTS_DIR/app-stderr.log" "$ARTIFACTS_DIR/app-stdout.log" \
       "$ARTIFACTS_DIR/app-console.log" 2>/dev/null; then
@@ -249,9 +222,10 @@ while [ "$waited" -lt "$MAX_WAIT" ]; do
       rw_log "Suite reported FINISHED; WebSocket drain confirmed after ${waited}s"
       break
     fi
-  else
-    suite_finished_stable=0
+    prev="$cur"
+    continue
   fi
+  suite_finished_stable=0
 
   if grep -qaE "Fatal|Terminating app due to uncaught exception|EXC_BAD|did crash|libsystem_kernel" \
       "$ARTIFACTS_DIR/app-stderr.log" "$ARTIFACTS_DIR/app-stdout.log" \
@@ -259,6 +233,21 @@ while [ "$waited" -lt "$MAX_WAIT" ]; do
     rw_log "Detected app crash/fatal after ${waited}s"
     break
   fi
+
+  # Count-based exit, a BACKSTOP rather than the primary signal -- see the matching comment
+  # in scripts/run-tv-ui-tests.sh. EXPECTED counts GOLDENS, so a run that captures more than
+  # there are goldens reaches it with captures still in flight, and a short plateau past that
+  # point is not evidence the suite has finished.
+  if [ "$EXPECTED" -gt 0 ] && [ "$cur" -ge "$EXPECTED" ] && [ "$cur" -eq "$prev" ]; then
+    stable=$((stable+1))
+    if [ "$stable" -ge 10 ]; then
+      rw_log "No completion marker, but the capture count has held at or above $EXPECTED for 80s after ${waited}s"
+      break
+    fi
+  else
+    stable=0
+  fi
+  prev="$cur"
 done
 rw_log "Capture settled: $(/usr/bin/find "$WS_RAW_DIR" -name '*.png' 2>/dev/null | wc -l | tr -d ' ') of $EXPECTED screenshots after ${waited}s"
 

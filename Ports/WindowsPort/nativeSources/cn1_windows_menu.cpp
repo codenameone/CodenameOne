@@ -65,6 +65,8 @@
 
 typedef struct {
     int commandId;    /* the Codename One id, echoed back in the event */
+    int keyChar;      /* the shortcut key, 0 when the command has none */
+    int modifiers;    /* Command.DESKTOP_SHORTCUT_MODIFIER_*: 1 primary, 2 shift, 4 alt */
 } CN1MenuItem;
 
 static CN1MenuItem menuItems[CN1_MENU_MAX_ITEMS];
@@ -246,6 +248,8 @@ static void rebuildMenu(const char* spec) {
                 }
                 int slot = menuItemCount++;
                 menuItems[slot].commandId = atoi(idField);
+                menuItems[slot].keyChar = atoi(keyField);
+                menuItems[slot].modifiers = atoi(modField);
                 AppendMenuW(popup, MF_STRING, (UINT_PTR) (CN1_MENU_ID_BASE + slot), wide);
                 free(wide);
             }
@@ -277,6 +281,55 @@ void cn1WinMenuSetCommands(const char* spec) {
     rebuildMenu(spec);
 }
 
+/* Fires the command whose shortcut matches this key, and reports whether it did.
+ *
+ * appendAccelerator only WRITES "Ctrl+S" into the label; Win32 draws that text and nothing
+ * more. Without this the menu advertised a shortcut that did nothing at all, because the
+ * message pump has no accelerator table and never calls TranslateAccelerator.
+ *
+ * Matching here rather than building an HACCEL: the table would have to be rebuilt and
+ * destroyed alongside the menu and threaded into the pump, where this needs one call from
+ * the existing WM_KEYDOWN. The modifiers must match EXACTLY -- an item with no modifier is
+ * not triggered by a bare keypress, which would otherwise swallow ordinary typing.
+ */
+int cn1WinMenuHandleAccelerator(int vkey) {
+    if (menuBar == NULL || vkey == 0) {
+        return 0;
+    }
+    int mods = 0;
+    if (GetKeyState(VK_CONTROL) & 0x8000) {
+        mods |= 1;
+    }
+    if (GetKeyState(VK_SHIFT) & 0x8000) {
+        mods |= 2;
+    }
+    if (GetKeyState(VK_MENU) & 0x8000) {
+        mods |= 4;
+    }
+    if (mods == 0) {
+        /* No modifier held: nothing here is a bare-key shortcut, and treating one as such
+         * would eat the keystroke from whatever has focus. */
+        return 0;
+    }
+    for (int i = 0; i < menuItemCount; i++) {
+        int keyChar = menuItems[i].keyChar;
+        if (keyChar == 0 || menuItems[i].modifiers != mods) {
+            continue;
+        }
+        /* The shortcut is carried as a character; WM_KEYDOWN reports a virtual key, and for
+         * letters and digits the two coincide on the uppercase form. */
+        int upper = keyChar;
+        if (upper >= 'a' && upper <= 'z') {
+            upper -= 'a' - 'A';
+        }
+        if (upper == vkey) {
+            cn1WinPushEvent(CN1_EVENT_MENU_COMMAND, 0, 0, menuItems[i].commandId);
+            return 1;
+        }
+    }
+    return 0;
+}
+
 int cn1WinMenuHandleCommand(WPARAM wParam) {
     /* A menu selection has a zero high word; a control notification does not. Checked
      * before the id range so a notification whose control id happens to fall in the range
@@ -306,6 +359,34 @@ JAVA_VOID com_codename1_impl_windows_WindowsNative_menuSetCommands___java_lang_S
     }
     const char* utf8 = spec == JAVA_NULL ? "" : stringToUTF8(threadStateData, spec);
     SendMessageW(cn1Win.hwnd, WM_CN1_MENU, 0, (LPARAM) utf8);
+}
+
+/*
+ * The modifiers held right now: 1 shift, 2 control, 4 alt. Mirrors macCurrentModifiers on
+ * the macOS port, including the bit values, so the Java side of the three desktop ports
+ * reads one encoding.
+ *
+ * GetKeyState answers for the key state as of the message being processed, which is what a
+ * handler running on a key event wants -- Shift-Tab asks whether Shift is down while it
+ * handles the Tab. The high bit is the held flag; the low bit is the toggle state and means
+ * nothing here.
+ *
+ * Asked for rather than pushed with the event because a modifier pressed on its own
+ * generates no key event, so anything latched from the last one would be stale.
+ */
+JAVA_INT com_codename1_impl_windows_WindowsNative_currentModifiers___R_int(
+        CODENAME_ONE_THREAD_STATE) {
+    JAVA_INT mask = 0;
+    if (GetKeyState(VK_SHIFT) & 0x8000) {
+        mask |= 1;
+    }
+    if (GetKeyState(VK_CONTROL) & 0x8000) {
+        mask |= 2;
+    }
+    if (GetKeyState(VK_MENU) & 0x8000) {
+        mask |= 4;
+    }
+    return mask;
 }
 
 }

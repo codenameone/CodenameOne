@@ -3248,6 +3248,33 @@ public class WindowsImplementation extends CodenameOneImplementation {
         return true;
     }
 
+
+    /// @inheritDoc
+    ///
+    /// Without this the core answers false and Shift-Tab traverses forwards like a plain Tab,
+    /// because Form.moveFocusByTab asks Display.isShiftKeyDown for the direction. Only
+    /// JavaSEPort and the macOS port reported modifier state before this.
+    @Override
+    public boolean isShiftKeyDown() {
+        return (WindowsNative.currentModifiers() & 1) != 0;
+    }
+
+    /// @inheritDoc
+    ///
+    /// See `#isShiftKeyDown()`.
+    @Override
+    public boolean isControlKeyDown() {
+        return (WindowsNative.currentModifiers() & 2) != 0;
+    }
+
+    /// @inheritDoc
+    ///
+    /// See `#isShiftKeyDown()`.
+    @Override
+    public boolean isAltKeyDown() {
+        return (WindowsNative.currentModifiers() & 4) != 0;
+    }
+
     // ---- native menu bar ----------------------------------------------------
 
     /// Commands published to the native menu bar, keyed by the id the bar echoes back.

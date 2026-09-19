@@ -151,43 +151,52 @@ MAX_WAIT="${CN1SS_TV_TIMEOUT:-1200}"
 TV_REF_DIR="${SCREENSHOT_REF_DIR:-$SCRIPT_DIR/ios/screenshots-tv}"
 EXPECTED="$(/usr/bin/find "$TV_REF_DIR" -name '*.png' 2>/dev/null | wc -l | tr -d ' ')"
 rt_log "Expecting $EXPECTED screenshots (golden set)"
-stable=0; waited=0; prev=-1
+stable=0; waited=0; prev=-1; finished_stable=0
 while [ "$waited" -lt "$MAX_WAIT" ]; do
   sleep 8; waited=$((waited+8))
   cur="$(/usr/bin/find "$WS_RAW_DIR" -name '*.png' 2>/dev/null | wc -l | tr -d ' ')"
-  # The count alone is not an exit condition: EXPECTED counts the GOLDENS on disk, and a
-  # suite that captures more screenshots than there are goldens -- which is every run that
-  # adds a test, before its golden exists -- reaches EXPECTED while earlier captures are
-  # still in flight. Breaking there snapshots the directory mid-stream and reports whatever
-  # had not arrived as "Actual screenshot missing (test did not produce output)", naming
-  # tests that ran perfectly.
-  #
-  # Measured on tvOS run 35395173010: the comparison ran at 22:34:33 and called DesktopMode
-  # and Media360Panorama missing; the WebSocket sink logged both delivered, status=ok, at
-  # 22:35:04. Six new captures with no goldens had pushed the count to EXPECTED six
-  # screenshots early.
-  #
-  # So require the count to have STOPPED CHANGING as well. While captures are still
-  # arriving it keeps rising and this never fires; once it plateaus, two confirmations give
-  # the final writes their flush window. That also makes seeding a new golden possible at
-  # all, which it was not: the wait ended before the new captures landed.
-  if [ "$EXPECTED" -gt 0 ] && [ "$cur" -ge "$EXPECTED" ] && [ "$cur" -eq "$prev" ]; then
-    stable=$((stable+1)); prev="$cur"
-    [ "$stable" -ge 2 ] && break
+
+  # The suite's own completion marker is the authority, and is checked before anything
+  # derived from the screenshot count. Confirmed twice so the WebSocket sink gets a drain
+  # window after the app says it is done.
+  if grep -qa "CN1SS:SUITE:FINISHED" "$APP_CONSOLE" 2>/dev/null; then
+    finished_stable=$((finished_stable+1))
+    if [ "$finished_stable" -ge 2 ]; then
+      rt_log "Suite reported FINISHED; capture drain confirmed after ${waited}s"
+      break
+    fi
+    prev="$cur"
     continue
   fi
-  stable=0
-  prev="$cur"
-  # The suite emits CN1SS:SUITE:FINISHED when done; bail early on that (covers
-  # the seed run where EXPECTED=0) or on an obvious native crash. Do not infer
-  # a hang from screenshot inactivity: the trailing assertion and performance
-  # tests legitimately run for several minutes without producing a PNG.
-  if grep -qa "CN1SS:SUITE:FINISHED" "$APP_CONSOLE" 2>/dev/null; then
-    rt_log "Suite reported FINISHED after ${waited}s"; break
-  fi
+  finished_stable=0
+
   if grep -qaE "Fatal|Terminating app due to uncaught exception|EXC_BAD|did crash|libsystem_kernel" "$APP_CONSOLE" 2>/dev/null; then
     rt_log "Detected app crash/fatal in console after ${waited}s"; break
   fi
+
+  # Count-based exit, a BACKSTOP now rather than the primary signal -- for a run whose
+  # marker never arrives at all.
+  #
+  # It cannot be primary. EXPECTED counts the goldens on disk, so a run that captures more
+  # than that -- every run that adds a test, before its golden exists -- passes EXPECTED with
+  # captures still to come, and this script says in as many words that trailing tests
+  # legitimately run for minutes without producing a PNG. A short plateau past the old count
+  # is therefore not evidence that the suite is done. Measured on tvOS run 35395173010: the
+  # comparison ran at 22:34:33 and two screenshots were still delivered at 22:35:04, thirty
+  # seconds later.
+  #
+  # So the plateau has to outlast a gap like that before it is believed: ten polls is eighty
+  # seconds, against the sixteen that a two-poll plateau allowed.
+  if [ "$EXPECTED" -gt 0 ] && [ "$cur" -ge "$EXPECTED" ] && [ "$cur" -eq "$prev" ]; then
+    stable=$((stable+1))
+    if [ "$stable" -ge 10 ]; then
+      rt_log "No completion marker, but the capture count has held at or above $EXPECTED for 80s after ${waited}s"
+      break
+    fi
+  else
+    stable=0
+  fi
+  prev="$cur"
 done
 rt_log "Capture settled: $(/usr/bin/find "$WS_RAW_DIR" -name '*.png' 2>/dev/null | wc -l | tr -d ' ') of $EXPECTED screenshots after ${waited}s"
 

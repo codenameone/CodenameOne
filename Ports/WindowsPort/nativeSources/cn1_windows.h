@@ -312,6 +312,7 @@ void cn1WinMenuSetCommands(const char* spec);
 /* Handles WM_COMMAND for a menu selection. Returns 1 when the id belonged to the menu bar
  * and an event was pushed, 0 when it did not and the message should fall through. */
 int  cn1WinMenuHandleCommand(WPARAM wParam);
+int  cn1WinMenuHandleAccelerator(int vkey);
 LRESULT CALLBACK cn1WinWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam);
 LRESULT cn1WinAccessibilityObject(HWND hwnd, WPARAM wParam, LPARAM lParam);
 

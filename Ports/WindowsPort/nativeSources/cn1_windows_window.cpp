@@ -783,6 +783,14 @@ LRESULT CALLBACK cn1WinWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam
             return 0;
         }
         case WM_KEYDOWN:
+            /* A menu shortcut first. The menu labels advertise accelerators and there is no
+             * accelerator table in this pump, so without this they were decoration. A match
+             * consumes the keystroke: it belongs to the command, not to the focused
+             * component. Only an exact modifier match can match, so ordinary typing and the
+             * Tab/Escape handling below are untouched. */
+            if (cn1WinMenuHandleAccelerator((int) wParam)) {
+                return 0;
+            }
             cn1WinPushEvent(CN1_EVENT_KEY_PRESSED, 0, 0, (int) wParam);
             return 0;
         case WM_KEYUP:

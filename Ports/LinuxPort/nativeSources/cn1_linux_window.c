@@ -64,6 +64,15 @@ static int cn1EventHead = 0;
 static int cn1EventTail = 0;
 static pthread_mutex_t cn1EventLock = PTHREAD_MUTEX_INITIALIZER;
 
+/* The modifier mask from the most recent key event: 1 shift, 2 control, 4 alt. Same bit
+ * values as the macOS and Windows ports, so the Java side of all three reads one encoding.
+ *
+ * Latched from the key event rather than queried, which is what this use needs: Shift-Tab
+ * asks whether Shift is down while handling the Tab, and the Tab event's own state field
+ * carries it. (A modifier pressed alone produces no key event, so this does not track one
+ * held in isolation -- nothing here asks.) */
+static volatile int cn1CurrentModifiers = 0;
+
 void cn1LinuxPushEvent(int type, int x, int y, int keyCode) {
     cn1LinuxPushWindowEvent(0, type, x, y, keyCode);
 }
@@ -613,6 +622,21 @@ static gboolean cn1OnTouch(GtkWidget* widget, GdkEventTouch* e, gpointer data) {
 static gboolean cn1OnKey(GtkWidget* widget, GdkEventKey* e, gpointer data) {
     (void) widget;
     (void) data;
+    /* Recorded before the peer-focus check below returns: the modifiers are true for this
+     * keystroke whether or not Codename One goes on to handle it. */
+    if (e != 0) {
+        int mods = 0;
+        if (e->state & GDK_SHIFT_MASK) {
+            mods |= 1;
+        }
+        if (e->state & GDK_CONTROL_MASK) {
+            mods |= 2;
+        }
+        if (e->state & GDK_MOD1_MASK) {
+            mods |= 4;
+        }
+        cn1CurrentModifiers = mods;
+    }
     /* The key handler is on the toplevel window so it sees keystrokes regardless
      * of which child has focus. But when a native peer widget (the text-edit
      * GtkEntry/GtkTextView, a WebKit view, an app @NativeInterface widget) holds
@@ -1252,6 +1276,11 @@ static void cn1MenuRebuild(void* arg) {
      * content it is supposed to head. */
     gtk_box_reorder_child(GTK_BOX(cn1RootBox), bar, 0);
     gtk_widget_show_all(bar);
+}
+
+JAVA_INT com_codename1_impl_linux_LinuxNative_currentModifiers___R_int(
+        CODENAME_ONE_THREAD_STATE) {
+    return (JAVA_INT) cn1CurrentModifiers;
 }
 
 JAVA_VOID com_codename1_impl_linux_LinuxNative_menuSetCommands___java_lang_String(

@@ -4059,6 +4059,19 @@ public class Form extends Container implements TopLevelContainer {
             return false;
         }
         if (keyCode == KEY_TAB) {
+            // Known limitation, on the two ParparVM desktop ports: this is not reached while a
+            // native text editor holds the keystroke. The Win32 EDIT control answers
+            // DLGC_WANTALLKEYS, and the GTK handler deliberately returns FALSE so a focused
+            // peer keeps its own input -- returning TRUE there unconditionally is what once
+            // made typing into the native editor show nothing. So the commonest desktop case,
+            // tabbing from one text field to the next, still traverses nothing on Windows and
+            // Linux; tabbing between non-editing components works everywhere.
+            //
+            // Closing it means intercepting Tab inside each port's native editor and
+            // committing before forwarding, which is surgery on the text-input path of two
+            // ports that cannot be exercised from here. Left for a change that can be run on
+            // both, rather than written blind against the one path with a history of
+            // swallowing every keystroke.
             return moveFocusByTab(Display.getInstance().isShiftKeyDown());
         }
         if (keyCode == KEY_ESCAPE) {

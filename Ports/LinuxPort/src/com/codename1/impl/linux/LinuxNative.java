@@ -55,6 +55,13 @@ public final class LinuxNative {
      */
     public static native void menuSetCommands(String spec);
 
+    /// The modifier keys for the current keystroke, as a bitmask: 1 shift, 2 control, 4 alt.
+    ///
+    /// Same encoding as the macOS and Windows ports. Latched from the GTK key event, which is
+    /// what Shift-Tab needs: it asks whether Shift is held while handling the Tab, and the Tab
+    /// event carries that.
+    public static native int currentModifiers();
+
     public static native void nativeLog(String message);
     /**
      * The desktop's colour scheme: 1 dark, 0 light, -1 unknown.

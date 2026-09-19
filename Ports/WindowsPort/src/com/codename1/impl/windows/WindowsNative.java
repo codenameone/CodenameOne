@@ -182,6 +182,14 @@ public final class WindowsNative {
      */
     public static native void menuSetCommands(String spec);
 
+    /// The modifier keys held down right now, as a bitmask: 1 shift, 2 control, 4 alt.
+    ///
+    /// Queried on demand rather than carried on each key event, the way the macOS port does
+    /// it. A modifier pressed on its own produces no key event at all, so a value latched
+    /// from the last key event would be stale exactly when it is asked for -- and Shift-Tab
+    /// asks while Shift is held and Tab is the key that arrived.
+    public static native int currentModifiers();
+
     // ---- additional desktop windows (cn1_windows_desktopwindow.cpp) ----------
     //
     // A window is addressed by the slot index returned from desktopWindowCreate;
