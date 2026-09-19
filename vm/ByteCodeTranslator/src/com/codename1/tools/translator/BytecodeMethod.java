@@ -661,8 +661,20 @@ public class BytecodeMethod implements SignatureSet {
             // `this` (__cn1ThisObject, a C parameter) is an object root found by the
             // conservative native-stack scan. Constructors are deferred (super-call /
             // field-init / partially-constructed-receiver semantics need more care).
-            if (!obj || !FRAMELESS_INSTANCE_ENABLED || constructor
-                    || methodName.equals("__INIT__") || methodName.equals("__CLINIT__")) {
+            // PHASE 3c: CONSTRUCTORS ARE FRAMELESS TOO. They were the single largest
+            // remaining exclusion by a wide margin -- the census counted 3,850 of 23,445
+            // methods against 357 for try/catch -- and the exclusion was a DEFERRAL
+            // ("super-call / field-init / partially-constructed-receiver semantics need
+            // more care"), never a proof. A constructor's receiver is a C parameter
+            // exactly like any instance method's, and the conservative native-stack scan
+            // finds it whether its fields are written yet or not: allocation zeroes the
+            // object before the constructor is entered, so a partially built receiver
+            // traces as itself plus null fields, never as garbage.
+            //
+            // __CLINIT__ stays excluded, and that is a semantic criterion rather than
+            // caution: a static initializer is entered through the class-init guard and
+            // can re-enter arbitrary other clinits.
+            if (!obj || !FRAMELESS_INSTANCE_ENABLED || methodName.equals("__CLINIT__")) {
                 if (FRAMELESS_CENSUS && !ignoreTryCatch) {
                     censusReason(0);
                 }
