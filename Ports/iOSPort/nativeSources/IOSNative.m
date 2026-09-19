@@ -33,6 +33,10 @@
 #include <string.h>
 #import "CN1ES2compat.h"
 #import "CN1JailbreakDetector.h"
+// Unconditional: the hinge entry points at the bottom of this file are built
+// on every slice, so their declarations cannot sit inside a TARGET_OS_WATCH
+// block the way the neighbouring imports do.
+#import "CN1Hinge.h"
 #if TARGET_OS_WATCH
 #import "CN1CGGraphics.h"
 #import "CN1WatchHost.h"
@@ -22863,4 +22867,68 @@ JAVA_INT com_codename1_impl_ios_IOSNative_generateRsaKeyPair___int_byte_1ARRAY_b
 
 JAVA_LONG com_codename1_impl_ios_IOSNative_createWebSocketNative___int_java_lang_String_R_long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT connectionId, JAVA_OBJECT url) {
     return com_codename1_impl_ios_IOSNative_createWebSocketNative___int_java_lang_String(CN1_THREAD_STATE_PASS_ARG instanceObject, connectionId, url);
+}
+
+// ---------------------------------------------------------------------
+// Foldable / hinge (UIHinge). Implementation lives in CN1Hinge.m; these are
+// the ParparVM entry points, and they live HERE because IOSNative.java is
+// the class that declares them.
+//
+// Every other nativeSources file that defines com_codename1_impl_ios_IOSNative_
+// symbols -- CN1Bluetooth, CN1Call, CN1Health, CN1Vision and the rest -- is
+// separate BECAUSE it is feature-gated, and each carries #else trampolines so
+// the symbols survive with the feature off. The hinge has no feature gate, so
+// there is no such reason, and an ungated file holding entry points is one more
+// thing every build path has to keep carrying. Nothing excludes it today, but
+// the cost of being wrong is a Java native with no symbol -- which does not
+// fail the build, it makes the dead-code pass drop the method and ship the
+// feature inert.
+// ---------------------------------------------------------------------
+
+void com_codename1_impl_ios_IOSNative_startHingeMonitoring__(
+        CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
+    POOL_BEGIN();
+    cn1HingeStart();
+    POOL_END();
+}
+
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isFoldableDisplay___R_boolean(
+        CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
+    POOL_BEGIN();
+    JAVA_BOOLEAN result = cn1HingeIsFoldableDisplay() ? JAVA_TRUE : JAVA_FALSE;
+    POOL_END();
+    return result;
+}
+
+JAVA_INT com_codename1_impl_ios_IOSNative_getHingeStatus___R_int(
+        CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
+    return (JAVA_INT)cn1HingeStatus();
+}
+
+JAVA_INT com_codename1_impl_ios_IOSNative_getHingeAngleDegrees___R_int(
+        CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
+    return (JAVA_INT)cn1HingeAngleDegrees();
+}
+
+JAVA_INT com_codename1_impl_ios_IOSNative_getFoldRegion___int_1ARRAY_R_int(
+        CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT out) {
+    if (out == JAVA_NULL) {
+        return 0;
+    }
+#ifndef NEW_CODENAME_ONE_VM
+    org_xmlvm_runtime_XMLVMArray* intArray = out;
+    JAVA_ARRAY_INT* data =
+        (JAVA_ARRAY_INT*)intArray->fields.org_xmlvm_runtime_XMLVMArray.array_;
+#else
+    JAVA_ARRAY_INT* data = (JAVA_ARRAY_INT*)((JAVA_ARRAY)out)->data;
+#endif
+    int region[4];
+    int kind = cn1HingeFoldRegion(region);
+    if (kind != 0) {
+        data[0] = (JAVA_ARRAY_INT)region[0];
+        data[1] = (JAVA_ARRAY_INT)region[1];
+        data[2] = (JAVA_ARRAY_INT)region[2];
+        data[3] = (JAVA_ARRAY_INT)region[3];
+    }
+    return (JAVA_INT)kind;
 }
