@@ -151,11 +151,10 @@ public final class HealthDataType {
     ///
     /// **This is an iOS metric.** Health Connect stores no SDNN record at
     /// all -- its only HRV record is `HeartRateVariabilityRmssdRecord`,
-    /// which is [#HEART_RATE_VARIABILITY_RMSSD]. The Android mapping here
-    /// still points at Health Connect's `HEART_RATE_VARIABILITY`
-    /// permission group for backwards compatibility, so a read of this
-    /// type on Android returns RMSSD values under an SDNN name. Prefer
-    /// [#HEART_RATE_VARIABILITY_RMSSD] for anything cross-platform.
+    /// which is [#HEART_RATE_VARIABILITY_RMSSD] -- so Android refuses this
+    /// type with [HealthError#TYPE_NOT_SUPPORTED] rather than answering it
+    /// with a different statistic. Use [#HEART_RATE_VARIABILITY_RMSSD] for
+    /// anything cross-platform.
     public static final HealthDataType HEART_RATE_VARIABILITY_SDNN =
             discrete("heart_rate_variability_sdnn", HealthUnit.MILLISECOND);
 
@@ -165,9 +164,14 @@ public final class HealthDataType {
     /// The cross-platform HRV metric, and the one to reach for:
     /// Health Connect has only ever stored RMSSD
     /// (`HeartRateVariabilityRmssdRecord`), and HealthKit added
-    /// `HKQuantityTypeIdentifierHeartRateVariabilityRMSSD` in iOS 27. An
-    /// older iOS, or an application built with an SDK older than iOS 27,
-    /// reports it as [HealthError#TYPE_NOT_SUPPORTED] rather than
+    /// `HKQuantityTypeIdentifierHeartRateVariabilityRMSSD` in iOS 27.
+    ///
+    /// This is also the first HRV type Android can actually answer --
+    /// [#HEART_RATE_VARIABILITY_SDNN] has no Health Connect record behind
+    /// it and is refused there.
+    ///
+    /// An older iOS, or an application built with an SDK older than
+    /// iOS 27, reports it as [HealthError#TYPE_NOT_SUPPORTED] rather than
     /// substituting SDNN -- the two are different statistics over the same
     /// intervals and are not interchangeable.
     public static final HealthDataType HEART_RATE_VARIABILITY_RMSSD =

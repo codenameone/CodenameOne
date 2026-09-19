@@ -47,6 +47,7 @@ import androidx.health.connect.client.records.OxygenSaturationRecord
 import androidx.health.connect.client.records.PowerRecord
 import androidx.health.connect.client.records.Record
 import androidx.health.connect.client.records.RespiratoryRateRecord
+import androidx.health.connect.client.records.HeartRateVariabilityRmssdRecord
 import androidx.health.connect.client.records.RestingHeartRateRecord
 import androidx.health.connect.client.records.SleepSessionRecord
 import androidx.health.connect.client.records.SpeedRecord
@@ -814,6 +815,10 @@ class CN1HealthConnectBridge(private val context: Context)
                 record.time,
                 record.beatsPerMinute.toDouble(), "count/min")
 
+            is HeartRateVariabilityRmssdRecord -> instant(sb, record, token,
+                record.time,
+                record.heartRateVariabilityMillis, "ms")
+
             is OxygenSaturationRecord -> instant(sb, record, token,
                 record.time,
                 record.percentage.value, "%")
@@ -1246,6 +1251,11 @@ class CN1HealthConnectBridge(private val context: Context)
                 zoneOffset = zone, beatsPerMinute = wholeCount(token, value),
                 metadata = meta)
 
+            "heart_rate_variability_rmssd" ->
+                HeartRateVariabilityRmssdRecord(time = instantOf(token, start, end),
+                    zoneOffset = zone, heartRateVariabilityMillis = value,
+                    metadata = meta)
+
             "oxygen_saturation" -> OxygenSaturationRecord(time = instantOf(token, start, end),
                 zoneOffset = zone, percentage = Percentage(value),
                 metadata = meta)
@@ -1596,6 +1606,7 @@ class CN1HealthConnectBridge(private val context: Context)
         "hydration" -> HydrationRecord::class
         "heart_rate" -> HeartRateRecord::class
         "resting_heart_rate" -> RestingHeartRateRecord::class
+        "heart_rate_variability_rmssd" -> HeartRateVariabilityRmssdRecord::class
         "oxygen_saturation" -> OxygenSaturationRecord::class
         "respiratory_rate" -> RespiratoryRateRecord::class
         "body_temperature" -> BodyTemperatureRecord::class
@@ -1640,6 +1651,7 @@ class CN1HealthConnectBridge(private val context: Context)
         is HydrationRecord -> "hydration"
         is HeartRateRecord -> "heart_rate"
         is RestingHeartRateRecord -> "resting_heart_rate"
+        is HeartRateVariabilityRmssdRecord -> "heart_rate_variability_rmssd"
         is OxygenSaturationRecord -> "oxygen_saturation"
         is RespiratoryRateRecord -> "respiratory_rate"
         is BasalBodyTemperatureRecord -> "basal_body_temperature"
