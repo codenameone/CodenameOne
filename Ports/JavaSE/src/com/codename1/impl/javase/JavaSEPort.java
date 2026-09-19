@@ -92,7 +92,6 @@ import java.sql.Statement;
 import java.util.HashMap;
 import java.util.Map;
 import com.codename1.io.Properties;
-import java.util.StringTokenizer;
 import java.util.Timer;
 import java.util.prefs.Preferences;
 import java.util.zip.ZipEntry;
@@ -833,23 +832,15 @@ public class JavaSEPort extends CodenameOneImplementation {
         if (skinNames == null) {
             skinNames = DEFAULT_SKINS;
         }
-        StringBuilder merged = new StringBuilder(skinNames);
-        boolean added = false;
+        String merged = skinNames;
         for (String skin : BUNDLED_WATCH_SKINS) {
             if (JavaSEPort.class.getResource(skin) == null) {
                 continue;
             }
-            if (skinNames.contains(skin + ";") || skinNames.endsWith(skin)) {
-                continue;
-            }
-            if (merged.length() > 0 && merged.charAt(merged.length() - 1) != ';') {
-                merged.append(';');
-            }
-            merged.append(skin).append(';');
-            added = true;
+            merged = SkinPath.append(merged, skin);
         }
-        if (added) {
-            pref.put("skins", merged.toString());
+        if (!merged.equals(skinNames)) {
+            pref.put("skins", merged);
         }
     }
     private static final String DEFAULT_SKINS = DEFAULT_SKIN+";";
@@ -8807,7 +8798,7 @@ public class JavaSEPort extends CodenameOneImplementation {
                         // the menu, even if they dismiss the reload
                         // before loadSkinFile finishes its own
                         // addSkinName.
-                        addSkinName(picked.toURI().toString());
+                        addSkinName(SkinPath.toEntry(picked));
                     }
                     String mainClass = System.getProperty("MainClass");
                     if (mainClass != null) {
@@ -8863,14 +8854,16 @@ public class JavaSEPort extends CodenameOneImplementation {
         // never launches the companion can still open a watch skin to check a layout.
         registerBundledWatchSkins(pref);
         String skinNames = pref.get("skins", DEFAULT_SKINS);
-        if (skinNames == null || skinNames.length() < DEFAULT_SKINS.length()) {
+        if (SkinPath.split(skinNames).isEmpty()) {
+            // Empty or unparseable: fall back rather than render a menu with no
+            // skins in it. This used to compare the stored length against the
+            // default's, which also threw away a preference holding exactly one
+            // short entry.
             skinNames = DEFAULT_SKINS;
         }
         final List<String> topLevelSkins = new ArrayList<String>();
         final List<String> otaSkins = new ArrayList<String>();
-        StringTokenizer tkn = new StringTokenizer(skinNames, ";");
-        while (tkn.hasMoreTokens()) {
-            String entry = tkn.nextToken();
+        for (String entry : SkinPath.split(skinNames)) {
             String kind = classifySkin(entry);
             if ("ota".equals(kind)) {
                 otaSkins.add(entry);
@@ -8939,16 +8932,7 @@ public class JavaSEPort extends CodenameOneImplementation {
         if (pathOrURI == null || pathOrURI.isEmpty()) {
             return null;
         }
-        File asFile = null;
-        if (pathOrURI.startsWith("file:") || pathOrURI.contains("://")) {
-            try {
-                asFile = new File(new URL(pathOrURI).getFile());
-            } catch (Exception e) {
-                return null;
-            }
-        } else {
-            asFile = new File(pathOrURI);
-        }
+        File asFile = SkinPath.toFile(pathOrURI);
         if (asFile != null && asFile.exists()) {
             File otaRoot = new File(System.getProperty("user.home"), ".codenameone");
             try {
@@ -8971,20 +8955,7 @@ public class JavaSEPort extends CodenameOneImplementation {
 
     private JRadioButtonMenuItem buildSkinRadioItem(final JFrame frm, final String skinPath,
             final String currentSkin, final boolean desktopSkinActive) {
-        String name;
-        if (skinPath.startsWith("file:") || skinPath.contains("://")) {
-            try {
-                name = new File(new URL(skinPath).getFile()).getName();
-            } catch (Exception e) {
-                name = skinPath;
-            }
-        } else if (skinPath.startsWith("/") && !new File(skinPath).exists()) {
-            // classpath resource - drop the leading slash for display
-            name = skinPath.substring(1);
-        } else {
-            File f = new File(skinPath);
-            name = f.exists() ? f.getName() : skinPath;
-        }
+        String name = SkinPath.displayName(skinPath);
         JRadioButtonMenuItem item = new JRadioButtonMenuItem(name,
                 !desktopSkinActive && skinPath.equals(currentSkin));
         item.addActionListener(new ActionListener() {
@@ -9241,7 +9212,7 @@ public class JavaSEPort extends CodenameOneImplementation {
                                                 try {
                                                     File skin = downloadSkin(skinDir, url, data[1], progress);
                                                     if (skin.exists()) {
-                                                        addSkinName(skin.toURI().toString());
+                                                        addSkinName(SkinPath.toEntry(skin));
                                                     }
                                                 } catch (Exception e) {
                                                 }
@@ -9446,14 +9417,7 @@ public class JavaSEPort extends CodenameOneImplementation {
     private void addSkinName(String f) {
         Preferences pref = Preferences.userNodeForPackage(JavaSEPort.class);
         String skinNames = pref.get("skins", DEFAULT_SKINS);
-        if (skinNames != null) {
-            if (!skinNames.contains(f)) {
-                skinNames += ";" + f;
-            }
-        } else {
-            skinNames = f;
-        }
-        pref.put("skins", skinNames);
+        pref.put("skins", SkinPath.append(skinNames, f));
         try {
             pref.flush();
         } catch(Throwable t) {
@@ -10913,9 +10877,27 @@ public class JavaSEPort extends CodenameOneImplementation {
 
     private void loadSkinFile(String f, JFrame frm) {
         try {
-            File fsFile = new File(f);
-            if (fsFile.exists()) {
-                f = fsFile.toURI().toString();
+            // A local skin is opened as a file rather than through a URL: the entry we
+            // store has to survive a round trip back to this File, and going via the
+            // filesystem is the only reading of it that cannot disagree with
+            // SkinPath.toFile about what a percent-encoded path means.
+            File fsFile = SkinPath.toFile(f);
+            if (fsFile != null && fsFile.exists()) {
+                f = SkinPath.toEntry(fsFile);
+                FileInputStream fsIn = new FileInputStream(fsFile);
+                try {
+                    loadSkinFile(fsIn, frm);
+                } finally {
+                    try {
+                        fsIn.close();
+                    } catch (IOException closeFailed) {
+                        System.err.println("close: " + closeFailed);
+                    }
+                }
+                Preferences fsPref = Preferences.userNodeForPackage(JavaSEPort.class);
+                fsPref.put("skin", f);
+                addSkinName(f);
+                return;
             }
             if (f.contains("://") || f.startsWith("file:")) {
 
