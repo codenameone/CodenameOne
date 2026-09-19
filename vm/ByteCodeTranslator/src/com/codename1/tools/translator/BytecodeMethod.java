@@ -2406,7 +2406,16 @@ public class BytecodeMethod implements SignatureSet {
         // once for the vtable and once for the classId that indexes
         // classToInterfaceMap -- so resolving it once here removes that work from
         // every interface dispatch, which is the hottest indirect call the VM makes.
-        b.append("struct clazz* cn1__cls = CN1_CLASS_OF(__cn1ThisObject);\n    ");
+        // Skip the tagged resolve where a tagged value cannot arrive: this thunk only
+        // ever sees objects whose class is its owner or below, and a boxed immediate
+        // is assignable to very few of those. See CN1_CLASS_OF_UNTAGGED.
+        b.append("struct clazz* cn1__cls = ")
+         // `cls`, not clsName: this thunk is virtual_<cls>_<method>, so its receiver is
+         // a `cls` or a subclass. clsName is where the METHOD was declared, which for
+         // an Object method is java.lang.Object and would keep the tagged resolve on
+         // every equals/hashCode/toString thunk in the program.
+         .append(Parser.canReceiveTagged(cls) ? "CN1_CLASS_OF" : "CN1_CLASS_OF_UNTAGGED")
+         .append("(__cn1ThisObject);\n    ");
 
         /* A SWITCH ON THE CLASS ID, ahead of the indirect dispatch below.
          *

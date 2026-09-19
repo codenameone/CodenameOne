@@ -1242,6 +1242,17 @@ static inline struct clazz* cn1ClassOf(JAVA_OBJECT o) {
 #define CN1_CLASS_OF(o) ((o)->__codenameOneParentClsReference)
 #endif
 
+/* The class word, read DIRECTLY, for a receiver that cannot be a tagged immediate.
+ *
+ * CN1_CLASS_OF masks, tests the tag and selects between a proxy entry and the
+ * object -- five instructions before it loads anything. That work only ever finds
+ * something for a boxed Integer/Long/Double/Float/Character/Short, so a thunk
+ * whose owner none of those is assignable to can skip it entirely. The translator
+ * decides that from the hierarchy (Parser.canReceiveTagged); using this where a
+ * tagged value CAN arrive dereferences a small integer.
+ */
+#define CN1_CLASS_OF_UNTAGGED(o) ((o)->__codenameOneParentClsReference)
+
 #define GET_CLASS_ID(JavaObj) ((CN1_CLASS_OF(JavaObj))->classId)
 
 /* ---- java.lang.String TWIN CLASS -------------------------------------------

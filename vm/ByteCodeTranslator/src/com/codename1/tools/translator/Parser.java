@@ -117,6 +117,49 @@ public class Parser extends ClassVisitor {
      * about the classes that survived. Interfaces are excluded: an interface is never a
      * class word.
      */
+    /**
+     * TRUE when a value whose static type is {@code clsName} could be a TAGGED immediate.
+     *
+     * CN1_CLASS_OF is not a field load when tagged values are compiled in: it masks the
+     * pointer, tests the tag and selects between a proxy table entry and the object
+     * before loading anything -- five instructions, on every virtual dispatch and every
+     * class query. That work only ever finds something for a boxed Integer, Long,
+     * Double, Float, Character or Short.
+     *
+     * A virtual thunk for class X only ever receives objects whose class is X or below,
+     * so if no taggable class is assignable to X the test cannot fire and the class word
+     * can be read straight out of the object. Derived from the hierarchy rather than
+     * hardcoded, so a future tagged type is covered by adding it to CN1_TAGGABLE_CLASSES
+     * alone.
+     */
+    public static synchronized boolean canReceiveTagged(String clsName) {
+        if (cn1TaggedReachable == null) {
+            cn1TaggedReachable = new java.util.HashSet<String>();
+            for (String t : CN1_TAGGABLE_CLASSES) {
+                cn1TaggedReachable.add(t);
+                ByteCodeClass c = getClassObject(t);
+                // Every supertype and interface of a taggable class can be the static
+                // type of a tagged value: Object, Number, Comparable, Serializable.
+                while (c != null) {
+                    cn1TaggedReachable.add(c.getClsName());
+                    if (c.getBaseInterfaces() != null) {
+                        for (String i : c.getBaseInterfaces()) {
+                            cn1TaggedReachable.add(i.replace('/', '_').replace('$', '_'));
+                        }
+                    }
+                    String base = c.getBaseClass();
+                    c = base == null ? null
+                            : getClassObject(base.replace('/', '_').replace('$', '_'));
+                }
+            }
+            // Belt and braces: a class we could not resolve must not become "safe".
+            cn1TaggedReachable.add("java_lang_Object");
+        }
+        return cn1TaggedReachable.contains(clsName);
+    }
+
+    private static java.util.Set<String> cn1TaggedReachable;
+
     /** Classes a TAGGED immediate reports as its own -- see CN1_TAG_* in cn1_globals.h. */
     private static final java.util.Set<String> CN1_TAGGABLE_CLASSES =
             new java.util.HashSet<String>(java.util.Arrays.asList(
