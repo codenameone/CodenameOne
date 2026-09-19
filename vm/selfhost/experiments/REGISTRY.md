@@ -3613,3 +3613,67 @@ feature -- a flag defaulting off is a change nobody runs and a path CI never
 exercises. Gating is for debug code. The flag was removed and the behaviour is
 unconditional; __CLINIT__ stays excluded on a semantic criterion (entered through
 the class-init guard, can re-enter arbitrary other clinits), not on caution.
+
+## Round 36: the String store, four increments in, and the header that blocks the fifth
+
+The goal: a fused String carries a 24-byte JavaArrayPrototype around a payload
+nothing else can reach. length duplicates count, dimensions is always 1,
+primitiveSize is the coder, dataOffset is a constant for the shape, and two
+fields are GC sentinels -- only the class pointer carries information, and that
+is one bit. ~27MB across the corpus, and it is what keeps a typical String in
+size class 96 instead of 64.
+
+Landed, each separately green (gauntlet, gc-verify, Gate A byte-identical):
+
+| commit | |
+|---|---|
+| 5712778c2d | Java side behind isLatin1/latin1Value/isUtf16Exact/utf16Value |
+| a342ce95a0 | C side: 11 reads through cn1StrChars |
+| 99486fcd17 | Twin clazz -- the free coder bit |
+| add81dfb52 | Last 10 C readers through the helpers |
+
+### The twin, and why it landed without a layout change
+
+class__java_lang_String_i8 is a byte-for-byte copy of the primary: same classId,
+name, vtable POINTER, mark function, type-test row. Everything that decides
+behaviour keys on the ID, so the twin is a java.lang.String in every observable
+way; only the ADDRESS differs, and that address is the coder bit -- stored in a
+word every object already carries. Checked first: there is no classId->clazz
+table in the runtime and classId is read in exactly five places.
+
+Twins beat real ByteString/CharString subclasses here because String is final
+TODAY, so charAt/length/equals devirtualize to direct calls. Subclasses would
+give them two or three implementations and push the hottest methods in the VM
+onto the thunk switch -- throughput paid for bytes.
+
+It was landed with NO layout change, allocating real Strings through the twin so
+the machinery was exercised rather than dormant, and that immediately caught a
+silent bug: the memcpy inherited cn1ClazzRegistered, which means "this clazz
+ADDRESS is in the conservative GC's exact registry". The primary is registered by
+the time the copy is taken, so CN1_CLAZZ_REGISTER skipped the twin forever,
+gcMarkObject's guard stopped believing the twin's address was a clazz, and every
+String allocated with it stopped looking like an object. Clean build; FusedTest
+aborted under gc-verify and diverged by a few bits of checksum. In a combined
+commit that would have been indistinguishable from the new layout misbehaving.
+
+### What blocks the fifth increment, so nobody re-derives it
+
+The flip needs cn1StrChars/cn1StrIsLatin1 visible to BOTH nativeMethods.m and
+cn1_intrinsics.h, which is where the remaining raw reads live. Moving them into
+cn1_intrinsics.h does not work: that header is included by generated .c files
+that do not necessarily include java_lang_String.h, and the existing
+`#if __has_include("java_lang_String.h")` guard beside its StringBuilder block
+does NOT help, because __has_include tests whether the file EXISTS, not whether
+this translation unit included it. The header is on disk in every build.
+
+The way through is the opposite of inlining them: declare both as extern in
+cn1_globals.h (which needs no String struct for a declaration) and define them
+once in nativeMethods.m. -O3 ships -flto=thin, so the call is inlined across
+translation units anyway and the representation stays single-sourced.
+
+Remaining after that: the i16 twin, three fused allocation paths writing the
+payload with no JavaArrayPrototype, cn1GcStringIsFusedLeaf keyed on the twin
+rather than the embedded child's header, and the Java accessors given native
+fallbacks -- with no array object, latin1Value()/utf16Value() cannot hand back an
+array and their callers (replace, toCharArray, toCharNoCopy) need rewriting in
+terms of charInternal.
