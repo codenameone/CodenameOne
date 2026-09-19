@@ -113,7 +113,8 @@ public final class HealthWire {
             ",steps,distance_walking_running,"
             + "flights_climbed,elevation_gained,"
             + "active_energy,wheelchair_pushes,hydration,heart_rate,"
-            + "resting_heart_rate,oxygen_saturation,respiratory_rate,"
+            + "resting_heart_rate,heart_rate_variability_rmssd,"
+            + "oxygen_saturation,respiratory_rate,"
             + "body_temperature,basal_body_temperature,vo2_max,"
             + "blood_glucose,body_mass,lean_body_mass,bone_mass,"
             + "body_fat_percentage,height,power,speed,cycling_cadence,"
@@ -126,7 +127,8 @@ public final class HealthWire {
             + "flights_climbed,elevation_gained,"
             + "active_energy,wheelchair_pushes,hydration,body_mass,"
             + "lean_body_mass,bone_mass,body_fat_percentage,height,"
-            + "resting_heart_rate,oxygen_saturation,respiratory_rate,"
+            + "resting_heart_rate,heart_rate_variability_rmssd,"
+            + "oxygen_saturation,respiratory_rate,"
             + "body_temperature,basal_body_temperature,vo2_max,"
             + "blood_glucose,heart_rate,";
 

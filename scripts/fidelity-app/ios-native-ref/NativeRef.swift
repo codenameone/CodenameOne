@@ -415,13 +415,26 @@ func makeGlassView() -> UIVisualEffectView {
     }
 }
 
-@main
-class AppDelegate: UIResponder, UIApplicationDelegate {
+// The capture runs from a SCENE delegate, not from the application delegate.
+//
+// iOS 27 refuses to launch an app that was built with its SDK and has not
+// adopted the scene life cycle -- "Application failed to launch: UIScene life
+// cycle is required for apps built with this SDK". It refuses SILENTLY as far
+// as the capture is concerned: the process starts, UIKit brings a scene up, and
+// didFinishLaunchingWithOptions is simply never called. Measured with this very
+// file: the same binary, built by Xcode 27.1, produced 68 goldens on the iOS
+// 26.3 runtime and zero on 27.0, with the script reporting nothing more useful
+// than an empty Documents directory.
+//
+// This is the same rule IPhoneBuilder enforces for customer applications; the
+// reference app is hand-rolled and had its own Info.plist, so it never got it.
+class SceneDelegate: UIResponder, UIWindowSceneDelegate {
     var window: UIWindow?
 
-    func application(_ application: UIApplication,
-                     didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil) -> Bool {
-        let w = UIWindow(frame: UIScreen.main.bounds)
+    func scene(_ scene: UIScene, willConnectTo session: UISceneSession,
+               options connectionOptions: UIScene.ConnectionOptions) {
+        guard let windowScene = scene as? UIWindowScene else { return }
+        let w = UIWindow(windowScene: windowScene)
         w.rootViewController = UIViewController()
         w.makeKeyAndVisible()
         self.window = w
@@ -442,7 +455,6 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
                 self.renderAll(host: w.rootViewController!.view)
             }
         }
-        return true
     }
 
     func runAnimation(host: UIView, anim: String, appearance: String) {
@@ -635,5 +647,20 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
         }
         print("NATIVEREF:DONE count=\(count) dir=\(docs.path)")
         exit(0)
+    }
+}
+
+/// Exists only to name the scene delegate. Every line of the capture lives on
+/// SceneDelegate above -- see the comment there for why the application
+/// delegate cannot host it any more.
+@main
+class AppDelegate: UIResponder, UIApplicationDelegate {
+    func application(_ application: UIApplication,
+                     configurationForConnecting connectingSceneSession: UISceneSession,
+                     options: UIScene.ConnectionOptions) -> UISceneConfiguration {
+        let config = UISceneConfiguration(name: "Default",
+                                          sessionRole: connectingSceneSession.role)
+        config.delegateClass = SceneDelegate.self
+        return config
     }
 }

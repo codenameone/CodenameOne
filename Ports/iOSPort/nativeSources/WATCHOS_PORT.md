@@ -212,3 +212,54 @@ Digital-Crown + tap input into the CN1 pointer/scroll event path.
 > without the watchOS SDK + Xcode. The Phase 0 spike (ParparVM on `arm64_32`,
 > one CG frame on-device) must validate the toolchain before the full rollout is
 > worth committing. The foundation above is what the spike exercises.
+
+## watchOS 27: what actually changed (measured 2026-09-19, Xcode 27.1)
+
+Almost nothing that this port has to act on, and that is worth writing down so
+the next person does not re-derive it.
+
+**WatchKit, ClockKit and WatchConnectivity gain ZERO new headers** between
+`WatchOS26.2.sdk` and `WatchOS27.0.sdk`. The rendering contract, the
+complication surfaces and the phone-watch channel are all unchanged.
+
+What did change is **which frameworks the watch can link**. New on the watch in
+27: `FoundationModels`, `CoreAI`, `Vision`, `ThreadNetwork`, `NowPlaying`,
+`MediaIntents`, `LinkPresentation`, `AudioAccessoryKit`, `StateReporting`,
+`CrashReportExtension`, `_AppIntents_HealthKit` and several `_X_Y` interop
+shims. Plus `CMBody` / `CLBody` / `NIBody` -- body-identity protocols in
+CoreMotion, CoreLocation and NearbyInteraction, with no Codename One surface.
+
+Three entries in `WatchNativeBuilder`'s two lists were re-checked against the
+new SDKs, and the comments there now record the result:
+
+| Framework | WatchOS26.2 | WatchSim26.2 | WatchOS27.0 | WatchSim27.0 |
+|---|---|---|---|---|
+| `SceneKit` | present | present | present | present |
+| `BackgroundTasks` | present | **absent** | present | present |
+| `Vision` | absent | absent | **present** | **present** |
+
+`SceneKit` was never absent -- the comment claiming it was, was simply wrong,
+and harmlessly so: it is weak-linked either way because nothing on the watch
+slice references it. `BackgroundTasks` was the one framework whose availability
+differed between the device and simulator SDKs; that asymmetry is gone in 27.
+`Vision` is genuinely new on the watch.
+
+None of this moves a framework across the optional/linkable partition -- every
+absent framework is still weak-linked and every referenced one is still linked
+-- and `WatchNativeBuilderTest`'s 49 tests pass unchanged against the Xcode 27.1
+SDKs.
+
+`Vision` being present is the one that could become a feature: it is what
+`com.codename1.ai.vision` needs. It is not enough on its own -- `CN1Vision.m`
+would have to compile for `TARGET_OS_WATCH` first -- so the framework stays in
+the optional list as "present but unreferenced" until someone does that work.
+
+HealthKit's watch-relevant additions are covered separately: iOS/watchOS 27 add
+`HKLiveWorkoutZoneUpdate` and a `-workoutBuilder:didUpdateWorkoutZone:`
+delegate callback, which matter here because `CN1_HEALTH_WORKOUT_SESSION` is
+`TARGET_OS_WATCH`-gated in `CodenameOne_GLViewController.h`.
+
+`UIHinge` is `API_UNAVAILABLE(watchos)`, so `CN1Hinge.m` compiles to its
+"no hinge" answers on this slice. It needs no entry in `EXCLUDED_WATCH_SOURCES`:
+the guard is `__has_include(<UIKit/UIHingeInteraction.h>)`, and that header is
+absent from the watch SDK, so the file excludes itself.
