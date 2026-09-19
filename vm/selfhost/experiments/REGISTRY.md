@@ -3728,3 +3728,45 @@ JDK 25.
 
 A representation change needs a test that interrogates the representation. The
 existing suite tests what the VM COMPUTES; nothing tested what it IS.
+
+## Round 38: enum values() is a non-issue, and the instrument that said otherwise
+
+Round 37 closed with "the single biggest allocation site in the program is enum
+values()" -- 135,074 OutputType[] clones. **Retracted.** OutputType[] is cloned
+ONCE per run, by ByteCodeTranslator$1's clinit building a switch map, which is
+exactly what javac is supposed to do.
+
+The site profiler keyed on the allocation call's return address alone and kept
+the class of whichever allocation claimed the slot first, on the stated reasoning
+that a site allocates one array class. cloneArray breaks that: one call site that
+clones every array class there is. Its row reported the true CLONE COUNT against
+the FIRST CLASS cloned.
+
+CN1_LOG_CLONE_SITES settles such questions in one run by naming the caller.
+Keyed on (pc, class), the same run reads:
+
+| site | allocations | MB |
+|---|---:|---:|
+| Subroutine.<init>(Subroutine) -> boolean[] | 134,768 | 4.56 |
+| Frame.<init>(Frame) -> Value[] | 134,768 | 18.89 |
+| Analyzer.analyze -> Value[] (two sites) | 71,724 | 13.14 |
+| String.getBytes -> byte[] | 19,016 | 25.54 |
+
+So the dominant allocation sites are ASM's Analyzer -- ~341k allocations and
+~37MB -- driven by OUR two dataflow passes, LocalReceiverTypes.capture and
+resolveDupForms. That is a real cost and worth reducing, but it is translator
+work: it makes every customer's build faster and moves the benchmark RATIO not at
+all, because the JDK arm runs the same passes.
+
+### Three instrument defects in one session
+
+- cn1FusedLatin1Begin charged a fused block to two census rows, making byte[]
+  look like 647k separate arrays when it was 42k (round 33).
+- The frameless census existed but its report was never registered, so plan item
+  D6 stayed "unmeasured" while the measurement sat in the tree (round 35).
+- This one.
+
+Each cost a round of work aimed at a target that was not there. An instrument
+that cannot be wrong in a way its own output reveals will eventually send
+somebody somewhere expensive, and all three were found by cross-checking one
+instrument against another rather than by reading either.
