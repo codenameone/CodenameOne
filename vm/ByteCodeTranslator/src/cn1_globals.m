@@ -1417,9 +1417,8 @@ void flushReleaseQueue() {
 // peer is released here instead -- a cost only ObjC targets pay, and (for
 // BiBOP pages) only on pages flagged by cn1BibopNoteNativePeer at cache time.
 #if defined(__APPLE__) && defined(__OBJC__)
-extern struct clazz class__java_lang_String;
 static inline void cn1ReleaseStringPeer(JAVA_OBJECT o) {
-    if(o->__codenameOneParentClsReference == &class__java_lang_String) {
+    if(cn1IsStringClass(o->__codenameOneParentClsReference)) {
         struct obj__java_lang_String* s = (struct obj__java_lang_String*)o;
         if(s->java_lang_String_nsString != 0) {
             void* v = (void*)s->java_lang_String_nsString;
@@ -12863,7 +12862,7 @@ void gcMarkObject(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj, JAVA_BOOLEAN force
     // Allocation bounds and the embedded tag establish ownership; separate or
     // shared backing arrays still get traced, even when adjacent in memory.
     gcMarkFunctionPointer objectMark = __cls->markFunction;
-    if (__cls == &class__java_lang_String && cn1GcStringIsFusedLeaf(obj)) objectMark = 0;
+    if (cn1IsStringClass(__cls) && cn1GcStringIsFusedLeaf(obj)) objectMark = 0;
     int markVal = currentGcMarkValue;
 
     // Parallel worker path: claim the object's mark bit with an atomic CAS so exactly
@@ -14299,9 +14298,51 @@ JAVA_OBJECT newStringFromCString(CODENAME_ONE_THREAD_STATE, const char *str) {
 // which case the caller performs the ordinary 2-object build.
 // This is the "1 alloc instead of byte[]+String" fast path shared by Long/Integer.toString and the
 // String.cn1Concat helpers -- the bulk of a string-building workload's GC garbage.
+/* The twin, and the one-time copy that fills it.
+ *
+ * Copied rather than emitted so the translator stays untouched, and copied LAZILY
+ * so it is taken after java.lang.String's clinit rather than before it. That
+ * ordering is the whole correctness argument: `vtable` is a POINTER, so a copy
+ * made after the table is allocated shares the very same table and any later fill
+ * is visible through the twin. A copy taken at image-init time would capture a
+ * null vtable and dispatch through the twin would crash.
+ */
+struct clazz class__java_lang_String_i8;
+static _Atomic int cn1StringTwinReady = 0;
+
+static void cn1InitStringTwin(void) {
+    if(atomic_load_explicit(&cn1StringTwinReady, memory_order_acquire)) {
+        return;
+    }
+    // Racy by construction and safe for it: every writer copies the SAME bytes from
+    // the same fully initialised source, so a second thread either sees the finished
+    // copy or redoes it identically. The release store is what publishes it.
+    // memcpy, not assignment: struct clazz declares isArray and baseInterfaceCount
+    // const, which blocks whole-struct assignment. The TWIN itself is not const, so
+    // copying into it is well defined; the const is on how the members are declared,
+    // not on the object being written.
+    memcpy(&class__java_lang_String_i8, &class__java_lang_String, sizeof(struct clazz));
+    // THE COPY MUST NOT INHERIT cn1ClazzRegistered. That flag says "this clazz
+    // ADDRESS is in the conservative GC's exact registry", and the primary is
+    // already registered by the time this copy is taken -- so carrying the flag
+    // over makes CN1_CLAZZ_REGISTER skip the twin forever, gcMarkObject's guard
+    // refuses to believe the twin's address is a real clazz, and every String
+    // allocated with it stops looking like an object. Measured, not theorised:
+    // that is exactly what happened -- FusedTest aborted under gc-verify and
+    // diverged in the gauntlet, while the build was perfectly clean.
+    class__java_lang_String_i8.cn1ClazzRegistered = JAVA_FALSE;
+#ifdef CN1_ALLOC_CENSUS
+    // Same reasoning for the census counters: they belong to the primary's history.
+    class__java_lang_String_i8.cn1AllocCount = 0;
+    class__java_lang_String_i8.cn1AllocBytes = 0;
+#endif
+    atomic_store_explicit(&cn1StringTwinReady, 1, memory_order_release);
+}
+
 JAVA_OBJECT cn1FusedLatin1Begin(CODENAME_ONE_THREAD_STATE, int len, JAVA_ARRAY_BYTE** dst) {
 #ifndef CN1_DISABLE_BIBOP
     if(__builtin_expect(class__java_lang_String.initialized, 1)) {
+        cn1InitStringTwin();
         int off = (int)((sizeof(struct obj__java_lang_String) + 7) & ~(size_t)7);
         int total = off + CN1_FUSED_ARR_BYTES(len, sizeof(JAVA_ARRAY_BYTE));
         // Full BiBOP alloc (handles freeList / bump / page-acquire) so the fused path stays effective
@@ -14312,7 +14353,7 @@ JAVA_OBJECT cn1FusedLatin1Begin(CODENAME_ONE_THREAD_STATE, int len, JAVA_ARRAY_B
         // garbage), so there is no init-before-publish race. Caller fills *dst[0..len) then
         // cn1FusedLatin1End(so, len) sets the count LAST (count>0 always implies a fully-written value).
         if(total <= CN1_BIBOP_MAX_OBJECT) {
-            JAVA_OBJECT so = cn1BibopAlloc(threadStateData, total, &class__java_lang_String);
+            JAVA_OBJECT so = cn1BibopAlloc(threadStateData, total, &class__java_lang_String_i8);
             if(so != JAVA_NULL) {
                 JAVA_OBJECT arr = cn1FusedInstallPrimArray(so, off, &class_array1__JAVA_BYTE, sizeof(JAVA_ARRAY_BYTE), len);
                 ((struct obj__java_lang_String*)so)->java_lang_String_value = arr; // count stays 0 until End

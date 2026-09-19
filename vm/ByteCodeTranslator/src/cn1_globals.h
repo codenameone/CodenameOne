@@ -1244,6 +1244,32 @@ static inline struct clazz* cn1ClassOf(JAVA_OBJECT o) {
 
 #define GET_CLASS_ID(JavaObj) ((CN1_CLASS_OF(JavaObj))->classId)
 
+/* ---- java.lang.String TWIN CLASS -------------------------------------------
+ *
+ * Two clazz structs, one classId. class__java_lang_String_i8 is a byte-for-byte
+ * copy of class__java_lang_String, so it carries the same classId, name, vtable
+ * pointer, mark function and type-test row. Everything that decides behaviour
+ * keys on the ID -- instanceof, getClass, the interface map row, the thunk
+ * switch, the type-test bitset -- so an object of the twin is a java.lang.String
+ * in every way a program can observe.
+ *
+ * What differs is the ADDRESS, and that is the point: the class word is already
+ * in every object header, so a pointer compare against it carries a bit that
+ * costs nothing to store. String needs exactly such a bit -- its coder -- and
+ * the only place that bit lives today is a 24-byte JavaArrayPrototype wrapped
+ * around a payload no one else can reach.
+ *
+ * Anything comparing a class pointer to &class__java_lang_String by IDENTITY has
+ * to ask cn1IsStringClass instead. Missing one does not fail loudly: it compiles,
+ * and simply answers "not a String".
+ */
+extern struct clazz class__java_lang_String;
+extern struct clazz class__java_lang_String_i8;
+static inline int cn1IsStringClass(const struct clazz* c) {
+    return c == &class__java_lang_String || c == &class__java_lang_String_i8;
+}
+
+
 /* Constant-time instanceof against a type the translator assigned a dense bit
  * index to (see Parser.typeTestIds). One load of the runtime class id, one load
  * from the class's bitmap row, a shift and an and -- no call and no loop, where

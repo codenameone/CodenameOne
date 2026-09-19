@@ -271,7 +271,7 @@ static inline __attribute__((always_inline)) JAVA_BOOLEAN cn1InlStrEquals(
 #endif
     if(self == other) return JAVA_TRUE;
     if(other == JAVA_NULL || CN1_IS_TAGGED(other)
-            || other->__codenameOneParentClsReference != &class__java_lang_String) return JAVA_FALSE;
+            || !cn1IsStringClass(other->__codenameOneParentClsReference)) return JAVA_FALSE;
     struct obj__java_lang_String* a = (struct obj__java_lang_String*)self;
     struct obj__java_lang_String* b = (struct obj__java_lang_String*)other;
     int count = a->java_lang_String_count;

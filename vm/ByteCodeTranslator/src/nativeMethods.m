@@ -3757,7 +3757,7 @@ static inline JAVA_INT cn1HmMarker(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT key) {
         return (JAVA_INT)0x80000000;
     }
     JAVA_INT h;
-    if(CN1_CLASS_OF(key) == &class__java_lang_String) {
+    if(cn1IsStringClass(CN1_CLASS_OF(key))) {
         h = ((struct obj__java_lang_String*)key)->java_lang_String_hashCode;
         if(h == 0) h = java_lang_String_hashCode___R_int(threadStateData, key);
     } else h = virtual_java_lang_Object_hashCode___R_int(threadStateData, key);
@@ -3789,7 +3789,7 @@ static JAVA_INT cn1HmFindSlot(CODENAME_ONE_THREAD_STATE, struct obj__java_util_H
     uint32_t perturb = (uint32_t)marker;
     int firstTomb = -1;
     JAVA_INT expected = t->java_util_HashMap_modCount;
-    int stringKey = key != JAVA_NULL && CN1_CLASS_OF(key) == &class__java_lang_String;
+    int stringKey = key != JAVA_NULL && cn1IsStringClass(CN1_CLASS_OF(key));
     while(1) {
         JAVA_INT m = meta[i];
         if(m == 0) { // META_EMPTY
@@ -3856,7 +3856,7 @@ static JAVA_INT cn1HsFindSlot(CODENAME_ONE_THREAD_STATE, struct obj__java_util_H
     uint32_t perturb = (uint32_t)marker;
     int firstTomb = -1;
     JAVA_INT expected = s->java_util_HashSet_cn1ModCount;
-    int stringKey = key != JAVA_NULL && CN1_CLASS_OF(key) == &class__java_lang_String;
+    int stringKey = key != JAVA_NULL && cn1IsStringClass(CN1_CLASS_OF(key));
     while(1) {
         JAVA_INT m = meta[i];
         if(m == 0) { // META_EMPTY
@@ -4920,7 +4920,7 @@ JAVA_OBJECT java_lang_StringBuilder_append___java_lang_String_R_java_lang_String
 JAVA_BOOLEAN java_lang_StringBuilder_tryAppendRange___java_lang_CharSequence_int_int_R_boolean(
         CODENAME_ONE_THREAD_STATE, JAVA_OBJECT builder, JAVA_OBJECT text, JAVA_INT start, JAVA_INT end) {
     int sourceBuilder = text->__codenameOneParentClsReference == &class__java_lang_StringBuilder;
-    if(!sourceBuilder && text->__codenameOneParentClsReference != &class__java_lang_String) return JAVA_FALSE;
+    if(!sourceBuilder && !cn1IsStringClass(text->__codenameOneParentClsReference)) return JAVA_FALSE;
     JAVA_INT length = end - start;
     if(length == 0) return JAVA_TRUE;
     CN1_KEEP_NATIVE_OWNER(bufferOwner, builder);
