@@ -68,14 +68,6 @@
         <targetPath>archetype-resources/.agent-skills/codename-one</targetPath>
         <filtering>false</filtering>
       </resource>
-      <resource>
-        <directory>${project.basedir}/../../scripts/initializr/common/src/main/resources</directory>
-        <targetPath>archetype-resources</targetPath>
-        <filtering>false</filtering>
-        <includes>
-          <include>AGENTS.md</include>
-        </includes>
-      </resource>
     </resources>
 
     <pluginManagement>
@@ -101,24 +93,32 @@
 
     <plugins>
       <!--
-        The Claude Code stub is the one staged file whose published name differs
-        from its source name (agent-skill-claude-stub.md -> SKILL.md), which
-        maven-resources cannot express, so it is copied by ant instead. Same
-        source directory as the two <resource> entries above; the point is that
-        nothing here is authored twice.
+        The root pointer and the Claude Code stub are both published under names
+        they are NOT stored under, which maven-resources cannot express, so ant
+        copies them. Same source directory as the <resource> entry above; the
+        point is that nothing here is authored twice.
+
+        The two renames have opposite reasons. The stub's published name is fixed
+        by Claude Code (SKILL.md). The pointer's source name avoids AGENTS.md,
+        because that is a name agents look for on their own: a file called that
+        inside this repository would be read as instructions for the Codename One
+        tree, and it describes a generated application instead.
       -->
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-antrun-plugin</artifactId>
         <executions>
           <execution>
-            <id>stage-claude-skill-stub</id>
+            <id>stage-agent-skill-pointers</id>
             <phase>process-resources</phase>
             <goals>
               <goal>run</goal>
             </goals>
             <configuration>
               <target>
+                <copy file="${project.basedir}/../../scripts/initializr/common/src/main/resources/agent-skill-agents-md.md"
+                      tofile="${project.build.outputDirectory}/archetype-resources/AGENTS.md"
+                      overwrite="true"/>
                 <copy file="${project.basedir}/../../scripts/initializr/common/src/main/resources/agent-skill-claude-stub.md"
                       tofile="${project.build.outputDirectory}/archetype-resources/.claude/skills/codename-one/SKILL.md"
                       overwrite="true"/>

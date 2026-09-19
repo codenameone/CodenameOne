@@ -139,8 +139,13 @@ class Cn1AppArchetypeCertificateWizardTest {
     void agentSkillIsGeneratedInTheSameLayoutAsTheInitializr() throws Exception {
         File initializrResources =
                 new File("../../scripts/initializr/common/src/main/resources");
-        assertTrue(new File(initializrResources, "AGENTS.md").isFile(),
-                "the archetype pom stages AGENTS.md from " + initializrResources);
+        // Stored under a name that is NOT AGENTS.md on purpose: that name is one agents
+        // look for by themselves, and a file called that inside this repository would be
+        // read as instructions for the Codename One tree rather than for a generated app.
+        assertTrue(new File(initializrResources, "agent-skill-agents-md.md").isFile(),
+                "the archetype pom stages the AGENTS.md body from " + initializrResources);
+        assertFalse(new File(initializrResources, "AGENTS.md").isFile(),
+                "the AGENTS.md body must not be stored under the reserved name");
         assertTrue(new File(initializrResources, "agent-skill-claude-stub.md").isFile(),
                 "the archetype pom stages the Claude stub from " + initializrResources);
         assertTrue(new File(initializrResources, "skill/SKILL.md").isFile(),
@@ -149,7 +154,7 @@ class Cn1AppArchetypeCertificateWizardTest {
         String pom = archetypeFile("pom.xml");
         assertTrue(pom.contains("archetype-resources/.agent-skills/codename-one"),
                 "the skill must be staged under .agent-skills/, not only under .claude/");
-        assertTrue(pom.contains("<include>AGENTS.md</include>"),
+        assertTrue(pom.contains("archetype-resources/AGENTS.md"),
                 "the root AGENTS.md pointer must be staged into the archetype");
         assertTrue(pom.contains("archetype-resources/.claude/skills/codename-one/SKILL.md"),
                 "the Claude stub must be staged at its single-file path");

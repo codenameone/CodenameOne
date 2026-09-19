@@ -73,6 +73,8 @@ codename1.arg.ios.onDeviceDebug.proxyPort=55333
 codename1.arg.ios.onDeviceDebug.waitForAttach=true
 ```
 
+**`waitForAttach=true` blocks an MCP-only session.** It does not merely show a "waiting for debugger" overlay: the app delegate defers the VM callback that boots Codename One until the proxy reports an IDE attached, so `start()` never runs and a `MCP.startSocketServer` call inside it never fires. Set it to `false` whenever the point of the session is driving the app rather than a breakpoint. The Android goal has the same trap and the same answer (`waitForAttach=false`).
+
 `proxyHost` stays `127.0.0.1` for the **native iOS simulator**, which shares your machine's loopback. For a **physical iPhone** it must be your machine's LAN address (`ifconfig` / `ipconfig`), reachable from the phone's Wi-Fi network — the phone opens the connection, so a host that only answers on loopback will never be reached.
 
 **2. Build:**
@@ -119,11 +121,11 @@ if (Display.getInstance().isDebuggableBuild()) {
 
 The port is on the **device's** loopback, not yours, so it needs a forward:
 
-- **Android device or emulator** — `adb forward tcp:8765 tcp:8765`, then connect to `127.0.0.1:8765` on your machine. Tear it down with `adb forward --remove tcp:8765` when you are done.
+- **Android device or emulator** — `adb forward tcp:8765 tcp:8765`, then connect to `127.0.0.1:8765` on your machine. Tear it down with `adb forward --remove tcp:8765` when you are done. With more than one device online `adb` refuses both commands rather than guessing, so pass the same serial the debug goal used: `adb -s <serial> forward tcp:8765 tcp:8765` and `adb -s <serial> forward --remove tcp:8765`.
 - **Native iOS simulator** — it shares your machine's network stack, so `127.0.0.1:8765` already *is* the app's port. Nothing to forward.
 - **Physical iPhone** — the port is on the phone's own loopback and there is no Codename One goal that tunnels it. The route is a usbmux TCP relay such as `iproxy 8765 8765` from libimobiledevice. If you do not have that tooling, use the iOS simulator for the MCP loop and keep the physical device for the JDWP session above.
 
-Pair this with `waitForAttach=false` on Android when you want the app to boot straight into a drivable state rather than blocking for a debugger.
+**Set `waitForAttach=false` on both platforms.** It is a convenience on Android and a requirement on iOS, where the VM callback that boots the app is itself deferred until a debugger attaches, so with it left on, the starter above never runs and nothing is listening to forward to.
 
 **Security, unchanged from the simulator case:** loopback is not authentication. Everything on the device can reach the port, which is exactly why `startSocketServer` refuses on a release build. Do not lift that gate to make a device session work, do not leave the starter in shipping code, and remove the forward when the session ends.
 

@@ -78,8 +78,15 @@ public class GeneratorModel {
     // They sit flat at the root of src/main/resources for the same reason skill/ is
     // repackaged into skill.zip: Codename One's classloader rejects nested directories
     // under src/main/resources at runtime.
+    //
+    // Neither is stored under the name it is published as. AGENTS.md is a name agents
+    // look for on their own, so a file called that here would be read as instructions
+    // for THIS repository -- and it says things like "run the simulator with
+    // mvn -pl common cn1:run", which is true of a generated app and false of the
+    // Codename One tree. The Claude stub already had to be renamed on staging because
+    // its published name is SKILL.md; this one is renamed for the opposite reason.
     private static final String CLAUDE_SKILL_STUB_RESOURCE = "/agent-skill-claude-stub.md";
-    private static final String AGENTS_MD_RESOURCE = "/AGENTS.md";
+    private static final String AGENTS_MD_RESOURCE = "/agent-skill-agents-md.md";
 
     private final IDE ide;
     private final Template template;
