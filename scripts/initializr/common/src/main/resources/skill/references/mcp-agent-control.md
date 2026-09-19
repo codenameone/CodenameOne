@@ -28,6 +28,12 @@ If you are running the app yourself rather than through the menu, the same switc
 MCP.startSocketServer(8765);
 ```
 
+## Attaching to a build on a device
+
+The socket server is not simulator-only. It binds wherever the platform can bind a loopback port, which includes an app running on an Android phone or an iPhone, so the same five tools drive the real build — semantic identifiers instead of coordinates guessed off a screenshot. The port is on the *device's* loopback rather than yours, so it needs a forward: `adb forward tcp:8765 tcp:8765` on Android, nothing at all on the native iOS simulator (it shares your machine's network stack), and a usbmux relay on a physical iPhone.
+
+`references/on-device-debugging.md` has the whole sequence for both platforms, alongside the JDWP attach that usually goes with it.
+
 ## What you can call
 
 Every server publishes these, with no work from the app:

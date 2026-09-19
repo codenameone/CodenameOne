@@ -1831,6 +1831,55 @@ public class IPhoneBuilder extends Executor {
         }
     }
 
+    /**
+     * Whether an on-device-debug proxy host is the loopback interface, and so needs
+     * no local-network declaration.
+     *
+     * Deliberately a SMALL allow-list rather than a parse: everything it does not
+     * recognise is treated as the local network, which is the answer that keeps a
+     * debugging session working. The whole 127/8 block counts, because loopback is
+     * 127.0.0.1 by convention and not by rule.
+     */
+    static boolean isLoopbackDebugProxyHost(String host) {
+        if (host == null) {
+            return false;
+        }
+        String trimmed = host.trim();
+        // Brackets are how a literal IPv6 address is written in a host position.
+        if (trimmed.startsWith("[") && trimmed.endsWith("]")) {
+            trimmed = trimmed.substring(1, trimmed.length() - 1).trim();
+        }
+        if (trimmed.equalsIgnoreCase("localhost")
+                || trimmed.equals("::1")
+                || trimmed.equals("0:0:0:0:0:0:0:1")) {
+            return true;
+        }
+        if (!trimmed.startsWith("127.")) {
+            return false;
+        }
+        // "127.0.0.1" yes, "127.0.0.1.example.com" no -- a host name may begin with
+        // digits, and one that merely starts with the right four characters is not
+        // an address at all.
+        String[] parts = trimmed.split("\\.");
+        if (parts.length != 4) {
+            return false;
+        }
+        for (int i = 0; i < parts.length; i++) {
+            if (parts[i].length() == 0 || parts[i].length() > 3) {
+                return false;
+            }
+            for (int c = 0; c < parts[i].length(); c++) {
+                if (parts[i].charAt(c) < '0' || parts[i].charAt(c) > '9') {
+                    return false;
+                }
+            }
+            if (Integer.parseInt(parts[i]) > 255) {
+                return false;
+            }
+        }
+        return true;
+    }
+
     private int getDeploymentTargetInt(BuildRequest request) {
         String target = getDeploymentTarget(request);
         if (target.indexOf(".") > 0) {
@@ -16493,6 +16542,36 @@ public class IPhoneBuilder extends Executor {
                         + "<dict>"
                         + "<key>NSAllowsArbitraryLoads</key><true/>"
                         + "</dict>";
+            }
+            // A PHYSICAL device reaches the proxy across the Wi-Fi it shares with
+            // the developer's machine, and since iOS 14 that is local-network
+            // access: consent-gated, and gated on a purpose string the app has to
+            // declare up front. Without one the app is terminated the moment
+            // cn1_debugger dials out -- before it can connect, so the session fails
+            // with the proxy still waiting and nothing on the device to explain it.
+            //
+            // Only for the LAN case. The native simulator shares the host's
+            // loopback, which is not the local network, and an unnecessary purpose
+            // string puts a prompt in front of a developer who never asked for one
+            // -- the same reason the nearby flags are kept apart from each other.
+            //
+            // Ambiguity resolves TOWARDS declaring it: a proxyHost that is not
+            // recognisably loopback may still be a LAN name rather than an address,
+            // and the costs are not symmetric. A spare purpose string costs one
+            // prompt in a build that is debug-only by construction; a missing one
+            // costs a debugging session that cannot start.
+            //
+            // Through applyCatalogPlistEntry rather than putArgument, for the reason
+            // the Matter block above states: the sweep that copies
+            // ios.NS*UsageDescription hints into privacyUsageDescriptions ran long
+            // before this line, the plist is rendered from that map, and a bare
+            // argument set here would never be read. It fills only a MISSING value,
+            // so a project that declared its own string keeps it.
+            if (!isLoopbackDebugProxyHost(proxyHost)) {
+                applyCatalogPlistEntry(request, new String[] {
+                    "NSLocalNetworkUsageDescription",
+                    "Connects to the Codename One debugging proxy on your computer. "
+                            + "This is a development build."});
             }
         }
 
