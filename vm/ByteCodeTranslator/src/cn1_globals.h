@@ -1317,6 +1317,47 @@ extern JAVA_CHAR cn1StrCharAtRaw(JAVA_OBJECT s, JAVA_INT i);
  * cn1_array_start_offset, i.e. past CN1_TYPETEST_ROWS, so those fall back to
  * instanceofFunction, which has always handled array types before it reaches the
  * scan. The bound test is also what keeps a row lookup in range. */
+/* instanceof against a class NOTHING LIVE EXTENDS.
+ *
+ * The general form reads the class word, then reads classId out of it -- a second
+ * load, dependent on the first -- and indexes the type-test bitmap. Against a leaf
+ * the class word IS the answer, so this is ONE load and a compare.
+ *
+ * The tagged test stays and is cheap: a tagged immediate is a boxed value, whose
+ * class is never a leaf the application tests for, so !CN1_IS_TAGGED settles it
+ * without resolving anything. It must come BEFORE the field read, because
+ * dereferencing a tagged word reads whatever that small integer points at.
+ *
+ * Measured against C2's output for the same test: HotSpot compares the klass word
+ * directly because the klass is the identity there, and that single dependent load
+ * was most of the 31% load gap on BytecodeMethod.equals.
+ */
+/* instanceof java.lang.String.
+ *
+ * String is final, so it is a leaf and the leaf form above would apply -- except
+ * that its class word is not unique. A fused String carries a TWIN clazz, same
+ * classId and vtable, different address, so a plain identity compare against
+ * &class__java_lang_String answers FALSE for exactly the Strings the VM creates
+ * most. The twin commit said in as many words that identity comparisons must ask
+ * cn1IsStringClass; this is that rule applying to code written after it.
+ *
+ * Still worth having: one load and up to three compares, against the general
+ * form's two dependent loads plus a bitmap index.
+ */
+#define BC_INSTANCEOF_STRING() { \
+        JAVA_OBJECT cn1__io = SP[-1].data.o; \
+        SP[-1].type = CN1_TYPE_INT; \
+        SP[-1].data.i = (cn1__io != JAVA_NULL && !CN1_IS_TAGGED(cn1__io) \
+                && cn1IsStringClass(cn1__io->__codenameOneParentClsReference)) ? 1 : 0; \
+    }
+
+#define BC_INSTANCEOF_LEAF(clsSymbol) { \
+        JAVA_OBJECT cn1__io = SP[-1].data.o; \
+        SP[-1].type = CN1_TYPE_INT; \
+        SP[-1].data.i = (cn1__io != JAVA_NULL && !CN1_IS_TAGGED(cn1__io) \
+                && cn1__io->__codenameOneParentClsReference == &(clsSymbol)) ? 1 : 0; \
+    }
+
 #define BC_INSTANCEOF_FAST(typeTestIdx, typeOfInstanceOf) { \
     if(SP[-1].data.o != JAVA_NULL) { \
         int tmpInstanceOfId = GET_CLASS_ID(SP[-1].data.o); \

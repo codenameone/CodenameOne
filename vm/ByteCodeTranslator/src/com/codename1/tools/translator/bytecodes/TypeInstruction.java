@@ -450,6 +450,20 @@ public class TypeInstruction extends Instruction {
                     // every non-array type an instanceof anywhere in the application
                     // tests against. The id is still passed so the array fallback
                     // inside the macro has something to call with.
+                    // Leaf first: nothing live extends it, so the class word IS the
+                    // answer and the classId load disappears with the bitmap lookup.
+                    // String is a leaf but its class word is not unique -- fused
+                    // Strings carry a twin clazz. See BC_INSTANCEOF_STRING.
+                    if("java_lang_String".equals(actualType)) {
+                        b.append("BC_INSTANCEOF_STRING();\n");
+                        break;
+                    }
+                    if(Parser.isLeafClass(actualType)) {
+                        b.append("BC_INSTANCEOF_LEAF(class__");
+                        b.append(actualType);
+                        b.append(");\n");
+                        break;
+                    }
                     int typeTestIdx = Parser.typeTestIndex(actualType);
                     if(typeTestIdx >= 0) {
                         b.append("BC_INSTANCEOF_FAST(");

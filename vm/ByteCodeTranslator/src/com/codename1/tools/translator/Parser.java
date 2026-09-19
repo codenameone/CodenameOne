@@ -102,6 +102,55 @@ public class Parser extends ClassVisitor {
     }
 
     /**
+     * TRUE when nothing live extends {@code clsName}, so an object is an instance of it
+     * exactly when its class word IS that class.
+     *
+     * That distinction is worth a load. The general test reads the class word, then
+     * reads classId out of it -- a SECOND load, dependent on the first -- and indexes
+     * the type-test bitmap with it. Against a leaf, comparing the class word to the
+     * class itself answers the same question with one load and no bitmap. Read beside
+     * C2's output for the same test, that dependent load is most of the difference:
+     * HotSpot compares the klass word directly because for it the klass IS the
+     * identity, while we had been comparing ids.
+     *
+     * Only meaningful after the cull, because "nothing live extends it" is a statement
+     * about the classes that survived. Interfaces are excluded: an interface is never a
+     * class word.
+     */
+    /** Classes a TAGGED immediate reports as its own -- see CN1_TAG_* in cn1_globals.h. */
+    private static final java.util.Set<String> CN1_TAGGABLE_CLASSES =
+            new java.util.HashSet<String>(java.util.Arrays.asList(
+                    "java_lang_Integer", "java_lang_Long", "java_lang_Double",
+                    "java_lang_Float", "java_lang_Character", "java_lang_Short"));
+
+    public static synchronized boolean isLeafClass(String clsName) {
+        ByteCodeClass c = getClassObject(clsName);
+        if (c == null || c.isIsInterface() || c.isEliminated()) {
+            return false;
+        }
+        // A BOXED type is final, so it is a leaf by the subclass test -- and the leaf
+        // form is still wrong for it, because a tagged immediate IS an instance and has
+        // no class word to compare. `Integer.valueOf(5) instanceof Integer` has to be
+        // true. BoxEdge, HtTorture and InstanceOfT all caught this at once; the earlier
+        // reasoning that "a tagged value's class is never a leaf anyone tests for" was
+        // simply false, and final is exactly what these classes are.
+        if (CN1_TAGGABLE_CLASSES.contains(clsName)) {
+            return false;
+        }
+        cn1EnsureSubclassIndex();
+        java.util.List<ByteCodeClass> subs = cn1SubclassIndex.get(clsName);
+        if (subs == null) {
+            return true;
+        }
+        for (ByteCodeClass sub : subs) {
+            if (!sub.isEliminated()) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /**
      * If (name, desc) invoked virtually on {@code owner} has no reachable
      * override in any non-eliminated subclass, returns the mangled name of the
      * class whose non-abstract declaration implements it (owner or an
