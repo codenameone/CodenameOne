@@ -15,8 +15,20 @@ name: Native theme fidelity
   workflow_dispatch:
   pull_request:
     paths:
-      - 'native-themes/ios-modern/theme.css'
-      - 'native-themes/android-material/theme.css'
+      # One entry per THEME, not per file: ios-modern is built from
+      # common.css + gen26.css + gen27.css since the generation split, and this
+      # list still named the theme.css that split removed -- so from that merge
+      # until this fix, NO pull request could trigger the iOS fidelity suite at
+      # all. It went unnoticed because the splitting PR itself matched: deleting
+      # a path counts as touching it, so the last PR this gate ran on was the one
+      # that broke it.
+      #
+      # Globbed by directory so the next part file is covered on the day it is
+      # added rather than the day someone notices. native-themes/<theme>/target/
+      # is the concatenated build input and is gitignored, so it never appears in
+      # a pull request and cannot widen this.
+      - 'native-themes/ios-modern/**'
+      - 'native-themes/android-material/**'
   push:
     branches: [master]
     paths:
