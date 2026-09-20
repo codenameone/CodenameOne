@@ -3984,3 +3984,48 @@ Undecided: inline caches. Possibly large, and the static half is already done.
 No timing this round: the host was at load 27 under Spotlight indexing. The last
 trustworthy figure is round 41's 1.145x at 1.4% spread, which predates this
 change.
+
+## Round 43: null checks that are proven away rather than moved
+
+Round 42 moved array null checks onto the hardware. This one removes a different
+population outright.
+
+The null test on a devirtualized call exists for a precise reason: removing the
+virtual dispatch removed the load that would have faulted. So it is emitted
+exactly where getProvenDirectOwner() succeeded. But the reason that succeeded is
+that the receiver's provenance was an exact ALLOCATION -- and an allocation does
+not produce null. A NEW or a lambda's invokedynamic proves the type and the
+non-nullness together; a factory call or a field read proves only the type.
+
+That distinction was being discarded: setClosedWorldReceiverTypes kept the type
+and not the reason, so every proof looked the same. Carrying both:
+
+    cn1ThrowNullPointerOrDie sites   967 -> 694
+
+273 branches, 28%, on calls hot enough to have been devirtualized. No handler and
+no exposure, unlike the implicit form -- the check is not relocated, it is shown
+to be dead.
+
+ACONST_NULL needed explicit handling. The exactness test TOLERATES it, because a
+null merges with anything without disproving its type, and it is precisely what
+must disprove non-nullness.
+
+### Status, and why there is no number
+
+Gauntlet, gc-verify and Gate A green for both this and round 42. NO TIMING: the
+host has been between load 30 and 194 throughout, running iOS Simulator runtimes
+and Spotlight indexing. The last trustworthy figure remains round 41's 1.145x
+against JDK 25 at 1.4% spread, which predates the implicit null checks and this
+change. Both are load-bearing enough to want a real measurement before anything
+is claimed for them.
+
+Open, in order:
+
+  - Benchmark these two on a quiet host.
+  - The fast-common-path idea (round 41 item 2, reinterpreted): lift guardrails
+    statically where the analysis can prove they are unnecessary, as the
+    exception machinery already does for methods with no try/catch. The two null
+    check commits are instances of exactly this shape.
+  - Compressed references: the 32GB window is in and holds the whole page heap
+    (fallbacks=0); the legacy heap still comes from calloc outside it and a
+    reference block can hold either kind.
