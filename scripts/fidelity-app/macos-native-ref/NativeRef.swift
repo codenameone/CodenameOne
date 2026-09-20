@@ -581,19 +581,34 @@ final class RefApp: NSObject, NSApplicationDelegate {
         }
         rep.size = NSSize(width: TILE_W, height: TILE_H)
         tile.cacheDisplay(in: tile.bounds, to: rep)
-        if let translucent = translucentPixelCount(rep), translucent > 0 {
+        if let mask = coverageMaskReading(rep) {
             // The tile is opaque by construction -- TileView.draw fills every pixel with
-            // windowBackgroundColor -- so a translucent pixel here means a control REPLACED
-            // what was under it with a coverage mask instead of blending onto it. That is not
-            // a cosmetic difference: promoting the golden flattens the alpha away, and the
-            // masked region lands as solid black in Aqua and solid white in Dark Aqua with its
-            // own label invisible against it, which is what the first DesktopTabs golden
-            // shipped (see appkit_tabview). Nothing recovers it afterwards, because the draw
-            // destroyed the pixels underneath rather than covering them, so this has to fail at
-            // capture rather than be discovered by eye in review.
-            blocker("\(spec.id) \(state): \(translucent) translucent pixel(s) -- a control "
-                    + "drew a coverage mask over the tile instead of blending onto it; that "
-                    + "region will flatten to solid black/white when the golden is promoted")
+            // windowBackgroundColor -- so a translucent pixel means a control REPLACED what
+            // was under it instead of blending onto it. That alone is not the failure,
+            // though, and a first version of this check that failed on it was wrong: it
+            // blocked the whole macOS capture over NSSlider, whose knob is one uniformly
+            // translucent fill and whose tiles have been correct for as long as the set has
+            // existed.
+            //
+            // What is fatal is an alpha channel carrying IMAGE STRUCTURE: a control drawn as
+            // a pure coverage mask, constant RGB with its shape and its text in alpha. Read
+            // back as RGB -- which is what a viewer does, and what the comparator scores --
+            // that is a solid block of the mask colour, black in Aqua and white in Dark Aqua,
+            // with the control's own label invisible against it. It is not recoverable
+            // afterwards either, because the draw destroyed the pixels underneath rather than
+            // covering them. The first DesktopTabs golden shipped exactly this (see
+            // appkit_tabview).
+            //
+            // The two are told apart by counting distinct alphas among the pure black/white
+            // translucent pixels, and the separation is not a judgement call. Measured over
+            // the committed set: every NSSlider tile has exactly ONE (276 pixels of knob at a
+            // single alpha), and the two broken NSTabView tiles have 90 and 126, because that
+            // is where the glyphs went. The threshold below sits an order of magnitude away
+            // from both.
+            blocker("\(spec.id) \(state): \(mask.pixels) pixel(s) of pure \(mask.colour) "
+                    + "across \(mask.distinctAlphas) distinct alpha values -- a control drew "
+                    + "itself as a coverage mask, so its shape and text are in the alpha "
+                    + "channel and it reads as a solid block of that colour")
             return nil
         }
         let img = NSImage(size: rep.size)
@@ -601,22 +616,60 @@ final class RefApp: NSObject, NSApplicationDelegate {
         return img
     }
 
-    /// Number of pixels whose alpha is not fully opaque, or nil when the rep cannot be read
-    /// in the packed form this walks. See the caller for why a single one is fatal.
-    func translucentPixelCount(_ rep: NSBitmapImageRep) -> Int? {
+    /// A control drawn as a coverage mask, or nil when the tile carries none.
+    ///
+    /// Looks only at translucent pixels whose RGB is pure black or pure white, which is what
+    /// AppKit leaves behind when it renders a control as coverage rather than colour: the
+    /// label colour in every channel, with the shape and the glyphs in alpha. Counting the
+    /// DISTINCT alphas among them is what separates that from a control that is simply
+    /// translucent, whose fill is one alpha. See the caller for the measured numbers.
+    ///
+    /// Returns nil, not a false verdict, when the rep is not in the packed 8-bit form this
+    /// walks -- the capture allocates it directly above, so that cannot silently become the
+    /// normal path.
+    func coverageMaskReading(_ rep: NSBitmapImageRep)
+            -> (pixels: Int, colour: String, distinctAlphas: Int)? {
+        // An order of magnitude clear of both measured populations: 1 for a translucent fill,
+        // 90+ for a mask. Ordinary anti-aliasing along a translucent edge spreads alphas too,
+        // which is why this is not simply "more than one".
+        let maskAlphaSpread = 8
         guard rep.samplesPerPixel == 4, !rep.isPlanar, rep.bitsPerSample == 8,
               let base = rep.bitmapData else { return nil }
         let bpp = rep.bitsPerPixel / 8
         let alphaFirst = rep.bitmapFormat.contains(.alphaFirst)
-        var count = 0
+        // PREMULTIPLIED unless the rep says otherwise, which is the default NSBitmapImageRep
+        // gives you and therefore what the capture above allocates. It matters here and cost
+        // a probe to find: premultiplied, a pure WHITE pixel at alpha 13 is stored (13,13,13),
+        // not (255,255,255), so testing for 255 in every channel found the Aqua mask (black,
+        // stored (0,0,0) either way) and silently missed the Dark Aqua one. The PNG on disk is
+        // un-premultiplied, which is why the committed golden reads (255,255,255,13) and the
+        // buffer it came from does not.
+        let premultiplied = !rep.bitmapFormat.contains(.alphaNonpremultiplied)
+        var blackAlphas = Set<UInt8>(), whiteAlphas = Set<UInt8>()
+        var blackPixels = 0, whitePixels = 0
         for y in 0..<rep.pixelsHigh {
             let row = base + y * rep.bytesPerRow
             for x in 0..<rep.pixelsWide {
                 let px = row + x * bpp
-                if px[alphaFirst ? 0 : 3] != 255 { count += 1 }
+                let a = px[alphaFirst ? 0 : 3]
+                if a == 255 { continue }
+                let o = alphaFirst ? 1 : 0
+                let (r, g, b) = (px[o], px[o + 1], px[o + 2])
+                let white: UInt8 = premultiplied ? a : 255
+                if r == 0 && g == 0 && b == 0 && a > 0 {
+                    blackAlphas.insert(a); blackPixels += 1
+                } else if r == white && g == white && b == white {
+                    whiteAlphas.insert(a); whitePixels += 1
+                }
             }
         }
-        return count
+        if blackAlphas.count > maskAlphaSpread {
+            return (blackPixels, "black", blackAlphas.count)
+        }
+        if whiteAlphas.count > maskAlphaSpread {
+            return (whitePixels, "white", whiteAlphas.count)
+        }
+        return nil
     }
 
     func isBlank(_ image: NSImage) -> Bool {
