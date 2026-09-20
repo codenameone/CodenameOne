@@ -3933,3 +3933,54 @@ The sequence is 1.158 (r30), 1.171 (r35), 1.154 (r40), 1.145 now.
 The shape of the answer: we are not losing on code quality in the ordinary sense
 -- we inline more, spill less and address constants better. We lose on LOADS and
 on work that C2 simply does not emit because it may deoptimise.
+
+## Round 42: implicit null checks, and the stub that must not return
+
+Item 1 of round 41's list. C2 annotated 12 sites "implicit exception" against our
+26 explicit cbz; it dereferences and lets the hardware say so. The mechanism
+transfers directly to array access, because the bounds check ALREADY loads
+->length and that load faults at offset 16 on a null array. The load is the null
+test, so the compare and branch leave every array access in the program.
+
+Semantics survive on ORDER, not on care: the length load faults before the
+comparison it feeds, so a null array with index 999999 is still NPE rather than
+ArrayIndexOutOfBounds. NullDeref pins that and matches JDK 25 exactly.
+
+### The finding worth keeping
+
+**The landing stub must not return.** A plain C function returns through the link
+register, which on arm64 still points at the faulting instruction -- so the fault
+repeats forever. The first standalone probe hung exactly so, before any of this
+reached the VM, and it is the kind of thing that would have read as "signals do
+not work here" if it had been discovered inside a full build.
+
+The rest fell out easily because throwException already walks the thread's
+try-block stack and longjmps. No new unwinder was needed; a signal handler can
+reach the existing one.
+
+### What was and was not accepted
+
+A platform capability, not an option -- Windows needs SEH, and there the explicit
+test stays. Faults outside the first page restore the default handler and
+re-raise, so real corruption still crashes with a real report. What IS accepted:
+a wild pointer landing in the first page becomes an NPE instead of a crash. That
+is the same exposure HotSpot carries, and it is bounded to one page.
+
+### The rest of round 41's list, after review
+
+Kept: item 2 (uncommon traps) reinterpreted -- not deoptimization, which needs an
+interpreter we do not have, but the same IDEA applied statically: a fast common
+path with the guardrails lifted, as the exception machinery already does for
+methods with no try/catch and as devirtualization does for calls. That is
+deepening the static analysis rather than adding speculation.
+
+Dropped, with reasons: profile-guided layout (we are not taking a profile);
+patchable safepoint nops (they pay for a JIT we do not have); vectorizing
+String.hashCode (the method is small -- if hashing costs too much the answer is a
+cheaper hash, not a SIMD rabbit hole).
+
+Undecided: inline caches. Possibly large, and the static half is already done.
+
+No timing this round: the host was at load 27 under Spotlight indexing. The last
+trustworthy figure is round 41's 1.145x at 1.4% spread, which predates this
+change.
