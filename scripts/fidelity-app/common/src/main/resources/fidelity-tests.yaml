@@ -447,7 +447,10 @@ components:
     platforms: gnome
     states: normal,hover,pressed
 
-  # No DesktopSeparator row, and the reason is a measurement rather than an omission.
+  # The DesktopSeparator row below is captured and has goldens, but it is NOT SCORED, and
+  # that is a measurement rather than an oversight. (An earlier revision of this file dropped
+  # the row outright and this note said so; the row came back so the reference tiles exist to
+  # look at, and the rest of the note is why no number comes with them.)
   #
   # A separator is a 1px hairline a few levels off the surface, on all three platforms. The
   # comparator's content mask measures distance from the backdrop, and that contrast does not

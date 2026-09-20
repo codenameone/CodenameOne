@@ -42,6 +42,28 @@
             <Style x:Key="TileHostStyle" TargetType="Grid">
                 <Setter Property="Background" Value="{ThemeResource SolidBackgroundFillColorBaseBrush}" />
             </Style>
+
+            <!--
+                The separator rule and the group box frame, here for exactly the reason the
+                tile backdrop is: both were assigned in code from
+                Application.Current.Resources, which is the one-shot application-dictionary
+                read described above.
+
+                The symptom is quieter than the backdrop's was, which is why it survived a
+                review round. In light mode the brushes happen to be right. In dark mode the
+                captured rule was #1E1E1E on a #202020 tile and the frame the same, DARKER
+                than the surface behind them, when both of these resources are a translucent
+                WHITE in the dark theme and must come out lighter. What was actually captured
+                is the LIGHT theme's translucent black composited onto the dark tile:
+                0x20 * (1 - 15/255) is 0x1E, to the number. The result reads as a blank tile.
+            -->
+            <Style x:Key="SeparatorRuleStyle" TargetType="Border">
+                <Setter Property="Background" Value="{ThemeResource DividerStrokeColorDefaultBrush}" />
+            </Style>
+
+            <Style x:Key="GroupBoxFrameStyle" TargetType="Border">
+                <Setter Property="BorderBrush" Value="{ThemeResource CardStrokeColorDefaultBrush}" />
+            </Style>
         </ResourceDictionary>
     </Application.Resources>
 </Application>

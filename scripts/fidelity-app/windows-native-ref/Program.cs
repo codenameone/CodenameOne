@@ -271,12 +271,17 @@ public partial class App : Application
         // one-pixel Border in DividerStrokeColorDefaultBrush, which is what its own settings
         // pages use between groups. MenuFlyoutSeparator exists but is a menu primitive with
         // menu insets, so it would be measuring the wrong thing.
+        // The brush comes from a Style carrying a {ThemeResource}, NOT from
+        // Application.Current.Resources. That read resolves against the application
+        // dictionary once and does no element-theme resolution, so the dark pass captured the
+        // LIGHT theme's translucent black over the dark tile and the rule came out darker
+        // than the surface behind it. Same trap, and same fix, as TileHostStyle.
         return new Border
         {
             Height = 1,
             HorizontalAlignment = HorizontalAlignment.Stretch,
             VerticalAlignment = VerticalAlignment.Center,
-            Background = (Brush)Application.Current.Resources["DividerStrokeColorDefaultBrush"],
+            Style = (Style)Application.Current.Resources["SeparatorRuleStyle"],
         };
     }
 
@@ -294,7 +299,9 @@ public partial class App : Application
         var body = new Border
         {
             BorderThickness = new Thickness(1),
-            BorderBrush = (Brush)Application.Current.Resources["CardStrokeColorDefaultBrush"],
+            // See MakeSeparator: the frame brush has to come from a {ThemeResource} Style or
+            // the dark capture draws it darker than the tile it sits on.
+            Style = (Style)Application.Current.Resources["GroupBoxFrameStyle"],
             CornerRadius = new CornerRadius(4),
             Padding = new Thickness(8),
             Child = new TextBlock { Text = "Item" },

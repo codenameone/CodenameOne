@@ -336,22 +336,72 @@ final class RefApp: NSObject, NSApplicationDelegate {
             row.isEmphasized = true
             let label = NSTextField(labelWithString: "Row")
             label.sizeToFit()
-            label.setFrameOrigin(NSPoint(x: 4, y: (rowHeight - label.frame.height) / 2))
+            // 11, not 4, and the difference is the selection capsule. Since macOS 11 an
+            // emphasized NSTableRowView draws its fill as a rounded rect inset 7pt from its
+            // own bounds, so a label placed 4pt from the ROW's edge came out with its glyphs
+            // at x=7 -- exactly on the capsule's left edge, text flush against the fill with
+            // no padding at all, which is not what any macOS list looks like.
+            //
+            // The 7pt of padding inside the capsule is AppKit's own number, not a chosen one:
+            // a one-row NSTableView in .inset style -- the modern list style, where AppKit
+            // places both the capsule and the cell -- puts its capsule at x=10 and its glyphs
+            // at x=17. This row's own capsule measures to x=10 as well, so matching that gap
+            // puts the glyphs at 17, and the field's 3pt left bearing puts its frame at 14 --
+            // which is where the capture then measures them.
+            label.setFrameOrigin(NSPoint(x: 14, y: (rowHeight - label.frame.height) / 2))
             row.addSubview(label)
             return row
         case "appkit_tabview":
-            // Full height as well as full width (see FULL_HEIGHT_KINDS). Left to its fitting
-            // size an NSTabView is taller than the tile and its tab strip came out clipped
-            // through its own top edge -- a reference that is cut in half measures nothing,
-            // whatever the number underneath says.
-            let tv = NSTabView()
-            let one = NSTabViewItem(identifier: "one")
-            one.label = "One"
-            let two = NSTabViewItem(identifier: "two")
-            two.label = "Two"
-            tv.addTabViewItem(one)
-            tv.addTabViewItem(two)
-            return tv
+            // NSTabView itself CANNOT be captured, so this is the box plus the pill AppKit
+            // draws on it, assembled from two controls that can.
+            //
+            // Its unselected tab button is composited by the window server, not drawn into the
+            // view's backing store: every in-process path -- cacheDisplay into the rep
+            // bitmapImageRepForCachingDisplay hands out, into an explicitly opaque rep, into a
+            // rep pre-filled with the backdrop, with the tile layer-backed, with
+            // canDrawSubviewsIntoLayer, and CALayer.render(in:) -- returns that segment as a
+            // pure COVERAGE MASK: constant RGB (the label colour: 0,0,0 in Aqua and
+            // 255,255,255 in Dark Aqua) with every shape in alpha, 20/255 for the fill and
+            // 219/255 for the glyphs, over pixels the draw REPLACED rather than blended. The
+            // strip background underneath is gone, so no compositing recovers it, and
+            // flattening to opaque RGB -- which promoting a golden does -- turns the segment
+            // solid black in light and solid white in dark with its label invisible against
+            // it. That is what shipped in the first macos-aqua golden. CALayer.render(in:)
+            // drops the strip entirely instead. Same class of limitation as NSMenu and the
+            // AppKit tooltip above, found the same way.
+            //
+            // So the reference is composed the way the DesktopToolbar row is: an NSBox for the
+            // content frame and a real NSSegmentedControl for the strip, which is the control
+            // macOS 11+ draws that strip as and which captures correctly. The geometry is not
+            // invented -- the broken capture's LAYOUT was right, only its pixels were lost, and
+            // it measured the pill vertically centred on the box's top edge, which is what the
+            // constraints below say. What CN1's Tabs UIID has to match is unchanged.
+            let container = NSView(frame: NSRect(x: 0, y: 0, width: TILE_W, height: TILE_H))
+            let box = NSBox()
+            box.boxType = .primary
+            box.titlePosition = .noTitle
+            box.translatesAutoresizingMaskIntoConstraints = false
+            container.addSubview(box)
+            let pill = NSSegmentedControl(labels: ["One", "Two"],
+                                          trackingMode: .selectOne,
+                                          target: nil,
+                                          action: nil)
+            pill.selectedSegment = 0
+            pill.translatesAutoresizingMaskIntoConstraints = false
+            container.addSubview(pill)
+            // The insets are NSTabView's own, read off the broken capture rather than chosen:
+            // in a 240x56 tile it put its box at x 7..232, y 16..45 and its pill's top edge at
+            // y 6, pill centred horizontally. Pinning those reproduces the control's layout
+            // exactly, which is the half of the old reference that was right.
+            NSLayoutConstraint.activate([
+                box.leadingAnchor.constraint(equalTo: container.leadingAnchor, constant: 7),
+                box.trailingAnchor.constraint(equalTo: container.trailingAnchor, constant: -7),
+                box.topAnchor.constraint(equalTo: container.topAnchor, constant: 16),
+                box.bottomAnchor.constraint(equalTo: container.bottomAnchor, constant: -10),
+                pill.centerXAnchor.constraint(equalTo: container.centerXAnchor),
+                pill.topAnchor.constraint(equalTo: container.topAnchor, constant: 6),
+            ])
+            return container
         case "appkit_toolbar":
             // NSToolbar belongs to a window and cannot be rendered into a view, so the
             // reference is the strip a window shows in its place: the title bar's own
@@ -531,9 +581,42 @@ final class RefApp: NSObject, NSApplicationDelegate {
         }
         rep.size = NSSize(width: TILE_W, height: TILE_H)
         tile.cacheDisplay(in: tile.bounds, to: rep)
+        if let translucent = translucentPixelCount(rep), translucent > 0 {
+            // The tile is opaque by construction -- TileView.draw fills every pixel with
+            // windowBackgroundColor -- so a translucent pixel here means a control REPLACED
+            // what was under it with a coverage mask instead of blending onto it. That is not
+            // a cosmetic difference: promoting the golden flattens the alpha away, and the
+            // masked region lands as solid black in Aqua and solid white in Dark Aqua with its
+            // own label invisible against it, which is what the first DesktopTabs golden
+            // shipped (see appkit_tabview). Nothing recovers it afterwards, because the draw
+            // destroyed the pixels underneath rather than covering them, so this has to fail at
+            // capture rather than be discovered by eye in review.
+            blocker("\(spec.id) \(state): \(translucent) translucent pixel(s) -- a control "
+                    + "drew a coverage mask over the tile instead of blending onto it; that "
+                    + "region will flatten to solid black/white when the golden is promoted")
+            return nil
+        }
         let img = NSImage(size: rep.size)
         img.addRepresentation(rep)
         return img
+    }
+
+    /// Number of pixels whose alpha is not fully opaque, or nil when the rep cannot be read
+    /// in the packed form this walks. See the caller for why a single one is fatal.
+    func translucentPixelCount(_ rep: NSBitmapImageRep) -> Int? {
+        guard rep.samplesPerPixel == 4, !rep.isPlanar, rep.bitsPerSample == 8,
+              let base = rep.bitmapData else { return nil }
+        let bpp = rep.bitsPerPixel / 8
+        let alphaFirst = rep.bitmapFormat.contains(.alphaFirst)
+        var count = 0
+        for y in 0..<rep.pixelsHigh {
+            let row = base + y * rep.bytesPerRow
+            for x in 0..<rep.pixelsWide {
+                let px = row + x * bpp
+                if px[alphaFirst ? 0 : 3] != 255 { count += 1 }
+            }
+        }
+        return count
     }
 
     func isBlank(_ image: NSImage) -> Bool {
