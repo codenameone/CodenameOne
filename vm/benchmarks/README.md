@@ -361,6 +361,12 @@ any new build path must too.
 
 ## Reference results
 
+**THESE NUMBERS ARE HARDWARE-SPECIFIC. Do not treat them as the baseline on a
+different Mac** -- see the M4 Max table below, where the same code measures a
+1.25x geomean instead of 1.00x. Reading this table as current cost an afternoon:
+a 5-round run on an M4 Max was taken as evidence of a 3x allocation regression,
+and the July code rebuilt on that machine turned out to measure WORSE than today.
+
 Apple M2, best-of-5 interleaved, ThinLTO, vs warmed Azul JDK 25
 (2026-07, PR #5327):
 
@@ -375,6 +381,43 @@ Apple M2, best-of-5 interleaved, ThinLTO, vs warmed Azul JDK 25
 **Geomean 1.00x.** int/long run at exact pure-C parity (same-flags C controls
 measured identical); the residual is C2-vs-clang scheduling of the dependency
 chain. recursion is HotSpot's speculative inlining — accepted.
+
+### The same suite on an Apple M4 Max (2026-09)
+
+Same harness, same warmed Azul JDK 25, ThinLTO. Verified stable: 5, 5 and 13
+interleaved rounds all landed within a point of each other, on a quiet machine
+and a loaded one.
+
+| bench | ratio | | bench | ratio |
+|---|---:|---|---|---:|
+| **objectAllocation** | **3.70x** | | intArithmetic | 1.04x |
+| **stringBuilding** | **2.05x** | | arraySequential | 1.05x |
+| **recursion** | **1.94x** | | arrayRandom | 0.96x |
+| **hashMapChurn** | **1.57x** | | mathTranscendental | 0.94x |
+| longArithmetic | 1.09x | | quicksort | 0.92x |
+| | | | valueEscape | 0.53x |
+
+**Geomean 1.25x**, all checksums bit-identical.
+
+THIS IS NOT A REGRESSION, and the check that proves it is worth keeping: the
+July baseline (`9c7affa412`, the last `vm/` commit before August) rebuilt in a
+worktree ON THIS MACHINE measures geomean 1.25x and objectAllocation **4.09x** --
+the same total and a worse allocation number than current `master`.
+
+So the gap is the machine. The arms that widened (allocation, string building,
+hashMap churn) are the allocation-bound ones, and the reading that fits is that
+HotSpot's TLAB bump and young-generation copying scale with the faster core and
+memory subsystem while the BiBOP path does not: its per-object cost is two
+store-releases and a body `memset`, none of which get proportionally cheaper.
+
+Two consequences:
+
+- **Quote the hardware with any ratio from this suite.** A table without it
+  invites exactly the false-regression hunt described above.
+- The allocation gap is real, long-standing, and *more* visible on newer silicon
+  rather than less. Note the body zero is already elided where the constructor
+  assigns every field (`CN1_FAST_NEW_NOZERO`, emitted by `InlinableConstructor`),
+  so "just stop zeroing" is not the remaining lever -- that ground is taken.
 
 ### SATB write-barrier cost (concurrent-mark correctness fix)
 

@@ -4963,3 +4963,44 @@ Two things this does NOT yet establish, and they gate any change:
 
 Next measurement, before any edit: split the 3.71x into zeroing / ordering /
 guard components by ablating each in a scratch build.
+
+### CORRECTION to the above, same night
+
+Two claims in Round 31 were wrong and one framing was.
+
+**The bulk-zeroing lead is dead, and was already dead.** The body zero is ALREADY
+elided where the constructor assigns every field: `CN1_FAST_NEW_NOZERO`, emitted
+by `InlinableConstructor` at 129 sites. `test_alloc_zero.c` measured a real
+effect and proposed an optimisation the tree already implements where it is
+provable. Re-deriving an existing optimisation and then "proving" it with a
+microbenchmark is worse than not looking, because the benchmark lends it
+credibility.
+
+**"objectAllocation is 3.71x" is reproducible but NOT comparable to the README.**
+The reference table there is Apple M2; this host is an M4 Max. Established by
+elimination, three refutations deep:
+
+- machine load -- refuted, a quiet re-run reproduced it (3.92x, geomean 1.25x)
+- under-sampling -- refuted, the documented 13 interleaved reps reproduced it
+  (3.70x, geomean 1.25x)
+- a regression since July -- refuted by rebuilding `9c7affa412` (the last `vm/`
+  commit before August) in a worktree ON THIS MACHINE: geomean 1.25x and
+  objectAllocation **4.09x**, i.e. the same total and WORSE allocation than
+  current master
+
+So nothing regressed, the measurement is sound, and the M2 table simply does not
+transfer. `vm/benchmarks/README.md` now carries both tables and says so.
+
+**What survives.** The allocation gap is real, long-standing, and *widens* on
+newer silicon -- the arms that grew (allocation, stringBuilding, hashMapChurn)
+are the allocation-bound ones, consistent with HotSpot's TLAB bump and young-gen
+copying scaling with the core while a path costing two store-releases and a
+memset does not. What does NOT survive is the claim that this is newly
+discovered or that zeroing is the lever.
+
+**The process failure worth keeping.** `vm/CLAUDE.md` already says this host
+cannot resolve a 5% difference and that `objectAllocation` swung 1.201 to 0.892
+in two sessions an hour apart. That file was read THIS SESSION for its memory
+metric rule, and the benchmark warning in it was not applied. Before quoting a
+ratio from this suite: name the hardware, and check the recorded baseline was
+taken on it.
