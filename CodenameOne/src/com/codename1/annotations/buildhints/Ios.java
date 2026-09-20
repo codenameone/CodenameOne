@@ -185,4 +185,30 @@ public @interface Ios {
 
     /// Allows intercepting a URL call using the syntax `<string>urlPrefix<string>`
     String urlScheme() default "";
+
+    /// Which Xcode the build server compiles with.
+    ///
+    /// Unset lets the server choose: it prefers its own default and falls back
+    /// to the newest Xcode it carries, so a server that has not been re-imaged
+    /// keeps building. Naming one opts out of that fallback -- a version the
+    /// server does not have fails the build rather than quietly substituting a
+    /// toolchain, since silently archiving against an SDK nobody asked for is
+    /// the worse outcome.
+    ///
+    /// Builds are claimed off a shared queue, so an Xcode present on some
+    /// servers and not others makes a build pass or fail by luck of the draw.
+    /// That is a fleet out of step and worth reporting, not a hint to tune.
+    ///
+    /// The constants are the majors a current build server image carries, a set
+    /// that belongs to the image rather than to this framework. A version
+    /// outside them -- a minor such as `27.1`, or a major shipped since this
+    /// release -- is still reachable as a plain
+    /// `codename1.arg.ios.xcode_version=<version>` line in
+    /// `codenameone_settings.properties`, and leaving this attribute at
+    /// [IosXcodeVersion#DEFAULT] writes nothing, so the two do not conflict.
+    ///
+    /// Read only by the build service; a local build uses the Xcode
+    /// `xcode-select` points at and ignores this.
+    @Hint(name = "ios.xcode_version", external = true)
+    IosXcodeVersion xcodeVersion() default IosXcodeVersion.DEFAULT;
 }
