@@ -4769,3 +4769,64 @@ a blocker that does not exist. `cn1InlSbAppendStr` remains the real lesson about
 intent-vs-size (its author marked it inline and clang still declined until the
 BODY was narrowed in Round 26) -- but that is an argument for narrowing bodies,
 not for a new annotation.
+
+---
+
+## Round 29: closing the hole Round 27 found, and a second one behind it
+
+Round 27 narrowed the same-block SATB deletion barrier and then discovered that
+removing that barrier OUTRIGHT left all six gc-verify self-tests and all 33
+gauntlet tortures GREEN. The narrowing shipped on an argument plus an offline
+proof of the arithmetic, with nothing in the VM able to contradict either.
+
+That hole was not inherited. `cn1RefBlockMove` and self-tests 4 and 5 all landed
+on 2026-09-16 in this same effort: the barrier and the tests meant to cover it
+were written in the same week, by the same hand.
+
+### Why a torture could not do it, and what works instead
+
+Round 27 tried to build a GC torture that fails without the barrier and could
+not. Reaching the hazard needs a barrier-free republication path -- an object
+leaving a block mid-mark and landing somewhere already scanned without firing the
+insertion barrier -- and the VM no longer has one.
+
+So the claim is checked directly instead of through the collector's behaviour.
+`cn1SatbVerifyMove` is the derivation made executable:
+
+    every overwritten slot whose OLD value survives nowhere in the block
+    afterwards must lie inside the range handed to the deletion barrier
+
+A slot inside the range that did survive is merely conservative and is counted,
+not reported. A slot outside it that vanished is a reference the snapshot was
+owed. Crucially this involves no mark, no thread interleaving and no object dying
+at the right moment -- it is a property of the move -- so it runs on EVERY move
+rather than only under the bulk handshake, and the fault is deterministic.
+
+    clean arm                      17,200 checks, 0 violations
+    CN1_GC_FAULT=moverange          8,640 MOVE-RANGE LOST reports
+
+The reports name the right slot: `remove(at)` shifts left with `from=at+1,
+to=at`, and slot `at` holds the removed element, which is exactly what leaves.
+
+### The second hole, found while fixing the first
+
+The first fault run reported ZERO violations -- and so did
+`CN1_GC_FAULT=halfblock`, a fault known to work. **Every existing call to
+`cn1GcFaultInit` sits inside a mark or a sweep**, so a fault could only ever arm
+once a collection had run. Fine for the five existing faults, which all break the
+collector. Useless for one that breaks a MUTATOR path.
+
+The failure mode is the exact one this round exists to end: the fault arm ran,
+armed nothing, and produced output **identical to a clean run**. Reading that as
+"no violations, the barrier is fine" would have been a false green manufactured
+by a harness that never engaged -- the original hole one level up. Arming now
+happens at startup, idempotent, GC-path callers unaffected.
+
+### The shape to watch for
+
+Three times in two rounds, something reported success because it never ran: the
+gates that could not see the barrier, the fault that never armed, and (Round 26)
+a selfhost gate that exited 0 after `mvn clean` deleted its classpath file. A
+check satisfiable by "nothing happened" is not a check. self-test7 therefore
+reads the CHECK COUNT from the clean arm as well as the violation count -- a
+driver that shifted nothing would report zero violations and look perfect.

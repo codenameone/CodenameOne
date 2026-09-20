@@ -132,6 +132,13 @@ int cn1GcFaultRefClear = 0;
 // failed with "LOST held key k1" while the gauntlet and all three self-hosting gates were
 // green.
 int cn1GcFaultHalfBlock = 0;
+// CN1_GC_FAULT=moverange makes a same-block reference move report an EMPTY lost
+// range, i.e. tells the SATB deletion barrier that nothing left the block. That is
+// the fault the GC gates could not see: with the narrowed barrier disabled
+// outright, all six gc-verify self-tests and all 33 gauntlet tortures stayed GREEN.
+// cn1SatbVerifyMove checks the invariant directly and self-test7 requires this to
+// be caught.
+int cn1GcFaultMoveRange = 0;
 // CN1_GC_FAULT=freelive reclaims a few slots the sweep has just proved LIVE, so a field
 // that is still in use ends up pointing at freed memory. That is the dangling-reference
 // defect in its purest form, and it is what proves the BiBOP slot quarantine works.
@@ -224,6 +231,10 @@ static void cn1GcFaultInit(void) {
           if(e != 0 && atol(e) > 0) { cn1GcFaultDropEvery = atol(e); } }
         fprintf(stderr, "[GC-FAULT] freeing one live slot in every %ld, max %d (fault injection)\n",
                 cn1GcFaultDropEvery, CN1_GC_FAULT_MAX_FREES);
+    } else if(strcmp(f, "moverange") == 0) {
+        cn1GcFaultMoveRange = 1;
+        fprintf(stderr, "[GC-FAULT] same-block move reports an EMPTY lost range "
+                        "(the deletion barrier the gates could not see)\n");
     } else if(strcmp(f, "refnoclear") == 0) {
         cn1GcFaultRefClear = 1;
         fprintf(stderr, "[GC-FAULT] dead referents left in place instead of cleared\n");
@@ -2658,6 +2669,79 @@ void cn1RefBlockSet(CODENAME_ONE_THREAD_STATE, JAVA_LONG block, JAVA_INT index, 
     *slot = value;
 }
 
+#ifdef CN1_GC_VERIFY
+long cn1SatbMoveChecks = 0;
+long cn1SatbMoveViolations = 0;
+
+/* THE DERIVATION IN cn1SatbMoveLostRange, MADE EXECUTABLE AND RUN ON EVERY MOVE.
+ *
+ * This exists because the gates could not see the barrier it guards. With the
+ * same-block deletion barrier removed OUTRIGHT -- a definitely-wrong collector --
+ * run-gc-verify.sh's six self-tests and all 33 gauntlet tortures reported GREEN.
+ * The narrowing was therefore landed on an argument and an offline proof of the
+ * arithmetic, with nothing in the VM able to contradict either. That is the hole
+ * this closes, and it was mine: the barrier and those self-tests were written in
+ * the same week.
+ *
+ * The invariant checked is the one the narrowing actually claims:
+ *
+ *     every overwritten slot whose OLD value survives nowhere in the block
+ *     afterwards must lie inside the reported lost range
+ *
+ * A slot inside the range that did survive is merely conservative and is counted,
+ * not reported. A slot OUTSIDE it that did not survive is a reference the snapshot
+ * was owed and never got, which is exactly how a live object gets swept.
+ *
+ * Note what this does NOT depend on: a mark being in progress, a particular thread
+ * interleaving, or an object dying at the right moment. It is a property of the
+ * move alone, so it is checked on every move rather than only under the bulk
+ * handshake, and the self-test that injects a fault against it is deterministic
+ * instead of racing the collector. That is the whole reason it can succeed where a
+ * torture could not: the previous attempt failed to construct a FAILING workload,
+ * because reaching the hazard needs a barrier-free republication path the VM no
+ * longer has.
+ */
+static void cn1SatbVerifyMove(JAVA_OBJECT* base, JAVA_INT blockCount,
+                              const JAVA_OBJECT* before, JAVA_INT from, JAVA_INT to,
+                              JAVA_INT count, JAVA_INT lostStart, JAVA_INT lostLen) {
+    (void)from;
+    cn1SatbMoveChecks++;
+    for(JAVA_INT j = to ; j < to + count && j < blockCount ; j++) {
+        JAVA_OBJECT old = before[j];
+        if(old == JAVA_NULL || CN1_IS_TAGGED(old)) {
+            continue;
+        }
+        int survives = 0;
+        for(JAVA_INT k = 0 ; k < blockCount ; k++) {
+            if(base[k] == old) { survives = 1; break; }
+        }
+        if(survives) {
+            continue;
+        }
+        if(j >= lostStart && j < lostStart + lostLen) {
+            continue;
+        }
+        cn1SatbMoveViolations++;
+        fprintf(stderr,
+                "[GC-VS] MOVE-RANGE LOST slot %d of [%d,%d) left the block but the "
+                "deletion barrier was only told [%d,%d) (from=%d to=%d count=%d)\n",
+                (int)j, (int)to, (int)(to + count),
+                (int)lostStart, (int)(lostStart + lostLen),
+                (int)from, (int)to, (int)count);
+        fflush(stderr);
+    }
+}
+
+void cn1SatbReportMoveChecks(void) {
+    if(cn1SatbMoveChecks == 0 && cn1SatbMoveViolations == 0) {
+        return;
+    }
+    fprintf(stderr, "[GC-VS] move-range checks=%ld violations=%ld\n",
+            cn1SatbMoveChecks, cn1SatbMoveViolations);
+    fflush(stderr);
+}
+#endif
+
 // BULK MOVE, for the insert/remove shifts ArrayList does with System.arraycopy. The whole
 // source range is logged ONCE under the bulk handshake rather than per element: the
 // per-element barrier takes the SATB mutex per accepted reference, which turns one memmove
@@ -2668,6 +2752,19 @@ void cn1RefBlockMove(CODENAME_ONE_THREAD_STATE, JAVA_LONG block, JAVA_INT from, 
         return;
     }
     JAVA_OBJECT* base = (JAVA_OBJECT*)(uintptr_t)block;
+#ifdef CN1_GC_VERIFY
+    /* Snapshot BEFORE the move, and check after it. Unconditional: the invariant
+     * is a property of the move, not of the mark, so checking it only under the
+     * bulk handshake would make the self-test race the collector. */
+    JAVA_INT cn1__vsCount = cn1RefBlockCount(block);
+    JAVA_OBJECT* cn1__vsBefore = 0;
+    if(cn1__vsCount > 0) {
+        cn1__vsBefore = (JAVA_OBJECT*)malloc(sizeof(JAVA_OBJECT) * (size_t)cn1__vsCount);
+        if(cn1__vsBefore != 0) {
+            memcpy(cn1__vsBefore, base, sizeof(JAVA_OBJECT) * (size_t)cn1__vsCount);
+        }
+    }
+#endif
     if(cn1SatbBulkBegin()) {
         // The DESTINATION range is what is being overwritten, so that is what the
         // deletion barrier owes the snapshot -- but only the part of it that does
@@ -2694,6 +2791,17 @@ void cn1RefBlockMove(CODENAME_ONE_THREAD_STATE, JAVA_LONG block, JAVA_INT from, 
     }
     memmove(base + to, base + from, (size_t)count * sizeof(JAVA_OBJECT));
     cn1SatbBulkEnd();
+#ifdef CN1_GC_VERIFY
+    if(cn1__vsBefore != 0) {
+        JAVA_INT vsStart;
+        JAVA_INT vsLen = cn1SatbMoveLostRange(from, to, count, &vsStart);
+        /* CN1_GC_FAULT=moverange narrows the range to nothing, which is the exact
+         * shape the GC gates could not detect. The check below must catch it. */
+        if(cn1GcFaultMoveRange) { vsStart = to; vsLen = 0; }
+        cn1SatbVerifyMove(base, cn1__vsCount, cn1__vsBefore, from, to, count, vsStart, vsLen);
+        free(cn1__vsBefore);
+    }
+#endif
 }
 
 // CLEAR, for Arrays.fill(array, a, b, null) -- the range a removal blanks so the dropped
@@ -15808,6 +15916,22 @@ void initConstantPool() {
     // Before any generated code runs: an array access no longer tests for null and
     // relies on this handler to turn the resulting fault into a NullPointerException.
     cn1InstallFaultHandler();
+#ifdef CN1_GC_VERIFY
+    // ARM THE FAULT SELECTOR AT STARTUP, not at the first collection. Every existing
+    // call to cn1GcFaultInit sits inside a mark or sweep, so a fault could only ever
+    // be armed once a GC had run -- which is fine for faults that break the collector
+    // and useless for one that breaks a MUTATOR path. CN1_GC_FAULT=moverange targets
+    // the same-block move barrier, which runs whether or not a mark is in progress,
+    // and without this the fault silently never armed: the injected-fault arm looked
+    // identical to a clean run, which is precisely the false green this self-test
+    // exists to end. Idempotent (cn1GcFaultInit has a done flag), so the GC-path
+    // callers are unaffected.
+    { extern void cn1GcFaultInitPublic(void); cn1GcFaultInitPublic(); }
+    // Prints "move-range checks=N violations=M". self-test7 reads the check COUNT to
+    // prove the driver actually performed same-block moves: a run that shifted nothing
+    // reports zero violations and is indistinguishable from a clean one.
+    atexit(cn1SatbReportMoveChecks);
+#endif
     atexit(cn1ReportBlockSyscalls);
     atexit(cn1HeapWindowReport);
     atexit(cn1ReportLowMemoryParks);

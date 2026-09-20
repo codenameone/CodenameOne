@@ -335,4 +335,60 @@ if [ "$seOk" -eq 1 ]; then
     fi
 fi
 
+# Seventh self-test, for the SAME-BLOCK SATB DELETION BARRIER -- and it exists because
+# this script could not see that barrier at all.
+#
+# The barrier was narrowed from "log the whole destination range" to "log only the
+# min(count, |to-from|) slots that actually leave the block". To check whether these
+# gates covered the claim, the barrier was then removed OUTRIGHT -- a definitely-wrong
+# collector -- and all six self-tests above plus all 33 gauntlet tortures reported
+# GREEN. The narrowing was landed on an argument and an offline proof of the
+# arithmetic, with nothing in the VM able to contradict either.
+#
+# What makes this checkable, where an earlier GC torture could not be made to fail, is
+# that the invariant does not involve the collector:
+#
+#     every overwritten slot whose OLD value survives nowhere in the block afterwards
+#     must lie inside the range handed to the deletion barrier
+#
+# cn1SatbVerifyMove checks exactly that on every move, so the fault is deterministic
+# rather than a race against a mark. CN1_GC_FAULT=moverange reports an EMPTY lost
+# range, which is precisely the removal these gates could not detect.
+printf '%-16s ' "self-test7"
+rm -f ./target/bin/ListShift-verify
+if ! ./translate-and-build.sh ListShift target/bin/ListShift-verify -DCN1_GC_VERIFY \
+        > target/bin/ListShift-selftest-build.log 2>&1; then
+    echo "BROKEN -- could not build ListShift for the move-range self-test"
+    tail -25 target/bin/ListShift-selftest-build.log
+    fail=1
+elif [ ! -x ./target/bin/ListShift-verify ]; then
+    echo "BROKEN -- could not build ListShift for the move-range self-test"
+    fail=1
+else
+    mrClean="$(./target/bin/ListShift-verify 2>&1)" || true
+    mrFault="$(CN1_GC_FAULT=moverange ./target/bin/ListShift-verify 2>&1)" || true
+    mrCleanHits="$(printf '%s' "$mrClean" | grep -c 'MOVE-RANGE LOST' || true)"
+    mrFaultHits="$(printf '%s' "$mrFault" | grep -c 'MOVE-RANGE LOST' || true)"
+    # "the workload performed moves at all" is a separate claim from "the check
+    # passed": a driver that shifted nothing would report zero on both arms and look
+    # identical to a clean run. That is the vacuity this whole self-test is about.
+    mrChecks="$(printf '%s' "$mrClean" | grep -oE 'move-range checks=[0-9]+' | tail -1 | cut -d= -f2)"
+    [ -z "$mrChecks" ] && mrChecks=0
+    if [ "$mrChecks" -eq 0 ]; then
+        echo "BROKEN -- ListShift performed no same-block moves, so the check proved nothing"
+        printf '%s\n' "$mrClean" | tail -5
+        fail=1
+    elif [ "$mrCleanHits" -ne 0 ]; then
+        echo "BROKEN -- the check reported a lost slot in correctly compiled code"
+        printf '%s\n' "$mrClean" | grep 'MOVE-RANGE LOST' | head -3
+        fail=1
+    elif [ "$mrFaultHits" -eq 0 ]; then
+        echo "BROKEN -- an EMPTY lost range was reported and NOTHING noticed"
+        printf '%s\n' "$mrFault" | tail -5
+        fail=1
+    else
+        echo "caught the emptied move range ($mrFaultHits reports, $mrChecks moves checked clean)"
+    fi
+fi
+
 [ "$fail" -eq 0 ] && echo "GC-VERIFY GREEN" || { echo "GC-VERIFY FAILED"; exit 1; }

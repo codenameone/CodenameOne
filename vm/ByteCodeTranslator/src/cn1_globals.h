@@ -1604,6 +1604,10 @@ extern void cn1SatbEnqueue(JAVA_OBJECT old);
 extern volatile int gcSatbTerminating;
 extern JAVA_BOOLEAN cn1SatbBulkBegin(void);
 extern void cn1SatbEnqueueRangeLocked(JAVA_ARRAY_OBJECT* refs, int count);
+#ifdef CN1_GC_VERIFY
+/// Prints the same-block move-range check tally at exit; see cn1SatbVerifyMove.
+extern void cn1SatbReportMoveChecks(void);
+#endif
 
 /// A move WITHIN one reference block drops far less than it touches, and the
 /// deletion barrier only owes the snapshot what is actually dropped.
