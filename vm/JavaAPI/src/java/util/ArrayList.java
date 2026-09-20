@@ -85,8 +85,17 @@ public class ArrayList<E> extends AbstractList<E> implements List<E>, RandomAcce
         return objects;
     }
 
+    /* Same split: the guard is two compares, the throw drags in an exception
+     * allocation and its constructor. Keeping them together costs every get()
+     * and set() a call. */
     private void checkIndex(int index) {
-        if (index < 0 || index >= size) throw new IndexOutOfBoundsException();
+        if (index < 0 || index >= size) {
+            throwIndex();
+        }
+    }
+
+    private void throwIndex() {
+        throw new IndexOutOfBoundsException();
     }
 
     private void checkPosition(int index) {
@@ -110,12 +119,36 @@ public class ArrayList<E> extends AbstractList<E> implements List<E>, RandomAcce
     public int size() { return size; }
     public boolean isEmpty() { return size == 0; }
 
+    /* SPLIT SO THE GUARD CAN BE INLINED, and the growth cannot drag it down.
+     *
+     * This used to be one method whose hot path is the single comparison below
+     * and whose body also holds the growth policy, a resize (allocation plus a
+     * copy) and an OutOfMemoryError construction. clang costs a call by the whole
+     * callee, so the three-instruction guard was never inlined into add(): the
+     * disassembly of ArrayList.add carried `bl _java_util_ArrayList_reserve___int`
+     * even with -inline-threshold raised from 225 to 1200, which only grew the
+     * binary 60% and made nothing faster.
+     *
+     * Splitting it is what actually offers clang the choice -- the same shape
+     * CN1_FAST_NEW already uses, an inline fast path over an out-of-line
+     * fallback. The decision stays with the compiler; this just stops hiding it. */
     private void reserve(int required) {
-        if (required < 0) throw new OutOfMemoryError();
-        int cap = capacity();
-        if (required <= cap) {
+        /* `required >= 0` is not redundant. capacity() is never negative, so a
+         * NEGATIVE required -- which addAll reaches by integer overflow on
+         * size + values.length -- satisfies `required <= capacity()` and would
+         * take the fast path back out of here, skipping the OutOfMemoryError
+         * that reserveSlow still throws for it. The two compares fold into one
+         * unsigned compare; the check costs nothing and the omission would be a
+         * silent out-of-range write. */
+        if (required >= 0 && required <= capacity()) {
             return;
         }
+        reserveSlow(required);
+    }
+
+    private void reserveSlow(int required) {
+        if (required < 0) throw new OutOfMemoryError();
+        int cap = capacity();
         if (cap == 0) {
             // First growth. DEFAULT_CAPACITY unless more was asked for, which is what
             // the old `capacity = 10` placeholder produced on the first add.
@@ -146,8 +179,36 @@ public class ArrayList<E> extends AbstractList<E> implements List<E>, RandomAcce
         if (capacity() != size) resize(size);
     }
 
+    /* THE PUBLIC METHOD IS THE HOT PATH, and the growth is a separate private
+     * call it does not make.
+     *
+     * add() used to open with reserve(size + 1), so the common case -- there is
+     * room, nothing to do -- was a CALL. clang costs a call by the whole callee,
+     * and reserve carried the growth policy, a resize and an OutOfMemoryError
+     * construction, so the guard was never inlined: ArrayList.add's disassembly
+     * carried `bl _java_util_ArrayList_reserve___int` even with clang's inline
+     * threshold raised from 225 to 1200 (which only grew the binary 60% and made
+     * nothing faster).
+     *
+     * Writing the capacity test here and delegating only the growth means the
+     * frequent path is straight-line code in the caller and the rare path is one
+     * call that is supposed to be a call. The decision to inline is still
+     * clang's; this stops handing it a small guard welded to a large body. */
     public boolean add(E value) {
-        reserve(size + 1);
+        int s = size;
+        if (s < capacity()) {
+            NativeStorage.set(cn1Storage, s, value);
+            size = s + 1;
+            modCount++;
+            return true;
+        }
+        return addGrow(value);
+    }
+
+    /* Deliberately NOT inlinable and deliberately not on the common path: it
+     * exists so add() above can stay small. */
+    private boolean addGrow(E value) {
+        reserveSlow(size + 1);
         NativeStorage.set(cn1Storage, size++, value);
         modCount++;
         return true;

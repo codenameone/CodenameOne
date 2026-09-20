@@ -176,7 +176,9 @@ public class ByteCodeTranslator {
                     continue;
                 }
                 if(f.getName().endsWith(".class")) {
+                    long __t0 = System.nanoTime();
                     Parser.parse(f);
+                    cn1ParseNs += System.nanoTime() - __t0;
                 } else {
                     if(!f.isDirectory() && !isBuildMetadata(f)) {
                         // copy the file to the dest dir
@@ -506,9 +508,33 @@ public class ByteCodeTranslator {
         }
     }
 
+    /* PHASE TIMING (-Dcn1.phaseTiming=true).
+     *
+     * The self-hosting benchmark runs THE SAME Java on both arms, so a per-phase
+     * split is the one instrument that compares them directly: a sampling profile
+     * cannot, because at -O3 with ThinLTO identical functions are folded and the
+     * symbol names stop meaning anything.
+     *
+     * Two phases, because they are different KINDS of work. Parsing is file I/O
+     * plus ASM's ClassReader walking bytes into a node graph -- allocation-heavy,
+     * pointer-chasing. Emission is the optimizer and the codegen, which is string
+     * building and hash lookups. Knowing which of the two carries the gap against
+     * HotSpot is the difference between guessing at mechanisms and choosing one.
+     */
+    static long cn1ParseNs;
+    static long cn1WriteNs;
+
+    static void cn1ReportPhases() {
+        if(!"true".equalsIgnoreCase(Util.getProperty("cn1.phaseTiming", "false"))) {
+            return;
+        }
+        System.out.println("[PHASE] parse=" + (cn1ParseNs / 1000000) + "ms emit+write="
+                + (cn1WriteNs / 1000000) + "ms");
+    }
+
     private static void handleDefaultOutput(ByteCodeTranslator b, File[] sources, File dest) throws Exception {
         b.execute(sources, dest);
-        Parser.writeOutput(dest);
+        { long __w0 = System.nanoTime(); Parser.writeOutput(dest); cn1WriteNs += System.nanoTime() - __w0; cn1ReportPhases(); }
     }
 
     private static void handleCleanOutput(ByteCodeTranslator b, File[] sources, File dest, String appName, String appType) throws Exception {
@@ -560,7 +586,7 @@ public class ByteCodeTranslator {
         copyRuntimeResource(srcRoot, "cn1_win_compat.h");
         copyRuntimeResource(srcRoot, "cn1_win_compat.c");
 
-        Parser.writeOutput(srcRoot);
+        { long __w0 = System.nanoTime(); Parser.writeOutput(srcRoot); cn1WriteNs += System.nanoTime() - __w0; cn1ReportPhases(); }
 
         File javaIoFileHeader = new File(srcRoot, "java_io_File.h");
         if (javaIoFileHeader.exists()) {
@@ -851,7 +877,7 @@ public class ByteCodeTranslator {
         srcRoot.mkdirs();
         ByteCodeClass.setPreferredMainClass(appName);
         b.execute(sources, srcRoot);
-        Parser.writeOutput(srcRoot);
+        { long __w0 = System.nanoTime(); Parser.writeOutput(srcRoot); cn1WriteNs += System.nanoTime() - __w0; cn1ReportPhases(); }
     }
 
     private static void handleAppleOutput(ByteCodeTranslator b, File[] sources, File dest, String appName, String appPackageName, String appDisplayName, String appVersion, String appType, String addFrameworks, ApplePlatform platform) throws Exception {
@@ -950,7 +976,7 @@ public class ByteCodeTranslator {
         copyRuntimeResource(srcRoot, "cn1_db_sqlite_impl.h");
         emitBundledSqlite(srcRoot);
 
-        Parser.writeOutput(srcRoot);
+        { long __w0 = System.nanoTime(); Parser.writeOutput(srcRoot); cn1WriteNs += System.nanoTime() - __w0; cn1ReportPhases(); }
 
         File templateInfoPlist = new File(srcRoot, appName + "-Info.plist");
         copy(ByteCodeTranslator.class.getResourceAsStream(templateRoot + "/template/template-Info.plist"), new FileOutputStream(templateInfoPlist));

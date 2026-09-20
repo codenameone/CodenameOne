@@ -3560,7 +3560,6 @@ extern long long cn1SoeEntryCount;
 #define CN1_FRAMELESS_SOE_GUARD(retval) \
     do { \
         CN1_SOE_TICK(); \
-        if (__builtin_expect(threadStateData->nativeStackLimit == 0, 0)) { cn1ComputeNativeStackLimit(threadStateData); } \
         JAVA_LONG __cn1FrameAddr = (JAVA_LONG)(intptr_t)__builtin_frame_address(0); \
         if (__builtin_expect(__cn1FrameAddr < threadStateData->nativeStackLimit \
                 && __cn1FrameAddr >= threadStateData->nativeStackLimit - (JAVA_LONG)CN1_FRAMELESS_STACK_GUARD_BAND, 0)) { \

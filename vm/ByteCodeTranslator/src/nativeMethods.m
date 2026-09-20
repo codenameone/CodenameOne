@@ -2280,7 +2280,7 @@ struct ThreadLocalData* cn1CreateThreadLocalData(JAVA_BOOLEAN bindToCallingOsThr
       cn1StallRegisterThread(i); }
 #endif
     i->interrupted = JAVA_FALSE;
-    
+
     i->currentThreadObject = 0;
     
     i->utf8Buffer = 0;
@@ -2316,9 +2316,36 @@ struct ThreadLocalData* cn1CreateThreadLocalData(JAVA_BOOLEAN bindToCallingOsThr
 
     i->callStackOffset = 0;
 
-    // ThreadLocalData is malloc'd (not zeroed); 0 means "frameless native-stack
-    // limit not yet computed" -- it is filled in lazily on first frameless entry.
-    i->nativeStackLimit = 0;
+    /* THE STACK LIMIT IS SETTLED HERE, NOT ON FIRST FRAMELESS ENTRY.
+     *
+     * CN1_FRAMELESS_SOE_GUARD used to open with
+     * `if (nativeStackLimit == 0) cn1ComputeNativeStackLimit(...)`, which put a
+     * branch AND a cold call site into every guarded method -- 4,840 call sites
+     * to cn1ComputeNativeStackLimit and 3,141 to cn1ThrowStackOverflow across the
+     * hello corpus, more than any other symbol in the binary. They never execute,
+     * but they are code, and clang costs a callee by its whole body: that bulk is
+     * part of why small methods were not being inlined into their callers even
+     * with the inline threshold raised five-fold.
+     *
+     * bindToCallingOsThread is exactly the right predicate. TRUE means we are ON
+     * the thread whose stack this is, so pthread_self() answers about the right
+     * stack. FALSE means the caller is spawning a VIRTUAL thread that will run on
+     * its own allocated stack, where a pthread-derived limit would describe the
+     * SPAWNER's stack -- so it gets the same "introspection gave nothing usable"
+     * sentinel the compute path already uses, which makes the two-sided test
+     * inert. That is what the guard already did for virtual threads in practice;
+     * this says so on purpose.
+     *
+     * THIS MUST STAY BELOW THE OTHER FIELD INITIALIZATION. Written higher up it
+     * is silently overwritten by the zero this replaces, and with the lazy check
+     * gone the limit stays 0, the two-sided test can never trip, and the guard is
+     * inert -- SoeTest caught exactly that, dying with no output instead of
+     * throwing StackOverflowError. */
+    if(bindToCallingOsThread) {
+        cn1ComputeNativeStackLimit(i);
+    } else {
+        i->nativeStackLimit = 1;
+    }
 
     i->pendingHeapAllocations = calloc(PER_THREAD_ALLOCATION_COUNT, sizeof(void *));
     i->heapAllocationSize = 0;
