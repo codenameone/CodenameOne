@@ -4516,3 +4516,50 @@ At exit the footprint partitions roughly as: Java live 592MB, BiBOP slack
 183-219MB, malloc idle 342MB. The next candidate is therefore the BiBOP slack --
 34% of a managed heap, with 427-519 empty pages retained -- and the legacy heap's
 own malloc churn. Neither is the block allocator.
+
+## Round 50: raise the BiBOP ceiling to 2KB
+
+The opposite shape to round 49. Instead of adding an allocator, raise the
+ceiling on the one that already works: CN1_BIBOP_MAX_OBJECT 512 -> 2048, eight
+more size classes, about ten lines. Objects that move there leave malloc for the
+reserved window, swept and madvise-released, rather than moving into a second
+heap of my own making.
+
+Interleaved, eight rounds, every run verified at 2,933 emitted .c files:
+
+| | 512 | 2048 |
+|---|---:|---:|
+| legacy OBJECTS | 28,000 | **2,300** |
+| legacy BYTES | 146MB | 140MB |
+| MALLOC idle (median) | 386MB | 343MB |
+| peak footprint (median) | 1556MB | 1560MB |
+| elapsed (median) | 5.59s | **5.54s** |
+
+### It is a throughput change, and the memory model behind it was wrong
+
+26,000 objects moved into managed pages and took about 6MB with them. What is
+left on the legacy path is 2,300 objects holding 140MB -- **61KB each** -- the
+class-file and emitted-source buffers. So the legacy heap is a handful of very
+large buffers, not tens of thousands of medium ones, and no size class worth
+having will capture it.
+
+The "1,300-1,700 B/obj" figure that motivated this was an average over a [LIVE]
+CLASS GROUP (byte[]), not the legacy heap's distribution. Reading a per-class
+average as a per-heap one is how the prediction came out wrong.
+
+What is real is the work removed: the legacy path costs a calloc, an
+allObjectsInHeap registration and an extent-snapshot entry per object, and 26,000
+of those per run became bump allocations. The 2048 arm won 7 of the 8 paired
+rounds. The COUNTER is the durable evidence -- this host cannot resolve 1.5%, as
+three rounds running have shown -- and the count is a 92% cut.
+
+### Where the memory question now stands
+
+Two candidates are eliminated rather than tried and failed:
+
+- malloc's ~340MB idle is NOT small collection blocks (round 49 pooled them; the
+  slack simply moved) and NOT medium objects (this round moved them; idle fell
+  11%). What is left is those 2,300 large buffers.
+- BiBOP slack, 183-219MB on a 640MB reserved heap, is the price of non-moving
+  collection. A copying collector compacts it; this one cannot, and the branch
+  has already recorded why a moving collector is not on the table.

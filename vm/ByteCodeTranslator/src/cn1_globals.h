@@ -1650,7 +1650,7 @@ static inline void cn1NativeOwnerFence(JAVA_OBJECT* owner) {
 
 // Shared by ThreadLocalData's adaptive state and the page allocator below.
 #ifndef CN1_BIBOP_NUM_CLASSES
-#define CN1_BIBOP_NUM_CLASSES 15
+#define CN1_BIBOP_NUM_CLASSES 23
 #endif
 
 // handles the stack used for print stack trace and GC
@@ -2010,8 +2010,19 @@ const int currentCodenameOneCallStackOffset = threadStateData->callStackOffset;
 #ifndef CN1_BIBOP_PAGE_SIZE
 #define CN1_BIBOP_PAGE_SIZE (64*1024)
 #endif
+// RAISED FROM 512. The legacy path costs a calloc, an allObjectsInHeap
+// registration and an extent-snapshot entry PER OBJECT; BiBOP costs a bump.
+// Measured on the hello corpus, interleaved, every run verified at 2,933 emitted
+// files: legacy objects 28,000 -> 2,300, a 92% cut, and the 2048 arm was faster
+// in 7 of 8 paired rounds (median 5.54s against 5.59s).
+//
+// It is a THROUGHPUT change, not a footprint one, and the measurement says why:
+// the 26,000 objects that moved carried only ~6MB with them. What is left on the
+// legacy path is 2,300 objects holding 140MB -- 61KB each, the class-file and
+// emitted-source buffers, far above any size class worth having. Peak footprint
+// is unchanged (medians 1556MB against 1560MB).
 #ifndef CN1_BIBOP_MAX_OBJECT
-#define CN1_BIBOP_MAX_OBJECT 512
+#define CN1_BIBOP_MAX_OBJECT 2048
 #endif
 #ifndef CN1_BIBOP_HEAP_POS
 #define CN1_BIBOP_HEAP_POS (-3)

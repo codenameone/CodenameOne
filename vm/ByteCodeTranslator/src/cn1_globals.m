@@ -6114,7 +6114,7 @@ _Atomic int cn1GcCycleState = CN1_GC_CYCLE_IDLE;
 #define CN1_BIBOP_PAGE_SIZE (64*1024)
 #endif
 #ifndef CN1_BIBOP_MAX_OBJECT
-#define CN1_BIBOP_MAX_OBJECT 512
+#define CN1_BIBOP_MAX_OBJECT 2048
 #endif
 // Bytes bump/free-list-allocated through BiBOP since the last GC that force a
 // collection so RSS stays bounded even for an all-small-object workload (these
@@ -6192,11 +6192,18 @@ _Atomic int cn1GcCycleState = CN1_GC_CYCLE_IDLE;
 // Size classes (slot sizes, 16-aligned). size <= CN1_BIBOP_MAX_OBJECT maps to
 // the smallest class >= size; everything else takes the legacy path.
 // CN1_BIBOP_NUM_CLASSES is fixed in cn1_globals.h (must equal this array length).
+/* The table carries classes past the default ceiling so the ceiling itself can be
+ * an A/B flag: CN1_BIBOP_NUM_CLASSES selects how many are in use and
+ * CN1_BIBOP_MAX_OBJECT must name the last one. Raising both moves objects that
+ * would take the legacy calloc path into managed pages instead -- which is where
+ * the 1.3-1.7KB byte[] that dominate this corpus' live set sit. */
 static const int cn1BibopClassSize[] = {
-    32, 48, 64, 80, 96, 112, 128, 160, 192, 224, 256, 320, 384, 448, 512
+    32, 48, 64, 80, 96, 112, 128, 160, 192, 224, 256, 320, 384, 448, 512,
+    640, 768, 896, 1024, 1280, 1536, 1792, 2048
 };
-_Static_assert(sizeof(cn1BibopClassSize)/sizeof(int) == CN1_BIBOP_NUM_CLASSES,
-               "cn1BibopClassSize length must match CN1_BIBOP_NUM_CLASSES in cn1_globals.h");
+_Static_assert(sizeof(cn1BibopClassSize)/sizeof(int) >= CN1_BIBOP_NUM_CLASSES,
+               "cn1BibopClassSize must carry at least CN1_BIBOP_NUM_CLASSES entries");
+_Static_assert(CN1_BIBOP_NUM_CLASSES >= 1, "at least one size class");
 static signed char cn1BibopSizeToClass[CN1_BIBOP_MAX_OBJECT + 1];
 
 // struct CN1BibopPage is defined in cn1_globals.h (shared with the inlined bump).
@@ -6297,6 +6304,10 @@ static void cn1BibopDoInit() {
             }
         }
     }
+    /* The ceiling and the class count have to name the same slot size, or a size
+     * between the last class and the ceiling maps to -1 and silently falls to the
+     * legacy path while the dispatch believes BiBOP took it. */
+    CODENAME_ONE_ASSERT(cn1BibopClassSize[CN1_BIBOP_NUM_CLASSES - 1] == CN1_BIBOP_MAX_OBJECT);
     for(int s = 0 ; s <= CN1_BIBOP_MAX_OBJECT ; s++) {
         while(ci < CN1_BIBOP_NUM_CLASSES && cn1BibopClassSize[ci] < s) {
             ci++;
