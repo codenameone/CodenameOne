@@ -10,3 +10,9 @@ bench_*
 *.s
 *.o
 *.dSYM/
+# Same rule for the exhaustive proofs: sources kept, binaries and the header
+# extracted from cn1_globals.h at build time are not.
+test_*
+!test_*.c
+!test_*.sh
+*_extracted.h

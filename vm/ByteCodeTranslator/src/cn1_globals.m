@@ -2670,9 +2670,27 @@ void cn1RefBlockMove(CODENAME_ONE_THREAD_STATE, JAVA_LONG block, JAVA_INT from, 
     JAVA_OBJECT* base = (JAVA_OBJECT*)(uintptr_t)block;
     if(cn1SatbBulkBegin()) {
         // The DESTINATION range is what is being overwritten, so that is what the
-        // deletion barrier owes the snapshot.
-        cn1SatbEnqueueRangeLocked((JAVA_ARRAY_OBJECT*)(base + to), count);
-        cn1SatbEnqueueRangeLocked((JAVA_ARRAY_OBJECT*)(base + from), count);
+        // deletion barrier owes the snapshot -- but only the part of it that does
+        // not survive the move. Within one block a shift PERMUTES references, it
+        // does not drop them: min(count, |to-from|) slots actually leave, which is
+        // ONE for ArrayList's insert and remove however long the list is. See
+        // cn1SatbMoveLostRange for the derivation. This was the largest single
+        // mutator cost in the self-hosting profile at 7.8%, nearly all of it
+        // mark-word loads for references that were still in the block afterwards.
+        JAVA_INT lostStart;
+        JAVA_INT lostLen = cn1SatbMoveLostRange(from, to, count, &lostStart);
+        if(lostLen > 0) {
+            cn1SatbEnqueueRangeLocked((JAVA_ARRAY_OBJECT*)(base + lostStart), lostLen);
+        }
+        // NO INSERTION HALF, and unlike the deletion half it is not narrowed but
+        // dropped: every value this move writes was ALREADY in this same block, so
+        // the move makes nothing newly reachable through this object. The bulk
+        // handshake brackets the memmove, so a concurrent scan sees either the whole
+        // pre-move state (marks a superset of what survives) or the whole post-move
+        // state (and what left went to the deletion barrier above). Neither order
+        // can miss a reference. Across two arrays that argument fails outright --
+        // see java_lang_System_arraycopy, which keeps both halves whenever the
+        // arrays differ.
     }
     memmove(base + to, base + from, (size_t)count * sizeof(JAVA_OBJECT));
     cn1SatbBulkEnd();

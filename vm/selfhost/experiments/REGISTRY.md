@@ -4630,3 +4630,70 @@ sites", and the wrong one for "does this code run" -- the monitor pair
 (`monitorEnter` 1,367 + `monitorExitBlock` 2,260) ranks high statically, and this
 workload uses `HashMap`/`ArrayList`/`StringBuilder`, none of them synchronised.
 Profile before touching it.
+
+---
+
+## Round 27: the biggest mutator cost was a GC barrier, and no gate could see it
+
+A profile of the mutator (main thread only -- the all-thread view is ~78% idle
+GC workers and says nothing) put one function on top:
+
+| self time | |
+|---:|---|
+| **7.8%** | `cn1SatbEnqueueRangeLocked` |
+| 11.8% | `open`/`write`/`close` (emitting 855 files) |
+| 4.9% | `memmove` |
+| 3.7% | `cn1HmFindSlot` |
+
+Callers: `ArrayList.remove(int)` 19 samples, `ArrayList.add(int,Object)` 14,
+`System.arraycopy` 7. All three are **same-array shifts**.
+
+A move within one block PERMUTES references, it does not drop them. Slots
+`[to, to+count-1]` are overwritten, and the old value at slot `j` survives
+exactly when `j` is in `[from, from+count-1]` -- it gets rewritten at
+`j + (to-from)`. So the snapshot is owed
+
+    [to, to+count-1] \ [from, from+count-1]
+
+which is contiguous and holds `min(count, |to-from|)` slots: **one**, for an
+ArrayList insert or remove, whatever the list's length. The barrier was loading a
+mark word per moved element -- scattered across the heap -- for references that
+were still in the array afterwards. The insertion half is owed nothing at all for
+a same-block move: every value written was already in that block.
+
+Result: **7.8% -> 1.5%** of mutator self time, out of the top ten. Gauntlet,
+gc-verify and Gate A (855 files byte-identical) green.
+
+### The part worth remembering: the gates could not see any of it
+
+Before trusting that green, the barrier was removed OUTRIGHT for same-block moves
+-- `cn1SatbMoveLostRange` forced to return 0, a definitely-wrong collector.
+
+**`run-gc-verify.sh` (all six self-tests) and `run-gauntlet.sh` (33 tortures,
+both stop modes) were GREEN.**
+
+So the passing run proved nothing, and would have been banked as proof. This is a
+coverage hole that **predates this change**: any future edit to the same-block
+SATB barrier gets the same false green. It is the `BulkCopyBarrier` lesson --
+a self-test that cannot fail is worse than none -- arriving from the other
+direction, as a gate that cannot fail.
+
+What replaces it, for the half that admits proof:
+`cbench/test_satb_range.sh` EXTRACTS `cn1SatbMoveLostRange` from the header
+(never a copy, which would pass while the real code drifted) and brute-forces it
+against a model over all 32,500 shapes -- exact on every one, never
+under-reporting. Then it injects three faults, including the exact
+"barrier always empty" one the GC gates missed, and requires each to be caught.
+
+### What is NOT proved, stated plainly
+
+The arithmetic is proved. The PREMISE under it -- that a reference remaining in
+the block needs no barrier of either kind -- is a reachability argument, and no
+gate exercises it. A torture could not be constructed that fails without it,
+partly because there may be no barrier-free republication path left in the VM,
+which would make the claim a theorem rather than a gap. Recorded as reasoned,
+not as measured.
+
+Note the shape of the trade before "restoring the insertion half to be safe":
+that leaves the barrier O(count) per shift and gives back most of the win. It is
+not a free safety margin.

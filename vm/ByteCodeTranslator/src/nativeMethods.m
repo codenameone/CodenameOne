@@ -1110,10 +1110,28 @@ JAVA_VOID java_lang_System_arraycopy___java_lang_Object_int_java_lang_Object_int
             // One acquisition of the SATB mutex per 256 references rather than per
             // reference; this used to be two locked enqueues per element. See
             // cn1SatbEnqueueRangeLocked.
-            cn1SatbEnqueueRangeLocked(((JAVA_ARRAY_OBJECT*)CN1_ARRAY_DATA(dstArr)) + dstOffset, length);
+            if(srcArr == dstArr) {
+                // SAME ARRAY -- the overlap-safe shift ArrayList and the ASM tree
+                // classes perform. A move within one array permutes its references
+                // rather than dropping them, so the snapshot is owed only the
+                // min(length, |dstOffset-srcOffset|) slots that actually leave, and
+                // the insertion half is owed nothing at all: every value written was
+                // already in this array. cn1SatbMoveLostRange carries the derivation,
+                // and cn1RefBlockMove the argument for dropping the insertion half.
+                JAVA_INT lostStart;
+                JAVA_INT lostLen = cn1SatbMoveLostRange(srcOffset, dstOffset, length, &lostStart);
+                if(lostLen > 0) {
+                    cn1SatbEnqueueRangeLocked(((JAVA_ARRAY_OBJECT*)CN1_ARRAY_DATA(dstArr)) + lostStart, lostLen);
+                }
+            } else {
+                // TWO ARRAYS: nothing is preserved by the copy, so every overwritten
+                // slot is owed, and the copy really does publish references into an
+                // object that may already be black -- both halves stay.
+                cn1SatbEnqueueRangeLocked(((JAVA_ARRAY_OBJECT*)CN1_ARRAY_DATA(dstArr)) + dstOffset, length);
 #ifndef CN1_NO_BULK_INSERTION_BARRIER
-            cn1SatbEnqueueRangeLocked(((JAVA_ARRAY_OBJECT*)CN1_ARRAY_DATA(srcArr)) + srcOffset, length);
+                cn1SatbEnqueueRangeLocked(((JAVA_ARRAY_OBJECT*)CN1_ARRAY_DATA(srcArr)) + srcOffset, length);
 #endif
+            }
         }
     }
     /* java.lang.System.arraycopy is contractually overlap-safe (the spec defines
