@@ -300,13 +300,27 @@ public class TextFieldRenderElement extends RenderElement {
      * Crane's search form, where the input colour is white.</p>
      */
     private com.codename1.flutter.TextStyle hintStyle(InputDecoration d) {
+        // A LABEL is not a placeholder, and they part company on colour.
+        //
+        // One string reaches the component either way -- Codename One shows one piece of
+        // text in an empty field -- so this asked the theme for a hint colour whatever it
+        // was showing. Flutter only does that for a hintText; a labelText resting in the
+        // field takes onSurfaceVariant, which is a good deal darker. Shrine's login states
+        // labelText and came out in pale grey where the reference reads it in the study's
+        // brown: 52 dark pixels against the reference's 3297.
+        boolean isLabel = d != null && d.getLabelText() != null;
         com.codename1.flutter.TextStyle style = new com.codename1.flutter.TextStyle();
         com.codename1.flutter.Color tint = null;
         try {
             ThemeData theme = Theme.of(this);
             style = style.merge(inputStyle());
-            tint = theme.hintColor() != null ? theme.hintColor()
-                    : defaultHintColor(theme.brightness());
+            if (isLabel && theme.colorScheme() != null
+                    && theme.colorScheme().onSurfaceVariant() != null) {
+                tint = theme.colorScheme().onSurfaceVariant();
+            } else {
+                tint = theme.hintColor() != null ? theme.hintColor()
+                        : defaultHintColor(theme.brightness());
+            }
         } catch (Throwable noTheme) {
             tint = null;
         }
