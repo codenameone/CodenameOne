@@ -64,14 +64,6 @@ static int cn1EventHead = 0;
 static int cn1EventTail = 0;
 static pthread_mutex_t cn1EventLock = PTHREAD_MUTEX_INITIALIZER;
 
-/* The modifier mask from the most recent key event: 1 shift, 2 control, 4 alt. Same bit
- * values as the macOS and Windows ports, so the Java side of all three reads one encoding.
- *
- * Latched from the key event rather than queried, which is what this use needs: Shift-Tab
- * asks whether Shift is down while handling the Tab, and the Tab event's own state field
- * carries it. (A modifier pressed alone produces no key event, so this does not track one
- * held in isolation -- nothing here asks.) */
-static volatile int cn1CurrentModifiers = 0;
 
 void cn1LinuxPushEvent(int type, int x, int y, int keyCode) {
     cn1LinuxPushWindowEvent(0, type, x, y, keyCode);
@@ -279,6 +271,20 @@ int cn1LinuxPopEvent(int* out) {
 }
 
 /* ------------------------------------------------------------- globals */
+
+/* The modifier mask from the most recent key event: 1 shift, 2 control, 4 alt. Same bit
+ * values as the macOS and Windows ports, so the Java side of all three reads one encoding.
+ *
+ * Latched from the key event rather than queried, which is what this use needs: Shift-Tab
+ * asks whether Shift is down while handling the Tab, and the Tab event's own state field
+ * carries it. (A modifier pressed alone produces no key event, so this does not track one
+ * held in isolation -- nothing here asks.)
+ *
+ * Declared BELOW the globals marker on purpose. scripts/test_native_hover_queue.py compiles
+ * the event ring standalone by slicing this file from CN1_EVENT_RING to that marker, with
+ * -Wall -Wextra -Werror; a static declared inside the slice and used only further down is an
+ * unused variable there and fails the build. */
+static volatile int cn1CurrentModifiers = 0;
 
 static GtkWidget* cn1Window = 0;
 static GtkWidget* cn1DrawingArea = 0;

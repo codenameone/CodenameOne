@@ -363,11 +363,6 @@ void cn1WinPushEvent(CN1EventType type, int x, int y, int keyCode) {
  * something has to go it must never be the release. */
 /* Unlike hover motion, leave has no later motion outside the window to repair
  * a dropped notification. Protect only the terminal sentinel, not the motion stream. */
-/* The virtual key whose WM_KEYDOWN a menu accelerator consumed, so the matching WM_KEYUP can
- * be consumed as well. Zero when no such press is outstanding. Touched only from the window
- * procedure, which is one thread. */
-static int cn1AcceleratorKeyDown = 0;
-
 static int cn1WinIsProtectedEvent(CN1EventType type, int x, int y) {
     return type == CN1_EVENT_WINDOW_SHOWN || type == CN1_EVENT_WINDOW_HIDDEN
             || type == CN1_EVENT_WINDOW_CLOSE
@@ -556,6 +551,16 @@ int cn1WinPollEvent(CN1Event* out) {
 }
 
 /* ------------------------------------------------------------- input helpers */
+
+/* The virtual key whose WM_KEYDOWN a menu accelerator consumed, so the matching WM_KEYUP can
+ * be consumed as well. Zero when no such press is outstanding. Touched only from the window
+ * procedure, which is one thread.
+ *
+ * Declared BELOW the input-helpers marker on purpose. scripts/test_native_hover_queue.py
+ * compiles the event queue standalone by slicing this file from cn1WinPushEvent to that
+ * marker, with -Wall -Wextra -Werror; a static declared inside that slice and used only
+ * further down is "defined but not used" there and fails the build. */
+static int cn1AcceleratorKeyDown = 0;
 
 /* Bitmask (CN1_PE_MASK_*) of the mouse buttons currently held. Mouse capture is
  * held while ANY button is down so a drag that starts inside the window keeps
