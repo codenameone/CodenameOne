@@ -311,24 +311,47 @@ public class ContainerTransformTransition extends Transition {
                 : blend(surfaceColor, openColor, cross));
         g.fillRect(x, y, w, h);
 
-        // The tapped content stays fully opaque and is simply covered as the page arrives
-        // over it, which is what the fade variant of the transform does.
-        if (originBuffer != null) {
-            g.drawImage(originBuffer, x + (w - originBuffer.getWidth()) / 2,
-                    y + (h - originBuffer.getHeight()) / 2);
+        // Both contents are drawn at their OWN size scaled to the box's WIDTH, anchored
+        // at its top-left corner.
+        //
+        // This is the part that makes it a transform rather than a window. Drawn at 1:1
+        // and clipped, the page inside a half-sized box is the page's top-left QUARTER,
+        // so folding the compose page away showed a crop of its header sliding about
+        // while the reference shows the whole page shrinking into the button. Width, not
+        // height: the aspect ratios of a button and a page have nothing to do with each
+        // other, and fitting the width is what keeps the text at the size the box implies.
+        //
+        // The tapped thing fades over the FIRST fifth of the way in -- gone before the
+        // page begins to appear, so the two are never both half visible -- and fades back
+        // in across the whole of the way out.
+        float closedAlpha = closing
+                ? Math.max(0f, (linear - FIFTH) / (1f - FIFTH))
+                : Math.max(0f, 1f - linear / FIFTH);
+        if (originBuffer != null && closedAlpha > 0) {
+            int old = g.getAlpha();
+            g.setAlpha((int) (255 * Math.min(1f, closedAlpha)));
+            drawFittedToWidth(g, originBuffer, x, y, w);
+            g.setAlpha(old);
         }
 
         float open = closing ? 1f - cross : cross;
         if (open > 0) {
             int old = g.getAlpha();
             g.setAlpha((int) (255 * open));
-            // Anchored to the surface, not to the screen: the page grows with the box out
-            // of the corner it started in, which is what makes it read as the same object
-            // rather than a page revealed through a window.
-            g.drawImage(openBuffer(), x, y);
+            drawFittedToWidth(g, openBuffer(), x, y, w);
             g.setAlpha(old);
         }
         g.setClip(clip[0], clip[1], clip[2], clip[3]);
+    }
+
+    /// Draws an image scaled so its WIDTH is {@code w}, anchored at {@code x, y}, with
+    /// its aspect ratio kept. The caller's clip decides how much of it is seen.
+    private static void drawFittedToWidth(Graphics g, Image img, int x, int y, int w) {
+        if (img == null || img.getWidth() <= 0) {
+            return;
+        }
+        int h = Math.max(1, (int) ((long) img.getHeight() * w / img.getWidth()));
+        g.drawImage(img, x, y, Math.max(1, w), h);
     }
 
     /// 0 before the second fifth, 1 after it, and the crossing in between.

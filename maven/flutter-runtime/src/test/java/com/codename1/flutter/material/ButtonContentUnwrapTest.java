@@ -154,12 +154,21 @@ class ButtonContentUnwrapTest {
     void unresolvableContentIsNeverStringified() {
         // A widget the walk cannot see through. Printing its class name put
         // "com.codename1.flutter..." across the app bar; no label is the only honest answer.
-        Widget opaque = new Widget() {
+        // It has to be MOUNTABLE as well as opaque: a button now mounts content it cannot
+        // consume rather than dropping it, so a fixture whose element does not match its
+        // widget fails on the cast rather than on what this test is about.
+        class Opaque extends Widget implements com.codename1.flutter.widgets.HasChild {
+            @Override
+            public Widget getChild() {
+                return null;
+            }
+
             @Override
             public com.codename1.flutter.Element createElement() {
                 return new com.codename1.flutter.widgets.PassThroughRenderElement(this);
             }
-        };
+        }
+        Widget opaque = new Opaque();
         ButtonRenderElement e = mount(opaque);
 
         assertEquals(null, e.consumedLabel(), "no label beats a class name");

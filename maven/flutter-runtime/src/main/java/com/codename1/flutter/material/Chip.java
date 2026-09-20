@@ -26,6 +26,7 @@ package com.codename1.flutter.material;
 import com.codename1.flutter.BuildContext;
 import com.codename1.flutter.Clip;
 import com.codename1.flutter.Color;
+import com.codename1.flutter.EdgeInsets;
 import com.codename1.flutter.CrossAxisAlignment;
 import com.codename1.flutter.MainAxisSize;
 import com.codename1.flutter.StatelessWidget;
@@ -130,6 +131,61 @@ public class Chip extends StatelessWidget {
         row.mainAxisSize(MainAxisSize.min);
         row.crossAxisAlignment(CrossAxisAlignment.center);
         row.children(kids);
-        return row;
+
+        // A chip is a CAPSULE, not a row. Built as a bare row it was an avatar and some
+        // text loose on the page -- the compose page's recipient had no pill behind it at
+        // all, and neither did anything else that uses one.
+        com.codename1.flutter.BoxDecoration d =
+                new com.codename1.flutter.BoxDecoration();
+        d.color(resolveBackground(context));
+        d.borderRadius(com.codename1.flutter.BorderRadius.circular(HEIGHT_LP / 2));
+
+        com.codename1.flutter.widgets.Container box =
+                new com.codename1.flutter.widgets.Container();
+        box.decoration(d);
+        box.padding(labelPadding(context));
+        // Height only: a chip is exactly 32 logical pixels tall and as wide as it needs.
+        box.constraints(new com.codename1.flutter.rendering.BoxConstraints(
+                0, Double.POSITIVE_INFINITY, HEIGHT_LP, HEIGHT_LP));
+        box.child(row);
+        return box;
+    }
+
+    /** Material's chip height in logical pixels. */
+    private static final double HEIGHT_LP = 32;
+    /** Material's default label padding, horizontal only. */
+    private static final double LABEL_HPAD_LP = 8;
+
+    private EdgeInsets labelPadding(BuildContext context) {
+        ChipThemeData t = chipTheme(context);
+        if (t != null && t.labelPadding() != null) {
+            return t.labelPadding();
+        }
+        return EdgeInsets.symmetric(LABEL_HPAD_LP, 0);
+    }
+
+    /// The chip's own colour, then the theme's, then Material's surface.
+    private Color resolveBackground(BuildContext context) {
+        if (backgroundColor != null) {
+            return backgroundColor;
+        }
+        ChipThemeData t = chipTheme(context);
+        if (t != null && t.backgroundColor() != null) {
+            return t.backgroundColor();
+        }
+        try {
+            return Theme.of(context).colorScheme().surfaceVariant();
+        } catch (Throwable err) {
+            return null;
+        }
+    }
+
+    private ChipThemeData chipTheme(BuildContext context) {
+        try {
+            ThemeData t = Theme.of(context);
+            return t == null ? null : t.chipTheme();
+        } catch (Throwable err) {
+            return null;
+        }
     }
 }

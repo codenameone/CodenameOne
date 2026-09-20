@@ -193,9 +193,6 @@ public class Navigator extends StatelessWidget {
             return;
         }
         RouteEntry e = stack.remove(stack.size() - 1);
-        if (e.rootElement != null) {
-            FlutterUI.unmountTree(e.rootElement);
-        }
         if (e.previousForm != null) {
             // The way out mirrors the way in. showBack() plays the transition of the form
             // being RETURNED TO, in reverse -- and that form carries whatever animation
@@ -204,8 +201,38 @@ public class Navigator extends StatelessWidget {
             // side after the compose page had grown out of the button: the push was a
             // container transform and the pop was the inbox's own page transition.
             RouteTransitions.apply(e.previousForm, e.route);
+            // Tear the popped page down only once the transition that shows the page
+            // BEHIND it has finished.
+            //
+            // The transition photographs the outgoing Form the moment it starts, so
+            // unmounting first handed it a Form with nothing left in it: the container
+            // transform folded a blank card back into the button while the reference
+            // folds away the page you were reading. onShowCompleted fires after the
+            // animation queue drains, which is exactly when the popped page stops being
+            // on screen.
+            unmountWhenShown(e.previousForm, e.rootElement);
             e.previousForm.showBack();
+        } else if (e.rootElement != null) {
+            FlutterUI.unmountTree(e.rootElement);
         }
+    }
+
+    /// Unmounts {@code tree} the first time {@code form} finishes being shown.
+    private static void unmountWhenShown(Form form, final Element tree) {
+        if (tree == null) {
+            return;
+        }
+        final Form f = form;
+        final ActionListener[] once =
+                new ActionListener[1];
+        once[0] = new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent ev) {
+                f.removeShowListener(once[0]);
+                FlutterUI.unmountTree(tree);
+            }
+        };
+        form.addShowListener(once[0]);
     }
 
     /**

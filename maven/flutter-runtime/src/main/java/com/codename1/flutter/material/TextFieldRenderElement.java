@@ -256,9 +256,9 @@ public class TextFieldRenderElement extends RenderElement {
      * form, would otherwise show a white placeholder on a light fill.</p>
      */
     private void applyTextStyle(com.codename1.ui.TextField tf, InputDecoration d) {
-        applyOne(tf.getAllStyles(), inputStyle());
+        applyOne(tf.getAllStyles(), inputStyle(), backdropRgb());
         if (tf.getHintLabel() != null) {
-            applyOne(tf.getHintLabel().getAllStyles(), hintStyle(d));
+            applyOne(tf.getHintLabel().getAllStyles(), hintStyle(d), backdropRgb());
         }
     }
 
@@ -382,8 +382,27 @@ public class TextFieldRenderElement extends RenderElement {
     }
 
     /** One style's size, weight and colour onto one Codename One style. */
+    /// What a translucent ink is composited over: the field's own fill when it has an
+    /// opaque one, else the surface the page is painted on.
+    private int backdropRgb() {
+        try {
+            com.codename1.flutter.Color fill =
+                    resolveFill(textField().getDecoration(), inputDecorationTheme());
+            if (fill != null && fill.alpha() == 255) {
+                return fill.rgb();
+            }
+            ColorScheme cs = Theme.of(this).colorScheme();
+            if (cs != null && cs.surface() != null) {
+                return cs.surface().rgb();
+            }
+        } catch (Throwable noTheme) {
+            // fall through to white
+        }
+        return 0xFFFFFF;
+    }
+
     private static void applyOne(com.codename1.ui.plaf.Style target,
-            com.codename1.flutter.TextStyle ts) {
+            com.codename1.flutter.TextStyle ts, int backdropRgb) {
         if (ts == null) {
             return;
         }
@@ -412,7 +431,19 @@ public class TextFieldRenderElement extends RenderElement {
             }
         }
         if (ts.getColor() != null) {
-            target.setFgColor(ts.getColor().rgb());
+            // A TRANSLUCENT ink has to be composited here.
+            //
+            // Codename One's Style carries an opaque foreground, so taking rgb() off a
+            // colour that stated an alpha paints it at FULL strength -- and Material states
+            // one constantly. The compose page asks for its Subject placeholder in the
+            // primary colour at half opacity and got it in solid navy, reading as a title
+            // rather than as a hint.
+            com.codename1.flutter.Color c = ts.getColor();
+            if (c.alpha() < 255) {
+                c = com.codename1.flutter.Color.alphaBlend(c,
+                        new com.codename1.flutter.Color(0xFF000000L | (backdropRgb & 0xFFFFFF)));
+            }
+            target.setFgColor(c.rgb());
         }
     }
 
@@ -448,15 +479,30 @@ public class TextFieldRenderElement extends RenderElement {
                 all.setBgTransparency(255);
             }
         }
-        int radiusPx = outlineRadiusPx(d.getBorder());
+        // Which border, through the same fallbacks Flutter uses: the field's own, then the
+        // theme's enabled border, then the theme's border.
+        Object stated = d.getBorder();
+        if (stated == null && themed != null) {
+            stated = themed.getEnabledBorder() != null ? themed.getEnabledBorder() : themed.getBorder();
+        }
+        int radiusPx = stated instanceof com.codename1.flutter.InputBorder
+                ? outlineRadiusPx((com.codename1.flutter.InputBorder) stated) : 0;
         if (radiusPx > 0) {
             com.codename1.ui.plaf.RoundRectBorder b = com.codename1.ui.plaf.RoundRectBorder.create()
                     .cornerRadius(radiusPx / com.codename1.ui.Display.getInstance().convertToPixels(1f))
                     .strokeOpacity(0)
                     .shadowOpacity(0);
             all.setBorder(b);
-        } else if (d.getBorder() == com.codename1.flutter.InputBorder.none) {
+        } else if (stated == com.codename1.flutter.InputBorder.none) {
             all.setBorder(com.codename1.ui.plaf.Border.createEmpty());
+        } else if (stated == null || stated instanceof com.codename1.flutter.UnderlineInputBorder) {
+            // Flutter's DEFAULT is a rule under the field, not a box around it. Leaving the
+            // Codename One theme's own border in place drew a full outline on every field
+            // that states no border of its own -- Rally's login fields are a dark fill with
+            // a hairline beneath, and they came out as bright rectangles.
+            all.setBorder(com.codename1.ui.plaf.Border.createUnderlineBorder(
+                    Math.max(1, (int) Math.round(com.codename1.flutter.rendering.Dp.px(1))),
+                    underlineRgb()));
         }
         // The SAME border in every state. A Codename One theme gives a text field one
         // border unselected and a different one -- often none -- selected, which is a
@@ -481,6 +527,23 @@ public class TextFieldRenderElement extends RenderElement {
                     (int) Math.round(com.codename1.flutter.rendering.Dp.px(pad.left())),
                     (int) Math.round(com.codename1.flutter.rendering.Dp.px(pad.right())));
         }
+    }
+
+    /// The default underline's colour: onSurface at 38%, composited onto what it is drawn
+    /// over, because a Codename One border colour carries no alpha.
+    private int underlineRgb() {
+        try {
+            ColorScheme cs = Theme.of(this).colorScheme();
+            if (cs != null && cs.onSurface() != null) {
+                return com.codename1.flutter.Color.alphaBlend(
+                        cs.onSurface().withOpacity(0.38),
+                        new com.codename1.flutter.Color(0xFF000000L | (backdropRgb() & 0xFFFFFF)))
+                        .rgb();
+            }
+        } catch (Throwable noTheme) {
+            // fall through
+        }
+        return 0x757575;
     }
 
     /** The outline's corner radius in device pixels, or 0 when it has none. */

@@ -109,6 +109,10 @@ public class ChipThemeData {
         return backgroundColor;
     }
 
+    public EdgeInsets labelPadding() {
+        return labelPadding;
+    }
+
     public Color secondarySelectedColor() {
         return secondarySelectedColor;
     }

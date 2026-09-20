@@ -86,11 +86,39 @@ public class ButtonRenderElement extends RenderElement {
 
     /** The widget the button draws. Overridden by buttons with their own trigger. */
     protected Widget contentWidget() {
+        return unwrapToLeaf(rawContentWidget());
+    }
+
+    /**
+     * The content child exactly as written, without the walk to a leaf. Overridden -- not
+     * {@link #contentWidget()} -- by buttons with a trigger of their own, so both the
+     * consumed form and the mounted form come from one place.
+     */
+    protected Widget rawContentWidget() {
         Widget w = widget();
-        Widget content = w instanceof ButtonBase
+        return w instanceof ButtonBase
                 ? ((ButtonBase) w).getChild()
                 : ((IconButton) w).getIcon();
-        return unwrapToLeaf(content);
+    }
+
+    /**
+     * Whether this button's content is a real widget subtree rather than something the
+     * button can swallow into its own text or glyph.
+     *
+     * <p>A button draws a label and an icon, so a child that is one of those is CONSUMED:
+     * cheaper, and it lets the button's own style reach the text. Anything else has to be
+     * mounted and laid out like any other subtree, and that is not an exotic case -- the
+     * compose page's account row is a PopupMenuButton whose child is a Row of an address
+     * and a caret. Consumed, it could be reduced to neither a string nor a glyph, so the
+     * button drew nothing at all and the row was a blank band on the page.</p>
+     */
+    protected boolean isCompositeContent() {
+        Widget raw = rawContentWidget();
+        if (raw == null) {
+            return false;
+        }
+        Widget leaf = contentWidget();
+        return !(leaf instanceof Text) && !(leaf instanceof Icon);
     }
 
     /**
@@ -153,7 +181,7 @@ public class ButtonRenderElement extends RenderElement {
             String d = ((Text) c).getData();
             return d == null ? "" : d;
         }
-        if (c == null || c instanceof Icon) {
+        if (c == null || c instanceof Icon || isCompositeContent()) {
             return null;
         }
         try {
@@ -342,11 +370,69 @@ public class ButtonRenderElement extends RenderElement {
     /** Flutter's {@code kMinInteractiveDimension}. */
     private static final double MIN_INTERACTIVE_LP = 48;
 
+    private com.codename1.flutter.Element contentChild;
+
+    @Override
+    protected void syncChildren() {
+        // Mounted only in composite mode. Passing null the rest of the time is what
+        // UNMOUNTS the subtree when a rebuild turns a composite child into a plain Text.
+        contentChild = updateChild(contentChild,
+                isCompositeContent() ? rawContentWidget() : null, 0);
+    }
+
+    @Override
+    public void visitChildren(dart.runtime.Funcs.VoidFunc1<com.codename1.flutter.Element> v) {
+        if (contentChild != null) {
+            v.call(contentChild);
+        }
+    }
+
+    /**
+     * Makes the mounted content transparent to touch so the press lands on the button
+     * underneath it.
+     *
+     * <p>The host is one flat container and the content's components attach AFTER the
+     * button's, so they sit above it and CN1 hands them the press -- a Label, which does
+     * nothing with it. The button is then unreachable through its own face. Anything that
+     * is a button in its own right is left alone: a nested one is entitled to the press.</p>
+     */
+    private void passPointerThrough(com.codename1.flutter.Element e) {
+        if (e == null) {
+            return;
+        }
+        if (e instanceof ButtonRenderElement) {
+            return;
+        }
+        if (e instanceof RenderElement) {
+            Component c = ((RenderElement) e).component();
+            if (c != null && !(c instanceof Button)) {
+                c.setIgnorePointerEvents(true);
+            }
+        }
+        e.visitChildren(new dart.runtime.Funcs.VoidFunc1<com.codename1.flutter.Element>() {
+            @Override
+            public void call(com.codename1.flutter.Element child) {
+                passPointerThrough(child);
+            }
+        });
+    }
+
     @Override
     protected Size performLayout(BoxConstraints constraints) {
         Component c = component();
         if (c == null) {
             return constraints.smallest();
+        }
+        RenderElement composite = contentChild == null ? null : findRenderElement(contentChild);
+        if (composite != null) {
+            // The subtree measures itself and the button is exactly as big as it. The
+            // minimum tap targets below belong to a button that draws its OWN label at its
+            // own padding; a mounted child already carries whatever padding it was given,
+            // and forcing 48lp onto it moved the compose page's account row off its rule.
+            Size cs = composite.layout(constraints);
+            setChildOffset(composite, 0, 0);
+            passPointerThrough(contentChild);
+            return constraints.constrain(cs);
         }
         Dimension d = c.getPreferredSize();
         double w = d.getWidth();

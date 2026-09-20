@@ -67,4 +67,12 @@ public class DividerThemeData {
     public Double space() {
         return space;
     }
+
+    public Double indent() {
+        return indent;
+    }
+
+    public Double endIndent() {
+        return endIndent;
+    }
 }

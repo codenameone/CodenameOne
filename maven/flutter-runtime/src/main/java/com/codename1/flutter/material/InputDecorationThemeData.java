@@ -68,6 +68,14 @@ public class InputDecorationThemeData {
     public Color getFillColor() { return fillColor; }
 
     /** The default content padding for descendant fields. */
+    public Object getBorder() {
+        return border;
+    }
+
+    public Object getEnabledBorder() {
+        return enabledBorder;
+    }
+
     public EdgeInsetsGeometry getContentPadding() { return contentPadding; }
 
     /** The default type for descendant fields' labels. */

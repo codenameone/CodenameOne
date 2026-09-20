@@ -54,12 +54,77 @@ public class DividerRenderElement extends RenderElement {
         return (Divider) widget();
     }
 
+    /// The ambient divider theme, or null.
+    ///
+    /// Every dimension below reads widget, then theme, then Flutter's default -- the
+    /// precedence Divider.createBorderSide uses. Reading only the widget meant a study that
+    /// states its rules once in its ThemeData got none of them.
+    private DividerThemeData theme() {
+        try {
+            ThemeData t = Theme.of(this);
+            return t == null ? null : t.dividerTheme();
+        } catch (Throwable err) {
+            return null;
+        }
+    }
+
     private double heightLp() {
-        return divider().getHeight() != null ? divider().getHeight() : DEFAULT_HEIGHT_LP;
+        if (divider().getHeight() != null) {
+            return divider().getHeight();
+        }
+        DividerThemeData dt = theme();
+        if (dt != null && dt.space() != null) {
+            return dt.space();
+        }
+        return DEFAULT_HEIGHT_LP;
     }
 
     private double thicknessLp() {
-        return divider().getThickness() != null ? divider().getThickness() : DEFAULT_THICKNESS_LP;
+        if (divider().getThickness() != null) {
+            return divider().getThickness();
+        }
+        DividerThemeData dt = theme();
+        if (dt != null && dt.thickness() != null) {
+            return dt.thickness();
+        }
+        return DEFAULT_THICKNESS_LP;
+    }
+
+    private double indentLp() {
+        if (divider().getIndent() != null) {
+            return divider().getIndent();
+        }
+        DividerThemeData dt = theme();
+        return dt != null && dt.indent() != null ? dt.indent() : 0;
+    }
+
+    private double endIndentLp() {
+        if (divider().getEndIndent() != null) {
+            return divider().getEndIndent();
+        }
+        DividerThemeData dt = theme();
+        return dt != null && dt.endIndent() != null ? dt.endIndent() : 0;
+    }
+
+    /// Widget colour, then the divider theme's, then the scheme's outlineVariant -- and
+    /// black when there is no theme at all, which is the colour a BorderSide defaults to.
+    private int colorRgb() {
+        if (divider().getColor() != null) {
+            return divider().getColor().rgb();
+        }
+        DividerThemeData dt = theme();
+        if (dt != null && dt.color() != null) {
+            return dt.color().rgb();
+        }
+        try {
+            ColorScheme cs = Theme.of(this).colorScheme();
+            if (cs != null && cs.outlineVariant() != null) {
+                return cs.outlineVariant().rgb();
+            }
+        } catch (Throwable err) {
+            // no ambient theme: fall through
+        }
+        return DEFAULT_COLOR;
     }
 
     @Override
@@ -81,8 +146,7 @@ public class DividerRenderElement extends RenderElement {
     }
 
     private void applyStyle(Component strip) {
-        int color = divider().getColor() != null ? divider().getColor().rgb() : DEFAULT_COLOR;
-        strip.getAllStyles().setBgColor(color);
+        strip.getAllStyles().setBgColor(colorRgb());
         strip.getAllStyles().setBgTransparency(255);
     }
 
@@ -101,6 +165,16 @@ public class DividerRenderElement extends RenderElement {
             t = (int) Math.min(t, Math.round(size().height()));
             strip.setY(y + (int) Math.round((size().height() - t) / 2));
             strip.setHeight(t);
+            // The rule is inset from both ends; the BOX is not. Flutter puts the indent on
+            // the line's own margin, so a divider still occupies the full width it was
+            // given and only the painted part is short.
+            int start = (int) Math.round(Dp.px(indentLp()));
+            int end = (int) Math.round(Dp.px(endIndentLp()));
+            int w = (int) Math.round(size().width()) - start - end;
+            if (w > 0) {
+                strip.setX(x + start);
+                strip.setWidth(w);
+            }
         }
     }
 }

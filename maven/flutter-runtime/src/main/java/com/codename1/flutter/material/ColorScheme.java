@@ -252,7 +252,12 @@ public class ColorScheme {
     public Color background() { return or(background, surface); }
     public Color onBackground() { return or(onBackground, onSurface); }
     public Color outline() { return or(outline, new Color(0xFF79747E)); }
-    public Color outlineVariant() { return or(outlineVariant, outline()); }
+    /// Falls back to {@link #onBackground()}, which is what Flutter's ColorScheme does --
+    /// and it is load bearing rather than a detail, because an M3 Divider takes its colour
+    /// from this role. A scheme written out by hand names neither, so falling back to
+    /// `outline` painted the compose page's rules in a pale grey where the reference draws
+    /// them almost black.
+    public Color outlineVariant() { return or(outlineVariant, onBackground()); }
     public Color shadow() { return or(shadow, new Color(0xFF000000)); }
     public Color scrim() { return or(scrim, new Color(0xFF000000)); }
     public Color inverseSurface() { return or(inverseSurface, onSurface); }
