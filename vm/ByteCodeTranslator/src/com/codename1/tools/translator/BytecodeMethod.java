@@ -3941,6 +3941,15 @@ public class BytecodeMethod implements SignatureSet {
             "true".equalsIgnoreCase(Util.getProperty("cn1.bceCensus", "false"));
     static int bceMethods, bceMethodsWithArrays, bceRefusedTryCatch, bceRefusedOther,
                bceArrayOpsTotal, bceArrayOpsRefusedTryCatch;
+    /* Loops that matched the counted shape and were then refused because a handler
+     * landed inside them. Non-vacuity evidence for bceHandlerLandsIn: if this is 0
+     * over a corpus the size of the translator's own, the check is not a guard, it
+     * is decoration, and that is worth knowing. */
+    static int bceLoopsRefusedByHandler;
+    /* Array accesses this pass actually cleared, split by whether the method has a
+     * try/catch at all. The second number IS the change: before the per-loop check
+     * it was necessarily zero, because such a method never reached the analysis. */
+    static int bceAccessesMarked, bceAccessesMarkedInTryCatchMethod;
 
     private int countArrayOps() {
         int c = 0;
@@ -3968,11 +3977,16 @@ public class BytecodeMethod implements SignatureSet {
             bceArrayOpsTotal += ops;
             if (ops > 0) {
                 bceMethodsWithArrays++;
-                boolean tc = TryCatch.isTryCatchInMethod();
-                if (!tc) {
-                    for (Instruction in : instructions) {
-                        if (in instanceof TryCatch) { tc = true; break; }
-                    }
+                // The instruction scan, NOT TryCatch.isTryCatchInMethod(): that
+                // static flag is set in TryCatch.appendInstruction and cleared by
+                // TryCatch.reset() inside appendMethodC, i.e. both happen during
+                // EMISSION, while this pass runs in optimize(), before any of that.
+                // Read here it answers for whichever method was emitted last, so
+                // the first census over-counted by however many try/catch-free
+                // methods happened to follow one that had them.
+                boolean tc = false;
+                for (Instruction in : instructions) {
+                    if (in instanceof TryCatch) { tc = true; break; }
                 }
                 if (tc) {
                     bceRefusedTryCatch++;
@@ -3982,25 +3996,59 @@ public class BytecodeMethod implements SignatureSet {
         }
         // View without LineNumber noise but keeping labels for back-edge detection.
         java.util.ArrayList<Instruction> r = new java.util.ArrayList<Instruction>(instructions.size());
+        java.util.ArrayList<Label> handlers = null;
         for (Instruction in : instructions) {
             if (in instanceof LineNumber) {
                 continue;
             }
+            if (in instanceof TryCatch) {
+                // A try/catch used to disable this pass for the WHOLE method, and it
+                // was the most expensive of the three guardrails try/catch controls:
+                // 20% of the corpus' array accesses sat in a method it refused,
+                // against 17% of StringBuilder sites and 1% of methods for frameless.
+                //
+                // It refuses less than that now. A TryCatch instruction is a
+                // DECLARATION of an exception edge, not the edge itself, so it is not
+                // control flow in this positional view and is kept out of it (leaving
+                // it in would also break the fixed-width condition-shape window
+                // below). What the edge can do is land control INSIDE a loop without
+                // running its test -- the same hazard bceForeignEntry already refuses
+                // for an ordinary Jump, minus the instruction that makes it visible.
+                // So the landing pad is what matters: record it, and refuse per loop.
+                if (handlers == null) {
+                    handlers = new java.util.ArrayList<Label>();
+                }
+                handlers.add(((TryCatch) in).getHandler());
+                continue;
+            }
             // Control flow we don't model precisely -> disable BCE for the whole method.
-            if (in instanceof SwitchInstruction || in instanceof CustomJump || in instanceof TryCatch) {
+            if (in instanceof SwitchInstruction || in instanceof CustomJump) {
                 return;
             }
             r.add(in);
         }
-        if (TryCatch.isTryCatchInMethod()) {
-            return;
-        }
+        // NOT TryCatch.isTryCatchInMethod() -- that flag belongs to emission (see the
+        // census note above), and reading it here answered for a different method.
         int n = r.size();
         java.util.HashMap<Label, Integer> pos = new java.util.HashMap<Label, Integer>();
         for (int i = 0; i < n; i++) {
             Instruction x = r.get(i);
             if (x instanceof LabelInstruction) {
                 pos.put(((LabelInstruction) x).getLabel(), i);
+            }
+        }
+        // Resolve every landing pad to a position. A handler we cannot locate is a
+        // transfer we cannot reason about, so the method goes back to being refused
+        // whole -- exactly today's behaviour, reached only when the label is missing.
+        int[] handlerAt = NO_HANDLERS;
+        if (handlers != null) {
+            handlerAt = new int[handlers.size()];
+            for (int i = 0; i < handlerAt.length; i++) {
+                Integer hp = pos.get(handlers.get(i));
+                if (hp == null) {
+                    return;
+                }
+                handlerAt[i] = hp;
             }
         }
         // Canonical javac top-test counted loop:
@@ -4032,6 +4080,17 @@ public class BytecodeMethod implements SignatureSet {
             if (!(idx instanceof VarOp) || idx.getOpcode() != Opcodes.ILOAD) continue;
             if (!(hdr instanceof LabelInstruction)) continue;     // header label the back-edge returns to
             int header = jx - 4;
+            // An exception edge that lands anywhere in [header, exit) enters the
+            // condition or the body without IF_ICMPGE having run, so i < a.length is
+            // no longer established there and the whole proof below collapses. A pad
+            // OUTSIDE the loop is just another way to LEAVE it; a jump from there
+            // back in is an ordinary Jump, which bceForeignEntry still refuses.
+            if (bceHandlerLandsIn(handlerAt, header, exit)) {
+                if (BCE_CENSUS) {
+                    bceLoopsRefusedByHandler++;
+                }
+                continue;
+            }
             int arrVar = ((VarOp) arr).getIndex();
             int indVar = ((VarOp) idx).getIndex();
             if (arrVar == indVar) continue;
@@ -4049,8 +4108,28 @@ public class BytecodeMethod implements SignatureSet {
                 if (bceLocalWrittenInRange(r, indVar, jx, k)) continue;     // i unchanged test->access
                 if (bceForeignEntry(r, pos, header, k, j)) continue;        // no bypass entry into cond/body
                 ld.markBoundsSafe();
+                if (BCE_CENSUS) {
+                    bceAccessesMarked++;
+                    if (handlerAt.length > 0) {
+                        bceAccessesMarkedInTryCatchMethod++;
+                    }
+                }
             }
         }
+    }
+
+    private static final int[] NO_HANDLERS = new int[0];
+
+    // True if any exception landing pad sits in [from, to). Linear: a method has a
+    // handful of handlers, and the alternative (a sorted array plus a binary search)
+    // would cost more to get right than it saves.
+    private static boolean bceHandlerLandsIn(int[] handlerAt, int from, int to) {
+        for (int i = 0; i < handlerAt.length; i++) {
+            if (handlerAt[i] >= from && handlerAt[i] < to) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private static boolean bceIsArrayLoadOpcode(int op) {

@@ -509,7 +509,10 @@ public class Parser extends ClassVisitor {
                 + " arrayOps=" + ops
                 + " arrayOpsInRefusedMethods=" + BytecodeMethod.bceArrayOpsRefusedTryCatch
                 + (ops > 0 ? "  (" + (100 * BytecodeMethod.bceArrayOpsRefusedTryCatch / ops)
-                    + "% of array accesses sit in a method try/catch disables)" : ""));
+                    + "% of array accesses sit in a method that used to be refused whole)" : ""));
+            System.out.println("[BCE] cleared=" + BytecodeMethod.bceAccessesMarked
+                + " ofThoseInTryCatchMethods=" + BytecodeMethod.bceAccessesMarkedInTryCatchMethod
+                + " loopsRefusedByHandlerInside=" + BytecodeMethod.bceLoopsRefusedByHandler);
         }
         if (BytecodeMethod.FRAMELESS_CENSUS) {
             int t = BytecodeMethod.censusTotal;

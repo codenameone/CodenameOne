@@ -97,6 +97,12 @@ echo "run-gauntlet: modern reference Java $refFeature ($REF_JAVA); legacy refere
 # non-capturing instances too, so `a == b` is unspecified on both sides. What it does check
 # is that capturing lambdas still see their OWN captures, which is what a shared-instance
 # bug would break first.
+# BceTryCatch pins bounds-check elimination against exception edges. BCE used to be
+# refused for any method with a try/catch and is now refused per LOOP, only when a
+# handler lands inside one -- so these shapes put a counted array loop on both sides of
+# that line. The sharp case is shorterArrayInBody: the loop is proven over a, indexes a
+# HALF-LENGTH b with the same i, and the AIOOBE it must still throw is the thing a
+# proof widened from "this array" to "any array" would swallow.
 # NestThrow is four throws, and it exists because the third one escaped its catch.
 # A throw from INSIDE a catch handler was not caught by a try lexically around it:
 # nested try/catch made both regions begin at the same instruction, the inner one
@@ -104,7 +110,7 @@ echo "run-gauntlet: modern reference Java $refFeature ($REF_JAVA); legacy refere
 # handler therefore deregistered the outer try along with it. It is four lines of Java
 # and it was wrong on every platform, which is the argument for keeping the trivial
 # shapes in the list beside the elaborate ones.
-TORTURES="NestThrow MapTorture MapTorture2 IdmTorture HtTorture SbTorture StrCmp FusedTest IbpTest ExcTest ThreadChurn SoeTest TaggedSync BoxEdge ConcatCorrupt ToCharT ForEachT LambdaT FeMin Latin1T SbLatin1T SetTorture InstanceOfT WriterT StrQueryT LambdaDevirtT TwinProbe NullDeref ThrowingFinalizer"
+TORTURES="BceTryCatch NestThrow MapTorture MapTorture2 IdmTorture HtTorture SbTorture StrCmp FusedTest IbpTest ExcTest ThreadChurn SoeTest TaggedSync BoxEdge ConcatCorrupt ToCharT ForEachT LambdaT FeMin Latin1T SbLatin1T SetTorture InstanceOfT WriterT StrQueryT LambdaDevirtT TwinProbe NullDeref ThrowingFinalizer"
 mkdir -p target/host-classes target/bin
 # FusedTest uses @com.codename1.annotations.Fused -- supply the annotation
 # source for the host compile (ParparVM's JavaAPI carries its own copy)
