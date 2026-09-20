@@ -376,3 +376,68 @@ function under test was pure and clang folded twenty million calls into one. The
 fix is to make every call depend on the iteration index, and the check is to
 count `bl` in the loop body -- which the harness comment now says. A benchmark
 arm that reports zero is not a result, it is a bug.
+
+---
+
+# The biggest item, measured and then declined
+
+## The cursor release is half of every allocation
+
+| arm | ns/op |
+|---|---:|
+| H today: mark release + cursor release | 1.950 |
+| I cursor store RELAXED | **0.980** |
+| J both relaxed | 0.985 |
+| K release kept, cursor read from the thread state | 1.833 |
+
+**The `stlr` on `p->bumpIndex` costs ~0.97ns -- about half the fast path.** The
+mark release next to it costs nothing measurable (I against J).
+
+Arm K refutes the obvious fix. The theory was that the cost is the loop-carried
+edge -- the next allocation's load of `bumpIndex` being a dependent load on an
+`stlr` to the same address -- so K keeps the release exactly as it is and takes
+the READ off it, allocating from a plain thread-local cursor. It recovers 0.117ns
+of the 0.97. **The cost is the ordering primitive itself**: on this core a
+store-release drains the store buffer whether or not anything downstream depends
+on it. Worth knowing generally, and it is why every instruction removed around
+this store was absorbed -- they were never the constraint.
+
+## Why it is not being relaxed
+
+The sweep's contract is a single acquire on the cursor publishing every slot
+header below it, which is what lets its per-slot reads be plain loads:
+
+> ACQUIRE pairs with the allocator's RELEASE store of bumpIndex: for every slot
+> i < n the header stores (parentCls / heapPosition / mark) that preceded that
+> release are visible to this walk. Relaxed could observe a freshly-bumped slot
+> with a garbage header.
+
+The sweep alone could be re-proved -- it never touches an OWNED page (there is an
+assert for exactly that), so a thread could publish its cursor once at retire.
+The readers that block it are the ones that DO run on owned pages concurrently:
+the conservative resolver (`idx >= pg->bumpIndex` rejects the slot) and the grace
+pass. Against a stale cursor, a just-allocated object is rejected as a root and
+is not traced; an OLD object reachable only through it is then covered by nothing
+except the SATB insertion barrier.
+
+That is the allocate-black invariant, and this branch has already been here. From
+the grace-pass note: the barrier was audited, two real holes were found and fixed
+(`arraycopy` on an object array, `cloneArray`), and then -- decisively -- **two
+purpose-built drivers reported `violations=0` with the barrier deliberately
+compiled out**. The window is real by inspection and too narrow for any gate here
+to open.
+
+So the same conclusion applies, for the same reason: this would trade a measured
+0.97ns per allocation (25.8M allocations, ~26ms of a 5.4s run, 0.48%) for a
+correctness risk that surfaces as silent heap corruption in a customer app with
+no reproducer. **If it is revisited, the thing to build FIRST is the same thing
+the grace-pass note asks for: a way to drive an allocation into the residual
+window on purpose.** Without that, no version of this change can be validated,
+and a green gate would mean nothing.
+
+## What that leaves
+
+The allocation fast path is now ~1.0ns of ordering primitive plus ~1.0ns of
+everything else, and the everything-else half has had its dependency chain
+shortened as far as it goes without touching the collector's contract. Further
+work on allocation THROUGHPUT is blocked on a verification tool, not on ideas.

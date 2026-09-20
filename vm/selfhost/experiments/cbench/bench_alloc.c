@@ -51,6 +51,8 @@ __thread Page* tlsCurrent[NCLASSES];
 typedef struct TLD {
     long pad[17];
     Page* current[NCLASSES];
+    int nextSlot;
+    int slotsLeft;
 } TLD;
 
 static Clazz theClass;
@@ -231,6 +233,76 @@ static uint64_t runBigPageZero(long n) {
     for(long i=0;i<n;i++){ if(i % BIG_SLOTS == 0) resetPageZeroed(); a += (uintptr_t)allocBigNoZero(&theTld); }
     return a;
 }
+/* The two store-releases. Arm H is today: mark published release, then the bump
+ * cursor published release -- the cursor release being the loop-carried edge for
+ * the next allocation. Arm I relaxes the cursor (UNSOUND as it stands: the sweep
+ * pairs a single acquire on the cursor with plain per-slot header loads, so the
+ * release is what publishes parentCls/heapPosition/mark for every slot below it).
+ * It is here only to price the ordering primitive before anyone does the work of
+ * re-proving the sweep. Arm J relaxes both, as a floor. */
+__attribute__((noinline)) static Obj* allocRelCursor(TLD* t) {
+    Page* p = t->current[0];
+    int bi = atomic_load_explicit(&p->bumpIndex, memory_order_relaxed);
+    if(__builtin_expect(bi < p->slotCount, 1)) {
+        Obj* o = (Obj*)((char*)p + p->firstSlotOffset + (long)bi * 32);
+        o->cls = &theClass; o->heapPosition = -3;
+        atomic_store_explicit((_Atomic int*)&o->mark, -1, memory_order_release);
+        atomic_store_explicit(&p->bumpIndex, bi + 1, memory_order_release);
+        return o;
+    }
+    return 0;
+}
+__attribute__((noinline)) static Obj* allocRlxCursor(TLD* t) {
+    Page* p = t->current[0];
+    int bi = atomic_load_explicit(&p->bumpIndex, memory_order_relaxed);
+    if(__builtin_expect(bi < p->slotCount, 1)) {
+        Obj* o = (Obj*)((char*)p + p->firstSlotOffset + (long)bi * 32);
+        o->cls = &theClass; o->heapPosition = -3;
+        atomic_store_explicit((_Atomic int*)&o->mark, -1, memory_order_release);
+        atomic_store_explicit(&p->bumpIndex, bi + 1, memory_order_relaxed);
+        return o;
+    }
+    return 0;
+}
+__attribute__((noinline)) static Obj* allocRlxBoth(TLD* t) {
+    Page* p = t->current[0];
+    int bi = atomic_load_explicit(&p->bumpIndex, memory_order_relaxed);
+    if(__builtin_expect(bi < p->slotCount, 1)) {
+        Obj* o = (Obj*)((char*)p + p->firstSlotOffset + (long)bi * 32);
+        o->cls = &theClass; o->heapPosition = -3;
+        atomic_store_explicit((_Atomic int*)&o->mark, -1, memory_order_relaxed);
+        atomic_store_explicit(&p->bumpIndex, bi + 1, memory_order_relaxed);
+        return o;
+    }
+    return 0;
+}
+/* K: keep the release EXACTLY as it is -- it still orders the header stores
+ * before it, so the sweep's "one acquire on the cursor publishes every slot
+ * below it" contract is untouched -- but stop the fast path from READING the
+ * page cursor. The next slot comes from a plain thread-local cursor instead, so
+ * the stlr is no longer the loop-carried edge: nothing downstream loads it.
+ *
+ * This is the version that does not need the grace-window invariant re-proved,
+ * because it changes what the ALLOCATOR depends on, not what the COLLECTOR sees. */
+__attribute__((noinline)) static Obj* allocTldCursor(TLD* t) {
+    int bi = t->nextSlot;
+    if(__builtin_expect(bi < t->slotsLeft, 1)) {
+        Page* p = t->current[0];
+        Obj* o = (Obj*)((char*)p + p->firstSlotOffset + (long)bi * 32);
+        o->cls = &theClass; o->heapPosition = -3;
+        atomic_store_explicit((_Atomic int*)&o->mark, -1, memory_order_release);
+        t->nextSlot = bi + 1;
+        atomic_store_explicit(&p->bumpIndex, bi + 1, memory_order_release);
+        return o;
+    }
+    return 0;
+}
+static uint64_t runTldCursor(long n){ uint64_t a=0; for(long i=0;i<n;i++){ if((i&(SLOTS-1))==0){ resetPage(); theTld.nextSlot=0; theTld.slotsLeft=SLOTS; } a+=(uintptr_t)allocTldCursor(&theTld);} return a; }
+
+static uint64_t runRelCursor(long n){ uint64_t a=0; for(long i=0;i<n;i++){ if((i&(SLOTS-1))==0) resetPage(); a+=(uintptr_t)allocRelCursor(&theTld);} return a; }
+static uint64_t runRlxCursor(long n){ uint64_t a=0; for(long i=0;i<n;i++){ if((i&(SLOTS-1))==0) resetPage(); a+=(uintptr_t)allocRlxCursor(&theTld);} return a; }
+static uint64_t runRlxBoth(long n)  { uint64_t a=0; for(long i=0;i<n;i++){ if((i&(SLOTS-1))==0) resetPage(); a+=(uintptr_t)allocRlxBoth(&theTld);} return a; }
+
 static uint64_t runBigZero(long n)   { uint64_t a=0; for(long i=0;i<n;i++){ if(i % BIG_SLOTS == 0) resetPage(); a += (uintptr_t)allocBigZero(&theTld); } return a; }
 static uint64_t runBigNoZero(long n) { uint64_t a=0; for(long i=0;i<n;i++){ if(i % BIG_SLOTS == 0) resetPage(); a += (uintptr_t)allocBigNoZero(&theTld); } return a; }
 
@@ -264,6 +336,14 @@ int main(void) {
         { "G 96B: 1d, page zeroed at format", runBigPageZero, 0 },
     };
     cn1BenchRun("ALLOCATION FAST PATH (96-byte object)", big, 3, 4000000, 9);
+    cn1BenchArm ord[] = {
+        { "H today: mark release + cursor release", runRelCursor, 0 },
+        { "I cursor relaxed (unsound as-is)", runRlxCursor, 0 },
+        { "J both relaxed (floor)", runRlxBoth, 0 },
+        { "K release kept, cursor in TLD", runTldCursor, 0 },
+    };
+    cn1BenchRun("STORE-RELEASE COST IN THE BUMP PATH", ord, 4, 8000000, 9);
+
     if(cn1BenchSink == 12345) printf("unreachable\n");
     return 0;
 }
