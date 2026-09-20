@@ -4830,3 +4830,62 @@ a selfhost gate that exited 0 after `mvn clean` deleted its classpath file. A
 check satisfiable by "nothing happened" is not a check. self-test7 therefore
 reads the CHECK COUNT from the clean arm as well as the violation count -- a
 driver that shifted nothing would report zero violations and look perfect.
+
+---
+
+## Round 30: I/O was waved away, then measured, and it is not the gap
+
+Round 27's profile put 11.8% of mutator time in open/write/close, and it was
+dismissed in passing with "HotSpot does the same I/O". That was never measured,
+and the split inside the 11.8% argued against it: `open` 7.0%, `close` 3.9%,
+bulk `write` not in the top ten. A per-file syscall cost is exactly where an AOT
+runtime's own stream implementation can differ from HotSpot's.
+
+`IoBench` + `run-io-benchmark.sh` measure it with the translator's OWN API
+shapes, because the question is whether our implementation of these calls is
+slower, not whether a better API exists:
+
+| arm | call site it mirrors | parpar | JDK 25 | ratio |
+|---|---|---:|---:|---:|
+| writeWhole | `Parser.writeFile`: open, ONE write, close | 15.45ms | 15.36ms | 1.006x |
+| openCloseOnly | the per-file syscall path alone | 3.55 | 3.83 | 0.929x |
+| readChunked | `FileInputStream` -> ASM `ClassReader` | 4.67 | 5.32 | 0.878x |
+| readFully | `DataInputStream.readFully` | 4.13 | 4.48 | 0.921x |
+| copyStreams | `ByteCodeTranslator.copy`, 8192B chunks | 17.96 | 21.63 | 0.830x |
+| writeManySmall | `ConcatenatingFileOutputStream` | 0.58 | 4.22 | **0.138x** |
+
+**We match or beat HotSpot on every shape.** The worst arm is 1.006x. So the
+11.8% is real work that HotSpot pays equally -- the dismissal was right, and was
+worth the hour to confirm rather than assert. `writeManySmall` at 0.138x is this
+VM's FileOutputStream buffering small writes where HotSpot's does not: 3,200
+writes are 3,200 syscalls there and far fewer here.
+
+### The directory-size theory, also dead
+
+`openCloseOnly` measures 8.5us per file while the profile implies far more, and
+the one structural difference was that the benchmark used 400 files in a fresh
+directory against the translator's ~2,933 in a single one. APFS create cost is
+flat in directory size:
+
+| files in one dir | parpar us/file | jdk25 us/file |
+|---:|---:|---:|
+| 400 | 39.38 | 36.66 |
+| 1200 | 41.11 | 38.20 |
+| 3000 | 41.63 | 41.99 |
+
+(These include create + 30KB write + close, so they are consistent with the
+8.5us open+close figure rather than contradicting it.)
+
+### A flaw in this harness, found before trusting it
+
+The cross-check inherited from `run-benchmark.sh` compares a checksum computed
+from bytes handed to `write()` -- not bytes that reached the disk. Given that
+writeManySmall is 7.5x faster precisely BECAUSE this VM buffers, a buffer that
+dropped its tail on close would post an identical checksum and an even better
+time. `IoBench` now reads the bytes back and compares them, and the runner
+treats a MISSING verify line as failure: "the check did not run" must not read
+as "the check passed". Both arms emit `IOBENCH VERIFY OK bytes=4096`.
+
+That is the fourth instance in four rounds of a check that could report success
+without having run. It is worth treating as the default hypothesis about any
+green result in this tree, not as a recurring surprise.
