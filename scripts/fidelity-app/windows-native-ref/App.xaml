@@ -50,12 +50,31 @@
                 read described above.
 
                 The symptom is quieter than the backdrop's was, which is why it survived a
-                review round. In light mode the brushes happen to be right. In dark mode the
-                captured rule was #1E1E1E on a #202020 tile and the frame the same, DARKER
-                than the surface behind them, when both of these resources are a translucent
-                WHITE in the dark theme and must come out lighter. What was actually captured
-                is the LIGHT theme's translucent black composited onto the dark tile:
-                0x20 * (1 - 15/255) is 0x1E, to the number. The result reads as a blank tile.
+                review round. In light mode both brushes happen to be right; in dark mode both
+                captured #1E1E1E on a #202020 tile, which is the LIGHT theme's translucent
+                black composited onto the dark tile: 0x20 * (1 - 15/255) is 0x1E, to the
+                number.
+
+                What the two resources then do in the dark theme is NOT the same, and the
+                capture that confirmed the fix is what says so:
+
+                  DividerStrokeColorDefault is translucent black in light and translucent
+                  WHITE in dark, so the corrected rule came out #323232, lighter than the
+                  surface it divides, contrast 18 against 2 before, in the same band as the
+                  Aqua (21) and Adwaita (29) references.
+
+                  CardStrokeColorDefault is translucent black in BOTH themes, just at a
+                  different alpha, so the corrected frame came out #1D1D1D: right resource,
+                  and still nearly invisible. 0x20 * (1 - 25/255) is 0x1D, also to the number,
+                  which is how we know it is now resolving the dark brush rather than still
+                  resolving the light one that lands 1 away from it.
+
+                That second one is a real Fluent design and not a bug to chase here: a card
+                stroke is drawn around a CardBackgroundFillColorDefaultBrush fill that is
+                LIGHTER than the page, and it is the fill the stroke reads against. This
+                reference draws the stroke with no fill, so the dark frame stays faint. Giving
+                it the fill would be the faithful thing and would also change what the CN1
+                GroupBox UIID has to match, so it is left alone and written down instead.
             -->
             <Style x:Key="SeparatorRuleStyle" TargetType="Border">
                 <Setter Property="Background" Value="{ThemeResource DividerStrokeColorDefaultBrush}" />
