@@ -256,10 +256,38 @@ public class TextFieldRenderElement extends RenderElement {
      * form, would otherwise show a white placeholder on a light fill.</p>
      */
     private void applyTextStyle(com.codename1.ui.TextField tf, InputDecoration d) {
-        applyOne(tf.getAllStyles(), textField().getStyle());
+        applyOne(tf.getAllStyles(), inputStyle());
         if (tf.getHintLabel() != null) {
             applyOne(tf.getHintLabel().getAllStyles(), hintStyle(d));
         }
+    }
+
+    /**
+     * The type the input itself is set in: the theme's {@code bodyLarge}, with the
+     * field's own style over it.
+     *
+     * <p>Only the field's own style was applied, so a field that states none -- which is
+     * most of them -- fell back to whatever Codename One's default font happens to be
+     * and ignored the theme entirely. The Rally study is where that shows: it sets
+     * {@code bodyLarge} to a 40-point serif, and its login fields came up in small sans
+     * where the reference reads them in large serif.</p>
+     *
+     * <p>{@code bodyLarge} rather than {@code titleMedium}: the latter is the Material 2
+     * answer, which this used. Material 3 resolves a text field's style through
+     * {@code _m3InputStyle}, and that is {@code textTheme.bodyLarge}.</p>
+     */
+    private com.codename1.flutter.TextStyle inputStyle() {
+        com.codename1.flutter.TextStyle style = new com.codename1.flutter.TextStyle();
+        try {
+            ThemeData theme = Theme.of(this);
+            if (theme != null && theme.textTheme() != null) {
+                style = style.merge(theme.textTheme().bodyLarge());
+            }
+        } catch (Throwable noTheme) {
+            // a field outside any theme still has to render
+        }
+        return textField().getStyle() == null ? style
+                : style.merge(textField().getStyle());
     }
 
     /**
@@ -276,19 +304,24 @@ public class TextFieldRenderElement extends RenderElement {
         com.codename1.flutter.Color tint = null;
         try {
             ThemeData theme = Theme.of(this);
-            if (theme.textTheme() != null) {
-                style = style.merge(theme.textTheme().titleMedium());
-            }
+            style = style.merge(inputStyle());
             tint = theme.hintColor() != null ? theme.hintColor()
                     : defaultHintColor(theme.brightness());
         } catch (Throwable noTheme) {
             tint = null;
         }
-        if (textField().getStyle() != null) {
-            style = style.merge(textField().getStyle());
-        }
         if (tint != null) {
             style.color(tint);
+        }
+        // The ambient inputDecorationTheme's labelStyle, over the tint.
+        //
+        // It was never read, so a theme that states the colour of its labels did not get
+        // it and every field fell back to the generic hint colour. The Rally study sets
+        // one, and its login labels came out dark on a dark background where the
+        // reference reads them in light grey.
+        InputDecorationThemeData themed = inputDecorationTheme();
+        if (themed != null && themed.getLabelStyle() != null) {
+            style = style.merge(themed.getLabelStyle());
         }
         com.codename1.flutter.TextStyle explicit = d == null ? null : d.getHintStyle();
         return explicit == null ? style : style.merge(explicit);
