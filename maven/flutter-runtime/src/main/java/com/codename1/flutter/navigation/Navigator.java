@@ -150,7 +150,17 @@ public class Navigator extends StatelessWidget {
     public static void push(BuildContext context, MaterialPageRoute route) {
         RouteEntry e = new RouteEntry(route);
         if (Display.isInitialized()) {
-            e.previousForm = Display.getInstance().getCurrent();
+            // The form to come BACK to, which during a pop's transition is not the
+            // form on screen.
+            //
+            // Display.getCurrent() still answers the page being left until the
+            // transition that replaces it finishes, so a push issued while a pop is
+            // still animating recorded the popped page as its own previous form --
+            // and that page then never left. Driven route to route, the first study
+            // opened sat behind every screen for the rest of the run, and popping
+            // back from any of them returned to it rather than to the page beneath.
+            e.previousForm = returningTo != null
+                    ? returningTo : Display.getInstance().getCurrent();
             RenderHost host = FlutterUI.mountInNewForm(new RouteWidget(route), pushingElement(context));
             e.form = host.form();
             e.rootElement = host.rootElement();
@@ -211,11 +221,16 @@ public class Navigator extends StatelessWidget {
             // animation queue drains, which is exactly when the popped page stops being
             // on screen.
             unmountWhenShown(e.previousForm, e.rootElement);
+            returningTo = e.previousForm;
             e.previousForm.showBack();
         } else if (e.rootElement != null) {
             FlutterUI.unmountTree(e.rootElement);
         }
     }
+
+    /// The form a pop is on its way back to, for as long as that is still in
+    /// flight. Null at rest.
+    private static Form returningTo;
 
     /// Unmounts {@code tree} the first time {@code form} finishes being shown.
     private static void unmountWhenShown(Form form, final Element tree) {
@@ -229,6 +244,9 @@ public class Navigator extends StatelessWidget {
             @Override
             public void actionPerformed(ActionEvent ev) {
                 f.removeShowListener(once[0]);
+                if (returningTo == f) {
+                    returningTo = null;
+                }
                 FlutterUI.unmountTree(tree);
             }
         };
