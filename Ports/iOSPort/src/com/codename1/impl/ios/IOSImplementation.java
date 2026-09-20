@@ -2925,6 +2925,22 @@ public class IOSImplementation extends CodenameOneImplementation {
     protected String nativeThemeMode() {
         return iosMode == null ? "auto" : iosMode.toLowerCase();
     }
+
+    /// Which generation of the MODERN theme this build ships. "26" or "27",
+    /// emitted into the generated stub by IPhoneBuilder from the
+    /// ios.themeGeneration hint. Defaults to 26 so a build that says nothing --
+    /// including one produced before the hint existed -- keeps the theme it had.
+    private static String iosThemeGeneration = "26";
+
+    /// Invoked from the generated stub (do not rename).
+    public static void setIosThemeGeneration(String g) {
+        iosThemeGeneration = g;
+    }
+
+    /// The modern theme resource for the requested generation, without ".res".
+    protected String modernThemeResourceName() {
+        return "27".equals(iosThemeGeneration) ? "iOSModern27Theme" : "iOSModernTheme";
+    }
     
     private static boolean waitForAnimationLock(Form f) {
         while (!f.grabAnimationLock()) {
@@ -2990,7 +3006,23 @@ public class IOSImplementation extends CodenameOneImplementation {
             // Display.setProperty("ios.themeMode", "modern") before the
             // first Form is shown.
             if(mode.equals("modern") || mode.equals("liquid")) {
-                InputStream in = getResourceAsStream("/iOSModernTheme.res");
+                String want = modernThemeResourceName();
+                InputStream in = getResourceAsStream("/" + want + ".res");
+                if (in == null && !"iOSModernTheme".equals(want)) {
+                    // A generation the bundle does not carry. Falling through
+                    // silently would drop the app onto iOS 7 -- a bigger change
+                    // than the one that was asked for, and one that also loses
+                    // dark mode, since the iOS 7 theme has no $Dark styles at
+                    // all. Say so, then use the generation that IS shipped.
+                    //
+                    // IPhoneBuilder rejects an unknown ios.themeGeneration
+                    // outright, so a real build cannot reach this; it exists for
+                    // a framework build whose themes have not been generated.
+                    System.out.println("Codename One: /" + want + ".res is not in the"
+                            + " app bundle, but ios.themeGeneration asked for it."
+                            + " Falling back to iOSModernTheme.res (generation 26).");
+                    in = getResourceAsStream("/iOSModernTheme.res");
+                }
                 if (in != null) {
                     r = Resources.open(in);
                     Hashtable tp = r.getTheme(r.getThemeResourceNames()[0]);

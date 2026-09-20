@@ -41,6 +41,18 @@ generated from `native-themes/android-material/theme.css`.
 existing apps). `legacy` is the pre-Holo theme. The legacy
 alias `cn1.androidTheme` is still honored for back-compat.
 
+|`ios.themeGeneration`
+|`26` (default) +
+`27`
+|Which iOS design generation the modern theme targets. Consulted
+only when `ios.themeMode` resolves to modern; the iOS 7 and
+pre-flat looks have one generation each and ignore it. Unset is
+`26`, so an existing project keeps the theme it has. `27` is a
+real design change rather than a version bump -- 31 of the 68
+native reference tiles differ, concentrated in the Liquid Glass
+surfaces and the bar and button chrome built on them, while the
+classic form controls are identical.
+
 |`nativeTheme`
 |`modern` / `legacy` / `custom`
 |Cross-platform shortcut that sets both `ios.themeMode` and

@@ -68,6 +68,15 @@ public class NativeThemeLightDarkConsistencyTest extends UITestBase {
         assertLightDarkBorderShapeParity("iOSModernTheme.res");
     }
 
+    /// The iOS 27 generation is a separate .res built from the same common.css,
+    /// so it can diverge only where gen27.css says so -- and a dark-mode gap
+    /// introduced there would be invisible in the 26 theme this suite already
+    /// covers.
+    @Test
+    public void iosModern27LightAndDarkBorderShapesMatch() throws Exception {
+        assertLightDarkBorderShapeParity("iOSModern27Theme.res");
+    }
+
     @Test
     public void androidMaterialLightAndDarkBorderShapesMatch() throws Exception {
         assertLightDarkBorderShapeParity("AndroidMaterialTheme.res");

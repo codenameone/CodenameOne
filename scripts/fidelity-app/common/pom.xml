@@ -176,6 +176,7 @@
                                 <copy todir="${project.build.outputDirectory}" verbose="true">
                                     <fileset dir="${project.basedir}/../../../Themes">
                                         <include name="iOSModernTheme.res"/>
+                                        <include name="iOSModern27Theme.res"/>
                                         <include name="AndroidMaterialTheme.res"/>
                                         <include name="WindowsFluentTheme.res"/>
                                         <include name="MacOSAquaTheme.res"/>
