@@ -96,6 +96,10 @@ public class ContainerTransformTransition extends Transition {
     /// Whether this instance is the CLOSE half, which runs on the mirrored curve.
     private boolean closing;
 
+    /// Whether the thing being grown out of was round, which changes the SHAPE of the
+    /// travelling surface for the whole run -- see the squash in paint.
+    private boolean originRound;
+
     private ContainerTransformTransition(String componentName, int duration) {
         this.componentName = componentName;
         this.duration = duration;
@@ -185,16 +189,41 @@ public class ContainerTransformTransition extends Transition {
             startH = Math.max(1, origin.getHeight());
             // A round thing stays round while it grows; anything else keeps its corners.
             startRadius = Math.min(startW, startH) / 2;
+            // Square to within a pixel or two IS the test for round: a circular button is
+            // the only thing that can have been one, and the squash below would be wrong
+            // for a card.
+            originRound = Math.abs(startW - startH) <= Math.max(2, startW / 16);
             surfaceColor = origin.getStyle().getBgColor();
             openColor = openPage().getStyle().getBgColor();
-            // WITH its background. A button's colour usually comes from its border or a
-            // painter rather than from bgColor, so a snapshot without the background is a
-            // bare glyph and the style's colour is whatever the theme happened to set --
-            // which is how the surface came out pale where the reference's button is
-            // still its own colour for the first fifth of the run.
+            // Cut out of the PAGE's snapshot, not painted from the component.
+            //
+            // The named component is the tapped surface itself, and what is drawn on top
+            // of it -- a glyph, a label, a whole row -- can be a separate component beside
+            // it rather than a child of it. Painting the component alone therefore gave a
+            // bare capsule: the compose button's pencil was simply absent from the card
+            // for the whole transform, where the reference carries it the entire way.
+            // The page has already been photographed a few lines above, and in that
+            // photograph the button is whole.
+            Image anchorShot = closing ? destBuffer : sourceBuffer;
             originBuffer = Image.createImage(startW, startH, 0);
-            origin.paintComponent(originBuffer.getGraphics(), true);
-            surfaceColor = centreColor(originBuffer, origin.getStyle().getBgColor());
+            if (anchorShot != null) {
+                originBuffer.getGraphics().drawImage(anchorShot, -startX, -startY);
+            } else {
+                origin.paintComponent(originBuffer.getGraphics(), true);
+            }
+            // The commonest colour in it, not the middle pixel: the middle of a button is
+            // usually its glyph, and taking that made the growing surface the colour of
+            // the icon instead of the colour of the button.
+            surfaceColor = dominantColor(originBuffer, origin.getStyle().getBgColor());
+            // ...and then keep only what was drawn ON the button.
+            //
+            // A cut-out of the page brings the page with it: the compose button sits in
+            // the notch of the bottom bar, so its rectangle is mostly dark bar, and scaled
+            // four times into the card that read as a black frame around the glyph. What
+            // belongs to the button is what lies inside its outline and is not its own
+            // colour -- which is exactly its content, and the card is already painting the
+            // colour underneath it.
+            originBuffer = maskToContent(originBuffer, startW, startH, surfaceColor, originRound);
         }
     }
 
@@ -295,13 +324,44 @@ public class ContainerTransformTransition extends Transition {
         int y = lerp(startY, 0, t);
         int w = lerp(startW, fullW, t);
         int h = lerp(startH, fullH, t);
-        int radius = lerp(startRadius, 0, t);
+
+        // The SHAPE is not the rectangle. Material lerps the tapped thing's outline into
+        // the page's, and a circle squashes the rectangle toward a square about its centre
+        // as it goes -- that is what keeps a round button looking round instead of
+        // stretching into a lozenge the instant it starts to grow.
+        //
+        // It is most of the geometry, not a rounding detail. Measured against the
+        // reference at the middle of the close, the rectangle is 685 x 1392 and the
+        // painted surface 685 x 1066: the same box and the same centre, 326 pixels
+        // shorter. Painting the rectangle itself put a third of the card's height in the
+        // wrong place for the whole run.
+        float circularity = originRound ? 1f - t : 0f;
+        int px = x;
+        int py = y;
+        int pw = w;
+        int ph = h;
+        if (circularity > 0) {
+            if (w < h) {
+                int d = (int) (circularity * (h - w) / 2f);
+                py += d;
+                ph -= 2 * d;
+            } else {
+                int d = (int) (circularity * (w - h) / 2f);
+                px += d;
+                pw -= 2 * d;
+            }
+        }
+        // Off the UNADJUSTED box, as Flutter's _adjustBorderRadius is: the radius that
+        // makes the squashed box a circle is half the short side of the box it came from.
+        int radius = originRound
+                ? (int) (circularity * Math.min(w, h) / 2f)
+                : lerp(startRadius, 0, t);
 
         int[] clip = g.getClip();
         if (radius > 0 && g.isShapeClipSupported()) {
-            g.setClip(roundRect(x, y, w, h, radius));
+            g.setClip(roundRect(px, py, pw, ph, radius));
         } else {
-            g.setClip(x, y, w, h);
+            g.setClip(px, py, pw, ph);
         }
 
         // The surface holds the tapped thing's colour for the first fifth, crosses to the
@@ -309,7 +369,7 @@ public class ContainerTransformTransition extends Transition {
         // Opening runs the tapped thing's colour to the page's; closing runs it back.
         g.setColor(closing ? blend(openColor, surfaceColor, cross)
                 : blend(surfaceColor, openColor, cross));
-        g.fillRect(x, y, w, h);
+        g.fillRect(px, py, pw, ph);
 
         // Both contents are drawn at their OWN size scaled to the box's WIDTH, anchored
         // at its top-left corner.
@@ -321,17 +381,14 @@ public class ContainerTransformTransition extends Transition {
         // height: the aspect ratios of a button and a page have nothing to do with each
         // other, and fitting the width is what keeps the text at the size the box implies.
         //
-        // The tapped thing fades over the FIRST fifth of the way in -- gone before the
-        // page begins to appear, so the two are never both half visible -- and fades back
-        // in across the whole of the way out.
-        float closedAlpha = closing
-                ? Math.max(0f, (linear - FIFTH) / (1f - FIFTH))
-                : Math.max(0f, 1f - linear / FIFTH);
-        if (originBuffer != null && closedAlpha > 0) {
-            int old = g.getAlpha();
-            g.setAlpha((int) (255 * Math.min(1f, closedAlpha)));
+        // The tapped thing stays FULLY OPAQUE the whole way and is simply covered as the
+        // page arrives over it. That is what the fade variant of the transform does -- its
+        // closed content has a constant opacity of 1 and only the page's opacity moves --
+        // and it is the visible difference between a button that becomes the page and two
+        // pictures dissolving into each other. Measured on the reference at the middle of
+        // the close, the pencil inside the shrinking card is pure black, not a tint.
+        if (originBuffer != null) {
             drawFittedToWidth(g, originBuffer, x, y, w);
-            g.setAlpha(old);
         }
 
         float open = closing ? 1f - cross : cross;
@@ -371,15 +428,21 @@ public class ContainerTransformTransition extends Transition {
         }
         path.reset();
         int rad = Math.min(r, Math.min(w, h) / 2);
+        // CLOCKWISE, explicitly. GeneralPath.arcTo defaults to counter-clockwise, and the
+        // rectangle below is walked clockwise, so every corner took the long way round --
+        // a 270 degree sweep that bulges back into the box instead of a 90 degree one.
+        // With a small radius that reads as a slightly soft corner; with a large one the
+        // shape is unrecognisable, and this transition's corners reach half the short side
+        // at the start of the run.
         path.moveTo(x + rad, y);
         path.lineTo(x + w - rad, y);
-        path.arcTo(x + w - rad, y + rad, x + w, y + rad);
+        path.arcTo(x + w - rad, y + rad, x + w, y + rad, true);
         path.lineTo(x + w, y + h - rad);
-        path.arcTo(x + w - rad, y + h - rad, x + w - rad, y + h);
+        path.arcTo(x + w - rad, y + h - rad, x + w - rad, y + h, true);
         path.lineTo(x + rad, y + h);
-        path.arcTo(x + rad, y + h - rad, x, y + h - rad);
+        path.arcTo(x + rad, y + h - rad, x, y + h - rad, true);
         path.lineTo(x, y + rad);
-        path.arcTo(x + rad, y + rad, x + rad, y);
+        path.arcTo(x + rad, y + rad, x + rad, y, true);
         path.closePath();
         return path;
     }
@@ -388,14 +451,74 @@ public class ContainerTransformTransition extends Transition {
         return from + (int) ((to - from) * t);
     }
 
-    /// The colour at the middle of a snapshot, which is the surface colour of whatever
-    /// was tapped however it came to be painted. Falls back to {@code fallback} where the
-    /// middle pixel is transparent.
-    private static int centreColor(Image img, int fallback) {
+    /// Clears everything outside the tapped thing's outline, and everything inside it that
+    /// is the thing's own colour, leaving its content on transparency.
+    private static Image maskToContent(Image img, int w, int h, int surface, boolean round) {
+        try {
+            int[] px = img.getRGB();
+            int cx = w / 2;
+            int cy = h / 2;
+            // Inside the outline by a few pixels. The edge of a round button is
+            // anti-aliased against whatever is behind it, so the outermost ring is neither
+            // the button's colour nor its content -- and magnified four times it drew a
+            // pale arc across the card that belongs to nothing.
+            int rad = Math.min(w, h) / 2;
+            rad -= Math.max(2, rad / 12);
+            int radSq = rad * rad;
+            int sr = (surface >> 16) & 0xff;
+            int sg = (surface >> 8) & 0xff;
+            int sb = surface & 0xff;
+            for (int y = 0; y < h; y++) {
+                for (int x = 0; x < w; x++) {
+                    int i = y * w + x;
+                    if (round) {
+                        int dx = x - cx;
+                        int dy = y - cy;
+                        if (dx * dx + dy * dy > radSq) {
+                            px[i] = 0;
+                            continue;
+                        }
+                    }
+                    int p = px[i];
+                    if (Math.abs(((p >> 16) & 0xff) - sr) <= TOLERANCE
+                            && Math.abs(((p >> 8) & 0xff) - sg) <= TOLERANCE
+                            && Math.abs((p & 0xff) - sb) <= TOLERANCE) {
+                        px[i] = 0;
+                    }
+                }
+            }
+            return Image.createImage(px, w, h);
+        } catch (Throwable t) {
+            return img;
+        }
+    }
+
+    /// How close to the surface colour counts as the surface rather than its content.
+    private static final int TOLERANCE = 24;
+
+    /// The commonest opaque colour in a snapshot, which is the surface colour of whatever
+    /// was tapped however it came to be painted. Falls back to {@code fallback} when the
+    /// snapshot is empty or unreadable.
+    private static int dominantColor(Image img, int fallback) {
         try {
             int[] rgb = img.getRGB();
-            int px = rgb[(img.getHeight() / 2) * img.getWidth() + img.getWidth() / 2];
-            return ((px >>> 24) & 0xff) < 128 ? fallback : (px & 0xffffff);
+            java.util.HashMap counts = new java.util.HashMap();
+            int best = fallback;
+            int bestN = 0;
+            for (int iter = 0; iter < rgb.length; iter++) {
+                if (((rgb[iter] >>> 24) & 0xff) < 128) {
+                    continue;
+                }
+                Integer key = new Integer(rgb[iter] & 0xffffff);
+                Object prev = counts.get(key);
+                int n = prev == null ? 1 : ((Integer) prev).intValue() + 1;
+                counts.put(key, new Integer(n));
+                if (n > bestN) {
+                    bestN = n;
+                    best = key.intValue();
+                }
+            }
+            return bestN == 0 ? fallback : best;
         } catch (Throwable t) {
             return fallback;
         }
