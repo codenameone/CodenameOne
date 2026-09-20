@@ -47,11 +47,11 @@ public final class IOSNative {
     //native void startMainThread(Runnable r);
     native void initVM();
 
-    /// Returns true on iOS builds compiled with -Dios.metal=true (i.e.
-    /// CN1_USE_METAL is defined in CN1ES2compat.h). Java-side code that
-    /// needs to branch between the GL and Metal mutable-image rendering
-    /// paths queries this once at init -- there is no other reliable
-    /// source of truth on the Java side since the build flag only
+    /// Returns true when CN1_USE_METAL is defined in CN1RenderBackend.h, which
+    /// is every slice but watchOS. Java-side code that needs to branch
+    /// between the Core Graphics and Metal mutable-image rendering paths
+    /// queries this once at init -- there is no other reliable source of
+    /// truth on the Java side, since which slice is being built only
     /// affects native compilation.
     native boolean isMetalRendering();
     native boolean calendarSupported();
@@ -185,7 +185,7 @@ public final class IOSNative {
 
     /// Metal-only multi-stop gradient bridge to CN1MetalFillGradient. positions
     /// holds stopCount entries in [0, 1]; premultipliedRgba holds stopCount * 4
-    /// floats. On GL builds this method is a no-op. mutable is true when the
+    /// floats. It is a no-op where Metal is absent. mutable is true when the
     /// fill targets the current mutable image's offscreen MTLTexture.
     native void fillGradient(int kind, int stopCount, float[] positions, float[] premultipliedRgba,
                              int cycleMethod, float angleOrFromAngle,

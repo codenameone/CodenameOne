@@ -35,10 +35,6 @@
 #if TARGET_OS_MACCATALYST
 #import "CN1MacWindows.h"
 #endif
-// The OpenGL ES backend. Absent on macOS, where this port is Metal-only.
-#if !TARGET_OS_OSX
-#import "EAGLView.h"
-#endif
 #ifdef CN1_USE_METAL
 #import "METALView.h"
 #import "CN1Metalcompat.h"
@@ -94,10 +90,7 @@
 #include "com_codename1_impl_ios_ZoozPurchase.h"
 #include "com_codename1_ui_plaf_UIManager.h"
 #include "com_codename1_payment_Receipt.h"
-#import "CN1ES2compat.h"
-#ifdef USE_ES2
-#import <GLKit/GLKit.h>
-#endif
+#import "CN1RenderBackend.h"
 #include "java_lang_System.h"
 
 static char cn1MainQueueSpecificKey;
@@ -1011,7 +1004,7 @@ void Java_com_codename1_impl_ios_IOSImplementation_editStringAtImpl
     }
     //CN1Log(@"Java_com_codename1_impl_ios_IOSImplementation_editStringAtImpl");
     currentlyEditingMaxLength = maxSize;
-    // Honored by the UITextView shouldChangeTextInRange: delegate (EAGLView/METALView) to
+    // Honored by the UITextView shouldChangeTextInRange: delegate (METALView) to
     // intercept Return on multi-line text areas when the iosReturnExitsEditing client
     // property is set on the editing component.
     currentlyReturnExitsEditing = returnExitsEditing && !isSingleLine;
@@ -1168,7 +1161,7 @@ void Java_com_codename1_impl_ios_IOSImplementation_editStringAtImpl
                 utf.font = (BRIDGE_CAST CN1Font*)font;
             }
             utf.text = [NSString stringWithUTF8String:str];
-            utf.delegate = [[CodenameOne_GLViewController instance] eaglView];
+            utf.delegate = [[CodenameOne_GLViewController instance] renderingView];
             [utf setBackgroundColor:[UIColor clearColor]];
             
 #ifndef NEW_CODENAME_ONE_VM
@@ -1302,7 +1295,7 @@ void Java_com_codename1_impl_ios_IOSImplementation_editStringAtImpl
                 utv.font = (BRIDGE_CAST CN1Font*)font;
             }
             utv.text = [NSString stringWithUTF8String:str];
-            utv.delegate = [[CodenameOne_GLViewController instance] eaglView];
+            utv.delegate = [[CodenameOne_GLViewController instance] renderingView];
 
             // When iosReturnExitsEditing is set on a multi-line TextArea, present the
             // Return key as "Done" -- the actual exit-on-return is enforced by the
@@ -1917,7 +1910,7 @@ void Java_com_codename1_impl_ios_IOSImplementation_nativeFillArcMutableImpl
 #endif
 }
 
-// START ES2 ADDITION: Drawing Shapes ------------------------------------------------------------------------------
+// START: Drawing Shapes -------------------------------------------------------------------------------------------
 
 void Java_com_codename1_impl_ios_IOSImplementation_fillConvexPolygonImpl(JAVA_OBJECT points, int color, int alpha)
 {
@@ -1989,7 +1982,7 @@ void Java_com_codename1_impl_ios_IOSImplementation_drawTextureAlphaMaskImpl(JAVA
 
 }
 
-// END ES2 ADDITION -------------------------------------------------------------------------------------------------
+// END: Drawing Shapes ---------------------------------------------------------------------------------------------
 void com_codename1_impl_ios_IOSImplementation_nativeSetTransformImpl___float_float_float_float_float_float_float_float_float_float_float_float_float_float_float_float_int_int(JAVA_OBJECT instanceObject,
                                                                                                                                                                                JAVA_FLOAT a0, JAVA_FLOAT a1, JAVA_FLOAT a2, JAVA_FLOAT a3,
                                                                                                                                                                                JAVA_FLOAT b0, JAVA_FLOAT b1, JAVA_FLOAT b2, JAVA_FLOAT b3,
@@ -1998,12 +1991,10 @@ void com_codename1_impl_ios_IOSImplementation_nativeSetTransformImpl___float_flo
                                                                                                                                                                                JAVA_INT originX, JAVA_INT originY
                                                                                                                                                                                )
 {
-#ifdef USE_ES2
     //    dispatch_async(dispatch_get_main_queue(), ^{
-    // Equivalent to GLKMatrix4MakeAndTranspose(a..., b..., c..., d...):
-    // input is row-major; GLKMatrix4 stores column-major. Avoid the GLKit
-    // helper so the Mac Catalyst slice compiles without GLKit math symbols.
-    GLKMatrix4 m = (GLKMatrix4){ {
+    // The input is row-major and CN1Matrix4 stores column-major, so the
+    // literal below is the transpose of the arguments.
+    CN1Matrix4 m = (CN1Matrix4){ {
         a0, b0, c0, d0,
         a1, b1, c1, d1,
         a2, b2, c2, d2,
@@ -2016,7 +2007,6 @@ void com_codename1_impl_ios_IOSImplementation_nativeSetTransformImpl___float_flo
     [f release];
 #endif
     //    });
-#endif
 }
 
 void com_codename1_impl_ios_IOSImplementation_nativeSetTransformMutableImpl___float_float_float_float_float_float_float_float_float_float_float_float_float_float_float_float_int_int(JAVA_OBJECT instanceObject,
@@ -2031,10 +2021,9 @@ void com_codename1_impl_ios_IOSImplementation_nativeSetTransformMutableImpl___fl
     {
         GLUIImage *target = [CodenameOne_GLViewController instance].currentMutableImage;
         if (target == nil) return;
-        // Equivalent to GLKMatrix4MakeAndTranspose(a..., b..., c..., d...):
-        // input is row-major; GLKMatrix4 stores column-major. Avoid the GLKit
-        // helper so the Mac Catalyst slice compiles without GLKit math symbols.
-        GLKMatrix4 m = (GLKMatrix4){ {
+        // The input is row-major and CN1Matrix4 stores column-major, so the
+        // literal below is the transpose of the arguments.
+        CN1Matrix4 m = (CN1Matrix4){ {
             a0, b0, c0, d0,
             a1, b1, c1, d1,
             a2, b2, c2, d2,
@@ -2049,13 +2038,11 @@ void com_codename1_impl_ios_IOSImplementation_nativeSetTransformMutableImpl___fl
         return;
     }
 #endif
-#ifdef USE_ES2
     POOL_BEGIN();
     currentMutableTransformSet = NO;
-    // Equivalent to GLKMatrix4MakeAndTranspose(a..., b..., c..., d...):
-    // input is row-major; GLKMatrix4 stores column-major. Avoid the GLKit
-    // helper so the Mac Catalyst slice compiles without GLKit math symbols.
-    GLKMatrix4 m = (GLKMatrix4){ {
+    // The input is row-major and CN1Matrix4 stores column-major, so the
+    // literal below is the transpose of the arguments.
+    CN1Matrix4 m = (CN1Matrix4){ {
         a0, b0, c0, d0,
         a1, b1, c1, d1,
         a2, b2, c2, d2,
@@ -2063,11 +2050,11 @@ void com_codename1_impl_ios_IOSImplementation_nativeSetTransformMutableImpl___fl
     } };
 #if !TARGET_OS_WATCH
     CATransform3D output;
-    GLfloat glMatrix[16];
+    float rowMajor[16];
     CGFloat caMatrix[16];
 
-    memcpy(glMatrix, m.m, sizeof(glMatrix)); //insert GL matrix data to the buffer
-    for(int i=0; i<16; i++) caMatrix[i] = glMatrix[i]; //this will do the typecast if needed
+    memcpy(rowMajor, m.m, sizeof(rowMajor)); //copy the matrix into the buffer
+    for(int i=0; i<16; i++) caMatrix[i] = rowMajor[i]; //this will do the typecast if needed
 
     output = *((CATransform3D *)caMatrix);
 
@@ -2089,7 +2076,6 @@ void com_codename1_impl_ios_IOSImplementation_nativeSetTransformMutableImpl___fl
     }
 #endif
     POOL_END();
-#endif
 }
 
 
@@ -2606,12 +2592,10 @@ void Java_com_codename1_impl_ios_IOSImplementation_setNativeClippingGlobalImpl
 
 void Java_com_codename1_impl_ios_IOSImplementation_setNativeClippingMaskGlobalImpl(JAVA_LONG textureName, JAVA_INT x, JAVA_INT y, JAVA_INT w, JAVA_INT h)
 {
-#ifdef USE_ES2
     ClipRect* f = [[ClipRect alloc] initWithArgs:x ypos:y w:w h:h f:0 texture:textureName];
     [[CodenameOne_GLViewController instance] upcomingAddClip:f];
 #ifndef CN1_USE_ARC
     [f release];
-#endif
 #endif
 }
 
@@ -3229,32 +3213,13 @@ int isPainted() {
     return 0;
 }
 
-// Uniform index.
-enum {
-    UNIFORM_TRANSLATE,
-    NUM_UNIFORMS
-};
-GLint uniforms[NUM_UNIFORMS];
-
-// Attribute index.
-enum {
-    ATTRIB_VERTEX,
-    ATTRIB_COLOR,
-    NUM_ATTRIBUTES
-};
-
 #if !TARGET_OS_WATCH
 // UIKit-only declaration: the type in its signature does not exist on macOS,
 // so the whole declaration is dropped rather than just its body. Guarding
 // only the body would leave a signature naming an unknown type.
 #if !TARGET_OS_OSX
 @interface CodenameOne_GLViewController ()
-@property (nonatomic, retain) EAGLContext *context;
 @property (nonatomic, assign) CADisplayLink *displayLink;
-- (BOOL)loadShaders;
-- (BOOL)compileShader:(GLuint *)shader type:(GLenum)type file:(NSString *)file;
-- (BOOL)linkProgram:(GLuint)prog;
-- (BOOL)validateProgram:(GLuint)prog;
 @end
 #endif
 
@@ -3264,7 +3229,7 @@ enum {
 #if !TARGET_OS_OSX
 @implementation CodenameOne_GLViewController
 
-@synthesize context, displayLink, currentMutableImage, animating;
+@synthesize displayLink, currentMutableImage, animating;
 static CodenameOne_GLViewController *sharedSingleton;
 +(BOOL)isDrawTextureSupported {
 // UIKit-only helper. AppKit's equivalent is a different API rather than a
@@ -3290,7 +3255,7 @@ static CodenameOne_GLViewController *sharedSingleton;
 // entirely (TvNativeBuilder), so both pass nil to initWithNibName: and the
 // on it under Xcode 26), so CodenameOne_GLAppDelegate.m passes nil to
 // initWithNibName: and the default loadView would hand us a plain
-// CN1View. The rendering pipeline expects [eaglView] to find a METALView
+// CN1View. The rendering pipeline expects [renderingView] to find a METALView
 // in self.view or its subviews; without one CN1MetalSetDeviceAndCommand-
 // Queue never runs and CN1MetalGlyphAtlas+atlasForFont: returns nil for
 // every font ("no atlas available" on every CN1MetalDrawString). Build
@@ -3645,7 +3610,7 @@ bool lockDrawing;
     // the display width/height each time to match the view, without performing other resizing
     // details, so it is possible that the size change event still needs to be sent
     // even if the display width already matches the value we're given here.
-    [[self eaglView] updateFrameBufferSize:(int)(size.width * scaleValue) h:(int)(size.height * scaleValue)];
+    [[self renderingView] updateFrameBufferSize:(int)(size.width * scaleValue) h:(int)(size.height * scaleValue)];
     displayWidth = (int)size.width * scaleValue;
     displayHeight = (int)size.height * scaleValue;
     screenSizeChanged(displayWidth, displayHeight);
@@ -4126,11 +4091,9 @@ static BOOL cn1TakeFrameworkOwnedPress(long long identity) {
 }
 #endif
 
-#ifdef USE_ES2
-extern GLKMatrix4 CN1transformMatrix;
+extern CN1Matrix4 CN1transformMatrix;
 extern int CN1transformMatrixVersion;
-extern BOOL cn1CompareMatrices(GLKMatrix4 m1, GLKMatrix4 m2);
-#endif
+extern BOOL cn1CompareMatrices(CN1Matrix4 m1, CN1Matrix4 m2);
 
 -(CN1Image*)createSplashImage {
 // UIKit-only helper. AppKit's equivalent is a different API rather than a
@@ -4212,64 +4175,47 @@ extern BOOL cn1CompareMatrices(GLKMatrix4 m1, GLKMatrix4 m2);
 #endif
 }
 
-EAGLView* lastFoundEaglView;
+METALView* lastFoundRenderingView;
 /**
- * By default the view of the CodenameOne_GLViewController is an EAGLView object.  But
+ * By default the view of the CodenameOne_GLViewController is a METALView object.  But
  * if there are peer components, and they are to be painted behind, then the view hierarchy
  * is re-rooted with a parent.  This method is a convenience method in cases where
- * we need to obtain the EAGLView.
+ * we need to obtain the METALView.
  */
 // UIKit-only declaration: the type in its signature does not exist on macOS,
 // so the whole declaration is dropped rather than just its body. Guarding
 // only the body would leave a signature naming an unknown type.
 #if !TARGET_OS_OSX
--(EAGLView*) eaglView {
-// UIKit-only helper. AppKit's equivalent is a different API rather than a
-// renamed one, so this is inert on the native macOS port until it is ported.
-#if TARGET_OS_OSX
-    return nil;
-#else
-    // Under CN1_USE_METAL the rendering view is a METALView, not an EAGLView.
-    // Both classes conform to CN1RenderingView, so the return value is used
-    // through the shared protocol surface (setFramebuffer, presentFramebuffer,
-    // updateFrameBufferSize:h:, addPeerComponent:, peerComponentsLayer).
-    // The declared return type stays EAGLView* for ABI stability; the cast is
-    // duck-typed. Any EAGLView-only call site (e.g. -setContext:) is guarded
-    // by #ifndef CN1_USE_METAL.
-#ifdef CN1_USE_METAL
+-(METALView*) renderingView {
     Class renderingClass = [METALView class];
-#else
-    Class renderingClass = [EAGLView class];
-#endif
     if ([self.view class] == renderingClass) {
-        lastFoundEaglView = (EAGLView*)self.view;
-        return (EAGLView*)self.view;
+        lastFoundRenderingView = (METALView*)self.view;
+        return lastFoundRenderingView;
     }
     for (CN1View* child in self.view.subviews) {
 
         if ([child class] == renderingClass) {
-            lastFoundEaglView = (EAGLView*)child;
-            return (EAGLView*)child;
+            lastFoundRenderingView = (METALView*)child;
+            return lastFoundRenderingView;
         }
     }
-    if (lastFoundEaglView != nil && lastFoundEaglView.peerComponentsLayer != nil) {
+    if (lastFoundRenderingView != nil && lastFoundRenderingView.peerComponentsLayer != nil) {
         // This is an edge case that occurs if we add a peer component for the first time while
         // the app is in transition.  In this case, the new root would be added
         // to the UITransitionView, and when the transition is complete, the 
-        // AutoLayoutView has the original EAGL view added to it, but our view controller
-        // would lose the reference to the eagl view.
-        // We need to re-do the re-rooting of the EAGL view and peer components layer in this case.
-        CN1View* parent = [lastFoundEaglView superview];
-        CN1View* newRoot = [lastFoundEaglView.peerComponentsLayer superview];
-        [lastFoundEaglView removeFromSuperview];
-        [newRoot addSubview:lastFoundEaglView];
+        // AutoLayoutView has the original rendering view added to it, but our view controller
+        // would lose the reference to it.
+        // We need to re-do the re-rooting of the rendering view and peer components layer in this case.
+        CN1View* parent = [lastFoundRenderingView superview];
+        CN1View* newRoot = [lastFoundRenderingView.peerComponentsLayer superview];
+        [lastFoundRenderingView removeFromSuperview];
+        [newRoot addSubview:lastFoundRenderingView];
         [parent addSubview:newRoot];
         self.view = newRoot;
-        return lastFoundEaglView;
+        return lastFoundRenderingView;
     }
-    NSLog(@"EAGLView not found.  This is not good!!");
+    NSLog(@"METALView not found.  This is not good!!");
     return nil;
-#endif
 }
 #endif
 
@@ -4279,15 +4225,6 @@ EAGLView* lastFoundEaglView;
 // renamed one, so this is inert on the native macOS port until it is ported.
 #if TARGET_OS_OSX
 #else
-#if defined(USE_ES2) && !defined(CN1_USE_METAL)
-    // CN1transformMatrix/version + cn1CompareMatrices live in CN1ES2compat.m
-    // which is excluded from the Mac Catalyst slice. Skip them on Metal —
-    // CN1Metalcompat manages its own transform state.
-    if (!cn1CompareMatrices(GLKMatrix4Identity, CN1transformMatrix)) {
-        CN1transformMatrix = GLKMatrix4Identity;
-        CN1transformMatrixVersion = (CN1transformMatrixVersion+1)%10000;
-    }
-#endif
     retinaBug = isRetinaBug();
     if(retinaBug) {
         scaleValue = 1;
@@ -4296,45 +4233,10 @@ EAGLView* lastFoundEaglView;
     }
     sharedSingleton = self;
     [self initVars];
-#ifdef CN1_USE_METAL
-    // Metal builds never create an EAGLContext; the METALView owns its own
-    // MTLDevice / MTLCommandQueue. EAGLContext is unavailable on Mac
-    // Catalyst (OpenGLES.framework is absent from the macOS SDK) so we
-    // route around it entirely.
-    self.context = nil;
-#else
-#ifdef USE_ES2
-    EAGLContext *aContext = [[EAGLContext alloc] initWithAPI:kEAGLRenderingAPIOpenGLES2];
-#else
-    EAGLContext *aContext = [[EAGLContext alloc] initWithAPI:kEAGLRenderingAPIOpenGLES1];
-
-    if (!aContext) {
-        aContext = [[EAGLContext alloc] initWithAPI:kEAGLRenderingAPIOpenGLES1];
-    }
-#endif
-    if (!aContext)
-        CN1Log(@"Failed to create ES context");
-    else if (![EAGLContext setCurrentContext:aContext])
-        CN1Log(@"Failed to set ES context current");
-
-	self.context = aContext;
-#ifndef CN1_USE_ARC
-    [aContext release];
-#endif
-#endif // !CN1_USE_METAL
-
-#ifndef CN1_USE_METAL
-    // METALView has no GL context. Under CN1_USE_METAL this call is a no-op.
-    [[self eaglView] setContext:context];
-#endif
-    [[self eaglView] setFramebuffer];
+    [[self renderingView] setFramebuffer];
     //self.view.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
     //self.view.autoresizesSubviews = YES;
-    
-    //    if ([context API] == kEAGLRenderingAPIOpenGLES2)
-    //        [self loadShaders];
-    
-    
+
     animating = FALSE;
     animationFrameInterval = 1;
     self.displayLink = nil;
@@ -4344,9 +4246,6 @@ EAGLView* lastFoundEaglView;
     // path is GL-only. Default to true so behaviour matches a typical
     // device GL response.
     drawTextureSupported = YES;
-#else
-    const char* extensions = (const char*)glGetString(GL_EXTENSIONS);
-    drawTextureSupported = extensions == 0 || strstr(extensions, "OES_draw_texture") != 0;
 #endif
     //CN1Log(@"Draw texture extension %i", (int)drawTextureSupported);
     
@@ -4388,7 +4287,7 @@ EAGLView* lastFoundEaglView;
         int he = Java_com_codename1_impl_ios_IOSImplementation_getDisplayHeightImpl();
         
         //some hacking to scale launch image so that it will be drawn correctly
-        GLfloat xScale = 1;
+        float xScale = 1;
         int statusbarHeight = 20;
         if(isIOS7()) {
             statusbarHeight = 0;
@@ -4401,7 +4300,7 @@ EAGLView* lastFoundEaglView;
             
             gl = [[GLUIImage alloc] initWithImage:img];
             dr = [[DrawImage alloc] initWithArgs:255 xpos:0 ypos:0 i:gl w:img.size.width h:img.size.height];
-            [[self eaglView] setFramebuffer];
+            [[self renderingView] setFramebuffer];
         } else {
             //add statusbar fix 20 pix only if not an iPad a iPad Launch images height is without statusbar
             
@@ -4425,23 +4324,11 @@ EAGLView* lastFoundEaglView;
             }
             
             CN1Log(@"Drew image on %i, %i for display %i, %i", imgHeight, imgWidth, wi, he);
-            [[self eaglView] setFramebuffer];
+            [[self renderingView] setFramebuffer];
         }
 
         
-        GLErrorLog;
 
-#ifndef CN1_USE_METAL
-        // The _glScalef / _glTranslatef pair flips the splash image into the
-        // GL Y-up coordinate system used by DrawImage. On Metal builds the
-        // projection flip is handled inside CN1MetalBeginFrame so the
-        // manual setup is unnecessary; the helpers themselves live in
-        // CN1ES2compat.m which is excluded from the Mac Catalyst slice.
-        _glScalef(xScale, -1, 1);
-        GLErrorLog;
-        _glTranslatef(0, -he, 0);
-        GLErrorLog;
-#endif
 
         [dr execute];
 #ifndef CN1_USE_ARC
@@ -4449,16 +4336,8 @@ EAGLView* lastFoundEaglView;
         [dr release];
 #endif
 
-#ifndef CN1_USE_METAL
-        _glTranslatef(0, he, 0);
-        GLErrorLog;
 
-        _glScalef(xScale, -1, 1);
-        GLErrorLog;
-#endif
-
-        [[self eaglView] presentFramebuffer];
-        GLErrorLog;
+        [[self renderingView] presentFramebuffer];
     }
 #ifdef CN1_USE_STOREKIT
     [[SKPaymentQueue defaultQueue] addTransactionObserver:[CodenameOne_GLViewController instance]];
@@ -4647,22 +4526,7 @@ BOOL prefersStatusBarHidden = NO;
 // renamed one, so this is inert on the native macOS port until it is ported.
 #if TARGET_OS_OSX
 #else
-#ifndef CN1_USE_METAL
-    if (program) {
-        glDeleteProgram(program);
-        program = 0;
-    }
-#endif
 
-#ifndef CN1_USE_METAL
-    // Tear down context.
-    if ([EAGLContext currentContext] == context)
-        [EAGLContext setCurrentContext:nil];
-#endif
-
-#ifndef CN1_USE_ARC
-    [context release];
-#endif
 
 #ifdef INCLUDE_MOPUB
     self.adView = nil;
@@ -4724,20 +4588,6 @@ BOOL prefersStatusBarHidden = NO;
 #if TARGET_OS_OSX
 #else
 	[super viewDidUnload];
-
-#ifndef CN1_USE_METAL
-    if (program) {
-        glDeleteProgram(program);
-        program = 0;
-    }
-#endif
-
-#ifndef CN1_USE_METAL
-    // Tear down context.
-    if ([EAGLContext currentContext] == context)
-        [EAGLContext setCurrentContext:nil];
-#endif
-	self.context = nil;
 #endif
 }
 
@@ -4989,12 +4839,11 @@ BOOL prefersStatusBarHidden = NO;
     
     // simply create a property of 'BOOL' type
     // Pass physical pixels: viewWillTransitionToSize: fires before UIKit
-    // updates the view's bounds, so on the Metal backend the EAGLView's
-    // bounds read would still return the previous orientation. The
-    // METALView resize logic trusts these parameters; the EAGLView
-    // implementation is a no-op (#4954).
-    [[self eaglView] updateFrameBufferSize:(int)(size.width * scaleValue) h:(int)(size.height * scaleValue)];
-    [[self eaglView] deleteFramebuffer];
+    // updates the view's bounds, so a bounds read here would still return
+    // the previous orientation. The METALView resize logic trusts these
+    // parameters instead (#4954).
+    [[self renderingView] updateFrameBufferSize:(int)(size.width * scaleValue) h:(int)(size.height * scaleValue)];
+    [[self renderingView] deleteFramebuffer];
 
     displayWidth = (int)size.width * scaleValue;
     displayHeight = (int)size.height * scaleValue;
@@ -5056,8 +4905,8 @@ BOOL prefersStatusBarHidden = NO;
         return;
     }
 
-    [[self eaglView] updateFrameBufferSize:(int)(self.view.bounds.size.width * scaleValue) h:(int)(self.view.bounds.size.height * scaleValue)];
-    [[self eaglView] deleteFramebuffer];
+    [[self renderingView] updateFrameBufferSize:(int)(self.view.bounds.size.width * scaleValue) h:(int)(self.view.bounds.size.height * scaleValue)];
+    [[self renderingView] deleteFramebuffer];
 
     displayWidth = (int)self.view.bounds.size.width * scaleValue;
     displayHeight = (int)self.view.bounds.size.height * scaleValue;
@@ -5121,7 +4970,7 @@ BOOL prefersStatusBarHidden = NO;
         return;
     }
 #endif
-    id renderingView = [self eaglView];
+    id renderingView = [self renderingView];
 #ifdef CN1_USE_METAL
     BOOL hasScreenOps = NO;
     if (currentTarget != nil) {
@@ -5137,29 +4986,11 @@ BOOL prefersStatusBarHidden = NO;
     }
 #endif
     [renderingView setFramebuffer];
-    GLErrorLog;
     BOOL drewContentOps = NO;
     if(currentTarget != nil) {
         if([currentTarget count] > 0) {
             [ClipRect setDrawRect:rect];
             //CN1Log(@"Clipping rect to: %i, %i, %i %i", (int)rect.origin.x, (int)rect.origin.y, (int)rect.size.width, (int)rect.size.height );
-#ifndef CN1_USE_METAL
-            // _glScalef / _glTranslatef expand into glScalefES2 / glTranslatefES2
-            // which live in CN1ES2compat.m (excluded for Mac Catalyst). On
-            // Metal builds the projection flip is handled by CN1MetalBeginFrame
-            // / METALView so this manual setup is unnecessary.
-            _glScalef(1, -1, 1);
-            GLErrorLog;
-            _glTranslatef(0, -displayHeight, 0);
-            GLErrorLog;
-#endif // !CN1_USE_METAL
-            
-            /*if(((int)rect.size.width) != displayWidth || ((int)rect.size.height) != displayHeight) {
-             glScissor(rect.origin.x, displayHeight - rect.origin.y - rect.size.height, rect.size.width, rect.size.height);
-             glEnable(GL_SCISSOR_TEST);
-             glClearColor(1, 1, 1, 1);
-             glClear(GL_COLOR_BUFFER_BIT);
-             }*/
             
             //CN1Log(@"self.view.bounds.size.height %i displayHeight %i", (int)self.view.bounds.size.height, displayHeight);
             NSMutableArray* cp = nil;
@@ -5167,7 +4998,6 @@ BOOL prefersStatusBarHidden = NO;
                 cp = [currentTarget copy];
                 [currentTarget removeAllObjects];
             }
-            GLErrorLog;
 #ifdef CN1_USE_METAL
             // Phase 3 v2: walk the queue, switching encoders when target
             // changes. nil target = screen (already opened by setFramebuffer
@@ -5194,7 +5024,6 @@ BOOL prefersStatusBarHidden = NO;
                 // encoder set up by setFramebuffer.
                 if (opTarget != nil && !mutableEncoderOpen) continue;
                 [ex executeWithClipping];
-                GLErrorLog;
                 if (opTarget == nil) {
                     // Screen-targeted op: this present puts real content on
                     // the GL layer (a drain of only mutable-image ops doesn't).
@@ -5204,23 +5033,10 @@ BOOL prefersStatusBarHidden = NO;
             if (mutableEncoderOpen) {
                 CN1MetalEndMutableImageDraw(currentDrainTarget);
             }
-#else
-            drewContentOps = YES;
-            for(ExecutableOp* ex in cp) {
-                [ex executeWithClipping];
-                //[ex executeWithLog];
-                GLErrorLog;
-            }
 #endif
             //CN1Log(@"Total memory is: %i", [ExecutableOp get_free_memory]);
 #ifndef CN1_USE_ARC
             [cp release];
-#endif
-#ifndef CN1_USE_METAL
-        	_glTranslatef(0, displayHeight, 0);
-            GLErrorLog;
-            _glScalef(1, -1, 1);
-            GLErrorLog;
 #endif
 
             [DrawGradientTextureCache flushDeleted];
@@ -5295,10 +5111,8 @@ BOOL prefersStatusBarHidden = NO;
             }
         }
     }
-    GLErrorLog;
 
     [renderingView presentFramebuffer];
-    GLErrorLog;
     if (drewContentOps && !cn1LaunchPlaceholderDone) {
         // First frame with real content is on screen -- fade out the launch
         // placeholder installed by cn1InstallRootViewControllerIntoWindow.
@@ -5317,182 +5131,6 @@ BOOL prefersStatusBarHidden = NO;
     }
 }
 
-- (BOOL)compileShader:(GLuint *)shader type:(GLenum)type file:(NSString *)file
-{
-#ifdef CN1_USE_METAL
-    // The legacy ES1 shader compilation path is unused on the Metal
-    // backend (CN1Metalcompat / CN1MetalShaders.metal handle everything).
-    // Gating the body keeps the Mac Catalyst slice free of OpenGL symbols.
-    (void)shader; (void)type; (void)file;
-    return FALSE;
-#else
-    GLint status;
-    const GLchar *source;
-
-    source = (GLchar *)[[NSString stringWithContentsOfFile:file encoding:NSUTF8StringEncoding error:nil] UTF8String];
-    if (!source)
-    {
-        CN1Log(@"Failed to load vertex shader");
-        return FALSE;
-    }
-
-    *shader = glCreateShader(type);
-    glShaderSource(*shader, 1, &source, NULL);
-    glCompileShader(*shader);
-
-#if defined(DEBUG)
-    GLint logLength;
-    glGetShaderiv(*shader, GL_INFO_LOG_LENGTH, &logLength);
-    if (logLength > 0)
-    {
-        GLchar *log = (GLchar *)malloc(logLength);
-        glGetShaderInfoLog(*shader, logLength, &logLength, log);
-        CN1Log(@"Shader compile log:\n%s", log);
-        free(log);
-    }
-#endif
-
-    glGetShaderiv(*shader, GL_COMPILE_STATUS, &status);
-    if (status == 0)
-    {
-        glDeleteShader(*shader);
-        return FALSE;
-    }
-
-    return TRUE;
-#endif
-}
-
-- (BOOL)linkProgram:(GLuint)prog
-{
-#ifdef CN1_USE_METAL
-    (void)prog;
-    return FALSE;
-#else
-    GLint status;
-
-    glLinkProgram(prog);
-
-#if defined(DEBUG)
-    GLint logLength;
-    glGetProgramiv(prog, GL_INFO_LOG_LENGTH, &logLength);
-    if (logLength > 0)
-    {
-        GLchar *log = (GLchar *)malloc(logLength);
-        glGetProgramInfoLog(prog, logLength, &logLength, log);
-        CN1Log(@"Program link log:\n%s", log);
-        free(log);
-    }
-#endif
-
-    glGetProgramiv(prog, GL_LINK_STATUS, &status);
-    if (status == 0)
-        return FALSE;
-
-    return TRUE;
-#endif
-}
-
-- (BOOL)validateProgram:(GLuint)prog
-{
-#ifdef CN1_USE_METAL
-    (void)prog;
-    return FALSE;
-#else
-    GLint logLength, status;
-
-    glValidateProgram(prog);
-    glGetProgramiv(prog, GL_INFO_LOG_LENGTH, &logLength);
-    if (logLength > 0)
-    {
-        GLchar *log = (GLchar *)malloc(logLength);
-        glGetProgramInfoLog(prog, logLength, &logLength, log);
-        CN1Log(@"Program validate log:\n%s", log);
-        free(log);
-    }
-
-    glGetProgramiv(prog, GL_VALIDATE_STATUS, &status);
-    if (status == 0)
-        return FALSE;
-
-    return TRUE;
-#endif
-}
-
-- (BOOL)loadShaders
-{
-#ifdef CN1_USE_METAL
-    return FALSE;
-#else
-    GLuint vertShader, fragShader;
-    NSString *vertShaderPathname, *fragShaderPathname;
-
-    // Create shader program.
-    program = glCreateProgram();
-
-    // Create and compile vertex shader.
-    vertShaderPathname = [[NSBundle mainBundle] pathForResource:@"Shader" ofType:@"vsh"];
-    if (![self compileShader:&vertShader type:GL_VERTEX_SHADER file:vertShaderPathname])
-    {
-        CN1Log(@"Failed to compile vertex shader");
-        return FALSE;
-    }
-
-    // Create and compile fragment shader.
-    fragShaderPathname = [[NSBundle mainBundle] pathForResource:@"Shader" ofType:@"fsh"];
-    if (![self compileShader:&fragShader type:GL_FRAGMENT_SHADER file:fragShaderPathname])
-    {
-        CN1Log(@"Failed to compile fragment shader");
-        return FALSE;
-    }
-
-    // Attach vertex shader to program.
-    glAttachShader(program, vertShader);
-
-    // Attach fragment shader to program.
-    glAttachShader(program, fragShader);
-
-    // Bind attribute locations.
-    // This needs to be done prior to linking.
-    glBindAttribLocation(program, ATTRIB_VERTEX, "position");
-    glBindAttribLocation(program, ATTRIB_COLOR, "color");
-
-    // Link program.
-    if (![self linkProgram:program])
-    {
-        CN1Log(@"Failed to link program: %d", program);
-
-        if (vertShader)
-        {
-            glDeleteShader(vertShader);
-            vertShader = 0;
-        }
-        if (fragShader)
-        {
-            glDeleteShader(fragShader);
-            fragShader = 0;
-        }
-        if (program)
-        {
-            glDeleteProgram(program);
-            program = 0;
-        }
-
-        return FALSE;
-    }
-
-    // Get uniform locations.
-    uniforms[UNIFORM_TRANSLATE] = glGetUniformLocation(program, "translate");
-
-    // Release vertex and fragment shaders.
-    if (vertShader)
-        glDeleteShader(vertShader);
-    if (fragShader)
-        glDeleteShader(fragShader);
-
-    return TRUE;
-#endif
-}
 
 
 -(BOOL)isPaintFinished {

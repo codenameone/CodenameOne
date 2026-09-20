@@ -23,16 +23,12 @@
 #import <Foundation/Foundation.h>
 #import "ExecutableOp.h"
 #import "Renderer.h"
-// OpenGL ES does not exist on macOS; this port is Metal-only.
-#if !TARGET_OS_OSX
-#import <OpenGLES/ES2/gl.h>
-#endif
 
 @interface DrawPath : ExecutableOp {
     Renderer* renderer;
     int color;
     int alpha;
-    GLuint tex;
+    unsigned int tex;
 }
 
 -(id)initWithArgs:(Renderer*)renderer color:(int)c alpha:(int)a;

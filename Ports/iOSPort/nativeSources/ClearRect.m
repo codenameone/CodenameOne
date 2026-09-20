@@ -31,69 +31,6 @@
 #import "CN1Metalcompat.h"
 #endif
 
-#ifdef USE_ES2
-#if !defined(CN1_USE_METAL) && !TARGET_OS_WATCH
-extern GLKMatrix4 CN1modelViewMatrix;
-extern GLKMatrix4 CN1projectionMatrix;
-extern GLKMatrix4 CN1transformMatrix;
-extern int CN1modelViewMatrixVersion;
-extern int CN1projectionMatrixVersion;
-extern int CN1transformMatrixVersion;
-extern GLuint CN1activeProgram;
-static GLuint program=0;
-static GLuint vertexShader;
-static GLuint fragmentShader;
-static GLuint modelViewMatrixUniform;
-static GLuint projectionMatrixUniform;
-static GLuint transformMatrixUniform;
-static GLuint vertexCoordAtt;
-static GLuint textureCoordAtt;
-static int currentCN1modelViewMatrixVersion=-1;
-static int currentCN1projectionMatrixVersion=-1;
-static int currentCN1transformMatrixVersion=-1;
-
-
-static NSString *fragmentShaderSrc =
-@"precision highp float;\n"
-"void main(){\n"
-"   gl_FragColor = vec4(0,0,0,0); \n"
-"}\n";
-
-static NSString *vertexShaderSrc =
-@"attribute vec4 aVertexCoord;\n"
-
-"uniform mat4 uModelViewMatrix;\n"
-"uniform mat4 uProjectionMatrix;\n"
-"uniform mat4 uTransformMatrix;\n"
-
-"void main(){\n"
-"   gl_Position = uProjectionMatrix *  uModelViewMatrix * uTransformMatrix * aVertexCoord;\n"
-"}";
-
-static GLuint getOGLProgram(){
-    if ( program == 0  ){
-        program = CN1compileShaderProgram(vertexShaderSrc, fragmentShaderSrc);
-        GLErrorLog;
-        vertexCoordAtt = glGetAttribLocation(program, "aVertexCoord");
-        GLErrorLog;
-        
-        modelViewMatrixUniform = glGetUniformLocation(program, "uModelViewMatrix");
-        GLErrorLog;
-        projectionMatrixUniform = glGetUniformLocation(program, "uProjectionMatrix");
-        GLErrorLog;
-        transformMatrixUniform = glGetUniformLocation(program, "uTransformMatrix");
-        GLErrorLog;
-        
-        glBindBuffer(GL_ARRAY_BUFFER, 0);
-        GLErrorLog;
-        
-        
-    }
-    return program;
-}
-
-#endif // !CN1_USE_METAL
-#endif
 
 
 @implementation ClearRect
@@ -108,81 +45,11 @@ static GLuint getOGLProgram(){
 -(void)execute {
     CN1CGClearRect(x, y, width, height);
 }
-#elif defined(USE_ES2)
+#else
 -(void)execute {
 #ifdef CN1_USE_METAL
     CN1MetalClearRect(x, y, width, height);
-#else
-    glUseProgram(getOGLProgram());
-    GLfloat xOffset = 0;
-    GLfloat yOffset = 0;
-    
-#if (TARGET_OS_SIMULATOR)
-    xOffset = 0;
-    yOffset = 0;
 #endif
-    
-    GLfloat vertexes[] = {
-        x+xOffset, y+yOffset,
-        x + width, y+yOffset,
-        x+xOffset, y + height,
-        x + width, y + height
-    };
-    glEnableVertexAttribArray(vertexCoordAtt);
-    GLErrorLog;
-    
-    if (currentCN1projectionMatrixVersion != CN1projectionMatrixVersion) {
-        glUniformMatrix4fv(projectionMatrixUniform, 1, 0, CN1projectionMatrix.m);
-        GLErrorLog;
-        currentCN1projectionMatrixVersion = CN1projectionMatrixVersion;
-    }
-    if (currentCN1modelViewMatrixVersion != CN1modelViewMatrixVersion) {
-        glUniformMatrix4fv(modelViewMatrixUniform, 1, 0, CN1modelViewMatrix.m);
-        GLErrorLog;
-        currentCN1modelViewMatrixVersion = CN1modelViewMatrixVersion;
-    }
-    if (currentCN1transformMatrixVersion != CN1transformMatrixVersion) {
-        glUniformMatrix4fv(transformMatrixUniform, 1, 0, CN1transformMatrix.m);
-        GLErrorLog;
-        currentCN1transformMatrixVersion = CN1transformMatrixVersion;
-    }
-
-    glVertexAttribPointer(vertexCoordAtt, 2, GL_FLOAT, GL_FALSE, 0, vertexes);
-    GLErrorLog;
-    
-    _glDisable(GL_BLEND);
-    GLErrorLog;
-    
-    glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
-    GLErrorLog;
-    
-    _glEnable(GL_BLEND);
-    GLErrorLog;
-
-    glDisableVertexAttribArray(vertexCoordAtt);
-    GLErrorLog;
-#endif
-}
-#else
--(void)execute {
-    //[UIColorFromRGB(color, alpha) set];
-    //CGContextFillRect(context, CGRectMake(x, y, width, height));
-    GlColorFromRGB(color, alpha);
-    GLfloat vertexes[] = {
-        x, y,
-        x + width, y,
-        x, y + height,
-        x + width, y + height
-    };
-
-    GLErrorLog;
-    _glVertexPointer(2, GL_FLOAT, 0, vertexes);
-    _glEnableClientState(GL_VERTEX_ARRAY);
-    GLErrorLog;
-    _glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
-    GLErrorLog;
-    _glDisableClientState(GL_VERTEX_ARRAY);
-    GLErrorLog;
 }
 #endif
 

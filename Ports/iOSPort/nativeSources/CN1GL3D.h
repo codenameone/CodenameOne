@@ -23,11 +23,11 @@
 #ifndef CN1GL3D_h
 #define CN1GL3D_h
 
-#import "CN1ES2compat.h"
+#import "CN1RenderBackend.h"
 
 // The portable 3D API (com.codename1.gpu) is implemented on iOS with Metal.
-// The whole backend is gated on CN1_USE_METAL so a non-Metal build still links
-// (the IOSNative bridge functions resolve to no-ops returning 0). We build on a
+// The whole backend is gated on CN1_USE_METAL; the watch slice, which has no
+// Metal, supplies its own no-op bridge stubs in CN1WatchRuntime.m. We build on a
 // hand rolled CAMetalLayer + CADisplayLink (the same primitives the 2D METALView
 // uses) rather than MTKView so we do not pull in the MetalKit framework.
 #ifdef CN1_USE_METAL

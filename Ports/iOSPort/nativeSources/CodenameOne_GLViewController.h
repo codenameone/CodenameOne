@@ -20,19 +20,13 @@
  * Please contact Codename One through http://www.codenameone.com/ if you 
  * need additional information or have any questions.
  */
-#import "CN1ES2compat.h"
+#import "CN1RenderBackend.h"
 #import "CN1AppleUI.h"
 
-// OpenGL ES does not exist on macOS, and the native macOS port is Metal-only,
-// so none of this is reachable there. Mac Catalyst gets to the same place via
-// fabricated stub headers; here the imports are simply skipped.
+// METALView is the rendering view on every UIKit slice. The native macOS port
+// draws through AppKit instead and never sees it.
 #if !TARGET_OS_OSX
-#import <OpenGLES/EAGL.h>
-#import "EAGLView.h"
-#import <OpenGLES/ES1/gl.h>
-#import <OpenGLES/ES1/glext.h>
-#import <OpenGLES/ES2/gl.h>
-#import <OpenGLES/ES2/glext.h>
+#import "METALView.h"
 #endif
 #import "ExecutableOp.h"
 #import "PaintOp.h"
@@ -566,7 +560,7 @@ BOOL cn1_watch_apply_mirrored_surface(NSString *kind, NSData *json,
 #define CN1_CAP_ROUND 1
 #define CN1_CAP_SQUARE 2
 
-#define EAGLVIEW [[CodenameOne_GLViewController instance] eaglView]
+#define CN1_RENDERING_VIEW [[CodenameOne_GLViewController instance] renderingView]
 
 // Launch placeholder shown over the GL/Metal view between makeKeyAndVisible
 // and the first EDT-painted frame; see CodenameOne_GLViewController.m. UIWindow
@@ -603,7 +597,7 @@ void CN1DismissLaunchPlaceholder(void);
 @property (nonatomic) NSInteger animationFrameInterval;
 @property (readwrite, assign) GLUIImage* currentMutableImage;
 +(CodenameOne_GLViewController*)instance;
--(id)eaglView;
+-(id)renderingView;
 -(id)view;
 -(void)startAnimation;
 -(void)stopAnimation;
@@ -670,9 +664,6 @@ CLLocationManagerDelegate, AVAudioRecorderDelegate
 #endif
 > {
 @private
-    EAGLContext *context;
-    GLuint program;
-    
     BOOL animating;
     NSInteger animationFrameInterval;
 
@@ -702,7 +693,7 @@ CLLocationManagerDelegate, AVAudioRecorderDelegate
 @property (nonatomic) NSInteger animationFrameInterval;
 @property (readwrite, assign) GLUIImage* currentMutableImage;
 
--(EAGLView*)eaglView;
+-(METALView*)renderingView;
 -(void)startAnimation;
 -(void)stopAnimation;
 +(BOOL)isDrawTextureSupported;

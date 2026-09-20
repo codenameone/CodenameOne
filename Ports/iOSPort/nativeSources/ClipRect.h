@@ -33,7 +33,7 @@
     int height;
     BOOL firstClip;
     // The texture if this is a texture clip
-    GLuint texture;
+    unsigned int texture;
     JAVA_FLOAT* xPoints;
     JAVA_FLOAT* yPoints;
     int numPoints;
@@ -42,7 +42,7 @@
 -(void)executeWithClipping;
 -(id)initWithArgs:(int)xpos ypos:(int)ypos w:(int)w h:(int)h f:(BOOL)f;
 // Alternate constructor with a texture
--(id)initWithArgs:(int)xpos ypos:(int)ypos w:(int)w h:(int)h f:(BOOL)f texture:(GLuint)texture;
+-(id)initWithArgs:(int)xpos ypos:(int)ypos w:(int)w h:(int)h f:(BOOL)f texture:(unsigned int)texture;
 -(id)initWithPolygon:(JAVA_FLOAT*)x y:(JAVA_FLOAT*)y length:(int)len;
 -(void)execute;
 +(void)updateClipToScale;

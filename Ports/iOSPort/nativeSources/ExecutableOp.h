@@ -21,23 +21,12 @@
  * need additional information or have any questions.
  */
 #import <Foundation/Foundation.h>
-// CN1ES2compat.h gates CN1_USE_METAL (the iOS builder uncomments
-// //#define CN1_USE_METAL at the top). The ExecutableOp.target ivar
-// and accessors below are conditional on CN1_USE_METAL, so .h and .m
-// must both see the same definition. Importing here ensures that.
-#import "CN1ES2compat.h"
+// CN1RenderBackend.h defines CN1_USE_METAL on every slice that has Metal. The
+// ExecutableOp.target ivar and accessors below are conditional on it, so .h
+// and .m must both see the definition. Importing here ensures that.
+#import "CN1RenderBackend.h"
 
-extern void logGlErrorAt(const char *f, int l);
 extern int nextPowerOf2(int val);
-
-#define GLErrorLog logGlErrorAt(__FILE__, __LINE__)
-
-#define GlColorFromRGB(rgbValue,alphaColor) _glColor4f(((float)((rgbValue >> 16) & 0xff))/255.0, \
-((float)((rgbValue >> 8) & 0xff))/255.0, ((float)(rgbValue & 0xff))/255.0, ((float)alphaColor)/255.0); GLErrorLog;
-
-#define GlColorFromARGB(rgbValue) _glColor4f(((float)((rgbValue >> 16) & 0xff))/255.0, \
-((float)((rgbValue >> 8) & 0xff))/255.0, ((float)(rgbValue & 0xff))/255.0, (((rgbValue >> 24) & 0xff) /255.0)); GLErrorLog;
-
 
 // NSColor is the AppKit spelling; the component initializer is otherwise the
 // same call with the same arguments. Kept as one macro per platform rather than
@@ -63,11 +52,6 @@ green:((float)((rgbValue >> 8) & 0xff))/255.0 blue:((float)(rgbValue & 0xff))/25
 green:((float)((rgbValue >> 8) & 0xff))/255.0 blue:((float)(rgbValue & 0xff))/255.0 alpha:(((rgbValue >> 24) & 0xff) /255.0)]
 #endif
 
-#ifdef USE_ES2
-#define GLKVector4FromRGB(rgbValue,alphaColor) GLKVector4Make(((float)((rgbValue >> 16) & 0xff))/255.0, \
-((float)((rgbValue >> 8) & 0xff))/255.0, ((float)(rgbValue & 0xff))/255.0, ((float)alphaColor)/255.0)
-
-#endif
 
 @class GLUIImage;
 

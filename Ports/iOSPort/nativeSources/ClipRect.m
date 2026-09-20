@@ -29,10 +29,8 @@
 #import "CN1Metalcompat.h"
 #endif
 #import "FillRect.h"
-#ifdef USE_ES2
 #import "DrawTextureAlphaMask.h"
 #import "FillPolygon.h"
-#endif
 
 static int clipX, clipY, clipW, clipH;
 static BOOL clipApplied = NO;
@@ -69,7 +67,7 @@ static CGRect drawingRect;
 }
 
 
--(id)initWithArgs:(int)xpos ypos:(int)ypos w:(int)w h:(int)h f:(BOOL)f texture:(GLuint)tex{
+-(id)initWithArgs:(int)xpos ypos:(int)ypos w:(int)w h:(int)h f:(BOOL)f texture:(unsigned int)tex{
     x = xpos;
     y = ypos;
     width = w;
@@ -109,7 +107,7 @@ static CGRect drawingRect;
         if (sx < 0) { sw += sx; sx = 0; }
         if (sy < 0) { sh += sy; sy = 0; }
         // Issue #5273: confine a screen clip to the current flush region
-        // (drawingRect), mirroring the Metal and GL/ES2 branches below. The
+        // (drawingRect), mirroring the Metal branch below. The
         // watch CG surface is persistent across partial repaints, so without
         // this clamp a clip emitted during a partial flush (e.g. an
         // independently scrollable BorderLayout.CENTER under a fixed band) can
@@ -176,12 +174,12 @@ static CGRect drawingRect;
     //      stencil pipeline: render the polygon to the stencil at a
     //      fresh reference value, then bind a stencil-test depth state
     //      so subsequent draws on this encoder are masked to the
-    //      polygon shape. Mirrors the GL ES2 sequence below.
+    //      polygon shape.
     //
     //   3. A texture-mask clip (initWithArgs:...:texture:) -- texture
-    //      != 0 with x/y/w/h holding the mask bbox. Metal's GLuint
-    //      texture handle from the GL path isn't directly compatible
-    //      with MTLTexture, so this still falls back to a bbox scissor
+    //      != 0 with x/y/w/h holding the mask bbox. The op's plain
+    //      integer texture handle isn't an MTLTexture, so this still
+    //      falls back to a bbox scissor
     //      (matches the documented Phase 2 fallback for the texture
     //      mask case; a follow-up could rasterise the alpha mask into
     //      an MTLTexture and sample it in a stencil-write shader).
@@ -197,9 +195,9 @@ static CGRect drawingRect;
         // scrollable BorderLayout.CENTER container scrolling under a fixed
         // toolbar / BorderLayout.NORTH -- paintDirty() flushes only the dirty
         // sub-region, yet a clip emitted during that flush can still extend
-        // above it into the fixed header band. The GL backend clamps every
-        // clip to drawingRect (see the ES2 branch below), so an escaping draw
-        // can never touch pixels outside the flushed region. The Metal backend
+        // above it into the fixed header band. Clamping every clip to
+        // drawingRect means an escaping draw can never touch pixels outside
+        // the flushed region. The Metal backend
         // was missing that clamp: because it renders into a PERSISTENT
         // screenTexture (MTLLoadActionLoad) the escaping fill overwrote the
         // toolbar / NORTH band and it stayed blank until a full repaint (e.g.
@@ -208,7 +206,7 @@ static CGRect drawingRect;
         // with their own framebuffer bounds, where drawingRect (the screen
         // flush rect) does not apply.
         // A degenerate drawingRect means "no flush region known", not "clip
-        // everything away" -- the watch branch above and the ES2 branch below
+        // everything away" -- the watch branch above and the Metal branch below
         // both test it before clamping and this one did not. Without the test a
         // flush issued with a zero or negative size silently discards every
         // screen op in that drain, which is a whole frame lost with nothing
@@ -231,125 +229,6 @@ static CGRect drawingRect;
         CN1MetalSetScissor(sx, sy, sw, sh);
         clipApplied = (sw > 0 && sh > 0);
     }
-#else
-#ifdef USE_ES2
-    if ( texture != 0 || numPoints > 0 ){
-        clipX = x; clipY=y; clipW=width; clipH=height;
-        glClearStencil(0x0);
-        glEnable(GL_STENCIL_TEST);
-        //glDisable(GL_STENCIL_TEST);
-        _glDisable(GL_SCISSOR_TEST);
-        glStencilFunc(GL_NEVER, 1, 0xff);
-        
-        glStencilOp(GL_REPLACE, GL_KEEP, GL_KEEP);
-        glColorMask(GL_FALSE, GL_FALSE, GL_FALSE, GL_FALSE);
-        glStencilMask(0xff);
-        glClear(GL_STENCIL_BUFFER_BIT);
-        
-        GLKMatrix4 transform = glGetTransformES2();
-        glSetTransformES2(GLKMatrix4Identity);
-        ExecutableOp *f;
-        if ( texture != 0 ){
-            f = [[DrawTextureAlphaMask alloc] initWithArgs:texture color:0xffffff alpha:0xff x:x y:y w:width h:height];
-        } else {
-            f = [[FillPolygon alloc] initWithArgs:xPoints y:yPoints num:numPoints color:0xffffff alpha: 0xff];
-        }
-        [f execute];
-
-#ifndef CN1_USE_ARC
-        [f release];
-#endif
-        glSetTransformES2(transform);
-        
-        glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
-        glStencilMask(0x0);
-        glStencilFunc(GL_EQUAL, 1, 0xff);
-        clipIsTexture = YES;
-        glStencilOp(GL_KEEP, GL_KEEP, GL_KEEP);
-        [super clipBlock:NO];
-        
-        return;
-    }
-
-    
-#endif
-    clipIsTexture = NO;
-    int x2 = x + width;
-    int y2 = y + height;
-    int orX = drawingRect.origin.x;
-    int orY = drawingRect.origin.y;
-    if(x < orX) {
-        x = orX;
-        width = x2 - x;
-    }
-    if(y < orY) {
-        y = orY;
-        height = y2 - y;
-    }
-    int destX2 = (int)(drawingRect.origin.x + drawingRect.size.width);
-    int destY2 = (int)(drawingRect.origin.y + drawingRect.size.height);
-    if(x2 > destX2) {
-        width = destX2 - x;
-    }
-    if(y2 > destY2) {
-        height = destY2 - y;
-    }
-    if(width > 0 && height > 0) {
-        [super clipBlock:NO];
-        // full screen access, no need for this
-        int scale = scaleValue;
-        int displayHeight = [CodenameOne_GLViewController instance].view.bounds.size.height * scale;
-        if(width == [CodenameOne_GLViewController instance].view.bounds.size.width * scale && height == displayHeight) {
-            GLErrorLog;
-            _glDisable(GL_SCISSOR_TEST);
-#ifdef USE_ES2
-            glDisable(GL_STENCIL_TEST);
-            GLErrorLog;
-#endif
-            
-            return;
-        }
-#ifdef USE_ES2
-        clipX = x;
-        
-        clipW = width;
-        if (clipX<0){
-            clipX=0;
-            clipW=width;
-        }
-        
-        clipY = y;
-        clipH = height;
-        if (clipY<0){
-            clipY=0;
-            clipH=height;
-        }
-#else
-        clipX = x;
-        clipW = width;
-        clipY = y;
-        clipH = height;
-#endif
-        
-        [ClipRect updateClipToScale];
-        _glEnable(GL_SCISSOR_TEST);
-        GLErrorLog;
-#ifdef USE_ES2
-        glDisable(GL_STENCIL_TEST);
-        GLErrorLog;
-#endif
-        clipApplied = YES;
-    } else {
-        [super clipBlock:YES];
-        _glDisable(GL_SCISSOR_TEST);
-
-        GLErrorLog;
-#ifdef USE_ES2
-        glDisable(GL_STENCIL_TEST);
-        GLErrorLog;
-#endif
-        clipApplied = NO;
-    }
 #endif // CN1_USE_METAL
 #endif // TARGET_OS_WATCH
 
@@ -360,14 +239,6 @@ static CGRect drawingRect;
     if ( clipIsTexture ){
         return;
     }
-#if !defined(CN1_USE_METAL) && !TARGET_OS_WATCH
-    int displayHeight = [CodenameOne_GLViewController instance].view.bounds.size.height * scaleValue;
-    if(currentScaleX == 1 && currentScaleY == 1) {
-        //_glEnable(GL_SCISSOR_TEST);
-        //CN1Log(@"Updating clip to scale");
-        glScissor(clipX, displayHeight - clipY - clipH, clipW, clipH);
-    }
-#endif // !CN1_USE_METAL
 }
 
 #ifndef CN1_USE_ARC

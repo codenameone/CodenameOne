@@ -23,7 +23,7 @@
 #include "TargetConditionals.h"
 #if !TARGET_OS_WATCH
 
-#import "CN1ES2compat.h"
+#import "CN1RenderBackend.h"
 #ifdef CN1_USE_METAL
 #import <QuartzCore/QuartzCore.h>
 @import Metal;
@@ -525,7 +525,7 @@ int cn1DirectToDrawableEnabled(void) {
         // a second present path.
         metalLayer.framebufferOnly = NO;
         // Colour space for the Metal layer. Default is sRGB so colours
-        // match the GL path's CAEAGLLayer output: without it, CG-rasterised
+        // match the CAEAGLLayer output the port used to produce: without it, CG-rasterised
         // images and gradients (DeviceRGB-tagged in their CGBitmapContext)
         // display slightly brighter on Metal because the layer treats
         // their bytes as linear-RGB instead of sRGB-encoded.
@@ -637,7 +637,7 @@ int cn1DirectToDrawableEnabled(void) {
              object:nil];
 }
 
-//The EAGL view is stored in the nib file. When it's unarchived it's sent -initWithCoder:.
+//The rendering view is stored in the nib file. When it's unarchived it's sent -initWithCoder:.
 - (id)initWithCoder:(NSCoder*)coder
 {
     self = [super initWithCoder:coder];
@@ -772,8 +772,7 @@ int cn1DirectToDrawableEnabled(void) {
     // Match iOS UIKit's Y-down convention: origin at top-left.
     // Passing bottom=h, top=0 makes y_ndc = 1 - 2*y_input/h, so y_input=0
     // maps to NDC y=+1 (top of the drawable) and y_input=h maps to NDC y=-1
-    // (bottom). That avoids the _glScalef(1,-1,1) + _glTranslatef(0,-h,0)
-    // workaround the GL path does in CodenameOne_GLViewController.drawFrame.
+    // (bottom), with no flip-and-translate workaround in drawFrame.
     projectionMatrix = CN1MetalOrtho(0.0f, (float)pw, (float)ph, 0.0f, -1.0f, 1.0f);
     CAMetalLayer *layer = (CAMetalLayer*)self.layer;
     layer.drawableSize = CGSizeMake(pw, ph);
@@ -1017,8 +1016,8 @@ int cn1DirectToDrawableEnabled(void) {
     // Render into the persistent screen texture so incremental draws from
     // subsequent drawFrame calls accumulate on top of whatever was there
     // before. MTLLoadActionLoad preserves previous pixels (vs MTLLoadActionClear
-    // which would wipe everything each frame) — CN1 only queues diff ops
-    // per frame; the OpenGL path relies on its renderbuffer persisting.
+    // which would wipe everything each frame) — CN1 only queues the ops that
+    // changed since the previous frame.
     colorAttachment.texture = target;
     if (cn1DirectToDrawable()) {
         if (!directFrameCleared) {
@@ -1759,7 +1758,7 @@ extern BOOL currentlyReturnExitsEditing;
 #endif
 
 #else
-// Compiled out on watchOS: this file is OpenGL ES / Metal / UIKit-only and the watch
+// Compiled out on watchOS: this file is Metal / UIKit-only and the watch
 // slice renders through the Core Graphics backend instead. The typedef keeps the
 // translation unit non-empty, which ISO C requires.
 typedef int cn1_metalview_unused_on_watch;

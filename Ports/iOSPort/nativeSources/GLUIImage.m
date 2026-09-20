@@ -37,7 +37,6 @@ extern int nextPowerOf2(int val);
 #ifndef CN1_USE_ARC
     [img retain];
 #endif
-    textureName = 0;
     textureWidth = -1;
     textureHeight = -1;
     return self;
@@ -53,85 +52,6 @@ extern int nextPowerOf2(int val);
 
 -(int)getTextureHeight {
     return textureHeight;
-}
-
--(GLuint)getTexture:(int)texWidth texHeight:(int)texHeight {
-#if defined(CN1_USE_METAL) || TARGET_OS_WATCH
-    // Metal builds never sample via GL texture handles; DrawImage / TileImage
-    // route through getMTLTexture instead. watchOS has no GL at all and renders
-    // images directly from the CN1Image via the Core Graphics backend. Return 0
-    // so the GL helpers are preprocessed away and the slice links without GL
-    // function symbols.
-    return 0;
-#else
-    if(textureName == 0) {
-        textureWidth = texWidth;
-        textureHeight = texHeight;
-#ifdef GLUIIMAGE_AUTOSCALE_LARGE_TEXTURES
-        if (textureWidth > GL_MAX_TEXTURE_SIZE || textureHeight > GL_MAX_TEXTURE_SIZE) {
-            if (textureWidth > GL_MAX_TEXTURE_SIZE) {
-                textureHeight = (int)(textureHeight * GL_MAX_TEXTURE_SIZE / (float)textureWidth);
-                textureWidth = GL_MAX_TEXTURE_SIZE;
-            }
-            if (textureHeight > GL_MAX_TEXTURE_SIZE) {
-               textureWidth = (int)(textureWidth * GL_MAX_TEXTURE_SIZE / (float)textureHeight);
-                textureHeight = GL_MAX_TEXTURE_SIZE;
-            }
-
-            texWidth = textureWidth;
-            texHeight = textureHeight;
-        }
-#endif
-        GLErrorLog;
-        glGenTextures(1, &textureName);
-        GLErrorLog;
-        glActiveTexture(GL_TEXTURE0);
-        GLErrorLog;
-        glBindTexture(GL_TEXTURE_2D, textureName);
-        GLErrorLog;
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-        GLErrorLog;
-        int w = texWidth;//(int)img.size.width;
-        int h = texHeight;//(int)img.size.height;
-        int p2w = nextPowerOf2(w);
-        int p2h = nextPowerOf2(h);
-
-        if (p2w > GL_MAX_TEXTURE_SIZE) {
-            NSLog(@"Warning: Trying to create texture with width %d which exceeds the max texture size %d.  This will fail, and image will appear black.", p2w, GL_MAX_TEXTURE_SIZE);
-        }
-        if (p2h > GL_MAX_TEXTURE_SIZE) {
-            NSLog(@"Warning: Trying to create texture with height %d which exceeds the max texture size %d.  This will fail, and image will appear black.", p2h, GL_MAX_TEXTURE_SIZE);
-        }
-
-        CGColorSpaceRef colorSpace = CGColorSpaceCreateDeviceRGB();
-        void* imageData = malloc(p2h * p2w * 4);
-        CGContextRef context = CGBitmapContextCreate(imageData, p2w, p2h, 8, 4 * p2w, colorSpace, kCGImageAlphaPremultipliedLast);
-        CGContextTranslateCTM(context, 0, p2h);
-        CGContextScaleCTM(context, 1, -1);
-        CGColorSpaceRelease(colorSpace);
-        CGContextClearRect(context, CGRectMake(0, 0, p2w, p2h));
-        //CGContextSetRGBStrokeColor(context, 1, 0, 0, 1);
-        //CGContextSetRGBFillColor(context, 0, 1, 0, 1);
-        //CGContextFillRect(context, CGRectMake(0, p2h - h, w, h));
-        //CGContextStrokeRect(context, CGRectMake(0, 0, w, p2h));
-        CGContextDrawImage(context, CGRectMake(0, p2h - h, w, h), img.CGImage);
-        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, p2w, p2h, 0, GL_RGBA, GL_UNSIGNED_BYTE, imageData);
-        GLErrorLog;
-        CGContextRelease(context);
-        GLErrorLog;
-
-        glBindTexture(GL_TEXTURE_2D, 0);
-        GLErrorLog;
-        free(imageData);
-    } else {
-        if(texWidth != textureWidth || texHeight != textureHeight) {
-            glDeleteTextures(1, &textureName);
-            textureName = 0;
-            return [self getTexture:texWidth texHeight:texHeight];
-        }
-    }
-    return textureName;
-#endif // !CN1_USE_METAL
 }
 
 -(void)setImage:(CN1Image*)i {
@@ -152,23 +72,6 @@ extern int nextPowerOf2(int val);
     [mtlTexture release];
     mtlTexture = nil;
 #endif
-#if !defined(CN1_USE_METAL) && !TARGET_OS_WATCH
-    if(textureName != 0) {
-        int tname = textureName;
-        textureName = 0;
-        if([NSThread isMainThread]) {
-            glDeleteTextures(1, &tname);
-            GLErrorLog;
-        } else {
-            dispatch_async(dispatch_get_main_queue(), ^{
-                //int fm = [ExecutableOp get_free_memory];
-                glDeleteTextures(1, &tname);
-                GLErrorLog;
-                //CN1Log(@"Texture deletion freed up: %i", [ExecutableOp get_free_memory] - fm);
-            });
-        }
-    }
-#endif // !CN1_USE_METAL && !TARGET_OS_WATCH
 }
 
 -(void)setName:(NSString*)s {
@@ -287,23 +190,6 @@ extern int nextPowerOf2(int val);
         [name release];
 #endif
     }
-#if !defined(CN1_USE_METAL) && !TARGET_OS_WATCH
-    if(textureName != 0) {
-        int tname = textureName;
-        textureName = 0;
-        if([NSThread isMainThread]) {
-            glDeleteTextures(1, &tname);
-            GLErrorLog;
-        } else {
-            dispatch_async(dispatch_get_main_queue(), ^{
-                //int fm = [ExecutableOp get_free_memory];
-                glDeleteTextures(1, &tname);
-                GLErrorLog;
-                //CN1Log(@"Texture deletion freed up: %i", [ExecutableOp get_free_memory] - fm);
-            });
-        }
-    }
-#endif // !CN1_USE_METAL && !TARGET_OS_WATCH
 #ifdef CN1_USE_METAL
     // Both ivars hold a +1 MTLTexture retain (newTextureWithDescriptor /
     // CN1MetalTextureFromUIImage both return owned references). Without

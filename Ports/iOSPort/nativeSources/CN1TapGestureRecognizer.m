@@ -91,8 +91,8 @@ shouldRecognizeSimultaneouslyWithGestureRecognizer:(UIGestureRecognizer *)otherG
 -(BOOL)ignoreEvent:(UITouch*)touch {
     CodenameOne_GLViewController *ctrl = [CodenameOne_GLViewController instance];
     // touchesForView should return all of the touches in the GLViewController.view and descendents.
-    // the "view" member will either be the EAGLView itself, or a container that includes the
-    // EAGLView and peer components.
+    // the "view" member will either be the METALView itself, or a container that includes the
+    // METALView and peer components.
     // We DO want to process touches from peer components
     // We DO NOT want to process touches from popovers like datepickers and openGallery.
     // See the OpenGalleryTest2793 sample to test events for openGallery.
@@ -324,7 +324,7 @@ shouldRecognizeSimultaneouslyWithGestureRecognizer:(UIGestureRecognizer *)otherG
 }
 @end
 #else
-// Compiled out on watchOS: this file is OpenGL ES / Metal / UIKit-only and the watch
+// Compiled out on watchOS: this file is Metal / UIKit-only and the watch
 // slice renders through the Core Graphics backend instead. The typedef keeps the
 // translation unit non-empty, which ISO C requires.
 typedef int cn1_cn1tapgesturerecognizer_unused_on_watch;

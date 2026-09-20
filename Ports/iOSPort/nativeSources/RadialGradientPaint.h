@@ -22,10 +22,7 @@
  */
 #import <Foundation/Foundation.h>
 #import "PaintOp.h"
-#import "CN1ES2compat.h"
-#ifdef USE_ES2
-#import <GLKit/GLKit.h>
-#endif
+#import "CN1RenderBackend.h"
 
 @interface RadialGradientPaint : PaintOp {
 
