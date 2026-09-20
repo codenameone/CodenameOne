@@ -1110,9 +1110,25 @@ extern void cn1StartupPhase(const char* name);
 /// any case, and on arm64 it is one that actually reorders).
 #define CN1_CONSTANT_POOL_LOAD(off) \
     ((JAVA_OBJECT)__atomic_load_n(&constantPoolObjects[off], __ATOMIC_ACQUIRE))
-#define STRING_FROM_CONSTANT_POOL_OFFSET(off) \
-    (__builtin_expect(CN1_CONSTANT_POOL_LOAD(off) != JAVA_NULL, 1) \
-        ? CN1_CONSTANT_POOL_LOAD(off) : cn1MaterializeConstantPoolString(off))
+/// Reads the slot ONCE. The macro this replaces named CN1_CONSTANT_POOL_LOAD
+/// twice, and clang cannot fold the pair away: an acquire load is a
+/// synchronisation point it will not CSE, and for all the optimiser knows that
+/// very acquire synchronises-with a writer to constantPoolObjects itself, so
+/// even the base pointer had to be re-loaded. Every string literal in the
+/// program therefore paid ldr/add/ldapr twice -- six instructions and two
+/// ordering primitives where three and one do.
+///
+/// Folding them is safe because a slot is written exactly once, null -> object
+/// under constantPoolMutex, and never cleared; the base is assigned once during
+/// init. The two loads could only ever have returned the same pointer.
+static inline JAVA_OBJECT cn1ConstantPoolString(int off) {
+    JAVA_OBJECT o = CN1_CONSTANT_POOL_LOAD(off);
+    if(__builtin_expect(o != JAVA_NULL, 1)) {
+        return o;
+    }
+    return cn1MaterializeConstantPoolString(off);
+}
+#define STRING_FROM_CONSTANT_POOL_OFFSET(off) cn1ConstantPoolString(off)
 
 #define BC_IINC(val, num) ilocals_##val##_ += num;
 

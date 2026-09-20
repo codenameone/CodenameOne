@@ -4563,3 +4563,70 @@ Two candidates are eliminated rather than tried and failed:
 - BiBOP slack, 183-219MB on a 640MB reserved heap, is the price of non-moving
   collection. A copying collector compacts it; this one cannot, and the branch
   has already recorded why a moving collector is not on the table.
+
+---
+
+## Round 26: every string literal paid for two acquire loads
+
+The pass that looked for the user's "if(x) return ...; split it" shape in C found
+the two biggest call-site counts in the binary were **already** that shape and
+already correct:
+
+| function | `bl` sites | verdict |
+|---|---:|---|
+| `cn1MaterializeConstantPoolString` | 4,437 | fast path inline, cold call -- correct |
+| `cn1SatbEnqueue` | 4,101 | `gcSatbActive` test inline, cold call -- correct |
+| `cn1HmFindSlot` | 117 | a probe LOOP, file-static; out of line is defensible |
+
+So the shape was not the problem. The defect was inside the one that looked
+healthiest.
+
+`STRING_FROM_CONSTANT_POOL_OFFSET` named `CN1_CONSTANT_POOL_LOAD(off)` twice --
+once in the ternary's condition and once in its true arm -- and clang folded
+neither away. The emitted fast path for every string literal in the program was:
+
+```
+ldr   x8, [x19]        ; load constantPoolObjects
+add   x8, x8, #0x240   ; + off*8
+ldapr x8, [x8]         ; acquire load #1
+cbz   x8, <cold>       ; null -> materialise
+ldr   x8, [x19]        ; reload the base AGAIN
+add   x8, x8, #0x240   ; recompute the address AGAIN
+ldapr x10, [x8]        ; acquire load #2 -- redundant
+```
+
+Six instructions and two ordering primitives where three and one do. clang is not
+being dim: an atomic acquire load is a synchronisation point it will not CSE, and
+for all the optimiser knows that very acquire synchronises-with a writer to
+`constantPoolObjects` itself, so even the base pointer had to be re-loaded.
+
+Folding them is safe, and the safety is a property of the data rather than a
+judgement call: a slot is written exactly once, null -> object under
+`constantPoolMutex` (`cn1_globals.m:14722` is the only store to any slot), and
+never cleared; the base is assigned once at init. The two loads could only ever
+have returned the same pointer -- so this was pure redundancy, **not** a latent
+null-after-non-null bug, and should not be described as one.
+
+| | before | after |
+|---|---:|---:|
+| `ldapr` | 13,827 | **9,125** (-4,702, -34%) |
+| `ldapur` | 4,891 | 4,857 |
+| `ldar` | 640 | 640 |
+| total `bl` | 58,552 | 58,548 |
+| binary | 5,285,080 | **5,202,520** (-82KB) |
+
+-4,702 acquire loads against 4,431 materialise sites: one per site, which is the
+prediction, arriving at the predicted magnitude. Gates green, Gate A byte-identical.
+
+Unlike most rounds here there is no trade to weigh -- instruction count, ordering
+primitives and binary size all moved the same way. It is also the cheapest fix on
+this branch by a wide margin, and it survived in a macro carrying a nine-line
+comment about the acquire/release pairing. The comment was right about the
+ordering and silent about the arithmetic, and nobody reads a macro body twice.
+
+**Method note.** Static call-site counts found this; they should not pick the next
+one. They are the right instrument for "is this function inlined at its call
+sites", and the wrong one for "does this code run" -- the monitor pair
+(`monitorEnter` 1,367 + `monitorExitBlock` 2,260) ranks high statically, and this
+workload uses `HashMap`/`ArrayList`/`StringBuilder`, none of them synchronised.
+Profile before touching it.
