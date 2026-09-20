@@ -1701,6 +1701,10 @@ struct ThreadLocalData {
     // 0 == not yet computed (lazily initialized once per thread on first use).
     JAVA_LONG nativeStackLimit;
 
+    /* Per-size-class current BiBOP page. See the note at the fast path: this was
+     * `__thread`, which costs an indirect call per allocation on Darwin. */
+    struct CN1BibopPage* bibopCurrent[CN1_BIBOP_NUM_CLASSES];
+
 #ifdef CN1_GC_VERIFY
     // The thread's whole C stack, [low, high), recorded beside the limit above and
     // used by nothing but the verifier's escaped-stack-object check. A heap object's
@@ -2040,10 +2044,64 @@ const int currentCodenameOneCallStackOffset = threadStateData->callStackOffset;
 // Compile-time size -> class-index. With a constant `sz` (sizeof(...)) clang
 // folds the whole chain to an int literal (or -1 for oversized => fast path
 // dead-code-eliminated, slow path only).
+/* Size -> class index, for the INLINE bump path. It must agree with
+ * cn1BibopClassSize[] in cn1_globals.m, and when it does not the failure is
+ * silent and expensive: a size this macro answers -1 for skips the inlined bump
+ * entirely and goes out of line to __NEW_X -> codenameOneGcMalloc, which then
+ * finds a perfectly good class for it in the RUNTIME table and allocates from
+ * BiBOP anyway. Everything still works; the object just paid for a call.
+ *
+ * That is exactly what happened when CN1_BIBOP_MAX_OBJECT went from 512 to 2048:
+ * the runtime table learned the eight new classes, this macro did not, and every
+ * 513..2048-byte object took the slow path while the census reported the ceiling
+ * raise as working. The static assertion below is the part that matters -- it
+ * makes the two definitions unable to drift again. */
 #define CN1_BIBOP_CIDX(sz) ( \
   (sz)<=32?0:(sz)<=48?1:(sz)<=64?2:(sz)<=80?3:(sz)<=96?4:(sz)<=112?5: \
   (sz)<=128?6:(sz)<=160?7:(sz)<=192?8:(sz)<=224?9:(sz)<=256?10: \
-  (sz)<=320?11:(sz)<=384?12:(sz)<=448?13:(sz)<=512?14:-1)
+  (sz)<=320?11:(sz)<=384?12:(sz)<=448?13:(sz)<=512?14: \
+  (CN1_BIBOP_NUM_CLASSES<=15)?-1: \
+  (sz)<=640?15:(sz)<=768?16:(sz)<=896?17:(sz)<=1024?18: \
+  (sz)<=1280?19:(sz)<=1536?20:(sz)<=1792?21:(sz)<=2048?22:-1)
+
+/* THE PAGE GEOMETRY IS A COMPILE-TIME CONSTANT, so stop loading it.
+ *
+ * cn1BibopFormatPage derives all three of slotSize, firstSlotOffset and
+ * slotCount from ci and CN1_BIBOP_PAGE_SIZE alone, and ci is a constant at every
+ * CN1_FAST_NEW call site (it comes from sizeof(struct obj__X)). Yet the fast path
+ * loaded all three back out of the page header, and TWO OF THEM SAT ON THE
+ * ADDRESS-GENERATION DEPENDENCY CHAIN:
+ *
+ *     ldr   x9,  [x0,#144]      ; p
+ *     ldrsw x8,  [x9,#28]       ; firstSlotOffset   <- depends on p
+ *     ldrsw x11, [x9,#20]       ; slotSize          <- depends on p
+ *     ldr   w10, [x9,#32]       ; bumpIndex         <- depends on p
+ *     smaddl x8, w11, w10, x8   ; slot address      <- depends on all three
+ *
+ * As constants that collapses to an add of an immediate plus a shifted index, the
+ * multiply-accumulate disappears, and three loads leave the load ports. This is
+ * not an instruction-count argument: the two geometry loads are ON the chain that
+ * produces the address the allocation then writes through.
+ *
+ * Identical by construction -- the definitions below are the same expressions
+ * cn1BibopFormatPage uses, and the assertions in cn1_globals.m check them against
+ * the runtime table rather than trusting that they stay in step. */
+#define CN1_BIBOP_CLASS_SIZE(ci) ( \
+  (ci)==0?32:(ci)==1?48:(ci)==2?64:(ci)==3?80:(ci)==4?96:(ci)==5?112: \
+  (ci)==6?128:(ci)==7?160:(ci)==8?192:(ci)==9?224:(ci)==10?256: \
+  (ci)==11?320:(ci)==12?384:(ci)==13?448:(ci)==14?512: \
+  (ci)==15?640:(ci)==16?768:(ci)==17?896:(ci)==18?1024: \
+  (ci)==19?1280:(ci)==20?1536:(ci)==21?1792:(ci)==22?2048:0)
+#define CN1_BIBOP_HDR_BYTES ((int)((sizeof(CN1BibopPage) + 15) & ~((size_t)15)))
+#define CN1_BIBOP_SLOT_COUNT(ci) \
+    ((CN1_BIBOP_PAGE_SIZE - CN1_BIBOP_HDR_BYTES) / CN1_BIBOP_CLASS_SIZE(ci))
+
+/* The ceiling must name the LAST class the macro knows, and the macro must
+ * refuse anything above it. Either half breaking is a silent slow path. */
+_Static_assert(CN1_BIBOP_CIDX(CN1_BIBOP_MAX_OBJECT) == CN1_BIBOP_NUM_CLASSES - 1,
+               "CN1_BIBOP_CIDX and CN1_BIBOP_MAX_OBJECT disagree about the last size class");
+_Static_assert(CN1_BIBOP_CIDX(CN1_BIBOP_MAX_OBJECT + 1) == -1,
+               "CN1_BIBOP_CIDX must refuse sizes above CN1_BIBOP_MAX_OBJECT");
 
 typedef struct CN1BibopPage {
     struct CN1BibopPage* _Atomic nextAll; // append-only global registry chain
@@ -2143,7 +2201,18 @@ typedef struct CN1BibopPage {
 
 // Per-thread current page per size class; defined in cn1_globals.m. Touched only
 // by the owning thread (alloc) and by that same thread on death.
-extern __thread CN1BibopPage* bibopCurrent[CN1_BIBOP_NUM_CLASSES];
+/* The per-thread current page per size class. It USED TO BE `__thread`, and on
+ * Darwin that is not a cheap addressing mode -- it is the TLS-descriptor
+ * sequence, which is an adrp/ldr pair, a load of the descriptor and an INDIRECT
+ * CALL, per allocation. Measured standalone against the same fast path reading
+ * the array out of the thread state: 1.508ns -> 1.264ns, -16%, and the
+ * disassembly loses a `blr`, two loads and the stack frame that only existed to
+ * spill around that call.
+ *
+ * threadStateData is already parameter one of every generated function, so this
+ * is the same storage reached by one `ldr` off x0. Declared here (rather than in
+ * the struct's own section) so it sits next to the fast path that reads it. */
+extern struct ThreadLocalData* getThreadLocalData(void);
 extern _Atomic long bibopBytesSinceGc;
 extern _Atomic long bibopGcTriggerBytes;
 // Atomic mirror of currentGcMarkValue for mutator-side adaptive-policy
@@ -2239,7 +2308,7 @@ static inline JAVA_OBJECT cn1BibopFastAlloc(CODENAME_ONE_THREAD_STATE, int size,
     // cn1GcRegisterClazz.) Cost is one predictable flag-test per alloc, measured
     // at noise level on allocation-heavy renders.
     CN1_CLAZZ_REGISTER(parent);
-    CN1BibopPage* p = bibopCurrent[ci];
+    CN1BibopPage* p = threadStateData->bibopCurrent[ci];
     if(__builtin_expect(p != (CN1BibopPage*)0 && p->freeList == (void*)0 &&
                         constantPoolObjects != (JAVA_OBJECT*)0
 #ifndef CN1_CONSERVATIVE_GC_ROOTS
@@ -2247,8 +2316,9 @@ static inline JAVA_OBJECT cn1BibopFastAlloc(CODENAME_ONE_THREAD_STATE, int size,
 #endif
                         , 1)) {
         int bi = atomic_load_explicit(&p->bumpIndex, memory_order_relaxed);
-        if(__builtin_expect(bi < p->slotCount, 1)) {
-            JAVA_OBJECT o = (JAVA_OBJECT)((char*)p + p->firstSlotOffset + (long)bi * p->slotSize);
+        if(__builtin_expect(bi < CN1_BIBOP_SLOT_COUNT(ci), 1)) {
+            JAVA_OBJECT o = (JAVA_OBJECT)((char*)p + CN1_BIBOP_HDR_BYTES
+                    + (long)bi * CN1_BIBOP_CLASS_SIZE(ci));
 #ifdef CN1_BIBOP_VALIDATE
             // INVARIANT: the per-thread current page must be OWNED and match this
             // size class, and the bumped slot must lie inside the page. A violation
@@ -2298,7 +2368,7 @@ static inline JAVA_OBJECT cn1BibopFastAlloc(CODENAME_ONE_THREAD_STATE, int size,
             // sweep (never a concurrent phase) clears the flag.
             __atomic_store_n(&p->gcAllocedSinceSweep, JAVA_TRUE, __ATOMIC_RELAXED);
 #endif
-            CN1_BIBOP_ACCOUNT_BYTES(threadStateData, p->slotSize);
+            CN1_BIBOP_ACCOUNT_BYTES(threadStateData, CN1_BIBOP_CLASS_SIZE(ci));
             // allocationsSinceLastGC / totalAllocations (the isHighFrequencyGC heuristic)
             // are now bumped in bulk by CN1_BIBOP_FLUSH_BYTES once per page-acquire, not
             // per object -- removing two global-counter stores from the hot path.
@@ -2333,7 +2403,7 @@ static inline JAVA_OBJECT cn1BibopFastAlloc(CODENAME_ONE_THREAD_STATE, int size,
 static inline JAVA_OBJECT cn1BibopFastAllocNoZero(CODENAME_ONE_THREAD_STATE, int size, struct clazz* parent, int ci) {
     if(ci < 0) return (JAVA_OBJECT)0; // oversized: folded away for big types
     CN1_CLAZZ_REGISTER(parent); // see cn1BibopFastAlloc: every alloc path registers
-    CN1BibopPage* p = bibopCurrent[ci];
+    CN1BibopPage* p = threadStateData->bibopCurrent[ci];
     if(__builtin_expect(p != (CN1BibopPage*)0 && p->freeList == (void*)0 &&
                         constantPoolObjects != (JAVA_OBJECT*)0
 #ifndef CN1_CONSERVATIVE_GC_ROOTS
@@ -2341,8 +2411,9 @@ static inline JAVA_OBJECT cn1BibopFastAllocNoZero(CODENAME_ONE_THREAD_STATE, int
 #endif
                         , 1)) {
         int bi = atomic_load_explicit(&p->bumpIndex, memory_order_relaxed);
-        if(__builtin_expect(bi < p->slotCount, 1)) {
-            JAVA_OBJECT o = (JAVA_OBJECT)((char*)p + p->firstSlotOffset + (long)bi * p->slotSize);
+        if(__builtin_expect(bi < CN1_BIBOP_SLOT_COUNT(ci), 1)) {
+            JAVA_OBJECT o = (JAVA_OBJECT)((char*)p + CN1_BIBOP_HDR_BYTES
+                    + (long)bi * CN1_BIBOP_CLASS_SIZE(ci));
 #ifdef CN1_BIBOP_VALIDATE
             if(p->classIndex != ci || p->owned != JAVA_TRUE ||
                (char*)o < (char*)p + p->firstSlotOffset ||
@@ -2380,7 +2451,7 @@ static inline JAVA_OBJECT cn1BibopFastAllocNoZero(CODENAME_ONE_THREAD_STATE, int
             // relaxed: concurrently read by the grace pass (see cn1BibopFastAlloc)
             __atomic_store_n(&p->gcAllocedSinceSweep, JAVA_TRUE, __ATOMIC_RELAXED);
 #endif
-            CN1_BIBOP_ACCOUNT_BYTES(threadStateData, p->slotSize);
+            CN1_BIBOP_ACCOUNT_BYTES(threadStateData, CN1_BIBOP_CLASS_SIZE(ci));
 #ifdef CN1_GC_CONFORM
             cn1RecordAllocation(parent, size);
 #endif
@@ -3475,8 +3546,20 @@ extern void cn1ComputeNativeStackLimit(CODENAME_ONE_THREAD_STATE);
 // stack essentially never maps into the 256KB band of another stack, while a
 // genuinely overflowing stack must descend THROUGH the band (no single
 // frameless frame approaches 256KB), so overflow detection is preserved.
+/* -DCN1_COUNT_SOE_ENTRIES makes every guarded entry tick a plain counter, so the
+ * guard's whole-program ceiling can be computed from a real call count instead of
+ * guessed at. Not atomic and not meant to be: the count only needs an order of
+ * magnitude, and an atomic here would cost more than the thing being measured. */
+#ifdef CN1_COUNT_SOE_ENTRIES
+extern long long cn1SoeEntryCount;
+#define CN1_SOE_TICK() (cn1SoeEntryCount++)
+#else
+#define CN1_SOE_TICK() ((void)0)
+#endif
+
 #define CN1_FRAMELESS_SOE_GUARD(retval) \
     do { \
+        CN1_SOE_TICK(); \
         if (__builtin_expect(threadStateData->nativeStackLimit == 0, 0)) { cn1ComputeNativeStackLimit(threadStateData); } \
         JAVA_LONG __cn1FrameAddr = (JAVA_LONG)(intptr_t)__builtin_frame_address(0); \
         if (__builtin_expect(__cn1FrameAddr < threadStateData->nativeStackLimit \

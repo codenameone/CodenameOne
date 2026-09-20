@@ -1509,6 +1509,10 @@ void gcReleaseObj(JAVA_OBJECT o) {
 // size directly; elsewhere we fall back to anchoring off the current frame with a
 // generous (8MB) assumed stack. The guard band is subtracted so there is room to
 // build + throw the StackOverflowError once the limit is crossed.
+#ifdef CN1_COUNT_SOE_ENTRIES
+long long cn1SoeEntryCount = 0;
+#endif
+
 void cn1ComputeNativeStackLimit(CODENAME_ONE_THREAD_STATE) {
 #if defined(__APPLE__) || defined(__MACH__)
     void* stackBase = pthread_get_stackaddr_np(pthread_self());
@@ -1835,7 +1839,7 @@ static void cn1DrainAdoptBuffer() {
 JAVA_BOOLEAN hasAgressiveAllocator;
 
 #ifndef CN1_DISABLE_BIBOP
-extern void cn1BibopRetireThreadPages();
+extern void cn1BibopRetireThreadPages(CODENAME_ONE_THREAD_STATE);
 #endif
 
 // the thread just died, mark its remaining resources
@@ -1845,7 +1849,7 @@ void collectThreadResources(struct ThreadLocalData *current)
     // Retire this (dying) thread's current BiBOP pages so their slots become
     // collectable. Runs on the dying thread, so its __thread current pages are
     // reachable here.
-    cn1BibopRetireThreadPages();
+    cn1BibopRetireThreadPages(current);
     // LEVER A: flush any unaccounted per-thread bytes into the global GC trigger.
     CN1_BIBOP_FLUSH_BYTES(current);
     // Release this thread's pacing claim. A claim is normally handed back at the
@@ -6276,8 +6280,7 @@ static int bibopTriggerHighSurvivalStreak = 0;
 // thread (allocation) and by that same thread on death (collectThreadResources
 // runs on the dying thread), so __thread is correct and the GC never needs to
 // reach into it -- retired pages are handed to the GC via the global stack.
-// Non-static: the inlined bump fast path (cn1_globals.h) reads bibopCurrent[ci].
-__thread CN1BibopPage* bibopCurrent[CN1_BIBOP_NUM_CLASSES];
+// Now a ThreadLocalData field; see the note at the fast path in cn1_globals.h.
 
 #ifdef CN1_ALLOC_CENSUS
 static void cn1BibopExitReport(void);
@@ -6308,6 +6311,13 @@ static void cn1BibopDoInit() {
      * between the last class and the ceiling maps to -1 and silently falls to the
      * legacy path while the dispatch believes BiBOP took it. */
     CODENAME_ONE_ASSERT(cn1BibopClassSize[CN1_BIBOP_NUM_CLASSES - 1] == CN1_BIBOP_MAX_OBJECT);
+    /* The inline fast path computes slot geometry from ci as a CONSTANT. Check
+     * that constant against this table rather than assuming the two stay in step:
+     * a mismatch would have the inlined bump hand out addresses the sweep walks
+     * at a different stride, which is silent heap corruption rather than a crash. */
+    for(int __ci = 0 ; __ci < CN1_BIBOP_NUM_CLASSES ; __ci++) {
+        CODENAME_ONE_ASSERT(CN1_BIBOP_CLASS_SIZE(__ci) == cn1BibopClassSize[__ci]);
+    }
     for(int s = 0 ; s <= CN1_BIBOP_MAX_OBJECT ; s++) {
         while(ci < CN1_BIBOP_NUM_CLASSES && cn1BibopClassSize[ci] < s) {
             ci++;
@@ -8258,9 +8268,9 @@ static void cn1BibopMaybeGc(CODENAME_ONE_THREAD_STATE) {
 // Retire the thread's current page for class ci (if any) onto the global SWEEP
 // stack and adopt a PARTIAL (preferred) or FREE page, formatting a fresh one
 // only as a last resort. Runs on the owning thread.
-static CN1BibopPage* cn1BibopAcquirePage(int ci) {
+static CN1BibopPage* cn1BibopAcquirePage(CODENAME_ONE_THREAD_STATE, int ci) {
     pthread_mutex_lock(&bibopMutex);
-    CN1BibopPage* old = bibopCurrent[ci];
+    CN1BibopPage* old = threadStateData->bibopCurrent[ci];
     if(old != 0) {
         old->owned = JAVA_FALSE;
         // push onto the SWEEP stack (single producer here holds bibopMutex, but
@@ -8270,7 +8280,7 @@ static CN1BibopPage* cn1BibopAcquirePage(int ci) {
             old->nextPool = sh;
         } while(!atomic_compare_exchange_weak_explicit(&bibopSweepStack, &sh, old,
                     memory_order_release, memory_order_relaxed));
-        bibopCurrent[ci] = 0;
+        threadStateData->bibopCurrent[ci] = 0;
     }
     CN1BibopPage* np = bibopPartialPool[ci];
     if(np != 0) {
@@ -8327,7 +8337,7 @@ static CN1BibopPage* cn1BibopAcquirePage(int ci) {
     }
     np->owned = JAVA_TRUE;
     np->nextPool = 0;
-    bibopCurrent[ci] = np;
+    threadStateData->bibopCurrent[ci] = np;
     return np;
 }
 
@@ -8552,6 +8562,9 @@ void cn1HeapAccounting(const char* label) {
             __cn1MallocInUse / 1048576.0, __cn1MallocAllocated / 1048576.0,
             (__cn1MallocAllocated - __cn1MallocInUse) / 1048576.0,
             bibopArenaTotalBytes / 1048576.0);
+#ifdef CN1_COUNT_SOE_ENTRIES
+    fprintf(stderr, "[SOE] guarded frameless entries so far: %lld\n", cn1SoeEntryCount);
+#endif
     fflush(stderr);
 }
 
@@ -8901,7 +8914,7 @@ static JAVA_OBJECT cn1BibopAlloc(CODENAME_ONE_THREAD_STATE, int size, struct cla
     if(ci < 0) {
         return 0;
     }
-    CN1BibopPage* p = bibopCurrent[ci];
+    CN1BibopPage* p = threadStateData->bibopCurrent[ci];
     JAVA_OBJECT o = 0;
     for(;;) {
         if(p != 0) {
@@ -8928,7 +8941,7 @@ static JAVA_OBJECT cn1BibopAlloc(CODENAME_ONE_THREAD_STATE, int size, struct cla
         }
         // Need a fresh/partial page. This is the rare slow path (~once per page).
         cn1BibopMaybeGc(threadStateData);
-        p = cn1BibopAcquirePage(ci);
+        p = cn1BibopAcquirePage(threadStateData, ci);
         if(p == 0) {
             return 0; // out of pages -> legacy heap path
         }
@@ -9742,10 +9755,10 @@ static void cn1GraceAuditLegacy(CODENAME_ONE_THREAD_STATE) {
 
 // Called on the dying thread (collectThreadResources): retire all of its
 // current pages so their slots become collectable.
-void cn1BibopRetireThreadPages() {
+void cn1BibopRetireThreadPages(CODENAME_ONE_THREAD_STATE) {
     pthread_once(&bibopOnce, cn1BibopDoInit);
     for(int ci = 0 ; ci < CN1_BIBOP_NUM_CLASSES ; ci++) {
-        CN1BibopPage* old = bibopCurrent[ci];
+        CN1BibopPage* old = threadStateData->bibopCurrent[ci];
         if(old != 0) {
             old->owned = JAVA_FALSE;
             CN1BibopPage* sh = atomic_load_explicit(&bibopSweepStack, memory_order_relaxed);
@@ -9753,7 +9766,7 @@ void cn1BibopRetireThreadPages() {
                 old->nextPool = sh;
             } while(!atomic_compare_exchange_weak_explicit(&bibopSweepStack, &sh, old,
                         memory_order_release, memory_order_relaxed));
-            bibopCurrent[ci] = 0;
+            threadStateData->bibopCurrent[ci] = 0;
         }
     }
 }

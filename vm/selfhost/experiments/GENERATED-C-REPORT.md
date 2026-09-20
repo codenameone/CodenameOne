@@ -299,3 +299,80 @@ shape pays, then teach the translator to emit it.
 here needs the same interleaved, 8-round, output-verified measurement the
 allocator rounds used, because three separate changes this session looked good
 at four rounds and evaporated at eight.
+
+---
+
+# Proof pass: what survived contact with the machine
+
+Every item above was re-examined with a standalone microbenchmark
+(`cbench/`, interleaved arms, min-of-9, repeated) AND by reading the arm64 that
+clang produces. The two disagreed often enough that the method is worth stating
+first.
+
+## Instruction count is not a proxy for time
+
+Item 3's arm C removes **22 instructions and 6 loads** from the write barrier and
+is **0.003 ns/op** different. The barrier's flag load is a BRANCH condition, not
+an input to the store, so it never enters the store's dependency chain and the
+issue window absorbs the whole thing.
+
+The corollary cuts the other way: item 1a is worth having not because it removes
+three instructions but because one of them is an **indirect call**, which is a
+serialization point and forces a stack frame that exists only to spill around it.
+
+So the question to ask of a candidate is never "how many instructions" but:
+
+- is it on a **dependency chain** that feeds an address or a branch that matters;
+- does it consume a **load port** on a path that is load-bound;
+- is it an **ordering primitive** (`stlr`/`ldapr`) or a **call**, which serialize
+  regardless of how they are counted;
+- does it force a **frame** in a function that would otherwise need none.
+
+## Taken
+
+| item | what the machine says | measured |
+|---|---|---|
+| 1a `bibopCurrent` -> ThreadLocalData | loses an indirect `blr`, 4 loads, and the frame that only existed to spill around the call | -0.23 ns/alloc, every run |
+| page geometry as constants | `slotCount`/`firstSlotOffset`/`slotSize` were LOADS, two of them feeding `smaddl` on the address chain; now immediates and a shifted `add` | 3 loads and a multiply off the critical path |
+| CN1_BIBOP_CIDX extended | 513..2048-byte objects were getting `ci = -1` and falling out of line to `__NEW_X`; the runtime table had the classes, the inline macro did not | the ceiling raise now reaches the fast path |
+| SOE guard off leaves | the guard forces a frame-pointer materialisation on entry | 597,522,393 -> 409,951,756 guarded entries, 0.277 ns each = ~52ms of 5.4s |
+
+## Rejected, with the reason
+
+| item | why not |
+|---|---|
+| 3 SATB barrier restructure | 22 fewer instructions, 0.003 ns. Off the dependency chain. |
+| 1d body zero | The zero writes into a line the allocator is already fetching for the header, so it is nearly free. Moving it to page-format measured WORSE (2.02 vs 1.71 ns) -- the bulk pass evicts the working set and every later allocation takes a cold line. |
+| 1b / 1c flag and startup tests | Instruction counts drop (63 -> 58 -> 48) but the ops are independent and absorbed; the clean first run had them identical and a later 0.26ns swing reproduced as code layout, not work. |
+| 6 class-init guard | 0.018 ns. One `ldapr` that folds into an adjacent compare. Would have cost a whole-program dominator analysis. |
+
+## Open, and it is a proof rather than a measurement
+
+**The allocation rate is set by two store-releases, not by instruction count.**
+
+```
+str   x20, [o]        ; class pointer
+stlur w11, [o+8]      ; mark = -1          RELEASE
+stlur w10, [p+32]     ; bumpIndex = bi+1   RELEASE
+```
+
+The second is the loop-carried edge: the next allocation's `bumpIndex` load
+cannot issue until it retires, which is what pins the fast path near four cycles
+and why everything removed around it was absorbed.
+
+Whether it can be relaxed is a question about the SWEEP, not the mutator. The
+mark-word release already publishes the object; the cursor release additionally
+guarantees that a collector which sees slot N consumed also sees slot N-1's mark.
+Relaxing it is sound only if the sweep's "a slot whose mark is not current is
+skipped without dereferencing" invariant already covers a cursor that becomes
+visible before the mark it refers to. That is worth establishing -- it removes an
+ordering primitive from every allocation in the VM -- and it is not something to
+try and measure.
+
+## Method note for whoever runs the harness next
+
+Two arms in `bench_call.c` initially reported **0.000 ns/op** because the
+function under test was pure and clang folded twenty million calls into one. The
+fix is to make every call depend on the iteration index, and the check is to
+count `bl` in the loop body -- which the harness comment now says. A benchmark
+arm that reports zero is not a result, it is a bug.
