@@ -114,6 +114,37 @@ public class LabelInstruction extends Instruction {
     	labelCatchDepth.clear();
     	usedLabels.clear();
     	labelNames.clear();
+    	catchDepthInstructions = null;
+    }
+
+    /*
+     * The instruction list of the method being emitted, so appendInstruction below can
+     * compute a catch depth it has no other way to reach.
+     *
+     * It used to get that depth by having TryCatch.appendInstruction call
+     * getLabelCatchDepth EAGERLY for its end label, purely to seed the cache -- and that
+     * is a poisoned answer whenever a LATER try/catch begins at a label the walk has
+     * already passed, which is what every NESTED try compiles to: both regions start at
+     * the same instruction, so both register a begin at the same label. The inner one is
+     * emitted first, asks for the depth of its end label while only ITS OWN begin is
+     * registered, and caches 1 where the answer is 2.
+     *
+     * END_TRY(1) then sets tryBlockOffset back to the method's base rather than to the
+     * enclosing try, so entering the inner HANDLER deregistered the outer try with it: a
+     * throw from inside a catch block escaped a try that was lexically around it.
+     * `try { try { throw a; } catch (E e) { throw e; } } catch (E e) {}` left the method
+     * with the exception uncaught, on every platform, which is as plain as a codegen bug
+     * gets -- and nothing in the tortures threw from a handler.
+     */
+    private static List<Instruction> catchDepthInstructions;
+
+    /**
+     * Remember the list for the lazy computation above. Called once per emitted method,
+     * from TryCatch, which is the only instruction holding the list before any label is
+     * emitted.
+     */
+    public static void setCatchDepthInstructions(List<Instruction> inst) {
+        catchDepthInstructions = inst;
     }
     public LabelInstruction(org.objectweb.asm.Label parent) {
         super(-1);
@@ -223,7 +254,7 @@ public class LabelInstruction extends Instruction {
             // the exception is thrown, and again when it leaves the TRY_CATCH block.
             // This happens, for example, inside synchronized blocks for cleaning
             // up monitors on exceptions thrown.
-            int depth = getLabelCatchDepth(parent, null);
+            int depth = getLabelCatchDepth(parent, catchDepthInstructions);
             b.append("END_TRY(").append(depth).append(");");
         } else {
             List<Pair> strs = tryBeginLabels.get(parent);

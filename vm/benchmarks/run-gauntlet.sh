@@ -97,7 +97,14 @@ echo "run-gauntlet: modern reference Java $refFeature ($REF_JAVA); legacy refere
 # non-capturing instances too, so `a == b` is unspecified on both sides. What it does check
 # is that capturing lambdas still see their OWN captures, which is what a shared-instance
 # bug would break first.
-TORTURES="MapTorture MapTorture2 IdmTorture HtTorture SbTorture StrCmp FusedTest IbpTest ExcTest ThreadChurn SoeTest TaggedSync BoxEdge ConcatCorrupt ToCharT ForEachT LambdaT FeMin Latin1T SbLatin1T SetTorture InstanceOfT WriterT StrQueryT LambdaDevirtT TwinProbe NullDeref ThrowingFinalizer"
+# NestThrow is four throws, and it exists because the third one escaped its catch.
+# A throw from INSIDE a catch handler was not caught by a try lexically around it:
+# nested try/catch made both regions begin at the same instruction, the inner one
+# cached its END_TRY depth before the outer one had registered, and entering the inner
+# handler therefore deregistered the outer try along with it. It is four lines of Java
+# and it was wrong on every platform, which is the argument for keeping the trivial
+# shapes in the list beside the elaborate ones.
+TORTURES="NestThrow MapTorture MapTorture2 IdmTorture HtTorture SbTorture StrCmp FusedTest IbpTest ExcTest ThreadChurn SoeTest TaggedSync BoxEdge ConcatCorrupt ToCharT ForEachT LambdaT FeMin Latin1T SbLatin1T SetTorture InstanceOfT WriterT StrQueryT LambdaDevirtT TwinProbe NullDeref ThrowingFinalizer"
 mkdir -p target/host-classes target/bin
 # FusedTest uses @com.codename1.annotations.Fused -- supply the annotation
 # source for the host compile (ParparVM's JavaAPI carries its own copy)
