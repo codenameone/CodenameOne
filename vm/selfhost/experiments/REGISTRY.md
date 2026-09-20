@@ -4029,3 +4029,52 @@ Open, in order:
   - Compressed references: the 32GB window is in and holds the whole page heap
     (fallbacks=0); the legacy heap still comes from calloc outside it and a
     reference block can hold either kind.
+
+## Round 44: the three guardrails, finally ranked
+
+The fast-common-path idea is one thing repeated: a guardrail is lifted where the
+analysis can prove it unnecessary. Rounds 42 and 43 did it twice for null checks
+-- once by moving the check to the hardware, once by proving it dead. The next
+candidates are the three things analyzeBoundsChecks' own javadoc says a single
+try/catch disables at once. Two had been counted. The third had not, and it is
+the one that costs a compare and a branch on every array access:
+
+| guardrail | what one try/catch costs |
+|---|---|
+| frameless codegen | 361 of 23,449 methods -- **1%** |
+| StringBuilder stack allocation | 315 of 1,818 sites -- **17%** |
+| **bounds-check elimination** | **3,910 of 19,164 array accesses -- 20%** |
+
+That ordering is the result. The old plan's D6 nominated try/catch as the biggest
+codegen item left on the strength of the frameless number alone, which is the
+smallest of the three by a factor of twenty.
+
+20% is an upper bound rather than a promise: BCE only fires on the canonical
+counted loop, so the recoverable share of those 3,910 is smaller.
+
+### The design, so it is ready rather than remembered
+
+BCE's proof is that falling through `IF_ICMPGE exit` establishes i < a.length for
+the body. An exception edge adds exactly one way to enter that body without the
+test: a handler whose TARGET lies inside it. So the blanket bail can become a
+per-loop check -- no TryCatch.getHandler() resolving to a position within
+[loopTop, exit) -- and the existing proof stands unchanged. An exception thrown
+inside the body leaves the loop, which is harmless: no later access happens in
+that iteration.
+
+TryCatch exposes getStart/getEnd/getHandler, and the pass already builds a
+Label->position map for the exit target, so the check is local.
+
+NOT ATTEMPTED HERE, deliberately. A wrong bounds-check elimination is a silent
+out-of-bounds access, which is the worst failure class in this VM, and the bail
+being replaced is driven by a STATIC hasTryCatch flag whose reset discipline
+needs checking before it is trusted. Two subtle errors today were caught only by
+tests written for other purposes (boxed types in the leaf instanceof, the String
+twin in the same). This one wants a fresh start and a torture that puts an array
+loop inside a try/catch.
+
+### Still no timing
+
+The host ran iOS Simulator runtimes and Spotlight indexing at load 30-194
+throughout. Round 41's 1.145x at 1.4% spread remains the last trustworthy figure
+and predates rounds 42 and 43.
