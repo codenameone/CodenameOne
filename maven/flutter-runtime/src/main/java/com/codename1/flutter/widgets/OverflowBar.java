@@ -26,6 +26,7 @@ package com.codename1.flutter.widgets;
 import com.codename1.flutter.BuildContext;
 import com.codename1.flutter.StatelessWidget;
 import com.codename1.flutter.Widget;
+import com.codename1.flutter.MainAxisAlignment;
 
 import dart.core.DartList;
 
@@ -84,7 +85,30 @@ public class OverflowBar extends StatelessWidget {
     @Override
     public Widget build(BuildContext context) {
         Row row = new Row();
-        row.children(children);
+        // Both of these were dropped, and both are visible. Shrine's login states an END
+        // alignment and 8 logical pixels of spacing: its CANCEL and NEXT sat hard against
+        // the left edge with no gap, where the reference has them apart and to the right.
+        if (alignment instanceof MainAxisAlignment) {
+            row.mainAxisAlignment((MainAxisAlignment) alignment);
+        }
+        row.children(spacing > 0 ? spaced(children) : children);
         return row;
+    }
+
+    /// The children with a gap of {@code spacing} between each pair.
+    private DartList<Widget> spaced(DartList<Widget> kids) {
+        if (kids == null || kids.size() < 2) {
+            return kids;
+        }
+        DartList<Widget> out = new DartList<Widget>();
+        for (int i = 0; i < kids.size(); i++) {
+            if (i > 0) {
+                SizedBox gap = new SizedBox();
+                gap.width(spacing);
+                out.add(gap);
+            }
+            out.add(kids.get(i));
+        }
+        return out;
     }
 }

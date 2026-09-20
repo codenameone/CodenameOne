@@ -137,6 +137,16 @@ public class ButtonRenderElement extends RenderElement {
      * {@code toString()} fallback for unsupported content (with a log
      * warning), or null when the content is an icon or absent.
      */
+    /// The colour the consumed Text asked for, or null when it asked for none.
+    private com.codename1.flutter.Color consumedLabelColor() {
+        Widget c = contentWidget();
+        if (!(c instanceof Text)) {
+            return null;
+        }
+        com.codename1.flutter.TextStyle ts = ((Text) c).getStyle();
+        return ts == null ? null : ts.getColor();
+    }
+
     public String consumedLabel() {
         Widget c = contentWidget();
         if (c instanceof Text) {
@@ -296,6 +306,17 @@ public class ButtonRenderElement extends RenderElement {
                 all.setFgColor(tint != null ? tint.rgb() : cs.onSurface().rgb());
                 all.setBorder(Border.createEmpty());
                 clearBackground(all);
+            }
+            // The consumed Text's OWN colour, last, because it is the most specific
+            // thing anyone said about this label.
+            //
+            // A button takes its child's string and drops the style that came with it, so
+            // a label that states a colour lost it and wore the button role's instead.
+            // Shrine's CANCEL says onSurface and came out in the pale pink its role gives
+            // it, against the reference's near-black.
+            com.codename1.flutter.Color own = consumedLabelColor();
+            if (own != null) {
+                all.setFgColor(own.rgb());
             }
         } catch (Exception err) {
             // styling is best-effort; the base theme look remains
