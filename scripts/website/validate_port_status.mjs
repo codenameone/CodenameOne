@@ -48,6 +48,26 @@ function attribute(tag, name) {
     return match ? (match[1] || match[2]) : "";
 }
 
+// The CI targets the compliance matrix renders a column for, and the platform
+// name each one's tooltip must carry. This is also where the expected target
+// COUNT comes from: it used to be spelled 12 in two unrelated assertions, and
+// removing a target left one of them failing and the other quietly passing on
+// a stale number.
+const PLATFORM_NAMES = {
+    "android": "Android",
+    "ios-metal": "iOS",
+    "macos": "macOS",
+    "mac-catalyst": "macOS (Mac Catalyst)",
+    "javascript": "Web",
+    "linux-x64": "Linux x64",
+    "linux-arm64": "Linux ARM64",
+    "windows-x64": "Windows x64",
+    "windows-arm64": "Windows ARM64",
+    "watchos": "watchOS",
+    "tvos": "tvOS"
+};
+const PORT_COUNT = Object.keys(PLATFORM_NAMES).length;
+
 function validate() {
     const home = read("index.html");
     const page = read(path.join("port-status", "index.html"));
@@ -78,15 +98,16 @@ function validate() {
     if (/\bdata-port=(?:["']?javase["']?)(?:\s|>)/i.test(page)) {
         fail("JavaSE must not appear as a portability target");
     }
-    if (!/12 CI targets/i.test(pageText) || /12 port targets/i.test(pageText)) {
-        fail("the compliance columns must be described as CI targets, not distinct platforms");
+    if (!new RegExp(`${PORT_COUNT} CI targets`, "i").test(pageText) ||
+        new RegExp(`${PORT_COUNT} port targets`, "i").test(pageText)) {
+        fail(`the compliance columns must be described as ${PORT_COUNT} CI targets, not distinct platforms`);
     }
 
     const deploymentRows = countMatches(page, /\bdata-deployment-row(?:=|\s|>)/g);
     const browserResults = countMatches(page, /\bdata-browser-result(?:=|\s|>)/g);
     const performanceRows = countMatches(page, /\bdata-performance-row(?:=|\s|>)/g);
     const performanceCells = countMatches(page, /\bdata-performance-cell(?:=|\s|>)/g);
-    if (deploymentRows !== 8 || browserResults !== 3 || performanceRows !== 10 || performanceCells !== 10 * 12) {
+    if (deploymentRows !== 8 || browserResults !== 3 || performanceRows !== 10 || performanceCells !== 10 * PORT_COUNT) {
         fail("deployment, browser, or performance evidence is incomplete");
     }
     for (const required of [
@@ -131,21 +152,8 @@ function validate() {
     if (renderedCells !== featureCells) {
         fail("not every compliance cell has a build-time status");
     }
-    const platformNames = {
-        "android": "Android",
-        "ios-metal": "iOS",
-        "macos": "macOS",
-        "mac-catalyst": "macOS (Mac Catalyst)",
-        "javascript": "Web",
-        "linux-x64": "Linux x64",
-        "linux-arm64": "Linux ARM64",
-        "windows-x64": "Windows x64",
-        "windows-arm64": "Windows ARM64",
-        "watchos": "watchOS",
-        "tvos": "tvOS"
-    };
     const performanceTags = page.match(/<td\b[^>]*data-performance-cell[^>]*>/g) || [];
-    for (const [port, name] of Object.entries(platformNames)) {
+    for (const [port, name] of Object.entries(PLATFORM_NAMES)) {
         if (!performanceTags.some((tag) => attribute(tag, "data-port") === port &&
             attribute(tag, "title").startsWith(`${name}:`))) {
             fail(`performance cells for ${name} must identify the platform in their tooltip`);
@@ -154,7 +162,7 @@ function validate() {
     const primaryCellTags = Array.from(page.matchAll(/<td\b(?=[^>]*\bdata-feature-cell\b)[^>]*>/gi), match => match[0]);
     for (const cell of primaryCellTags) {
         const port = attribute(cell, "data-port");
-        if (!platformNames[port] || !attribute(cell, "title").startsWith(`${platformNames[port]}:`)) {
+        if (!PLATFORM_NAMES[port] || !attribute(cell, "title").startsWith(`${PLATFORM_NAMES[port]}:`)) {
             fail(`compliance cell for ${port || "an unknown port"} has no platform-named tooltip`);
         }
     }
@@ -219,7 +227,7 @@ function validate() {
     for (const cell of manualCellTags) {
         const port = attribute(cell, "data-port");
         const state = attribute(cell, "class");
-        if (!platformNames[port] || !attribute(cell, "title").startsWith(`${platformNames[port]}:`) ||
+        if (!PLATFORM_NAMES[port] || !attribute(cell, "title").startsWith(`${PLATFORM_NAMES[port]}:`) ||
             !/^is-(?:supported|conditional|fallback|unavailable)$/.test(state)) {
             fail(`environment-dependent cell for ${port || "an unknown port"} is incomplete`);
         }

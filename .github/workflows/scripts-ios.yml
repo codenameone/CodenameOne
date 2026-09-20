@@ -319,6 +319,24 @@ jobs:
           MTL_DEBUG_LAYER: '1'
           MTL_DEBUG_LAYER_ERROR_MODE: 'assert'
           CN1SS_PORT_ID: ios-metal
+          # Count this build's compiler warnings and attribute each to whoever
+          # owns the code. This used to ride on the GL leg; that leg is gone, so
+          # it moves here -- and this is now the ONLY leg that runs the census,
+          # which means the baseline comparison and its injected-warning probe
+          # exist nowhere else. pr.yml only runs the parser self-test, which
+          # censuses nothing.
+          #
+          # This leg can host it for the same reason the old one could: it sets
+          # no CN1_IOS_DERIVED_DATA, so run-ios-ui-tests.sh wipes its derived
+          # data and compiles every translation unit from cold. An incremental
+          # build reports no warnings and is indistinguishable from a clean
+          # codebase, which is why the tool exits 2 rather than passing when the
+          # compile count falls short of the manifest.
+          CN1_WARNING_CENSUS: '1'
+          CN1_WARNING_LEG: ios-sim-debug
+          # build-ios-app.sh stages the manifest under the default artifacts dir,
+          # which is not the per-step one above.
+          CN1_WARNING_MANIFEST: ${{ github.workspace }}/artifacts/cn1-source-manifest.txt
         run: |
           set -euo pipefail
           mkdir -p "${ARTIFACTS_DIR}"
@@ -390,6 +408,8 @@ jobs:
             artifacts/*-stats.txt
             artifacts/vm_time.txt
             artifacts/xcodebuild-list.txt
+            artifacts/cn1-source-manifest.txt
+            artifacts/ios-ui-tests-metal/native-warnings.json
           if-no-files-found: warn
           retention-days: 14
 
