@@ -4697,3 +4697,75 @@ not as measured.
 Note the shape of the trade before "restoring the insertion half to be safe":
 that leaves the barrier O(count) per shift and gives back most of the win. It is
 not a free safety margin.
+
+---
+
+## Round 28: the inlining work was already done, and four hypotheses died proving it
+
+The remaining approved items were "devirtualize single-implementation call sites"
+and "for sites that cannot be proved, emit the body once as an inline function
+with its own signature, called both by the vtable target and by the proven
+sites". Both rest on one premise: **that small hot methods are failing to inline
+at their call sites.** The premise is false, and it took four refutations to
+establish that.
+
+The apparent evidence was out-of-line call counts in the shipping binary:
+`ArrayList.get` 167, `ArrayList.add` 152, `String.charAt` 113. Each hypothesis
+for why, and what killed it:
+
+| hypothesis | measurement | verdict |
+|---|---|---|
+| the emitted prologue (locals[]/stack[], `__builtin_frame_address`, the `cleanup` + `"memory"` clobber) blocks inlining | `cbench/test_inline_prologue.c`: 5 variants, 2 TUs, ThinLTO | **refuted** -- all inlined, including a non-leaf variant calling an uninlinable helper the way `get` calls `checkIndex` |
+| ThinLTO declines to IMPORT the body (`-import-instr-limit`, default 100) | rebuilt at 400 | **refuted** -- counts IDENTICAL (167/152/113); total `bl` moved, so the flag took effect |
+| caller size: real callers median 2,821 instrs, p90 16,339 | synthetic 24,758-instruction caller | **refuted** -- the tiny callee still inlined |
+| inliner cost budget | `-inline-threshold=1000` at link | **refuted** -- total `bl` 58,542 -> 93,207 and binary 5.2 -> 7.37MB, yet `get` went 167 -> **172** and `charAt` 113 -> **140** |
+
+A budget increase that inlines 59% more calls program-wide while making these
+three WORSE is not a cost decision. That is what finally pointed at the answer.
+
+### The answer: they are cold fallbacks, and the fast paths are already inlined
+
+`BytecodeMethod.c` contains **zero** occurrences of `ArrayList_get`. The calls
+come from `cn1_intrinsics.h`:
+
+```c
+static inline JAVA_OBJECT cn1InlListGet(..., JAVA_OBJECT owner, JAVA_INT index) {
+    if(__builtin_expect((unsigned)index < (unsigned)list->..._size, 1))
+        return cn1RefBlockGet(list->..._cn1Storage, index);          /* inlined */
+    return java_util_ArrayList_get___int_R_java_lang_Object(...);    /* COLD */
+}
+```
+
+167 inlined copies of the fast path, each carrying one cold out-of-range call.
+`cn1InlListAdd` and `charAt` are the same shape. So all 432 are the *fallback*
+half of exactly the two-method split the work proposed to introduce -- the same
+shape as `cn1InlSbAppendStr`, and the same one Round 26 described correctly when
+narrowing it created 3,264 new fallback calls.
+
+**Reading a cold-fallback count as failed inlining is the error here**, and it is
+the inverse of the mistake that would have been made by acting on it: building a
+second inline path for methods that already have one.
+
+### What is actually already implemented
+
+- **Single-implementation devirtualization** -- `Invoke.resolveSingleTarget`,
+  one resolver shared by the dependency pass and the emitter.
+- **Guarded direct calls for small cones** -- `Invoke.buildGuards`,
+  `CN1_MAX_GUARDS = 4`.
+- **classId-switch dispatch for interfaces**, direct call per arm with a vtable
+  fallback (see `virtual_java_util_List_get`, 7 arms).
+- **Inline fast path + out-of-line fallback** for the hot collection and string
+  operations -- the `cn1Inl*` family.
+
+Note the sibling-arm check that ruled out "these are inlined switch copies":
+if they were, `LinkedList`/`Arrays$ArrayList` arms would appear in the same
+callers. They are zero in every caller. Worth keeping as a technique -- it
+distinguishes an inlined multi-way dispatch from a genuine direct call cheaply.
+
+### Deliberately not done
+
+`@Inline` as an annotation, and deriving the split from emitted size. Both target
+a blocker that does not exist. `cn1InlSbAppendStr` remains the real lesson about
+intent-vs-size (its author marked it inline and clang still declined until the
+BODY was narrowed in Round 26) -- but that is an argument for narrowing bodies,
+not for a new annotation.
