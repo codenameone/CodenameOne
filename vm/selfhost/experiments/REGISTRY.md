@@ -4110,3 +4110,131 @@ is not a reason to stop taking them -- it is the critical-mass argument this
 branch started from -- but it does mean the benchmark can no longer arbitrate
 single changes, and the ASM comparison has become the more informative
 instrument.
+
+## Round 46: bounds-check elimination, four times as much of it, and a throw that escaped
+
+Round 44 nominated the try/catch guardrail on BCE as the largest codegen item
+left, at 20% of the corpus' array accesses. Both halves of that turned out to be
+wrong, and finding out why is most of this round.
+
+### The 20% was a leak, not a measurement
+
+`TryCatch.isTryCatchInMethod()` is set in `TryCatch.appendInstruction` and cleared
+by `TryCatch.reset()` inside `appendMethodC` -- both during EMISSION, while
+`analyzeBoundsChecks` runs in `optimize()`, before any of that. Read there it
+answers for whichever method was emitted last, so the census over-counted by
+however many try/catch-free methods happened to follow one that had them. That
+static flag was also the pass' second bail, so it was refusing methods with no
+try/catch in them at all.
+
+Scanning instructions instead: **207 methods and 1,424 array accesses, 7%.**
+
+### And 7% was not the ceiling that mattered either
+
+The per-loop refinement landed as designed -- a TryCatch instruction is a
+DECLARATION of an exception edge, so it is kept out of the positional view and
+its LANDING PAD is what gets checked; a pad inside [header, exit) enters the body
+without the test having run, a pad outside is just another way to leave, and a
+jump from there back in is an ordinary Jump that bceForeignEntry still refuses.
+It recovered **14 array accesses**, and `loopsRefusedByHandlerInside` came back
+non-zero, so the new guard does fire rather than decorate.
+
+14. The number that explains that is `cleared=106 of arrayOps=19164` -- BCE was
+clearing **half a percent** of the corpus' array accesses, so no guardrail was
+what held it back. The single canonical loop shape it recognized was.
+
+### So count the refusals instead of guessing at them
+
+A rejection-reason census -- first failing precondition per candidate loop, plus
+the per-access misses inside accepted ones -- answered it in one run:
+
+```
+candidateLoops: lengthNotArraylength=2384  accepted=133  (nothing else over 70)
+inAcceptedLoops: cleared=106  notALoad=74  arrayNotLoopArray=43  indexNotInductionVar=23
+```
+
+Nine tenths of all candidate loops were refused because the comparison's right
+side was not a literal ARRAYLENGTH, i.e. the length was hoisted into a local --
+`int n = a.length; for (i = 0; i < n; i++)`, which is what javac emits for most
+real code. And 28% of the array ops inside the loops it DID accept were stores,
+which the pass never marked at all.
+
+### Both, and the result
+
+| | cleared | accepted loops |
+|---|---:|---:|
+| round 45 | 106 | 133 |
+| + per-loop handler check | 106 (+14 in try/catch methods) | 133 |
+| + array stores | 143 | 133 |
+| + hoisted length | 159 | 149 |
+| + array-slot rule relaxed | 426 | 406 |
+| + real dominance | **438** | **419** |
+
+**4.1x**, and 438 of 19,164 is 2.3% against 0.55%.
+
+Stores need a different matcher: the value expression sits BETWEEN the index and
+the store, so there is nothing adjacent to compare, and the operand stack is
+walked back from the store until the depth below it is exactly the array+index
+pair. A call in the value expression cannot touch this frame's locals and cannot
+change an array's length, so the proof is the same one the load path uses -- only
+the way the pair is located differs. The mark then had to be honoured in three
+more places: `shouldEmitNullAndArrayBoundsChecks` ignored it outright (so a proven
+access kept its check on every path the reduction passes could not fold), and
+there was no `CN1_SET_ARRAY_ELEMENT_*_NOCHK` to emit.
+
+### Three tries at one dominance proof
+
+Proving `n` IS `a.length` at the loop is a claim about two slots, and the part
+that took three attempts is "reaching the header means the capture ran".
+
+- Refusing any jump into `(q, header]` refuses the **back edge**, which every
+  loop has. Proved 0 of 1,154 candidates -- a total refusal that looks exactly
+  like "the corpus does not have this shape" from the outside, which is why the
+  sub-reason census went in before the second attempt rather than after it.
+- Narrowing to `(q, header)` proved only the FIRST loop of any method that hoists
+  one length and runs several loops on it: the earlier loops' own exit labels are
+  jump targets sitting between the capture and the later headers.
+- Asking for dominance directly -- delete the capture from the CFG and see
+  whether the header is still reachable, with every exception handler as an entry
+  -- is both correct and more permissive. `captureNotDominating` fell from 29 to 9.
+
+The other rule that had to be relaxed rather than tightened: refusing every write
+to the array's slot accounted for **307 of 1,134** refusals on its own. A write
+BEFORE the capture is harmless, because re-running it means jumping back to it
+and re-running the capture with it; only a write the capture has already passed
+can leave `n` describing an array the loop no longer indexes.
+
+What is left, for whoever widens this next: `lengthLocalNoCapture=604` (the local
+is not set from an ARRAYLENGTH at all -- many are genuinely not array lengths),
+`lengthLocalWrittenTwice=211`, and `lengthNotArraylength=1079` where the bound is
+a constant, a field or a call.
+
+### The bug this turned up is bigger than the optimization
+
+`BceTryCatch` failed on the target, and it failed identically with BCE compiled
+out. Minimized:
+
+```java
+try { try { throw a; } catch (E e) { throw e; } } catch (E e) { }   // uncaught
+```
+
+Nested try/catch compiles to two exception-table entries beginning at the SAME
+instruction, so both register a begin at the same label. TryCatch emitted them in
+table order and each asked for its own end label's catch depth as it went -- the
+inner region, emitted first, computed that depth while only its own begin was
+registered and cached 1 where the answer was 2. END_TRY restores tryBlockOffset
+to that depth, so entering the inner handler deregistered the OUTER try with it.
+
+Wrong on every platform, for years, in four lines of Java. Nothing in the
+tortures threw from inside a handler. Deferring the computation to label emission
+fixes it; `NestThrow` and `NestedTryIntegrationTest` gate it, the latter by
+re-translating under `cn1.legacyCatchDepth` and requiring the escape to come back.
+
+### The lesson worth keeping
+
+Three separate numbers in this round were artefacts of the instrument rather than
+facts about the code: the 20% guardrail cost (a static flag read in the wrong
+phase), the 0-of-1,154 hoisted-length proof (a rule that refused the back edge),
+and the first-loop-only result after that. Each looked like a finding. The thing
+that separated them from findings was always a second counter, never more
+thought about the first one.

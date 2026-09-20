@@ -110,7 +110,13 @@ echo "run-gauntlet: modern reference Java $refFeature ($REF_JAVA); legacy refere
 # handler therefore deregistered the outer try along with it. It is four lines of Java
 # and it was wrong on every platform, which is the argument for keeping the trivial
 # shapes in the list beside the elaborate ones.
-TORTURES="BceTryCatch NestThrow MapTorture MapTorture2 IdmTorture HtTorture SbTorture StrCmp FusedTest IbpTest ExcTest ThreadChurn SoeTest TaggedSync BoxEdge ConcatCorrupt ToCharT ForEachT LambdaT FeMin Latin1T SbLatin1T SetTorture InstanceOfT WriterT StrQueryT LambdaDevirtT TwinProbe NullDeref ThrowingFinalizer"
+# BceHoisted is the same pass' other half: the length hoisted into a local, which is
+# what nine tenths of this corpus' counted loops compile to. Proving n IS a.length is a
+# claim about two slots rather than one, so the shapes that break it are all in there --
+# the array replaced after the capture, the length local written twice, one length
+# bounding two arrays of different sizes. Those cases must still THROW, and a wrong
+# proof does not throw, it reads past the end of a heap object.
+TORTURES="BceTryCatch BceHoisted NestThrow MapTorture MapTorture2 IdmTorture HtTorture SbTorture StrCmp FusedTest IbpTest ExcTest ThreadChurn SoeTest TaggedSync BoxEdge ConcatCorrupt ToCharT ForEachT LambdaT FeMin Latin1T SbLatin1T SetTorture InstanceOfT WriterT StrQueryT LambdaDevirtT TwinProbe NullDeref ThrowingFinalizer"
 mkdir -p target/host-classes target/bin
 # FusedTest uses @com.codename1.annotations.Fused -- supply the annotation
 # source for the host compile (ParparVM's JavaAPI carries its own copy)

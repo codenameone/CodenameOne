@@ -3950,6 +3950,31 @@ public class BytecodeMethod implements SignatureSet {
      * try/catch at all. The second number IS the change: before the per-loop check
      * it was necessarily zero, because such a method never reached the analysis. */
     static int bceAccessesMarked, bceAccessesMarkedInTryCatchMethod;
+    /* WHY a candidate loop was rejected, first failing precondition wins. 106 of the
+     * corpus' 19,164 array accesses are cleared, so the try/catch guardrail was never
+     * the thing holding this pass back -- the shape it recognizes is. These say which
+     * part of the shape does the refusing, so the widening is chosen rather than
+     * guessed at. Indices match BCE_WHY below. */
+    static final String[] BCE_WHY = {
+        "exitNotForward", "lengthNotArraylength", "arrayNotLocal", "indexNotLocal",
+        "noHeaderLabel", "handlerInside", "arrayIsIndex", "inductionNotProven",
+        "headerHasOtherEntries", "arrayWrittenInBody", "accepted", "hoistedLengthUnproven"
+    };
+    static final int[] bceWhy = new int[BCE_WHY.length];
+    /* Array ops inside an ACCEPTED loop's body that were still not cleared, by reason. */
+    static final String[] BCE_MISS = {
+        "notALoad", "indexNotInductionVar", "arrayNotLoopArray", "indexWrittenBeforeAccess",
+        "foreignEntry", "cleared"
+    };
+    static final int[] bceMiss = new int[BCE_MISS.length];
+    /* Which half of the hoisted-length proof refused. Only 20 of 1,154 candidates got
+     * through the first version, and "the corpus does not have that shape" and "the
+     * rule is too strict" look identical from the outside. */
+    static final String[] BCE_HOIST = {
+        "lengthLocalWrittenTwice", "lengthLocalNoCapture", "captureAfterHeader",
+        "arraySlotWritten", "captureNotDominating", "unused", "proven"
+    };
+    static final int[] bceHoist = new int[BCE_HOIST.length];
 
     private int countArrayOps() {
         int c = 0;
@@ -4067,19 +4092,48 @@ public class BytecodeMethod implements SignatureSet {
             Jump j = (Jump) ji;
             Integer exitP = pos.get(j.getLabel());
             if (exitP == null || exitP <= jx) {
+                if (BCE_CENSUS) { bceWhy[0]++; }
                 continue; // exit must be a forward target
             }
             int exit = exitP;
-            // condition shape:  ILOAD i ; ALOAD a ; ARRAYLENGTH ; IF_ICMPGE exit
+            // Two condition shapes. The original one reads the length at the test:
+            //
+            //     header: ILOAD i ; ALOAD a ; ARRAYLENGTH ; IF_ICMPGE exit
+            //
+            // and the second hoists it into a local, which is what NINE TENTHS of this
+            // corpus' counted loops actually compile to (2,384 candidates against 133
+            // for the direct form -- measured, see the census):
+            //
+            //     ALOAD a ; ARRAYLENGTH ; ISTORE n
+            //     header: ILOAD i ; ILOAD n ; IF_ICMPGE exit
+            //
+            // bceHoistedLengthArray proves n IS a.length rather than assuming it, and
+            // hands back the array's slot so everything below is unchanged.
+            int header;
+            int arrVar;
+            int indVar;
             Instruction len = r.get(jx - 1);
-            Instruction arr = r.get(jx - 2);
-            Instruction idx = r.get(jx - 3);
-            Instruction hdr = r.get(jx - 4);
-            if (len.getOpcode() != Opcodes.ARRAYLENGTH) continue;
-            if (!(arr instanceof VarOp) || arr.getOpcode() != Opcodes.ALOAD) continue;
-            if (!(idx instanceof VarOp) || idx.getOpcode() != Opcodes.ILOAD) continue;
-            if (!(hdr instanceof LabelInstruction)) continue;     // header label the back-edge returns to
-            int header = jx - 4;
+            if (len.getOpcode() == Opcodes.ARRAYLENGTH) {
+                Instruction arr = r.get(jx - 2);
+                Instruction idx = r.get(jx - 3);
+                Instruction hdr = r.get(jx - 4);
+                if (!(arr instanceof VarOp) || arr.getOpcode() != Opcodes.ALOAD) { if (BCE_CENSUS) { bceWhy[2]++; } continue; }
+                if (!(idx instanceof VarOp) || idx.getOpcode() != Opcodes.ILOAD) { if (BCE_CENSUS) { bceWhy[3]++; } continue; }
+                if (!(hdr instanceof LabelInstruction)) { if (BCE_CENSUS) { bceWhy[4]++; } continue; }     // header label the back-edge returns to
+                header = jx - 4;
+                arrVar = ((VarOp) arr).getIndex();
+                indVar = ((VarOp) idx).getIndex();
+            } else {
+                if (!(len instanceof VarOp) || len.getOpcode() != Opcodes.ILOAD) { if (BCE_CENSUS) { bceWhy[1]++; } continue; }
+                Instruction idx = r.get(jx - 2);
+                Instruction hdr = r.get(jx - 3);
+                if (!(idx instanceof VarOp) || idx.getOpcode() != Opcodes.ILOAD) { if (BCE_CENSUS) { bceWhy[3]++; } continue; }
+                if (!(hdr instanceof LabelInstruction)) { if (BCE_CENSUS) { bceWhy[4]++; } continue; }
+                header = jx - 3;
+                indVar = ((VarOp) idx).getIndex();
+                arrVar = bceHoistedLengthArray(r, pos, ((VarOp) len).getIndex(), header, handlerAt);
+                if (arrVar < 0) { if (BCE_CENSUS) { bceWhy[11]++; } continue; }
+            }
             // An exception edge that lands anywhere in [header, exit) enters the
             // condition or the body without IF_ICMPGE having run, so i < a.length is
             // no longer established there and the whole proof below collapses. A pad
@@ -4088,25 +4142,52 @@ public class BytecodeMethod implements SignatureSet {
             if (bceHandlerLandsIn(handlerAt, header, exit)) {
                 if (BCE_CENSUS) {
                     bceLoopsRefusedByHandler++;
+                    bceWhy[5]++;
                 }
                 continue;
             }
-            int arrVar = ((VarOp) arr).getIndex();
-            int indVar = ((VarOp) idx).getIndex();
-            if (arrVar == indVar) continue;
-            if (!bceInductionMonotonicNonNegative(r, indVar)) continue;
-            if (bceCountJumpsTargeting(r, header) != 1) continue;          // only the back-edge enters the header
-            if (bceLocalWrittenInRange(r, arrVar, jx, exit)) continue;     // array invariant in loop body
+            if (arrVar == indVar) { if (BCE_CENSUS) { bceWhy[6]++; } continue; }
+            if (!bceInductionMonotonicNonNegative(r, indVar)) { if (BCE_CENSUS) { bceWhy[7]++; } continue; }
+            if (bceCountJumpsTargeting(r, header) != 1) { if (BCE_CENSUS) { bceWhy[8]++; } continue; }          // only the back-edge enters the header
+            if (bceLocalWrittenInRange(r, arrVar, jx, exit)) { if (BCE_CENSUS) { bceWhy[9]++; } continue; }     // array invariant in loop body
+            if (BCE_CENSUS) { bceWhy[10]++; }
 
             for (int k = jx + 1; k < exit; k++) {
                 Instruction ld = r.get(k);
-                if (!bceIsArrayLoadOpcode(ld.getOpcode())) continue;
+                if (bceIsArrayStoreOpcode(ld.getOpcode())) {
+                    // a[i] = <value>. The value expression sits BETWEEN the index and
+                    // the store, so there is nothing adjacent to match -- walk the
+                    // operand stack back from the store to find where it began. A call
+                    // in the value cannot touch this frame's locals and cannot change
+                    // an array's length, so the proof is the same one the load path
+                    // uses; only the way the pair is located differs.
+                    int vbase = bceStoreValueBase(r, k);
+                    if (vbase < jx + 3) { if (BCE_CENSUS) { bceMiss[0]++; } continue; }
+                    Instruction si = r.get(vbase - 1);
+                    Instruction sa = r.get(vbase - 2);
+                    if (!(si instanceof VarOp) || si.getOpcode() != Opcodes.ILOAD || ((VarOp) si).getIndex() != indVar) { if (BCE_CENSUS) { bceMiss[1]++; } continue; }
+                    if (!(sa instanceof VarOp) || sa.getOpcode() != Opcodes.ALOAD || ((VarOp) sa).getIndex() != arrVar) { if (BCE_CENSUS) { bceMiss[2]++; } continue; }
+                    if (bceLocalWrittenInRange(r, indVar, jx, k)) { if (BCE_CENSUS) { bceMiss[3]++; } continue; }
+                    if (bceForeignEntry(r, pos, header, k, j)) { if (BCE_CENSUS) { bceMiss[4]++; } continue; }
+                    ld.markBoundsSafe();
+                    if (BCE_CENSUS) {
+                        bceMiss[5]++;
+                        bceAccessesMarked++;
+                        if (handlerAt.length > 0) { bceAccessesMarkedInTryCatchMethod++; }
+                    }
+                    continue;
+                }
+                if (!bceIsArrayLoadOpcode(ld.getOpcode())) {
+                    if (BCE_CENSUS && bceIsArrayOpcode(ld.getOpcode())) { bceMiss[0]++; }
+                    continue;
+                }
                 Instruction li = r.get(k - 1);
                 Instruction la = r.get(k - 2);
-                if (!(li instanceof VarOp) || li.getOpcode() != Opcodes.ILOAD || ((VarOp) li).getIndex() != indVar) continue;
-                if (!(la instanceof VarOp) || la.getOpcode() != Opcodes.ALOAD || ((VarOp) la).getIndex() != arrVar) continue;
-                if (bceLocalWrittenInRange(r, indVar, jx, k)) continue;     // i unchanged test->access
-                if (bceForeignEntry(r, pos, header, k, j)) continue;        // no bypass entry into cond/body
+                if (!(li instanceof VarOp) || li.getOpcode() != Opcodes.ILOAD || ((VarOp) li).getIndex() != indVar) { if (BCE_CENSUS) { bceMiss[1]++; } continue; }
+                if (!(la instanceof VarOp) || la.getOpcode() != Opcodes.ALOAD || ((VarOp) la).getIndex() != arrVar) { if (BCE_CENSUS) { bceMiss[2]++; } continue; }
+                if (bceLocalWrittenInRange(r, indVar, jx, k)) { if (BCE_CENSUS) { bceMiss[3]++; } continue; }     // i unchanged test->access
+                if (bceForeignEntry(r, pos, header, k, j)) { if (BCE_CENSUS) { bceMiss[4]++; } continue; }        // no bypass entry into cond/body
+                if (BCE_CENSUS) { bceMiss[5]++; }
                 ld.markBoundsSafe();
                 if (BCE_CENSUS) {
                     bceAccessesMarked++;
@@ -4130,6 +4211,215 @@ public class BytecodeMethod implements SignatureSet {
             }
         }
         return false;
+    }
+
+    /**
+     * The array slot whose length is parked in local {@code nVar}, or -1.
+     *
+     * The proof has to survive both halves changing under it, so all three of these
+     * hold: {@code nVar} is written EXACTLY ONCE in the whole method and that write is
+     * the ARRAYLENGTH capture; the array's slot is never written at all, so the length
+     * it captured is the length it still has; and nothing jumps INTO the region between
+     * the capture and the loop, so reaching the header means the capture ran. Refusing
+     * every write to the array slot is stricter than it has to be -- a store before the
+     * capture is harmless unless a back edge can re-run it -- and the strict form is
+     * what a parameter or a field read into a fresh local already satisfies.
+     */
+    private static int bceHoistedLengthArray(java.util.List<Instruction> r,
+                                             java.util.HashMap<Label, Integer> pos,
+                                             int nVar, int header, int[] handlerAt) {
+        int q = -1;
+        for (int i = 0; i < r.size(); i++) {
+            Instruction in = r.get(i);
+            if (in instanceof IInc && ((IInc) in).getVar() == nVar) {
+                if (BCE_CENSUS) { bceHoist[0]++; }
+                return -1;
+            }
+            if (in instanceof VarOp && ((VarOp) in).getIndex() == nVar && bceIsStoreOpcode(in.getOpcode())) {
+                if (q >= 0 || in.getOpcode() != Opcodes.ISTORE) {
+                    if (BCE_CENSUS) { bceHoist[0]++; }
+                    return -1; // written twice, or the slot is reused for another type
+                }
+                q = i;
+            }
+        }
+        if (q < 2) {
+            if (BCE_CENSUS) { bceHoist[1]++; }
+            return -1;
+        }
+        if (q >= header) {
+            if (BCE_CENSUS) { bceHoist[2]++; }
+            return -1;
+        }
+        if (r.get(q - 1).getOpcode() != Opcodes.ARRAYLENGTH) {
+            if (BCE_CENSUS) { bceHoist[1]++; }
+            return -1;
+        }
+        Instruction a = r.get(q - 2);
+        if (!(a instanceof VarOp) || a.getOpcode() != Opcodes.ALOAD) {
+            if (BCE_CENSUS) { bceHoist[1]++; }
+            return -1;
+        }
+        int arrVar = ((VarOp) a).getIndex();
+        // Writes to the array's slot are allowed BEFORE the capture and refused at or
+        // after it. Re-running such a write means jumping back to it, and everything
+        // between there and the loop is then re-run too -- the capture included, so n
+        // is re-taken for whatever array the slot now holds. What cannot be allowed is
+        // a write the capture has already passed, which would leave n describing an
+        // array the loop no longer indexes. Refusing every write regardless was the
+        // first rule here and it alone accounted for 307 of the 1,134 refusals.
+        for (int i = q; i < r.size(); i++) {
+            Instruction in = r.get(i);
+            if (in instanceof IInc && ((IInc) in).getVar() == arrVar) {
+                if (BCE_CENSUS) { bceHoist[3]++; }
+                return -1;
+            }
+            if (in instanceof VarOp && ((VarOp) in).getIndex() == arrVar && bceIsStoreOpcode(in.getOpcode())) {
+                if (BCE_CENSUS) { bceHoist[3]++; }
+                return -1;
+            }
+        }
+        // Reaching the header must mean the capture ran -- q must DOMINATE the header.
+        // Ask that directly: walk the control-flow graph from every entry with q deleted
+        // and see whether the header is still reachable.
+        //
+        // The two approximations tried first were both wrong in instructive ways.
+        // Refusing any jump into (q, header] refuses the BACK EDGE, which every loop
+        // has, and proved 0 of 1,154 candidates. Narrowing it to (q, header) then proved
+        // only the FIRST loop of any method that hoists one length and runs several
+        // loops on it, because the earlier loops' own exit labels are jump targets
+        // sitting between the capture and the later headers.
+        if (!bceDominates(r, pos, q, header, handlerAt)) {
+            if (BCE_CENSUS) { bceHoist[4]++; }
+            return -1;
+        }
+        if (BCE_CENSUS) { bceHoist[6]++; }
+        return arrVar;
+    }
+
+    /**
+     * True when every path from an entry to {@code header} runs {@code barrier} -- plain
+     * dominance, computed by deleting the barrier and asking whether the header is still
+     * reachable. Exception handlers are entries too: a handler is entered from anywhere
+     * in its range, so a handler that reaches the header without passing the capture is
+     * exactly the hole a scan over jump targets cannot see.
+     */
+    private static boolean bceDominates(java.util.List<Instruction> r,
+                                        java.util.HashMap<Label, Integer> pos,
+                                        int barrier, int header, int[] handlerAt) {
+        int n = r.size();
+        boolean[] seen = new boolean[n];
+        java.util.ArrayDeque<Integer> work = new java.util.ArrayDeque<Integer>();
+        work.add(Integer.valueOf(0));
+        for (int i = 0; i < handlerAt.length; i++) {
+            work.add(Integer.valueOf(handlerAt[i]));
+        }
+        while (!work.isEmpty()) {
+            int i = work.poll().intValue();
+            if (i < 0 || i >= n || i == barrier || seen[i]) {
+                continue;
+            }
+            seen[i] = true;
+            if (i == header) {
+                return false;
+            }
+            Instruction c = r.get(i);
+            int op = c.getOpcode();
+            if (c instanceof Jump) {
+                Integer t = pos.get(((Jump) c).getLabel());
+                if (t == null) {
+                    return false; // a target we cannot place could be the header
+                }
+                work.add(t);
+                if (op != Opcodes.GOTO) {
+                    work.add(Integer.valueOf(i + 1));
+                }
+                continue;
+            }
+            if (op == Opcodes.ATHROW || op == Opcodes.RETURN || op == Opcodes.IRETURN
+                    || op == Opcodes.LRETURN || op == Opcodes.FRETURN || op == Opcodes.DRETURN
+                    || op == Opcodes.ARETURN) {
+                continue; // no fallthrough
+            }
+            work.add(Integer.valueOf(i + 1));
+        }
+        return true;
+    }
+
+    private static boolean bceIsStoreOpcode(int op) {
+        return op == Opcodes.ISTORE || op == Opcodes.LSTORE || op == Opcodes.FSTORE
+                || op == Opcodes.DSTORE || op == Opcodes.ASTORE;
+    }
+
+    /**
+     * Index of the first instruction of the VALUE expression of the array store at
+     * {@code k}, or -1. Walks the operand stack backwards from the store until the
+     * depth below it is exactly the array+index pair, so the caller can check those two
+     * by position. Anything the stack model cannot account for -- a label, a branch, a
+     * DUP -- ends the walk rather than being guessed at.
+     */
+    private int bceStoreValueBase(java.util.List<Instruction> r, int k) {
+        int op = r.get(k).getOpcode();
+        int need = (op == Opcodes.LASTORE || op == Opcodes.DASTORE) ? 2 : 1;
+        int d = 2 + need; // depth after r[k-1], i.e. just before the store runs
+        for (int m = k - 1; m >= 2; m--) {
+            Instruction c = r.get(m);
+            if (c instanceof LabelInstruction || c instanceof Jump || c instanceof CustomJump
+                    || c instanceof SwitchInstruction || c instanceof TryCatch) {
+                return -1;
+            }
+            int popped;
+            int pushed;
+            if (c instanceof Invoke) {
+                Invoke iv = (Invoke) c;
+                if (c.getOpcode() == Opcodes.INVOKEDYNAMIC) {
+                    return -1;
+                }
+                popped = sbDescArgSlots(iv.getDesc()) + (c.getOpcode() == Opcodes.INVOKESTATIC ? 0 : 1);
+                pushed = sbDescRetSlots(iv.getDesc());
+            } else if (c.getOpcode() == Opcodes.CHECKCAST) {
+                popped = 1;
+                pushed = 1;
+            } else {
+                int[] pp = sbPopPush(c);
+                if (pp == null) {
+                    return -1;
+                }
+                popped = pp[0];
+                pushed = pp[1];
+            }
+            int before = d - pushed + popped;
+            if (before == 2) {
+                return m;
+            }
+            if (before < 2) {
+                return -1;
+            }
+            d = before;
+        }
+        return -1;
+    }
+
+    private static boolean bceIsArrayStoreOpcode(int op) {
+        switch (op) {
+            case Opcodes.IASTORE: case Opcodes.LASTORE: case Opcodes.FASTORE:
+            case Opcodes.DASTORE: case Opcodes.AASTORE: case Opcodes.BASTORE:
+            case Opcodes.CASTORE: case Opcodes.SASTORE: return true;
+            default: return false;
+        }
+    }
+
+    /** Every array element access, load or store -- what countArrayOps counts. */
+    private static boolean bceIsArrayOpcode(int op) {
+        switch (op) {
+            case Opcodes.IALOAD: case Opcodes.LALOAD: case Opcodes.FALOAD:
+            case Opcodes.DALOAD: case Opcodes.AALOAD: case Opcodes.BALOAD:
+            case Opcodes.CALOAD: case Opcodes.SALOAD:
+            case Opcodes.IASTORE: case Opcodes.LASTORE: case Opcodes.FASTORE:
+            case Opcodes.DASTORE: case Opcodes.AASTORE: case Opcodes.BASTORE:
+            case Opcodes.CASTORE: case Opcodes.SASTORE: return true;
+            default: return false;
+        }
     }
 
     private static boolean bceIsArrayLoadOpcode(int op) {
@@ -6071,7 +6361,9 @@ public class BytecodeMethod implements SignatureSet {
                                                 + "            CN1_ARRAY_STORE_CHECK(__cn1ArrayTmp, __cn1ValueTmp);\n"
                                                 + "            CN1_SET_ARRAY_ELEMENT_"+elementType+"(__cn1ArrayTmp, __cn1IndexTmp, __cn1ValueTmp);\n"
                                                 + "        }\n"
-                                                : "        CN1_SET_ARRAY_ELEMENT_"+elementType+"(__cn1ArrayTmp, __cn1IndexTmp, __cn1ValueTmp);\n") +
+                                                : "        CN1_SET_ARRAY_ELEMENT_"+elementType
+                                                    + ((current.isBoundsSafe() || isDisableNullAndArrayBoundsChecks()) ? "_NOCHK" : "")
+                                                    + "(__cn1ArrayTmp, __cn1IndexTmp, __cn1ValueTmp);\n") +
                                         "    }\n";
                             }
                             instructions.add(iter-3, new CustomIntruction(code, code, dependentClasses));

@@ -2892,6 +2892,20 @@ static inline JAVA_VOID cn1_set_array_element_char(CODENAME_ONE_THREAD_STATE, JA
 #define CN1_ARRAY_ELEMENT_SHORT_NOCHK(array, index) (((JAVA_ARRAY_SHORT*) CN1_ARRAY_DATA(array))[(index)])
 #define CN1_ARRAY_ELEMENT_CHAR_NOCHK(array, index) (((JAVA_ARRAY_CHAR*) CN1_ARRAY_DATA(array))[(index)])
 
+// Unchecked array element WRITES, the store half of the reads above and emitted
+// under the same proof. The pass marks a store only when the operand stack walks
+// back from it to the same ALOAD a ; ILOAD i pair the loop's test bounded, so the
+// value expression in between -- which is why a store cannot be matched by
+// adjacency the way a load can -- is accounted for rather than assumed simple.
+#define CN1_SET_ARRAY_ELEMENT_INT_NOCHK(array, index, value) (((JAVA_ARRAY_INT*) CN1_ARRAY_DATA((JAVA_ARRAY)(array)))[(index)] = (value))
+#define CN1_SET_ARRAY_ELEMENT_BYTE_NOCHK(array, index, value) (((JAVA_ARRAY_BYTE*) CN1_ARRAY_DATA((JAVA_ARRAY)(array)))[(index)] = (value))
+#define CN1_SET_ARRAY_ELEMENT_FLOAT_NOCHK(array, index, value) (((JAVA_ARRAY_FLOAT*) CN1_ARRAY_DATA((JAVA_ARRAY)(array)))[(index)] = (value))
+#define CN1_SET_ARRAY_ELEMENT_DOUBLE_NOCHK(array, index, value) (((JAVA_ARRAY_DOUBLE*) CN1_ARRAY_DATA((JAVA_ARRAY)(array)))[(index)] = (value))
+#define CN1_SET_ARRAY_ELEMENT_LONG_NOCHK(array, index, value) (((JAVA_ARRAY_LONG*) CN1_ARRAY_DATA((JAVA_ARRAY)(array)))[(index)] = (value))
+#define CN1_SET_ARRAY_ELEMENT_OBJECT_NOCHK(array, index, value) (((JAVA_ARRAY_OBJECT*) CN1_ARRAY_DATA((JAVA_ARRAY)(array)))[(index)] = (value))
+#define CN1_SET_ARRAY_ELEMENT_SHORT_NOCHK(array, index, value) (((JAVA_ARRAY_SHORT*) CN1_ARRAY_DATA((JAVA_ARRAY)(array)))[(index)] = (value))
+#define CN1_SET_ARRAY_ELEMENT_CHAR_NOCHK(array, index, value) (((JAVA_ARRAY_CHAR*) CN1_ARRAY_DATA((JAVA_ARRAY)(array)))[(index)] = (value))
+
 #define CN1_SET_ARRAY_ELEMENT_INT(array, index, value) cn1_set_array_element_int(threadStateData, array, index, value)
 #define CN1_SET_ARRAY_ELEMENT_BYTE(array, index, value) cn1_set_array_element_byte(threadStateData, array, index, value)
 #define CN1_SET_ARRAY_ELEMENT_FLOAT(array, index, value) cn1_set_array_element_float(threadStateData, array, index, value)

@@ -100,6 +100,15 @@ public class BasicInstruction extends Instruction implements AssignableExpressio
     }
 
     private boolean shouldEmitNullAndArrayBoundsChecks() {
+        // isBoundsSafe() belongs here as much as in ArrayLoadExpression: the reduction
+        // passes fold most array accesses into expressions, but the ones they cannot
+        // fold fall through to the raw BC_*ALOAD / BC_*ASTORE emission below, and those
+        // were ignoring the proof outright. Array STORES have no folded form that reads
+        // the mark at all except the frameless diverging one, so without this a proven
+        // store kept its check on every other path.
+        if (isBoundsSafe()) {
+            return false;
+        }
         return getMethod() == null || !getMethod().isDisableNullAndArrayBoundsChecks();
     }
 

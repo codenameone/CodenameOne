@@ -513,6 +513,21 @@ public class Parser extends ClassVisitor {
             System.out.println("[BCE] cleared=" + BytecodeMethod.bceAccessesMarked
                 + " ofThoseInTryCatchMethods=" + BytecodeMethod.bceAccessesMarkedInTryCatchMethod
                 + " loopsRefusedByHandlerInside=" + BytecodeMethod.bceLoopsRefusedByHandler);
+            StringBuilder why = new StringBuilder("[BCE] candidateLoops:");
+            for (int i = 0; i < BytecodeMethod.BCE_WHY.length; i++) {
+                why.append(' ').append(BytecodeMethod.BCE_WHY[i]).append('=').append(BytecodeMethod.bceWhy[i]);
+            }
+            System.out.println(why);
+            StringBuilder miss = new StringBuilder("[BCE] inAcceptedLoops:");
+            for (int i = 0; i < BytecodeMethod.BCE_MISS.length; i++) {
+                miss.append(' ').append(BytecodeMethod.BCE_MISS[i]).append('=').append(BytecodeMethod.bceMiss[i]);
+            }
+            System.out.println(miss);
+            StringBuilder ho = new StringBuilder("[BCE] hoistedLength:");
+            for (int i = 0; i < BytecodeMethod.BCE_HOIST.length; i++) {
+                ho.append(' ').append(BytecodeMethod.BCE_HOIST[i]).append('=').append(BytecodeMethod.bceHoist[i]);
+            }
+            System.out.println(ho);
         }
         if (BytecodeMethod.FRAMELESS_CENSUS) {
             int t = BytecodeMethod.censusTotal;
