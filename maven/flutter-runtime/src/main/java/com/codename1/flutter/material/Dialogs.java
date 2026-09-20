@@ -64,18 +64,52 @@ public final class Dialogs {
     }
 
     public static void showDialog(BuildContext context, Funcs.Func1<BuildContext, Widget> builder) {
+        present(builder, BorderLayout.CENTER, false);
+    }
+
+    /**
+     * A sheet that rises from the bottom edge, full width -- the shape of a modal popup
+     * rather than of a dialog.
+     *
+     * <p>Presenting one as a centred, packed dialog is not a near miss. A sheet states a
+     * height and leaves its width to the presentation, so packing sized it to its
+     * content: the Cupertino picker demo's 216-high sheet came up as a tall narrow strip
+     * down the middle of the screen instead of a full-width wheel along the bottom.</p>
+     *
+     * <p>Dismissible by touching outside it, as the reference is by default.</p>
+     */
+    public static void showModalPopup(BuildContext context,
+            Funcs.Func1<BuildContext, Widget> builder) {
+        present(builder, BorderLayout.SOUTH, true, true);
+    }
+
+    private static void present(Funcs.Func1<BuildContext, Widget> builder, String position,
+            boolean dismissOnOutsideTouch) {
+        present(builder, position, dismissOnOutsideTouch, false);
+    }
+
+    private static void present(Funcs.Func1<BuildContext, Widget> builder, String position,
+            boolean dismissOnOutsideTouch, boolean stretch) {
         DialogWidget rootWidget = new DialogWidget(builder);
         DialogEntry e = new DialogEntry();
         if (Display.isInitialized()) {
             com.codename1.ui.Dialog d = new com.codename1.ui.Dialog(new BorderLayout());
-            d.setDisposeWhenPointerOutOfBounds(false);
+            d.setDisposeWhenPointerOutOfBounds(dismissOnOutsideTouch);
             Container c = FlutterUI.wrap(rootWidget);
             d.add(BorderLayout.CENTER, c);
             e.dialog = d;
             e.root = ((FlutterRootLayout) c.getLayout()).host().rootElement();
             dialogStack.add(e);
-            // modeless: returns immediately, the calling code keeps running
-            d.showPacked(BorderLayout.CENTER, false);
+            // modeless: returns immediately, the calling code keeps running.
+            //
+            // STRETCHED for a sheet: packing sizes both axes to the content, and a sheet
+            // states only its height -- so a 216-high picker came up as a tall narrow
+            // strip instead of spanning the screen.
+            if (stretch) {
+                d.showStretched(position, false);
+            } else {
+                d.showPacked(position, false);
+            }
         } else {
             RenderHost host = new RenderHost();
             e.root = FlutterUI.mount(rootWidget, host, new BuildOwner());

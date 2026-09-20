@@ -55,6 +55,6 @@ public final class CupertinoDialogs {
                                                Color barrierColor, Boolean barrierDismissible,
                                                Boolean useRootNavigator, Object semanticsDismissible,
                                                Object routeSettings) {
-        Dialogs.showDialog(context, builder);
+        Dialogs.showModalPopup(context, builder);
     }
 }
