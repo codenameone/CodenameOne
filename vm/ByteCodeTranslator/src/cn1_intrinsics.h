@@ -163,34 +163,45 @@ static inline JAVA_OBJECT cn1InlSbAppendInt(CODENAME_ONE_THREAD_STATE, JAVA_OBJE
     return java_lang_StringBuilder_append___int_R_java_lang_StringBuilder(threadStateData, sb, v);
 }
 
+/* ONE CASE, INLINE. EVERYTHING ELSE IS A CALL.
+ *
+ * This used to try to handle every shape here -- latin1 or wide destination,
+ * fused or heap-backed source, with a decode loop for the wide case -- and the
+ * result was ~60 instructions including two adrp/add pairs just to materialise
+ * the class pointers the coder test compares against. clang declined to inline
+ * that, correctly: the disassembly carried 3,408 call sites and SIXTY-SIX
+ * out-of-line copies of it. A "fast path" the compiler will not take is not a
+ * fast path, it is a call with extra steps.
+ *
+ * So the inline body is now only the shape that actually dominates string
+ * concatenation -- appending a short, fused, Latin-1 String onto a Latin-1
+ * builder that has room. That is one class-pointer comparison, three integer
+ * tests and a memcpy. Every other case (null, wide destination, heap-backed
+ * byte[] source, long, does not fit) goes to the out-of-line native, which was
+ * already the fallback here and is the source of truth for all of them -- so
+ * narrowing can only move work off this path, never change its answer. */
 static inline JAVA_OBJECT cn1InlSbAppendStr(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT sb, JAVA_OBJECT str) {
     CN1_KEEP_NATIVE_OWNER(bufferOwner, sb);
     CN1_KEEP_NATIVE_OWNER(stringOwner, str);
     if(__builtin_expect(str != JAVA_NULL, 1)) {
         struct obj__java_lang_String* s = (struct obj__java_lang_String*)str;
         struct obj__java_lang_StringBuilder* t = (struct obj__java_lang_StringBuilder*)sb;
-        JAVA_INT len = s->java_lang_String_count;
-        if(len == 0) return sb;
-        JAVA_INT count = t->java_lang_StringBuilder_count;
-        void* data = (void*)(uintptr_t)t->java_lang_StringBuilder_cn1Storage;
-        // short segments (concat literals) copy inline; longer ones ride the
-        // out-of-line memcpy path
-        if(__builtin_expect(len <= 8 && count + len <= t->java_lang_StringBuilder_capacity, 1)) {
-            JAVA_INT so = 0;
-            int destinationLatin1 = !t->java_lang_StringBuilder_wide;
-            int sourceLatin1 = cn1StrIsLatin1(str);
-            if(destinationLatin1 && !sourceLatin1) {
-                return java_lang_StringBuilder_append___java_lang_String_R_java_lang_StringBuilder(threadStateData, sb, str);
+        /* value == JAVA_NULL means the payload is fused into the String itself,
+         * and the twin class word IS the coder -- see cn1StrIsLatin1. Testing
+         * both at once keeps this to a single class-pointer comparison. */
+        if(__builtin_expect(s->java_lang_String_value == JAVA_NULL
+                && str->__codenameOneParentClsReference == &class__java_lang_String_i8
+                && !t->java_lang_StringBuilder_wide, 1)) {
+            JAVA_INT len = s->java_lang_String_count;
+            JAVA_INT count = t->java_lang_StringBuilder_count;
+            if(__builtin_expect((unsigned)len <= 8u
+                    && count + len <= t->java_lang_StringBuilder_capacity, 1)) {
+                memcpy((JAVA_ARRAY_BYTE*)(uintptr_t)t->java_lang_StringBuilder_cn1Storage + count,
+                       (char*)str + ((sizeof(struct obj__java_lang_String) + 7) & ~(size_t)7),
+                       (size_t)len);
+                t->java_lang_StringBuilder_count = count + len;
+                return sb;
             }
-            if(destinationLatin1) {
-                memcpy((JAVA_ARRAY_BYTE*)data + count, (JAVA_ARRAY_BYTE*)cn1StrChars(str) + so, (size_t)len);
-            } else {
-                JAVA_ARRAY_CHAR* d = (JAVA_ARRAY_CHAR*)data + count;
-                for(int i = 0; i < len; i++) d[i] = sourceLatin1
-                    ? (JAVA_CHAR)((uint8_t*)cn1StrChars(str))[so + i] : ((JAVA_ARRAY_CHAR*)cn1StrChars(str))[so + i];
-            }
-            t->java_lang_StringBuilder_count = count + len;
-            return sb;
         }
     }
     return java_lang_StringBuilder_append___java_lang_String_R_java_lang_StringBuilder(threadStateData, sb, str);
