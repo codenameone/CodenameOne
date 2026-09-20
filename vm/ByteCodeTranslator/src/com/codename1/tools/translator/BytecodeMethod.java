@@ -611,6 +611,15 @@ public class BytecodeMethod implements SignatureSet {
         }
     }
 
+    /** Set while emitting: this method is frameless AND contains a try/catch, so its
+     *  frame needs the two extra names CN1_FRAMELESS_TRY_FRAME defines. */
+    private boolean framelessHasTryCatch;
+
+    /** @return true if a return in this method must unwind the try-block stack itself. */
+    public boolean isFramelessWithTryCatch() {
+        return framelessHasTryCatch;
+    }
+
     private int rawFramelessEligibility = -1;
     private boolean rawFramelessWithoutHandlers;
 
@@ -699,9 +708,18 @@ public class BytecodeMethod implements SignatureSet {
         boolean hasRealInstruction = false;
         for (Instruction i : instructions) {
             if (i instanceof TryCatch) {
-                if (!ignoreTryCatch) {
-                    return false;
-                }
+                // A try/catch used to disqualify the method outright -- the last of the
+                // three guardrails it controlled, and like the other two a DEFERRAL
+                // rather than a proof. What a frameless frame lacks is two NAMES the
+                // exception macros use (methodBlockOffset and
+                // currentCodenameOneCallStackOffset); CN1_FRAMELESS_TRY_FRAME supplies
+                // both, emitted only into the methods that need them. The setjmp
+                // requirement was already met independently: volatileLocals is set by
+                // the same instruction scan and selects the _VSP frame variant, so the
+                // locals and SP are volatile here exactly as they are in an ordinary
+                // frame.
+                //
+                // ignoreTryCatch is now only the census' way of asking the old question.
                 continue;
             }
             if (i instanceof LabelInstruction || i instanceof LineNumber || i instanceof LocalVariable) {
@@ -1860,12 +1878,12 @@ public class BytecodeMethod implements SignatureSet {
             // eventually refused to compile at all.
             boolean volatileLocals = FORCE_VOLATILE_LOCALS || onDeviceDebug
                     || synchronizedMethod;
-            if (!volatileLocals) {
-                for (Instruction tcScan : instructions) {
-                    if (tcScan instanceof TryCatch) {
-                        volatileLocals = true;
-                        break;
-                    }
+            framelessHasTryCatch = false;
+            for (Instruction tcScan : instructions) {
+                if (tcScan instanceof TryCatch) {
+                    volatileLocals = true;
+                    framelessHasTryCatch = true;
+                    break;
                 }
             }
             // Selects the _VSP variant of whichever frame macro is emitted
@@ -1929,6 +1947,9 @@ public class BytecodeMethod implements SignatureSet {
                     b.append(", ");
                     b.append(maxLocals);
                     b.append(", 0);\n");
+                    if (framelessHasTryCatch) {
+                        b.append("    CN1_FRAMELESS_TRY_FRAME();\n");
+                    }
                     // A bounded instance field getter cannot recurse or grow the
                     // call chain. Let C inline it to a load without retaining a
                     // native-stack limit test at every getter use.

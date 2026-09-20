@@ -3415,6 +3415,28 @@ static inline void cn1InitMethodStackInline(CODENAME_ONE_THREAD_STATE, JAVA_OBJE
 #define DEFINE_METHOD_STACK_FRAMELESS(stackSize, localsStackSize, spPosition) DEFINE_METHOD_STACK_FRAMELESS_IMPL(, stackSize, localsStackSize, spPosition)
 #define DEFINE_METHOD_STACK_FRAMELESS_VSP(stackSize, localsStackSize, spPosition) DEFINE_METHOD_STACK_FRAMELESS_IMPL(volatile, stackSize, localsStackSize, spPosition)
 
+// The two names a try/catch needs that a frameless frame does not otherwise define.
+// Emitted ONLY into frameless methods that contain one, so the other 90% of frameless
+// methods stay byte-for-byte what they were.
+//
+//   methodBlockOffset                  END_TRY and JUMP_TO restore tryBlockOffset to it
+//   currentCodenameOneCallStackOffset  DEFINE_CATCH_BLOCK restores callStackOffset to it
+//
+// Both are the value AT ENTRY, and for a frameless frame that is also the value the
+// method never changes -- it pushes no call-stack entry and opens no thread-stack slice.
+// The catch block's restore is therefore a no-op for this frame and the right thing for
+// any CALLEE frame a longjmp unwound through.
+#define CN1_FRAMELESS_TRY_FRAME() \
+    const int currentCodenameOneCallStackOffset CN1_UNUSED = threadStateData->callStackOffset; \
+    int methodBlockOffset CN1_UNUSED = threadStateData->tryBlockOffset;
+
+// A RETURN out of a try block skips the end label where END_TRY would have run, so the
+// block stack has to be unwound here instead. This is the frameless half of what
+// releaseForReturnInException does for an ordinary frame -- only the tryBlockOffset
+// part, because a frameless frame has no thread-stack slice to release and no call-stack
+// entry to pop.
+#define CN1_FRAMELESS_TRY_RETURN() threadStateData->tryBlockOffset = methodBlockOffset;
+
 // Headroom (bytes) kept below the end of the native C stack: enough to detect the
 // overflow and still build + throw the StackOverflowError without overrunning.
 #define CN1_FRAMELESS_STACK_GUARD_BAND (256 * 1024)

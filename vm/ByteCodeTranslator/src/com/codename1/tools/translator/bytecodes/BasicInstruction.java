@@ -99,6 +99,18 @@ public class BasicInstruction extends Instruction implements AssignableExpressio
         return synchronizedMethod;
     }
 
+    /**
+     * The unwind a RETURN out of a frameless method's try block has to do for itself.
+     *
+     * An ordinary frame calls releaseForReturnInException, which restores three things;
+     * a frameless frame opens no thread-stack slice and pushes no call-stack entry, so
+     * only the try-block stack is left. Empty for every frameless method without a
+     * try/catch, which is 90% of them, so their emitted C is unchanged.
+     */
+    private String framelessTryUnwind() {
+        return TryCatch.isTryCatchInMethod() ? "    CN1_FRAMELESS_TRY_RETURN();\n" : "";
+    }
+
     private boolean shouldEmitNullAndArrayBoundsChecks() {
         // isBoundsSafe() belongs here as much as in ArrayLoadExpression: the reduction
         // passes fold most array accesses into expressions, but the ones they cannot
@@ -651,7 +663,7 @@ public class BasicInstruction extends Instruction implements AssignableExpressio
                 appendSynchronized(b);
 
                 if(getMethod() != null && getMethod().isFrameless()) {
-                    b.append("    return SP[-1].data.i;\n");
+                    b.append(framelessTryUnwind()).append("    return SP[-1].data.i;\n");
                 } else if(TryCatch.isTryCatchInMethod()) {
                     b.append("    releaseForReturnInException(threadStateData, cn1LocalsBeginInThread, methodBlockOffset); return SP[-1].data.i;\n");
 //                    b.append(maxLocals);
@@ -675,7 +687,7 @@ public class BasicInstruction extends Instruction implements AssignableExpressio
                 appendSynchronized(b);
 
                 if(getMethod() != null && getMethod().isFrameless()) {
-                    b.append("    return POP_LONG();\n");
+                    b.append(framelessTryUnwind()).append("    return POP_LONG();\n");
                 } else if(TryCatch.isTryCatchInMethod()) {
                     b.append("    releaseForReturnInException(threadStateData, cn1LocalsBeginInThread, methodBlockOffset); \n    return POP_LONG();\n");
                 } else {
@@ -695,7 +707,7 @@ public class BasicInstruction extends Instruction implements AssignableExpressio
                 appendSynchronized(b);
 
                 if(getMethod() != null && getMethod().isFrameless()) {
-                    b.append("    return POP_FLOAT();\n");
+                    b.append(framelessTryUnwind()).append("    return POP_FLOAT();\n");
                 } else if(TryCatch.isTryCatchInMethod()) {
                     b.append("    releaseForReturnInException(threadStateData, cn1LocalsBeginInThread, methodBlockOffset); \n    return POP_FLOAT();\n");
                 } else {
@@ -715,7 +727,7 @@ public class BasicInstruction extends Instruction implements AssignableExpressio
                 appendSynchronized(b);
 
                 if(getMethod() != null && getMethod().isFrameless()) {
-                    b.append("    return POP_DOUBLE();\n");
+                    b.append(framelessTryUnwind()).append("    return POP_DOUBLE();\n");
                 } else if(TryCatch.isTryCatchInMethod()) {
                     b.append("    releaseForReturnInException(threadStateData, cn1LocalsBeginInThread, methodBlockOffset); \n    return POP_DOUBLE();\n");
                 } else {
@@ -737,7 +749,7 @@ public class BasicInstruction extends Instruction implements AssignableExpressio
                 if(getMethod() != null && getMethod().isFrameless()) {
                     // No frame to release -- the operand stack is a method-local array and
                     // the object roots live in native C storage scanned conservatively.
-                    b.append("    return POP_OBJ();\n");
+                    b.append(framelessTryUnwind()).append("    return POP_OBJ();\n");
                 } else if(TryCatch.isTryCatchInMethod()) {
                     b.append("    releaseForReturnInException(threadStateData, cn1LocalsBeginInThread, methodBlockOffset); \n    return POP_OBJ();\n");
                 } else {
@@ -761,7 +773,7 @@ public class BasicInstruction extends Instruction implements AssignableExpressio
                     break;
                 }
                 if(getMethod() != null && getMethod().isFrameless()) {
-                    b.append("    return;\n");
+                    b.append(framelessTryUnwind()).append("    return;\n");
                 } else if(TryCatch.isTryCatchInMethod()) {
                     b.append("    releaseForReturnInException(threadStateData, cn1LocalsBeginInThread, methodBlockOffset); \n    return;\n");
                 } else {
