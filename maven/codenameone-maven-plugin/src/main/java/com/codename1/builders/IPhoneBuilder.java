@@ -77,6 +77,13 @@ public class IPhoneBuilder extends Executor {
     // Graphics backend. Like macNativeBuilder this is inert unless the project
     // declares a codename1.watchMain, keeping the iOS build unchanged.
     private final WatchNativeBuilder watchNativeBuilder = new WatchNativeBuilder(this);
+    /// The iOS design generation the modern theme targets: "26" or "27".
+    /// Read from ios.themeGeneration, validated in build(), and emitted into the
+    /// generated stub. Package-private so WatchNativeBuilder and
+    /// MacOSNativeBuilder emit the SAME value -- a phone and its watch resolving
+    /// to different generations would be a skew nobody would think to look for.
+    String iosThemeGeneration = "26";
+
 
     /// Where each entry-point stub lives once they have been separated, or null when there is one
     /// translation and the classpath is untouched. See WatchNativeBuilder.isolateStub.
@@ -2300,7 +2307,22 @@ public class IPhoneBuilder extends Executor {
                 iosMode = "auto";
             }
         }
-        
+
+        // Which generation of the MODERN look. Orthogonal to iosMode above:
+        // that one picks modern vs iOS 7 vs pre-flat, this picks which iOS
+        // design generation the modern theme targets.
+        //
+        // An unrecognised value is a build error rather than a silent fallback.
+        // Falling back would ship the 26 look to someone who asked for 27 and
+        // say nothing, and a theme is exactly the kind of thing nobody notices
+        // is wrong until it is in front of users -- the same failure the
+        // nativeTheme comment above records for iosMode.
+        iosThemeGeneration = request.getArg("ios.themeGeneration", "26").trim();
+        if (!"26".equals(iosThemeGeneration) && !"27".equals(iosThemeGeneration)) {
+            throw new BuildException("ios.themeGeneration must be 26 or 27, got '"
+                    + iosThemeGeneration + "'");
+        }
+
         tmpFile = getBuildDirectory();
         if (tmpFile == null) {
             throw new IllegalStateException("Build directory must be set before running build.");
@@ -4136,6 +4158,8 @@ public class IPhoneBuilder extends Executor {
                     + "        " + request.getMainClass() + "Stub stub = new " + request.getMainClass() + "Stub();\n"
                     + "        com.codename1.impl.ios.IOSImplementation.setMainClass(stub.i);\n"
                     + "        com.codename1.impl.ios.IOSImplementation.setIosMode(\"" + iosMode + "\");\n"
+                    + "        com.codename1.impl.ios.IOSImplementation.setIosThemeGeneration(\""
+                        + iosThemeGeneration + "\");\n"
                     + routeDispatcherInstallSource(sourceZip, "        ")
                     + annotationFrameworksInstallSource(sourceZip, "        ")
                     + "        Display.init(stub);\n"

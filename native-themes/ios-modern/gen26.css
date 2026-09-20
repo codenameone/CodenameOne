@@ -1,0 +1,38 @@
+/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+/*
+ * iOS 26 generation layer.
+ *
+ * EMPTY, and that is the correct starting state rather than a placeholder.
+ *
+ * common.css is today's theme verbatim, so `common.css + gen26.css` compiles to
+ * a .res that is byte-identical to the one the single file produced -- which is
+ * what makes the split provable rather than argued. scripts/verify-native-theme
+ * -split.sh is that proof.
+ *
+ * A declaration arrives here only as the DUAL of one in gen27.css: when a
+ * measured fidelity delta shows iOS 27 needs a different value, the property
+ * leaves common.css, its old value lands here, and its new value lands there.
+ * Moving anything here on its own would change generation 26, which is exactly
+ * what this file exists to keep from happening.
+ */

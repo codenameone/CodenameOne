@@ -587,6 +587,12 @@ class WatchNativeBuilder {
                 + "        " + stubClass + " stub = new " + stubClass + "();\n"
                 + "        com.codename1.impl.ios.IOSImplementation.setMainClass(stub.i);\n"
                 + "        com.codename1.impl.ios.IOSImplementation.setIosMode(\"" + iosMode + "\");\n"
+                // The SAME generation the phone stub emits, read from the owner rather
+                // than re-derived: a watch resolving to a different iOS design
+                // generation than the phone it pairs with is a skew nobody would
+                // think to look for, and both stubs load from one bundle.
+                + "        com.codename1.impl.ios.IOSImplementation.setIosThemeGeneration(\""
+                + owner.iosThemeGeneration + "\");\n"
                 // Same position as the phone stub's: before Display.init, after the implementation
                 // is known. The generated route dispatcher and the annotation frameworks are found
                 // reflectively too, so without these the second translation drops their bootstrap
