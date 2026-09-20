@@ -596,6 +596,8 @@ public class BytecodeMethod implements SignatureSet {
     // that is worth attacking depends entirely on how many allocation sites the analysis
     // currently refuses and WHY, so count the reasons rather than guess at them.
     static int sbCensusSites, sbCensusBailTryCatch, sbCensusBailSync, sbCensusStackAllocated;
+    static final boolean SB_SKIP_ESCAPE_VALIDATION =
+            "true".equalsIgnoreCase(Util.getProperty("cn1.sbSkipEscapeValidation", "false"));
     /// Why the 'other' exclusions happened, so the census answers where the REMAINING
     /// frameless opportunity is rather than only ruling try/catch out.
     static int censusNoConstructor, censusNoSync, censusNoDebug, censusNoOpcode, censusEmpty;
@@ -5169,11 +5171,32 @@ public class BytecodeMethod implements SignatureSet {
             return;
         }
         if (sawTryCatch) {
-            // Exception edges are not modelled by the walks below, so ONE try/catch
-            // anywhere in the method disables stack allocation for EVERY builder in
-            // it -- including builders that are nowhere near the protected range.
+            // ONE try/catch anywhere in the method used to disable stack allocation for
+            // EVERY builder in it -- 315 of this corpus' 1,818 sites, 17%, including
+            // builders nowhere near the protected range. 300 of those 315 survive the
+            // analysis unchanged, and the reason is that the analysis was already
+            // control-flow-INSENSITIVE where it counts.
+            //
+            // Walk the argument. A builder parked in a local is validated by checking
+            // EVERY instruction in the method that touches that slot, in index order,
+            // with no regard for how control reaches it -- so a use inside a handler is
+            // checked exactly like any other, and an escape there (PUTFIELD, a
+            // non-borrowing call) bails the same way. A builder never parked in a local
+            // is consumed inside one expression, and an exception mid-expression
+            // DISCARDS it: the catch block resets SP to &stack[1], so nothing in flight
+            // survives the edge to be captured.
+            //
+            // What the edge cannot do is extend the object's LIFETIME, which is the only
+            // thing stack allocation actually depends on. The struct is a C local of the
+            // same function as the setjmp, so a longjmp lands in the frame that owns it.
+            //
+            // The residual risk is a wrong escape analysis, and that risk is not new --
+            // it applies to every stack allocation this translator already does. It is
+            // now checked rather than argued: the verifier compares every traced
+            // reference against each thread's C stack range, and run-gc-verify.sh's
+            // self-test6 requires it to catch a deliberately escaped builder and to stay
+            // quiet on correctly compiled code.
             sbCensusBailTryCatch += sbSites;
-            return;
         }
         java.util.Map<org.objectweb.asm.Label, Integer> labelIndex =
                 new java.util.HashMap<org.objectweb.asm.Label, Integer>();
@@ -5242,7 +5265,12 @@ public class BytecodeMethod implements SignatureSet {
             }
 
             boolean ok = true;
-            if (trackedLocal >= 0) {
+            // -Dcn1.sbSkipEscapeValidation=true drops the whole-lifetime check below so a
+            // builder that provably escapes is stack-allocated anyway. It exists for one
+            // reason: the verifier's escaped-stack-object check has to be shown catching
+            // a real escape, and nothing in correct code produces one. Never set outside
+            // run-gc-verify.sh's self-test.
+            if (trackedLocal >= 0 && !SB_SKIP_ESCAPE_VALIDATION) {
                 // The construction walk parked the ref in a local. Validate the
                 // slot's whole lifetime: no reads that could belong to a previous
                 // scope's value, every ALOAD walks to a legal consumption, every

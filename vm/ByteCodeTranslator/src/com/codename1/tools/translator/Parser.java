@@ -496,10 +496,10 @@ public class Parser extends ClassVisitor {
             int sites = BytecodeMethod.sbCensusSites;
             System.out.println("[SB] StringBuilder NEW sites=" + sites
                     + " stackAllocated=" + BytecodeMethod.sbCensusStackAllocated
-                    + " refusedByTryCatch=" + BytecodeMethod.sbCensusBailTryCatch
+                    + " inTryCatchMethods=" + BytecodeMethod.sbCensusBailTryCatch
                     + " refusedBySynchronized=" + BytecodeMethod.sbCensusBailSync
-                    + (sites > 0 ? "  (tryCatch alone refuses "
-                        + (100 * BytecodeMethod.sbCensusBailTryCatch / sites) + "% of sites)" : ""));
+                    + (sites > 0 ? "  (try/catch no longer refuses any of the "
+                        + (100 * BytecodeMethod.sbCensusBailTryCatch / sites) + "% of sites it reaches)" : ""));
         }
         if (BytecodeMethod.BCE_CENSUS) {
             int ops = BytecodeMethod.bceArrayOpsTotal;

@@ -270,4 +270,69 @@ else
     fi
 fi
 
+# Sixth self-test, for ESCAPED STACK OBJECTS -- and, through it, for a class of bug the
+# verifier could not see at all until this existed.
+#
+# Three analyses in this translator put objects on the C stack: implicitly stack-allocated
+# StringBuilders, scalar-replaced @StackAllocate instances, and SIMD stack arrays. Each
+# rests on proving the object does not escape its frame, and a wrong proof produced NO
+# signal: the address is in no BiBOP page and no legacy extent, so cn1GcVerifyClassify
+# answered UNKNOWN and skipped it -- the same answer it gives a static or an immortal.
+# The check compares the address against each live thread's C stack range instead, which
+# needs no dereference and cannot be confused with either.
+#
+# SbEscape publishes a stack builder into a heap object's field. Built normally the
+# analysis refuses it, nothing is stack-allocated and the run is clean; built with
+# -Dcn1.sbSkipEscapeValidation=true the builder goes on the stack anyway and the escape
+# is real. BOTH arms are required, because "the ablated arm reports" alone would also be
+# satisfied by a check that reports everything.
+#
+# The escape is published from main's frame on purpose. A builder escaping a frame that
+# RETURNS is the real shape but does not survive to be reported -- later calls overwrite
+# the dead frame, the collector reads a garbage class word out of it, and the process
+# dies with SIGBUS before any verify pass runs (measured: exit 138, no output).
+printf '%-16s ' "self-test6"
+seClean=""
+seLeak=""
+seOk=1
+if ! ./translate-and-build.sh SbEscape target/bin/SbEscape-control -DCN1_GC_VERIFY \
+        > target/bin/SbEscape-control-build.log 2>&1; then
+    echo "BROKEN -- could not build SbEscape"
+    tail -25 target/bin/SbEscape-control-build.log
+    fail=1
+    seOk=0
+elif ! CN1_BENCH_TRANSLATOR_OPTS="-Dcn1.sbSkipEscapeValidation=true" \
+        ./translate-and-build.sh SbEscape target/bin/SbEscape-leak -DCN1_GC_VERIFY \
+        > target/bin/SbEscape-leak-build.log 2>&1; then
+    echo "BROKEN -- could not build the escaping arm of SbEscape"
+    tail -25 target/bin/SbEscape-leak-build.log
+    fail=1
+    seOk=0
+fi
+if [ "$seOk" -eq 1 ]; then
+    seClean="$(CN1_GC_VERIFY_SOFT=1 CN1_GC_VERIFY_LOG=1 ./target/bin/SbEscape-control 2>&1)" || true
+    seLeak="$(CN1_GC_VERIFY_SOFT=1 CN1_GC_VERIFY_LOG=1 ./target/bin/SbEscape-leak 2>&1)" || true
+    # `|| true` on every one of these: grep -c EXITS 1 when the count is zero, and a
+    # zero count is the expected answer for seFalse. Under `set -e` that killed the
+    # script between this test's label and its verdict -- the run printed
+    # "self-test6" and then nothing at all, with no GREEN and no FAILED line.
+    sePasses="$(printf '%s' "$seClean" | grep -c '^\[GC-VERIFY\]' || true)"
+    seFound="$(printf '%s' "$seLeak" | grep -c 'ESCAPED STACK OBJECT' || true)"
+    seFalse="$(printf '%s' "$seClean" | grep -c 'ESCAPED STACK OBJECT' || true)"
+    if [ "$sePasses" -eq 0 ]; then
+        echo "BROKEN -- vacuous: SbEscape completed no GC cycle, so nothing was verified"
+        fail=1
+    elif [ "$seFalse" -ne 0 ]; then
+        echo "BROKEN -- the check reported an escape in correctly compiled code"
+        printf '%s\n' "$seClean" | grep 'ESCAPED STACK OBJECT' | head -3
+        fail=1
+    elif [ "$seFound" -eq 0 ]; then
+        echo "BROKEN -- a stack builder was published into a heap field and NOTHING noticed"
+        printf '%s\n' "$seLeak" | tail -5
+        fail=1
+    else
+        echo "caught the escaped stack object ($seFound reports, $sePasses clean passes)"
+    fi
+fi
+
 [ "$fail" -eq 0 ] && echo "GC-VERIFY GREEN" || { echo "GC-VERIFY FAILED"; exit 1; }

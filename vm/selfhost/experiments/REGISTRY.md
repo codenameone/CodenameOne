@@ -4238,3 +4238,84 @@ phase), the 0-of-1,154 hoisted-length proof (a rule that refused the back edge),
 and the first-loop-only result after that. Each looked like a finding. The thing
 that separated them from findings was always a second counter, never more
 thought about the first one.
+
+## Round 47: StringBuilder stack allocation stops fearing try/catch, and the check that had to exist first
+
+The same guardrail, the other analysis. One try/catch anywhere in a method disabled
+implicit stack allocation for EVERY builder in it -- 315 of the corpus' 1,818 sites,
+17%, including builders nowhere near the protected range.
+
+**300 of the 315 survive the escape analysis unchanged**: sites stack-allocated go
+1,423 -> 1,723, 78% -> 95%. The reason is that the analysis was already
+control-flow-INSENSITIVE where it counts. A builder parked in a local is validated by
+walking EVERY instruction in the method that touches that slot, in index order, with
+no regard for how control reaches it -- so a use inside a handler is checked exactly
+like any other, and an escape there (a PUTFIELD, a non-borrowing call) bails the same
+way. A builder never parked in a local is consumed inside one expression, and an
+exception mid-expression DISCARDS it, because the catch block resets SP to
+&stack[1]. What an exception edge cannot do is extend the object's LIFETIME, which is
+the only thing stack allocation depends on: the struct is a C local of the same
+function as the setjmp, so a longjmp lands in the frame that owns it.
+
+### The residual risk was invisible to every gate in this repo
+
+A wrong escape analysis puts a C-stack address in the heap. Three analyses here do
+this kind of proof -- implicitly stack-allocated builders, scalar-replaced
+@StackAllocate instances, SIMD stack arrays -- and a wrong one produced NO signal:
+the address is in no BiBOP page and no legacy extent, so cn1GcVerifyClassify answered
+UNKNOWN and SKIPPED it, the same answer it gives a static or an immortal.
+
+So the check went in first. Each thread's C stack range is recorded beside the
+existing nativeStackLimit, and the verifier compares every traced reference against
+those ranges -- no dereference, so it runs BEFORE the classifier and cannot be
+confused with either of the things UNKNOWN legitimately covers. self-test6 requires
+BOTH arms: the ablated build (-Dcn1.sbSkipEscapeValidation) must be caught, and the
+normal build must stay silent, because "the ablated arm reports" alone would also be
+satisfied by a check that reports everything. Measured: control 5 clean passes and 0
+escapes, ablated arm 5 reports.
+
+Worth knowing if that driver is ever changed: a builder escaping a frame that
+RETURNS is the real-world shape and does NOT survive to be reported. Later calls
+overwrite the dead frame, the collector reads a garbage class word out of it, and the
+process dies with SIGBUS before any verify pass runs -- measured, exit 138 with no
+output at all. SbEscape publishes from main's frame so the object stays well-formed
+and the check is what notices.
+
+### The bug in the check, and why it matters more than the check
+
+The first version walked all NUMBER_OF_SUPPORTED_THREADS (1024) slots for every
+traced reference. On MapTorture2 that is 300,000 references a pass, so 300 MILLION
+iterations.
+
+**It did not look slow. It made two self-tests go quiet.** The collector became slow
+enough that the workload FINISHED FIRST, so the run recorded one verify pass -- the
+empty one, before any objects existed -- instead of two, and self-test4 and
+self-test5 reported BROKEN because their injected faults never got a second cycle to
+be caught in. The visible symptom was `passes=1 refs=0`, which reads like a detection
+failure and is nothing of the kind.
+
+The diagnosis order is the transferable part, because the first hypothesis was wrong:
+
+1. A/B the new OPTIMIZATION first (-DCN1_DISABLE_SB_STACK_ALLOC). It failed
+   identically with stack allocation off, which ruled out the obvious suspect and the
+   plausible story that went with it (fewer allocations -> fewer cycles -> the fault
+   has fewer chances to fire).
+2. Revert the runtime half: `passes=2 refs=297895`, key k13 lost. Cause confirmed.
+3. Split the header from the .m: the header alone was fine, so it was the check
+   itself, not the struct layout.
+
+The fix is an envelope compare -- collect the live threads' ranges once per verify
+pass, then reject on two comparisons, since stacks are nowhere near the heap.
+
+And a second, smaller one in the same test: `grep -c` EXITS 1 when the count is zero,
+and zero is the EXPECTED answer for the clean arm's escape count. Under this script's
+`set -e` that killed it between self-test6's label and its verdict -- the run printed
+"self-test6" and then nothing, with no GREEN and no FAILED line, which is the shape of
+a gate that has stopped existing rather than one that failed.
+
+### No timing
+
+The host has been at load 4-13 all session. perf-guard's last run came back at
+elapsed spread 26.8% and peak spread 15.0% against JDK 25's 3.4% and 2.3%, so neither
+axis gated and the 1.162x/1.037x it printed is not a figure. Round 45's 1.152x/1.064x
+remains the last trustworthy pair, and it predates rounds 46 and 47.

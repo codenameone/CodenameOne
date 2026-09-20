@@ -1701,6 +1701,21 @@ struct ThreadLocalData {
     // 0 == not yet computed (lazily initialized once per thread on first use).
     JAVA_LONG nativeStackLimit;
 
+#ifdef CN1_GC_VERIFY
+    // The thread's whole C stack, [low, high), recorded beside the limit above and
+    // used by nothing but the verifier's escaped-stack-object check. A heap object's
+    // reference field pointing in here is a stack-allocated object that outlived its
+    // frame -- the failure mode every stack-allocation analysis in this translator
+    // risks, and the one the verifier could not see: an address in a dead frame is
+    // not in a BiBOP page or a legacy extent, so cn1GcVerifyClassify calls it
+    // UNKNOWN and SKIPS it, which is the same answer it gives a static or an
+    // immortal. Ranges make the three distinguishable without dereferencing
+    // anything. 0/0 means not yet computed, which costs a missed detection and
+    // never a false one.
+    JAVA_LONG nativeStackLow;
+    JAVA_LONG nativeStackHigh;
+#endif
+
     // LEVER A (perf-tier1): per-thread, plain-add accumulator for BiBOP allocation
     // volume. Replaces the per-object atomic_fetch_add on the global bibopBytesSinceGc
     // (which an uncontended single thread still pays as an arm64 exclusive-monitor RMW,

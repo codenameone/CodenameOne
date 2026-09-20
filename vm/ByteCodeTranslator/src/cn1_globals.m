@@ -1516,12 +1516,27 @@ void cn1ComputeNativeStackLimit(CODENAME_ONE_THREAD_STATE) {
     threadStateData->nativeStackLimit = (JAVA_LONG)(intptr_t)stackBase
             - (JAVA_LONG)stackSize
             + (JAVA_LONG)CN1_FRAMELESS_STACK_GUARD_BAND;
+#ifdef CN1_GC_VERIFY
+    /* pthread_get_stackaddr_np returns the HIGH end on Darwin. */
+    threadStateData->nativeStackHigh = (JAVA_LONG)(intptr_t)stackBase;
+    threadStateData->nativeStackLow = (JAVA_LONG)(intptr_t)stackBase - (JAVA_LONG)stackSize;
+#endif
 #else
     // Portable fallback: pthread stack introspection is unavailable, so anchor off
     // the current frame and assume an 8MB stack below it.
     threadStateData->nativeStackLimit = (JAVA_LONG)(intptr_t)__builtin_frame_address(0)
             - (JAVA_LONG)(8L * 1024L * 1024L)
             + (JAVA_LONG)CN1_FRAMELESS_STACK_GUARD_BAND;
+#ifdef CN1_GC_VERIFY
+    /* Anchored on the current frame like the limit above, and for the same reason:
+     * with no stack introspection this is the only fix we have on the range. It is
+     * used only to RECOGNISE an escape, so being approximate costs detections, not
+     * correctness. */
+    threadStateData->nativeStackHigh = (JAVA_LONG)(intptr_t)__builtin_frame_address(0)
+            + (JAVA_LONG)(1L * 1024L * 1024L);
+    threadStateData->nativeStackLow = (JAVA_LONG)(intptr_t)__builtin_frame_address(0)
+            - (JAVA_LONG)(8L * 1024L * 1024L);
+#endif
 #endif
     // Guard against a degenerate (0) result, which would re-trigger computation
     // every call; if introspection yielded nothing usable, disable the limit.
@@ -10716,7 +10731,61 @@ static const char* cn1GcVerifyWhen = "after sweep";
 // never a gate.
 static int cn1GcVerifyAllHolders = 0;
 static int cn1GcVerifyAging = 0;
-static long cn1GcVerifyStatus[6];
+static long cn1GcVerifyStatus[7];
+
+/* The live threads' C stack ranges, COLLECTED ONCE PER VERIFY PASS.
+ *
+ * The first version of this walked all NUMBER_OF_SUPPORTED_THREADS (1024) slots for
+ * every traced reference -- 300,000 references a pass on MapTorture2, so 300 MILLION
+ * iterations -- and the way that failed is worth keeping. It did not look slow. It
+ * made the collector slow enough that the workload FINISHED FIRST, so the run
+ * recorded one verify pass (the empty one before any objects existed) instead of two,
+ * and self-test4 and self-test5 went quiet because their injected faults never got a
+ * second cycle to be caught in. The symptom of an expensive check inside the
+ * collector is a gate that stops firing, not a benchmark that gets worse. */
+static uintptr_t cn1GcStackLo[NUMBER_OF_SUPPORTED_THREADS];
+static uintptr_t cn1GcStackHi[NUMBER_OF_SUPPORTED_THREADS];
+static int cn1GcStackRangeN = 0;
+static uintptr_t cn1GcStackEnvLo = 0, cn1GcStackEnvHi = 0;
+
+static void cn1GcCollectStackRanges(void) {
+    cn1GcStackRangeN = 0;
+    cn1GcStackEnvLo = (uintptr_t)-1;
+    cn1GcStackEnvHi = 0;
+    for(int ti = 0 ; ti < NUMBER_OF_SUPPORTED_THREADS ; ti++) {
+        struct ThreadLocalData* th = allThreads[ti];
+        if(th == 0 || th->nativeStackHigh == 0) continue;
+        uintptr_t lo = (uintptr_t)th->nativeStackLow;
+        uintptr_t hi = (uintptr_t)th->nativeStackHigh;
+        if(hi <= lo) continue;
+        cn1GcStackLo[cn1GcStackRangeN] = lo;
+        cn1GcStackHi[cn1GcStackRangeN] = hi;
+        cn1GcStackRangeN++;
+        if(lo < cn1GcStackEnvLo) cn1GcStackEnvLo = lo;
+        if(hi > cn1GcStackEnvHi) cn1GcStackEnvHi = hi;
+    }
+    if(cn1GcStackRangeN == 0) {
+        cn1GcStackEnvLo = 1;
+        cn1GcStackEnvHi = 0;   // empty envelope: every test rejects in one compare
+    }
+}
+
+/* True when v lies inside some live thread's C stack. Address arithmetic only: the
+ * value may be a dead frame, a half-written field or not a pointer at all, and this
+ * runs BEFORE the classifier for exactly that reason. A thread whose range is still
+ * 0/0 (it has not entered a frameless method yet) is absent from the table, so the
+ * check can miss an escape and can never invent one.
+ *
+ * The envelope compare is what makes this affordable: stacks are far from the heap,
+ * so essentially every reference is rejected by it without touching the table. */
+static int cn1GcInThreadStack(JAVA_OBJECT o) {
+    uintptr_t v = (uintptr_t)o;
+    if(v < cn1GcStackEnvLo || v >= cn1GcStackEnvHi) return 0;
+    for(int i = 0 ; i < cn1GcStackRangeN ; i++) {
+        if(v >= cn1GcStackLo[i] && v < cn1GcStackHi[i]) return 1;
+    }
+    return 0;
+}
 static long cn1GcVerifyAge[5];            // referenced-child age histogram (epochs behind)
 static const char* cn1GcVerifyCensusCls = 0;
 static long cn1GcVerifyCensusAge[5];
@@ -10890,6 +10959,14 @@ JAVA_BOOLEAN cn1GcVerifyQuarantineFree(JAVA_OBJECT obj) {
 #define CN1_GC_VS_STALE_SLOT 3
 #define CN1_GC_VS_QUARANTINED 4
 #define CN1_GC_VS_DEAD_AGE  5
+/* A heap object's reference field pointing into a thread's C stack: a
+ * stack-allocated object -- an implicitly stack-allocated StringBuilder, a
+ * scalar-replaced @StackAllocate instance, a SIMD stack array -- that escaped the
+ * frame it lived in. Every one of those rests on an escape analysis in the
+ * translator, and until this existed a wrong one produced no signal at all: the
+ * address is in no page and no extent, so the classifier said UNKNOWN and moved on,
+ * and the program read a dead frame. */
+#define CN1_GC_VS_STACK_ESCAPE 6
 
 // Classify a reference WITHOUT dereferencing anything it has not first proven
 // to be mapped. BiBOP pages are never unmapped (the registry is grow-only) and
@@ -10994,6 +11071,7 @@ void cn1GcResurrectAudit(CODENAME_ONE_THREAD_STATE) {
     // it looks for was reclaimed by EARLIER cycles. Label the shared reporter
     // accordingly; "after sweep" would point a reader at the wrong phase.
     cn1GcVerifyWhen = "at mark end (resurrection audit)";
+    cn1GcCollectStackRanges();
     cn1GcVerifyActive = 1;
     for(int i = 0 ; i < cn1GcResCount ; i++) {
         JAVA_OBJECT o = cn1GcResRing[i];
@@ -11034,6 +11112,27 @@ void cn1GcVerifyChild(JAVA_OBJECT child, void* markSite) {
     CN1BibopPage* pg = 0;
     int idx = -1;
     cn1GcVerifyChecked++;
+    if(cn1GcInThreadStack(child)) {
+        // Reported BEFORE the classifier runs, because the classifier's answer for a
+        // stack address is UNKNOWN -- the branch below that must not touch the object
+        // and returns without counting a violation.
+        cn1GcVerifyStatus[CN1_GC_VS_STACK_ESCAPE]++;
+        cn1GcVerifyViolations++;
+        if(cn1GcVerifyReported < 20) {
+            cn1GcVerifyReported++;
+            fprintf(stderr,
+                "[GC-VERIFY] ESCAPED STACK OBJECT at epoch %d\n"
+                "            holder = %p class=%s\n"
+                "            field  -> %p, which is inside a thread's C stack\n"
+                "            A stack-allocated object outlived its frame. Some escape\n"
+                "            analysis in the translator admitted a reference it should\n"
+                "            have refused; reading it reads a dead frame.\n",
+                currentGcMarkValue, (void*)cn1GcVerifyHolder,
+                cn1GcVerifyHolder != JAVA_NULL ? cn1GcVerifyClsName(cn1GcVerifyHolder) : "?",
+                (void*)child);
+        }
+        return;
+    }
     int st = cn1GcVerifyClassify(child, &pg, &idx);
     if(st == CN1_GC_VS_UNKNOWN) {
         // NOT PLACED -- and this is the one branch that must never touch the
@@ -11194,6 +11293,7 @@ void cn1GcVerifyHeap(CODENAME_ONE_THREAD_STATE) {
     cn1GcVerifyCensusCls = getenv("CN1_GC_VERIFY_CENSUS");
     memset(cn1GcVerifyCensusAge, 0, sizeof(cn1GcVerifyCensusAge));
     memset(cn1GcVerifyStatus, 0, sizeof(cn1GcVerifyStatus));
+    cn1GcCollectStackRanges();
     cn1GcVerifyActive = 1;
     long holders = 0;
 #ifndef CN1_DISABLE_BIBOP
@@ -11261,10 +11361,11 @@ void cn1GcVerifyHeap(CODENAME_ONE_THREAD_STATE) {
     cn1GcVerifyFreedLegacy = 0;
     if(cn1GcVerifyViolations > 0) {
         fprintf(stderr, "[GC-VERIFY] epoch=%d holders=%ld refs=%ld VIOLATIONS=%ld "
-                "(freeSlot=%ld recycledSlot=%ld quarantined=%ld agedOut=%ld)\n",
+                "(freeSlot=%ld recycledSlot=%ld quarantined=%ld agedOut=%ld stackEscape=%ld)\n",
                 currentGcMarkValue, holders, cn1GcVerifyChecked, cn1GcVerifyViolations,
                 cn1GcVerifyStatus[CN1_GC_VS_FREE_SLOT], cn1GcVerifyStatus[CN1_GC_VS_STALE_SLOT],
-                cn1GcVerifyStatus[CN1_GC_VS_QUARANTINED], cn1GcVerifyStatus[CN1_GC_VS_DEAD_AGE]);
+                cn1GcVerifyStatus[CN1_GC_VS_QUARANTINED], cn1GcVerifyStatus[CN1_GC_VS_DEAD_AGE],
+                cn1GcVerifyStatus[CN1_GC_VS_STACK_ESCAPE]);
         fflush(stderr);
         // A dangling reference is never survivable state: everything observed
         // after this point is reading recycled memory. Fail loudly, at the
@@ -11280,10 +11381,11 @@ void cn1GcVerifyHeap(CODENAME_ONE_THREAD_STATE) {
                 cn1GcVerifyCensusAge[3], cn1GcVerifyCensusAge[4]);
         fflush(stderr);
     } else if(getenv("CN1_GC_VERIFY_LOG") != 0) {
-        fprintf(stderr, "[GC-VERIFY] epoch=%d holders=%ld refs=%ld clean (ok=%ld unknown=%ld free=%ld stale=%ld quar=%ld dead=%ld) reclaimed=%ld/%ld age[0..4+]=%ld/%ld/%ld/%ld/%ld\n",
+        fprintf(stderr, "[GC-VERIFY] epoch=%d holders=%ld refs=%ld clean (ok=%ld unknown=%ld free=%ld stale=%ld quar=%ld dead=%ld stackEscape=%ld) reclaimed=%ld/%ld age[0..4+]=%ld/%ld/%ld/%ld/%ld\n",
                 currentGcMarkValue, holders, cn1GcVerifyChecked,
                 cn1GcVerifyStatus[0], cn1GcVerifyStatus[1], cn1GcVerifyStatus[2],
                 cn1GcVerifyStatus[3], cn1GcVerifyStatus[4], cn1GcVerifyStatus[5],
+                cn1GcVerifyStatus[CN1_GC_VS_STACK_ESCAPE],
                 freedSlots, freedLegacy,
                 cn1GcVerifyAge[0], cn1GcVerifyAge[1], cn1GcVerifyAge[2],
                 cn1GcVerifyAge[3], cn1GcVerifyAge[4]);
