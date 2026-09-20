@@ -4078,3 +4078,35 @@ loop inside a try/catch.
 The host ran iOS Simulator runtimes and Spotlight indexing at load 30-194
 throughout. Round 41's 1.145x at 1.4% spread remains the last trustworthy figure
 and predates rounds 42 and 43.
+
+## Round 45: status, on a host that finally went quiet
+
+7 interleaved rounds, parpar spread 5.8% elapsed and 7.4% peak -- the peak
+spread is under the gate's 8% threshold, so BOTH axes were gated this time,
+which has been rare.
+
+| | vs JDK 25 | vs JDK 8 |
+|---|---:|---:|
+| elapsed | **1.152x** | 0.882x |
+| peak memory | **1.064x** | 0.743x |
+
+Against round 41's 1.145x at 1.4% spread, 1.152x is inside the spread: **rounds
+42 and 43 -- implicit null checks and the 273 proven-dead checks -- are not
+resolvable by this benchmark.** That is the ordinary outcome here and was the
+expectation; both were taken on what the disassembly showed, not on a predicted
+whole-program number.
+
+Where the session stands against JDK 25 across its length: 1.278x -> 1.214x ->
+1.147x -> 1.158x -> 1.171x -> 1.154x -> 1.145x -> 1.152x on time, and roughly
+1.20x -> 1.024x -> 1.064x on peak. The time figure has moved about 10% and the
+memory figure from a fifth behind to within noise of parity. We beat JDK 8 on
+both axes by 12% and 26%.
+
+The honest reading of the last several rounds: individual changes have been
+landing below this benchmark's resolution. The disassembly shows them (92 -> 85
+loads on the method examined, 7,387 of 7,520 thunks losing the tagged resolve,
+273 of 967 null tests proven dead), and the whole-program number does not. That
+is not a reason to stop taking them -- it is the critical-mass argument this
+branch started from -- but it does mean the benchmark can no longer arbitrate
+single changes, and the ASM comparison has become the more informative
+instrument.
