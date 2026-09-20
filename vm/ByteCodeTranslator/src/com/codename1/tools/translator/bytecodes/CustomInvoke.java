@@ -59,6 +59,8 @@ public class CustomInvoke extends Instruction {
     }
     
     private String provenDirectOwner;
+    /** Carried from the Invoke this replaced; see Invoke.isExactReceiverNonNull. */
+    private boolean exactReceiverNonNull;
     private String cMethodName;
     private String getCMethodName() {
         if (cMethodName == null) {
@@ -87,6 +89,7 @@ public class CustomInvoke extends Instruction {
         // Same for a FUSED construction (the deferred NEW's owner+children block).
         ci.fusedPlan = invoke.getFusedPlan();
         ci.provenDirectOwner = invoke.getProvenDirectOwner();
+        ci.exactReceiverNonNull = invoke.isExactReceiverNonNull();
         return ci;
     }
 
@@ -631,7 +634,8 @@ public class CustomInvoke extends Instruction {
             }
 
         }
-        NativeInvocation.append(b, bld.toString(), receiver, args, literalArgs, args.size(), provenDirectOwner != null);
+        NativeInvocation.append(b, bld.toString(), receiver, args, literalArgs, args.size(),
+                provenDirectOwner != null && !exactReceiverNonNull);
         if (origOpcode != Opcodes.INVOKESTATIC && targetObjectLiteral != null) numLiteralArgs++;
         if(noPop) {
             b.append(");\n");

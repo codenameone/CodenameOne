@@ -51,6 +51,23 @@ public class Invoke extends Instruction {
         exactReceiverType = types.size() == 1 ? types.iterator().next() : null;
     }
 
+    /* Whether the proof that fixed the receiver's type ALSO shows it is not null.
+     *
+     * The null test on a devirtualized call exists because devirtualization removed
+     * the dispatch that would have faulted. But the provenance that made the type
+     * exact is frequently a NEW or a lambda's invokedynamic, and neither can produce
+     * null -- so for those sites the test can never fire. A factory call or a field
+     * read proves a type without proving non-nullness, and those keep it. */
+    private boolean exactReceiverNonNull;
+
+    public void setExactReceiverNonNull(boolean value) {
+        exactReceiverNonNull = value;
+    }
+
+    public boolean isExactReceiverNonNull() {
+        return exactReceiverNonNull;
+    }
+
     public boolean hasExactReceiver(String type) {
         return exactReceiverType != null && exactReceiverType.equals(type);
     }
@@ -576,7 +593,8 @@ public class Invoke extends Instruction {
             NativeInvocation.appendGuarded(b, guards, bld.toString(), receiver, args, null,
                     args.size(), returnVal == null);
         } else {
-            NativeInvocation.append(b, bld.toString(), receiver, args, null, args.size(), getProvenDirectOwner() != null);
+            NativeInvocation.append(b, bld.toString(), receiver, args, null, args.size(),
+                    getProvenDirectOwner() != null && !isExactReceiverNonNull());
         }
         if(noPop) {
             b.append(");\n");

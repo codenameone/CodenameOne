@@ -319,6 +319,10 @@ final class LocalReceiverTypes {
                 if (receiver.insns.isEmpty()) continue;
                 Set<String> types = new HashSet<String>();
                 boolean exact = true;
+                // Non-null needs EVERY source to be an allocation. ACONST_NULL is
+                // tolerated by the exactness test above -- a null merges with anything
+                // without disproving its type -- and is exactly what must disprove this.
+                boolean nonNull = true;
                 List<Call> calls = new ArrayList<Call>();
                 List<FieldKey> fields = new ArrayList<FieldKey>();
                 for (AbstractInsnNode source : receiver.insns) {
@@ -333,17 +337,24 @@ final class LocalReceiverTypes {
                     } else if (source.getOpcode() == Opcodes.NEW) {
                         types.add(((TypeInsnNode) source).desc.replace('/', '_').replace('$', '_'));
                     } else if (source instanceof MethodInsnNode) {
+                        nonNull = false;
                         calls.add(new Call((MethodInsnNode) source));
                     } else if ((source.getOpcode() == Opcodes.GETFIELD || source.getOpcode() == Opcodes.GETSTATIC)
                             && collectionField(((FieldInsnNode) source).desc)) {
+                        nonNull = false;
                         fields.add(new FieldKey((FieldInsnNode) source));
+                    } else if (source.getOpcode() == Opcodes.ACONST_NULL) {
+                        nonNull = false;
                     } else if (source.getOpcode() != Opcodes.ACONST_NULL) {
                         exact = false;
                         break;
                     }
                 }
                 if (exact && (!calls.isEmpty() || !fields.isEmpty())) pending.add(new Pending(invoke, types, calls, fields));
-                else if (exact && !types.isEmpty()) invoke.setClosedWorldReceiverTypes(types);
+                else if (exact && !types.isEmpty()) {
+                    invoke.setClosedWorldReceiverTypes(types);
+                    invoke.setExactReceiverNonNull(nonNull);
+                }
             }
             if (factoryExact) method.freshReturnType = fresh;
             return frames; // Also reuse the category sizes for DUP/POP2 resolution.
