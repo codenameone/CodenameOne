@@ -68,12 +68,21 @@ FLAG_RE = re.compile(r'\[(-W[^\]]+)\]\s*$')
 # opposed to what it could have compiled.
 # Xcode names the task, the output, then the source:
 #   CompileC <obj> <src> normal arm64 objective-c com.apple.compilers... (in target ...)
-# Verified against Xcode 26.3 output. CompileMetalFile and the assembler use the
-# same shape, and a .metal that only CompileC were matched would look like a
-# source the build skipped.
 COMPILE_XCODE_RE = re.compile(
-    r'^\s*(?:CompileC|CompileMetalFile|CompileAssembly)\s+(?:"[^"]*"|\S+)\s+'
+    r'^\s*(?:CompileC|CompileAssembly)\s+(?:"[^"]*"|\S+)\s+'
     r'(?P<src>"[^"]+"|\S+)\s+normal\b')
+# CompileMetalFile does NOT share that shape. It names the source alone, with no
+# object ahead of it and no "normal <arch>" after it:
+#   CompileMetalFile <src> (in target 'X' from project 'Y')
+# It used to be listed in the pattern above under a comment asserting the shapes
+# matched, so it matched nothing -- and the parser fixture had been written in
+# the same invented shape, so the self-test confirmed the mistake instead of
+# catching it. Nothing noticed while the GL build deleted CN1MetalShaders.metal
+# before compiling: the shader was absent from the manifest too, so the coverage
+# check balanced at zero on both sides. With Metal the only renderer the shader
+# always ships, and the census then called it a source the build never compiled
+# and refused to report.
+COMPILE_METAL_RE = re.compile(r'^\s*CompileMetalFile\s+(?P<src>"[^"]+"|\S+)')
 # CMake's two generators announce the same thing with different progress
 # prefixes -- ninja counts jobs ("[7/91]"), make counts percent ("[  3%]") -- and
 # the prefix is absent entirely when progress reporting is off. One optional group
@@ -284,7 +293,7 @@ def parse_log(text):
     for raw in rejoin_split_lines([l.rstrip("\r") for l in text.splitlines()]):
         line = raw
 
-        m = COMPILE_XCODE_RE.match(line)
+        m = COMPILE_XCODE_RE.match(line) or COMPILE_METAL_RE.match(line)
         if m:
             compiled.add(os.path.basename(m.group("src").strip('"')))
         elif SWIFT_COMPILE_RE.match(line):
