@@ -26,6 +26,7 @@ import com.codename1.junit.FormTest;
 import com.codename1.junit.UITestBase;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
+import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.layouts.BoxLayout;
 import com.codename1.ui.plaf.UIManager;
 
@@ -294,6 +295,54 @@ class DesktopKeyboardConventionsTest extends UITestBase {
         } finally {
             backField.setInt(null, originalBack);
         }
+    }
+
+    @FormTest
+    void tabSkipsControlsOnAnInactiveTabPage() {
+        // Tabs keeps every page in the hierarchy; TabsLayout positions the inactive ones beside
+        // the visible one by an x offset, without marking anything invisible. A filter that
+        // asked the component only about itself therefore admitted every control on every
+        // hidden page, and Tab walked focus into a page nobody can see.
+        implementation.setDesktop(true);
+        Tabs tabs = new Tabs();
+        Button onVisiblePage = new Button("visible");
+        Button onHiddenPage = new Button("hidden");
+        tabs.addTab("One", onVisiblePage);
+        tabs.addTab("Two", onHiddenPage);
+        Form f = new Form("Tabs", new BorderLayout());
+        f.add(BorderLayout.CENTER, tabs);
+        f.show();
+        DisplayTest.flushEdt();
+
+        java.util.List<Component> order = Form.buildDesktopTabIterator(f, null).getComponents();
+        assertTrue(order.contains(onVisiblePage),
+                "a control on the selected page belongs in the traversal");
+        assertFalse(order.contains(onHiddenPage),
+                "a control on an inactive page is unreachable and must not be tabbed to");
+    }
+
+    @FormTest
+    void tabStillReachesContentScrolledOutOfView() {
+        // The other half of the same rule, and the reason the test above cannot simply ask
+        // whether a component is inside the viewport. Content below the fold is off screen too,
+        // and tabbing to it is precisely how a desktop scrolls it into view.
+        implementation.setDesktop(true);
+        Container scroller = new Container(BoxLayout.y());
+        scroller.setScrollableY(true);
+        Button far = null;
+        for (int i = 0; i < 60; i++) {
+            Button b = new Button("row " + i);
+            scroller.add(b);
+            far = b;
+        }
+        Form f = new Form("Scroller", new BorderLayout());
+        f.add(BorderLayout.CENTER, scroller);
+        f.show();
+        DisplayTest.flushEdt();
+
+        java.util.List<Component> order = Form.buildDesktopTabIterator(f, null).getComponents();
+        assertTrue(order.contains(far),
+                "a scrollable ancestor can bring this into view, so it stays in the order");
     }
 
     @FormTest

@@ -1043,6 +1043,18 @@ public class Window extends Container implements TopLevelContainer {
             return moveFocusByTab(Display.getInstance().isShiftKeyDown());
         }
         if (keyCode == KEY_ESCAPE) {
+            if (getKeyInputScope() != null) {
+                // Something inside this window owns the keyboard -- a Dialog put there by
+                // showInHostLayer, typically. Escape is then the dialog's to answer, and the
+                // window must not act on it: the window-level answer is closeRequested(), which
+                // on the default DISPOSE_ON_CLOSE tears down the whole window rather than
+                // cancelling the dialog on top of it. The dialog's own scoped back listener
+                // never even sees the release, because its host is already gone.
+                //
+                // Declining here rather than dispatching to the scope, so the key travels the
+                // ordinary path and the scope handles it exactly as it would any other back key.
+                return false;
+            }
             return escapePressed();
         }
         return false;

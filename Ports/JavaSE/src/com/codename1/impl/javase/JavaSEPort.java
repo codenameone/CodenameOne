@@ -2736,7 +2736,13 @@ public class JavaSEPort extends CodenameOneImplementation {
     /// whatever Codename One draws.
     @Override
     public boolean isNativeCommandsSupported() {
-        return isDesktop();
+        // The same condition setNativeCommands installs under, not merely "is this a desktop".
+        // They disagreed whenever the project asked for desktop.titleBar=toolbar explicitly:
+        // this returned true, so the core kept commandBehavior Native and MenuBar.updateCommands
+        // stopped drawing the legacy Form.addCommand commands -- while setNativeCommands
+        // returned immediately because the effective mode was not native or custom, installing
+        // no menu. The commands then existed nowhere at all.
+        return isDesktopNativeChromeMode();
     }
 
     @Override

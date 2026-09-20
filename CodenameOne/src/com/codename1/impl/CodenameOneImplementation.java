@@ -5081,6 +5081,19 @@ public abstract class CodenameOneImplementation {
                 return true;
             }
         }
+        // getCommandCount covers the MenuBar, which is only part of what was published.
+        // Form.initComponentImpl publishes toolbar.getAllNativeMenuCommands() when the desktop
+        // chrome hides the Toolbar, and that set also carries the left bar, the right bar and
+        // the overflow -- the commands the Toolbar API actually recommends. Searching only the
+        // MenuBar therefore failed to recognise exactly those, and they fell through to the
+        // direct call this method exists to avoid.
+        com.codename1.ui.Toolbar tb = f.getToolbar();
+        if (tb != null) {
+            Vector published = tb.getAllNativeMenuCommands();
+            if (published != null && published.contains(cmd)) {
+                return true;
+            }
+        }
         return false;
     }
 

@@ -2717,7 +2717,19 @@ public class Dialog extends Form implements AbstractDialog {
     void cancel() {
         Command back = getBackCommand();
         if (back != null) {
-            dispatchCommand(back, new ActionEvent(back, ActionEvent.Type.Command));
+            // The guard first, exactly as Form.escapePressed does it. dispatchCommand runs the
+            // command and only then reaches actionCommandImpl, where the guard is consulted --
+            // so asking afterwards lets a vetoed cancel navigate away or discard the state the
+            // guard existed to protect. This path is shared by Escape, the native window close
+            // request and the hosted back action, so all three were affected.
+            if (!checkPopGuard(com.codename1.router.PopReason.HARDWARE_BACK)) {
+                return;
+            }
+            ActionEvent ev = new ActionEvent(back, ActionEvent.Type.Command);
+            back.actionPerformed(ev);
+            if (!ev.isConsumed()) {
+                actionCommandImpl(back, ev);
+            }
             return;
         }
         dispose();

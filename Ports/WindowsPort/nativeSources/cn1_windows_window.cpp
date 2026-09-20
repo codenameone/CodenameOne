@@ -363,6 +363,11 @@ void cn1WinPushEvent(CN1EventType type, int x, int y, int keyCode) {
  * something has to go it must never be the release. */
 /* Unlike hover motion, leave has no later motion outside the window to repair
  * a dropped notification. Protect only the terminal sentinel, not the motion stream. */
+/* The virtual key whose WM_KEYDOWN a menu accelerator consumed, so the matching WM_KEYUP can
+ * be consumed as well. Zero when no such press is outstanding. Touched only from the window
+ * procedure, which is one thread. */
+static int cn1AcceleratorKeyDown = 0;
+
 static int cn1WinIsProtectedEvent(CN1EventType type, int x, int y) {
     return type == CN1_EVENT_WINDOW_SHOWN || type == CN1_EVENT_WINDOW_HIDDEN
             || type == CN1_EVENT_WINDOW_CLOSE
@@ -789,11 +794,20 @@ LRESULT CALLBACK cn1WinWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam
              * component. Only an exact modifier match can match, so ordinary typing and the
              * Tab/Escape handling below are untouched. */
             if (cn1WinMenuHandleAccelerator((int) wParam)) {
+                /* Remember the key so its release can be swallowed too. Consuming only the
+                 * press sent the focused component a release with no press before it, which
+                 * is a second action or a corrupted press/release state depending on what has
+                 * focus -- the same half-a-keystroke problem Escape had on the Java side. */
+                cn1AcceleratorKeyDown = (int) wParam;
                 return 0;
             }
             cn1WinPushEvent(CN1_EVENT_KEY_PRESSED, 0, 0, (int) wParam);
             return 0;
         case WM_KEYUP:
+            if (cn1AcceleratorKeyDown != 0 && cn1AcceleratorKeyDown == (int) wParam) {
+                cn1AcceleratorKeyDown = 0;
+                return 0;
+            }
             cn1WinPushEvent(CN1_EVENT_KEY_RELEASED, 0, 0, (int) wParam);
             return 0;
         case WM_DISPLAYCHANGE:

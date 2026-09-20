@@ -406,4 +406,46 @@ class DesktopComponentsTest extends UITestBase {
         assertEquals(1, real.getContextMenuCommands().length,
                 "and the null beside it is dropped rather than carried");
     }
+
+    @FormTest
+    void aDisabledStepperStaysDisabledAcrossValueChanges() {
+        // updateButtonState took only the bound into account, so anything that called it --
+        // setValue, a typed commit -- re-enabled whichever button could move, and a control
+        // the application had switched off became partly interactive again.
+        Stepper s = new Stepper(5, 1, 10);
+        Form f = new Form("Stepper", BoxLayout.y());
+        f.add(s);
+        f.show();
+        DisplayTest.flushEdt();
+
+        s.setEnabled(false);
+        assertFalse(s.getDecrementButton().isEnabled(), "disabling the stepper disables its buttons");
+        assertFalse(s.getIncrementButton().isEnabled(), "both of them");
+
+        s.setValue(7);
+        DisplayTest.flushEdt();
+        assertFalse(s.getDecrementButton().isEnabled(),
+                "and a value change must not quietly switch them back on");
+        assertFalse(s.getIncrementButton().isEnabled(), "either of them");
+    }
+
+    @FormTest
+    void aReEnabledStepperKeepsItsBoundState() {
+        // Enabling a Container enables its children, so without re-applying the bounds a
+        // stepper sitting at its maximum came back with an active increment button that
+        // could not move the value.
+        Stepper s = new Stepper(10, 1, 10);
+        Form f = new Form("Stepper", BoxLayout.y());
+        f.add(s);
+        f.show();
+        DisplayTest.flushEdt();
+
+        s.setEnabled(false);
+        s.setEnabled(true);
+        DisplayTest.flushEdt();
+
+        assertTrue(s.getDecrementButton().isEnabled(), "it can still go down from the maximum");
+        assertFalse(s.getIncrementButton().isEnabled(),
+                "but not up, and re-enabling must not pretend otherwise");
+    }
 }

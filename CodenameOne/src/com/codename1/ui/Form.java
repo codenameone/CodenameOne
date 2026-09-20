@@ -6045,8 +6045,52 @@ public class Form extends Container implements TopLevelContainer {
     private static class DesktopTabIteratorFilter implements Filter {
         @Override
         public boolean filter(Component c) {
-            return c.isVisible() && c.isFocusable() && c.isEnabled() && !c.isHidden(true);
+            return c.isVisible() && c.isFocusable() && c.isEnabled() && !c.isHidden(true)
+                    && isReachableForTraversal(c);
         }
+    }
+
+    /// True when the user could actually get to this component by tabbing to it.
+    ///
+    /// The flags on the component itself are not enough. `Tabs` keeps every page in the
+    /// hierarchy and its TabsLayout positions the inactive ones beside the visible one, by an
+    /// x or y offset, without marking anything invisible -- so every control on every hidden
+    /// tab passed a check that only asked the component about itself, and Tab walked focus
+    /// into a page nobody can see.
+    ///
+    /// The test is deliberately not "is it inside the visible viewport". An item scrolled
+    /// below the fold is off screen too, and it MUST stay in the order: tabbing to it is how a
+    /// desktop scrolls it into view. What separates the two is whether an ancestor can ever
+    /// bring the component into view. A scrollable ancestor can; a fixed one cannot, and a
+    /// component lying outside a fixed ancestor's box is clipped away for good. Tabs' page
+    /// host is a plain Container, which is what makes the hidden pages unreachable and the
+    /// scrolled list item reachable.
+    ///
+    /// #### Parameters
+    ///
+    /// - `c`: the candidate
+    ///
+    /// #### Returns
+    ///
+    /// true when it can be reached
+    private static boolean isReachableForTraversal(Component c) {
+        Component child = c;
+        Container parent = c.getParent();
+        while (parent != null) {
+            if (!parent.isVisible()) {
+                return false;
+            }
+            if (!parent.isScrollableX() && !parent.isScrollableY()
+                    && (child.getX() + child.getWidth() <= 0
+                        || child.getY() + child.getHeight() <= 0
+                        || child.getX() >= parent.getWidth()
+                        || child.getY() >= parent.getHeight())) {
+                return false;
+            }
+            child = parent;
+            parent = parent.getParent();
+        }
+        return true;
     }
 
     /// Orders the desktop traversal: an explicitly numbered component first, in its number's

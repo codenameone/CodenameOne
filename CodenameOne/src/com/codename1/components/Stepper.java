@@ -350,8 +350,23 @@ public class Stepper extends Container {
     /// Disables the button that cannot move: a desktop stepper at its bound greys out the
     /// half that would step past it rather than accepting a press that does nothing.
     private void updateButtonState() {
-        decrement.setEnabled(value > minValue);
-        increment.setEnabled(value < maxValue);
+        // The bound AND the control's own enabled state. Taking only the bound meant a
+        // disabled Stepper re-enabled its buttons the moment anything called setValue, so a
+        // control the application had switched off became partly interactive again.
+        boolean on = isEnabled();
+        decrement.setEnabled(on && value > minValue);
+        increment.setEnabled(on && value < maxValue);
+    }
+
+    /// {@inheritDoc}
+    ///
+    /// Re-applies the bound states afterwards. Enabling a Container enables its children, so
+    /// without this a Stepper re-enabled at one end of its range showed an active button that
+    /// could not move the value.
+    @Override
+    public void setEnabled(boolean enabled) {
+        super.setEnabled(enabled);
+        updateButtonState();
     }
 
     /// Narrows a value computed in `long` back to `int` without wrapping.
