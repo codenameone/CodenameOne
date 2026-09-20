@@ -2657,14 +2657,49 @@ extern CN1_COLD JAVA_INT cn1ThrowNullPointer_R_int(CODENAME_ONE_THREAD_STATE);
 // removed earlier and for free by the bounds-check-elimination pass
 // (BytecodeMethod.analyzeBoundsChecks), and a method may opt out deliberately via
 // the DisableNullAndArrayBoundsChecks annotation.
+/* IMPLICIT NULL CHECKS -- a platform capability, not an option.
+ *
+ * Where the hardware can tell us, an array access does not need to TEST for null:
+ * the bounds check already loads ->length, and on a null array that load faults at
+ * offsetof(length) == 16. A handler turns a fault below CN1_NULL_GUARD_BYTES into
+ * the NullPointerException the test would have thrown, so the compare and branch
+ * disappear from every array access in the program while the semantics -- NPE
+ * before ArrayIndexOutOfBounds -- are preserved by the ORDER: the length load is
+ * what faults, and it happens before the comparison it feeds.
+ *
+ * Off where we cannot install the handler (Windows needs SEH, not sigaction), and
+ * there the explicit test stays. That is a difference in what the platform can do,
+ * not a switch anybody chooses.
+ *
+ * THE EXPOSURE, stated plainly: a wild pointer that happens to land below the
+ * guard page becomes a NullPointerException instead of a crash. HotSpot carries
+ * the same exposure. What bounds it here is that the window is one page and the
+ * handler re-raises anything outside it, so corruption at a real address still
+ * dies loudly.
+ */
+#if !defined(_WIN32) && (defined(__APPLE__) || defined(__linux__))
+#define CN1_IMPLICIT_NULL_CHECKS 1
+#endif
+#define CN1_NULL_GUARD_BYTES 4096
+extern void cn1InstallFaultHandler(void);
+
 // One guard, used by every configuration: null then bounds, matching the order
 // and the semantics cn1_array_access_validate() has always had. The bounds test
 // is a single unsigned compare, so it covers index < 0 and index >= length.
+#ifdef CN1_IMPLICIT_NULL_CHECKS
+// No null test: the ->length load below faults on a null array and the handler
+// raises the NullPointerException. Order is what keeps the semantics right.
+#define CN1_ARRAY_ACCESS_GUARD(array, bounds) \
+    do { \
+        if(__builtin_expect(((unsigned int)(bounds)) >= (unsigned int)(((JAVA_ARRAY)(array))->length), 0)) { cn1ThrowArrayIndexOrDie(threadStateData, bounds); } \
+    } while(0)
+#else
 #define CN1_ARRAY_ACCESS_GUARD(array, bounds) \
     do { \
         if(__builtin_expect((array) == JAVA_NULL, 0)) { cn1ThrowNullPointerOrDie(threadStateData); } \
         if(__builtin_expect(((unsigned int)(bounds)) >= (unsigned int)(((JAVA_ARRAY)(array))->length), 0)) { cn1ThrowArrayIndexOrDie(threadStateData, bounds); } \
     } while(0)
+#endif
 
 #define CN1_ARRAY_ACCESS_GUARD_EXPR(array, bounds) \
     (__builtin_expect((array) == JAVA_NULL, 0) ? cn1ThrowNullPointer_R_boolean(threadStateData) \

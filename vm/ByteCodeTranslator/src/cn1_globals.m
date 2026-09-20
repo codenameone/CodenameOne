@@ -15661,6 +15661,9 @@ void initConstantPool() {
 
     // Low-memory throttle diagnostics and the CN1_SIMULATE_MEMORY_WARNING_MS test
     // hook. Both are no-ops unless their environment variable is set.
+    // Before any generated code runs: an array access no longer tests for null and
+    // relies on this handler to turn the resulting fault into a NullPointerException.
+    cn1InstallFaultHandler();
     atexit(cn1ReportBlockSyscalls);
     atexit(cn1HeapWindowReport);
     atexit(cn1ReportLowMemoryParks);
@@ -16037,6 +16040,62 @@ CN1_NORETURN void cn1ThrowNullPointerOrDie(CODENAME_ONE_THREAD_STATE) {
  * installed, which is right for a statement-form guard that has nowhere to go, but
  * wrong here. A frameless method returns to let its caller's frame take the pending
  * exception, and the expression forms must produce a value. */
+#ifdef CN1_IMPLICIT_NULL_CHECKS
+/* The landing pad for a null dereference.
+ *
+ * MUST NOT RETURN. A plain function returns through the link register, which on
+ * arm64 still points at the faulting instruction -- the fault then repeats
+ * forever. That is not a theory: the first version of this hung exactly so.
+ * throwException walks the thread's try-block stack and longjmps, so control
+ * never comes back here; the abort is for the case where it somehow does.
+ */
+static CN1_NORETURN void cn1ImplicitNpeStub(void) {
+    cn1ThrowNullPointerHere(getThreadLocalData());
+    abort();
+}
+
+static void cn1FaultHandler(int sig, siginfo_t* info, void* ctx) {
+    uintptr_t addr = (uintptr_t)(info != 0 ? info->si_addr : 0);
+    if(addr < CN1_NULL_GUARD_BYTES) {
+        ucontext_t* uc = (ucontext_t*)ctx;
+        uintptr_t stub = (uintptr_t)&cn1ImplicitNpeStub;
+#if defined(__APPLE__) && defined(__aarch64__)
+        uc->uc_mcontext->__ss.__pc = (uint64_t)stub;
+#elif defined(__APPLE__) && defined(__x86_64__)
+        uc->uc_mcontext->__ss.__rip = (uint64_t)stub;
+#elif defined(__linux__) && defined(__aarch64__)
+        uc->uc_mcontext.pc = (unsigned long long)stub;
+#elif defined(__linux__) && defined(__x86_64__)
+        uc->uc_mcontext.gregs[REG_RIP] = (greg_t)stub;
+#else
+        (void)uc; (void)stub;
+        goto notOurs;   /* unknown layout: never guess at a register file */
+#endif
+        return;
+    }
+#if !((defined(__APPLE__) || defined(__linux__)) && (defined(__aarch64__) || defined(__x86_64__)))
+notOurs:
+#endif
+    // Not a null dereference. Restore the default and re-raise so a real fault is
+    // still a real crash with a real report, rather than something this handler
+    // quietly swallowed.
+    signal(sig, SIG_DFL);
+    raise(sig);
+}
+
+void cn1InstallFaultHandler(void) {
+    struct sigaction sa;
+    memset(&sa, 0, sizeof(sa));
+    sa.sa_sigaction = cn1FaultHandler;
+    sa.sa_flags = SA_SIGINFO | SA_ONSTACK;
+    sigemptyset(&sa.sa_mask);
+    sigaction(SIGSEGV, &sa, 0);
+    sigaction(SIGBUS, &sa, 0);
+}
+#else
+void cn1InstallFaultHandler(void) { }
+#endif
+
 CN1_COLD void cn1ThrowNullPointerHere(CODENAME_ONE_THREAD_STATE) {
     throwException(threadStateData, __NEW_INSTANCE_java_lang_NullPointerException(threadStateData));
 }
