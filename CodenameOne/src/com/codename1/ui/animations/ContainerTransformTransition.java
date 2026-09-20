@@ -206,11 +206,7 @@ public class ContainerTransformTransition extends Transition {
             // photograph the button is whole.
             Image anchorShot = closing ? destBuffer : sourceBuffer;
             originBuffer = Image.createImage(startW, startH, 0);
-            if (anchorShot != null) {
-                originBuffer.getGraphics().drawImage(anchorShot, -startX, -startY);
-            } else {
-                origin.paintComponent(originBuffer.getGraphics(), true);
-            }
+            originBuffer.getGraphics().drawImage(anchorShot, -startX, -startY);
             // The commonest colour in it, not the middle pixel: the middle of a button is
             // usually its glyph, and taking that made the growing surface the colour of
             // the icon instead of the colour of the button.
@@ -509,10 +505,10 @@ public class ContainerTransformTransition extends Transition {
                 if (((rgb[iter] >>> 24) & 0xff) < 128) {
                     continue;
                 }
-                Integer key = new Integer(rgb[iter] & 0xffffff);
+                Integer key = Integer.valueOf(rgb[iter] & 0xffffff);
                 Object prev = counts.get(key);
                 int n = prev == null ? 1 : ((Integer) prev).intValue() + 1;
-                counts.put(key, new Integer(n));
+                counts.put(key, Integer.valueOf(n));
                 if (n > bestN) {
                     bestN = n;
                     best = key.intValue();

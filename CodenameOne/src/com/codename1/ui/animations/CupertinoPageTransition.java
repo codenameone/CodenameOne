@@ -133,7 +133,9 @@ public class CupertinoPageTransition extends Transition {
 
     @Override
     public boolean animate() {
-        if (arriving == null) {
+        // Both, though they are set and cleared together: a reader (and a static analyser)
+        // should not have to know that to see this is safe.
+        if (arriving == null || departing == null) {
             return false;
         }
         departing.getValue();
@@ -143,7 +145,7 @@ public class CupertinoPageTransition extends Transition {
     @Override
     public void paint(Graphics g) {
         Component destination = getDestination();
-        if (arriving == null || destination == null) {
+        if (arriving == null || departing == null || destination == null) {
             return;
         }
         int w = destination.getWidth();
