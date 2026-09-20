@@ -283,4 +283,50 @@ class DesktopNativeThemeSelectionTest {
         }
     }
 
+    /// The simulator must resolve the same generation the device would, because
+    /// "it looked right in the simulator" is the whole point of the simulator.
+    /// IOSImplementation#modernThemeResourceName is the device half.
+    @Test
+    public void iosThemeGenerationSelectsTheMatchingModernTheme() throws Exception {
+        String key = "codename1.arg.ios.themeGeneration";
+        String modeKey = "codename1.arg.ios.themeMode";
+        String prevGen = System.getProperty(key);
+        String prevMode = System.getProperty(modeKey);
+        java.lang.reflect.Method resolver =
+                JavaSEPort.class.getDeclaredMethod("resolveAutoNativeTheme", String.class);
+        resolver.setAccessible(true);
+        try {
+            System.setProperty(modeKey, "modern");
+
+            System.clearProperty(key);
+            assertEquals("iOSModernTheme", resolver.invoke(null, "ios"),
+                    "unset must stay on generation 26 so an existing project does not move");
+
+            System.setProperty(key, "26");
+            assertEquals("iOSModernTheme", resolver.invoke(null, "ios"));
+
+            System.setProperty(key, "27");
+            assertEquals("iOSModern27Theme", resolver.invoke(null, "ios"));
+
+            // The generation is orthogonal to the look: it is consulted only
+            // when the theme resolves to modern, and must not leak into the
+            // legacy modes.
+            System.setProperty(modeKey, "ios7");
+            assertEquals("iOS7Theme", resolver.invoke(null, "ios"),
+                    "themeGeneration must not affect a non-modern themeMode");
+            System.setProperty(modeKey, "legacy");
+            assertEquals("iPhoneTheme", resolver.invoke(null, "ios"));
+        } finally {
+            if (prevGen == null) {
+                System.clearProperty(key);
+            } else {
+                System.setProperty(key, prevGen);
+            }
+            if (prevMode == null) {
+                System.clearProperty(modeKey);
+            } else {
+                System.setProperty(modeKey, prevMode);
+            }
+        }
+    }
 }

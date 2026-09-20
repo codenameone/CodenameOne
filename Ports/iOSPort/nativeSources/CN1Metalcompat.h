@@ -23,20 +23,18 @@
 #ifndef CN1Metalcompat_h
 #define CN1Metalcompat_h
 
-#import "CN1ES2compat.h"
+#import "CN1RenderBackend.h"
 #ifdef CN1_USE_METAL
 
 @import Metal;
 @import simd;
 #import "CN1AppleUI.h"
-#import <GLKit/GLKit.h>
 
 // Metal rendering backend for Codename One iOS.
 //
-// The existing OpenGL ES 2 ExecutableOp implementations call raw GL functions
-// (glUseProgram, glUniformMatrix4fv, glDrawArrays). They cannot transparently
-// run on Metal, so each op gets an #ifdef CN1_USE_METAL branch in its execute
-// method that calls the higher-level C API declared here.
+// Each ExecutableOp's execute method calls the higher-level C API declared
+// here from its #ifdef CN1_USE_METAL branch; the #else is watchOS, which
+// renders through CN1CGGraphics instead.
 //
 // State lives in CN1Metalcompat.m:
 //   - active render command encoder (set by METALView.setFramebuffer,
@@ -45,9 +43,8 @@
 //   - current clip rect / scissor
 //   - pipeline state cache (lazy built, keyed by pipeline variant + blend)
 //
-// Matrices use the same GLKMatrix4 type as the GL path so SetTransform.m can
-// pass its matrix through unchanged; CN1Metalcompat converts to simd_float4x4
-// at upload time.
+// Matrices are CN1Matrix4, so SetTransform.m passes its matrix through
+// unchanged; CN1Metalcompat converts to simd_float4x4 at upload time.
 
 // -------- Pipeline variants --------
 typedef NS_ENUM(NSInteger, CN1MetalPipeline) {
@@ -123,13 +120,13 @@ id<MTLRenderCommandEncoder> CN1MetalActiveEncoder(void);
 int CN1MetalFramebufferWidth(void);
 int CN1MetalFramebufferHeight(void);
 
-// -------- Matrix state (mirrors CN1modelViewMatrix / CN1projectionMatrix / CN1transformMatrix in the GL path) --------
+// -------- Matrix state (model-view, projection and transform) --------
 
 // Called by SetTransform.execute. Replaces the current transform matrix.
-void CN1MetalSetTransform(GLKMatrix4 transform);
+void CN1MetalSetTransform(CN1Matrix4 transform);
 
 // Returns the current transform matrix (for SetTransform.currentTransform).
-GLKMatrix4 CN1MetalGetTransform(void);
+CN1Matrix4 CN1MetalGetTransform(void);
 
 // Matrix stack operations used by the drawFrame flip workaround, Rotate,
 // Scale, ResetAffine. (Phase 2.)
@@ -184,7 +181,7 @@ void CN1MetalClearRect(int x, int y, int width, int height);
 
 // Draw a 1-pixel line from (x1,y1) to (x2,y2) with the given color+alpha.
 // Note: Metal does not support line width > 1; on retina displays lines
-// appear thin. Matches the GL path's glLineWidth=1 default.
+// appear thin, matching a one-pixel line width.
 void CN1MetalDrawLine(int color, int alpha, int x1, int y1, int x2, int y2);
 
 // Draw a rectangular outline (not filled) at (x,y,w,h). Rendered as a

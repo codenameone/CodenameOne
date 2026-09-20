@@ -863,7 +863,7 @@ class WatchNativeBuilderTest {
         assertTrue(ruby.contains("watch_unavailable = %w["), ruby);
         // Downcased in the script -- IPhoneBuilder spells one of these "JavascriptCore.framework",
         // which only resolves because macOS is case-insensitive, so the match is too.
-        assertTrue(ruby.contains("opengles.framework") && ruby.contains("carplay.framework"),
+        assertTrue(ruby.contains("metal.framework") && ruby.contains("carplay.framework"),
                 "the declared list has to reach the script: " + ruby);
         assertTrue(ruby.contains("present = !watch_unavailable.include?(base.downcase)"),
                 "casing must not decide whether a framework reaches the watch link: " + ruby);

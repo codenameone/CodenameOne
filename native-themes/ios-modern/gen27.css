@@ -1,0 +1,40 @@
+/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+/*
+ * iOS 27 generation layer.
+ *
+ * Appended AFTER common.css, so every rule here overrides the common one for
+ * the same UIID property by property, and #Constants keys override key by key.
+ * See native-themes/README.md for the cascade rules the build relies on.
+ *
+ * Contents are driven by measurement, not by reading release notes: capture the
+ * native reference on an iOS 27 simulator
+ * (CN1SS_FIDELITY_GOLDEN_SET=ios-27-metal scripts/build-ios-native-ref.sh) and
+ * compare it tile by tile against goldens/ios-26-metal. 31 of 68 tiles differ,
+ * concentrated in the Liquid Glass surfaces and the bar and button chrome built
+ * on them; the classic form controls -- TextField, Dialog, CheckBox,
+ * RadioButton, Switch, Slider, ProgressBar -- are byte-identical and belong in
+ * common.css.
+ *
+ * Empty until each of those deltas is tuned and its baseline recorded.
+ */

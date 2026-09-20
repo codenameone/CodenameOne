@@ -389,6 +389,26 @@ final class Cn1ssHashTracker {
 final class Cn1ssWebSocketSink {
     private static final int ACK_TIMEOUT_MS = 10_000;
     private static final int CONNECT_TIMEOUT_MS = 5_000;
+    /// How many times the FIRST connect is attempted before the sink gives up.
+    ///
+    /// One attempt is not enough, and the failure is total rather than partial:
+    /// ensureConnected latches `unavailable` on the first miss, so a single slow
+    /// handshake loses every remaining screenshot in the suite and the run ends
+    /// in "FATAL: no CN1 renders delivered". That is not hypothetical -- three
+    /// hosted-runner runs died exactly this way (`reason=connect-timeout`, with
+    /// the server logging one `SocketException: Connection reset` as the client
+    /// walked away mid-handshake). On those runs the simulator was demonstrably
+    /// slow: the app took 63s to reach its first log line and 3.7s to render a
+    /// tile that normally takes 1.1s, so the 5s handshake budget was simply too
+    /// tight for a cold app on a loaded machine.
+    ///
+    /// Retrying is a genuine fix rather than a tolerance: the connection either
+    /// establishes or it does not, so a persistent failure still fails the run
+    /// loudly after the full budget, with one log line per attempt to say so.
+    /// The retries cost nothing on a healthy machine, where the first attempt
+    /// connects in milliseconds.
+    private static final int CONNECT_ATTEMPTS = 4;
+    private static final int CONNECT_RETRY_PAUSE_MS = 1_000;
     private static final Map<String, AckLatch> pending = new HashMap<String, AckLatch>();
     private static WebSocket socket;
     private static volatile boolean attemptedConnect;
@@ -622,10 +642,36 @@ final class Cn1ssWebSocketSink {
             return false;
         }
         attemptedConnect = true;
-        return connect(url);
+        return connectWithRetries(url);
     }
 
-    private static boolean connect(String url) {
+    /// Runs connectOnce up to CONNECT_ATTEMPTS times, and only then declares the
+    /// sink unavailable. See CONNECT_ATTEMPTS for why a single attempt is wrong.
+    private static boolean connectWithRetries(String url) {
+        for (int attempt = 1; attempt <= CONNECT_ATTEMPTS; attempt++) {
+            if (connectOnce(url, attempt)) {
+                return true;
+            }
+            if (attempt < CONNECT_ATTEMPTS) {
+                try {
+                    Thread.sleep(CONNECT_RETRY_PAUSE_MS);
+                } catch (InterruptedException ie) {
+                    Thread.currentThread().interrupt();
+                    break;
+                }
+            }
+        }
+        unavailable = true;
+        socket = null;
+        System.out.println("CN1SS:INFO:ws-sink-unavailable reason=connect-failed-after-"
+                + CONNECT_ATTEMPTS + "-attempts");
+        return false;
+    }
+
+    /// One connect attempt. Returns true when the socket is open. On failure it
+    /// reports the reason and returns false WITHOUT latching `unavailable` --
+    /// that decision belongs to connectWithRetries, which owns the budget.
+    private static boolean connectOnce(String url, int attempt) {
         final Object connectGate = new Object();
         final boolean[] connected = new boolean[1];
         final String[] errReason = new String[1];
@@ -683,9 +729,9 @@ final class Cn1ssWebSocketSink {
         if (connected[0]) {
             return true;
         }
-        unavailable = true;
         socket = null;
-        System.out.println("CN1SS:INFO:ws-sink-unavailable reason=" + errReason[0]);
+        System.out.println("CN1SS:INFO:ws-connect-attempt " + attempt + "/" + CONNECT_ATTEMPTS
+                + " failed reason=" + errReason[0]);
         return false;
     }
 

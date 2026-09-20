@@ -38,11 +38,11 @@
 // Single-threaded — all entry points run on the main thread inside
 // drawFrame's op drain.
 //
-// This header MUST be `#import "CN1ES2compat.h"`-ed before its body so
+// This header MUST be `#import "CN1RenderBackend.h"`-ed before its body so
 // the CN1_USE_METAL macro is visible (the PCH does not include it; see
 // METALView.h for the same pattern).
 
-#import "CN1ES2compat.h"
+#import "CN1RenderBackend.h"
 #ifdef CN1_USE_METAL
 #import <Foundation/Foundation.h>
 #import <CoreText/CoreText.h>

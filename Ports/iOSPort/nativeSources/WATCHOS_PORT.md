@@ -24,7 +24,7 @@ Contract the render-driver must provide (everything else already compiles):
   ones are no-ops on watch.
 - A **`[CodenameOne_GLViewController instance]`-compatible singleton** (NSObject,
   NOT UIViewController) exposing the selectors the other 10 files call:
-  `drawFrame`, `flushBuffer`, `drawString`, `upcomingAddClip`, `eaglView`/`view`
+  `drawFrame`, `flushBuffer`, `drawString`, `upcomingAddClip`, `renderingView`/`view`
   (return the `CN1WatchRenderingView`), `isPaintFinished`, and no-op
   `present*ViewController*`.
 - The op queue (`currentTarget`/`upcomingTarget` swap) + `drawFrame` draining
@@ -160,10 +160,8 @@ Each remaining op gets the same treatment as `FillRect.m`:
 ```objc
 #if TARGET_OS_WATCH
 -(void)execute { CN1CG<Primitive>(...); }
-#elif defined(USE_ES2)
-   ... existing ES2/Metal ...
 #else
-   ... existing ES1 ...
+   ... existing Metal ...
 #endif
 ```
 
@@ -171,31 +169,31 @@ Remaining ops and their `CN1CG*` target:
 
 | Op | Backend call | Notes |
 |----|--------------|-------|
-| `FillPolygon` | `CN1CGFillPolygon` | guard the direct `<OpenGLES/*>` imports in the .m |
-| `DrawString` | `CN1CGDrawString` | header imports OpenGLES + UIKit — guard them |
-| `DrawImage` | `CN1CGDrawImage` | use `[img getImage].CGImage`; guard GL headers in .h |
+| `FillPolygon` | `CN1CGFillPolygon` | |
+| `DrawString` | `CN1CGDrawString` | header imports UIKit — guard it |
+| `DrawImage` | `CN1CGDrawImage` | use `[img getImage].CGImage` |
 | `TileImage` | `CN1CGTileImage` | as DrawImage |
-| `DrawGradient` | `CN1CGGradientRect` | guard GL headers in .h |
+| `DrawGradient` | `CN1CGGradientRect` | |
 | `Scale` / `Rotate` | `CN1CGScale` / `CN1CGRotate` | Scale.m imports ClipRect.h (see below) |
-| `SetTransform` | `CN1CGSetAffine` | header interface is inside `#ifdef USE_ES2`; add a watch interface |
+| `SetTransform` | `CN1CGSetAffine` | |
 | `ResetAffine` | `CN1CGResetAffine` | |
-| `ClipRect` | `CN1CGSetClipRect` / `CN1CGSetClipPolygon` | has `GLuint` ivars — guard |
+| `ClipRect` | `CN1CGSetClipRect` / `CN1CGSetClipPolygon` | has a texture-handle ivar — guard |
 | `DrawPath` | (tessellate → `CN1CGFillPolygon`/path) | uses `Renderer*`; needs CG path build |
-| `DrawTextureAlphaMask` | `CN1CGDrawImage` of the mask | Metal/GL only today |
+| `DrawTextureAlphaMask` | `CN1CGDrawImage` of the mask | Metal only today |
 | `DrawMultiStopGradient` | extend `CN1CGGradientRect` | entirely inside `#ifdef CN1_USE_METAL` |
 | `RadialGradientPaint` | paint-state; map to gradient | |
 
 Shared headers needing `#if TARGET_OS_WATCH` / `#else` guards so the watch slice
-compiles (they pull `<OpenGLES/*>` / `GLuint` / GLKit):
-`GLUIImage.h` (keep the `UIImage` ivar + `getImage`; drop GL texture members),
+compiles (they pull UIKit / Metal):
+`GLUIImage.h` (keep the `UIImage` ivar + `getImage`; drop the texture members),
 `ClipRect.h`, `SetTransform.h`, `Rotate.h`, `RadialGradientPaint.h`,
 `DrawImage.h`, `TileImage.h`, `DrawString.h`, `DrawGradient.h`,
 `DrawTextureAlphaMask.h`, `DrawPath.h`/`Renderer.h`.
 
 Files **excluded** from the watch slice via
-`EXCLUDED_SOURCE_FILE_NAMES[sdk=watchos*]` (GL/Metal-only, no watch substitute) —
+`EXCLUDED_SOURCE_FILE_NAMES[sdk=watchos*]` (Metal-only, no watch substitute) —
 see `WatchNativeBuilder.applyXcodeSettings`:
-`EAGLView.m`, `METALView.m`, `CN1ES1compat.m`, `CN1ES2compat.m`, `CN1GL3D.m`,
+`METALView.m`, `CN1GL3D.m`,
 `CN1Metalcompat.m`, `CN1MetalGlyphAtlas.m`, `CN1MetalPipelineCache.m`,
 `DrawGradientTextureCache.m`, `DrawStringTextureCache.m`,
 `CodenameOne_GLViewController.xib`, `CodenameOne_GLSceneDelegate.m`.
@@ -203,7 +201,7 @@ see `WatchNativeBuilder.applyXcodeSettings`:
 ## Bootstrap (Phase 3)
 
 `CodenameOne_GLAppDelegate.m` / `CodenameOne_GLViewController.m` instantiate
-`CN1WatchRenderingView` instead of `EAGLView`/`METALView` and replace the
+`CN1WatchRenderingView` instead of `METALView` and replace the
 `CADisplayLink` pump with a timer (see `CN1WatchHost`). The watch host
 (`CN1WatchHost.{h,m}`, SwiftUI/SpriteKit surface) owns the run loop and feeds
 Digital-Crown + tap input into the CN1 pointer/scroll event path.

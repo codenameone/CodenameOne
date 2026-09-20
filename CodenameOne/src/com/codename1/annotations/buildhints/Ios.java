@@ -163,6 +163,16 @@ public @interface Ios {
     /// different team IDs for debug and release builds respectively.
     String teamId() default "";
 
+    /// `26` (default) or `27`: which iOS design generation the modern theme
+    /// targets. Consulted only when [#themeMode()] resolves to modern/liquid;
+    /// every other mode ignores it.
+    ///
+    /// Unset means 26, so an application that says nothing keeps the theme it
+    /// has. `27` selects the generation built from
+    /// `native-themes/ios-modern/gen27.css`.
+    @Hint(valuePattern = "26|27")
+    IosThemeGeneration themeGeneration() default IosThemeGeneration.DEFAULT;
+
     /// `auto` (default), `modern`, `ios7`, `legacy`. `auto` (unset) keeps the
     /// existing iOS 7 flat theme so pre-refactor screenshot goldens and apps see
     /// no behavior change. `modern` / `liquid` opts in to the CSS-generated iOS

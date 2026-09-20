@@ -296,6 +296,7 @@
                                         <include name="iOS7Theme.res"/>
                                         <include name="iPhoneTheme.res"/>
                                         <include name="iOSModernTheme.res"/>
+                                        <include name="iOSModern27Theme.res"/>
                                         <include name="androidTheme.res"/>
                                         <include name="android_holo_light.res"/>
                                         <include name="AndroidMaterialTheme.res"/>

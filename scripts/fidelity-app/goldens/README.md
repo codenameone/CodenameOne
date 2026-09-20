@@ -8,10 +8,43 @@ nothing in CI ever writes one.
 | Set | Captured from |
 |---|---|
 | `ios-26-metal` | iOS simulator, `scripts/build-ios-native-ref.sh` |
+| `ios-27-metal` | iOS simulator, same script with `CN1SS_FIDELITY_GOLDEN_SET=ios-27-metal` |
 | `android-m3` | Android emulator, `scripts/build-android-native-ref.sh` |
 | `windows-11-fluent` | Hosted Windows runner, WinUI 3 |
 | `macos-aqua` | Hosted macOS runner, AppKit |
 | `gnome-adwaita` | Hosted Linux runner, GTK4 + libadwaita under Xvfb |
+
+## The two iOS generations
+
+`ios-26-metal` and `ios-27-metal` are both live. They are separate sets rather
+than a shared base plus overrides, and that is measured rather than assumed:
+only **12 of the 68** tiles are byte-identical between them, 0.1 MB in total, so
+a shared layer would buy nothing and add a resolution step to every comparison.
+56 tiles genuinely differ, concentrated in the Liquid Glass surfaces and the bar
+and button chrome built on them.
+
+What is NOT duplicated is the authoring: one `fidelity-tests.yaml`, one
+`NativeRef.swift`. The generation difference comes from the OS drawing its own
+widgets on a matching runtime, not from per-generation reference code -- which
+is why the runtime the capture runs on is the thing that has to be right.
+
+`CN1SS_FIDELITY_GOLDEN_SET` drives all three steps so they cannot disagree:
+
+```
+CN1SS_FIDELITY_GOLDEN_SET=ios-27-metal scripts/build-ios-native-ref.sh   # capture
+CN1SS_FIDELITY_GOLDEN_SET=ios-27-metal scripts/build-fidelity-app.sh ios # build
+CN1SS_FIDELITY_GOLDEN_SET=ios-27-metal scripts/run-ios-fidelity-tests.sh <app> # score
+```
+
+The build step is the one that is easy to forget: it selects the app's theme
+generation (`ios.themeGeneration=27`), and without it the run scores the iOS 26
+theme against iOS 27's native widgets and reports a regression in all 56.
+
+**iOS 27.1 cannot host this capture.** That runtime supports exactly one device
+type, iPhone Duo -- 65 supported types on iOS 26.3, 62 on 27.0, **1** on 27.1 --
+so `ios-27-metal` is captured on iOS 27.0, on the same iPhone 16 model as the 26
+set. `scripts/lib/ios-sim.sh` picks the newest runtime that HAS the model, which
+is what makes that fall out rather than fail.
 
 ## Why the desktop sets come from CI
 

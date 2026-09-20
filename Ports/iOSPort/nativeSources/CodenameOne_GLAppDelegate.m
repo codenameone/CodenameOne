@@ -28,7 +28,7 @@
 #import "CN1JailbreakDetector.h"
 #include "xmlvm.h"
 #import <objc/message.h>
-#import "EAGLView.h"
+#import "METALView.h"
 #import "CodenameOne_GLViewController.h"
 #ifdef CN1_INCLUDE_CALL
 #import "CN1Call.h"
@@ -187,7 +187,7 @@ static void installSignalHandlers() {
         // to [UIScreen mainScreen].scale; viewDidLoad's updateDisplayMetricsFromView then
         // used the correct scaleValue. Fire awakeFromNib manually, but do NOT force
         // [self.viewController view] first — awakeFromNib reaches self.view through
-        // [self eaglView] internally, which triggers loadView/viewDidLoad after scaleValue
+        // [self renderingView] internally, which triggers loadView/viewDidLoad after scaleValue
         // has already been set. Forcing the view load separately reverses that order and
         // caches wrong density/ppi (scaleValue=1 × NIB 320×460 bounds = DENSITY_MEDIUM).
         [self.viewController awakeFromNib];
@@ -420,11 +420,11 @@ static NSUserActivity *cn1PendingLaunchActivity = nil;
 - (void)cn1ApplicationDidEnterBackground
 {
  #ifdef CN1_BLOCK_SCREENSHOTS_ON_ENTER_BACKGROUND
-    // Hide the view controller's root view rather than just the EAGL/Metal
+    // Hide the view controller's root view rather than just the Metal
     // surface. Once a peer component is added with paintPeersBehindEnabled,
-    // the controller's view is a newRoot containing both eaglView and the
+    // the controller's view is a newRoot containing both renderingView and the
     // peerComponentsLayer (BrowserComponent's WKWebView lives in the latter)
-    // -- hiding only eaglView leaves peers visible in the app-switcher snapshot.
+    // -- hiding only renderingView leaves peers visible in the app-switcher snapshot.
     [CodenameOne_GLViewController instance].view.hidden = YES;
     cn1IsHiddenInBackground = YES;
 #endif
@@ -467,7 +467,7 @@ static NSUserActivity *cn1PendingLaunchActivity = nil;
     CodenameOne_GLViewController* vc = [CodenameOne_GLViewController instance];
     if (vc != nil) {
 #ifdef CN1_USE_METAL
-        id renderingView = [vc eaglView];
+        id renderingView = [vc renderingView];
         if ([renderingView respondsToSelector:@selector(invalidateRetainedFramebuffer)]) {
             [renderingView invalidateRetainedFramebuffer];
         }
@@ -806,7 +806,7 @@ static NSUserActivity *cn1PendingLaunchActivity = nil;
 {
     /*
      Sent when the application is about to move from active to inactive state. This can occur for certain types of temporary interruptions (such as an incoming phone call or SMS message) or when the user quits the application and it begins the transition to the background state.
-     Use this method to pause ongoing tasks, disable timers, and throttle down OpenGL ES frame rates. Games should use this method to pause the game.
+     Use this method to pause ongoing tasks, disable timers, and throttle down rendering frame rates. Games should use this method to pause the game.
      */
     [self cn1ApplicationWillResignActive];
     //[self.viewController stopAnimation];
@@ -1321,7 +1321,7 @@ static NSString *cn1MenuIdentifierForHint(NSString *hint, BOOL *placeAtStart) AP
 @end
 
 #else
-// Compiled out on watchOS: this file is OpenGL ES / Metal / UIKit-only and the watch
+// Compiled out on watchOS: this file is Metal / UIKit-only and the watch
 // slice renders through the Core Graphics backend instead. The typedef keeps the
 // translation unit non-empty, which ISO C requires.
 typedef int cn1_codenameone_glappdelegate_unused_on_watch;

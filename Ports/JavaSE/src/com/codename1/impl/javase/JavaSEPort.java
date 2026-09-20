@@ -3239,12 +3239,23 @@ public class JavaSEPort extends CodenameOneImplementation {
      * theme resource basename (without ".res") or {@code null} to fall back
      * to the skin's embedded theme.
      */
+    /// The modern iOS theme for the generation the project asks for.
+    ///
+    /// Mirrors IOSImplementation#modernThemeResourceName so the simulator shows
+    /// the same theme the device would. Reads the hint every time rather than
+    /// caching: the simulator picks up a project's settings without a restart,
+    /// so a cached answer would survive the change that was meant to alter it.
+    private static String modernIosTheme() {
+        return "27".equals(buildHint("ios.themeGeneration"))
+                ? "iOSModern27Theme" : "iOSModernTheme";
+    }
+
     private static String resolveAutoNativeTheme(String platformName) {
         if ("ios".equals(platformName)) {
             String iosMode = buildHint("ios.themeMode");
             if (iosMode != null) {
                 if ("modern".equalsIgnoreCase(iosMode) || "liquid".equalsIgnoreCase(iosMode)) {
-                    return "iOSModernTheme";
+                    return modernIosTheme();
                 }
                 if ("ios7".equalsIgnoreCase(iosMode) || "flat".equalsIgnoreCase(iosMode)) {
                     return "iOS7Theme";
@@ -3261,7 +3272,7 @@ public class JavaSEPort extends CodenameOneImplementation {
                 return null;
             }
             // Default for an iOS skin is the modern theme.
-            return "iOSModernTheme";
+            return modernIosTheme();
         }
         if ("and".equals(platformName)) {
             String andMode = buildHint("and.themeMode");
@@ -8785,7 +8796,8 @@ public class JavaSEPort extends CodenameOneImplementation {
         m.setDoubleBuffered(true);
         String[][] items = {
             {"auto", "Auto (from build hints)"},
-            {"iOSModernTheme", "iOS Modern (Liquid Glass)"},
+            {"iOSModernTheme", "iOS Modern (Liquid Glass, iOS 26)"},
+            {"iOSModern27Theme", "iOS Modern (iOS 27)"},
             {"iOS7Theme", "iOS 7 (Flat)"},
             {"iPhoneTheme", "iPhone (Pre-Flat)"},
             {"AndroidMaterialTheme", "Android Material"},

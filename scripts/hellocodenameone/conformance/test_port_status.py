@@ -1018,13 +1018,13 @@ class PortStatusTest(unittest.TestCase):
     def test_publishable_accepts_a_report_that_skips_workloads(self):
         # The shape every iOS, tvOS, and watchOS run produces: the simulator
         # skips the three GC-footprint workloads and measures the other seven.
-        report = self.publishable_report("ios-gl")
+        report = self.publishable_report("ios-metal")
         for benchmark in ("objectAllocation", "hashMapChurn", "stringBuilding"):
             del report["performance"]["benchmarks"][benchmark]
             report["performance"]["skipped"][benchmark] = "ios-simulator-gc-footprint"
 
         self.assertEqual(([], []), port_status.publishable_report_problems(
-            self.manifest, "ios-gl", report
+            self.manifest, "ios-metal", report
         ))
 
     def test_publishable_accepts_a_documented_test_skip(self):
@@ -1297,7 +1297,7 @@ class PortStatusTest(unittest.TestCase):
             comparison_path.write_text(json.dumps(comparison), encoding="utf-8")
             report = port_status.normalize(
                 manifest=self.manifest,
-                port_id="ios-gl",
+                port_id="ios-metal",
                 logs=[log_path],
                 comparisons=[comparison_path],
                 output=root / "report.json",
@@ -1328,7 +1328,7 @@ class PortStatusTest(unittest.TestCase):
             comparison_path.write_text(json.dumps(comparison), encoding="utf-8")
             report = port_status.normalize(
                 manifest=self.manifest,
-                port_id="ios-gl",
+                port_id="ios-metal",
                 logs=[log_path],
                 comparisons=[comparison_path],
                 output=root / "report.json",

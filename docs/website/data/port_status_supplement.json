@@ -94,7 +94,6 @@
         {
           "prefix": "map-tiles-never-loaded",
           "ports": [
-            "ios-gl",
             "ios-metal",
             "android"
           ]
@@ -110,7 +109,6 @@
         {
           "prefix": "native-provider-active",
           "ports": [
-            "ios-gl",
             "ios-metal",
             "macos",
             "mac-catalyst",
@@ -163,7 +161,6 @@
         {
           "prefix": "android-only-remoteviews-lowering",
           "ports": [
-            "ios-gl",
             "ios-metal",
             "macos",
             "mac-catalyst",
@@ -258,7 +255,6 @@
         {
           "prefix": "encode-unavailable-on-",
           "ports": [
-            "ios-gl",
             "ios-metal",
             "macos",
             "mac-catalyst",
@@ -269,7 +265,6 @@
         {
           "prefix": "no-video-encoder-on-",
           "ports": [
-            "ios-gl",
             "ios-metal",
             "macos",
             "mac-catalyst",
@@ -280,7 +275,6 @@
         {
           "prefix": "encode-write-failed-on-",
           "ports": [
-            "ios-gl",
             "ios-metal",
             "macos",
             "mac-catalyst",
@@ -291,7 +285,6 @@
         {
           "prefix": "VideoIO-unsupported-on-",
           "ports": [
-            "ios-gl",
             "ios-metal",
             "macos",
             "mac-catalyst",
@@ -321,7 +314,6 @@
         },
         {
           "ports": [
-            "ios-gl",
             "ios-metal",
             "mac-catalyst"
           ],
@@ -385,7 +377,6 @@
         {
           "ports": [
             "android",
-            "ios-gl",
             "ios-metal",
             "macos",
             "mac-catalyst"
@@ -442,7 +433,6 @@
         },
         {
           "ports": [
-            "ios-gl",
             "ios-metal"
           ],
           "state": "conditional",
@@ -492,7 +482,6 @@
         {
           "ports": [
             "android",
-            "ios-gl",
             "ios-metal"
           ],
           "state": "supported",
@@ -556,7 +545,6 @@
         },
         {
           "ports": [
-            "ios-gl",
             "ios-metal"
           ],
           "state": "supported",
@@ -613,7 +601,6 @@
         },
         {
           "ports": [
-            "ios-gl",
             "ios-metal"
           ],
           "state": "supported",
@@ -663,7 +650,6 @@
         {
           "ports": [
             "android",
-            "ios-gl",
             "ios-metal"
           ],
           "state": "supported",
@@ -720,7 +706,6 @@
         },
         {
           "ports": [
-            "ios-gl",
             "ios-metal"
           ],
           "state": "supported",
@@ -770,7 +755,6 @@
         },
         {
           "ports": [
-            "ios-gl",
             "ios-metal"
           ],
           "state": "conditional",
@@ -806,7 +790,6 @@
         {
           "ports": [
             "android",
-            "ios-gl",
             "ios-metal"
           ],
           "state": "conditional",
@@ -849,7 +832,6 @@
         {
           "ports": [
             "android",
-            "ios-gl",
             "ios-metal"
           ],
           "state": "supported",
@@ -899,7 +881,6 @@
         },
         {
           "ports": [
-            "ios-gl",
             "ios-metal"
           ],
           "state": "conditional",
@@ -935,7 +916,6 @@
         {
           "ports": [
             "android",
-            "ios-gl",
             "ios-metal",
             "macos",
             "mac-catalyst",
@@ -971,7 +951,6 @@
         {
           "ports": [
             "android",
-            "ios-gl",
             "ios-metal"
           ],
           "state": "supported",
@@ -1021,7 +1000,6 @@
         },
         {
           "ports": [
-            "ios-gl",
             "ios-metal"
           ],
           "state": "supported",
@@ -1057,7 +1035,6 @@
         {
           "ports": [
             "android",
-            "ios-gl",
             "ios-metal"
           ],
           "state": "conditional",
@@ -1100,7 +1077,6 @@
         {
           "ports": [
             "android",
-            "ios-gl",
             "ios-metal"
           ],
           "state": "conditional",
@@ -1150,7 +1126,6 @@
         },
         {
           "ports": [
-            "ios-gl",
             "ios-metal"
           ],
           "state": "conditional",
@@ -1207,7 +1182,6 @@
         {
           "ports": [
             "android",
-            "ios-gl",
             "ios-metal",
             "mac-catalyst",
             "macos",
@@ -1243,7 +1217,6 @@
         {
           "ports": [
             "android",
-            "ios-gl",
             "ios-metal",
             "macos",
             "mac-catalyst",

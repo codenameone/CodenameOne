@@ -5,8 +5,8 @@
 # checkbox/radio marks, ImageViewer navigation arrows) which load on tvOS via
 # the runtime CTFontManagerRegisterFontsForURL registration in IOSNative.m.
 #
-# Apple TV reuses the iOS UIApplicationMain entry and the Metal renderer (tvOS
-# has UIKit + Metal, just no OpenGL ES), so the <Main>TV target is built like a
+# Apple TV reuses the iOS UIApplicationMain entry and the Metal renderer, so
+# the <Main>TV target is built like a
 # regular iOS app for the appletvsimulator SDK and launched via simctl. It
 # streams each screenshot to the host-side Cn1ssScreenshotServer over
 # ws://127.0.0.1:8765 -- the same transport the iOS / watch jobs use -- so the

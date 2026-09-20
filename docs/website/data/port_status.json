@@ -19,7 +19,6 @@
   ],
   "golden_directories": [
     "scripts/android/screenshots",
-    "scripts/ios/screenshots",
     "scripts/ios/screenshots-metal",
     "scripts/ios/screenshots-watch",
     "scripts/ios/screenshots-tv",
@@ -38,14 +37,8 @@
       "workflow": "scripts-android.yml"
     },
     {
-      "id": "ios-gl",
-      "name": "iOS (OpenGL)",
-      "detail": "iOS Simulator, legacy renderer",
-      "workflow": "scripts-ios.yml"
-    },
-    {
       "id": "ios-metal",
-      "name": "iOS (Metal)",
+      "name": "iOS",
       "detail": "iOS Simulator, Metal renderer",
       "workflow": "scripts-ios.yml"
     },

@@ -165,17 +165,19 @@ public class IOSImplementation extends CodenameOneImplementation {
     private NativeGraphics currentlyDrawingOn;
     //private NativeImage backBuffer;
     private NativeGraphics globalGraphics;
-    /// True when iOS was built with -Dios.metal=true. The mutable-image
-    /// alpha-mask routing in MutableGraphics relies on the C-side
-    /// drawTextureAlphaMaskImpl tagging the op with currentMutableImage so
-    /// drawFrame's drain switches the encoder to the mutable's MTLTexture
-    /// before drawing -- a Metal-only code path (`#ifdef CN1_USE_METAL`
-    /// guard around `setTarget` in CodenameOne_GLViewController.m). On a
-    /// GL build the same alpha-mask op runs against the screen encoder,
-    /// so the round-rect mask lands on the screen instead of inside the
-    /// mutable's UIImage and Switch's track / thumb come out empty.
-    /// `metalRendering` keeps the CG-bitmap-then-DrawImage fallback in
-    /// place for GL while letting Metal use the unified alpha-mask
+    /// True on a slice that renders through Metal, which is every Apple
+    /// platform this port builds for except watchOS -- the watch renders
+    /// through Core Graphics instead. The mutable-image alpha-mask routing
+    /// in MutableGraphics relies on the C-side drawTextureAlphaMaskImpl
+    /// tagging the op with currentMutableImage so drawFrame's drain
+    /// switches the encoder to the mutable's MTLTexture before drawing --
+    /// a Metal-only code path (`#ifdef CN1_USE_METAL` guard around
+    /// `setTarget` in CodenameOne_GLViewController.m). Where that does not
+    /// exist the same alpha-mask op would run against the screen encoder,
+    /// so the round-rect mask would land on the screen instead of inside
+    /// the mutable's UIImage and Switch's track / thumb would come out
+    /// empty. `metalRendering` keeps the CG-bitmap-then-DrawImage fallback
+    /// in place there while letting Metal use the unified alpha-mask
     /// pipeline.
     ///
     /// Static so inner-class accessors don't trip over javac's synthesized
@@ -262,9 +264,9 @@ public class IOSImplementation extends CodenameOneImplementation {
         // Set the metalRendering static gate as early as possible -- before
         // any NativeImage / NativeGraphics is constructed -- so mutable-image
         // rendering routes through the alpha-mask Metal pipeline from the
-        // very first paint on Metal builds, and through the CG-bitmap
-        // fallback on GL builds (where the alpha-mask op can't target a
-        // mutable, see comment on the static field above).
+        // very first paint where Metal exists, and through the CG-bitmap
+        // fallback where it does not (the alpha-mask op can't target a
+        // mutable there, see comment on the static field above).
         metalRendering = nativeInstance.isMetalRendering();
         setUseNativeCookieStore(false);
         Display.getInstance().setTransitionYield(10);
@@ -2955,6 +2957,22 @@ public class IOSImplementation extends CodenameOneImplementation {
     protected String nativeThemeMode() {
         return iosMode == null ? "auto" : iosMode.toLowerCase();
     }
+
+    /// Which generation of the MODERN theme this build ships. "26" or "27",
+    /// emitted into the generated stub by IPhoneBuilder from the
+    /// ios.themeGeneration hint. Defaults to 26 so a build that says nothing --
+    /// including one produced before the hint existed -- keeps the theme it had.
+    private static String iosThemeGeneration = "26";
+
+    /// Invoked from the generated stub (do not rename).
+    public static void setIosThemeGeneration(String g) {
+        iosThemeGeneration = g;
+    }
+
+    /// The modern theme resource for the requested generation, without ".res".
+    protected String modernThemeResourceName() {
+        return "27".equals(iosThemeGeneration) ? "iOSModern27Theme" : "iOSModernTheme";
+    }
     
     private static boolean waitForAnimationLock(Form f) {
         while (!f.grabAnimationLock()) {
@@ -3020,7 +3038,23 @@ public class IOSImplementation extends CodenameOneImplementation {
             // Display.setProperty("ios.themeMode", "modern") before the
             // first Form is shown.
             if(mode.equals("modern") || mode.equals("liquid")) {
-                InputStream in = getResourceAsStream("/iOSModernTheme.res");
+                String want = modernThemeResourceName();
+                InputStream in = getResourceAsStream("/" + want + ".res");
+                if (in == null && !"iOSModernTheme".equals(want)) {
+                    // A generation the bundle does not carry. Falling through
+                    // silently would drop the app onto iOS 7 -- a bigger change
+                    // than the one that was asked for, and one that also loses
+                    // dark mode, since the iOS 7 theme has no $Dark styles at
+                    // all. Say so, then use the generation that IS shipped.
+                    //
+                    // IPhoneBuilder rejects an unknown ios.themeGeneration
+                    // outright, so a real build cannot reach this; it exists for
+                    // a framework build whose themes have not been generated.
+                    System.out.println("Codename One: /" + want + ".res is not in the"
+                            + " app bundle, but ios.themeGeneration asked for it."
+                            + " Falling back to iOSModernTheme.res (generation 26).");
+                    in = getResourceAsStream("/iOSModernTheme.res");
+                }
                 if (in != null) {
                     r = Resources.open(in);
                     Hashtable tp = r.getTheme(r.getThemeResourceNames()[0]);
@@ -3723,10 +3757,9 @@ public class IOSImplementation extends CodenameOneImplementation {
         } else {
             // The path didn't reduce to a polygon (still has multiple
             // disjoint sub-paths or other oddities). Fall back to the
-            // alpha-mask Renderer; on the GL backend this paints the
-            // shape into the stencil, on the Metal backend the texture
-            // handle isn't compatible with MTLTexture and the bounding
-            // box is used as a coarse fallback (see ClipRect.m).
+            // alpha-mask Renderer; the texture handle isn't compatible
+            // with MTLTexture, so the bounding box is used as a coarse
+            // fallback (see ClipRect.m).
             TextureAlphaMask mask = (TextureAlphaMask)textureCache.get(shape, null);
             if ( mask == null ){
                 mask = (TextureAlphaMask)this.createAlphaMask(shape, null);
@@ -4189,7 +4222,7 @@ public class IOSImplementation extends CodenameOneImplementation {
     /**
      * Creates a platform-specific alpha mask for a shape.  This is used to cache 
      * masks in the {@link com.codename1.ui.GeneralPath} class.  On iOS the alpha
-     * mask is an OpenGL texture ID (not a raster of alpha pixels), but other platforms 
+     * mask is a texture handle (not a raster of alpha pixels), but other platforms
      * may use different representations if they like.
      * 
      * <p>The {@link com.codename1.ui.Graphics#drawAlphaMask} method
@@ -8331,7 +8364,7 @@ public class IOSImplementation extends CodenameOneImplementation {
         
         @Override
         boolean isAntiAliasingSupported() {
-            // Currently global graphics are drawn with opengl
+            // Currently global graphics are drawn on the GPU
             // and don't support antialiasing on drawLine, drawRect, functions
             // etc...
             return false;
@@ -11587,9 +11620,9 @@ public class IOSImplementation extends CodenameOneImplementation {
         ng.fillLinearGradient(startColor, endColor, x, y, width, height, horizontal);
     }
 
-    // Metal builds route the multi-stop CSS Gradient API through a pure-GPU
-    // shader (CN1MetalPipelineMultiStopGradient). GL builds (or Metal builds
-    // that can't pack the gradient into the shader's 8-stop budget) fall back
+    // The multi-stop CSS Gradient API goes through a pure-GPU shader
+    // (CN1MetalPipelineMultiStopGradient). A gradient that doesn't pack into
+    // the shader's 8-stop budget, or a slice with no Metal, falls back
     // to the base CodenameOneImplementation software rasterizer, which builds
     // an ARGB raster via Gradient.sampleArgb() and uploads it through
     // drawImage. The Java side caches that raster on the Gradient via a
@@ -13922,7 +13955,7 @@ public class IOSImplementation extends CodenameOneImplementation {
      * incoming phone call or SMS message) or when the user quits the application 
      * and it begins the transition to the background state.
      * Use this method to pause ongoing tasks, disable timers, and throttle down 
-     * OpenGL ES frame rates. Games should use this method to pause the game.
+     * rendering frame rates. Games should use this method to pause the game.
      */
     /// The macOS counterpart, which does NOT treat losing focus as being
     /// minimized.

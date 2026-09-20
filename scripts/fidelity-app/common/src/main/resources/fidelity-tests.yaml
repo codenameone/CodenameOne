@@ -35,7 +35,7 @@
 #                   backdrop; the comparator masks the backdrop out and scores
 #                   ONLY the widget, so the unchanged backdrop cannot inflate
 #                   the score.
-#                   "lens"   = selection-lens optics (the iOS-26 tab lens).
+#                   "lens"   = selection-lens optics (the modern tab lens).
 #                   Scored like "glass"; animation-frame captures are
 #                   additionally validated against the motion model.
 #                   The comparison mode is chosen from THIS field (test intent),
