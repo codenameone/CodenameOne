@@ -38,6 +38,7 @@ public abstract class ComponentAnimation {
     private int step = -1;
     private ArrayList<Runnable> post;
     private boolean completed = false;
+    private boolean stepped = false;
 
     /// Allows us to create an animation that compounds several separate animations so they appear as a
     /// single animation to the system and process in parallel
@@ -124,6 +125,7 @@ public abstract class ComponentAnimation {
 
     /// Invoked by the animation manager internally
     public final void updateAnimationState() {
+        stepped = true;
         updateState();
         if (!isInProgress()) {
             completeIfNeeded();
@@ -131,14 +133,34 @@ public abstract class ComponentAnimation {
             completed = false;
         }
     }
-    
-    /// Completes the animation if needed, without forcing an additional updateState() call.
+
+    /// Completes the animation if needed, without re-applying the state of an animation that has
+    /// already been stepped.
     public final void completeAnimation() {
         if (!isInProgress()) {
+            applyPendingState();
             completeIfNeeded();
         }
     }
-    
+
+    /// Applies whatever part of this animation's payload `#updateState()` has not applied yet.
+    ///
+    /// The manager only steps the head of its queue while `#isInProgress()` is true, so an animation
+    /// that reports false from the moment it is queued is otherwise completed without ever running.
+    /// That is the whole lifecycle of a deferred UI mutation - `Container` queues one of these when a
+    /// component is added or removed while another animation is in flight, and the add or the remove
+    /// only happens inside `#updateState()`. Dropping it makes the mutation a silent no-op, so a
+    /// never-stepped animation gets exactly one update here before it completes.
+    ///
+    /// An animation that was already stepped must not be updated again: stepping it past its end is
+    /// what this call deliberately avoids.
+    void applyPendingState() {
+        if (!stepped) {
+            stepped = true;
+            updateState();
+        }
+    }
+
     private void completeIfNeeded() {
         if (!completed) {
             completed = true;
@@ -227,11 +249,31 @@ public abstract class ComponentAnimation {
         @Override
         protected void updateState() {
             if (sequence > -1) {
-                anims[Math.min(sequence, anims.length - 1)].updateState();
+                ComponentAnimation current = anims[Math.min(sequence, anims.length - 1)];
+                // updateState() is called rather than updateAnimationState() so a child of a sequence
+                // does not fire its own completion callbacks, but the child still has to be marked as
+                // stepped or applyPendingState() would apply it a second time when the compound ends.
+                current.stepped = true;
+                current.updateState();
                 return;
             }
             for (ComponentAnimation a : anims) {
                 a.updateAnimationState();
+            }
+        }
+
+        /// Cascades to the children rather than calling `#updateState()` once.
+        ///
+        /// A single aggregate update cannot stand in for the children here. In a sequence,
+        /// `#isInProgress()` has already walked the cursor past the end by the time the compound is
+        /// completed, so one `updateState()` would land on the last child and apply nothing else - and
+        /// a sequence that never started would apply *only* the last child. Cascading also covers the
+        /// partially stepped case, where the compound itself was stepped but a child that was never in
+        /// progress got skipped as the cursor walked over it.
+        @Override
+        void applyPendingState() {
+            for (ComponentAnimation a : anims) {
+                a.applyPendingState();
             }
         }
 

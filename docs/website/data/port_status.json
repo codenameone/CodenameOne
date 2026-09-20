@@ -729,6 +729,15 @@
       ]
     },
     {
+      "id": "foldable-posture",
+      "category": "Device APIs",
+      "name": "Foldable posture",
+      "description": "Checks the device fold posture, hinge angle, and fold bounds, and the not-foldable contract on devices that do not fold.",
+      "tests": [
+        "DevicePostureApiTest"
+      ]
+    },
+    {
       "id": "camera-access",
       "category": "Platform-dependent APIs",
       "name": "Camera access",

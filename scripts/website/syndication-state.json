@@ -2194,6 +2194,27 @@
         "tags_set": true,
         "canonical_set": true,
         "syndicated_at": "2026-09-19T00:01:08+00:00"
+      },
+      "devto": {
+        "id": 4695229,
+        "url": "https://dev.to/codenameone/what-go-taught-us-about-java-garbage-collection-25ha",
+        "syndicated_at": "2026-09-19T16:28:01+00:00"
+      },
+      "medium": {
+        "url": "https://medium.com/p/9d366328ed49/edit",
+        "syndicated_at": "2026-09-19T19:00:35+00:00"
+      }
+    },
+    "hashmap-misses-probe-sequence": {
+      "hashnode": {
+        "url": "https://debugagent.com/faster-maps-chasing-swiss-speed",
+        "published": true,
+        "draft_url": "https://hashnode.com/draft/6aaf22113a322f44e7900163",
+        "cover_set": true,
+        "subheading_set": true,
+        "tags_set": true,
+        "canonical_set": true,
+        "syndicated_at": "2026-09-20T00:01:11+00:00"
       }
     }
   }

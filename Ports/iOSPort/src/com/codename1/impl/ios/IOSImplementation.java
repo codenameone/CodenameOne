@@ -277,6 +277,13 @@ public class IOSImplementation extends CodenameOneImplementation {
         if("true".equals(Display.getInstance().getProperty("DisableScreenshots", ""))) {
             nativeInstance.setDisableScreenshots(true);
         }
+        // Start observing the hinge here rather than lazily on the first
+        // DevicePosture query, because an application can register a
+        // Display#addPostureListener and never query anything -- and a lazily
+        // installed observer would then never be installed, so the listener
+        // would never fire. It is idempotent, it costs one main-thread hop, and
+        // it compiles to nothing on an SDK without the hinge API.
+        nativeInstance.startHingeMonitoring();
     }
     
     @Override
@@ -331,6 +338,43 @@ public class IOSImplementation extends CodenameOneImplementation {
         }
         
         return rect;
+    }
+
+    // --- Foldable posture (com.codename1.ui.DevicePosture) ---
+    //
+    // Backed by UIKit's hinge API on iOS 27.1 and newer; IOSFoldablePosture
+    // answers "not foldable" everywhere else, so there is no version check here.
+    // These mirror the Android port, which routes the same six methods through
+    // AndroidFoldablePosture.
+
+    @Override
+    public boolean isFoldable() {
+        return IOSFoldablePosture.isFoldable();
+    }
+
+    @Override
+    public int getDevicePosture() {
+        return IOSFoldablePosture.getPosture();
+    }
+
+    @Override
+    public int getHingeAngle() {
+        return IOSFoldablePosture.getHingeAngle();
+    }
+
+    @Override
+    public int getFoldOrientation() {
+        return IOSFoldablePosture.getFoldOrientation();
+    }
+
+    @Override
+    public boolean isPostureSeparating() {
+        return IOSFoldablePosture.isSeparating();
+    }
+
+    @Override
+    public Rectangle getFoldBounds(Rectangle rect) {
+        return IOSFoldablePosture.getFoldBounds(rect);
     }
 
     public boolean isNativeInputImmediate() {
