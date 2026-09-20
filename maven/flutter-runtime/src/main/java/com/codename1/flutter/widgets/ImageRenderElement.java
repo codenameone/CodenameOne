@@ -779,11 +779,22 @@ public class ImageRenderElement extends RenderElement {
             // Centred in the box, which is what every BoxFit but `fill` means.
             int dx = getX() + (int) Math.round((bw - dw) / 2);
             int dy = getY() + (int) Math.round((bh - dh) / 2);
+            // CLIPPED TO THE BOX, because several of the fits deliberately overflow it:
+            // `cover` scales until the box is covered and spills on the other axis,
+            // `none` draws the picture at its own size however big that is. Flutter's
+            // paintImage clips; this did not, so a picture drew outside the component
+            // that owns it -- and nothing else on the screen expects that. It showed up
+            // as smearing in the status bar while scrolling the mail list: the avatars
+            // were painting above the top of the list, over a band that is not part of
+            // any scrolling content and so is not repainted as the list moves.
+            int[] clip = g.getClip();
+            g.clipRect(getX(), getY(), bw, bh);
             if (radius > 0) {
                 g.drawImageRounded(s, dx, dy, (int) Math.round(dw), (int) Math.round(dh), radius);
             } else {
                 g.drawImage(s, dx, dy, (int) Math.round(dw), (int) Math.round(dh));
             }
+            g.setClip(clip[0], clip[1], clip[2], clip[3]);
         }
 
         /// Whether the platform rounds a picture's corners as it draws it, in

@@ -273,9 +273,26 @@ public abstract class EffectRenderElement extends RenderElement {
         if (shape == null || !g.isShapeClipSupported()) {
             return false;
         }
+        // INTERSECT, do not replace. setClip(Shape) installs the shape outright, so
+        // whatever the ancestors had established was simply discarded -- and the nearest
+        // ancestor that matters is usually a scroller. A clipped subtree inside a list
+        // therefore kept painting after it had scrolled out of the viewport: the mail
+        // avatars, which are the only clipped thing in a mail row, drew over the status
+        // bar as the list moved under it, and that band is not repainted by the scroll,
+        // so they smeared.
+        //
+        // Re-intersecting with the incoming rectangle after installing the shape is what
+        // clipRect is for. Note the incoming clip is read as a RECTANGLE, so a shaped
+        // clip an ancestor established is honoured only to its bounding box -- weaker
+        // than exact, and far better than dropping it.
+        int cx = g.getClipX();
+        int cy = g.getClipY();
+        int cw = g.getClipWidth();
+        int ch = g.getClipHeight();
         g.pushClip();
         try {
             g.setClip(shape);
+            g.clipRect(cx, cy, cw, ch);
             subtree.paint(g);
         } finally {
             g.popClip();

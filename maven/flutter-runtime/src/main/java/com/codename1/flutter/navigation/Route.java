@@ -48,7 +48,21 @@ public abstract class Route<T> {
         this.settings = (v instanceof RouteSettings) ? (RouteSettings) v : null;
     }
 
+    /**
+     * Never null, as Flutter's is not: a route built without settings gets an empty
+     * one whose name is null.
+     *
+     * <p>Returning null here LOCKED THE APP. Every study is wrapped in a back-to-gallery
+     * button whose tap is {@code popUntil(route.settings().name() == '/')}, so a route on
+     * the stack with no settings threw out of the predicate, the pop never finished, and
+     * the only way out of the study was gone. A route reached in a way that sets no
+     * settings -- a showModalPopup, a route pushed by builder rather than by name -- was
+     * enough to arm it.</p>
+     */
     public RouteSettings settings() {
+        if (settings == null) {
+            settings = new RouteSettings();
+        }
         return settings;
     }
 

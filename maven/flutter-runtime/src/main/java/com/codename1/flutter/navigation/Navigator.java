@@ -473,7 +473,20 @@ public class Navigator extends StatelessWidget {
             // runApp route off the stack, an always-false predicate unwinds to it.
             while (!stack.isEmpty()) {
                 Route<Object> top = (Route<Object>) stack.get(stack.size() - 1).route;
-                Boolean stop = predicate == null ? null : predicate.call(top);
+                Boolean stop;
+                try {
+                    stop = predicate == null ? null : predicate.call(top);
+                } catch (Throwable thrownByPredicate) {
+                    // KEEP UNWINDING, and report it.
+                    //
+                    // A predicate that throws used to take the whole pop with it and leave
+                    // the user on the page they were trying to leave -- and popUntil is
+                    // what the back-to-gallery button calls, so a throw there was a locked
+                    // app with no way out. Unwinding one route too far is a page the user
+                    // can walk back into; a screen with no exit is not.
+                    com.codename1.flutter.FlutterErrorReport.record(thrownByPredicate);
+                    stop = null;
+                }
                 if (stop != null && stop.booleanValue()) {
                     return;
                 }
