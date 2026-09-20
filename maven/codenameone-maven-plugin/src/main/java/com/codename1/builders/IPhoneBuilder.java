@@ -3882,6 +3882,12 @@ public class IPhoneBuilder extends Executor {
                     + inviteAppClipGroup + "\"));\n";
         }
         String dbLegacy = databaseLegacyStubProperty(request, usesDatabase);
+        // The desktop title-bar mode, for the macOS target this builder also produces.
+        // IOSImplementation.getConfiguredDesktopTitleBarMode() reads it back out of this exact
+        // Display property and its comment already said the stub surfaced it -- nothing did, so
+        // the hint was inert and the Aqua theme's own constant decided alone. Inert on iPhone
+        // and iPad, where that method returns null before it ever looks: isDesktop() is false.
+        String desktopTitleBar = desktopTitleBarStubProperty(request);
 
         // If the build-time SVG transcoder produced a registry class, weave
         // its installGlobal() call into the Stub right before the first
@@ -4068,6 +4074,7 @@ public class IPhoneBuilder extends Executor {
                     + disableScreenshots
                     + inviteDomainProperty
                     + dbLegacy
+                    + desktopTitleBar
                     + adPadding
                     + integrateFacebook
                     + integrateGoogleConnect

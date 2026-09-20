@@ -1245,6 +1245,10 @@ public class WindowsNativeBuilder extends Executor {
         // And the database compatibility switch, before the lifecycle below starts, so it is in
         // force by the time anything opens a database.
         src.append(databaseLegacyStubProperty(request, usesDatabase));
+        // See LinuxNativeBuilder: the hint has to be surfaced or the theme constant decides
+        // alone. Fluent asks for "native" too, so this port agreed with the hint by luck --
+        // which is exactly why a project asking for "toolbar" never got it.
+        src.append(desktopTitleBarStubProperty(request));
         src.append(svgInstall);
         src.append("        Display.getInstance().callSerially(new Runnable() {\n");
         src.append("            public void run() {\n");

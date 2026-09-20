@@ -1214,8 +1214,11 @@ public class IOSImplementation extends CodenameOneImplementation {
         if (!isDesktop()) {
             return "toolbar";
         }
-        // Opt-in via the desktop.titleBar build hint (codename1.arg.desktop.titleBar), surfaced as a
-        // Display property by the generated iOS stub. Default toolbar = unchanged legacy behavior.
+        // Opt-in via the desktop.titleBar build hint (codename1.arg.desktop.titleBar), surfaced as
+        // a Display property by the generated stub. That sentence was aspirational until
+        // Executor.desktopTitleBarStubProperty existed: no builder emitted the property, so this
+        // read the default on every build and the Aqua theme's own desktopTitleBarMode constant
+        // decided alone. Default toolbar = unchanged legacy behavior.
         return Display.getInstance().getProperty("desktop.titleBar", "toolbar");
     }
 
