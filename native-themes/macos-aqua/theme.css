@@ -616,9 +616,19 @@ Tabs { background-color: transparent; padding: 0; margin: 0; }
 TabbedPane { background-color: transparent; padding: 0; margin: 0; }
 TabsContainer { background-color: #ececec; padding: 0; margin: 0; }
 TabsContainerHost { background-color: #ececec; padding: 0; margin: 0; }
-Tab { color: #7f7f7f; background-color: transparent; border: none; padding: 1.6mm 3.2mm 1.6mm 3.2mm; margin: 0; }
-Tab.selected { color: #ffffff; background-color: #007aff; border-radius: 1.59mm; padding: 1.6mm 3.2mm 1.6mm 3.2mm; margin: 0; }
-Tab.pressed { color: #ffffff; background-color: #e8e8e8; padding: 1.6mm 3.2mm 1.6mm 3.2mm; margin: 0; }
+/* A selected macOS tab is a raised PILL, not an accent-filled cell. This rule used to say
+   color #ffffff on background #007aff, which is the iOS selection style it was derived from and
+   is what an app actually rendered: a saturated blue block with white text where AppKit draws a
+   white pill with ordinary label text. Fluent and Adwaita were both written correctly -- a light
+   pill and an underline -- so this was the only one still carrying the phone look.
+
+   The values are measured off the captured AppKit reference (goldens/macos-aqua/DesktopTabs),
+   not chosen: selected #ffffff with #262626 text here, #6a6a6a with #ebebeb in the dark block
+   below. Note the label does NOT go white on selection on this platform. */
+Tab { color: #202020; background-color: transparent; border: none; padding: 1.6mm 3.2mm 1.6mm 3.2mm; margin: 0; }
+Tab.selected { color: #262626; background-color: #ffffff; border-radius: 1.59mm; padding: 1.6mm 3.2mm 1.6mm 3.2mm; margin: 0; }
+/* Dark text, because the fill is light. It read #ffffff on #e8e8e8 -- white on near-white. */
+Tab.pressed { color: #262626; background-color: #e8e8e8; padding: 1.6mm 3.2mm 1.6mm 3.2mm; margin: 0; }
 
 @media (prefers-color-scheme: dark) {
     Form { background-color: #323232; color: #ffffff; }
@@ -718,8 +728,10 @@ Tab.pressed { color: #ffffff; background-color: #e8e8e8; padding: 1.6mm 3.2mm 1.
     TabbedPane { background-color: transparent; padding: 0; margin: 0; }
     TabsContainer { background-color: #323232; padding: 0; margin: 0; }
     TabsContainerHost { background-color: #323232; padding: 0; margin: 0; }
-    Tab { color: #98989d; background-color: transparent; border: none; padding: 1.6mm 3.2mm 1.6mm 3.2mm; margin: 0; }
-    Tab.selected { color: #ffffff; background-color: #007aff; border-radius: 1.59mm; padding: 1.6mm 3.2mm 1.6mm 3.2mm; margin: 0; }
+    /* See the light rules: the selected tab is a grey pill, measured #6a6a6a/#ebebeb off the
+       reference, not the #007aff accent block this used to paint. */
+    Tab { color: #e1e1e1; background-color: transparent; border: none; padding: 1.6mm 3.2mm 1.6mm 3.2mm; margin: 0; }
+    Tab.selected { color: #ebebeb; background-color: #6a6a6a; border-radius: 1.59mm; padding: 1.6mm 3.2mm 1.6mm 3.2mm; margin: 0; }
     Tab.pressed { color: #ffffff; background-color: #3a3a3a; padding: 1.6mm 3.2mm 1.6mm 3.2mm; margin: 0; }
 
 }
