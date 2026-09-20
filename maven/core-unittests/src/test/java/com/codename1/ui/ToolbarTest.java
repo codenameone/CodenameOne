@@ -26,13 +26,16 @@ package com.codename1.ui;
 import com.codename1.junit.FormTest;
 import com.codename1.junit.TestLogger;
 import com.codename1.junit.UITestBase;
+import com.codename1.ui.animations.ComponentAnimation;
 import com.codename1.ui.events.ActionEvent;
+import com.codename1.ui.geom.Dimension;
 import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.FontImage;
 import com.codename1.ui.plaf.UIManager;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 
+import java.util.concurrent.Callable;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 
@@ -341,6 +344,138 @@ class ToolbarTest extends UITestBase {
             return ((java.util.Collection<?>) queue).contains(form);
         }
         return false;
+    }
+
+    /// A component that counts how many times it is painted, used below to detect the
+    /// form being drawn twice into one paint pass.
+    private static final class PaintCounter extends Component {
+        private int paints;
+
+        @Override
+        public void paint(Graphics g) {
+            paints++;
+        }
+
+        @Override
+        protected Dimension calcPreferredSize() {
+            return new Dimension(120, 40);
+        }
+    }
+
+    /// An animation that stays in progress for a fixed number of steps, so the animation
+    /// queue can be held busy while something else mutates the hierarchy.
+    private static final class BlockingAnimation extends ComponentAnimation {
+        private int remaining;
+
+        BlockingAnimation(int steps) {
+            this.remaining = steps;
+        }
+
+        @Override
+        public boolean isInProgress() {
+            return remaining > 0;
+        }
+
+        @Override
+        protected void updateState() {
+            remaining--;
+        }
+    }
+
+    /// Steps the animation queue the way `Display`'s EDT loop does, through
+    /// `Form.repaintAnimations()`, until `until` is met or the budget runs out.
+    ///
+    /// Deliberately not `AnimationManager.flush()`, which every other side-menu test here
+    /// uses. `flush()` is only reached when a form is deinitialized, and it applies each
+    /// animation directly rather than letting the manager complete it -- so a test that
+    /// drains with it never takes the code path that this one is about.
+    private void stepAnimations(Form form, Callable<Boolean> until, long budgetMs) {
+        long deadline = System.currentTimeMillis() + budgetMs;
+        while (System.currentTimeMillis() < deadline) {
+            form.flushRevalidateQueue();
+            form.repaintAnimations();
+            flushSerialCalls();
+            try {
+                if (Boolean.TRUE.equals(until.call())) {
+                    return;
+                }
+                Thread.sleep(8);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                return;
+            } catch (Exception e) {
+                fail("condition threw: " + e);
+            }
+        }
+    }
+
+    private static int paintsInOnePass(Form form, PaintCounter body) {
+        Image target = Image.createImage(form.getWidth(), form.getHeight());
+        body.paints = 0;
+        form.paintComponent(target.getGraphics(), true);
+        return body.paints;
+    }
+
+    /// Issue #4912 -- the form left "shaded" after the on-top side menu closes -- came
+    /// back, and the guard above did not see it.
+    ///
+    /// That guard disables the dispose animation so `detachToolbarLayeredPane` runs
+    /// synchronously inside `closeLeftSideMenu`, and so does the #4979 guard below it.
+    /// The synchronous path is the one case that never had the bug. On the animated path
+    /// the detach runs from the dispose animation's completion callback, and its
+    /// `cnt.remove()` is therefore a mutation made *while the animation manager is
+    /// running*: if anything else is still queued at that moment, `Container` takes it as
+    /// a deferred removal, whose whole payload lives in `updateState()`. The manager only
+    /// steps the head of the queue while `isInProgress()` is true, and a deferred mutation
+    /// reports false from the moment it is queued -- so it was completed without ever
+    /// being applied and the dim backdrop pane was never taken out of the form.
+    ///
+    /// A pane left behind is visible twice over. It is a black fill at ~31% over the whole
+    /// form, and it keeps the form level layered pane non-empty, which makes that pane
+    /// paint the entire form a second time inside the form's own pass, compositing every
+    /// translucent pixel twice. Both read as a permanently shaded form, on every platform,
+    /// for as long as that form instance lives (issue #5606).
+    @FormTest
+    void closingTheSideMenuWhileAnotherAnimationRunsDetachesTheDimBackdrop() {
+        implementation.setBuiltinSoundsEnabled(false);
+        Toolbar.setOnTopSideMenu(true);
+
+        final Form form = new Form("Shade", new BorderLayout());
+        final Toolbar toolbar = new Toolbar();
+        form.setToolbar(toolbar);
+        PaintCounter body = new PaintCounter();
+        form.add(BorderLayout.CENTER, body);
+        form.show();
+        flushSerialCalls();
+        toolbar.addCommandToSideMenu("Entry", null, evt -> { });
+        form.forceRevalidate();
+        flushSerialCalls();
+
+        assertEquals(1, paintsInOnePass(form, body),
+                "a form with nothing in its form level layered pane paints once per pass");
+
+        toolbar.openSideMenu();
+        stepAnimations(form, () -> !form.getAnimationManager().isAnimating(), 1200);
+        assertTrue(toolbar.isSideMenuShowing(), "Side menu should be showing after open");
+
+        toolbar.closeLeftSideMenu();
+        // Queued behind the dispose animation so the manager is still busy at the moment
+        // the dispose completion detaches the dim pane. Any real animation does this -- a
+        // ripple, an animateLayout, the transition of the form the command navigates to.
+        form.getAnimationManager().addAnimation(new BlockingAnimation(40));
+        stepAnimations(form, () -> !toolbar.isSideMenuShowing()
+                && form.getFormLayeredPaneIfExists() != null
+                && form.getFormLayeredPaneIfExists().getComponentCount() == 0, 2000);
+
+        assertFalse(toolbar.isSideMenuShowing(), "Side menu should be closed");
+        Container flp = form.getFormLayeredPaneIfExists();
+        assertNotNull(flp, "the form level layered pane exists once the side menu has used it");
+        assertEquals(0, flp.getComponentCount(),
+                "the side menu dim backdrop must be off the form once the menu is closed "
+                        + "(issue #4912/#5606 -- a layer left behind shades the form for good)");
+        assertEquals(1, paintsInOnePass(form, body),
+                "the form must still paint once per pass after the side menu is closed "
+                        + "(a second pass composites every translucent pixel twice)");
     }
 
     /// Regression test for issue #4979: tapping a command in the
