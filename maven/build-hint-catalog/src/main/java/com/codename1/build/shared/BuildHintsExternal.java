@@ -345,14 +345,6 @@ final class BuildHintsExternal {
                         + "testflight support in the release binaries for easy beta testing. Notice that the IDE "
                         + "plugin has a \"Test Flight\" check box you *should* use under the iOS section."));
 
-        h.add(new Hint("ios.xcode_version")
-                .group(HintGroup.IOS)
-                .type(HintType.STRING)
-                .platform("ios")
-                .external()
-                .doc("The version of Xcode used on the server. Defaults to 4.5; accepts 5.0 as an option and "
-                        + "nothing else."));
-
         h.add(new Hint("javascript.inject.afterHead")
                 .group(HintGroup.JAVASCRIPT)
                 .type(HintType.STRING)
