@@ -4434,3 +4434,85 @@ peak of that truncated run is 0.92GB at 0.6% spread, which looks exactly like a
 clean, stable measurement and supports a completely wrong story about the
 collector holding its best case. The column that caught it was a count of emitted
 .c files. Every peak figure in this round carries one.
+
+## Round 49: a native block pool, built and reverted
+
+Round 48 ended by proposing that the legacy heap and the native block allocator
+move off malloc. The block half was built and measured. It does not work, and
+the reason is worth more than the code was.
+
+### The attribution was right
+
+`[JHEAP]` reports malloc directly, which makes this cheap. Baseline at exit:
+`MALLOC inUse=575.39MB allocated=917.88MB idle=342.48MB` against `JAVA live
+591.73MB`. Rebuilding with `CN1_BLOCK_MMAP_THRESHOLD=256`, so every block
+bypasses malloc at an absurd cost in page waste, gave `inUse=147.93MB
+allocated=298.44MB idle=150.51MB` -- and a 4,990MB footprint, which is what
+mapping 128-byte blocks into 16KB pages costs.
+
+So small native blocks really are ~427MB of malloc's in-use and 56% of its
+retention. `[CAPHIST]` names them: 1,235,497 reference blocks of capacity <=16
+(128 bytes) and 312,183 tables of the same capacity (384 bytes) -- ArrayList
+backing stores, HashMap tables, String payloads. About 2.5 million calloc/free
+pairs per translation.
+
+### The pool
+
+Size-classed slots (23 classes, 32B..2KB) inside chunk-aligned mappings,
+outside the reserved window on purpose -- block memory has never been resolvable
+by cn1ConservativeResolve, and putting it in the window would make a stray stack
+word pointing into a block resolve to a fabricated object. Free finds the chunk
+by masking the slot address, so the non-mapping fallback had to be
+posix_memalign rather than calloc: cn1RefBlockFree picks its path from the same
+size test the allocator used, and a plain fallback would hand a pooled pointer
+to free().
+
+One bug in it, found by MapTorture2 on the first run and worth repeating because
+it is the shape this whole subsystem fails in: a chunk retired to the spare
+cache and then reused handed out the previous tenant's bytes, while
+cn1BlockAlloc promises calloc semantics. Fresh mmap is zeroed, so the bump path
+is right for a NEW chunk and wrong for a REUSED one, and a reference block filled
+that way is read by the marker as a page of object pointers.
+
+### And it is not a win
+
+Interleaved, every run verified at 2,933 emitted .c files.
+
+At four rounds it looked like one: median footprint -5.1%, max -8.9%, spread
+12.7% -> 6.3%, time flat. At EIGHT rounds:
+
+| arm | peak min | median | max | spread | elapsed min/med |
+|---|---:|---:|---:|---:|---:|
+| nopool | **1328MB** | 1488MB | **1585MB** | 19.4% | 5.26 / 5.35 |
+| pool (64KB chunks) | 1411MB | 1472MB | 1713MB | 21.4% | 5.27 / 5.41 |
+
+Medians 1% apart, no-pool better on BOTH the minimum and the maximum, spread
+unchanged, elapsed minima equal. The four-round variance reduction was noise,
+and it was predicted to be the kind of claim four samples can manufacture in the
+same session it was made.
+
+Why it cannot win, in hindsight: the pool held 250MB of chunks for 177MB of
+slots. A chunk returns to the OS only when EVERY slot in it dies, and with
+long-lived blocks scattered across 23 size classes, chunks stay partially
+occupied -- so malloc's fragmentation was replaced by the pool's, at the same
+total. 64KB chunks beat 256KB ones on release granularity (26% slack against
+29%, the same reason BiBOP pages are 64KB) and still did not clear the bar.
+
+Malloc's idle did not fall either: 342MB before, 293-391MB after. The retention
+that remains is driven by the LEGACY HEAP -- 134-168MB live, high turnover --
+which this pool does not touch. The threshold=256 attribution run removed that
+traffic too, which is why it looked like the blocks were responsible for all of
+it.
+
+REVERTED. Three hundred lines in the allocator, one silent-corruption failure
+mode already demonstrated, for nothing measurable. The rule that benchmarks
+guard rather than decide covers changes that are better in PRINCIPLE; this one
+trades one allocator's fragmentation for another's, and measurement is the only
+thing that could have said which wins.
+
+### What is left of the memory question
+
+At exit the footprint partitions roughly as: Java live 592MB, BiBOP slack
+183-219MB, malloc idle 342MB. The next candidate is therefore the BiBOP slack --
+34% of a managed heap, with 427-519 empty pages retained -- and the legacy heap's
+own malloc churn. Neither is the block allocator.
