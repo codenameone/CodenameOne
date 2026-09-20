@@ -4319,3 +4319,118 @@ The host has been at load 4-13 all session. perf-guard's last run came back at
 elapsed spread 26.8% and peak spread 15.0% against JDK 25's 3.4% and 2.3%, so neither
 axis gated and the 1.162x/1.037x it printed is not a figure. Round 45's 1.152x/1.064x
 remains the last trustworthy pair, and it predates rounds 46 and 47.
+
+## Round 48: frameless meets try/catch, and the memory gap turns out not to be the heap
+
+The third guardrail, and then the measurement that says what to do next.
+
+### Frameless codegen under try/catch
+
+21,251 -> 21,612 methods, with the extra frame emitted into the 353 that need it.
+What a frameless frame lacked was two NAMES the exception macros use --
+methodBlockOffset (END_TRY and JUMP_TO restore tryBlockOffset to it) and
+currentCodenameOneCallStackOffset (DEFINE_CATCH_BLOCK restores callStackOffset to
+it). Both are the entry value, and for a frameless frame that is also the value
+the method never changes, so the catch block's restore is a no-op for this frame
+and the right thing for any CALLEE frame a longjmp unwound through.
+
+The setjmp requirement was already met: volatileLocals is set by the same
+instruction scan and selects the _VSP frame variant. The only genuinely new part
+is that a RETURN out of a try block skips the end label where END_TRY would have
+run, so it unwinds the block stack itself.
+
+All three guardrails are now lifted:
+
+| guardrail | before | after |
+|---|---:|---:|
+| bounds-check elimination | 106 accesses | 438 |
+| StringBuilder stack allocation | 1,423 sites (78%) | 1,723 (95%) |
+| frameless codegen | 21,251 methods | 21,612 |
+
+### Whole-program: nothing, for the fourth round running
+
+1.175x then 1.162x against round 45's 1.152x, parpar elapsed spread 2.3-2.8%.
+All inside each other's noise; parpar's own minimum did not move (5.346s ->
+5.29-5.41s). Reported as a null result.
+
+### The memory axis is not the heap, and not the collector
+
+perf-guard has said for several rounds that peak is ungateable at 15-21% spread
+and called it collector pacing. It is not. Six standalone runs, each VERIFIED at
+2,933 emitted .c files and exit 0:
+
+| | min | median | max | spread |
+|---|---:|---:|---:|---:|
+| parpar peak | 1.431GB | ~1.49GB | 1.703GB | **19.0%** |
+| jdk25 peak | ~1.50GB | ~1.53GB | ~1.56GB | 3.2% |
+
+min/min 0.965x, median/median 0.974x, max/max 1.084x -- at or better than parity
+on a typical run, losing only on the tail, and perf-guard gates max-of-N.
+
+`[GCPROBE]`'s partition kills the pacing hypothesis in one run, which is exactly
+what the residual field was added for:
+
+| (last cycle) | run1 | run2 | run3 |
+|---|---:|---:|---:|
+| residentPgKb (page heap) | 609MB | 608MB | 617MB |
+| sideKb | 269MB | 273MB | 270MB |
+| legBlockKb | 133MB | 117MB | 136MB |
+| **residKb** | **437MB** | **443MB** | **668MB** |
+| footprint | 1442MB | 1461MB | 1698MB |
+
+The footprint swings 256MB and residKb swings 231MB of it. The page heap holds to
+1.5% while the process swings 19%, and maxMarkMs barely moves -- so the mutator
+is not running ahead of the collector, and a footprint TARGET would have been a
+fix for a mechanism that is not operating.
+
+### Where it actually is
+
+`vmmap --summary` at a verified 1.5GB peak:
+
+| region | size | dirty |
+|---|---:|---:|
+| VM_ALLOCATE (the reserved window -- BiBOP pages) | 812.6M | 683.3M |
+| MALLOC_SMALL | 608.0M | 596.3M |
+| MALLOC_SMALL (empty) | 152.0M | 151.5M |
+| MALLOC_LARGE | 89.5M | 79.6M |
+| MALLOC_LARGE (empty) | 75.6M | 69.4M |
+
+and the allocation census at exit: `bibop 457.28MB legacy 134.45MB | nativeBlocks
+270.17MB`, with byte[] the dominant live class at ~1300-1700 B/obj (class-file
+buffers and emitted C text, all over the 512-byte BiBOP limit) and 1.8M Strings
+at ~70 B/obj.
+
+Put together:
+
+| | live payload | dirty pages holding it |
+|---|---:|---:|
+| BiBOP page heap (reserved window) | 457MB | 683MB |
+| legacy heap + native blocks (MALLOC) | 404MB | 816MB |
+
+**The malloc side carries 2x overhead and it is the half that varies; the managed
+side carries 1.5x and does not move.** ~220MB of that is dirty memory malloc has
+already freed -- which is consistent with T2's finding that
+malloc_zone_pressure_relief never moved the peak in three configurations. You
+cannot ask malloc to return what its free lists hold; the traffic has to stop
+going there.
+
+So the next item is to route the LEGACY HEAP and the NATIVE BLOCK allocator
+through the same reserved window with size classes and madvise release, instead
+of malloc. The expected win is most of the 220MB of retention plus part of the 2x
+overhead -- but the reason to do it first is that it makes peak footprint
+REPRODUCIBLE, and until it is, this benchmark cannot resolve any memory change at
+all.
+
+Note the earlier plan's D1 aimed at taking BiBOP pages from mmap rather than
+malloc. That half is already done -- the pages come from the reserved window and
+are the stable half. The malloc user that remains is the block allocator.
+
+### A measurement that measured nothing
+
+Worth recording because it nearly became a finding. Run standalone without
+CN1_RESOURCE_PATH, the translator parses the whole corpus and then dies in
+copyRuntimeResource before emitting a single file -- exit 1, no .c written. The
+peak of that truncated run is 0.92GB at 0.6% spread, which looks exactly like a
+clean, stable measurement and supports a completely wrong story about the
+collector holding its best case. The column that caught it was a count of emitted
+.c files. Every peak figure in this round carries one.
