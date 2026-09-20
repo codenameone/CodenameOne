@@ -3928,9 +3928,57 @@ public class BytecodeMethod implements SignatureSet {
      * branches into the body bypassing the test. Any construct we don't model
      * precisely (try/catch, switch, computed jumps, non-constant init) bails.
      */
+    /* BOUNDS-CHECK ELIMINATION CENSUS (-Dcn1.bceCensus=true).
+     *
+     * The other two guardrails this method's javadoc names -- frameless codegen and
+     * StringBuilder stack allocation -- have both been counted, and the answers were
+     * 1% of methods and 17% of sites. This one never was, and it is the one that
+     * costs a compare and a branch on every array access rather than a frame or an
+     * allocation. Count what try/catch alone refuses before deciding it is worth
+     * modelling exception edges to recover.
+     */
+    static final boolean BCE_CENSUS =
+            "true".equalsIgnoreCase(Util.getProperty("cn1.bceCensus", "false"));
+    static int bceMethods, bceMethodsWithArrays, bceRefusedTryCatch, bceRefusedOther,
+               bceArrayOpsTotal, bceArrayOpsRefusedTryCatch;
+
+    private int countArrayOps() {
+        int c = 0;
+        for (Instruction in : instructions) {
+            int op = in.getOpcode();
+            if (op == Opcodes.IALOAD || op == Opcodes.AALOAD || op == Opcodes.BALOAD
+                    || op == Opcodes.CALOAD || op == Opcodes.SALOAD || op == Opcodes.LALOAD
+                    || op == Opcodes.FALOAD || op == Opcodes.DALOAD
+                    || op == Opcodes.IASTORE || op == Opcodes.AASTORE || op == Opcodes.BASTORE
+                    || op == Opcodes.CASTORE || op == Opcodes.SASTORE || op == Opcodes.LASTORE
+                    || op == Opcodes.FASTORE || op == Opcodes.DASTORE) {
+                c++;
+            }
+        }
+        return c;
+    }
+
     void analyzeBoundsChecks() {
         if (DISABLE_BCE) {
             return;
+        }
+        if (BCE_CENSUS && !nativeMethod && !abstractMethod && !eliminated) {
+            int ops = countArrayOps();
+            bceMethods++;
+            bceArrayOpsTotal += ops;
+            if (ops > 0) {
+                bceMethodsWithArrays++;
+                boolean tc = TryCatch.isTryCatchInMethod();
+                if (!tc) {
+                    for (Instruction in : instructions) {
+                        if (in instanceof TryCatch) { tc = true; break; }
+                    }
+                }
+                if (tc) {
+                    bceRefusedTryCatch++;
+                    bceArrayOpsRefusedTryCatch += ops;
+                }
+            }
         }
         // View without LineNumber noise but keeping labels for back-edge detection.
         java.util.ArrayList<Instruction> r = new java.util.ArrayList<Instruction>(instructions.size());

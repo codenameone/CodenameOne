@@ -501,6 +501,16 @@ public class Parser extends ClassVisitor {
                     + (sites > 0 ? "  (tryCatch alone refuses "
                         + (100 * BytecodeMethod.sbCensusBailTryCatch / sites) + "% of sites)" : ""));
         }
+        if (BytecodeMethod.BCE_CENSUS) {
+            int ops = BytecodeMethod.bceArrayOpsTotal;
+            System.out.println("[BCE] methods=" + BytecodeMethod.bceMethods
+                + " withArrayOps=" + BytecodeMethod.bceMethodsWithArrays
+                + " refusedByTryCatch=" + BytecodeMethod.bceRefusedTryCatch
+                + " arrayOps=" + ops
+                + " arrayOpsInRefusedMethods=" + BytecodeMethod.bceArrayOpsRefusedTryCatch
+                + (ops > 0 ? "  (" + (100 * BytecodeMethod.bceArrayOpsRefusedTryCatch / ops)
+                    + "% of array accesses sit in a method try/catch disables)" : ""));
+        }
         if (BytecodeMethod.FRAMELESS_CENSUS) {
             int t = BytecodeMethod.censusTotal;
             System.out.println("[FRAMELESS] methods=" + t
