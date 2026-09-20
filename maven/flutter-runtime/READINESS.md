@@ -153,11 +153,22 @@ The floor had been fixed once so `steps: 0` could express a tap; the DEFAULT was
 
 The Dismissible verdict stands -- it was taken with a genuine multi-step swipe.
 
-### Open, and real: the Cupertino picker's popup renders wrong
+### Open, and real: the Cupertino pickers are stubs
 
-The popup opens and presents, but the picker inside it draws as a narrow vertical white
-pill rather than a wheel. The tap, the route to `showCupertinoModalPopup` and
-`Dialogs.showDialog` are all sound; this is a layout defect in the picker's content.
+The presentation is fixed -- a modal popup now rises from the bottom edge and spans the
+screen, dismissible by touching outside it. What it contains is not:
+
+| Widget | State |
+|---|---|
+| `CupertinoDatePicker` | `build()` returns a bare `Container` -- the sheet comes up empty |
+| `CupertinoPicker` | `build()` returns a plain `Column` of the children: no wheel, no `itemExtent`, no magnification, and `onSelectedItemChanged` is never called |
+| `CupertinoTimerPicker` | same shape |
+
+These are unimplemented widgets rather than wiring faults, and a faithful wheel --
+`itemExtent`, `magnification`, `squeeze`, momentum, selection tracking -- is a piece of
+work in its own right. **None of it is visible to the sweep**, which photographs settled
+routes: the picker rows themselves render correctly and the wheel only ever appears
+inside the popup.
 
 ## 3. Structural gaps
 
