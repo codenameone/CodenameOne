@@ -4889,3 +4889,77 @@ as "the check passed". Both arms emit `IOBENCH VERIFY OK bytes=4096`.
 That is the fourth instance in four rounds of a check that could report success
 without having run. It is worth treating as the default hypothesis about any
 green result in this tree, not as a recurring surprise.
+
+---
+
+## Round 31: "we win on every method" was false, and allocation is the gap
+
+Rounds 28-30 each closed a line of inquiry by showing we were already at parity
+or ahead -- inlining, dispatch, file I/O. The conclusion drawn from that ("we are
+winning on every method, yet losing the total") is not a paradox, it is a
+selection error: those were the arms CHOSEN, and they were not the ones that
+lose. The suite that already existed says so plainly.
+
+`run-benchmark.sh 5`, all checksums bit-identical to JDK 25:
+
+| bench | ratio | | bench | ratio |
+|---|---:|---|---|---:|
+| **objectAllocation** | **3.71x** | | arrayRandom | 0.96 |
+| **recursion** | **1.97x** | | mathTranscendental | 0.93 |
+| **stringBuilding** | **1.72x** | | quicksort | 0.92 |
+| **hashMapChurn** | **1.57x** | | valueEscape | 0.54 |
+| longArithmetic | 1.09 | | intArithmetic | 1.04 |
+| arraySequential | 1.05 | | **GEOMEAN** | **1.24x** |
+
+The four losses are exactly what a translator does all day, which is also why the
+self-hosting profile is FLAT: allocation cost is smeared across every function
+instead of sitting in one, so no profile entry exceeds 7%. A flat profile was
+read for two rounds as "no single thing to fix" when it actually meant "one thing
+to fix, everywhere".
+
+It also collapses two problems into one. Allocation being slow and peak memory
+being high are the same root -- object representation and the allocation path --
+not separate axes to attack separately.
+
+### What the bump does that a TLAB bump does not
+
+`cn1BibopFastAlloc` is already inlined by default (the `-DCN1_INLINE_ALLOC`
+comment at cn1_globals.h:2057 is STALE; the real guard is the negative
+`CN1_DISABLE_INLINE_ALLOC`). Per object it still pays:
+
+- a `memset` of the body
+- TWO store-releases: the mark word, and the bump cursor (`stlr` on arm64)
+- a class-registry flag test and three guard loads
+
+HotSpot pays none of these per object: its TLAB top is a plain store, and the
+TLAB is bulk-zeroed at refill. The global counters here were already batched per
+page-acquire, so they are not the problem.
+
+### The zeroing half, measured
+
+`cbench/test_alloc_zero.c`, interleaved arms, consumer touches every body so no
+arm can skip work it is supposed to do:
+
+| slot bytes | perObject | bulkPage | noZero | bulk/perObject |
+|---:|---:|---:|---:|---:|
+| 32 | 1.95ms | 0.51ms | 0.36ms | **0.26x** |
+| 48 | 1.65ms | 0.47ms | 0.32ms | **0.28x** |
+| 96 | 0.62ms | 0.46ms | 0.28ms | 0.74x |
+
+Zeroing a 64KB page once costs about a quarter of zeroing its objects one at a
+time, and lands close to not zeroing at all -- so bulk captures most of what is
+available. This is HotSpot's own answer (bulk-zero at refill), not a new idea.
+
+Two things this does NOT yet establish, and they gate any change:
+
+- what FRACTION of the 3.71x is zeroing rather than the two `stlr` and the guard
+  loads. The isolated arm says the zeroing is worth ~4x on itself, not that
+  allocation gets 4x faster.
+- whether a page can be bulk-zeroed safely. Arena pages come from
+  `cn1HeapWindowCarve` (mmap, OS-zeroed on first touch) so a FRESH page may need
+  no zeroing at all, but a RECYCLED page holds dead occupants, and the per-object
+  memset comment records that skipping it was measured 2x SLOWER via floating
+  garbage in the mark==-1 grace window. The free-list path must keep its zero.
+
+Next measurement, before any edit: split the 3.71x into zeroing / ordering /
+guard components by ablating each in a scratch build.
