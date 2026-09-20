@@ -37,7 +37,7 @@ import dart.runtime.Funcs;
  * wheel is not modeled this pass; the item widgets are laid out as a vertical
  * {@link Column} (approximate). The selection callback is captured.
  */
-public class CupertinoPicker extends StatelessWidget {
+public class CupertinoPicker extends Widget {
 
     private DartList<Widget> children;
     private Funcs.VoidFunc1<Long> onSelectedItemChanged;
@@ -71,12 +71,16 @@ public class CupertinoPicker extends StatelessWidget {
         this.children = v;
     }
 
+    DartList<Widget> getChildren() {
+        return children;
+    }
+
+    Funcs.VoidFunc1<Long> getOnSelectedItemChanged() {
+        return onSelectedItemChanged;
+    }
+
     @Override
-    public Widget build(BuildContext context) {
-        Column col = new Column();
-        if (children != null) {
-            col.children(children);
-        }
-        return col;
+    public com.codename1.flutter.Element createElement() {
+        return new CupertinoPickerRenderElement(this);
     }
 }

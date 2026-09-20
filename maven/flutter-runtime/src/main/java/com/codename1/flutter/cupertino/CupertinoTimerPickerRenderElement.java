@@ -23,55 +23,45 @@
  */
 package com.codename1.flutter.cupertino;
 
-import com.codename1.flutter.BuildContext;
-import com.codename1.flutter.Color;
-import com.codename1.flutter.StatelessWidget;
 import com.codename1.flutter.Widget;
-import com.codename1.flutter.widgets.Container;
+import com.codename1.ui.Container;
+import com.codename1.ui.spinner.DurationSpinner3D;
 
 import dart.core.Duration;
-import dart.runtime.Funcs;
 
 /**
- * The iOS countdown-timer wheel — Flutter's {@code CupertinoTimerPicker}. Like
- * {@link CupertinoDatePicker}, the wheel is not modeled this pass; it composes
- * an empty {@link Container} placeholder and captures the change callback.
+ * {@link CupertinoTimerPicker}: Codename One's duration wheel, in hours, minutes and
+ * seconds -- which is what the Cupertino timer picker's default mode shows.
  */
-public class CupertinoTimerPicker extends Widget {
+class CupertinoTimerPickerRenderElement extends CupertinoWheelRenderElement {
 
-    private Duration initialTimerDuration;
-    private Funcs.VoidFunc1<Duration> onTimerDurationChanged;
+    private static final long MILLIS_PER_MICRO = 1000;
 
-    public void backgroundColor(Color v) {
+    CupertinoTimerPickerRenderElement(Widget widget) {
+        super(widget);
     }
 
-    public void mode(Object v) {
-    }
-
-    public void initialTimerDuration(Duration v) {
-        this.initialTimerDuration = v;
-    }
-
-    public void minuteInterval(long v) {
-    }
-
-    public void secondInterval(long v) {
-    }
-
-    public void onTimerDurationChanged(Funcs.VoidFunc1<Duration> v) {
-        this.onTimerDurationChanged = v;
-    }
-
-    Duration getInitialTimerDuration() {
-        return initialTimerDuration;
-    }
-
-    Funcs.VoidFunc1<Duration> getOnTimerDurationChanged() {
-        return onTimerDurationChanged;
+    private CupertinoTimerPicker picker() {
+        return (CupertinoTimerPicker) widget();
     }
 
     @Override
-    public com.codename1.flutter.Element createElement() {
-        return new CupertinoTimerPickerRenderElement(this);
+    protected Container createWheel() {
+        DurationSpinner3D d = new DurationSpinner3D(DurationSpinner3D.FIELD_HOUR
+                | DurationSpinner3D.FIELD_MINUTE | DurationSpinner3D.FIELD_SECOND);
+        Duration initial = picker().getInitialTimerDuration();
+        if (initial != null) {
+            d.setValue(Long.valueOf(initial.inMicroseconds() / MILLIS_PER_MICRO));
+        }
+        return d;
+    }
+
+    @Override
+    protected void report(Object value) {
+        dart.runtime.Funcs.VoidFunc1<Duration> f = picker().getOnTimerDurationChanged();
+        if (f == null || !(value instanceof Long)) {
+            return;
+        }
+        f.call(Duration.ofMicroseconds(((Long) value).longValue() * MILLIS_PER_MICRO));
     }
 }

@@ -26,7 +26,7 @@ package com.codename1.ui.spinner;
 /// by the Picker.
 ///
 /// @author shannah
-interface InternalPickerWidget {
+public interface InternalPickerWidget {
     Object getValue();
 
     void setValue(Object value);

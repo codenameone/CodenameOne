@@ -41,7 +41,7 @@ import static com.codename1.ui.CN.convertToPixels;
 /// Used by Picker in lightweight mode.
 ///
 /// @author Steve Hannah
-class DateTimeSpinner3D extends Container implements InternalPickerWidget {
+public class DateTimeSpinner3D extends Container implements InternalPickerWidget {
     private final Date today = new Date();
     private final int off;
     private final Container wrapper = new Container(BoxLayout.x());

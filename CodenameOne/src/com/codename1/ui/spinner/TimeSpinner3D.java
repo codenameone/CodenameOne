@@ -42,7 +42,7 @@ import static com.codename1.ui.CN.convertToPixels;
 /// users to set a duration in hours and minutes.
 ///
 /// @author Steve Hannah
-class TimeSpinner3D extends Container implements InternalPickerWidget {
+public class TimeSpinner3D extends Container implements InternalPickerWidget {
 
     static final int DEFAULT_MINUTE_STEP = 5;
     private Spinner3D hour;

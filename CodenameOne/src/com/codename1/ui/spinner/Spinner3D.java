@@ -32,7 +32,7 @@ import static com.codename1.ui.ComponentSelector.$;
 /// This is used by the Picker widget when in lightweight mode.
 ///
 /// @author Steve Hannah
-class Spinner3D extends Container implements InternalPickerWidget {
+public class Spinner3D extends Container implements InternalPickerWidget {
     private final SpinnerNode root;
 
     private final ScrollingContainer scroller;

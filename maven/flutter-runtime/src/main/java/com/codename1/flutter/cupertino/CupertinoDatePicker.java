@@ -38,7 +38,7 @@ import dart.runtime.Funcs;
  * placeholder while keeping the correct API shape (mode / initial value / the
  * change callback are captured).
  */
-public class CupertinoDatePicker extends StatelessWidget {
+public class CupertinoDatePicker extends Widget {
 
     private CupertinoDatePickerMode mode;
     private DateTime initialDateTime;
@@ -77,8 +77,20 @@ public class CupertinoDatePicker extends StatelessWidget {
         this.onDateTimeChanged = v;
     }
 
+    CupertinoDatePickerMode getMode() {
+        return mode;
+    }
+
+    DateTime getInitialDateTime() {
+        return initialDateTime;
+    }
+
+    Funcs.VoidFunc1<DateTime> getOnDateTimeChanged() {
+        return onDateTimeChanged;
+    }
+
     @Override
-    public Widget build(BuildContext context) {
-        return new Container();
+    public com.codename1.flutter.Element createElement() {
+        return new CupertinoDatePickerRenderElement(this);
     }
 }
