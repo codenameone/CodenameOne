@@ -347,11 +347,18 @@ final class BuildHintsExternal {
 
         h.add(new Hint("ios.xcode_version")
                 .group(HintGroup.IOS)
-                .type(HintType.STRING)
+                .type(HintType.VERSION)
                 .platform("ios")
                 .external()
-                .doc("The version of Xcode used on the server. Defaults to 4.5; accepts 5.0 as an option and "
-                        + "nothing else."));
+                .doc("Which Xcode the build server compiles with, as a major version (`26`, `27`) or a "
+                        + "major.minor (`27.1`). Unset takes the server's default -- 27 -- and falls back to "
+                        + "the newest Xcode that server carries, so a build never fails merely because the "
+                        + "preferred one is absent. An explicit version the server does not have fails the "
+                        + "build instead, naming the ones it does: every build server is meant to carry the "
+                        + "same Xcodes, so that is a server to report rather than a hint to tune. `12.4` and "
+                        + "`11.3` still name the legacy toolchains; every other pre-26 value is a leftover "
+                        + "from when this hint selected an Xcode 7 to 12 and no longer builds. Local builds "
+                        + "ignore this and use the Xcode `xcode-select` points at."));
 
         h.add(new Hint("javascript.inject.afterHead")
                 .group(HintGroup.JAVASCRIPT)
