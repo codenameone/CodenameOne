@@ -490,8 +490,20 @@ public class TextFieldRenderElement extends RenderElement {
         if (radiusPx > 0) {
             com.codename1.ui.plaf.RoundRectBorder b = com.codename1.ui.plaf.RoundRectBorder.create()
                     .cornerRadius(radiusPx / com.codename1.ui.Display.getInstance().convertToPixels(1f))
-                    .strokeOpacity(0)
                     .shadowOpacity(0);
+            // An OUTLINE, which is what the name says. It was built with strokeOpacity 0 --
+            // a rounded background and no line -- so a field whose whole decoration IS its
+            // outline had none: Shrine's login states a CutCornersBorder on its theme and
+            // rendered as two labels loose on a white page.
+            com.codename1.flutter.BorderSide side = sideOf(stated);
+            if (side != null && side.color() != null && side.width() > 0) {
+                b = b.strokeColor(side.color().rgb())
+                        .strokeOpacity(side.color().alpha())
+                        .stroke((float) Math.max(1, Math.round(
+                                com.codename1.flutter.rendering.Dp.px(side.width()))), false);
+            } else {
+                b = b.strokeOpacity(0);
+            }
             all.setBorder(b);
         } else if (stated == com.codename1.flutter.InputBorder.none) {
             all.setBorder(com.codename1.ui.plaf.Border.createEmpty());
@@ -544,6 +556,14 @@ public class TextFieldRenderElement extends RenderElement {
             // fall through
         }
         return 0x757575;
+    }
+
+    /// The side an input border draws itself with, or null when it states none.
+    private static com.codename1.flutter.BorderSide sideOf(Object border) {
+        if (!(border instanceof com.codename1.flutter.OutlineInputBorder)) {
+            return null;
+        }
+        return ((com.codename1.flutter.OutlineInputBorder) border).borderSide();
     }
 
     /** The outline's corner radius in device pixels, or 0 when it has none. */
