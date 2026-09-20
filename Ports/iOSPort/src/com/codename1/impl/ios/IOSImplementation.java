@@ -10626,6 +10626,23 @@ public class IOSImplementation extends CodenameOneImplementation {
         if(key.equalsIgnoreCase("cn1.nativeRedirects")) {
             return "true";
         }
+        // The ios.themeGeneration build hint, read back. iOS has no generic
+        // build-hint bridge -- getProperty answers a fixed key list and the
+        // generated stub's static setter is the only way a hint reaches the
+        // device -- so a hint the port already stores is invisible to the
+        // application unless it is answered here. The fidelity harness needs
+        // exactly this: it installs the native theme itself rather than through
+        // installNativeTheme, so without a readable generation it always scored
+        // the iOS 26 theme, including against the iOS 27 goldens.
+        if(key.equalsIgnoreCase("ios.themeGeneration")) {
+            return iosThemeGeneration;
+        }
+        // The theme resource that generation selects, so a caller that wants the
+        // file rather than the number does not have to re-derive the mapping and
+        // risk disagreeing with installNativeTheme about it.
+        if(key.equalsIgnoreCase("cn1.nativeThemeResource")) {
+            return "/" + modernThemeResourceName() + ".res";
+        }
         if(key.equalsIgnoreCase("OS")) {
             return "iOS";
         }

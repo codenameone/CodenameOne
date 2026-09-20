@@ -26,10 +26,31 @@ case "$PLATFORM" in
     #
     # It rides IOS_DEPENDENCY_ARGS because that is the only channel
     # build-ios-app.sh forwards to the inner mvnw -- its positional arguments go
-    # nowhere. -Dcodename1.arg.<hint> does reach the builder from there;
-    # verified by reading the constant pool the generated stub indexes into,
-    # which is the only place the value is observable (the stub itself stores
-    # pool INDICES and is byte-identical between generations).
+    # nowhere.
+    #
+    # SETTING THE HINT IS NOT ENOUGH, and the ways it silently does nothing all
+    # look identical from here: two runs whose scores match to the last decimal,
+    # which reads as "the theme change had no effect" rather than "the theme was
+    # never loaded". Every one of these was hit in practice:
+    #
+    #   - The suite installs its own theme (FidelityDeviceRunner.resolveThemeResource)
+    #     instead of going through IOSImplementation.installNativeTheme, and used
+    #     to hardcode generation 26. It now asks the port.
+    #   - iOS has no generic build-hint bridge, so the hint only reaches the device
+    #     as a static setter IPhoneBuilder writes into the generated stub. A stale
+    #     codenameone-maven-plugin simply omits it.
+    #   - The inner mvnw resolves that plugin from whatever localRepository is
+    #     configured -- a machine-wide /tmp/cn1-local-repo shared between checkouts
+    #     will hand it another checkout's jar. Pass -Dmaven.repo.local here too.
+    #   - The generated stub is a plugin OUTPUT, and Maven does not know a plugin
+    #     change invalidates it; an incremental build happily reuses the old stub.
+    #
+    # Checking that the hint's VALUE appears in the generated constant pool proves
+    # none of this -- it only proves the string was interned. The two checks that
+    # actually settle it:
+    #
+    #   grep setIosThemeGeneration <ios-source>/*-src/*Stub.m
+    #   grep 'installed theme' artifacts/ios-fidelity/simctl-log.txt
     case "${CN1SS_FIDELITY_GOLDEN_SET:-}" in
       ios-27-*)
         export IOS_DEPENDENCY_ARGS="${IOS_DEPENDENCY_ARGS:-} -Dcodename1.arg.ios.themeMode=modern -Dcodename1.arg.ios.themeGeneration=27"
