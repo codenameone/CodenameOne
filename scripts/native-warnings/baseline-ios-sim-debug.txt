@@ -29,7 +29,9 @@ port|Ports/iOSPort/nativeSources/CN1Camera.m|-Wdeprecated-declarations|? is depr
 port|Ports/iOSPort/nativeSources/CN1Crypto.m|-Warc-bridge-casts-disallowed-in-nonarc|? casts have no effect when not using ARC|10 instance(s) when the baseline was written; not yet triaged
 port|Ports/iOSPort/nativeSources/CN1Crypto.m|-Wunused-variable|unused variable ?|2 instance(s) when the baseline was written; not yet triaged
 port|Ports/iOSPort/nativeSources/CN1DragAndDrop.m|-Wunused-variable|unused variable ?|1 instance(s) when the baseline was written; not yet triaged
+port|Ports/iOSPort/nativeSources/CN1GL3D.m|-Warc-bridge-casts-disallowed-in-nonarc|? casts have no effect when not using ARC|8 instance(s) when the Metal renderer became the only one; this file compiled to nothing on the GL census leg
 port|Ports/iOSPort/nativeSources/CN1Language.m|-Wunused-function|unused function ?|2 instance(s) when the baseline was written; not yet triaged
+port|Ports/iOSPort/nativeSources/CN1Metalcompat.h|-Wnullability-completeness|pointer is missing a nullability type specifier (_Nonnull, _Nullable, or _Null_unspecified)|3 instance(s) when the Metal renderer became the only one; this file compiled to nothing on the GL census leg
 port|Ports/iOSPort/nativeSources/CN1SoundPool.m|-Wobjc-multiple-method-names|multiple methods named ? found|2 instance(s) when the baseline was written; not yet triaged
 port|Ports/iOSPort/nativeSources/CN1TapGestureRecognizer.m|-Wshorten-64-to-32|implicit conversion loses integer precision: ? (aka ?) to ?|5 instance(s) when the baseline was written; not yet triaged
 port|Ports/iOSPort/nativeSources/CN1TextInputView.m|-Wdeprecated-declarations|? is deprecated: first deprecated in iOS ?|3 instance(s) when the baseline was written; not yet triaged
