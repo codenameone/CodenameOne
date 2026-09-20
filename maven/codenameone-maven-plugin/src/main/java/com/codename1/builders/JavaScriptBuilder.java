@@ -55,6 +55,7 @@ public class JavaScriptBuilder extends Executor {
     private File jsDistDir;
     private File jsOutputZip;
     private File jsDeployableArtifact;
+    private File[] jsBuildArtifacts = new File[0];
     // Directory holding the JavaScript-port web assets (port.js, js/, style.css,
     // ...) for this build. Handed to the translator via the
     // -Dcodename1.javascriptport.webapp override so it bundles port.js (the
@@ -87,6 +88,50 @@ public class JavaScriptBuilder extends Executor {
 
     public File getJavaScriptDeployableArtifact() {
         return jsDeployableArtifact;
+    }
+
+    /**
+     * The artifacts the translator writes BESIDE the bundle: the deployment configuration the
+     * developer activates by hand, and the suspension report.
+     *
+     * <p>They are deliberately not in the bundle -- it is a web root, and the zip above unpacks
+     * straight into one -- but that leaves them inside the build directory, which
+     * {@code Executor.cleanup()} deletes when the build ends. A caller that wants the developer
+     * to ever see them has to copy them out before then.</p>
+     *
+     * @return the artifacts that exist, possibly none, never null
+     */
+    public File[] getJavaScriptBuildArtifacts() {
+        return jsBuildArtifacts.clone();
+    }
+
+    /**
+     * The sidecar artifacts for {@code distDir}, by the names the translator derives from the
+     * bundle directory's own name (see {@code JavascriptBundleWriter.sidecar}).
+     *
+     * <p>Named rather than "every sibling of the bundle" on purpose: when the rename below
+     * cannot use {@code renameTo} it copies instead and leaves the original bundle sitting
+     * beside the new one, and a sibling sweep would then pick up a whole second copy of the
+     * application.</p>
+     *
+     * @param distDir the bundle directory the translator produced
+     * @return the ones that exist, in a stable order
+     */
+    static File[] locateBuildArtifacts(File distDir) {
+        File parent = distDir.getAbsoluteFile().getParentFile();
+        if (parent == null) {
+            return new File[0];
+        }
+        String prefix = distDir.getAbsoluteFile().getName() + "-";
+        List<File> found = new ArrayList<File>();
+        String[] names = new String[] {"cn1-security", "suspension-report.txt"};
+        for (String name : names) {
+            File f = new File(parent, prefix + name);
+            if (f.exists()) {
+                found.add(f);
+            }
+        }
+        return found.toArray(new File[found.size()]);
     }
 
     @Override
@@ -169,6 +214,9 @@ public class JavaScriptBuilder extends Executor {
                 error("Translator did not produce a JS bundle under " + translatorOut, null);
                 return false;
             }
+            // Captured BEFORE the rename below, because the translator names these after the
+            // bundle directory it wrote, and that is the name the rename replaces.
+            jsBuildArtifacts = locateBuildArtifacts(distDir);
             mergeTranslatorRootResources(translatorOut, distDir);
 
             File finalDist = new File(translatorOut, "dist" + File.separator + request.getMainClass() + "-js");

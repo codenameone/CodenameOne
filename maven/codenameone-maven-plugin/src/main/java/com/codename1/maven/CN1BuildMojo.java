@@ -2658,6 +2658,26 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
                 projectHelper.attachArtifact(project, extension, classifier, copyTo);
                 getLog().info("JavaScript deployable bundle written to " + copyTo);
             }
+            // The translator writes its deployment configuration and its build report BESIDE
+            // the bundle rather than inside it, so unpacking the zip into a web root cannot
+            // publish them. The zip copied above is all that leaves the build directory, and
+            // the finally below deletes that directory outright -- without this the developer
+            // never sees either artifact at all. They are copied, not attached: host
+            // configuration is not something to publish to a Maven repository.
+            for (File artifact : e.getJavaScriptBuildArtifacts()) {
+                File copyTo = new File(project.getBuild().getDirectory(), artifact.getName());
+                try {
+                    if (artifact.isDirectory()) {
+                        FileUtils.copyDirectory(artifact, copyTo);
+                    } else {
+                        FileUtils.copyFile(artifact, copyTo);
+                    }
+                } catch (IOException ex) {
+                    throw new MojoExecutionException("Failed to copy JavaScript build artifact to "
+                            + copyTo, ex);
+                }
+                getLog().info("JavaScript build artifact written to " + copyTo);
+            }
         } catch (BuildException ex) {
             String builderLog = e.getErrorMessage();
             if (builderLog != null && builderLog.trim().length() > 0) {
