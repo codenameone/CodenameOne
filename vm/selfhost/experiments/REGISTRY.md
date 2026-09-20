@@ -5004,3 +5004,71 @@ in two sessions an hour apart. That file was read THIS SESSION for its memory
 metric rule, and the benchmark warning in it was not applied. Before quoting a
 ratio from this suite: name the hardware, and check the recorded baseline was
 taken on it.
+
+---
+
+## Round 32: two real regressions, found after an entire bisect run on the wrong baseline
+
+### The error first
+
+Eight benchmark runs were spent attributing a `stringBuilding` regression to this
+session's first commit. The baseline used, `003228c750`, was taken from a
+`git status` snapshot at the top of the session and assumed to be the parent of
+that commit. **It is not**: `7a3bcebb68^` is `5db4686983`, and roughly SEVENTY
+commits separate them (Rounds 28-49 -- fused Strings, the BiBOP ceiling,
+devirtualization, frameless constructors, the array-header work).
+
+So every "before my session" comparison actually compared one commit against code
+70 revisions older, and then blamed the three files in that commit. That is why
+reverting each of them in turn -- `cn1_globals.h`, `nativeMethods.m`,
+`ArrayList.java` -- changed nothing: none of them ever could have. Three
+consecutive "the only remaining culprit is impossible" results were evidence the
+ENDPOINTS were wrong, and each one was read instead as "try the next file".
+
+**Verify the baseline is the parent before the first bisect step**, with
+`git rev-parse <commit>^`, not from a status line.
+
+### What is actually true
+
+Measured against `5db4686983`, the real pre-session commit:
+
+| bench | true baseline | HEAD | verdict |
+|---|---:|---:|---|
+| stringBuilding | 18.4ms | 18.5ms | unchanged |
+| hashMapChurn | 20.7ms | 21.0ms | unchanged |
+| arraySequential | 8.9ms | 9.0ms | unchanged |
+| objectAllocation | 31.8ms | 27.0-32.8ms | unmeasurable |
+| GEOMEAN | 1.26x | 1.25x | marginally better |
+
+This session changed nothing measurable, in either direction.
+
+### The regressions that ARE real, and where they live
+
+Tracked across four points on THIS M4 Max (parpar ms -- the parpar column only;
+the host column swings ~50% on these short benchmarks and its ratios are noise):
+
+| bench | Jul `9c7affa412` | R25 `003228c750` | base `5db4686983` | HEAD |
+|---|---:|---:|---:|---:|
+| **stringBuilding** | 15.3 | **12.7** | **18.4** | 18.5 |
+| **hashMapChurn** | **14.9** | 20.2 | 20.7 | 21.0 |
+| arraySequential | 16.1 | 16.2 | **8.9** | 9.0 |
+
+- `stringBuilding` **12.7 -> 18.4ms (+45%)**, inside Rounds 28-49.
+- `hashMapChurn` **14.9 -> 20.2ms (+36%)**, between July and Round 25.
+- `arraySequential` 16.2 -> 8.9ms, a real 1.8x WIN in the same window.
+
+So the String and collection representation work bought one benchmark and cost
+two, and nothing in the tree recorded it -- the geomean stayed flat because the
+win cancelled the losses, which is exactly how an aggregate hides this.
+
+### Which numbers can be trusted here
+
+- `stringBuilding` repeats to **+/-1%** (12.7, 12.8, 12.9 on one build). Usable.
+- `objectAllocation` measured **21.6, 35.9, 36.3ms on ONE binary** -- a 68%
+  swing. Every delta quoted from it in Rounds 30-31 is void. Its ~3-5x gap
+  against HotSpot is consistent and real; no change in it is measurable.
+- RATIOS are unreliable: the host column moved 9.3 -> 13.9ms between runs of the
+  same benchmark. Read the parpar millisecond column.
+
+Next: bisect `stringBuilding` across Rounds 28-49 with the parpar column and a
+verified parent at each step.
