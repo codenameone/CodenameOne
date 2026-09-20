@@ -50,9 +50,9 @@ function attribute(tag, name) {
 
 // The CI targets the compliance matrix renders a column for, and the platform
 // name each one's tooltip must carry. This is also where the expected target
-// COUNT comes from: it used to be spelled 12 in two unrelated assertions, and
-// removing a target left one of them failing and the other quietly passing on
-// a stale number.
+// COUNT comes from: it used to be spelled 12 in three unrelated assertions,
+// and removing a target failed them one CI round at a time -- each fix
+// revealing the next, because nothing tied the number to the list it counts.
 const PLATFORM_NAMES = {
     "android": "Android",
     "ios-metal": "iOS",
@@ -127,8 +127,8 @@ function validate() {
     const featureRows = countMatches(page, /\bdata-feature-row(?:=|\s|>)/g);
     const featureCells = countMatches(page, /\bdata-feature-cell(?:=|\s|>)/g);
     const mappedTests = countMatches(page, /<li><code>[^<]+<\/code><\/li>/g);
-    if (portCards !== 12 || !/data-port-card=(?:["']?windows-arm64["']?)(?:\s|>)/i.test(page)) {
-        fail(`generated ${portCards} port cards or omitted Windows ARM64; expected 12 targets`);
+    if (portCards !== PORT_COUNT || !/data-port-card=(?:["']?windows-arm64["']?)(?:\s|>)/i.test(page)) {
+        fail(`generated ${portCards} port cards or omitted Windows ARM64; expected ${PORT_COUNT} targets`);
     }
     if (featureRows < 51) {
         fail(`the generated table has only ${featureRows} feature rows`);
