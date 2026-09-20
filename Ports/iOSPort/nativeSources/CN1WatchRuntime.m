@@ -442,7 +442,7 @@ void cn1_watch_runtime_pointerReleased(int x, int y) {
 BOOL isAppSuspended = NO;
 int mallocWhileSuspended = 0;
 
-// --- 3D GL bridge (CN1GL3D.m) is OpenGL/Metal based and excluded on watchOS.
+// --- The 3D bridge (CN1GL3D.m) is Metal based and excluded on watchOS.
 // Provide no-op stubs so NativeLookup registration links; 3D is unsupported. ---
 JAVA_LONG com_codename1_impl_ios_IOSNative_gl3dCreateContext___R_long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) { return 0; }
 JAVA_LONG com_codename1_impl_ios_IOSNative_gl3dGetViewPeer___long_R_long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG contextPeer) { return 0; }

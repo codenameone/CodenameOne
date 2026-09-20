@@ -133,8 +133,7 @@ function validate() {
     }
     const platformNames = {
         "android": "Android",
-        "ios-gl": "iOS (OpenGL)",
-        "ios-metal": "iOS (Metal)",
+        "ios-metal": "iOS",
         "macos": "macOS",
         "mac-catalyst": "macOS (Mac Catalyst)",
         "javascript": "Web",

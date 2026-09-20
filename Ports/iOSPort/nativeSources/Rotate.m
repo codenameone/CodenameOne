@@ -24,9 +24,7 @@
 #import "ClipRect.h"
 #import "CodenameOne_GLViewController.h"
 #include "xmlvm.h"
-#ifdef USE_ES2
 #import "SetTransform.h"
-#endif
 #include "TargetConditionals.h"
 #if TARGET_OS_WATCH
 #import "CN1CGGraphics.h"
@@ -43,18 +41,16 @@ float currentRotateY = 1;
     y = yy;
     angle = ang;
 #if !TARGET_OS_WATCH
-#ifdef USE_ES2
     m = [SetTransform currentTransform];
     float a = angle * M_PI / 180.0;
 #ifdef CN1_USE_METAL
-    // GLKMatrix4Translate / GLKMatrix4Rotate are inline GLKit math
-    // helpers that the Mac Catalyst stub headers don't provide. Inline
-    // the equivalent column-major matrix multiplies so the math is
-    // identical to the GL path without depending on GLKit symbols.
+    // Translate-then-rotate-then-translate-back, written out as
+    // column-major matrix multiplies. CN1Matrix4 is a plain struct with no
+    // math library behind it.
     // Step 1: m = m * Translate(x, y, 0)
     //   New columns: c0,c1,c2 unchanged; c3' = c3 + x*c0 + y*c1.
     {
-        GLKMatrix4 r = m;
+        CN1Matrix4 r = m;
         for (int i = 0; i < 4; i++) {
             r.m[3*4 + i] = m.m[3*4 + i] + ((float)x) * m.m[0*4 + i]
                                         + ((float)y) * m.m[1*4 + i];
@@ -68,7 +64,7 @@ float currentRotateY = 1;
     {
         float ca = cosf(a);
         float sa = sinf(a);
-        GLKMatrix4 r = m;
+        CN1Matrix4 r = m;
         for (int i = 0; i < 4; i++) {
             r.m[0*4 + i] =  m.m[0*4 + i] * ca + m.m[1*4 + i] * sa;
             r.m[1*4 + i] = -m.m[0*4 + i] * sa + m.m[1*4 + i] * ca;
@@ -77,22 +73,17 @@ float currentRotateY = 1;
     }
     // Step 3: m = m * Translate(-x, -y, 0). Same as step 1, signs flipped.
     {
-        GLKMatrix4 r = m;
+        CN1Matrix4 r = m;
         for (int i = 0; i < 4; i++) {
             r.m[3*4 + i] = m.m[3*4 + i] + (-(float)x) * m.m[0*4 + i]
                                         + (-(float)y) * m.m[1*4 + i];
         }
         m = r;
     }
-#else
-    m = GLKMatrix4Translate(m, x, y, 0);
-    m = GLKMatrix4Rotate(m, a, 0, 0, 1);
-    m = GLKMatrix4Translate(m, -x, -y, 0);
 #endif
 
     [SetTransform currentTransform:m];
 
-#endif
 #endif // !TARGET_OS_WATCH
     return self;
 }
@@ -106,17 +97,9 @@ float currentRotateY = 1;
 }
 #else
 -(void)execute {
-#ifndef USE_ES2
-    _glTranslatef(x, y, 0);
-    _glRotatef(angle, 0, 0, 1);
-    _glTranslatef(-x, -y, 0);
-
-    GLErrorLog;
-#else
     SetTransform *f = [[SetTransform alloc] initWithArgs:m originX:0 originY:0];
     [f execute];
     [f release];
-#endif
     currentRotateX = x;
     currentRotateY = y;
     currentRotate = angle;

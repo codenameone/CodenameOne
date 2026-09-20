@@ -31,10 +31,9 @@ Two properties are load-bearing:
   This is also why the sources compiled here are the **pristine** ones under
   ``Ports/iOSPort/nativeSources``, with a generated project supplying only the translated
   headers and the prefix header. In a generated tree the builder has already rewritten the
-  gates for that one app -- the hello-world sample ships with ``CN1_USE_METAL`` uncommented
-  -- and ``-D`` can only add a define, never remove one. Compiling the generated tree would
-  silently test whichever configuration that sample happened to use, and report a GL sweep
-  that was really a second Metal sweep.
+  gates for that one app, and ``-D`` can only add a define, never remove one. Compiling
+  the generated tree would silently test whichever configuration that sample happened to
+  use.
 
 * **The differ is proven to bite.** A synthetic probe that calls a known
   iOS-27-deprecated selector must show up as a delta. A comparison that silently produces
@@ -78,12 +77,6 @@ NATIVE_SOURCES = os.path.join(REPO_ROOT, "Ports", "iOSPort", "nativeSources")
 GATE_DENY = {
     # A function-like macro (a logging helper), not a gate.
     "CN1Log(str,...)",
-    # The renderer selector, not a feature gate: CONFIGURATIONS owns it. Harvested along
-    # with everything else it was defined for BOTH sweeps, so the "gl" run was a second
-    # Metal run and a GL-only regression could not be seen. The renderer self-check missed
-    # it because it built its defines differently from the sweeps -- which is why it now
-    # builds them through the same helper.
-    "CN1_USE_METAL",
     # A placeholder LINE that IPhoneBuilder replaces wholesale with one of the
     # CN1_METAL_COLORSPACE_* defines. Defining the placeholder itself selects nothing;
     # EXTRA_DEFINES below supplies the default the builder would have chosen.
@@ -118,7 +111,7 @@ CN1_DEFAULT_DEPLOYMENT_TARGET = "14.0"
 
 # Build configurations that select materially different code. The first is the baseline;
 # each of the others is compiled as well, because a single pass would leave its half
-# untested -- which is how a deprecation in the GL path survives a green Metal run.
+# untested.
 #
 # CN1_ON_DEVICE_DEBUG is here rather than in the harvested gate list because the builder
 # does not uncomment it in the port sources: it rewrites the GENERATED cn1_globals.h. The
@@ -131,8 +124,9 @@ CN1_DEFAULT_DEPLOYMENT_TARGET = "14.0"
 # indistinguishable from one of them having quietly become a copy of the baseline, so the
 # difference is checked directly.
 CONFIGURATIONS = [
-    ("gl", [], None),
-    ("metal", ["CN1_USE_METAL"], "METALView.m"),
+    # Metal is the only renderer, and CN1RenderBackend.h defines CN1_USE_METAL itself, so
+    # there is no renderer axis left to sweep -- the baseline already compiles it.
+    ("default", [], None),
     ("ondevicedebug", ["CN1_ON_DEVICE_DEBUG"], "cn1_debugger.m"),
 ]
 
@@ -200,10 +194,8 @@ def discover_sdks(developer_dirs):
 def defines_for(gates, config_defines):
     """The exact -D set a sweep compiles with.
 
-    Shared with the renderer self-check on purpose. When the check built its own list it
-    reported the configurations as distinct while both sweeps were compiling the same
-    Metal path, because CN1_USE_METAL had been harvested as a feature gate and applied to
-    both. A self-check that does not mirror the real invocation can only confirm itself.
+    Shared with the configuration self-check on purpose: a self-check that does not
+    mirror the real invocation can only confirm itself.
     """
     return gates + EXTRA_DEFINES + config_defines
 
@@ -801,7 +793,7 @@ def main():
                             clean += 1
                 # The shaders, under the Metal configuration only. They compile with the
                 # SDK's OWN metal rather than one shared compiler -- see metal_for_sdk.
-                if config_name == "metal" and shaders:
+                if config_name == "default" and shaders:
                     mtool = metal_for_sdk(sdk, dev_dirs)
                     if mtool is None:
                         shader_skip = ("no metal compiler in the Xcode that ships %s"

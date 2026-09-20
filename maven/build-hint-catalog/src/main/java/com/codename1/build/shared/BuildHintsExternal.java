@@ -304,14 +304,6 @@ final class BuildHintsExternal {
                         + "documentation]. These are added to the entitlements file with the key "
                         + "`keychain-access-groups`."));
 
-        h.add(new Hint("ios.newPipeline")
-                .group(HintGroup.IOS)
-                .type(HintType.BOOLEAN)
-                .platform("ios")
-                .external()
-                .doc("Boolean true/false defaults to true. Allows toggling the OpenGL ES 2.0 drawing pipeline "
-                        + "off to the older OGL ES 1.0 pipeline."));
-
         h.add(new Hint("ios.release.archs")
                 .group(HintGroup.IOS)
                 .type(HintType.STRING)

@@ -22,20 +22,11 @@
  */
 #import <Foundation/Foundation.h>
 
-// OpenGL ES does not exist on macOS; this port is Metal-only.
-#if !TARGET_OS_OSX
-#import <OpenGLES/EAGL.h>
-
-#import <OpenGLES/ES1/gl.h>
-#import <OpenGLES/ES1/glext.h>
-#import <OpenGLES/ES2/gl.h>
-#import <OpenGLES/ES2/glext.h>
-#endif
 #import "CN1AppleUI.h"
 
 @interface DrawGradientTextureCache : NSObject {
     NSDate *lastAccess;
-    GLuint textureName;
+    unsigned int textureName;
     
     int type;
     int startColor;
@@ -48,9 +39,9 @@
 }
 
 -(BOOL)isEqual:(id)object;
--(id)initWithGradient:(int)typeA startColorA:(int)startColorA endColorA:(int)endColorA widthA:(int)widthA heightA:(int)heightA relativeXA:(float)relativeXA relativeYA:(float)relativeYA relativeSizeA:(float)relativeSizeA tA:(GLuint)tA;
-+(void)cache:(int)typeA startColorA:(int)startColorA endColorA:(int)endColorA widthA:(int)widthA heightA:(int)heightA relativeXA:(float)relativeXA relativeYA:(float)relativeYA relativeSizeA:(float)relativeSizeA tA:(GLuint)tA;
-+(GLuint)checkCache:(int)typeA startColorA:(int)startColorA endColorA:(int)endColorA widthA:(int)widthA heightA:(int)heightA relativeXA:(float)relativeXA relativeYA:(float)relativeYA relativeSizeA:(float)relativeSizeA;
+-(id)initWithGradient:(int)typeA startColorA:(int)startColorA endColorA:(int)endColorA widthA:(int)widthA heightA:(int)heightA relativeXA:(float)relativeXA relativeYA:(float)relativeYA relativeSizeA:(float)relativeSizeA tA:(unsigned int)tA;
++(void)cache:(int)typeA startColorA:(int)startColorA endColorA:(int)endColorA widthA:(int)widthA heightA:(int)heightA relativeXA:(float)relativeXA relativeYA:(float)relativeYA relativeSizeA:(float)relativeSizeA tA:(unsigned int)tA;
++(unsigned int)checkCache:(int)typeA startColorA:(int)startColorA endColorA:(int)endColorA widthA:(int)widthA heightA:(int)heightA relativeXA:(float)relativeXA relativeYA:(float)relativeYA relativeSizeA:(float)relativeSizeA;
 +(void)flushDeleted;
 
 @end

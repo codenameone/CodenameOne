@@ -23,9 +23,7 @@
 #import "RadialGradientPaint.h"
 #import "CodenameOne_GLViewController.h"
 #include "xmlvm.h"
-#ifdef USE_ES2
 #import "SetTransform.h"
-#endif
 
 
 @implementation RadialGradientPaint

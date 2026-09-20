@@ -20,7 +20,7 @@
  * Please contact Codename One through http://www.codenameone.com/ if you
  * need additional information or have any questions.
  */
-#import "CN1ES2compat.h"
+#import "CN1RenderBackend.h"
 #ifdef CN1_USE_METAL
 #import "CN1AppleUI.h"
 #import <QuartzCore/CAMetalLayer.h>
@@ -32,7 +32,7 @@
 
 
 // Metal-backed rendering view. Wraps a CAMetalLayer into a CN1View subclass.
-// Gated by CN1_USE_METAL; the OpenGL ES 2 backend (EAGLView) is the default.
+// Gated by CN1_USE_METAL, which every slice but watchOS defines.
 @interface METALView : CN1View<UITextViewDelegate, UITextFieldDelegate, CN1RenderingView> {
 @private
     // The pixel dimensions of the CAMetalLayer's drawable.
@@ -71,9 +71,9 @@
 @property (nonatomic, retain) id<CAMetalDrawable> drawable;
 // Persistent offscreen render target that accumulates ops across frames.
 // CN1's drawFrame only queues the ops that have changed since the previous
-// frame; on OpenGL the renderbuffer persists, so that works. Metal drawables
-// are ephemeral (each is cleared on acquire), so we render into this
-// reusable texture and blit it to the drawable at present time.
+// frame, and Metal drawables are ephemeral (each is cleared on acquire), so we
+// render into this reusable texture and blit it to the drawable at present
+// time.
 @property (nonatomic, retain) id<MTLTexture> screenTexture;
 // Stencil8 attachment used for polygon-shape clipping (#3921). Same
 // dimensions as screenTexture; cleared at the start of every frame so

@@ -33,7 +33,7 @@ static NSMutableArray* cachedGradients = nil;
 static NSMutableArray* pendingDeleteGradients = nil;
 static int MAX_CACHE_SIZE = 5;
 
--(id)initWithGradient:(int)typeA startColorA:(int)startColorA endColorA:(int)endColorA widthA:(int)widthA heightA:(int)heightA relativeXA:(float)relativeXA relativeYA:(float)relativeYA relativeSizeA:(float)relativeSizeA tA:(GLuint)tA {
+-(id)initWithGradient:(int)typeA startColorA:(int)startColorA endColorA:(int)endColorA widthA:(int)widthA heightA:(int)heightA relativeXA:(float)relativeXA relativeYA:(float)relativeYA relativeSizeA:(float)relativeSizeA tA:(unsigned int)tA {
 #ifndef CN1_USE_ARC
     lastAccess = [[NSDate date] retain];
 #endif
@@ -53,7 +53,7 @@ static int MAX_CACHE_SIZE = 5;
     [pendingDeleteGradients removeAllObjects];
 }
 
-+(void)cache:(int)typeA startColorA:(int)startColorA endColorA:(int)endColorA widthA:(int)widthA heightA:(int)heightA relativeXA:(float)relativeXA relativeYA:(float)relativeYA relativeSizeA:(float)relativeSizeA tA:(GLuint)tA {
++(void)cache:(int)typeA startColorA:(int)startColorA endColorA:(int)endColorA widthA:(int)widthA heightA:(int)heightA relativeXA:(float)relativeXA relativeYA:(float)relativeYA relativeSizeA:(float)relativeSizeA tA:(unsigned int)tA {
     DrawGradientTextureCache* d = [[DrawGradientTextureCache alloc] initWithGradient:typeA startColorA:startColorA endColorA:endColorA widthA:widthA heightA:heightA relativeXA:relativeXA relativeYA:relativeYA relativeSizeA:relativeSizeA tA:tA];
     if(cachedGradients == nil) {
         cachedGradients = [[NSMutableArray alloc] init];
@@ -104,7 +104,7 @@ static int MAX_CACHE_SIZE = 5;
         relativeSize == o->relativeSize;
 }
 
-+(GLuint)checkCache:(int)typeA startColorA:(int)startColorA endColorA:(int)endColorA widthA:(int)widthA heightA:(int)heightA relativeXA:(float)relativeXA relativeYA:(float)relativeYA relativeSizeA:(float)relativeSizeA {
++(unsigned int)checkCache:(int)typeA startColorA:(int)startColorA endColorA:(int)endColorA widthA:(int)widthA heightA:(int)heightA relativeXA:(float)relativeXA relativeYA:(float)relativeYA relativeSizeA:(float)relativeSizeA {
     DrawGradientTextureCache* tmp = [[DrawGradientTextureCache alloc] initWithGradient:typeA startColorA:startColorA endColorA:endColorA widthA:widthA heightA:heightA relativeXA:relativeXA relativeYA:relativeYA relativeSizeA:relativeSizeA tA:0];
     for(DrawGradientTextureCache* d in cachedGradients) {
         if([tmp isEqual:d]) {
@@ -131,10 +131,6 @@ static int MAX_CACHE_SIZE = 5;
 #ifndef CN1_USE_ARC
     [lastAccess release];
 #endif
-#ifndef CN1_USE_METAL
-    glDeleteTextures(1, &textureName);
-    GLErrorLog;
-#endif
 #ifndef CN1_USE_ARC
     [super dealloc];
 #endif
@@ -143,7 +139,7 @@ static int MAX_CACHE_SIZE = 5;
 @end
 
 #else
-// Compiled out on watchOS: this file is OpenGL ES / Metal / UIKit-only and the watch
+// Compiled out on watchOS: this file is Metal / UIKit-only and the watch
 // slice renders through the Core Graphics backend instead. The typedef keeps the
 // translation unit non-empty, which ISO C requires.
 typedef int cn1_drawgradienttexturecache_unused_on_watch;

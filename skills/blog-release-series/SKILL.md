@@ -134,8 +134,7 @@ Per-post assets (screenshots, diagrams, animated GIFs) live in `docs/website/sta
 Real screenshots beat ASCII mockups. Always. Before asking the user to take a screenshot, look for an existing test fixture:
 
 ```
-scripts/ios/screenshots-metal/<TestName>.png       # iOS Metal (preferred for SVG content)
-scripts/ios/screenshots/<TestName>.png             # iOS GL fallback
+scripts/ios/screenshots-metal/<TestName>.png       # iOS
 scripts/android/screenshots/<TestName>.png         # Android
 scripts/javase/screenshots/<TestName>.png          # JavaSE simulator
 ```

@@ -24,9 +24,9 @@
 /*
  * CN1CGGraphics is the watchOS rendering backend for Codename One.
  *
- * watchOS has no OpenGL ES and no Metal, so the GL/Metal ExecutableOp paths
- * used on iOS cannot run. Instead the same ExecutableOp queue is rasterized
- * into a CGBitmapContext using Core Graphics + Core Text. The bitmap is then
+ * watchOS has no Metal, so the ExecutableOp paths used on iOS cannot run.
+ * Instead the same ExecutableOp queue is rasterized into a CGBitmapContext
+ * using Core Graphics + Core Text. The bitmap is then
  * handed to the watch host surface (see CN1WatchRenderingView) for display.
  *
  * The whole module is compiled only on the watchOS slice; every entry point is
@@ -107,7 +107,7 @@ void CN1CGSetClipPolygon(float *xPoints, float *yPoints, int numPoints);
 void CN1CGResetClip(void);
 
 // Affine transform ----------------------------------------------------------
-// CN1 ships a GLKMatrix4 for the 2D transform; only the affine 2x3 submatrix
+// CN1 ships a CN1Matrix4 for the 2D transform; only the affine 2x3 submatrix
 // is meaningful for CG. Callers pass the six affine components directly.
 
 void CN1CGSetAffine(CGFloat a, CGFloat b, CGFloat c, CGFloat d, CGFloat tx, CGFloat ty,

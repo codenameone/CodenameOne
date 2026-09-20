@@ -23,7 +23,7 @@
 #include "TargetConditionals.h"
 #if !TARGET_OS_WATCH
 
-#import "CN1ES2compat.h"
+#import "CN1RenderBackend.h"
 #ifdef CN1_USE_METAL
 #import "CN1Metalcompat.h"
 #if TARGET_OS_OSX
@@ -115,14 +115,14 @@ static simd_float4x4 identityMatrix(void) {
     }};
 }
 
-static simd_float4x4 glkToSimd(GLKMatrix4 m) {
+static simd_float4x4 cn1MatrixToSimd(CN1Matrix4 m) {
     simd_float4x4 r;
     memcpy(&r, m.m, sizeof(float) * 16);
     return r;
 }
 
-static GLKMatrix4 simdToGlk(simd_float4x4 m) {
-    GLKMatrix4 r;
+static CN1Matrix4 simdToCn1Matrix(simd_float4x4 m) {
+    CN1Matrix4 r;
     memcpy(r.m, &m, sizeof(float) * 16);
     return r;
 }
@@ -226,7 +226,7 @@ int CN1MetalFramebufferWidth(void) { return currentFramebufferWidth; }
 int CN1MetalFramebufferHeight(void) { return currentFramebufferHeight; }
 
 // Process-lifetime device + command queue cache. The original implementation
-// dereferenced [[GLViewController instance] eaglView].layer to fetch the
+// dereferenced [[GLViewController instance] renderingView].layer to fetch the
 // CAMetalLayer's device on every call, but -[CN1View layer] is a main-thread-
 // only API. Paint runs on the Codename One EDT (a GCD background queue), and
 // any drawShape → createAlphaMask → nativePathRendererCreateTexture path
@@ -279,12 +279,12 @@ id<MTLCommandQueue> CN1MetalCommandQueue(void) {
 
 // --------------- Matrix state ---------------
 
-void CN1MetalSetTransform(GLKMatrix4 transform) {
-    currentTransform = glkToSimd(transform);
+void CN1MetalSetTransform(CN1Matrix4 transform) {
+    currentTransform = cn1MatrixToSimd(transform);
 }
 
-GLKMatrix4 CN1MetalGetTransform(void) {
-    return simdToGlk(currentTransform);
+CN1Matrix4 CN1MetalGetTransform(void) {
+    return simdToCn1Matrix(currentTransform);
 }
 
 void CN1MetalLoadIdentity(void) {
@@ -493,7 +493,7 @@ void CN1MetalApplyPolygonStencilClip(const float *xCoords, const float *yCoords,
     // current transform on the Java side). The shader's vertex stage
     // would otherwise apply the live `currentTransform` again -- a
     // double-transform that shifts and re-rotates the stencil mask. Match
-    // the GL ES2 sequence at ClipRect.m:149-150: render the polygon with
+    // the legacy stencil sequence in ClipRect.m: render the polygon with
     // an identity transform, then restore.
     simd_float4x4 savedTransform = currentTransform;
     currentTransform = identityMatrix();
@@ -658,7 +658,7 @@ void CN1MetalFillRect(int color, int alpha, int x, int y, int width, int height)
 // hardware antialiasing splits the coverage between two rows at half
 // intensity each -- the line ends up looking 2 px wide and washed out.
 // The standard fix is to offset the line's endpoints by half a pixel so
-// the line passes through the pixel-centre of a single row. The GL ES2
+// the line passes through the pixel-centre of a single row. The legacy
 // DrawLine / DrawRect ops already do this (DrawLine.m:122, DrawRect.m:122).
 //
 // One catch: `MTLPrimitiveTypeLine` clips at the viewport boundary, and
@@ -2230,7 +2230,7 @@ void CN1MetalReleaseCaches(void) {
 #endif /* CN1_USE_METAL */
 
 #else
-// Compiled out on watchOS: this file is OpenGL ES / Metal / UIKit-only and the watch
+// Compiled out on watchOS: this file is Metal / UIKit-only and the watch
 // slice renders through the Core Graphics backend instead. The typedef keeps the
 // translation unit non-empty, which ISO C requires.
 typedef int cn1_cn1metalcompat_unused_on_watch;

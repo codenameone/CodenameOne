@@ -34,8 +34,8 @@ two will never converge, which is why they have separate baselines rather than a
 shared one with a loose tolerance.
 
 Treat this as the **Catalyst slice's own baseline**, evolving independently from
-`../../macos/screenshots/` (native AppKit), `../../ios/screenshots/` (iOS OpenGL
-ES) and `../../ios/screenshots-metal/` (iOS Metal).
+`../../macos/screenshots/` (native AppKit) and `../../ios/screenshots-metal/`
+(iOS).
 
 ## Updating
 

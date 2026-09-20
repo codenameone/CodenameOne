@@ -180,7 +180,7 @@ class WatchNativeBuilder {
             // provider, it mirrors the phone's -- so linking them would pull
             // in symbols nothing on the watch calls.
             "CallKit.framework;PushKit.framework;"
-            + "OpenGLES.framework;GLKit.framework;Metal.framework;"
+            + "Metal.framework;"
             + "MapKit.framework;MediaPlayer.framework;MessageUI.framework;"
             + "AddressBookUI.framework;AddressBook.framework;"
             + "WebKit.framework;StoreKit.framework;"
@@ -934,72 +934,6 @@ class WatchNativeBuilder {
         }
         owner.createFile(new File(appSrcDir, mainClass + "-Watch-Bridging-Header.h"),
                 bridging.toString().getBytes(StandardCharsets.UTF_8));
-    }
-
-    /**
-     * Write stub GLKit / OpenGLES headers under {@code watchOSStubs/} so the
-     * shared sources that {@code #import <GLKit/...>} / {@code <OpenGLES/...>}
-     * (chiefly CN1ES2compat.h) compile on watchOS, where those frameworks don't
-     * exist. The stubs provide the GL scalar types + GLKMatrix4/GLKVector*
-     * typedefs the declarations reference; the GL functions are never called on
-     * the watch slice (the TARGET_OS_WATCH op branches route to CN1CGGraphics).
-     * Same approach MacNativeBuilder uses for the Catalyst slice.
-     */
-    void writeStubHeaders(File appSrcDir) throws IOException {
-        File stubsDir = new File(appSrcDir, "watchOSStubs");
-        File openGLESes1 = new File(new File(stubsDir, "OpenGLES"), "ES1");
-        File openGLESes2 = new File(new File(stubsDir, "OpenGLES"), "ES2");
-        File eagl = new File(stubsDir, "OpenGLES");
-        File glkit = new File(stubsDir, "GLKit");
-        openGLESes1.mkdirs();
-        openGLESes2.mkdirs();
-        glkit.mkdirs();
-        String glTypes =
-                "#ifndef CN1_WATCHOS_STUB_GLES_TYPES\n#define CN1_WATCHOS_STUB_GLES_TYPES\n"
-                + "typedef unsigned int GLenum;\ntypedef unsigned int GLuint;\n"
-                + "typedef int GLint;\ntypedef int GLsizei;\ntypedef float GLfloat;\n"
-                + "typedef float GLclampf;\ntypedef unsigned char GLubyte;\n"
-                + "typedef unsigned char GLboolean;\ntypedef void GLvoid;\n"
-                + "typedef signed char GLbyte;\ntypedef short GLshort;\n"
-                + "typedef unsigned short GLushort;\ntypedef int GLfixed;\n"
-                + "typedef unsigned int GLbitfield;\ntypedef long GLintptr;\n"
-                + "typedef long GLsizeiptr;\n#endif\n";
-        writeStub(new File(eagl, "EAGL.h"),
-                "#ifndef CN1_WATCHOS_STUB_EAGL_H\n#define CN1_WATCHOS_STUB_EAGL_H\n"
-                + "#import <Foundation/Foundation.h>\n"
-                + "@interface EAGLContext : NSObject @end\n"
-                + "typedef enum { kEAGLRenderingAPIOpenGLES1 = 1, kEAGLRenderingAPIOpenGLES2 = 2,"
-                + " kEAGLRenderingAPIOpenGLES3 = 3 } EAGLRenderingAPI;\n#endif\n");
-        writeStub(new File(openGLESes1, "gl.h"), glTypes);
-        writeStub(new File(openGLESes1, "glext.h"), "");
-        writeStub(new File(openGLESes2, "gl.h"), glTypes);
-        writeStub(new File(openGLESes2, "glext.h"), "");
-        writeStub(new File(glkit, "GLKit.h"),
-                "#ifndef CN1_WATCHOS_STUB_GLKIT_H\n#define CN1_WATCHOS_STUB_GLKIT_H\n"
-                + "#import <Foundation/Foundation.h>\n#import <OpenGLES/ES2/gl.h>\n"
-                + "typedef struct { float m[16]; } GLKMatrix4;\n"
-                + "typedef struct { float v[4]; } GLKVector4;\n"
-                + "typedef struct { float v[3]; } GLKVector3;\n"
-                + "typedef struct { float v[2]; } GLKVector2;\n"
-                // Inline GLKit math so the GLKMatrix4 transform machinery in the
-                // op files (SetTransform/ClipRect/etc.) compiles on watchOS even
-                // though the GLKit framework is absent. The watch render path uses
-                // the Core Graphics backend (CN1CGGraphics); these helpers only
-                // keep the transform bookkeeping (column-major 4x4) consistent.
-                + "static const GLKMatrix4 GLKMatrix4Identity = { { 1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1 } };\n"
-                + "static inline GLKVector4 GLKVector4Make(float x,float y,float z,float w){ GLKVector4 v; v.v[0]=x; v.v[1]=y; v.v[2]=z; v.v[3]=w; return v; }\n"
-                + "static inline GLKVector3 GLKVector3Make(float x,float y,float z){ GLKVector3 v; v.v[0]=x; v.v[1]=y; v.v[2]=z; return v; }\n"
-                + "static inline GLKMatrix4 GLKMatrix4Multiply(GLKMatrix4 a, GLKMatrix4 b){ GLKMatrix4 r; for(int c=0;c<4;c++){ for(int row=0;row<4;row++){ float s=0; for(int k=0;k<4;k++){ s += a.m[k*4+row]*b.m[c*4+k]; } r.m[c*4+row]=s; } } return r; }\n"
-                + "static inline GLKMatrix4 GLKMatrix4MakeTranslation(float tx,float ty,float tz){ GLKMatrix4 r = GLKMatrix4Identity; r.m[12]=tx; r.m[13]=ty; r.m[14]=tz; return r; }\n"
-                + "static inline GLKMatrix4 GLKMatrix4Translate(GLKMatrix4 m,float tx,float ty,float tz){ return GLKMatrix4Multiply(m, GLKMatrix4MakeTranslation(tx,ty,tz)); }\n"
-                + "static inline GLKMatrix4 GLKMatrix4MakeScale(float sx,float sy,float sz){ GLKMatrix4 r = GLKMatrix4Identity; r.m[0]=sx; r.m[5]=sy; r.m[10]=sz; return r; }\n"
-                + "@interface GLKView : NSObject @end\n@interface GLKBaseEffect : NSObject @end\n"
-                + "@interface GLKTextureLoader : NSObject @end\n@interface GLKTextureInfo : NSObject @end\n#endif\n");
-        owner.log("[watchNative] Wrote watchOS stub headers under " + stubsDir.getAbsolutePath());
-    }
-
-    private void writeStub(File f, String content) throws IOException {
-        owner.createFile(f, content.getBytes(StandardCharsets.UTF_8));
     }
 
     /**
@@ -1764,7 +1698,6 @@ class WatchNativeBuilder {
         owner.createFile(plist, sb.toString().getBytes(StandardCharsets.UTF_8));
     }
 
-
     /// Names the string or strings this build is waiting for.
     ///
     /// "declares neither X nor Y" was accurate only while nothing was detected. With a direction
@@ -1809,7 +1742,6 @@ class WatchNativeBuilder {
         }
         return owner.phoneWritesHealthData();
     }
-
 
     /**
      * Writes the watch target's app icon.
@@ -2097,7 +2029,6 @@ class WatchNativeBuilder {
         sb.append("</dict>\n</plist>\n");
         return sb.toString();
     }
-
 
     /**
      * The CODE_SIGN_ENTITLEMENTS setting for the watch target, or an empty
@@ -2423,12 +2354,9 @@ class WatchNativeBuilder {
                 .append("  bs['SWIFT_VERSION'] = '5.0'\n")
                 .append("  bs['SWIFT_OBJC_BRIDGING_HEADER'] = '")
                 .append(IPhoneBuilder.escapeRubyStr(mainClass + "-src/" + mainClass + "-Watch-Bridging-Header.h")).append("'\n")
-                // Resolve <GLKit/..> and <OpenGLES/..> to the watchOS stub
-                // headers (writeStubHeaders) only when Xcode is actually
-                // compiling the watch target for a watch SDK. If an old or
-                // implicit app dependency makes Xcode visit this target during
-                // an iOS Simulator build, these stubs must not shadow Apple's
-                // real OpenGLES headers.
+                // Drop the plain key so only the SDK-conditional ones below apply:
+                // if an implicit app dependency makes Xcode visit this target during
+                // an iOS build, nothing here should reach it.
                 .append("  bs.delete('HEADER_SEARCH_PATHS')\n")
                 // The staged watch tree comes FIRST when it exists, so a header shared by name
                 // with the phone's resolves to the watch translation's copy. These are the
@@ -2437,13 +2365,11 @@ class WatchNativeBuilder {
                 .append("  bs['HEADER_SEARCH_PATHS[sdk=watchos*]'] = '$(inherited) ")
                 .append(watchSources.isEmpty() ? "" : "$(SRCROOT)/"
                         + IPhoneBuilder.escapeRubyStr(mainClass + "-src/" + WATCH_SRC_DIR) + " ")
-                .append("$(SRCROOT)/")
-                .append(IPhoneBuilder.escapeRubyStr(mainClass)).append("-src/watchOSStubs'\n")
+                .append("'\n")
                 .append("  bs['HEADER_SEARCH_PATHS[sdk=watchsimulator*]'] = '$(inherited) ")
                 .append(watchSources.isEmpty() ? "" : "$(SRCROOT)/"
                         + IPhoneBuilder.escapeRubyStr(mainClass + "-src/" + WATCH_SRC_DIR) + " ")
-                .append("$(SRCROOT)/")
-                .append(IPhoneBuilder.escapeRubyStr(mainClass)).append("-src/watchOSStubs'\n")
+                .append("'\n")
                 // A standalone watch app IS the product, so it must be installable; an embedded
                 // companion is carried inside the phone app and must not be.
                 .append(standalone
@@ -2492,10 +2418,10 @@ class WatchNativeBuilder {
                     .append("end\n");
         }
 
-        // watchOS frameworks auto-link via modules; remove GL/Metal framework
-        // refs that the template added for iOS so the watch target doesn't try
-        // to link them.
-        s.append("gl = %w[OpenGLES.framework GLKit.framework Metal.framework]\n")
+        // watchOS frameworks auto-link via modules; remove the Metal framework
+        // ref that the template added for iOS so the watch target doesn't try
+        // to link it.
+        s.append("gl = %w[Metal.framework]\n")
                 .append("watch_target.frameworks_build_phase.files.to_a.each do |bf|\n")
                 .append("  ref = bf.file_ref\n")
                 .append("  next unless ref && ref.path\n")

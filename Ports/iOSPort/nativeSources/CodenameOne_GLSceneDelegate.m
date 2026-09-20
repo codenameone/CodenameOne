@@ -352,7 +352,7 @@ static void cn1MacResignActiveIfApplicationInactive(void) {
 @end
 
 #else
-// Compiled out on watchOS: this file is OpenGL ES / Metal / UIKit-only and the watch
+// Compiled out on watchOS: this file is Metal / UIKit-only and the watch
 // slice renders through the Core Graphics backend instead. The typedef keeps the
 // translation unit non-empty, which ISO C requires.
 typedef int cn1_codenameone_glscenedelegate_unused_on_watch;

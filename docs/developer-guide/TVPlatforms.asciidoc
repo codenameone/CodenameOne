@@ -101,9 +101,7 @@ App ID and provisioning profile from your iOS app, you supply tvOS signing
 material the same way you do for the other Apple targets.
 
 NOTE: `codename1.tvMain` (and `tvNative.enabled`) only add the tvOS target; the
-iPhone/iPad build is unchanged. In particular enabling the tvOS target does
-*not* switch the iOS app's renderer -- tvOS runs on Metal (it has no OpenGL ES),
-but the iOS app continues to honor its own `ios.metal` setting.
+iPhone/iPad build is unchanged.
 
 ==== tvOS Build Hints
 

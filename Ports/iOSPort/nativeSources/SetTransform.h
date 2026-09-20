@@ -20,22 +20,19 @@
  * Please contact Codename One through http://www.codenameone.com/ if you
  * need additional information or have any questions.
  */
-#import "CN1ES2compat.h"
-#ifdef USE_ES2
+#import "CN1RenderBackend.h"
 #import "CN1AppleUI.h"
 #import <Foundation/Foundation.h>
 #import "ExecutableOp.h"
-#import <GLKit/GLKit.h>
 
 @interface SetTransform : ExecutableOp {
-    GLKMatrix4 m;
+    CN1Matrix4 m;
     int originX;
     int originY;
     
 }
--(id)initWithArgs:(GLKMatrix4)matrix originX:(int)x originY:(int)y;
+-(id)initWithArgs:(CN1Matrix4)matrix originX:(int)x originY:(int)y;
 -(void)execute;
-+(GLKMatrix4)currentTransform;
-+(void)currentTransform:(GLKMatrix4)matrix;
++(CN1Matrix4)currentTransform;
++(void)currentTransform:(CN1Matrix4)matrix;
 @end
-#endif

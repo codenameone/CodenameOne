@@ -22,20 +22,10 @@
  */
 #import "ExecutableOp.h"
 #import "xmlvm.h"
-#ifdef USE_ES2
-// OpenGL ES does not exist on macOS; this port is Metal-only.
-#if !TARGET_OS_OSX
-#import <OpenGLES/ES2/gl.h>
-#endif
-#else
-#import <OpenGLES/ES1/gl.h>
-#endif
 
-// textureName is a 64-bit handle:
-//   - On the GL build it's a GLuint zero-extended to JAVA_LONG.
-//   - On the Metal build it's a CFBridgingRetain'd id<MTLTexture> pointer
-//     (set up by IOSNative.m's nativePathRendererCreateTexture under
-//     CN1_USE_METAL and freed by nativeDeleteTexture).
+// textureName is a 64-bit handle: a CFBridgingRetain'd id<MTLTexture>
+// pointer, set up by IOSNative.m's nativePathRendererCreateTexture under
+// CN1_USE_METAL and freed by nativeDeleteTexture.
 @interface DrawTextureAlphaMask : ExecutableOp {
     JAVA_LONG textureName;
     int color;

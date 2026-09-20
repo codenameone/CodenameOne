@@ -182,10 +182,10 @@ if [[ "$WORKSPACE_PATH" == *.xcworkspace ]] && [[ "$SCHEME" != *" ("* ]]; then
 fi
 ri_log "Using scheme $SCHEME"
 
-# The golden-image directory defaults to scripts/ios/screenshots for the
-# OpenGL backend. Callers can override via SCREENSHOT_REF_DIR (absolute or
-# relative to the repo root) so parallel backends -- like the Metal port --
-# can ship their own golden set. See Ports/iOSPort/METAL_PORT_STATUS.md.
+# The golden-image directory defaults to scripts/ios/screenshots-metal, the
+# baseline for the iOS simulator. Callers can override via SCREENSHOT_REF_DIR
+# (absolute or relative to the repo root) so a variant suite can ship its own
+# golden set.
 if [ -n "${SCREENSHOT_REF_DIR:-}" ]; then
   if [ ! -d "$SCREENSHOT_REF_DIR" ]; then
     ri_log "SCREENSHOT_REF_DIR override '$SCREENSHOT_REF_DIR' is not a directory" >&2
@@ -196,7 +196,7 @@ if [ -n "${SCREENSHOT_REF_DIR:-}" ]; then
   SCREENSHOT_REF_DIR="$(cd "$SCREENSHOT_REF_DIR" && pwd)"
   ri_log "Using screenshot reference dir from SCREENSHOT_REF_DIR: $SCREENSHOT_REF_DIR"
 else
-  SCREENSHOT_REF_DIR="$SCRIPT_DIR/ios/screenshots"
+  SCREENSHOT_REF_DIR="$SCRIPT_DIR/ios/screenshots-metal"
 fi
 SCREENSHOT_TMP_DIR="$(mktemp -d "${TMPDIR}/cn1-ios-tests-XXXXXX" 2>/dev/null || echo "${TMPDIR}/cn1-ios-tests")"
 SCREENSHOT_RAW_DIR="$SCREENSHOT_TMP_DIR/raw"
@@ -206,7 +206,7 @@ mkdir -p "$SCREENSHOT_RAW_DIR" "$SCREENSHOT_PREVIEW_DIR"
 export CN1SS_OUTPUT_DIR="$SCREENSHOT_RAW_DIR"
 export CN1SS_PREVIEW_DIR="$SCREENSHOT_PREVIEW_DIR"
 
-# Tight golden gate for the iOS sim pipelines (GL + Metal). The comparator's
+# Tight golden gate for the iOS sim pipelines. The comparator's
 # stock default (0.30% of a 1179x2556 capture = ~9k px) let widget-level
 # regressions -- e.g. the dark ChatInput +/Mic buttons rendering square
 # instead of round, ~2-3k px of corners -- pass silently, so the stale golden
@@ -1199,7 +1199,7 @@ fi
 COMPARE_JSON="$SCREENSHOT_TMP_DIR/screenshot-compare.json"
 SUMMARY_FILE="$SCREENSHOT_TMP_DIR/screenshot-summary.txt"
 COMMENT_FILE="$SCREENSHOT_TMP_DIR/screenshot-comment.md"
-export CN1SS_PORT_ID="${CN1SS_PORT_ID:-ios-gl}"
+export CN1SS_PORT_ID="${CN1SS_PORT_ID:-ios-metal}"
 export CN1SS_SUITE_LOG="$TEST_LOG"
 export CN1SS_SUITE_LOG_2="$FALLBACK_LOG"
 export CN1SS_BINARY_PATH="$APP_BUNDLE_PATH"

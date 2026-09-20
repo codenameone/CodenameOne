@@ -65,7 +65,6 @@ import java.util.regex.Pattern;
  * @author Steve Hannah
  */
 public class IPhoneBuilder extends Executor {
-    private boolean useMetal;
 
     // macNative.enabled=true switches this iOS build to also emit a native Mac
     // variant of the same app. All Mac-specific code lives in MacNativeBuilder
@@ -99,7 +98,6 @@ public class IPhoneBuilder extends Executor {
     /// Where the tunnel stub was moved so each translator pass is handed one
     /// main; null when no packet-tunnel extension is generated.
     private File vpnTunnelStubDir;
-
 
     // tvNative.* delegate: adds an Apple TV (tvOS) target. tvOS is handled like
     // the Mac Catalyst slice (Metal + GL stub headers + GL-only sources excluded)
@@ -1189,7 +1187,6 @@ public class IPhoneBuilder extends Executor {
         return statement == null ? "" : "            " + statement;
     }
 
-
     boolean phoneUsesHealthData(BuildRequest request) {
         // App-wide, which is the grain the API scan works at and the grain this answer is
         // reported at. A per-root reachability walk used to narrow it per target; it was deleted
@@ -1202,7 +1199,6 @@ public class IPhoneBuilder extends Executor {
         return usesHealthRead || usesHealthWrite || usesHealthWorkout
                 || healthCapabilityDeclared(request);
     }
-
 
     /// Whether the detected usage READS from the store, per root.
     ///
@@ -1220,7 +1216,6 @@ public class IPhoneBuilder extends Executor {
     boolean phoneWritesHealthData() {
         return usesHealthWrite || usesHealthWorkout;
     }
-
 
     /// HealthKit asked for explicitly, by any of its spellings.
     private boolean healthCapabilityDeclared(BuildRequest request) {
@@ -1724,8 +1719,6 @@ public class IPhoneBuilder extends Executor {
         return false;
     }
 
-
-
     
     private File getResDir() {
         return new File(tmpFile, "res");
@@ -1888,7 +1881,6 @@ public class IPhoneBuilder extends Executor {
         return Integer.parseInt(target);
     }
 
-
     /**
      * The Facebook SDK pods, at whatever version the request asked for.
      *
@@ -1929,8 +1921,6 @@ public class IPhoneBuilder extends Executor {
         }
         return hint;
     }
-
-
 
     @Override
     protected String hardeningPlatform(BuildRequest request) {
@@ -2050,7 +2040,6 @@ public class IPhoneBuilder extends Executor {
         return java.util.Collections.singletonList(watchMain);
     }
 
-
     /**
      * Whether an explicit {@code ios.includePush} turns push OFF.
      *
@@ -2111,17 +2100,13 @@ public class IPhoneBuilder extends Executor {
         appAttest = request.getArg("ios.appAttest", "false").equals("true");
         defaultEnvironment.put("LANG", "en_US.UTF-8");
         tmpFile = tmpDir = getBuildDirectory();
-        useMetal = "true".equals(request.getArg("ios.metal", "true"));
 
         // macNative: extend this iOS build to also produce a native Mac slice.
         // All Mac-specific work is delegated to MacNativeBuilder; this builder
-        // only flips a few iOS-side knobs (Metal forced on, minimum deployment
-        // target floor, Ruby xcodeproj gem required) when Mac is enabled.
+        // only flips a few iOS-side knobs (minimum deployment target floor,
+        // Ruby xcodeproj gem required) when Mac is enabled.
         macNativeBuilder.parseHints(request);
         if (macNativeBuilder.isEnabled()) {
-            // The Mac slice cannot link OpenGL ES; force Metal on regardless of
-            // the ios.metal hint. (Already on by default now, but defensive.)
-            useMetal = true;
             // Catalyst requires iOS 13.1+ -> macOS 10.15+.
             addMinDeploymentTarget(macNativeBuilder.getIosMinDeploymentTarget());
             // Mac requires the iPad device family. iphone-only is incompatible.
@@ -2140,13 +2125,10 @@ public class IPhoneBuilder extends Executor {
         }
 
         // tvNative: parse + prep. The tvOS app is a SEPARATE appletvos target
-        // (like the watch target, not a Catalyst-style slice of the iOS app), so
-        // we must NOT touch the iOS app's renderer here -- forcing useMetal=true
-        // would override an explicit ios.metal=false and make the GL screenshot
-        // job actually render with Metal. tvOS itself has no OpenGL ES and runs
-        // on Metal via the project's default ios.metal=true; the tvOS target's
-        // own Xcode settings are written by tvNativeBuilder.applyXcodeSettings.
-        // We only need the xcodeproj gem to add and wire the target.
+        // (like the watch target, not a Catalyst-style slice of the iOS app).
+        // The tvOS target's own Xcode settings are written by
+        // tvNativeBuilder.applyXcodeSettings. We only need the xcodeproj gem to
+        // add and wire the target.
         tvNativeBuilder.parseHints(request);
         if (tvNativeBuilder.isEnabled()) {
             ensureXcodeprojInstalled();
@@ -2158,7 +2140,6 @@ public class IPhoneBuilder extends Executor {
             log(arg+"="+request.getArg(arg, null));
         }
         log("-------------------");
-
 
         buildVersion = request.getVersion();
         if(request.getArg("ios.twoDigitVersion", "false").equals("true")) {
@@ -2411,9 +2392,7 @@ public class IPhoneBuilder extends Executor {
                     installLocalizedStringsScript.append("xcproj.targets.each{|e| e.add_resources([fileref])}\n");
                 }
 
-
                 child.delete();
-
 
             }
             if (child.getName().endsWith(".framework.zip")) {
@@ -3018,7 +2997,6 @@ public class IPhoneBuilder extends Executor {
                     }
                 }
 
-
                 @Override
                 public void usesClassMethod(String cls, String method) {
                     // The catalog first: it decides frameworks and plist
@@ -3452,7 +3430,6 @@ public class IPhoneBuilder extends Executor {
             new File(buildinRes, "iOS7Theme.res").delete();
         } 
 
-
         // Flip the crypto build toggles in CN1Crypto.h based on what the
         // user's bytecode references. Apps that don't touch
         // com.codename1.security.* get stub-only versions of the iOS
@@ -3526,25 +3503,14 @@ public class IPhoneBuilder extends Executor {
         debug("Crypto API "+(usesCryptoAPI?"enabled":"disabled")
               +", AES-GCM "+(usesCryptoGcm?"enabled":"disabled"));
 
-        if (useMetal) {
-            try {
-                File CN1ES2compat = new File(buildinRes, "CN1ES2compat.h");
-                replaceInFile(CN1ES2compat, "//#define CN1_USE_METAL", "#define CN1_USE_METAL");
-                String colorSpaceDefine = resolveMetalColorSpaceDefine(request.getArg("ios.metal.colorSpace", "sRGB"));
-                replaceInFile(CN1ES2compat, "//#define CN1_METAL_COLORSPACE_PLACEHOLDER", colorSpaceDefine);
-                copy(new File(buildinRes, "CodenameOne_METALViewController.xib"), new File(buildinRes, "CodenameOne_GLViewController.xib"));
-            } catch (Exception ex) {
-                throw new BuildException("Failed to inject Metal controllers", ex);
-            }
-        } else {
-            new File(buildinRes, "CodenameOne_METALViewController.xib").delete();
-            // The .metal shader file isn't guarded by an #ifdef like the
-            // companion .m files, so leaving it in the project forces Xcode
-            // to invoke the Metal toolchain -- which Xcode 26 ships as a
-            // separately-downloaded component that build servers don't have.
-            new File(buildinRes, "CN1MetalShaders.metal").delete();
+        try {
+            File renderBackend = new File(buildinRes, "CN1RenderBackend.h");
+            String colorSpaceDefine = resolveMetalColorSpaceDefine(request.getArg("ios.metal.colorSpace", "sRGB"));
+            replaceInFile(renderBackend, "//#define CN1_METAL_COLORSPACE_PLACEHOLDER", colorSpaceDefine);
+            copy(new File(buildinRes, "CodenameOne_METALViewController.xib"), new File(buildinRes, "CodenameOne_GLViewController.xib"));
+        } catch (Exception ex) {
+            throw new BuildException("Failed to inject Metal controllers", ex);
         }
-
 
         final String moPubAdUnitId = request.getArg("ios.mopubId", null);
         final String moPubTabletAdUnitId = request.getArg("ios.mopubTabletId", moPubAdUnitId);
@@ -3621,7 +3587,6 @@ public class IPhoneBuilder extends Executor {
             } catch (Exception ex) {
                 throw new BuildException("Failed to add facebook api", ex);
             }
-
 
         }
 
@@ -3775,7 +3740,6 @@ public class IPhoneBuilder extends Executor {
             }
         }
         
-
 
         try {
             if (request.getArg("ios.lowMemCamera", "false").equals("true")) {
@@ -4274,9 +4238,6 @@ public class IPhoneBuilder extends Executor {
         resultDir = new File(tmpFile, "result");
         resultDir.mkdirs();
 
-
-
-
         // BEFORE includePush is read, not after. A VoIP push IS a push, and
         // this copy has no pushV3 -- it reads ios.includePush directly.
         // Turning the hint on is what gets the push entitlement onto an app
@@ -4554,7 +4515,6 @@ public class IPhoneBuilder extends Executor {
                 replaceInFile(glAppDelegate, "//openURLMarkerEntry", openURLInject);
             }
 
-
             String beforeFinishLaunching = request.getArg("ios.beforeFinishLaunching", null);
             if (beforeFinishLaunching != null) {
                 replaceInFile(glAppDelegate, "//beforeDidFinishLaunchingWithOptionsMarkerEntry", beforeFinishLaunching);
@@ -4697,7 +4657,6 @@ public class IPhoneBuilder extends Executor {
                 File CodenameOne_GLViewController_h = new File(buildinRes, "CodenameOne_GLViewController.h");
                 replaceInFile(CodenameOne_GLViewController_h, "//#define CN1_HANDLE_UNIVERSAL_LINKS", "#define CN1_HANDLE_UNIVERSAL_LINKS");
             }
-
 
             if (request.getArg("ios.locationUsageDescription", null) != null) {
                 // Remove location warning message for iOS8...  This is sort of developer documentation
@@ -6737,9 +6696,6 @@ public class IPhoneBuilder extends Executor {
                 throw new BuildException("Failed to extract parparvm-compiler.jar", ex);
             }
 
-
-
-
             try {
                 unzip(getResourceAsStream("/parparvm-java-api.jar"), classesDir, classesDir, classesDir);
             } catch (IOException ex) {
@@ -6767,7 +6723,6 @@ public class IPhoneBuilder extends Executor {
             boolean isReleaseBuild = !request.getArg("ios.buildType", "debug").equals("debug");
             String onDeviceDebug = !isReleaseBuild
                     && Boolean.valueOf(request.getArg("ios.onDeviceDebug", "false")) ? "true" : "false";
-
 
             if (enableGalleryMultiselect && photoLibraryUsage) {
                 addMinDeploymentTarget("8.0");
@@ -7012,7 +6967,6 @@ public class IPhoneBuilder extends Executor {
                     writeCatalystInfoPlist(tmpFile, request.getMainClass());
                 }
 
-
                 if(runPods || !request.getArg("ios.buildType", "debug").equals("debug") || request.getArg("ios.force64", "false").equals("true")) {
                     File pbx = new File(tmpFile, "dist/" + request.getMainClass() + ".xcodeproj/project.pbxproj");
 
@@ -7027,7 +6981,6 @@ public class IPhoneBuilder extends Executor {
                         replaceAllInFile(pbx, "VALID_ARCHS = [^;]+;", "VALID_ARCHS = \"\\$(ARCHS_STANDARD)\";");
                     }
                 }
-
 
                 if(bicodeHandle) {
                     String minTargetVersion = request.getArg("ios.minDeploymentTarget", "6.0");
@@ -7059,10 +7012,8 @@ public class IPhoneBuilder extends Executor {
                     }
                 }
 
-                if (useMetal) {
-                    File pbx = new File(tmpFile, "dist/" + request.getMainClass() + ".xcodeproj/project.pbxproj");
-                    replaceInFile(pbx, "CLANG_ENABLE_MODULES = NO;", "CLANG_ENABLE_MODULES = YES;");
-                }
+                File pbx = new File(tmpFile, "dist/" + request.getMainClass() + ".xcodeproj/project.pbxproj");
+                replaceInFile(pbx, "CLANG_ENABLE_MODULES = NO;", "CLANG_ENABLE_MODULES = YES;");
             } catch (Exception ex) {
                 throw new BuildException("Failed to update infoplist file", ex);
             }
@@ -7233,7 +7184,6 @@ public class IPhoneBuilder extends Executor {
                             if (extEntitlementsFile != null) {
                                 codeSignEntitlements = extensionName + "/" + extEntitlementsFile.getName();
                             }
-
 
                             // The identifier as Xcode will see it: an archive may write
                             // PRODUCT_BUNDLE_IDENTIFIER = $(EXTENSION_ID) with EXTENSION_ID beside
@@ -7454,8 +7404,6 @@ public class IPhoneBuilder extends Executor {
                                 buildSettingsProps.delete();
                             }
 
-
-
                             // The minimum iOS this extension declares, which App Store validation
                             // reads out of the built .appex as MinimumOSVersion. Computed after the
                             // properties are folded in, so an archive that states its own wins.
@@ -7530,8 +7478,6 @@ public class IPhoneBuilder extends Executor {
                             }
                             sb.append("}\n");
                             sb.append("end\n");
-
-
 
                         }
                         if (appExtensions.length > 0) {
@@ -7856,10 +7802,7 @@ public class IPhoneBuilder extends Executor {
                         }
                     }
 
-
-                    if (useMetal) {
-                        buildSettings += "      config.build_settings['CLANG_ENABLE_MODULES'] = \"YES\"\n";
-                    }
+                    buildSettings += "      config.build_settings['CLANG_ENABLE_MODULES'] = \"YES\"\n";
                     if (excludeArm64Simulator) {
                         // Google ML Kit's binary frameworks contain device
                         // arm64 and simulator x86_64 slices. Apply the same
@@ -7868,7 +7811,6 @@ public class IPhoneBuilder extends Executor {
                         // the aggregate xcconfig.
                         buildSettings += "      config.build_settings['EXCLUDED_ARCHS[sdk=iphonesimulator*]'] = \"arm64\"\n";
                     }
-
 
                     podFileContents += "\n\npost_install do |installer|\n" +
                             "  installer.pods_project.targets.each do |target|\n" +
@@ -8058,7 +8000,6 @@ public class IPhoneBuilder extends Executor {
                     // provisioning profile does not carry fails signing, so an unused capability
                     // is not free.
                     macNativeBuilder.writeEntitlements(request, appSrcDir);
-                    macNativeBuilder.writeStubHeaders(appSrcDir);
                     macNativeBuilder.applyXcodeSettings(request, tmpFile, buildVersion);
                     macNativeBuilder.writeExportOptions(request, new File(tmpFile, "dist"));
                 }
@@ -8072,7 +8013,6 @@ public class IPhoneBuilder extends Executor {
                     writeWatchWidgetExtension(request, new File(tmpFile, "dist"), appSrcDir);
                     watchNativeBuilder.writeWatchInfoPlist(request, appSrcDir);
                     watchNativeBuilder.writeWatchEntry(request, appSrcDir);
-                    watchNativeBuilder.writeStubHeaders(appSrcDir);
                     // Empty when the watch shares the phone's translation, which is what tells
                     // applyXcodeSettings to reuse the app target's sources and neutralise the
                     // phone stub's main instead.
@@ -8096,8 +8036,6 @@ public class IPhoneBuilder extends Executor {
             } catch (Exception ex) {
                 throw new BuildException("Failed to inject into plist", ex);
             }
-
-
 
             
         }
@@ -10360,7 +10298,6 @@ public class IPhoneBuilder extends Executor {
         }
         return identifierAsBuilt(declared.trim(), flattenForContext(settings, context));
     }
-
 
     /// The iOS SDK this build archives against.
     ///
@@ -12809,7 +12746,6 @@ public class IPhoneBuilder extends Executor {
         return "PeerComponent.create(new long[] {" + methodCallString + "})";
     }
 
-
     @Override
     protected String convertPeerComponentToNative(String param) {
         return "((long[])" + param + ".getNativePeer())[0]";
@@ -12958,7 +12894,6 @@ public class IPhoneBuilder extends Executor {
         }
         return value;
     }
-
 
     /**
      * The packet-tunnel Network Extension target.
@@ -16632,7 +16567,7 @@ public class IPhoneBuilder extends Executor {
         }
         
         boolean multitasking = "true".equals(request.getArg("ios.multitasking", "true"));
-        if (multitasking && useMetal && getDeploymentTargetInt(request) < 14) {
+        if (multitasking && getDeploymentTargetInt(request) < 14) {
             // An explicit ios.deployment_target below 14 cannot satisfy the
             // App Store launch screen rule for iPad multitasking apps via the
             // UILaunchScreen key (it only counts when MinimumOSVersion is 14
@@ -16641,7 +16576,6 @@ public class IPhoneBuilder extends Executor {
             log("ios.deployment_target is below 14; implicitly disabling iPad multitasking (UIRequiresFullScreen) so the launch screen passes App Store validation. Set ios.deployment_target=14.0 or higher to keep multitasking support.");
             multitasking = false;
         }
-
 
         if (!multitasking || xcodeVersion < 9) {
             if (inject.indexOf("UIRequiresFullScreen") < 0) {
@@ -16774,7 +16708,6 @@ public class IPhoneBuilder extends Executor {
                     
 
                 }
-
 
             }
         } else {
@@ -17440,7 +17373,6 @@ public class IPhoneBuilder extends Executor {
         return -1;
     }
 
-
     private String resolveMetalColorSpaceDefine(String hint) {
         String value = hint == null ? "sRGB" : hint.trim();
         if (value.length() == 0) {
@@ -17899,7 +17831,6 @@ public class IPhoneBuilder extends Executor {
         return trimmed;
     }
 
-
     private void addLocalizedIconsBuildSetting(File pbx) throws IOException {
         if (localizedIcons.isEmpty()) {
             return;
@@ -18033,7 +17964,6 @@ public class IPhoneBuilder extends Executor {
                 || "com/codename1/ai/language/Translator".equals(cls)
                 || "com/codename1/ai/language/SmartReply".equals(cls);
     }
-
 
     /** Locale-independent case-insensitive suffix test. */
     static boolean endsWithIgnoreCase(String value, String suffix) {
