@@ -1,3 +1,25 @@
+/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
 package com.codename1.ui;
 
 import com.codename1.junit.FormTest;
@@ -46,8 +68,13 @@ class AnimationManagerTest extends UITestBase {
         assertEquals(1, completionCalls.get(), "Completion callback should not run a second time");
     }
 
+    /// An animation that reports `isInProgress() == false` from the moment it is queued has never been
+    /// stepped, so its whole payload is still sitting in `updateState()` and it has to be applied once
+    /// before the animation completes. This is the shape of every deferred UI mutation `Container`
+    /// queues while another animation is in flight - see issue #5606, where skipping the update made
+    /// `add()` and `remove()` during an animation silent no-ops.
     @Test
-    void testAlreadyFinishedAnimationRunsCompletionWithoutUpdateState() {
+    void testNeverSteppedAnimationIsAppliedOnceBeforeCompletion() {
         Form form = new Form();
         AnimationManager manager = form.getAnimationManager();
         AtomicInteger updateStateCalls = new AtomicInteger();
@@ -70,7 +97,11 @@ class AnimationManagerTest extends UITestBase {
 
         manager.updateAnimations();
 
-        assertEquals(0, updateStateCalls.get(), "Already-finished animation must not mutate state");
+        assertEquals(1, updateStateCalls.get(), "Never-stepped animation must apply its payload once");
         assertEquals(1, completionCalls.get(), "Completion callback should still run once");
+
+        manager.updateAnimations();
+        assertEquals(1, updateStateCalls.get(), "The payload must not be applied a second time");
+        assertEquals(1, completionCalls.get(), "Completion callback should not run a second time");
     }
 }
