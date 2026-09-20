@@ -296,11 +296,18 @@ public class ButtonRenderElement extends RenderElement {
             int hpad = (int) Math.round(Dp.px(CAPSULE_HPAD_LP));
             int vpad = (int) Math.round(Dp.px(CAPSULE_VPAD_LP));
             if (w instanceof ElevatedButton) {
+                // Material 3's elevated button is a PALE face with a coloured label:
+                // surfaceContainerLow behind, primary on it. This painted the primary
+                // colour as the face and onPrimary as the label, which is the FILLED
+                // button's scheme -- so every elevated button in the gallery came out a
+                // solid block of accent where the reference has a tinted card. The
+                // dialog demo's SHOW DIALOG is the clearest case: solid purple against
+                // the reference's lavender with purple lettering.
                 all.setPadding(vpad, vpad, hpad, hpad);
-                all.setFgColor(cs.onPrimary().rgb());
+                all.setFgColor(cs.primary().rgb());
                 all.setBorder(RoundBorder.create()
                         .rectangle(true)
-                        .color(cs.primary().rgb())
+                        .color(cs.surfaceContainerLow().rgb())
                         .shadowOpacity(40));
                 clearBackground(all);
             } else if (w instanceof OutlinedButton) {
@@ -448,9 +455,9 @@ public class ButtonRenderElement extends RenderElement {
             w = Math.max(w, Dp.px(MIN_INTERACTIVE_LP));
             h = Math.max(h, Dp.px(MIN_INTERACTIVE_LP));
         } else {
-            // Material spec: text buttons have a 64x36lp minimum tap target
+            // Material 3's button minimum is 64x40, not the 36 of the 2018 spec.
             w = Math.max(w, Dp.px(64));
-            h = Math.max(h, Dp.px(36));
+            h = Math.max(h, Dp.px(40));
         }
         return constraints.constrain(new Size(w, h));
     }

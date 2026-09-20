@@ -65,6 +65,11 @@ public class ColorScheme {
     private Color onBackground;
     private Color outline;
     private Color outlineVariant;
+    private Color surfaceContainerLowest;
+    private Color surfaceContainerLow;
+    private Color surfaceContainer;
+    private Color surfaceContainerHigh;
+    private Color surfaceContainerHighest;
     private Color shadow;
     private Color scrim;
     private Color inverseSurface;
@@ -214,6 +219,11 @@ public class ColorScheme {
     public void onBackground(Color v) { this.onBackground = v; }
     public void outline(Color v) { this.outline = v; }
     public void outlineVariant(Color v) { this.outlineVariant = v; }
+    public void surfaceContainerLowest(Color v) { this.surfaceContainerLowest = v; }
+    public void surfaceContainerLow(Color v) { this.surfaceContainerLow = v; }
+    public void surfaceContainer(Color v) { this.surfaceContainer = v; }
+    public void surfaceContainerHigh(Color v) { this.surfaceContainerHigh = v; }
+    public void surfaceContainerHighest(Color v) { this.surfaceContainerHighest = v; }
     public void shadow(Color v) { this.shadow = v; }
     public void scrim(Color v) { this.scrim = v; }
     public void inverseSurface(Color v) { this.inverseSurface = v; }
@@ -251,6 +261,16 @@ public class ColorScheme {
     public Color onSurfaceVariant() { return or(onSurfaceVariant, onSurface); }
     public Color background() { return or(background, surface); }
     public Color onBackground() { return or(onBackground, onSurface); }
+    /// Material 3's tonal surface containers. Flutter falls each of them back to
+    /// {@link #surface()} when the scheme names none, and several component
+    /// defaults are written in terms of them -- an elevated button's face is
+    /// surfaceContainerLow, not primary.
+    public Color surfaceContainerLowest() { return or(surfaceContainerLowest, surface); }
+    public Color surfaceContainerLow() { return or(surfaceContainerLow, surface); }
+    public Color surfaceContainer() { return or(surfaceContainer, surface); }
+    public Color surfaceContainerHigh() { return or(surfaceContainerHigh, surface); }
+    public Color surfaceContainerHighest() { return or(surfaceContainerHighest, surface); }
+
     public Color outline() { return or(outline, new Color(0xFF79747E)); }
     /// Falls back to {@link #onBackground()}, which is what Flutter's ColorScheme does --
     /// and it is load bearing rather than a detail, because an M3 Divider takes its colour
