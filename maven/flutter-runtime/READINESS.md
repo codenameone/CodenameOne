@@ -173,6 +173,22 @@ does not use that mode.
 **Still not visible to the sweep**, which photographs settled routes: the rows render
 correctly either way and the wheel only ever appears inside the popup.
 
+## 2d. OPEN: the text field is wrong in four separate ways
+
+Measured on `/demo/text-field`, which is where all four show at once. None of them
+is a layout problem; the field is in the right place and the wrong shape.
+
+| What | Measured |
+|---|---|
+| The requested size never reaches the label | The field asks for **48px** (16sp at 3x, and 16 is right -- demo pages run the Material 2018 scale, not the gallery's Montserrat) and the label renders at **76px**. Glyph heights confirm it: our `Name*` run is 55px against the reference's 34 |
+| `TextField.maxLines` is stored and never read | The demo's Life story field asks for 3 lines and renders as one; the reference's box is three lines tall |
+| `InputDecoration.helperText` is stored and never read | The reference carries `0/14` under the phone number and "Keep it short, this is just a demo." under Life story. We show neither, and the counter is missing too |
+| `suffixIcon` is dropped | The password field's visibility toggle is absent |
+
+The size is the one to fix first, because it is not confined to this demo: every
+field in the app is set in a face a half larger than it asked for, and the extra
+height pushes everything below it down.
+
 ## 3. Structural gaps
 
 | Gap | Consequence |
