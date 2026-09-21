@@ -5120,8 +5120,25 @@ void codenameOneGCMark() {
                 // gp->bumpIndex and iterates slots while the mutator is still allocating
                 // into those same pages; serialising the walk with its own drains is
                 // evidently load-bearing, and what exactly breaks was not established.
-                // Anyone retrying this needs that mechanism first -- the crash is
-                // workload-dependent, so a quiet benchmark will not show it.
+                // MECHANISM FOUND, and it is not scheduling. cn1GcInGracePass is
+                // cn1GcTrace.gracePass, and cn1GcTrace is __thread. Marking CONSULTS it:
+                //
+                //     cn1BibopStampMarked((o), (m), (cn1GcInGracePass != 0 && (snap) == -1))
+                //
+                // So the grace pass is a distinct marking MODE, and the mode lives in
+                // thread-local state. When the GC thread sets gracePass = 1 only the GC
+                // thread sees it; a helper draining concurrently has gracePass = 0 and
+                // stamps objects the grace walk discovered the WRONG way. That matches
+                // the bisect exactly: harmless with no helpers, harmless on hashMapChurn
+                // where the pass finds few fresh objects, and a freed-live-object NPE on
+                // objectAllocation.
+                //
+                // Any future attempt must propagate the mode to every marker that can
+                // pop grace-discovered work -- helpers and cn1GcMutatorAssist alike --
+                // rather than just handing them the worklist. Carrying it per ENTRY
+                // (the worklist already carries a per-entry `precise` flag, so there is
+                // precedent) is the obvious shape; a second global would reintroduce
+                // exactly the isolation bug the __thread comment above warns about.
                 //
                 // Repeated generations are the wrong shape for a producer that drains as
                 // it goes. Making this parallel properly means ONE generation held open
