@@ -13787,6 +13787,22 @@ static int gcMarkResolveThreadCount() {
     if(n < 1) {
         n = 1;
     }
+    // RUNTIME override, for the core-scaling matrix. HotSpot has
+    // -XX:ActiveProcessorCount and macOS has no taskset, so without an equivalent
+    // here a core-count comparison would hold the JVM's parallelism down while
+    // leaving ours at whatever the machine reports -- measuring two different
+    // experiments and calling it a scaling curve. Diagnostic only: unset, nothing
+    // changes, and the compile-time -DCN1_GC_MARK_THREADS still wins where it is
+    // set (it is an A/B arm, and an env var must not silently override a build).
+    {
+        const char* e = getenv("CN1_GC_MARK_THREADS");
+        if(e != 0 && *e != 0) {
+            int v = atoi(e);
+            if(v >= 1) {
+                n = v > CN1_GC_MARK_THREAD_CAP ? CN1_GC_MARK_THREAD_CAP : v;
+            }
+        }
+    }
     return n;
 }
 

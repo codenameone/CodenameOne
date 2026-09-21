@@ -5072,3 +5072,79 @@ win cancelled the losses, which is exactly how an aggregate hides this.
 
 Next: bisect `stringBuilding` across Rounds 28-49 with the parpar column and a
 verified parent at each step.
+
+---
+
+## Round 33: a standing matrix, and the first real answer to "why are we losing"
+
+Bisecting was abandoned as the wrong tool: the host column on the short
+benchmarks moves ~50% run to run, so a bisect over dozens of commits is a
+coin-flip per step. `vm/benchmarks/run-matrix.sh` replaces it -- every workload,
+several core counts, printed every session so a regression is seen the day it
+lands rather than hunted weeks later.
+
+### What it measures that nothing here did before
+
+- **Core counts, held on BOTH sides.** `-XX:ActiveProcessorCount=N` for HotSpot,
+  and a new RUNTIME `CN1_GC_MARK_THREADS` override for us (it was compile-time
+  only). macOS has no taskset, so without the second one a "scaling curve" would
+  throttle the JVM and leave us at 16 cores -- two experiments in one table.
+- **A warm, AOT JDK 25** (JEP 483/514): recorded per workload, then linked.
+  Comparing an AOT translator to a cold JVM flatters us and answers nothing.
+  The cache needs a JAR -- an exploded directory is refused outright.
+- **The hello corpus**, with the arguments perf-guard.sh derives for it. NOT the
+  translator corpus: perf-guard's own note records the same binary winning on
+  translator and losing 1.263x/1.349x on hello.
+
+### The headline the matrix produced immediately
+
+| | 1 core | 16 cores |
+|---|---|---|
+| selfhost(hello) time | 6837ms **1.13x** | 6919ms **1.12x** |
+| selfhost peak memory | 1409MB **0.98x** | 1407MB **0.94x** |
+| objectAllocation | 3.41x | 3.78x |
+| stringBuilding | 1.83x | 2.10x |
+
+**On the workload ParparVM exists for we are 1.12-1.13x on time and we WIN on
+memory (0.94-0.98x).** The microbenchmarks are much harsher than the real thing.
+
+And the core columns answer the standing question. **Our millisecond column is
+flat from 1 to 16 cores while HotSpot's falls**: objectAllocation 2.30x -> 3.69x,
+stringBuilding 1.99x -> 1.33x (the host moving, not us). HotSpot converts cores
+into speed through parallel GC and JIT compiler threads; a single mutator thread
+with a concurrent collector does not. So a large part of the gap on a 16-core M4
+Max is parallelism we do not use, and the **1-core column is the honest proxy for
+a phone** -- the platform this VM actually ships to. That is where we are
+closest.
+
+### Reading it without a quiet machine
+
+Ratios are formed WITHIN a round from an interleaved pair, and the table reports
+the MEDIAN OF PER-ROUND RATIOS. Minimising each arm independently across rounds
+(the old shape) can pair round 1's parpar with round 5's host and call it a
+ratio; an identical binary measured intArithmetic at 56.7ms and 88.8ms an hour
+apart here, which is the size of error that admits. Arm order alternates each
+round so one arm never always warms the machine for the other.
+
+Two self-checks, because four separate "green" results this session turned out to
+be checks that never ran:
+
+- a `!` on any cell whose per-round ratios spread >15% -- it flags
+  objectAllocation on both core counts, independently confirming the 68% swing
+  measured by hand in Round 32.
+- a **machine canary** (intArithmetic at the lowest core count) plus `uptime`.
+  Measured 56.7ms cool and 88.9ms after hours of benchmarking: a 57% thermal
+  drift that would otherwise read as a regression next session. Over 10% from
+  the recorded reference the table says the ABSOLUTE ms are not comparable --
+  the ratios still are, which is the point of pairing them.
+
+### The trap this harness fell into while being built
+
+`translate-and-build.sh` runs a Maven clean that removes
+`selfhost-asm-classpath.txt`, so the selfhost build goes stale and
+`bench-selfhost.sh` REFUSES -- into a log the arm only greps. A cached
+`.selfhost-built` marker then certified a build that no longer existed and the
+row printed NA. Same shape as `verify-selfhost.sh` exiting 0 having run nothing,
+hit earlier in this same session and documented at the time. The build is now
+done once per matrix run, after the bench builds have done their cleaning, and a
+failure prints SKIPPED with the log path.
