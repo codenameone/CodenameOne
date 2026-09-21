@@ -15,6 +15,20 @@ name: Native theme fidelity
   workflow_dispatch:
   pull_request:
     paths:
+      # The 26 row's trigger was CSS-only by design. The 27 row is not: it is the
+      # only check on a theme generation nothing else exercises, and a renderer,
+      # port, harness or workflow change reaches it without touching any CSS.
+      # This PR proved the gap -- it edits the workflow, GlassRecipe, the gate and
+      # the frame goldens, and neither fidelity row ran.
+      - '.github/workflows/scripts-fidelity.yml'
+      - 'scripts/build-fidelity-app.sh'
+      - 'scripts/run-ios-fidelity-tests.sh'
+      - 'scripts/run-android-fidelity-tests.sh'
+      - 'scripts/lib/cn1ss.sh'
+      - 'scripts/common/java/**'
+      - 'scripts/fidelity-app/**'
+      - '!scripts/fidelity-app/*-native-ref/**'
+      - 'CodenameOne/src/com/codename1/ui/plaf/**'
       # One entry per THEME, not per file: ios-modern is built from
       # common.css + gen26.css + gen27.css since the generation split, and this
       # list still named the theme.css that split removed -- so from that merge
@@ -302,9 +316,11 @@ jobs:
     # and changed nothing on device, and the only other reachable value
     # overshoots. See GlassRecipe.liquidPanel27.
     #
-    # The run still executes on every pull request, uploads its artifacts and
-    # reports its scores -- what it does not do is fail the build on them.
-    continue-on-error: true
+    # The tolerance is on the fidelity STEP, not here. At job level it would turn
+    # EVERY failure into a green tick -- Xcode selection, dependency setup,
+    # compilation, simulator boot, capture -- so the row would report success
+    # while producing none of the scores this comment promises, which is worse
+    # than no row at all.
     permissions:
       contents: read
       pull-requests: write
@@ -408,6 +424,9 @@ jobs:
         # header records the runs and why the one retry it does is allowed.
         run: ./scripts/ci/boot-ios-simulator.sh 'iOS-27[0-9-]*' 'iPhone 16' iPhone16-fidelity27
       - name: Run fidelity suite (simulator, Metal)
+        # Only THIS step tolerates failure, and only until the baseline lands --
+        # see the job header. Everything before it still fails the job.
+        continue-on-error: true
         # The committed baseline is the ratchet floor: the gate fails the job
         # on any regression. To re-anchor intentionally, run locally with
         # FIDELITY_UPDATE_BASELINE=1 and commit the updated baseline JSON.

@@ -33,6 +33,7 @@ on:
       - 'scripts/hellocodenameone/**'
       - 'scripts/ios/tests/**'
       - 'scripts/ios/screenshots-metal/**'
+      - 'scripts/ios/screenshots-metal-27/**'
       - 'scripts/ios/screenshots-watch/**'
       - 'scripts/ios/screenshots-tv/**'
       - 'scripts/templates/**'
@@ -71,6 +72,7 @@ on:
       - 'scripts/hellocodenameone/**'
       - 'scripts/ios/tests/**'
       - 'scripts/ios/screenshots-metal/**'
+      - 'scripts/ios/screenshots-metal-27/**'
       - 'scripts/ios/screenshots-watch/**'
       - 'scripts/ios/screenshots-tv/**'
       - 'scripts/templates/**'
@@ -630,6 +632,13 @@ jobs:
         timeout-minutes: 20
 
       - name: Run iOS UI screenshot tests (Metal)
+        # SEEDING RUN: scripts/ios/screenshots-metal-27 has no images yet, and
+        # they can only come from a run on this image -- capturing them on a
+        # maintainer's machine would bake in that machine's toolchain. Tolerated
+        # on this step ALONE, so everything before it (Xcode selection, setup,
+        # build, simulator boot) still fails the job. Removed once the baselines
+        # are committed; scripts/ios/screenshots-metal-27/README.md has the steps.
+        continue-on-error: true
         env:
           ARTIFACTS_DIR: ${{ github.workspace }}/artifacts/ios-ui-tests-metal-27
           # Golden set for the iOS simulator. See

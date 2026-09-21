@@ -106,6 +106,20 @@ public class FidelityGate {
                     g.put("width_ratio", widthRatio);
                     g.put("height_ratio", heightRatio);
                     currentGeometry.put(test, g);
+                } else if (oneSidedEmpty(geo)) {
+                    // A widget that rendered on one side and not the other, failed
+                    // HERE rather than left to the baseline loops below. Those only
+                    // iterate pairs that already have baseline geometry, so a NEW
+                    // pair -- or one whose baseline predates geometry -- carrying a
+                    // one-sided empty reached neither collection and the gate exited
+                    // 0 on it. Measured before fixing: a lone
+                    // {"empty":true,"native_empty":false,"cn1_empty":true} against an
+                    // empty baseline passed silently, which is the exact case this
+                    // distinction was added to catch.
+                    broken.add(test + " (widget silhouette on "
+                            + (Boolean.TRUE.equals(geo.get("cn1_empty")) ? "the native side only"
+                                                                         : "our side only")
+                            + "; geometry cannot be compared)");
                 } else if (bothSidesEmpty(geo)) {
                     // A tile with no widget SILHOUETTE on either side has no
                     // geometry to give, which is not the same as withholding it.
@@ -368,6 +382,21 @@ public class FidelityGate {
             return s;
         }
         return value.toString();
+    }
+
+    /// True when exactly ONE side has no widget silhouette. That is not a tile
+    /// with nothing to measure -- it is a widget present in one render and absent
+    /// from the other, which is a regression wearing the same `empty` label.
+    private static boolean oneSidedEmpty(Map<String, Object> geo) {
+        if (!Boolean.TRUE.equals(geo.get("empty"))) {
+            return false;
+        }
+        Object nativeEmpty = geo.get("native_empty");
+        Object cn1Empty = geo.get("cn1_empty");
+        if (nativeEmpty == null || cn1Empty == null) {
+            return false;   // a report predating these flags says nothing either way
+        }
+        return !Boolean.TRUE.equals(nativeEmpty) || !Boolean.TRUE.equals(cn1Empty);
     }
 
     /// True when the geometry block says the tile has no widget silhouette on
