@@ -50,6 +50,14 @@ export CN1_WS_MAX_MESSAGE_MB="${CN1_WS_MAX_MESSAGE_MB:-32}"
 
 PORT="${CN1_WS_PORT:-9001}"
 TARGET_HOST="${CN1_WS_HOST:-127.0.0.1}"
+# SIZED FOR THE SUITE, not left at a default. On the thread-pool arm a websocket
+# holds its worker for the life of the connection, so the worker count is the
+# ceiling on concurrent connections -- and Autobahn leaves some of its ~300 open,
+# each holding a worker until the idle timeout. With eight workers the run reached
+# case 9.4.4 and then every remaining case was REFUSED, with the server still
+# running and still reporting itself healthy. That is not a protocol failure and
+# the report cannot tell you so.
+WORKERS="${CN1_WS_WORKERS:-64}"
 # Bound to every interface when the client is dialling in from a VM, and to
 # loopback otherwise -- a conformance run should not expose a port to the network
 # unless reaching it requires that.
@@ -102,14 +110,15 @@ case "$ARM" in
         rm -rf "$OUT"; mkdir -p "$OUT"
         find src impl/javase demo/wsecho -name '*.java' -print0 \
             | xargs -0 "$JAVAC" -nowarn -d "$OUT"
-        "$JAVA" -cp "$OUT" com.demo.WsEcho --port "$PORT" --host "$BIND_HOST" &
+        "$JAVA" -cp "$OUT" com.demo.WsEcho --port "$PORT" --host "$BIND_HOST" \
+            --workers "$WORKERS" &
         SERVER_PID=$!
         ;;
     native)
         : "${JDK_8_HOME:?build.sh requires JDK_8_HOME by name}"
         BIN="$(pwd)/target/wsecho-native"
         CN1_BACKEND_DEMO=demo/wsecho CN1_BACKEND_SQLITE=0 ./build.sh WsEcho com.demo "$BIN"
-        "$BIN" --port "$PORT" --host "$BIND_HOST" &
+        "$BIN" --port "$PORT" --host "$BIND_HOST" --workers "$WORKERS" &
         SERVER_PID=$!
         ;;
     *)
@@ -180,7 +189,27 @@ fi
     crossbario/autobahn-testsuite \
     wstest -m fuzzingclient -s /reports/fuzzingclient.json
 
+# BEFORE the report is read. A server that exits mid-suite shows up in the report
+# as a run of "connection refused" and in the gate as "the suite shrank", which is
+# true but describes the symptom two steps from the cause. Observed once on a
+# developer machine at load average 12.8, not reproduced in the two full runs
+# after it -- and a one-off that reports itself as a coverage failure is exactly
+# the kind of thing that gets explained away. Say it plainly instead.
+if ! kill -0 "$SERVER_PID" 2>/dev/null; then
+    echo "ws-conformance: the $ARM server exited DURING the suite." >&2
+    echo "  Cases after that point could not connect, so the gate below will also" >&2
+    echo "  report the suite as shrunken. The server's death is the real finding." >&2
+    SERVER_DIED=1
+else
+    SERVER_DIED=0
+fi
+
 cleanup
 SERVER_PID=""
 
 python3 conformance/check-autobahn.py "$REPORTS" "$MANIFEST" $WRITE_MANIFEST
+GATE_STATUS=$?
+if [ "$SERVER_DIED" = "1" ]; then
+    exit 1
+fi
+exit $GATE_STATUS

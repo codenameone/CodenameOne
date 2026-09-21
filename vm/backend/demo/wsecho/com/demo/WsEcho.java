@@ -44,15 +44,18 @@ import java.io.IOException;
 public class WsEcho {
     public static void main(String[] args) throws Exception {
         int port = 9001;
+        int workers = 8;
         String host = "127.0.0.1";
         for(int iter = 0 ; iter < args.length ; iter++) {
             if("--port".equals(args[iter]) && iter + 1 < args.length) {
                 port = Integer.parseInt(args[++iter]);
             } else if("--host".equals(args[iter]) && iter + 1 < args.length) {
                 host = args[++iter];
+            } else if("--workers".equals(args[iter]) && iter + 1 < args.length) {
+                workers = Integer.parseInt(args[++iter]);
             }
         }
-        HttpServer server = HttpServer.start(host, port, 128, 8, null);
+        HttpServer server = HttpServer.start(host, port, 128, workers, null);
         server.websocketRouter(new HttpServer.WebSocketHandler() {
             public WebSocket open(HttpServer.Request request) {
                 return new Echo();

@@ -545,6 +545,15 @@ has no virtual threads here, and it's also the mode any TLS server runs in. A
 pooled deployment serving many WebSockets has to size `workers` for them, because
 unlike a request they don't give the worker back.
 
+That makes `workers` the ceiling on concurrent connections in pool mode, and going
+past it fails in a way worth knowing about: the process stays healthy, the listener
+stays bound, and new connections are simply refused, because no worker ever comes
+back to accept them. An eight-worker server driven by the conformance suite
+reached case 9.4.4 and refused everything after it. The server says so now --
+it logs once when WebSockets hold half the pool -- and the two ways out are more
+workers or a shorter `CN1_WS_IDLE_TIMEOUT_MS`, so abandoned connections give their
+worker back sooner. On virtual threads none of this applies.
+
 The idle timeout is separate for the same reason. `CN1_HTTP_TIMEOUT_MS` sheds a
 client that began a request and stopped; a WebSocket is idle by design and would
 be shed within seconds by that rule. `CN1_WS_IDLE_TIMEOUT_MS` governs these

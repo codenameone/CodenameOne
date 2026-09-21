@@ -3309,7 +3309,40 @@ public final class HttpServer {
      * arm is always pooled, and so is any TLS server -- which is why a pooled
      * deployment serving many websockets needs its worker count sized for them.
      */
+    /**
+     * Warns, once, when websockets are using up the worker pool.
+     *
+     * In pool mode a websocket holds its worker for the whole life of the
+     * connection, so `workerCount` is the ceiling on how many can be open at
+     * once -- and the failure past that ceiling is silent and misleading: the
+     * process is healthy, the listener is bound, `kill -0` says it is alive, and
+     * new connections are simply refused because no worker ever comes back to
+     * accept them.
+     *
+     * Measured with the Autobahn suite against an eight-worker server: the run
+     * reached case 9.4.4 and every case after it failed to connect. Diagnosing
+     * that from the outside took a bisect. One line of warning is cheaper.
+     */
+    private void warnIfWebSocketsAreEatingThePool() {
+        if(virtualThreads || webSocketPoolWarningIssued) {
+            return;
+        }
+        if(webSockets.size() * 2 < workerCount) {
+            return;
+        }
+        webSocketPoolWarningIssued = true;
+        System.out.println("[http] " + webSockets.size() + " of " + workerCount
+                + " workers are held by websockets. This server is not running on "
+                + "virtual threads, so a websocket occupies its worker until the "
+                + "connection ends -- past workerCount, new connections are accepted "
+                + "by nobody. Raise the worker count, or shorten "
+                + "CN1_WS_IDLE_TIMEOUT_MS so abandoned connections are shed sooner.");
+    }
+
+    private volatile boolean webSocketPoolWarningIssued;
+
     private void runWebSocket(int fd, WebSocketSession socket) {
+        warnIfWebSocketsAreEatingThePool();
         // serve() raised activeRequests for this descriptor, and workOutstanding()
         // counts it -- so an idle websocket would make stop() wait out its entire
         // drain window, every time, for a peer with nothing to say. Give it back
@@ -3430,7 +3463,9 @@ public final class HttpServer {
             java.util.Iterator entries = deferredCloses.entrySet().iterator();
             while(entries.hasNext()) {
                 Map.Entry entry = (Map.Entry)entries.next();
-                if(((WebSocketSession)entry.getValue()).retire()) {
+                // Non-blocking: this runs on the reactor thread, which is also
+                // the accepting thread. See WebSocketSession.isQuiescent.
+                if(((WebSocketSession)entry.getValue()).isQuiescent()) {
                     done.add(entry.getKey());
                     entries.remove();
                 }

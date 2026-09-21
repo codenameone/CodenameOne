@@ -381,6 +381,28 @@ public final class WebSocketSession {
         return writers.get() == 0;
     }
 
+    /**
+     * Whether every writer has left, asked WITHOUT waiting.
+     *
+     * {@link #retire} may wait, and that is right where it is called from -- the
+     * connection's own thread, which has nothing else to do. It is wrong from the
+     * deferred-close sweep, which runs on the REACTOR thread: that thread is also
+     * the one that accepts, so a sweep that waits 100ms per deferred session stops
+     * the server accepting for as long as it takes, the listen backlog fills, and
+     * new connections are REFUSED while the process looks perfectly healthy.
+     *
+     * Measured: the Autobahn suite reached case 9.4.4 and then every remaining
+     * case failed to connect, with the server still running and `kill -0` still
+     * reporting it alive.
+     */
+    boolean isQuiescent() {
+        if(!dead) {
+            dead = true;
+            ServerSocket.shutdown(fd);
+        }
+        return writers.get() == 0;
+    }
+
     private static final long RETIRE_WAIT_MILLIS = 100;
 
     /** Reads more bytes. Answers false at end of stream. */
