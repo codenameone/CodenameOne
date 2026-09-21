@@ -269,8 +269,13 @@ cn1ss_backend_build_native() {
   # that mode, and a native with no C symbol takes its Java method with it, so
   # Crypto.sha1 would vanish and every handshake would compute the wrong accept.
   # Install libssl/libcurl/libnghttp2 instead; the vm-tests job already does.
+  # CN1_BACKEND_STANDALONE_DEMO because this demo needs neither the @RestClient
+  # contract nor demo/common, and generating the contract needs codenameone-core
+  # in the repo-local .m2-repo -- which the legs that run this server do not
+  # build. Without it build.sh stops with "codenameone-core:8.0-SNAPSHOT is not in
+  # .m2-repo" and produces no binary.
   ( cd "$root/vm/backend" \
-    && CN1_BACKEND_DEMO=demo/cn1ss CN1_BACKEND_SQLITE=0 \
+    && CN1_BACKEND_DEMO=demo/cn1ss CN1_BACKEND_SQLITE=0 CN1_BACKEND_STANDALONE_DEMO=1 \
        ./build.sh Cn1ssScreenshotServer com.demo "$out" ) 2>&1 \
     | sed 's/^/[cn1ss-native] /'
   if [ ! -x "$out" ]; then

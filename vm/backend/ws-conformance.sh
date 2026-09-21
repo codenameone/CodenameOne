@@ -117,7 +117,8 @@ case "$ARM" in
     native)
         : "${JDK_8_HOME:?build.sh requires JDK_8_HOME by name}"
         BIN="$(pwd)/target/wsecho-native"
-        CN1_BACKEND_DEMO=demo/wsecho CN1_BACKEND_SQLITE=0 ./build.sh WsEcho com.demo "$BIN"
+        CN1_BACKEND_DEMO=demo/wsecho CN1_BACKEND_SQLITE=0 \
+            CN1_BACKEND_STANDALONE_DEMO=1 ./build.sh WsEcho com.demo "$BIN"
         "$BIN" --port "$PORT" --host "$BIND_HOST" --workers "$WORKERS" &
         SERVER_PID=$!
         ;;
