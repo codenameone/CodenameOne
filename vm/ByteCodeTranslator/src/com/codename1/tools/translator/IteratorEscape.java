@@ -25,8 +25,15 @@ package com.codename1.tools.translator;
 
 import com.codename1.tools.translator.bytecodes.Field;
 import com.codename1.tools.translator.bytecodes.Instruction;
+import com.codename1.tools.translator.bytecodes.CustomJump;
 import com.codename1.tools.translator.bytecodes.Invoke;
+import com.codename1.tools.translator.bytecodes.Jump;
+import com.codename1.tools.translator.bytecodes.SwitchInstruction;
+import com.codename1.tools.translator.bytecodes.TryCatch;
+import org.objectweb.asm.Label;
 import com.codename1.tools.translator.bytecodes.LabelInstruction;
+import com.codename1.tools.translator.bytecodes.LineNumber;
+import com.codename1.tools.translator.bytecodes.LocalVariable;
 import com.codename1.tools.translator.bytecodes.TypeInstruction;
 import com.codename1.tools.translator.bytecodes.VarOp;
 import java.util.List;
@@ -117,6 +124,44 @@ class IteratorEscape {
         receiverCalls.clear();
         lastTrackedLocal = -1;
         List<Instruction> ins = m.getInstructions();
+        // WHICH LABELS ARE ACTUALLY JOIN POINTS.
+        //
+        // The walk used to refuse whenever the tracked value was on the stack at ANY
+        // LabelInstruction. Most labels are not join points at all -- nothing branches
+        // to them -- and a label nothing targets can only be reached by falling through
+        // from the instruction above it, which is the very path this linear walk models.
+        // Measured on the self-hosting corpus: 98 of 198 undecidable sites (49%) were
+        // refused at a label with no incoming control flow.
+        //
+        // The set is every label some instruction can transfer control TO: Jump,
+        // CustomJump (a fused conditional branch), every arm and the default of a
+        // switch, and all three labels of a TryCatch -- an exception can enter the
+        // handler from anywhere inside [start, end), so the region bounds count too.
+        // LocalVariable's scopeStart/scopeEnd are debug metadata, not control flow,
+        // and are deliberately NOT included; treating them as join points would put
+        // nearly every label back in the set and recover nothing.
+        java.util.Set<Object> joinLabels = new java.util.HashSet<Object>();
+        for (Instruction ji : ins) {
+            if (ji instanceof Jump) {
+                joinLabels.add(((Jump) ji).getLabel());
+            } else if (ji instanceof CustomJump) {
+                joinLabels.add(((CustomJump) ji).getLabel());
+            } else if (ji instanceof SwitchInstruction) {
+                SwitchInstruction sw = (SwitchInstruction) ji;
+                joinLabels.add(sw.getDefaultLabel());
+                Label[] arms = sw.getLabels();
+                if (arms != null) {
+                    for (int a = 0; a < arms.length; a++) {
+                        joinLabels.add(arms[a]);
+                    }
+                }
+            } else if (ji instanceof TryCatch) {
+                TryCatch tc = (TryCatch) ji;
+                joinLabels.add(tc.getStart());
+                joinLabels.add(tc.getEnd());
+                joinLabels.add(tc.getHandler());
+            }
+        }
         // The abstract operand stack: true means "this slot holds the tracked reference".
         boolean[] stack = new boolean[Math.max(8, m.getMaxStack() + 8)];
         int sp = 0;
@@ -126,12 +171,43 @@ class IteratorEscape {
         // exactly that. One is enough: a second store of the tracked value to a different
         // local gives up rather than growing into a general dataflow.
         int trackedLocal = -1;
+        // ALIAS SET, not a single local. The walk used to refuse outright when the
+        // tracked value was stored to a SECOND local -- 59 of 137 remaining undecidable
+        // sites on the self-hosting corpus, the largest single cause left. A set of
+        // locals is the natural answer and needs no control-flow fixpoint.
+        //
+        // It is deliberately never CLEARED. Marking a local as possibly-holding the
+        // value when it does not is an over-approximation: it can only make the walk
+        // report ESCAPES where the truth is SAFE. Clearing is the opposite and is
+        // unsound on a linear walk -- if a branch skips the overwriting store, the local
+        // still holds the tracked value while the walk believes it does not, and a later
+        // ALOAD would hand back "untracked" and miss a real escape.
+        boolean[] trackedLocals = new boolean[Math.max(8, m.getMaxLocals() + 8)];
         for (Instruction i : ins) {
             int op = i.getOpcode();
             // A label or a jump is a join point. The linear walk cannot model where the
             // tracked value would flow, so require that it is not on the stack at all
             // here; then there is nothing to flow and the walk stays sound.
-            if (i instanceof LabelInstruction || isBranch(op)) {
+            boolean joinPoint = isBranch(op)
+                    || (i instanceof LabelInstruction
+                        && joinLabels.contains(((LabelInstruction) i).getLabel()));
+            // A label nothing branches to is a no-op for this walk: it moves no values
+            // and has no stack effect. Skipping it is what makes the join-point set
+            // useful -- otherwise the walk falls through to the generic stack model,
+            // which has no entry for a label and refuses with "undescribed stack
+            // effect" instead. Measured: that moved 72 of the 98 recovered sites
+            // straight back into the undecidable bucket under a different name.
+            // Pseudo-instructions carry no stack effect at all: a label nothing
+            // branches to, a line-number marker, a local-variable debug range. The
+            // generic model has no entry for them and refuses with "undescribed stack
+            // effect", which is not a statement about the program. Measured: 98 sites
+            // were refused at a LabelInstruction, and once that was fixed the same 72
+            // reappeared at LineNumber -- the same non-answer wearing a different name.
+            if (i instanceof LineNumber || i instanceof LocalVariable
+                    || (i instanceof LabelInstruction && !joinPoint)) {
+                continue;
+            }
+            if (joinPoint) {
                 for (int s = 0; s < sp; s++) {
                     if (stack[s]) {
                         lastReason = "tracked value live across branch/label op=" + op
@@ -157,10 +233,12 @@ class IteratorEscape {
                 stack = push(stack, sp++, true);
                 continue;
             }
-            if (i instanceof VarOp && op == Opcodes.ALOAD && trackedLocal >= 0
-                    && ((VarOp) i).getIndex() == trackedLocal) {
-                stack = push(stack, sp++, true);
-                continue;
+            if (i instanceof VarOp && op == Opcodes.ALOAD) {
+                int li = ((VarOp) i).getIndex();
+                if (li >= 0 && li < trackedLocals.length && trackedLocals[li]) {
+                    stack = push(stack, sp++, true);
+                    continue;
+                }
             }
             // --- sinks ----------------------------------------------------------------
             if (i instanceof Field) {
@@ -251,16 +329,15 @@ class IteratorEscape {
                 sp = Math.max(0, sp - 1);
                 int idx = i instanceof VarOp ? ((VarOp) i).getIndex() : -1;
                 if (value) {
-                    if (idx < 0 || (trackedLocal >= 0 && trackedLocal != idx)) {
-                        lastReason = "ASTORE of the tracked value to a second local";
+                    if (idx < 0 || idx >= trackedLocals.length) {
+                        lastReason = "ASTORE of the tracked value to an unaddressable local";
                         return UNKNOWN;
                     }
+                    trackedLocals[idx] = true;
                     trackedLocal = idx;
                     lastTrackedLocal = idx;
-                } else if (idx >= 0 && idx == trackedLocal) {
-                    trackedLocal = -1;   // overwritten with something else
-                    lastTrackedLocal = -1;
                 }
+                // No clear on an untracked store -- see the alias-set note above.
                 continue;
             }
             if (op == Opcodes.DUP) {

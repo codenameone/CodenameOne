@@ -46,6 +46,13 @@ public class CustomJump extends Instruction {
      */
     private String customSuffix;
 
+    /// The branch target. Needed by IteratorEscape to decide which labels are real
+    /// join points: a CustomJump is a fused conditional branch, so its target must be
+    /// treated exactly like a Jump's.
+    public Label getLabel() {
+        return label;
+    }
+
     public CustomJump(Label label, String customCompareCode) {
         super(-1);
         this.label = label;
