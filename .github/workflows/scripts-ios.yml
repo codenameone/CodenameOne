@@ -462,6 +462,13 @@ jobs:
       # what makes the 27 baselines render the iOS 27 theme instead of scoring the
       # iOS 26 one against iOS 27 goldens.
       IOS_DEPENDENCY_ARGS: '-Dcodename1.arg.ios.themeGeneration=27'
+      # Its OWN warning ratchet. The census is per-TOOLCHAIN -- a new warning
+      # kind fails it -- and Xcode 27's clang does not emit the same set as
+      # Xcode 26's. Sharing ios-sim-debug's baseline, this job failed the census
+      # and stopped before running a single screenshot, while the tolerated step
+      # below reported the job green: a leg that produced nothing and said
+      # nothing. Baseline seeded from this job's own build log.
+      CN1_WARNING_LEG: ios-sim-debug-xcode27
       # Optional: when set, build-ios-app.sh writes it as a bundled resource so
       # the GoogleWebMap screenshot test renders a live Google map; absent (e.g.
       # fork PRs with no access to the secret) the test skips.
