@@ -55,6 +55,18 @@ jobs:
           fi
       - name: Boot one through the helper our jobs use
         run: ./scripts/ci/boot-ios-simulator.sh 'iOS-27[0-9-]*' 'iPhone 16' iPhone16-probe27
+      - name: Which candidate cannot report a version
+        # cn1_select_xcode swallows this (2>/dev/null) because a candidate that
+        # cannot answer is meant to be skipped. Run the same probe out loud once,
+        # so the image's behaviour is on the record rather than inferred.
+        run: |
+          set +e
+          for app in /Applications/Xcode*.app; do
+            printf '%s -> ' "$app"
+            "$app/Contents/Developer/usr/bin/xcodebuild" -version 2>&1 \
+              | awk '/^Xcode /{print $2; found=1; exit} END{if(!found) print "(no version line)"}'
+            printf '   exit=%s\n' "${PIPESTATUS[0]}"
+          done
       - name: Xcode selection our scripts would make
         run: |
           set -euo pipefail
@@ -62,3 +74,4 @@ jobs:
           source scripts/lib/xcode.sh
           CN1_XCODE_MAJOR=27 cn1_select_xcode
           echo "DEVELOPER_DIR=${DEVELOPER_DIR:-<unset>}"
+          echo "CN1_XCODE_VERSION=${CN1_XCODE_VERSION:-<unset>}"

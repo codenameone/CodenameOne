@@ -58,8 +58,17 @@ cn1_select_xcode() {
         local app version major best_version="" seen=""
         for app in /Applications/Xcode*.app; do
             [ -x "$app/Contents/Developer/usr/bin/xcodebuild" ] || continue
+            # `|| true` is load-bearing. A caller running under `set -e` -- which
+            # every CI step here does -- is killed by this assignment the moment
+            # one candidate's xcodebuild exits non-zero, before the emptiness
+            # check below ever runs. Measured on the GitHub xcode-27 image, where
+            # /Applications holds the real Xcode plus three symlinks to it and one
+            # of those invocations aborts (SIGABRT, status 134): selection died
+            # with no output at all, because the crash text goes to /dev/null and
+            # the status goes to `set -e`. A candidate that cannot report its
+            # version is one to SKIP, which is what the next line is for.
             version="$("$app/Contents/Developer/usr/bin/xcodebuild" -version 2>/dev/null \
-                        | awk '/^Xcode /{print $2; exit}')"
+                        | awk '/^Xcode /{print $2; exit}' || true)"
             [ -n "$version" ] || continue
             seen="$seen $version($app)"
             major="${version%%.*}"
