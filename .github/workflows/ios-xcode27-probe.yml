@@ -1,0 +1,57 @@
+# Answers three questions about the Xcode 27 hosted image before anything
+# expensive is built on top of it, and is deleted once they are answered:
+#
+#   1. Does the `xcode-27` runner label resolve for this repository at all?
+#      It is a PUBLIC PREVIEW image, so availability is not a given.
+#   2. Which Xcode and iOS simulator runtime does it actually carry?
+#   3. Can an iPhone 16 be CREATED on iOS 27 there? The image pre-creates
+#      iPhone 17 / 17e / 18 Pro / 18 Pro Max / Air and no iPhone 16, while our
+#      goldens were captured on an iPhone 16 -- so the plan depends on simctl
+#      being able to make one.
+#
+# Dispatch-only ON PURPOSE: this is a probe, not a gate.
+name: iOS Xcode 27 probe
+
+'on':
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    runs-on: xcode-27
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v6
+      - name: What is on this image
+        run: |
+          set -euo pipefail
+          sw_vers
+          echo "--- xcodebuild ---"
+          xcodebuild -version
+          echo "--- installed Xcodes ---"
+          ls -d /Applications/Xcode*.app || true
+          echo "--- iOS runtimes ---"
+          xcrun simctl list runtimes | grep -i ios || true
+          echo "--- pre-created iPhone devices ---"
+          xcrun simctl list devices available | grep -i iphone || true
+      - name: Is the iPhone 16 device type present
+        run: |
+          set -euo pipefail
+          echo "--- iPhone device types ---"
+          xcrun simctl list devicetypes | grep -i iphone || true
+          if xcrun simctl list devicetypes | grep -q 'SimDeviceType.iPhone-16)'; then
+            echo "RESULT: iPhone-16 device type IS available"
+          else
+            echo "RESULT: iPhone-16 device type is NOT available"
+          fi
+      - name: Boot one through the helper our jobs use
+        run: ./scripts/ci/boot-ios-simulator.sh 'iOS-27[0-9-]*' 'iPhone 16' iPhone16-probe27
+      - name: Xcode selection our scripts would make
+        run: |
+          set -euo pipefail
+          # shellcheck source=/dev/null
+          source scripts/lib/xcode.sh
+          CN1_XCODE_MAJOR=27 cn1_select_xcode
+          echo "DEVELOPER_DIR=${DEVELOPER_DIR:-<unset>}"
