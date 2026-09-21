@@ -2236,6 +2236,11 @@
         "tags_set": true,
         "canonical_set": true,
         "syndicated_at": "2026-09-21T00:01:14+00:00"
+      },
+      "devto": {
+        "id": 4709942,
+        "url": "https://dev.to/codenameone/faster-starts-less-javascript-overhead-297m",
+        "syndicated_at": "2026-09-21T18:40:10+00:00"
       }
     }
   }
