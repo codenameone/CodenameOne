@@ -5136,6 +5136,28 @@ void codenameOneGCMark() {
                 // Any future attempt must propagate the mode to every marker that can
                 // pop grace-discovered work -- helpers and cn1GcMutatorAssist alike --
                 // rather than just handing them the worklist. Carrying it per ENTRY
+                //
+                // AND THE PER-ENTRY FIX WAS BUILT AND DOES NOT FIX IT. Adding
+                // gcMarkWorklistEntry.gracePass -- stamped by both producers, adopted and
+                // restored by all three consumers (serial drain, helper loop,
+                // cn1GcMutatorAssist) exactly the way `precise` already is -- leaves the
+                // corruption in place. So the thread-local MODE is not the mechanism, or
+                // not the only one.
+                //
+                // Two further data points for whoever picks this up:
+                //
+                //   * Skipping the producer's own periodic drain when helpers exist makes
+                //     it worse, and that part IS understood: the walk outruns the helpers,
+                //     the worklist overflows, and an overflowing push is DROPPED -- an
+                //     unmarked live object. The producer must keep draining even when
+                //     others are consuming.
+                //   * With the producer still draining, the failure becomes a COIN FLIP:
+                //     6 of 12 runs of objectAllocation crashed, 12 of 12 clean serially.
+                //     A single green run means nothing here; count them.
+                //
+                // That is a race inside the page walk against concurrent markers, and it
+                // was not identified. Do not retry this without reproducing it under
+                // CN1_GC_VERIFY first, where GraceAudit names the holder and the victim.
                 // (the worklist already carries a per-entry `precise` flag, so there is
                 // precedent) is the obvious shape; a second global would reintroduce
                 // exactly the isolation bug the __thread comment above warns about.
