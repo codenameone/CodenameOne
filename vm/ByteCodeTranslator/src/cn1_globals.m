@@ -5075,6 +5075,41 @@ void codenameOneGCMark() {
             // full gcMarkDrain, which is what closes the fixpoint.
             if(gcMarkWorklistTop >= gcMarkWorklistCapacity / 2) {
                 atomic_fetch_add_explicit(&cn1GcGraceDrains, 1, memory_order_relaxed);
+// SERIAL ON PURPOSE -- the parallel drain was tried here and is SLOWER.
+                //
+                // The diagnosis that motivates it is real: profiling objectAllocation
+                // with `sample` shows the GC thread burning inside __GC_MARK_Node under
+                // codenameOneGCMark while all three mark workers sit in __psynch_cvwait
+                // for the entire run, and the mutator spends 72% of its samples in
+                // usleep inside cn1PacingPark, throttled waiting for a cycle one thread
+                // is holding open. The workers are parked because the parallel
+                // generation ends before this phase begins.
+                //
+                // But gcMarkDrainParallel starts a WHOLE GENERATION per call: reset
+                // termination state, broadcast, wake the helpers, each reports finished,
+                // and the caller waits. This loop drains every time the worklist reaches
+                // half capacity, so that handshake runs constantly and costs more than
+                // the batch it parallelises. Measured with both arms built from this
+                // tree and five INTERLEAVED rounds, min of 15 reps each:
+                //
+                //     parallel  28.34 33.97 30.25 39.12 26.90  median 30.25  spread 45%
+                //     serial    28.60 28.55 28.98 31.62 27.50  median 28.60  spread 15%
+                //
+                // Neutral on the median, slightly better at its best, and far more
+                // VARIABLE -- what a per-batch handshake looks like when it sometimes
+                // costs more than the batch. An earlier version of this note claimed
+                // 25.7 serial against 31.1 parallel and called it a 21% regression;
+                // that compared the parallel arm against a serial number from a
+                // DIFFERENT run on a differently loaded host. Serial re-measured at the
+                // same moment was 30.4. Quote no ratio whose arms were not interleaved
+                // within one run -- which is what ab-bench.sh exists to enforce.
+                //
+                // Repeated generations are the wrong shape for a producer that drains as
+                // it goes. Making this parallel properly means ONE generation held open
+                // across the whole pass, with the helpers consuming while the page walk
+                // produces -- which needs termination detection to wait on the producer,
+                // not just on the helpers. That is a change to the worklist protocol,
+                // not a substitution here.
                 gcMarkDrainWorklist(d);
             }
         }
