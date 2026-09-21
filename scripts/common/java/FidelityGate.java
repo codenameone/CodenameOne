@@ -28,7 +28,9 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.TreeMap;
+import java.util.TreeSet;
 
 /// The native-fidelity ratchet gate. Given a ProcessScreenshots "--mode fidelity"
 /// comparison JSON and a stored baseline, it fails (exit 20) when any component's
@@ -82,6 +84,7 @@ public class FidelityGate {
         }
         Map<String, Double> current = new LinkedHashMap<>();
         Map<String, Map<String, Double>> currentGeometry = new LinkedHashMap<>();
+        Set<String> geometricallyEmpty = new TreeSet<>();
         List<String> broken = new ArrayList<>();
         for (Object item : JsonUtil.asArray(data.get("results"))) {
             Map<String, Object> result = JsonUtil.asObject(item);
@@ -103,6 +106,18 @@ public class FidelityGate {
                     g.put("width_ratio", widthRatio);
                     g.put("height_ratio", heightRatio);
                     currentGeometry.put(test, g);
+                } else if (bothSidesEmpty(geo)) {
+                    // A tile with no widget SILHOUETTE on either side has no
+                    // geometry to give, which is not the same as withholding it.
+                    // It happens for real: iOS 27's dark glass over a flat
+                    // mid-grey backdrop transforms to within a shade of that same
+                    // grey, so the panel has no edge -- in the native capture as
+                    // much as in our render. Recorded as an empty entry so the
+                    // pair still has to APPEAR here, and so a later run that grows
+                    // a silhouette on one side alone is a change rather than a
+                    // quiet pass. One-sided empty is deliberately NOT accepted:
+                    // that is a widget rendering in one and not the other.
+                    geometricallyEmpty.add(test);
                 }
             } else {
                 broken.add(test + " (" + status + ")");
@@ -113,7 +128,8 @@ public class FidelityGate {
         // A compared pair cannot evade its geometry contract by returning no metrics.
         // Check updates too, while allowing partial runs to retain untouched entries.
         for (String pair : baselineGeometry.keySet()) {
-            if (current.containsKey(pair) && !currentGeometry.containsKey(pair)) {
+            if (current.containsKey(pair) && !currentGeometry.containsKey(pair)
+                    && !geometricallyEmpty.contains(pair)) {
                 broken.add(pair + " (missing or incomplete geometry for an existing baseline)");
             }
         }
@@ -122,7 +138,8 @@ public class FidelityGate {
             // New and legacy score-only pairs must acquire geometry when refreshed;
             // otherwise the update would permanently exempt them from this contract.
             for (String pair : current.keySet()) {
-                if (!baselineGeometry.containsKey(pair) && !currentGeometry.containsKey(pair)) {
+                if (!baselineGeometry.containsKey(pair) && !currentGeometry.containsKey(pair)
+                        && !geometricallyEmpty.contains(pair)) {
                     broken.add(pair + " (missing or incomplete geometry in baseline update)");
                 }
             }
@@ -351,6 +368,16 @@ public class FidelityGate {
             return s;
         }
         return value.toString();
+    }
+
+    /// True when the geometry block says the tile has no widget silhouette on
+    /// EITHER side. Written by ProcessScreenshots.geometryMetrics; a block that
+    /// predates those flags carries `empty` alone, and is not accepted here --
+    /// an old report must not acquire an exemption it never measured.
+    private static boolean bothSidesEmpty(Map<String, Object> geo) {
+        return Boolean.TRUE.equals(geo.get("empty"))
+                && Boolean.TRUE.equals(geo.get("native_empty"))
+                && Boolean.TRUE.equals(geo.get("cn1_empty"));
     }
 
     private static Double toDouble(Object value) {
