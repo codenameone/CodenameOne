@@ -919,8 +919,15 @@ ChatVoiceButton { cn1-derive: Button; padding: 1.5mm; margin: 0.5mm; }
     ChatBubbleUser { background-color: var(--accent-color-dark, #4cc2ff); color: var(--accent-fg-color-dark, #000000); }
     ChatBubbleAssistant { background-color: #2d2d2d; color: var(--text-color-dark, #ffffff); }
     ChatBubbleSystem { background-color: transparent; color: #9b9b9b; }
-    ChatBubbleText { background-color: transparent; color: var(--text-color-dark, #ffffff); }
+    ChatBubbleText { cn1-derive: Label; background-color: transparent; color: var(--text-color-dark, #ffffff); }
     ChatTypingIndicator { background-color: transparent; color: #9b9b9b; }
     ChatInput { background-color: var(--window-bg-color-dark, #202020); }
-    ChatInputField { background-color: #2b2b2b; color: var(--text-color-dark, #ffffff); }
+    ChatInputField { cn1-derive: TextField; background-color: #2b2b2b; color: var(--text-color-dark, #ffffff); }
+    /* The derives are REPEATED here, not inherited. cn1-derive is flattened against the
+       LIGHT parent at compile time, so a UIID that derives only in the light block ships a
+       concrete copy of the light colours and no dark entry at all -- it would keep its light
+       colours on a dark form. DesktopNativeThemeParityTest fails the build for exactly that. */
+    ChatSendButton { cn1-derive: RaisedButton; padding: 1.5mm 3mm; margin: 0.5mm; }
+    ChatAttachButton { cn1-derive: Button; padding: 1.5mm; margin: 0.5mm; }
+    ChatVoiceButton { cn1-derive: Button; padding: 1.5mm; margin: 0.5mm; }
 }
