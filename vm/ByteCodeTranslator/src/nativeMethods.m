@@ -3057,10 +3057,18 @@ JAVA_VOID monitorExit(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj) {
 // plain-store double-check on EVERY generated class initializer in the VM, which predates
 // tagging and is not fixed here.
 #if CN1_TAGGED_ACTIVE
+/* THE FLAG IS A FILE-SCOPE GLOBAL, NOT A FUNCTION-LOCAL STATIC, AND THAT IS THE
+ * POINT. valueOf is the whole construction of a tagged box -- it should compile to
+ * a shift and an OR -- but a function holding a MUTABLE STATIC LOCAL cannot be
+ * freely duplicated, so ThinLTO declines to inline it across modules. It therefore
+ * showed up as its own frame at 17% of mutator time in a HashMap workload that
+ * calls it 6M times per rep, for a value type that is supposed to be free.
+ * Hoisting the flag to file scope removes the obstacle; the semantics are
+ * identical (one flag per class, acquire on read, release on publish). */
+#define CN1_DECLARE_BOX_CLINIT_FLAG(cls) static int cn1__clinit_##cls = 0;
 #define CN1_FORCE_BOX_CLINIT(cls) \
     do { \
-        static int cn1__clinit_##cls = 0; \
-        if(!__atomic_load_n(&cn1__clinit_##cls, __ATOMIC_ACQUIRE)) { \
+        if(__builtin_expect(!__atomic_load_n(&cn1__clinit_##cls, __ATOMIC_ACQUIRE), 0)) { \
             monitorEnterBlock(threadStateData, (JAVA_OBJECT)&class__##cls); \
             __STATIC_INITIALIZER_##cls(threadStateData); \
             monitorExitBlock(threadStateData, (JAVA_OBJECT)&class__##cls); \
@@ -3077,6 +3085,15 @@ JAVA_VOID monitorExit(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj) {
 #if CN1_TAGGED_ACTIVE
 extern void __STATIC_INITIALIZER_java_lang_Integer(CODENAME_ONE_THREAD_STATE);
 #endif
+#if CN1_TAGGED_ACTIVE
+CN1_DECLARE_BOX_CLINIT_FLAG(java_lang_Integer)
+CN1_DECLARE_BOX_CLINIT_FLAG(java_lang_Long)
+CN1_DECLARE_BOX_CLINIT_FLAG(java_lang_Double)
+CN1_DECLARE_BOX_CLINIT_FLAG(java_lang_Float)
+CN1_DECLARE_BOX_CLINIT_FLAG(java_lang_Character)
+CN1_DECLARE_BOX_CLINIT_FLAG(java_lang_Short)
+#endif
+
 JAVA_OBJECT java_lang_Integer_valueOf___int_R_java_lang_Integer(CODENAME_ONE_THREAD_STATE, JAVA_INT i) {
 #if CN1_TAGGED_ACTIVE
     CN1_FORCE_BOX_CLINIT(java_lang_Integer);

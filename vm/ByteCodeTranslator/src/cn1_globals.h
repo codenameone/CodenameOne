@@ -2167,7 +2167,44 @@ typedef struct CN1BibopPage {
     int slotSize;
     int slotCount;
     int firstSlotOffset;                  // byte offset of slot 0 from page base
-    _Atomic int bumpIndex;                // next slot to bump-allocate (published)
+    /* ---- CACHE-LINE SPLIT, and it is load-bearing -----------------------------
+     * bumpIndex is written by the OWNING MUTATOR on every single allocation (a
+     * store-release), and gcAllocedSinceSweep on every allocation too. The GC
+     * fields below -- nextAll walked to enumerate pages, gcGraceMarked,
+     * gcLastMarkedEpoch, the sweep bookkeeping -- are read and written by the
+     * MARKER THREADS concurrently. With the whole header in one 64/128B line
+     * those are the same line, so every allocation and every marker touch
+     * ping-pong it between cores.
+     *
+     * Measured before this split, objectAllocation mean over 5 reps at default
+     * trigger, mutator single-threaded on a 16-core machine:
+     *
+     *     1 marker  78.5ms   2 markers  79.9ms   4 markers 103.4ms   8 markers 103.3ms
+     *
+     * i.e. 32% slower purely from adding marker threads that have idle cores to
+     * run on, while intArithmetic in the same process stayed flat (56.7-61.7).
+     * A collector on its own core is supposed to be free to the mutator; this is
+     * the mechanism by which it was not.
+     *
+     * The alignment puts the mutator-hot pair on their own line. Do not move a
+     * GC-written field above this boundary.
+     *
+     * WHAT THIS DID AND DID NOT FIX. After the split the marker-count dependence
+     * is GONE -- 1/2/4/8 markers measure 97.1/102.7/95.5/90.4, flat, where before
+     * they stepped 78.5/79.9/103.4/103.3. So the collector no longer charges the
+     * mutator for having more marker threads, which is the property that matters.
+     *
+     * It did NOT move the headline. A 40-rep interleaved A/B at 8 markers:
+     * mean 103.8 -> 100.9 (0.973) but median 94.2 -> 115.6, with the control
+     * (intArithmetic) at 0.998. Those disagree, and with objectAllocation bimodal
+     * at ~30ms/~150ms the benchmark cannot resolve the difference. Kept anyway:
+     * a field written on every allocation sharing a line with fields concurrent
+     * markers write is wrong independently of what one benchmark can measure, and
+     * the padding costs ~8 slots of 2047 in a 64KB page.
+     *
+     * The 73% of objectAllocation that IS the collector survives this fix, so it
+     * is the memory traffic of tracing the heap, not header contention. */
+    _Atomic int bumpIndex __attribute__((aligned(128))); // next slot to bump-allocate (published)
     void* freeList;                       // intrusive free-list head (slot ptr)
     int freeCount;
     JAVA_BOOLEAN owned;
@@ -2188,7 +2225,8 @@ typedef struct CN1BibopPage {
                                           //  owner's stores
                                           // (owner-thread single-writer; published to the
                                           //  GC via the sweep-stack release-push)
-    JAVA_BOOLEAN gcNeedsReclaim;          // a survivor carries a finalizer or monitor ->
+    /* Everything from here on is GC-side: keep it off the mutator's line. */
+    JAVA_BOOLEAN gcNeedsReclaim __attribute__((aligned(128))); // a survivor carries a finalizer or monitor ->
                                           //  dead slots must reach cn1BibopReclaimSlot
     JAVA_BOOLEAN gcHasMonitors;           // STICKY: a monitor was ever attached to an
                                           //  object in this page (set by
