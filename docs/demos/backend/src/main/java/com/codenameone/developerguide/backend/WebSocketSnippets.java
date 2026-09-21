@@ -26,6 +26,7 @@ import com.codename1.backend.Backend;
 import com.codename1.backend.HttpServer;
 import com.codename1.backend.WebSocket;
 import com.codename1.backend.WebSocketSession;
+import com.codename1.backend.annotations.WebSocketMapping;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -63,6 +64,17 @@ public static Backend start() throws Exception {
             .start();
 }
 // end::backend-websocket-register[]
+
+// tag::backend-websocket-annotated[]
+@WebSocketMapping("/chat")
+public static final class ChatEndpoint implements WebSocket {
+    public void onOpen(WebSocketSession session) { }
+
+    public void onText(WebSocketSession session, String message) { }
+
+    public void onBinary(WebSocketSession session, byte[] message, int offset, int length) { }
+}
+// end::backend-websocket-annotated[]
 
 // tag::backend-websocket-broadcast[]
 public static final class Room implements WebSocket {

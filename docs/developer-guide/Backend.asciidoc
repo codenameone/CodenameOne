@@ -450,6 +450,21 @@ and a route points at one:
 include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/WebSocketSnippets.java[tag=backend-websocket-register,indent=0]
 ----
 
+Or the build can find it, the way it finds a `@RestController`:
+
+[source,java]
+----
+include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/WebSocketSnippets.java[tag=backend-websocket-annotated,indent=0]
+----
+
+The annotation goes on the type rather than on a method, because a `@GetMapping`
+marks a call and a websocket is a connection: its contract is seven callbacks that
+share per-connection state, which is an object. What it keeps from `@GetMapping` is
+what a reader cares about -- the path is relative to a class-level
+`@RequestMapping`, a constructor taking a `DataSource` or an `EntityManager` is
+injected the same way, and two endpoints claiming one path is a build error rather
+than something registration order decides.
+
 `HttpServer` takes the same registration directly, for a server built without the
 builder:
 
