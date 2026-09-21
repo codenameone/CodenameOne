@@ -5158,6 +5158,30 @@ void codenameOneGCMark() {
                 // That is a race inside the page walk against concurrent markers, and it
                 // was not identified. Do not retry this without reproducing it under
                 // CN1_GC_VERIFY first, where GraceAudit names the holder and the victim.
+                //
+                // THAT REPRODUCTION WAS RUN, and it points at lost WORK rather than at
+                // stamping. Under CN1_GC_VERIFY, third run:
+                //
+                //     holder = Node mark=4 (epoch+0)      marked this epoch, survived
+                //     field -> Node mark=-8               FREED
+                //     markSite = markFn+116               the field read in the holder's
+                //                                         own mark function
+                //
+                // So the HOLDER was marked and its CHILD was never traced. Marking an
+                // object and running its mark function are separate: gcMarkObject marks
+                // and pushes, and the function that walks the fields runs when the entry
+                // is POPPED. A marked-but-never-popped holder leaves its children
+                // unmarked, and the sweep takes them.
+                //
+                // The suspect is the interaction between the producer's periodic serial
+                // gcMarkDrainWorklist and a LIVE generation's termination state, which
+                // this attempt mixed without thinking about it. If a serial drain empties
+                // the worklist mid-walk and gcMarkActiveWorkers reaches zero, gcMarkDone
+                // latches TRUE: the helpers leave and report finished, every later push by
+                // the walk has no consumer, and gcMarkParallelJoin's own drain loop sees
+                // gcMarkDone already set and returns at once. Not confirmed -- but it is
+                // the next thing to instrument, and it is a different question from the
+                // marking-mode one above, which was tested and is NOT the cause.
                 // (the worklist already carries a per-entry `precise` flag, so there is
                 // precedent) is the obvious shape; a second global would reintroduce
                 // exactly the isolation bug the __thread comment above warns about.
