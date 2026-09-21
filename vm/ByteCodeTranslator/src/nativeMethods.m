@@ -3840,6 +3840,18 @@ static JAVA_INT cn1TaggedHashSlow(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT key, ui
 }
 #endif
 
+#ifdef CN1_HM_PROBE_CENSUS
+long cn1HmProbeCalls = 0, cn1HmProbeSteps = 0;
+static void cn1HmProbeReport(void) {
+    if(cn1HmProbeCalls == 0) return;
+    fprintf(stderr, "[HMPROBE] lookups=%ld extraSteps=%ld stepsPerLookup=%.3f\n",
+            cn1HmProbeCalls, cn1HmProbeSteps,
+            (double)cn1HmProbeSteps / (double)cn1HmProbeCalls);
+    fflush(stderr);
+}
+__attribute__((constructor)) static void cn1HmProbeInit(void){ atexit(cn1HmProbeReport); }
+#endif
+
 static inline JAVA_INT cn1HmMarker(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT key) {
     if(key == JAVA_NULL) {
         return (JAVA_INT)0x80000000;
@@ -3901,8 +3913,24 @@ static JAVA_INT cn1HmFindSlot(CODENAME_ONE_THREAD_STATE, struct obj__java_util_H
     int i = marker & mask;
     if(meta == NULL) return -(i + 1);
     uint32_t perturb = (uint32_t)marker;
+#ifdef CN1_HM_PROBE_CENSUS
+    /* How many slots does one lookup actually touch? A COUNT, so a loaded machine
+     * cannot corrupt it -- unlike every timing taken on this host tonight. Near
+     * 1.0 means the spreading is healthy and the remaining cost is cache
+     * behaviour across the three separate blocks; materially above it means the
+     * marker clusters and the probe recurrence itself is the cost. Those want
+     * opposite fixes, which is why this is measured rather than guessed. */
+    cn1HmProbeCalls++;
+#endif
     int firstTomb = -1;
     JAVA_INT expected = t->java_util_HashMap_modCount;
+    /* SHORT-CIRCUITING THE TAG TEST HERE WAS MEASURED SLOWER AND REVERTED.
+     * Skipping cn1IsStringClass for a tagged key removes a tag resolve from every
+     * lookup and is obviously correct -- and ab-bench.sh put hashMapChurn at
+     * 1.055 (5.5% SLOWER) with every control at 1.000. cn1HmFindSlot is static,
+     * and changing its body changed how clang inlines it into get/put; the
+     * removed work cost less than the inlining it disturbed. Re-measure with
+     * ab-bench.sh before trying it again. */
     int stringKey = key != JAVA_NULL && cn1IsStringClass(CN1_CLASS_OF(key));
     while(1) {
         JAVA_INT m = meta[i];
@@ -3925,6 +3953,9 @@ static JAVA_INT cn1HmFindSlot(CODENAME_ONE_THREAD_STATE, struct obj__java_util_H
         }
         perturb >>= 5;
         i = cn1HmNextSlot(i, perturb, mask);
+#ifdef CN1_HM_PROBE_CENSUS
+        cn1HmProbeSteps++;
+#endif
     }
 }
 
