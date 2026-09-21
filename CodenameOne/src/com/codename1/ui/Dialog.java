@@ -2170,6 +2170,25 @@ public class Dialog extends Form implements AbstractDialog {
     /// exactly the expression it always did.
     @Override
     void showDialog(boolean modal, boolean reverse) {
+        if (Display.getInstance().isDesktop()) {
+            // A desktop dialog is a card sized to what it says. The percentages below are the
+            // phone convention -- 20% off the top, 10% off the bottom, 20% each side, so the
+            // dialog is always 70% x 60% of its host no matter what is in it. On a phone that
+            // reads as a sheet; on a desktop window it reads as a confirm box with a title, one
+            // line of text, and a third of the window empty above and below it. Measured on the
+            // committed goldens before this: the same "Delete the document?" dialog came out
+            // 215px tall at 400x300, 280px at 1000x400 and 490px at 900x700 -- tracking the
+            // window, never the content.
+            //
+            // showPacked is the existing content-sized path, already used whenever a dialog
+            // position is set, and it honours the dialogMaxWidthPercentInt / dialogMaxWidthMMInt
+            // theme caps so a long body still wraps into a centred card rather than a full-width
+            // strip. Routed here rather than at the two call sites because Form.showModal and
+            // showModeless both funnel through this method, so this is where hosted and
+            // non-hosted desktop dialogs meet.
+            showPacked(BorderLayout.CENTER, modal);
+            return;
+        }
         if (hostBounds() == null) {
             super.showDialog(modal, reverse);
             return;
