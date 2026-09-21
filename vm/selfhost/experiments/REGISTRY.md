@@ -5537,3 +5537,91 @@ under load (this run averaged load 5.8). Raising DEEP_BUDGET_MS, or giving the
 allocation rows their own floor, is the next harness step -- not attempted here,
 because a harness change made to chase one row on one loaded run is how a
 threshold gets tuned to noise.
+
+---
+
+## Round 31: the parallel grace pass, and a 27% regression that was TLS
+
+**The sleep.** Profiling objectAllocation put the mutator at 72% of samples in
+usleep inside cn1PacingPark, throttled against an allocation cap while ONE
+thread held the cycle open running the grace pass, and all three mark helpers
+sat in __psynch_cvwait for the whole run. cn1GcMutatorAssist could not help:
+it returns 0 unless gcMarkActiveWorkers > 0 AND gcMarkWorklistTop > 0, and a
+serial grace drain leaves both false.
+
+**Six earlier attempts to parallelise it crashed, and the cause was found.**
+It was never the drain. gcMarkWorklistPush picks its path from gcMarkLocalBuf:
+
+    lb != 0  (every helper)   buffer locally, flush under gcMarkWorklistMutex
+    lb == 0  (the producer)   gcMarkWorklist[top] = ...; top++   RAW, no mutex
+
+The raw path carries the precondition "Serial producer: no workers can access
+the shared queue in this phase". The grace pass runs on the GC thread, which
+had no buffer, so every attempt broke it: a helper's flush interleaves with the
+producer's read-write-increment of the same index, the helper's entry is
+overwritten, and the object it named is marked but never popped -- its mark
+function never runs, its children stay unmarked, and the sweep frees them under
+a live holder. That is the CN1_GC_VERIFY report exactly (holder mark=4, child
+mark=-8, markSite in the holder's own mark function), and it explains the result
+that made no sense: locking only the POP side made the crash deterministic
+(12/12) rather than fixing it, because it widened the window the push clobbers.
+
+The fix is a local buffer on the producer. Termination needed no new protocol:
+gcMarkParallelDispatch already counts the caller among gcMarkThreadCount, so
+gcMarkDone cannot latch until the producer itself goes idle.
+
+    objectAllocation, plain      12/12 clean   (was 6/12; 0/12 with a locked pop)
+    CN1_GC_VERIFY                0 violations in 9 runs   (was ~1 in 3)
+    run-gc-verify                GREEN, and GREEN on baseline
+    run-gauntlet (JDK 25 ref)    GREEN, 33 tortures, both stop modes
+
+Non-vacuity was probed, because a silent fallback to the serial path would pass
+every one of those: the default build reports markers=4 with the producer
+active, and CN1_GC_MARK_THREADS=1 correctly takes no producer path at all.
+
+**THE 27% REGRESSION ON recursion WAS THE TLS BLOCK, NOT THE GRACE PASS.**
+The first A/B scored objectAllocation 0.824 and recursion 1.269 (settled, +-0%).
+Switching the parallel producer off at RUNTIME changed recursion not at all --
+98-100ms either way -- which eliminated both the dispatch/join handshake and the
+gcMarkRunBatch extraction and pointed at the declaration:
+
+    static __thread struct gcMarkLocalBuffer gcMarkProducerBuf;   // several KB
+
+The generated code touches thread-locals on every call for the frame push/pop
+and the stack pointer, and recursion is nothing but calls.
+
+    baseline                       99  100   99  100 ms
+    buffer as a __thread struct   126  125  123  125 ms   +27%
+    buffer as a __thread pointer   98   99  100   99 ms   recovered
+
+GENERAL RULE, worth more than this change: keep large per-thread scratch OFF the
+TLS block. A multi-KB __thread object is not free to declare; it taxes every
+thread-local read in the VM.
+
+**The win is real but NOT pinned down, and the honest number is a range.**
+Re-measured after the TLS fix, the machine was carrying another checkout's
+simulator at 331% CPU (load 7.1), and ab-bench reported objectAllocation
+UNSETTLED at +-40%/+-38%. Hand-measured at 25 reps, interleaved with alternating
+order, 8 rounds, paired ratios:
+
+    1.109  0.909  0.906  0.887  0.916  0.957  1.035  0.961    median 0.937
+
+So ~6% under load, 17.6% at load ~4, 6 of 8 rounds favouring the new arm. This
+is expected to be core-dependent -- the whole mechanism is helpers consuming
+while the walk produces, so it buys less when there are no spare cores. A quiet
+machine is needed to pin it, and NO single figure from this session should be
+quoted as the result.
+
+**Dead code, stated rather than hidden:** gcMarkProducerPoll's contribute-a-batch
+branch never fired in any workload measured here -- the helpers keep up, so the
+shared worklist never reaches the drain threshold. It is kept as the bound
+against a producer outrunning them, but it is currently unexercised.
+
+**A pre-existing gate defect, found on the way:** run-gc-verify's self-test5
+reported "BROKEN -- freelive never freed a live slot in 4 runs". That is the
+non-vacuity guard firing because the fault INJECTOR never fired, not a heap
+violation. It is load-sensitive under parallel marking (the same binary fired
+1/3 at one moment and 8/8 at another) and the gate only makes 4 attempts.
+Baseline and this branch both fired 8/8 when re-measured, so it is not this
+change -- but a guard whose reliability depends on machine load will read green
+when it should not, and it is worth fixing on its own.
