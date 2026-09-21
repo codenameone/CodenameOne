@@ -443,7 +443,7 @@ An endpoint implements `com.codename1.backend.WebSocket`:
 include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/WebSocketSnippets.java[tag=backend-websocket-echo,indent=0]
 ----
 
-and a route points at one:
+A route points at one:
 
 [source,java]
 ----
@@ -458,7 +458,7 @@ include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/W
 ----
 
 The annotation goes on the type rather than on a method, because a `@GetMapping`
-marks a call and a websocket is a connection: its contract is seven callbacks that
+marks a call and a WebSocket is a connection: its contract is seven callbacks that
 share per-connection state, which is an object. What it keeps from `@GetMapping` is
 what a reader cares about -- the path is relative to a class-level
 `@RequestMapping`, a constructor taking a `DataSource` or an `EntityManager` is
@@ -507,10 +507,10 @@ is what makes a broadcast possible.
 include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/WebSocketSnippets.java[tag=backend-websocket-broadcast,indent=0]
 ----
 
-Each session serialises its own writers, so two threads can't interleave halves of
+Each session serializes its own writers, so two threads can't interleave halves of
 two messages on one connection. What the server doesn't do is queue: `sendText`
 writes to the socket and blocks if the peer has stopped reading. That's honest
-backpressure rather than a buffer that grows until the machine runs out, but it
+back pressure rather than a buffer that grows until the machine runs out, but it
 means one unresponsive client can hold up a loop that broadcasts to every other
 one. A server with many clients and large messages should broadcast from a small
 pool rather than from the receiving thread.
@@ -531,7 +531,7 @@ describes; `getSubprotocol` then answers null.
 
 ==== A connection, not a request
 
-A websocket is a connection that stopped being HTTP, and the difference is
+A WebSocket is a connection that stopped being HTTP, and the difference is
 something an author can feel.
 
 Under virtual threads -- the default on the packaged runtime -- each connection
@@ -542,11 +542,11 @@ for.
 On the thread pool it's a worker per connection for as long as the connection
 lasts. That's the mode the local development loop always runs in, because the JVM
 has no virtual threads here, and it's also the mode any TLS server runs in. A
-pooled deployment serving many websockets has to size `workers` for them, because
+pooled deployment serving many WebSockets has to size `workers` for them, because
 unlike a request they don't give the worker back.
 
 The idle timeout is separate for the same reason. `CN1_HTTP_TIMEOUT_MS` sheds a
-client that began a request and stopped; a websocket is idle by design and would
+client that began a request and stopped; a WebSocket is idle by design and would
 be shed within seconds by that rule. `CN1_WS_IDLE_TIMEOUT_MS` governs these
 instead, defaults to five minutes, and accepts 0 for connections that may stay
 silent indefinitely. `CN1_WS_MAX_MESSAGE_MB` bounds reassembly, because a message
@@ -561,8 +561,8 @@ window, so a shutdown reads as one to the client rather than as a network failur
 
 ==== How the frame layer is checked
 
-Most of RFC 6455 is about frames a conformant client never sends, so a server can
-be wrong in ways nothing it talks to will reveal. The
+Most of RFC 6455 is about frames a conformant client never sends, which is how a
+server ends up wrong in ways nothing it talks to will reveal. The
 https://github.com/crossbario/autobahn-testsuite[Autobahn|Testsuite] is what finds
 those, and `vm/backend/ws-conformance.sh` runs it:
 
@@ -742,7 +742,7 @@ no TLS, and what it does need is exactly what a translated binary is good at.
 * WebSockets are RFC 6455 over HTTP/1.1. There is no permessage-deflate, so
   messages go out uncompressed no matter how compressible, and no RFC 8441, so
   a browser that reaches this server over HTTP/2 opens a second connection for its
-  websocket rather than carrying it on the first. Both are what every client
+  WebSocket rather than carrying it on the first. Both are what every client
   already falls back to. `wss` works on the packaged runtime through the same TLS
   the rest of the server uses, and not in the local loop, which terminates no
   TLS.
