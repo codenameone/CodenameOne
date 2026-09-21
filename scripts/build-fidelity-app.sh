@@ -51,12 +51,59 @@ case "$PLATFORM" in
     #
     #   grep setIosThemeGeneration <ios-source>/*-src/*Stub.m
     #   grep 'installed theme' artifacts/ios-fidelity/simctl-log.txt
+    ios_generation=26
     case "${CN1SS_FIDELITY_GOLDEN_SET:-}" in
       ios-27-*)
+        ios_generation=27
         export IOS_DEPENDENCY_ARGS="${IOS_DEPENDENCY_ARGS:-} -Dcodename1.arg.ios.themeMode=modern -Dcodename1.arg.ios.themeGeneration=27"
         echo "[build-fidelity-app] golden set ${CN1SS_FIDELITY_GOLDEN_SET}: building with ios.themeGeneration=27" >&2
         ;;
     esac
+
+    # Forward the local repository the OUTER build is using. The inner mvnw
+    # otherwise resolves 8.0-SNAPSHOT from whatever localRepository is
+    # configured for the machine, which on a box with several checkouts is a
+    # shared directory another checkout last wrote -- and a plugin from there
+    # simply omits setIosThemeGeneration, leaving the port on generation 26
+    # while this script announces an iOS 27 build.
+    #
+    # Propagated, never invented: CI installs into the repository its own cache
+    # restores and sets nothing here, so imposing a per-checkout default would
+    # point the inner build at an empty directory and break it. Set
+    # CN1_LOCAL_REPO to the repository that holds the artifacts you just built.
+    if [ -n "${CN1_LOCAL_REPO:-}" ]; then
+      export IOS_DEPENDENCY_ARGS="${IOS_DEPENDENCY_ARGS:-} -Dmaven.repo.local=${CN1_LOCAL_REPO}"
+      echo "[build-fidelity-app] inner build uses maven.repo.local=${CN1_LOCAL_REPO}" >&2
+    fi
+
+    # Drop a generated Xcode project that was produced for a DIFFERENT theme
+    # generation. CN1BuildMojo.doIOSLocalBuild() decides whether to regenerate
+    # from source timestamps alone, so a build-hint change on the command line
+    # does not reach it: the stub keeps its previous setIosThemeGeneration call,
+    # the runner trusts that stale value and installs the other generation's
+    # .res, and the run scores one generation against the other's goldens with
+    # nothing in the output saying so. Measured while tuning gen27.css -- three
+    # consecutive runs produced byte-identical scores for exactly this reason.
+    #
+    # An existing project with NO stamp is also dropped: its generation is
+    # unknown, and one extra regeneration is cheaper than a silently mismatched
+    # run.
+    ios_target="$SCRIPT_DIR/fidelity-app/ios/target"
+    ios_stamp="$ios_target/.cn1-theme-generation"
+    if [ -d "$ios_target" ]; then
+      if [ ! -f "$ios_stamp" ] || [ "$(cat "$ios_stamp" 2>/dev/null)" != "$ios_generation" ]; then
+        for stale in "$ios_target"/*-ios-source; do
+          [ -e "$stale" ] || continue
+          echo "[build-fidelity-app] generation changed -> removing $stale" >&2
+          rm -rf "$stale"
+        done
+      fi
+      # Written before the build rather than after, so the stamp always
+      # describes the project on disk: the project is absent at this point, so a
+      # build that fails part way leaves "absent or generation N", never a
+      # generation-N stamp over a generation-M project.
+      printf '%s\n' "$ios_generation" > "$ios_stamp"
+    fi
     exec "$SCRIPT_DIR/build-ios-app.sh" "${@:2}"
     ;;
   *)

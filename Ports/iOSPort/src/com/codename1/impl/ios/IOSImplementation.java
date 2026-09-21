@@ -3127,6 +3127,22 @@ public class IOSImplementation extends CodenameOneImplementation {
     /// the whole time, and installNativeTheme()'s modern branch read that null
     /// as "the theme was never built" and fell back to iOS 7 -- silently, on
     /// every target, which is why ios.themeMode=modern appeared to do nothing.
+    /// True when the app bundle carries this resource. Opens and closes rather
+    /// than keeping the stream: the caller wants the NAME, and a stream left open
+    /// here would leak once per query.
+    private boolean hasResource(String name) {
+        InputStream in = getResourceAsStream(name);
+        if(in == null) {
+            return false;
+        }
+        try {
+            in.close();
+        } catch(IOException err) {
+            // Nothing to do: the question was whether it exists, and it does.
+        }
+        return true;
+    }
+
     private InputStream getResourceAsStream(String name) {
         return getResourceAsStream(IOSImplementation.class, name);
     }
@@ -10640,8 +10656,19 @@ public class IOSImplementation extends CodenameOneImplementation {
         // The theme resource that generation selects, so a caller that wants the
         // file rather than the number does not have to re-derive the mapping and
         // risk disagreeing with installNativeTheme about it.
+        //
+        // Answers the resource that is actually PRESENT, applying the same
+        // generation-26 fallback installNativeTheme applies. Reporting the
+        // requested name unconditionally would hand a caller a path that is not
+        // in the bundle, and a caller that trusts the answer -- the fidelity
+        // runner does, and gives up when the stream is null -- would then install
+        // no theme at all, which is worse than the fallback this exists beside.
         if(key.equalsIgnoreCase("cn1.nativeThemeResource")) {
-            return "/" + modernThemeResourceName() + ".res";
+            String want = "/" + modernThemeResourceName() + ".res";
+            if(!"/iOSModernTheme.res".equals(want) && !hasResource(want)) {
+                return "/iOSModernTheme.res";
+            }
+            return want;
         }
         if(key.equalsIgnoreCase("OS")) {
             return "iOS";

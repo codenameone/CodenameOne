@@ -67,11 +67,52 @@ public class GlassRecipeTest extends UITestBase {
     }
 
     @Test
-    public void namedResolvesEveryDocumentedName() {
-        for (String name : KNOWN) {
-            for (int i = 0; i < 2; i++) {
-                boolean dark = i == 1;
-                assertNotNull(GlassRecipe.named(name, dark), name + " did not resolve");
+    public void everyDocumentedNameResolvesToItsOwnRecipe() {
+        // NOT an assertNotNull sweep. named() answers the panel recipe for
+        // anything it does not recognise, and panel is not null -- so a non-null
+        // assertion passes even with every chrome27/pill27/panel27 branch deleted
+        // from the lookup, which is exactly the regression that would silently
+        // paint the toolbar with the wrong material. Measured: with the chrome27
+        // branch removed, all six tests in this class still passed. Each name
+        // must therefore be compared against the recipe it is supposed to return,
+        // on every parameter.
+        for (int i = 0; i < 2; i++) {
+            boolean dark = i == 1;
+            assertSameRecipe(GlassRecipe.plainBlur(), GlassRecipe.named("blur", dark),
+                    "blur/" + appearance(dark));
+            assertSameRecipe(GlassRecipe.liquidChrome(dark), GlassRecipe.named("chrome", dark),
+                    "chrome/" + appearance(dark));
+            assertSameRecipe(GlassRecipe.liquidPill(dark), GlassRecipe.named("pill", dark),
+                    "pill/" + appearance(dark));
+            assertSameRecipe(GlassRecipe.liquidPanel(dark), GlassRecipe.named("panel", dark),
+                    "panel/" + appearance(dark));
+            assertSameRecipe(GlassRecipe.liquidChrome27(dark), GlassRecipe.named("chrome27", dark),
+                    "chrome27/" + appearance(dark));
+            assertSameRecipe(GlassRecipe.liquidPill27(dark), GlassRecipe.named("pill27", dark),
+                    "pill27/" + appearance(dark));
+            assertSameRecipe(GlassRecipe.liquidPanel27(dark), GlassRecipe.named("panel27", dark),
+                    "panel27/" + appearance(dark));
+        }
+    }
+
+    @Test
+    public void everyKnownNameIsDistinguishableFromTheFallback() {
+        // The dual of the test above, and what makes it airtight: if a name
+        // happened to be materially equal to the panel fallback, comparing it to
+        // its factory could not tell "the branch exists" from "the branch is
+        // gone". Every name except panel itself must differ from the fallback in
+        // at least one parameter.
+        for (int i = 0; i < 2; i++) {
+            boolean dark = i == 1;
+            GlassRecipe fallback = GlassRecipe.named("no-such-material", dark);
+            for (String name : KNOWN) {
+                if ("panel".equals(name)) {
+                    continue;
+                }
+                assertTrue(differs(fallback, GlassRecipe.named(name, dark)),
+                        name + "/" + appearance(dark) + " is materially identical to the"
+                                + " unknown-name fallback, so no test can prove its lookup"
+                                + " branch is still wired up");
             }
         }
     }
@@ -160,6 +201,30 @@ public class GlassRecipeTest extends UITestBase {
                     "the shipped iOS themes named no glass materials at all, so the"
                             + " *GlassRecipe constants were dropped from the theme");
         }
+    }
+
+    private static String appearance(boolean dark) {
+        return dark ? "dark" : "light";
+    }
+
+    /// Full identity: kind and all five material parameters.
+    private static void assertSameRecipe(GlassRecipe expected, GlassRecipe actual, String what) {
+        assertNotNull(actual, what + " did not resolve");
+        assertEquals(expected.getKind(), actual.getKind(), what + " kind");
+        assertEquals(expected.getSaturation(), actual.getSaturation(), 0.0001f, what + " saturation");
+        assertEquals(expected.getScale(), actual.getScale(), 0.0001f, what + " scale");
+        assertEquals(expected.getOffset(), actual.getOffset(), 0.0001f, what + " offset");
+        assertEquals(expected.getRefraction(), actual.getRefraction(), 0.0001f, what + " refraction");
+        assertEquals(expected.getSpecular(), actual.getSpecular(), 0.0001f, what + " specular");
+    }
+
+    private static boolean differs(GlassRecipe a, GlassRecipe b) {
+        return a.getKind() != b.getKind()
+                || a.getSaturation() != b.getSaturation()
+                || a.getScale() != b.getScale()
+                || a.getOffset() != b.getOffset()
+                || a.getRefraction() != b.getRefraction()
+                || a.getSpecular() != b.getSpecular();
     }
 
     private static void assertSameMaterial(GlassRecipe a, GlassRecipe b, String what) {
