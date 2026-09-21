@@ -65,6 +65,7 @@ class CleanTargetLinuxIntegrationTest {
                 "import com.codenameone.examples.hellocodenameone.tests.Cn1ssDeviceRunnerReporter;\n" +
                 "public class LinuxHelloMain {\n" +
                 "    public static void main(String[] args) {\n" +
+                "        Display.init(null);\n" +
                 // The suite builds its own launcher instead of the port's generated stub, so NONE
                 // of the properties that stub sets are present here -- including desktop.titleBar,
                 // which hellocodenameone's codenameone_settings.properties sets to "native" and
@@ -73,27 +74,10 @@ class CleanTargetLinuxIntegrationTest {
                 // keeps the legacy title area, and every golden records a title strip that a
                 // built application does not draw.
                 //
-                // Set BEFORE Display.init rather than after, which is where the obvious place
-                // would be. init starts the EDT, and setProperty creates Display.localProperties
-                // -- a plain HashMap -- on whichever thread calls it, so setting it afterwards
-                // publishes that map from this thread to a running EDT with no barrier. Doing it
-                // first means no EDT exists to race with. Safe this early because setProperty
-                // only reaches the implementation for AppArg, blockCopyPaste and the
-                // platformHint. prefix; every other key, this one included, goes straight into
-                // localProperties.
-                //
-                // Not a proven fix for anything. The suite did SIGSEGV on the EDT inside
-                // Display.getProperty -> HashMap.get (RIP symbolized from the uploaded core)
-                // shortly after this line was added, which is what prompted the reordering. But
-                // the generated stub LinuxNativeBuilder writes has always called setProperty
-                // after Display.init for package_name, x86-64 is strongly ordered, and this
-                // SIGSEGV has hit unrelated tests at unrelated points -- 7 screenshots in here,
-                // 138 in RealOsmVectorScreenshotTest on the previous run. That reads as the
-                // intermittent crash this job already documents, surfacing in a path this
-                // change made hot, rather than a race this ordering cures. The ordering is kept
-                // because it is free and strictly safer; the crash is still open.
+                // Immediately after Display.init and before anything else, which is exactly
+                // where the generated stub puts package_name, the hardening properties and the
+                // database switch. Nothing goes before Display.init.
                 "        Display.getInstance().setProperty(\"desktop.titleBar\", \"native\");\n" +
-                "        Display.init(null);\n" +
                 // Force kotlin.Unit into the translation set (reached only via lambda
                 // return types otherwise), exactly as the Windows launcher does.
                 "        if (kotlin.Unit.INSTANCE == null) { return; }\n" +
