@@ -630,6 +630,48 @@ Tab.selected { color: #262626; background-color: #ffffff; border-radius: 1.59mm;
 /* Dark text, because the fill is light. It read #ffffff on #e8e8e8 -- white on near-white. */
 Tab.pressed { color: #262626; background-color: #e8e8e8; padding: 1.6mm 3.2mm 1.6mm 3.2mm; margin: 0; }
 
+/* --- Chat ------------------------------------------------------------------------------ */
+/*
+ * The desktop themes shipped without ANY Chat UIID, so a chat rendered as bare left/right
+ * text: no bubble, no surface, nothing. ios-modern and android-material have carried these
+ * for as long as the component has existed; these three were simply never given them.
+ *
+ * The user bubble is accent-bound through var(--accent-color) so an app that retunes the
+ * accent retunes its own messages with it, which is how the mobile themes behave and what
+ * the palette-override contract expects. The assistant bubble is a neutral surface instead,
+ * because a conversation where both sides are accent-coloured reads as one voice.
+ */
+ChatView { background-color: var(--window-bg-color, #ececec); padding: 0; margin: 0; }
+ChatViewMessages { background-color: transparent; padding: 1mm 2mm; margin: 0; }
+ChatBubbleRow { background-color: transparent; padding: 1mm 2mm; margin: 0; }
+ChatBubbleUser {
+    background-color: var(--accent-color, #007aff);
+    color: var(--accent-fg-color, #ffffff);
+    padding: 2mm 3mm;
+    margin: 0.5mm 0;
+    border-radius: 2.8mm;
+}
+ChatBubbleAssistant {
+    background-color: #e9e9eb;
+    color: var(--text-color, #000000);
+    padding: 2mm 3mm;
+    margin: 0.5mm 0;
+    border-radius: 2.8mm;
+}
+ChatBubbleSystem {
+    background-color: transparent;
+    color: #8e8e93;
+    padding: 1mm 2mm;
+    margin: 0.5mm 0;
+}
+ChatBubbleText { cn1-derive: Label; background-color: transparent; padding: 0; margin: 0; }
+ChatTypingIndicator { background-color: transparent; color: #8e8e93; padding: 1mm 3mm; margin: 0; }
+ChatInput { background-color: var(--window-bg-color, #ececec); padding: 1mm 2mm; margin: 0; }
+ChatInputField { cn1-derive: TextField; background-color: #ffffff; padding: 2mm 3mm; margin: 0.5mm; }
+ChatSendButton { cn1-derive: RaisedButton; padding: 1.5mm 3mm; margin: 0.5mm; }
+ChatAttachButton { cn1-derive: Button; padding: 1.5mm; margin: 0.5mm; }
+ChatVoiceButton { cn1-derive: Button; padding: 1.5mm; margin: 0.5mm; }
+
 @media (prefers-color-scheme: dark) {
     Form { background-color: #323232; color: #ffffff; }
     Label { color: #ffffff; }
@@ -638,10 +680,16 @@ Tab.pressed { color: #262626; background-color: #e8e8e8; padding: 1.6mm 3.2mm 1.
     Button.pressed { color: #ffffff; background-color: #4a4a4a; border: 0.26mm solid #5c5c5c; border-radius: 1.76mm; }
     Button.disabled { color: #6e6e6e; background-color: #3c3c3c; border: 0.26mm solid #4a4a4a; border-radius: 1.76mm; }
 
-    RaisedButton { color: #ffffff; background-color: #007aff; }
+    RaisedButton { color: var(--accent-fg-color-dark, #ffffff); background-color: var(--accent-color-dark, #007aff); }
     RaisedButton.pressed { color: #ffffff; background-color: #0060cc; }
     RaisedButton.disabled { color: #6e6e6e; background-color: #3c3c3c; }
 
+    /* NOT bound to --accent-color-dark, and deliberately: Aqua lightens the accent for text
+       on a dark surface (#4DA3FF against the token's #007AFF), and there is no token for that
+       derivative. Binding it would repaint a shipped colour rather than make an override
+       reach it. The light rule binds because there the value IS the accent. Every other
+       accent-bearing pair in this block is bound; this is the one asymmetry, recorded so it
+       is a decision rather than an oversight. */
     FlatButton { color: #4da3ff; background-color: transparent; }
     FlatButton.pressed { color: #007aff; background-color: #4a4a4a; }
 
@@ -650,22 +698,22 @@ Tab.pressed { color: #262626; background-color: #e8e8e8; padding: 1.6mm 3.2mm 1.
     TextField.disabled { color: #6e6e6e; background-color: #2a2a2a; border: 0.26mm solid #3c3c3c; border-radius: 1.06mm; }
 
     CheckBox { color: #ffffff; }
-    CheckBox.selected { color: #007aff; }
+    CheckBox.selected { color: var(--accent-color-dark, #007aff); }
     CheckBox.disabled { color: #6e6e6e; }
 
     RadioButton { color: #ffffff; }
-    RadioButton.selected { color: #007aff; }
+    RadioButton.selected { color: var(--accent-color-dark, #007aff); }
     RadioButton.disabled { color: #6e6e6e; }
 
     Switch { background-color: #5a5a5a; }
-    Switch.selected { background-color: #007aff; }
+    Switch.selected { background-color: var(--accent-color-dark, #007aff); }
     Switch.disabled { background-color: #3c3c3c; }
 
     Slider { background-color: #5a5a5a; }
-    SliderFull { background-color: #007aff; color: #007aff; }
+    SliderFull { background-color: var(--accent-color-dark, #007aff); color: var(--accent-color-dark, #007aff); }
     /* Capsule borders carry their own fill color; rebuild them for dark mode. */
     ProgressBar { background-color: #5a5a5a; cn1-background-type: cn1-pill-border; }
-    ProgressBarFull { background-color: #007aff; color: #007aff; cn1-background-type: cn1-pill-border; }
+    ProgressBarFull { background-color: var(--accent-color-dark, #007aff); color: #007aff; cn1-background-type: cn1-pill-border; }
 
     TitleArea { background-color: #323232; border-bottom: 0.26mm solid #48484a; }
     Title { color: #ffffff; }
@@ -712,7 +760,7 @@ Tab.pressed { color: #262626; background-color: #e8e8e8; padding: 1.6mm 3.2mm 1.
     PopupContentPane { background-color: #2a2a2a; border: 0.26mm solid #545456; border-radius: 1.59mm; padding: 1.1mm 0 1.1mm 0; margin: 0; }
     CommandList { background-color: transparent; padding: 0; margin: 0; }
     Command { color: #ffffff; background-color: transparent; padding: 1.1mm 2.6mm 1.1mm 2.6mm; margin: 0; text-align: left; }
-    Command.selected { color: #ffffff; background-color: #007aff; padding: 1.1mm 2.6mm 1.1mm 2.6mm; margin: 0; text-align: left; }
+    Command.selected { color: var(--accent-fg-color-dark, #ffffff); background-color: var(--accent-color-dark, #007aff); padding: 1.1mm 2.6mm 1.1mm 2.6mm; margin: 0; text-align: left; }
     Command.disabled { color: #98989d; background-color: transparent; padding: 1.1mm 2.6mm 1.1mm 2.6mm; margin: 0; text-align: left; }
     TouchCommand { cn1-derive: Command; }
     TooltipDialog { background-color: #2a2a2a; border: 0.26mm solid #545456; border-radius: 1.59mm; padding: 0; margin: 0; }
@@ -734,4 +782,17 @@ Tab.pressed { color: #262626; background-color: #e8e8e8; padding: 1.6mm 3.2mm 1.
     Tab.selected { color: #ebebeb; background-color: #6a6a6a; border-radius: 1.59mm; padding: 1.6mm 3.2mm 1.6mm 3.2mm; margin: 0; }
     Tab.pressed { color: #ffffff; background-color: #3a3a3a; padding: 1.6mm 3.2mm 1.6mm 3.2mm; margin: 0; }
 
+
+    /* Chat. Accent-bound in dark too -- see the light rules; the dark block's accent goes
+       through --accent-color-dark, which this theme already declares. */
+    ChatView { background-color: var(--window-bg-color-dark, #323232); }
+    ChatViewMessages { background-color: transparent; }
+    ChatBubbleRow { background-color: transparent; }
+    ChatBubbleUser { background-color: var(--accent-color-dark, #007aff); color: var(--accent-fg-color-dark, #ffffff); }
+    ChatBubbleAssistant { background-color: #3a3a3c; color: var(--text-color-dark, #ffffff); }
+    ChatBubbleSystem { background-color: transparent; color: #98989d; }
+    ChatBubbleText { background-color: transparent; color: var(--text-color-dark, #ffffff); }
+    ChatTypingIndicator { background-color: transparent; color: #98989d; }
+    ChatInput { background-color: var(--window-bg-color-dark, #323232); }
+    ChatInputField { background-color: #1e1e1e; color: var(--text-color-dark, #ffffff); }
 }
