@@ -58,17 +58,32 @@ cn1_select_xcode() {
         local app version major best_version="" seen=""
         for app in /Applications/Xcode*.app; do
             [ -x "$app/Contents/Developer/usr/bin/xcodebuild" ] || continue
-            # `|| true` is load-bearing. A caller running under `set -e` -- which
-            # every CI step here does -- is killed by this assignment the moment
-            # one candidate's xcodebuild exits non-zero, before the emptiness
-            # check below ever runs. Measured on the GitHub xcode-27 image, where
-            # /Applications holds the real Xcode plus three symlinks to it and one
-            # of those invocations aborts (SIGABRT, status 134): selection died
-            # with no output at all, because the crash text goes to /dev/null and
-            # the status goes to `set -e`. A candidate that cannot report its
-            # version is one to SKIP, which is what the next line is for.
+            # Run it, then judge it on BOTH its output and its exit status, and
+            # let neither kill the caller.
+            #
+            # Measured on the GitHub xcode-27 image, where /Applications holds the
+            # real Xcode plus three symlinks to it:
+            #
+            #   Xcode_27_Release_Candidate.app -> prints "Xcode 27.0", exit 134
+            #   Xcode_27.0.0.app / Xcode_27.0.app / Xcode.app -> 27.0, exit 0
+            #
+            # Two separate traps in that one line. The crashing app is FIRST in
+            # glob order, and without the `|| true` the failing status propagates
+            # out of the assignment and `set -e` -- which every CI step here runs
+            # with -- kills selection on candidate one, before any working Xcode
+            # is tried, with no output at all because the crash text went to
+            # /dev/null. And it prints a perfectly good version BEFORE aborting,
+            # so checking the string alone accepts an Xcode whose xcodebuild dies;
+            # here that was survivable only because all four report 27.0 and the
+            # tie-break happens to keep the last, which is luck rather than logic.
+            #
+            # An xcodebuild that cannot exit cleanly is not one to build with.
             version="$("$app/Contents/Developer/usr/bin/xcodebuild" -version 2>/dev/null \
                         | awk '/^Xcode /{print $2; exit}' || true)"
+            if ! "$app/Contents/Developer/usr/bin/xcodebuild" -version >/dev/null 2>&1; then
+                seen="$seen ${version:-?}($app, unusable)"
+                continue
+            fi
             [ -n "$version" ] || continue
             seen="$seen $version($app)"
             major="${version%%.*}"
