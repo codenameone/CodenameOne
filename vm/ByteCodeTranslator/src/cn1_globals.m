@@ -14348,7 +14348,20 @@ static void gcMarkDrainParallel(CODENAME_ONE_THREAD_STATE) {
 // Only the GC thread runs the grace pass, but the buffer is __thread anyway: it is
 // addressed through the same gcMarkLocalBuf slot every worker uses, and a file-scope
 // static there would be a second thread's buffer waiting to happen.
-static __thread struct gcMarkLocalBuffer gcMarkProducerBuf;
+//
+// A POINTER, not the struct by value, and that is worth 27% of `recursion`. The struct
+// is CN1_GC_MARK_LOCAL_CAP entries -- several KB -- and putting that much in TLS slows
+// EVERY thread-local access in the generated code, which the frame push/pop and stack
+// pointer touch on every single call. Measured, three arms interleaved, min of 7 reps:
+//
+//     baseline (no buffer)          99  100   99  100 ms
+//     buffer as a __thread struct  126  125  123  125 ms      <- +27%
+//     buffer as a __thread pointer  98   99  100   99 ms      <- recovered
+//
+// The cost had nothing to do with the grace pass: an A/B with the parallel producer
+// switched off at runtime showed no difference at all, which is what sent the search
+// to the declaration. Keep large per-thread scratch OFF the TLS block.
+static __thread struct gcMarkLocalBuffer* gcMarkProducerBuf = 0;
 
 // Open the generation and become a buffered producer. False => one marker configured,
 // caller keeps the serial walk.
@@ -14356,8 +14369,14 @@ static JAVA_BOOLEAN gcMarkProducerBegin(CODENAME_ONE_THREAD_STATE) {
     if(!gcMarkParallelDispatch(threadStateData)) {
         return JAVA_FALSE;
     }
-    gcMarkProducerBuf.count = 0;
-    gcMarkLocalBuf = &gcMarkProducerBuf;
+    if(gcMarkProducerBuf == 0) {
+        gcMarkProducerBuf = (struct gcMarkLocalBuffer*)malloc(sizeof(struct gcMarkLocalBuffer));
+        if(gcMarkProducerBuf == 0) {
+            return JAVA_FALSE;   // no buffer, no safe parallel producer
+        }
+    }
+    gcMarkProducerBuf->count = 0;
+    gcMarkLocalBuf = gcMarkProducerBuf;
     return JAVA_TRUE;
 }
 
@@ -14366,8 +14385,8 @@ static JAVA_BOOLEAN gcMarkProducerBegin(CODENAME_ONE_THREAD_STATE) {
 // worklist to reach the drain threshold -- marks one batch here too, so the producer
 // contributes rather than letting the shared worklist grow without bound.
 static void gcMarkProducerPoll(CODENAME_ONE_THREAD_STATE) {
-    if(gcMarkProducerBuf.count > 0) {
-        gcMarkFlushLocal(&gcMarkProducerBuf);
+    if(gcMarkProducerBuf->count > 0) {
+        gcMarkFlushLocal(gcMarkProducerBuf);
     }
     struct gcMarkWorklistEntry batch[CN1_GC_MARK_BATCH];
     int n = 0;
@@ -14384,8 +14403,8 @@ static void gcMarkProducerPoll(CODENAME_ONE_THREAD_STATE) {
     if(n > 0) {
         atomic_fetch_add_explicit(&cn1GcGraceDrains, 1, memory_order_relaxed);
         gcMarkRunBatch(threadStateData, batch, n);
-        if(gcMarkProducerBuf.count > 0) {
-            gcMarkFlushLocal(&gcMarkProducerBuf);
+        if(gcMarkProducerBuf->count > 0) {
+            gcMarkFlushLocal(gcMarkProducerBuf);
         }
     }
 }
@@ -14395,8 +14414,8 @@ static void gcMarkProducerPoll(CODENAME_ONE_THREAD_STATE) {
 // moment gcMarkDone can latch -- exactly the "wait for the producer, not just the
 // helpers" the termination protocol needed.
 static void gcMarkProducerEnd(CODENAME_ONE_THREAD_STATE) {
-    if(gcMarkProducerBuf.count > 0) {
-        gcMarkFlushLocal(&gcMarkProducerBuf);
+    if(gcMarkProducerBuf->count > 0) {
+        gcMarkFlushLocal(gcMarkProducerBuf);
     }
     gcMarkLocalBuf = 0;  // gcMarkWorkerDrainLoop installs its own
     gcMarkWorkerDrainLoop();
