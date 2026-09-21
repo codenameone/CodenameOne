@@ -90,8 +90,15 @@ public final class Crypto {
     }
 
     /**
-     * SHA-1, for the database wire protocols that specify it (MySQL's
-     * mysql_native_password). Never for anything this code chooses.
+     * SHA-1, for the wire protocols that specify it by name: MySQL's
+     * mysql_native_password, and the RFC 6455 4.2.2 websocket handshake, where the
+     * digest of the client key and a fixed GUID becomes Sec-WebSocket-Accept.
+     *
+     * Never for anything this code CHOOSES: passwords go through
+     * {@link #hashPassword} and tokens through {@link #hmacSha256}. Both callers
+     * here are standards quoting the algorithm, and in neither is the result
+     * standing in for a signature -- the handshake value is a replay guard against
+     * caches and proxies, not an authenticator.
      */
     public static byte[] sha1(byte[] data) {
         return digest("SHA-1", data);

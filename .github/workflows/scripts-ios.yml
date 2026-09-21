@@ -51,6 +51,16 @@ on:
       - '!docs/**'
       - 'maven/**'
       - '!maven/core-unittests/**'
+      # The screenshot transport is the Codename One backend's own websocket
+      # server (vm/backend/demo/cn1ss), so a change to the backend changes this
+      # leg's transport. Without these entries a websocket regression would break
+      # every screenshot run while triggering none of the jobs that would catch it.
+      - 'vm/backend/src/com/codename1/backend/**'
+      - 'vm/backend/impl/**'
+      - 'vm/backend/native/**'
+      - 'vm/backend/demo/cn1ss/**'
+      - 'vm/backend/build.sh'
+      - 'scripts/lib/cn1ss.sh'
   push:
     branches: [ master ]
     paths:
@@ -90,6 +100,16 @@ on:
       - '!docs/**'
       - 'maven/**'
       - '!maven/core-unittests/**'
+      # The screenshot transport is the Codename One backend's own websocket
+      # server (vm/backend/demo/cn1ss), so a change to the backend changes this
+      # leg's transport. Without these entries a websocket regression would break
+      # every screenshot run while triggering none of the jobs that would catch it.
+      - 'vm/backend/src/com/codename1/backend/**'
+      - 'vm/backend/impl/**'
+      - 'vm/backend/native/**'
+      - 'vm/backend/demo/cn1ss/**'
+      - 'vm/backend/build.sh'
+      - 'scripts/lib/cn1ss.sh'
 
 jobs:
   build-port:

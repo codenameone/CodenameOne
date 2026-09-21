@@ -261,6 +261,34 @@ public final class ServerSocket {
         Deadlines.clear(fd);
         Descriptors.closeQuietly(entry);
     }
+
+    /**
+     * Breaks a descriptor in both directions without closing it.
+     *
+     * For the one case a close cannot serve: a thread is parked inside a write to
+     * a peer that has stopped reading, and the connection has to go NOW. A close
+     * would free the number while that thread still holds it, and the number is
+     * reused immediately -- so the write lands in whatever connection was handed
+     * it next. shutdown(2) makes the parked write fail instead, and the close
+     * follows once the writer has left.
+     *
+     * Quiet about failure on purpose: every reason it can fail (the peer already
+     * went, the descriptor was already shut) is a state the caller wanted anyway.
+     */
+    public static void shutdown(int fd) {
+        Object entry = Descriptors.get(fd);
+        if(entry instanceof java.nio.channels.SocketChannel) {
+            java.nio.channels.SocketChannel channel = (java.nio.channels.SocketChannel)entry;
+            try {
+                channel.shutdownInput();
+            } catch (Exception ignored) {
+            }
+            try {
+                channel.shutdownOutput();
+            } catch (Exception ignored) {
+            }
+        }
+    }
     /** Cores available to this process. */
     public static int availableProcessors() {
         return Runtime.getRuntime().availableProcessors();

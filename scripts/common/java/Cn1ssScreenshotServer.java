@@ -1,3 +1,25 @@
+/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
 import java.io.ByteArrayOutputStream;
 import java.io.DataInputStream;
 import java.io.EOFException;
@@ -19,17 +41,37 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 
-/// Host-side WebSocket server that replaces the base64-over-stdout chunk
-/// pipeline. Listens on `--port <n>` (0 = ephemeral), prints the bound port
-/// on the first stdout line so the runner script can capture it, then
-/// accepts WebSocket connections from the device under test. For each
-/// screenshot the device sends a META text frame followed by a binary
-/// frame containing the PNG bytes; the server writes the PNG to
-/// `<out>/<safeName>.png` and echoes back an `ACK <safeName>` text frame so
-/// the device knows it can move on to the next test.
+/// Host-side WebSocket server for the on-device screenshot pipeline.
 ///
-/// No base64. No chunking. No fixed inter-test delays. The device unblocks
-/// as soon as the bytes hit the host disk.
+/// **This is no longer the primary implementation.** The server the CI legs run
+/// is `vm/backend/demo/cn1ss/com/demo/Cn1ssScreenshotServer.java`, built on the
+/// Codename One backend's own WebSocket support
+/// (`vm/backend/src/com/codename1/backend/WebSocket*.java`), and
+/// `scripts/lib/cn1ss.sh` selects between them with `CN1SS_WS_SERVER`.
+///
+/// This copy is kept for one reason: **the native Windows port has no backend
+/// arm.** The backend is POSIX-only -- every `Backend*` test in `vm/tests` aborts
+/// with "the server-side backend is POSIX-only for now" -- while
+/// `CleanTargetIntegrationTest.capturesHelloSuiteOverWebSocket` and
+/// `scripts/windows/run-hello.bat` compile and run THIS file directly. Deleting it
+/// would take the Windows screenshot suite with it.
+///
+/// So: a change here is a Windows change. The two implementations answer
+/// identically today -- same `CN1SS:INFO:`/`CN1SS:WARN:` lines, same `ACK`/`NACK`
+/// text, same files -- and anything that changes one must change the other, or the
+/// two CI transports drift apart silently.
+///
+/// One difference is deliberate rather than accidental: this server accepts
+/// unmasked client frames, which RFC 6455 5.1 forbids. The backend implementation
+/// closes with 1002 instead. Every client in this tree masks, so nothing observes
+/// the difference.
+///
+/// Protocol: listens on `--port <n>` (0 = ephemeral), prints the bound port on the
+/// first stdout line so the runner script can capture it, then accepts WebSocket
+/// connections from the device under test. For each screenshot the device sends a
+/// META text frame followed by a binary frame containing the PNG bytes; the server
+/// writes the PNG to `<out>/<safeName>.png` and echoes back an `ACK <safeName>`
+/// text frame so the device knows it can move on to the next test.
 public class Cn1ssScreenshotServer {
 
     private static final String GUID = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11";

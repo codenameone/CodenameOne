@@ -24,7 +24,9 @@ package com.codename1.backend;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 import com.codename1.backend.orm.EntityDefinition;
 import com.codename1.backend.orm.EntityManager;
@@ -199,6 +201,8 @@ public final class Backend {
         private String tlsCertificate;
         private String tlsKey;
         private StaticFiles staticFiles;
+        private final Map webSockets = new LinkedHashMap();
+        private HttpServer.WebSocketHandler webSocketRouter;
         private boolean createTables;
         private boolean createTablesGiven;
         private boolean handlersNeedADatabase;
@@ -223,6 +227,26 @@ public final class Backend {
         /** Adds handlers built once the database exists. See {@link Handlers}. */
         public Builder handlers(Handlers factory) {
             this.factory = factory;
+            return this;
+        }
+
+        /**
+         * Serves `path` as a websocket.
+         *
+         * Registered on the server once it exists, so an endpoint is in place
+         * before the listener starts answering and no client can arrive at a path
+         * that is about to be routed.
+         */
+        public Builder websocket(String path, WebSocket endpoint) {
+            if(path != null && endpoint != null) {
+                webSockets.put(path, endpoint);
+            }
+            return this;
+        }
+
+        /** A router for websocket paths, consulted after the exact routes above. */
+        public Builder websocketRouter(HttpServer.WebSocketHandler router) {
+            this.webSocketRouter = router;
             return this;
         }
 
@@ -526,6 +550,16 @@ public final class Backend {
                     context.close();
                 }
                 throw err;
+            }
+            // Before announce, so nothing reports the server as ready while a
+            // route it is about to serve is still unregistered.
+            java.util.Iterator routes = webSockets.entrySet().iterator();
+            while(routes.hasNext()) {
+                Map.Entry route = (Map.Entry)routes.next();
+                server.websocket((String)route.getKey(), (WebSocket)route.getValue());
+            }
+            if(webSocketRouter != null) {
+                server.websocketRouter(webSocketRouter);
             }
             Backend backend = new Backend(server, pool, manager, config, drain);
             if(!quiet) {
