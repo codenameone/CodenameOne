@@ -5212,3 +5212,80 @@ Two, and only two:
 Note which lever is NOT available: matching HotSpot's trick directly. Its 23.8
 CPU-seconds go to JIT compilation, work an AOT VM does not have. That is an
 advantage we already hold, and it is why we win on CPU while losing on wall.
+
+---
+
+## Round 35: objectAllocation is 73% collector, and the benchmark was never noisy
+
+### The benchmark reports its luckiest rep
+
+`Bench` runs 3 warmup + 5 measured reps and takes the MINIMUM. objectAllocation's
+reps within one run:
+
+    32.30  129.62  165.85   29.74  123.80      intArithmetic: 58.16 57.48 56.86 57.04 56.95
+
+A 5x swing on identical work, while another benchmark in the SAME PROCESS holds
+to 2%. Every objectAllocation figure quoted in Rounds 30-34 -- 3.44x, 3.68x,
+3.71x, 4.09x -- was the fast rep. On the mean it is ~11x HotSpot, not ~3.7x.
+
+The 50-68% "run-to-run variance" that Round 32 declared unmeasurable was never
+noise: it is how many of five reps happened to overlap a collection.
+
+### It is the concurrent collector, by 73%
+
+`CN1_GC_TRIGGER_MB` pushed out until collections stop:
+
+| trigger | cycles | reps (ms) | mean |
+|---|---:|---|---:|
+| default | 25 | 57.8 118.6 146.2 37.1 166.6 | 105.2 |
+| 4096MB | 4 | 29.2 29.7 31.2 29.8 35.5 | 31.1 |
+| 16384MB | 4 | 28.6 29.0 28.9 28.4 28.9 | **28.8** |
+
+With collections suppressed the bimodality disappears and the spread falls to
+**2%**. intArithmetic is flat (57-59) in every arm, so this is not drift. The
+allocator is uniform and unremarkable; 73% of the benchmark is the collector.
+
+Note the residual: 28.8ms against HotSpot's 8.2ms is still **3.5x** with the
+collector entirely out of the picture. These are two separate problems, and the
+nanosecond-level work in Round 31 (two store-releases, guard loads, body zero,
+the CN1_FAST_NEW wrapper) was aimed at the smaller one.
+
+### Four mechanisms eliminated, one confirmed
+
+- **page faults** -- REFUTED and ANTI-correlated: the fastest run had the MOST
+  faults (25.34ms/50,130) and the slowest the fewest (37.99ms/45,716).
+- **safepoint waiting** -- REFUTED. A `[GC] force-stopped thread 1 after 250000us
+  at a safepoint it never reached` looked like the answer. Rebuilding with
+  CN1_GC_SAFEPOINT_WAIT_MAX_US at 250000 / 20000 / 2000 moved the mean 98.9 ->
+  98.5 -> 95.8. The force-stop is a symptom.
+- **SATB barriers** -- REFUTED. `-DCN1_DISABLE_SATB` measured slightly WORSE
+  (mean 111.0 against 96.2), i.e. no effect outside the variance.
+- **machine / mmap / parks** -- REFUTED. intArithmetic holds 0.5-2% across every
+  arm; mmap, munmap and park counts are identical run to run.
+- **CONFIRMED: concurrent marking competing with the mutator.** What remains
+  after the above, and the trigger sweep removes the effect entirely along with
+  the collections.
+
+The shape explains it. objectAllocation creates 8M Nodes per rep that die almost
+immediately; the live set is tiny and the garbage is enormous. This collector
+traces the whole live heap on every cycle -- 25 of them in a run -- concurrently
+with a mutator that is still allocating. HotSpot's young generation copies the
+few survivors and reclaims the rest for nothing, so its collection cost scales
+with SURVIVORS where ours scales with cycles over the whole heap.
+
+### A correction this round forces
+
+Round 34 concluded "we are not idle, we are not parallel" from bibopParks=0 and
+LOWMEM parks=0, reading them as "the mutator never waits for the collector".
+The mutator does not PARK -- it keeps running while the collector competes with
+it for memory bandwidth, and no park counter can see that. The wall-time finding
+(1.42 cores against HotSpot's 2.67) stands; the inference that the collector
+therefore costs the mutator nothing does not.
+
+### What this does NOT license
+
+A nursery was measured in Rounds 3/5 and lost on both axes, for a reason that
+still applies: promotion moved survivors into the slower legacy heap. This round
+is not a retraction of that -- it is a measurement of what the current collector
+costs an allocation-heavy mutator, which is a different question from whether
+that particular nursery design fixes it.
