@@ -97,7 +97,11 @@ run_pair() {
     local cores=$1 pbin=$2 pargs=$3 hmain=$4 hargs=$5 aot=$6 label=$7
     for r in $(seq 1 "$ROUNDS"); do
         local pd hd
-        pd=$(mktemp -d); hd=$(mktemp -d)
+        # .noindex: macOS Spotlight skips directories with that suffix. The IO arms
+        # emit thousands of files per round and mdworker was measured at 24-44% CPU
+        # indexing them -- the harness was loading the machine it was measuring.
+        pd=/tmp/cn1m-p-$$-$r.noindex; hd=/tmp/cn1m-h-$$-$r.noindex
+        mkdir -p "$pd" "$hd"
         # INTERLEAVED, AND THE ORDER ALTERNATES. Both arms of a round run adjacent
         # in time, so thermal drift and background load hit them together and divide
         # out of the ratio. Alternating which goes first cancels the residual bias
@@ -208,7 +212,13 @@ pth=os.path.join(out,'selfhost.txt')
 if os.path.exists(pth):
     for line in open(pth):
         t=line.split()
-        if len(t)==6 and t[2]!='NA': sh[t[1]]=(float(t[2]),float(t[3]),int(t[4]),int(t[5]))
+        # Only a well-formed SELFHOST line counts. The arm also tee's human text
+        # ("(selfhost: build FAILED...)") into this file, and parsing that as a
+        # float crashed the whole report -- losing 17 good benchmark rows to one
+        # skipped arm.
+        if len(t)==6 and t[0]=='SELFHOST' and t[2]!='NA':
+            try: sh[t[1]]=(float(t[2]),float(t[3]),int(t[4]),int(t[5]))
+            except ValueError: pass
 def med(v): return statistics.median(v)
 print("\n"+"="*86)
 print("PARPARVM PERFORMANCE MATRIX -- median of PER-ROUND ratios vs JDK 25 (AOT, warm)")
