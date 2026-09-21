@@ -3813,11 +3813,64 @@ JAVA_BOOLEAN java_util_HashMap_areEqualKeys___java_lang_Object_java_lang_Object_
 // HashMap.cn1Marker exactly). The spread is deliberately weak so Integer keys
 // stay at slot == value and a dense range keeps its sequential-store locality;
 // what makes that safe is the probe sequence below, not the spread.
+#if CN1_TAGGED_ACTIVE
+/* The five non-Integer tagged types. Out of line deliberately: keeping them here
+ * is what lets cn1HmMarker stay small enough to inline into get/put. Each arm is
+ * that type's hashCode as vm/JavaAPI defines it, checked against those sources --
+ * Short/Character return the value, Float is floatToIntBits, Long and Double fold
+ * the high half into the low. Boolean and Byte are NOT tagged (no tag code), and
+ * an unrecognised tag falls back to the virtual dispatch, which stays the source
+ * of truth. Double untags by MASKING the tag bits, lossless because the scheme
+ * only tags doubles whose low three bits are already zero. */
+static JAVA_INT cn1TaggedHashSlow(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT key, uintptr_t tag) {
+    switch(tag) {
+        case CN1_TAG_SHORT:     return (JAVA_INT)CN1_UNTAG_SHORT(key);
+        case CN1_TAG_CHARACTER: return (JAVA_INT)CN1_UNTAG_CHAR(key);
+        case CN1_TAG_FLOAT:     return (JAVA_INT)CN1_UNTAG_FLOAT_BITS(key);
+        case CN1_TAG_LONG: {
+            JAVA_LONG v = CN1_UNTAG_LONG(key);
+            return (JAVA_INT)(v ^ (((uint64_t)v) >> 32));
+        }
+        case CN1_TAG_DOUBLE: {
+            uint64_t b = CN1_UNTAG_DOUBLE_BITS(key);
+            return (JAVA_INT)(b ^ (b >> 32));
+        }
+        default: return virtual_java_lang_Object_hashCode___R_int(threadStateData, key);
+    }
+}
+#endif
+
 static inline JAVA_INT cn1HmMarker(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT key) {
     if(key == JAVA_NULL) {
         return (JAVA_INT)0x80000000;
     }
     JAVA_INT h;
+#if CN1_TAGGED_ACTIVE
+    /* A TAGGED KEY CARRIES ITS OWN HASH IN ITS POINTER BITS.
+     *
+     * Integer keys are the common case for a Map and every Integer in this VM is
+     * an immediate, yet the path below reached its hash through TWO tag resolves
+     * (CN1_CLASS_OF for the String test, then another inside the thunk) and a
+     * virtual dispatch -- to compute a value that is literally (intptr_t)key >> 3.
+     * That made a value type cost MORE than HotSpot's heap Integer, whose hash is
+     * one field load, and it ran on every get and every put.
+     *
+     * Each arm below is that type's java.lang hashCode contract, not a shortcut:
+     * Integer/Short/Character/Byte return the value, Boolean is 1231/1237, Float
+     * is floatToIntBits, Long and Double fold the high half into the low.
+     */
+    /* ONLY THE INTEGER CASE IS INLINE. The first cut put all six tagged types in
+     * a switch here, and cn1HmMarker -- which was `static inline` and folded into
+     * put -- became too big to inline: the profile grew a 28.3% cn1HmMarker frame
+     * that had not existed, and the benchmark did not move. Integer is what a Map
+     * is keyed on; the other five go out of line where their size costs nothing. */
+    uintptr_t cn1__tag = CN1_TAG_CODE(key);
+    if(__builtin_expect(cn1__tag == CN1_TAG_INTEGER, 0)) {
+        h = CN1_UNTAG_INT(key);
+    } else if(__builtin_expect(cn1__tag != 0, 0)) {
+        h = cn1TaggedHashSlow(threadStateData, key, cn1__tag);
+    } else
+#endif
     if(cn1IsStringClass(CN1_CLASS_OF(key))) {
         h = ((struct obj__java_lang_String*)key)->java_lang_String_hashCode;
         if(h == 0) h = java_lang_String_hashCode___R_int(threadStateData, key);
