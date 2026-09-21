@@ -9,11 +9,18 @@
 #      goldens were captured on an iPhone 16 -- so the plan depends on simctl
 #      being able to make one.
 #
-# Dispatch-only ON PURPOSE: this is a probe, not a gate.
+# Temporary, and deleted in this same branch once it has answered. It triggers
+# on pushes to the branch rather than on dispatch because workflow_dispatch is
+# only offered for workflows that already exist on the default branch, and the
+# whole point is to learn this BEFORE anything reaches master.
 name: iOS Xcode 27 probe
 
 'on':
   workflow_dispatch:
+  push:
+    branches: [ios27-ci-gate]
+    paths:
+      - '.github/workflows/ios-xcode27-probe.yml'
 
 permissions:
   contents: read
