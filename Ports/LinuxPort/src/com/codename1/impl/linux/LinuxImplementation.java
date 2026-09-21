@@ -3349,7 +3349,22 @@ public class LinuxImplementation extends CodenameOneImplementation {
         if (!isDesktop()) {
             return "toolbar";
         }
-        return Display.getInstance().getProperty("desktop.titleBar", "toolbar");
+        String configured = Display.getInstance().getProperty("desktop.titleBar", null);
+        if (configured != null && configured.length() > 0) {
+            return configured;
+        }
+        // The installed theme answers before the default does, because Form.getDesktopTitleBarMode
+        // already asks it. Resolving "toolbar" here regardless made the two disagree on the same
+        // screen: Form read "native" from the Adwaita theme and never attached the Toolbar,
+        // while this answered "toolbar", so isNativeTitle() stayed false and the LEGACY title area
+        // kept painting a title strip the mode said belonged to the window. JavaSE hit the same
+        // split -- see resolveDesktopTitleBarMode there -- and lost its commands to it.
+        String themed = com.codename1.ui.plaf.UIManager.getInstance()
+                .getThemeConstant("desktopTitleBarMode", null);
+        if (themed != null && themed.length() > 0) {
+            return themed;
+        }
+        return "toolbar";
     }
 
     /// @inheritDoc

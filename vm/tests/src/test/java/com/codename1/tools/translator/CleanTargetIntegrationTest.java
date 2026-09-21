@@ -944,6 +944,14 @@ class CleanTargetIntegrationTest {
                 // (which calls initDisplay synchronously).
                 "        com.codename1.impl.windows.WindowsNative.enableOffscreenCapture();\n" +
                 "        Display.init(null);\n" +
+                // The suite builds its own launcher instead of the port's generated stub, so NONE
+                // of the properties that stub sets are present here -- including desktop.titleBar,
+                // which hellocodenameone's codenameone_settings.properties sets to "native" and
+                // which Executor.desktopTitleBarStubProperty emits for a real build. Without it
+                // this suite renders chrome no shipped app has: the port resolves "toolbar",
+                // keeps the legacy title area, and every golden records a title strip that a
+                // built application does not draw.
+                "        Display.getInstance().setProperty(\"desktop.titleBar\", \"native\");\n" +
                 // Deterministic validation for the native fault->exception handler
                 // (cn1WinFaultToException). initDisplay (called synchronously by
                 // Display.init above) installs the vectored handler, so a null deref

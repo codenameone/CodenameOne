@@ -66,6 +66,14 @@ class CleanTargetLinuxIntegrationTest {
                 "public class LinuxHelloMain {\n" +
                 "    public static void main(String[] args) {\n" +
                 "        Display.init(null);\n" +
+                // The suite builds its own launcher instead of the port's generated stub, so NONE
+                // of the properties that stub sets are present here -- including desktop.titleBar,
+                // which hellocodenameone's codenameone_settings.properties sets to "native" and
+                // which Executor.desktopTitleBarStubProperty emits for a real build. Without it
+                // this suite renders chrome no shipped app has: the port resolves "toolbar",
+                // keeps the legacy title area, and every golden records a title strip that a
+                // built application does not draw.
+                "        Display.getInstance().setProperty(\"desktop.titleBar\", \"native\");\n" +
                 // Force kotlin.Unit into the translation set (reached only via lambda
                 // return types otherwise), exactly as the Windows launcher does.
                 "        if (kotlin.Unit.INSTANCE == null) { return; }\n" +
