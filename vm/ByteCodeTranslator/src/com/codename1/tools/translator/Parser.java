@@ -67,6 +67,12 @@ public class Parser extends ClassVisitor {
     private static String[] nativeSources;
     private static List<ByteCodeClass> classes = new ArrayList<>();
 
+    /// The closed world, for analyses that must resolve a callee body. An analysis that
+    /// cannot find a body must answer conservatively rather than assume anything.
+    static List<ByteCodeClass> getClasses() {
+        return classes;
+    }
+
     // ---- CLOSED-WORLD DEVIRTUALIZATION -----------------------------------
     // ParparVM compiles a closed world: after dead-code elimination the class
     // list is final, so an INVOKEVIRTUAL whose method has NO reachable override

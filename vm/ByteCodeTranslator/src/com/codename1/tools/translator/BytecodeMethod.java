@@ -4890,7 +4890,23 @@ public class BytecodeMethod implements SignatureSet {
             TypeInstruction ti = (TypeInstruction) ins;
             retireSeen++;
             String owner = IteratorEscape.mangle(ti.getTypeName());
-            if (IteratorEscape.newEscapesStrict(this, owner) != IteratorEscape.SAFE) {
+            // CLUSTER walk, not the per-object one. A self-referential structure built
+            // and dropped inside one frame -- the `head = new Node(v, head)` shape -- has
+            // no frame-local MEMBER, because each member is stored into the next one's
+            // field, yet the chain as a whole never leaves the frame. Per-object escape
+            // analysis must reject every member of it; HotSpot does not scalar-replace
+            // these either (-XX:-EliminateAllocations costs it only 5% on this shape).
+            // -Dcn1.retireDebug=<methodName> reports the verdict per NEW site.
+            String __dbg = Util.getProperty("cn1.retireDebug", "");
+            boolean __on = __dbg.length() > 0 && methodName.contains(__dbg);
+            int __r = IteratorEscape.clusterEscapes(this, owner);
+            if (__on) {
+                System.out.println("[RETIRE-DBG] " + clsName + "." + methodName
+                        + " NEW " + owner + " -> " + __r + " local=" + IteratorEscape.lastTrackedLocal
+                        + " reason=" + IteratorEscape.lastReason
+                        + " calls=" + IteratorEscape.receiverCalls);
+            }
+            if (__r != IteratorEscape.SAFE) {
                 retireDropEscape++;
                 continue;
             }
@@ -4938,6 +4954,24 @@ public class BytecodeMethod implements SignatureSet {
             // The SITE writes its own guard, so the scope can only ever retire the
             // object this analysis actually reasoned about.
             ti.setDeadGuardId(guard);
+            // The NEW may have been fused during optimize(): init-before-publish leaves
+            // the TypeInstruction emitting only a NULL placeholder while an
+            // InlinableConstructor performs the real allocation further down. The guard
+            // has to reach whichever instruction actually produces the object.
+            int tiIdx = instructions.indexOf(ti);
+            if (tiIdx >= 0) {
+                for (int k = tiIdx + 1; k < instructions.size() && k < tiIdx + 12; k++) {
+                    Instruction fi = instructions.get(k);
+                    if (fi instanceof com.codename1.tools.translator.bytecodes.CustomInvoke) {
+                        ((com.codename1.tools.translator.bytecodes.CustomInvoke) fi)
+                                .setDeadGuardId(guard);
+                        break;
+                    }
+                    if (fi instanceof TypeInstruction) {
+                        break;   // a different allocation starts here
+                    }
+                }
+            }
             if (retirableGuards == null) {
                 retirableGuards = new java.util.ArrayList<Integer>();
             }

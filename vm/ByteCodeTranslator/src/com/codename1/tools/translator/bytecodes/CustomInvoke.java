@@ -380,6 +380,15 @@ public class CustomInvoke extends Instruction {
     // this flag stops it from inlining again (infinite recursion).
     private boolean emittingInlineCtorElse = false;
     private InlinableConstructor inlineCtorPlan;
+
+    /// Frame-exit retire guard for the object this fused constructor allocates, or -1.
+    /// InlinableConstructor is a PLAN, not an Instruction -- CustomInvoke is the
+    /// instruction in the list, so the guard has to arrive here and be handed down.
+    private int deadGuardId = -1;
+
+    public void setDeadGuardId(int id) {
+        this.deadGuardId = id;
+    }
     private boolean inlineCtorAnalyzed = false;
     // Copied from the source Invoke by create() -- this <init> allocates + builds
     // + publishes its object (the matching NEW only pushed a placeholder).
@@ -430,6 +439,7 @@ public class CustomInvoke extends Instruction {
             // Literal-arg ctor with the receiver on-stack (from NEW;DUP): the
             // survivor sits one slot below the receiver (SP[-2]); pop the receiver.
             String cType = Util.mangle(owner);
+            inlineCtorPlan.setDeadGuardId(deadGuardId);
             inlineCtorPlan.appendInitBeforePublish(b, cType, argExprs, argCats, 2, 1);
             return true;
         }

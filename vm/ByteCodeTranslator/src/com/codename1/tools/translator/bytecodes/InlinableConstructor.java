@@ -93,6 +93,17 @@ public final class InlinableConstructor {
 
     private final List<Store> stores;
 
+    /// Frame-exit retire guard this fused allocation writes, or -1.
+    ///
+    /// The NEW this replaces only emits a NULL placeholder (init-before-publish), so the
+    /// guard cannot be written there -- the object does not exist yet at that point. It
+    /// is written at the PUBLISH line below, where __ibp is fully constructed.
+    private int deadGuardId = -1;
+
+    public void setDeadGuardId(int id) {
+        this.deadGuardId = id;
+    }
+
     private InlinableConstructor(List<Store> stores) {
         this.stores = stores;
     }
@@ -232,6 +243,49 @@ public final class InlinableConstructor {
         b.append("    __ibp->__codenameOneParentClsReference = &class__").append(cType).append(";\n");
         // publish: the object becomes a GC root only now, fully constructed.
         b.append("    SP[-").append(survivorSlot).append("].data.o = __ibp;\n");
+        if(deadGuardId >= 0) {
+            // Same moment as publication: the object is complete, and the guard is the
+            // only other thing that will ever hold this reference.
+            b.append("    __cn1dead_").append(deadGuardId).append(" = __ibp; /* frame-exit retired */\n");
+            // ALLOCATE BLACK.
+            //
+            // A fresh object (mark -1) is traced by the grace pass AS A ROOT, subtree and
+            // all -- the single largest item in a mark, and on an allocation-heavy loop it
+            // is every object the loop makes. Publishing at the CURRENT epoch instead
+            // means the grace pass skips it (mark is not -1) while the sweep still keeps
+            // it for this cycle, which is the same conservatism grace was providing.
+            //
+            // Blanket allocate-black is unsafe, and that is why it was declined before:
+            // grace traces a fresh object's subtree because an OLDER object reachable
+            // only through it would otherwise be swept. Here the cluster analysis has
+            // established that every reference this object holds is another member of
+            // the same frame-local cluster -- so there is no older object hanging off it,
+            // and nothing is lost by not tracing. That is the whole point of proving the
+            // CLUSTER rather than the object.
+            //
+            // A reachable object is never endangered either way: the mark reaches it from
+            // the frame's conservatively scanned locals and refreshes the epoch.
+            // ALLOCATE-BLACK WAS TRIED HERE AND WITHDRAWN. Publishing a cluster member
+            // at the current epoch instead of -1 makes the grace pass skip it, and that
+            // is worth 14-17% on objectAllocation (22.2ms vs 25.7ms, 5/5 interleaved
+            // rounds). It is also WRONG, and the wrongness is not the obvious window:
+            //
+            //   unguarded                  MtStress: live holder -> FREED slot
+            //   guarded on !gcSatbActive   MtStress: live holder -> FREED slot (same)
+            //
+            // GraceAudit passes ~240 verify passes in both arms; only the multi-mutator
+            // driver reproduces it, so one mutator keeps the window too narrow to see.
+            // Guarding on "no mark in progress" does NOT close it, which rules out the
+            // explanation that looked obvious -- an object created after its own thread's
+            // stack was scanned. Whatever the mechanism is, it was not established here,
+            // and #5609 declined the blanket form for a reason that still stands.
+            //
+            // The safe form is also pointless on this shape: guarded, it measures 25.95ms
+            // against a 25.70ms control, because an allocation loop keeps a mark running
+            // almost continuously so the cheap path almost never fires. Do not re-add it
+            // without a mechanism that survives MtStress -- the benchmark will look
+            // excellent and the gate is the only thing that objects.
+        }
         b.append("    SP -= ").append(pop).append("; }\n");
     }
 

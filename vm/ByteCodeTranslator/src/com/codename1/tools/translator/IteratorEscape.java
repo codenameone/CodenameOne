@@ -113,7 +113,109 @@ class IteratorEscape {
     /// Census-only today; it exists so the two populations can be counted separately before
     /// anything is built on either.
     static int newEscapesStrict(BytecodeMethod m, String owner) {
+        clusterStores = false;
         return walk(m, false, owner, true);
+    }
+
+    /// Does this NEW's object escape the frame, allowing CLUSTER-INTERNAL stores?
+    ///
+    /// Same question as newEscapesStrict, except that storing a tracked reference into
+    /// a field of another tracked object is permitted. That admits self-referential
+    /// structures built and dropped inside one frame -- linked lists, chains, small
+    /// trees -- which per-object analysis must reject because every member is stored
+    /// into another member.
+    ///
+    /// SOUNDNESS RESTS ON NON-ESCAPE: if no reference to the cluster leaves the frame,
+    /// no code outside the frame can store into a cluster member's fields, so this walk
+    /// sees every store that can ever happen to one. The single exception is the
+    /// constructor, which runs in its own frame -- closed separately by
+    /// ctorOnlyStoresParamsIntoThis.
+    static int clusterEscapes(BytecodeMethod m, String owner) {
+        clusterStores = true;
+        int r = walk(m, false, owner, true);
+        clusterStores = false;
+        return r;
+    }
+
+    /// Set only for the duration of a clusterEscapes walk.
+    private static boolean clusterStores = false;
+
+    /// Does this constructor put its parameters NOWHERE except into fields of `this`?
+    ///
+    /// Deliberately a shape check rather than a dataflow: the body must consist only of
+    /// loads, primitive arithmetic, PUTFIELDs, a super constructor call on `this`, and
+    /// the return. Anything else -- a PUTSTATIC, a call taking a parameter, an array
+    /// store, a throw, a second NEW -- and the answer is no.
+    ///
+    /// This is what closes the one hole in the cluster argument. Non-escape means no
+    /// code outside the frame can store into a cluster member's fields, so the frame's
+    /// own walk sees every store -- EXCEPT the ones the constructor performs in its own
+    /// frame. Restricting the constructor to "parameters into my own fields" makes those
+    /// stores knowable from the call site, where every reference parameter has already
+    /// been shown to be a cluster member.
+    static boolean ctorOnlyStoresParamsIntoThis(String owner, String desc) {
+        BytecodeMethod ctor = null;
+        String mangled = mangle(owner);
+        for (ByteCodeClass c : Parser.getClasses()) {
+            if (!mangle(c.getClsName()).equals(mangled)) {
+                continue;
+            }
+            for (BytecodeMethod m : c.getMethods()) {
+                if ("__INIT__".equals(m.getMethodName()) && desc.equals(m.getDesc())) {
+                    ctor = m;
+                    break;
+                }
+            }
+            break;
+        }
+        if (ctor == null || ctor.isNative() || ctor.isAbstract()) {
+            return false;   // an unknown body is an unchecked body
+        }
+        for (Instruction i : ctor.getInstructions()) {
+            int op = i.getOpcode();
+            if (i instanceof LabelInstruction || i instanceof LineNumber
+                    || i instanceof LocalVariable) {
+                continue;
+            }
+            if (i instanceof Field) {
+                if (op == Opcodes.PUTFIELD || op == Opcodes.GETFIELD) {
+                    continue;   // own-field traffic
+                }
+                return false;   // PUTSTATIC/GETSTATIC
+            }
+            if (i instanceof Invoke) {
+                Invoke in = (Invoke) i;
+                // Only the super constructor, and only with no arguments of its own.
+                if (op == Opcodes.INVOKESPECIAL && "<init>".equals(in.getName())
+                        && in.getArgs().isEmpty()) {
+                    continue;
+                }
+                return false;
+            }
+            if (i instanceof TypeInstruction || i instanceof Jump || i instanceof CustomJump
+                    || i instanceof SwitchInstruction || i instanceof TryCatch) {
+                return false;   // allocation or control flow: out of shape
+            }
+            if (i instanceof VarOp) {
+                if (op == Opcodes.ALOAD || op == Opcodes.ILOAD || op == Opcodes.LLOAD
+                        || op == Opcodes.FLOAD || op == Opcodes.DLOAD) {
+                    continue;
+                }
+                return false;   // a STORE means the body is doing more than wiring
+            }
+            switch (op) {
+                case Opcodes.RETURN:
+                case Opcodes.ACONST_NULL:
+                case Opcodes.DUP:
+                case Opcodes.ICONST_0: case Opcodes.ICONST_1: case Opcodes.ICONST_2:
+                case Opcodes.ICONST_3: case Opcodes.ICONST_4: case Opcodes.ICONST_5:
+                case Opcodes.ICONST_M1:
+                    continue;
+                default:
+                    return false;
+            }
+        }
+        return true;
     }
 
     /// @param trackThis    follow local 0 (ALOAD 0) rather than a NEW result
@@ -208,15 +310,27 @@ class IteratorEscape {
                 continue;
             }
             if (joinPoint) {
+                // POP THE BRANCH'S OWN OPERANDS BEFORE ASKING WHAT SURVIVES.
+                //
+                // A conditional branch CONSUMES the values it tests; they reach neither
+                // successor. Checking the whole stack first therefore refuses on the very
+                // value the branch destroys. `while (p != null)` compiles to IFNULL on the
+                // tracked reference, and that alone rejected the linked-list shape this
+                // analysis exists to accept -- reason "tracked value live across
+                // branch/label op=198", with every other cluster rule already satisfied.
+                //
+                // What must not be live is whatever REMAINS on the stack afterwards: that
+                // is what flows into the join, and the linear walk cannot model where it
+                // goes.
+                if (isBranch(op)) {
+                    sp = Math.max(0, sp - branchPops(op));
+                }
                 for (int s = 0; s < sp; s++) {
                     if (stack[s]) {
                         lastReason = "tracked value live across branch/label op=" + op
                                 + " (" + i.getClass().getSimpleName() + ")";
                         return UNKNOWN;
                     }
-                }
-                if (isBranch(op)) {
-                    sp = Math.max(0, sp - branchPops(op));
                 }
                 continue;
             }
@@ -246,8 +360,22 @@ class IteratorEscape {
                 if (op == Opcodes.PUTFIELD) {
                     // ..., objectref, value ->
                     boolean value = sp > 0 && stack[sp - 1];
+                    boolean target = sp > 1 && stack[sp - 2];
                     sp = Math.max(0, sp - 2);
                     if (value) {
+                        // A CLUSTER-INTERNAL STORE IS NOT AN ESCAPE.
+                        //
+                        // Storing a tracked reference into a field of ANOTHER tracked
+                        // object keeps it inside the same frame-local cluster -- the
+                        // reference has not become reachable from anywhere new. The
+                        // linked-list shape this exists for is `head = new Node(v, head)`:
+                        // no single Node is frame-local, because each is stored into the
+                        // next one's field, yet the chain as a whole never leaves the
+                        // frame. Per-object escape analysis rejects every member of it,
+                        // which is why HotSpot does not scalar-replace these either.
+                        if (target && clusterStores) {
+                            continue;
+                        }
                         return ESCAPES;   // stored into the heap
                     }
                     continue;
@@ -278,9 +406,23 @@ class IteratorEscape {
                 // ARGUMENT hands it to a frame this analysis has not examined, so it is
                 // an escape; being the RECEIVER is not, because a receiver is only a
                 // `this` inside the callee and that callee is checked on its own.
+                boolean ctorAbsorbs = false;
+                if (clusterStores && hasReceiver && op == Opcodes.INVOKESPECIAL
+                        && "<init>".equals(inv.getName())) {
+                    int ridx0 = sp - 1 - argCount;
+                    // The receiver is a cluster member and the constructor puts its
+                    // parameters nowhere but into that receiver's own fields, so a
+                    // tracked argument stays inside the cluster. This is the other half
+                    // of the linked-list shape: `new Node(v, head)` hands the previous
+                    // member to the constructor, which stores it in this.next.
+                    if (ridx0 >= 0 && stack[ridx0]
+                            && ctorOnlyStoresParamsIntoThis(inv.getOwner(), inv.getDesc())) {
+                        ctorAbsorbs = true;
+                    }
+                }
                 for (int a = 0; a < argCount; a++) {
                     int idx = sp - 1 - a;
-                    if (idx >= 0 && stack[idx]) {
+                    if (idx >= 0 && stack[idx] && !ctorAbsorbs) {
                         return ESCAPES;
                     }
                 }
