@@ -2225,6 +2225,18 @@
         "url": "https://medium.com/p/c644f89ec993/edit",
         "syndicated_at": "2026-09-20T17:01:25+00:00"
       }
+    },
+    "startup-cost-before-first-paint": {
+      "hashnode": {
+        "url": "https://debugagent.com/faster-starts-less-javascript-overhead",
+        "published": true,
+        "draft_url": "https://hashnode.com/draft/6ab073916db0cef128157930",
+        "cover_set": true,
+        "subheading_set": true,
+        "tags_set": true,
+        "canonical_set": true,
+        "syndicated_at": "2026-09-21T00:01:14+00:00"
+      }
     }
   }
 }
