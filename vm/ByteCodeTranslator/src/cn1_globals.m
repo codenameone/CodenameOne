@@ -5182,6 +5182,25 @@ void codenameOneGCMark() {
                 // gcMarkDone already set and returns at once. Not confirmed -- but it is
                 // the next thing to instrument, and it is a different question from the
                 // marking-mode one above, which was tested and is NOT the cause.
+                //
+                // AND THE MISSING LOCK IS NOT IT EITHER. gcMarkDrainWorklist is the
+                // SERIAL drain and touches gcMarkWorklistTop with NO mutex, so a producer
+                // calling it while helpers pop under gcMarkWorklistMutex is two
+                // decrementers on one index -- and a skipped entry is exactly a marked
+                // holder whose mark function never runs. Replacing it with a mutex-held
+                // batch pop made it WORSE:
+                //
+                //     producer uses unlocked gcMarkDrainWorklist    6 of 12 runs crash
+                //     producer uses a locked batch pop             12 of 12 runs crash
+                //
+                // Deterministic instead of intermittent means the timing moved, not that
+                // the cause was addressed. Six mechanisms have now been built and
+                // disproved -- per-entry marking mode, worklist overflow, the missing
+                // lock -- and the fault has NOT been found. The serial arm stays 12/12.
+                //
+                // Next asymmetry to rule out: the producer runs with gcMarkLocalBuf == 0
+                // while every helper runs with a local buffer, so children discovered on
+                // the two paths take different routes onto the worklist.
                 // (the worklist already carries a per-entry `precise` flag, so there is
                 // precedent) is the obvious shape; a second global would reintroduce
                 // exactly the isolation bug the __thread comment above warns about.
