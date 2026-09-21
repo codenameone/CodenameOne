@@ -2055,6 +2055,9 @@ static void gcMarkDrainWorklist(CODENAME_ONE_THREAD_STATE);
 // is configured. Defined further down (after gcMarkDrain). See the big comment block
 // at the worklist declarations for the design and the invariants it preserves.
 static void gcMarkDrainParallel(CODENAME_ONE_THREAD_STATE);
+static JAVA_BOOLEAN gcMarkProducerBegin(CODENAME_ONE_THREAD_STATE);
+static void gcMarkProducerPoll(CODENAME_ONE_THREAD_STATE);
+static void gcMarkProducerEnd(CODENAME_ONE_THREAD_STATE);
 static int cn1GcMutatorAssist(CODENAME_ONE_THREAD_STATE);
 
 #ifdef CN1_CONSERVATIVE_GC_ROOTS
@@ -5000,6 +5003,12 @@ void codenameOneGCMark() {
 #ifdef CN1_GC_CONFORM
         { long long __g0 = cn1GcNowNs(); cn1GcGraceNs -= __g0; }
 #endif
+        // Helpers consume while this walk produces. False => one marker configured, and
+        // everything below behaves exactly as the serial pass always did. Note the two
+        // readers of cn1GcInGracePass are both pure accounting (gcGraceMarked and
+        // cn1GcGraceFullDrains) and the flag is __thread, so a helper marking a
+        // grace-discovered child under-counts those statistics and changes nothing else.
+        JAVA_BOOLEAN graceParallel = gcMarkProducerBegin(d);
         while(gp != 0) {
 #ifndef CN1_BIBOP_NO_FASTSWEEP
             if(__atomic_load_n(&gp->gcAllocedSinceSweep, __ATOMIC_RELAXED) == JAVA_FALSE) {
@@ -5073,7 +5082,14 @@ void codenameOneGCMark() {
             // times a cycle and quadratic for a caller that drains periodically. Doing
             // it here hung the Mac Catalyst suite outright. The pass still ends with a
             // full gcMarkDrain, which is what closes the fixpoint.
-            if(gcMarkWorklistTop >= gcMarkWorklistCapacity / 2) {
+            if(graceParallel) {
+                // Publish this page's discoveries so the helpers can see them, and take a
+                // batch back only when they are far enough behind for the worklist to reach
+                // the same threshold the serial walk drained at. The unlocked
+                // gcMarkDrainWorklist below must NOT run in this mode: it decrements
+                // gcMarkWorklistTop with no mutex against helpers doing the same.
+                gcMarkProducerPoll(d);
+            } else if(gcMarkWorklistTop >= gcMarkWorklistCapacity / 2) {
                 atomic_fetch_add_explicit(&cn1GcGraceDrains, 1, memory_order_relaxed);
 // SERIAL ON PURPOSE -- the parallel drain was tried here and is SLOWER.
                 //
@@ -5230,6 +5246,9 @@ void codenameOneGCMark() {
                 // not a substitution here.
                 gcMarkDrainWorklist(d);
             }
+        }
+        if(graceParallel) {
+            gcMarkProducerEnd(d);
         }
         gcMarkDrain(d);
 #ifdef CN1_GC_CONFORM
@@ -14013,6 +14032,33 @@ static int gcMarkResolveThreadCount() {
     return n;
 }
 
+// Run the mark functions for one popped batch. Shared verbatim by the worker drain
+// loop and by the grace-pass producer, so the two cannot drift: any caller must already
+// hold a local buffer (children land there) and must NOT hold gcMarkWorklistMutex.
+static void gcMarkRunBatch(struct ThreadLocalData* d, struct gcMarkWorklistEntry* batch, int n) {
+    for(int i = 0 ; i < n ; i++) {
+        JAVA_OBJECT obj = batch[i].obj;
+        gcMarkFunctionPointer fp = obj->__codenameOneParentClsReference->markFunction;
+        if(fp != 0) {
+            int savedPrecise = cn1GcPreciseTrace;
+            cn1GcPreciseTrace = batch[i].precise;
+#if CN1_ADOPT_POLICY != 0 && !defined(CN1_DISABLE_BIBOP)
+            // Same cascade as the serial gcMarkDrain: a matured object's children
+            // mature with it. gcCurrentlyMaturing is thread-local, so workers don't
+            // race. (Registration is deferred + locked, so this is only about which
+            // objects get flagged -- always safe.)
+            JAVA_BOOLEAN __savedMaturing = gcCurrentlyMaturing;
+            gcCurrentlyMaturing = (obj->__heapPosition == CN1_BIBOP_ADOPTED) ? JAVA_TRUE : __savedMaturing;
+            fp(d, obj, batch[i].force);
+            gcCurrentlyMaturing = __savedMaturing;
+#else
+            fp(d, obj, batch[i].force);
+#endif
+            cn1GcPreciseTrace = savedPrecise;
+        }
+    }
+}
+
 // The body each marker (GC thread + helpers) runs for one parallel drain. Pops batches
 // from the shared worklist, runs their mark functions (which push children into this
 // thread's local buffer), flushes, and repeats until the worklist is empty and every
@@ -14035,27 +14081,7 @@ static void gcMarkWorkerDrainLoop() {
             memcpy(batch, &gcMarkWorklist[gcMarkWorklistTop], n * sizeof(struct gcMarkWorklistEntry));
             pthread_mutex_unlock(&gcMarkWorklistMutex);
 
-            for(int i = 0 ; i < n ; i++) {
-                JAVA_OBJECT obj = batch[i].obj;
-                gcMarkFunctionPointer fp = obj->__codenameOneParentClsReference->markFunction;
-                if(fp != 0) {
-                    int savedPrecise = cn1GcPreciseTrace;
-                    cn1GcPreciseTrace = batch[i].precise;
-#if CN1_ADOPT_POLICY != 0 && !defined(CN1_DISABLE_BIBOP)
-                    // Same cascade as the serial gcMarkDrain: a matured object's children
-                    // mature with it. gcCurrentlyMaturing is thread-local, so workers don't
-                    // race. (Registration is deferred + locked, so this is only about which
-                    // objects get flagged -- always safe.)
-                    JAVA_BOOLEAN __savedMaturing = gcCurrentlyMaturing;
-                    gcCurrentlyMaturing = (obj->__heapPosition == CN1_BIBOP_ADOPTED) ? JAVA_TRUE : __savedMaturing;
-                    fp(d, obj, batch[i].force);
-                    gcCurrentlyMaturing = __savedMaturing;
-#else
-                    fp(d, obj, batch[i].force);
-#endif
-                    cn1GcPreciseTrace = savedPrecise;
-                }
-            }
+            gcMarkRunBatch(d, batch, n);
             gcMarkFlushLocal(&localBuf);
 
             pthread_mutex_lock(&gcMarkWorklistMutex);
@@ -14245,34 +14271,40 @@ static void gcMarkPoolEnsure() {
 // while the relevant mutator thread is paused). Dispatches the helper pool, participates
 // on the GC thread, waits for everyone to finish, then -- only if the worklist overflowed
 // -- runs one serial gcMarkDrain to execute the heap-rescan fixed point (invariant #3).
-static void gcMarkDrainParallel(CODENAME_ONE_THREAD_STATE) {
+// Open a parallel mark generation: reset termination state and wake the helpers. The
+// CALLER is counted as one of the markers (gcMarkThreadCount includes the GC thread), so
+// gcMarkActiveWorkers cannot reach zero -- and gcMarkDone cannot latch -- until the
+// caller itself goes idle in gcMarkWorkerDrainLoop. That is what lets the grace-pass
+// producer hold ONE generation open across the whole page walk: helpers consume while it
+// produces, and they park on the worklist condition rather than ending the generation.
+// Returns false when only one marker is configured (no pool, caller marks serially).
+static JAVA_BOOLEAN gcMarkParallelDispatch(CODENAME_ONE_THREAD_STATE) {
     gcMarkPoolEnsure();
     if(gcMarkThreadCount <= 1) {
-        // Single marker configured: behave exactly like before -- no pool, no atomics.
-        gcMarkDrain(threadStateData);
-        return;
+        return JAVA_FALSE;
     }
-
     gcMarkThreadState = threadStateData;
 
     // Reset termination state. Safe to touch unlocked here: the previous generation's
-    // helpers have all reported finished (we waited below) and are parked on the control
-    // condition, and the GC thread is the only one running between generations.
+    // helpers have all reported finished (gcMarkParallelJoin waited) and are parked on
+    // the control condition, and the GC thread is the only one running between
+    // generations.
     pthread_mutex_lock(&gcMarkWorklistMutex);
     gcMarkActiveWorkers = gcMarkThreadCount; // GC thread + helpers
     gcMarkDone = JAVA_FALSE;
     pthread_mutex_unlock(&gcMarkWorklistMutex);
 
-    // Dispatch the helpers.
     pthread_mutex_lock(&gcMarkCtlMutex);
     gcMarkWorkersFinished = 0;
     gcMarkGeneration++;
     pthread_cond_broadcast(&gcMarkCtlCond);
     pthread_mutex_unlock(&gcMarkCtlMutex);
+    return JAVA_TRUE;
+}
 
-    // The GC thread participates as one marker.
-    gcMarkWorkerDrainLoop();
-
+// Close a generation opened by gcMarkParallelDispatch. The caller must already have run
+// gcMarkWorkerDrainLoop (which is what drops its own active count and latches gcMarkDone).
+static void gcMarkParallelJoin(CODENAME_ONE_THREAD_STATE) {
     // Wait for the helpers to finish this generation before returning (so no helper is
     // still touching mark bits when the caller proceeds to release threads / sweep).
     pthread_mutex_lock(&gcMarkCtlMutex);
@@ -14285,6 +14317,90 @@ static void gcMarkDrainParallel(CODENAME_ONE_THREAD_STATE) {
     if(gcMarkWorklistOverflow) {
         gcMarkDrain(threadStateData);
     }
+}
+
+static void gcMarkDrainParallel(CODENAME_ONE_THREAD_STATE) {
+    if(!gcMarkParallelDispatch(threadStateData)) {
+        // Single marker configured: behave exactly like before -- no pool, no atomics.
+        gcMarkDrain(threadStateData);
+        return;
+    }
+    // The GC thread participates as one marker.
+    gcMarkWorkerDrainLoop();
+    gcMarkParallelJoin(threadStateData);
+}
+
+// ---- GRACE-PASS PRODUCER -------------------------------------------------
+// The page walk feeds the helpers instead of marking alone. One generation is held open
+// across the whole pass; see gcMarkParallelDispatch for why that needs no new
+// termination protocol, and the long note at the BiBOP grace pass for the bug that made
+// six earlier attempts crash.
+//
+// The essential part is the buffer: gcMarkWorklistPush selects its path from
+// gcMarkLocalBuf, and the lb == 0 path publishes straight into the shared worklist with
+// NO mutex ("Serial producer: no workers can access the shared queue in this phase").
+// The producer must therefore own one, so its pushes take the same locked flush as every
+// helper's. Without it a helper's flush and the producer's read-write-increment race on
+// one index, the helper's entry is overwritten, and the object it named is marked but
+// never popped -- its mark function never runs, its children stay unmarked, and the
+// sweep frees them under a live holder.
+//
+// Only the GC thread runs the grace pass, but the buffer is __thread anyway: it is
+// addressed through the same gcMarkLocalBuf slot every worker uses, and a file-scope
+// static there would be a second thread's buffer waiting to happen.
+static __thread struct gcMarkLocalBuffer gcMarkProducerBuf;
+
+// Open the generation and become a buffered producer. False => one marker configured,
+// caller keeps the serial walk.
+static JAVA_BOOLEAN gcMarkProducerBegin(CODENAME_ONE_THREAD_STATE) {
+    if(!gcMarkParallelDispatch(threadStateData)) {
+        return JAVA_FALSE;
+    }
+    gcMarkProducerBuf.count = 0;
+    gcMarkLocalBuf = &gcMarkProducerBuf;
+    return JAVA_TRUE;
+}
+
+// Called where the serial walk would have drained. Publishes what the walk has produced
+// so the helpers can see it, and -- only when they are falling behind far enough for the
+// worklist to reach the drain threshold -- marks one batch here too, so the producer
+// contributes rather than letting the shared worklist grow without bound.
+static void gcMarkProducerPoll(CODENAME_ONE_THREAD_STATE) {
+    if(gcMarkProducerBuf.count > 0) {
+        gcMarkFlushLocal(&gcMarkProducerBuf);
+    }
+    struct gcMarkWorklistEntry batch[CN1_GC_MARK_BATCH];
+    int n = 0;
+    pthread_mutex_lock(&gcMarkWorklistMutex);
+    if(gcMarkWorklistTop >= gcMarkWorklistCapacity / 2) {
+        n = gcMarkWorklistTop;
+        if(n > CN1_GC_MARK_BATCH) {
+            n = CN1_GC_MARK_BATCH;
+        }
+        gcMarkWorklistTop -= n;
+        memcpy(batch, &gcMarkWorklist[gcMarkWorklistTop], n * sizeof(struct gcMarkWorklistEntry));
+    }
+    pthread_mutex_unlock(&gcMarkWorklistMutex);
+    if(n > 0) {
+        atomic_fetch_add_explicit(&cn1GcGraceDrains, 1, memory_order_relaxed);
+        gcMarkRunBatch(threadStateData, batch, n);
+        if(gcMarkProducerBuf.count > 0) {
+            gcMarkFlushLocal(&gcMarkProducerBuf);
+        }
+    }
+}
+
+// Walk finished: publish the tail, then join the helpers as an ordinary marker. The
+// producer has been counted in gcMarkActiveWorkers since dispatch, so this is the first
+// moment gcMarkDone can latch -- exactly the "wait for the producer, not just the
+// helpers" the termination protocol needed.
+static void gcMarkProducerEnd(CODENAME_ONE_THREAD_STATE) {
+    if(gcMarkProducerBuf.count > 0) {
+        gcMarkFlushLocal(&gcMarkProducerBuf);
+    }
+    gcMarkLocalBuf = 0;  // gcMarkWorkerDrainLoop installs its own
+    gcMarkWorkerDrainLoop();
+    gcMarkParallelJoin(threadStateData);
 }
 
 // ---- FUSED OBJECTS -------------------------------------------------------
