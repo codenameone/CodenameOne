@@ -2486,6 +2486,17 @@ public final class HttpServer {
          * same single-writer rule the tables beside it follow.
          */
         boolean[] armedByFd = new boolean[1024];
+        /**
+         * Which descriptors are websockets rather than HTTP connections.
+         *
+         * advance() arms SOCKET_TIMEOUT_MILLIS on every park, which is right for a
+         * half-sent request and fatal for a websocket: a connection idle for more
+         * than fifteen seconds was closed by sweepDeadlines while both peers still
+         * believed it was open. Measured against the browser screenshot suite,
+         * which delivered 31 of 181 images before the client's socket went away
+         * with no error on either side.
+         */
+        boolean[] webSocketByFd = new boolean[1024];
 
         /**
          * When each parked connection stops being worth waiting for, or 0.
@@ -2539,6 +2550,9 @@ public final class HttpServer {
             boolean[] grownArmed = new boolean[size];
             System.arraycopy(armedByFd, 0, grownArmed, 0, armedByFd.length);
             armedByFd = grownArmed;
+            boolean[] grownWebSockets = new boolean[size];
+            System.arraycopy(webSocketByFd, 0, grownWebSockets, 0, webSocketByFd.length);
+            webSocketByFd = grownWebSockets;
             Conn[] grownConns = new Conn[size];
             System.arraycopy(connByFd, 0, grownConns, 0, connByFd.length);
             connByFd = grownConns;
@@ -2591,6 +2605,7 @@ public final class HttpServer {
             deadlineByFd[fd] = 0;
             connByFd[fd] = null;
             armedByFd[fd] = false;
+            webSocketByFd[fd] = false;
         }
 
         void setHandle(int fd, long handle) {
@@ -2604,6 +2619,10 @@ public final class HttpServer {
                 // a registration that the next connection to reuse this number
                 // would not have.
                 armedByFd[fd] = false;
+                // Same reason: the next connection on this number is HTTP until it
+                // says otherwise, and inheriting this flag would give it a
+                // websocket's idle allowance.
+                webSocketByFd[fd] = false;
             }
         }
 
@@ -2613,6 +2632,17 @@ public final class HttpServer {
             }
             ensureCapacity(fd);
             deadlineByFd[fd] = at;
+        }
+
+        void setWebSocket(int fd, boolean value) {
+            if(fd >= 0) {
+                ensureCapacity(fd);
+                webSocketByFd[fd] = value;
+            }
+        }
+
+        boolean isWebSocket(int fd) {
+            return fd >= 0 && fd < webSocketByFd.length && webSocketByFd[fd];
         }
 
         boolean isArmed(int fd) {
@@ -2823,7 +2853,16 @@ public final class HttpServer {
         }
         // Parked on I/O: start its clock. Nothing else will, and without it a
         // half-sent request parks a virtual thread for ever.
-        me.setDeadline(fd, System.currentTimeMillis() + SOCKET_TIMEOUT_MILLIS);
+        //
+        // A WEBSOCKET GETS ITS OWN ALLOWANCE. SOCKET_TIMEOUT_MILLIS is about a
+        // client that began a request and stopped, and a websocket parked between
+        // messages looks exactly like one -- so arming it here closed every
+        // connection quiet for more than fifteen seconds, with both peers still
+        // believing it was open and nothing logged on either side. The upgrade
+        // sets the flag; this is where it has to be read, because advance() runs
+        // on every park and overwrites whatever the upgrade set.
+        me.setDeadline(fd, me.isWebSocket(fd) ? webSocketDeadline()
+                : System.currentTimeMillis() + SOCKET_TIMEOUT_MILLIS);
         try {
             // Normally already armed and this is no syscall at all, which is the
             // point: a keep-alive connection is registered once at accept and
@@ -3281,13 +3320,22 @@ public final class HttpServer {
      * what a websocket, idle by design, looks like. Fifteen seconds would shed
      * every one of them.
      */
-    private void armWebSocketDeadline(int fd) {
-        long at = WS_IDLE_TIMEOUT_MILLIS <= 0 ? 0
+    /** When a parked websocket should be given up on. 0 means never. */
+    private static long webSocketDeadline() {
+        return WS_IDLE_TIMEOUT_MILLIS <= 0 ? 0
                 : System.currentTimeMillis() + WS_IDLE_TIMEOUT_MILLIS;
+    }
+
+    private void armWebSocketDeadline(int fd) {
+        long at = webSocketDeadline();
         VtHost[] hosts = vtHosts;
         if(hosts != null) {
             VtHost owner = ownerOf(fd);
             if(owner != null) {
+                // The flag as well as the deadline: advance() re-arms on every
+                // park and needs to know this descriptor is not an HTTP request
+                // that stalled.
+                owner.setWebSocket(fd, true);
                 owner.setDeadline(fd, at);
             }
             return;

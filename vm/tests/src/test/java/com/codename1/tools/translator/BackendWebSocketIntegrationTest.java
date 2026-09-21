@@ -121,6 +121,11 @@ class BackendWebSocketIntegrationTest {
         // cn1MainArgs, and this test is partly about that being true.
         ProcessBuilder run = new ProcessBuilder(binary.toString(), "--port",
                 String.valueOf(port), "--out", outDir.toString());
+        // A short HTTP read deadline, so idleLongerThanTheRequestTimeout can wait
+        // past it in seconds rather than in the default fifteen. It also makes the
+        // test sharper: the websocket allowance it must NOT inherit is now four
+        // times the wait.
+        run.environment().put("CN1_HTTP_TIMEOUT_MS", "1500");
         run.redirectErrorStream(true);
         run.redirectOutput(work.resolve("server.log").toFile());
         server = run.start();
@@ -229,6 +234,42 @@ class BackendWebSocketIntegrationTest {
             client.close();
         }
     }
+
+    @Test
+    @DisplayName("a session idle past the HTTP read timeout survives on the virtual-thread arm")
+    void idleLongerThanTheRequestTimeout() throws Exception {
+        // THE TEST THIS ARM EXISTS FOR. advance() re-arms SOCKET_TIMEOUT_MILLIS on
+        // every park, which is right for a half-sent request and fatal for a
+        // websocket parked between messages -- it closed any connection quiet for
+        // more than fifteen seconds while both peers still believed it was open,
+        // and logged nothing on either side.
+        //
+        // Invisible on the Java SE arm, which is pool mode and never goes through
+        // advance(). It cost 150 of 181 screenshots on the browser leg before CI
+        // found it.
+        Ws client = new Ws(port);
+        try {
+            byte[] before = new byte[512];
+            new Random(31L).nextBytes(before);
+            deliver(client, "idlebefore", before, false);
+
+            Thread.sleep(IDLE_PAST_REQUEST_TIMEOUT_MILLIS);
+
+            byte[] after = new byte[512];
+            new Random(32L).nextBytes(after);
+            deliver(client, "idleafter", after, false);
+            assertArrayEquals(after, Files.readAllBytes(outDir.resolve("idleafter.png")));
+        } finally {
+            client.close();
+        }
+    }
+
+    /**
+     * Past the default request timeout and far short of the websocket one, so this
+     * measures the distinction rather than the wall clock. CN1_HTTP_TIMEOUT_MS is
+     * lowered for the server this class starts so the wait stays short.
+     */
+    private static final long IDLE_PAST_REQUEST_TIMEOUT_MILLIS = 6000;
 
     @Test
     @DisplayName("a PING between fragments is answered without joining the message")

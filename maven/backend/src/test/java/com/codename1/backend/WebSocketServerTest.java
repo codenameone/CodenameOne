@@ -366,6 +366,45 @@ class WebSocketServerTest {
     }
 
     @Test
+    @DisplayName("a session idle past the HTTP timeout survives")
+    void idleLongerThanTheRequestTimeout() throws Exception {
+        // The HTTP read deadline is about a client that began a request and
+        // stopped; a websocket parked between messages looks exactly like one.
+        // On the virtual-thread arm this was fatal -- advance() re-arms
+        // SOCKET_TIMEOUT_MILLIS on EVERY park, so it overwrote the websocket's
+        // own allowance and closed any connection quiet for more than fifteen
+        // seconds, with both peers still believing it was open. The browser
+        // screenshot suite delivered 31 of 181 images before its socket went away
+        // with nothing logged on either side.
+        //
+        // This arm is pool mode and does not go through advance(), so what it
+        // pins is the other half of the same rule: the deadline armed at upgrade
+        // outlives the request timeout, and a quiet session is still there
+        // afterwards.
+        RawWebSocketClient client = new RawWebSocketClient(port);
+        try {
+            client.sendText("before");
+            assertTrue(client.readFrame());
+            assertEquals("before", client.getLastText());
+
+            Thread.sleep(IDLE_PAST_REQUEST_TIMEOUT_MILLIS);
+
+            client.sendText("after");
+            assertTrue(client.readFrame(),
+                    "the session was closed while it was merely idle");
+            assertEquals("after", client.getLastText());
+        } finally {
+            client.close();
+        }
+    }
+
+    /**
+     * Comfortably past the default request timeout and nowhere near the websocket
+     * one, so the test proves the distinction rather than the wall clock.
+     */
+    private static final long IDLE_PAST_REQUEST_TIMEOUT_MILLIS = 3000;
+
+    @Test
     @DisplayName("an open websocket is a connection, not an active request")
     void idleSessionIsNotSaturation() throws Exception {
         RawWebSocketClient client = new RawWebSocketClient(port);
