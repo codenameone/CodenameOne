@@ -5104,6 +5104,25 @@ void codenameOneGCMark() {
                 // same moment was 30.4. Quote no ratio whose arms were not interleaved
                 // within one run -- which is what ab-bench.sh exists to enforce.
                 //
+                // THE ONE-GENERATION VERSION WAS ALSO TRIED, AND IT CRASHES. Splitting
+                // gcMarkDrainParallel into dispatch/join and holding a single generation
+                // open across the whole page walk -- helpers consuming while the walk
+                // produces -- needs no protocol change: a helper that empties the worklist
+                // only ends the generation when gcMarkActiveWorkers hits ZERO, and the
+                // producer stays counted because the GC thread does not enter the drain
+                // loop until the walk is done. It builds and it is wrong:
+                //
+                //     helpers + objectAllocation   NullPointerException
+                //     CN1_GC_MARK_THREADS=1        correct (checksum matches)
+                //     helpers + hashMapChurn       correct
+                //
+                // So it needs BOTH a helper pool and heavy allocation. The walk reads
+                // gp->bumpIndex and iterates slots while the mutator is still allocating
+                // into those same pages; serialising the walk with its own drains is
+                // evidently load-bearing, and what exactly breaks was not established.
+                // Anyone retrying this needs that mechanism first -- the crash is
+                // workload-dependent, so a quiet benchmark will not show it.
+                //
                 // Repeated generations are the wrong shape for a producer that drains as
                 // it goes. Making this parallel properly means ONE generation held open
                 // across the whole pass, with the helpers consuming while the page walk
