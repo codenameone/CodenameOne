@@ -3129,6 +3129,22 @@ public class IOSImplementation extends CodenameOneImplementation {
     /// the whole time, and installNativeTheme()'s modern branch read that null
     /// as "the theme was never built" and fell back to iOS 7 -- silently, on
     /// every target, which is why ios.themeMode=modern appeared to do nothing.
+    /// True when the app bundle carries this resource. Opens and closes rather
+    /// than keeping the stream: the caller wants the NAME, and a stream left open
+    /// here would leak once per query.
+    private boolean hasResource(String name) {
+        InputStream in = getResourceAsStream(name);
+        if(in == null) {
+            return false;
+        }
+        try {
+            in.close();
+        } catch(IOException err) {
+            // Nothing to do: the question was whether it exists, and it does.
+        }
+        return true;
+    }
+
     private InputStream getResourceAsStream(String name) {
         return getResourceAsStream(IOSImplementation.class, name);
     }
@@ -10626,6 +10642,34 @@ public class IOSImplementation extends CodenameOneImplementation {
         // mandatory.
         if(key.equalsIgnoreCase("cn1.nativeRedirects")) {
             return "true";
+        }
+        // The ios.themeGeneration build hint, read back. iOS has no generic
+        // build-hint bridge -- getProperty answers a fixed key list and the
+        // generated stub's static setter is the only way a hint reaches the
+        // device -- so a hint the port already stores is invisible to the
+        // application unless it is answered here. The fidelity harness needs
+        // exactly this: it installs the native theme itself rather than through
+        // installNativeTheme, so without a readable generation it always scored
+        // the iOS 26 theme, including against the iOS 27 goldens.
+        if(key.equalsIgnoreCase("ios.themeGeneration")) {
+            return iosThemeGeneration;
+        }
+        // The theme resource that generation selects, so a caller that wants the
+        // file rather than the number does not have to re-derive the mapping and
+        // risk disagreeing with installNativeTheme about it.
+        //
+        // Answers the resource that is actually PRESENT, applying the same
+        // generation-26 fallback installNativeTheme applies. Reporting the
+        // requested name unconditionally would hand a caller a path that is not
+        // in the bundle, and a caller that trusts the answer -- the fidelity
+        // runner does, and gives up when the stream is null -- would then install
+        // no theme at all, which is worse than the fallback this exists beside.
+        if(key.equalsIgnoreCase("cn1.nativeThemeResource")) {
+            String want = "/" + modernThemeResourceName() + ".res";
+            if(!"/iOSModernTheme.res".equals(want) && !hasResource(want)) {
+                return "/iOSModernTheme.res";
+            }
+            return want;
         }
         if(key.equalsIgnoreCase("OS")) {
             return "iOS";

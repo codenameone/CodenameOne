@@ -943,6 +943,18 @@ public class FidelityDeviceRunner {
             return forced;
         }
         if ("ios".equals(platform)) {
+            // Ask the PORT which generation this build selected rather than
+            // hardcoding 26. The suite installs the theme itself instead of going
+            // through IOSImplementation.installNativeTheme, so the ios.themeGeneration
+            // build hint had no effect here at all: an ios-27-metal run built with
+            // ios.themeGeneration=27 still scored the iOS 26 theme against the iOS 27
+            // goldens, and the two runs produced byte-identical scores -- which reads
+            // as "the theme change did nothing" rather than as "the theme was never
+            // loaded". Answered by IOSImplementation.getProperty.
+            String resource = Display.getInstance().getProperty("cn1.nativeThemeResource", null);
+            if (resource != null && resource.length() > 0) {
+                return resource;
+            }
             return "/iOSModernTheme.res";
         }
         if (platform != null && platform.startsWith("and")) {
