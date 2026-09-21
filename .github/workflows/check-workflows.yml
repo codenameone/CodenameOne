@@ -38,6 +38,14 @@ jobs:
       - name: Validate every workflow file
         run: scripts/check-workflows.sh
 
+      # Same reasoning one level up: build-ios-metal-27 is a 320-line COPY of
+      # build-ios-metal, and a copy nobody checks drifts. Both jobs would stay
+      # green while diverging, because each passes on its own terms and nothing
+      # compares them. Also unfiltered by paths -- the two can drift through an
+      # edit to either one.
+      - name: The two iOS Metal legs must stay identical
+        run: scripts/check-ios-metal-legs-match.py
+
       # This workflow is unfiltered, so changes to the spec, its validator, or any
       # native reference table are checked before they reach master.
       - name: Validate fidelity spec and native reference tables

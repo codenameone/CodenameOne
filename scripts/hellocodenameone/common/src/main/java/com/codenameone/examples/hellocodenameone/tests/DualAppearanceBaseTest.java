@@ -435,7 +435,21 @@ public abstract class DualAppearanceBaseTest extends BaseTest {
     private String pickModernThemeResource() {
         String platform = Display.getInstance().getPlatformName();
         if ("ios".equals(platform)) {
-            return "/iOSModernTheme.res";
+            // ASK THE PORT which iOS generation this build carries instead of
+            // naming generation 26. The suite installs the theme itself rather
+            // than letting installNativeTheme do it, so the ios.themeGeneration
+            // build hint reaches the render only through this answer -- hardcoded,
+            // an iOS 27 build would render the iOS 26 theme and be scored against
+            // iOS 27 goldens, which is a diff in every glass tile and no
+            // indication anywhere of why.
+            //
+            // IOSImplementation.getProperty answers it, and answers with the
+            // resource that is actually PRESENT: a bundle without the generation
+            // it was asked for falls back to generation 26 rather than naming a
+            // file that is not there. The literal below is only the non-iOS
+            // default, which this branch never reaches.
+            return Display.getInstance().getProperty("cn1.nativeThemeResource",
+                    "/iOSModernTheme.res");
         }
         if ("and".equals(platform)) {
             return "/AndroidMaterialTheme.res";

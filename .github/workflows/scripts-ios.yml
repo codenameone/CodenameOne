@@ -413,6 +413,345 @@ jobs:
           if-no-files-found: warn
           retention-days: 14
 
+
+  build-ios-metal-27:
+    if: ${{ !inputs.watch_only }}
+    # The SAME suite as build-ios-metal, on the Xcode 27 / iOS 27 hosted image and
+    # against its own baselines. A copy rather than a move: build-ios-metal keeps
+    # gating the toolchain we actually pin (CN1_XCODE_MAJOR=26), which is what
+    # applications are built with today, and this leg is what stops iOS 27
+    # breaking us in the gap before that pin moves.
+    #
+    # Everything below is deliberately identical to build-ios-metal except the
+    # runner, the toolchain pin, the theme generation, the baseline directory and
+    # the artifact/comment names. scripts/check-ios-metal-legs-match.py holds the
+    # two to that, because a copied 320-line job drifts otherwise.
+    #
+    # `xcode-27` is a PUBLIC PREVIEW image (actions/runner-images#14404) whose
+    # capacity is still being balanced, so read a queue here as the image rather
+    # than as a fault in the change under test.
+    needs: build-port
+    permissions:
+      contents: read
+      pull-requests: write
+      issues: write
+    runs-on: xcode-27
+    timeout-minutes: 75
+    concurrency:
+      group: mac-ci-${{ github.workflow }}-metal27-${{ github.ref_name }}
+      cancel-in-progress: true
+
+    env:
+      GITHUB_TOKEN: ${{ secrets.CN1SS_GH_TOKEN }}
+      # The device runner reports logical test failures through CN1SS log
+      # markers, not through the build or the screenshot comparison. Make the
+      # normalized report authoritative so a failing or never-run compliance
+      # test cannot leave this workflow green and then be published from master.
+      CN1SS_FAIL_ON_TEST_PROBLEMS: '1'
+      GH_TOKEN: ${{ secrets.CN1SS_GH_TOKEN }}
+      # Pin the toolchain rather than taking the image default: scripts/lib/
+      # xcode.sh resolves CN1_XCODE_MAJOR, and leaving it at 26 on an image that
+      # ships only Xcode 27 fails resolution outright instead of quietly using
+      # the wrong one.
+      CN1_XCODE_MAJOR: '27'
+      # Build the sample against the iOS 27 theme generation. helloworld installs
+      # the modern theme itself (DualAppearanceBaseTest.pickModernThemeResource)
+      # and now asks the port which generation this build carries, so this hint is
+      # what makes the 27 baselines render the iOS 27 theme instead of scoring the
+      # iOS 26 one against iOS 27 goldens.
+      IOS_DEPENDENCY_ARGS: '-Dcodename1.arg.ios.themeGeneration=27'
+      # Optional: when set, build-ios-app.sh writes it as a bundled resource so
+      # the GoogleWebMap screenshot test renders a live Google map; absent (e.g.
+      # fork PRs with no access to the secret) the test skips.
+      GOOGLE_MAPS_API_KEY: ${{ secrets.GOOGLE_MAPS_API_KEY }}
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Cache CocoaPods and user gems
+        uses: actions/cache@v5
+        with:
+          path: |
+            ~/.gem
+            ~/Library/Caches/CocoaPods
+            ~/.cocoapods/repos
+          key: ${{ runner.os }}-pods-v1-${{ hashFiles('scripts/setup-workspace.sh') }}
+          restore-keys: |
+            ${{ runner.os }}-pods-v1-
+
+      - name: Ensure CocoaPods tooling
+        run: |
+          mkdir -p ~/.codenameone
+          cp maven/UpdateCodenameOne.jar ~/.codenameone/
+          set -euo pipefail
+          if ! command -v ruby >/dev/null; then
+            echo "ruby not found"; exit 1
+          fi
+          GEM_USER_DIR="$(ruby -e 'print Gem.user_dir')"
+          export PATH="$GEM_USER_DIR/bin:$PATH"
+          if ! command -v pod >/dev/null 2>&1; then
+            gem install cocoapods xcodeproj --no-document --user-install
+          fi
+          pod --version
+
+      - name: Compute setup-workspace hash
+        id: setup_hash
+        run: |
+          set -euo pipefail
+          echo "hash=$(shasum -a 256 scripts/setup-workspace.sh | awk '{print $1}')" >> "$GITHUB_OUTPUT"
+
+      - name: Compute CN1 source hash
+        id: src_hash
+        run: |
+          set -euo pipefail
+          SRC_HASH=$(find CodenameOne/src Ports/iOSPort vm/JavaAPI vm/ByteCodeTranslator Themes native-themes \
+              maven/codenameone-maven-plugin/src/main \
+              -type f \( -name '*.java' -o -name '*.m' -o -name '*.h' -o -name '*.xml' -o -name '*.properties' -o -name '*.css' \) 2>/dev/null \
+              | sort | xargs shasum -a 256 | shasum -a 256 | awk '{print $1}')
+          POM_HASH=$(find . -name 'pom.xml' -not -path './scripts/*' 2>/dev/null \
+              | sort | xargs shasum -a 256 | shasum -a 256 | awk '{print $1}')
+          SCRIPT_HASH=$(shasum -a 256 \
+              scripts/setup-workspace.sh \
+              scripts/build-ios-port.sh \
+              scripts/build-native-themes.sh \
+              .github/workflows/_build-ios-port.yml \
+              | shasum -a 256 | awk '{print $1}')
+          echo "hash=${SRC_HASH:0:16}-${POM_HASH:0:16}-${SCRIPT_HASH:0:16}" >> "$GITHUB_OUTPUT"
+
+      - name: Set TMPDIR
+        run: echo "TMPDIR=${{ runner.temp }}" >> $GITHUB_ENV
+
+      - name: Cache codenameone-tools
+        uses: actions/cache@v5
+        with:
+          path: ${{ runner.temp }}/codenameone-tools
+          key: ${{ runner.os }}-cn1-tools-${{ steps.setup_hash.outputs.hash }}
+          restore-keys: |
+            ${{ runner.os }}-cn1-tools-
+
+      - name: Cache Maven repository
+        uses: actions/cache@v5
+        with:
+          path: ~/.m2/repository
+          key: ${{ runner.os }}-m2-${{ hashFiles('**/pom.xml') }}
+          restore-keys: |
+            ${{ runner.os }}-m2-
+
+      - name: Restore cn1-binaries cache
+        uses: actions/cache@v5
+        with:
+          path: ../cn1-binaries
+          key: cn1-binaries-${{ runner.os }}-${{ steps.setup_hash.outputs.hash }}
+          restore-keys: |
+            cn1-binaries-${{ runner.os }}-
+
+      - name: Download built CN1 + iOS port bundle
+        uses: actions/download-artifact@v4
+        with:
+          name: cn1-built-bundle
+          path: ${{ runner.temp }}
+      - name: Restore built CN1 + iOS port tree
+        run: |
+          set -euo pipefail
+          # Replaces the evictable cn1-built cache restore with the artifact
+          # build-port handed off (not LRU-evicted, survives --failed re-runs).
+          # The tar was created relative to / so this restores
+          # ~/.m2/com/codenameone + Themes + Ports/iOSPort/nativeSources to
+          # their original absolute paths.
+          tar -C / -xf "$RUNNER_TEMP/cn1-built-bundle.tar"
+
+      - name: Install Metal Toolchain
+        # Xcode 26+ requires the Metal Toolchain component to be downloaded
+        # explicitly before .metal files can compile. The runner's default
+        # xcodebuild is often an older Xcode whose -downloadComponent flag
+        # doesn't exist, so we point DEVELOPER_DIR at Xcode 26 first (same
+        # selection logic build-ios-app.sh uses). If the component is
+        # already cached on the runner image, xcodebuild exits quickly
+        # without re-downloading.
+        run: |
+          set -euo pipefail
+          # Same selection the build scripts use, so this cannot install the
+          # component into one Xcode and then build with another.
+          # shellcheck source=/dev/null
+          source scripts/lib/xcode.sh
+          cn1_select_xcode || exit 1
+          "$XCODEBUILD" -downloadComponent MetalToolchain
+        timeout-minutes: 10
+
+      - name: Build sample iOS app and compile workspace (Metal)
+        id: build-ios-app
+        run: ./scripts/build-ios-app.sh -q -DskipTests
+        timeout-minutes: 30
+
+      # Every framework the port's natives need must be one the project DECLARES.
+      # A framework that only reaches the link through an autolink hint -- a Swift
+      # file's `import SwiftUI`, a CocoaPods dependency, `@import` under the Metal
+      # build's CLANG_ENABLE_MODULES -- links this sample and no plain Objective-C
+      # application. That is how `_OBJC_CLASS_$_UTType` stayed undefined in every
+      # customer archive while this job was green for five days.
+      #
+      # Runs on the project the step above already generated, so it costs seconds
+      # and it never links a Swift object, a pod or an extension.
+      - name: Check the port links only frameworks the project declares (Metal)
+        run: |
+          set -euo pipefail
+          # Resolve against the SAME Xcode build-ios-app.sh used. This step used
+          # to shell out to the runner's ambient xcrun, so it answered "is this
+          # symbol declared?" against a different SDK than the one that produced
+          # the project it was checking.
+          # shellcheck source=/dev/null
+          source scripts/lib/xcode.sh
+          cn1_select_xcode || exit 1
+          scripts/check-ios-framework-links.py \
+            --developer-dir "$DEVELOPER_DIR" \
+            "$(dirname "${{ steps.build-ios-app.outputs.workspace }}")"
+        timeout-minutes: 10
+
+      # Apple can deprecate an API, or change a behaviour for anything LINKED
+      # against the new SDK, and nothing else here would notice: every other
+      # check compiles against one SDK and has nothing to compare it to. This one
+      # compiles the port twice, varying only -isysroot, so what it reports is
+      # caused by the SDK and not by the command line.
+      #
+      # It sweeps the renderer and on-device-debug configurations itself, from
+      # pristine port sources, so hosting it in this job costs one build.
+      #
+      # It is a no-op on a runner that carries a single Xcode, which is the case
+      # today -- and it starts working, without another edit, on the first image
+      # that ships two. That is deliberate: the alternative is remembering to add
+      # it at exactly the moment a toolchain moves, which is the moment nobody
+      # has spare attention.
+      - name: Compare the port against the next iOS SDK
+        run: |
+          set -euo pipefail
+          scripts/check-ios-sdk-deltas.py \
+            --skip-if-single-sdk \
+            --project-dir "$(dirname "${{ steps.build-ios-app.outputs.workspace }}")"/*-src
+        timeout-minutes: 20
+
+      - name: Run iOS UI screenshot tests (Metal)
+        env:
+          ARTIFACTS_DIR: ${{ github.workspace }}/artifacts/ios-ui-tests-metal-27
+          # Golden set for the iOS simulator. See
+          # scripts/ios/screenshots-metal/README.md.
+          SCREENSHOT_REF_DIR: ${{ github.workspace }}/scripts/ios/screenshots-metal-27
+          # Override the PR comment marker / preview path / title so this
+          # job posts its own comment instead of overwriting the GL job's
+          # comment (both jobs ran with the same default marker before, so
+          # whichever finished last clobbered the other's results).
+          CN1SS_COMMENT_MARKER: '<!-- CN1SS_IOS_METAL27_COMMENT -->'
+          CN1SS_PREVIEW_SUBDIR: ios-metal-27
+          CN1SS_REPORT_TITLE: 'iOS Metal screenshot updates'
+          CN1SS_SUCCESS_MESSAGE: '✅ Native iOS Metal screenshot tests passed.'
+          CN1SS_COMMENT_LOG_PREFIX: '[run-ios-device-tests-metal]'
+          # Strict screenshot gating: fail on any pixel mismatch and on any
+          # missing screenshot. The Metal backend must produce the full
+          # baseline set; a test that hangs (e.g. the DialogTheme texture
+          # backdrop) drops every later capture and silently shrinks the
+          # suite from 122 to 107 - that now fails the job. No missing
+          # screenshots are tolerated. Enforced in scripts/lib/cn1ss.sh.
+          CN1SS_FAIL_ON_MISMATCH: '1'
+          # Enable Apple's Metal API Validation in the simulator. Catches
+          # render-pass / pipeline-state mismatches at the moment they
+          # happen (issue #5103: stencil pixel-format mismatch shipped in
+          # four consecutive 7.0.x releases because no test exercised the
+          # validation layer). assert mode crashes the app on the first
+          # validation error -- the missed CN1SS:SUITE:FINISHED marker
+          # then fails this step. run-ios-ui-tests.sh forwards both vars
+          # to the launched app via simctl --setenv.
+          MTL_DEBUG_LAYER: '1'
+          MTL_DEBUG_LAYER_ERROR_MODE: 'assert'
+          CN1SS_PORT_ID: ios-metal
+          # Count this build's compiler warnings and attribute each to whoever
+          # owns the code. This used to ride on the GL leg; that leg is gone, so
+          # it moves here -- and this is now the ONLY leg that runs the census,
+          # which means the baseline comparison and its injected-warning probe
+          # exist nowhere else. pr.yml only runs the parser self-test, which
+          # censuses nothing.
+          #
+          # This leg can host it for the same reason the old one could: it sets
+          # no CN1_IOS_DERIVED_DATA, so run-ios-ui-tests.sh wipes its derived
+          # data and compiles every translation unit from cold. An incremental
+          # build reports no warnings and is indistinguishable from a clean
+          # codebase, which is why the tool exits 2 rather than passing when the
+          # compile count falls short of the manifest.
+          CN1_WARNING_CENSUS: '1'
+          CN1_WARNING_LEG: ios-sim-debug
+          # build-ios-app.sh stages the manifest under the default artifacts dir,
+          # which is not the per-step one above.
+          CN1_WARNING_MANIFEST: ${{ github.workspace }}/artifacts/cn1-source-manifest.txt
+        run: |
+          set -euo pipefail
+          mkdir -p "${ARTIFACTS_DIR}"
+
+          echo "workspace='${{ steps.build-ios-app.outputs.workspace }}'"
+          echo "scheme='${{ steps.build-ios-app.outputs.scheme }}'"
+          echo "reference dir='${SCREENSHOT_REF_DIR}'"
+
+          ./scripts/run-ios-ui-tests.sh \
+            "${{ steps.build-ios-app.outputs.workspace }}" \
+            "" \
+            "${{ steps.build-ios-app.outputs.scheme }}"
+        # Match the GL envelope; run-ios-ui-tests.sh still fails a stalled
+        # DeviceRunner after 12 minutes without CN1SS progress.
+        timeout-minutes: 65
+
+      # NO port-status upload here, deliberately. The published port report is
+      # keyed on the port id `ios-metal`, and there is only one iOS port -- this
+      # leg differs by TOOLCHAIN, not by port. A second upload under that id
+      # would publish whichever leg finished last, the same clobber the comment
+      # marker above already had to be split to avoid.
+
+      - name: Publish Metal screenshot summary
+        # Surfaces run-ios-ui-tests.sh's comparison result in the job's
+        # GitHub Actions summary page so the Metal port status is visible
+        # at a glance without digging into the artifact zip. Always runs
+        # so a failed or cancelled tests step still reports whatever got
+        # captured. The Python helper lives in scripts/ci/ because
+        # embedding Python heredocs inside a YAML "run: |" block is
+        # fragile -- unindented Python breaks the block scalar.
+        if: always()
+        env:
+          COMPARE_JSON: ${{ github.workspace }}/artifacts/ios-ui-tests-metal-27/screenshot-compare.json
+          COMMENT_MD: ${{ github.workspace }}/artifacts/ios-ui-tests-metal-27/screenshot-comment.md
+        run: |
+          set -eu
+          {
+            echo "## iOS Metal screenshot comparison"
+            echo
+            echo "Ran against \`scripts/hellocodenameone\` on the iOS simulator."
+            echo "Golden images: \`scripts/ios/screenshots-metal/\`."
+            echo
+            if [ -s "$COMPARE_JSON" ]; then
+              python3 scripts/ci/metal-screenshot-summary.py --markdown "$COMPARE_JSON"
+            elif [ -s "$COMMENT_MD" ]; then
+              cat "$COMMENT_MD"
+            else
+              echo "_No screenshot comparison artifact was produced. See the upload step output for details._"
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+          if [ -s "$COMPARE_JSON" ]; then
+            NOTICE="$(python3 scripts/ci/metal-screenshot-summary.py --headline "$COMPARE_JSON" || true)"
+            if [ -n "$NOTICE" ]; then
+              echo "::notice title=Metal screenshot comparison::${NOTICE}"
+            fi
+          fi
+
+      - name: Upload iOS Metal artifacts
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: ios-ui-tests-metal-27
+          path: |
+            artifacts/ios-ui-tests-metal-27
+            artifacts/*.log
+            artifacts/*-stats.txt
+            artifacts/vm_time.txt
+            artifacts/xcodebuild-list.txt
+            artifacts/cn1-source-manifest.txt
+            artifacts/ios-ui-tests-metal-27/native-warnings.json
+          if-no-files-found: warn
+          retention-days: 14
   build-ios-watch:
     # Native Apple Watch (watchOS) screenshot pipeline. The watch slice
     # auto-enables from codename1.watchMain in the sample, so build-ios-app.sh

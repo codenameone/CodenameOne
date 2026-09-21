@@ -83,7 +83,8 @@ public class TabsLiquidGlassAnimationScreenshotTest extends BaseTest {
             return true;
         }
         if (!installIosModernTheme()) {
-            fail("Unable to load /iOSModernTheme.res for the Liquid Glass frame probe");
+            fail("Unable to load " + Display.getInstance().getProperty("cn1.nativeThemeResource",
+                    "/iOSModernTheme.res") + " for the Liquid Glass frame probe");
             return false;
         }
         System.out.println("CN1SS:INFO:test=TabsLiquidGlassAnimation"
@@ -184,10 +185,16 @@ public class TabsLiquidGlassAnimationScreenshotTest extends BaseTest {
     }
 
     private boolean installIosModernTheme() {
+        // The generation this build carries, not a hardcoded 26 -- see
+        // DualAppearanceBaseTest.pickModernThemeResource for why. This probe
+        // measures the Liquid Glass tab morph, which is precisely the surface
+        // iOS 27 retuned, so reading the wrong generation here is not cosmetic.
+        String resourceName = Display.getInstance().getProperty("cn1.nativeThemeResource",
+                "/iOSModernTheme.res");
         InputStream in = Display.getInstance().getResourceAsStream(
-                TabsLiquidGlassAnimationScreenshotTest.class, "/iOSModernTheme.res");
+                TabsLiquidGlassAnimationScreenshotTest.class, resourceName);
         if (in == null) {
-            in = TabsLiquidGlassAnimationScreenshotTest.class.getResourceAsStream("/iOSModernTheme.res");
+            in = TabsLiquidGlassAnimationScreenshotTest.class.getResourceAsStream(resourceName);
         }
         if (in == null) {
             return false;
