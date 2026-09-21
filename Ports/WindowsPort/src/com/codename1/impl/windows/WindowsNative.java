@@ -208,6 +208,11 @@ public final class WindowsNative {
     /** Maps or unmaps a native window. */
     public static native void desktopWindowShow(int slot, boolean visible);
 
+    /// Sets the MAIN window's title. The desktopWindow* family above addresses secondary
+    /// Window peers by slot; this is the one the form title goes to in desktop "native"
+    /// title-bar mode, where the CN1 title area is suppressed. A no-op when headless.
+    public static native void mainWindowSetTitle(String title);
+
     public static native void desktopWindowSetTitle(int slot, String title);
 
     public static native void desktopWindowSetBounds(int slot, int x, int y, int width, int height);

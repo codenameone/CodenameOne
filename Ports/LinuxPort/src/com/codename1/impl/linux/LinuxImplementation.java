@@ -3301,6 +3301,37 @@ public class LinuxImplementation extends CodenameOneImplementation {
 
     /// @inheritDoc
     ///
+    /// True in desktop `native` title-bar mode, which is what suppresses the CN1 title area on
+    /// a form that has no Toolbar. Without it this port drew a CN1 title strip on every such
+    /// form even while the mode claimed the title belonged to the window -- the Toolbar path
+    /// honoured Form.isDesktopHideToolbar() and the legacy MenuBar/title-area path did not, so
+    /// the two disagreed on the same screen. The iOS/macOS and JavaSE ports have always
+    /// answered this; these two never overrode it and took the base false.
+    @Override
+    public boolean isNativeTitle() {
+        return isDesktop() && "native".equals(getDesktopTitleBarMode());
+    }
+
+    /// @inheritDoc
+    ///
+    /// Pushes the current form's title to the OS window, which is where isNativeTitle() above
+    /// just moved it. Dialogs are skipped: a Dialog is painted inside the form rather than
+    /// owning the window, so letting one retitle the window would leave the wrong title behind
+    /// after it was dismissed.
+    @Override
+    public void refreshNativeTitle() {
+        if (!isNativeTitle()) {
+            return;
+        }
+        com.codename1.ui.Form f = getCurrentForm();
+        if (f != null && !(f instanceof com.codename1.ui.Dialog)) {
+            String t = f.getTitle();
+            LinuxNative.mainWindowSetTitle(t == null ? "" : t);
+        }
+    }
+
+    /// @inheritDoc
+    ///
     /// Null, not "toolbar", when nothing asked: the Adwaita theme carries its own
     /// desktopTitleBarMode -- `custom`, because GNOME's HeaderBar IS the title bar -- and it
     /// may only answer when the project did not.

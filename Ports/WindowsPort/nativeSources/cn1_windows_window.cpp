@@ -985,6 +985,38 @@ JAVA_BOOLEAN com_codename1_impl_windows_WindowsNative_faultSelfTestEnabled___R_b
     return (n > 0 && n < sizeof(buf)) ? JAVA_TRUE : JAVA_FALSE;
 }
 
+/*
+ * The main window's title, after initDisplay has already set it once.
+ *
+ * Needed because desktop "native" title-bar mode moves the form title OUT of the CN1 title
+ * area and into the OS window's, and until now this port had nowhere to put it: the title was
+ * a CreateWindowExW argument and WindowsNative.desktopWindowSetTitle addresses the SECONDARY
+ * Window peers by slot, never the main one. Without this, suppressing the CN1 title area would
+ * simply lose the title.
+ *
+ * SetWindowTextW is documented as safe to call from any thread -- it sends WM_SETTEXT to the
+ * window's own thread -- so unlike the GTK counterpart this needs no marshalling. A null HWND
+ * (headless screenshot mode never creates one) makes it a no-op.
+ */
+JAVA_VOID com_codename1_impl_windows_WindowsNative_mainWindowSetTitle___java_lang_String(
+        CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1Arg1) {
+    if (cn1Win.hwnd == NULL) {
+        return;
+    }
+    const char* utf8Title = __cn1Arg1 == JAVA_NULL ? "" : stringToUTF8(threadStateData, __cn1Arg1);
+    int titleLen = MultiByteToWideChar(CP_UTF8, 0, utf8Title, -1, NULL, 0);
+    if (titleLen <= 0) {
+        titleLen = 1;
+    }
+    WCHAR* wTitle = (WCHAR*) malloc((size_t) titleLen * sizeof(WCHAR));
+    if (wTitle == NULL) {
+        return;
+    }
+    MultiByteToWideChar(CP_UTF8, 0, utf8Title, -1, wTitle, titleLen);
+    SetWindowTextW(cn1Win.hwnd, wTitle);
+    free(wTitle);
+}
+
 JAVA_VOID com_codename1_impl_windows_WindowsNative_initDisplay___java_lang_String_int_int(
         CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1Arg1, JAVA_INT __cn1Arg2, JAVA_INT __cn1Arg3) {
 #ifdef CN1_WIDGETBOARD

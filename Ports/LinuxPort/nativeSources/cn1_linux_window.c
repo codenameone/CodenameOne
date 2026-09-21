@@ -996,6 +996,32 @@ static void cn1LinuxInstallFaultHandlers() {
     signal(SIGABRT, cn1LinuxAbortBacktrace);
 }
 
+/* The main window's title, after initDisplay has already set it once.
+ *
+ * Needed because desktop "native" title-bar mode moves the form title OUT of the CN1 title
+ * area and into the OS window's, and until now this port had nowhere to put it: the title was
+ * a CreateWindow-time argument and LinuxNative.desktopWindowSetTitle addresses the SECONDARY
+ * Window peers by slot, never the main one. Without this, suppressing the CN1 title area would
+ * simply lose the title.
+ *
+ * Marshalled onto the GTK main loop like every other widget call here.
+ * cn1LinuxRunOnMainAndWait runs the callback inline when there is no window, which is what the
+ * headless screenshot mode wants -- the setter is then a no-op on a window that does not exist.
+ */
+static void cn1MainTitleOnMain(void* arg) {
+    const char* t = (const char*) arg;
+    if (cn1Window != 0) {
+        gtk_window_set_title(GTK_WINDOW(cn1Window), t != 0 ? t : "");
+    }
+}
+
+JAVA_VOID com_codename1_impl_linux_LinuxNative_mainWindowSetTitle___java_lang_String(
+        CODENAME_ONE_THREAD_STATE, JAVA_OBJECT title) {
+    extern const char* stringToUTF8(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT);
+    const char* t = title == JAVA_NULL ? "" : stringToUTF8(threadStateData, title);
+    cn1LinuxRunOnMainAndWait(cn1MainTitleOnMain, (void*) t);
+}
+
 JAVA_VOID com_codename1_impl_linux_LinuxNative_initDisplay___java_lang_String_int_int(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT title, JAVA_INT width, JAVA_INT height) {
     extern const char* stringToUTF8(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT);
     const char* t = title == JAVA_NULL ? "Codename One" : stringToUTF8(threadStateData, title);
