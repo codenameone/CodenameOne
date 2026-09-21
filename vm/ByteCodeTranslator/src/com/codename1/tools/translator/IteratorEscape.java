@@ -66,6 +66,16 @@ class IteratorEscape {
     /// counts alone, and the first cut refused all 37 classes on the same instruction.
     static String lastReason = "";
 
+    /// Callees invoked ON the tracked reference during the last walk, as
+    /// owner.name+desc. Valid only immediately after a walk, exactly like lastReason.
+    /// A site is only retirable if none of these leaks `this`.
+    static final java.util.List<String> receiverCalls = new java.util.ArrayList<String>();
+
+    /// The local the last walk followed, or -1 if the value never reached one. Valid
+    /// only immediately after a walk. Frame-exit retirement needs it: the object to
+    /// retire is whatever that local holds when the frame goes.
+    static int lastTrackedLocal = -1;
+
     private IteratorEscape() {
     }
 
@@ -87,11 +97,25 @@ class IteratorEscape {
         return walk(m, false, owner, false);
     }
 
+    /// Same question, but ARETURN of the tracked value counts as an escape.
+    ///
+    /// The iterator scheme allocates in the CALLER's frame, so a factory that returns the
+    /// object is handing it to the frame it already lives in -- not a leak. Any scheme that
+    /// reclaims at the END of the allocating method (freeing a page wholesale, say) does not
+    /// have that property: a returned reference outlives the frame that owns the storage.
+    /// Census-only today; it exists so the two populations can be counted separately before
+    /// anything is built on either.
+    static int newEscapesStrict(BytecodeMethod m, String owner) {
+        return walk(m, false, owner, true);
+    }
+
     /// @param trackThis    follow local 0 (ALOAD 0) rather than a NEW result
     /// @param newOwner     internal name of the class whose NEW result is followed
     /// @param returnIsLeak whether ARETURN of the tracked value counts as an escape
     private static int walk(BytecodeMethod m, boolean trackThis, String newOwner,
             boolean returnIsLeak) {
+        receiverCalls.clear();
+        lastTrackedLocal = -1;
         List<Instruction> ins = m.getInstructions();
         // The abstract operand stack: true means "this slot holds the tracked reference".
         boolean[] stack = new boolean[Math.max(8, m.getMaxStack() + 8)];
@@ -182,6 +206,20 @@ class IteratorEscape {
                         return ESCAPES;
                     }
                 }
+                // The tracked value as a RECEIVER is not an escape here, but only
+                // because the callee is checked separately. Record WHICH callee, so
+                // that check can be "do the methods this site actually calls leak
+                // `this`" instead of "does any method of the class leak `this`".
+                // The difference is decisive: ArrayList.iterator() hands `this` to the
+                // iterator, which disqualifies EVERY ArrayList under the per-class
+                // question -- including the overwhelming majority of methods that only
+                // ever call add() and size().
+                if (hasReceiver) {
+                    int ridx = sp - 1 - argCount;
+                    if (ridx >= 0 && stack[ridx]) {
+                        receiverCalls.add(inv.getOwner() + "." + inv.getName() + inv.getDesc());
+                    }
+                }
                 sp = Math.max(0, sp - argCount - (hasReceiver ? 1 : 0));
                 char[] out = i.getStackOutputTypes();
                 if (out != null) {
@@ -218,8 +256,10 @@ class IteratorEscape {
                         return UNKNOWN;
                     }
                     trackedLocal = idx;
+                    lastTrackedLocal = idx;
                 } else if (idx >= 0 && idx == trackedLocal) {
                     trackedLocal = -1;   // overwritten with something else
+                    lastTrackedLocal = -1;
                 }
                 continue;
             }

@@ -29,6 +29,7 @@ public final class InlineIntrinsics {
         RENAMES.put("java_lang_StringBuilder_append___int_R_java_lang_StringBuilder", "cn1InlSbAppendInt");
         RENAMES.put("java_lang_StringBuilder_append___java_lang_String_R_java_lang_StringBuilder", "cn1InlSbAppendStr");
         RENAMES.put("java_lang_StringBuilder_toString___R_java_lang_String", "cn1InlSbToString");
+        RENAMES.put("java_lang_StringBuilder_resizeBufferImpl___int_boolean_R_boolean", "cn1InlSbResize");
         RENAMES.put("java_lang_String_replace___char_char_R_java_lang_String", "cn1InlStrReplace");
         RENAMES.put("java_lang_String_length___R_int", "cn1InlStrLength");
         RENAMES.put("java_lang_String_hashCode___R_int", "cn1InlStrHash");

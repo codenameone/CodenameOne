@@ -5289,3 +5289,251 @@ still applies: promotion moved survivors into the slower legacy heap. This round
 is not a retraction of that -- it is a measurement of what the current collector
 costs an allocation-heavy mutator, which is a different question from whether
 that particular nursery design fixes it.
+
+## Round 26: the pending set is a no-op; the grace pass is the flood
+
+A page-granularity "poor man's young generation": pages a thread is filling are
+flagged `gcPendingOwned` and hidden from the collector, then graduate when full.
+Page granularity was chosen because an unpublished object is already invisible to
+the MARK (which follows references) but not to walks that visit slots BY INDEX --
+so there is no per-object state and no mark-word change, which is what sank the
+earlier attempt.
+
+Measured on AllocOnly (60 reps, 8M-node list), 5 interleaved rounds, in-tree
+`-DCN1_NO_PENDING` negative control (verified non-vacuous with `cmp`), both arms
+checksum 179987422567680:
+
+| arm | wall (min of 5) | peak (max of 5) |
+|---|---:|---:|
+| skip sweep + grace pass | 4.14s | 4216 MB |
+| both walks skipped, control | 4.63s | 4217 MB |
+| **skip sweep only (correct)** | **4.57s** | 4222 MB |
+| skip nothing, control | 4.52s | 4232 MB |
+
+**wall 1.011, peak 0.998 -- no win.** The 10.6% the first row shows was entirely
+the grace-pass skip, and that skip is a correctness bug: GraceAudit reported
+`VIOLATIONS=248 (freeSlot=248)`, live holders at the current epoch pointing at
+freed BiBOP slots. Reverted; nothing of the mechanism remains in the tree.
+
+Two results worth keeping:
+
+1. **The sweep is not where allocation-heavy workloads pay.** Skipping it entirely
+   is worth nothing measurable. The grace pass is the expensive walk: for every
+   page with `gcAllocedSinceSweep`, it walks slots `0..bumpIndex` and calls
+   `gcMarkObject` on every fresh object -- it treats each one as a ROOT and traces
+   its whole subtree. That is where short-lived objects flood the collector.
+
+2. **The grace pass is NOT newly falsifiable -- I first claimed it was, and that
+   was wrong.** GraceAudit caught this shortcut because deleting the pass for a
+   whole class of pages is a GROSS fault. The invariant that actually gates the
+   allocate-black optimization is a different and much narrower one, and #5609
+   measured that the verifier cannot see it: two purpose-built drivers, single-
+   and four-threaded, ~100 verify passes each with the destination made
+   unreachable so only the grace rule keeps it, report `violations=0` WITH THE
+   BARRIER DELIBERATELY COMPILED OUT. Catching gross removal is not evidence the
+   subtle window can be opened.
+
+   Read before touching this: #5442 (why the full-registry walk exists -- the
+   narrower per-epoch fresh-page scheme of #5436 left an uncovered window and
+   produced silent heap corruption in a customer app, issue #5425, corrupted
+   dictionary entries and an impossible NPE) and #5609 (the pass instrumented and
+   found EFFICIENT: the prune skips ~9,950 pages per cycle and walks ~1,900, and
+   82-91% of the slots it touches are genuinely fresh -- there is no redundant
+   work to shave, and "THE GRACE PASS ITSELF IS NOT CHANGED, and that is the
+   result").
+
+   The winning change is known and already named -- allocate-black, worth 60-70%
+   of the walk -- and it is blocked on ONE prerequisite: a way to drive an
+   allocation into the residual window on purpose. Build that first or leave it
+   closed; narrowing this rule without it has already cost a field corruption.
+
+## Round 27: the stringBuilding/hashMapChurn "regressions" do not exist
+
+Claimed earlier this session: stringBuilding +45% and hashMapChurn +36% regressed
+over Rounds 28-49. Both are **refuted**. `ab-bench.sh` against two baselines, 5
+interleaved rounds each, median of per-round paired ratios, every control row at
+~1.000 so both runs are sound:
+
+| benchmark | vs Round 35 (d733eebbf8) | vs Round 30 (58e0705206) |
+|---|---:|---:|
+| stringBuilding | 1.054 (5% spread) | **0.964** |
+| hashMapChurn | 0.960 | **0.960** |
+| arraySequential | 0.546 | 0.548 |
+| objectAllocation | 0.861 (183% spread!) | 1.167 (79% spread!) |
+
+stringBuilding is FASTER than the Round 30 clean baseline; hashMapChurn is faster
+than both. Nothing to bisect.
+
+Where the bad numbers came from: a baseline in a different configuration -- the
+third instance of exactly the error `ab-bench.sh` was written to prevent, and its
+header already documents the first two. The guard existed and was not used before
+the claim was made. **Quote no per-benchmark ratio that did not come out of
+ab-bench.sh with its control rows shown.**
+
+The one row worth acting on is objectAllocation: it is the only benchmark that
+moves between runs (0.861 then 1.167) and it is UNSETTLED in both (183%, 79%
+per-round spread). It cannot be scored by this harness as it stands, so any claim
+about allocation throughput measured on it -- in either direction -- is unusable.
+Making that row settle is a prerequisite for the allocation work, not a side quest.
+
+## Round 28: objectAllocation is unmeasurable at MEASURE=5, and measurable at 25
+
+Round 27 left objectAllocation as the one row that moves between runs (0.861 then
+1.167) while being UNSETTLED in both (183%, 79% per-round spread). Diagnosed.
+
+`CommonWorkloads.objectAllocation` allocates 8M nodes but nulls the chain every
+512 iterations, so the live set is tiny and a rep lasts ~34ms. Only a handful of
+GC cycles fit in that window, so whether one lands inside it decides the number.
+Same binary, same process, identical checksum -- consecutive reps:
+
+    37.85  50.56  37.15  24.07  38.21
+    28.03  46.86  48.35  43.33  34.66
+    28.63  46.35  45.95  31.05  21.95
+    37.94  45.26  33.01  22.14  44.49
+
+**21.95ms to 50.56ms for provably identical work.** Collector interference, not
+measurement noise.
+
+ab-bench already takes min-of-5-reps per round and then the median of per-round
+paired ratios -- the right shape -- but against a 2.3x-wide distribution the
+min-of-5 is ITSELF a noisy order statistic. Measured floor estimates from four
+processes: 24.07 / 28.03 / 21.95 / 22.14, a 27.7% spread in the floor alone.
+That is the whole explanation for 0.861-vs-1.167.
+
+MEASURE 5 -> 25, six processes, min-of-25 each:
+
+    28.68  28.60  28.66  28.78  28.83  28.60   ->  0.80% spread
+
+Two orders of magnitude tighter. Note the floor RISES (22 -> 28.6ms): 25
+consecutive reps reach a sustained allocator steady state instead of sampling a
+lucky cold window, and the higher figure is the honest one -- sustained
+allocation throughput is what this row is supposed to report.
+
+This is harness resolution, not workload tuning: the workload is untouched and
+both arms see the identical change. Not landed here -- the measure phase gets 5x
+longer, so the depth wants to be selective (or applied only to rows ab-bench
+flags '!') rather than charged to all eleven benchmarks.
+
+CONSEQUENCE: every allocation-throughput claim made on this row is unusable in
+BOTH directions until the depth lands, including the Round 26 pending-set
+numbers. Reading a 2.3x-wide distribution through a 5-sample floor is very
+likely why the pending set first looked like a 10.6% win when GraceAudit then
+proved the mechanism producing it was corrupting the heap.
+
+### Round 28 addendum: the depth landed in ab-bench, and it answers both rows
+
+`Bench` takes an optional argv[0] rep count and argv[1] benchmark filter; the
+default is unchanged (11 benchmarks x 5 reps, byte-identical behaviour to before)
+and the same file is javac'd for the JDK arm and translated for the parpar arm,
+so both arms move together. ab-bench re-measures ONLY the rows it flags '!', at
+25 reps, so the depth is never charged to the other ten benchmarks.
+
+Validated on HEAD vs Round 30, the comparison whose shallow pass scored
+objectAllocation 0.861, then 1.167, then 0.469:
+
+    objectAllocation   base 31.09ms (+-9%)   new 19.87ms (+-7%)   ratio 0.639  settled
+    stringBuilding     base 19.75ms (+-2%)   new 19.85ms (+-1%)   ratio 1.005  settled
+    valueEscape        base  3.97ms (+-2%)   new  3.90ms (+-10%)  ratio 0.983  UNSETTLED
+
+**stringBuilding is 1.005 at +-1-2%.** Dead parity with the Round 30 baseline,
+which is the precise figure Round 27 could only bound loosely -- two shallow runs
+of the identical A/B had disagreed 0.964 vs 1.069 while both self-reported 3-4%
+spread, so the 10% '!' threshold was passing rows that are not reproducible.
+**objectAllocation is 0.639 settled** -- the tree is ~36% FASTER on allocation
+than Round 30, the opposite of the concern that started this.
+
+valueEscape stays flagged and that is correct: it runs in ~4ms, so it is the next
+row whose duration is too short to measure through GC quantization.
+
+TWO BUGS IN MY OWN HARNESS CODE, both caught by its output rather than by me:
+
+1. Spread was computed over the POOLED arms, `(max(bv+nv)-min(bv+nv))/min(...)`.
+   Base and new genuinely differ, so the real improvement was added to the
+   "spread" -- meaning the MORE a change helped, the more certainly the row was
+   declared unmeasurable. objectAllocation and arraySequential were both reported
+   STILL UNSETTLED at 83%/93% purely from this. Spread is now per-arm.
+2. A filtered deep run executes that benchmark ALONE and so starts from a
+   different heap state: 19.9ms isolated vs 28.6ms in-suite for identical work.
+   The ratio is unaffected (both arms are filtered alike) but the absolute ms are
+   not comparable to the table above them, and the output now says so. This also
+   corrects the Round 28 claim that 28.6ms is "the honest sustained figure" -- it
+   is the honest IN-SUITE figure; absolute ms from this row means nothing without
+   its context stated.
+
+## Round 29: the pacing growth floor is refuted by its own gate
+
+The uncommitted `cn1PacingGrowthFloorBytes` change scaled the run-ahead bound off
+host free memory (`max(512MB, fm/8)`) instead of a flat 512MB. On AllocOnly (60
+reps) it measured 6.75s -> 4.18s with parks falling 61-65 -> 5-6, and peak rising
+796MB -> 4197MB.
+
+**It fails `GcOverflowSpiralIntegrationTest`, and that test exists to catch this
+exact change.** A/B on this machine, translator reinstalled for each arm:
+
+| arm | result | peak |
+|---|---|---:|
+| `fm/8` growth floor | **FAILED** | 4,201,619 KB |
+| reverted (control) | **PASSED** | -- |
+
+    PEAK_FOOTPRINT_KB=4201619   against BASELINE_FOOTPRINT_KB=3824
+    live set: a few hundred bytes
+
+The assertion names the mechanism unprompted: "a number this size means it is
+tracking the HOST's free RAM again, and the app grows until the machine
+complains ... check cn1PacingPastGrowthFloor". 4.2GB also matches the 4197MB
+measured independently on AllocOnly -- two unrelated workloads, same magnitude.
+
+REVERTED. The wall-clock win is real and is recorded here for whoever takes the
+proper route, which the code comment already identified: "Removing that cost needs
+short-lived garbage kept out of the heap, not a different number here."
+
+A PROCESS NOTE, because it nearly went the other way. I twice reported these two
+guard tests as not existing in this tree -- `GcOverflowSpiralIntegrationTest` and
+`BibopPageFloorIntegrationTest` are both in `vm/tests/src/test/java/` and both run
+from `.github/workflows/parparvm-parallel-mark.yml`. The claim came from a
+`grep -rl ... | head -5` whose output was truncated after CLAUDE.md and four
+generated-C copies; a truncated list was read as an exhaustive one. Had it stood,
+the only argument against this change would have been judgement about a memory
+trade, instead of a purpose-built test failing on the precise symptom.
+
+Second trap in the same session: `mvn ... | tail -40` reports `$?` from `tail`,
+so a failing Maven run printed `GATES_EXIT=0`. Use `set -o pipefail` and capture
+Maven's own status, or a gate that never ran reads as green. Running the tests
+also requires `mvn -pl ByteCodeTranslator install` FIRST -- otherwise the `tests`
+module compiles against a stale jar in .m2-repo and dies on "cannot find symbol"
+in files unrelated to the change.
+
+## Round 30: cn1InlSbResize is unmeasurable and is KEPT; the adaptive depth proves itself
+
+A/B of the working tree (cn1InlSbResize) against HEAD without it. The only
+ByteCodeTranslator/src differences are cn1_intrinsics.h and InlineIntrinsics.java,
+so the comparison isolates the inline.
+
+    stringBuilding                                             ratio 1.005   5% spread
+    intArithmetic      base  56.77ms (+-0%)  new  56.69ms (+-0%)  ratio 0.999  25 reps  settled
+    mathTranscendental base 166.42ms (+-1%)  new 166.71ms (+-1%)  ratio 1.002  25 reps  settled
+    valueEscape        base   3.55ms (+-0%)  new   3.55ms (+-0%)  ratio 1.000 199 reps  settled
+    objectAllocation   base  28.17ms (+-25%) new  28.06ms (+-9%)  ratio 0.996  25 reps  UNSETTLED
+
+**No measurable wall-clock effect.** KEPT anyway, and the reason is a standing
+rule rather than this table: benchmarks guard against regression, they do not
+decide whether a correct low-level optimization survives, because the gap closes
+on a critical mass of individually unmeasurable wins. The change is correct, it
+removes a native call, and it takes resize frames from 17% to 4.7% of profile.
+Deleting correct work because a 19ms benchmark cannot resolve it is how that
+critical mass never accumulates.
+
+THE ADAPTIVE DEPTH IS VALIDATED. valueEscape is the row nothing could settle --
+3.55ms, close to scheduling resolution. The duration-scaled rule gave it 199 reps
+and it returned +-0% at ratio 1.000. A fixed rep count could not have done this:
+25 reps of a 3.55ms workload is 89ms of measurement, which is noise, while 25 reps
+of mathTranscendental is 4.2 seconds. Budget, not count.
+
+STILL OPEN: objectAllocation did not settle at 25 reps in this run (+-25% on the
+base arm) though it settled at +-5%/+-2% in two earlier ones. Its duration (~28ms)
+puts it exactly at the DEEP_REPS floor, so the budget rule never actually raises
+it; the floor is doing the work and 800ms is evidently not enough for this row
+under load (this run averaged load 5.8). Raising DEEP_BUDGET_MS, or giving the
+allocation rows their own floor, is the next harness step -- not attempted here,
+because a harness change made to chase one row on one loaded run is how a
+threshold gets tuned to noise.

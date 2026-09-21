@@ -849,6 +849,60 @@ static int cn1GcAgingSlack(void) {
 static inline int cn1GcSweepReclaims(int mark) {
     return mark != -1 && mark < currentGcMarkValue - cn1GcAgingSlack();
 }
+/* ---- STATICALLY-PROVEN-DEAD FAST PATH -------------------------------------
+ * Retire an object the TRANSLATOR proved is both non-escaping and dead at this
+ * point, so the collector stops paying for it a cycle early.
+ *
+ * A fresh object (mark -1) costs twice: the grace pass treats it as a ROOT and
+ * traces its whole subtree, and the sweep grants it the one-cycle grace instead
+ * of freeing it. Neither is needed for an object nothing can reach. Stamping it
+ * with an ordinary STALE EPOCH skips both -- the grace pass ignores it (mark is
+ * no longer -1, so it is not traced) and the sweep reclaims it on the next pass.
+ *
+ * NO NEW MARK STATE. An earlier attempt encoded "pending" as mark -2 and four
+ * ordinal readers of that word silently reclassified it, which cost a double free
+ * and a SIGBUS. The value written here is a value the collector already
+ * understands, derived from the two rules rather than chosen:
+ *
+ *   cn1GcSweepReclaims(v) must be TRUE   -> v < currentGcMarkValue - slack
+ *   cn1GcWasReclaimed(v)  must be FALSE  -> v >= cn1GcReclaimedBefore
+ *
+ * The window between those is non-empty exactly when the epoch has advanced since
+ * the last sweep; the clamp degrades to "no change" otherwise rather than risking
+ * the object being mistaken for an already-freed slot.
+ *
+ * WHY A WRONG PROOF IS NOT FATAL. This does not hide the object. If it is in fact
+ * reachable from any root, the mark reaches it and overwrites this value with the
+ * current epoch, and the sweep keeps it. The proof failing costs the optimization,
+ * not the object. The one residual window is an object reachable ONLY from a
+ * location the mark cannot see -- which is what the grace rule exists for, and why
+ * this is applied only where escape analysis PROVED the reference never leaves the
+ * frame, rather than to fresh objects in general.
+ */
+void cn1MarkDeadNow(JAVA_OBJECT o) {
+#ifndef CN1_DISABLE_BIBOP
+    if(o == JAVA_NULL || CN1_IS_TAGGED(o)) { return; }
+    /* Page-resident only: the legacy heap reclaims on a different path. */
+    if(o->__heapPosition != CN1_BIBOP_HEAP_POS) { return; }
+    /* Never race a running mark. The collector may already hold this object in a
+     * worklist, and the whole point is to save work, not to win a race for one
+     * object. Off-mark this is a single predicted-not-taken load. */
+    if(__builtin_expect(gcSatbActive, 0)) { return; }
+    /* Only retire something still FRESH. An object the collector already marked
+     * this cycle is one it reached from a root; overriding that would discard a
+     * liveness decision that outranks any static proof. */
+    int expected = -1;
+    int floorv = atomic_load_explicit(&cn1GcReclaimedBefore, memory_order_acquire);
+    int stale = currentGcMarkValue - cn1GcAgingSlack() - 1;
+    if(stale < floorv) { stale = floorv; }
+    atomic_compare_exchange_strong_explicit(
+        (_Atomic int*)&o->__codenameOneGcMark, &expected, stale,
+        memory_order_release, memory_order_relaxed);
+#else
+    (void)o;
+#endif
+}
+
 // Page-heap bytes allocated across the whole run, charged cycle by cycle. Divided by
 // the cycle count it says how far the mutator ran ahead of the collector, which is what
 // "the collector is keeping up" means as a number: a healthy run allocates about one

@@ -2324,6 +2324,30 @@ extern _Atomic long cn1BibopBeltRuns;
 extern _Atomic long cn1BibopAdoptedRescanSkips;
 #endif
 extern int currentGcMarkValue;
+
+// Retire a statically-proven-dead, non-escaping object one cycle early.
+// Defined in cn1_globals.m; see the block comment there for why the value it
+// writes is an ordinary stale epoch and not a new mark state.
+void cn1MarkDeadNow(JAVA_OBJECT o);
+
+// ONE HOOK PER FRAME, NOT ONE PER RETURN.
+//
+// A method returns through many emitted paths -- one per return type, plus the
+// exception variants -- and patching each is how one gets missed. A cleanup
+// attribute fires on every ordinary return from the scope regardless of which
+// path took it, which is the same mechanism CN1StackBuffer already uses for
+// native buffers. Exception exits (longjmp) do NOT run it, and that is fine:
+// missing the call skips an optimization, it never breaks a program.
+struct CN1RetireScope {
+    JAVA_OBJECT* slots[8];
+    int count;
+};
+
+static inline void cn1RetireScopeLeave(struct CN1RetireScope* s) {
+    for(int i = 0 ; i < s->count ; i++) {
+        cn1MarkDeadNow(*(s->slots[i]));
+    }
+}
 #ifndef CN1_BIBOP_NO_FASTSWEEP
 // Called from monitorEnter (any thread) when a monitor (CN1ThreadData) is freshly
 // attached to a heap object. If the object is a BiBOP slot it bumps a global live-monitor

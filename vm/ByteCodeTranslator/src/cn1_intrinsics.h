@@ -180,6 +180,39 @@ static inline JAVA_OBJECT cn1InlSbAppendInt(CODENAME_ONE_THREAD_STATE, JAVA_OBJE
  * byte[] source, long, does not fit) goes to the out-of-line native, which was
  * already the fallback here and is the source of truth for all of them -- so
  * narrowing can only move work off this path, never change its answer. */
+/* THE CONSTRUCTOR'S OWN RESIZE NEVER ALLOCATES, SO IT SHOULD NOT BE A CALL.
+ *
+ * `new StringBuilder()` is `resizeBuffer(INITIAL_CAPACITY=16, false)`, and a
+ * StringBuilder carries __cn1InlineStorage[16] inside the object -- so 16 narrow
+ * bytes fit exactly, with nothing to allocate and nothing to copy. It was still
+ * an out-of-line native carrying a keepalive fence and a dozen branches, and the
+ * growth that follows is a SECOND trip through the same native: two calls per
+ * builder, 32M of them in the stringBuilding benchmark. A dense profile put
+ * resizeBuffer + resizeBufferImpl at 17% of mutator time with memmove another
+ * 9.8%; HotSpot's constructor is an inlined `new byte[16]`.
+ *
+ * Only the case that allocates nothing is inlined here. A fresh builder has
+ * cn1Storage == 0 (the object is zeroed), so that test alone separates the
+ * constructor from every later growth, and the stack-builder scope -- whose
+ * inline bytes live in a CN1StackBuffer rather than the object -- is excluded
+ * explicitly. Everything else, growth included, goes to the native, which stays
+ * the source of truth.
+ */
+static inline JAVA_BOOLEAN cn1InlSbResize(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT builder,
+                                          JAVA_INT capacity, JAVA_BOOLEAN wide) {
+    struct obj__java_lang_StringBuilder* t = (struct obj__java_lang_StringBuilder*)builder;
+    if(__builtin_expect(!wide
+            && t->java_lang_StringBuilder_cn1Storage == 0
+            && capacity >= 0
+            && capacity <= (JAVA_INT)sizeof(t->__cn1InlineStorage)
+            && t->__heapPosition != CN1_GC_STACK_BUILDER, 1)) {
+        t->java_lang_StringBuilder_cn1Storage = (JAVA_LONG)(uintptr_t)t->__cn1InlineStorage;
+        return JAVA_TRUE;
+    }
+    return java_lang_StringBuilder_resizeBufferImpl___int_boolean_R_boolean(
+            threadStateData, builder, capacity, wide);
+}
+
 static inline JAVA_OBJECT cn1InlSbAppendStr(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT sb, JAVA_OBJECT str) {
     CN1_KEEP_NATIVE_OWNER(bufferOwner, sb);
     CN1_KEEP_NATIVE_OWNER(stringOwner, str);

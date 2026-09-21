@@ -38,6 +38,24 @@ public class TypeInstruction extends Instruction {
     private String actualType;
     private int stackAllocId = -1;
     private boolean scalarReplaced = false;
+
+    /// Index of the frame-exit retire guard this NEW writes into, or -1.
+    ///
+    /// The guard exists so the retire scope points at a variable that can ONLY ever
+    /// hold the object from this site. Pointing it at the LOCAL instead is unsound in a
+    /// way no gate reliably shows: the escape analysis proves the OBJECT ALLOCATED HERE
+    /// never leaves the frame, while the local it was stored into may later be
+    /// overwritten by a parameter or a field read -- and the scope would then retire an
+    /// object nothing proved dead.
+    private int deadGuardId = -1;
+
+    public void setDeadGuardId(int id) {
+        this.deadGuardId = id;
+    }
+
+    public int getDeadGuardId() {
+        return deadGuardId;
+    }
     private int scalarStructId = -1;
     private boolean initBeforePublish = false;
     private String originalType;
@@ -367,11 +385,16 @@ public class TypeInstruction extends Instruction {
                 // stack buffer when one is on offer; CN1_ITER_NEW falls through to
                 // CN1_FAST_NEW when there is none, so this is the same allocation
                 // everywhere else.
-                b.append("PUSH_POINTER(")
-                 .append(com.codename1.tools.translator.Parser.isStackIterator(type)
+                b.append("PUSH_POINTER(");
+                if(deadGuardId >= 0) {
+                    b.append("__cn1dead_").append(deadGuardId).append(" = ");
+                }
+                b.append(com.codename1.tools.translator.Parser.isStackIterator(type)
                          ? "CN1_ITER_NEW(" : "CN1_FAST_NEW(");
                 b.append(type);
-                b.append(")); /* NEW */\n");
+                b.append(")");
+                b.append(deadGuardId >= 0 ? "); /* NEW, frame-exit retired */\n"
+                                          : "); /* NEW */\n");
                 break;
             case Opcodes.ANEWARRAY:
                 if(type.startsWith("[")) {

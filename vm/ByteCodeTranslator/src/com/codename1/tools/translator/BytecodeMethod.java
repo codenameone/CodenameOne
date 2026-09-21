@@ -1826,10 +1826,19 @@ public class BytecodeMethod implements SignatureSet {
         // optimize()'s return fast-paths (plain return, no frame release) so it must
         // be set first.
         frameless = isFramelessEligible();
+        // Phase 1 shares the raw-bytecode requirement with frameless eligibility.
+        collectRetireCandidates();
 
         boolean hasInstructions = true;
         if(optimizerOn) {
             hasInstructions = optimize();
+            // AFTER optimize(), never before. optimize() is what decides scalar
+            // replacement and stack allocation, and `frameless` is set just above --
+            // running this earlier reads both as "no", so every StringBuilder site
+            // looks like a heap object and every frameless method looks framed. That
+            // is exactly why the first wiring emitted nothing: the analysis kept 14
+            // sites and codegen then discarded all of them.
+            analyzeRetirableLocals();
         }
 
         if(hasInstructions) {
@@ -2017,6 +2026,11 @@ public class BytecodeMethod implements SignatureSet {
                 b.append("    struct elementStruct*").append(volatileLocals ? " volatile" : "")
                         .append(" SP = &threadStateData->threadObjectStack[threadStateData->threadObjectStackOffset];\n");
             }
+            // Frame-exit retirement scope. Emitted here because `locals` exists from
+            // the DEFINE_*_METHOD_STACK macro above, and because a declaration at the
+            // top of the function body is what makes its cleanup attribute cover every
+            // return path below it.
+            b.append(frameRetireScopeDecl());
             int startOffset = 0;
             if(synchronizedMethod) {
                 if(staticMethod) {
@@ -4828,6 +4842,185 @@ public class BytecodeMethod implements SignatureSet {
 
     // Compute before instruction rewriting. A false entry also breaks recursive
     // proof cycles conservatively; no caller relies on an unfinished proof.
+    private static final boolean DISABLE_FRAME_RETIRE =
+            "true".equalsIgnoreCase(Util.getProperty("CN1_DISABLE_FRAME_RETIRE", "false"));
+
+    /// Locals holding an object this frame allocated and provably never let escape.
+    /// Retired at frame exit; see cn1MarkDeadNow in cn1_globals.m.
+    private java.util.List<Integer> retirableLocals;
+    private java.util.List<Integer> retirableGuards;
+
+    /// Where sites are lost, so a zero at the end of the pipe is explainable rather
+    /// than mysterious. Printed by Parser when -Dcn1.allocCensus is on.
+    static int retireSeen, retireDropStack, retireDropEscape, retireDropNoLocal,
+            retireDropCallee, retireDropFrameless, retireKept;
+
+    /// FRAME EXIT IS WHERE DEADNESS IS KNOWN.
+    ///
+    /// A non-escaping object dies with the frame that made it, by definition -- no
+    /// last-use liveness analysis, no worrying about a local being reassigned in a loop.
+    /// The question collapses to "did this reference leave the frame", which the escape
+    /// analysis already answers, and the answer is consumed at exactly one place.
+    ///
+    /// Three conditions, all necessary:
+    ///   1. newEscapesStrict == SAFE -- the reference never leaves this frame, ARETURN
+    ///      included (the iterator scheme allows ARETURN because it allocates in the
+    ///      CALLER's frame; retiring at THIS frame's exit does not have that property).
+    ///   2. Every callee invoked ON the object keeps `this`. The walk permits the tracked
+    ///      value as a receiver only because "that callee is checked on its own", and for
+    ///      an arbitrary type nothing else performs that check.
+    ///   3. It reached a local, and the site is not already scalar-replaced or
+    ///      stack-allocated -- those have no heap object to retire.
+    /// Candidate sites found on RAW bytecode, held until the allocation decisions exist.
+    private java.util.Map<TypeInstruction, Integer> retireCandidates;
+
+    /// PHASE 1, on RAW bytecode. The escape walk models real opcodes; optimize() fuses
+    /// them into opaque custom instructions, after which the walk cannot follow a value
+    /// and conservatively answers ESCAPES for everything. Measured: running this after
+    /// optimize() dropped 209 of 209 non-stack sites, against 14 kept before it. The
+    /// same ordering constraint is why `frameless` is decided on raw bytecode too.
+    public void collectRetireCandidates() {
+        if (DISABLE_FRAME_RETIRE || isNative() || abstractMethod) {
+            return;
+        }
+        for (Instruction ins : instructions) {
+            if (!(ins instanceof TypeInstruction) || ins.getOpcode() != Opcodes.NEW) {
+                continue;
+            }
+            TypeInstruction ti = (TypeInstruction) ins;
+            retireSeen++;
+            String owner = IteratorEscape.mangle(ti.getTypeName());
+            if (IteratorEscape.newEscapesStrict(this, owner) != IteratorEscape.SAFE) {
+                retireDropEscape++;
+                continue;
+            }
+            int local = IteratorEscape.lastTrackedLocal;
+            if (local < 0) {
+                retireDropNoLocal++;
+                continue;
+            }
+            java.util.List<String> calls =
+                    new java.util.ArrayList<String>(IteratorEscape.receiverCalls);
+            if (!Parser.calleesKeepThis(calls, new java.util.HashMap<String, Boolean>())) {
+                retireDropCallee++;
+                continue;
+            }
+            if (retireCandidates == null) {
+                retireCandidates = new java.util.HashMap<TypeInstruction, Integer>();
+            }
+            retireCandidates.put(ti, Integer.valueOf(local));
+        }
+    }
+
+    /// PHASE 2, after optimize(). Only now is it known whether a site still has a heap
+    /// object -- scalar replacement and stack allocation are decided inside optimize --
+    /// and whether this method has a frame to exit at all.
+    public void analyzeRetirableLocals() {
+        if (DISABLE_FRAME_RETIRE || retireCandidates == null) {
+            return;
+        }
+        // NOTE: frameless is NOT a disqualifier. It only decides whether the method
+        // calls releaseForReturn, and the retire scope does not ride on that -- its
+        // cleanup attribute fires on scope exit either way. What DOES matter is how
+        // the method names its object locals, which is isBarebone(), handled in
+        // frameRetireScopeDecl. Excluding frameless here cost 3 of every 4 surviving
+        // candidates for no safety reason at all.
+        int guard = 0;
+        for (java.util.Map.Entry<TypeInstruction, Integer> e : retireCandidates.entrySet()) {
+            TypeInstruction ti = e.getKey();
+            if (ti.isScalarReplaced() || ti.getStackAllocType() != null) {
+                retireDropStack++;
+                continue;   // no heap object exists at this site
+            }
+            if (guard >= 8) {
+                break;      // slots[8] in CN1RetireScope
+            }
+            // The SITE writes its own guard, so the scope can only ever retire the
+            // object this analysis actually reasoned about.
+            ti.setDeadGuardId(guard);
+            if (retirableGuards == null) {
+                retirableGuards = new java.util.ArrayList<Integer>();
+            }
+            retirableGuards.add(Integer.valueOf(guard));
+            guard++;
+            retireKept++;
+        }
+    }
+
+    private void unusedOldRetirePass() {
+        for (Instruction ins : instructions) {
+            if (!(ins instanceof TypeInstruction) || ins.getOpcode() != Opcodes.NEW) {
+                continue;
+            }
+            TypeInstruction ti = (TypeInstruction) ins;
+            retireSeen++;
+            if (ti.isScalarReplaced() || ti.getStackAllocType() != null) {
+                retireDropStack++;
+                continue;   // no heap object exists at this site
+            }
+            String owner = IteratorEscape.mangle(ti.getTypeName());
+            if (IteratorEscape.newEscapesStrict(this, owner) != IteratorEscape.SAFE) {
+                retireDropEscape++;
+                continue;
+            }
+            int local = IteratorEscape.lastTrackedLocal;
+            if (local < 0) {
+                retireDropNoLocal++;
+                continue;
+            }
+            java.util.List<String> calls =
+                    new java.util.ArrayList<String>(IteratorEscape.receiverCalls);
+            if (!Parser.calleesKeepThis(calls, new java.util.HashMap<String, Boolean>())) {
+                retireDropCallee++;
+                continue;
+            }
+            if (frameless) {
+                retireDropFrameless++;
+                continue;
+            }
+            if (retirableLocals == null) {
+                retirableLocals = new java.util.ArrayList<Integer>();
+            }
+            Integer key = Integer.valueOf(local);
+            if (!retirableLocals.contains(key)) {
+                retirableLocals.add(key);
+                retireKept++;
+            }
+        }
+    }
+
+    /// The C emitted immediately before a frame is released. Empty when nothing
+    /// qualifies, which is the overwhelming majority of methods.
+    /// The scope declaration placed once at the top of the generated function. Its
+    /// cleanup attribute fires on every ordinary return, so no return-emission site
+    /// needs to know this optimization exists -- there are a dozen of them across
+    /// BytecodeMethod and BasicInstruction, one per return type plus the exception
+    /// variants, and patching each is how one gets missed.
+    /// Declares one guard per retirable site plus the scope that retires them.
+    ///
+    /// Guards rather than locals: a guard is written by the NEW itself and by nothing
+    /// else, so it cannot be holding some other object at frame exit. It also makes the
+    /// emission independent of how the method names its locals (locals[] vs olocals_N_),
+    /// which is decided by isBarebone() and had already cost this pass most of its
+    /// population once.
+    String frameRetireScopeDecl() {
+        if (retirableGuards == null || retirableGuards.isEmpty()) {
+            return "";
+        }
+        StringBuilder r = new StringBuilder();
+        StringBuilder slots = new StringBuilder();
+        int n = 0;
+        for (Integer g : retirableGuards) {
+            r.append("    JAVA_OBJECT __cn1dead_").append(g).append(" = JAVA_NULL;\n");
+            if (n > 0) { slots.append(", "); }
+            slots.append("&__cn1dead_").append(g);
+            n++;
+        }
+        r.append("    struct CN1RetireScope __cn1retire __attribute__((cleanup(cn1RetireScopeLeave))) = {{")
+         .append(slots).append("}, ").append(n).append("};\n");
+        return r.toString();
+    }
+
     public void analyzeBuilderOwnership() {
         if (!desc.contains("Ljava/lang/StringBuilder;")) return;
         int slot = staticMethod ? 0 : 1;
