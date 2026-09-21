@@ -5198,12 +5198,29 @@ void codenameOneGCMark() {
                 // disproved -- per-entry marking mode, worklist overflow, the missing
                 // lock -- and the fault has NOT been found. The serial arm stays 12/12.
                 //
-                // Next asymmetry to rule out: the producer runs with gcMarkLocalBuf == 0
-                // while every helper runs with a local buffer, so children discovered on
-                // the two paths take different routes onto the worklist.
-                // (the worklist already carries a per-entry `precise` flag, so there is
-                // precedent) is the obvious shape; a second global would reintroduce
-                // exactly the isolation bug the __thread comment above warns about.
+                // FOUND IT, and it is the producer's own PUSH, not its drain.
+                // gcMarkWorklistPush has two paths, chosen by gcMarkLocalBuf:
+                //
+                //   lb != 0  (every helper)   buffer locally, flush under the mutex
+                //   lb == 0  (this producer)  write gcMarkWorklist[top] and top++ RAW
+                //
+                // The raw path carries the comment "Serial producer: no workers can
+                // access the shared queue in this phase" -- a precondition each of these
+                // attempts broke, because the page walk runs on the GC thread, which has
+                // no local buffer. So the producer published entries with no mutex while
+                // helpers pushed and popped under one. Interleave a helper's flush with
+                // the producer's read-write-increment of the same index and the helper's
+                // entry is OVERWRITTEN: an object marked but never popped, whose mark
+                // function therefore never runs, whose children stay unmarked, and which
+                // the sweep then frees under a live holder. That is the verifier's report
+                // exactly -- holder mark=4, child mark=-8, markSite in the holder's own
+                // mark function. It also explains why locking only the POP side made it
+                // deterministic rather than better: that widened the window the unlocked
+                // push clobbers. (gcMarkWorklistGrow reallocs the array on that same
+                // unlocked path, which is the same bug with a bigger blast radius.)
+                //
+                // The fix is not a new protocol: give the producer a local buffer and its
+                // pushes take the identical locked flush path as every helper.
                 //
                 // Repeated generations are the wrong shape for a producer that drains as
                 // it goes. Making this parallel properly means ONE generation held open
