@@ -5148,3 +5148,67 @@ row printed NA. Same shape as `verify-selfhost.sh` exiting 0 having run nothing,
 hit earlier in this same session and documented at the time. The build is now
 done once per matrix run, after the bench builds have done their cleaning, and a
 failure prints SKIPPED with the log path.
+
+---
+
+## Round 34: the wall-time paradox, resolved -- we are not idle, we are not parallel
+
+The standing conflict: ParparVM uses LESS CPU than JDK 25 and takes MORE wall
+time. Three explanations were proposed and each was measured rather than argued.
+
+**Sleeping -- dead.** The runtime's own counters, which are counts and therefore
+immune to machine load:
+
+    [PACING] bibopParks=0 legacyParks=0 volumeParks=0
+    [LOWMEM] parks=0 throttledAllocations=0
+
+Not one park of any kind on a full hello-corpus translation. The mutator is never
+throttled and never waits for the collector.
+
+**Teardown -- dead.** Between the last emitted file and process exit: 0.020,
+0.021, 0.027s across three runs -- 0.1% of wall. A build whose `main` ends in
+`_exit(0)` (no atexit, no teardown, heap deliberately leaked) then disagreed with
+itself, min -121ms and median +304ms; the physical bound settles it regardless,
+since nothing after the last write takes more than ~25ms.
+
+**Page faults -- dead for this workload.** 106,799 minor faults against JDK 25's
+89,096, only 20% more, and our peak footprint is LOWER (1079MB vs 1349MB). The
+earlier 2.3x-memory finding (commit 4e3e5e723d) was a runaway-heap scenario at
+38.6GB, not this one.
+
+### What it actually is
+
+    parpar  real=21.64s  user=30.80s  sys=2.70s   -> 1.42 cores
+    jdk25   real=14.27s  user=38.03s  sys=1.75s   -> 2.67 cores
+
+**HotSpot does MORE total work and finishes sooner.** 38.03 CPU-seconds against
+our 30.80, spread across 2.67 cores against our 1.42. Our mutator is the critical
+path with nothing beside it but one collector thread; theirs runs ~14.3s where
+ours needs ~21.6s -- about **1.5x faster** -- bought with ~23.8 CPU-seconds of
+JIT and parallel GC running concurrently with it.
+
+So both halves of the observation are true and consistent: we burn less CPU
+because we do not JIT, and we take longer because there is no parallelism to hide
+a slower mutator behind. The paradox was only ever a paradox if you assumed equal
+parallelism.
+
+This also matches the microbenchmarks rather than contradicting them. We are at
+parity on arithmetic and arrays and 1.6-3.7x behind on allocation, string
+building and hashmap churn -- which is exactly what a translator does all day, so
+the mutator-side deficit concentrates in the workload that matters.
+
+### Where that leaves the levers
+
+Two, and only two:
+
+1. **Make the mutator faster** on the allocation-heavy shapes. The per-allocation
+   work is two store-releases, a class-registry test and three guard loads; a
+   TLAB bump has none of them.
+2. **Use the idle cores.** We leave ~2.5 of 4 busy cores unused at the 4-core
+   mark while HotSpot saturates them. Anything that can move off the mutator
+   thread -- sweeping, page formatting, zeroing ahead of the bump -- is wall time
+   we currently pay in line.
+
+Note which lever is NOT available: matching HotSpot's trick directly. Its 23.8
+CPU-seconds go to JIT compilation, work an AOT VM does not have. That is an
+advantage we already hold, and it is why we win on CPU while losing on wall.
