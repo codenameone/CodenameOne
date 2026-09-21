@@ -559,6 +559,27 @@ server read as permanently saturated.
 `stop()` sends every open connection a 1001 "going away" close before the drain
 window, so a shutdown reads as one to the client rather than as a network failure.
 
+==== How the frame layer is checked
+
+Most of RFC 6455 is about frames a conformant client never sends, so a server can
+be wrong in ways nothing it talks to will reveal. The
+https://github.com/crossbario/autobahn-testsuite[Autobahn|Testsuite] is what finds
+those, and `vm/backend/ws-conformance.sh` runs it:
+
+----
+vm/backend/ws-conformance.sh --arm javase     # or --arm native
+----
+
+It needs Docker or Podman, starts an echo server, and drives ~300 cases through
+it. The gate has no per-case tolerance: every case must pass, and `NON-STRICT`
+counts as a failure, because a lenient frame parser is the thing this is looking
+for. The set of cases that ran also has to match a committed manifest, so the
+suite can't shrink unnoticed to the ones that happen to pass.
+
+Sections 12 and 13 are excluded while permessage-deflate is unimplemented. They're
+excluded rather than tolerated: accepting their result as a pass would also accept
+it for a case that used to work.
+
 === What it costs
 
 Same handler, three ways, plus Go for an outside reference. Two pinned cores, 64
