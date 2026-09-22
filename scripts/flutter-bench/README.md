@@ -180,8 +180,11 @@ would quietly produce an incomparable number.
 Every run posts the comment on the pull request. A nightly or dispatched run
 on master also publishes the folded results to the `port-status-data` branch
 as `benchmarks/flutter.json`, and the website build resolves that into
-`data/port_status_flutter_benchmark.json`. It is not rendered on the Port
-Status page, which by design carries no framework comparison.
+`data/port_status_flutter_benchmark.json`, which the Port Status page renders
+as its own section. That section is the only place the page may name another
+framework: `scripts/website/validate_port_status.mjs` still fails any Flutter
+mention outside it, and fails the section if it reuses the compliance matrix's
+counted attributes.
 
 ## Known constraints
 
