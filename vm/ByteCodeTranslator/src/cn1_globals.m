@@ -15982,6 +15982,36 @@ static void cn1ReportSlotHistogram(void) {
         fprintf(stderr, "[SLOTHIST] %s  slotBytes=%-14lld scalar=%-14lld array=%-14lld  %6.2f%% of today\n",
                 sc[k].name, tot, objSlot[k], arrSlot[k], 100.0 * (double)tot / (double)base);
     }
+    // NET, charging for the side table. Bytes taken out of the header are not
+    // deleted, they are RELOCATED: whatever the collector still needs per object --
+    // the mark epoch, the heap position -- has to live somewhere, and a side table
+    // costs its own bytes per slot. The object-side saving is only real where it
+    // crosses a size class; the table is paid on every slot regardless. An earlier
+    // reading of this instrument quoted the left-hand column as the win and was
+    // wrong for exactly that reason.
+    //
+    // slotBytes is a per-allocation sum, so N * sideBytes is the matching unit.
+    {
+        long long n = objCount + arrCount;
+        static const struct { int hdrDelta; const char* what; } need[] = {
+            {  8, "gcMark+heapPos moved out (hdr 16->8)" },
+            { 16, "whole header moved out  (hdr 16->0)" },
+        };
+        static const double side[] = { 8.0, 4.0, 2.0, 1.0, 0.25 };
+        int a, b2;
+        fprintf(stderr, "[SLOTHIST] NET once the side table is charged (%lld allocations):\n", n);
+        for(a = 0 ; a < 2 ; a++) {
+            int idx = (need[a].hdrDelta == 8) ? 2 : 4;   /* hdr=8 row, hdr=0 row */
+            long long slotb = objSlot[idx] + arrSlot[idx];
+            fprintf(stderr, "[SLOTHIST]   %s:\n", need[a].what);
+            for(b2 = 0 ; b2 < 5 ; b2++) {
+                double tot = (double)slotb + (double)n * side[b2];
+                fprintf(stderr, "[SLOTHIST]     side=%5.2f B/slot -> %14.0f  %6.2f%% of today%s\n",
+                        side[b2], tot, 100.0 * tot / (double)base,
+                        tot >= (double)base ? "   <-- LOSES" : "");
+            }
+        }
+    }
     // The sizes that carry the volume, so a reader can see WHERE a saving does or
     // does not cross a class boundary instead of trusting the totals.
     // FEASIBILITY OF TYPE-HOMOGENEOUS PAGES, which is what "clazz from the page
