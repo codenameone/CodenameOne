@@ -115,4 +115,54 @@ final class Utf8 {
         }
         return true;
     }
+
+    /**
+     * The UTF-8 bytes of a String.
+     *
+     * Wrapped because `getBytes("UTF-8")` is declared to throw
+     * UnsupportedEncodingException, and every caller here would have to carry that
+     * through a path where it cannot happen: UTF-8 is mandatory on both arms. The
+     * throw below is a bug report, not a condition to handle.
+     */
+    static byte[] encode(String value) {
+        if(value == null) {
+            return new byte[0];
+        }
+        try {
+            return value.getBytes("UTF-8");
+        } catch (java.io.UnsupportedEncodingException err) {
+            throw new IllegalStateException("this runtime has no UTF-8: " + err);
+        }
+    }
+
+    /** The String a UTF-8 range spells. Validate it first; this one cannot fail. */
+    static String decode(byte[] bytes, int offset, int length) {
+        try {
+            return new String(bytes, offset, length, "UTF-8");
+        } catch (java.io.UnsupportedEncodingException err) {
+            throw new IllegalStateException("this runtime has no UTF-8: " + err);
+        }
+    }
+
+    /**
+     * The largest length at or below `limit` that does not cut a character in half.
+     *
+     * For the one place a UTF-8 payload has a hard size cap it did not choose: a
+     * close frame's reason shares 125 bytes with the code, so a long reason has to
+     * be truncated. Cutting mid-character would make the close frame itself
+     * invalid UTF-8, and the peer would answer a protocol error to a perfectly
+     * ordinary goodbye.
+     */
+    static int truncateAt(byte[] bytes, int limit) {
+        if(limit >= bytes.length) {
+            return bytes.length;
+        }
+        int at = limit;
+        // Back up over continuation bytes to the start of the character they
+        // belong to, then drop that character entirely.
+        while(at > 0 && (bytes[at] & 0xc0) == 0x80) {
+            at--;
+        }
+        return at;
+    }
 }

@@ -213,7 +213,12 @@ if [ -n "$WS_JAVA_BIN" ] \
   export CN1SS_WS_DIR
   rjb_log "WebSocket screenshot server listening on port ${CN1SS_WS_PORT} (out=$CN1SS_WS_DIR)"
 else
-  rjb_log "WebSocket screenshot server not started; relying on base64-over-console fallback"
+  rjb_log "The websocket screenshot server did not start, and there is NO fallback:"
+  rjb_log "Cn1ssDeviceRunnerHelper says so in as many words, and the device"
+  rjb_log "streams every screenshot over that socket. Continuing would run the"
+  rjb_log "whole suite, deliver nothing, and fail on a count gate many minutes"
+  rjb_log "from here with no mention of the transport. Stopping instead."
+  exit 6
 fi
 
 if [ -n "${BROWSER_CMD:-}" ]; then
