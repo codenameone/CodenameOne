@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Compile the real heap-removal functions and guard class literals (issue #5881)."""
+"""Fast heap-removal smoke check; GetClassIntegrationTest covers real descriptors."""
 import os
 from pathlib import Path
 import shlex
@@ -65,6 +65,7 @@ HARNESS = r'''
 int main(void) {
     struct clazz ordinaryClass = { &class__java_lang_Class, 0, 0 };
     struct clazz classLiteral = { &class__java_lang_Class, 0, 0 };
+    struct clazz arrayLiteral = { 0, 0, 0 };
     struct JavaObjectPrototype display = { &ordinaryClass, 2, 0 };
     struct JavaObjectPrototype buffer = { &ordinaryClass, 2, 1 };
     struct JavaObjectPrototype pending = { &ordinaryClass, -1, -1 };
@@ -72,6 +73,7 @@ int main(void) {
     JAVA_OBJECT pendingTable[] = { &pending };
     struct ThreadLocalData state = { 1, pendingTable };
     JAVA_OBJECT literals[] = { (JAVA_OBJECT)&classLiteral,
+                              (JAVA_OBJECT)&arrayLiteral,
                               (JAVA_OBJECT)&class__java_lang_Class,
                               JAVA_NULL, (JAVA_OBJECT)(uintptr_t)3 };
     allObjectsInHeap = calloc(sizeOfAllObjectsInHeap, sizeof(JAVA_OBJECT));
@@ -86,6 +88,7 @@ int main(void) {
         assert(allObjectsInHeap[1] == &buffer);
         assert(display.__heapPosition == 0);
         assert(classLiteral.__heapPosition == 0);
+        assert(arrayLiteral.__heapPosition == 0);
         assert(class__java_lang_Class.__heapPosition == 0);
         assert(registered == NULL && rooted == NULL);
     }

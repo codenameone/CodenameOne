@@ -91,6 +91,13 @@ public class GetClassApp {
         say("staticClass", Boolean.valueOf(LiteralHolder.ENTRY == classOfA));
         say("staticMetaClass", Boolean.valueOf(LiteralHolder.META == Class.class));
         say("staticArrayClass", Boolean.valueOf(LiteralHolder.ARRAY == int[].class));
+        // Keep generated reference-array descriptors in the native fixture too.
+        say("classArray1", Boolean.valueOf(Class[].class.isArray()));
+        say("classArray2", Boolean.valueOf(Class[][].class.isArray()));
+        say("classArray3", Boolean.valueOf(Class[][][].class.isArray()));
+        say("entryArray1", Boolean.valueOf(Entry[].class.isArray()));
+        say("entryArray2", Boolean.valueOf(Entry[][].class.isArray()));
+        say("entryArray3", Boolean.valueOf(Entry[][][].class.isArray()));
 
         // The reporter's failure only showed up while a dictionary load was allocating
         // hard, so re-check every invariant under churn instead of once at startup.

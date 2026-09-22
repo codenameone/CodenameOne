@@ -5332,8 +5332,10 @@ JAVA_BOOLEAN removeObjectFromHeapCollection(CODENAME_ONE_THREAD_STATE, JAVA_OBJE
     // and reclaimed the input buffers while the EDT still used them.
     // getClass() rewrites a descriptor's parent from class__java_lang_Class
     // to ClazzClazz. Both represent class metadata; neither is a heap object.
-    // The metaclasses themselves can have null parents, so check their identities
-    // too. Read the parent once rather than testing two different snapshots.
+    // Primitive-array and generated Class[] descriptors start with a null
+    // parent, as do the metaclasses themselves. Live heap objects always have
+    // a class; these null-parent descriptors likewise have no heap entry.
+    // Read the parent once rather than testing different snapshots.
     // Null and tagged values likewise have no heap entry or header to inspect.
     if(o == JAVA_NULL || CN1_IS_TAGGED(o)
        || o == (JAVA_OBJECT)&class__java_lang_Class
@@ -5341,7 +5343,7 @@ JAVA_BOOLEAN removeObjectFromHeapCollection(CODENAME_ONE_THREAD_STATE, JAVA_OBJE
         return JAVA_TRUE;
     }
     struct clazz* parent = o->__codenameOneParentClsReference;
-    if(parent == &class__java_lang_Class || parent == &ClazzClazz) {
+    if(parent == 0 || parent == &class__java_lang_Class || parent == &ClazzClazz) {
         return JAVA_TRUE;
     }
 
