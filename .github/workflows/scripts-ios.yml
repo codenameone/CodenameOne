@@ -364,7 +364,7 @@ jobs:
           if-no-files-found: warn
           retention-days: 14
 
-      - name: The suite must have produced screenshots
+      - name: The suite must have compared screenshots
         # Runs in BOTH iOS Metal legs, and is the control that was missing.
         #
         # The screenshot step can be tolerated while a baseline set is being
@@ -388,12 +388,25 @@ jobs:
           # fails a leg that captured a full set -- which is exactly what it did
           # on its first run, the same scope mistake as the warning leg above.
           ARTIFACTS_DIR: ${{ github.workspace }}/artifacts/ios-ui-tests-metal
+        #
+        # Counted from the COMPARISON REPORT, not from PNGs on disk. The runner
+        # keeps only the captures that failed comparison, so a run in which all
+        # 155 matched leaves zero PNGs behind -- indistinguishable, by file
+        # count, from a run that never started. That was this check's first
+        # version, and it failed the iOS 27 leg on the very run where every
+        # screenshot matched its baseline. The report exists only once the suite
+        # reached the screenshot stage, and lists every screenshot it compared.
         run: |
           set -euo pipefail
-          count=$(find "${ARTIFACTS_DIR}" -name '*.png' 2>/dev/null | wc -l | tr -d ' ')
-          echo "screenshots produced: ${count}"
+          report="${ARTIFACTS_DIR}/screenshot-compare.json"
+          if [ ! -f "${report}" ]; then
+            echo "::error title=No screenshots::no comparison report at ${report}; the suite never reached the screenshot stage"
+            exit 1
+          fi
+          count=$(python3 -c 'import json,sys; print(len(json.load(open(sys.argv[1])).get("results") or []))' "${report}")
+          echo "screenshots compared: ${count}"
           if [ "${count}" -eq 0 ]; then
-            echo "::error title=No screenshots::the suite produced 0 screenshots; the leg validated nothing"
+            echo "::error title=No screenshots::the suite compared 0 screenshots; the leg validated nothing"
             exit 1
           fi
       - name: Publish Metal screenshot summary
@@ -755,7 +768,7 @@ jobs:
       # would publish whichever leg finished last, the same clobber the comment
       # marker above already had to be split to avoid.
 
-      - name: The suite must have produced screenshots
+      - name: The suite must have compared screenshots
         # Runs in BOTH iOS Metal legs, and is the control that was missing.
         #
         # The screenshot step can be tolerated while a baseline set is being
@@ -779,12 +792,25 @@ jobs:
           # fails a leg that captured a full set -- which is exactly what it did
           # on its first run, the same scope mistake as the warning leg above.
           ARTIFACTS_DIR: ${{ github.workspace }}/artifacts/ios-ui-tests-metal-27
+        #
+        # Counted from the COMPARISON REPORT, not from PNGs on disk. The runner
+        # keeps only the captures that failed comparison, so a run in which all
+        # 155 matched leaves zero PNGs behind -- indistinguishable, by file
+        # count, from a run that never started. That was this check's first
+        # version, and it failed the iOS 27 leg on the very run where every
+        # screenshot matched its baseline. The report exists only once the suite
+        # reached the screenshot stage, and lists every screenshot it compared.
         run: |
           set -euo pipefail
-          count=$(find "${ARTIFACTS_DIR}" -name '*.png' 2>/dev/null | wc -l | tr -d ' ')
-          echo "screenshots produced: ${count}"
+          report="${ARTIFACTS_DIR}/screenshot-compare.json"
+          if [ ! -f "${report}" ]; then
+            echo "::error title=No screenshots::no comparison report at ${report}; the suite never reached the screenshot stage"
+            exit 1
+          fi
+          count=$(python3 -c 'import json,sys; print(len(json.load(open(sys.argv[1])).get("results") or []))' "${report}")
+          echo "screenshots compared: ${count}"
           if [ "${count}" -eq 0 ]; then
-            echo "::error title=No screenshots::the suite produced 0 screenshots; the leg validated nothing"
+            echo "::error title=No screenshots::the suite compared 0 screenshots; the leg validated nothing"
             exit 1
           fi
       - name: Publish Metal screenshot summary
