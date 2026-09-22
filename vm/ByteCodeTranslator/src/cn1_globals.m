@@ -5325,12 +5325,16 @@ void codenameOneGCSweep() {
 }
 
 JAVA_BOOLEAN removeObjectFromHeapCollection(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT o) {
-    // A tagged Integer has no heap entry to remove (and no object header).  Static
-    // final boxed values reach this path because the translator historically
-    // removes immutable static finals from the heap collection.  Treat the
-    // immediate as already outside the heap instead of falling through to a
-    // header dereference in findPointerPosInHeap().
-    if(o != JAVA_NULL && CN1_IS_TAGGED(o)) {
+    // Static-final setters also pass class literals here (e.g.
+    // CodenameOneThread.CODE). A clazz is static metadata, not a heap entry:
+    // its zero-initialized __heapPosition would erase slot 0. In issue #5881
+    // that slot held Display, so subsequent collections skipped its fields
+    // and reclaimed the input buffers while the EDT still used them.
+    // Class.class itself has a null parent, hence the explicit identity check.
+    // Null and tagged values likewise have no heap entry or header to inspect.
+    if(o == JAVA_NULL || CN1_IS_TAGGED(o)
+       || o == (JAVA_OBJECT)&class__java_lang_Class
+       || o->__codenameOneParentClsReference == &class__java_lang_Class) {
         return JAVA_TRUE;
     }
 
