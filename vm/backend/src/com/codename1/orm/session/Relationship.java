@@ -24,34 +24,62 @@ package com.codename1.orm.session;
 
 /// Immutable generated relationship mapping.
 public final class Relationship {
-    public final String field, mappedBy, joinTable, joinColumn, inverseJoinColumn,mapKey,orderColumn,orderBy;
+    public final String field;
+    public final String mappedBy;
+    public final String joinTable;
+    public final String joinColumn;
+    public final String inverseJoinColumn;
+    public final String mapKey;
+    public final String orderColumn;
+    public final String orderBy;
     public final Class target;
-    public final boolean many, lazy, orphanRemoval,unique,element;
-    public final int column, cascade;
-    public static final int PERSIST=1, MERGE=2, REMOVE=4, REFRESH=8, DETACH=16;
-    public Relationship(String field,Class target,boolean many,boolean lazy,int column,
-            String mappedBy,String joinTable,String joinColumn,String inverseJoinColumn,
-            int cascade,boolean orphanRemoval) {
-        this(field,target,many,lazy,column,mappedBy,joinTable,joinColumn,inverseJoinColumn,cascade,orphanRemoval,false);
+    public final boolean many;
+    public final boolean lazy;
+    public final boolean orphanRemoval;
+    public final boolean unique;
+    public final boolean element;
+    public final int column;
+    public final int cascade;
+    public static final int PERSIST = 1;
+    public static final int MERGE = 2;
+    public static final int REMOVE = 4;
+    public static final int REFRESH = 8;
+    public static final int DETACH = 16;
+    public Relationship(String field, Class target, boolean many, boolean lazy, int column, String mappedBy,
+            String joinTable, String joinColumn, String inverseJoinColumn, int cascade, boolean orphanRemoval) {
+        this(field, target, many, lazy, column, mappedBy, joinTable, joinColumn, inverseJoinColumn, cascade,
+                orphanRemoval, false);
     }
-    public Relationship(String field,Class target,boolean many,boolean lazy,int column,
-            String mappedBy,String joinTable,String joinColumn,String inverseJoinColumn,
-            int cascade,boolean orphanRemoval,boolean unique) {
-        this(field,target,many,lazy,column,mappedBy,joinTable,joinColumn,inverseJoinColumn,cascade,orphanRemoval,unique,"","","");
+    public Relationship(String field, Class target, boolean many, boolean lazy, int column, String mappedBy,
+            String joinTable, String joinColumn, String inverseJoinColumn, int cascade, boolean orphanRemoval,
+            boolean unique) {
+        this(field, target, many, lazy, column, mappedBy, joinTable, joinColumn, inverseJoinColumn, cascade,
+                orphanRemoval, unique, "", "", "");
     }
-    public Relationship(String field,Class target,boolean many,boolean lazy,int column,
-            String mappedBy,String joinTable,String joinColumn,String inverseJoinColumn,
-            int cascade,boolean orphanRemoval,boolean unique,String mapKey,String orderColumn,String orderBy) {
-        this(field,target,many,lazy,column,mappedBy,joinTable,joinColumn,inverseJoinColumn,cascade,orphanRemoval,unique,mapKey,orderColumn,orderBy,false);
+    public Relationship(String field, Class target, boolean many, boolean lazy, int column, String mappedBy,
+            String joinTable, String joinColumn, String inverseJoinColumn, int cascade, boolean orphanRemoval,
+            boolean unique, String mapKey, String orderColumn, String orderBy) {
+        this(field, target, many, lazy, column, mappedBy, joinTable, joinColumn, inverseJoinColumn, cascade,
+                orphanRemoval, unique, mapKey, orderColumn, orderBy, false);
     }
-    public Relationship(String field,Class target,boolean many,boolean lazy,int column,
-            String mappedBy,String joinTable,String joinColumn,String inverseJoinColumn,
-            int cascade,boolean orphanRemoval,boolean unique,String mapKey,String orderColumn,String orderBy,boolean element) {
-        this.element=element;
-        this.mapKey=mapKey;this.orderColumn=orderColumn;this.orderBy=orderBy;
-        this.unique=unique;
-        this.field=field;this.target=target;this.many=many;this.lazy=lazy;this.column=column;
-        this.mappedBy=mappedBy;this.joinTable=joinTable;this.joinColumn=joinColumn;
-        this.inverseJoinColumn=inverseJoinColumn;this.cascade=cascade;this.orphanRemoval=orphanRemoval;
+    public Relationship(String field, Class target, boolean many, boolean lazy, int column, String mappedBy,
+            String joinTable, String joinColumn, String inverseJoinColumn, int cascade, boolean orphanRemoval,
+            boolean unique, String mapKey, String orderColumn, String orderBy, boolean element) {
+        this.element = element;
+        this.mapKey = mapKey;
+        this.orderColumn = orderColumn;
+        this.orderBy = orderBy;
+        this.unique = unique;
+        this.field = field;
+        this.target = target;
+        this.many = many;
+        this.lazy = lazy;
+        this.column = column;
+        this.mappedBy = mappedBy;
+        this.joinTable = joinTable;
+        this.joinColumn = joinColumn;
+        this.inverseJoinColumn = inverseJoinColumn;
+        this.cascade = cascade;
+        this.orphanRemoval = orphanRemoval;
     }
 }

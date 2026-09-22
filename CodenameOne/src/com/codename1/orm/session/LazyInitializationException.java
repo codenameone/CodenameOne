@@ -24,5 +24,7 @@ package com.codename1.orm.session;
 
 /// An unloaded association was accessed after its session was detached or closed.
 public final class LazyInitializationException extends PersistenceException {
-    public LazyInitializationException(String message) { super(message); }
+    public LazyInitializationException(String message) {
+        super(message);
+    }
 }

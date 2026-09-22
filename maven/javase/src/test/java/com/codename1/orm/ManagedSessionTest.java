@@ -194,6 +194,25 @@ class ManagedSessionTest {
             s.beginTransaction();assertThrows(OptimisticLockException.class,()->s.merge(r));s.rollbackTransaction();s.close();
         } finally { em.close(); }
     }
+    @Test void failedFlushPreservesCallbackExceptionAndRequiresRollback() throws Exception {
+        EntityManager em=manager();
+        RuntimeException failure=new IllegalStateException("callback failed");
+        Models.register(new Model() {
+            @Override public void lifecycle(Record record,int event) {
+                if(event==2) { throw failure; }
+            }
+        });
+        try {
+            Session s=em.openSession();Record record=seed(s);
+            s.beginTransaction();record.name="uncommitted";
+            assertSame(failure,assertThrows(IllegalStateException.class,s::flush));
+            assertTrue(s.isRollbackOnly());
+            assertThrows(PersistenceException.class,s::commitTransaction);
+            s.rollbackTransaction();
+            assertEquals("first",s.find(Record.class,record.id).name);s.close();
+        } finally { Models.register(new Model());em.close(); }
+    }
+
     @Test void identifierMutationCannotRedirectRefreshOrDeletion() throws Exception {
         EntityManager em=manager();
         try {

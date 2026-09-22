@@ -40,8 +40,8 @@ public interface SqlAccess {
     List<Object[]> query(String sql, Object[] params, int[] kinds) throws IOException;
     int execute(String sql, Object[] params) throws IOException;
     long insert(String sql, Object[] params, String keyColumn) throws IOException;
-    void prepareGenerator(int strategy,String name) throws IOException;
-    Object nextIdentifier(int strategy,String name,int kind) throws IOException;
+    void prepareGenerator(int strategy, String name) throws IOException;
+    Object nextIdentifier(int strategy, String name, int kind) throws IOException;
     void begin() throws IOException;
     void commit() throws IOException;
     void rollback() throws IOException;

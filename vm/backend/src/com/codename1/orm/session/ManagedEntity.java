@@ -23,6 +23,8 @@
 package com.codename1.orm.session;
 
 /// Implemented by build-time enhancement, never by application models.
+// The prefix reserves enhancement hooks so they cannot collide with entity APIs.
+@SuppressWarnings("PMD.MethodNamingConventions")
 public interface ManagedEntity {
     EntityState __cn1OrmState();
     void __cn1OrmState(EntityState state);

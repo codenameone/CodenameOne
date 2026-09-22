@@ -68,13 +68,13 @@ requests, with a separate session for each request.
 The existing scalar `Dao` API keeps its immediate-write behavior. Entities
 using relationships, `@Version`, composite IDs, generated strategies,
 inheritance, converters, indexes, or embedded values use sessions; asking for a
-legacy DAO for these mappings throws an error rather than silently dropping
+legacy DAO for these mappings throws an error rather than dropping
 managed behavior.
 
 A managed session maintains one instance per entity identity, detects changes
 at flush time, and flushes before commit and before queries in a transaction.
 `persist`, `merge`, and `remove` require an active transaction. `merge` returns
-the managed copy; it does not attach the supplied detached instance.
+the managed copy; it doesn't attach the supplied detached instance.
 
 [source,java]
 ----
@@ -84,7 +84,7 @@ include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/M
 Closing a session rolls back any active transaction. It never commits. A
 rollback clears the persistence context. An optimistic-lock or database failure
 requires rollback before the session can continue writing. Closing the session
-does not close its entity manager's database or pool.
+doesn't close its entity manager's database or pool.
 
 ==== Association mappings
 
@@ -104,9 +104,9 @@ The build enhances entity classes and field-access callers so a normal public
 field read can initialize a lazy relationship. No runtime proxy generator or
 reflection is needed. `session.isLoaded(entity, "relationship")` inspects load
 state without fetching; `session.initialize(entity, "relationship")` fetches
-explicitly. An unloaded relationship cannot be read after detaching its entity
+explicitly. An unloaded relationship can't be read after detaching its entity
 or closing its session: this throws `LazyInitializationException`. Generated
-`@Mapped` serializers reject unloaded associations rather than fetching them
+`@Mapped` serialization code rejects unloaded associations rather than fetching them
 during serialization; initialize the relationships needed for the output first.
 
 Fetching is synchronous. On the client, perform database work off the EDT and
@@ -131,7 +131,7 @@ counts a relationship without materializing it.
 
 `createQuery` accepts an explicit JPQL subset: entity or scalar selects,
 relationship joins, named parameters, comparisons and boolean predicates,
-aggregates, grouping/having, ordering, scalar predicate subqueries, and bulk
+aggregates, grouping/having, ordering, nested queries in scalar predicates, and bulk
 update/delete. String and numeric literals and named values become bound SQL
 parameters. `IN :values` and `IN (:values)` accept an `Iterable` or object array,
 including an empty collection. Unsupported syntax is rejected. Scalar projections return the
@@ -144,7 +144,7 @@ include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/M
 
 Bulk mutations use `executeUpdate()` inside a transaction. They flush pending
 managed changes, bypass per-entity callbacks and cascades, and clear the context
-so later reads cannot reuse stale entities.
+so later reads can't reuse stale entities.
 
 An `int` or `long` field annotated `@Version` is maintained by the session.
 Updates and deletes compare its previous value and throw
@@ -167,14 +167,14 @@ Public no-argument void methods can receive `@PrePersist`, `@PostPersist`,
 Inherited callbacks run before subclass callbacks; overriding a callback method
 replaces the inherited declaration. Client scalar `Property` fields participate
 in dirty checking and counters. Backend entities use plain fields because the
-backend runtime does not contain the client properties package.
+backend runtime doesn't contain the client properties package.
 
 `@Convert(converter=CodeConverter.class, storageType=String.class)` maps a
 custom basic value to a SQL scalar. The converter implements
 `com.codename1.orm.session.AttributeConverter<Code,String>` and has a public
 no-argument constructor. It receives null values too. Query-builder predicates
 and JPQL comparison parameters apply the field's converter. Identifiers and
-versions cannot use converters.
+versions can't use converters.
 
 ==== Identity and inheritance
 
@@ -224,7 +224,7 @@ indexes. MySQL indexed text uses a bounded key type; specify `@Column(type=...)`
 when the schema needs a particular length.
 
 `session.validateSchema()` checks mapped entity columns, storage-type families,
-nullability, primary keys, and required collection columns. It does not migrate
+whether null values are allowed, primary keys, and required collection columns. It doesn't migrate
 schemas or validate every database-specific constraint. Existing tables are
 left to explicit migrations. In particular, a legacy client DAO's text char
 columns need migration to the managed layer's numeric UTF-16 storage when moving
@@ -233,15 +233,15 @@ to a managed schema.
 Backend sessions support `find(type, id, LockMode.PESSIMISTIC_READ)` and
 `PESSIMISTIC_WRITE`, or `lock(entity, mode)`, inside a transaction. PostgreSQL and
 MySQL/MariaDB use their row-lock clauses. SQLite rejects these modes explicitly;
-it cannot provide row-level pessimistic locks.
+it can't provide row-level pessimistic locks.
 
 ==== Supported boundary
 
-This API provides managed persistence through CN1 annotations; it is not a JPA
+This API provides managed persistence through CN1 annotations; it's not a JPA
 provider or a Hibernate binary replacement. Entity access uses public fields.
 Getter/setter access mappings, property-backed associations, joined/table-per-class
 inheritance, embeddable element collections, and independently stored entity-map
-keys are not supported. Nested fetch graphs and mixed entity/scalar JPQL
+keys aren't supported. Nested fetch graphs and mixed entity/scalar JPQL
 projections are also outside the current query subset. Use the builder's
 `count()` for distinct composite identities. Native device execution and each
 backend database version still require application integration testing.
@@ -253,7 +253,7 @@ The annotation processor fails the build when:
 * `@Entity` lands on an interface, or an abstract entity has no `@Inheritance` root.
 * A concrete entity has no public no-arg constructor.
 * No identifier is mapped, or a composite identifier requests generated values.
-* Persistent column/table/index names conflict, or `mappedBy` does not resolve.
+* Persistent column/table/index names conflict, or `mappedBy` doesn't resolve.
 * A field's static type or relationship mapping is unsupported.
 
 Errors are accumulated so the first build run reports every offending

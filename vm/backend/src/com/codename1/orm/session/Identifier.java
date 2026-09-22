@@ -28,17 +28,30 @@ import java.util.Arrays;
 public final class Identifier {
     private final Object[] values;
     private Identifier(Object[] values) {
-        this.values=values.clone();
-        for(int i=0;i<this.values.length;i++) {
-            Object value=Values.storage(this.values[i]);
-            if(value instanceof Integer || value instanceof Short || value instanceof Byte)
-                value=Long.valueOf(((Number)value).longValue());
-            if(value instanceof byte[]) throw new IllegalArgumentException("Binary composite keys are not supported");
-            this.values[i]=value;
+        this.values = values.clone();
+        for (int i = 0; i < this.values.length; i++) {
+            Object value = Values.storage(this.values[i]);
+            if (value instanceof Integer || value instanceof Short || value instanceof Byte) {
+                value = Long.valueOf(((Number) value).longValue());
+            }
+            if (value instanceof byte[]) {
+                throw new IllegalArgumentException("Binary composite keys are not supported");
+            }
+            this.values[i] = value;
         }
     }
-    public static Identifier of(Object... values) { return new Identifier(values); }
-    public Object[] values() { return values.clone(); }
-    public boolean equals(Object other) { return other instanceof Identifier && Arrays.equals(values,((Identifier)other).values); }
-    public int hashCode() { return Arrays.hashCode(values); }
+    public static Identifier of(Object... values) {
+        return new Identifier(values);
+    }
+    public Object[] values() {
+        return values.clone();
+    }
+    @Override
+    public boolean equals(Object other) {
+        return other instanceof Identifier && Arrays.equals(values, ((Identifier) other).values);
+    }
+    @Override
+    public int hashCode() {
+        return Arrays.hashCode(values);
+    }
 }

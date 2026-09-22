@@ -23,7 +23,7 @@
 package com.codename1.orm.session;
 
 /// Reflection-free conversion between a domain value and one SQL scalar.
-public interface AttributeConverter<T,S> {
+public interface AttributeConverter<T, S> {
     S toDatabase(T value);
     T fromDatabase(S value);
 }

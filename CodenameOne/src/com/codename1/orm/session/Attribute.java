@@ -24,18 +24,34 @@ package com.codename1.orm.session;
 
 /// Immutable generated column mapping. Kind numbers match the backend SQL dialect.
 public final class Attribute {
-    public static final int TEXT=0, INTEGER=1, BIGINT=2, REAL=3, BLOB=4, BOOLEAN=5, TIMESTAMP=6;
-    public final String field, column, declaredType;
+    public static final int TEXT = 0;
+    public static final int INTEGER = 1;
+    public static final int BIGINT = 2;
+    public static final int REAL = 3;
+    public static final int BLOB = 4;
+    public static final int BOOLEAN = 5;
+    public static final int TIMESTAMP = 6;
+    public final String field;
+    public final String column;
+    public final String declaredType;
     public final int kind;
-    public final boolean id, generated, nullable, version;
-    public Attribute(String field, String column, int kind, boolean id, boolean generated,
-                     boolean nullable, boolean version) {
-        this(field,column,kind,id,generated,nullable,version,null);
+    public final boolean id;
+    public final boolean generated;
+    public final boolean nullable;
+    public final boolean version;
+    public Attribute(
+            String field, String column, int kind, boolean id, boolean generated, boolean nullable, boolean version) {
+        this(field, column, kind, id, generated, nullable, version, null);
     }
-    public Attribute(String field, String column, int kind, boolean id, boolean generated,
-                     boolean nullable, boolean version,String declaredType) {
-        this.declaredType=declaredType;
-        this.field=field; this.column=column; this.kind=kind; this.id=id;
-        this.generated=generated; this.nullable=nullable; this.version=version;
+    public Attribute(String field, String column, int kind, boolean id, boolean generated, boolean nullable,
+            boolean version, String declaredType) {
+        this.declaredType = declaredType;
+        this.field = field;
+        this.column = column;
+        this.kind = kind;
+        this.id = id;
+        this.generated = generated;
+        this.nullable = nullable;
+        this.version = version;
     }
 }

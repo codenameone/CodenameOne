@@ -26,83 +26,159 @@ package com.codename1.orm.session;
 public abstract class EntityModel<T> {
     public abstract Class<T> type();
     public abstract String table();
-    public Class hierarchyRoot() { return type(); }
-    public int discriminatorIndex() { return -1; }
-    public String discriminatorValue() { return ""; }
-    public String[] discriminatorValues() { return new String[0]; }
-    public boolean hasRelationship(T entity,int index) { return true; }
+    public Class hierarchyRoot() {
+        return type();
+    }
+    public int discriminatorIndex() {
+        return -1;
+    }
+    public String discriminatorValue() {
+        return "";
+    }
+    public String[] discriminatorValues() {
+        return new String[0];
+    }
+    public boolean hasRelationship(T entity, int index) {
+        return true;
+    }
     public abstract Attribute[] attributes();
     public abstract T create();
     public abstract Object get(T entity, int index);
-    public Object domainValue(T entity,int index) { return get(entity,index); }
+    public Object domainValue(T entity, int index) {
+        return get(entity, index);
+    }
     public abstract void set(T entity, int index, Object value);
-    public boolean requiresSession() { return relationships().length>0 || versionIndex()>=0 || generation()!=0 || idIndexes().length>1 || indexes().length>0 || discriminatorIndex()>=0; }
+    public boolean requiresSession() {
+        return relationships().length > 0 || versionIndex() >= 0 || generation() != 0 || idIndexes().length > 1 ||
+                indexes().length > 0 || discriminatorIndex() >= 0;
+    }
     /// 0: assigned/identity, 1: UUID, 2: native sequence with table fallback, 3: table.
-    public Index[] indexes() { return new Index[0]; }
-    public int generation() { return 0; }
-    public String generator() { return table()+"_id"; }
-    public Object parameter(int index,Object value) { return Values.storage(value); }
-    public void read(T entity,Object[] values) { for(int i=0;i<values.length;i++) set(entity,i,values[i]); }
+    public Index[] indexes() {
+        return new Index[0];
+    }
+    public int generation() {
+        return 0;
+    }
+    public String generator() {
+        return table() + "_id";
+    }
+    public Object parameter(int index, Object value) {
+        return Values.storage(value);
+    }
+    public void read(T entity, Object[] values) {
+        for (int i = 0; i < values.length; i++) {
+            set(entity, i, values[i]);
+        }
+    }
     /// Generated lifecycle dispatch: pre/post persist, pre/post update, pre/post remove, post load.
-    public void lifecycle(T entity,int event) {}
-    public Relationship[] relationships() { return new Relationship[0]; }
-    public Object relation(T entity,int index) {
-        if(index<0 || index>=relationships().length) throw new IllegalArgumentException("Unknown relationship");
+    public void lifecycle(T entity, int event) {
+    }
+    public Relationship[] relationships() {
+        return new Relationship[0];
+    }
+    public Object relation(T entity, int index) {
+        if (index < 0 || index >= relationships().length) {
+            throw new IllegalArgumentException("Unknown relationship");
+        }
         return null;
     }
-    public void relation(T entity,int index,Object value) { throw new IllegalArgumentException("Unknown relationship"); }
+    public void relation(T entity, int index, Object value) {
+        throw new IllegalArgumentException("Unknown relationship");
+    }
     public final int relationIndex(String field) {
-        Relationship[] all=relationships();
-        for(int i=0;i<all.length;i++) if(all[i].field.equals(field)) return i;
-        throw new IllegalArgumentException("Unknown relationship: "+field);
+        Relationship[] all = relationships();
+        for (int i = 0; i < all.length; i++) {
+            if (all[i].field.equals(field)) {
+                return i;
+            }
+        }
+        throw new IllegalArgumentException("Unknown relationship: " + field);
     }
     public final int index(String field) {
-        Attribute[] attrs=attributes();
-        for(int i=0;i<attrs.length;i++) if(attrs[i].field.equals(field)) return i;
+        Attribute[] attrs = attributes();
+        for (int i = 0; i < attrs.length; i++) {
+            if (attrs[i].field.equals(field)) {
+                return i;
+            }
+        }
         throw new IllegalArgumentException("Unknown field " + type().getName() + "." + field);
     }
     public final int idIndex() {
-        Attribute[] attrs=attributes();
-        int found=-1;
-        for(int i=0;i<attrs.length;i++) if(attrs[i].id) {
-            if(found<0) found=i;
+        Attribute[] attrs = attributes();
+        int found = -1;
+        for (int i = 0; i < attrs.length; i++) {
+            if (attrs[i].id) {
+                if (found < 0) {
+                    found = i;
+                }
+            }
         }
-        if(found<0) throw new PersistenceException("Missing id: " + type().getName());
+        if (found < 0) {
+            throw new PersistenceException("Missing id: " + type().getName());
+        }
         return found;
     }
     public final int[] idIndexes() {
-        Attribute[] attrs=attributes();int count=0;
-        for(Attribute attr:attrs) if(attr.id) count++;
-        if(count==0) throw new PersistenceException("Missing id: "+type().getName());
-        int[] result=new int[count];int next=0;
-        for(int i=0;i<attrs.length;i++) if(attrs[i].id) result[next++]=i;
+        Attribute[] attrs = attributes();
+        int count = 0;
+        for (Attribute attr : attrs) {
+            if (attr.id) {
+                count++;
+            }
+        }
+        if (count == 0) {
+            throw new PersistenceException("Missing id: " + type().getName());
+        }
+        int[] result = new int[count];
+        int next = 0;
+        for (int i = 0; i < attrs.length; i++) {
+            if (attrs[i].id) {
+                result[next++] = i;
+            }
+        }
         return result;
     }
     public final Object identifier(T entity) {
-        int[] ids=idIndexes();Object[] values=new Object[ids.length];
-        for(int i=0;i<ids.length;i++) values[i]=get(entity,ids[i]);
-        return ids.length==1?values[0]:Identifier.of(values);
+        int[] ids = idIndexes();
+        Object[] values = new Object[ids.length];
+        for (int i = 0; i < ids.length; i++) {
+            values[i] = get(entity, ids[i]);
+        }
+        return ids.length == 1 ? values[0] : Identifier.of(values);
     }
     public Object[] keyValues(Object key) {
-        Object[] values=key instanceof Identifier?((Identifier)key).values():key instanceof Object[]?((Object[])key).clone():new Object[]{key};
-        if(values.length!=idIndexes().length) throw new IllegalArgumentException("Wrong identifier width for "+type().getName());
-        for(int i=0;i<values.length;i++) {
-            values[i]=Values.storage(values[i]);
-            if(values[i]==null) throw new IllegalArgumentException("Null identifier component for "+type().getName());
+        Object[] values = key instanceof Identifier ? ((Identifier) key).values()
+                          : key instanceof Object[] ? ((Object[]) key).clone()
+                                                    : new Object[] {key};
+        if (values.length != idIndexes().length) {
+            throw new IllegalArgumentException("Wrong identifier width for " + type().getName());
+        }
+        for (int i = 0; i < values.length; i++) {
+            values[i] = Values.storage(values[i]);
+            if (values[i] == null) {
+                throw new IllegalArgumentException("Null identifier component for " + type().getName());
+            }
         }
         return values;
     }
     public final Object identifierFromRow(Object[] row) {
-        int[] ids=idIndexes();Object[] values=new Object[ids.length];
-        for(int i=0;i<ids.length;i++) values[i]=row[ids[i]];
-        return ids.length==1?values[0]:Identifier.of(values);
+        int[] ids = idIndexes();
+        Object[] values = new Object[ids.length];
+        for (int i = 0; i < ids.length; i++) {
+            values[i] = row[ids[i]];
+        }
+        return ids.length == 1 ? values[0] : Identifier.of(values);
     }
     public final int versionIndex() {
-        Attribute[] attrs=attributes();
-        int found=-1;
-        for(int i=0;i<attrs.length;i++) if(attrs[i].version) {
-            if(found>=0) throw new PersistenceException("Multiple version fields: " + type().getName());
-            found=i;
+        Attribute[] attrs = attributes();
+        int found = -1;
+        for (int i = 0; i < attrs.length; i++) {
+            if (attrs[i].version) {
+                if (found >= 0) {
+                    throw new PersistenceException("Multiple version fields: " + type().getName());
+                }
+                found = i;
+            }
         }
         return found;
     }

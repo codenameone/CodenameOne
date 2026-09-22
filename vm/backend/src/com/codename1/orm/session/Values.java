@@ -44,12 +44,24 @@ import java.util.Date;
 public final class Values {
     /// Normalizes mutable and boxed values before binding or taking a snapshot.
     public static Object storage(Object value) {
-        if(value instanceof java.util.Date) return Long.valueOf(((java.util.Date)value).getTime());
-        if(value instanceof Boolean) return Long.valueOf(((Boolean)value).booleanValue()?1:0);
-        if(value instanceof Character) return Long.valueOf(((Character)value).charValue());
-        if(value instanceof Byte || value instanceof Short || value instanceof Integer) return Long.valueOf(((Number)value).longValue());
-        if(value instanceof Float) return Double.valueOf(((Number)value).doubleValue());
-        if(value instanceof Enum) return ((Enum)value).name();
+        if (value instanceof Date) {
+            return Long.valueOf(((Date) value).getTime());
+        }
+        if (value instanceof Boolean) {
+            return Long.valueOf(((Boolean) value).booleanValue() ? 1 : 0);
+        }
+        if (value instanceof Character) {
+            return Long.valueOf(((Character) value).charValue());
+        }
+        if (value instanceof Byte || value instanceof Short || value instanceof Integer) {
+            return Long.valueOf(((Number) value).longValue());
+        }
+        if (value instanceof Float) {
+            return Double.valueOf(((Number) value).doubleValue());
+        }
+        if (value instanceof Enum) {
+            return ((Enum) value).name();
+        }
         return value;
     }
 
@@ -58,17 +70,17 @@ public final class Values {
 
     /// The value as text, or null.
     public static String asString(Object value) {
-        if(value == null) {
+        if (value == null) {
             return null;
         }
-        if(value instanceof String) {
-            return (String)value;
+        if (value instanceof String) {
+            return (String) value;
         }
-        if(value instanceof byte[]) {
+        if (value instanceof byte[]) {
             // A BLOB column read into a String field. Decoded as UTF-8 rather
             // than through String.valueOf, which would answer "[B@1f3a".
             try {
-                byte[] bytes = (byte[])value;
+                byte[] bytes = (byte[]) value;
                 return new String(bytes, 0, bytes.length, "UTF-8");
             } catch (IOException err) {
                 return null;
@@ -85,10 +97,10 @@ public final class Values {
 
     /// The value as a 64-bit integer, or null.
     public static Long asLongObject(Object value) throws IOException {
-        if(value == null) {
+        if (value == null) {
             return null;
         }
-        if(value instanceof Double || value instanceof Float) {
+        if (value instanceof Double || value instanceof Float) {
             // SQLITE HAS NO COLUMN TYPES, only affinities: an INTEGER column
             // holds 12.5 if something put one there -- a migration, raw SQL,
             // another client -- and the driver hands it back as a Double.
@@ -96,11 +108,11 @@ public final class Values {
             // branch below refuses the identical "12.5". The same value cannot be
             // corrupted one way and refused the other because of how the engine
             // chose to encode it.
-            double exact = ((Number)value).doubleValue();
-            if(exact != Math.floor(exact) || Double.isInfinite(exact) || Double.isNaN(exact)) {
-                throw new IOException("A column holding " + describe(value)
-                        + " has a fractional part and the field it is read into is an "
-                        + "integer; the value would have to be rounded to fit");
+            double exact = ((Number) value).doubleValue();
+            if (exact != Math.floor(exact) || Double.isInfinite(exact) || Double.isNaN(exact)) {
+                throw new IOException("A column holding " + describe(value) +
+                                      " has a fractional part and the field it is read into is an "
+                                      + "integer; the value would have to be rounded to fit");
             }
             // 9.223372036854776E18 IS 2^63, and Long.MAX_VALUE is 2^63 - 1,
             // which no double can represent. So the boundary value compares
@@ -108,26 +120,26 @@ public final class Values {
             // clamps it to Long.MAX_VALUE: a different number, silently. The
             // upper bound is exclusive for that reason; the lower one is not,
             // because -2^63 IS Long.MIN_VALUE exactly.
-            if(exact < -9.223372036854776E18 || exact >= 9.223372036854776E18) {
-                throw new IOException("A column holding " + describe(value)
-                        + " is outside the range of the integer field it is read into");
+            if (exact < -9.223372036854776E18 || exact >= 9.223372036854776E18) {
+                throw new IOException("A column holding " + describe(value) +
+                                      " is outside the range of the integer field it is read into");
             }
-            return Long.valueOf((long)exact);
+            return Long.valueOf((long) exact);
         }
-        if(value instanceof Number) {
-            return Long.valueOf(((Number)value).longValue());
+        if (value instanceof Number) {
+            return Long.valueOf(((Number) value).longValue());
         }
-        if(value instanceof Boolean) {
-            return Long.valueOf(((Boolean)value).booleanValue() ? 1L : 0L);
+        if (value instanceof Boolean) {
+            return Long.valueOf(((Boolean) value).booleanValue() ? 1L : 0L);
         }
-        if(value instanceof String) {
-            String text = ((String)value).trim();
+        if (value instanceof String) {
+            String text = ((String) value).trim();
             // The spellings a server sends for a boolean when it does not send a
             // number: PostgreSQL's text format is t and f.
-            if("t".equals(text) || "true".equalsIgnoreCase(text)) {
+            if ("t".equals(text) || "true".equalsIgnoreCase(text)) {
                 return Long.valueOf(1L);
             }
-            if("f".equals(text) || "false".equalsIgnoreCase(text)) {
+            if ("f".equals(text) || "false".equalsIgnoreCase(text)) {
                 return Long.valueOf(0L);
             }
             try {
@@ -152,43 +164,38 @@ public final class Values {
     /// The value as a 32-bit integer, or {@code fallback} when it is null.
     public static int asInt(Object value, int fallback) throws IOException {
         Long out = asLongObject(value);
-        return out == null ? fallback : (int)narrowed(out.longValue(), value,
-                -2147483648L, 2147483647L, "int");
+        return out == null ? fallback : (int) narrowed(out.longValue(), value, -2147483648L, 2147483647L, "int");
     }
 
     /// The value as a boxed 32-bit integer, or null.
     public static Integer asIntObject(Object value) throws IOException {
         Long out = asLongObject(value);
-        return out == null ? null : Integer.valueOf((int)narrowed(out.longValue(), value,
-                -2147483648L, 2147483647L, "int"));
+        return out == null ? null
+                           : Integer.valueOf((int) narrowed(out.longValue(), value, -2147483648L, 2147483647L, "int"));
     }
 
     /// The value as a 16-bit integer, or {@code fallback} when it is null.
     public static short asShort(Object value, short fallback) throws IOException {
         Long out = asLongObject(value);
-        return out == null ? fallback : (short)narrowed(out.longValue(), value,
-                -32768L, 32767L, "short");
+        return out == null ? fallback : (short) narrowed(out.longValue(), value, -32768L, 32767L, "short");
     }
 
     /// The value as a boxed 16-bit integer, or null.
     public static Short asShortObject(Object value) throws IOException {
         Long out = asLongObject(value);
-        return out == null ? null : Short.valueOf((short)narrowed(out.longValue(), value,
-                -32768L, 32767L, "short"));
+        return out == null ? null : Short.valueOf((short) narrowed(out.longValue(), value, -32768L, 32767L, "short"));
     }
 
     /// The value as a byte, or {@code fallback} when it is null.
     public static byte asByte(Object value, byte fallback) throws IOException {
         Long out = asLongObject(value);
-        return out == null ? fallback : (byte)narrowed(out.longValue(), value,
-                -128L, 127L, "byte");
+        return out == null ? fallback : (byte) narrowed(out.longValue(), value, -128L, 127L, "byte");
     }
 
     /// The value as a boxed byte, or null.
     public static Byte asByteObject(Object value) throws IOException {
         Long out = asLongObject(value);
-        return out == null ? null : Byte.valueOf((byte)narrowed(out.longValue(), value,
-                -128L, 127L, "byte"));
+        return out == null ? null : Byte.valueOf((byte) narrowed(out.longValue(), value, -128L, 127L, "byte"));
     }
 
     /// {@code number} when the field it is going into can hold it, or a refusal.
@@ -199,11 +206,10 @@ public final class Values {
     /// are ordinary integer columns on every engine, and SQLite's are not even
     /// range-checked, so a value too large for the field is something a migration
     /// or another client can put there any day.
-    private static long narrowed(long number, Object value, long min, long max, String field)
-            throws IOException {
-        if(number < min || number > max) {
-            throw new IOException("A column holding " + describe(value)
-                    + " is outside the range of the " + field + " field it is read into");
+    private static long narrowed(long number, Object value, long min, long max, String field) throws IOException {
+        if (number < min || number > max) {
+            throw new IOException("A column holding " + describe(value) + " is outside the range of the " + field +
+                                  " field it is read into");
         }
         return number;
     }
@@ -216,19 +222,19 @@ public final class Values {
 
     /// The value as a boxed double, or null.
     public static Double asDoubleObject(Object value) throws IOException {
-        if(value == null) {
+        if (value == null) {
             return null;
         }
-        if(value instanceof Number) {
-            return Double.valueOf(((Number)value).doubleValue());
+        if (value instanceof Number) {
+            return Double.valueOf(((Number) value).doubleValue());
         }
-        if(value instanceof String) {
-            String text = ((String)value).trim();
+        if (value instanceof String) {
+            String text = ((String) value).trim();
             double parsed;
             try {
                 parsed = Double.parseDouble(text);
             } catch (NumberFormatException err) {
-                throw notANumber(value, "a number");
+                throw new IOException(notANumber(value, "a number").getMessage(), err);
             }
             // A NUMERIC column comes back as exact text, and parseDouble answers
             // INFINITY for a finite number too large to hold -- 1e999 -- and ZERO
@@ -236,14 +242,14 @@ public final class Values {
             // row does not, which is the same silent substitution the integral
             // conversions refuse. An Infinity or NaN the database really stores
             // is spelled as such, and passes.
-            if(Double.isInfinite(parsed) && !spellsNonFinite(text)) {
-                throw new IOException("A column holding " + describe(value)
-                        + " is too large for the floating point field it is read into");
+            if (Double.isInfinite(parsed) && !spellsNonFinite(text)) {
+                throw new IOException("A column holding " + describe(value) +
+                                      " is too large for the floating point field it is read into");
             }
-            if(parsed == 0.0 && hasNonZeroDigit(text)) {
-                throw new IOException("A column holding " + describe(value)
-                        + " is too small for the floating point field it is read into, "
-                        + "which would read it as zero");
+            if (parsed == 0.0 && hasNonZeroDigit(text)) {
+                throw new IOException("A column holding " + describe(value) +
+                                      " is too small for the floating point field it is read into, "
+                                      + "which would read it as zero");
             }
             return Double.valueOf(parsed);
         }
@@ -274,13 +280,13 @@ public final class Values {
     /// store either, and reproducing what the row holds is right. What is refused
     /// is a finite number becoming an infinite one.
     private static float narrowedToFloat(double number, Object value) throws IOException {
-        if(!Double.isNaN(number) && !Double.isInfinite(number)
-                && (number > 3.4028234663852886E38 || number < -3.4028234663852886E38)) {
-            throw new IOException("A column holding " + describe(value)
-                    + " is outside the range of the float field it is read into");
+        if (!Double.isNaN(number) && !Double.isInfinite(number) &&
+                (number > 3.4028234663852886E38 || number < -3.4028234663852886E38)) {
+            throw new IOException(
+                    "A column holding " + describe(value) + " is outside the range of the float field it is read into");
         }
-        float narrowed = (float)number;
-        if(narrowed == 0.0f && number != 0.0) {
+        float narrowed = (float) number;
+        if (narrowed == 0.0f && number != 0.0) {
             // THE OTHER BOUNDARY. A float's smallest subnormal is about 1.4e-45,
             // so a stored 1e-100 narrows to zero -- a nonzero row read back as
             // no value at all, which is the same silent substitution the
@@ -288,9 +294,9 @@ public final class Values {
             // text. Losing PRECISION is inherent to a float and is not this;
             // losing the value is. Note -0.0 compares equal to 0.0, so a stored
             // negative zero passes rather than being reported as underflow.
-            throw new IOException("A column holding " + describe(value)
-                    + " is too small for the float field it is read into, "
-                    + "which would read it as zero");
+            throw new IOException("A column holding " + describe(value) +
+                                  " is too small for the float field it is read into, "
+                                  + "which would read it as zero");
         }
         return narrowed;
     }
@@ -303,11 +309,11 @@ public final class Values {
 
     /// The value as a boxed flag, or null.
     public static Boolean asBooleanObject(Object value) throws IOException {
-        if(value == null) {
+        if (value == null) {
             return null;
         }
-        if(value instanceof Boolean) {
-            return (Boolean)value;
+        if (value instanceof Boolean) {
+            return (Boolean) value;
         }
         Long number = asLongObject(value);
         return number == null ? null : Boolean.valueOf(number.longValue() != 0);
@@ -320,14 +326,14 @@ public final class Values {
     /// the first character of whatever a blob decoded to, while the primitive
     /// char field beside it refused the same row.
     public static Character asCharObject(Object value) throws IOException {
-        if(value == null) {
+        if (value == null) {
             return null;
         }
-        if(!(value instanceof String)) {
-            throw new IOException("A column holding " + describe(value)
-                    + " cannot be read as a character; the field expects text");
+        if (!(value instanceof String)) {
+            throw new IOException(
+                    "A column holding " + describe(value) + " cannot be read as a character; the field expects text");
         }
-        String text = (String)value;
+        String text = (String) value;
         return text.length() == 0 ? null : Character.valueOf(text.charAt(0));
     }
 
@@ -341,14 +347,14 @@ public final class Values {
     /// Long gave the first DIGIT, and NaN gave 'N'. Every other converter in this
     /// class refuses an encoding it cannot mean; this one used to accept them all.
     public static char asChar(Object value, char fallback) throws IOException {
-        if(value == null) {
+        if (value == null) {
             return fallback;
         }
-        if(!(value instanceof String)) {
-            throw new IOException("A column holding " + describe(value)
-                    + " cannot be read as a character; the field expects text");
+        if (!(value instanceof String)) {
+            throw new IOException(
+                    "A column holding " + describe(value) + " cannot be read as a character; the field expects text");
         }
-        String text = (String)value;
+        String text = (String) value;
         return text.length() == 0 ? fallback : text.charAt(0);
     }
 
@@ -365,10 +371,10 @@ public final class Values {
     /// <p>Boxed fields do not come through here: they can hold the null, and
     /// that is the reason to declare one.
     public static Object required(Object value, String field) throws IOException {
-        if(value == null) {
+        if (value == null) {
             throw new IOException("The column for " + field + " holds SQL NULL and the "
-                    + "field is a primitive, which cannot hold one. Declare the field as "
-                    + "its boxed type to read a nullable column.");
+                                  + "field is a primitive, which cannot hold one. Declare the field as "
+                                  + "its boxed type to read a nullable column.");
         }
         return value;
     }
@@ -396,29 +402,27 @@ public final class Values {
 
     /// The nullable twin of {@link #asCodeUnit}.
     public static Character asCodeUnitObject(Object value) throws IOException {
-        if(value == null) {
+        if (value == null) {
             return null;
         }
-        if(value instanceof String) {
-            String text = (String)value;
+        if (value instanceof String) {
+            String text = (String) value;
             return text.length() == 0 ? null : Character.valueOf(text.charAt(0));
         }
-        if(!(value instanceof Number)) {
-            throw new IOException("A column holding " + describe(value)
-                    + " cannot be read as a character");
+        if (!(value instanceof Number)) {
+            throw new IOException("A column holding " + describe(value) + " cannot be read as a character");
         }
         Long number = asLongObject(value);
-        if(number == null) {
+        if (number == null) {
             return null;
         }
         long unit = number.longValue();
-        if(unit < 0 || unit > 65535) {
+        if (unit < 0 || unit > 65535) {
             // NARROWING would answer a different character rather than say so,
             // which is what every other integral conversion here refuses to do.
-            throw new IOException("A column holding " + describe(value)
-                    + " is outside the range of a character");
+            throw new IOException("A column holding " + describe(value) + " is outside the range of a character");
         }
-        return Character.valueOf((char)unit);
+        return Character.valueOf((char) unit);
     }
 
     /// The value as a moment in time, or null.
@@ -430,13 +434,12 @@ public final class Values {
     /// that is a number is read the same way, and anything else is refused rather
     /// than guessed at.
     public static Date asDate(Object value) throws IOException {
-        if(value instanceof Boolean) {
+        if (value instanceof Boolean) {
             // A flag is not a moment. asLongObject reads one as 0 or 1, which
             // would make "true" the first millisecond of 1970 rather than an
             // error, and every other converter refuses the encodings it cannot
             // mean.
-            throw new IOException("A column holding " + describe(value)
-                    + " cannot be read as a date");
+            throw new IOException("A column holding " + describe(value) + " cannot be read as a date");
         }
         Long millis = asLongObject(value);
         return millis == null ? null : new Date(millis.longValue());
@@ -444,17 +447,16 @@ public final class Values {
 
     /// The value as bytes, or null. Text is encoded as UTF-8.
     public static byte[] asBytes(Object value) throws IOException {
-        if(value == null) {
+        if (value == null) {
             return null;
         }
-        if(value instanceof byte[]) {
-            return (byte[])value;
+        if (value instanceof byte[]) {
+            return (byte[]) value;
         }
-        if(value instanceof String) {
-            return ((String)value).getBytes("UTF-8");
+        if (value instanceof String) {
+            return ((String) value).getBytes("UTF-8");
         }
-        throw new IOException("A column holding " + describe(value)
-                + " cannot be read as bytes");
+        throw new IOException("A column holding " + describe(value) + " cannot be read as bytes");
     }
 
     /// {@code text} as a long, where it is an integer written with a fraction of
@@ -467,33 +469,34 @@ public final class Values {
     /// Long.MAX_VALUE is a value nobody wrote.
     private static long integralText(String text, Object value) throws IOException {
         int dot = text.indexOf('.');
-        if(dot < 0) {
+        if (dot < 0) {
             throw notANumber(value, "an integer");
         }
-        for(int iter = dot + 1 ; iter < text.length() ; iter++) {
-            if(text.charAt(iter) != '0') {
-                throw new IOException("A column holding " + describe(value)
-                        + " has a fractional part and the field it is read into is an "
-                        + "integer; the value would have to be rounded to fit");
+        for (int iter = dot + 1; iter < text.length(); iter++) {
+            if (text.charAt(iter) != '0') {
+                throw new IOException("A column holding " + describe(value) +
+                                      " has a fractional part and the field it is read into is an "
+                                      + "integer; the value would have to be rounded to fit");
             }
         }
         String whole = text.substring(0, dot);
-        if(whole.length() == 0 || "+".equals(whole) || "-".equals(whole)) {
+        if (whole.length() == 0 || "+".equals(whole) || "-".equals(whole)) {
             whole = whole + "0";
         }
         try {
             return Long.parseLong(whole);
         } catch (NumberFormatException err) {
-            throw new IOException("A column holding " + describe(value)
-                    + " is outside the range of the integer field it is read into");
+            throw new IOException("A column holding " + describe(value) +
+                                          " is outside the range of the integer field it is read into",
+                    err);
         }
     }
 
     /// Whether the text itself says infinity or NaN, rather than overflowing to one.
     private static boolean spellsNonFinite(String text) {
-        for(int iter = 0 ; iter < text.length() ; iter++) {
+        for (int iter = 0; iter < text.length(); iter++) {
             char c = text.charAt(iter);
-            if(c == 'i' || c == 'I' || c == 'n' || c == 'N') {
+            if (c == 'i' || c == 'I' || c == 'n' || c == 'N') {
                 return true;
             }
         }
@@ -503,12 +506,12 @@ public final class Values {
     /// Whether the text carries a non-zero digit before its exponent, which is
     /// what separates a real number that UNDERFLOWED from an honest zero.
     private static boolean hasNonZeroDigit(String text) {
-        for(int iter = 0 ; iter < text.length() ; iter++) {
+        for (int iter = 0; iter < text.length(); iter++) {
             char c = text.charAt(iter);
-            if(c == 'e' || c == 'E') {
+            if (c == 'e' || c == 'E') {
                 return false;
             }
-            if(c >= '1' && c <= '9') {
+            if (c >= '1' && c <= '9') {
                 return true;
             }
         }
@@ -516,24 +519,22 @@ public final class Values {
     }
 
     private static IOException notANumber(Object value, String wanted) {
-        return new IOException("A column holding " + describe(value)
-                + " cannot be read as " + wanted);
+        return new IOException("A column holding " + describe(value) + " cannot be read as " + wanted);
     }
 
     /// What a value is, for a message, without pasting a password into a log.
     private static String describe(Object value) {
-        if(value == null) {
+        if (value == null) {
             return "null";
         }
-        if(value instanceof String) {
-            String text = (String)value;
+        if (value instanceof String) {
+            String text = (String) value;
             // Truncated: the value may be a row somebody stored, and an error
             // message is a log line.
-            return "the text '" + (text.length() > 32 ? text.substring(0, 32) + "..." : text)
-                    + "'";
+            return "the text '" + (text.length() > 32 ? text.substring(0, 32) + "..." : text) + "'";
         }
-        if(value instanceof byte[]) {
-            return ((byte[])value).length + " bytes";
+        if (value instanceof byte[]) {
+            return ((byte[]) value).length + " bytes";
         }
         return "a " + value.getClass().getName();
     }

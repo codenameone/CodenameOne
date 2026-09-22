@@ -36,106 +36,208 @@ final class SessionSqlAccess implements SqlAccess {
     private final Database db;
     private boolean ownsTransaction;
     private void checkOwner() throws IOException {
-        if(db.isInTransaction() && !ownsTransaction) throw new IOException("Database is in another transaction");
-        if(!db.isInTransaction()) db.execute("PRAGMA foreign_keys = ON");
+        if (db.isInTransaction() && !ownsTransaction) {
+            throw new IOException("Database is in another transaction");
+        }
+        if (!db.isInTransaction()) {
+            db.execute("PRAGMA foreign_keys = ON");
+        }
     }
-    SessionSqlAccess(Database db) { this.db=db; }
-    public String dialect() { return "sqlite"; }
+    SessionSqlAccess(Database db) {
+        this.db = db;
+    }
+    @Override
+    public String dialect() {
+        return "sqlite";
+    }
+    @Override
     public List<Object[]> describe(String table) throws IOException {
-        List<Object[]> raw=query("PRAGMA table_info("+quote(table)+")",new Object[0],new int[]{Attribute.INTEGER,Attribute.TEXT,Attribute.TEXT,Attribute.INTEGER,Attribute.TEXT,Attribute.INTEGER});
-        List<Object[]> result=new ArrayList<Object[]>();
-        for(Object[] row:raw) result.add(new Object[]{row[1],row[2],row[3],row[5]});
+        List<Object[]> raw = query("PRAGMA table_info(" + quote(table) + ")", new Object[0],
+                new int[] {Attribute.INTEGER, Attribute.TEXT, Attribute.TEXT, Attribute.INTEGER, Attribute.TEXT,
+                        Attribute.INTEGER});
+        List<Object[]> result = new ArrayList<Object[]>();
+        for (Object[] row : raw) {
+            result.add(new Object[] {row[1], row[2], row[3], row[5]});
+        }
         return result;
     }
-    public String quote(String name) { return "\""+name.replace("\"","\"\"")+"\""; }
-    public String columnType(int kind) {
-        switch(kind) { case Attribute.TEXT:return "TEXT"; case Attribute.REAL:return "REAL"; case Attribute.BLOB:return "BLOB"; default:return "INTEGER"; }
+    @Override
+    public String quote(String name) {
+        return "\"" + name.replace("\"", "\"\"") + "\"";
     }
-    public String generatedKeyColumn(int kind,String name) { return "INTEGER PRIMARY KEY AUTOINCREMENT"; }
-    public String assignedKeyColumn(int kind) { return columnType(kind)+" PRIMARY KEY NOT NULL"; }
-    public String insertDefaults(String table) { return "INSERT INTO "+table+" DEFAULT VALUES"; }
+    @Override
+    public String columnType(int kind) {
+        switch (kind) {
+            case Attribute.TEXT:
+                return "TEXT";
+            case Attribute.REAL:
+                return "REAL";
+            case Attribute.BLOB:
+                return "BLOB";
+            default:
+                return "INTEGER";
+        }
+    }
+    @Override
+    public String generatedKeyColumn(int kind, String name) {
+        return "INTEGER PRIMARY KEY AUTOINCREMENT";
+    }
+    @Override
+    public String assignedKeyColumn(int kind) {
+        return columnType(kind) + " PRIMARY KEY NOT NULL";
+    }
+    @Override
+    public String insertDefaults(String table) {
+        return "INSERT INTO " + table + " DEFAULT VALUES";
+    }
+    @Override
     public String lockClause(com.codename1.orm.session.LockMode mode) {
-        if(mode==com.codename1.orm.session.LockMode.NONE) return "";
+        if (mode == com.codename1.orm.session.LockMode.NONE) {
+            return "";
+        }
         throw new UnsupportedOperationException("SQLite does not support pessimistic row locks");
     }
-    public String limit(int limit,int offset) { return limit<0 && offset==0?"":" LIMIT "+limit+" OFFSET "+offset; }
-    public List<Object[]> query(String sql,Object[] args,int[] kinds) throws IOException {
-        synchronized(db) {
+    @Override
+    public String limit(int limit, int offset) {
+        return limit < 0 && offset == 0 ? "" : " LIMIT " + limit + " OFFSET " + offset;
+    }
+    @Override
+    public List<Object[]> query(String sql, Object[] args, int[] kinds) throws IOException {
+        synchronized (db) {
             checkOwner();
-            Cursor cursor=db.executeQuery(sql,args);
+            Cursor cursor = db.executeQuery(sql, args);
             try {
-                List<Object[]> result=new ArrayList<Object[]>();
-                while(cursor.next()) {
-                    Row row=cursor.getRow(); Object[] values=new Object[kinds.length];
-                    for(int i=0;i<values.length;i++) {
-                        switch(kinds[i]) {
-                            case Attribute.TEXT: values[i]=row.getString(i);break;
-                            case Attribute.BLOB: values[i]=row.getBlob(i);break;
-                            case Attribute.REAL: values[i]=Double.valueOf(row.getDouble(i));break;
-                            default: values[i]=Long.valueOf(row.getLong(i));break;
+                List<Object[]> result = new ArrayList<Object[]>();
+                while (cursor.next()) {
+                    Row row = cursor.getRow();
+                    Object[] values = new Object[kinds.length];
+                    for (int i = 0; i < values.length; i++) {
+                        switch (kinds[i]) {
+                            case Attribute.TEXT:
+                                values[i] = row.getString(i);
+                                break;
+                            case Attribute.BLOB:
+                                values[i] = row.getBlob(i);
+                                break;
+                            case Attribute.REAL:
+                                values[i] = Double.valueOf(row.getDouble(i));
+                                break;
+                            default:
+                                values[i] = Long.valueOf(row.getLong(i));
+                                break;
                         }
-                        if(Database.supportsWasNull(row)) { if(Database.wasNull(row)) values[i]=null; }
-                        else if(kinds[i]!=Attribute.TEXT && kinds[i]!=Attribute.BLOB && row.getString(i)==null) values[i]=null;
+                        if (Database.supportsWasNull(row)) {
+                            if (Database.wasNull(row)) {
+                                values[i] = null;
+                            }
+                        } else if (kinds[i] != Attribute.TEXT && kinds[i] != Attribute.BLOB &&
+                                   row.getString(i) == null) {
+                            values[i] = null;
+                        }
                     }
                     result.add(values);
                 }
                 return result;
-            } finally { cursor.close(); }
+            } finally {
+                cursor.close();
+            }
         }
     }
-    public int execute(String sql,Object[] args) throws IOException {
-        synchronized(db) {
+    @Override
+    public int execute(String sql, Object[] args) throws IOException {
+        synchronized (db) {
             checkOwner();
-            db.execute(sql,args);
-            Cursor cursor=db.executeQuery("SELECT changes()");
-            try { if(!cursor.next()) throw new IOException("SQLite did not return changes()"); return cursor.getRow().getInteger(0); }
-            finally { cursor.close(); }
+            db.execute(sql, args);
+            Cursor cursor = db.executeQuery("SELECT changes()");
+            try {
+                if (!cursor.next()) {
+                    throw new IOException("SQLite did not return changes()");
+                }
+                return cursor.getRow().getInteger(0);
+            } finally {
+                cursor.close();
+            }
         }
     }
-    public long insert(String sql,Object[] args,String keyColumn) throws IOException {
-        synchronized(db) {
+    @Override
+    public long insert(String sql, Object[] args, String keyColumn) throws IOException {
+        synchronized (db) {
             checkOwner();
-            db.execute(sql,args);
-            Cursor cursor=db.executeQuery("SELECT last_insert_rowid()");
-            try { if(!cursor.next()) throw new IOException("SQLite did not return generated id"); return cursor.getRow().getLong(0); }
-            finally { cursor.close(); }
+            db.execute(sql, args);
+            Cursor cursor = db.executeQuery("SELECT last_insert_rowid()");
+            try {
+                if (!cursor.next()) {
+                    throw new IOException("SQLite did not return generated id");
+                }
+                return cursor.getRow().getLong(0);
+            } finally {
+                cursor.close();
+            }
         }
     }
-    public void prepareGenerator(int strategy,String name) throws IOException {
-        if(strategy==1) return;
-        execute("CREATE TABLE IF NOT EXISTS cn1_orm_sequences (sequence_name TEXT PRIMARY KEY NOT NULL, next_value INTEGER NOT NULL)",new Object[0]);
-        execute("INSERT OR IGNORE INTO cn1_orm_sequences (sequence_name,next_value) VALUES (?,0)",new Object[]{name});
-    }
-    public Object nextIdentifier(int strategy,String name,int kind) throws IOException {
-        if(strategy==1) {
-            String hex=(String)query("SELECT lower(hex(randomblob(16)))",new Object[0],new int[]{Attribute.TEXT}).get(0)[0];
-            int variant=(Integer.parseInt(hex.substring(16,17),16)&3)|8;
-            return hex.substring(0,8)+"-"+hex.substring(8,12)+"-4"+hex.substring(13,16)+"-"+Integer.toString(variant,16)+hex.substring(17,20)+"-"+hex.substring(20);
+    @Override
+    public void prepareGenerator(int strategy, String name) throws IOException {
+        if (strategy == 1) {
+            return;
         }
-        synchronized(db) {
-            long max=kind==Attribute.INTEGER?Integer.MAX_VALUE:Long.MAX_VALUE;
-            if(execute("UPDATE cn1_orm_sequences SET next_value = next_value + 1 WHERE sequence_name = ? AND next_value < ?",new Object[]{name,Long.valueOf(max)})!=1)
-                throw new IOException("Identifier generator is missing or exhausted: "+name);
-            return query("SELECT next_value FROM cn1_orm_sequences WHERE sequence_name = ?",new Object[]{name},new int[]{Attribute.BIGINT}).get(0)[0];
+        execute("CREATE TABLE IF NOT EXISTS cn1_orm_sequences (sequence_name TEXT PRIMARY KEY NOT NULL, next_value "
+                        + "INTEGER NOT NULL)",
+                new Object[0]);
+        execute("INSERT OR IGNORE INTO cn1_orm_sequences (sequence_name,next_value) VALUES (?,0)", new Object[] {name});
+    }
+    @Override
+    public Object nextIdentifier(int strategy, String name, int kind) throws IOException {
+        if (strategy == 1) {
+            String hex = (String) query("SELECT lower(hex(randomblob(16)))", new Object[0], new int[] {Attribute.TEXT})
+                                 .get(0)[0];
+            int variant = (Integer.parseInt(hex.substring(16, 17), 16) & 3) | 8;
+            return hex.substring(0, 8) + "-" + hex.substring(8, 12) + "-4" + hex.substring(13, 16) + "-" +
+                    Integer.toString(variant, 16) + hex.substring(17, 20) + "-" + hex.substring(20);
+        }
+        synchronized (db) {
+            long max = kind == Attribute.INTEGER ? Integer.MAX_VALUE : Long.MAX_VALUE;
+            if (execute("UPDATE cn1_orm_sequences SET next_value = next_value + 1 WHERE sequence_name = ? AND "
+                                + "next_value < ?",
+                        new Object[] {name, Long.valueOf(max)}) != 1) {
+                throw new IOException("Identifier generator is missing or exhausted: " + name);
+            }
+            return query("SELECT next_value FROM cn1_orm_sequences WHERE sequence_name = ?", new Object[] {name},
+                    new int[] {Attribute.BIGINT})
+                    .get(0)[0];
         }
     }
+    @Override
     public void begin() throws IOException {
-        synchronized(db) {
-            if(db.isInTransaction()) throw new IOException("Database already has an active transaction");
-            db.execute("PRAGMA foreign_keys = ON");db.beginTransaction();ownsTransaction=true;
+        synchronized (db) {
+            if (db.isInTransaction()) {
+                throw new IOException("Database already has an active transaction");
+            }
+            db.execute("PRAGMA foreign_keys = ON");
+            db.beginTransaction();
+            ownsTransaction = true;
         }
     }
+    @Override
     public void commit() throws IOException {
-        synchronized(db) {
-            if(!ownsTransaction) throw new IOException("Session does not own the transaction");
-            db.commitTransaction();ownsTransaction=false;
+        synchronized (db) {
+            if (!ownsTransaction) {
+                throw new IOException("Session does not own the transaction");
+            }
+            db.commitTransaction();
+            ownsTransaction = false;
         }
     }
+    @Override
     public void rollback() throws IOException {
-        synchronized(db) {
-            if(!ownsTransaction) throw new IOException("Session does not own the transaction");
-            db.rollbackTransaction();ownsTransaction=false;
+        synchronized (db) {
+            if (!ownsTransaction) {
+                throw new IOException("Session does not own the transaction");
+            }
+            db.rollbackTransaction();
+            ownsTransaction = false;
         }
     }
-    public void close() {}
+    @Override
+    public void close() {
+    }
 }

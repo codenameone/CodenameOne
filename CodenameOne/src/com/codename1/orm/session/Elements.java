@@ -25,25 +25,52 @@ import java.io.IOException;
 import java.util.Date;
 
 final class Elements {
-    private Elements() {}
+    private Elements() {
+    }
     static int kind(Class type) {
-        if(type==String.class) return Attribute.TEXT;
-        if(type==Double.class || type==Float.class) return Attribute.REAL;
+        if (type == String.class) {
+            return Attribute.TEXT;
+        }
+        if (type == Double.class || type == Float.class) {
+            return Attribute.REAL;
+        }
         return Attribute.BIGINT;
     }
-    static Object read(Class type,Object value) {
+    static Object read(Class type, Object value) {
         try {
-            if(type==String.class) return Values.asString(value);
-            if(type==Integer.class) return Values.asIntObject(value);
-            if(type==Long.class) return Values.asLongObject(value);
-            if(type==Short.class) return Values.asShortObject(value);
-            if(type==Byte.class) return Values.asByteObject(value);
-            if(type==Double.class) return Values.asDoubleObject(value);
-            if(type==Float.class) return Values.asFloatObject(value);
-            if(type==Boolean.class) return Values.asBooleanObject(value);
-            if(type==Character.class) return Values.asCodeUnitObject(value);
-            if(type==Date.class) return Values.asDate(value);
-            throw new PersistenceException("Unsupported element type: "+type.getName());
-        } catch(IOException error) { throw new PersistenceException(error.getMessage(),error); }
+            if (type == String.class) {
+                return Values.asString(value);
+            }
+            if (type == Integer.class) {
+                return Values.asIntObject(value);
+            }
+            if (type == Long.class) {
+                return Values.asLongObject(value);
+            }
+            if (type == Short.class) {
+                return Values.asShortObject(value);
+            }
+            if (type == Byte.class) {
+                return Values.asByteObject(value);
+            }
+            if (type == Double.class) {
+                return Values.asDoubleObject(value);
+            }
+            if (type == Float.class) {
+                return Values.asFloatObject(value);
+            }
+            if (type == Boolean.class) {
+                return Values.asBooleanObject(value);
+            }
+            if (type == Character.class) {
+                return Values.asCodeUnitObject(value);
+            }
+            if (type == Date.class) {
+                return Values.asDate(value);
+            }
+            throw new PersistenceException("Unsupported element type: " + type.getName());
+        } catch (IOException error) {
+            throw new PersistenceException(error.getMessage(), error);
+        }
     }
 }

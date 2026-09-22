@@ -27,6 +27,12 @@ public final class Index {
     public final String name;
     public final boolean unique;
     private final String[] fields;
-    public Index(String name,boolean unique,String... fields) { this.name=name;this.unique=unique;this.fields=fields.clone(); }
-    public String[] fields() { return fields.clone(); }
+    public Index(String name, boolean unique, String... fields) {
+        this.name = name;
+        this.unique = unique;
+        this.fields = fields.clone();
+    }
+    public String[] fields() {
+        return fields.clone();
+    }
 }

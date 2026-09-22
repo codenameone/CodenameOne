@@ -26,35 +26,55 @@ package com.codename1.orm.session;
 public final class EntityState {
     Session session;
     final Object entity;
-    final boolean[] loaded,fetching;
+    final boolean[] loaded;
+    final boolean[] fetching;
     final Object[] keys;
-    boolean attached=true;
-    EntityState(Session session,Object entity,int relationships) {
-        this.session=session;this.entity=entity;loaded=new boolean[relationships];fetching=new boolean[relationships];keys=new Object[relationships];
+    boolean attached = true;
+    EntityState(Session session, Object entity, int relationships) {
+        this.session = session;
+        this.entity = entity;
+        loaded = new boolean[relationships];
+        fetching = new boolean[relationships];
+        keys = new Object[relationships];
     }
-    public static void beforeRead(ManagedEntity entity,int index) {
-        EntityState state=entity.__cn1OrmState();
-        if(state!=null) state.read(index);
+    public static void beforeRead(ManagedEntity entity, int index) {
+        EntityState state = entity.__cn1OrmState();
+        if (state != null) {
+            state.read(index);
+        }
     }
-    public static void beforeSerialization(ManagedEntity entity,int index) {
-        EntityState state=entity.__cn1OrmState();
-        if(state!=null && !state.loaded[index])
+    public static void beforeSerialization(ManagedEntity entity, int index) {
+        EntityState state = entity.__cn1OrmState();
+        if (state != null && !state.loaded[index]) {
             throw new LazyInitializationException("Initialize the relationship before serialization");
+        }
     }
-    public static void beforeWrite(ManagedEntity entity,int index) {
-        EntityState state=entity.__cn1OrmState();
-        if(state!=null) {
-            if(state.attached && !state.loaded[index]) state.session.beforeAssignment(entity,index);
+    public static void beforeWrite(ManagedEntity entity, int index) {
+        EntityState state = entity.__cn1OrmState();
+        if (state != null) {
+            if (state.attached && !state.loaded[index]) {
+                state.session.beforeAssignment(entity, index);
+            }
             state.assigned(index);
         }
     }
     public void read(int index) {
-        if(loaded[index]) return;
-        if(!attached) throw new LazyInitializationException("Entity is detached");
-        session.initialize(entity,index);
+        if (loaded[index]) {
+            return;
+        }
+        if (!attached) {
+            throw new LazyInitializationException("Entity is detached");
+        }
+        session.initialize(entity, index);
     }
-    public void assigned(int index) { loaded[index]=true; }
+    public void assigned(int index) {
+        loaded[index] = true;
+    }
     /// Returns the stored key without triggering an association query.
-    public Object key(int index) { return keys[index]; }
-    public boolean isLoaded(int index) { return loaded[index]; }
+    public Object key(int index) {
+        return keys[index];
+    }
+    public boolean isLoaded(int index) {
+        return loaded[index];
+    }
 }
