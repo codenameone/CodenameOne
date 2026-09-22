@@ -9,11 +9,14 @@ repo's `Themes/` directory, alongside the legacy hand-authored themes.
 
 ```
 native-themes/
-  base/                  shared tokens, @constants, @font-face (future)
-  ios-modern/common.css  iOS liquid-glass theme, everything generation-neutral
-  ios-modern/gen26.css   iOS 26 overrides
-  ios-modern/gen27.css   iOS 27 overrides
+  base/                        shared tokens, @constants, @font-face (future)
+  ios-modern/common.css        iOS liquid-glass theme, everything generation-neutral
+  ios-modern/gen26.css         iOS 26 overrides
+  ios-modern/gen27.css         iOS 27 overrides
   android-material/theme.css   Android Material 3 theme
+  windows-fluent/theme.css     Windows 11 Fluent (WinUI 3)
+  macos-aqua/theme.css         macOS Aqua (AppKit)
+  gnome-adwaita/theme.css      GNOME Adwaita (GTK4 + libadwaita)
 ```
 
 A single-file theme is fed straight to the compiler. The iOS theme is built from
@@ -150,6 +153,33 @@ Each theme must declare these in `#Constants`:
   which is populated from the theme's `@media (prefers-color-scheme: dark)`
   blocks.
 
+## Desktop themes declare their own behaviour
+
+A desktop native theme also turns on the behaviours that make a desktop application feel
+like one. These are theme constants rather than port hooks on purpose: the three desktop
+`theme.css` files install only on a desktop, so an application still on the legacy theme is
+untouched and nothing needs an `isDesktop()` gate.
+
+- `interactiveScrollBool: true` -- a grab-able thumb, a track that pages on click, a
+  reserved gutter, no fade. The bar draws through `DesktopScroll` / `DesktopScrollThumb`
+  and the horizontal pair, which are separate UIIDs from the mobile `Scroll` / `ScrollThumb`
+  precisely so turning this on never restyles the mobile bar.
+- `scrollThumbMinSizeInt` -- the thumb's minimum length in pixels.
+- `defaultNativeWindowModeBool: true` -- a `Dialog` opens as a real operating system window.
+  Anchored popups (`ComboBox`, `Picker`, the context menu) never do.
+- `desktopTitleBarMode` -- `native`, `custom` or `toolbar`. A `desktop.titleBar` build hint
+  outranks it; the constant is what speaks when the project said nothing.
+- `commandBehavior: Native` -- commands go to the platform's menu. Safe on a port that has
+  none: `setCommandBehavior` normalises it away there.
+- `separatorThicknessMM` -- the `Separator` rule.
+
+Note the highlight states on `DesktopScrollThumb` are `.selected` (pointer over) and
+`.pressed` (dragging), NOT `.hover`. `LookAndFeel`'s interactive thumb reads
+`getSelectedStyle()` and `getPressedStyle()`; a `.hover` rule there compiles and is never
+painted. And do not write these four as `cn1-derive: ScrollThumb` -- a derive emits the
+whole state family by copying the base, so the highlight comes out identical to the resting
+colour, present in the `.res` and invisible on screen.
+
 ## cn1-derive inheritance rule
 
 `cn1-derive` only works reliably when the derived UIID is a straightforward
@@ -192,3 +222,6 @@ Outputs:
 
 - `Themes/iOSModernTheme.res`
 - `Themes/AndroidMaterialTheme.res`
+- `Themes/WindowsFluentTheme.res`
+- `Themes/MacOSAquaTheme.res`
+- `Themes/GnomeAdwaitaTheme.res`

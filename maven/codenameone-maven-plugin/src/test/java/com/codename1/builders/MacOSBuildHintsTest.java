@@ -598,12 +598,20 @@ public class MacOSBuildHintsTest {
     /// so defaulting to it gave a new macOS port an iPhone 7 look and no dark
     /// mode whatsoever, however carefully the application asked for one. That is
     /// what made every *_dark screenshot come out light.
+    ///
+    /// The unset default is now aqua rather than modern. "modern" was never right for a
+    /// Mac either -- it is the iOS 26 Liquid Glass theme, an iPhone design language on a
+    /// desktop -- and was only the default because flipping it reseeds this port's
+    /// committed screenshot baselines, which now happens alongside it.
     @Test
-    public void theNativeThemeDefaultsToModernAndIsConstrainedToKnownModes() {
-        assertEquals("modern", parse(raw(), "p").getThemeMode());
+    public void theNativeThemeDefaultsToAquaAndIsConstrainedToKnownModes() {
+        // A macOS application gets the macOS design language unless it asks otherwise.
+        assertEquals("aqua", parse(raw(), "p").getThemeMode());
         // aqua and native have to survive the whitelist or the hint cannot select the
         // theme it names.
         assertEquals("aqua", parse(raw("macos.themeMode", "aqua"), "p").getThemeMode());
+        // And the iOS looks are still reachable by name, for an application that wants one.
+        assertEquals("modern", parse(raw("macos.themeMode", "modern"), "p").getThemeMode());
         assertEquals("native", parse(raw("macos.themeMode", "native"), "p").getThemeMode());
         assertEquals("ios7", parse(raw("macos.themeMode", "ios7"), "p").getThemeMode());
         assertEquals("ios7", parse(raw("macNative.themeMode", "ios7"), "p").getThemeMode());

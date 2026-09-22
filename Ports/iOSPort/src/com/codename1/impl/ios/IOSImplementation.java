@@ -1214,9 +1214,24 @@ public class IOSImplementation extends CodenameOneImplementation {
         if (!isDesktop()) {
             return "toolbar";
         }
-        // Opt-in via the desktop.titleBar build hint (codename1.arg.desktop.titleBar), surfaced as a
-        // Display property by the generated iOS stub. Default toolbar = unchanged legacy behavior.
+        // Opt-in via the desktop.titleBar build hint (codename1.arg.desktop.titleBar), surfaced as
+        // a Display property by the generated stub. That sentence was aspirational until
+        // Executor.desktopTitleBarStubProperty existed: no builder emitted the property, so this
+        // read the default on every build and the Aqua theme's own desktopTitleBarMode constant
+        // decided alone. Default toolbar = unchanged legacy behavior.
         return Display.getInstance().getProperty("desktop.titleBar", "toolbar");
+    }
+
+    /// @inheritDoc
+    ///
+    /// Null, not "toolbar", when the stub surfaced no property: the Aqua theme carries its own
+    /// desktopTitleBarMode and may only answer when the project asked for nothing.
+    @Override
+    public String getConfiguredDesktopTitleBarMode() {
+        if (!isDesktop()) {
+            return null;
+        }
+        return Display.getInstance().getProperty("desktop.titleBar", null);
     }
 
     @Override
@@ -1270,6 +1285,16 @@ public class IOSImplementation extends CodenameOneImplementation {
             return "";
         }
         return value.replace('\n', ' ').replace('\r', ' ').replace('\t', ' ');
+    }
+
+    /// @inheritDoc
+    ///
+    /// True on the desktop -- the native macOS build's real NSMenu, and Catalyst's
+    /// UIMenuBuilder. False on a phone or tablet, where setNativeCommands below returns
+    /// without doing anything and the commands belong in the Toolbar.
+    @Override
+    public boolean isNativeCommandsSupported() {
+        return isDesktop();
     }
 
     @Override
@@ -1336,7 +1361,15 @@ public class IOSImplementation extends CodenameOneImplementation {
         Display.getInstance().callSerially(new Runnable() {
             @Override
             public void run() {
-                c.actionPerformed(new ActionEvent(c));
+                // Routed through the owning form, and the enabled check lives there too. The
+                // form is resolved at selection time rather than when the menu was published:
+                // MenuBar publishes from addCommand, while the form is still being built and
+                // before show() makes it current, so a form captured then is the previous one.
+                //
+                // This matters more than it used to -- the macOS port now installs the Aqua
+                // theme by default, which hides the Toolbar, so this menu is the only way to
+                // reach these commands.
+                instance.dispatchNativeMenuCommand(c);
             }
         });
     }

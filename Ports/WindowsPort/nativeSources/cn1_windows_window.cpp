@@ -552,6 +552,16 @@ int cn1WinPollEvent(CN1Event* out) {
 
 /* ------------------------------------------------------------- input helpers */
 
+/* The virtual key whose WM_KEYDOWN a menu accelerator consumed, so the matching WM_KEYUP can
+ * be consumed as well. Zero when no such press is outstanding. Touched only from the window
+ * procedure, which is one thread.
+ *
+ * Declared BELOW the input-helpers marker on purpose. scripts/test_native_hover_queue.py
+ * compiles the event queue standalone by slicing this file from cn1WinPushEvent to that
+ * marker, with -Wall -Wextra -Werror; a static declared inside that slice and used only
+ * further down is "defined but not used" there and fails the build. */
+static int cn1AcceleratorKeyDown = 0;
+
 /* Bitmask (CN1_PE_MASK_*) of the mouse buttons currently held. Mouse capture is
  * held while ANY button is down so a drag that starts inside the window keeps
  * delivering WM_MOUSEMOVE after the cursor leaves it, and released only once the
@@ -783,9 +793,26 @@ LRESULT CALLBACK cn1WinWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam
             return 0;
         }
         case WM_KEYDOWN:
+            /* A menu shortcut first. The menu labels advertise accelerators and there is no
+             * accelerator table in this pump, so without this they were decoration. A match
+             * consumes the keystroke: it belongs to the command, not to the focused
+             * component. Only an exact modifier match can match, so ordinary typing and the
+             * Tab/Escape handling below are untouched. */
+            if (cn1WinMenuHandleAccelerator((int) wParam)) {
+                /* Remember the key so its release can be swallowed too. Consuming only the
+                 * press sent the focused component a release with no press before it, which
+                 * is a second action or a corrupted press/release state depending on what has
+                 * focus -- the same half-a-keystroke problem Escape had on the Java side. */
+                cn1AcceleratorKeyDown = (int) wParam;
+                return 0;
+            }
             cn1WinPushEvent(CN1_EVENT_KEY_PRESSED, 0, 0, (int) wParam);
             return 0;
         case WM_KEYUP:
+            if (cn1AcceleratorKeyDown != 0 && cn1AcceleratorKeyDown == (int) wParam) {
+                cn1AcceleratorKeyDown = 0;
+                return 0;
+            }
             cn1WinPushEvent(CN1_EVENT_KEY_RELEASED, 0, 0, (int) wParam);
             return 0;
         case WM_DISPLAYCHANGE:
@@ -868,6 +895,16 @@ LRESULT CALLBACK cn1WinWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam
             }
             return DefWindowProcW(hwnd, msg, wParam, lParam);
         }
+        case WM_CN1_MENU:
+            /* On the window's own thread, which is the whole reason this is a message:
+             * SetMenu is not legal from the EDT. */
+            cn1WinMenuSetCommands((const char*) lParam);
+            return 0;
+        case WM_COMMAND:
+            if (cn1WinMenuHandleCommand(wParam)) {
+                return 0;
+            }
+            return DefWindowProcW(hwnd, msg, wParam, lParam);
         case WM_CLOSE:
             cn1WinPushEvent(CN1_EVENT_CLOSE, 0, 0, 0);
             DestroyWindow(hwnd);
@@ -946,6 +983,38 @@ JAVA_BOOLEAN com_codename1_impl_windows_WindowsNative_faultSelfTestEnabled___R_b
     char buf[8];
     DWORD n = GetEnvironmentVariableA("CN1_FAULT_SELFTEST", buf, (DWORD) sizeof(buf));
     return (n > 0 && n < sizeof(buf)) ? JAVA_TRUE : JAVA_FALSE;
+}
+
+/*
+ * The main window's title, after initDisplay has already set it once.
+ *
+ * Needed because desktop "native" title-bar mode moves the form title OUT of the CN1 title
+ * area and into the OS window's, and until now this port had nowhere to put it: the title was
+ * a CreateWindowExW argument and WindowsNative.desktopWindowSetTitle addresses the SECONDARY
+ * Window peers by slot, never the main one. Without this, suppressing the CN1 title area would
+ * simply lose the title.
+ *
+ * SetWindowTextW is documented as safe to call from any thread -- it sends WM_SETTEXT to the
+ * window's own thread -- so unlike the GTK counterpart this needs no marshalling. A null HWND
+ * (headless screenshot mode never creates one) makes it a no-op.
+ */
+JAVA_VOID com_codename1_impl_windows_WindowsNative_mainWindowSetTitle___java_lang_String(
+        CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1Arg1) {
+    if (cn1Win.hwnd == NULL) {
+        return;
+    }
+    const char* utf8Title = __cn1Arg1 == JAVA_NULL ? "" : stringToUTF8(threadStateData, __cn1Arg1);
+    int titleLen = MultiByteToWideChar(CP_UTF8, 0, utf8Title, -1, NULL, 0);
+    if (titleLen <= 0) {
+        titleLen = 1;
+    }
+    WCHAR* wTitle = (WCHAR*) malloc((size_t) titleLen * sizeof(WCHAR));
+    if (wTitle == NULL) {
+        return;
+    }
+    MultiByteToWideChar(CP_UTF8, 0, utf8Title, -1, wTitle, titleLen);
+    SetWindowTextW(cn1Win.hwnd, wTitle);
+    free(wTitle);
 }
 
 JAVA_VOID com_codename1_impl_windows_WindowsNative_initDisplay___java_lang_String_int_int(

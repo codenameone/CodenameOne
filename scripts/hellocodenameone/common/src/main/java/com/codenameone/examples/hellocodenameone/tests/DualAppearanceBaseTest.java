@@ -365,10 +365,25 @@ public abstract class DualAppearanceBaseTest extends BaseTest {
             UIManager.initFirstTheme("/theme");
         }
         UIManager.getInstance().refreshTheme();
+        restoreAfterCapture();
         // Lift the gate before calling done() so the overridden
         // done() above lets the call through this time.
         bothPhasesComplete = true;
         done();
+    }
+
+    /**
+     * Hook for a subclass that changed global state to make its own capture
+     * meaningful, called once both appearance passes have finished.
+     *
+     * <p>done() cannot be used for this: it is called speculatively (the JS
+     * port force-dones after the light emit) and the gate above swallows
+     * those calls, so a subclass overriding done() cannot tell a premature
+     * call from the real one and would restore between the two passes.
+     * finish() runs exactly once, at the point this class already restores
+     * dark mode and the app theme for the same reason.
+     */
+    protected void restoreAfterCapture() {
     }
 
     private void installModernThemeIfRequested() {

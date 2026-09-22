@@ -47,6 +47,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <execinfo.h>
+#include <signal.h>
+#include <unistd.h>
 
 static const char *out_dir = NULL;
 static int is_probe = 1;
@@ -154,6 +157,23 @@ static const Spec SPECS[] = {
     {"DesktopSlider",       "gtk_scale",             {"normal", "hover", "disabled", NULL}},
     {"DesktopProgressBar",  "gtk_progressbar",       {"normal", NULL}},
     {"DesktopComboBox",     "gtk_dropdown",          {"normal", "hover", "disabled", NULL}},
+
+    /* Second wave. GNOME carries the scrollbar, the menu bar and the menu item that AppKit
+     * cannot -- a GtkScrollbar is an ordinary widget and GtkPopoverMenuBar renders into the
+     * paintable -- but not the tooltip, which is a surface of its own like AppKit's. */
+    {"DesktopScrollBar",          "gtk_scrollbar",   {"normal", NULL}},
+    {"DesktopScrollBarHighlight", "gtk_scrollbar",   {"normal", "hover", "pressed", NULL}},
+    {"DesktopSeparator",    "gtk_separator",         {"normal", NULL}},
+    {"DesktopGroupBox",     "gtk_frame",             {"normal", NULL}},
+    {"DesktopStepper",      "gtk_spin_button",       {"normal", "disabled", NULL}},
+    {"DesktopLinkButton",   "gtk_link_button",       {"normal", "hover", "disabled", NULL}},
+    {"DesktopSearchField",  "gtk_search_entry",      {"normal", "disabled", NULL}},
+    {"DesktopListRow",      "gtk_listbox_row",       {"normal", "selected", NULL}},
+    {"DesktopTabs",         "gtk_notebook",          {"normal", NULL}},
+    {"DesktopToolbar",      "adw_header_bar",        {"normal", NULL}},
+    {"DesktopDisclosure",   "gtk_expander",          {"normal", NULL}},
+    {"DesktopMenuBar",      "gtk_popover_menubar",   {"normal", NULL}},
+    {"DesktopMenuItem",     "gtk_popover_menu_item", {"normal", "hover", "disabled", NULL}},
 };
 #define SPEC_COUNT ((int) (sizeof(SPECS) / sizeof(SPECS[0])))
 
@@ -164,7 +184,27 @@ static const Spec SPECS[] = {
 static int is_full_width(const char *kind) {
     return strcmp(kind, "gtk_scale") == 0
         || strcmp(kind, "gtk_progressbar") == 0
-        || strcmp(kind, "gtk_entry") == 0;
+        || strcmp(kind, "gtk_entry") == 0
+        /* Second wave, same rule: a search entry measures to its placeholder, and a row, a
+         * frame, a notebook, a header bar and a menu bar are containers that take the width
+         * they are given. */
+        || strcmp(kind, "gtk_search_entry") == 0
+        || strcmp(kind, "gtk_listbox_row") == 0
+        || strcmp(kind, "gtk_separator") == 0
+        || strcmp(kind, "gtk_frame") == 0
+        || strcmp(kind, "gtk_notebook") == 0
+        || strcmp(kind, "adw_header_bar") == 0
+        || strcmp(kind, "gtk_popover_menubar") == 0;
+}
+
+/* Controls with no natural HEIGHT, the same rule on the other axis. A frame is a border
+ * around other things -- left to measure itself it collapses onto its own label and draws
+ * no border, which is a heading rather than a group box -- and a vertical scrollbar is
+ * defined by its length. Kept in step BY HAND with FULL_HEIGHT_KINDS in the macOS
+ * reference, IsFullHeight in the Windows one and FULL_HEIGHT_IDS in DesktopTileRunner. */
+static int is_full_height(const char *kind) {
+    return strcmp(kind, "gtk_frame") == 0
+        || strcmp(kind, "gtk_scrollbar") == 0;
 }
 static int exit_code = 0;
 
@@ -454,6 +494,117 @@ static GtkWidget *make_widget(const char *kind) {
         const char *items[] = {"Option", NULL};
         return gtk_drop_down_new_from_strings(items);
     }
+    if (strcmp(kind, "gtk_scrollbar") == 0) {
+        /* The adjustment is what gives the slider a size and a position: page_size over
+         * upper is the proportion of the trough it covers, so 40 of 100 is the two fifths
+         * the CN1 side is drawn at, at value 0 -- the top. Both sides have to agree about
+         * where the thumb is before anything about its colour or shape can be compared. */
+        GtkAdjustment *adj = gtk_adjustment_new(0.0, 0.0, 100.0, 1.0, 10.0, 40.0);
+        return gtk_scrollbar_new(GTK_ORIENTATION_VERTICAL, adj);
+    }
+    if (strcmp(kind, "gtk_separator") == 0) {
+        /* GtkSeparator is the real thing rather than a drawn line: its thickness and colour
+           come from the Adwaita stylesheet, which is exactly what the Separator UIID has to
+           match. It has no natural width, so it is in the full-width set. */
+        return gtk_separator_new(GTK_ORIENTATION_HORIZONTAL);
+    }
+
+    if (strcmp(kind, "gtk_frame") == 0) {
+        /* GtkFrame with a label IS the GNOME group box; there is no separate widget. */
+        GtkWidget *frame = gtk_frame_new("Group");
+        GtkWidget *body = gtk_label_new("Item");
+        gtk_widget_set_margin_start(body, 8);
+        gtk_widget_set_margin_end(body, 8);
+        gtk_widget_set_margin_top(body, 8);
+        gtk_widget_set_margin_bottom(body, 8);
+        gtk_frame_set_child(GTK_FRAME(frame), body);
+        return frame;
+    }
+    if (strcmp(kind, "gtk_spin_button") == 0) {
+        /* One widget here, unlike AppKit's field-plus-stepper pair: a GtkSpinButton already
+         * IS the entry with its two buttons, which is the same control the CN1 Stepper
+         * composes. */
+        GtkWidget *sp = gtk_spin_button_new_with_range(0.0, 10.0, 1.0);
+        gtk_spin_button_set_value(GTK_SPIN_BUTTON(sp), 1.0);
+        return sp;
+    }
+    if (strcmp(kind, "gtk_link_button") == 0) {
+        return gtk_link_button_new_with_label("https://www.codenameone.com/", "Link");
+    }
+    if (strcmp(kind, "gtk_search_entry") == 0) {
+        GtkWidget *e = gtk_search_entry_new();
+        gtk_editable_set_text(GTK_EDITABLE(e), "Search");
+        return e;
+    }
+    if (strcmp(kind, "gtk_listbox_row") == 0) {
+        /* Inside a GtkListBox, not detached: Adwaita styles a row through the list's own
+         * CSS node, so a bare GtkListBoxRow draws none of the padding, background or
+         * selection the platform gives it. */
+        GtkWidget *list = gtk_list_box_new();
+        GtkWidget *row = gtk_list_box_row_new();
+        GtkWidget *label = gtk_label_new("Row");
+        gtk_widget_set_halign(label, GTK_ALIGN_START);
+        gtk_widget_set_margin_start(label, 8);
+        gtk_widget_set_margin_end(label, 8);
+        gtk_widget_set_margin_top(label, 4);
+        gtk_widget_set_margin_bottom(label, 4);
+        gtk_list_box_row_set_child(GTK_LIST_BOX_ROW(row), label);
+        gtk_list_box_append(GTK_LIST_BOX(list), row);
+        return list;
+    }
+    if (strcmp(kind, "gtk_notebook") == 0) {
+        GtkWidget *nb = gtk_notebook_new();
+        gtk_notebook_append_page(GTK_NOTEBOOK(nb), gtk_label_new(""), gtk_label_new("One"));
+        gtk_notebook_append_page(GTK_NOTEBOOK(nb), gtk_label_new(""), gtk_label_new("Two"));
+        return nb;
+    }
+    if (strcmp(kind, "adw_header_bar") == 0) {
+        /* AdwHeaderBar is the GNOME title bar, and on GNOME the title bar IS the toolbar --
+         * which is exactly why the Adwaita theme asks for desktopTitleBarMode: custom. */
+        GtkWidget *bar = adw_header_bar_new();
+        adw_header_bar_set_title_widget(ADW_HEADER_BAR(bar), adw_window_title_new("Title", NULL));
+        return bar;
+    }
+    if (strcmp(kind, "gtk_expander") == 0) {
+        return gtk_expander_new("Details");
+    }
+    if (strcmp(kind, "gtk_popover_menubar") == 0) {
+        /* The models are held for the life of the process, deliberately.
+         *
+         * GtkPopoverMenuBar keeps a reference to the model it was built from and rebuilds
+         * its items from it while it lives, and the popovers it creates hold on to the
+         * submenu. Dropping our references here made the lifetime depend on GTK's teardown
+         * order rather than on ours -- and the capture then segfaulted partway through the
+         * DARK pass, several widgets after this one had been written, which is exactly the
+         * shape of a deferred free. Two earlier runs of the same binary completed, so it is
+         * intermittent, which is the other half of that shape.
+         *
+         * Holding them costs two objects in a tool that writes a hundred PNGs and exits. A
+         * capture that crashes one run in three costs a run. */
+        static GMenu *model = NULL;
+        static GMenu *file = NULL;
+        if (model == NULL) {
+            model = g_menu_new();
+            file = g_menu_new();
+            g_menu_append(file, "Open", "app.open");
+            g_menu_append_submenu(model, "File", G_MENU_MODEL(file));
+        }
+        return gtk_popover_menu_bar_new_from_model(G_MENU_MODEL(model));
+    }
+    if (strcmp(kind, "gtk_popover_menu_item") == 0) {
+        /* A menu item is a GtkButton with the "model" style class inside a popover menu:
+         * that class is what Adwaita styles a menu row with, and a plain button would be
+         * measured against the theme's menu row rather than against a menu row. */
+        GtkWidget *item = gtk_button_new_with_label("Open");
+        gtk_button_set_has_frame(GTK_BUTTON(item), FALSE);
+        gtk_widget_add_css_class(item, "model");
+        gtk_widget_add_css_class(item, "flat");
+        GtkWidget *child = gtk_button_get_child(GTK_BUTTON(item));
+        if (GTK_IS_LABEL(child)) {
+            gtk_widget_set_halign(child, GTK_ALIGN_START);
+        }
+        return item;
+    }
     blocker("unknown native_gnome kind '%s'", kind);
     return NULL;
 }
@@ -506,6 +657,13 @@ static int apply_state(GtkWidget *w, const char *state, const char *kind) {
             gtk_check_button_set_active(GTK_CHECK_BUTTON(w), TRUE);
             return 1;
         }
+        if (GTK_IS_LIST_BOX(w)) {
+            GtkListBoxRow *row = gtk_list_box_get_row_at_index(GTK_LIST_BOX(w), 0);
+            if (row) {
+                gtk_list_box_select_row(GTK_LIST_BOX(w), row);
+                return 1;
+            }
+        }
         return 0;
     }
     blocker("unknown state '%s'", state);
@@ -530,10 +688,14 @@ static GtkWidget *build_tile(const Spec *spec, const char *state) {
         return NULL;
     }
     gtk_widget_set_halign(w, is_full_width(spec->kind) ? GTK_ALIGN_FILL : GTK_ALIGN_START);
-    gtk_widget_set_valign(w, GTK_ALIGN_START);
+    gtk_widget_set_valign(w, is_full_height(spec->kind) ? GTK_ALIGN_FILL : GTK_ALIGN_START);
     if (is_full_width(spec->kind)) {
         gtk_widget_set_size_request(w, TILE_W, -1);
         gtk_widget_set_hexpand(w, TRUE);
+    }
+    if (is_full_height(spec->kind)) {
+        gtk_widget_set_size_request(w, is_full_width(spec->kind) ? TILE_W : -1, TILE_H);
+        gtk_widget_set_vexpand(w, TRUE);
     }
 
     GtkWidget *tile = gtk_box_new(GTK_ORIENTATION_VERTICAL, 0);
@@ -637,7 +799,20 @@ static gboolean on_ready(gpointer data) {
         }
     }
 
-    write_manifest(win, probe_widget ? probe_widget : GTK_WIDGET(win));
+    /* Re-fetch rather than reuse `probe_widget`. That pointer was taken before the capture
+     * loop, and the loop builds a tile into `content` and DESTROYS it for every spec and
+     * state, so by here it names freed memory. write_manifest calls
+     * gtk_widget_get_pango_context on it, which is a read straight through the dangling
+     * pointer -- the NULL check above cannot see that, because the pointer is not null, it
+     * is stale.
+     *
+     * This is the intermittent GNOME capture segfault: it depended on what the allocator
+     * had put back in that memory, which is why it reproduced roughly once in three runs
+     * and looked like flakiness. Adding a spec changed the allocation pattern enough to
+     * make it fire every time, which is the only reason it stopped being intermittent and
+     * became findable. */
+    GtkWidget *manifest_probe = content ? gtk_widget_get_first_child(content) : NULL;
+    write_manifest(win, manifest_probe ? manifest_probe : GTK_WIDGET(win));
 
     for (int i = 0; i < blocker_count; i++) {
         fprintf(stderr, "NATIVEREF:BLOCKER %s\n", blockers[i]);
@@ -647,7 +822,32 @@ static gboolean on_ready(gpointer data) {
     return G_SOURCE_REMOVE;
 }
 
+/* Turns a crash into something diagnosable.
+ *
+ * A capture that dies mid-set reports exit 139 and nothing else, and a segfault inside a
+ * toolkit teardown is the kind that appears one run in three -- so the run that shows it is
+ * not necessarily the run anyone is watching. The handler prints the frames and re-raises,
+ * so the shell still sees the real signal and the job still fails.
+ *
+ * async-signal-safe: backtrace_symbols_fd writes straight to the fd and allocates nothing,
+ * unlike backtrace_symbols.
+ */
+static void on_fatal_signal(int sig) {
+    void *frames[64];
+    int n = backtrace(frames, 64);
+    const char *msg = "NATIVEREF:BLOCKER fatal signal, backtrace follows\n";
+    ssize_t ignored = write(STDERR_FILENO, msg, strlen(msg));
+    (void) ignored;
+    backtrace_symbols_fd(frames, n, STDERR_FILENO);
+    signal(sig, SIG_DFL);
+    raise(sig);
+}
+
 int main(int argc, char **argv) {
+    signal(SIGSEGV, on_fatal_signal);
+    signal(SIGABRT, on_fatal_signal);
+    signal(SIGBUS, on_fatal_signal);
+
     out_dir = g_getenv("NATIVEREF_OUT");
     if (!out_dir) {
         fprintf(stderr, "NATIVEREF:ERR NATIVEREF_OUT is not set\n");

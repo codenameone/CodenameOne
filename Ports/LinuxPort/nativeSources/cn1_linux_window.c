@@ -64,6 +64,7 @@ static int cn1EventHead = 0;
 static int cn1EventTail = 0;
 static pthread_mutex_t cn1EventLock = PTHREAD_MUTEX_INITIALIZER;
 
+
 void cn1LinuxPushEvent(int type, int x, int y, int keyCode) {
     cn1LinuxPushWindowEvent(0, type, x, y, keyCode);
 }
@@ -271,9 +272,29 @@ int cn1LinuxPopEvent(int* out) {
 
 /* ------------------------------------------------------------- globals */
 
+/* The modifier mask from the most recent key event: 1 shift, 2 control, 4 alt. Same bit
+ * values as the macOS and Windows ports, so the Java side of all three reads one encoding.
+ *
+ * Latched from the key event rather than queried, which is what this use needs: Shift-Tab
+ * asks whether Shift is down while handling the Tab, and the Tab event's own state field
+ * carries it. (A modifier pressed alone produces no key event, so this does not track one
+ * held in isolation -- nothing here asks.)
+ *
+ * Declared BELOW the globals marker on purpose. scripts/test_native_hover_queue.py compiles
+ * the event ring standalone by slicing this file from CN1_EVENT_RING to that marker, with
+ * -Wall -Wextra -Werror; a static declared inside the slice and used only further down is an
+ * unused variable there and fails the build. */
+static volatile int cn1CurrentModifiers = 0;
+
 static GtkWidget* cn1Window = 0;
 static GtkWidget* cn1DrawingArea = 0;
 static GtkWidget* cn1Overlay = 0;       /* GtkOverlay: drawing area + native widget layer */
+static GtkWidget* cn1RootBox = 0;       /* GtkBox: optional menu bar above the overlay */
+static GtkWidget* cn1MenuBar = 0;       /* the native menu bar, when commands published one */
+/* Created ONCE and reused. A fresh group per rebuild would leak one per published form and
+ * leave the window holding every group it had ever been given -- the menu items go away
+ * with the bar, but the groups themselves do not. */
+static GtkAccelGroup* cn1MenuAccels = 0;
 static GtkWidget* cn1Fixed = 0;         /* GtkFixed overlay hosting positioned native peers */
 static GtkWidget* cn1AccessibilityFixed = 0; /* transparent GTK/ATK semantic hierarchy */
 static CN1Graphics cn1WindowG;          /* the on-screen / headless back buffer */
@@ -607,6 +628,21 @@ static gboolean cn1OnTouch(GtkWidget* widget, GdkEventTouch* e, gpointer data) {
 static gboolean cn1OnKey(GtkWidget* widget, GdkEventKey* e, gpointer data) {
     (void) widget;
     (void) data;
+    /* Recorded before the peer-focus check below returns: the modifiers are true for this
+     * keystroke whether or not Codename One goes on to handle it. */
+    if (e != 0) {
+        int mods = 0;
+        if (e->state & GDK_SHIFT_MASK) {
+            mods |= 1;
+        }
+        if (e->state & GDK_CONTROL_MASK) {
+            mods |= 2;
+        }
+        if (e->state & GDK_MOD1_MASK) {
+            mods |= 4;
+        }
+        cn1CurrentModifiers = mods;
+    }
     /* The key handler is on the toplevel window so it sees keystrokes regardless
      * of which child has focus. But when a native peer widget (the text-edit
      * GtkEntry/GtkTextView, a WebKit view, an app @NativeInterface widget) holds
@@ -960,6 +996,32 @@ static void cn1LinuxInstallFaultHandlers() {
     signal(SIGABRT, cn1LinuxAbortBacktrace);
 }
 
+/* The main window's title, after initDisplay has already set it once.
+ *
+ * Needed because desktop "native" title-bar mode moves the form title OUT of the CN1 title
+ * area and into the OS window's, and until now this port had nowhere to put it: the title was
+ * a CreateWindow-time argument and LinuxNative.desktopWindowSetTitle addresses the SECONDARY
+ * Window peers by slot, never the main one. Without this, suppressing the CN1 title area would
+ * simply lose the title.
+ *
+ * Marshalled onto the GTK main loop like every other widget call here.
+ * cn1LinuxRunOnMainAndWait runs the callback inline when there is no window, which is what the
+ * headless screenshot mode wants -- the setter is then a no-op on a window that does not exist.
+ */
+static void cn1MainTitleOnMain(void* arg) {
+    const char* t = (const char*) arg;
+    if (cn1Window != 0) {
+        gtk_window_set_title(GTK_WINDOW(cn1Window), t != 0 ? t : "");
+    }
+}
+
+JAVA_VOID com_codename1_impl_linux_LinuxNative_mainWindowSetTitle___java_lang_String(
+        CODENAME_ONE_THREAD_STATE, JAVA_OBJECT title) {
+    extern const char* stringToUTF8(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT);
+    const char* t = title == JAVA_NULL ? "" : stringToUTF8(threadStateData, title);
+    cn1LinuxRunOnMainAndWait(cn1MainTitleOnMain, (void*) t);
+}
+
 JAVA_VOID com_codename1_impl_linux_LinuxNative_initDisplay___java_lang_String_int_int(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT title, JAVA_INT width, JAVA_INT height) {
     extern const char* stringToUTF8(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT);
     const char* t = title == JAVA_NULL ? "Codename One" : stringToUTF8(threadStateData, title);
@@ -1014,7 +1076,14 @@ JAVA_VOID com_codename1_impl_linux_LinuxNative_initDisplay___java_lang_String_in
     gtk_widget_set_opacity(cn1AccessibilityFixed, 0.01);
     gtk_overlay_add_overlay(GTK_OVERLAY(cn1Overlay), cn1AccessibilityFixed);
     gtk_overlay_set_overlay_pass_through(GTK_OVERLAY(cn1Overlay), cn1AccessibilityFixed, TRUE);
-    gtk_container_add(GTK_CONTAINER(cn1Window), cn1Overlay);
+    /* A vertical box between the window and the overlay, so a menu bar has somewhere to go.
+     * It is created unconditionally and stays EMPTY until commands arrive: an application
+     * that publishes none packs nothing above the overlay, and a GtkBox with one child
+     * that expands is laid out exactly as the overlay was when it was the window's direct
+     * child. That is what keeps every existing screenshot byte-identical. */
+    cn1RootBox = gtk_box_new(GTK_ORIENTATION_VERTICAL, 0);
+    gtk_box_pack_start(GTK_BOX(cn1RootBox), cn1Overlay, TRUE, TRUE, 0);
+    gtk_container_add(GTK_CONTAINER(cn1Window), cn1RootBox);
 
     g_signal_connect(cn1DrawingArea, "draw", G_CALLBACK(cn1OnDraw), 0);
     g_signal_connect(cn1DrawingArea, "configure-event", G_CALLBACK(cn1OnConfigure), 0);
@@ -1033,6 +1102,229 @@ JAVA_VOID com_codename1_impl_linux_LinuxNative_initDisplay___java_lang_String_in
     gtk_widget_show_all(cn1Window);
     gtk_widget_grab_focus(cn1DrawingArea);
     cn1WindowOpen = 1;
+}
+
+/* ------------------------------------------------------------- menu bar */
+
+/*
+ * The native menu bar.
+ *
+ * Commands arrive as one encoded row each, the format
+ * IOSImplementation.setNativeCommands writes for the macOS menu and
+ * WindowsImplementation writes for the Win32 one:
+ *
+ *   "<menuHint>\t<label>\t<shortcutKeyChar>\t<shortcutModifiers>\t<commandId>"
+ *
+ * rows separated by '\n'. The three ParparVM desktop ports share it deliberately: a second
+ * encoding is a second thing to keep in step with Command's placement constants.
+ *
+ * GtkMenuBar and GtkMenuItem, because this port is GTK 3 -- the GMenu/GtkPopoverMenuBar
+ * pair is GTK 4. (The GNOME fidelity reference app IS GTK 4; it is a separate program.)
+ *
+ * Everything here runs on the GTK main thread, marshalled by the caller.
+ */
+
+#define CN1_MENU_MAX_ITEMS 512
+#define CN1_MENU_MAX_POPUPS 32
+
+static int cn1MenuCommandIds[CN1_MENU_MAX_ITEMS];
+static int cn1MenuItemCount = 0;
+
+/* The standard top-level menus. The hint strings are Command.DESKTOP_MENU_* verbatim;
+ * anything else becomes a top-level menu titled with the hint itself, and an empty hint
+ * lands in "Commands".
+ *
+ * About, Preferences and Quit have no application menu to go to -- GNOME has no menu bar
+ * app menu the way macOS does -- so they go where a GNOME user looks: About under Help,
+ * the other two under File. A placement decision, which is why this table is not simply a
+ * copy of the macOS one. */
+static const char* cn1MenuTitleForHint(const char* hint) {
+    if (strcmp(hint, "File") == 0 || strcmp(hint, "Preferences") == 0
+            || strcmp(hint, "Quit") == 0 || strcmp(hint, "App") == 0) {
+        return "File";
+    }
+    if (strcmp(hint, "Edit") == 0) {
+        return "Edit";
+    }
+    if (strcmp(hint, "View") == 0) {
+        return "View";
+    }
+    if (strcmp(hint, "Window") == 0) {
+        return "Window";
+    }
+    if (strcmp(hint, "Help") == 0 || strcmp(hint, "About") == 0) {
+        return "Help";
+    }
+    return hint[0] == '\0' ? "Commands" : hint;
+}
+
+/* The chosen item's slot, carried as the widget's own data so the callback needs no
+ * lookup table beyond the id array. */
+static void cn1OnMenuItem(GtkMenuItem* item, gpointer data) {
+    (void) item;
+    int slot = GPOINTER_TO_INT(data);
+    if (slot < 0 || slot >= cn1MenuItemCount) {
+        return;
+    }
+    /* Queued, not run here: this is the GTK thread. The EDT drains it through pollEvent,
+     * which is the rule every other input on this port follows. */
+    cn1LinuxPushEvent(CN1_EVENT_MENU_COMMAND, 0, 0, cn1MenuCommandIds[slot]);
+}
+
+/* Reads one tab-delimited field into out, advancing *cursor past the delimiter. Returns 0
+ * at the end of the row. */
+static int cn1MenuNextField(const char** cursor, char* out, size_t cap) {
+    const char* p = *cursor;
+    size_t n = 0;
+    while (*p != '\0' && *p != '\t' && *p != '\n') {
+        if (n + 1 < cap) {
+            out[n++] = *p;
+        }
+        p++;
+    }
+    out[n] = '\0';
+    if (*p == '\t') {
+        p++;
+        *cursor = p;
+        return 1;
+    }
+    *cursor = p;
+    return 0;
+}
+
+/* Attaches the accelerator so GTK both draws it beside the item and responds to it. */
+static void cn1MenuAddAccel(GtkWidget* item, GtkAccelGroup* accels, int keyChar,
+                            int modifiers) {
+    if (keyChar == 0 || accels == NULL) {
+        return;
+    }
+    GdkModifierType mods = 0;
+    /* Command.DESKTOP_SHORTCUT_MODIFIER_PRIMARY is Control here, which is the point of the
+     * constant: the same application code produces Command on a Mac. */
+    if (modifiers & 1) {
+        mods |= GDK_CONTROL_MASK;
+    }
+    if (modifiers & 2) {
+        mods |= GDK_SHIFT_MASK;
+    }
+    if (modifiers & 4) {
+        mods |= GDK_MOD1_MASK;
+    }
+    guint key = gdk_unicode_to_keyval((guint) keyChar);
+    if (key != 0) {
+        gtk_widget_add_accelerator(item, "activate", accels, key, mods, GTK_ACCEL_VISIBLE);
+    }
+}
+
+/* Rebuilds the bar. On the GTK main thread; see the section header. */
+static void cn1MenuRebuild(void* arg) {
+    const char* spec = (const char*) arg;
+    if (cn1Window == 0 || cn1RootBox == 0) {
+        return;
+    }
+    if (cn1MenuBar != 0) {
+        gtk_widget_destroy(cn1MenuBar);
+        cn1MenuBar = 0;
+    }
+    cn1MenuItemCount = 0;
+    if (spec == NULL || spec[0] == '\0') {
+        /* No commands: nothing is packed above the overlay, which is the layout every
+         * existing screenshot was captured with. */
+        return;
+    }
+
+    GtkWidget* bar = gtk_menu_bar_new();
+    if (cn1MenuAccels == 0) {
+        cn1MenuAccels = gtk_accel_group_new();
+        gtk_window_add_accel_group(GTK_WINDOW(cn1Window), cn1MenuAccels);
+    }
+    GtkAccelGroup* accels = cn1MenuAccels;
+
+    GtkWidget* popups[CN1_MENU_MAX_POPUPS];
+    char titles[CN1_MENU_MAX_POPUPS][64];
+    int popupCount = 0;
+
+    const char* cursor = spec;
+    while (*cursor != '\0' && cn1MenuItemCount < CN1_MENU_MAX_ITEMS) {
+        char hint[64];
+        char label[256];
+        char keyField[16];
+        char modField[16];
+        char idField[24];
+        cn1MenuNextField(&cursor, hint, sizeof(hint));
+        cn1MenuNextField(&cursor, label, sizeof(label));
+        cn1MenuNextField(&cursor, keyField, sizeof(keyField));
+        cn1MenuNextField(&cursor, modField, sizeof(modField));
+        cn1MenuNextField(&cursor, idField, sizeof(idField));
+        if (*cursor == '\n') {
+            cursor++;
+        }
+        if (label[0] == '\0') {
+            continue;
+        }
+
+        const char* title = cn1MenuTitleForHint(hint);
+        GtkWidget* popup = 0;
+        for (int i = 0; i < popupCount; i++) {
+            if (strcmp(titles[i], title) == 0) {
+                popup = popups[i];
+                break;
+            }
+        }
+        if (popup == 0) {
+            if (popupCount >= CN1_MENU_MAX_POPUPS) {
+                continue;
+            }
+            popup = gtk_menu_new();
+            GtkWidget* top = gtk_menu_item_new_with_label(title);
+            gtk_menu_item_set_submenu(GTK_MENU_ITEM(top), popup);
+            gtk_menu_shell_append(GTK_MENU_SHELL(bar), top);
+            popups[popupCount] = popup;
+            strncpy(titles[popupCount], title, 63);
+            titles[popupCount][63] = '\0';
+            popupCount++;
+        }
+
+        int slot = cn1MenuItemCount++;
+        cn1MenuCommandIds[slot] = atoi(idField);
+        GtkWidget* item = gtk_menu_item_new_with_label(label);
+        cn1MenuAddAccel(item, accels, atoi(keyField), atoi(modField));
+        g_signal_connect(item, "activate", G_CALLBACK(cn1OnMenuItem),
+                GINT_TO_POINTER(slot));
+        gtk_menu_shell_append(GTK_MENU_SHELL(popup), item);
+    }
+
+    if (popupCount == 0) {
+        /* Every row was unusable. An empty bar is a strip the user cannot explain, so it is
+         * not packed at all. */
+        gtk_widget_destroy(bar);
+        cn1MenuItemCount = 0;
+        return;
+    }
+
+    cn1MenuBar = bar;
+    gtk_box_pack_start(GTK_BOX(cn1RootBox), bar, FALSE, FALSE, 0);
+    /* Above the overlay. pack_start appends, so the bar would otherwise sit under the
+     * content it is supposed to head. */
+    gtk_box_reorder_child(GTK_BOX(cn1RootBox), bar, 0);
+    gtk_widget_show_all(bar);
+}
+
+JAVA_INT com_codename1_impl_linux_LinuxNative_currentModifiers___R_int(
+        CODENAME_ONE_THREAD_STATE) {
+    return (JAVA_INT) cn1CurrentModifiers;
+}
+
+JAVA_VOID com_codename1_impl_linux_LinuxNative_menuSetCommands___java_lang_String(
+        CODENAME_ONE_THREAD_STATE, JAVA_OBJECT spec) {
+    extern const char* stringToUTF8(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT);
+    const char* utf8 = spec == JAVA_NULL ? "" : stringToUTF8(threadStateData, spec);
+    /* AndWait, not a post, and that is load bearing twice over. The menu is in place before
+     * this returns, so a form shown immediately afterwards cannot race the rebuild -- and,
+     * more sharply, stringToUTF8 hands back THIS THREAD'S scratch buffer, which the next
+     * conversion on this thread overwrites. A posted callback would read it after it had
+     * moved on. A blocking hand-off cannot: nothing else runs here until it returns. */
+    cn1LinuxRunOnMainAndWait(cn1MenuRebuild, (void*) utf8);
 }
 
 JAVA_INT com_codename1_impl_linux_LinuxNative_getDisplayWidth___R_int(CODENAME_ONE_THREAD_STATE) {

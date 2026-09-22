@@ -119,6 +119,28 @@
        them. Without it a progress bar paints the legacy full-height fill, 19px against
        this reference. */
     progressTrackThicknessMM: "0.79";
+
+    /* ---- Desktop behaviour the ports used to have to be told about separately ----
+       Both of these are behaviours a native desktop theme IS, so the theme is where they
+       belong: these three files install only on the desktop, which means an application
+       still on the legacy theme is untouched and no port-side isDesktop() gate is needed.
+
+       interactiveScrollBool turns the fading touch indicator into a real scrollbar -- a
+       thumb that can be grabbed, a track that pages on click, a reserved gutter, and no
+       fade. scrollThumbMinSizeInt keeps that thumb grabbable on content far taller than
+       the viewport; 24px is the floor all three toolkits settle around.
+
+       defaultNativeWindowModeBool opens a Dialog as a real operating system window rather
+       than drawing it inside the application's own surface. Anchored popups (ComboBox,
+       Picker) never take it, and the constant is ignored wherever there is no windowing
+       system, so shared code needs no guard. */
+    interactiveScrollBool: true;
+    scrollThumbMinSizeInt: 24;
+    defaultNativeWindowModeBool: true;
+
+    /* Separator's rule thickness. A 1px hairline, which is what all three draw. */
+    separatorThicknessMM: "0.26";
+
 }
 
 /* --- Window and text ------------------------------------------------------------------- */
@@ -559,10 +581,34 @@ ScrollThumb.hover { background-color: #767676; cn1-background-type: cn1-pill-bor
 ScrollThumb.pressed { background-color: #5d5d5d; cn1-background-type: cn1-pill-border; }
 HorizontalScroll { background-color: transparent; }
 HorizontalScrollThumb { cn1-derive: ScrollThumb; }
-DesktopScroll { background-color: transparent; }
-DesktopScrollThumb { cn1-derive: ScrollThumb; }
-DesktopHorizontalScroll { background-color: transparent; }
-DesktopHorizontalScrollThumb { cn1-derive: ScrollThumb; }
+
+/* --- The interactive desktop scrollbar ------------------------------------------------- */
+/*
+ * These four are NOT the mobile Scroll/ScrollThumb above. LookAndFeel.initScroll swaps to
+ * them when interactiveScrollBool is on, and until now this theme derived the thumb from the
+ * mobile one -- which meant a desktop scrollbar with no gutter, no minimum length and no
+ * highlight, on a theme whose whole job is to look like the platform.
+ *
+ * The gutter width is DesktopScroll's horizontal padding plus its margin
+ * (LookAndFeel.getVerticalScrollWidth sums exactly those), and the thumb is inset from it by
+ * its own margin. That is how a thin thumb sits in a wider track.
+ *
+ * The highlight states are .selected and .pressed, NOT .hover: LookAndFeel's
+ * InteractiveScrollThumb returns getSelectedStyle() while the pointer is over the thumb and
+ * getPressedStyle() while it is being dragged. A .hover rule here would compile, and would
+ * never be painted.
+ *
+ * Properties are spelled out rather than cn1-derive'd from ScrollThumb, because deriving is
+ * what left them wrong.
+ */
+DesktopScroll { background-color: transparent; padding: 0 1.59mm 0 1.59mm; margin: 0; }
+DesktopScrollThumb { background-color: #8a8a8a; cn1-background-type: cn1-pill-border; padding: 0; margin: 0 0.79mm 0 0.79mm; }
+DesktopScrollThumb.selected { background-color: #767676; cn1-background-type: cn1-pill-border; padding: 0; margin: 0 0.79mm 0 0.79mm; }
+DesktopScrollThumb.pressed { background-color: #5d5d5d; cn1-background-type: cn1-pill-border; padding: 0; margin: 0 0.79mm 0 0.79mm; }
+DesktopHorizontalScroll { background-color: transparent; padding: 1.59mm 0 1.59mm 0; margin: 0; }
+DesktopHorizontalScrollThumb { background-color: #8a8a8a; cn1-background-type: cn1-pill-border; padding: 0; margin: 0.79mm 0 0.79mm 0; }
+DesktopHorizontalScrollThumb.selected { background-color: #767676; cn1-background-type: cn1-pill-border; padding: 0; margin: 0.79mm 0 0.79mm 0; }
+DesktopHorizontalScrollThumb.pressed { background-color: #5d5d5d; cn1-background-type: cn1-pill-border; padding: 0; margin: 0.79mm 0 0.79mm 0; }
 
 /* NavigationView's selected row: a layer fill with an accent bar, approximated here by the
    fill; the bar needs a per-side border and is tracked rather than faked. */
@@ -595,6 +641,141 @@ ListRendererFocus {
 
 /* --- Dark ------------------------------------------------------------------------------ */
 
+
+/* --- Grouping, rules and links --------------------------------------------------------- */
+/*
+ * Separator is the component's own UIID: its foreground colour is the rule and its margin is
+ * the air either side. GroupBox is the frame and GroupBoxTitle the caption -- nothing here
+ * positions the caption relative to the top edge, because the three platforms disagree about
+ * it and a theme that wants it inset says so with a negative top margin.
+ */
+Separator { color: #e5e5e5; background-color: transparent; margin: 1.6mm 0 1.6mm 0; padding: 0; }
+GroupBox { background-color: transparent; border: 0.26mm solid #e9e9e9; border-radius: 1.06mm; padding: 1.6mm; margin: 1.6mm 0 1.6mm 0; }
+GroupBoxTitle { color: #5d5d5d; background-color: transparent; padding: 0 0 1.6mm 0; margin: 0; }
+Link { color: #0078d4; background-color: transparent; text-decoration: underline; padding: 0; margin: 0; }
+Link.hover { color: #0078d4; background-color: transparent; text-decoration: underline; padding: 0; margin: 0; }
+
+/* --- Stepper (NSStepper / NumberBox / GtkSpinButton) ----------------------------------- */
+Stepper { background-color: transparent; padding: 0; margin: 0; }
+StepperField { color: #1a1a1a; background-color: #ffffff; border: 0.26mm solid #e9e9e9; border-radius: 1.06mm; padding: 1.6mm 2.6mm 1.6mm 2.6mm; margin: 0; }
+StepperButton { color: #1a1a1a; background-color: #f3f3f3; border: 0.26mm solid #e9e9e9; border-radius: 1.06mm; padding: 1.6mm 1.6mm 1.6mm 1.6mm; margin: 0; }
+StepperButton.disabled { color: #5d5d5d; background-color: #f3f3f3; border: 0.26mm solid #e9e9e9; border-radius: 1.06mm; padding: 1.6mm 1.6mm 1.6mm 1.6mm; margin: 0; }
+StepperButton.hover { color: #1a1a1a; background-color: #f0f0f0; border: 0.26mm solid #e9e9e9; border-radius: 1.06mm; padding: 1.6mm 1.6mm 1.6mm 1.6mm; margin: 0; }
+
+/* --- Menus, tooltips and the rest of the popup surfaces -------------------------------- */
+/*
+ * On Windows and macOS the menu BAR is the platform's own and never reaches these rules. What
+ * does reach them is everything Codename One still draws itself: the right-click context menu,
+ * the overflow menu, the tooltip, and the whole of the GNOME headerbar mode. None of the four
+ * was defined by any desktop theme, so each of them fell through to UIManager's blank default
+ * -- which on a dark window is black text on white.
+ */
+PopupContentPane { background-color: #fbfbfb; border: 0.26mm solid #e9e9e9; border-radius: 2.12mm; padding: 1.6mm 0 1.6mm 0; margin: 0; }
+CommandList { background-color: transparent; padding: 0; margin: 0; }
+Command { color: #1a1a1a; background-color: transparent; padding: 1.6mm 2.6mm 1.6mm 2.6mm; margin: 0; text-align: left; }
+Command.selected { color: #ffffff; background-color: #0078d4; padding: 1.6mm 2.6mm 1.6mm 2.6mm; margin: 0; text-align: left; }
+Command.disabled { color: #5d5d5d; background-color: transparent; padding: 1.6mm 2.6mm 1.6mm 2.6mm; margin: 0; text-align: left; }
+TouchCommand { cn1-derive: Command; }
+TooltipDialog { background-color: #fbfbfb; border: 0.26mm solid #e9e9e9; border-radius: 1.06mm; padding: 0; margin: 0; }
+Tooltip { color: #1a1a1a; background-color: transparent; padding: 1.6mm 2.6mm 1.6mm 2.6mm; margin: 0; }
+Command.hover { color: #1a1a1a; background-color: #f0f0f0; padding: 1.6mm 2.6mm 1.6mm 2.6mm; margin: 0; text-align: left; }
+
+/* --- Dialog command area ---------------------------------------------------------------- */
+/*
+ * Dialog, DialogTitle and DialogBody were already here; the buttons along the bottom were not,
+ * and they are most of what a desktop alert looks like. DialogButtonDefault is the one the
+ * platform emphasises -- the accented button on Windows and GNOME, the key-equivalent button
+ * on macOS.
+ */
+DialogCommandArea { background-color: transparent; padding: 1.6mm 2.6mm 1.6mm 2.6mm; margin: 0; }
+DialogButton { cn1-derive: Button; }
+DialogButtonDefault { cn1-derive: RaisedButton; }
+
+/* --- Search field, accordion and tabs ---------------------------------------------------- */
+/*
+ * ToolbarSearch is written by SearchBar, and the Accordion pair is seeded by
+ * UIManager.resetThemeProps with a plain line border and phone metrics. Both looked like a
+ * mobile control on a desktop window; defining them here suppresses the framework's seed.
+ */
+ToolbarSearch { color: #1a1a1a; background-color: #ffffff; border: 0.26mm solid #e9e9e9; border-radius: 1.06mm; padding: 1.6mm 2.6mm 1.6mm 2.6mm; margin: 0; }
+AccordionHeader { color: #1a1a1a; background-color: transparent; border-radius: 1.06mm; padding: 1.6mm 2.6mm 1.6mm 2.6mm; margin: 0; }
+AccordionItem { background-color: transparent; border: none; padding: 0 2.6mm 1.6mm 2.6mm; margin: 0; }
+Tabs { background-color: transparent; padding: 0; margin: 0; }
+AccordionHeader.hover { color: #1a1a1a; background-color: #f0f0f0; border-radius: 1.06mm; padding: 1.6mm 2.6mm 1.6mm 2.6mm; margin: 0; }
+
+
+/* --- Tabs ------------------------------------------------------------------------------- */
+/*
+ * The UIID a tab button actually gets is `Tab`, and its selected state is that button's own
+ * selected style. This theme previously defined SelectedTab and UnselectedTab, which nothing in
+ * the framework writes -- so the rules were dead and the tab strip fell through to
+ * UIManager.resetThemeProps, which seeds `Tab.sel#derive: Tab`. That seed makes the selected tab
+ * IDENTICAL to an unselected one: the captured Linux screenshot showed three plain boxes with no
+ * indication of which was open, and the DesktopTabs fidelity row scored 35-68%.
+ *
+ * TabbedPane is the content pane below the strip, TabsContainer the strip itself and
+ * TabsContainerHost its wrapper; all three are named by Tabs and none was defined here.
+ */
+TabbedPane { background-color: transparent; padding: 0; margin: 0; }
+/* The divider under the tab strip. GtkNotebook draws one and so does a WinUI TabView;
+   NSTabView does not, which is why the Aqua theme has no such rule -- its pill sits on
+   the bare window background.
+
+   It is also what makes the row MEASURE like the native one. A Tab is transparent until
+   it is selected, so without the divider the only content in the tile is the selected
+   tab's fill and the two labels: the comparator's bbox came out 64%% of the native
+   width where it had been 100%%. Drawing the line the platform actually draws fixes the
+   look and the measurement together, which is the only kind of fix worth making to a
+   geometry number. */
+TabsContainer { background-color: #f3f3f3; border-bottom: 0.26mm solid #e5e5e5; padding: 0; margin: 0; }
+TabsContainerHost { background-color: #f3f3f3; padding: 0; margin: 0; }
+Tab { color: #5d5d5d; background-color: transparent; border: none; padding: 1.6mm 3.2mm 1.6mm 3.2mm; margin: 0; }
+Tab.selected { color: #1a1a1a; background-color: #fbfbfb; border-radius: 1.06mm; padding: 1.6mm 3.2mm 1.6mm 3.2mm; margin: 0; }
+Tab.pressed { color: #1a1a1a; background-color: #f0f0f0; padding: 1.6mm 3.2mm 1.6mm 3.2mm; margin: 0; }
+Tab.hover { color: #1a1a1a; background-color: #f0f0f0; padding: 1.6mm 3.2mm 1.6mm 3.2mm; margin: 0; }
+
+/* --- Chat ------------------------------------------------------------------------------ */
+/*
+ * The desktop themes shipped without ANY Chat UIID, so a chat rendered as bare left/right
+ * text: no bubble, no surface, nothing. ios-modern and android-material have carried these
+ * for as long as the component has existed; these three were simply never given them.
+ *
+ * The user bubble is accent-bound through var(--accent-color) so an app that retunes the
+ * accent retunes its own messages with it, which is how the mobile themes behave and what
+ * the palette-override contract expects. The assistant bubble is a neutral surface instead,
+ * because a conversation where both sides are accent-coloured reads as one voice.
+ */
+ChatView { background-color: var(--window-bg-color, #f3f3f3); padding: 0; margin: 0; }
+ChatViewMessages { background-color: transparent; padding: 1mm 2mm; margin: 0; }
+ChatBubbleRow { background-color: transparent; padding: 1mm 2mm; margin: 0; }
+ChatBubbleUser {
+    background-color: var(--accent-color, #0078d4);
+    color: var(--accent-fg-color, #ffffff);
+    padding: 2mm 3mm;
+    margin: 0.5mm 0;
+    border-radius: 1.06mm;
+}
+ChatBubbleAssistant {
+    background-color: #f3f3f3;
+    color: var(--text-color, #1a1a1a);
+    padding: 2mm 3mm;
+    margin: 0.5mm 0;
+    border-radius: 1.06mm;
+}
+ChatBubbleSystem {
+    background-color: transparent;
+    color: #5d5d5d;
+    padding: 1mm 2mm;
+    margin: 0.5mm 0;
+}
+ChatBubbleText { cn1-derive: Label; background-color: transparent; padding: 0; margin: 0; }
+ChatTypingIndicator { background-color: transparent; color: #5d5d5d; padding: 1mm 3mm; margin: 0; }
+ChatInput { background-color: var(--window-bg-color, #f3f3f3); padding: 1mm 2mm; margin: 0; }
+ChatInputField { cn1-derive: TextField; background-color: #fbfbfb; padding: 2mm 3mm; margin: 0.5mm; }
+ChatSendButton { cn1-derive: RaisedButton; padding: 1.5mm 3mm; margin: 0.5mm; }
+ChatAttachButton { cn1-derive: Button; padding: 1.5mm; margin: 0.5mm; }
+ChatVoiceButton { cn1-derive: Button; padding: 1.5mm; margin: 0.5mm; }
+
 @media (prefers-color-scheme: dark) {
     Form { background-color: #202020; color: #ffffff; }
     Label { color: #ffffff; }
@@ -604,7 +785,7 @@ ListRendererFocus {
     Button.pressed { color: #cfcfcf; background-color: #272727; border: 0.26mm solid #303030; border-radius: 1.06mm; }
     Button.disabled { color: #787878; background-color: #272727; border: 0.26mm solid #303030; border-radius: 1.06mm; }
 
-    RaisedButton { color: #000000; background-color: #4cc2ff; }
+    RaisedButton { color: var(--accent-fg-color-dark, #000000); background-color: var(--accent-color-dark, #4cc2ff); }
     RaisedButton.hover { color: #000000; background-color: #47b1e8; }
     RaisedButton.pressed { color: #2b2b2b; background-color: #42a1d2; }
     RaisedButton.disabled { color: #787878; background-color: #434343; }
@@ -634,17 +815,17 @@ ListRendererFocus {
     TextField.disabled { color: #787878; background-color: #272727; border: 0.26mm solid #303030; border-radius: 1.06mm; }
 
     CheckBox { color: #ffffff; }
-    CheckBox.selected { color: #4cc2ff; }
+    CheckBox.selected { color: var(--accent-color-dark, #4cc2ff); }
     CheckBox.hover { color: #ffffff; background-color: #2d2d2d; }
     CheckBox.disabled { color: #787878; }
 
     RadioButton { color: #ffffff; }
-    RadioButton.selected { color: #4cc2ff; }
+    RadioButton.selected { color: var(--accent-color-dark, #4cc2ff); }
     RadioButton.hover { color: #ffffff; background-color: #2d2d2d; }
     RadioButton.disabled { color: #787878; }
 
     Switch { background-color: #9a9a9a; }
-    Switch.selected { background-color: #4cc2ff; }
+    Switch.selected { background-color: var(--accent-color-dark, #4cc2ff); }
     Switch.hover { background-color: #aaaaaa; }
     Switch.disabled { background-color: #434343; }
 
@@ -652,10 +833,10 @@ ListRendererFocus {
        worse than the bar thumb it replaced until this was measured off the
        committed dark golden. */
     Slider { background-color: #9a9a9a; color: #424242; }
-    SliderFull { background-color: #4cc2ff; color: #4cc2ff; }
+    SliderFull { background-color: var(--accent-color-dark, #4cc2ff); color: var(--accent-color-dark, #4cc2ff); }
     /* Capsule borders carry their own fill color; rebuild them for dark mode. */
     ProgressBar { background-color: #9a9a9a; cn1-background-type: cn1-pill-border; }
-    ProgressBarFull { background-color: #4cc2ff; color: #4cc2ff; cn1-background-type: cn1-pill-border; }
+    ProgressBarFull { background-color: var(--accent-color-dark, #4cc2ff); color: #4cc2ff; cn1-background-type: cn1-pill-border; }
 
     TitleArea { background-color: #202020; }
     Title { color: #ffffff; }
@@ -685,6 +866,68 @@ ListRendererFocus {
        keeps TextField's near-white background on a dark form. Repeat every derive. */
     TextArea { cn1-derive: TextField; }
     HorizontalScrollThumb { cn1-derive: ScrollThumb; }
-    DesktopScrollThumb { cn1-derive: ScrollThumb; }
-    DesktopHorizontalScrollThumb { cn1-derive: ScrollThumb; }
+    DesktopScroll { background-color: transparent; padding: 0 1.59mm 0 1.59mm; margin: 0; }
+    DesktopScrollThumb { background-color: #9a9a9a; cn1-background-type: cn1-pill-border; padding: 0; margin: 0 0.79mm 0 0.79mm; }
+    DesktopScrollThumb.selected { background-color: #aaaaaa; cn1-background-type: cn1-pill-border; padding: 0; margin: 0 0.79mm 0 0.79mm; }
+    DesktopScrollThumb.pressed { background-color: #cfcfcf; cn1-background-type: cn1-pill-border; padding: 0; margin: 0 0.79mm 0 0.79mm; }
+    DesktopHorizontalScroll { background-color: transparent; padding: 1.59mm 0 1.59mm 0; margin: 0; }
+    DesktopHorizontalScrollThumb { background-color: #9a9a9a; cn1-background-type: cn1-pill-border; padding: 0; margin: 0.79mm 0 0.79mm 0; }
+    DesktopHorizontalScrollThumb.selected { background-color: #aaaaaa; cn1-background-type: cn1-pill-border; padding: 0; margin: 0.79mm 0 0.79mm 0; }
+    DesktopHorizontalScrollThumb.pressed { background-color: #cfcfcf; cn1-background-type: cn1-pill-border; padding: 0; margin: 0.79mm 0 0.79mm 0; }
+    Separator { color: #2d2d2d; background-color: transparent; margin: 1.6mm 0 1.6mm 0; padding: 0; }
+    GroupBox { background-color: transparent; border: 0.26mm solid #363636; border-radius: 1.06mm; padding: 1.6mm; margin: 1.6mm 0 1.6mm 0; }
+    GroupBoxTitle { color: #cfcfcf; background-color: transparent; padding: 0 0 1.6mm 0; margin: 0; }
+    Link { color: #4cc2ff; background-color: transparent; text-decoration: underline; padding: 0; margin: 0; }
+    Link.hover { color: #4cc2ff; background-color: transparent; text-decoration: underline; padding: 0; margin: 0; }
+    Stepper { background-color: transparent; padding: 0; margin: 0; }
+    StepperField { color: #ffffff; background-color: #1f1f1f; border: 0.26mm solid #363636; border-radius: 1.06mm; padding: 1.6mm 2.6mm 1.6mm 2.6mm; margin: 0; }
+    StepperButton { color: #ffffff; background-color: #202020; border: 0.26mm solid #363636; border-radius: 1.06mm; padding: 1.6mm 1.6mm 1.6mm 1.6mm; margin: 0; }
+    StepperButton.disabled { color: #cfcfcf; background-color: #202020; border: 0.26mm solid #363636; border-radius: 1.06mm; padding: 1.6mm 1.6mm 1.6mm 1.6mm; margin: 0; }
+    StepperButton.hover { color: #ffffff; background-color: #323232; border: 0.26mm solid #363636; border-radius: 1.06mm; padding: 1.6mm 1.6mm 1.6mm 1.6mm; margin: 0; }
+    PopupContentPane { background-color: #2c2c2c; border: 0.26mm solid #363636; border-radius: 2.12mm; padding: 1.6mm 0 1.6mm 0; margin: 0; }
+    CommandList { background-color: transparent; padding: 0; margin: 0; }
+    Command { color: #ffffff; background-color: transparent; padding: 1.6mm 2.6mm 1.6mm 2.6mm; margin: 0; text-align: left; }
+    Command.selected { color: var(--accent-fg-color-dark, #000000); background-color: var(--accent-color-dark, #4cc2ff); padding: 1.6mm 2.6mm 1.6mm 2.6mm; margin: 0; text-align: left; }
+    Command.disabled { color: #cfcfcf; background-color: transparent; padding: 1.6mm 2.6mm 1.6mm 2.6mm; margin: 0; text-align: left; }
+    TouchCommand { cn1-derive: Command; }
+    TooltipDialog { background-color: #2c2c2c; border: 0.26mm solid #363636; border-radius: 1.06mm; padding: 0; margin: 0; }
+    Tooltip { color: #ffffff; background-color: transparent; padding: 1.6mm 2.6mm 1.6mm 2.6mm; margin: 0; }
+    Command.hover { color: #ffffff; background-color: #323232; padding: 1.6mm 2.6mm 1.6mm 2.6mm; margin: 0; text-align: left; }
+    DialogCommandArea { background-color: transparent; padding: 1.6mm 2.6mm 1.6mm 2.6mm; margin: 0; }
+    DialogButton { cn1-derive: Button; }
+    DialogButtonDefault { cn1-derive: RaisedButton; }
+    ToolbarSearch { color: #ffffff; background-color: #1f1f1f; border: 0.26mm solid #363636; border-radius: 1.06mm; padding: 1.6mm 2.6mm 1.6mm 2.6mm; margin: 0; }
+    AccordionHeader { color: #ffffff; background-color: transparent; border-radius: 1.06mm; padding: 1.6mm 2.6mm 1.6mm 2.6mm; margin: 0; }
+    AccordionItem { background-color: transparent; border: none; padding: 0 2.6mm 1.6mm 2.6mm; margin: 0; }
+    Tabs { background-color: transparent; padding: 0; margin: 0; }
+    AccordionHeader.hover { color: #ffffff; background-color: #323232; border-radius: 1.06mm; padding: 1.6mm 2.6mm 1.6mm 2.6mm; margin: 0; }
+
+    TabbedPane { background-color: transparent; padding: 0; margin: 0; }
+    TabsContainer { background-color: #202020; border-bottom: 0.26mm solid #2d2d2d; padding: 0; margin: 0; }
+    TabsContainerHost { background-color: #202020; padding: 0; margin: 0; }
+    Tab { color: #cfcfcf; background-color: transparent; border: none; padding: 1.6mm 3.2mm 1.6mm 3.2mm; margin: 0; }
+    Tab.selected { color: #ffffff; background-color: #2c2c2c; border-radius: 1.06mm; padding: 1.6mm 3.2mm 1.6mm 3.2mm; margin: 0; }
+    Tab.pressed { color: #ffffff; background-color: #323232; padding: 1.6mm 3.2mm 1.6mm 3.2mm; margin: 0; }
+    Tab.hover { color: #ffffff; background-color: #323232; padding: 1.6mm 3.2mm 1.6mm 3.2mm; margin: 0; }
+
+
+    /* Chat. Accent-bound in dark too -- see the light rules; the dark block's accent goes
+       through --accent-color-dark, which this theme already declares. */
+    ChatView { background-color: var(--window-bg-color-dark, #202020); }
+    ChatViewMessages { background-color: transparent; }
+    ChatBubbleRow { background-color: transparent; }
+    ChatBubbleUser { background-color: var(--accent-color-dark, #4cc2ff); color: var(--accent-fg-color-dark, #000000); }
+    ChatBubbleAssistant { background-color: #2d2d2d; color: var(--text-color-dark, #ffffff); }
+    ChatBubbleSystem { background-color: transparent; color: #9b9b9b; }
+    ChatBubbleText { cn1-derive: Label; background-color: transparent; color: var(--text-color-dark, #ffffff); }
+    ChatTypingIndicator { background-color: transparent; color: #9b9b9b; }
+    ChatInput { background-color: var(--window-bg-color-dark, #202020); }
+    ChatInputField { cn1-derive: TextField; background-color: #2b2b2b; color: var(--text-color-dark, #ffffff); }
+    /* The derives are REPEATED here, not inherited. cn1-derive is flattened against the
+       LIGHT parent at compile time, so a UIID that derives only in the light block ships a
+       concrete copy of the light colours and no dark entry at all -- it would keep its light
+       colours on a dark form. DesktopNativeThemeParityTest fails the build for exactly that. */
+    ChatSendButton { cn1-derive: RaisedButton; padding: 1.5mm 3mm; margin: 0.5mm; }
+    ChatAttachButton { cn1-derive: Button; padding: 1.5mm; margin: 0.5mm; }
+    ChatVoiceButton { cn1-derive: Button; padding: 1.5mm; margin: 0.5mm; }
 }

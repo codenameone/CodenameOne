@@ -689,6 +689,11 @@ public class LinuxNativeBuilder extends Executor {
         // And the database compatibility switch, before the lifecycle below starts, so it is in
         // force by the time anything opens a database.
         src.append(databaseLegacyStubProperty(request, usesDatabase));
+        // And the desktop title-bar mode, so a project that set desktop.titleBar actually gets
+        // it. Without this line the hint never reaches the port and the theme constant decides
+        // alone -- which on Adwaita means "custom", so an app that asked for "native" kept its
+        // Toolbar. See Executor.desktopTitleBarStubProperty.
+        src.append(desktopTitleBarStubProperty(request));
         src.append(svgInstall);
         src.append("        Display.getInstance().callSerially(new Runnable() {\n");
         src.append("            public void run() {\n");

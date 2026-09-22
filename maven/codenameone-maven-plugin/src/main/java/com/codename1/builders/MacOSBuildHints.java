@@ -709,14 +709,14 @@ public class MacOSBuildHints {
      * Which native theme the generated stub installs, as
      * IOSImplementation.setIosMode() takes it.
      *
-     * <p>{@code modern} by DEFAULT, which is where macOS parts company with iOS.
+     * <p>{@code aqua} by DEFAULT, which is where macOS parts company with iOS.
      * iOS defaults to {@code auto} and therefore to the legacy iOS 7 theme
      * deliberately, so that existing applications and their screenshot goldens
      * are not disturbed. This port has neither: it has never shipped, so there
-     * is nothing to disturb, and defaulting it to a pre-flat iOS theme would
-     * give a brand new macOS port an iPhone 7 look and -- because iOS7Theme.res
-     * carries no $Dark styles at all -- no dark mode whatsoever, however
-     * carefully the application asks for one.</p>
+     * is nothing to disturb, and defaulting it to an iOS theme of any generation
+     * would give a macOS application an iPhone design language -- which is what
+     * it did until this change, because the Aqua theme's own flip was deferred
+     * until its screenshot baselines could be reseeded alongside it.</p>
      *
      * <p>{@code macos.themeMode} names it directly, the legacy macNative.
      * spelling is accepted like every other setting here, and the cross platform
@@ -741,13 +741,15 @@ public class MacOSBuildHints {
                 // asked for the modern iOS look and still gets it.
                 mode = shared;
             } else {
-                // NOT aqua yet, and that is the same sequencing as the Windows and Linux
-                // poms: making Aqua the default restyles every screen and reseeds this
-                // port's committed screenshot baselines, which deserves its own review and
-                // wants doing once, after the theme reaches its fidelity target. Until
-                // then macos.themeMode=aqua selects it explicitly, which is what the
-                // whitelist above is for and what the review asked for.
-                mode = "modern";
+                // Aqua. This port had been defaulting to the modern iOS theme, which is an
+                // iPhone design language on a Mac -- and which it only ever did because the
+                // flip restyles every screen and reseeds this port's committed screenshot
+                // baselines. Those are reseeded in this same change, from the CI runner that
+                // captures them, which is what the deferral was waiting for.
+                //
+                // macos.themeMode still names any of the others explicitly, including
+                // "modern" for an application that wants the iOS look on a Mac.
+                mode = "aqua";
             }
         }
         // Interpolated into generated Java source, so it is constrained to the

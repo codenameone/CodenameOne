@@ -54,10 +54,28 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class MacOSStubThemeTest {
 
     @Test
-    void theGeneratedStubInstallsTheModernThemeByDefault(@TempDir Path tmp) throws Exception {
+    void theGeneratedStubInstallsTheAquaThemeByDefault(@TempDir Path tmp) throws Exception {
         String stub = generateStub(tmp, new HashMap<String, String>());
-        assertTrue(stub.contains("setIosMode(\"modern\")"),
-                "the stub must select the only theme that declares @darkModeBool; got:\n" + stub);
+        assertTrue(stub.contains("setIosMode(\"aqua\")"),
+                "a macOS application gets the macOS design language unless it asks otherwise;"
+                        + " got:\n" + stub);
+    }
+
+    /// The property the default is really guarding, asserted separately from the value.
+    ///
+    /// This test used to require "modern", and the reason was never that modern was right
+    /// for a Mac -- it is the iOS 26 theme -- but that iOS7Theme.res declares no
+    /// @darkModeBool, so a stub defaulting to it left the application with no dark mode
+    /// whatever it asked for. Aqua declares the constant too (asserted against the compiled
+    /// resource by DesktopNativeThemeContentTest), so the property survives the change of
+    /// value. Naming it here means the next person to move this default is told what it has
+    /// to keep, rather than reading a literal and guessing.
+    @Test
+    void theDefaultIsNeverTheThemeWithNoDarkMode(@TempDir Path tmp) throws Exception {
+        String stub = generateStub(tmp, new HashMap<String, String>());
+        assertFalse(stub.contains("setIosMode(\"ios7\")"),
+                "iOS7Theme.res declares no @darkModeBool, so defaulting to it takes dark mode"
+                        + " away from every application on this port");
     }
 
     @Test
@@ -92,6 +110,32 @@ class MacOSStubThemeTest {
                 "native sources are not application resources");
         assertTrue(new File(nativeSources, "iOSModernTheme.res").isFile(),
                 "and it stays staged for the signature gate, which reads that set");
+    }
+
+    /// The theme the port now DEFAULTS to has to reach the application too.
+    ///
+    /// installNativeTheme() asks for its resource by name at run time and falls back to the
+    /// legacy theme WITHOUT SAYING SO when the lookup returns null, so a default that is not
+    /// staged is a silent revert to the iOS 7 look. That was latent while the default was
+    /// modern and iOSModernTheme.res was the only theme anyone staged; it became load
+    /// bearing when the default moved to aqua.
+    @Test
+    void theAquaThemeReachesTheApplicationResourcesToo(@TempDir Path tmp) throws Exception {
+        File nativeSources = new File(tmp.toFile(), "nativeSources");
+        File buildinRes = new File(tmp.toFile(), "btres");
+        assertTrue(nativeSources.mkdirs() && buildinRes.mkdirs());
+        Files.write(new File(nativeSources, "MacOSAquaTheme.res").toPath(),
+                "aqua".getBytes(StandardCharsets.UTF_8));
+        Files.write(new File(nativeSources, "iOSModernTheme.res").toPath(),
+                "modern".getBytes(StandardCharsets.UTF_8));
+
+        MacOSNativeBuilder.stageThemeResources(nativeSources, buildinRes);
+
+        assertTrue(new File(buildinRes, "MacOSAquaTheme.res").isFile(),
+                "the default theme has to be an application resource or the port silently"
+                        + " falls back to the legacy one");
+        assertTrue(new File(buildinRes, "iOSModernTheme.res").isFile(),
+                "and the theme macos.themeMode=modern names still has to be there");
     }
 
     /// An application shipping its own theme of the same name keeps it.

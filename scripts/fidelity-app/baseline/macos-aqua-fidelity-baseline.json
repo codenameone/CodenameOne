@@ -150,6 +150,76 @@
       "height_ratio": 1.0,
       "width_ratio": 0.8933
     },
+    "DesktopDisclosure_normal_dark": {
+      "center_offset": 6.32,
+      "height_ratio": 0.8182,
+      "width_ratio": 0.6
+    },
+    "DesktopDisclosure_normal_light": {
+      "center_offset": 6.32,
+      "height_ratio": 0.8182,
+      "width_ratio": 0.6
+    },
+    "DesktopGroupBox_normal_dark": {
+      "center_offset": 1.0,
+      "height_ratio": 1.04,
+      "width_ratio": 1.0085
+    },
+    "DesktopGroupBox_normal_light": {
+      "center_offset": 1.0,
+      "height_ratio": 1.04,
+      "width_ratio": 1.0085
+    },
+    "DesktopLinkButton_disabled_dark": {
+      "center_offset": 3.81,
+      "height_ratio": 0.9167,
+      "width_ratio": 0.72
+    },
+    "DesktopLinkButton_disabled_light": {
+      "center_offset": 3.81,
+      "height_ratio": 0.9167,
+      "width_ratio": 0.72
+    },
+    "DesktopLinkButton_hover_dark": {
+      "center_offset": 3.81,
+      "height_ratio": 0.9167,
+      "width_ratio": 0.72
+    },
+    "DesktopLinkButton_hover_light": {
+      "center_offset": 3.81,
+      "height_ratio": 0.9167,
+      "width_ratio": 0.72
+    },
+    "DesktopLinkButton_normal_dark": {
+      "center_offset": 3.81,
+      "height_ratio": 0.9167,
+      "width_ratio": 0.72
+    },
+    "DesktopLinkButton_normal_light": {
+      "center_offset": 3.81,
+      "height_ratio": 0.9167,
+      "width_ratio": 0.72
+    },
+    "DesktopListRow_normal_dark": {
+      "center_offset": 9.22,
+      "height_ratio": 0.8,
+      "width_ratio": 0.9167
+    },
+    "DesktopListRow_normal_light": {
+      "center_offset": 9.22,
+      "height_ratio": 0.8,
+      "width_ratio": 0.9167
+    },
+    "DesktopListRow_selected_dark": {
+      "center_offset": 1.5,
+      "height_ratio": 0.8636,
+      "width_ratio": 1.0727
+    },
+    "DesktopListRow_selected_light": {
+      "center_offset": 1.5,
+      "height_ratio": 0.8636,
+      "width_ratio": 1.0727
+    },
     "DesktopProgressBar_normal_dark": {
       "center_offset": 3.0,
       "height_ratio": 1.3333,
@@ -200,6 +270,26 @@
       "height_ratio": 1.1333,
       "width_ratio": 1.0556
     },
+    "DesktopSearchField_disabled_dark": {
+      "center_offset": 0.5,
+      "height_ratio": 1.3125,
+      "width_ratio": 1.0
+    },
+    "DesktopSearchField_disabled_light": {
+      "center_offset": 1.0,
+      "height_ratio": 1.1053,
+      "width_ratio": 1.0
+    },
+    "DesktopSearchField_normal_dark": {
+      "center_offset": 0.5,
+      "height_ratio": 1.3125,
+      "width_ratio": 1.0
+    },
+    "DesktopSearchField_normal_light": {
+      "center_offset": 1.0,
+      "height_ratio": 1.1053,
+      "width_ratio": 1.0
+    },
     "DesktopSlider_disabled_dark": {
       "center_offset": 56.14,
       "height_ratio": 0.6,
@@ -229,6 +319,26 @@
       "center_offset": 3.5,
       "height_ratio": 0.5714,
       "width_ratio": 1.0
+    },
+    "DesktopStepper_disabled_dark": {
+      "center_offset": 86.01,
+      "height_ratio": 1.05,
+      "width_ratio": 3.6875
+    },
+    "DesktopStepper_disabled_light": {
+      "center_offset": 85.52,
+      "height_ratio": 1.0,
+      "width_ratio": 3.6308
+    },
+    "DesktopStepper_normal_dark": {
+      "center_offset": 86.01,
+      "height_ratio": 1.05,
+      "width_ratio": 3.6875
+    },
+    "DesktopStepper_normal_light": {
+      "center_offset": 85.51,
+      "height_ratio": 0.9545,
+      "width_ratio": 3.6308
     },
     "DesktopSwitch_disabled_dark": {
       "center_offset": 7.76,
@@ -270,6 +380,16 @@
       "height_ratio": 1.0,
       "width_ratio": 1.0789
     },
+    "DesktopTabs_normal_dark": {
+      "center_offset": 40.03,
+      "height_ratio": 0.25,
+      "width_ratio": 0.6239
+    },
+    "DesktopTabs_normal_light": {
+      "center_offset": 39.56,
+      "height_ratio": 0.2,
+      "width_ratio": 0.6195
+    },
     "DesktopTextField_disabled_dark": {
       "center_offset": 98.02,
       "height_ratio": 0.6,
@@ -299,6 +419,16 @@
       "center_offset": 1.0,
       "height_ratio": 1.1,
       "width_ratio": 1.0
+    },
+    "DesktopToolbar_normal_dark": {
+      "center_offset": 15.01,
+      "height_ratio": 1.5455,
+      "width_ratio": 8.1379
+    },
+    "DesktopToolbar_normal_light": {
+      "center_offset": 15.01,
+      "height_ratio": 1.5455,
+      "width_ratio": 8.1379
     }
   },
   "pairs": {
@@ -332,6 +462,20 @@
     "DesktopComboBox_hover_light": 89.46,
     "DesktopComboBox_normal_dark": 89.25,
     "DesktopComboBox_normal_light": 89.46,
+    "DesktopDisclosure_normal_dark": 85.37,
+    "DesktopDisclosure_normal_light": 83.72,
+    "DesktopGroupBox_normal_dark": 73.62,
+    "DesktopGroupBox_normal_light": 73.04,
+    "DesktopLinkButton_disabled_dark": 90.56,
+    "DesktopLinkButton_disabled_light": 88.56,
+    "DesktopLinkButton_hover_dark": 91.06,
+    "DesktopLinkButton_hover_light": 88.92,
+    "DesktopLinkButton_normal_dark": 91.06,
+    "DesktopLinkButton_normal_light": 88.92,
+    "DesktopListRow_normal_dark": 84.92,
+    "DesktopListRow_normal_light": 83.11,
+    "DesktopListRow_selected_dark": 85.19,
+    "DesktopListRow_selected_light": 83.72,
     "DesktopProgressBar_normal_dark": 81.01,
     "DesktopProgressBar_normal_light": 84.46,
     "DesktopRadioButton_disabled_dark": 90.87,
@@ -342,12 +486,20 @@
     "DesktopRadioButton_normal_light": 79.53,
     "DesktopRadioButton_selected_dark": 82.82,
     "DesktopRadioButton_selected_light": 83.33,
+    "DesktopSearchField_disabled_dark": 78.6,
+    "DesktopSearchField_disabled_light": 81.19,
+    "DesktopSearchField_normal_dark": 75.79,
+    "DesktopSearchField_normal_light": 85.92,
     "DesktopSlider_disabled_dark": 77.86,
     "DesktopSlider_disabled_light": 77.38,
     "DesktopSlider_hover_dark": 72.94,
     "DesktopSlider_hover_light": 76.14,
     "DesktopSlider_normal_dark": 72.94,
     "DesktopSlider_normal_light": 76.14,
+    "DesktopStepper_disabled_dark": 81.68,
+    "DesktopStepper_disabled_light": 80.02,
+    "DesktopStepper_normal_dark": 80.85,
+    "DesktopStepper_normal_light": 79.36,
     "DesktopSwitch_disabled_dark": 76.21,
     "DesktopSwitch_disabled_light": 95.33,
     "DesktopSwitch_hover_dark": 91.59,
@@ -356,11 +508,15 @@
     "DesktopSwitch_normal_light": 95.03,
     "DesktopSwitch_selected_dark": 84.53,
     "DesktopSwitch_selected_light": 87.21,
+    "DesktopTabs_normal_dark": 78.6,
+    "DesktopTabs_normal_light": 79.04,
     "DesktopTextField_disabled_dark": 89.29,
     "DesktopTextField_disabled_light": 91.18,
     "DesktopTextField_hover_dark": 81.08,
     "DesktopTextField_hover_light": 90.91,
     "DesktopTextField_normal_dark": 81.08,
-    "DesktopTextField_normal_light": 90.91
+    "DesktopTextField_normal_light": 90.91,
+    "DesktopToolbar_normal_dark": 74.99,
+    "DesktopToolbar_normal_light": 76.14
   }
 }
