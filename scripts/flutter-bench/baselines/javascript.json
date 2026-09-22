@@ -1,0 +1,16 @@
+{
+  "codenameone": {
+    "code_bytes": 12626716,
+    "install_bytes": 108240310,
+    "wire_bytes": 90141877
+  },
+  "generated_at": "2026-09-22T22:37:03Z",
+  "platform": "javascript",
+  "recorded_from": "flutter-bench run 35788675826 (commit f5cadddb7d)",
+  "schema_version": 1,
+  "tolerances": {
+    "code_bytes": 0.02,
+    "install_bytes": 0.02,
+    "wire_bytes": 0.02
+  }
+}
