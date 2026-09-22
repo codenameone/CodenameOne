@@ -610,32 +610,72 @@ class AndroidAdapter(Adapter):
     def artifact(self, side):
         return self.apks[side]
 
-    def code_size(self, side):
-        """The dex and native libraries, which is the runtime plus the app.
+    # The ABI every size is reported for: what a phone is actually delivered.
+    SIZE_ABI = "arm64-v8a"
 
-        The rest of an apk is resources and assets, identical on both sides.
-        """
+    def _entries(self, side):
         import zipfile as _zip
-        total = 0
         try:
             with _zip.ZipFile(self.apks[side]) as archive:
-                for info in archive.infolist():
-                    if info.filename.endswith(".dex") or info.filename.endswith(".so"):
-                        total += info.file_size
+                return archive.infolist()
         except (OSError, _zip.BadZipFile):
             return None
+
+    @classmethod
+    def _other_abi(cls, name):
+        """Whether a zip entry is a native library for an ABI other than SIZE_ABI."""
+        parts = name.split("/")
+        return len(parts) > 2 and parts[0] == "lib" and parts[1] != cls.SIZE_ABI
+
+    def code_size(self, side):
+        """The dex and the SIZE_ABI native libraries: the runtime plus the app.
+
+        One ABI, not every ABI in the file. `flutter build apk` produces a FAT
+        apk with the engine and the Dart image for arm64, armv7 and x86_64, and
+        a phone installs one of them -- Play delivers per-ABI splits. Summing all
+        three counted Flutter's code about three times over and reported a 13x
+        difference that no user would see. The rule is the same for both sides.
+        """
+        entries = self._entries(side)
+        if entries is None:
+            return None
+        total = sum(i.file_size for i in entries
+                    if not self._other_abi(i.filename)
+                    and (i.filename.endswith(".dex") or i.filename.endswith(".so")))
         return total or None
 
-    def wire_size_override(self, side):
-        """An apk is already a zip, so its own size IS the download size."""
-        return os.path.getsize(self.apks[side])
+    def delivered_size(self, side):
+        """The apk as delivered for SIZE_ABI: the file minus other ABIs' libraries.
+
+        Each excluded entry costs its compressed bytes plus its local and central
+        directory headers (30 and 46 bytes, each carrying the name), so an apk
+        with no other ABIs comes out at exactly its file size.
+        """
+        entries = self._entries(side)
+        if entries is None:
+            return None
+        excluded = sum(i.compress_size + 30 + 46 + 2 * len(i.filename.encode("utf-8"))
+                       for i in entries if self._other_abi(i.filename))
+        return os.path.getsize(self.apks[side]) - excluded
 
     def sizes(self, side, workdir):
+        # An apk is already a zip, so its size as delivered IS the download size.
+        delivered = self.delivered_size(side)
         return {
-            "install_bytes": benchlib.tree_size(self.apks[side]),
+            "install_bytes": delivered,
             "code_bytes": self.code_size(side),
-            "wire_bytes": self.wire_size_override(side),
+            "wire_bytes": delivered,
         }
+
+    def notes(self):
+        return [
+            "Android sizes are for the arm64-v8a slice a phone is delivered, on both "
+            "sides; Flutter's release apk carries three ABIs and would otherwise count "
+            "its engine about three times.",
+            "Android start-up and memory come from an x86_64 emulator with a software "
+            "GPU. They compare the two runtimes on one machine; they are not phone "
+            "timings, and a renderer that leans on the GPU is penalised more there.",
+        ]
 
     def _install(self, side):
         """Installs the APK that was sized, once per run, replacing any other.

@@ -180,5 +180,40 @@ class AndroidInstall(unittest.TestCase):
                          "nothing may be timed when the install failed")
 
 
+class AndroidSizing(unittest.TestCase):
+    """Sizes are for the one ABI a phone is delivered, on both sides."""
+
+    def _apk(self, entries):
+        import zipfile
+        path = os.path.join(tempfile.mkdtemp(), "app.apk")
+        with zipfile.ZipFile(path, "w", zipfile.ZIP_STORED) as archive:
+            for name, size in entries:
+                archive.writestr(name, b"x" * size)
+        return path
+
+    def _adapter(self, apk):
+        return platforms.AndroidAdapter(None, {"codenameone": "a", "flutter": "b"},
+                                        {"codenameone": ".A", "flutter": ".B"},
+                                        {"codenameone": apk, "flutter": apk})
+
+    def test_a_fat_apk_counts_one_abi(self):
+        apk = self._apk([("classes.dex", 1000), ("lib/arm64-v8a/libapp.so", 5000),
+                         ("lib/x86_64/libapp.so", 5000), ("lib/armeabi-v7a/libapp.so", 5000),
+                         ("assets/flutter_assets/a.png", 2000)])
+        adapter = self._adapter(apk)
+        self.assertEqual(6000, adapter.code_size("flutter"),
+                         "the dex and the arm64 libraries, not all three ABIs")
+        delivered = adapter.delivered_size("flutter")
+        self.assertLess(delivered, os.path.getsize(apk) - 9900)
+        self.assertGreater(delivered, 8000, "the arm64 slice, the dex and the assets stay")
+
+    def test_a_single_abi_apk_is_its_own_size(self):
+        apk = self._apk([("classes.dex", 4000), ("lib/arm64-v8a/libcn1.so", 700),
+                         ("assets/a.png", 2000)])
+        adapter = self._adapter(apk)
+        self.assertEqual(os.path.getsize(apk), adapter.delivered_size("codenameone"))
+        self.assertEqual(4700, adapter.code_size("codenameone"))
+
+
 if __name__ == "__main__":
     unittest.main()
