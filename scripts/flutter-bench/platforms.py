@@ -18,6 +18,7 @@ keeping honest: an unexercised adapter is a proposal, not a measurement.
 
 import glob
 import os
+import platform as _host
 import re
 import shutil
 import queue
@@ -249,7 +250,7 @@ class MacOSAdapter(_ProcessAdapter):
         self.apps = {"codenameone": cn1_app, "flutter": flutter_app}
 
     def available(self):
-        if os.uname().sysname != "Darwin":
+        if _host.system() != "Darwin":
             return False, "not a macOS host"
         for side, path in self.apps.items():
             if not os.path.isdir(path):
@@ -306,7 +307,7 @@ class LinuxAdapter(_ProcessAdapter):
         self.apps = {"codenameone": cn1_app, "flutter": flutter_app}
 
     def available(self):
-        if os.uname().sysname != "Linux":
+        if _host.system() != "Linux":
             return False, "not a Linux host"
         if not os.environ.get("DISPLAY") and not os.environ.get("WAYLAND_DISPLAY"):
             # Measured on this project: the JavaSE simulator needs a real

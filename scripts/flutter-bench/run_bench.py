@@ -25,6 +25,7 @@ import glob
 import json
 import os
 import sys
+import tempfile
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
@@ -123,7 +124,10 @@ def main(argv=None):
     parser.add_argument("--android-serial")
     parser.add_argument("--json")
     parser.add_argument("--markdown")
-    parser.add_argument("--workdir", default="/tmp")
+    # The platform's temp directory, not "/tmp": native Windows Python has no
+    # /tmp, and the zip wire_size writes there failed the Windows leg after both
+    # applications had built.
+    parser.add_argument("--workdir", default=tempfile.gettempdir())
     parser.add_argument("--gate", action="store_true",
                         help="fail when a metric regresses past its baseline, "
                              "or when there is no baseline to compare against")
