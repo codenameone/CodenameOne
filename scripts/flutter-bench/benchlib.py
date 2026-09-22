@@ -83,7 +83,12 @@ def tree_size(path):
             try:
                 total += os.path.getsize(full)
             except OSError:
-                pass
+                # Deliberately ignored. A build tree is live while this walks
+                # it -- a compiler or packaging step can remove or replace a
+                # file between the listing and the stat -- and a file that has
+                # gone is a file the artifact does not ship. Failing here would
+                # turn a harmless race into a lost measurement.
+                continue
     return total
 
 
