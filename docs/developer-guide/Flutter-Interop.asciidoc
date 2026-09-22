@@ -9,10 +9,10 @@ pipeline on every port the framework supports.
 There is no Dart VM in the application, no embedded rendering engine, and no
 platform view. A screen written as Dart widgets becomes ordinary Codename One
 components, so it inherits the theme, the event thread, the accessibility
-tree and the native build for free -- and it can sit in the same `Form` as
+tree and the native build at no extra cost -- and it can sit in the same `Form` as
 hand-written Codename One code.
 
-Two things follow from that, and they are the reason to reach for this at all:
+Two things follow from that, and they're the reason to reach for this at all:
 
 * An existing Dart UI can be reused without adopting a second runtime, a
   second build system or a second set of platform plugins.
@@ -35,7 +35,7 @@ Codename One containers.
 
 The key design point is where the boundary sits. The runtime reimplements
 Flutter's *layout and composition* model -- constraints down, sizes up,
-elements reconciled against widgets -- but it does not reimplement Flutter's
+elements reconciled against widgets -- but it doesn't reimplement Flutter's
 *rasteriser*. Painting is Codename One's, which is what makes the output a
 real Codename One component tree rather than a texture.
 
@@ -50,8 +50,8 @@ include::../demos/common/src/main/snippets/developer-guide/flutter-interop.xml[t
 ----
 
 Then put Dart files under `common/src/main/flutter`. The goal is already bound
-in the generated `pom.xml` and is a silent no-op while that directory does not
-exist, so nothing changes for projects that do not use it.
+in the generated `pom.xml` and is a silent no-op while that directory doesn't
+exist, so nothing changes for projects that don't use it.
 
 No Dart SDK is required. The transpiler is Java and runs as part of the Maven
 build; the Dart source is input, not something that gets executed.
@@ -74,7 +74,7 @@ paths are configurable:
 |The package the generated classes are emitted into.
 |===
 
-=== Use case: one screen inside an existing application
+=== Use case: One screen inside an existing application
 
 This is the incremental path, and the one to start with. `FlutterUI.wrap`
 inflates a widget into a plain `Container` that can be added anywhere an
@@ -87,14 +87,14 @@ include::../demos/common/src/main/java/com/codenameone/developerguide/flutter/Fl
 
 The wrapped subtree is a component like any other: it participates in the
 parent's layout, scrolls with it, and is styled by the same theme. An embedded
-subtree deliberately does *not* install the Material base theme, so dropping a
-widget into an existing screen will not restyle the screen around it.
+subtree does *not* install the Material base theme, so dropping a
+widget into an existing screen won't restyle the screen around it.
 
 That makes this the right shape for reusing a piece of design work -- a chart,
 a card, an onboarding pane -- without committing the rest of the application to
 anything.
 
-=== Use case: porting an application wholesale
+=== Use case: Porting an application wholesale
 
 When the Dart source *is* the application, `FlutterUI.runApp` mounts the tree
 as the root of a new `Form` and shows it, which is the direct analogue of
@@ -110,22 +110,22 @@ tree is expected to be the whole UI and to look the way its author intended.
 
 A wholesale port is mostly a question of how much of the Dart language and of
 the Flutter libraries the application actually uses. The transpiler reports
-what it cannot handle rather than guessing: a construct outside the supported
+what it can't handle rather than guessing: a construct outside the supported
 subset fails the build with a milestone code identifying the feature, so the
 gap is a list you can work through rather than a runtime surprise.
 
-At runtime the same principle applies. Widgets that are not implemented are
-recorded through the error inventory rather than silently drawing nothing,
-so a screen that is missing something says so.
+At runtime the same principle applies. Widgets that aren't implemented are
+recorded through the error inventory rather than drawing nothing,
+so a screen that's missing something says so.
 
 === What to expect from the result
 
 The transpiled UI is a Codename One application in every respect that matters
-for shipping it: it builds for the same targets, it is signed and packaged the
+for shipping it: it builds for the same targets, it's signed and packaged the
 same way, and it has no additional runtime to install on the device.
 
 That last point is what the size and start-up differences come from, and it
-cuts both ways -- a Flutter application carries an engine that is very good at
+cuts both ways -- a Flutter application carries an engine that's good at
 what it does, while a transpiled one carries Codename One's. The benchmark
 described in <<flutter-benchmark>> measures both sides of the same application
 on each platform and publishes the result rather than asserting a direction.
@@ -156,11 +156,11 @@ up. Not `du`, which rounds every file up to a block.
 
 |Executable code
 |Every compiled binary in the artifact, added together. Counting only the main
-executable is wrong on iOS, where a Flutter application's own code is not in
-the executable at all -- it is in the frameworks beside it.
+executable is wrong on iOS, where a Flutter application's own code isn't in
+the executable at all -- it's in the frameworks beside it.
 
 |Download size
-|The artifact compressed, because that is what a store ships.
+|The artifact compressed, because that's what a store ships.
 
 |Cold start
 |Wall time from launching the process to the first frame being on screen,
@@ -178,16 +178,16 @@ alternative produced a flattering result:
   of whichever happened to run second, and the load average is recorded with
   every result so a surprising ratio can be checked against it.
 
-* *Start-up is a bracket, not a point.* The two runtimes do not expose the
+* *Start-up is a bracket, not a point.* The two runtimes don't expose the
   same event. Flutter's post-frame callback runs before that frame is
   rasterised, while Codename One's marker fires once the form is on screen, so
   comparing them directly charges one runtime for rasterising its first screen
   and not the other. The benchmark therefore reports Flutter's figure as a
   range and computes the ratio from the end least favourable to Codename One.
 
-* *A platform that cannot be measured says so.* iOS start-up and memory are
+* *A platform that can't be measured says so.* iOS start-up and memory are
   reported as not measured rather than taken from a simulator, because Dart
-  cannot compile ahead-of-time for the simulator -- a simulator comparison
+  can't compile ahead-of-time for the simulator -- a simulator comparison
   would time Flutter's debug build against a Codename One release build.
   iOS sizes come from release device bundles, which need no signing to measure.
 
@@ -199,4 +199,4 @@ include::../demos/common/src/main/snippets/developer-guide/flutter-interop.sh[ta
 ----
 
 `--list` also reports which platform adapters have been exercised end to end,
-which is deliberately not the same question as which ones exist.
+which isn't the same question as which ones exist.

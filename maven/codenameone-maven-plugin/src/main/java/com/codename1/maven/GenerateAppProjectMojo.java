@@ -1,3 +1,26 @@
+/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+
 package com.codename1.maven;
 
 import com.codename1.ant.SortedProperties;
@@ -43,6 +66,14 @@ public class GenerateAppProjectMojo extends AbstractMojo {
 
     @Parameter(property="artifactId")
     private String artifactId;
+
+    /// The Java release the generated project should target: 8 or 17.
+    ///
+    /// Left unset the archetype chooses, which is what a user normally wants.
+    /// A build that will compile the generated project with a specific JDK has
+    /// to say so, because the two have to agree.
+    @Parameter(property = "javaVersion")
+    private String javaVersion;
 
     @Parameter(property="groupId")
     private String groupId;
@@ -95,6 +126,17 @@ public class GenerateAppProjectMojo extends AbstractMojo {
                 "package="+packageName()
         };
         Properties props = new Properties();
+        // The archetype's javaVersion, when the caller named one.
+        //
+        // This goal invokes archetype:generate as a SEPARATE Maven process, and
+        // that process does not inherit this one's -D properties -- only what is
+        // put in this list reaches it. So a caller passing -DjavaVersion=8 was
+        // silently ignored and got the archetype's default instead, which is 17:
+        // a generated project that a JDK 8 build cannot compile, failing with
+        // "invalid target release: 17" in a module the caller never wrote.
+        if (javaVersion != null && javaVersion.trim().length() > 0) {
+            props.setProperty("javaVersion", javaVersion.trim());
+        }
         for (String prop : propsArr) {
             int eqpos = prop.indexOf("=");
             if (eqpos > 0) {
