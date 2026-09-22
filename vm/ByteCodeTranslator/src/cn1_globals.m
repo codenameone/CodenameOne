@@ -5330,11 +5330,18 @@ JAVA_BOOLEAN removeObjectFromHeapCollection(CODENAME_ONE_THREAD_STATE, JAVA_OBJE
     // its zero-initialized __heapPosition would erase slot 0. In issue #5881
     // that slot held Display, so subsequent collections skipped its fields
     // and reclaimed the input buffers while the EDT still used them.
-    // Class.class itself has a null parent, hence the explicit identity check.
+    // getClass() rewrites a descriptor's parent from class__java_lang_Class
+    // to ClazzClazz. Both represent class metadata; neither is a heap object.
+    // The metaclasses themselves can have null parents, so check their identities
+    // too. Read the parent once rather than testing two different snapshots.
     // Null and tagged values likewise have no heap entry or header to inspect.
     if(o == JAVA_NULL || CN1_IS_TAGGED(o)
        || o == (JAVA_OBJECT)&class__java_lang_Class
-       || o->__codenameOneParentClsReference == &class__java_lang_Class) {
+       || o == (JAVA_OBJECT)&ClazzClazz) {
+        return JAVA_TRUE;
+    }
+    struct clazz* parent = o->__codenameOneParentClsReference;
+    if(parent == &class__java_lang_Class || parent == &ClazzClazz) {
         return JAVA_TRUE;
     }
 

@@ -10,6 +10,7 @@ import unittest
 
 REPO = Path(__file__).resolve().parent.parent
 RUNTIME = REPO / "vm/ByteCodeTranslator/src/cn1_globals.m"
+NATIVES = REPO / "vm/ByteCodeTranslator/src/nativeMethods.m"
 
 
 def function(source, signature):
@@ -40,14 +41,17 @@ struct ThreadLocalData {
     int heapAllocationSize;
     JAVA_OBJECT *pendingHeapAllocations;
 };
-#define CODENAME_ONE_THREAD_STATE struct ThreadLocalData *threadStateData
+#define CODENAME_ONE_THREAD_STATE struct ThreadLocalData *threadStateData __attribute__((unused))
 #define JAVA_NULL ((JAVA_OBJECT)0)
 #define JAVA_TRUE 1
 #define JAVA_FALSE 0
 #define CN1_IS_TAGGED(o) (((uintptr_t)(o) & 1) != 0)
 #define CN1_BIBOP_HEAP_POS (-3)
 #define CN1_CONSERVATIVE_GC_ROOTS
+#define CN1_TAGGED_ACTIVE 0
 static struct clazz class__java_lang_Class;
+static struct clazz ClazzClazz;
+static void initClazzClazz(void) {}
 static JAVA_OBJECT *allObjectsInHeap;
 static int sizeOfAllObjectsInHeap = 4;
 static int cn1SweepRemoving;
@@ -85,6 +89,23 @@ int main(void) {
         assert(class__java_lang_Class.__heapPosition == 0);
         assert(registered == NULL && rooted == NULL);
     }
+    /* Execute the real getClass() rewrite before a later static-final store.
+     * The first version of the fix only recognized the original parent. */
+    struct JavaObjectPrototype instance = { &classLiteral, -1, -1 };
+    JAVA_OBJECT reflected = java_lang_Object_getClassImpl___R_java_lang_Class(&state, &instance);
+    assert(reflected == (JAVA_OBJECT)&classLiteral);
+    assert(classLiteral.__codenameOneParentClsReference == &ClazzClazz);
+    assert(removeObjectFromHeapCollection(&state, reflected) == JAVA_TRUE);
+    assert(allObjectsInHeap[0] == &display && allObjectsInHeap[1] == &buffer);
+    assert(classLiteral.__heapPosition == 0 && registered == NULL && rooted == NULL);
+    JAVA_OBJECT meta = java_lang_Object_getClassImpl___R_java_lang_Class(
+            &state, (JAVA_OBJECT)&class__java_lang_Class);
+    assert(meta == (JAVA_OBJECT)&ClazzClazz);
+    assert(removeObjectFromHeapCollection(&state, meta) == JAVA_TRUE);
+    assert(allObjectsInHeap[0] == &display && ClazzClazz.__heapPosition == 0);
+    /* An ordinary object's class may also have the rewritten parent. */
+    assert(java_lang_Object_getClassImpl___R_java_lang_Class(&state, &display)
+            == (JAVA_OBJECT)&ordinaryClass);
     /* Genuine objects still follow their original removal/rooting paths. */
     assert(removeObjectFromHeapCollection(&state, &buffer) == JAVA_TRUE);
     assert(allObjectsInHeap[1] == NULL && registered == &buffer);
@@ -108,6 +129,8 @@ int main(void) {
         assert(allObjectsInHeap == NULL);
         assert(registered == NULL && rooted == NULL);
     }
+    assert(removeObjectFromHeapCollection(&state, meta) == JAVA_TRUE);
+    assert(allObjectsInHeap == NULL);
     return 0;
 }
 '''
@@ -116,7 +139,9 @@ int main(void) {
 class GcHeapRemovalTest(unittest.TestCase):
     def test_class_literals_preserve_heap_slot_zero(self):
         source = RUNTIME.read_text()
-        code = PRELUDE + function(source, "int findPointerPosInHeap(") + "\n"
+        code = PRELUDE + function(NATIVES.read_text(),
+                                "JAVA_OBJECT java_lang_Object_getClassImpl___R_java_lang_Class(") + "\n"
+        code += function(source, "int findPointerPosInHeap(") + "\n"
         code += function(source, "JAVA_BOOLEAN removeObjectFromHeapCollection(")
         code += HARNESS
         with tempfile.TemporaryDirectory() as directory:
