@@ -41,6 +41,10 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
 
 /**
  * Transpiles Flutter/Dart sources under {@code src/main/flutter} into Java
@@ -87,6 +91,8 @@ public class TranscodeFlutterMojo extends AbstractCN1Mojo {
     protected void executeImpl() throws MojoExecutionException, MojoFailureException {
         if (flutterSourceDir == null || !flutterSourceDir.isDirectory()) {
             sweepStaleOutput();
+            // Flutter was removed from the project: its assets go with it.
+            removeStaleAssets(new HashSet<String>());
             return;
         }
         checkJdk();
@@ -171,8 +177,9 @@ public class TranscodeFlutterMojo extends AbstractCN1Mojo {
      * name produced by {@link #flatAssetName}, which the Flutter runtime's
      * {@code FlutterAssets} recomputes when resolving {@code Image.asset(...)}.</p>
      */
-    private void copyAssets() throws MojoExecutionException {
+    void copyAssets() throws MojoExecutionException {
         File outDir = new File(project.getBuild().getOutputDirectory());
+        Set<String> written = new HashSet<String>();
         int count = 0;
         try {
             // Both roots a pubspec asset key can start with. "assets/" is an app's own
@@ -187,7 +194,7 @@ public class TranscodeFlutterMojo extends AbstractCN1Mojo {
                 }
                 Files.createDirectories(outDir.toPath());
                 // the root stays in the Flutter asset key, matching pubspec paths
-                count += flattenInto(dir, root, outDir);
+                count += flattenInto(dir, root, outDir, written);
             }
             if (count > 0) {
                 getLog().info("Flattened " + count + " Flutter asset(s) into the build output");
@@ -195,12 +202,64 @@ public class TranscodeFlutterMojo extends AbstractCN1Mojo {
         } catch (IOException e) {
             throw new MojoExecutionException("Failed copying Flutter assets", e);
         }
+        removeStaleAssets(written);
+    }
+
+    /**
+     * Deletes the flattened assets an earlier build wrote that this one did not,
+     * then records what this build wrote.
+     *
+     * <p>Flattening only ever ADDS to {@code target/classes}. An asset renamed or
+     * deleted in {@code src/main/flutter} -- or the whole Flutter tree removed --
+     * therefore kept being packaged by every incremental build until a clean one:
+     * a bigger application, and a stale {@code Image.asset} lookup that still
+     * succeeded against a file the project no longer has.</p>
+     *
+     * <p>Only names from this plugin's own record are ever deleted. Sweeping every
+     * {@code cn1f_*} file would be simpler, but the output directory is shared with
+     * the application's own resources, and a name this plugin did not write is not
+     * one it should remove.</p>
+     */
+    void removeStaleAssets(Set<String> written) throws MojoExecutionException {
+        File outDir = new File(project.getBuild().getOutputDirectory());
+        File manifest = assetManifest();
+        try {
+            if (manifest.isFile()) {
+                for (String name : Files.readAllLines(manifest.toPath(), java.nio.charset.StandardCharsets.UTF_8)) {
+                    name = name.trim();
+                    // Defensive: a record entry must name a flat asset in the output
+                    // root, never a path, whatever ended up in the file.
+                    if (name.startsWith("cn1f_") && name.indexOf('/') < 0 && name.indexOf('\\') < 0
+                            && !written.contains(name)) {
+                        Files.deleteIfExists(new File(outDir, name).toPath());
+                    }
+                }
+            }
+            if (written.isEmpty()) {
+                Files.deleteIfExists(manifest.toPath());
+            } else {
+                List<String> sorted = new ArrayList<String>(written);
+                java.util.Collections.sort(sorted);
+                Files.createDirectories(manifest.getParentFile().toPath());
+                Files.write(manifest.toPath(), sorted, java.nio.charset.StandardCharsets.UTF_8);
+            }
+        } catch (IOException e) {
+            throw new MojoExecutionException("Failed removing stale Flutter assets", e);
+        }
+    }
+
+    /**
+     * The record of flattened asset names. Beside the output rather than inside
+     * the generated-sources directory, which {@link #sweepStaleOutput} deletes.
+     */
+    private File assetManifest() {
+        return new File(project.getBuild().getDirectory(), "cn1-flutter-assets.lst");
     }
 
     /** The directory names under {@code src/main/flutter} that hold bundled assets. */
     private static final String[] ASSET_ROOTS = {"assets", "packages"};
 
-    private int flattenInto(File dir, String assetPrefix, File outDir) throws IOException {
+    private int flattenInto(File dir, String assetPrefix, File outDir, Set<String> written) throws IOException {
         File[] children = dir.listFiles();
         if (children == null) {
             return 0;
@@ -209,10 +268,12 @@ public class TranscodeFlutterMojo extends AbstractCN1Mojo {
         for (File child : children) {
             String key = assetPrefix + "/" + child.getName();
             if (child.isDirectory()) {
-                count += flattenInto(child, key, outDir);
+                count += flattenInto(child, key, outDir, written);
             } else {
-                Files.copy(child.toPath(), new File(outDir, flatAssetName(key)).toPath(),
+                String flat = flatAssetName(key);
+                Files.copy(child.toPath(), new File(outDir, flat).toPath(),
                         StandardCopyOption.REPLACE_EXISTING);
+                written.add(flat);
                 count++;
             }
         }
