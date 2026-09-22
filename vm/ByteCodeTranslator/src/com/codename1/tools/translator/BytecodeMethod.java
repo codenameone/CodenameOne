@@ -564,6 +564,24 @@ public class BytecodeMethod implements SignatureSet {
             case Opcodes.DUP2_X1:
             case Opcodes.DUP2_X2:
             case Opcodes.NEWARRAY:
+            // ATHROW: an explicit throw is throwException(threadStateData, obj), which
+            // reads only thread state -- the try-block stack, the exception slot -- and
+            // longjmps to the nearest handler. It touches nothing a frameless frame
+            // lacks, and frameless code already throws through the identical path for
+            // every implicit exception (bounds and null checks call
+            // throwArrayIndexOutOfBoundsException and friends from frameless bodies).
+            // Excluding it made a method pay a full frame on EVERY call for a throw it
+            // almost never takes: the census put ATHROW as the first blocker of ~90% of
+            // the methods still excluded by an instruction (234 of 260 blockers on the
+            // Bench translation; MONITORENTER the other 26). StringBuilder.resizeBuffer
+            // was one -- DEFINE_INSTANCE_METHOD_STACK, line tracking and
+            // releaseForReturn on every append that grows, for `throw new
+            // OutOfMemoryError()`.
+            //
+            // The one observable difference is the one every frameless method already
+            // has: it records no call-stack entry, so a trace filled in by this throw
+            // does not list it.
+            case Opcodes.ATHROW:
                 return true;
         }
         return false;
@@ -601,6 +619,20 @@ public class BytecodeMethod implements SignatureSet {
     /// Why the 'other' exclusions happened, so the census answers where the REMAINING
     /// frameless opportunity is rather than only ruling try/catch out.
     static int censusNoConstructor, censusNoSync, censusNoDebug, censusNoOpcode, censusEmpty;
+    /// Which instruction stopped a method from going frameless, by opcode. The census
+    /// used to report only "unhandledOpcode", which says a whitelist refused something
+    /// and not what -- and the answer decides the next change: an opcode that blocks
+    /// thousands of methods for no semantic reason is worth admitting, one that blocks
+    /// a handful is not. Counts the FIRST blocker per method only.
+    static final java.util.Map<String, Integer> censusBlockers = new java.util.TreeMap<String, Integer>();
+    static boolean censusBlocked(Instruction i, boolean ignoreTryCatch) {
+        if (FRAMELESS_CENSUS && !ignoreTryCatch) {
+            String k = i.getClass().getSimpleName() + ":" + i.getOpcode();
+            Integer c = censusBlockers.get(k);
+            censusBlockers.put(k, c == null ? 1 : c + 1);
+        }
+        return false;
+    }
     static void censusReason(int which) {
         switch (which) {
             case 0: censusNoConstructor++; break;
@@ -728,14 +760,14 @@ public class BytecodeMethod implements SignatureSet {
             if (i instanceof Field) {
                 // GETFIELD/PUTFIELD/GETSTATIC/PUTSTATIC are SP-based; safe under object mode.
                 if (!obj) {
-                    return false;
+                    return censusBlocked(i, ignoreTryCatch);
                 }
                 hasRealInstruction = true;
                 continue;
             }
             if (i instanceof TypeInstruction) {
                 if (!obj) {
-                    return false;
+                    return censusBlocked(i, ignoreTryCatch);
                 }
                 switch (i.getOpcode()) {
                     case Opcodes.NEW:
@@ -745,11 +777,11 @@ public class BytecodeMethod implements SignatureSet {
                         hasRealInstruction = true;
                         continue;
                     default:
-                        return false;
+                        return censusBlocked(i, ignoreTryCatch);
                 }
             }
             if (i instanceof MultiArray) {
-                return false; // MULTIANEWARRAY -- deferred (expand later)
+                return censusBlocked(i, ignoreTryCatch); // MULTIANEWARRAY -- deferred (expand later)
             }
             if (i instanceof IInc) {
                 hasRealInstruction = true;
@@ -789,12 +821,12 @@ public class BytecodeMethod implements SignatureSet {
                         // object local slot that lives in the method-local frame array,
                         // scanned conservatively.
                         if (!obj) {
-                            return false;
+                            return censusBlocked(i, ignoreTryCatch);
                         }
                         hasRealInstruction = true;
                         continue;
                     default:
-                        return false;
+                        return censusBlocked(i, ignoreTryCatch);
                 }
             }
             if (i instanceof Jump) {
@@ -819,12 +851,12 @@ public class BytecodeMethod implements SignatureSet {
                     case Opcodes.IFNULL:
                     case Opcodes.IFNONNULL:
                         if (!obj) {
-                            return false;
+                            return censusBlocked(i, ignoreTryCatch);
                         }
                         hasRealInstruction = true;
                         continue;
                     default:
-                        return false; // JSR
+                        return censusBlocked(i, ignoreTryCatch); // JSR
                 }
             }
             if (i instanceof Ldc) {
@@ -839,7 +871,7 @@ public class BytecodeMethod implements SignatureSet {
                     hasRealInstruction = true;
                     continue;
                 }
-                return false;
+                return censusBlocked(i, ignoreTryCatch);
             }
             if (i instanceof Invoke) {
                 if (obj) {
@@ -850,10 +882,10 @@ public class BytecodeMethod implements SignatureSet {
                     continue;
                 }
                 if (i.getOpcode() != Opcodes.INVOKESTATIC) {
-                    return false;
+                    return censusBlocked(i, ignoreTryCatch);
                 }
                 if (!isPrimitiveOnlyDescriptor(((Invoke) i).getDesc())) {
-                    return false;
+                    return censusBlocked(i, ignoreTryCatch);
                 }
                 hasRealInstruction = true;
                 continue;
@@ -867,7 +899,7 @@ public class BytecodeMethod implements SignatureSet {
                     hasRealInstruction = true;
                     continue;
                 }
-                return false;
+                return censusBlocked(i, ignoreTryCatch);
             }
             // Any other instruction type (CustomInvoke/CustomJump/CustomIntruction/
             // ArithmeticExpression are produced only by optimize and must not appear
@@ -875,7 +907,7 @@ public class BytecodeMethod implements SignatureSet {
             if (FRAMELESS_CENSUS && !ignoreTryCatch) {
                 censusReason(3);
             }
-            return false;
+            return censusBlocked(i, ignoreTryCatch);
         }
         if (FRAMELESS_CENSUS && !ignoreTryCatch && !hasRealInstruction) {
             censusReason(4);

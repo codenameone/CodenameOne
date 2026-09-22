@@ -549,6 +549,8 @@ public class Parser extends ClassVisitor {
                 + " onDeviceDebug=" + BytecodeMethod.censusNoDebug
                 + " unhandledOpcode=" + BytecodeMethod.censusNoOpcode
                 + " empty=" + BytecodeMethod.censusEmpty);
+            System.out.println("[FRAMELESS] first blocking instruction (class:opcode -> methods): "
+                + BytecodeMethod.censusBlockers);
         }
         LocalReceiverTypes.clear();
         cn1SubclassIndex = null;
