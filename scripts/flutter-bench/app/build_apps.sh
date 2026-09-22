@@ -119,8 +119,9 @@ cn1_reported() {  # cn1_reported <phrase>: the path a builder logged after <phra
   if [ -n "$path" ] && command -v cygpath >/dev/null 2>&1; then
     path="$(cygpath -m "$path")"
   fi
-  [ -n "$path" ] && [ -e "$path" ] || {
-    echo "the Codename One build did not report: $1" >&2; exit 2; }
+  [ -n "$path" ] || { echo "the Codename One build did not report: $1" >&2; exit 2; }
+  [ -e "$path" ] || {
+    echo "the Codename One build reported '$1 $path', which no longer exists" >&2; exit 2; }
   printf '%s\n' "$path"
 }
 
@@ -267,11 +268,18 @@ print(name if name in targets else (targets[0] if targets else ""))' )"
     # local-javascript, not the `javascript` target, which is the cloud build.
     cn1_build javascript local-javascript
     emit flutter "$FL/build/web"
-    # The builder writes the browser bundle as a zip; the adapter serves a
-    # directory, so it is unpacked and the directory holding index.html used.
-    WEB_ZIP="$(cn1_reported 'Wrote browser bundle to')"
+    # The deployable war, because it is the one that SURVIVES the build: the
+    # "browser bundle" zip is written inside target/codenameone/antProject,
+    # a scratch project removed when the build ends, and only the war is
+    # copied out to target/. A war's root is the static site a browser loads;
+    # WEB-INF and META-INF are the server side, which no browser downloads, so
+    # they are left out of what is sized.
+    WEB_ZIP="$(cn1_reported 'JavaScript deployable bundle written to')"
     rm -rf "$WORK/cn1-web"; mkdir -p "$WORK/cn1-web"
-    ( cd "$WORK/cn1-web" && unzip -q "$WEB_ZIP" )
+    # Unpacked whole and pruned, rather than `unzip -x`: an exclusion pattern
+    # that matches nothing is exit 11 for some unzip builds, which would end a
+    # build over a folder a particular war happens not to have.
+    ( cd "$WORK/cn1-web" && unzip -q "$WEB_ZIP" && rm -rf WEB-INF META-INF )
     WEB_INDEX="$(find "$WORK/cn1-web" -name index.html | awk '{ print length, $0 }' | sort -n | head -1 | cut -d' ' -f2-)"
     [ -n "$WEB_INDEX" ] || { echo "the browser bundle has no index.html" >&2; exit 2; }
     emit cn1 "$(dirname "$WEB_INDEX")"

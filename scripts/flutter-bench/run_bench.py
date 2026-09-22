@@ -174,8 +174,6 @@ def main(argv=None):
     report = benchlib.build_report(adapter.id, sides, args.runs, notes)
     report["status"] = "measured"
 
-    print(benchlib.render_markdown([report]))
-
     if args.baseline_out:
         _ensure_dir(args.baseline_out)
         with open(args.baseline_out, "w") as handle:
@@ -202,6 +200,10 @@ def main(argv=None):
             report["gate"] = {"status": "armed", "baseline": relative}
 
     _write(args, report, [report])
+    # Printed AFTER the gate is decided, so the job log carries the gate line
+    # ("within tolerance", "REGRESSED", "NOT ARMED"); printed before, a green
+    # job could not show whether it had compared against anything.
+    print(benchlib.render_markdown([report]))
 
     if findings:
         print("\nREGRESSION")
