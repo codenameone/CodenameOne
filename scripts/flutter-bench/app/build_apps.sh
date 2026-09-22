@@ -40,6 +40,7 @@ set -Eeuo pipefail
 # subshells the build steps run in.
 trap 'rc=$?; echo "build_apps.sh: FAILED at line $LINENO (exit $rc)" >&2' ERR
 
+HERE="$(cd "$(dirname "$0")" && pwd -P)"
 WORK=""
 PLATFORM=""
 MAVEN_REPO_LOCAL="${MAVEN_REPO_LOCAL:-}"
@@ -230,7 +231,14 @@ print(name if name in targets else (targets[0] if targets else ""))' )"
     ;;
 
   android)
-    ( cd "$FL" && flutter build apk --release -t "$FLUTTER_ENTRY" )
+    # Retried ONLY for a failed SDK download. Flutter's Gradle build installs
+    # the NDK it needs on first use, and one run got a corrupt archive from the
+    # SDK server ("Archive is not a ZIP archive", "Failed to install the
+    # following SDK components") after earlier runs had fetched the same NDK
+    # cleanly. Any other failure is a real one and is not retried.
+    ( cd "$FL" && RETRY_ATTEMPTS=3 \
+        RETRY_ONLY_MATCHING='Failed to install the following SDK components|Archive is not a ZIP archive|Error on ZipFile unknown archive' \
+        bash "$HERE/../../ci/retry.sh" flutter build apk --release -t "$FLUTTER_ENTRY" )
     cn1_build android android-source
     GRADLE_PROJECT="$(first "$CN1/android/target" -maxdepth 2 -type d -name '*-android-source')"
     [ -n "$GRADLE_PROJECT" ] || { echo "no generated Gradle project" >&2; exit 2; }
