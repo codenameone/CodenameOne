@@ -2072,7 +2072,6 @@ static void gcMarkDrainWorklist(CODENAME_ONE_THREAD_STATE);
 // at the worklist declarations for the design and the invariants it preserves.
 static void gcMarkDrainParallel(CODENAME_ONE_THREAD_STATE);
 static JAVA_BOOLEAN gcMarkProducerBegin(CODENAME_ONE_THREAD_STATE);
-static void gcMarkProducerPoll(CODENAME_ONE_THREAD_STATE);
 static void gcMarkProducerEnd(CODENAME_ONE_THREAD_STATE);
 static int cn1GcMutatorAssist(CODENAME_ONE_THREAD_STATE);
 
@@ -4339,6 +4338,192 @@ static JAVA_BOOLEAN cn1GcProcessReferences(CODENAME_ONE_THREAD_STATE) {
     return marked;
 }
 
+// The page the next marker will claim. Pages are handed out by CAS rather than by
+// a mutex: the only contention is one pointer swap per page, against a page's worth
+// of tracing.
+static _Atomic(CN1BibopPage*) gcGraceWalkCursor = 0;
+// Set while the grace page walk is open, so a helper waking into the generation
+// knows to join the walk before it starts consuming the worklist. Plain int with
+// atomic accessors -- read by every marker, written only by the producer.
+static _Atomic int gcMarkGraceWalkPhase = 0;
+static void gcMarkGracePoll(CODENAME_ONE_THREAD_STATE);
+static void gcMarkGraceWalkPages(CODENAME_ONE_THREAD_STATE);
+
+// ---- PARALLEL GRACE PAGE WALK ------------------------------------------
+// Every marker runs this: claim a page off the shared cursor, trace its fresh
+// slots in place, repeat until the list is exhausted. Pages are the unit of work
+// because they are INDEPENDENT -- which is exactly what the per-object worklist
+// this replaced was not, and why that version paid a lock, a flush and a
+// broadcast per 256 objects to hand out work that needed no coordination.
+//
+// Round 33 removed the worklist trip and with it the parallelism: tracing in
+// place handed all ~140M mark functions back to one thread, and the measured
+// result was stalls down (74% -> 22% of wall) with wall clock flat and marker
+// count making no difference at all -- 29.5/29.6/29.7ms at one marker against
+// 29.7/29.7/29.4ms at four. This puts the parallelism back, on the page axis.
+//
+// Termination needs no new protocol, for the same reason the producer needed
+// none: a marker still walking pages has NOT entered gcMarkWorkerDrainLoop, so
+// it is still counted in gcMarkActiveWorkers and gcMarkDone cannot latch
+// underneath it. Older children pushed from here reach the shared worklist by
+// the ordinary locked flush, so a marker that has finished walking can consume
+// them while another marker is still walking.
+static void gcMarkGraceWalkPages(CODENAME_ONE_THREAD_STATE) {
+    struct ThreadLocalData* d = threadStateData;
+    for(;;) {
+        CN1BibopPage* gp = atomic_load_explicit(&gcGraceWalkCursor, memory_order_acquire);
+        if(gp == 0) {
+            return;
+        }
+        CN1BibopPage* __nx = atomic_load_explicit(&gp->nextAll, memory_order_acquire);
+        if(!atomic_compare_exchange_weak_explicit(&gcGraceWalkCursor, &gp, __nx,
+                memory_order_acq_rel, memory_order_acquire)) {
+            continue;   // another marker claimed this page
+        }
+#ifndef CN1_BIBOP_NO_FASTSWEEP
+            if(__atomic_load_n(&gp->gcAllocedSinceSweep, __ATOMIC_RELAXED) == JAVA_FALSE) {
+#ifdef CN1_GC_CONFORM
+                atomic_fetch_add_explicit(&cn1GracePagesSkipped, 1, memory_order_relaxed);
+#endif
+
+                continue;
+            }
+#endif
+#ifdef CN1_GC_INSTRUMENT
+            atomic_fetch_add_explicit(&cn1BibopFreshPagesScanned, 1,
+                                      memory_order_relaxed);
+#endif
+            int gn = atomic_load_explicit(&gp->bumpIndex, memory_order_acquire);
+#ifdef CN1_GC_CONFORM
+            atomic_fetch_add_explicit(&cn1GracePagesWalked, 1, memory_order_relaxed);
+            atomic_fetch_add_explicit(&cn1GraceSlotsWalked, (long long)gn, memory_order_relaxed);
+            { long long __fresh = 0, __marked = 0;
+#endif
+            // TRACE FRESH SLOTS DIRECTLY, WITHOUT MARKING OR ENQUEUING THEM.
+            //
+            // This used to be gcMarkObject(go), which stamped the object AND pushed it
+            // so the drain would later pop it and run its mark function. Both halves of
+            // that were waste. The stamp buys nothing -- the sweep's grace rule keeps a
+            // mark == -1 slot and promotes it itself -- and the worklist trip is pure
+            // overhead for an object the walk is already standing on. Measured on
+            // objectAllocation before the change: graceMarked = 165,824,029 in 25 reps,
+            // i.e. 166M pushes, flushes under gcMarkWorklistMutex, and pops, to trace
+            // objects the walk had in hand. The profile showed the cost exactly where
+            // that predicts -- gcMarkFlushLocal at 18.5% of the GC thread and ~10% of
+            // every helper, with the helpers a further 27% in __psynch_cvwait, against
+            // only ~5% of their samples inside a real mark function.
+            //
+            // The mark function must run OUTSIDE the trusted window: it follows child
+            // words out of arbitrary classes, and the resolve guard is what rejects a
+            // word that is not an object. The slot walk itself stays inside, because a
+            // page slot IS an authoritative reference. So the two are separated --
+            // collect under trust, trace without it -- in bounded chunks so the buffer
+            // is a couple of KB of stack rather than one entry per slot.
+            //
+            // WHAT THIS BOUGHT, AND WHAT IT DID NOT. The stalls are gone: mutator
+            // threadStallMs fell from 3233 of 4367 (74%) to 323 of 1491 (22%), duty
+            // from 26.0% to 78.3%, and the pacingVolume total from 3211ms to 286ms
+            // (mean stall 123.5ms -> 15.9ms). Wall clock did NOT move: median of 10
+            // paired interleaved rounds is 1.000. The distribution says why --
+            //
+            //     base (worklist)      min 23.77  max 36.98 ms   spread 55%
+            //     this (direct trace)  min 29.59  max 31.18 ms   spread  5%
+            //
+            // -- the bad tail was removed AND so was the good case, because this trace
+            // is SERIAL. The worklist was distributing those mark functions across
+            // four markers; running them in place hands them all back to one thread.
+            // Confirmed by marker-count sensitivity (40 reps, 3 rounds):
+            //
+            //     this  markers=1   29.5 29.6 29.7 ms
+            //     this  markers=4   29.7 29.7 29.4 ms    <- identical, no scaling
+            //
+            // So the next step is to parallelise the PAGE WALK itself -- a shared page
+            // cursor, each marker tracing whole pages directly -- which keeps both the
+            // removed overhead and the parallelism. Pages are independent, which makes
+            // them a better unit of work than the per-object worklist this replaced.
+            // Do NOT read the flat median as "no win": the mechanism counters and the
+            // variance collapse are the result, and they are what the parallel walk
+            // would multiply.
+            for(int gi = 0 ; gi < gn ; ) {
+                JAVA_OBJECT __gbuf[CN1_GRACE_TRACE_CHUNK];
+                int __nf = 0;
+                CN1_GC_TRUSTED_BEGIN();  // page-slot walk: authoritative references
+                for(; gi < gn && __nf < CN1_GRACE_TRACE_CHUNK ; gi++) {
+                    JAVA_OBJECT go = cn1BibopSlot(gp, gi);
+                    if(__atomic_load_n(&go->__codenameOneGcMark, __ATOMIC_ACQUIRE) == -1
+                       && go->__codenameOneParentClsReference != 0
+                       && go->__codenameOneParentClsReference->markFunction != 0) {
+#ifdef CN1_GC_CONFORM
+                        __marked++;
+#endif
+                        __gbuf[__nf++] = go;
+                    }
+#ifdef CN1_GC_CONFORM
+                    else if(__atomic_load_n(&go->__codenameOneGcMark, __ATOMIC_RELAXED) == -1) {
+                        __fresh++;   // fresh but leaf: no subtree, nothing to do
+                    }
+#endif
+                }
+                CN1_GC_TRUSTED_END();
+                cn1GcGraceTraceFresh = 1;
+                for(int __i = 0 ; __i < __nf ; __i++) {
+                    JAVA_OBJECT go = __gbuf[__i];
+                    struct clazz* __gc = go->__codenameOneParentClsReference;
+                    if(__gc != 0 && __gc->markFunction != 0) {
+                        gcMarkFunctionPointer __fp = __gc->markFunction;
+                        __fp(d, go, JAVA_FALSE);
+                    }
+                }
+                cn1GcGraceTraceFresh = 0;
+#ifdef CN1_GC_CONFORM
+                atomic_fetch_add_explicit(&cn1GraceTracedDirect, __nf, memory_order_relaxed);
+#endif
+            }
+#ifdef CN1_GC_CONFORM
+            atomic_fetch_add_explicit(&cn1GraceSlotsFresh, __fresh + __marked, memory_order_relaxed);
+            atomic_fetch_add_explicit(&cn1GraceMarked, __marked, memory_order_relaxed);
+            }
+#endif
+            // (page advance is the shared cursor, at the top of this loop)
+            // DRAIN AS WE GO (issue #5537). This pass pushes EVERY fresh object on
+            // every page, and "fresh" means "allocated since the last cycle" -- a
+            // number set by the mutator's allocation rate, not by the live set. A
+            // thread churning short-lived objects produces far more than the worklist
+            // holds (65536 entries against ~500K fresh objects per cycle on the
+            // reporter's game-tree search), so pushing the whole walk before draining
+            // once overflowed the worklist as a matter of course.
+            //
+            // Overflow is survivable but ruinously expensive: it arms the belt, whose
+            // recovery pass is a full O(heap) rescan. That makes the cycle several
+            // times longer, which lets the mutator produce several times more fresh
+            // objects before the next one, which overflows again -- the collector
+            // never returns to the fast path, RSS climbs without bound (measured 90MB
+            // to 6.2GB in 20 seconds with a live set of a few hundred bytes) and the
+            // app is killed by the iOS per-process ceiling, or, once the process-budget
+            // pacing of #5563 holds it under that ceiling, parks on every allocation
+            // and appears frozen. Both were reported on this issue.
+            //
+            // Draining between pages costs nothing that the end-of-pass drain would
+            // not have cost anyway -- the same objects are scanned, just sooner -- and
+            // it bounds the cursor, so the pass cannot overflow by volume. It must run
+            // OUTSIDE the trusted window: a drain follows child words out of arbitrary
+            // mark functions, which is exactly what the resolve guard is there for.
+            //
+            // gcMarkDrainWorklist, NOT gcMarkDrain: the latter also rescans
+            // allObjectsInHeap from index 0 on every call, which is affordable a few
+            // times a cycle and quadratic for a caller that drains periodically. Doing
+            // it here hung the Mac Catalyst suite outright. The pass still ends with a
+            // full gcMarkDrain, which is what closes the fixpoint.
+            // Publish this page's older-child discoveries so other markers can see
+            // them, and take a batch back only when the worklist reaches the same
+            // threshold the serial walk drained at. gcMarkGracePoll picks the safe
+            // form: with a local buffer (any marker in a dispatched generation) it
+            // flushes and pops under the mutex; without one there are no other
+            // markers and the old unlocked serial drain below is correct.
+            gcMarkGracePoll(d);
+    }
+}
+
 void codenameOneGCMark() {
     cn1GcRootsIncomplete = JAVA_FALSE;
     currentGcMarkValue++;
@@ -5024,307 +5209,15 @@ void codenameOneGCMark() {
         // readers of cn1GcInGracePass are both pure accounting (gcGraceMarked and
         // cn1GcGraceFullDrains) and the flag is __thread, so a helper marking a
         // grace-discovered child under-counts those statistics and changes nothing else.
+        // Publish the cursor and open the walk BEFORE dispatching, so a helper that
+        // wakes immediately finds pages to claim rather than an empty cursor.
+        atomic_store_explicit(&gcGraceWalkCursor, gp, memory_order_release);
+        atomic_store_explicit(&gcMarkGraceWalkPhase, 1, memory_order_release);
         JAVA_BOOLEAN graceParallel = gcMarkProducerBegin(d);
-        while(gp != 0) {
-#ifndef CN1_BIBOP_NO_FASTSWEEP
-            if(__atomic_load_n(&gp->gcAllocedSinceSweep, __ATOMIC_RELAXED) == JAVA_FALSE) {
-#ifdef CN1_GC_CONFORM
-                atomic_fetch_add_explicit(&cn1GracePagesSkipped, 1, memory_order_relaxed);
-#endif
-                gp = atomic_load_explicit(&gp->nextAll, memory_order_acquire);
-                continue;
-            }
-#endif
-#ifdef CN1_GC_INSTRUMENT
-            atomic_fetch_add_explicit(&cn1BibopFreshPagesScanned, 1,
-                                      memory_order_relaxed);
-#endif
-            int gn = atomic_load_explicit(&gp->bumpIndex, memory_order_acquire);
-#ifdef CN1_GC_CONFORM
-            atomic_fetch_add_explicit(&cn1GracePagesWalked, 1, memory_order_relaxed);
-            atomic_fetch_add_explicit(&cn1GraceSlotsWalked, (long long)gn, memory_order_relaxed);
-            { long long __fresh = 0, __marked = 0;
-#endif
-            // TRACE FRESH SLOTS DIRECTLY, WITHOUT MARKING OR ENQUEUING THEM.
-            //
-            // This used to be gcMarkObject(go), which stamped the object AND pushed it
-            // so the drain would later pop it and run its mark function. Both halves of
-            // that were waste. The stamp buys nothing -- the sweep's grace rule keeps a
-            // mark == -1 slot and promotes it itself -- and the worklist trip is pure
-            // overhead for an object the walk is already standing on. Measured on
-            // objectAllocation before the change: graceMarked = 165,824,029 in 25 reps,
-            // i.e. 166M pushes, flushes under gcMarkWorklistMutex, and pops, to trace
-            // objects the walk had in hand. The profile showed the cost exactly where
-            // that predicts -- gcMarkFlushLocal at 18.5% of the GC thread and ~10% of
-            // every helper, with the helpers a further 27% in __psynch_cvwait, against
-            // only ~5% of their samples inside a real mark function.
-            //
-            // The mark function must run OUTSIDE the trusted window: it follows child
-            // words out of arbitrary classes, and the resolve guard is what rejects a
-            // word that is not an object. The slot walk itself stays inside, because a
-            // page slot IS an authoritative reference. So the two are separated --
-            // collect under trust, trace without it -- in bounded chunks so the buffer
-            // is a couple of KB of stack rather than one entry per slot.
-            //
-            // WHAT THIS BOUGHT, AND WHAT IT DID NOT. The stalls are gone: mutator
-            // threadStallMs fell from 3233 of 4367 (74%) to 323 of 1491 (22%), duty
-            // from 26.0% to 78.3%, and the pacingVolume total from 3211ms to 286ms
-            // (mean stall 123.5ms -> 15.9ms). Wall clock did NOT move: median of 10
-            // paired interleaved rounds is 1.000. The distribution says why --
-            //
-            //     base (worklist)      min 23.77  max 36.98 ms   spread 55%
-            //     this (direct trace)  min 29.59  max 31.18 ms   spread  5%
-            //
-            // -- the bad tail was removed AND so was the good case, because this trace
-            // is SERIAL. The worklist was distributing those mark functions across
-            // four markers; running them in place hands them all back to one thread.
-            // Confirmed by marker-count sensitivity (40 reps, 3 rounds):
-            //
-            //     this  markers=1   29.5 29.6 29.7 ms
-            //     this  markers=4   29.7 29.7 29.4 ms    <- identical, no scaling
-            //
-            // So the next step is to parallelise the PAGE WALK itself -- a shared page
-            // cursor, each marker tracing whole pages directly -- which keeps both the
-            // removed overhead and the parallelism. Pages are independent, which makes
-            // them a better unit of work than the per-object worklist this replaced.
-            // Do NOT read the flat median as "no win": the mechanism counters and the
-            // variance collapse are the result, and they are what the parallel walk
-            // would multiply.
-            for(int gi = 0 ; gi < gn ; ) {
-                JAVA_OBJECT __gbuf[CN1_GRACE_TRACE_CHUNK];
-                int __nf = 0;
-                CN1_GC_TRUSTED_BEGIN();  // page-slot walk: authoritative references
-                for(; gi < gn && __nf < CN1_GRACE_TRACE_CHUNK ; gi++) {
-                    JAVA_OBJECT go = cn1BibopSlot(gp, gi);
-                    if(__atomic_load_n(&go->__codenameOneGcMark, __ATOMIC_ACQUIRE) == -1
-                       && go->__codenameOneParentClsReference != 0
-                       && go->__codenameOneParentClsReference->markFunction != 0) {
-#ifdef CN1_GC_CONFORM
-                        __marked++;
-#endif
-                        __gbuf[__nf++] = go;
-                    }
-#ifdef CN1_GC_CONFORM
-                    else if(__atomic_load_n(&go->__codenameOneGcMark, __ATOMIC_RELAXED) == -1) {
-                        __fresh++;   // fresh but leaf: no subtree, nothing to do
-                    }
-#endif
-                }
-                CN1_GC_TRUSTED_END();
-                cn1GcGraceTraceFresh = 1;
-                for(int __i = 0 ; __i < __nf ; __i++) {
-                    JAVA_OBJECT go = __gbuf[__i];
-                    struct clazz* __gc = go->__codenameOneParentClsReference;
-                    if(__gc != 0 && __gc->markFunction != 0) {
-                        gcMarkFunctionPointer __fp = __gc->markFunction;
-                        __fp(d, go, JAVA_FALSE);
-                    }
-                }
-                cn1GcGraceTraceFresh = 0;
-#ifdef CN1_GC_CONFORM
-                atomic_fetch_add_explicit(&cn1GraceTracedDirect, __nf, memory_order_relaxed);
-#endif
-            }
-#ifdef CN1_GC_CONFORM
-            atomic_fetch_add_explicit(&cn1GraceSlotsFresh, __fresh + __marked, memory_order_relaxed);
-            atomic_fetch_add_explicit(&cn1GraceMarked, __marked, memory_order_relaxed);
-            }
-#endif
-            gp = atomic_load_explicit(&gp->nextAll, memory_order_acquire);
-            // DRAIN AS WE GO (issue #5537). This pass pushes EVERY fresh object on
-            // every page, and "fresh" means "allocated since the last cycle" -- a
-            // number set by the mutator's allocation rate, not by the live set. A
-            // thread churning short-lived objects produces far more than the worklist
-            // holds (65536 entries against ~500K fresh objects per cycle on the
-            // reporter's game-tree search), so pushing the whole walk before draining
-            // once overflowed the worklist as a matter of course.
-            //
-            // Overflow is survivable but ruinously expensive: it arms the belt, whose
-            // recovery pass is a full O(heap) rescan. That makes the cycle several
-            // times longer, which lets the mutator produce several times more fresh
-            // objects before the next one, which overflows again -- the collector
-            // never returns to the fast path, RSS climbs without bound (measured 90MB
-            // to 6.2GB in 20 seconds with a live set of a few hundred bytes) and the
-            // app is killed by the iOS per-process ceiling, or, once the process-budget
-            // pacing of #5563 holds it under that ceiling, parks on every allocation
-            // and appears frozen. Both were reported on this issue.
-            //
-            // Draining between pages costs nothing that the end-of-pass drain would
-            // not have cost anyway -- the same objects are scanned, just sooner -- and
-            // it bounds the cursor, so the pass cannot overflow by volume. It must run
-            // OUTSIDE the trusted window: a drain follows child words out of arbitrary
-            // mark functions, which is exactly what the resolve guard is there for.
-            //
-            // gcMarkDrainWorklist, NOT gcMarkDrain: the latter also rescans
-            // allObjectsInHeap from index 0 on every call, which is affordable a few
-            // times a cycle and quadratic for a caller that drains periodically. Doing
-            // it here hung the Mac Catalyst suite outright. The pass still ends with a
-            // full gcMarkDrain, which is what closes the fixpoint.
-            if(graceParallel) {
-                // Publish this page's discoveries so the helpers can see them, and take a
-                // batch back only when they are far enough behind for the worklist to reach
-                // the same threshold the serial walk drained at. The unlocked
-                // gcMarkDrainWorklist below must NOT run in this mode: it decrements
-                // gcMarkWorklistTop with no mutex against helpers doing the same.
-                gcMarkProducerPoll(d);
-            } else if(gcMarkWorklistTop >= gcMarkWorklistCapacity / 2) {
-                atomic_fetch_add_explicit(&cn1GcGraceDrains, 1, memory_order_relaxed);
-// SERIAL ON PURPOSE -- the parallel drain was tried here and is SLOWER.
-                //
-                // The diagnosis that motivates it is real: profiling objectAllocation
-                // with `sample` shows the GC thread burning inside __GC_MARK_Node under
-                // codenameOneGCMark while all three mark workers sit in __psynch_cvwait
-                // for the entire run, and the mutator spends 72% of its samples in
-                // usleep inside cn1PacingPark, throttled waiting for a cycle one thread
-                // is holding open. The workers are parked because the parallel
-                // generation ends before this phase begins.
-                //
-                // But gcMarkDrainParallel starts a WHOLE GENERATION per call: reset
-                // termination state, broadcast, wake the helpers, each reports finished,
-                // and the caller waits. This loop drains every time the worklist reaches
-                // half capacity, so that handshake runs constantly and costs more than
-                // the batch it parallelises. Measured with both arms built from this
-                // tree and five INTERLEAVED rounds, min of 15 reps each:
-                //
-                //     parallel  28.34 33.97 30.25 39.12 26.90  median 30.25  spread 45%
-                //     serial    28.60 28.55 28.98 31.62 27.50  median 28.60  spread 15%
-                //
-                // Neutral on the median, slightly better at its best, and far more
-                // VARIABLE -- what a per-batch handshake looks like when it sometimes
-                // costs more than the batch. An earlier version of this note claimed
-                // 25.7 serial against 31.1 parallel and called it a 21% regression;
-                // that compared the parallel arm against a serial number from a
-                // DIFFERENT run on a differently loaded host. Serial re-measured at the
-                // same moment was 30.4. Quote no ratio whose arms were not interleaved
-                // within one run -- which is what ab-bench.sh exists to enforce.
-                //
-                // THE ONE-GENERATION VERSION WAS ALSO TRIED, AND IT CRASHES. Splitting
-                // gcMarkDrainParallel into dispatch/join and holding a single generation
-                // open across the whole page walk -- helpers consuming while the walk
-                // produces -- needs no protocol change: a helper that empties the worklist
-                // only ends the generation when gcMarkActiveWorkers hits ZERO, and the
-                // producer stays counted because the GC thread does not enter the drain
-                // loop until the walk is done. It builds and it is wrong:
-                //
-                //     helpers + objectAllocation   NullPointerException
-                //     CN1_GC_MARK_THREADS=1        correct (checksum matches)
-                //     helpers + hashMapChurn       correct
-                //
-                // So it needs BOTH a helper pool and heavy allocation. The walk reads
-                // gp->bumpIndex and iterates slots while the mutator is still allocating
-                // into those same pages; serialising the walk with its own drains is
-                // evidently load-bearing, and what exactly breaks was not established.
-                // MECHANISM FOUND, and it is not scheduling. cn1GcInGracePass is
-                // cn1GcTrace.gracePass, and cn1GcTrace is __thread. Marking CONSULTS it:
-                //
-                //     cn1BibopStampMarked((o), (m), (cn1GcInGracePass != 0 && (snap) == -1))
-                //
-                // So the grace pass is a distinct marking MODE, and the mode lives in
-                // thread-local state. When the GC thread sets gracePass = 1 only the GC
-                // thread sees it; a helper draining concurrently has gracePass = 0 and
-                // stamps objects the grace walk discovered the WRONG way. That matches
-                // the bisect exactly: harmless with no helpers, harmless on hashMapChurn
-                // where the pass finds few fresh objects, and a freed-live-object NPE on
-                // objectAllocation.
-                //
-                // Any future attempt must propagate the mode to every marker that can
-                // pop grace-discovered work -- helpers and cn1GcMutatorAssist alike --
-                // rather than just handing them the worklist. Carrying it per ENTRY
-                //
-                // AND THE PER-ENTRY FIX WAS BUILT AND DOES NOT FIX IT. Adding
-                // gcMarkWorklistEntry.gracePass -- stamped by both producers, adopted and
-                // restored by all three consumers (serial drain, helper loop,
-                // cn1GcMutatorAssist) exactly the way `precise` already is -- leaves the
-                // corruption in place. So the thread-local MODE is not the mechanism, or
-                // not the only one.
-                //
-                // Two further data points for whoever picks this up:
-                //
-                //   * Skipping the producer's own periodic drain when helpers exist makes
-                //     it worse, and that part IS understood: the walk outruns the helpers,
-                //     the worklist overflows, and an overflowing push is DROPPED -- an
-                //     unmarked live object. The producer must keep draining even when
-                //     others are consuming.
-                //   * With the producer still draining, the failure becomes a COIN FLIP:
-                //     6 of 12 runs of objectAllocation crashed, 12 of 12 clean serially.
-                //     A single green run means nothing here; count them.
-                //
-                // That is a race inside the page walk against concurrent markers, and it
-                // was not identified. Do not retry this without reproducing it under
-                // CN1_GC_VERIFY first, where GraceAudit names the holder and the victim.
-                //
-                // THAT REPRODUCTION WAS RUN, and it points at lost WORK rather than at
-                // stamping. Under CN1_GC_VERIFY, third run:
-                //
-                //     holder = Node mark=4 (epoch+0)      marked this epoch, survived
-                //     field -> Node mark=-8               FREED
-                //     markSite = markFn+116               the field read in the holder's
-                //                                         own mark function
-                //
-                // So the HOLDER was marked and its CHILD was never traced. Marking an
-                // object and running its mark function are separate: gcMarkObject marks
-                // and pushes, and the function that walks the fields runs when the entry
-                // is POPPED. A marked-but-never-popped holder leaves its children
-                // unmarked, and the sweep takes them.
-                //
-                // The suspect is the interaction between the producer's periodic serial
-                // gcMarkDrainWorklist and a LIVE generation's termination state, which
-                // this attempt mixed without thinking about it. If a serial drain empties
-                // the worklist mid-walk and gcMarkActiveWorkers reaches zero, gcMarkDone
-                // latches TRUE: the helpers leave and report finished, every later push by
-                // the walk has no consumer, and gcMarkParallelJoin's own drain loop sees
-                // gcMarkDone already set and returns at once. Not confirmed -- but it is
-                // the next thing to instrument, and it is a different question from the
-                // marking-mode one above, which was tested and is NOT the cause.
-                //
-                // AND THE MISSING LOCK IS NOT IT EITHER. gcMarkDrainWorklist is the
-                // SERIAL drain and touches gcMarkWorklistTop with NO mutex, so a producer
-                // calling it while helpers pop under gcMarkWorklistMutex is two
-                // decrementers on one index -- and a skipped entry is exactly a marked
-                // holder whose mark function never runs. Replacing it with a mutex-held
-                // batch pop made it WORSE:
-                //
-                //     producer uses unlocked gcMarkDrainWorklist    6 of 12 runs crash
-                //     producer uses a locked batch pop             12 of 12 runs crash
-                //
-                // Deterministic instead of intermittent means the timing moved, not that
-                // the cause was addressed. Six mechanisms have now been built and
-                // disproved -- per-entry marking mode, worklist overflow, the missing
-                // lock -- and the fault has NOT been found. The serial arm stays 12/12.
-                //
-                // FOUND IT, and it is the producer's own PUSH, not its drain.
-                // gcMarkWorklistPush has two paths, chosen by gcMarkLocalBuf:
-                //
-                //   lb != 0  (every helper)   buffer locally, flush under the mutex
-                //   lb == 0  (this producer)  write gcMarkWorklist[top] and top++ RAW
-                //
-                // The raw path carries the comment "Serial producer: no workers can
-                // access the shared queue in this phase" -- a precondition each of these
-                // attempts broke, because the page walk runs on the GC thread, which has
-                // no local buffer. So the producer published entries with no mutex while
-                // helpers pushed and popped under one. Interleave a helper's flush with
-                // the producer's read-write-increment of the same index and the helper's
-                // entry is OVERWRITTEN: an object marked but never popped, whose mark
-                // function therefore never runs, whose children stay unmarked, and which
-                // the sweep then frees under a live holder. That is the verifier's report
-                // exactly -- holder mark=4, child mark=-8, markSite in the holder's own
-                // mark function. It also explains why locking only the POP side made it
-                // deterministic rather than better: that widened the window the unlocked
-                // push clobbers. (gcMarkWorklistGrow reallocs the array on that same
-                // unlocked path, which is the same bug with a bigger blast radius.)
-                //
-                // The fix is not a new protocol: give the producer a local buffer and its
-                // pushes take the identical locked flush path as every helper.
-                //
-                // Repeated generations are the wrong shape for a producer that drains as
-                // it goes. Making this parallel properly means ONE generation held open
-                // across the whole pass, with the helpers consuming while the page walk
-                // produces -- which needs termination detection to wait on the producer,
-                // not just on the helpers. That is a change to the worklist protocol,
-                // not a substitution here.
-                gcMarkDrainWorklist(d);
-            }
-        }
+        gcMarkGraceWalkPages(d);
+        // Closing the phase only stops LATE entrants; a helper already inside the walk
+        // runs until the cursor is exhausted, and is still counted active while it does.
+        atomic_store_explicit(&gcMarkGraceWalkPhase, 0, memory_order_release);
         if(graceParallel) {
             gcMarkProducerEnd(d);
         }
@@ -14166,6 +14059,24 @@ static void gcMarkWorkerDrainLoop() {
     struct gcMarkWorklistEntry batch[CN1_GC_MARK_BATCH];
     struct ThreadLocalData* d = gcMarkThreadState;
 
+    // JOIN THE GRACE PAGE WALK FIRST, if one is open. The walk is the bulk of the
+    // work in an allocation-heavy cycle and pages are independent, so claiming them
+    // here is strictly better than waiting for the producer to feed this thread
+    // through the worklist. Marking nothing and tracing in place, exactly as the
+    // producer does -- gcMarkLocalBuf is already installed above, so the older
+    // children found here take the ordinary locked flush.
+    //
+    // Safe against early termination: this marker has not yet decremented
+    // gcMarkActiveWorkers, so gcMarkDone cannot latch while it is still walking.
+    if(atomic_load_explicit(&gcMarkGraceWalkPhase, memory_order_acquire)) {
+        cn1GcInGracePass = 1;
+        gcMarkGraceWalkPages(d);
+        cn1GcInGracePass = 0;
+        if(localBuf.count > 0) {
+            gcMarkFlushLocal(&localBuf);
+        }
+    }
+
     pthread_mutex_lock(&gcMarkWorklistMutex);
     for(;;) {
         if(gcMarkWorklistTop > 0) {
@@ -14476,13 +14387,40 @@ static JAVA_BOOLEAN gcMarkProducerBegin(CODENAME_ONE_THREAD_STATE) {
     return JAVA_TRUE;
 }
 
-// Called where the serial walk would have drained. Publishes what the walk has produced
-// so the helpers can see it, and -- only when they are falling behind far enough for the
-// worklist to reach the drain threshold -- marks one batch here too, so the producer
-// contributes rather than letting the shared worklist grow without bound.
-static void gcMarkProducerPoll(CODENAME_ONE_THREAD_STATE) {
-    if(gcMarkProducerBuf->count > 0) {
-        gcMarkFlushLocal(gcMarkProducerBuf);
+// The per-page drain point, for whichever marker just finished a page. Publishes the
+// older children it found so other markers can see them, and -- only when they are
+// falling behind far enough for the worklist to reach the drain threshold -- marks one
+// batch here too, rather than letting the shared worklist grow without bound.
+//
+// HISTORY, because this spot carried a "SERIAL ON PURPOSE" note for a long time and the
+// note is now wrong. Draining here through gcMarkDrainParallel WAS slower, and the
+// measurement stands: that call opens a whole generation per invocation -- reset
+// termination state, broadcast, wake helpers, each reports finished, caller waits --
+// and this point is reached every time the worklist half fills, so the handshake ran
+// constantly and cost more than the batch it parallelised (interleaved, min of 15 reps:
+// parallel median 30.25 spread 45%, serial median 28.60 spread 15%). An earlier version
+// of that note quoted 25.7 against 31.1 and called it a 21% regression; those arms came
+// from different runs on a differently loaded host, and serial re-measured at that
+// moment was 30.4. Quote no ratio whose arms were not interleaved within one run.
+//
+// What changed is not the measurement but the shape: ONE generation is now held open
+// across the whole pass, so there is no per-batch handshake left to pay, and the fresh
+// objects that used to flood this worklist are traced in place and never enqueued at
+// all. What reaches here now is only older children, which are rare.
+//
+// The lb == 0 branch is the single-marker configuration, where the old unlocked serial
+// drain is correct precisely because no other marker exists to race it.
+static void gcMarkGracePoll(CODENAME_ONE_THREAD_STATE) {
+    struct gcMarkLocalBuffer* lb = gcMarkLocalBuf;
+    if(lb == 0) {
+        if(gcMarkWorklistTop >= gcMarkWorklistCapacity / 2) {
+            atomic_fetch_add_explicit(&cn1GcGraceDrains, 1, memory_order_relaxed);
+            gcMarkDrainWorklist(threadStateData);
+        }
+        return;
+    }
+    if(lb->count > 0) {
+        gcMarkFlushLocal(lb);
     }
     struct gcMarkWorklistEntry batch[CN1_GC_MARK_BATCH];
     int n = 0;
@@ -14499,8 +14437,8 @@ static void gcMarkProducerPoll(CODENAME_ONE_THREAD_STATE) {
     if(n > 0) {
         atomic_fetch_add_explicit(&cn1GcGraceDrains, 1, memory_order_relaxed);
         gcMarkRunBatch(threadStateData, batch, n);
-        if(gcMarkProducerBuf->count > 0) {
-            gcMarkFlushLocal(gcMarkProducerBuf);
+        if(lb->count > 0) {
+            gcMarkFlushLocal(lb);
         }
     }
 }
