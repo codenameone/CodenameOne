@@ -113,10 +113,10 @@ written against.
 
 ==== One application on all three
 
-The Codename One Settings tool is built this way. Its
-`codenameone_settings.properties` sets `desktop.themeMode=native`, so it
-opens in Fluent on Windows, Aqua on macOS and Adwaita on Linux, and its
-own `theme.css` never names a color the platform owns:
+The Codename One Settings tool is built this way. Its main class declares
+`@DesktopBuild(themeMode = "native")`, so it opens in Fluent on Windows,
+Aqua on macOS and Adwaita on Linux, and its own `theme.css` never names a
+color the platform owns:
 
 * Each control derives from the native UIID it's a variant of --
   `cn1-derive: TextField` for a field, `RaisedButton` for the primary
@@ -140,6 +140,13 @@ image:img/desktop-theme-settings-aqua-dark.png[Settings under Aqua in dark mode,
 .The Settings tool under GNOME Adwaita
 image:img/desktop-theme-settings-adwaita-light.png[Settings under Adwaita in light mode,scaledwidth=45%]
 image:img/desktop-theme-settings-adwaita-dark.png[Settings under Adwaita in dark mode,scaledwidth=45%]
+
+NOTE: All six images were captured on a Mac, not on Windows or Linux.
+Colors, borders and spacing come from the theme and are the same on every
+host, but each theme draws text in its platform's own typeface -- Segoe UI
+Variable, SF or Cantarell -- and the Fluent and Adwaita images fall back to
+the Mac's system font. On a real Windows or Linux desktop the text looks
+different.
 
 To preview a desktop theme in the simulator, pick the Desktop skin and
 choose the theme from the *Native Theme* menu. With *Auto* selected the

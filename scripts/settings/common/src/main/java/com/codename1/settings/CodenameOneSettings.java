@@ -84,7 +84,7 @@ import com.codename1.annotations.buildhints.*;
 
 @Android(themeMode = ThemeMode.MODERN)
 @Build(nativeTheme = ThemeMode.MODERN)
-@DesktopBuild(height = 820, interactiveScrollbars = Toggle.ON, titleBar = DesktopTitleBar.NATIVE, width = 1260)
+@DesktopBuild(height = 820, interactiveScrollbars = Toggle.ON, themeMode = "native", titleBar = DesktopTitleBar.NATIVE, width = 1260)
 @Ios(themeMode = ThemeMode.MODERN)
 public class CodenameOneSettings extends Lifecycle {
     public enum Section { BASIC, BUILD_HINTS, EXTENSIONS, ADVANCED }

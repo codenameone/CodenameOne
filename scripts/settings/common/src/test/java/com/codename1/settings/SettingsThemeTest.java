@@ -109,8 +109,8 @@ public class SettingsThemeTest {
     @Test
     public void colorsComeFromTheNativePaletteExceptTheBrand() throws Exception {
         String css = Files.readString(THEME_CSS, StandardCharsets.UTF_8);
-        String settings = Files.readString(SETTINGS, StandardCharsets.UTF_8);
-        assertTrue(settings.contains("codename1.arg.desktop.themeMode=native"),
+        String source = Files.readString(APP_SOURCE, StandardCharsets.UTF_8);
+        assertTrue(source.contains("themeMode = \"native\""),
                 "Settings must opt into the platform's desktop theme; unset means legacy.");
         for (String variable : new String[]{"--window-bg-color", "--control-bg-color", "--text-color",
                 "--text-secondary-color", "--window-bg-color-dark", "--text-color-dark"}) {
