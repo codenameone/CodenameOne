@@ -1849,7 +1849,9 @@ public class ByteCodeClass {
         }
         
         // The file-local completion flag was declared before the accessors.
-        b.append("void __STATIC_INITIALIZER_");
+        // CN1_CLINIT_ATTR (cold, noinline): see cn1_globals.h. Inlined, this body
+        // costs every caller its registers for a path taken once.
+        b.append("CN1_CLINIT_ATTR void __STATIC_INITIALIZER_");
         b.append(clsName);
         // ACQUIRE, not a plain load. This is the fast path of a double-checked
         // initialisation: the completing store below is a RELEASE, and the two
@@ -2411,7 +2413,7 @@ public class ByteCodeClass {
             b.append("(CODENAME_ONE_THREAD_STATE, void** vtable);\n");
         }
 
-        b.append("extern void __STATIC_INITIALIZER_");
+        b.append("extern CN1_CLINIT_ATTR void __STATIC_INITIALIZER_");
         b.append(clsName);
         b.append("(CODENAME_ONE_THREAD_STATE);\n");
         b.append("extern void __FINALIZER_");

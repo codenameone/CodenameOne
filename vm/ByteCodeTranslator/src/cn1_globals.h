@@ -2810,6 +2810,20 @@ extern JAVA_OBJECT __NEW_INSTANCE_java_lang_OutOfMemoryError(CODENAME_ONE_THREAD
     #define CN1_COLD __attribute__((cold))
 #endif
 
+/* The static initializer: called from the entry of every static method and every
+ * allocation site of its class, behind a check that is false for the whole life of
+ * the program after the first call. CN1_COLD alone does not keep it out of line --
+ * with ThinLTO clang inlined the ENTIRE initializer (the monitorEnter, the usleep
+ * wait loop, the vtable setup) into CommonWorkloads.fib, and to keep registers free
+ * for that never-taken path every fib call saved and restored twelve callee-saved
+ * registers and materialised ~10 global addresses before doing its eight
+ * instructions of work. noinline is what keeps the cold body a call. */
+#if defined(_MSC_VER)
+    #define CN1_CLINIT_ATTR __declspec(noinline)
+#else
+    #define CN1_CLINIT_ATTR __attribute__((cold, noinline))
+#endif
+
 #if defined(_MSC_VER)
     #define CN1_NORETURN __declspec(noreturn)
 #else
