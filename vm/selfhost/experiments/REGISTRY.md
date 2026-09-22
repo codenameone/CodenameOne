@@ -5774,3 +5774,68 @@ The host carried another checkout's java at 280-330% plus a Bench.app in an iOS
 Simulator at ~100% throughout, load 5-26 with one excursion to 116 that voided a
 whole measurement. Paired interleaved ratios are used for that reason. The
 counter deltas were taken at matched load (5.10 before, 5.05 after).
+
+---
+
+## Round 34: the parallelism goes back on the page axis, and the sleep ends
+
+Round 33 removed the grace pass's worklist trip and with it the parallelism.
+This hands pages out instead of objects: a shared cursor, one CAS per page, each
+marker tracing whole pages in place. Pages are INDEPENDENT, which the per-object
+worklist was not -- that version paid a lock, a flush and a broadcast per 256
+objects to distribute work needing no coordination. A helper joins the walk at
+drain-loop entry once it owns the local buffer that makes its pushes safe, and
+only OLDER children ever reach the shared worklist.
+
+Termination needed no new protocol, for the same reason the producer needed none
+in Round 31: a marker still walking has not entered gcMarkWorkerDrainLoop, so it
+is still counted in gcMarkActiveWorkers and gcMarkDone cannot latch under it.
+
+**Correctness GREEN.** 12/12 plain runs, 0 violations in 9 CN1_GC_VERIFY runs,
+run-gc-verify GREEN (GraceAudit clean, injected grace-pass fault still
+detected), run-gauntlet GREEN, 33 tortures both stop modes. Non-vacuity probed,
+because a silent fallback to serial would pass every one of those: at 4 markers
+helpers join the walk, at CN1_GC_MARK_THREADS=1 none does.
+
+**THE SLEEP IS GONE.** Both CONFORM arms run back to back, same conditions:
+
+                        serial trace (R33)   parallel walk (R34)
+    threadStallMs       802                  153
+    dutyPct             67.6                 93.2
+    cause=pacingVolume  719ms, 25 events     ABSENT -- 0 events
+    cause=handshake     82ms, 44 events      153ms, 39 events
+
+Nought pacing-volume stalls. The mutator no longer waits on the allocation cap
+at all, which is the defect this whole line of work started from: 72% of samples
+in usleep inside cn1PacingPark, three helpers parked in __psynch_cvwait, one
+thread holding the cycle open.
+
+The arc across four rounds, all on objectAllocation:
+
+    mutator stalled     74% of wall  ->  22%  ->  effectively none
+    dutyPct             26.0         ->  78.3 ->  93.2
+    pacingVolume total  3211ms       ->  286  ->  0
+
+**What is NOT established.** The wall-clock win. Release timing at 40 reps gave
+markers=1 28.3/28.7/29.0/28.7ms, markers=2 25.9/24.1/29.3/26.2, markers=4
+27.6/28.9/26.5/23.0, against the serial trace's flat 29.5/29.6/30.9 -- it scales
+where R33 did not, and it is faster, but markers=4 swings 23.0-28.9 and the host
+was never quiet. Every wall-clock figure in Rounds 33-34 was taken on a machine
+carrying another checkout's java at 280-330% plus a Bench.app in an iOS
+Simulator, load 5-26 with excursions to 116 and 173 that voided two whole
+measurements. The counter deltas above are back-to-back and survive that; the
+timing curve does not. Do not quote a scaling shape from this session.
+
+An earlier reading of these counters DID misfire and is worth recording: a
+parallel-walk run showed cause=handshake at 752ms against 37ms, which looked
+like a new bottleneck introduced by the change. It was not -- that arm had been
+measured against a differently loaded host and had done 199.7M graceSlotsWalked
+against 141.8M. Re-measured back to back, handshake is 153ms against 82ms. Same
+error as the stale-baseline ones in Rounds 31-33: two numbers from two runs.
+
+**Next.** The remaining objectAllocation gap is no longer collector stall -- duty
+is 93.2% and the mutator does not wait. It is the cost of tracing 197M fresh
+objects per 25 reps at all, which is O(allocated) where HotSpot's young
+collection is O(survived) and survivors here are ~nothing (liveMB 0-29 against
+occupiedMB 177-608). Closing that means not walking dead fresh objects, not
+walking them faster.
