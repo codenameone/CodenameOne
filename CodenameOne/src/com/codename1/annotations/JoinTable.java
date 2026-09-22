@@ -23,7 +23,7 @@
 package com.codename1.annotations;
 
 import java.lang.annotation.*;
-/** Join table and key column names for an owning to-many association. */
+/// Join table and key column names for an owning to-many association.
 @Retention(RetentionPolicy.CLASS)
 @Target(ElementType.FIELD)
 public @interface JoinTable {

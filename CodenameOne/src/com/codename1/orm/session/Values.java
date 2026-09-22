@@ -25,26 +25,24 @@ package com.codename1.orm.session;
 import java.io.IOException;
 import java.util.Date;
 
-/**
- * Turns what an engine sent into what a field holds.
- *
- * <p>{@link com.codename1.backend.Database} promises that rows come back as Long,
- * Double, String, byte[] or null whichever engine answered, and it keeps that
- * promise -- but "a Long" is not the same claim as "the type this field is". The
- * same column is a Long from SQLite and a String from PostgreSQL when it is
- * declared NUMERIC, because arbitrary precision does not fit in a double and the
- * exact text is the only lossless answer; MySQL does the same for DECIMAL. A
- * column somebody else's migration declared BOOLEAN comes back as a Long here and
- * could be "t" from a text-format driver elsewhere.
- *
- * <p>So the conversions are written once, tolerantly, in one place instead of
- * being generated into every entity -- and none of them is a cast whose failure
- * is caught. ParparVM's CHECKCAST is unchecked, so a cast that fails hands the
- * wrong object to the next instruction rather than throwing something a handler
- * could see.
- */
+/// Turns what an engine sent into what a field holds.
+///
+/// <p>{@link com.codename1.backend.Database} promises that rows come back as Long,
+/// Double, String, byte[] or null whichever engine answered, and it keeps that
+/// promise -- but "a Long" is not the same claim as "the type this field is". The
+/// same column is a Long from SQLite and a String from PostgreSQL when it is
+/// declared NUMERIC, because arbitrary precision does not fit in a double and the
+/// exact text is the only lossless answer; MySQL does the same for DECIMAL. A
+/// column somebody else's migration declared BOOLEAN comes back as a Long here and
+/// could be "t" from a text-format driver elsewhere.
+///
+/// <p>So the conversions are written once, tolerantly, in one place instead of
+/// being generated into every entity -- and none of them is a cast whose failure
+/// is caught. ParparVM's CHECKCAST is unchecked, so a cast that fails hands the
+/// wrong object to the next instruction rather than throwing something a handler
+/// could see.
 public final class Values {
-    /** Normalizes mutable and boxed values before binding or taking a snapshot. */
+    /// Normalizes mutable and boxed values before binding or taking a snapshot.
     public static Object storage(Object value) {
         if(value instanceof java.util.Date) return Long.valueOf(((java.util.Date)value).getTime());
         if(value instanceof Boolean) return Long.valueOf(((Boolean)value).booleanValue()?1:0);
@@ -58,7 +56,7 @@ public final class Values {
     private Values() {
     }
 
-    /** The value as text, or null. */
+    /// The value as text, or null.
     public static String asString(Object value) {
         if(value == null) {
             return null;
@@ -79,13 +77,13 @@ public final class Values {
         return String.valueOf(value);
     }
 
-    /** The value as a 64-bit integer, or {@code fallback} when it is null. */
+    /// The value as a 64-bit integer, or {@code fallback} when it is null.
     public static long asLong(Object value, long fallback) throws IOException {
         Long out = asLongObject(value);
         return out == null ? fallback : out.longValue();
     }
 
-    /** The value as a 64-bit integer, or null. */
+    /// The value as a 64-bit integer, or null.
     public static Long asLongObject(Object value) throws IOException {
         if(value == null) {
             return null;
@@ -151,58 +149,56 @@ public final class Values {
         throw notANumber(value, "an integer");
     }
 
-    /** The value as a 32-bit integer, or {@code fallback} when it is null. */
+    /// The value as a 32-bit integer, or {@code fallback} when it is null.
     public static int asInt(Object value, int fallback) throws IOException {
         Long out = asLongObject(value);
         return out == null ? fallback : (int)narrowed(out.longValue(), value,
                 -2147483648L, 2147483647L, "int");
     }
 
-    /** The value as a boxed 32-bit integer, or null. */
+    /// The value as a boxed 32-bit integer, or null.
     public static Integer asIntObject(Object value) throws IOException {
         Long out = asLongObject(value);
         return out == null ? null : Integer.valueOf((int)narrowed(out.longValue(), value,
                 -2147483648L, 2147483647L, "int"));
     }
 
-    /** The value as a 16-bit integer, or {@code fallback} when it is null. */
+    /// The value as a 16-bit integer, or {@code fallback} when it is null.
     public static short asShort(Object value, short fallback) throws IOException {
         Long out = asLongObject(value);
         return out == null ? fallback : (short)narrowed(out.longValue(), value,
                 -32768L, 32767L, "short");
     }
 
-    /** The value as a boxed 16-bit integer, or null. */
+    /// The value as a boxed 16-bit integer, or null.
     public static Short asShortObject(Object value) throws IOException {
         Long out = asLongObject(value);
         return out == null ? null : Short.valueOf((short)narrowed(out.longValue(), value,
                 -32768L, 32767L, "short"));
     }
 
-    /** The value as a byte, or {@code fallback} when it is null. */
+    /// The value as a byte, or {@code fallback} when it is null.
     public static byte asByte(Object value, byte fallback) throws IOException {
         Long out = asLongObject(value);
         return out == null ? fallback : (byte)narrowed(out.longValue(), value,
                 -128L, 127L, "byte");
     }
 
-    /** The value as a boxed byte, or null. */
+    /// The value as a boxed byte, or null.
     public static Byte asByteObject(Object value) throws IOException {
         Long out = asLongObject(value);
         return out == null ? null : Byte.valueOf((byte)narrowed(out.longValue(), value,
                 -128L, 127L, "byte"));
     }
 
-    /**
-     * {@code number} when the field it is going into can hold it, or a refusal.
-     *
-     * <p>A cast would WRAP: a column holding 2147483648 read into an int field
-     * became -2147483648, which is a different row's key, a different count, a
-     * different answer -- and nothing said so. The columns these fields map to
-     * are ordinary integer columns on every engine, and SQLite's are not even
-     * range-checked, so a value too large for the field is something a migration
-     * or another client can put there any day.
-     */
+    /// {@code number} when the field it is going into can hold it, or a refusal.
+    ///
+    /// <p>A cast would WRAP: a column holding 2147483648 read into an int field
+    /// became -2147483648, which is a different row's key, a different count, a
+    /// different answer -- and nothing said so. The columns these fields map to
+    /// are ordinary integer columns on every engine, and SQLite's are not even
+    /// range-checked, so a value too large for the field is something a migration
+    /// or another client can put there any day.
     private static long narrowed(long number, Object value, long min, long max, String field)
             throws IOException {
         if(number < min || number > max) {
@@ -212,13 +208,13 @@ public final class Values {
         return number;
     }
 
-    /** The value as a double, or {@code fallback} when it is null. */
+    /// The value as a double, or {@code fallback} when it is null.
     public static double asDouble(Object value, double fallback) throws IOException {
         Double out = asDoubleObject(value);
         return out == null ? fallback : out.doubleValue();
     }
 
-    /** The value as a boxed double, or null. */
+    /// The value as a boxed double, or null.
     public static Double asDoubleObject(Object value) throws IOException {
         if(value == null) {
             return null;
@@ -254,31 +250,29 @@ public final class Values {
         throw notANumber(value, "a number");
     }
 
-    /** The value as a float, or {@code fallback} when it is null. */
+    /// The value as a float, or {@code fallback} when it is null.
     public static float asFloat(Object value, float fallback) throws IOException {
         Double out = asDoubleObject(value);
         return out == null ? fallback : narrowedToFloat(out.doubleValue(), value);
     }
 
-    /** The value as a boxed float, or null. */
+    /// The value as a boxed float, or null.
     public static Float asFloatObject(Object value) throws IOException {
         Double out = asDoubleObject(value);
         return out == null ? null : Float.valueOf(narrowedToFloat(out.doubleValue(), value));
     }
 
-    /**
-     * {@code number} as a float, when a float can hold it.
-     *
-     * <p>A float field's column is DOUBLE on MySQL and DOUBLE PRECISION on
-     * PostgreSQL, both of which hold numbers a float cannot: 1e100 narrowed to
-     * INFINITY, so the entity held something the row does not and writing it
-     * back would store that or fail. The integral converters were given this
-     * check a round ago and this one was missed.
-     *
-     * <p>A value that is ALREADY infinite or NaN passes through: PostgreSQL can
-     * store either, and reproducing what the row holds is right. What is refused
-     * is a finite number becoming an infinite one.
-     */
+    /// {@code number} as a float, when a float can hold it.
+    ///
+    /// <p>A float field's column is DOUBLE on MySQL and DOUBLE PRECISION on
+    /// PostgreSQL, both of which hold numbers a float cannot: 1e100 narrowed to
+    /// INFINITY, so the entity held something the row does not and writing it
+    /// back would store that or fail. The integral converters were given this
+    /// check a round ago and this one was missed.
+    ///
+    /// <p>A value that is ALREADY infinite or NaN passes through: PostgreSQL can
+    /// store either, and reproducing what the row holds is right. What is refused
+    /// is a finite number becoming an infinite one.
     private static float narrowedToFloat(double number, Object value) throws IOException {
         if(!Double.isNaN(number) && !Double.isInfinite(number)
                 && (number > 3.4028234663852886E38 || number < -3.4028234663852886E38)) {
@@ -301,13 +295,13 @@ public final class Values {
         return narrowed;
     }
 
-    /** The value as a flag: anything non-zero, or the text of one, is true. */
+    /// The value as a flag: anything non-zero, or the text of one, is true.
     public static boolean asBoolean(Object value, boolean fallback) throws IOException {
         Boolean out = asBooleanObject(value);
         return out == null ? fallback : out.booleanValue();
     }
 
-    /** The value as a boxed flag, or null. */
+    /// The value as a boxed flag, or null.
     public static Boolean asBooleanObject(Object value) throws IOException {
         if(value == null) {
             return null;
@@ -319,14 +313,12 @@ public final class Values {
         return number == null ? null : Boolean.valueOf(number.longValue() != 0);
     }
 
-    /**
-     * The first character of the value as a boxed Character, or null.
-     *
-     * <p>The nullable twin of {@link #asChar}, and text-only for the same
-     * reason: the generated access for a Character field used asString and kept
-     * the first character of whatever a blob decoded to, while the primitive
-     * char field beside it refused the same row.
-     */
+    /// The first character of the value as a boxed Character, or null.
+    ///
+    /// <p>The nullable twin of {@link #asChar}, and text-only for the same
+    /// reason: the generated access for a Character field used asString and kept
+    /// the first character of whatever a blob decoded to, while the primitive
+    /// char field beside it refused the same row.
     public static Character asCharObject(Object value) throws IOException {
         if(value == null) {
             return null;
@@ -339,17 +331,15 @@ public final class Values {
         return text.length() == 0 ? null : Character.valueOf(text.charAt(0));
     }
 
-    /**
-     * The first character of the value, or {@code fallback} when it is null or
-     * empty.
-     *
-     * <p>TEXT ONLY. An entity's char field is stored in a text column, so a
-     * number or a blob arriving here means the table and the entity disagree --
-     * and taking the first character of however that value happens to print is
-     * not a reading of it: a byte[] gave whatever its first byte decoded to, a
-     * Long gave the first DIGIT, and NaN gave 'N'. Every other converter in this
-     * class refuses an encoding it cannot mean; this one used to accept them all.
-     */
+    /// The first character of the value, or {@code fallback} when it is null or
+    /// empty.
+    ///
+    /// <p>TEXT ONLY. An entity's char field is stored in a text column, so a
+    /// number or a blob arriving here means the table and the entity disagree --
+    /// and taking the first character of however that value happens to print is
+    /// not a reading of it: a byte[] gave whatever its first byte decoded to, a
+    /// Long gave the first DIGIT, and NaN gave 'N'. Every other converter in this
+    /// class refuses an encoding it cannot mean; this one used to accept them all.
     public static char asChar(Object value, char fallback) throws IOException {
         if(value == null) {
             return fallback;
@@ -362,20 +352,18 @@ public final class Values {
         return text.length() == 0 ? fallback : text.charAt(0);
     }
 
-    /**
-     * {@code value}, or a refusal when the column holds SQL NULL.
-     *
-     * <p>What the generated access wraps a PRIMITIVE field's read in. A Java
-     * primitive has no null, so the conversions below take a fallback and answer
-     * it -- which for a column that really is null means the entity carries 0,
-     * false or '\0' where the row carries nothing at all, told apart by nobody.
-     * The tables this ORM creates declare a primitive field's column NOT NULL so
-     * the case cannot arise in them; this is for the ones it did not create, and
-     * a migration or another client is exactly where a null turns up.
-     *
-     * <p>Boxed fields do not come through here: they can hold the null, and
-     * that is the reason to declare one.
-     */
+    /// {@code value}, or a refusal when the column holds SQL NULL.
+    ///
+    /// <p>What the generated access wraps a PRIMITIVE field's read in. A Java
+    /// primitive has no null, so the conversions below take a fallback and answer
+    /// it -- which for a column that really is null means the entity carries 0,
+    /// false or '\0' where the row carries nothing at all, told apart by nobody.
+    /// The tables this ORM creates declare a primitive field's column NOT NULL so
+    /// the case cannot arise in them; this is for the ones it did not create, and
+    /// a migration or another client is exactly where a null turns up.
+    ///
+    /// <p>Boxed fields do not come through here: they can hold the null, and
+    /// that is the reason to declare one.
     public static Object required(Object value, String field) throws IOException {
         if(value == null) {
             throw new IOException("The column for " + field + " holds SQL NULL and the "
@@ -385,32 +373,28 @@ public final class Values {
         return value;
     }
 
-    /**
-     * The value as a UTF-16 code unit, or {@code fallback} when it is null.
-     *
-     * <p>This is how an entity's char field is stored: the NUMBER of the code
-     * unit, in an integer column, on every engine. Text would be the obvious
-     * choice and it is the wrong one, because a char is not a string. The
-     * default value of an unset char field is {@code '\0'}, and PostgreSQL
-     * refuses a NUL inside a text value outright ("invalid byte sequence for
-     * encoding UTF8: 0x00"), so an entity with an untouched char field could not
-     * be inserted at all. An unpaired surrogate -- also a perfectly legal char --
-     * has no UTF-8 encoding either. As a number both are ordinary values, and
-     * they compare exactly rather than through whatever collation the column
-     * happens to carry, which on MySQL is case insensitive by default.
-     *
-     * <p>Text is still accepted, for a column somebody mapped onto an existing
-     * CHAR(1): a number and a string cannot be confused for one another, so
-     * there is no ambiguity in taking both.
-     */
+    /// The value as a UTF-16 code unit, or {@code fallback} when it is null.
+    ///
+    /// <p>This is how an entity's char field is stored: the NUMBER of the code
+    /// unit, in an integer column, on every engine. Text would be the obvious
+    /// choice and it is the wrong one, because a char is not a string. The
+    /// default value of an unset char field is {@code '\0'}, and PostgreSQL
+    /// refuses a NUL inside a text value outright ("invalid byte sequence for
+    /// encoding UTF8: 0x00"), so an entity with an untouched char field could not
+    /// be inserted at all. An unpaired surrogate -- also a perfectly legal char --
+    /// has no UTF-8 encoding either. As a number both are ordinary values, and
+    /// they compare exactly rather than through whatever collation the column
+    /// happens to carry, which on MySQL is case insensitive by default.
+    ///
+    /// <p>Text is still accepted, for a column somebody mapped onto an existing
+    /// CHAR(1): a number and a string cannot be confused for one another, so
+    /// there is no ambiguity in taking both.
     public static char asCodeUnit(Object value, char fallback) throws IOException {
         Character out = asCodeUnitObject(value);
         return out == null ? fallback : out.charValue();
     }
 
-    /**
-     * The nullable twin of {@link #asCodeUnit}.
-     */
+    /// The nullable twin of {@link #asCodeUnit}.
     public static Character asCodeUnitObject(Object value) throws IOException {
         if(value == null) {
             return null;
@@ -437,16 +421,14 @@ public final class Values {
         return Character.valueOf((char)unit);
     }
 
-    /**
-     * The value as a moment in time, or null.
-     *
-     * <p>An entity stores a Date as epoch MILLISECONDS in an integer column, on
-     * every engine, which is what makes it the same value everywhere: a native
-     * timestamp comes back as text whose format follows the server's DateStyle
-     * and session time zone. A number is therefore read as milliseconds; text
-     * that is a number is read the same way, and anything else is refused rather
-     * than guessed at.
-     */
+    /// The value as a moment in time, or null.
+    ///
+    /// <p>An entity stores a Date as epoch MILLISECONDS in an integer column, on
+    /// every engine, which is what makes it the same value everywhere: a native
+    /// timestamp comes back as text whose format follows the server's DateStyle
+    /// and session time zone. A number is therefore read as milliseconds; text
+    /// that is a number is read the same way, and anything else is refused rather
+    /// than guessed at.
     public static Date asDate(Object value) throws IOException {
         if(value instanceof Boolean) {
             // A flag is not a moment. asLongObject reads one as 0 or 1, which
@@ -460,7 +442,7 @@ public final class Values {
         return millis == null ? null : new Date(millis.longValue());
     }
 
-    /** The value as bytes, or null. Text is encoded as UTF-8. */
+    /// The value as bytes, or null. Text is encoded as UTF-8.
     public static byte[] asBytes(Object value) throws IOException {
         if(value == null) {
             return null;
@@ -475,16 +457,14 @@ public final class Values {
                 + " cannot be read as bytes");
     }
 
-    /**
-     * {@code text} as a long, where it is an integer written with a fraction of
-     * zeros -- "12", "12.", "12.000".
-     *
-     * <p>A fraction that is NOT zero is refused rather than truncated. The field
-     * is an integer and the column is not, which is a disagreement between the
-     * entity and the table; rounding it silently is how the wrong number ends up
-     * stored back. Out of range is refused for the same reason: a clamp to
-     * Long.MAX_VALUE is a value nobody wrote.
-     */
+    /// {@code text} as a long, where it is an integer written with a fraction of
+    /// zeros -- "12", "12.", "12.000".
+    ///
+    /// <p>A fraction that is NOT zero is refused rather than truncated. The field
+    /// is an integer and the column is not, which is a disagreement between the
+    /// entity and the table; rounding it silently is how the wrong number ends up
+    /// stored back. Out of range is refused for the same reason: a clamp to
+    /// Long.MAX_VALUE is a value nobody wrote.
     private static long integralText(String text, Object value) throws IOException {
         int dot = text.indexOf('.');
         if(dot < 0) {
@@ -509,7 +489,7 @@ public final class Values {
         }
     }
 
-    /** Whether the text itself says infinity or NaN, rather than overflowing to one. */
+    /// Whether the text itself says infinity or NaN, rather than overflowing to one.
     private static boolean spellsNonFinite(String text) {
         for(int iter = 0 ; iter < text.length() ; iter++) {
             char c = text.charAt(iter);
@@ -520,10 +500,8 @@ public final class Values {
         return false;
     }
 
-    /**
-     * Whether the text carries a non-zero digit before its exponent, which is
-     * what separates a real number that UNDERFLOWED from an honest zero.
-     */
+    /// Whether the text carries a non-zero digit before its exponent, which is
+    /// what separates a real number that UNDERFLOWED from an honest zero.
     private static boolean hasNonZeroDigit(String text) {
         for(int iter = 0 ; iter < text.length() ; iter++) {
             char c = text.charAt(iter);
@@ -542,7 +520,7 @@ public final class Values {
                 + " cannot be read as " + wanted);
     }
 
-    /** What a value is, for a message, without pasting a password into a log. */
+    /// What a value is, for a message, without pasting a password into a log.
     private static String describe(Object value) {
         if(value == null) {
             return "null";

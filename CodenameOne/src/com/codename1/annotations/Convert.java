@@ -23,7 +23,7 @@
 package com.codename1.annotations;
 import java.lang.annotation.*;
 import com.codename1.orm.session.AttributeConverter;
-/** A public no-arg converter for a basic field; converters also receive null values. */
+/// A public no-arg converter for a basic field; converters also receive null values.
 @Retention(RetentionPolicy.CLASS)
 @Target(ElementType.FIELD)
 public @interface Convert {

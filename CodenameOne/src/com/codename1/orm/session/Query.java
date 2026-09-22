@@ -27,7 +27,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.LinkedHashMap;
 
-/** Parameterized query using Java attribute names rather than SQL identifiers. */
+/// Parameterized query using Java attribute names rather than SQL identifiers.
 public final class Query<T> {
     final Session session;
     final EntityModel<T> model;
@@ -41,15 +41,15 @@ public final class Query<T> {
         final EntityModel model;final String alias,sql;
         Join(EntityModel model,String alias,String sql) { this.model=model;this.alias=alias;this.sql=sql; }
     }
-    /** Adds an inner join on a mapped relationship path. */
+    /// Adds an inner join on a mapped relationship path.
     public Query<T> join(String path) { ensureJoin(path,false);return this; }
-    /** Adds a left join on a mapped relationship path before using it in a predicate. */
+    /// Adds a left join on a mapped relationship path before using it in a predicate.
     public Query<T> leftJoin(String path) { ensureJoin(path,true);return this; }
     private final List<String> fetches=new ArrayList<String>();
-    /** Overrides mapping laziness for the named direct relationship. */
+    /// Overrides mapping laziness for the named direct relationship.
     public Query<T> fetch(String field) { model.relationIndex(field);fetches.add(field);return this; }
     Query(Session session,EntityModel<T> model) { this.session=session; this.model=model;this.rootAlias=session.nextAlias(); }
-    /** Tests membership in an owned scalar collection without loading it. */
+    /// Tests membership in an owned scalar collection without loading it.
     public Query<T> containsElement(String field,Object value) {
         Relationship relation=model.relationships()[model.relationIndex(field)];
         if(!relation.element) throw new IllegalArgumentException("Not an element collection: "+field);
@@ -98,7 +98,7 @@ public final class Query<T> {
         String sql=selection+from()+where()+(order.length()==0?"":" ORDER BY "+order)+session.limit(max,offset);
         return session.hydrateAll(model,session.read(sql,params.toArray(),session.kinds(model)),fetches);
     }
-    /** Counts matching roots, ignoring pagination and ordering. */
+    /// Counts matching roots, ignoring pagination and ordering.
     public long count() {
         session.autoFlush();
         String statement="SELECT COUNT(*)"+from()+where();

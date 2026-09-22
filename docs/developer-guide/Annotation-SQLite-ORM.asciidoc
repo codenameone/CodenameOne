@@ -78,15 +78,7 @@ the managed copy; it does not attach the supplied detached instance.
 
 [source,java]
 ----
-Session session = em.openSession();
-try {
-    session.beginTransaction();
-    Customer customer = session.find(Customer.class, customerId);
-    customer.name = "Updated name";
-    session.commitTransaction();
-} finally {
-    session.close();
-}
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/ManagedOrmSnippets.java[tag=managed-orm-unit-of-work,indent=0]
 ----
 
 Closing a session rolls back any active transaction. It never commits. A
@@ -127,12 +119,7 @@ The session query builder uses Java field paths, including relationship paths:
 
 [source,java]
 ----
-List<Order> orders = session.query(Order.class)
-    .eq("customer.name", "Alice")
-    .orderBy("id", true)
-    .limit(20)
-    .fetch("customer")
-    .list();
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/ManagedOrmSnippets.java[tag=managed-orm-builder-query,indent=0]
 ----
 
 `fetch` overrides laziness for a direct relationship. To-one and inverse
@@ -152,9 +139,7 @@ stored scalar representation; multiple scalar projections return `Object[]`.
 
 [source,java]
 ----
-List<Order> orders = session.createQuery(
-    "select o from Order o where o.customer.name = :name order by o.id",
-    Order.class).setParameter("name", "Alice").list();
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/ManagedOrmSnippets.java[tag=managed-orm-jpql-query,indent=0]
 ----
 
 Bulk mutations use `executeUpdate()` inside a transaction. They flush pending

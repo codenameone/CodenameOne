@@ -22,7 +22,7 @@
  */
 package com.codename1.orm.session;
 
-/** Generated index over mapped field names. */
+/// Generated index over mapped field names.
 public final class Index {
     public final String name;
     public final boolean unique;

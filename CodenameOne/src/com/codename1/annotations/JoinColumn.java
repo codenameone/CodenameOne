@@ -23,7 +23,7 @@
 package com.codename1.annotations;
 
 import java.lang.annotation.*;
-/** Foreign key column on the owning table. */
+/// Foreign key column on the owning table.
 @Retention(RetentionPolicy.CLASS)
 @Target(ElementType.FIELD)
 public @interface JoinColumn { String name() default ""; boolean nullable() default true; }

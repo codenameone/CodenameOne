@@ -22,7 +22,7 @@
  */
 package com.codename1.orm.session;
 
-/** Immutable generated column mapping. Kind numbers match the backend SQL dialect. */
+/// Immutable generated column mapping. Kind numbers match the backend SQL dialect.
 public final class Attribute {
     public static final int TEXT=0, INTEGER=1, BIGINT=2, REAL=3, BLOB=4, BOOLEAN=5, TIMESTAMP=6;
     public final String field, column, declaredType;

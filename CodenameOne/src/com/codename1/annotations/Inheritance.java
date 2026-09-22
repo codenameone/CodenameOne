@@ -22,7 +22,7 @@
  */
 package com.codename1.annotations;
 import java.lang.annotation.*;
-/** Stores an entity hierarchy in one table with an immutable discriminator. */
+/// Stores an entity hierarchy in one table with an immutable discriminator.
 @Retention(RetentionPolicy.CLASS)
 @Target(ElementType.TYPE)
 public @interface Inheritance { String discriminatorColumn() default "entity_type"; }

@@ -25,7 +25,7 @@ package com.codename1.orm.session;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
-/** Startup registry populated by generated bootstraps. */
+/// Startup registry populated by generated bootstraps.
 public final class Models {
     private static final Map<String,EntityModel<?>> REGISTRY=new LinkedHashMap<String,EntityModel<?>>();
     private Models() {}
@@ -33,7 +33,7 @@ public final class Models {
         if(model==null) throw new IllegalArgumentException("model is null");
         REGISTRY.put(model.type().getName(),model);
     }
-    /** Reads a relationship key without initializing it. Used by generated mappings. */
+    /// Reads a relationship key without initializing it. Used by generated mappings.
     public static Object foreignKey(Object owner,int index,Object target) {
         if(owner instanceof ManagedEntity) {
             EntityState state=((ManagedEntity)owner).__cn1OrmState();
@@ -47,13 +47,13 @@ public final class Models {
         if(model==null) throw new PersistenceException("No model for relationship target");
         return model.identifier(target);
     }
-    /** Component of a mapped foreign key, preserving unloaded association state. */
+    /// Component of a mapped foreign key, preserving unloaded association state.
     public static Object foreignKey(Object owner,int index,Object target,int component) {
         Object key=foreignKey(owner,index,target);
         if(key==null) return null;
         return key instanceof Identifier?((Identifier)key).values()[component]:key;
     }
-    /** Builds a map using a target entity's unconverted basic attribute. */
+    /// Builds a map using a target entity's unconverted basic attribute.
     public static Map mapBy(java.util.Collection values,Class type,String field) {
         if(values==null) return null;
         EntityModel model;synchronized(Models.class) { model=REGISTRY.get(type.getName()); }
@@ -66,7 +66,7 @@ public final class Models {
         }
         return result;
     }
-    /** New managed mappings must not silently fall through legacy scalar CRUD. */
+    /// New managed mappings must not silently fall through legacy scalar CRUD.
     public static synchronized boolean requiresSession(Class type) {
         EntityModel model=REGISTRY.get(type.getName());
         return model!=null && model.requiresSession();

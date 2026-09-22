@@ -24,7 +24,7 @@ package com.codename1.orm.session;
 
 import java.util.Arrays;
 
-/** Immutable composite identity, in the model's declared identifier-field order. */
+/// Immutable composite identity, in the model's declared identifier-field order.
 public final class Identifier {
     private final Object[] values;
     private Identifier(Object[] values) {

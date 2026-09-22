@@ -22,7 +22,7 @@
  */
 package com.codename1.annotations;
 import java.lang.annotation.*;
-/** Contributes inherited scalar and relationship mappings to concrete entities. */
+/// Contributes inherited scalar and relationship mappings to concrete entities.
 @Retention(RetentionPolicy.CLASS)
 @Target(ElementType.TYPE)
 public @interface MappedSuperclass {}

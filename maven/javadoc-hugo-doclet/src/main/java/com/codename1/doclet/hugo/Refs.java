@@ -153,7 +153,15 @@ final class Refs {
     static String typeContentPath(TypeElement type) {
         PackageElement pkg = packageOf(type);
         String dir = pkg.isUnnamed() ? "" : pkg.getQualifiedName().toString().replace('.', '/') + "/";
-        return dir + fileName(type) + ".md";
+        String name = fileName(type);
+        // Hugo interprets these basenames as bundle entry points, even when
+        // capitalized. An Index type must not hide its package's sibling pages.
+        // The hyphen cannot occur in a Java type name, so this cannot collide
+        // with another type. Public URLs are derived separately and stay intact.
+        if (name.equalsIgnoreCase("index") || name.equalsIgnoreCase("_index")) {
+            name = "type-" + name;
+        }
+        return dir + name + ".md";
     }
 
     /** The content file a package's summary is generated into. */

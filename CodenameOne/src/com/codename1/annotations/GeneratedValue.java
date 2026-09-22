@@ -22,7 +22,7 @@
  */
 package com.codename1.annotations;
 import java.lang.annotation.*;
-/** Overrides the legacy Id.autoIncrement strategy for this identifier. */
+/// Overrides the legacy Id.autoIncrement strategy for this identifier.
 @Retention(RetentionPolicy.CLASS)
 @Target(ElementType.FIELD)
 public @interface GeneratedValue {

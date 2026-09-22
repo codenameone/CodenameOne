@@ -22,7 +22,7 @@
  */
 package com.codename1.annotations;
 import java.lang.annotation.*;
-/** Collection mapping metadata interpreted at build time. */
+/// Collection mapping metadata interpreted at build time.
 @Retention(RetentionPolicy.CLASS)
 @Target(ElementType.FIELD)
 public @interface OrderBy { String value(); }

@@ -22,7 +22,7 @@
  */
 package com.codename1.annotations;
 import java.lang.annotation.*;
-/** Marks a public no-argument entity lifecycle callback. */
+/// Marks a public no-argument entity lifecycle callback.
 @Retention(RetentionPolicy.CLASS)
 @Target(ElementType.METHOD)
 public @interface PostPersist {}

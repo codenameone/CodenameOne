@@ -31,7 +31,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
-/** SQLite adapter used by managed sessions; the entity manager owns the database. */
+/// SQLite adapter used by managed sessions; the entity manager owns the database.
 final class SessionSqlAccess implements SqlAccess {
     private final Database db;
     private boolean ownsTransaction;

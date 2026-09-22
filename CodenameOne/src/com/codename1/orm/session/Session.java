@@ -30,11 +30,9 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
-/**
- * A bounded, non-thread-safe persistence context. Writes require an explicit
- * transaction; closing never commits. Instances returned by find are unique by
- * entity type and identifier until clear, detach, rollback, or close.
- */
+/// A bounded, non-thread-safe persistence context. Writes require an explicit
+/// transaction; closing never commits. Instances returned by find are unique by
+/// entity type and identifier until clear, detach, rollback, or close.
 public final class Session {
     private final SqlAccess sql;
     private final Map<String,EntityModel<?>> models;
@@ -140,7 +138,7 @@ public final class Session {
                 keyValues,kinds(model));
         return rows.isEmpty()?null:hydrate(model,rows.get(0));
     }
-    /** Reads or locks a row inside this session's transaction. */
+    /// Reads or locks a row inside this session's transaction.
     public <T> T find(Class<T> type,Object id,LockMode mode) {
         if(mode==null) throw new IllegalArgumentException("lock mode is null");
         if(mode==LockMode.NONE) return find(type,id);
@@ -317,7 +315,7 @@ public final class Session {
         } catch(RuntimeException e) { rollbackOnly=true; throw e; }
         finally { flushing=false; }
     }
-    /** Increments in SQL and refreshes an already managed instance. */
+    /// Increments in SQL and refreshes an already managed instance.
     public <T> boolean increment(Class<T> type,Object id,String field,long amount) {
         requireTransaction(); flush(); EntityModel<T> model=model(type);
         int index=model.index(field),version=model.versionIndex(); Attribute a=model.attributes()[index];
@@ -340,7 +338,7 @@ public final class Session {
         return changed>0;
     }
     public <T> Query<T> query(Class<T> type) { check(); return new Query<T>(this,model(type)); }
-    /** Creates missing tables and their constraints. Existing schemas require migrations. */
+    /// Creates missing tables and their constraints. Existing schemas require migrations.
     public void createTables() {
         check();
         if(transaction) throw new PersistenceException("Create schemas outside application transactions");
@@ -428,7 +426,7 @@ public final class Session {
         final String table,target;final String[] columns,targetColumns;
         ForeignKey(String table,String[] columns,String target,String[] targetColumns) { this.table=table;this.columns=columns;this.target=target;this.targetColumns=targetColumns; }
     }
-    /** Read-only validation of mapped columns, nullability, storage types, and primary keys. */
+    /// Read-only validation of mapped columns, nullability, storage types, and primary keys.
     public void validateSchema() {
         check();List<String> errors=new ArrayList<String>();
         for(EntityModel model:models.values()) {
@@ -485,7 +483,7 @@ public final class Session {
         if(name.indexOf("date")>=0 || name.indexOf("time")>=0) return 5;
         return 0;
     }
-    /** Counts a relationship without materializing its entities. */
+    /// Counts a relationship without materializing its entities.
     public long count(Object entity,String field) {
         check(); EntityModel owner=model(entity.getClass());Relationship relation=owner.relationships()[owner.relationIndex(field)];
         Object id=owner.identifier(entity);

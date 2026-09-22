@@ -22,7 +22,7 @@
  */
 package com.codename1.orm.session;
 
-/** An ORM failure, including an underlying database failure during lazy access. */
+/// An ORM failure, including an underlying database failure during lazy access.
 public class PersistenceException extends RuntimeException {
     public PersistenceException(String message) { super(message); }
     public PersistenceException(String message, Throwable cause) { super(message, cause); }

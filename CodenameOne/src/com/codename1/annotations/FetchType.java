@@ -22,5 +22,5 @@
  */
 package com.codename1.annotations;
 
-/** Association loading policy. */
+/// Association loading policy.
 public enum FetchType { EAGER, LAZY }

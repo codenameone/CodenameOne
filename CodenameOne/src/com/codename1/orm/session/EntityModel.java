@@ -22,7 +22,7 @@
  */
 package com.codename1.orm.session;
 
-/** Generated, reflection-free access to persistent entity values. */
+/// Generated, reflection-free access to persistent entity values.
 public abstract class EntityModel<T> {
     public abstract Class<T> type();
     public abstract String table();
@@ -37,13 +37,13 @@ public abstract class EntityModel<T> {
     public Object domainValue(T entity,int index) { return get(entity,index); }
     public abstract void set(T entity, int index, Object value);
     public boolean requiresSession() { return relationships().length>0 || versionIndex()>=0 || generation()!=0 || idIndexes().length>1 || indexes().length>0 || discriminatorIndex()>=0; }
-    /** 0: assigned/identity, 1: UUID, 2: native sequence with table fallback, 3: table. */
+    /// 0: assigned/identity, 1: UUID, 2: native sequence with table fallback, 3: table.
     public Index[] indexes() { return new Index[0]; }
     public int generation() { return 0; }
     public String generator() { return table()+"_id"; }
     public Object parameter(int index,Object value) { return Values.storage(value); }
     public void read(T entity,Object[] values) { for(int i=0;i<values.length;i++) set(entity,i,values[i]); }
-    /** Generated lifecycle dispatch: pre/post persist, pre/post update, pre/post remove, post load. */
+    /// Generated lifecycle dispatch: pre/post persist, pre/post update, pre/post remove, post load.
     public void lifecycle(T entity,int event) {}
     public Relationship[] relationships() { return new Relationship[0]; }
     public Object relation(T entity,int index) {

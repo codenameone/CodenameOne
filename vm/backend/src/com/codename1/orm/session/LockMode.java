@@ -21,5 +21,5 @@
  * need additional information or have any questions.
  */
 package com.codename1.orm.session;
-/** Explicit row-lock modes. SQLite does not support these row locks. */
+/// Explicit row-lock modes. SQLite does not support these row locks.
 public enum LockMode { NONE, PESSIMISTIC_READ, PESSIMISTIC_WRITE }

@@ -22,7 +22,7 @@
  */
 package com.codename1.orm;
 
-/** Creates a database-independent DAO instance for one entity manager. */
+/// Creates a database-independent DAO instance for one entity manager.
 public interface DaoFactory<T> {
     Dao<T> create();
 }

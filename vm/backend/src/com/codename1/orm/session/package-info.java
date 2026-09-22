@@ -20,9 +20,15 @@
  * Please contact Codename One through http://www.codenameone.com/ if you
  * need additional information or have any questions.
  */
+/// Managed persistence contexts and queries for the client and backend ORMs.
+///
+/// Open a [Session] with the runtime's `EntityManager.openSession()` method.
+/// A session maintains entity identity, detects changes, and loads relationships
+/// using generated [EntityModel] metadata. Writes require an active transaction;
+/// closing a session rolls back an active transaction and detaches its entities.
+/// Sessions are not thread-safe. Initialize associations needed by the UI before
+/// detaching entities, and perform client database access off the event thread.
+///
+/// Use [Query] for builder queries or [JpqlQuery] for the documented JPQL subset.
+/// Models and relationship field access are generated and enhanced at build time.
 package com.codename1.orm.session;
-
-/// An unloaded association was accessed after its session was detached or closed.
-public final class LazyInitializationException extends PersistenceException {
-    public LazyInitializationException(String message) { super(message); }
-}

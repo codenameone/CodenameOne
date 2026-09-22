@@ -25,10 +25,10 @@ package com.codename1.orm.session;
 import java.io.IOException;
 import java.util.List;
 
-/** Runtime adapter. A session owns this adapter, never a global connection. */
+/// Runtime adapter. A session owns this adapter, never a global connection.
 public interface SqlAccess {
     String dialect();
-    /** Rows contain column name, declared SQL type, not-null flag, primary-key flag. */
+    /// Rows contain column name, declared SQL type, not-null flag, primary-key flag.
     List<Object[]> describe(String table) throws IOException;
     String quote(String name);
     String columnType(int kind);

@@ -361,10 +361,16 @@ class HugoDocletTest {
                 "}",
                 ""), StandardCharsets.UTF_8);
 
+        for (String name : List.of("Index", "_index")) {
+            Files.writeString(sources.resolve(name + ".java"),
+                    "package p; public class " + name + " {}", StandardCharsets.UTF_8);
+        }
+
         DocumentationTool tool = ToolProvider.getSystemDocumentationTool();
         try (StandardJavaFileManager files = tool.getStandardFileManager(null, null, null)) {
             Iterable<? extends JavaFileObject> units = files.getJavaFileObjects(
                     sources.resolve("Sample.java"), sources.resolve("Other.java"),
+                    sources.resolve("Index.java"), sources.resolve("_index.java"),
                     sources.resolve("Child.java"),
                     sources.resolve("Shared.java"), sources.resolve("UsesShared.java"),
                     sources.resolve("Listener.java"), sources.resolve("Marker.java"),
@@ -394,6 +400,17 @@ class HugoDocletTest {
         // only characters that could be escaped, and neither appears in one.
         assertTrue(page(page).contains("\"" + anchor + "\""),
                 "expected fragment identifier " + anchor + " in " + page);
+    }
+
+    @Test
+    void reservedHugoBasenamesKeepTypeUrlsWithoutCreatingBundles() throws IOException {
+        for (String name : List.of("Index", "_index")) {
+            assertFalse(Files.exists(content.resolve("p/" + name + ".md")));
+            String page = page("type-" + name + ".md");
+            assertTrue(page.contains("\"url\": \"/javadoc/p/" + name + "/\""), page);
+        }
+        assertTrue(Files.exists(content.resolve("p/Other.md")));
+        assertTrue(Files.exists(content.resolve("p/package-summary.md")));
     }
 
     @Test

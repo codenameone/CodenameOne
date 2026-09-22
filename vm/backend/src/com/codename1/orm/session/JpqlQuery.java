@@ -27,12 +27,10 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
-/**
- * A parameterized query over generated entity metadata. Supports selects,
- * relationship joins, scalar projections, aggregates, predicate subqueries,
- * grouping, ordering and transactional bulk update/delete. Unsupported syntax
- * is rejected before any SQL is executed.
- */
+/// A parameterized query over generated entity metadata. Supports selects,
+/// relationship joins, scalar projections, aggregates, predicate subqueries,
+/// grouping, ordering and transactional bulk update/delete. Unsupported syntax
+/// is rejected before any SQL is executed.
 public final class JpqlQuery<T> {
     private final Session session;
     private final Class<T> resultType;
@@ -71,7 +69,7 @@ public final class JpqlQuery<T> {
             throw new PersistenceException("Query result is "+value.getClass().getName()+", expected "+resultType.getName());
         return (T)value;
     }
-    /** Bulk DML bypasses cascades/callbacks and clears the context after execution. */
+    /// Bulk DML bypasses cascades/callbacks and clears the context after execution.
     public int executeUpdate() {
         if(!plan.mutation) throw new IllegalStateException("Not a bulk mutation");
         if(limit>=0 || offset>0) throw new IllegalArgumentException("Bulk mutation pagination is not supported");

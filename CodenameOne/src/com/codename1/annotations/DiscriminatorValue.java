@@ -22,7 +22,7 @@
  */
 package com.codename1.annotations;
 import java.lang.annotation.*;
-/** The persistent discriminator for a concrete class in an entity hierarchy. */
+/// The persistent discriminator for a concrete class in an entity hierarchy.
 @Retention(RetentionPolicy.CLASS)
 @Target(ElementType.TYPE)
 public @interface DiscriminatorValue { String value(); }

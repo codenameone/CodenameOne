@@ -23,7 +23,7 @@
 package com.codename1.annotations;
 
 import java.lang.annotation.*;
-/** Declares a persistent association, resolved at build time. */
+/// Declares a persistent association, resolved at build time.
 @Retention(RetentionPolicy.CLASS)
 @Target(ElementType.FIELD)
 public @interface OneToOne {

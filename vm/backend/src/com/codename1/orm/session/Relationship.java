@@ -22,7 +22,7 @@
  */
 package com.codename1.orm.session;
 
-/** Immutable generated relationship mapping. */
+/// Immutable generated relationship mapping.
 public final class Relationship {
     public final String field, mappedBy, joinTable, joinColumn, inverseJoinColumn,mapKey,orderColumn,orderBy;
     public final Class target;

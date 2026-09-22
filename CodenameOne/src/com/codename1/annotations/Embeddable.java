@@ -22,7 +22,7 @@
  */
 package com.codename1.annotations;
 import java.lang.annotation.*;
-/** A reusable value object whose scalar fields are stored in its owner table. */
+/// A reusable value object whose scalar fields are stored in its owner table.
 @Retention(RetentionPolicy.CLASS)
 @Target(ElementType.TYPE)
 public @interface Embeddable {}

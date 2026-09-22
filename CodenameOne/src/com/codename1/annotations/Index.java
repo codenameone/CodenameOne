@@ -22,7 +22,7 @@
  */
 package com.codename1.annotations;
 import java.lang.annotation.*;
-/** Database index over mapped field names, declared on an entity. */
+/// Database index over mapped field names, declared on an entity.
 @Retention(RetentionPolicy.CLASS)
 @Target({})
 public @interface Index {

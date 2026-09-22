@@ -21,5 +21,5 @@
  * need additional information or have any questions.
  */
 package com.codename1.annotations;
-/** Portable identifier generation strategies. SEQUENCE uses a table when native sequences are unavailable. */
+/// Portable identifier generation strategies. SEQUENCE uses a table when native sequences are unavailable.
 public enum GenerationType { IDENTITY, UUID, SEQUENCE, TABLE }

@@ -22,7 +22,7 @@
  */
 package com.codename1.annotations;
 import java.lang.annotation.*;
-/** Mapping for an owned collection of scalar values. */
+/// Mapping for an owned collection of scalar values.
 @Retention(RetentionPolicy.CLASS)
 @Target(ElementType.FIELD)
 public @interface MapKeyColumn { String name() default "map_key"; }

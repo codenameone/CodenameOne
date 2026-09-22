@@ -22,5 +22,5 @@
  */
 package com.codename1.annotations;
 
-/** Lifecycle operations propagated to an association. */
+/// Lifecycle operations propagated to an association.
 public enum CascadeType { ALL, PERSIST, MERGE, REMOVE, REFRESH, DETACH }

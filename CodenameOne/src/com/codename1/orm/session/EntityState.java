@@ -22,7 +22,7 @@
  */
 package com.codename1.orm.session;
 
-/** Per-instance lazy state inserted into an entity by the enhancer. */
+/// Per-instance lazy state inserted into an entity by the enhancer.
 public final class EntityState {
     Session session;
     final Object entity;
@@ -54,7 +54,7 @@ public final class EntityState {
         session.initialize(entity,index);
     }
     public void assigned(int index) { loaded[index]=true; }
-    /** Returns the stored key without triggering an association query. */
+    /// Returns the stored key without triggering an association query.
     public Object key(int index) { return keys[index]; }
     public boolean isLoaded(int index) { return loaded[index]; }
 }

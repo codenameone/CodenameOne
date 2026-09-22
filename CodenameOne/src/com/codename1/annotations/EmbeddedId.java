@@ -22,7 +22,7 @@
  */
 package com.codename1.annotations;
 import java.lang.annotation.*;
-/** Flattens an embeddable identifier into the owner table using a field-name prefix. */
+/// Flattens an embeddable identifier into the owner table using a field-name prefix.
 @Retention(RetentionPolicy.CLASS)
 @Target(ElementType.FIELD)
 public @interface EmbeddedId {}
