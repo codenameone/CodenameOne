@@ -255,9 +255,8 @@ final class BuildHintsApple {
                 .platform("tv")
                 .doc("true/false (defaults to false). Adds an Apple TV (tvOS) application target to the iOS "
                         + "build. The tvOS app is a separate `appletvos` target built from the same Java/Kotlin "
-                        + "sources through ParparVM (UIKit + Metal; tvOS has no OpenGL ES). Enabling it doesn't "
-                        + "change the iOS app -- in particular it doesn't override the iOS app's `ios.metal` "
-                        + "setting. Also turned on implicitly by `codename1.tvMain`."));
+                        + "sources through ParparVM (UIKit + Metal). Enabling it doesn't change the iOS app. "
+                        + "Also turned on implicitly by `codename1.tvMain`."));
 
         h.add(new Hint("tvNative.mainClass")
                 .group(HintGroup.TV_NATIVE)

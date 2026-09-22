@@ -146,14 +146,36 @@ public final class HealthDataType {
     public static final HealthDataType WALKING_HEART_RATE_AVERAGE =
             discrete("walking_heart_rate_average", HealthUnit.COUNT_PER_MINUTE);
 
-    /// Heart-rate variability as the standard deviation of NN intervals,
-    /// the metric both platforms expose (`HKQuantityTypeIdentifier` `...
-    /// HeartRateVariabilitySDNN`). Other HRV metrics -- RMSSD, frequency
-    /// domain -- are not stored by either platform; derive them yourself
-    /// from the RR intervals a chest strap reports through
-    /// `com.codename1.health.sensors`.
+    /// Heart-rate variability as the standard deviation of NN intervals
+    /// (`HKQuantityTypeIdentifierHeartRateVariabilitySDNN`).
+    ///
+    /// **This is an iOS metric.** Health Connect stores no SDNN record at
+    /// all -- its only HRV record is `HeartRateVariabilityRmssdRecord`,
+    /// which is [#HEART_RATE_VARIABILITY_RMSSD] -- so Android refuses this
+    /// type with [HealthError#TYPE_NOT_SUPPORTED] rather than answering it
+    /// with a different statistic. Use [#HEART_RATE_VARIABILITY_RMSSD] for
+    /// anything cross-platform.
     public static final HealthDataType HEART_RATE_VARIABILITY_SDNN =
             discrete("heart_rate_variability_sdnn", HealthUnit.MILLISECOND);
+
+    /// Heart-rate variability as the root mean square of successive RR
+    /// interval differences.
+    ///
+    /// The cross-platform HRV metric, and the one to reach for:
+    /// Health Connect has only ever stored RMSSD
+    /// (`HeartRateVariabilityRmssdRecord`), and HealthKit added
+    /// `HKQuantityTypeIdentifierHeartRateVariabilityRMSSD` in iOS 27.
+    ///
+    /// This is also the first HRV type Android can actually answer --
+    /// [#HEART_RATE_VARIABILITY_SDNN] has no Health Connect record behind
+    /// it and is refused there.
+    ///
+    /// An older iOS, or an application built with an SDK older than
+    /// iOS 27, reports it as [HealthError#TYPE_NOT_SUPPORTED] rather than
+    /// substituting SDNN -- the two are different statistics over the same
+    /// intervals and are not interchangeable.
+    public static final HealthDataType HEART_RATE_VARIABILITY_RMSSD =
+            discrete("heart_rate_variability_rmssd", HealthUnit.MILLISECOND);
 
     public static final HealthDataType OXYGEN_SATURATION =
             discrete("oxygen_saturation", HealthUnit.PERCENT);

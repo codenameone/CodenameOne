@@ -24,7 +24,7 @@ Contract the render-driver must provide (everything else already compiles):
   ones are no-ops on watch.
 - A **`[CodenameOne_GLViewController instance]`-compatible singleton** (NSObject,
   NOT UIViewController) exposing the selectors the other 10 files call:
-  `drawFrame`, `flushBuffer`, `drawString`, `upcomingAddClip`, `eaglView`/`view`
+  `drawFrame`, `flushBuffer`, `drawString`, `upcomingAddClip`, `renderingView`/`view`
   (return the `CN1WatchRenderingView`), `isPaintFinished`, and no-op
   `present*ViewController*`.
 - The op queue (`currentTarget`/`upcomingTarget` swap) + `drawFrame` draining
@@ -160,10 +160,8 @@ Each remaining op gets the same treatment as `FillRect.m`:
 ```objc
 #if TARGET_OS_WATCH
 -(void)execute { CN1CG<Primitive>(...); }
-#elif defined(USE_ES2)
-   ... existing ES2/Metal ...
 #else
-   ... existing ES1 ...
+   ... existing Metal ...
 #endif
 ```
 
@@ -171,31 +169,31 @@ Remaining ops and their `CN1CG*` target:
 
 | Op | Backend call | Notes |
 |----|--------------|-------|
-| `FillPolygon` | `CN1CGFillPolygon` | guard the direct `<OpenGLES/*>` imports in the .m |
-| `DrawString` | `CN1CGDrawString` | header imports OpenGLES + UIKit — guard them |
-| `DrawImage` | `CN1CGDrawImage` | use `[img getImage].CGImage`; guard GL headers in .h |
+| `FillPolygon` | `CN1CGFillPolygon` | |
+| `DrawString` | `CN1CGDrawString` | header imports UIKit — guard it |
+| `DrawImage` | `CN1CGDrawImage` | use `[img getImage].CGImage` |
 | `TileImage` | `CN1CGTileImage` | as DrawImage |
-| `DrawGradient` | `CN1CGGradientRect` | guard GL headers in .h |
+| `DrawGradient` | `CN1CGGradientRect` | |
 | `Scale` / `Rotate` | `CN1CGScale` / `CN1CGRotate` | Scale.m imports ClipRect.h (see below) |
-| `SetTransform` | `CN1CGSetAffine` | header interface is inside `#ifdef USE_ES2`; add a watch interface |
+| `SetTransform` | `CN1CGSetAffine` | |
 | `ResetAffine` | `CN1CGResetAffine` | |
-| `ClipRect` | `CN1CGSetClipRect` / `CN1CGSetClipPolygon` | has `GLuint` ivars — guard |
+| `ClipRect` | `CN1CGSetClipRect` / `CN1CGSetClipPolygon` | has a texture-handle ivar — guard |
 | `DrawPath` | (tessellate → `CN1CGFillPolygon`/path) | uses `Renderer*`; needs CG path build |
-| `DrawTextureAlphaMask` | `CN1CGDrawImage` of the mask | Metal/GL only today |
+| `DrawTextureAlphaMask` | `CN1CGDrawImage` of the mask | Metal only today |
 | `DrawMultiStopGradient` | extend `CN1CGGradientRect` | entirely inside `#ifdef CN1_USE_METAL` |
 | `RadialGradientPaint` | paint-state; map to gradient | |
 
 Shared headers needing `#if TARGET_OS_WATCH` / `#else` guards so the watch slice
-compiles (they pull `<OpenGLES/*>` / `GLuint` / GLKit):
-`GLUIImage.h` (keep the `UIImage` ivar + `getImage`; drop GL texture members),
+compiles (they pull UIKit / Metal):
+`GLUIImage.h` (keep the `UIImage` ivar + `getImage`; drop the texture members),
 `ClipRect.h`, `SetTransform.h`, `Rotate.h`, `RadialGradientPaint.h`,
 `DrawImage.h`, `TileImage.h`, `DrawString.h`, `DrawGradient.h`,
 `DrawTextureAlphaMask.h`, `DrawPath.h`/`Renderer.h`.
 
 Files **excluded** from the watch slice via
-`EXCLUDED_SOURCE_FILE_NAMES[sdk=watchos*]` (GL/Metal-only, no watch substitute) —
+`EXCLUDED_SOURCE_FILE_NAMES[sdk=watchos*]` (Metal-only, no watch substitute) —
 see `WatchNativeBuilder.applyXcodeSettings`:
-`EAGLView.m`, `METALView.m`, `CN1ES1compat.m`, `CN1ES2compat.m`, `CN1GL3D.m`,
+`METALView.m`, `CN1GL3D.m`,
 `CN1Metalcompat.m`, `CN1MetalGlyphAtlas.m`, `CN1MetalPipelineCache.m`,
 `DrawGradientTextureCache.m`, `DrawStringTextureCache.m`,
 `CodenameOne_GLViewController.xib`, `CodenameOne_GLSceneDelegate.m`.
@@ -203,7 +201,7 @@ see `WatchNativeBuilder.applyXcodeSettings`:
 ## Bootstrap (Phase 3)
 
 `CodenameOne_GLAppDelegate.m` / `CodenameOne_GLViewController.m` instantiate
-`CN1WatchRenderingView` instead of `EAGLView`/`METALView` and replace the
+`CN1WatchRenderingView` instead of `METALView` and replace the
 `CADisplayLink` pump with a timer (see `CN1WatchHost`). The watch host
 (`CN1WatchHost.{h,m}`, SwiftUI/SpriteKit surface) owns the run loop and feeds
 Digital-Crown + tap input into the CN1 pointer/scroll event path.
@@ -212,3 +210,54 @@ Digital-Crown + tap input into the CN1 pointer/scroll event path.
 > without the watchOS SDK + Xcode. The Phase 0 spike (ParparVM on `arm64_32`,
 > one CG frame on-device) must validate the toolchain before the full rollout is
 > worth committing. The foundation above is what the spike exercises.
+
+## watchOS 27: what actually changed (measured 2026-09-19, Xcode 27.1)
+
+Almost nothing that this port has to act on, and that is worth writing down so
+the next person does not re-derive it.
+
+**WatchKit, ClockKit and WatchConnectivity gain ZERO new headers** between
+`WatchOS26.2.sdk` and `WatchOS27.0.sdk`. The rendering contract, the
+complication surfaces and the phone-watch channel are all unchanged.
+
+What did change is **which frameworks the watch can link**. New on the watch in
+27: `FoundationModels`, `CoreAI`, `Vision`, `ThreadNetwork`, `NowPlaying`,
+`MediaIntents`, `LinkPresentation`, `AudioAccessoryKit`, `StateReporting`,
+`CrashReportExtension`, `_AppIntents_HealthKit` and several `_X_Y` interop
+shims. Plus `CMBody` / `CLBody` / `NIBody` -- body-identity protocols in
+CoreMotion, CoreLocation and NearbyInteraction, with no Codename One surface.
+
+Three entries in `WatchNativeBuilder`'s two lists were re-checked against the
+new SDKs, and the comments there now record the result:
+
+| Framework | WatchOS26.2 | WatchSim26.2 | WatchOS27.0 | WatchSim27.0 |
+|---|---|---|---|---|
+| `SceneKit` | present | present | present | present |
+| `BackgroundTasks` | present | **absent** | present | present |
+| `Vision` | absent | absent | **present** | **present** |
+
+`SceneKit` was never absent -- the comment claiming it was, was simply wrong,
+and harmlessly so: it is weak-linked either way because nothing on the watch
+slice references it. `BackgroundTasks` was the one framework whose availability
+differed between the device and simulator SDKs; that asymmetry is gone in 27.
+`Vision` is genuinely new on the watch.
+
+None of this moves a framework across the optional/linkable partition -- every
+absent framework is still weak-linked and every referenced one is still linked
+-- and `WatchNativeBuilderTest`'s 49 tests pass unchanged against the Xcode 27.1
+SDKs.
+
+`Vision` being present is the one that could become a feature: it is what
+`com.codename1.ai.vision` needs. It is not enough on its own -- `CN1Vision.m`
+would have to compile for `TARGET_OS_WATCH` first -- so the framework stays in
+the optional list as "present but unreferenced" until someone does that work.
+
+HealthKit's watch-relevant additions are covered separately: iOS/watchOS 27 add
+`HKLiveWorkoutZoneUpdate` and a `-workoutBuilder:didUpdateWorkoutZone:`
+delegate callback, which matter here because `CN1_HEALTH_WORKOUT_SESSION` is
+`TARGET_OS_WATCH`-gated in `CodenameOne_GLViewController.h`.
+
+`UIHinge` is `API_UNAVAILABLE(watchos)`, so `CN1Hinge.m` compiles to its
+"no hinge" answers on this slice. It needs no entry in `EXCLUDED_WATCH_SOURCES`:
+the guard is `__has_include(<UIKit/UIHingeInteraction.h>)`, and that header is
+absent from the watch SDK, so the file excludes itself.

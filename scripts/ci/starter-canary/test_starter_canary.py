@@ -387,6 +387,26 @@ class Budgets(unittest.TestCase):
         self.assertIs(parameter.default, inspect.Parameter.empty)
 
 
+class WorkflowContract(unittest.TestCase):
+    """The live Linux leg needs a display even though the runner is headless."""
+
+    @classmethod
+    def workflow(cls):
+        root = Path(__file__).resolve().parents[3]
+        return (root / ".github/workflows/starter-canary.yml").read_text()
+
+    def test_linux_installs_xvfb(self):
+        workflow = self.workflow()
+        self.assertIn("if: runner.os == 'Linux'", workflow)
+        self.assertIn("bash scripts/ci/apt-get-install.sh xvfb", workflow)
+
+    def test_linux_runs_the_canary_inside_xvfb(self):
+        workflow = self.workflow()
+        self.assertIn('if [ "$RUNNER_OS" = "Linux" ]; then', workflow)
+        self.assertIn("command=(xvfb-run -a python)", workflow)
+        self.assertIn('"${command[@]}" scripts/ci/starter-canary/starter_canary.py', workflow)
+
+
 class PomProperties(unittest.TestCase):
     """The plugin version is its own property and must not be assumed equal."""
 

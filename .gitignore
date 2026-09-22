@@ -147,6 +147,7 @@ scripts/fidelity-app/common/src/main/resources/*ThemeDev.res
 # Native theme .res is copied into the fidelity-app bundle from Themes/ at
 # build time (common/pom.xml copy-native-themes); never commit the duplicate.
 scripts/fidelity-app/common/src/main/resources/iOSModernTheme.res
+scripts/fidelity-app/common/src/main/resources/iOSModern27Theme.res
 scripts/fidelity-app/common/src/main/resources/AndroidMaterialTheme.res
 /.m2/
 
@@ -185,3 +186,7 @@ cn1-build-hints.json
 /docs/website/content/developer-guide/chapters/
 /docs/website/data/developer-guide.json
 /docs/website/data/guide-links.json
+
+# Concatenated CSS the native-theme build feeds the compiler. Regenerated on
+# every run; the parts under native-themes/<theme>/*.css are the source.
+native-themes/*/target/

@@ -23,7 +23,11 @@ OUT_DIR="$REPO_ROOT/artifacts/desktop-native-ref/gnome"
 mkdir -p "$OUT_DIR"
 
 log "Compiling $SRC"
-cc -O1 -std=c11 -Wall -o "$BUILD/native-ref" "$SRC" \
+# -g and -rdynamic are for the fatal-signal handler in native-ref.c: without the dynamic
+# symbol table backtrace_symbols_fd prints bare addresses, which turns a crash report into
+# a hex dump nobody can act on. They cost build time and binary size in a tool that is
+# thrown away after one capture.
+cc -O1 -g -rdynamic -std=c11 -Wall -o "$BUILD/native-ref" "$SRC" \
     $(pkg-config --cflags --libs gtk4 libadwaita-1)
 
 # A bare Xvfb has no window manager, so nothing ever takes focus and every GTK toplevel

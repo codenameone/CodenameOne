@@ -51,11 +51,15 @@ import static org.junit.jupiter.api.Assertions.fail;
  * {@code struct clazz} instances, and {@code getClassImpl} hands the struct back
  * directly. That makes their identity, hash, and virtual {@code toString} dispatch worth
  * regression coverage independently of whatever else the reporter's program was doing.</p>
+ *
+ * <p>Also checks heap membership directly for real class descriptors (issue #5881).
+ * Correct Java output under allocation churn alone cannot prove that a static-final
+ * class literal has not silently erased another object's heap entry.</p>
  */
 class GetClassIntegrationTest {
 
     @Test
-    void classObjectsBehaveLikeTheJvmUnderAllocationChurn() throws Exception {
+    void classObjectsPreserveHeapAndBehaveLikeTheJvmUnderAllocationChurn() throws Exception {
         Parser.cleanup();
 
         Path sourceDir = Files.createTempDirectory("get-class-sources");
@@ -63,7 +67,7 @@ class GetClassIntegrationTest {
         Path javaApiDir = Files.createTempDirectory("get-class-java-api");
 
         Path source = sourceDir.resolve("GetClassApp.java");
-        Files.write(source, loadAppSource().getBytes(StandardCharsets.UTF_8));
+        Files.write(source, loadSource("GetClassApp.java").getBytes(StandardCharsets.UTF_8));
 
         CompilerHelper.CompilerConfig config = selectCompiler();
         if (config == null) {
@@ -107,6 +111,24 @@ class GetClassIntegrationTest {
         assertTrue(Files.exists(cmakeLists), "Translator should emit a CMake project");
         CleanTargetIntegrationTest.replaceLibraryWithExecutableTarget(cmakeLists, "GetClassApp-src");
 
+        // Run the heap invariant in a fresh process before VM startup, without
+        // allocator/collector timing. Append to the real runtime translation unit
+        // so the test can also inspect its private immortal-root registries.
+        Path nativeSources = distDir.resolve("GetClassApp-src");
+        Path runtime = nativeSources.resolve("cn1_globals.c");
+        String runtimeSource = new String(Files.readAllBytes(runtime), StandardCharsets.UTF_8);
+        Files.write(runtime, (runtimeSource + "\n" + loadSource("GcHeapRemovalTest.c"))
+                .getBytes(StandardCharsets.UTF_8));
+        Path nativeMain = nativeSources.resolve("GetClassApp.c");
+        String mainSource = new String(Files.readAllBytes(nativeMain), StandardCharsets.UTF_8);
+        String mainSignature = "int main(int argc, char *argv[]) {";
+        assertTrue(mainSource.contains(mainSignature), "Generated native main should exist");
+        mainSource = mainSource.replace(mainSignature,
+                "extern int cn1TestHeapRemoval(void);\n" + mainSignature
+                        + "\n    if (argc == 2 && strcmp(argv[1], \"--test-heap-removal\") == 0)"
+                        + " return cn1TestHeapRemoval();");
+        Files.write(nativeMain, mainSource.getBytes(StandardCharsets.UTF_8));
+
         Path buildDir = distDir.resolve("build");
         Files.createDirectories(buildDir);
         CleanTargetIntegrationTest.runCommand(Arrays.asList(
@@ -119,6 +141,10 @@ class GetClassIntegrationTest {
         CleanTargetIntegrationTest.runCommand(Arrays.asList("cmake", "--build", buildDir.toString()), distDir);
 
         Path executable = buildDir.resolve("GetClassApp");
+        String heapOutput = CleanTargetIntegrationTest.runCommand(
+                Arrays.asList(executable.toString(), "--test-heap-removal"), buildDir);
+        assertTrue(heapOutput.contains("HEAP_REMOVAL_OK: 33 descriptors"),
+                "Every real descriptor must preserve the heap. Output: " + heapOutput);
         String parparOutput = CleanTargetIntegrationTest.runCommand(
                 Arrays.asList(executable.toString()), buildDir);
         assertTrue(parparOutput.contains("DONE"),
@@ -159,10 +185,10 @@ class GetClassIntegrationTest {
         return cases;
     }
 
-    private String loadAppSource() throws Exception {
+    private String loadSource(String name) throws Exception {
         java.io.InputStream in = GetClassIntegrationTest.class
-                .getResourceAsStream("/com/codename1/tools/translator/GetClassApp.java");
-        assertNotNull(in, "GetClassApp.java test resource should exist");
+                .getResourceAsStream("/com/codename1/tools/translator/" + name);
+        assertNotNull(in, name + " test resource should exist");
         try (BufferedReader reader = new BufferedReader(new InputStreamReader(in, StandardCharsets.UTF_8))) {
             return reader.lines().collect(Collectors.joining("\n")) + "\n";
         }

@@ -63,6 +63,7 @@ using System.Text;
 using Microsoft.UI.Composition.SystemBackdrops;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
+using Microsoft.UI.Xaml.Controls.Primitives;
 using Microsoft.UI.Xaml.Media;
 using Microsoft.UI;
 using Microsoft.UI.Windowing;
@@ -158,6 +159,25 @@ public partial class App : Application
         new("DesktopSlider",       "winui_slider",        new[] { "normal", "hover", "disabled" }),
         new("DesktopProgressBar",  "winui_progressbar",   new[] { "normal" }),
         new("DesktopComboBox",     "winui_combobox",      new[] { "normal", "hover", "disabled" }),
+
+        // Second wave. Windows carries three rows the other two references cannot: its menu
+        // bar and menu item are ordinary Controls that render into a view, and so is its
+        // ToolTip, where the AppKit and GTK equivalents are window-server surfaces. The
+        // scrollbar is here and not on macOS for the same reason -- see the DesktopScrollBar
+        // note in fidelity-tests.yaml for what was measured.
+        new("DesktopScrollBar",    "winui_scrollbar",       new[] { "normal" }),
+        new("DesktopSeparator",    "winui_separator",       new[] { "normal" }),
+        new("DesktopGroupBox",     "winui_groupbox",        new[] { "normal" }),
+        new("DesktopStepper",      "winui_numberbox",       new[] { "normal", "disabled" }),
+        new("DesktopLinkButton",   "winui_hyperlinkbutton", new[] { "normal", "hover", "disabled" }),
+        new("DesktopSearchField",  "winui_autosuggestbox",  new[] { "normal", "disabled" }),
+        new("DesktopListRow",      "winui_listviewitem",    new[] { "normal", "selected" }),
+        new("DesktopTabs",         "winui_tabview",         new[] { "normal" }),
+        new("DesktopToolbar",      "winui_commandbar",      new[] { "normal" }),
+        new("DesktopDisclosure",   "winui_expander",        new[] { "normal" }),
+        new("DesktopMenuBar",      "winui_menubar",         new[] { "normal" }),
+        new("DesktopMenuItem",     "winui_menuflyoutitem",  new[] { "normal", "hover", "disabled" }),
+        new("DesktopTooltip",      "winui_tooltip",         new[] { "normal" }),
     };
 
     /// Controls with no natural width: layout always assigns one, so the tile width is the
@@ -165,7 +185,21 @@ public partial class App : Application
     /// and FULL_WIDTH_IDS in DesktopTileRunner. If one side stretches a control and the
     /// other does not, the comparison is between two geometries and the score means nothing.
     private static bool IsFullWidth(string kind) =>
-        kind is "winui_slider" or "winui_progressbar" or "winui_textbox";
+        kind is "winui_slider" or "winui_progressbar" or "winui_textbox"
+            // Second wave, same rule: a search field measures to its placeholder, and a row,
+            // a box, a tab strip, a command bar and a menu bar are containers that take the
+            // width they are given.
+            or "winui_autosuggestbox" or "winui_listviewitem"
+            or "winui_groupbox" or "winui_tabview" or "winui_commandbar" or "winui_menubar"
+            or "winui_separator";
+
+    /// Controls with no natural HEIGHT, the same rule on the other axis. A group box is a
+    /// frame around other things -- left to measure itself it collapses onto its own header
+    /// and draws no frame, which is a heading rather than a group box -- and a vertical
+    /// scrollbar is defined by its length. Kept in step BY HAND with FULL_HEIGHT_KINDS in the
+    /// macOS and GNOME references and FULL_HEIGHT_IDS in DesktopTileRunner.
+    private static bool IsFullHeight(string kind) =>
+        kind is "winui_groupbox" or "winui_scrollbar";
 
     private static FrameworkElement MakeWidget(string kind) => kind switch
     {
@@ -185,8 +219,132 @@ public partial class App : Application
         "winui_slider" => new Slider { Minimum = 0, Maximum = 1, Value = 0.5, StepFrequency = 0.01 },
         "winui_progressbar" => new ProgressBar { Minimum = 0, Maximum = 1, Value = 0.6 },
         "winui_combobox" => MakeComboBox(),
+
+        // A ScrollBar in its always-visible form with the thumb at the top covering two
+        // fifths of the track. Both sides have to agree about where the thumb is before
+        // anything about its colour or shape can be compared, and the CN1 side is drawn at
+        // the same proportion and offset.
+        "winui_scrollbar" => new ScrollBar
+        {
+            Orientation = Orientation.Vertical,
+            Minimum = 0,
+            Maximum = 100,
+            Value = 0,
+            ViewportSize = 40,
+            IndicatorMode = ScrollingIndicatorMode.MouseIndicator,
+            Visibility = Visibility.Visible,
+        },
+        "winui_separator" => MakeSeparator(),
+        "winui_groupbox" => MakeGroupBox(),
+        // NumberBox with its spin buttons shown inline, which is the WinUI stepper. Without
+        // SpinButtonPlacementMode it is a plain number field and the control under
+        // comparison would be missing half of itself.
+        "winui_numberbox" => new NumberBox
+        {
+            Value = 1,
+            Minimum = 0,
+            Maximum = 10,
+            SpinButtonPlacementMode = NumberBoxSpinButtonPlacementMode.Inline,
+        },
+        "winui_hyperlinkbutton" => new HyperlinkButton { Content = "Link" },
+        "winui_autosuggestbox" => new AutoSuggestBox
+        {
+            Text = "Search",
+            QueryIcon = new SymbolIcon(Symbol.Find),
+        },
+        "winui_listviewitem" => new ListViewItem { Content = "Row" },
+        "winui_tabview" => MakeTabView(),
+        "winui_commandbar" => MakeCommandBar(),
+        "winui_expander" => new Expander { Header = "Details", Content = new TextBlock { Text = "Item" } },
+        "winui_menubar" => MakeMenuBar(),
+        "winui_menuflyoutitem" => new MenuFlyoutItem { Text = "Open" },
+        // A WinUI ToolTip is an ordinary Control and renders into a view, which is why this
+        // row exists here and nowhere else: the AppKit and GTK tooltips are separate windows
+        // the capture path cannot see.
+        "winui_tooltip" => new ToolTip { Content = "Tooltip" },
         _ => null,
     };
+
+    private static FrameworkElement MakeSeparator()
+    {
+        // WinUI has no Separator control for content: the platform draws a horizontal rule as a
+        // one-pixel Border in DividerStrokeColorDefaultBrush, which is what its own settings
+        // pages use between groups. MenuFlyoutSeparator exists but is a menu primitive with
+        // menu insets, so it would be measuring the wrong thing.
+        // The brush comes from a Style carrying a {ThemeResource}, NOT from
+        // Application.Current.Resources. That read resolves against the application
+        // dictionary once and does no element-theme resolution, so the dark pass captured the
+        // LIGHT theme's translucent black over the dark tile and the rule came out darker
+        // than the surface behind it. Same trap, and same fix, as TileHostStyle.
+        return new Border
+        {
+            Height = 1,
+            HorizontalAlignment = HorizontalAlignment.Stretch,
+            VerticalAlignment = VerticalAlignment.Center,
+            Style = (Style)Application.Current.Resources["SeparatorRuleStyle"],
+        };
+    }
+
+    private static FrameworkElement MakeGroupBox()
+    {
+        // WinUI has no GroupBox control. Its headered-content convention is a Border with a
+        // caption above it, which is what the platform's own settings pages draw and what the
+        // GroupBox UIID has to match -- so that is built here rather than a control being
+        // substituted from another toolkit's vocabulary.
+        var caption = new TextBlock
+        {
+            Text = "Group",
+            Style = (Style)Application.Current.Resources["CaptionTextBlockStyle"],
+        };
+        var body = new Border
+        {
+            BorderThickness = new Thickness(1),
+            // See MakeSeparator: the frame brush has to come from a {ThemeResource} Style or
+            // the dark capture draws it darker than the tile it sits on.
+            Style = (Style)Application.Current.Resources["GroupBoxFrameStyle"],
+            CornerRadius = new CornerRadius(4),
+            Padding = new Thickness(8),
+            Child = new TextBlock { Text = "Item" },
+        };
+        var panel = new StackPanel { Orientation = Orientation.Vertical, Spacing = 4 };
+        panel.Children.Add(caption);
+        panel.Children.Add(body);
+        return panel;
+    }
+
+    private static TabView MakeTabView()
+    {
+        // Not closable, and no add button. A WinUI TabView is a document-tab control and
+        // shows a close affordance on every tab by default; a Codename One Tabs has no such
+        // thing, so leaving them on compares two tabs against two tabs plus two buttons and
+        // charges the difference to the theme.
+        var tv = new TabView { IsAddTabButtonVisible = false };
+        tv.TabItems.Add(new TabViewItem { Header = "One", IsClosable = false });
+        tv.TabItems.Add(new TabViewItem { Header = "Two", IsClosable = false });
+        tv.SelectedIndex = 0;
+        return tv;
+    }
+
+    private static CommandBar MakeCommandBar()
+    {
+        var bar = new CommandBar { DefaultLabelPosition = CommandBarDefaultLabelPosition.Right };
+        bar.Content = new TextBlock
+        {
+            Text = "Title",
+            Margin = new Thickness(12, 0, 0, 0),
+            VerticalAlignment = VerticalAlignment.Center,
+        };
+        return bar;
+    }
+
+    private static MenuBar MakeMenuBar()
+    {
+        var bar = new MenuBar();
+        var file = new MenuBarItem { Title = "File" };
+        file.Items.Add(new MenuFlyoutItem { Text = "Open" });
+        bar.Items.Add(file);
+        return bar;
+    }
 
     private static ComboBox MakeComboBox()
     {
@@ -219,6 +377,7 @@ public partial class App : Application
                 if (widget is ToggleSwitch ts) { ts.IsOn = true; return true; }
                 if (widget is CheckBox cb) { cb.IsChecked = true; return true; }
                 if (widget is RadioButton rb) { rb.IsChecked = true; return true; }
+                if (widget is ListViewItem lvi) { lvi.IsSelected = true; return true; }
                 _blockers.Add($"{tileName}: {kind} has no selected state");
                 return false;
             case "disabled":
@@ -233,9 +392,15 @@ public partial class App : Application
                     _blockers.Add($"{tileName}: {kind} is not a Control, so it has no visual states");
                     return false;
                 }
+                // "MouseOver" and "Dragging" are the ScrollBar template's own names: that
+                // control's CommonStates predate the PointerOver vocabulary and were never
+                // renamed. Tried after the modern names rather than instead of them, and a
+                // name that does not exist simply returns false and falls through to the
+                // next -- the blocker below is what fires when none of them matched.
                 string[] candidates = state == "hover"
-                    ? new[] { "PointerOver", "UncheckedPointerOver", "CheckedPointerOver" }
-                    : new[] { "Pressed", "UncheckedPressed", "CheckedPressed" };
+                    ? new[] { "PointerOver", "UncheckedPointerOver", "CheckedPointerOver",
+                              "MouseOver" }
+                    : new[] { "Pressed", "UncheckedPressed", "CheckedPressed", "Dragging" };
                 foreach (var name in candidates)
                 {
                     if (VisualStateManager.GoToState(control, name, false))
@@ -549,7 +714,9 @@ public partial class App : Application
                         w.HorizontalAlignment = IsFullWidth(spec.Kind)
                             ? HorizontalAlignment.Stretch
                             : HorizontalAlignment.Left;
-                        w.VerticalAlignment = VerticalAlignment.Top;
+                        w.VerticalAlignment = IsFullHeight(spec.Kind)
+                            ? VerticalAlignment.Stretch
+                            : VerticalAlignment.Top;
                         w.Margin = new Thickness(0);
 
                         var host = new Grid

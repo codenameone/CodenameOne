@@ -489,6 +489,10 @@ public class MenuBar extends Container implements ActionListener {
     private void updateCommands() {
         int commandBehavior = getCommandBehavior();
         if (commandBehavior == Display.COMMAND_BEHAVIOR_NATIVE) {
+            // Reachable only where the platform really has a menu bar:
+            // CodenameOneImplementation.setCommandBehavior normalises NATIVE away on a
+            // platform that does not, because returning here without one drops every
+            // command silently.
             Display.getInstance().getImplementation().setNativeCommands(commands);
             return;
         }

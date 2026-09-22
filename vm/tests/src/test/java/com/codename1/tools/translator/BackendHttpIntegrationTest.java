@@ -986,6 +986,118 @@ class BackendHttpIntegrationTest {
         }
     }
 
+    /**
+     * A descriptor number handed to a new connection must not be cleaned up by the
+     * old one that just let it go.
+     *
+     * A connection closes itself: drop() runs inside its virtual thread, before the
+     * thread returns to advance(). The kernel can hand that descriptor NUMBER to
+     * accept() the instant it is closed, and host 0 accepts while every other host
+     * is running its own virtual threads -- so by the time advance() cleared "its"
+     * per-descriptor slots, they could already belong to a connection that had been
+     * accepted since, on that same host. What got cleared was the arm flag, and the
+     * next time the new connection parked it was added to an epoll set that already
+     * held the descriptor: EEXIST, an IOException, and a connection dropped with no
+     * response at all.
+     *
+     * That is an empty reply to a valid request, which is how it was seen -- as
+     * "expected: <200> but was: <-1>" from the split-body test below, intermittently,
+     * on Linux only. Only on Linux because kqueue's EV_ADD re-creates a filter that
+     * already exists rather than refusing it, so the same mis-cleared flag heals
+     * itself on macOS and the development loop never saw this.
+     *
+     * The shape of the test is churn (short connections closing constantly, so
+     * descriptor numbers are recycled) around a request that has to PARK: the head
+     * arrives, then a gap, then the body. A request answered from bytes that are
+     * already buffered never parks and never reaches the re-arm.
+     *
+     * Honest about what it is: the window is the kernel's, so this catches a
+     * regression probabilistically rather than every time -- against an unfixed
+     * server with the window widened by 1ms it was 26 failures in 294 requests, and
+     * unwidened it is rarer. It cannot report a FALSE failure though, which is the
+     * property that matters: every assertion here is something a correct server
+     * never does.
+     */
+    @Test
+    @DisplayName("a recycled descriptor is not cleaned up by the connection that released it")
+    void aRecycledDescriptorKeepsItsNewConnection() throws Exception {
+        final long until = System.currentTimeMillis() + 15000;
+        final byte[] small = ("[\"" + repeat('a', 1024) + "\"]").getBytes(StandardCharsets.UTF_8);
+        Thread[] churn = new Thread[16];
+        for (int i = 0; i < churn.length; i++) {
+            churn[i] = new Thread(new Runnable() {
+                public void run() {
+                    while (System.currentTimeMillis() < until) {
+                        try {
+                            // Connection: close, so each one ends in a drop() from
+                            // inside its own virtual thread -- which is the moment
+                            // the descriptor number becomes available again.
+                            rawOn(port, "POST /echo HTTP/1.1\r\nHost: x\r\n"
+                                    + "Content-Type: application/json\r\nContent-Length: "
+                                    + small.length + "\r\nConnection: close\r\n\r\n", small);
+                        } catch (Exception ignored) {
+                            // A churn connection losing a race is not the subject;
+                            // the probe below is.
+                        }
+                    }
+                }
+            });
+            churn[i].start();
+        }
+
+        int answered = 0;
+        StringBuilder failures = new StringBuilder();
+        byte[] body = ("[\"" + repeat('a', 4096) + "\"]").getBytes(StandardCharsets.UTF_8);
+        try {
+            while (System.currentTimeMillis() < until) {
+                Socket socket = new Socket();
+                socket.connect(new InetSocketAddress("127.0.0.1", port), 5000);
+                socket.setSoTimeout(20000);
+                try {
+                    OutputStream out = socket.getOutputStream();
+                    out.write(("POST /echo HTTP/1.1\r\nHost: x\r\nContent-Type: application/json\r\n"
+                            + "Content-Length: " + body.length + "\r\nConnection: close\r\n\r\n")
+                            .getBytes(StandardCharsets.UTF_8));
+                    out.flush();
+                    // Long enough that the head is parsed and the virtual thread is
+                    // parked on the body when the churn recycles descriptors.
+                    Thread.sleep(50);
+                    out.write(body);
+                    out.flush();
+                    byte[] response = readFullyBytes(socket.getInputStream());
+                    answered++;
+                    if (status(response) != 200) {
+                        failures.append("\n  request ").append(answered).append(" answered ")
+                                .append(status(response)).append(" in ")
+                                .append(response.length).append(" byte(s)");
+                    }
+                } finally {
+                    socket.close();
+                }
+            }
+        } finally {
+            for (int i = 0; i < churn.length; i++) {
+                churn[i].join(30000);
+            }
+        }
+
+        assertTrue(answered > 0, "the probe never completed a request");
+        assertEquals(0, failures.length(),
+                "a parked request was dropped while descriptors were being recycled:"
+                        + failures);
+
+        // The drop is silent from the client's side -- an empty reply and nothing
+        // else -- so the server's own report is the second half of this. An empty
+        // response could also be a server that died; this line is what tells the
+        // two apart, and it is the message that was missing when this cost two CI
+        // runs to diagnose.
+        String log = new String(Files.readAllBytes(work.resolve("server.log")),
+                StandardCharsets.UTF_8);
+        assertEquals(-1, log.indexOf("could not re-arm fd="),
+                "the server re-armed a descriptor that was already in its poller, "
+                        + "which means a connection was dropped without a response:\n" + log);
+    }
+
     private static String repeat(char c, int count) {
         StringBuilder sb = new StringBuilder(count);
         for (int i = 0; i < count; i++) {

@@ -120,9 +120,13 @@ def pickJavaVersionFromCurrentJvm() {
 /**
  * Apply the Java-version-specific transforms that the initializr does on its
  * server-rendered templates:
- *   - Java 17 keeps .claude/skills/codename-one/** (the Codename One authoring skill)
- *   - Java 8 strips .claude/ so older projects don't suddenly grow an AI-agent
- *     skill they never opted into.
+ *   - Java 17 keeps the Codename One authoring skill in the same three-part
+ *     layout the initializr generates: AGENTS.md (vendor-neutral root pointer),
+ *     .agent-skills/codename-one/** (the skill), and .claude/skills/codename-one/
+ *     SKILL.md (a thin stub redirecting to it)
+ *   - Java 8 strips all three so older projects don't suddenly grow an AI-agent
+ *     skill they never opted into. The skill's guidance is Java 17 anyway (var,
+ *     records, text blocks, single-file source mode in tools/).
  *
  * The win/ module is the native win32 target and ships for every Java version
  * (only the long-retired UWP module that previously lived under win/ used to be
@@ -134,9 +138,11 @@ def pickJavaVersionFromCurrentJvm() {
  */
 def applyJavaVersionTransforms(rootDir, rootPom, resolvedJava) {
     if (resolvedJava != "17") {
-        def claudeDir = new java.io.File(rootDir, ".claude")
-        if (claudeDir.exists()) {
-            deleteRecursively(claudeDir)
+        [".claude", ".agent-skills", "AGENTS.md"].each { name ->
+            def skillPath = new java.io.File(rootDir, name)
+            if (skillPath.exists()) {
+                deleteRecursively(skillPath)
+            }
         }
     }
     setIntellijLanguageLevel(rootDir, resolvedJava)

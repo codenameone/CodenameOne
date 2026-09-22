@@ -165,6 +165,31 @@ public final class WindowsNative {
      */
     public static native boolean pollEvent(int[] out);
 
+    // ---- native menu bar (cn1_windows_menu.cpp) ------------------------------
+
+    /**
+     * Rebuilds the window's native menu bar from one encoded row per command:
+     * {@code "<menuHint>\t<label>\t<shortcutKeyChar>\t<shortcutModifiers>\t<commandId>"},
+     * rows separated by {@code '\n'}.
+     *
+     * <p>The same encoding IOSImplementation uses for the macOS menu, deliberately: the
+     * three ParparVM desktop ports share it so a second format is not a second thing to
+     * keep in step with Command's placement constants.</p>
+     *
+     * <p>An empty or null spec removes the menu bar. A selection comes back as a
+     * {@code CN1_EVENT_MENU_COMMAND} through pollEvent carrying the command id, so the
+     * command runs on the EDT rather than on the message pump.</p>
+     */
+    public static native void menuSetCommands(String spec);
+
+    /// The modifier keys held down right now, as a bitmask: 1 shift, 2 control, 4 alt.
+    ///
+    /// Queried on demand rather than carried on each key event, the way the macOS port does
+    /// it. A modifier pressed on its own produces no key event at all, so a value latched
+    /// from the last key event would be stale exactly when it is asked for -- and Shift-Tab
+    /// asks while Shift is held and Tab is the key that arrived.
+    public static native int currentModifiers();
+
     // ---- additional desktop windows (cn1_windows_desktopwindow.cpp) ----------
     //
     // A window is addressed by the slot index returned from desktopWindowCreate;
@@ -182,6 +207,11 @@ public final class WindowsNative {
 
     /** Maps or unmaps a native window. */
     public static native void desktopWindowShow(int slot, boolean visible);
+
+    /// Sets the MAIN window's title. The desktopWindow* family above addresses secondary
+    /// Window peers by slot; this is the one the form title goes to in desktop "native"
+    /// title-bar mode, where the CN1 title area is suppressed. A no-op when headless.
+    public static native void mainWindowSetTitle(String title);
 
     public static native void desktopWindowSetTitle(int slot, String title);
 

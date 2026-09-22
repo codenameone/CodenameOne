@@ -47,6 +47,10 @@ import java.util.TreeSet;
 final class JavascriptBundleWriter {
     private static final String RESOURCE_ROOT = "/javascript/";
 
+    /// The suspension analysis' report, named here because this class is what removes the copy
+    /// an older build left inside the bundle.
+    static final String SUSPENSION_REPORT = "suspension-report.txt";
+
     private JavascriptBundleWriter() {
     }
 
@@ -57,6 +61,7 @@ final class JavascriptBundleWriter {
         writeWorker(outputDirectory);
         writeBrowserBridge(outputDirectory);
         writeIndex(outputDirectory);
+        removeLegacyArtifacts(outputDirectory);
         JavascriptSecurityHeaders.write(outputDirectory);
         // vm_protocol.md and jso-bridge-dispatch-ids.txt are developer
         // artifacts, and this output directory becomes the app's PUBLIC web
@@ -82,6 +87,96 @@ final class JavascriptBundleWriter {
     static boolean emitDiagnostics() {
         String v = System.getProperty("parparvm.js.diagnostics");
         return "1".equals(v) || "true".equalsIgnoreCase(v);
+    }
+
+    /**
+     * Where an artifact that is <em>about</em> the bundle belongs: the
+     * directory the bundle directory itself sits in, never inside it.
+     *
+     * <p>The output directory is the application's public web root -- it is
+     * what gets uploaded, and what the build server zips flat for the
+     * developer to unpack into one. Anything written there is published, so
+     * a build report or a host configuration file put there either ships to
+     * every visitor or has to be deleted by hand before every deploy. One
+     * level up is the build's own {@code dist} directory, which is where the
+     * person reading the report already is and which nothing uploads.</p>
+     *
+     * @param outputDirectory the directory the bundle is written to
+     * @return the sibling directory, or the output directory itself when it
+     * has no parent, which cannot happen for a real translation
+     */
+    static File sidecarDirectory(File outputDirectory) {
+        File absolute = outputDirectory.getAbsoluteFile();
+        File parent = absolute.getParentFile();
+        return parent == null ? absolute : parent;
+    }
+
+    /**
+     * One artifact beside the bundle, named after it.
+     *
+     * <p>The name carries the bundle directory's own name because the
+     * sidecar directory is shared: {@code handleJavascriptOutput} puts every
+     * bundle of a destination in the same {@code dist}, so two applications
+     * translated into one destination coexist as {@code App1-js} and {@code
+     * App2-js}. Inside the bundle a fixed name could not collide; outside it,
+     * a fixed name means the second build silently overwrites the first
+     * application's configuration -- and the Content-Security-Policy is
+     * hashed from the page it was generated for, so the survivor would block
+     * the other application's inline script. Naming each sidecar
+     * {@code <bundle>-<name>} keeps them apart and sorts them next to the
+     * bundle they belong to.</p>
+     *
+     * @param outputDirectory the directory the bundle is written to
+     * @param name the artifact's name within the bundle's namespace
+     * @return the path to write, beside the bundle directory
+     */
+    static File sidecar(File outputDirectory, String name) {
+        return new File(sidecarDirectory(outputDirectory),
+                outputDirectory.getAbsoluteFile().getName() + "-" + name);
+    }
+
+    /**
+     * Deletes what earlier builds wrote INTO the bundle.
+     *
+     * <p>These artifacts used to be written to the output directory itself,
+     * and {@code handleJavascriptOutput} only calls {@code mkdirs()} on an
+     * existing destination -- it never cleans it. A developer who rebuilds
+     * over a bundle produced before they moved therefore keeps publishing the
+     * exact files moving them was meant to stop publishing, and the build
+     * gives no sign of it: the new copies appear beside the bundle and look
+     * right.</p>
+     *
+     * <p>Only the names this class and {@link JavascriptSecurityHeaders}
+     * wrote are removed, and the directory only when nothing else is left in
+     * it, so anything a developer put there themselves is untouched.</p>
+     *
+     * @param outputDirectory the directory the bundle is written to
+     */
+    static void removeLegacyArtifacts(File outputDirectory) {
+        File report = new File(outputDirectory, SUSPENSION_REPORT);
+        if (report.isFile() && !report.delete()) {
+            System.out.println("Warning: could not delete stale " + report.getAbsolutePath()
+                    + " -- delete it before deploying, it is not part of the application");
+        }
+        File legacy = new File(outputDirectory, JavascriptSecurityHeaders.DEPLOYMENT_DIRECTORY);
+        if (!legacy.isDirectory()) {
+            return;
+        }
+        String[] generated = JavascriptSecurityHeaders.generatedFiles();
+        for (int iter = 0; iter < generated.length; iter++) {
+            File f = new File(legacy, generated[iter]);
+            if (f.isFile() && !f.delete()) {
+                System.out.println("Warning: could not delete stale " + f.getAbsolutePath());
+            }
+        }
+        // Fails, harmlessly, when the developer kept something of their own in
+        // there -- which is the one case where removing the directory would be
+        // the wrong thing to do anyway.
+        if (!legacy.delete()) {
+            System.out.println("Warning: " + legacy.getAbsolutePath() + " is not empty and was"
+                    + " left in the bundle -- it is host configuration, not part of the"
+                    + " application, and should not be uploaded");
+        }
     }
 
     /**

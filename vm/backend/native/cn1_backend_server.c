@@ -814,7 +814,45 @@ JAVA_INT com_codename1_backend_Reactor_registerImpl___int_int_int_boolean_R_int(
         // the DEL + ADD that path pays, and it costs no cross-thread wake.
         ev.events |= EPOLLONESHOT;
     }
-    return epoll_ctl(poller, modify ? EPOLL_CTL_MOD : EPOLL_CTL_ADD, fd, &ev) == 0 ? 0 : -1;
+    /*
+     * ADD and MOD both mean "this descriptor should now be watched for these
+     * events", and which one is correct depends on whether the kernel already
+     * holds it -- which the caller tracks in a flag of its own, per host, from
+     * several threads. Getting that wrong is not a wrong flag: epoll answers
+     * EEXIST for an ADD it already has and ENOENT for a MOD it does not, the
+     * caller sees an IOException, and it drops a connection it has already read
+     * a request from WITHOUT writing a response. That is an empty reply to a
+     * valid request, and it is what BackendHttpIntegrationTest kept catching
+     * intermittently on Linux.
+     *
+     * Only on Linux, and that is the tell. The kqueue branch below has always
+     * been idempotent -- EV_ADD on a knote that exists updates it rather than
+     * refusing -- so the same mistaken flag costs nothing on macOS and the
+     * development loop never saw any of this. The asymmetry was the bug: the
+     * caller's flag is an optimisation, saving a syscall on the common path, and
+     * only epoll was treating it as a precondition.
+     *
+     * So each falls back to the other, and both platforms now mean the same
+     * thing by this call. The flag still keeps the fast path fast; it just no
+     * longer decides correctness.
+     */
+    if(epoll_ctl(poller, modify ? EPOLL_CTL_MOD : EPOLL_CTL_ADD, fd, &ev) == 0) {
+        return 0;
+    }
+    if(!modify && errno == EEXIST) {
+        if(epoll_ctl(poller, EPOLL_CTL_MOD, fd, &ev) == 0) {
+            return 0;
+        }
+    } else if(modify && errno == ENOENT) {
+        if(epoll_ctl(poller, EPOLL_CTL_ADD, fd, &ev) == 0) {
+            return 0;
+        }
+    }
+    /* -errno rather than -1: what is left is a real failure, and EBADF (closed
+       under us) and EPERM (not pollable) ask for different answers from a reader
+       of the log. A bare -1 could not tell them apart, and a CI failure saying
+       only "could not watch fd 20" cost a round to classify. */
+    return errno > 0 ? -errno : -1;
 #elif defined(CN1_HAVE_KQUEUE)
     struct kevent ev[2];
     int n = 0;

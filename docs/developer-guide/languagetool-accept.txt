@@ -759,3 +759,10 @@ resizer
 epoll
 # A benchmark of one narrow operation, as against a whole application.
 microbenchmark
+
+# -----------------------------------------------------------------------------
+# Attaching an agent to a build on a device (MCP-Headless-API.asciidoc).
+# -----------------------------------------------------------------------------
+# The open-source library whose iproxy tool relays a TCP port to an iPhone over
+# USB. A project name, spelled lowercase by its authors.
+libimobiledevice

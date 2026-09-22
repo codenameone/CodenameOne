@@ -29,6 +29,50 @@ switches, sliders, and pressed states. They provide a consistent regression
 baseline, not a claim of pixel equivalence. MacOS uses Zulu 8 to build and Temurin
 21 to render; the other hosts use Temurin 8 and 21.
 
+## macos-aqua, DesktopTabs and DesktopListRow
+
+Re-recorded from [run 35501085353](https://github.com/codenameone/CodenameOne/actions/runs/35501085353)
+after the AppKit reference app was corrected. Six pairs moved and no other pair
+on any platform moved at all, which is the check that the two runs are
+comparable.
+
+| Pair | Score | Geometry (centre offset) |
+| --- | --- | --- |
+| `DesktopTabs_normal_dark` | 48.96 -> 78.60 | unchanged |
+| `DesktopTabs_normal_light` | 81.97 -> 79.04 | unchanged |
+| `DesktopListRow_normal_dark` | 89.91 -> 84.92 | 2.24 -> 9.22 |
+| `DesktopListRow_normal_light` | 88.99 -> 83.11 | 2.24 -> 9.22 |
+| `DesktopListRow_selected_dark` | 85.53 -> 85.19 | 2.12 -> 1.50 |
+| `DesktopListRow_selected_light` | 84.26 -> 83.72 | 2.12 -> 1.50 |
+
+**None of these is the theme changing. The theme did not change; the reference
+did**, and three of the four directions are worth reading rather than absorbing:
+
+The dark tab jump is the repair. That reference had been an uncapturable
+NSTabView whose unselected segment came back as a coverage mask and flattened to
+a solid block, so 48.96 was the theme being scored against a broken image. It
+was the lowest pair in the matrix.
+
+The light tab drop is the same repair, in the direction nobody expects. The
+broken reference was a white pill beside a black block, and the CN1 render
+happened to resemble that slightly more than it resembles the real segmented
+control. 79.04 is the honest number.
+
+**The ListRow drop is a real divergence the corrected reference exposed, and it
+is not fixed here.** Measured on this run's tiles: AppKit puts the row label at
+x=17, CN1 puts it at x=9; AppKit's selection capsule is inset to x=10..229 and
+CN1's fills the tile 0..239. The same is true of Tabs, whose box AppKit insets
+to 7..232 against CN1's 0..239. So the macOS theme's `ListRenderer` left padding
+(2.5mm, about 9px) is short of the 17px AppKit uses, and neither `ListRenderer`
+nor `Tabs` insets its background the way AppKit does. Closing that means editing
+`native-themes/macos-aqua/theme.css`, rebuilding `MacOSAquaTheme.res` and
+reseeding every hellocodenameone macOS screenshot that shows a list, which is a
+change with its own blast radius and does not belong in a commit that fixes
+reference images. It is written down here with its numbers so it stays findable.
+
+The selected-row pair moved the other way, slightly: its centre offset improved
+from 2.12 to 1.50 because the label is now inside the capsule on both sides.
+
 ## Earlier measurements
 
 On 2026-09-16, the Windows and GNOME hover entries were refreshed from

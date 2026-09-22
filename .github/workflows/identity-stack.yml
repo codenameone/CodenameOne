@@ -336,8 +336,18 @@ jobs:
               extra="-DCN1_INCLUDE_OIDC -DCN1_INCLUDE_APPLESIGNIN -DCN1_INCLUDE_WEBAUTHN"
             fi
             echo "::group::clang $label"
+            # -fmodules because the port's Metal sources use @import, and the
+            # real build compiles with CLANG_ENABLE_MODULES=YES. The renderer
+            # header used to be unreachable here -- CN1_USE_METAL was a
+            # commented-out define the builder uncommented -- so a lint with
+            # modules off never saw the @import. Metal is the only renderer
+            # now and the define is unconditional, so this lint has to compile
+            # the way the product does or it fails on syntax the product
+            # accepts.
             xcrun --sdk iphoneos clang \
                 -fsyntax-only \
+                -fmodules \
+                -fmodules-cache-path="$STUB/modulecache" \
                 -arch arm64 \
                 -fobjc-arc \
                 -Werror=incompatible-pointer-types \

@@ -21,24 +21,14 @@
  * need additional information or have any questions.
  */
 #import <Foundation/Foundation.h>
-// OpenGL ES does not exist on macOS; this port is Metal-only.
-#if !TARGET_OS_OSX
-#import <OpenGLES/EAGL.h>
-
-#import <OpenGLES/ES1/gl.h>
-#import <OpenGLES/ES1/glext.h>
-#import <OpenGLES/ES2/gl.h>
-#import <OpenGLES/ES2/glext.h>
-#endif
 #import "CN1AppleUI.h"
-#import "CN1ES2compat.h"
+#import "CN1RenderBackend.h"
 #ifdef CN1_USE_METAL
 @import Metal;
 #endif
 
 @interface GLUIImage : NSObject {
     CN1Image* img;
-    GLuint textureName;
     NSString* name;
     int textureWidth;
     int textureHeight;
@@ -85,7 +75,6 @@
 }
 -(id)initWithImage:(CN1Image*)i;
 -(CN1Image*)getImage;
--(GLuint)getTexture:(int)texWidth texHeight:(int)texHeight;
 -(void)setName:(NSString*)s;
 -(void)setImage:(CN1Image*)i;
 -(int)getTextureWidth;

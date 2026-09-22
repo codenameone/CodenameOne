@@ -372,7 +372,7 @@ PY
 #
 # Without this the skip path some tests deliberately take could never succeed on
 # a port that owns a golden: GoogleWebMapScreenshotTest skips when the Google
-# Maps tiles never load -- documented for android, ios-gl and ios-metal, and
+# Maps tiles never load -- documented for android and ios-metal, and
 # rendered as a documented skip on the public table -- and the guard failed the
 # whole job on the uncovered golden anyway.
 cn1ss_count_documented_skips() {

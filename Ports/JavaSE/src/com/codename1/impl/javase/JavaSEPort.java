@@ -92,7 +92,6 @@ import java.sql.Statement;
 import java.util.HashMap;
 import java.util.Map;
 import com.codename1.io.Properties;
-import java.util.StringTokenizer;
 import java.util.Timer;
 import java.util.prefs.Preferences;
 import java.util.zip.ZipEntry;
@@ -833,23 +832,15 @@ public class JavaSEPort extends CodenameOneImplementation {
         if (skinNames == null) {
             skinNames = DEFAULT_SKINS;
         }
-        StringBuilder merged = new StringBuilder(skinNames);
-        boolean added = false;
+        String merged = skinNames;
         for (String skin : BUNDLED_WATCH_SKINS) {
             if (JavaSEPort.class.getResource(skin) == null) {
                 continue;
             }
-            if (skinNames.contains(skin + ";") || skinNames.endsWith(skin)) {
-                continue;
-            }
-            if (merged.length() > 0 && merged.charAt(merged.length() - 1) != ';') {
-                merged.append(';');
-            }
-            merged.append(skin).append(';');
-            added = true;
+            merged = SkinPath.append(merged, skin);
         }
-        if (added) {
-            pref.put("skins", merged.toString());
+        if (!merged.equals(skinNames)) {
+            pref.put("skins", merged);
         }
     }
     private static final String DEFAULT_SKINS = DEFAULT_SKIN+";";
@@ -1149,7 +1140,15 @@ public class JavaSEPort extends CodenameOneImplementation {
     private static Resources nativeThemeRes;
     // Desktop window-chrome configuration. Defaults preserve the legacy behavior (CN1 Toolbar,
     // no interactive scrollbars); the generated desktop Stub opts a new app in.
-    private static String desktopTitleBarMode = "toolbar";
+    //
+    // null means "nobody asked", NOT "toolbar". The two have to be distinguishable because a
+    // desktop native theme carries its own desktopTitleBarMode constant, and that constant may
+    // only speak when the project did not. Every reader below coalesces null to "toolbar" for
+    // its own answer, so nothing outside this class sees the sentinel -- except
+    // getConfiguredDesktopTitleBarMode, which exists to report it, and
+    // injectDesktopThemeConstants, which must not inject a mode nobody chose or it would
+    // overwrite the theme's own constant with this default.
+    private static String desktopTitleBarMode;
     private static boolean desktopInteractiveScrollbars = false;
     // Caches the last command-name signature pushed to the native menu bar to avoid rebuilding
     // (and flickering the macOS screen menu) when an unchanged form is re-shown.
@@ -2729,6 +2728,23 @@ public class JavaSEPort extends CodenameOneImplementation {
         }
     }
 
+    /// @inheritDoc
+    ///
+    /// True on the desktop, where setNativeCommands below builds a real Swing JMenuBar
+    /// (which becomes the macOS screen menu). False elsewhere, including the phone-skinned
+    /// simulator, where there is no menu bar to put anything on and the commands belong in
+    /// whatever Codename One draws.
+    @Override
+    public boolean isNativeCommandsSupported() {
+        // The same condition setNativeCommands installs under, not merely "is this a desktop".
+        // They disagreed whenever the project asked for desktop.titleBar=toolbar explicitly:
+        // this returned true, so the core kept commandBehavior Native and MenuBar.updateCommands
+        // stopped drawing the legacy Form.addCommand commands -- while setNativeCommands
+        // returned immediately because the effective mode was not native or custom, installing
+        // no menu. The commands then existed nowhere at all.
+        return isDesktopNativeChromeMode();
+    }
+
     @Override
     public void setNativeCommands(Vector commands) {
         if (!isDesktopNativeChromeMode()) {
@@ -3062,7 +3078,7 @@ public class JavaSEPort extends CodenameOneImplementation {
 
     /// @return the configured desktop title-bar mode (defaults to {@code "toolbar"}).
     public static String getDesktopTitleBarModeSetting() {
-        return desktopTitleBarMode;
+        return desktopTitleBarMode == null ? "toolbar" : desktopTitleBarMode;
     }
 
     /// The desktop title-bar mode core consults to decide whether to suppress the CN1 Toolbar.
@@ -3090,7 +3106,39 @@ public class JavaSEPort extends CodenameOneImplementation {
     /// Resolves the effective desktop title-bar mode, honoring the
     /// {@code codename1.arg.desktop.titleBar} system property fallback.
     private String resolveDesktopTitleBarMode() {
+        String mode = configuredDesktopTitleBarMode();
+        if (mode != null) {
+            return mode;
+        }
+        // The installed theme gets to answer before the default does, because Form already
+        // asks it: Form.getDesktopTitleBarMode consults the theme's desktopTitleBarMode
+        // constant when the project configured nothing. Resolving "toolbar" here regardless
+        // made the two disagree, and the disagreement cost the application its commands --
+        // Form read "native" from the theme and hid the Toolbar, while isDesktopNativeChromeMode
+        // read "toolbar" and returned from setNativeCommands without installing a menu, so the
+        // commands had nowhere left to be.
+        String themed = com.codename1.ui.plaf.UIManager.getInstance()
+                .getThemeConstant("desktopTitleBarMode", null);
+        if (themed != null && themed.length() > 0) {
+            return themed;
+        }
+        return "toolbar";
+    }
+
+    /// The mode the project actually asked for, or null when it asked for nothing. Kept
+    /// separate from {@link #resolveDesktopTitleBarMode()} so the "unset" case survives all the
+    /// way to Form, where a desktop native theme's own constant gets to answer instead.
+    private static String configuredDesktopTitleBarMode() {
         return System.getProperty("codename1.arg.desktop.titleBar", desktopTitleBarMode);
+    }
+
+    /// @inheritDoc
+    @Override
+    public String getConfiguredDesktopTitleBarMode() {
+        if (!isDesktop()) {
+            return null;
+        }
+        return configuredDesktopTitleBarMode();
     }
 
     /// @return true when running on the desktop with a title-bar mode that hides the CN1
@@ -3166,8 +3214,11 @@ public class JavaSEPort extends CodenameOneImplementation {
         if (h == null || !isDesktop()) {
             return;
         }
-        String mode = System.getProperty("codename1.arg.desktop.titleBar", desktopTitleBarMode);
+        String mode = configuredDesktopTitleBarMode();
         if (mode != null && mode.length() > 0) {
+            // Only when the project asked. Injecting the default here would write
+            // "toolbar" over a desktop native theme's own constant and put the in-app
+            // Toolbar back on every screen the theme meant to hand to the window.
             h.put("@desktopTitleBarMode", mode);
         }
         boolean interactive = desktopInteractiveScrollbars
@@ -3188,12 +3239,23 @@ public class JavaSEPort extends CodenameOneImplementation {
      * theme resource basename (without ".res") or {@code null} to fall back
      * to the skin's embedded theme.
      */
+    /// The modern iOS theme for the generation the project asks for.
+    ///
+    /// Mirrors IOSImplementation#modernThemeResourceName so the simulator shows
+    /// the same theme the device would. Reads the hint every time rather than
+    /// caching: the simulator picks up a project's settings without a restart,
+    /// so a cached answer would survive the change that was meant to alter it.
+    private static String modernIosTheme() {
+        return "27".equals(buildHint("ios.themeGeneration"))
+                ? "iOSModern27Theme" : "iOSModernTheme";
+    }
+
     private static String resolveAutoNativeTheme(String platformName) {
         if ("ios".equals(platformName)) {
             String iosMode = buildHint("ios.themeMode");
             if (iosMode != null) {
                 if ("modern".equalsIgnoreCase(iosMode) || "liquid".equalsIgnoreCase(iosMode)) {
-                    return "iOSModernTheme";
+                    return modernIosTheme();
                 }
                 if ("ios7".equalsIgnoreCase(iosMode) || "flat".equalsIgnoreCase(iosMode)) {
                     return "iOS7Theme";
@@ -3210,7 +3272,7 @@ public class JavaSEPort extends CodenameOneImplementation {
                 return null;
             }
             // Default for an iOS skin is the modern theme.
-            return "iOSModernTheme";
+            return modernIosTheme();
         }
         if ("and".equals(platformName)) {
             String andMode = buildHint("and.themeMode");
@@ -8743,7 +8805,8 @@ public class JavaSEPort extends CodenameOneImplementation {
         m.setDoubleBuffered(true);
         String[][] items = {
             {"auto", "Auto (from build hints)"},
-            {"iOSModernTheme", "iOS Modern (Liquid Glass)"},
+            {"iOSModernTheme", "iOS Modern (Liquid Glass, iOS 26)"},
+            {"iOSModern27Theme", "iOS Modern (iOS 27)"},
             {"iOS7Theme", "iOS 7 (Flat)"},
             {"iPhoneTheme", "iPhone (Pre-Flat)"},
             {"AndroidMaterialTheme", "Android Material"},
@@ -8816,7 +8879,7 @@ public class JavaSEPort extends CodenameOneImplementation {
                         // the menu, even if they dismiss the reload
                         // before loadSkinFile finishes its own
                         // addSkinName.
-                        addSkinName(picked.toURI().toString());
+                        addSkinName(SkinPath.toEntry(picked));
                     }
                     String mainClass = System.getProperty("MainClass");
                     if (mainClass != null) {
@@ -8872,14 +8935,16 @@ public class JavaSEPort extends CodenameOneImplementation {
         // never launches the companion can still open a watch skin to check a layout.
         registerBundledWatchSkins(pref);
         String skinNames = pref.get("skins", DEFAULT_SKINS);
-        if (skinNames == null || skinNames.length() < DEFAULT_SKINS.length()) {
+        if (SkinPath.split(skinNames).isEmpty()) {
+            // Empty or unparseable: fall back rather than render a menu with no
+            // skins in it. This used to compare the stored length against the
+            // default's, which also threw away a preference holding exactly one
+            // short entry.
             skinNames = DEFAULT_SKINS;
         }
         final List<String> topLevelSkins = new ArrayList<String>();
         final List<String> otaSkins = new ArrayList<String>();
-        StringTokenizer tkn = new StringTokenizer(skinNames, ";");
-        while (tkn.hasMoreTokens()) {
-            String entry = tkn.nextToken();
+        for (String entry : SkinPath.split(skinNames)) {
             String kind = classifySkin(entry);
             if ("ota".equals(kind)) {
                 otaSkins.add(entry);
@@ -8948,16 +9013,7 @@ public class JavaSEPort extends CodenameOneImplementation {
         if (pathOrURI == null || pathOrURI.isEmpty()) {
             return null;
         }
-        File asFile = null;
-        if (pathOrURI.startsWith("file:") || pathOrURI.contains("://")) {
-            try {
-                asFile = new File(new URL(pathOrURI).getFile());
-            } catch (Exception e) {
-                return null;
-            }
-        } else {
-            asFile = new File(pathOrURI);
-        }
+        File asFile = SkinPath.toFile(pathOrURI);
         if (asFile != null && asFile.exists()) {
             File otaRoot = new File(System.getProperty("user.home"), ".codenameone");
             try {
@@ -8980,20 +9036,7 @@ public class JavaSEPort extends CodenameOneImplementation {
 
     private JRadioButtonMenuItem buildSkinRadioItem(final JFrame frm, final String skinPath,
             final String currentSkin, final boolean desktopSkinActive) {
-        String name;
-        if (skinPath.startsWith("file:") || skinPath.contains("://")) {
-            try {
-                name = new File(new URL(skinPath).getFile()).getName();
-            } catch (Exception e) {
-                name = skinPath;
-            }
-        } else if (skinPath.startsWith("/") && !new File(skinPath).exists()) {
-            // classpath resource - drop the leading slash for display
-            name = skinPath.substring(1);
-        } else {
-            File f = new File(skinPath);
-            name = f.exists() ? f.getName() : skinPath;
-        }
+        String name = SkinPath.displayName(skinPath);
         JRadioButtonMenuItem item = new JRadioButtonMenuItem(name,
                 !desktopSkinActive && skinPath.equals(currentSkin));
         item.addActionListener(new ActionListener() {
@@ -9250,7 +9293,7 @@ public class JavaSEPort extends CodenameOneImplementation {
                                                 try {
                                                     File skin = downloadSkin(skinDir, url, data[1], progress);
                                                     if (skin.exists()) {
-                                                        addSkinName(skin.toURI().toString());
+                                                        addSkinName(SkinPath.toEntry(skin));
                                                     }
                                                 } catch (Exception e) {
                                                 }
@@ -9455,14 +9498,7 @@ public class JavaSEPort extends CodenameOneImplementation {
     private void addSkinName(String f) {
         Preferences pref = Preferences.userNodeForPackage(JavaSEPort.class);
         String skinNames = pref.get("skins", DEFAULT_SKINS);
-        if (skinNames != null) {
-            if (!skinNames.contains(f)) {
-                skinNames += ";" + f;
-            }
-        } else {
-            skinNames = f;
-        }
-        pref.put("skins", skinNames);
+        pref.put("skins", SkinPath.append(skinNames, f));
         try {
             pref.flush();
         } catch(Throwable t) {
@@ -10922,9 +10958,27 @@ public class JavaSEPort extends CodenameOneImplementation {
 
     private void loadSkinFile(String f, JFrame frm) {
         try {
-            File fsFile = new File(f);
-            if (fsFile.exists()) {
-                f = fsFile.toURI().toString();
+            // A local skin is opened as a file rather than through a URL: the entry we
+            // store has to survive a round trip back to this File, and going via the
+            // filesystem is the only reading of it that cannot disagree with
+            // SkinPath.toFile about what a percent-encoded path means.
+            File fsFile = SkinPath.toFile(f);
+            if (fsFile != null && fsFile.exists()) {
+                f = SkinPath.toEntry(fsFile);
+                FileInputStream fsIn = new FileInputStream(fsFile);
+                try {
+                    loadSkinFile(fsIn, frm);
+                } finally {
+                    try {
+                        fsIn.close();
+                    } catch (IOException closeFailed) {
+                        System.err.println("close: " + closeFailed);
+                    }
+                }
+                Preferences fsPref = Preferences.userNodeForPackage(JavaSEPort.class);
+                fsPref.put("skin", f);
+                addSkinName(f);
+                return;
             }
             if (f.contains("://") || f.startsWith("file:")) {
 

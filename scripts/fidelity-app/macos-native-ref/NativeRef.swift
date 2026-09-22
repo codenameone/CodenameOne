@@ -83,6 +83,22 @@ final class TileView: NSView {
     }
 }
 
+/// The strip a window shows where its title bar is, for the DesktopToolbar row.
+///
+/// NSToolbar belongs to a window and cannot be rendered into a view, so the reference is the
+/// surface the toolbar sits on plus the window title -- which is what the CN1 Toolbar UIID
+/// draws, and what comparing against a detached NSToolbar would NOT be.
+///
+/// Drawn rather than layer-backed, like TileView and for the same reason: a CGColor taken
+/// from a dynamic NSColor freezes at the appearance it was read in.
+final class TitleBarStripView: NSView {
+    override var isFlipped: Bool { true }
+    override func draw(_ dirtyRect: NSRect) {
+        NSColor.windowBackgroundColor.setFill()
+        dirtyRect.fill()
+    }
+}
+
 /// One row of the desktop matrix. `kind` is the native_mac key in fidelity-tests.yaml, and
 /// the ids and states are that file's too: the two lists must agree or the comparator pairs
 /// a CN1 render against nothing.
@@ -102,6 +118,21 @@ let SPECS: [Spec] = [
     Spec(id: "DesktopSlider", kind: "appkit_slider", states: ["normal", "hover", "disabled"]),
     Spec(id: "DesktopProgressBar", kind: "appkit_progress", states: ["normal"]),
     Spec(id: "DesktopComboBox", kind: "appkit_popupbutton", states: ["normal", "hover", "disabled"]),
+
+    // Second wave. No menu bar and no tooltip row here: NSMenu and an AppKit tooltip are
+    // window-server surfaces, invisible to cacheDisplay, which is the capture path that needs
+    // no Screen Recording consent. Those rows carry a platforms: list in the spec rather than
+    // a blank golden that would score 0% forever and read as a theme bug -- the same call
+    // already made for Aqua vibrancy.
+    Spec(id: "DesktopSeparator", kind: "appkit_box_separator", states: ["normal"]),
+    Spec(id: "DesktopGroupBox", kind: "appkit_box_titled", states: ["normal"]),
+    Spec(id: "DesktopStepper", kind: "appkit_stepper", states: ["normal", "disabled"]),
+    Spec(id: "DesktopLinkButton", kind: "appkit_link_button", states: ["normal", "hover", "disabled"]),
+    Spec(id: "DesktopSearchField", kind: "appkit_searchfield", states: ["normal", "disabled"]),
+    Spec(id: "DesktopListRow", kind: "appkit_tableview_row", states: ["normal", "selected"]),
+    Spec(id: "DesktopTabs", kind: "appkit_tabview", states: ["normal"]),
+    Spec(id: "DesktopToolbar", kind: "appkit_toolbar", states: ["normal"]),
+    Spec(id: "DesktopDisclosure", kind: "appkit_disclosure", states: ["normal"]),
 ]
 
 /// Controls that own the full tile width rather than sizing to their content. A slider, a
@@ -109,7 +140,24 @@ let SPECS: [Spec] = [
 /// asked for -- so the tile width is the honest answer, and it is the same rule the CN1
 /// renderer applies. Left to size themselves, a text field measures to its placeholder
 /// (39px for "Text"), which is not a control anyone would recognise or ship.
-let FULL_WIDTH_KINDS: Set<String> = ["appkit_slider", "appkit_progress", "appkit_textfield"]
+let FULL_WIDTH_KINDS: Set<String> = [
+    "appkit_slider", "appkit_progress", "appkit_textfield",
+    // Second wave, same rule: none of these has a natural width either. A search field
+    // measures to its placeholder, and a row, a box, a tab view and a toolbar are all
+    // containers that take the width they are given.
+    "appkit_searchfield", "appkit_tableview_row",
+    "appkit_box_titled", "appkit_tabview", "appkit_toolbar",
+    "appkit_box_separator",
+]
+
+/// Controls that own the full tile HEIGHT rather than sizing to their content.
+///
+/// A group box is a frame around other things, so its height is whatever it is given -- left
+/// to measure itself it collapses onto its own title and draws no frame at all, which is a
+/// heading, not a group box. The CN1 side applies the same rule through
+/// DesktopTileRunner.FULL_HEIGHT_IDS, and the two lists are kept in step by hand exactly as
+/// the full-width ones are.
+let FULL_HEIGHT_KINDS: Set<String> = ["appkit_box_titled", "appkit_tabview"]
 
 final class RefApp: NSObject, NSApplicationDelegate {
     var window: NSWindow!
@@ -204,6 +252,197 @@ final class RefApp: NSObject, NSApplicationDelegate {
             let pop = NSPopUpButton(frame: .zero, pullsDown: false)
             pop.addItem(withTitle: "Option")
             return pop
+        case "appkit_box_separator":
+            // NSBox in .separator mode IS AppKit's horizontal rule -- the same object as the
+            // titled box above, which is why both are NSBox here rather than one of them being
+            // a hand-drawn line. It has no natural width, so it is in FULL_WIDTH_KINDS.
+            let sep = NSBox(frame: NSRect(x: 0, y: 0, width: TILE_W, height: 1))
+            sep.boxType = .separator
+            return sep
+        case "appkit_box_titled":
+            // The label goes INSIDE the default content view. Assigning it AS the content view
+            // replaces the view the box draws its frame around, so the frame disappeared and
+            // the label was clipped by a box that had sized itself to nothing.
+            let box = NSBox(frame: NSRect(x: 0, y: 0, width: TILE_W, height: TILE_H))
+            box.title = "Group"
+            box.titlePosition = .atTop
+            box.boxType = .primary
+            let body = NSTextField(labelWithString: "Item")
+            body.sizeToFit()
+            body.setFrameOrigin(NSPoint(x: 4, y: 4))
+            box.contentView?.addSubview(body)
+            return box
+        case "appkit_stepper":
+            // The NSStepper alone is the two chevrons; the number beside it is a separate
+            // field, and the CN1 Stepper is the pair. Built as the pair so the two sides
+            // compare the same control rather than half of one.
+            //
+            // A plain container with explicit frames, not an NSStackView: a stack view's
+            // fittingSize came back with no width, so the tile showed the chevrons and no
+            // field at all -- half a control, which is exactly what this pairing exists to
+            // avoid.
+            let field = NSTextField(string: "1")
+            field.isBezeled = true
+            field.bezelStyle = .roundedBezel
+            field.sizeToFit()
+            field.setFrameSize(NSSize(width: max(field.frame.width, 48),
+                                      height: field.frame.height))
+            let stepper = NSStepper()
+            stepper.minValue = 0
+            stepper.maxValue = 10
+            stepper.doubleValue = 1
+            stepper.sizeToFit()
+            let h = max(field.frame.height, stepper.frame.height)
+            let row = NSView(frame: NSRect(x: 0, y: 0,
+                                           width: field.frame.width + 2 + stepper.frame.width,
+                                           height: h))
+            field.setFrameOrigin(NSPoint(x: 0, y: (h - field.frame.height) / 2))
+            stepper.setFrameOrigin(NSPoint(x: field.frame.width + 2,
+                                           y: (h - stepper.frame.height) / 2))
+            row.addSubview(field)
+            row.addSubview(stepper)
+            return row
+        case "appkit_link_button":
+            // NSButton's own link style, not a text field with an attributed string: the
+            // latter is what an application writes when the platform has no link control,
+            // and AppKit has one.
+            let b = NSButton(title: "Link", target: nil, action: nil)
+            b.isBordered = false
+            b.contentTintColor = .linkColor
+            b.attributedTitle = NSAttributedString(
+                string: "Link",
+                attributes: [.foregroundColor: NSColor.linkColor,
+                             .underlineStyle: NSUnderlineStyle.single.rawValue])
+            return b
+        case "appkit_searchfield":
+            let f = NSSearchField(string: "Search")
+            f.isEditable = true
+            return f
+        case "appkit_tableview_row":
+            // A row view with a cell in it, which is what a single NSTableView row draws.
+            //
+            // The frame is explicit because NSTableRowView has no intrinsic size in either
+            // axis -- measured: it laid out to 240x0 and produced no image at all, which the
+            // zero-size blocker caught. 24pt is the standard NSTableView row height, which is
+            // what a table would have given it.
+            let rowHeight: CGFloat = 24
+            let row = NSTableRowView(frame: NSRect(x: 0, y: 0, width: TILE_W, height: rowHeight))
+            // Emphasized, so a selected row draws the ACCENT fill rather than the grey one.
+            // An NSTableRowView outside a focused table is unemphasized by default, and grey
+            // is what macOS shows for a selection in a window the user is not working in --
+            // not what a selected row looks like while they are. Measured: the unemphasized
+            // reference scored the CN1 row at 67%, against a CN1 style that is correctly
+            // accent-filled.
+            row.isEmphasized = true
+            let label = NSTextField(labelWithString: "Row")
+            label.sizeToFit()
+            // 11, not 4, and the difference is the selection capsule. Since macOS 11 an
+            // emphasized NSTableRowView draws its fill as a rounded rect inset 7pt from its
+            // own bounds, so a label placed 4pt from the ROW's edge came out with its glyphs
+            // at x=7 -- exactly on the capsule's left edge, text flush against the fill with
+            // no padding at all, which is not what any macOS list looks like.
+            //
+            // The 7pt of padding inside the capsule is AppKit's own number, not a chosen one:
+            // a one-row NSTableView in .inset style -- the modern list style, where AppKit
+            // places both the capsule and the cell -- puts its capsule at x=10 and its glyphs
+            // at x=17. This row's own capsule measures to x=10 as well, so matching that gap
+            // puts the glyphs at 17, and the field's 3pt left bearing puts its frame at 14 --
+            // which is where the capture then measures them.
+            label.setFrameOrigin(NSPoint(x: 14, y: (rowHeight - label.frame.height) / 2))
+            row.addSubview(label)
+            return row
+        case "appkit_tabview":
+            // NSTabView itself CANNOT be captured, so this is the box plus the pill AppKit
+            // draws on it, assembled from two controls that can.
+            //
+            // Its unselected tab button is composited by the window server, not drawn into the
+            // view's backing store: every in-process path -- cacheDisplay into the rep
+            // bitmapImageRepForCachingDisplay hands out, into an explicitly opaque rep, into a
+            // rep pre-filled with the backdrop, with the tile layer-backed, with
+            // canDrawSubviewsIntoLayer, and CALayer.render(in:) -- returns that segment as a
+            // pure COVERAGE MASK: constant RGB (the label colour: 0,0,0 in Aqua and
+            // 255,255,255 in Dark Aqua) with every shape in alpha, 20/255 for the fill and
+            // 219/255 for the glyphs, over pixels the draw REPLACED rather than blended. The
+            // strip background underneath is gone, so no compositing recovers it, and
+            // flattening to opaque RGB -- which promoting a golden does -- turns the segment
+            // solid black in light and solid white in dark with its label invisible against
+            // it. That is what shipped in the first macos-aqua golden. CALayer.render(in:)
+            // drops the strip entirely instead. Same class of limitation as NSMenu and the
+            // AppKit tooltip above, found the same way.
+            //
+            // So the reference is composed the way the DesktopToolbar row is: an NSBox for the
+            // content frame and a real NSSegmentedControl for the strip, which is the control
+            // macOS 11+ draws that strip as and which captures correctly. The geometry is not
+            // invented -- the broken capture's LAYOUT was right, only its pixels were lost, and
+            // it measured the pill vertically centred on the box's top edge, which is what the
+            // constraints below say. What CN1's Tabs UIID has to match is unchanged.
+            let container = NSView(frame: NSRect(x: 0, y: 0, width: TILE_W, height: TILE_H))
+            let box = NSBox()
+            box.boxType = .primary
+            box.titlePosition = .noTitle
+            box.translatesAutoresizingMaskIntoConstraints = false
+            container.addSubview(box)
+            let pill = NSSegmentedControl(labels: ["One", "Two"],
+                                          trackingMode: .selectOne,
+                                          target: nil,
+                                          action: nil)
+            pill.selectedSegment = 0
+            pill.translatesAutoresizingMaskIntoConstraints = false
+            container.addSubview(pill)
+            // The insets are NSTabView's own, read off the broken capture rather than chosen:
+            // in a 240x56 tile it put its box at x 7..232, y 16..45 and its pill's top edge at
+            // y 6, pill centred horizontally. Pinning those reproduces the control's layout
+            // exactly, which is the half of the old reference that was right.
+            NSLayoutConstraint.activate([
+                box.leadingAnchor.constraint(equalTo: container.leadingAnchor, constant: 7),
+                box.trailingAnchor.constraint(equalTo: container.trailingAnchor, constant: -7),
+                box.topAnchor.constraint(equalTo: container.topAnchor, constant: 16),
+                box.bottomAnchor.constraint(equalTo: container.bottomAnchor, constant: -10),
+                pill.centerXAnchor.constraint(equalTo: container.centerXAnchor),
+                pill.topAnchor.constraint(equalTo: container.topAnchor, constant: 6),
+            ])
+            return container
+        case "appkit_toolbar":
+            // NSToolbar belongs to a window and cannot be rendered into a view, so the
+            // reference is the strip a window shows in its place: the title bar's own
+            // background with the window title on it. That is what the CN1 Toolbar UIID
+            // draws, and comparing it against a detached NSToolbar would compare two
+            // different things.
+            // The fill is DRAWN, not assigned to a layer. A CGColor taken from a dynamic
+            // NSColor is resolved once, at whatever appearance was in force when it was read,
+            // so the light tile came out with the dark window background painted across it.
+            // TileView draws its own fill for exactly this reason.
+            let strip = TitleBarStripView(frame: NSRect(x: 0, y: 0, width: TILE_W, height: TILE_H))
+            let title = NSTextField(labelWithString: "Title")
+            title.font = NSFont.titleBarFont(ofSize: NSFont.systemFontSize)
+            title.sizeToFit()
+            title.setFrameOrigin(NSPoint(
+                x: (TILE_W - title.frame.width) / 2,
+                y: (TILE_H - title.frame.height) / 2))
+            strip.addSubview(title)
+            return strip
+        case "appkit_disclosure":
+            // The triangle AND its label. AppKit's .disclosure bezel draws the triangle only
+            // and ignores the title outright -- measured: the tile came out as a bare chevron
+            // with no text, against a CN1 accordion header that is a labelled row. A titled
+            // disclosure on macOS is the triangle with a label beside it, which is what a
+            // sidebar or an inspector section actually shows.
+            let triangle = NSButton(title: "", target: nil, action: nil)
+            triangle.setButtonType(.pushOnPushOff)
+            triangle.bezelStyle = .disclosure
+            triangle.sizeToFit()
+            let label = NSTextField(labelWithString: "Details")
+            label.sizeToFit()
+            let h = max(triangle.frame.height, label.frame.height)
+            let row = NSView(frame: NSRect(x: 0, y: 0,
+                                           width: triangle.frame.width + 4 + label.frame.width,
+                                           height: h))
+            triangle.setFrameOrigin(NSPoint(x: 0, y: (h - triangle.frame.height) / 2))
+            label.setFrameOrigin(NSPoint(x: triangle.frame.width + 4,
+                                         y: (h - label.frame.height) / 2))
+            row.addSubview(triangle)
+            row.addSubview(label)
+            return row
         case "appkit_progress":
             let p = NSProgressIndicator()
             p.style = .bar
@@ -238,11 +477,26 @@ final class RefApp: NSObject, NSApplicationDelegate {
             return true
         case "selected":
             if let sw = view as? NSSwitch { sw.state = .on; return true }
+            if let row = view as? NSTableRowView { row.isSelected = true; return true }
             if let b = view as? NSButton { b.state = .on; return true }
+            // A composite: the disclosure is a triangle plus a label, and the state belongs
+            // to the triangle. Recursed rather than special-cased by kind, because the state
+            // is always a property of one control inside the composite and the alternative is
+            // a second table mapping kinds to which subview to reach for.
+            for sub in view.subviews where applyState(sub, state, kind) {
+                _ = sub
+                return true
+            }
             return false
         case "disabled":
             if let c = view as? NSControl { c.isEnabled = false; return true }
-            return false
+            // The stepper is a field plus a stepper and BOTH halves have to grey out; unlike
+            // selected, this is not one control's state, so it does not stop at the first.
+            var reached = false
+            for sub in view.subviews {
+                if applyState(sub, state, kind) { reached = true }
+            }
+            return reached
         default:
             blocker("unknown state '\(state)'")
             return false
@@ -284,6 +538,9 @@ final class RefApp: NSObject, NSApplicationDelegate {
         var size = widget.fittingSize
         if size.height <= 0 { size.height = widget.intrinsicContentSize.height }
         if size.height <= 0 { size.height = widget.frame.height }
+        if FULL_HEIGHT_KINDS.contains(spec.kind) {
+            size.height = TILE_H
+        }
         if FULL_WIDTH_KINDS.contains(spec.kind) {
             size.width = TILE_W
         } else {
@@ -324,9 +581,95 @@ final class RefApp: NSObject, NSApplicationDelegate {
         }
         rep.size = NSSize(width: TILE_W, height: TILE_H)
         tile.cacheDisplay(in: tile.bounds, to: rep)
+        if let mask = coverageMaskReading(rep) {
+            // The tile is opaque by construction -- TileView.draw fills every pixel with
+            // windowBackgroundColor -- so a translucent pixel means a control REPLACED what
+            // was under it instead of blending onto it. That alone is not the failure,
+            // though, and a first version of this check that failed on it was wrong: it
+            // blocked the whole macOS capture over NSSlider, whose knob is one uniformly
+            // translucent fill and whose tiles have been correct for as long as the set has
+            // existed.
+            //
+            // What is fatal is an alpha channel carrying IMAGE STRUCTURE: a control drawn as
+            // a pure coverage mask, constant RGB with its shape and its text in alpha. Read
+            // back as RGB -- which is what a viewer does, and what the comparator scores --
+            // that is a solid block of the mask colour, black in Aqua and white in Dark Aqua,
+            // with the control's own label invisible against it. It is not recoverable
+            // afterwards either, because the draw destroyed the pixels underneath rather than
+            // covering them. The first DesktopTabs golden shipped exactly this (see
+            // appkit_tabview).
+            //
+            // The two are told apart by counting distinct alphas among the pure black/white
+            // translucent pixels, and the separation is not a judgement call. Measured over
+            // the committed set: every NSSlider tile has exactly ONE (276 pixels of knob at a
+            // single alpha), and the two broken NSTabView tiles have 90 and 126, because that
+            // is where the glyphs went. The threshold below sits an order of magnitude away
+            // from both.
+            blocker("\(spec.id) \(state): \(mask.pixels) pixel(s) of pure \(mask.colour) "
+                    + "across \(mask.distinctAlphas) distinct alpha values -- a control drew "
+                    + "itself as a coverage mask, so its shape and text are in the alpha "
+                    + "channel and it reads as a solid block of that colour")
+            return nil
+        }
         let img = NSImage(size: rep.size)
         img.addRepresentation(rep)
         return img
+    }
+
+    /// A control drawn as a coverage mask, or nil when the tile carries none.
+    ///
+    /// Looks only at translucent pixels whose RGB is pure black or pure white, which is what
+    /// AppKit leaves behind when it renders a control as coverage rather than colour: the
+    /// label colour in every channel, with the shape and the glyphs in alpha. Counting the
+    /// DISTINCT alphas among them is what separates that from a control that is simply
+    /// translucent, whose fill is one alpha. See the caller for the measured numbers.
+    ///
+    /// Returns nil, not a false verdict, when the rep is not in the packed 8-bit form this
+    /// walks -- the capture allocates it directly above, so that cannot silently become the
+    /// normal path.
+    func coverageMaskReading(_ rep: NSBitmapImageRep)
+            -> (pixels: Int, colour: String, distinctAlphas: Int)? {
+        // An order of magnitude clear of both measured populations: 1 for a translucent fill,
+        // 90+ for a mask. Ordinary anti-aliasing along a translucent edge spreads alphas too,
+        // which is why this is not simply "more than one".
+        let maskAlphaSpread = 8
+        guard rep.samplesPerPixel == 4, !rep.isPlanar, rep.bitsPerSample == 8,
+              let base = rep.bitmapData else { return nil }
+        let bpp = rep.bitsPerPixel / 8
+        let alphaFirst = rep.bitmapFormat.contains(.alphaFirst)
+        // PREMULTIPLIED unless the rep says otherwise, which is the default NSBitmapImageRep
+        // gives you and therefore what the capture above allocates. It matters here and cost
+        // a probe to find: premultiplied, a pure WHITE pixel at alpha 13 is stored (13,13,13),
+        // not (255,255,255), so testing for 255 in every channel found the Aqua mask (black,
+        // stored (0,0,0) either way) and silently missed the Dark Aqua one. The PNG on disk is
+        // un-premultiplied, which is why the committed golden reads (255,255,255,13) and the
+        // buffer it came from does not.
+        let premultiplied = !rep.bitmapFormat.contains(.alphaNonpremultiplied)
+        var blackAlphas = Set<UInt8>(), whiteAlphas = Set<UInt8>()
+        var blackPixels = 0, whitePixels = 0
+        for y in 0..<rep.pixelsHigh {
+            let row = base + y * rep.bytesPerRow
+            for x in 0..<rep.pixelsWide {
+                let px = row + x * bpp
+                let a = px[alphaFirst ? 0 : 3]
+                if a == 255 { continue }
+                let o = alphaFirst ? 1 : 0
+                let (r, g, b) = (px[o], px[o + 1], px[o + 2])
+                let white: UInt8 = premultiplied ? a : 255
+                if r == 0 && g == 0 && b == 0 && a > 0 {
+                    blackAlphas.insert(a); blackPixels += 1
+                } else if r == white && g == white && b == white {
+                    whiteAlphas.insert(a); whitePixels += 1
+                }
+            }
+        }
+        if blackAlphas.count > maskAlphaSpread {
+            return (blackPixels, "black", blackAlphas.count)
+        }
+        if whiteAlphas.count > maskAlphaSpread {
+            return (whitePixels, "white", whiteAlphas.count)
+        }
+        return nil
     }
 
     func isBlank(_ image: NSImage) -> Bool {

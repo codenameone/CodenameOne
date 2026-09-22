@@ -26,11 +26,10 @@
 #include "TargetConditionals.h"
 
 // Shared method surface implemented by the rendering backends:
-//   - EAGLView          (OpenGL ES 2, iOS)
-//   - METALView         (Metal, iOS)
+//   - METALView             (Metal; iOS, tvOS and Mac Catalyst)
 //   - CN1WatchRenderingView (Core Graphics, watchOS)
-// CodenameOne_GLViewController calls through this protocol so it can drive any
-// backend behind the CN1_USE_METAL / TARGET_OS_WATCH ifdefs.
+// CodenameOne_GLViewController calls through this protocol so it can drive
+// either backend behind the CN1_USE_METAL / TARGET_OS_WATCH ifdefs.
 //
 // addPeerComponent takes a CN1View* on iOS. watchOS has no CN1View hierarchy and
 // no native peer components, so the argument degrades to id there (callers on

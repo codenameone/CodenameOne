@@ -90,8 +90,7 @@ bma_log "Using APP_DIR=$APP_DIR APP_MAIN_NAME=$APP_MAIN_NAME"
 # Inject the macNative.* build hints into the sample's
 # codenameone_settings.properties. -D arguments on the Maven CLI don't flow
 # into the Codename One Maven plugin's BuildRequest (the plugin reads
-# build args from the settings file on disk); follow the same pattern the
-# iOS Metal CI uses for codename1.arg.ios.metal=true.
+# build args from the settings file on disk).
 #
 # The original file is restored on exit so subsequent iOS-only invocations
 # of build-ios-app.sh against the same sample aren't poisoned.

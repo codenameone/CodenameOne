@@ -11,8 +11,6 @@
 		0F634E7B18E9ABBC002F3D1D /* CoreGraphics.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 0F634E7A18E9ABBC002F3D1D /* CoreGraphics.framework */; };
 		0F634E7D18E9ABBC002F3D1D /* UIKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 0F634E7C18E9ABBC002F3D1D /* UIKit.framework */; };
                 0F634EA318E9ABBC002F3D1D /* XCTest.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 0F634EA218E9ABBC002F3D1D /* XCTest.framework */; };
-		0F634E7F18E9ABBC002F3D1D /* GLKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 0F634E7E18E9ABBC002F3D1D /* GLKit.framework */; settings = {ATTRIBUTES = (Weak, ); }; };
-		0F634E8118E9ABBC002F3D1D /* OpenGLES.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 0F634E8018E9ABBC002F3D1D /* OpenGLES.framework */; settings = {ATTRIBUTES = (Weak, ); }; };
 		0F634EA518E9ABBC002F3D1D /* UIKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 0F634E7C18E9ABBC002F3D1D /* UIKit.framework */; };
 		0F634EA528E9ABBC002F3D1D /* Images.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 0F634E7C18EAABBC002F3D1D /* Images.xcassets */; };
 
@@ -35,8 +33,6 @@
 		0F634E7A18E9ABBC002F3D1D /* CoreGraphics.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreGraphics.framework; path = System/Library/Frameworks/CoreGraphics.framework; sourceTree = SDKROOT; };
 		0F634E7C18E9ABBC002F3D1D /* UIKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = UIKit.framework; path = System/Library/Frameworks/UIKit.framework; sourceTree = SDKROOT; };
                 0F634EA218E9ABBC002F3D1D /* XCTest.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = XCTest.framework; path = System/Library/Frameworks/XCTest.framework; sourceTree = SDKROOT; };
-		0F634E7E18E9ABBC002F3D1D /* GLKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = GLKit.framework; path = System/Library/Frameworks/GLKit.framework; sourceTree = SDKROOT; };
-		0F634E8018E9ABBC002F3D1D /* OpenGLES.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = OpenGLES.framework; path = System/Library/Frameworks/OpenGLES.framework; sourceTree = SDKROOT; };
 		0F634E7C18EAABBC002F3D1D /* Images.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = "Images.xcassets"; sourceTree = "<group>"; };
 **ACTUAL_FILES**/* End PBXFileReference section */
 
@@ -45,10 +41,8 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				0F634E8118E9ABBC002F3D1D /* OpenGLES.framework in Frameworks */,
 				0F634E7B18E9ABBC002F3D1D /* CoreGraphics.framework in Frameworks */,
 				0F634E7D18E9ABBC002F3D1D /* UIKit.framework in Frameworks */,
-				0F634E7F18E9ABBC002F3D1D /* GLKit.framework in Frameworks */,
 				0F634E7918E9ABBC002F3D1D /* Foundation.framework in Frameworks */,
 ***FRAMEWORKS***			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -91,8 +85,6 @@
 				0F634E7818E9ABBC002F3D1D /* Foundation.framework */,
 				0F634E7A18E9ABBC002F3D1D /* CoreGraphics.framework */,
 				0F634E7C18E9ABBC002F3D1D /* UIKit.framework */,
-				0F634E7E18E9ABBC002F3D1D /* GLKit.framework */,
-				0F634E8018E9ABBC002F3D1D /* OpenGLES.framework */,
 				0F634EA218E9ABBC002F3D1D /* XCTest.framework */,
 ***FRAMEWORKS2***			);
 			name = Frameworks;

@@ -18,6 +18,15 @@ fi
 APP_BUNDLE="$1"
 SIM_UDID="${2:-}"
 
+# Toolchain selection lives in one place; see scripts/lib/xcode.sh. Every simctl
+# call below used to run through a bare `xcrun`, i.e. whatever `xcode-select`
+# pointed at, while the app under test was built by a PINNED Xcode -- so on a
+# machine with two installed the suite could score a build from one toolchain on
+# a simulator driven by another.
+# shellcheck source=lib/xcode.sh
+source "$(dirname "${BASH_SOURCE[0]}")/lib/xcode.sh"
+cn1_select_xcode rf_log || exit 1
+
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 cd "$REPO_ROOT"
@@ -60,14 +69,21 @@ fi
 [ -x "$TARGET_JAVA_BIN" ] || { rf_log "java not found"; exit 3; }
 cn1ss_setup "$TARGET_JAVA_BIN" "$CN1SS_HELPER_SOURCE_DIR"
 
-# Pick a booted simulator if none was given.
+# Pick a simulator if none was given. NOT "whatever is booted": the golden set
+# names the OS design generation this run is scored against, and a booted
+# simulator of another generation produces phantom regressions out of nothing
+# but a different SF font revision. The old fallback also grepped for the device
+# NAME "iPhone 16", which does not match the devices this repo actually captures
+# on (they are named iPhone16-iOS26 / iPhone16-fidelity).
 if [ -z "$SIM_UDID" ]; then
-  SIM_UDID="$(xcrun simctl list devices booted 2>/dev/null | grep -Eo '[0-9A-F-]{36}' | head -n1 || true)"
+  # shellcheck source=lib/ios-sim.sh
+  source "$SCRIPT_DIR/lib/ios-sim.sh"
+  SIM_UDID="$(cn1_resolve_ios_sim_udid "$GOLDEN_SET" rf_log)" || exit 1
+  rf_log "Resolved simulator for $GOLDEN_SET: $SIM_UDID"
 fi
-if [ -z "$SIM_UDID" ]; then
-  rf_log "No booted simulator and none specified; booting iPhone 16"
-  SIM_UDID="$(xcrun simctl list devices available | grep -E 'iPhone 16 \(' | grep -Eo '[0-9A-F-]{36}' | head -n1)"
-  xcrun simctl boot "$SIM_UDID"
+if ! xcrun simctl list devices booted 2>/dev/null | grep -q "$SIM_UDID"; then
+  rf_log "Booting $SIM_UDID"
+  xcrun simctl boot "$SIM_UDID" 2>/dev/null || true
   xcrun simctl bootstatus "$SIM_UDID" -b
 fi
 rf_log "Using simulator $SIM_UDID"
@@ -139,8 +155,27 @@ rf_log "Delivered: ${CN1_COUNT} cn1 + ${FRAME_COUNT} animation frame(s); committ
 [ "$CN1_COUNT" -gt 0 ] || { rf_log "FATAL: no CN1 renders delivered"; exit 12; }
 [ "$GOLDEN_COUNT" -gt 0 ] || { rf_log "FATAL: no committed iOS goldens (run scripts/build-ios-native-ref.sh)"; exit 12; }
 
-export CN1SS_COMMENT_MARKER="<!-- CN1SS_FIDELITY_IOS_COMMENT -->"
-export CN1SS_PREVIEW_SUBDIR="ios-fidelity"
+# Identity per GOLDEN SET, not per platform. Two iOS fidelity jobs now run on the
+# same pull request -- one per OS design generation -- and a fixed marker and
+# preview path meant they updated the SAME comment and published to the SAME
+# location, so whichever finished last hid the other generation's scores and
+# could replace its linked images. The screenshot suite already hit this and had
+# to split its markers; this is the same failure one workflow over.
+#
+# ios-26-metal keeps the historical values so existing comments and preview
+# links are not orphaned; any other set gets its own.
+case "${GOLDEN_SET}" in
+  ios-26-metal)
+    export CN1SS_COMMENT_MARKER="<!-- CN1SS_FIDELITY_IOS_COMMENT -->"
+    export CN1SS_PREVIEW_SUBDIR="ios-fidelity"
+    REPORT_TITLE="Native fidelity (iOS Modern, Metal)"
+    ;;
+  *)
+    export CN1SS_COMMENT_MARKER="<!-- CN1SS_FIDELITY_${GOLDEN_SET} -->"
+    export CN1SS_PREVIEW_SUBDIR="fidelity-${GOLDEN_SET}"
+    REPORT_TITLE="Native fidelity (${GOLDEN_SET})"
+    ;;
+esac
 export CN1SS_FIDELITY_SPEC="${CN1SS_FIDELITY_SPEC:-$APP_DIR/common/src/main/resources/fidelity-tests.yaml}"
 export CN1SS_FIDELITY_PLATFORM="${CN1SS_FIDELITY_PLATFORM:-ios}"
 # NOTE: the || capture keeps `set -e` from aborting here -- the frames stage
@@ -148,7 +183,7 @@ export CN1SS_FIDELITY_PLATFORM="${CN1SS_FIDELITY_PLATFORM:-ios}"
 # reports a regression; the exit codes are combined at the end.
 rc=0
 cn1ss_process_fidelity \
-  "Native fidelity (iOS Modern, Metal)" \
+  "$REPORT_TITLE" \
   "$WORK_DIR/fidelity-compare.json" "$WORK_DIR/fidelity-summary.txt" "$WORK_DIR/fidelity-comment.md" \
   "$GOLDENS_DIR" "$PREVIEW_DIR" "$ARTIFACTS_DIR" "$BASELINE_FILE" \
   "${COMPARE_ENTRIES[@]}" || rc=$?

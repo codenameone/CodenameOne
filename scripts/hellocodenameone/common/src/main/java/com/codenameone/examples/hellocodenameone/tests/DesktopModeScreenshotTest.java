@@ -1,21 +1,39 @@
+/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation. Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Codename One in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
 package com.codenameone.examples.hellocodenameone.tests;
 
 import com.codename1.ui.CN;
 import com.codename1.ui.Command;
 import com.codename1.ui.Container;
-import com.codename1.ui.Display;
 import com.codename1.ui.Form;
 import com.codename1.ui.Label;
 import com.codename1.ui.Toolbar;
 import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.layouts.BoxLayout;
 import com.codename1.ui.plaf.Style;
-import com.codename1.ui.plaf.UIManager;
 
-import java.util.Hashtable;
-
-/// Shows that the desktop integration features are inert on the phone/tablet ports but reshape the
-/// UI on the Mac native (Catalyst) desktop build, where {@code CN.isDesktop()} is true.
+/// Shows that the desktop integration features are inert on the phone/tablet ports and reshape the
+/// UI on every desktop port, where {@code CN.isDesktop()} is true.
 ///
 /// The exact same code runs on every port:
 ///
@@ -23,36 +41,37 @@ import java.util.Hashtable;
 ///   renders an ordinary mobile screen - a CN1 {@code Toolbar} with a hamburger side-menu button
 ///   and the usual fading touch scrollbar, which has settled to invisible by the time the
 ///   screenshot is taken. So the desktop features have no visible impact there.
-/// * On the Mac native build ({@code CN.isDesktop() == true}) the test opts into desktop mode
-///   ({@code desktop.titleBar=native} plus interactive scrollbars). The screenshot then looks
-///   different: the in-app Toolbar and its hamburger are gone (the commands move to the native
-///   macOS menu bar, which isn't part of the form raster), and the scrollbar shows an
-///   always-visible, draggable thumb that the mobile ports never display.
+/// * On a desktop port ({@code CN.isDesktop() == true}) the screenshot looks different: the
+///   commands are in the platform's menu rather than a hamburger, and the scrollbar shows an
+///   always-visible, draggable thumb with a reserved gutter that the mobile ports never display.
 ///
-/// The command keyboard accelerators are exercised on the desktop too (they become Mac
-/// {@code UIKeyCommand}s), though a still screenshot can't show them.
+/// The commands are not in the raster on any desktop port, and that is the point of capturing
+/// this screen on all of them. Every one has a real menu bar now -- a Swing {@code JMenuBar} on
+/// the Java SE build, an {@code NSMenu} on macOS, a Win32 {@code HMENU} on Windows and a
+/// {@code GtkMenuBar} on Linux -- so the {@code native} title-bar mode hides the in-app Toolbar
+/// and the commands move into chrome the screenshot does not cover.
 ///
-/// The desktop-mode toggles are global, so the test reverts them in {@link #done()} - which runs
-/// only after the screenshot has been captured - keeping every other test's baseline (on every
-/// port) untouched.
+/// A port that had none would keep its Toolbar instead: {@code Form.isDesktopHideToolbar()}
+/// will not hide the only place the commands are drawn. That branch is asserted by
+/// {@code DesktopChromeTest} rather than by this screenshot, because no port takes it today.
+///
+/// The command keyboard accelerators are exercised on the desktop too, though a still screenshot
+/// cannot show them.
 public class DesktopModeScreenshotTest extends BaseTest {
-    private boolean desktopEnabled;
 
     @Override
     public boolean runTest() throws Exception {
-        if (CN.isDesktop()) {
-            desktopEnabled = true;
-            // Read live by the toolbar at show time; hides the Toolbar and bridges commands to the
-            // native menu bar. Inert on the mobile ports (gated on isDesktop()).
-            Display.getInstance().setProperty("desktop.titleBar", "native");
-            // Turn on the always-visible interactive scrollbar (the macOS-style thumb). Injected
-            // directly here (rather than via the isDesktop-gated port hook) so it only happens on
-            // the desktop branch; reverted in done().
-            Hashtable interactive = new Hashtable();
-            interactive.put("@interactiveScrollBool", "true");
-            UIManager.getInstance().addThemeProps(interactive);
-        }
-
+        // This test used to switch desktop mode on for itself and switch it back off in
+        // done(), because it was the only screen in the suite that ran with the desktop
+        // chrome. It is not any more: codenameone_settings.properties sets
+        // desktop.titleBar=native and desktop.interactiveScrollbars=true for the whole
+        // application, and the desktop ports install their platform's native theme, which
+        // turns interactiveScrollBool on through the theme rather than through a hook here.
+        //
+        // Keeping the local opt-in would now hide a regression rather than demonstrate a
+        // feature: whatever this test switched on for itself would look right even if the
+        // suite-wide settings had stopped working. What it demonstrates instead is the
+        // chrome the whole suite renders in.
         Form form = createForm("Desktop Mode", new BorderLayout(), "DesktopMode");
         Toolbar toolbar = new Toolbar();
         form.setToolbar(toolbar);
@@ -113,24 +132,6 @@ public class DesktopModeScreenshotTest extends BaseTest {
     @Override
     protected long extraSettleBeforeCaptureMillis() {
         return 700;
-    }
-
-    @Override
-    protected synchronized void done() {
-        // Revert the global desktop-mode toggles now that the screenshot has been captured, so the
-        // rest of the suite (and every other port's baseline) is unaffected by this test.
-        if (desktopEnabled) {
-            desktopEnabled = false;
-            try {
-                Display.getInstance().setProperty("desktop.titleBar", "toolbar");
-                Hashtable revert = new Hashtable();
-                revert.put("@interactiveScrollBool", "false");
-                UIManager.getInstance().addThemeProps(revert);
-            } catch (Throwable ignored) {
-                // best-effort restore; never let teardown fail the test
-            }
-        }
-        super.done();
     }
 
     private static int rowColor(int i) {

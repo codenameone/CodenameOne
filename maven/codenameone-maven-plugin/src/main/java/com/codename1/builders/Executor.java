@@ -553,6 +553,50 @@ public abstract class Executor {
         return "        Display.getInstance().setProperty(\"db.legacy\", \"true\");\n";
     }
 
+    /// The `desktop.titleBar` build hint, surfaced to the generated stub as a Display property.
+    ///
+    /// Without this the hint is INERT on every ParparVM desktop port. `Display.getProperty`
+    /// falls through to the implementation, whose base answer is the caller's default, and
+    /// neither `LinuxImplementation` nor `WindowsImplementation` overrides it; the iOS/macOS one
+    /// does override `getConfiguredDesktopTitleBarMode()` but reads it back through the same
+    /// Display property, and its comment said the stub surfaced it while no builder emitted it.
+    /// So `Form.getDesktopTitleBarMode()`'s documented precedence -- "the build hint wins, and a
+    /// theme must not talk it out of that" -- held only on JavaSE, which reads the system
+    /// property directly. Everywhere else the theme constant silently decided.
+    ///
+    /// That is visible rather than theoretical: hellocodenameone sets
+    /// `codename1.arg.desktop.titleBar=native`, and on Linux the Adwaita theme's own `custom`
+    /// won anyway, so the application kept a CN1 Toolbar with a hamburger instead of moving its
+    /// title to the window and its commands to the GTK menu bar. Fluent and Aqua both say
+    /// `native`, so those two ports agreed with the hint by luck and looked correct.
+    ///
+    /// Emitted ONLY when the project actually set the hint. Emitting a default would destroy the
+    /// distinction `getConfiguredDesktopTitleBarMode()` exists to express -- null means "nobody
+    /// asked", which is what lets a native theme's constant answer instead.
+    ///
+    /// #### Parameters
+    ///
+    /// - `request`: the build request whose args carry the hint
+    ///
+    /// #### Returns
+    ///
+    /// the stub line, or an empty string when the hint is unset or not one of the three modes
+    protected String desktopTitleBarStubProperty(BuildRequest request) {
+        String mode = request.getArg("desktop.titleBar", null);
+        if (mode == null) {
+            return "";
+        }
+        mode = mode.trim().toLowerCase();
+        if (!"native".equals(mode) && !"custom".equals(mode) && !"toolbar".equals(mode)) {
+            // Same three values GenerateDesktopAppWrapperMojo validates. An unknown one is
+            // dropped rather than passed through: it would reach Form as a mode nothing matches,
+            // which reads as "toolbar" and would look like the hint being ignored again.
+            log("Invalid desktop.titleBar build hint: '" + mode + "'. Ignoring it.");
+            return "";
+        }
+        return "        Display.getInstance().setProperty(\"desktop.titleBar\", \"" + mode + "\");\n";
+    }
+
     /// The same decision, for a stub that runs before `Display` exists.
     ///
     /// A **direct** call, not reflection: ParparVM's dead-code elimination does not keep a member

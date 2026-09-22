@@ -186,12 +186,17 @@ final class JavascriptSuspensionAnalysis {
      */
     static volatile DispatchModel exportedDispatchModel = null;
 
-    // Where the suspension report is written -- always, beside the bundle, as
-    // ``suspension-report.txt``. It exists because the sync/suspending split
-    // is the number this pass exists to move, and the only thing emitted
-    // before was a total (Parser, behind -verbose) that could not say WHICH
-    // rule was responsible for the suspending half. Null only when no output
-    // directory was supplied, which is the in-memory unit-test path.
+    // Where the suspension report is written -- always, and NEXT TO the bundle
+    // directory rather than inside it, as ``suspension-report.txt``. It exists
+    // because the sync/suspending split is the number this pass exists to
+    // move, and the only thing emitted before was a total (Parser, behind
+    // -verbose) that could not say WHICH rule was responsible for the
+    // suspending half. It is a report about the build and not part of the
+    // application, and the bundle directory is a public web root, so it goes
+    // in the sibling position JavascriptBundleWriter.sidecar picks, named
+    // after the bundle it describes.
+    // Null only when no output directory was supplied, which is the in-memory
+    // unit-test path.
     private String reportPath;
     // Method -> the rule that FIRST classified it suspending. A method can
     // have several independent causes; this records the one that won the race
@@ -228,12 +233,15 @@ final class JavascriptSuspensionAnalysis {
             return 0;
         }
         JavascriptSuspensionAnalysis a = new JavascriptSuspensionAnalysis();
-        // Always written, always beside the bundle. A diagnostic behind a
-        // system property is a diagnostic nobody sets, and the sync/suspending
-        // split is the number this whole pass exists to move -- it belongs in
-        // the build output where CI and a bisect can both read it.
+        // Always written, always beside the bundle directory -- never in it. A
+        // diagnostic behind a system property is a diagnostic nobody sets, and
+        // the sync/suspending split is the number this whole pass exists to
+        // move, so it belongs in the build output where CI and a bisect can
+        // both read it. The build output is the ``dist`` directory; the bundle
+        // directory inside it is the deployed web root and is not.
         if (outputDirectory != null) {
-            a.reportPath = new File(outputDirectory, "suspension-report.txt").getAbsolutePath();
+            a.reportPath = JavascriptBundleWriter.sidecar(
+                    outputDirectory, JavascriptBundleWriter.SUSPENSION_REPORT).getAbsolutePath();
         }
         a.rta = JavascriptReachability.modelFor(classes);
         a.index(classes);

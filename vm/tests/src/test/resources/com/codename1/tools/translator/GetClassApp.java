@@ -44,6 +44,14 @@ public class GetClassApp {
     static class Other implements Bulkable {
     }
 
+    // Lazy initialization exercises the generated static-final setters after
+    // ordinary objects exist. Class literals must never remove a heap entry.
+    static class LiteralHolder {
+        static final Class ENTRY = Entry.class;
+        static final Class META = Class.class;
+        static final Object ARRAY = int[].class;
+    }
+
     private static final StringBuilder OUT = new StringBuilder();
 
     private static void say(String label, Object value) {
@@ -80,6 +88,16 @@ public class GetClassApp {
         say("mapLookupA", classCode.get(a.getClass()));
         say("mapLookupB", classCode.get(b.getClass()));
         say("mapSize", Integer.valueOf(classCode.size()));
+        say("staticClass", Boolean.valueOf(LiteralHolder.ENTRY == classOfA));
+        say("staticMetaClass", Boolean.valueOf(LiteralHolder.META == Class.class));
+        say("staticArrayClass", Boolean.valueOf(LiteralHolder.ARRAY == int[].class));
+        // Keep generated reference-array descriptors in the native fixture too.
+        say("classArray1", Boolean.valueOf(Class[].class.isArray()));
+        say("classArray2", Boolean.valueOf(Class[][].class.isArray()));
+        say("classArray3", Boolean.valueOf(Class[][][].class.isArray()));
+        say("entryArray1", Boolean.valueOf(Entry[].class.isArray()));
+        say("entryArray2", Boolean.valueOf(Entry[][].class.isArray()));
+        say("entryArray3", Boolean.valueOf(Entry[][][].class.isArray()));
 
         // The reporter's failure only showed up while a dictionary load was allocating
         // hard, so re-check every invariant under churn instead of once at startup.

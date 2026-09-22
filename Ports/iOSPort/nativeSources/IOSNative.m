@@ -31,8 +31,12 @@
 #include <limits.h>
 #include <stdlib.h>
 #include <string.h>
-#import "CN1ES2compat.h"
+#import "CN1RenderBackend.h"
 #import "CN1JailbreakDetector.h"
+// Unconditional: the hinge entry points at the bottom of this file are built
+// on every slice, so their declarations cannot sit inside a TARGET_OS_WATCH
+// block the way the neighbouring imports do.
+#import "CN1Hinge.h"
 #if TARGET_OS_WATCH
 #import "CN1CGGraphics.h"
 #import "CN1WatchHost.h"
@@ -2209,8 +2213,6 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_gausianBlurImage___long_float(CN1_THR
     if (original == nil) {
         original = [glu getImage];
     }
-#else
-    original = [glu getImage];
 #endif
 
     // taken from: http://stackoverflow.com/a/19433086/756809
@@ -4828,10 +4830,10 @@ void com_codename1_impl_ios_IOSNative_peerSetVisible___long_boolean(CN1_THREAD_S
                 METALView *owner = (METALView *)CN1MacPeerOwnerHostView((NSView *)v);
                 [(owner != nil ? owner
                      : (peerHost != nil ? peerHost
-                        : (METALView *)[[CodenameOne_GLViewController instance] eaglView]))
+                        : (METALView *)[[CodenameOne_GLViewController instance] renderingView]))
                         addPeerComponent:v];
 #else
-                [[[CodenameOne_GLViewController instance] eaglView] addPeerComponent:v];
+                [[[CodenameOne_GLViewController instance] renderingView] addPeerComponent:v];
 #endif
             }
         }
@@ -4914,7 +4916,7 @@ void com_codename1_impl_ios_IOSNative_peerInitialized___long_int_int_int_int_int
     // Resolved here, on the calling thread, rather than inside the block: the
     // window manager marks the active rendering view only for the duration of a
     // window's paint, and this dispatch runs after that bracket has been
-    // cleared. eaglView answers the MAIN window's view unconditionally on this
+    // cleared. renderingView answers the MAIN window's view unconditionally on this
     // port, so without this a peer belonging to a secondary Window was added to
     // the main one and drawn there at coordinates meant for its own.
     extern NSView *CN1MacPeerHostView(void);
@@ -4945,7 +4947,7 @@ void com_codename1_impl_ios_IOSNative_peerInitialized___long_int_int_int_int_int
             METALView *owner = (METALView *)CN1MacPeerHostViewForWindowId(windowId);
             [(owner != nil ? owner
                  : (peerHost != nil ? peerHost
-                    : (METALView *)[[CodenameOne_GLViewController instance] eaglView]))
+                    : (METALView *)[[CodenameOne_GLViewController instance] renderingView]))
                     addPeerComponent:v];
         }
         // Remembered on the peer whether or not it was used just now: a peer is
@@ -4971,7 +4973,7 @@ void com_codename1_impl_ios_IOSNative_peerInitialized___long_int_int_int_int_int
         POOL_BEGIN();
         CN1View* v = (BRIDGE_CAST CN1View*)((void *)peer);
         if([v superview] == nil) {
-            [[[CodenameOne_GLViewController instance] eaglView] addPeerComponent:v];
+            [[[CodenameOne_GLViewController instance] renderingView] addPeerComponent:v];
         }
         if(w > 0 && h > 0) {
             float scale = scaleValue;
@@ -5443,11 +5445,11 @@ void com_codename1_impl_ios_IOSNative_fillLinearGradientMutable___int_int_int_in
     POOL_END();
 }
 
-// Multi-stop gradient bridge. Metal builds queue a DrawMultiStopGradient op so
-// matrices / clip / mutable-image targeting propagate through the standard
-// drain loop, matching the existing DrawGradient flow. GL builds have no
-// equivalent shader and the Java side never calls this method (it falls
-// through to the software rasterizer in CodenameOneImplementation).
+// Multi-stop gradient bridge. Queues a DrawMultiStopGradient op so matrices /
+// clip / mutable-image targeting propagate through the standard drain loop,
+// matching the DrawGradient flow. A slice without Metal has no equivalent
+// shader and the Java side never calls this method there (it falls through to
+// the software rasterizer in CodenameOneImplementation).
 void com_codename1_impl_ios_IOSNative_fillGradient___int_int_float_1ARRAY_float_1ARRAY_int_float_float_float_float_float_int_int_int_int_int_boolean(
         CN1_THREAD_STATE_MULTI_ARG
         JAVA_OBJECT instanceObject,
@@ -10944,19 +10946,19 @@ static void cn1_renderPeerComponents(CN1View *rootView, CGContextRef ctx) {
 #if TARGET_OS_OSX
 #else
     CodenameOne_GLViewController *controller = [CodenameOne_GLViewController instance];
-    EAGLView *glView = [controller eaglView];
-    if (glView == nil || rootView == nil || ctx == NULL) {
+    METALView *renderView = [controller renderingView];
+    if (renderView == nil || rootView == nil || ctx == NULL) {
         return;
     }
 
-    CN1View *peerLayer = glView.peerComponentsLayer;
+    CN1View *peerLayer = renderView.peerComponentsLayer;
     NSArray<CN1View *> *peerCandidates = nil;
     if (peerLayer != nil) {
         [peerLayer layoutIfNeeded];
         peerCandidates = peerLayer.subviews;
     } else {
-        [glView layoutIfNeeded];
-        peerCandidates = glView.subviews;
+        [renderView layoutIfNeeded];
+        peerCandidates = renderView.subviews;
     }
 
     if (peerCandidates.count == 0) {
@@ -11108,9 +11110,9 @@ static CN1Image* cn1_captureView(CN1View *view) {
     cn1_renderViewIntoContext(view, rootView, ctx);
 
     CodenameOne_GLViewController *controller = [CodenameOne_GLViewController instance];
-    EAGLView *glView = [controller eaglView];
-    if (glView != nil && glView != view) {
-        cn1_renderViewIntoContext(glView, rootView, ctx);
+    METALView *renderView = [controller renderingView];
+    if (renderView != nil && renderView != view) {
+        cn1_renderViewIntoContext(renderView, rootView, ctx);
     }
 
     cn1_renderPeerComponents(rootView, ctx);
@@ -15160,7 +15162,7 @@ void com_codename1_impl_ios_IOSNative_releaseWebSocketNative___long(CN1_THREAD_S
 }
 
 
-// ---------------- ES2 Port ADDITION: Shape Drawing -------------------------------------
+// ---------------- Shape Drawing --------------------------------------------------------
 
 
 //native void fillConvexPolygonGlobal(float[] points, int color, int alpha);
@@ -15352,13 +15354,6 @@ void com_codename1_impl_ios_IOSNative_nativeDeleteTexture___long(CN1_THREAD_STAT
     // Texture handle is a CFBridgingRetain'd id<MTLTexture>; release it to
     // drop the retain that nativePathRendererCreateTexture took.
     CFBridgingRelease((CFTypeRef)(void *)(uintptr_t)textureName);
-#else
-    dispatch_async(dispatch_get_main_queue(), ^{
-        GLuint tex = (GLuint)textureName;
-        //POOL_BEGIN();
-        glDeleteTextures(1, &tex);
-        //POOL_END();
-    });
 #endif
 }
 
@@ -15384,7 +15379,7 @@ JAVA_OBJECT com_codename1_impl_ios_IOSNative_nativePathRendererToARGB___long_int
     // (see the comment in nativePathRendererCreateTexture above).
     // Filter on the actual width / height below.
 
-    //GLuint tex=0;
+    //unsigned int tex=0;
     JAVA_INT x = min(outputBounds[0], outputBounds[2]);
     JAVA_INT y = min(outputBounds[1], outputBounds[3]);
     JAVA_INT width = outputBounds[2]-outputBounds[0];
@@ -15528,104 +15523,7 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_nativePathRendererCreateTexture___lon
         return handle;
     }
 #endif
-#if defined(USE_ES2) && !defined(CN1_USE_METAL) && !TARGET_OS_WATCH
-
-    __block JAVA_LONG outTexture = 0;
-
-    dispatch_sync(dispatch_get_main_queue(), ^{
-        POOL_BEGIN();
-        EAGLContext *ctx = [[CodenameOne_GLViewController instance] context];
-        if ( ctx != nil ){
-            [EAGLContext setCurrentContext:ctx];
-        } else {
-            //return 0;
-            POOL_END();
-            return;
-        }
-        
-        Renderer *r = (Renderer*)(uintptr_t)renderer;
-        JAVA_INT outputBounds[4];
-
-        Renderer_getOutputBounds((Renderer*)(uintptr_t)renderer, (JAVA_INT*)&outputBounds);
-        // outputBounds is { minX, minY, maxX, maxY }; the maxX/maxY
-        // values can legitimately be negative when the shape sits in
-        // the negative quadrant (e.g. the spinner SVG draws each
-        // rotated rect at y in [-40, -20]). The width / height check
-        // below filters degenerate / empty paths. Mirrors the Metal
-        // branch above.
-
-        GLuint tex=0;
-        JAVA_INT x = min(outputBounds[0], outputBounds[2]);
-        JAVA_INT y = min(outputBounds[1], outputBounds[3]);
-        JAVA_INT width = outputBounds[2]-outputBounds[0];
-        JAVA_INT height = outputBounds[3]-outputBounds[1];
-
-        if ( width < 0 ) width = -width;
-        if ( height < 0 ) height = -height;
-        if (width == 0 || height == 0) {
-            POOL_END();
-            return;
-        }
-        AlphaConsumer *ac = malloc(sizeof(AlphaConsumer));
-        ac->originX = x;
-        ac->originY = y;
-        ac->width = width;
-        ac->height = height;
-
-        jbyte* maskArray = malloc(sizeof(jbyte)*ac->width*ac->height);
-
-        ac->alphas = maskArray;
-        Renderer_produceAlphas(r, ac);
-        
-        _glEnableClientState(GL_VERTEX_ARRAY);
-        //glEnableClientState(GL_NORMAL_ARRAY);
-        GLErrorLog;
-        _glEnableClientState(GL_TEXTURE_COORD_ARRAY);
-        GLErrorLog;
-        glGenTextures(1, &tex);
-        
-        GLErrorLog;
-        
-        if ( tex == 0 ){
-            free(maskArray);
-            free(ac);
-            POOL_END();
-            return;
-            //return 0;
-        }
-        glActiveTexture(GL_TEXTURE1);
-        GLErrorLog;
-        glBindTexture(GL_TEXTURE_2D, tex);
-        GLErrorLog;
-        
-        //glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-        //glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-        //glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-        //glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-        
-        glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
-        
-        glTexImage2D(GL_TEXTURE_2D, 0, GL_ALPHA, ac->width, ac->height, 0, GL_ALPHA, GL_UNSIGNED_BYTE, maskArray);
-        GLErrorLog;
-        
-        glBindTexture(GL_TEXTURE_2D, 0);
-        GLErrorLog;
-        _glDisableClientState(GL_VERTEX_ARRAY);
-        GLErrorLog;
-        _glDisableClientState(GL_TEXTURE_COORD_ARRAY);
-        GLErrorLog;
-        
-        free(maskArray);
-        free(ac);
-
-        outTexture = tex;
-        //return (JAVA_LONG)tex;
-        POOL_END();
-    });
-    return outTexture;
-#else
     return 0;
-#endif
     
 }
 
@@ -15642,7 +15540,6 @@ float clamp_float_to_int(float val){
 
 void com_codename1_impl_ios_Matrix_MatrixUtil_multiplyMM___float_1ARRAY_int_float_1ARRAY_int_float_1ARRAY_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT result, JAVA_INT resultOffset, JAVA_OBJECT lhs, JAVA_INT lhsOffset, JAVA_OBJECT rhs, JAVA_INT rhsOffset)
 {
-#ifdef USE_ES2
 #ifndef NEW_CODENAME_ONE_VM
     //org_xmlvm_runtime_XMLVMArray* byteArray = java_lang_String_getBytes___java_lang_String(str, utf8String);
     //JAVA_ARRAY_BYTE* data = (JAVA_ARRAY_BYTE*)byteArray->fields.org_xmlvm_runtime_XMLVMArray.array_;
@@ -15659,10 +15556,8 @@ void com_codename1_impl_ios_Matrix_MatrixUtil_multiplyMM___float_1ARRAY_int_floa
 #endif
     
     
-#if defined(CN1_USE_METAL) || TARGET_OS_WATCH
-    // Manual 4x4 column-major multiply so this path compiles for the Mac
-    // Catalyst slice (no GLKit math symbols). Identical result to
-    // GLKMatrix4Multiply(GLKMatrix4MakeWithArray(L), GLKMatrix4MakeWithArray(R)).
+    // 4x4 column-major multiply, written out: there is no matrix library
+    // behind this port.
     const JAVA_ARRAY_FLOAT *L = lhsData + lhsOffset * sizeof(JAVA_FLOAT);
     const JAVA_ARRAY_FLOAT *R = rhsData + rhsOffset * sizeof(JAVA_FLOAT);
     float out[16];
@@ -15678,17 +15573,6 @@ void com_codename1_impl_ios_Matrix_MatrixUtil_multiplyMM___float_1ARRAY_int_floa
     for (int i = 0; i < 16; i++) {
         resultData[i + resultOffset] = clamp_float_to_int(out[i]);
     }
-#else
-    GLKMatrix4 mLeft = GLKMatrix4MakeWithArray(lhsData+lhsOffset*sizeof(JAVA_FLOAT));
-    GLKMatrix4 mRight = GLKMatrix4MakeWithArray(rhsData+rhsOffset*sizeof(JAVA_FLOAT));
-    GLKMatrix4 mResult = GLKMatrix4Multiply(mLeft, mRight);
-
-    for ( int i=0; i<16; i++){
-        resultData[i+resultOffset] = clamp_float_to_int(mResult.m[i]);
-    }
-    //memcpy(resultData+resultOffset*sizeof(JAVA_FLOAT), &mResult, 16*sizeof(JAVA_FLOAT));
-#endif
-#endif
 }
 
 
@@ -15706,9 +15590,7 @@ JAVA_OBJECT m, JAVA_INT pointSize, JAVA_OBJECT in, JAVA_INT srcPos, JAVA_OBJECT 
     JAVA_ARRAY_FLOAT* inData = (JAVA_ARRAY_FLOAT*) ((JAVA_ARRAY)in)->data;
     JAVA_ARRAY_FLOAT* outData = (JAVA_ARRAY_FLOAT*) ((JAVA_ARRAY)out)->data;
 #endif
-#if defined(CN1_USE_METAL) || TARGET_OS_WATCH
-    // Manual matrix-vector multiply for the Mac Catalyst slice (no GLKit
-    // math symbols). mData is a 4x4 column-major matrix.
+    // Matrix-vector multiply; mData is a 4x4 column-major matrix.
     const JAVA_ARRAY_FLOAT *M = mData;
     JAVA_INT len = numPoints * pointSize;
     for (JAVA_INT i = 0; i < len; i += pointSize) {
@@ -15732,25 +15614,6 @@ JAVA_OBJECT m, JAVA_INT pointSize, JAVA_OBJECT in, JAVA_INT srcPos, JAVA_OBJECT 
             outData[d0] = outv[2] / outv[3];
         }
     }
-#else
-    GLKMatrix4 mMat = GLKMatrix4MakeWithArray(mData);
-    JAVA_INT len = numPoints * pointSize;
-    for (JAVA_INT i=0; i<len; i+=pointSize) {
-        JAVA_INT s0 = srcPos + i;
-        GLKVector4 inputVector = GLKVector4Make(inData[s0], inData[s0+1], 0, 1);
-        if (pointSize==3) {
-            inputVector.v[2]= inData[s0+2];
-        }
-        GLKVector4 outputVector = GLKMatrix4MultiplyVector4(mMat, inputVector);
-
-        int d0 = destPos + i;
-        outData[d0++] = outputVector.v[0] / outputVector.v[3];
-        outData[d0++] = outputVector.v[1] / outputVector.v[3];
-        if (pointSize==3) {
-            outData[d0] = outputVector.v[2] / outputVector.v[3];
-        }
-    }
-#endif
 
 }
 
@@ -15803,7 +15666,6 @@ JAVA_VOID com_codename1_impl_ios_IOSNative_scalePoints___int_float_float_float_f
 
 JAVA_BOOLEAN com_codename1_impl_ios_Matrix_MatrixUtil_invertM___float_1ARRAY_int_float_1ARRAY_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT mInv, JAVA_INT mInvOffset, JAVA_OBJECT m, JAVA_INT mOffset)
 {
-#ifdef USE_ES2
 #ifndef NEW_CODENAME_ONE_VM
     //org_xmlvm_runtime_XMLVMArray* byteArray = java_lang_String_getBytes___java_lang_String(str, utf8String);
     //JAVA_ARRAY_BYTE* data = (JAVA_ARRAY_BYTE*)byteArray->fields.org_xmlvm_runtime_XMLVMArray.array_;
@@ -15820,20 +15682,16 @@ JAVA_BOOLEAN com_codename1_impl_ios_Matrix_MatrixUtil_invertM___float_1ARRAY_int
 #endif
     
     
-#if defined(CN1_USE_METAL) || TARGET_OS_WATCH
-    // Manual 4x4 matrix inverse for the Mac Catalyst slice. Returns 1 in
-    // both branches to preserve the original iOS semantic (the function
-    // always returns 1 unless USE_ES2 is off, mirroring GLKMatrix4Invert's
-    // behavior when callers ignore the `isInvertible` flag).
+    // 4x4 matrix inverse. Returns 1 in both branches to preserve the
+    // original iOS semantic: callers ignore an `isInvertible` flag.
     // NB: the JAVA_OBJECT parameter is already named `m`, so the working
     // copy of the float matrix is named `mm` to avoid shadowing.
     const JAVA_ARRAY_FLOAT *src = mData + mOffset * sizeof(JAVA_FLOAT);
     float mm[16];
     for (int i = 0; i < 16; i++) { mm[i] = src[i]; }
     // Cofactor expansion derived from a standard adjugate / determinant
-    // formula for 4x4 column-major matrices. Matches GLKMatrix4Invert's
-    // output bit-for-bit for invertible inputs; non-invertible matrices
-    // would have det == 0, mirroring GLKit's `*invertible = 0` behavior.
+    // formula for 4x4 column-major matrices. A non-invertible matrix has
+    // det == 0 and falls through to the identity below.
     float inv[16];
     inv[0]  =  mm[5]*mm[10]*mm[15] - mm[5]*mm[11]*mm[14] - mm[9]*mm[6]*mm[15] + mm[9]*mm[7]*mm[14] + mm[13]*mm[6]*mm[11] - mm[13]*mm[7]*mm[10];
     inv[4]  = -mm[4]*mm[10]*mm[15] + mm[4]*mm[11]*mm[14] + mm[8]*mm[6]*mm[15] - mm[8]*mm[7]*mm[14] - mm[12]*mm[6]*mm[11] + mm[12]*mm[7]*mm[10];
@@ -15860,22 +15718,6 @@ JAVA_BOOLEAN com_codename1_impl_ios_Matrix_MatrixUtil_invertM___float_1ARRAY_int
         mInvData[i + mInvOffset] = inv[i] * invDet;
     }
     return 1;
-#else
-    GLKMatrix4 mMat = GLKMatrix4MakeWithArray(mData+mOffset*sizeof(JAVA_FLOAT));
-    JAVA_BOOLEAN isInvertible = 0;
-    GLKMatrix4 mInvMat = GLKMatrix4Invert(mMat, &isInvertible);
-    if ( !isInvertible ){
-        return 1;
-    } else {
-        for ( int i=0; i<16; i++){
-            mInvData[i+mInvOffset] = mInvMat.m[i];
-        }
-        return 1;
-    }
-#endif
-#else
-    return 0;
-#endif
 
 }
 
@@ -15946,37 +15788,21 @@ void com_codename1_impl_ios_IOSNative_nativeSetTransformMutable___float_float_fl
 
 
 JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_nativeIsTransformSupportedGlobal__(JAVA_OBJECT instanceObject){
-#ifdef USE_ES2
     return YES;
-#else
-    return NO;
-#endif
 }
 
 JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_nativeIsPerspectiveTransformSupportedGlobal__(JAVA_OBJECT instanceObject){
-#ifdef USE_ES2
     return YES;
-#else
-    return NO;
-#endif
 }
 
 
 JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_nativeIsShapeSupportedGlobal__(JAVA_OBJECT instanceObject){
-#ifdef USE_ES2
     return YES;
-#else
-    return NO;
-#endif
 }
 
 
 JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_nativeIsAlphaMaskSupportedGlobal__(JAVA_OBJECT instanceObject){
-#ifdef USE_ES2
     return YES;
-#else
-    return NO;
-#endif
 }
 
 // End Shapes
@@ -18601,7 +18427,7 @@ void com_codename1_impl_ios_IOSNative_updateAccessibilityTree___java_lang_String
         if (windowId != 0) return;
 #endif
         if (container == nil) {
-            container = (CN1View *)[[CodenameOne_GLViewController instance] eaglView];
+            container = (CN1View *)[[CodenameOne_GLViewController instance] renderingView];
         }
         if (container == nil) return;
         /* The backing scale of the display this surface is on, which is not the process
@@ -18929,7 +18755,7 @@ static void cn1AccessibilityStatusChanged(CFNotificationCenterRef center, void *
 }
 #endif
 
-// Called from the METALView / EAGLView accessibilityElements getters: a real
+// Called from the METALView accessibilityElements getter: a real
 // client asked for
 // the tree. This, not the running flags, is what makes the gate correct for the
 // technologies UIKit will not report -- see the comment on that getter.
@@ -22875,4 +22701,68 @@ JAVA_INT com_codename1_impl_ios_IOSNative_generateRsaKeyPair___int_byte_1ARRAY_b
 
 JAVA_LONG com_codename1_impl_ios_IOSNative_createWebSocketNative___int_java_lang_String_R_long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT connectionId, JAVA_OBJECT url) {
     return com_codename1_impl_ios_IOSNative_createWebSocketNative___int_java_lang_String(CN1_THREAD_STATE_PASS_ARG instanceObject, connectionId, url);
+}
+
+// ---------------------------------------------------------------------
+// Foldable / hinge (UIHinge). Implementation lives in CN1Hinge.m; these are
+// the ParparVM entry points, and they live HERE because IOSNative.java is
+// the class that declares them.
+//
+// Every other nativeSources file that defines com_codename1_impl_ios_IOSNative_
+// symbols -- CN1Bluetooth, CN1Call, CN1Health, CN1Vision and the rest -- is
+// separate BECAUSE it is feature-gated, and each carries #else trampolines so
+// the symbols survive with the feature off. The hinge has no feature gate, so
+// there is no such reason, and an ungated file holding entry points is one more
+// thing every build path has to keep carrying. Nothing excludes it today, but
+// the cost of being wrong is a Java native with no symbol -- which does not
+// fail the build, it makes the dead-code pass drop the method and ship the
+// feature inert.
+// ---------------------------------------------------------------------
+
+void com_codename1_impl_ios_IOSNative_startHingeMonitoring__(
+        CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
+    POOL_BEGIN();
+    cn1HingeStart();
+    POOL_END();
+}
+
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isFoldableDisplay___R_boolean(
+        CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
+    POOL_BEGIN();
+    JAVA_BOOLEAN result = cn1HingeIsFoldableDisplay() ? JAVA_TRUE : JAVA_FALSE;
+    POOL_END();
+    return result;
+}
+
+JAVA_INT com_codename1_impl_ios_IOSNative_getHingeStatus___R_int(
+        CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
+    return (JAVA_INT)cn1HingeStatus();
+}
+
+JAVA_INT com_codename1_impl_ios_IOSNative_getHingeAngleDegrees___R_int(
+        CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
+    return (JAVA_INT)cn1HingeAngleDegrees();
+}
+
+JAVA_INT com_codename1_impl_ios_IOSNative_getFoldRegion___int_1ARRAY_R_int(
+        CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT out) {
+    if (out == JAVA_NULL) {
+        return 0;
+    }
+#ifndef NEW_CODENAME_ONE_VM
+    org_xmlvm_runtime_XMLVMArray* intArray = out;
+    JAVA_ARRAY_INT* data =
+        (JAVA_ARRAY_INT*)intArray->fields.org_xmlvm_runtime_XMLVMArray.array_;
+#else
+    JAVA_ARRAY_INT* data = (JAVA_ARRAY_INT*)((JAVA_ARRAY)out)->data;
+#endif
+    int region[4];
+    int kind = cn1HingeFoldRegion(region);
+    if (kind != 0) {
+        data[0] = (JAVA_ARRAY_INT)region[0];
+        data[1] = (JAVA_ARRAY_INT)region[1];
+        data[2] = (JAVA_ARRAY_INT)region[2];
+        data[3] = (JAVA_ARRAY_INT)region[3];
+    }
+    return (JAVA_INT)kind;
 }

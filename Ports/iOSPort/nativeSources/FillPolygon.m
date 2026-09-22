@@ -29,12 +29,7 @@
 //
 
 #import "FillPolygon.h"
-// OpenGL ES does not exist on macOS; this port is Metal-only.
-#if !TARGET_OS_OSX
-#import <OpenGLES/ES2/gl.h>
-#import <OpenGLES/ES1/gl.h>
-#endif
-#import "CN1ES2compat.h"
+#import "CN1RenderBackend.h"
 #import "xmlvm.h"
 #ifdef CN1_USE_METAL
 #import "CN1Metalcompat.h"
@@ -44,76 +39,6 @@
 #endif
 
 
-#ifdef USE_ES2
-#if !defined(CN1_USE_METAL) && !TARGET_OS_WATCH
-extern GLKMatrix4 CN1modelViewMatrix;
-extern GLKMatrix4 CN1projectionMatrix;
-extern GLKMatrix4 CN1transformMatrix;
-extern int CN1modelViewMatrixVersion;
-extern int CN1projectionMatrixVersion;
-extern int CN1transformMatrixVersion;
-extern GLuint CN1activeProgram;
-static GLuint program=0;
-static GLuint vertexShader;
-static GLuint fragmentShader;
-static GLuint modelViewMatrixUniform;
-static GLuint projectionMatrixUniform;
-static GLuint transformMatrixUniform;
-static GLuint colorUniform;
-static GLuint vertexCoordAtt;
-static GLuint textureCoordAtt;
-static int currentCN1modelViewMatrixVersion=-1;
-static int currentCN1projectionMatrixVersion=-1;
-static int currentCN1transformMatrixVersion=-1;
-
-
-static NSString *fragmentShaderSrc =
-@"precision highp float;\n"
-"uniform lowp vec4 uColor;\n"
-
-"void main(){\n"
-"   gl_FragColor = uColor; \n"
-"}\n";
-
-static NSString *vertexShaderSrc =
-@"attribute vec4 aVertexCoord;\n"
-
-"uniform mat4 uModelViewMatrix;\n"
-"uniform mat4 uProjectionMatrix;\n"
-"uniform mat4 uTransformMatrix;\n"
-
-"void main(){\n"
-"   gl_Position = uProjectionMatrix *  uModelViewMatrix * uTransformMatrix * aVertexCoord;\n"
-"}";
-
-static GLuint getOGLProgram(){
-    if ( program == 0  ){
-        program = CN1compileShaderProgram(vertexShaderSrc, fragmentShaderSrc);
-        GLErrorLog;
-        vertexCoordAtt = glGetAttribLocation(program, "aVertexCoord");
-        GLErrorLog;
-        
-        modelViewMatrixUniform = glGetUniformLocation(program, "uModelViewMatrix");
-        GLErrorLog;
-        projectionMatrixUniform = glGetUniformLocation(program, "uProjectionMatrix");
-        GLErrorLog;
-        transformMatrixUniform = glGetUniformLocation(program, "uTransformMatrix");
-        GLErrorLog;
-        
-        colorUniform = glGetUniformLocation(program, "uColor");
-        GLErrorLog;
-        
-        
-        glBindBuffer(GL_ARRAY_BUFFER, 0);
-        GLErrorLog;
-        
-        
-    }
-    return program;
-}
-
-#endif // !CN1_USE_METAL
-#endif
 
 
 @implementation FillPolygon
@@ -141,75 +66,6 @@ static GLuint getOGLProgram(){
 {
 #ifdef CN1_USE_METAL
     CN1MetalFillPolygon(x, y, numPoints, color, alpha);
-#else
-    glUseProgram(getOGLProgram());
-
-    float alph = ((float)alpha)/255.0;
-    
-    GLKVector4 colorV = GLKVector4Make(((float)((color >> 16) & 0xff))/255.0 * alph,
-                                       ((float)((color >> 8) & 0xff))/255.0 * alph, ((float)(color & 0xff))/255.0 * alph, alph);
-    GLfloat xOffset = 0;
-    GLfloat yOffset = 0;
-    
-#if (TARGET_OS_SIMULATOR)
-    xOffset = 0;
-    yOffset = 0;
-#endif
-    
-    GLfloat vertexes[numPoints*2];// = malloc(sizeof(GLfloat)*numPoints*2);
-    GLErrorLog;
-    int j = 0;
-    for ( int i=0; i<numPoints; i++){
-        //CN1Log(@"Point: %f %f", x[i], y[i]);
-        vertexes[j++] = (GLfloat)x[i];
-        vertexes[j++] = (GLfloat)y[i];
-    }
-    
-    glEnableVertexAttribArray(vertexCoordAtt);
-    GLErrorLog;
-    
-    if (currentCN1projectionMatrixVersion != CN1projectionMatrixVersion) {
-        glUniformMatrix4fv(projectionMatrixUniform, 1, 0, CN1projectionMatrix.m);
-        GLErrorLog;
-        currentCN1projectionMatrixVersion = CN1projectionMatrixVersion;
-    }
-    if (currentCN1modelViewMatrixVersion != CN1modelViewMatrixVersion) {
-        glUniformMatrix4fv(modelViewMatrixUniform, 1, 0, CN1modelViewMatrix.m);
-        GLErrorLog;
-        currentCN1modelViewMatrixVersion = CN1modelViewMatrixVersion;
-    }
-    if (currentCN1transformMatrixVersion != CN1transformMatrixVersion) {
-        glUniformMatrix4fv(transformMatrixUniform, 1, 0, CN1transformMatrix.m);
-        GLErrorLog;
-        currentCN1transformMatrixVersion = CN1transformMatrixVersion;
-    }
-    glUniform4fv(colorUniform, 1, colorV.v);
-    GLErrorLog;
-    
-    //_glVertexPointer(2, GL_FLOAT, 0, vertexes);
-    //GLErrorLog;
-    glVertexAttribPointer(vertexCoordAtt, 2, GL_FLOAT, GL_FALSE, 0, vertexes);
-    GLErrorLog;
-    
-    
-    //GLErrorLog;
-    //_glVertexPointer(2, GL_FLOAT, 0, vertexes);
-    //_glEnableClientState(GL_VERTEX_ARRAY);
-    //GLErrorLog;
-    glDrawArrays(GL_TRIANGLE_FAN, 0, numPoints);
-    //GLErrorLog;
-    //_glDisableClientState(GL_VERTEX_ARRAY);
-    //GLErrorLog;
-    
-    glDisableVertexAttribArray(vertexCoordAtt);
-    GLErrorLog;
-    
-    //glUseProgram(CN1activeProgram);
-    //GLErrorLog;
-
-
-    // ---------- end
-
 #endif // CN1_USE_METAL
 }
 #endif // TARGET_OS_WATCH
