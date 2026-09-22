@@ -37,6 +37,7 @@ on:
       # it, the same way archetype-smoke, designer and pr.yml list them.
       - 'scripts/ci/apt-get-install.sh'
       - 'scripts/ci/apt-get-update.sh'
+      - 'scripts/test_gc_heap_removal.py'
       - 'vm/**'
       - 'Ports/LinuxPort/**'
       - 'maven/linux/**'
@@ -62,6 +63,7 @@ on:
       - '.github/workflows/linux-build-run.yml'
       - 'scripts/ci/apt-get-install.sh'
       - 'scripts/ci/apt-get-update.sh'
+      - 'scripts/test_gc_heap_removal.py'
       - 'vm/**'
       - 'Ports/LinuxPort/**'
       - 'maven/linux/**'
@@ -263,6 +265,9 @@ jobs:
           sudo chmod +x /usr/local/bin/cn1-zig-cc
           zig version
 
+      - name: Check class-literal heap removal
+        run: python3 scripts/test_gc_heap_removal.py
+
       # Translate the suite with the "linux" app type, native-build the ELF
       # (CMake/Ninja), run it under Xvfb and capture the suite over the cn1ss
       # WebSocket. The capture test does the whole build+run; ~112 PNGs land in
@@ -339,16 +344,13 @@ jobs:
           mvn -B test -pl tests -am \
             '-Dtest=CleanTargetLinuxIntegrationTest#capturesHelloSuiteOverWebSocketLinux' \
             '-Dsurefire.failIfNoSpecifiedTests=false' || rc=$?
+          core_found=0
           for core in /tmp/cn1-cores/core.*; do
             [ -f "$core" ] || continue
-            # gdb is not on the runner image, so this whole post-mortem printed
-            # "gdb: command not found" and the core -- the only thing that names the
-            # faulting frame -- was collected and thrown away. An intermittent SIGSEGV
-            # here has now cost several runs with nothing to show for them. Installed
-            # inside the loop so a run that does not crash never pays for it.
+            core_found=1
             if ! command -v gdb >/dev/null 2>&1; then
-              (sudo apt-get update -qq && sudo apt-get install -y -qq gdb) >/dev/null 2>&1 \
-                || apk add --no-cache gdb >/dev/null 2>&1 || true
+              echo "WARNING: cannot inspect $core because gdb is unavailable; the core will still be uploaded"
+              continue
             fi
             elf="$(/usr/bin/find /tmp -maxdepth 4 -name LinuxHelloMain -type f 2>/dev/null | head -1)"
             mkdir -p "$(dirname "$CN1_APP_LOG_TEE")"
@@ -357,12 +359,15 @@ jobs:
               gdb "$elf" "$core" -batch -ex 'set pagination off' \
                 -ex 'thread apply all bt' \
                 -ex 'thread 1' -ex 'bt full' \
-                -ex 'frame 0' -ex 'info args' \
+                -ex 'frame 0' -ex 'info locals' -ex 'info args' \
                 -ex 'frame 1' -ex 'info locals' -ex 'info args' \
                 -ex 'p gcMarkWorklistTop' -ex 'p currentGcMarkValue' \
                 2>&1
-            } >> "$(dirname "$CN1_APP_LOG_TEE")/crash-stacks.txt" || true
+            } 2>&1 | tee -a "$(dirname "$CN1_APP_LOG_TEE")/crash-stacks.txt" || true
           done
+          if [ "$core_found" -eq 0 ]; then
+            echo "No core files found in /tmp/cn1-cores"
+          fi
           # Resolve the CN1 FAULT/ABORT backtrace addresses (LinuxHelloMain[0x...]) that the
           # SA_ONSTACK handler dumped to app-output.log into function names -- the faulting
           # frames (e.g. a stack overflow's recursion / the caller that ran CN1 on a small
