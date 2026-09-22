@@ -215,15 +215,16 @@ jobs:
             exit 1; }
 
       # Flutter's own Linux build and Codename One's native Linux port both
-      # compile against GTK3; without it CMake stops at "The following required
-      # packages were not found: gtk+-3.0" before either side produces
-      # anything.
+      # BOTH sides need a native toolchain here, and they need different
+      # things. Flutter's desktop build wants clang and a C++ standard library;
+      # the Codename One side compiles the native Linux port, whose CMakeLists
+      # resolves the whole GTK/GStreamer/WebKit stack through pkg_check_modules
+      # and stops at the first one missing. The shared script is that stack --
+      # an ad-hoc subset here configured far enough to fail on libcurl, several
+      # minutes into a build that had already transpiled and compiled.
       - name: Install the Linux desktop toolchain
         if: ${{ matrix.platform == 'linux' }}
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y ninja-build libgtk-3-dev pkg-config \
-              clang cmake libstdc++-12-dev
+        run: bash scripts/ci/install-linux-native-deps.sh clang libstdc++-12-dev
 
       # The Codename One build opens an AWT window (its CSS compiler), so a
       # headless runner fails inside `cn1:css` after the transpile has already

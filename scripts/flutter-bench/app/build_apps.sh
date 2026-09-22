@@ -32,7 +32,13 @@
 # EXERCISED: none end to end yet. The Codename One side of `macos` has been
 # built from a prepared tree; the native compile steps and the other platforms
 # have not. Treat their first CI run as the thing under review.
-set -euo pipefail
+set -Eeuo pipefail
+# Report WHERE a failure happened. This script drives Maven, Flutter, pub and
+# python, several of which can fail with no output at all -- the Windows leg
+# twice reported an exit code and nothing else, and the first guess about
+# which command produced it was wrong. -E so the trap is inherited by the
+# subshells the build steps run in.
+trap 'rc=$?; echo "build_apps.sh: FAILED at line $LINENO (exit $rc)" >&2' ERR
 
 WORK=""
 PLATFORM=""

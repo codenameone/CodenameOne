@@ -24,7 +24,13 @@
 #   <work>/flutter/   a Flutter project, gallery + platform scaffolding
 #   <work>/cn1/       a Codename One project generated from the archetype
 #   <work>/prepared.json
-set -euo pipefail
+set -Eeuo pipefail
+# Report WHERE a failure happened. This script drives Maven, Flutter, pub and
+# python, several of which can fail with no output at all -- the Windows leg
+# twice reported an exit code and nothing else, and the first guess about
+# which command produced it was wrong. -E so the trap is inherited by the
+# subshells the build steps run in.
+trap 'rc=$?; echo "prepare.sh: FAILED at line $LINENO (exit $rc)" >&2' ERR
 
 WORK=""
 FLUTTER_ROOT_ARG=""
