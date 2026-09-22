@@ -42,6 +42,12 @@ public class Image extends Widget {
 
     private String assetName;
     private String url;
+    /// Request headers from a NetworkImage provider; null when there are none.
+    private java.util.Map<?, ?> headers;
+    /// The encoded picture a MemoryImage provider carries; null otherwise.
+    private byte[] memoryBytes;
+    /// The provider's own key for a memory image, so a new buffer reloads.
+    private String memoryKey;
     private Double width;
     /// Flutter's decode-size hints. cacheWidth/cacheHeight decode the asset at
     /// that many DEVICE pixels, so they bound the picture's intrinsic size --
@@ -102,6 +108,21 @@ public class Image extends Widget {
                 this.assetName = key.substring("asset:".length());
             } else if (key != null && key.startsWith("url:")) {
                 this.url = key.substring("url:".length());
+                // The headers go with the URL. Keeping only the URL sent every
+                // request bare, so an image behind an Authorization header was
+                // refused on every load and never drawn.
+                if (inner instanceof com.codename1.flutter.NetworkImage) {
+                    Object h = ((com.codename1.flutter.NetworkImage) inner).getHeaders();
+                    this.headers = h instanceof java.util.Map && !((java.util.Map<?, ?>) h).isEmpty()
+                            ? (java.util.Map<?, ?>) h : null;
+                }
+            } else if (inner instanceof com.codename1.flutter.MemoryImage) {
+                // The bytes are already here, so there is nothing to resolve: the
+                // render element decodes them directly. This branch used to report
+                // the provider as unimplemented and draw nothing.
+                dart.typed_data.Uint8List data = ((com.codename1.flutter.MemoryImage) inner).getBytes();
+                this.memoryBytes = data == null ? null : data.toBytes();
+                this.memoryKey = key;
             } else {
                 com.codename1.flutter.FlutterErrorReport.unimplemented("ImageProvider",
                         inner.getClass().getName() + " resolves to no asset or URL ("
@@ -204,7 +225,25 @@ public class Image extends Widget {
      * across in-place widget updates.
      */
     public String sourceKey() {
-        return assetName != null ? "asset:" + assetName : "url:" + url;
+        if (assetName != null) {
+            return "asset:" + assetName;
+        }
+        if (memoryBytes != null) {
+            return memoryKey;
+        }
+        // The headers are part of what was asked for: a refreshed token must
+        // fetch again rather than be answered by the load made with the old one.
+        return headers == null ? "url:" + url : "url:" + url + "#h" + headers.hashCode();
+    }
+
+    /// Request headers for a network image, or null.
+    public java.util.Map<?, ?> getHeaders() {
+        return headers;
+    }
+
+    /// The encoded bytes of a memory image, or null.
+    public byte[] getMemoryBytes() {
+        return memoryBytes;
     }
 
     @Override

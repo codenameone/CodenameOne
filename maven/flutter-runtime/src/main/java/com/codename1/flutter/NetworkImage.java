@@ -55,6 +55,12 @@ public class NetworkImage extends ImageProvider {
         return scale;
     }
 
+    /// The Dart {@code headers:} map, or null. Sent with the request that fetches
+    /// the image -- an authenticated image endpoint answers 401 without them.
+    public Object getHeaders() {
+        return headers;
+    }
+
     @Override
     public String sourceKey() {
         return "url:" + url;

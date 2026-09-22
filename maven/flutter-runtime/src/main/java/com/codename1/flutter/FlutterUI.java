@@ -166,16 +166,22 @@ public final class FlutterUI {
      * "the app finished building" and "the marker printed" is unattributed
      * time, which is where wrong explanations come from.
      */
-    private static final class TimedRootContainer extends Container {
+    private static class TimedRootContainer extends Container {
+        private final boolean timed;
         private boolean painted;
 
         TimedRootContainer(com.codename1.ui.layouts.Layout layout) {
+            this(layout, true);
+        }
+
+        TimedRootContainer(com.codename1.ui.layouts.Layout layout, boolean timed) {
             super(layout);
+            this.timed = timed;
         }
 
         @Override
         public void paint(com.codename1.ui.Graphics g) {
-            if (painted) {
+            if (painted || !timed) {
                 super.paint(g);
                 return;
             }
@@ -512,11 +518,123 @@ public final class FlutterUI {
      */
     public static Container wrap(Widget w) {
         RenderHost host = new RenderHost();
-        Container c = startupTrace() ? new TimedRootContainer(new FlutterRootLayout(host))
-                : new Container(new FlutterRootLayout(host));
+        EmbeddedRoot c = new EmbeddedRoot(new FlutterRootLayout(host), startupTrace(), w, host);
         host.container(c);
-        mount(w, host, new BuildOwner());
+        c.mountTree();
         return c;
+    }
+
+    /**
+     * The container {@link #wrap} returns, which owns the lifetime of the tree
+     * mounted into it.
+     *
+     * <p>Removing a wrapped subtree must unmount it: that is what disposes each
+     * State, detaches the notifiers it listened to and stops its animations.
+     * {@code wrap} used to hand back a plain Container and drop the mounted
+     * root, so a host that swapped embedded Flutter screens in and out kept every
+     * old tree's listeners and frame-driver registrations alive after its UI was
+     * gone.</p>
+     *
+     * <p>The catch is that Codename One calls {@code deinitialize} for two
+     * different things: the component being REMOVED, and its form merely being
+     * hidden -- navigating to another form and back. Unmounting on the second
+     * would throw away the embedded state on an ordinary back-navigation, which
+     * Flutter keeps. The two are told apart after the fact: removal clears the
+     * parent once {@code deinitialize} returns, while a hidden form's components
+     * keep theirs. So the check is deferred one EDT cycle, which also treats a
+     * component moved between parents in the same cycle as kept.</p>
+     *
+     * <p>A container added again after it was unmounted mounts a fresh tree from
+     * the same widget, as re-inserting a widget does in Flutter. What this cannot
+     * see is a whole Form abandoned without its components ever being removed;
+     * Codename One has no signal for that, and such a form becomes garbage along
+     * with the tree it holds.</p>
+     */
+    private static final class EmbeddedRoot extends TimedRootContainer {
+        private final Widget widget;
+        private final RenderHost host;
+        private final EmbeddedLifetime lifetime = new EmbeddedLifetime();
+
+        EmbeddedRoot(com.codename1.ui.layouts.Layout layout, boolean timed, Widget widget, RenderHost host) {
+            super(layout, timed);
+            this.widget = widget;
+            this.host = host;
+        }
+
+        void mountTree() {
+            mount(widget, host, new BuildOwner());
+            lifetime.mounted();
+        }
+
+        @Override
+        protected void initComponent() {
+            super.initComponent();
+            if (lifetime.onInit()) {
+                removeAll();
+                mountTree();
+            }
+        }
+
+        @Override
+        protected void deinitialize() {
+            super.deinitialize();
+            if (lifetime.onDeinit()) {
+                com.codename1.ui.CN.callSerially(new Runnable() {
+                    @Override
+                    public void run() {
+                        if (lifetime.settle(getParent() != null)) {
+                            unmountTree(host.rootElement());
+                        }
+                    }
+                });
+            }
+        }
+    }
+
+    /**
+     * The removed-or-merely-hidden decision {@link EmbeddedRoot} makes, kept free
+     * of components so it can be tested without a display. Each method answers
+     * what the caller must do next.
+     */
+    static final class EmbeddedLifetime {
+        private boolean mounted;
+        private boolean unmountPending;
+
+        void mounted() {
+            mounted = true;
+        }
+
+        /** Initialized (shown, or added back). @return true to mount a fresh tree. */
+        boolean onInit() {
+            // Coming back cancels a pending unmount: this was a hide, or a move.
+            unmountPending = false;
+            return !mounted;
+        }
+
+        /** Deinitialized. @return true to schedule {@link #settle} one EDT cycle later. */
+        boolean onDeinit() {
+            if (!mounted || unmountPending) {
+                return false;
+            }
+            unmountPending = true;
+            return true;
+        }
+
+        /**
+         * One cycle after a deinitialize. @param attached whether the container
+         * still has a parent @return true to unmount the tree now.
+         */
+        boolean settle(boolean attached) {
+            if (!unmountPending) {
+                return false;
+            }
+            unmountPending = false;
+            if (attached || !mounted) {
+                return false;
+            }
+            mounted = false;
+            return true;
+        }
     }
 
     /**

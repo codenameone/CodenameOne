@@ -112,6 +112,11 @@ public class ImageRenderElement extends RenderElement {
                     img = downsample(encodedWithKnownSize(res.stream()));
                     assetRatio = res.ratio();
                 }
+            } else if (image().getMemoryBytes() != null) {
+                // MemoryImage: already encoded bytes in hand, decoded the way an
+                // asset's are -- same size bookkeeping, same downsampling.
+                img = downsample(encodedWithKnownSize(
+                        new java.io.ByteArrayInputStream(image().getMemoryBytes())));
             } else if (image().getUrl() != null) {
                 int pw = (int) Math.max(1, Math.round(Dp.px(
                         image().getWidth() != null ? image().getWidth() : FALLBACK_EXTENT_LP)));
@@ -119,9 +124,31 @@ public class ImageRenderElement extends RenderElement {
                         image().getHeight() != null ? image().getHeight() : FALLBACK_EXTENT_LP)));
                 EncodedImage placeholder = EncodedImage.createFromImage(
                         com.codename1.ui.Image.createImage(pw, ph, 0x0), false);
-                img = URLImage.createToStorage(placeholder,
-                        "flutter-img-" + image().getUrl().hashCode(),
-                        image().getUrl(), URLImage.RESIZE_SCALE);
+                final java.util.Map<?, ?> headers = image().getHeaders();
+                if (headers == null) {
+                    img = URLImage.createToStorage(placeholder,
+                            "flutter-img-" + image().getUrl().hashCode(),
+                            image().getUrl(), URLImage.RESIZE_SCALE);
+                } else {
+                    // NetworkImage(url, headers: ...): the headers ride on the
+                    // request through URLImage's per-image decorator. The storage
+                    // key covers them too, so a picture fetched with one user's
+                    // credentials is not served back from the cache for another's.
+                    img = URLImage.createToStorage(placeholder,
+                            "flutter-img-" + image().getUrl().hashCode() + "-h" + headers.hashCode(),
+                            image().getUrl(), URLImage.RESIZE_SCALE,
+                            new URLImage.RequestDecorator() {
+                                @Override
+                                public void decorate(com.codename1.io.ConnectionRequest req) {
+                                    for (java.util.Map.Entry<?, ?> e : headers.entrySet()) {
+                                        if (e.getKey() != null && e.getValue() != null) {
+                                            req.addRequestHeader(String.valueOf(e.getKey()),
+                                                    String.valueOf(e.getValue()));
+                                        }
+                                    }
+                                }
+                            });
+                }
             }
         } catch (Exception err) {
             Log.p("Flutter runtime: could not load image " + source);
