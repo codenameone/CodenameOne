@@ -600,35 +600,26 @@ public class ImageRenderElement extends RenderElement {
 
     private static com.codename1.ui.Image scaleUnencoded(com.codename1.ui.Image img,
             BoxFit fit, int bw, int bh, int iw, int ih) {
-        // scaledSmooth, not scaled, everywhere the picture gets SMALLER.
-        //
-        // Image.scaled hands the work to the platform, and the desktop and Android ports
-        // both answer with a point sampler -- one source pixel read per destination pixel,
-        // the rest discarded. On a photograph shrunk into a grid tile that is aliasing, and
-        // it measured as the whole of the difference on the grid-list demo: the reference's
-        // tiles are visibly smoother than ours were (edge energy 36.1 against 42.4).
-        // scaledSmooth averages the source area behind each pixel instead. The result is
-        // cached by the caller, so the extra pass is paid once per distinct size.
         com.codename1.ui.Image scaled;
         switch (fit) {
             case fill:
-                scaled = img.scaledSmooth(bw, bh);
+                scaled = img.scaled(bw, bh);
                 break;
             case cover:
-                scaled = img.fillSmooth(bw, bh);
+                scaled = img.fill(bw, bh);
                 break;
             case fitWidth:
-                scaled = img.scaledSmooth(bw, Math.max(1, ih * bw / iw));
+                scaled = img.scaled(bw, Math.max(1, ih * bw / iw));
                 break;
             case fitHeight:
-                scaled = img.scaledSmooth(Math.max(1, iw * bh / ih), bh);
+                scaled = img.scaled(Math.max(1, iw * bh / ih), bh);
                 break;
             case none:
                 scaled = img;
                 break;
             case scaleDown: {
                 double sr = Math.min(Math.min((double) bw / iw, (double) bh / ih), 1.0);
-                scaled = img.scaledSmooth(Math.max(1, (int) Math.round(iw * sr)),
+                scaled = img.scaled(Math.max(1, (int) Math.round(iw * sr)),
                         Math.max(1, (int) Math.round(ih * sr)));
                 break;
             }
