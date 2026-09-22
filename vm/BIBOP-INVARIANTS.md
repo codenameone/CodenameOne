@@ -157,10 +157,22 @@ touch until that thread lets go. With one cursor per size class that is 23 pages
 at worst. With one cursor per CLASS it is one page per class the program has
 ever allocated.
 
-Measured on the standard drivers, which are small:
+The cost is NOT one instance per page -- a 64KB page holds 2048 instances of a
+32-byte class, and a typed page fills with instances of its class exactly as a
+size-classed one does. The cost is one page per CLASS: the page is dedicated, so
+a class with three live objects strands the other 2045 slots where no other
+class may use them.
 
-    hashMapChurn   pages=23  typed=17      74% of the heap pinned
-    recursion      pages=24  typed=18      75% of the heap pinned
+Measured against the clean tree, same drivers, same validator build:
+
+                   clean          typed            live objects
+    hashMapChurn   7 pages        22 (16 typed)    47-62
+    recursion      7 pages        24 (18 typed)    53-61
+
++15 to +17 pages for ~16-18 live classes -- one page per class, as predicted.
+~448KB becomes ~1.4MB to hold about fifty objects, and ALL of those objects
+would fit in a single page with room for two thousand more. That is the whole
+cost in one sentence.
 
 At that ratio reclaim effectively stops, and it is not subtle: two fault
 injections in `run-gc-verify` -- restoring the pre-fix page-reclaim bound, and
