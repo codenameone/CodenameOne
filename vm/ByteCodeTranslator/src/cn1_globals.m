@@ -5065,6 +5065,31 @@ void codenameOneGCMark() {
             // page slot IS an authoritative reference. So the two are separated --
             // collect under trust, trace without it -- in bounded chunks so the buffer
             // is a couple of KB of stack rather than one entry per slot.
+            //
+            // WHAT THIS BOUGHT, AND WHAT IT DID NOT. The stalls are gone: mutator
+            // threadStallMs fell from 3233 of 4367 (74%) to 323 of 1491 (22%), duty
+            // from 26.0% to 78.3%, and the pacingVolume total from 3211ms to 286ms
+            // (mean stall 123.5ms -> 15.9ms). Wall clock did NOT move: median of 10
+            // paired interleaved rounds is 1.000. The distribution says why --
+            //
+            //     base (worklist)      min 23.77  max 36.98 ms   spread 55%
+            //     this (direct trace)  min 29.59  max 31.18 ms   spread  5%
+            //
+            // -- the bad tail was removed AND so was the good case, because this trace
+            // is SERIAL. The worklist was distributing those mark functions across
+            // four markers; running them in place hands them all back to one thread.
+            // Confirmed by marker-count sensitivity (40 reps, 3 rounds):
+            //
+            //     this  markers=1   29.5 29.6 29.7 ms
+            //     this  markers=4   29.7 29.7 29.4 ms    <- identical, no scaling
+            //
+            // So the next step is to parallelise the PAGE WALK itself -- a shared page
+            // cursor, each marker tracing whole pages directly -- which keeps both the
+            // removed overhead and the parallelism. Pages are independent, which makes
+            // them a better unit of work than the per-object worklist this replaced.
+            // Do NOT read the flat median as "no win": the mechanism counters and the
+            // variance collapse are the result, and they are what the parallel walk
+            // would multiply.
             for(int gi = 0 ; gi < gn ; ) {
                 JAVA_OBJECT __gbuf[CN1_GRACE_TRACE_CHUNK];
                 int __nf = 0;

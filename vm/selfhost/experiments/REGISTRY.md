@@ -5707,3 +5707,70 @@ NOT COMPARABLE, and worth stating because it is the obvious mistake to make
 with these numbers: the previous day's clean SELFHOST run was at 16 cores
 (1.114x wall, 0.944x peak). It cannot be used to claim this session's work
 moved the figure. A same-core-count before/after is still unmeasured.
+
+---
+
+## Round 33: the grace pass stops enqueuing, the stalls go, the clock does not
+
+Round 32 left objectAllocation the worst row (2.69-3.79x JDK 25). Profiling it
+at HEAD: mutator 63.7% of samples in cn1PacingPark -> usleep, GC thread 70.5% in
+codenameOneGCMark with 18.5% in gcMarkFlushLocal, and the three helpers ~35% in
+the drain loop, ~27% in __psynch_cvwait and only ~5% inside a real mark function.
+Counters: threadStallMs 3233 of wallMs 4367 (74%), 99.3% of it cause=pacingVolume;
+graceMarked 165,824,029; 344M Node allocations totalling 11.0GB; occupiedMB
+177-608 against liveMB 0-29; triggerMB 24 against allocatedMB 192 per cycle.
+
+So the collector's cost is proportional to what was ALLOCATED, while HotSpot's
+young collection is proportional to what SURVIVED -- about nothing here. That
+ratio is the 2.7-3.8x, and no amount of marker threads changes it.
+
+**The change.** The grace walk called gcMarkObject on every fresh slot, which
+stamped the object and pushed it so the drain could later pop it and run its
+mark function. Both halves are waste: the stamp buys no survival (the sweep's
+grace rule keeps mark == -1 and promotes it), and the worklist trip is overhead
+for an object the walk is holding. It now runs the mark function in place and
+marks nothing, enqueuing only OLDER children -- which is the pass's only real
+job, finding an old object reachable solely through a fresh one.
+
+An earlier framing of this idea -- "skip fresh CHILDREN" -- was wrong and is
+worth recording as such: without the skip a fresh child is simply marked and
+pushed by its parent instead of by the walk, so each fresh object's mark
+function runs exactly once either way and nothing is saved. The saving is in not
+enqueuing at all.
+
+**Correctness: GREEN.** CN1_GC_VERIFY 0 violations in 6 runs (31,075,613 refs,
+46.4M FIELDTYPE checks, 0 findings). run-gc-verify GREEN including GraceAudit
+clean and the injected grace-pass fault still detected -- the non-vacuity check
+for exactly this pass. run-gauntlet GREEN, 33 tortures, both stop modes. That
+matters because the change moves fresh slots from the gcLastMarkedEpoch bound to
+gcGraceEpoch for page reclamation, and the sweep says both are needed.
+
+**Result: the stalls go, the clock does not.**
+
+    threadStallMs   3233 of 4367 (74%)  ->   323 of 1491 (22%)
+    dutyPct         26.0                ->   78.3
+    pacingVolume    3211ms total        ->   286ms total
+    mean stall      123.5ms             ->   15.9ms
+    worst stall     379ms               ->   122ms
+
+    wall clock, median of 10 paired interleaved rounds:   1.000
+
+    base (worklist)      min 23.77  max 36.98 ms   spread 55%
+    this (direct trace)  min 29.59  max 31.18 ms   spread  5%
+
+The bad tail went and so did the good case, because this trace is SERIAL: the
+worklist had been spreading those mark functions over four markers. Confirmed by
+marker-count sensitivity, 40 reps, 3 rounds -- markers=1 gives 29.5/29.6/29.7ms
+and markers=4 gives 29.7/29.7/29.4ms, identical, no scaling at all, while the
+base arm stays noisy in both.
+
+**Next: parallelise the PAGE WALK.** A shared page cursor with each marker
+tracing whole pages directly keeps the removed overhead AND the parallelism.
+Pages are independent, which makes them a better unit than the per-object
+worklist this replaced.
+
+**Measurement caveat, stated because it limits every wall-clock figure here.**
+The host carried another checkout's java at 280-330% plus a Bench.app in an iOS
+Simulator at ~100% throughout, load 5-26 with one excursion to 116 that voided a
+whole measurement. Paired interleaved ratios are used for that reason. The
+counter deltas were taken at matched load (5.10 before, 5.05 after).
