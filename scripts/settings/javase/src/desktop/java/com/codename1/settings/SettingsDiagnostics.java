@@ -61,14 +61,13 @@ final class SettingsDiagnostics {
     /**
      * UIIDs sampled from the loaded theme. If the CSS theme did not load these
      * all fall back to the built-in {@link Style} defaults (white background,
-     * black text), which is itself the diagnosis.
+     * black text), which is itself the diagnosis. The native UIIDs say which
+     * desktop theme is underneath: each one paints its window and controls in
+     * its own colors, in whichever appearance display.darkMode reports.
      */
     static final String[] SAMPLED_UIIDS = {
-        "SettingsForm", "SettingsFormDark",
-        "SettingsChrome", "SettingsChromeDark",
-        "SettingsPage", "SettingsPageDark",
-        "SettingsPageTitle", "SettingsPageTitleDark",
-        "SettingsField", "SettingsFieldDark"
+        "SettingsForm", "SettingsChrome", "SettingsPage", "SettingsPageTitle", "SettingsField",
+        "Form", "TextField", "RaisedButton"
     };
 
     private SettingsDiagnostics() {

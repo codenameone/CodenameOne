@@ -334,6 +334,19 @@ TextField.disabled {
 }
 
 TextArea { cn1-derive: TextField; }
+/* The placeholder a TextField shows while empty. Without it the framework default applies
+   -- light grey italics with no padding -- so the hint sat hard against the field's
+   left edge in a face no desktop uses. The padding and size match TextField, so the
+   placeholder sits exactly where typed text will. The colour is
+   the dimmed label colour GtkEntry uses for its placeholder. */
+TextHint {
+    color: var(--text-secondary-color, #5e5c64);
+    background-color: transparent;
+    padding: 1.3mm 2.6mm 1.3mm 2.6mm;
+    margin: 0;
+    font-family: "native:MainRegular";
+    font-size: 3.88mm;
+}
 
 /* --- Check, radio, switch -------------------------------------------------------------- */
 
@@ -770,6 +783,7 @@ ChatVoiceButton { cn1-derive: Button; padding: 1.5mm; margin: 0.5mm; }
     FlatButton.pressed { color: #ffffff; background-color: #454545; }
 
     TextField { color: #ffffff; background-color: #1e1e1e; border: 0.26mm solid #3d3d3d; border-radius: 1.59mm; }
+    TextHint { color: var(--text-secondary-color-dark, #c0bfbc); background-color: transparent; }
     TextField.hover { color: #ffffff; background-color: #1e1e1e; border: 0.26mm solid #575757; border-radius: 1.59mm; }
     TextField.selected { color: #ffffff; background-color: #1e1e1e; border: 0.53mm solid #3584e4; border-radius: 1.59mm; }
     TextField.disabled { color: #919191; background-color: #282828; border: 0.26mm solid #363636; border-radius: 1.59mm; }
