@@ -3923,9 +3923,58 @@ static inline int cn1HmNextSlot(int i, uint32_t perturb, int mask) {
 
 // probe; >=0 found slot, else -(insertionPoint+1) (first tombstone on the path
 // if any, else the terminating empty slot). Must match cn1FindSlotImpl.
-static JAVA_INT cn1HmFindSlot(CODENAME_ONE_THREAD_STATE, struct obj__java_util_HashMap* t, JAVA_OBJECT key, JAVA_INT marker) {
-    JAVA_INT* meta = (JAVA_INT*)(uintptr_t)t->java_util_HashMap_cn1MetaBlock;
-    JAVA_OBJECT* keys = (JAVA_OBJECT*)(uintptr_t)t->java_util_HashMap_cn1KeysBlock;
+/* THE BLOCK POINTERS ARE READ RELAXED ON THE MUTATOR SIDE. They are Java `volatile`,
+ * which the translator emits as _Atomic, so a plain read was a sequentially consistent
+ * load -- an ldar on arm64, two of them on every lookup. They are volatile for the
+ * COLLECTOR, whose marker reads them concurrently while a grow swaps them. The mutator
+ * reading pointers it wrote itself needs no ordering at all: program order already
+ * covers it, and a second mutator thread touching the same HashMap is a data race
+ * whatever the load is. The generated writers and the marker's reads are unchanged. */
+#define CN1_HM_BLK(t, which) atomic_load_explicit(&(t)->java_util_HashMap_cn1##which##Block, memory_order_relaxed)
+
+static JAVA_INT cn1HmFindSlotSlow(CODENAME_ONE_THREAD_STATE, struct obj__java_util_HashMap* t, JAVA_OBJECT key, JAVA_INT marker)
+    __attribute__((cold, noinline));
+
+/* THE FIRST PROBE IS INLINE; EVERYTHING ELSE IS A CALL.
+ *
+ * This was one function of ~400 instructions, called out of line from get, put,
+ * containsKey and remove, and its prologue saved TWELVE callee-saved registers and
+ * materialised a handful of addresses on every call -- register pressure from the cold
+ * paths it carries (String equality, the user equals(), the CME throw), paid by the hot
+ * path, which is a few instructions: probe discipline is already perfect here, the
+ * CN1_HM_PROBE_CENSUS count is 0.000 extra steps per lookup on hashMapChurn. Same shape
+ * as the static initializer that was inlined into CommonWorkloads.fib.
+ *
+ * The inline part decides exactly the two first-probe outcomes that need no equality
+ * call, and decides them as the full probe would: an EMPTY slot answers -(i+1) (no
+ * tombstone can have been seen before the first slot), and an IDENTITY hit answers i
+ * (no user code ran, so the CME check cannot fire). Anything else restarts the full
+ * probe from the beginning, which only re-reads what this read. */
+static inline JAVA_INT cn1HmFindSlot(CODENAME_ONE_THREAD_STATE, struct obj__java_util_HashMap* t, JAVA_OBJECT key, JAVA_INT marker) {
+    JAVA_INT* meta = (JAVA_INT*)(uintptr_t)CN1_HM_BLK(t, Meta);
+    int i = marker & (t->java_util_HashMap_cn1Cap - 1);
+    if(__builtin_expect(meta == NULL, 0)) {
+        return -(i + 1);
+    }
+#ifdef CN1_HM_PROBE_CENSUS
+    cn1HmProbeCalls++;
+#endif
+    JAVA_INT m = meta[i];
+    if(m == 0) {
+        return -(i + 1);
+    }
+    if(m == marker && ((JAVA_OBJECT*)(uintptr_t)CN1_HM_BLK(t, Keys))[i] == key) {
+        return i;
+    }
+#ifdef CN1_HM_PROBE_CENSUS
+    cn1HmProbeCalls--;   // the full probe counts this lookup itself
+#endif
+    return cn1HmFindSlotSlow(threadStateData, t, key, marker);
+}
+
+static JAVA_INT cn1HmFindSlotSlow(CODENAME_ONE_THREAD_STATE, struct obj__java_util_HashMap* t, JAVA_OBJECT key, JAVA_INT marker) {
+    JAVA_INT* meta = (JAVA_INT*)(uintptr_t)CN1_HM_BLK(t, Meta);
+    JAVA_OBJECT* keys = (JAVA_OBJECT*)(uintptr_t)CN1_HM_BLK(t, Keys);
     int mask = t->java_util_HashMap_cn1Cap - 1;
     int i = marker & mask;
     if(meta == NULL) return -(i + 1);
@@ -3948,7 +3997,17 @@ static JAVA_INT cn1HmFindSlot(CODENAME_ONE_THREAD_STATE, struct obj__java_util_H
      * and changing its body changed how clang inlines it into get/put; the
      * removed work cost less than the inlining it disturbed. Re-measure with
      * ab-bench.sh before trying it again. */
-    int stringKey = key != JAVA_NULL && cn1IsStringClass(CN1_CLASS_OF(key));
+    /* THE IDENTITY HIT RETURNS AT ONCE. When keys[i] == key -- which is every hit for a
+     * tagged key, since equal tagged values are the same word, and most hits for any
+     * interned or reused key -- no user code has run, so the CME re-check below cannot
+     * fire, and the String test is not needed at all. Both used to run on EVERY hit:
+     * stringKey was computed up front (for a tagged key a tag resolve plus three
+     * class-pointer compares) and modCount and the meta-block pointer were reloaded.
+     * Now stringKey is computed only when identity fails, once per call.
+     *
+     * Semantics are unchanged: with key == JAVA_NULL, identity IS the old
+     * `k == JAVA_NULL` test, and a non-identity null key still never matches. */
+    int stringKey = -1;
     while(1) {
         JAVA_INT m = meta[i];
         if(m == 0) { // META_EMPTY
@@ -3956,14 +4015,21 @@ static JAVA_INT cn1HmFindSlot(CODENAME_ONE_THREAD_STATE, struct obj__java_util_H
         }
         if(m == marker) {
             JAVA_OBJECT k = keys[i];
-            JAVA_BOOLEAN matches = key == JAVA_NULL ? k == JAVA_NULL
-                    : (k == key || (stringKey ? cn1StringEquals(threadStateData, key, k)
-                        : java_util_HashMap_areEqualKeys___java_lang_Object_java_lang_Object_R_boolean(threadStateData, key, k)));
-            // No cached pointer may be read after a structurally mutating callback.
-            if(!stringKey && (expected != t->java_util_HashMap_modCount ||
-                    meta != (JAVA_INT*)(uintptr_t)t->java_util_HashMap_cn1MetaBlock)) CN1_THROW_CME();
-            if(matches) {
+            if(k == key) {
                 return i;
+            }
+            if(key != JAVA_NULL) {
+                if(stringKey < 0) {
+                    stringKey = cn1IsStringClass(CN1_CLASS_OF(key)) ? 1 : 0;
+                }
+                JAVA_BOOLEAN matches = stringKey ? cn1StringEquals(threadStateData, key, k)
+                        : java_util_HashMap_areEqualKeys___java_lang_Object_java_lang_Object_R_boolean(threadStateData, key, k);
+                // No cached pointer may be read after a structurally mutating callback.
+                if(!stringKey && (expected != t->java_util_HashMap_modCount ||
+                        meta != (JAVA_INT*)(uintptr_t)CN1_HM_BLK(t, Meta))) CN1_THROW_CME();
+                if(matches) {
+                    return i;
+                }
             }
         } else if(m == 1 && firstTomb < 0) { // META_TOMB
             firstTomb = i;
@@ -4397,7 +4463,7 @@ JAVA_OBJECT java_util_HashMap_get___java_lang_Object_R_java_lang_Object(CODENAME
     if(idx < 0) {
         return JAVA_NULL;
     }
-    return ((JAVA_OBJECT*)(uintptr_t)t->java_util_HashMap_cn1ValsBlock)[idx];
+    return ((JAVA_OBJECT*)(uintptr_t)CN1_HM_BLK(t, Vals))[idx];
 }
 
 JAVA_BOOLEAN java_util_HashMap_containsKey___java_lang_Object_R_boolean(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject, JAVA_OBJECT key) {
@@ -4416,11 +4482,11 @@ JAVA_OBJECT java_util_HashMap_put___java_lang_Object_java_lang_Object_R_java_lan
     CN1_KEEP_NATIVE_OWNER(__cn1StorageValue, value);
     struct obj__java_util_HashMap* t = (struct obj__java_util_HashMap*)__cn1ThisObject;
     JAVA_INT marker = cn1HmMarker(threadStateData, key);
-    if(t->java_util_HashMap_cn1MetaBlock == 0) {
+    if(CN1_HM_BLK(t, Meta) == 0) {
         java_util_HashMap_cn1Alloc___int(threadStateData, __cn1ThisObject, t->java_util_HashMap_cn1Cap);
     }
     JAVA_INT idx = cn1HmFindSlot(threadStateData, t, key, marker);
-    JAVA_LONG valsObj = t->java_util_HashMap_cn1ValsBlock;
+    JAVA_LONG valsObj = CN1_HM_BLK(t, Vals);
     JAVA_OBJECT* vals = (JAVA_OBJECT*)(uintptr_t)valsObj;
     if(idx >= 0) {
         JAVA_OBJECT old = vals[idx];
@@ -4430,8 +4496,8 @@ JAVA_OBJECT java_util_HashMap_put___java_lang_Object_java_lang_Object_R_java_lan
         return old;
     }
     JAVA_INT ins = -idx - 1;
-    JAVA_INT* meta = (JAVA_INT*)(uintptr_t)t->java_util_HashMap_cn1MetaBlock;
-    JAVA_LONG keysObj = t->java_util_HashMap_cn1KeysBlock;
+    JAVA_INT* meta = (JAVA_INT*)(uintptr_t)CN1_HM_BLK(t, Meta);
+    JAVA_LONG keysObj = CN1_HM_BLK(t, Keys);
     JAVA_OBJECT* keys = (JAVA_OBJECT*)(uintptr_t)keysObj;
     JAVA_BOOLEAN wasEmpty = meta[ins] == 0 ? JAVA_TRUE : JAVA_FALSE;
     meta[ins] = marker;
@@ -4462,9 +4528,9 @@ JAVA_OBJECT java_util_HashMap_remove___java_lang_Object_R_java_lang_Object(CODEN
     if(idx < 0) {
         return JAVA_NULL;
     }
-    JAVA_INT* meta = (JAVA_INT*)(uintptr_t)t->java_util_HashMap_cn1MetaBlock;
-    JAVA_OBJECT* keys = (JAVA_OBJECT*)(uintptr_t)t->java_util_HashMap_cn1KeysBlock;
-    JAVA_OBJECT* vals = (JAVA_OBJECT*)(uintptr_t)t->java_util_HashMap_cn1ValsBlock;
+    JAVA_INT* meta = (JAVA_INT*)(uintptr_t)CN1_HM_BLK(t, Meta);
+    JAVA_OBJECT* keys = (JAVA_OBJECT*)(uintptr_t)CN1_HM_BLK(t, Keys);
+    JAVA_OBJECT* vals = (JAVA_OBJECT*)(uintptr_t)CN1_HM_BLK(t, Vals);
     JAVA_OBJECT old = vals[idx];
     CN1_SATB_DELETE(&keys[idx]); // preserve the removed key/value for this mark cycle
     CN1_SATB_DELETE(&vals[idx]);
@@ -4482,8 +4548,8 @@ JAVA_VOID java_util_HashMap_clear__(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1
     if(t->java_util_HashMap_elementCount > 0 || t->java_util_HashMap_cn1Occupied > 0) {
         int len = t->java_util_HashMap_cn1Cap;
         java_util_NativeStorage_clearMap___long_long_long_int(threadStateData,
-            t->java_util_HashMap_cn1KeysBlock, t->java_util_HashMap_cn1ValsBlock,
-            t->java_util_HashMap_cn1MetaBlock, len);
+            CN1_HM_BLK(t, Keys), CN1_HM_BLK(t, Vals),
+            CN1_HM_BLK(t, Meta), len);
         t->java_util_HashMap_elementCount = 0;
         t->java_util_HashMap_cn1Occupied = 0;
         t->java_util_HashMap_modCount++;
