@@ -1,0 +1,410 @@
+#!/usr/bin/env python3
+"""Shared machinery for the Flutter-vs-Codename One benchmark.
+
+The benchmark measures ONE application built two ways: Flutter's own AOT
+compile of the gallery, and the identical Dart source transpiled to Java and
+run on Codename One. Same source, same screens, same device, so a difference
+in size, in start-up time or in memory is a difference between the two runtimes
+and nothing else.
+
+This module holds everything that is not platform specific: the metric list,
+the sizing helpers, the interleaving and best-of-N statistics, the rendering of
+the report, and the regression gate. Platform specific work -- how an
+application is launched, and how its memory is read -- lives behind the adapter
+interface in `platforms.py`.
+
+Rules the numbers have to obey, because it is easy to produce flattering ones:
+
+  * Release/AOT on both sides. A debug build of either is meaningless.
+  * The SAME SURFACE SIZE. Window or screen area drives the size of the GPU
+    surfaces that dominate a UI application's resident memory, so two builds
+    measured at different sizes cannot be compared on memory at all.
+  * INTERLEAVED runs, best-of-N, and the machine's load average recorded. A
+    ratio taken under different load twice is not a ratio -- a walkthrough
+    recording on this project desynchronised twice and looked like a timing
+    defect, and the cause was a stray simulator holding the machine at load 8.
+  * The start-up clock runs OUTSIDE both processes: each application prints one
+    marker on its first painted frame and the harness times from launch to that
+    line, so neither runtime is trusted to time itself.
+  * Every metric is reported, including the ones Codename One loses.
+"""
+
+import json
+import os
+import subprocess
+import time
+import zipfile
+
+# Lower is better for every metric here; that is what makes "wins" well
+# defined and lets the regression gate use a single comparison.
+METRICS = [
+    ("install_bytes", "Installed size", "bytes"),
+    ("code_bytes", "Executable code", "bytes"),
+    ("wire_bytes", "Download size (zipped)", "bytes"),
+    ("cold_start_ms", "Cold start to first frame on screen", "ms"),
+    ("idle_memory_bytes", "Memory at rest", "bytes"),
+]
+
+# Start-up is reported as a BRACKET, not a point, because the two runtimes do
+# not expose the same event. `cold_start_ms` is the conservative end -- the one
+# that cannot flatter us -- and `cold_start_lower_ms` is the optimistic end.
+# Only the conservative end is compared and gated; the other is carried so a
+# reader can see the width of the uncertainty rather than having to trust it.
+BRACKET_METRIC = "cold_start_ms"
+BRACKET_LOWER = "cold_start_lower_ms"
+
+METRIC_UNITS = dict((key, unit) for key, _label, unit in METRICS)
+METRIC_LABELS = dict((key, label) for key, label, _unit in METRICS)
+
+SIDES = ("codenameone", "flutter")
+
+
+# ----------------------------------------------------------------------
+# Sizing. Portable: every platform ships either a directory tree or a
+# single archive, and both reduce to "how many bytes does the user get".
+# ----------------------------------------------------------------------
+
+def tree_size(path):
+    """Apparent size of `path`: what the artifact actually occupies.
+
+    Deliberately not `du`: that reports ALLOCATED blocks, which rounds every
+    file up to the filesystem's block size and counts hard-linked framework
+    copies once. An application's size as the user experiences it is the sum
+    of its file lengths, and that is what both stores quote.
+    """
+    if os.path.isfile(path):
+        return os.path.getsize(path)
+    total = 0
+    for root, _dirs, files in os.walk(path):
+        for name in files:
+            full = os.path.join(root, name)
+            if os.path.islink(full):
+                continue
+            try:
+                total += os.path.getsize(full)
+            except OSError:
+                pass
+    return total
+
+
+def wire_size(path, workdir):
+    """What the artifact compresses to -- the number a download actually costs.
+
+    Stores compress before shipping, so an uncompressed comparison flatters
+    whichever side ships more compressible bytes. Deflate at a fixed level so
+    the number is reproducible across runners rather than dependent on
+    whichever zip binary is installed.
+    """
+    out = os.path.join(workdir, os.path.basename(str(path).rstrip("/")) + ".benchzip")
+    if os.path.exists(out):
+        os.remove(out)
+    with zipfile.ZipFile(out, "w", zipfile.ZIP_DEFLATED, compresslevel=6) as archive:
+        if os.path.isfile(path):
+            archive.write(path, os.path.basename(path))
+        else:
+            for root, _dirs, files in os.walk(path):
+                for name in files:
+                    full = os.path.join(root, name)
+                    if os.path.islink(full):
+                        continue
+                    archive.write(full, os.path.relpath(full, path))
+    size = os.path.getsize(out)
+    os.remove(out)
+    return size
+
+
+# Mach-O magic numbers, both endiannesses plus the fat/universal wrapper.
+_MACHO_MAGIC = (
+    b"\xfe\xed\xfa\xce", b"\xce\xfa\xed\xfe",   # 32 bit
+    b"\xfe\xed\xfa\xcf", b"\xcf\xfa\xed\xfe",   # 64 bit
+    b"\xca\xfe\xba\xbe", b"\xbe\xba\xfe\xca",   # universal
+)
+
+
+def macho_code_size(bundle):
+    """Every Mach-O binary in an Apple bundle, summed.
+
+    NOT just the main executable, and the difference is not small. On iOS a
+    Flutter application's own code is not in the executable at all: `Runner` is
+    a thin launcher of about a tenth of a megabyte, and the Dart AOT image and
+    the engine live in Frameworks/App.framework and Frameworks/Flutter.framework.
+    Sizing only the executable therefore compared our entire runtime against
+    Flutter's stub and reported a 700x loss that did not exist.
+
+    Summing every Mach-O in the bundle needs no per-side special casing: it
+    asks "how many bytes of compiled code does this application ship", which
+    is the same question on both sides however each chooses to lay them out.
+    """
+    total = 0
+    found = False
+    for root, _dirs, files in os.walk(bundle):
+        for name in files:
+            full = os.path.join(root, name)
+            if os.path.islink(full):
+                continue
+            try:
+                with open(full, "rb") as handle:
+                    if handle.read(4) in _MACHO_MAGIC:
+                        total += os.path.getsize(full)
+                        found = True
+            except OSError:
+                continue
+    return total if found else None
+
+
+# ----------------------------------------------------------------------
+# Statistics
+# ----------------------------------------------------------------------
+
+def best_of(values):
+    """The fastest/smallest run: the one least disturbed by the machine.
+
+    Not the mean. A shared CI runner produces a long right tail from other
+    jobs, and averaging it in measures the runner rather than the runtime.
+    The minimum is the closest thing to "what this build can do".
+    """
+    return min(values) if values else None
+
+
+def percentile(values, pct):
+    """The `pct` percentile by nearest rank, with no interpolation.
+
+    Frame times are a sample of real frames, not a continuous distribution,
+    so an interpolated p95 invents a frame that never rendered.
+    """
+    if not values:
+        return None
+    ordered = sorted(values)
+    rank = max(1, int(round(pct / 100.0 * len(ordered))))
+    return ordered[min(rank, len(ordered)) - 1]
+
+
+def load_average():
+    """The 1/5/15 minute load, or None where the platform has no such notion.
+
+    Recorded with every report because a ratio measured under different load
+    twice is not a ratio, and because a surprising result is usually the
+    machine rather than the code.
+    """
+    try:
+        one, five, fifteen = os.getloadavg()
+        return [round(one, 2), round(five, 2), round(fifteen, 2)]
+    except (OSError, AttributeError):
+        return None
+
+
+# ----------------------------------------------------------------------
+# Report assembly
+# ----------------------------------------------------------------------
+
+def summarise(side):
+    """Collapses a side's per-run samples into the reported figure."""
+    out = dict(side)
+    out["cold_start_ms"] = best_of(side.get("cold_start_runs") or [])
+    out["cold_start_lower_ms"] = best_of(side.get("cold_start_lower_runs") or [])
+    out["idle_memory_bytes"] = best_of(side.get("idle_memory_runs") or [])
+    return out
+
+
+def verdict(report):
+    """Who wins each metric, and by how much.
+
+    `ratio` is flutter/codenameone with lower-is-better throughout, so a ratio
+    above 1 means Codename One is ahead by that factor. A metric either side
+    failed to produce is reported as not measured rather than as a win: a
+    missing number is not a result.
+    """
+    out = {}
+    for key, _label, _unit in METRICS:
+        ours = report["codenameone"].get(key)
+        theirs = report["flutter"].get(key)
+        if ours is None or theirs is None or not ours or not theirs:
+            out[key] = {"status": "not measured"}
+            continue
+        out[key] = {
+            "status": "measured",
+            "codenameone": ours,
+            "flutter": theirs,
+            "ratio": round(float(theirs) / float(ours), 3),
+            "winner": "codenameone" if ours < theirs else "flutter",
+        }
+    return out
+
+
+def build_report(platform_id, sides, runs, notes=None):
+    report = {
+        "schema_version": 1,
+        "generated_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+        "platform": platform_id,
+        "load_average": load_average(),
+        "runs": runs,
+        "app": "flutter gallery (new_gallery), same Dart source on both sides",
+        "codenameone": summarise(sides["codenameone"]),
+        "flutter": summarise(sides["flutter"]),
+    }
+    if notes:
+        report["notes"] = notes
+    report["verdict"] = verdict(report)
+    return report
+
+
+def format_value(key, value):
+    if value is None:
+        return "--"
+    unit = METRIC_UNITS.get(key)
+    if unit == "bytes":
+        return "%.1f MB" % (value / 1024.0 / 1024.0)
+    if unit == "ms":
+        return "%.0f ms" % value
+    return str(value)
+
+
+def render_markdown(reports, title="Flutter vs Codename One"):
+    """The PR comment body: one table per platform, plus a roll-up.
+
+    Written for a reader who will not open the artifact, so every row states
+    both absolute numbers rather than only the ratio -- a 2x on a metric
+    nobody cares about reads the same as a 2x on one that matters, unless the
+    magnitudes are visible.
+    """
+    lines = ["## %s" % title, ""]
+    if not reports:
+        lines.append("_No benchmark results were produced._")
+        return "\n".join(lines) + "\n"
+
+    lines.append("Same application, built both ways: Flutter's AOT compile of "
+                 "the gallery, and the identical Dart source transpiled to Java "
+                 "on Codename One. Lower is better for every metric, so a ratio "
+                 "above 1.00x means Codename One is ahead by that factor.")
+    lines.append("")
+
+    for report in reports:
+        lines.append("### %s" % report["platform"])
+        lines.append("")
+        load = report.get("load_average")
+        lines.append("_best of %d interleaved runs%s_" % (
+            report.get("runs", 0),
+            ("; host load %s" % ", ".join(str(x) for x in load)) if load else ""))
+        lines.append("")
+        lines.append("| Metric | Codename One | Flutter | Ratio | Winner |")
+        lines.append("| --- | ---: | ---: | ---: | --- |")
+        for key, label, _unit in METRICS:
+            entry = report["verdict"].get(key, {})
+            if entry.get("status") != "measured":
+                lines.append("| %s | -- | -- | -- | not measured |" % label)
+                continue
+            flutter_cell = format_value(key, entry["flutter"])
+            if key == BRACKET_METRIC:
+                lower = report["flutter"].get(BRACKET_LOWER)
+                if lower is not None:
+                    # Both ends of the bracket, so the reader can see how much
+                    # of the gap is measurement uncertainty rather than runtime.
+                    flutter_cell = "%s (%s-%s)" % (
+                        flutter_cell, format_value(key, lower),
+                        format_value(key, entry["flutter"]))
+            lines.append("| %s | %s | %s | %.2fx | %s |" % (
+                label,
+                format_value(key, entry["codenameone"]),
+                flutter_cell,
+                entry["ratio"],
+                "Codename One" if entry["winner"] == "codenameone" else "Flutter"))
+        lines.append("")
+        if report["verdict"].get(BRACKET_METRIC, {}).get("status") == "measured" \
+                and report["flutter"].get(BRACKET_LOWER) is not None:
+            lines.append("> Start-up is bracketed: the two runtimes do not "
+                         "expose the same event, so Flutter's figure is given "
+                         "as a range and the ratio uses the end least "
+                         "favourable to Codename One.")
+            lines.append("")
+        for note in report.get("notes", []) or []:
+            lines.append("> %s" % note)
+        if report.get("notes"):
+            lines.append("")
+
+    wins, measured = tally(reports)
+    lines.append("**Codename One wins %d of %d measured metrics across %d platform(s).**"
+                 % (wins, measured, len(reports)))
+    lines.append("")
+    return "\n".join(lines) + "\n"
+
+
+def tally(reports):
+    wins = 0
+    measured = 0
+    for report in reports:
+        for key, _label, _unit in METRICS:
+            entry = report["verdict"].get(key, {})
+            if entry.get("status") != "measured":
+                continue
+            measured += 1
+            if entry["winner"] == "codenameone":
+                wins += 1
+    return wins, measured
+
+
+# ----------------------------------------------------------------------
+# The regression gate
+# ----------------------------------------------------------------------
+
+def load_baseline(path):
+    if not os.path.exists(path):
+        return None
+    with open(path) as handle:
+        return json.load(handle)
+
+
+def check_regressions(report, baseline):
+    """Compares this run against the committed baseline for its platform.
+
+    Only Codename One's own numbers are gated. Flutter's are recorded for the
+    ratio and are outside our control, so a Flutter SDK upgrade that makes
+    their build bigger must not turn our build red.
+
+    Each metric carries its own tolerance because they are not equally noisy.
+    Size is deterministic on a runner and gets a tight band; wall-clock
+    measurements on a shared runner do not, and a band tight enough to catch a
+    real regression there would fire constantly on load alone.
+    """
+    if not baseline:
+        return []
+    findings = []
+    tolerances = baseline.get("tolerances", {})
+    values = baseline.get("codenameone", {})
+    for key, label, _unit in METRICS:
+        expected = values.get(key)
+        actual = report["codenameone"].get(key)
+        if expected is None or actual is None:
+            continue
+        tolerance = tolerances.get(key)
+        if tolerance is None:
+            continue
+        limit = expected * (1.0 + tolerance)
+        if actual > limit:
+            findings.append({
+                "metric": key,
+                "label": label,
+                "baseline": expected,
+                "actual": actual,
+                "tolerance": tolerance,
+                "over_by": round((actual / float(expected) - 1.0) * 100.0, 1),
+            })
+    return findings
+
+
+def render_regressions(platform_id, findings):
+    lines = []
+    for item in findings:
+        lines.append(
+            "%s: %s is %s against a baseline of %s (+%.1f%%, tolerance +%.0f%%)"
+            % (platform_id, item["label"],
+               format_value(item["metric"], item["actual"]),
+               format_value(item["metric"], item["baseline"]),
+               item["over_by"], item["tolerance"] * 100.0))
+    return lines
+
+
+def run(cmd, **kwargs):
+    """subprocess.run with the arguments this harness always wants."""
+    kwargs.setdefault("capture_output", True)
+    kwargs.setdefault("text", True)
+    return subprocess.run(cmd, **kwargs)

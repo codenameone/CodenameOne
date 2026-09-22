@@ -1,0 +1,199 @@
+name: Flutter benchmark
+
+# Measures ONE application built two ways -- Flutter's own release build and
+# the identical Dart source transpiled by Codename One -- and publishes the
+# comparison to the pull request and to port status.
+#
+# Neither application is vendored. `scripts/flutter-bench/app/prepare.sh` takes
+# the gallery from the Flutter SDK this workflow installs
+# ($FLUTTER_ROOT/dev/integration_tests/new_gallery) and copies the SAME 159
+# files into both sides, so the comparison cannot drift: there is no second
+# copy for an edit to land on. The Codename One side is generated from the
+# SHIPPING archetype, which means a change that breaks the documented Flutter
+# wiring breaks this workflow too instead of passing unnoticed.
+
+on:
+  pull_request:
+    paths:
+      - 'maven/flutter-runtime/**'
+      - 'maven/dart-transpiler/**'
+      - 'maven/dart-runtime/**'
+      - 'maven/codenameone-maven-plugin/**'
+      - 'maven/cn1app-archetype/**'
+      - 'scripts/flutter-bench/**'
+      - '.github/workflows/flutter-bench.yml'
+  schedule:
+    # Nightly, so port status carries a current number and the PR runs have a
+    # trend to sit against rather than a single point.
+    - cron: '0 3 * * *'
+  workflow_dispatch:
+    inputs:
+      platforms:
+        description: 'Comma separated platform ids, or "all"'
+        default: 'all'
+
+concurrency:
+  group: flutter-bench-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  measure:
+    name: ${{ matrix.platform }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 120
+    strategy:
+      # One platform failing must not hide the others: a benchmark that
+      # publishes nothing because a single runner broke is worse than one that
+      # publishes five platforms and says the sixth did not run.
+      fail-fast: false
+      matrix:
+        include:
+          - platform: macos
+            runner: macos-latest
+          - platform: ios
+            runner: macos-latest
+          - platform: android
+            runner: ubuntu-latest
+          - platform: linux
+            runner: ubuntu-latest
+          - platform: windows
+            runner: windows-latest
+          - platform: javascript
+            runner: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK 8 for the framework build
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 8
+
+      - name: Set up JDK 17 for the transpiler
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      # A full SDK CHECKOUT, not a release archive. The benchmark's application
+      # is dev/integration_tests/new_gallery inside the SDK, and the published
+      # release archives do not carry dev/ at all -- so the usual setup actions,
+      # which unpack a release, leave prepare.sh with nothing to copy. Cloning
+      # the SDK is also what pins the reference: the revision is recorded in
+      # every result, so a number can be traced to the Flutter that produced it.
+      - name: Check out the Flutter SDK
+        run: |
+          git clone --depth 1 --branch "${FLUTTER_CHANNEL:-stable}" \
+              https://github.com/flutter/flutter.git "$RUNNER_TEMP/flutter"
+          echo "$RUNNER_TEMP/flutter/bin" >> "$GITHUB_PATH"
+          echo "FLUTTER_ROOT=$RUNNER_TEMP/flutter" >> "$GITHUB_ENV"
+        shell: bash
+
+      - name: Report the toolchain, and prove the gallery is present
+        shell: bash
+        run: |
+          flutter --version
+          flutter precache
+          test -d "$FLUTTER_ROOT/dev/integration_tests/new_gallery/lib" || {
+            echo "this Flutter checkout has no gallery; prepare.sh cannot run" >&2
+            exit 1; }
+          echo "gallery Dart files: $(find "$FLUTTER_ROOT/dev/integration_tests/new_gallery/lib" -name '*.dart' | wc -l)"
+
+      - name: Build the framework and install the archetype
+        run: |
+          cd maven
+          mvn -B -q install -DskipTests -Dmaven.javadoc.skip=true \
+              -Dmaven.source.skip=true \
+              -pl core,flutter-runtime,dart-runtime,dart-transpiler,codenameone-maven-plugin,cn1app-archetype -am
+
+      - name: Prepare both applications from one source
+        run: scripts/flutter-bench/app/prepare.sh --work "${{ runner.temp }}/fbench"
+
+      - name: Build both applications
+        id: build
+        run: |
+          scripts/flutter-bench/app/build_apps.sh \
+              --work "${{ runner.temp }}/fbench" \
+              --platform "${{ matrix.platform }}" | tee "${{ runner.temp }}/paths.txt"
+          grep '^cn1='     "${{ runner.temp }}/paths.txt" >> "$GITHUB_OUTPUT"
+          grep '^flutter=' "${{ runner.temp }}/paths.txt" >> "$GITHUB_OUTPUT"
+
+      - name: Measure
+        # --gate compares this run against the committed baseline for the
+        # platform and exits non-zero past the tolerance band. Reported through
+        # the job's own status rather than swallowed, but the comment is still
+        # published below so a reviewer sees the numbers that failed it.
+        run: |
+          python3 scripts/flutter-bench/run_bench.py \
+              --platform "${{ matrix.platform }}" \
+              --cn1-app     "${{ steps.build.outputs.cn1 }}" \
+              --flutter-app "${{ steps.build.outputs.flutter }}" \
+              --cn1-bundle com.example.bench \
+              --flutter-bundle com.codenameone.bench.gallery \
+              --json "${{ runner.temp }}/result-${{ matrix.platform }}.json" \
+              --gate
+
+      - name: Upload the result
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: flutter-bench-${{ matrix.platform }}
+          path: ${{ runner.temp }}/result-${{ matrix.platform }}.json
+          if-no-files-found: warn
+
+  publish:
+    name: Publish
+    needs: measure
+    # always(), so a platform that regressed still gets its numbers in front of
+    # a reviewer. The `measure` jobs already carry the red status; hiding the
+    # comment as well would leave the failure with no explanation attached.
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Collect every platform's result
+        uses: actions/download-artifact@v4
+        with:
+          pattern: flutter-bench-*
+          path: results
+          merge-multiple: true
+
+      - name: Render the comment
+        run: |
+          python3 scripts/flutter-bench/run_bench.py \
+              --render 'results/*.json' \
+              --markdown flutter-benchmark.md
+          cat flutter-benchmark.md
+
+      - name: Publish the benchmark comment
+        if: ${{ github.event_name == 'pull_request' && hashFiles('flutter-benchmark.md') != '' }}
+        uses: actions/github-script@v9
+        with:
+          retries: 3
+          script: |
+            const { publishQualityComment } = require('./.github/scripts/publish-quality-comment.js');
+            await publishQualityComment({
+              github, context, core,
+              marker: '<!-- flutter-benchmark -->',
+              reportPath: 'flutter-benchmark.md',
+            });
+
+      - name: Update the port status performance data
+        if: ${{ github.event_name == 'schedule' }}
+        run: |
+          python3 scripts/flutter-bench/port_status.py \
+              --results 'results/*.json' \
+              --out docs/website/data/port_status_reports
+
+      - name: Upload the rendered report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: flutter-benchmark-report
+          path: flutter-benchmark.md
