@@ -5839,3 +5839,70 @@ objects per 25 reps at all, which is O(allocated) where HotSpot's young
 collection is O(survived) and survivors here are ~nothing (liveMB 0-29 against
 occupiedMB 177-608). Closing that means not walking dead fresh objects, not
 walking them faster.
+
+---
+
+## Round 35: the first quiet-machine matrix, and where the cost actually sits
+
+Host finally idle (load 2.2 at start; canary intArithmetic@1 = 56.6ms against
+59.3ms on the loaded run). SELFHOST reports for the first time this session --
+the identity-hash divergence of Round 32 was what had blocked it.
+
+    SELFHOST            cores=1      cores=2      cores=4
+    parpar wall         5450ms       5475ms       5352ms
+    jdk25  wall         5161ms       5131ms       5133ms
+    ratio               1.06x        1.07x        1.04x
+    parpar peak         1354MB       1320MB       1364MB
+    jdk25  peak         1487MB       1477MB       1517MB
+    ratio               0.91x        0.89x        0.90x
+
+**Memory beats JDK 25 by 9-11% on the real workload; wall clock trails by 4-7%.**
+
+objectAllocation is flat in absolute terms -- 27.1/29.1/27.7ms at 1/2/4 cores --
+while HotSpot, derived from the ratios, goes 13.1/8.5/7.5ms. It scales with
+cores and we do not, which is the direct consequence of Round 34: the collector
+is off the critical path (duty 97.7%, zero pacing stalls), so extra cores have
+nothing left to buy us. Note this INVERTS the loaded-machine reading of Round 32
+(3.79x -> 2.69x, apparently improving with cores); that was HotSpot unable to
+use its cores either. Quiet-machine numbers are the true ones.
+
+**A contention test that failed, and what it still showed.** Idling the
+collector with CN1_GC_TRIGGER_MB=100000 made objectAllocation SLOWER (29.0ms
+against 27.6ms with the collector running). The arm is invalid: with no GC the
+11GB of allocation never reuses a page, so every allocation faults in fresh
+memory. Do not use "disable the collector" as a mutator baseline in this VM.
+
+The controlled half of it stands, though -- same GC work, only marker count
+differs, 40 reps, 5 interleaved rounds:
+
+    markers=1   median 27.8ms  (27.4-28.8)
+    markers=2   median 25.3ms  (24.9-25.7)   <- best, and tightest
+    markers=3   median 27.4ms  (21.5-28.0)
+    markers=4   median 26.7ms  (26.0-26.9)
+
+2 markers beats the default 4 by ~5%, with duty HIGHER at 4 (97.7% vs 94.2%).
+The machine is 16 logical cores (12P + 4E) and this is 5 threads, so it is not
+CPU oversubscription: the extra markers cost the mutator more shared cache and
+memory bandwidth than they return. Real, reproducible, and ~5% -- not the 2.7x.
+
+DO NOT retune CN1_GC_MARK_THREAD_CAP on this. The default was set on the
+selfhost corpus, where the same matrix gives 5450/5475/5352ms at 1/2/4 -- 4
+marginally best. One microbenchmark preferring 2 and the real workload
+preferring 4 is exactly the configuration-dependence this file keeps recording.
+
+**Where the remaining gap is.** Not the collector. The mutator's own path, and
+the biggest single item in it is the OBJECT HEADER: 16 bytes
+(clazz* 8 + gcMark 4 + heapPosition 4) on a 32-byte Node, i.e. HALF of every
+byte this benchmark allocates. The array note above this one already records the
+same thing from the other side -- 32-byte array headers are 20% of all bytes
+allocated per selfhost cycle before any payload.
+
+A staged path, each step independently measurable, none requiring the full
+side-registry rewrite:
+  1. type-homogeneous BiBOP pages -> clazz comes from the page header, one line
+     shared by ~2048 objects instead of 8 bytes per object (-8/object), and
+     CN1_CLASS_OF gets FASTER rather than slower, which is the trap that sinks a
+     naive side-table (it is on every virtual dispatch and instanceof);
+  2. heapPosition folded into page metadata (-4/object);
+  3. mark bits to a side bitmap (-4/object, and marking stops writing into cache
+     lines the mutator owns -- the ~5% measured above).
