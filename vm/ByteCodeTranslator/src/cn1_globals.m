@@ -15933,16 +15933,19 @@ void cn1RecordAllocation(struct clazz* parent, int size) {
 // the only way a 16-byte object can occupy 16 bytes rather than 32.
 static void cn1ReportSlotHistogram(void) {
     static const struct { int delta; int allow16; const char* name; } sc[] = {
-        {  0, 0, "today            hdr=16" },
-        {  8, 0, "clazz from page  hdr=8 " },
-        { 16, 0, "side metadata    hdr=0 " },
-        {  8, 1, "hdr=8  + 16B class     " },
-        { 16, 1, "hdr=0  + 16B class     " },
+        {  0, 0, "today              hdr=16" },
+        {  4, 0, "classId not ptr    hdr=12" },
+        {  8, 0, "clazz from page    hdr=8 " },
+        { 12, 0, "classId + hp folded hdr=4" },
+        { 16, 0, "side metadata      hdr=0 " },
+        {  4, 1, "hdr=12 + 16B class       " },
+        {  8, 1, "hdr=8  + 16B class       " },
+        { 16, 1, "hdr=0  + 16B class       " },
     };
     int ns = (int)(sizeof(sc)/sizeof(sc[0]));
     long long base = 0;
     int i, k;
-    long long objSlot[8], arrSlot[8];
+    long long objSlot[16], arrSlot[16];
     long long objCount = 0, arrCount = 0;
     for(k = 0 ; k < ns ; k++) { objSlot[k] = 0; arrSlot[k] = 0; }
     for(i = 0 ; i <= CN1_SLOTHIST_MAX ; i++) {
@@ -15981,6 +15984,37 @@ static void cn1ReportSlotHistogram(void) {
     }
     // The sizes that carry the volume, so a reader can see WHERE a saving does or
     // does not cross a class boundary instead of trusting the totals.
+    // FEASIBILITY OF TYPE-HOMOGENEOUS PAGES, which is what "clazz from the page
+    // header" requires. A page belongs to ONE class, so every class that allocates
+    // at all needs a page of its own -- CN1_BIBOP_PAGE_SIZE each, whether it holds
+    // one object or two thousand. The tail is therefore the whole question: a few
+    // hundred hot classes cost little, several thousand cold ones cost more memory
+    // than the header saving returns. Count them before believing the saving.
+    {
+        int nz = 0, le1 = 0, le10 = 0, le100 = 0, le1000 = 0;
+        long long tot = 0, tail = 0;
+        for(i = 0 ; i < CN1_ALLOC_PROFILE_SLOTS ; i++) {
+            long c = atomic_load_explicit(&cn1AllocProfCount[i], memory_order_relaxed);
+            if(c <= 0) {
+                continue;
+            }
+            nz++;
+            tot += c;
+            if(c <= 1)    { le1++; }
+            if(c <= 10)   { le10++;   tail += c; }
+            if(c <= 100)  { le100++; }
+            if(c <= 1000) { le1000++; }
+        }
+        fprintf(stderr, "[SLOTHIST] classes that allocated: %d (allocations %lld)\n", nz, tot);
+        fprintf(stderr, "[SLOTHIST]   with <=1: %d   <=10: %d   <=100: %d   <=1000: %d\n",
+                le1, le10, le100, le1000);
+        fprintf(stderr, "[SLOTHIST]   one %dKB page per class would cost %lld KB minimum "
+                        "against %lld KB of slot bytes saved at hdr=8\n",
+                CN1_BIBOP_PAGE_SIZE / 1024,
+                (long long)nz * (CN1_BIBOP_PAGE_SIZE / 1024),
+                (base - (objSlot[2] + arrSlot[2])) / 1024);
+    }
+
     // The sizes carrying the volume, so a reader sees WHERE a saving does or does
     // not cross a class boundary rather than trusting the totals. Selection by
     // repeated max with a taken[] mark -- 2049 buckets, printed once at exit.
