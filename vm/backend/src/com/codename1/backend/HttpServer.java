@@ -1022,37 +1022,66 @@ public final class HttpServer {
     }
 
     /**
-     * Serves `path` with `endpoint`.
+     * Where websocket routes come from.
      *
-     * May be called before or after the server starts; a connection that has not
-     * upgraded yet sees whatever is registered when its handshake arrives.
+     * The server ASKS for them, once, while it is starting and before the listener
+     * accepts anything. It is not a setter, and that is the point: this server is
+     * event driven everywhere else -- a Handler is called, a `@RestController` is
+     * found by the build, `Backend.Handlers` is invoked with what the server
+     * opened -- and a mutable registry an application pokes at afterwards is a
+     * different model bolted onto the side of it.
+     *
+     * It also removes a race rather than documenting one. Registration that
+     * happened after `start` returned left a window in which the listener was
+     * already bound and a valid upgrade arriving in it fell through to the
+     * ordinary HTTP handler, because the route it wanted did not exist yet.
+     * A callback the server runs before it accepts cannot have that window.
      */
-    public void websocket(String path, WebSocket endpoint) {
-        if(path == null || endpoint == null) {
-            throw new IllegalArgumentException("a websocket route needs both a path and an endpoint");
-        }
-        // Matched against the request's CANONICAL path, so a key carrying a
-        // percent escape or a query could never be selected however a client
-        // spelled its request. Refusing beats registering something unreachable.
-        if(path.indexOf('%') >= 0) {
-            throw new IllegalArgumentException("a websocket path is matched after "
-                    + "percent-decoding, so register the decoded form, not: " + path);
-        }
-        if(path.indexOf('?') >= 0) {
-            throw new IllegalArgumentException("a websocket path is matched without "
-                    + "its query string, so register the path alone, not: " + path);
-        }
-        webSocketRoutes.put(path, endpoint);
+    public interface WebSocketRoutes {
+        void register(WebSocketRegistry registry) throws Exception;
     }
 
-    /**
-     * Installs a router consulted for any path {@link #websocket} did not claim.
-     *
-     * Exact paths are tried first, so a catch-all router and a specific route can
-     * coexist without the registration order deciding which wins.
-     */
-    public void websocketRouter(WebSocketHandler router) {
-        this.webSocketRouter = router;
+    /** What a {@link WebSocketRoutes} callback puts its endpoints into. */
+    public interface WebSocketRegistry {
+        /**
+         * Serves `path` with `endpoint`.
+         *
+         * The path is matched against the request's CANONICAL path -- percent
+         * escapes decoded, query removed -- exactly as an HTTP route is, so a key
+         * that could never be selected is refused here rather than accepted and
+         * left unreachable.
+         */
+        void route(String path, WebSocket endpoint);
+
+        /** Consulted for any upgrade {@link #route} did not claim. */
+        void fallback(WebSocketHandler router);
+    }
+
+    /** The registry handed to a WebSocketRoutes callback during start. */
+    private final class Registry implements WebSocketRegistry {
+        public void route(String path, WebSocket endpoint) {
+            if(path == null || endpoint == null) {
+                throw new IllegalArgumentException(
+                        "a websocket route needs both a path and an endpoint");
+            }
+            // Refused rather than registered-and-unreachable. Routing matches the
+            // canonical path without its query, so either of these is a key no
+            // request could ever select -- and a server that starts happily with
+            // an endpoint nothing can reach is worse than one that will not start.
+            if(path.indexOf('%') >= 0) {
+                throw new IllegalArgumentException("a websocket path is matched after "
+                        + "percent-decoding, so register the decoded form, not: " + path);
+            }
+            if(path.indexOf('?') >= 0) {
+                throw new IllegalArgumentException("a websocket path is matched without "
+                        + "its query string, so register the path alone, not: " + path);
+            }
+            webSocketRoutes.put(path, endpoint);
+        }
+
+        public void fallback(WebSocketHandler router) {
+            webSocketRouter = router;
+        }
     }
 
     /** How large a single websocket message may be before it is refused with 1009. */
@@ -1137,6 +1166,14 @@ public final class HttpServer {
     }
 
     private volatile WebSocketHandler webSocketRouter;
+    /**
+     * Cleared at the top of stop(), before the open sessions are snapshotted.
+     *
+     * An upgrade that completes after that snapshot is one the shutdown will
+     * never say goodbye to, so it is refused instead -- with a 503, which is what
+     * a client reaching a draining server should see.
+     */
+    private volatile boolean acceptingUpgrades = true;
 
     /**
      * How much response body one HTTP/2 turn may hold before it drains.
@@ -1697,22 +1734,21 @@ public final class HttpServer {
      */
     public static HttpServer start(String host, int port, int backlog, int workerCount,
                                    Handler handler, Tls tls) throws IOException {
-        return start(host, port, backlog, workerCount, handler, tls, null, null);
+        return start(host, port, backlog, workerCount, handler, tls, null);
     }
 
     /**
-     * - `webSocketRoutes`: path to WebSocket, installed BEFORE the listener starts
-     *   accepting
-     * - `webSocketRouter`: consulted for paths the map does not claim
+     * - `webSockets`: asked for its routes before the listener accepts anything
      *
-     * The routes have to go in here rather than on the returned server: this
-     * method binds the listener and starts the poller threads before it returns,
-     * so a client arriving in that window would find no websocket routes, and its
-     * upgrade would fall through to the ordinary handler and be answered as HTTP.
+     * The callback runs here rather than on the returned server because this
+     * method binds the listener and starts the poller threads before it returns:
+     * a client arriving in that window would find no websocket routes at all, and
+     * its upgrade would fall through to the ordinary handler and be answered as
+     * HTTP. There is no way to express that mistake through this signature.
      */
     public static HttpServer start(String host, int port, int backlog, int workerCount,
-                                   Handler handler, Tls tls, Map webSocketRoutes,
-                                   WebSocketHandler webSocketRouter) throws IOException {
+                                   Handler handler, Tls tls, WebSocketRoutes webSockets)
+            throws IOException {
         // BEFORE THE BIND, because the two arms failed this differently and both
         // badly. Java SE's Executors.newFixedThreadPool throws for a non-positive
         // count -- but only after the listener and the reactor are open, so the
@@ -1787,11 +1823,18 @@ public final class HttpServer {
         final HttpServer server = new HttpServer(listener, reactor,
                 useVirtualThreads ? null : Executors.newFixedThreadPool(workerCount),
                 workerCount, handler, tls);
-        // Before any thread that could accept a connection exists.
-        if(webSocketRoutes != null) {
-            server.webSocketRoutes.putAll(webSocketRoutes);
+        // Before any thread that could accept a connection exists. A callback that
+        // throws takes the whole start down rather than leaving a server running
+        // with half its routes -- the same answer a Handlers factory gets.
+        if(webSockets != null) {
+            try {
+                webSockets.register(server.new Registry());
+            } catch (Exception err) {
+                abandonStart(listener, server);
+                throw err instanceof IOException ? (IOException)err
+                        : new IOException("the websocket routes could not be registered: " + err);
+            }
         }
-        server.webSocketRouter = webSocketRouter;
         if(useVirtualThreads) {
             ACTIVE_SERVER = server;
             // A poller PER HOST, because affinity is enforced by the poller: a
@@ -2028,6 +2071,13 @@ public final class HttpServer {
         // report an abnormal close for what was an orderly shutdown. 1001 is the
         // code that says "the server is going away", and the peer's echo brings
         // the connection down through the ordinary path.
+        // UPGRADES OFF FIRST. The goodbye pass below snapshots the open sessions,
+        // and an upgrade completing just after that snapshot is missed entirely:
+        // it releases its activeRequests count while idle so the drain finishes,
+        // and retirement then shuts its descriptor down without ever sending the
+        // 1001 -- so a client the server was deliberately closing sees an abnormal
+        // 1006 instead. Refusing upgrades before the snapshot closes the gap.
+        acceptingUpgrades = false;
         // A quarter of the drain window at most, so the goodbyes cannot eat the
         // time the requests in flight were promised.
         closeWebSocketsForShutdown(Math.max(1, Math.min(drainMillis / 4, 2000)));
@@ -2250,6 +2300,16 @@ public final class HttpServer {
     }
 
     private boolean workOutstandingBesidesCaller(int callerFd) {
+        // THE WEBSOCKET DISCOUNT COMES FIRST, because SERVING_FD is only set
+        // around ordinary HTTP handlers -- so a websocket callback calling stop()
+        // has callerFd == -1 and used to take the early return below, which meant
+        // the discount added for it could never run. A marker nothing reaches is
+        // not a control.
+        if(Boolean.TRUE.equals(SERVING_WS.get())) {
+            return inFlightRequests.get() > 0 || activeRequests.get() > 0
+                    || http2Turns.get() > 0 || webSocketTurns.get() > 1
+                    || pendingWork.get() > 0;
+        }
         if(callerFd < 0) {
             return workOutstanding();
         }
@@ -3325,6 +3385,12 @@ public final class HttpServer {
         // RFC 6455 4.2.1. Each refusal answers a specific status: a dropped
         // connection is indistinguishable from a dead server, which is the same
         // reason ProtocolException carries one on the request path.
+        if(!acceptingUpgrades) {
+            // Draining. Taking this one would add a session the goodbye pass has
+            // already been past, and it would be shut down without a Close.
+            writeStatusOnly(conn, 503, "the server is shutting down");
+            return false;
+        }
         if(!"HTTP/1.1".equals(request.getVersion())) {
             writeStatusOnly(conn, 400, "a websocket upgrade requires HTTP/1.1");
             return false;

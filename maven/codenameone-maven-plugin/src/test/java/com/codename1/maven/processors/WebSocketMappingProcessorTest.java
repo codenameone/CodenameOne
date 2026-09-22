@@ -76,8 +76,8 @@ public class WebSocketMappingProcessorTest {
     public void registersTheEndpointOnTheBuilder() throws Exception {
         RestControllerAnnotationProcessor processor = run(compile("Chat", ENDPOINT));
         String bootstrap = processor.generateBootstrap("com.example");
-        assertTrue("the endpoint is not registered:\n" + bootstrap,
-                bootstrap.indexOf(".websocket(\"/chat\", new com.example.Chat())") >= 0);
+        assertTrue("the endpoint is not registered through the callback:\n" + bootstrap,
+                bootstrap.indexOf("registry.route(\"/chat\", new com.example.Chat())") >= 0);
         assertTrue("the entry point no longer goes through the builder:\n" + bootstrap,
                 bootstrap.indexOf("com.codename1.backend.Backend.builder()") >= 0);
         assertTrue("the entry point does not run the server:\n" + bootstrap,
@@ -114,7 +114,7 @@ public class WebSocketMappingProcessorTest {
                 + "}\n";
         String bootstrap = run(compile("Scoped", source)).generateBootstrap("com.example");
         assertTrue("the base path was not applied:\n" + bootstrap,
-                bootstrap.indexOf(".websocket(\"/api/chat\"") >= 0);
+                bootstrap.indexOf("registry.route(\"/api/chat\"") >= 0);
     }
 
     @Test
@@ -157,7 +157,7 @@ public class WebSocketMappingProcessorTest {
                 "@WebSocketMapping(\"chat\")");
         String bootstrap = run(compile("Chat", source)).generateBootstrap("com.example");
         assertTrue("a bare path should be normalised:\n" + bootstrap,
-                bootstrap.indexOf(".websocket(\"/chat\"") >= 0);
+                bootstrap.indexOf("registry.route(\"/chat\"") >= 0);
     }
 
     @Test
@@ -208,8 +208,8 @@ public class WebSocketMappingProcessorTest {
         sources.put("com.example.Alerts", second);
         JavaSourceCompiler.compile(sources, classes, backendClasspath());
         String bootstrap = run(classes).generateBootstrap("com.example");
-        int alerts = bootstrap.indexOf(".websocket(\"/alerts\"");
-        int chat = bootstrap.indexOf(".websocket(\"/chat\"");
+        int alerts = bootstrap.indexOf("registry.route(\"/alerts\"");
+        int chat = bootstrap.indexOf("registry.route(\"/chat\"");
         assertTrue("both endpoints should be registered:\n" + bootstrap, alerts >= 0 && chat >= 0);
         assertTrue("registration order should follow the path, not the scan:\n" + bootstrap,
                 alerts < chat);

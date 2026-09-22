@@ -443,14 +443,7 @@ An endpoint implements `com.codename1.backend.WebSocket`:
 include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/WebSocketSnippets.java[tag=backend-websocket-echo,indent=0]
 ----
 
-A route points at one:
-
-[source,java]
-----
-include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/WebSocketSnippets.java[tag=backend-websocket-register,indent=0]
-----
-
-Or the build can find it, the way it finds a `@RestController`:
+The build finds it, the way it finds a `@RestController`:
 
 [source,java]
 ----
@@ -465,8 +458,26 @@ what a reader cares about -- the path is relative to a class-level
 injected the same way, and two endpoints claiming one path is a build error rather
 than something registration order decides.
 
-`HttpServer` takes the same registration directly, for a server built without the
-builder:
+==== Registering by hand
+
+A server assembled without the annotations asks for its endpoints the same way it
+asks for its handlers: the runtime calls back while it's starting, with whatever
+it opened.
+
+[source,java]
+----
+include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/WebSocketSnippets.java[tag=backend-websocket-register,indent=0]
+----
+
+There's no `server.websocket(path, endpoint)` to call afterward, and the absence
+is deliberate. Nothing else here is configured that way -- a controller is found
+by the build, a handler is called, a `DataSource` is handed to whoever declared
+one -- and a setter on a running server also has a window the callback doesn't: the
+listener is bound before the application gets the reference back, so an upgrade
+arriving in that gap finds a route that hasn't been added yet and is answered as
+ordinary HTTP.
+
+`HttpServer` takes the same callback, for a server built without the builder:
 
 [source,java]
 ----

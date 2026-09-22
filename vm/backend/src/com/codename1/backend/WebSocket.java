@@ -31,7 +31,9 @@ package com.codename1.backend;
  * its state in {@link WebSocketSession#setAttachment}.
  *
  * ```java
- * server.websocket("/echo", new WebSocket() {
+ * @WebSocketMapping("/echo")
+ * public class Echo implements WebSocket {
+ *     public void onOpen(WebSocketSession session) { }
  *     public void onText(WebSocketSession session, String message) throws Exception {
  *         session.sendText(message);
  *     }
@@ -39,8 +41,13 @@ package com.codename1.backend;
  *             throws Exception {
  *         session.sendBinary(message, offset, length);
  *     }
- * });
+ * }
  * ```
+ *
+ * The build finds that and registers it. A server assembled by hand gets the same
+ * thing through a callback rather than a setter -- see
+ * {@link Backend.WebSocketEndpoints} -- because this runtime is asked for its
+ * configuration while it starts and never reconfigured once it is running.
  *
  * Threading is the part worth reading twice. A callback runs on the thread that
  * owns the connection -- a virtual thread where the server has them, a pool worker

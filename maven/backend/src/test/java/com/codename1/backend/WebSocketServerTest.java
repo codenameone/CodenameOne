@@ -64,12 +64,7 @@ class WebSocketServerTest {
 
     @BeforeAll
     static void startServer() throws Exception {
-        server = HttpServer.start("127.0.0.1", 0, 64, 4, new HttpServer.Handler() {
-            public HttpServer.Response handle(HttpServer.Request request) {
-                return HttpServer.Response.text(200, "plain http");
-            }
-        });
-        server.websocket("/echo", new WebSocket() {
+        final WebSocket echo = new WebSocket() {
             public void onOpen(WebSocketSession session) {
                 EVENTS.add("open path=" + session.getPath() + " query=" + session.getQuery()
                         + " subprotocol=" + session.getSubprotocol());
@@ -86,6 +81,15 @@ class WebSocketServerTest {
             }
             public String[] getSubprotocols() {
                 return new String[]{"v2.chat", "v1.chat"};
+            }
+        };
+        server = HttpServer.start("127.0.0.1", 0, 64, 4, new HttpServer.Handler() {
+            public HttpServer.Response handle(HttpServer.Request request) {
+                return HttpServer.Response.text(200, "plain http");
+            }
+        }, null, new HttpServer.WebSocketRoutes() {
+            public void register(HttpServer.WebSocketRegistry registry) {
+                registry.route("/echo", echo);
             }
         });
         port = server.getPort();

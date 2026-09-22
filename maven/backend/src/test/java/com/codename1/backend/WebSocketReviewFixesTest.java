@@ -40,6 +40,16 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  */
 class WebSocketReviewFixesTest {
 
+    /** Registers one silent endpoint on `path`, the way a generated main does. */
+    private static Backend.WebSocketEndpoints routes(final String path) {
+        return new Backend.WebSocketEndpoints() {
+            public void register(HttpServer.WebSocketRegistry registry, DataSource dataSource,
+                                 com.codename1.backend.orm.EntityManager entities) {
+                registry.route(path, silent());
+            }
+        };
+    }
+
     /** An endpoint that does nothing, for tests about the server around it. */
     private static WebSocket silent() {
         return new WebSocket() {
@@ -61,7 +71,7 @@ class WebSocketReviewFixesTest {
         // handlers" before it ever bound a port -- and the processor test that
         // covered the generator asserted the emitted SOURCE, so it saw nothing.
         Backend backend = Backend.builder().port(0).quiet()
-                .websocket("/chat", silent())
+                .webSockets(routes("/chat"))
                 .start();
         try {
             assertTrue(backend.getServer().getPort() > 0, "the listener never bound");
@@ -74,9 +84,15 @@ class WebSocketReviewFixesTest {
     @DisplayName("a websocket router alone is also a server")
     void webSocketRouterOnlyServerStarts() throws Exception {
         Backend backend = Backend.builder().port(0).quiet()
-                .websocketRouter(new HttpServer.WebSocketHandler() {
-                    public WebSocket open(HttpServer.Request request) {
-                        return silent();
+                .webSockets(new Backend.WebSocketEndpoints() {
+                    public void register(HttpServer.WebSocketRegistry registry,
+                                         DataSource dataSource,
+                                         com.codename1.backend.orm.EntityManager entities) {
+                        registry.fallback(new HttpServer.WebSocketHandler() {
+                            public WebSocket open(HttpServer.Request request) {
+                                return silent();
+                            }
+                        });
                     }
                 })
                 .start();
@@ -91,7 +107,7 @@ class WebSocketReviewFixesTest {
     @DisplayName("an ordinary request to a websocket-only server is a 404, not a crash")
     void webSocketOnlyServerAnswersHttpWithNotFound() throws Exception {
         Backend backend = Backend.builder().port(0).quiet()
-                .websocket("/chat", silent())
+                .webSockets(routes("/chat"))
                 .start();
         try {
             Http.Response response = Http.get("127.0.0.1", backend.getServer().getPort(), "/x");
@@ -109,9 +125,13 @@ class WebSocketReviewFixesTest {
         // /ch%61t missed the /chat endpoint and fell through to a catch-all or a
         // 404 -- so which endpoint served a client, and which credentials it was
         // checked against, depended on how the client spelled the URI.
-        HttpServer server = HttpServer.start("127.0.0.1", 0, 16, 4, null);
+        HttpServer server = HttpServer.start("127.0.0.1", 0, 16, 4, null, null,
+                new HttpServer.WebSocketRoutes() {
+            public void register(HttpServer.WebSocketRegistry registry) {
+                registry.route("/chat", silent());
+            }
+        });
         try {
-            server.websocket("/chat", silent());
             int port = server.getPort();
             RawWebSocketClient plain = new RawWebSocketClient(port, "/chat", null);
             try {
@@ -135,24 +155,31 @@ class WebSocketReviewFixesTest {
 
     @Test
     @DisplayName("a route that could never match is refused at registration")
-    void unreachableRoutesAreRefused() throws Exception {
-        HttpServer server = HttpServer.start("127.0.0.1", 0, 8, 2, null);
-        try {
-            // Matched after percent-decoding and without the query, so either of
-            // these would register something no request could ever select.
-            assertThrows(IllegalArgumentException.class, new org.junit.jupiter.api.function.Executable() {
-                public void execute() {
-                    server.websocket("/ch%61t", silent());
-                }
-            });
-            assertThrows(IllegalArgumentException.class, new org.junit.jupiter.api.function.Executable() {
-                public void execute() {
-                    server.websocket("/chat?room=1", silent());
-                }
-            });
-        } finally {
-            server.stop(500);
-        }
+    void unreachableRoutesAreRefused() {
+        // Matched after percent-decoding and without the query, so either of these
+        // would register something no request could ever select. The callback
+        // throwing takes the whole start down rather than leaving a server running
+        // with an endpoint nothing can reach.
+        assertThrows(IOException.class, new org.junit.jupiter.api.function.Executable() {
+            public void execute() throws Exception {
+                HttpServer.start("127.0.0.1", 0, 8, 2, null, null,
+                        new HttpServer.WebSocketRoutes() {
+                    public void register(HttpServer.WebSocketRegistry registry) {
+                        registry.route("/ch%61t", silent());
+                    }
+                });
+            }
+        });
+        assertThrows(IOException.class, new org.junit.jupiter.api.function.Executable() {
+            public void execute() throws Exception {
+                HttpServer.start("127.0.0.1", 0, 8, 2, null, null,
+                        new HttpServer.WebSocketRoutes() {
+                    public void register(HttpServer.WebSocketRegistry registry) {
+                        registry.route("/chat?room=1", silent());
+                    }
+                });
+            }
+        });
     }
 
     @Test

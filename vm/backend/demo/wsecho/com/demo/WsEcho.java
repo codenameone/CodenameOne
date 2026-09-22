@@ -55,10 +55,14 @@ public class WsEcho {
                 workers = Integer.parseInt(args[++iter]);
             }
         }
-        HttpServer server = HttpServer.start(host, port, 128, workers, null);
-        server.websocketRouter(new HttpServer.WebSocketHandler() {
-            public WebSocket open(HttpServer.Request request) {
-                return new Echo();
+        HttpServer server = HttpServer.start(host, port, 128, workers, null, null,
+                new HttpServer.WebSocketRoutes() {
+            public void register(HttpServer.WebSocketRegistry registry) {
+                registry.fallback(new HttpServer.WebSocketHandler() {
+                    public WebSocket open(HttpServer.Request request) {
+                        return new Echo();
+                    }
+                });
             }
         });
         System.out.println("WSECHO_PORT=" + server.getPort());

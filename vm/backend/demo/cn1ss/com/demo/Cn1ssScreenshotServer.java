@@ -98,13 +98,18 @@ public class Cn1ssScreenshotServer {
             System.exit(2);
         }
 
-        HttpServer server = HttpServer.start("127.0.0.1", port, 64, 4, null);
-        // Any path: the clients dial ws://host:8765 with no path, and the one the
-        // server sees depends on which client substitutes what. A catch-all keeps
-        // that from being something four client stacks have to agree on.
-        server.websocketRouter(new HttpServer.WebSocketHandler() {
-            public WebSocket open(HttpServer.Request request) {
-                return new Receiver();
+        HttpServer server = HttpServer.start("127.0.0.1", port, 64, 4, null, null,
+                new HttpServer.WebSocketRoutes() {
+            public void register(HttpServer.WebSocketRegistry registry) {
+                // Any path: the clients dial ws://host:8765 with no path, and the
+                // one the server sees depends on which client substitutes what. A
+                // fallback keeps that from being something four client stacks have
+                // to agree on.
+                registry.fallback(new HttpServer.WebSocketHandler() {
+                    public WebSocket open(HttpServer.Request request) {
+                        return new Receiver();
+                    }
+                });
             }
         });
 

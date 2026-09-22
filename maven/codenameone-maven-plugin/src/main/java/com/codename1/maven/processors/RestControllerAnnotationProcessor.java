@@ -2509,14 +2509,29 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
             // asked only for the pool.
             sb.append("                .requiresDataSource()\n");
         }
-        // Registered on the builder, so an endpoint is in place before the
-        // listener answers. Sorted by path (webSockets is a TreeMap), which keeps
-        // the generated source byte-identical between builds -- a bootstrap whose
-        // text depends on scan order recompiles for no reason and diffs noisily.
-        for (WebSocketEndpoint endpoint : webSockets.values()) {
-            sb.append("                .websocket(\"").append(endpoint.path).append("\", new ")
-              .append(endpoint.sourceName).append("(").append(argumentForInjection(endpoint.injection,
-                      endpoint.binaryName)).append("))\n");
+        // A CALLBACK, like .handlers below, not a setter on a started server. The
+        // runtime invokes this while it is starting and before the listener
+        // accepts, so there is no window in which a generated route exists here
+        // and not in the server.
+        //
+        // Sorted by path (webSockets is a TreeMap), which keeps the generated
+        // source byte-identical between builds -- a bootstrap whose text depends
+        // on scan order recompiles for no reason and diffs noisily.
+        if (!webSockets.isEmpty()) {
+            sb.append("                .webSockets(new com.codename1.backend.Backend.WebSocketEndpoints() {\n");
+            sb.append("            public void register(\n");
+            sb.append("                    com.codename1.backend.HttpServer.WebSocketRegistry registry,\n");
+            sb.append("                    com.codename1.backend.DataSource dataSource,\n");
+            sb.append("                    com.codename1.backend.orm.EntityManager entities)\n");
+            sb.append("                    throws Exception {\n");
+            for (WebSocketEndpoint endpoint : webSockets.values()) {
+                sb.append("                registry.route(\"").append(endpoint.path)
+                  .append("\", new ").append(endpoint.sourceName).append("(")
+                  .append(argumentForInjection(endpoint.injection, endpoint.binaryName))
+                  .append("));\n");
+            }
+            sb.append("            }\n");
+            sb.append("        })\n");
         }
         sb.append("                .handlers(new com.codename1.backend.Backend.Handlers() {\n");
         sb.append("            public com.codename1.backend.HttpServer.Handler[] create(\n");

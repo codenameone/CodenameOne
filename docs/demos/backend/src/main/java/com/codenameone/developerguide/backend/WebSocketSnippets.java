@@ -23,6 +23,8 @@
 package com.codenameone.developerguide.backend;
 
 import com.codename1.backend.Backend;
+import com.codename1.backend.DataSource;
+import com.codename1.backend.orm.EntityManager;
 import com.codename1.backend.HttpServer;
 import com.codename1.backend.WebSocket;
 import com.codename1.backend.WebSocketSession;
@@ -60,7 +62,12 @@ public static final class Echo implements WebSocket {
 public static Backend start() throws Exception {
     return Backend.builder()
             .port(8080)
-            .websocket("/echo", new Echo())
+            .webSockets(new Backend.WebSocketEndpoints() {
+                public void register(HttpServer.WebSocketRegistry registry,
+                                     DataSource dataSource, EntityManager entities) {
+                    registry.route("/echo", new Echo());
+                }
+            })
             .start();
 }
 // end::backend-websocket-register[]
@@ -139,13 +146,15 @@ public static final class Graph implements WebSocket {
 
 // tag::backend-websocket-raw[]
 public static HttpServer startRaw() throws Exception {
-    HttpServer server = HttpServer.start(null, 8080, 512, 16, new HttpServer.Handler() {
+    return HttpServer.start(null, 8080, 512, 16, new HttpServer.Handler() {
         public HttpServer.Response handle(HttpServer.Request request) {
             return HttpServer.Response.text(200, "ok");
         }
+    }, null, new HttpServer.WebSocketRoutes() {
+        public void register(HttpServer.WebSocketRegistry registry) {
+            registry.route("/echo", new Echo());
+        }
     });
-    server.websocket("/echo", new Echo());
-    return server;
 }
 // end::backend-websocket-raw[]
 }

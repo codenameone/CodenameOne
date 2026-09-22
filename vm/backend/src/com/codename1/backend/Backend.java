@@ -183,6 +183,21 @@ public final class Backend {
                 throws Exception;
     }
 
+    /**
+     * Where a server's websocket endpoints come from.
+     *
+     * Deliberately the same shape as {@link Handlers}: the server calls this once
+     * while it is starting, with whatever it opened, and the callback registers
+     * what it wants. A controller is found by the build, a Handler is called, a
+     * DataSource is handed over -- nothing in this runtime is configured by an
+     * application reaching into a started server, and websockets are not the
+     * exception.
+     */
+    public interface WebSocketEndpoints {
+        void register(HttpServer.WebSocketRegistry registry, DataSource dataSource,
+                      EntityManager entities) throws Exception;
+    }
+
     /** Collects what a server needs and starts one. */
     public static final class Builder {
         private Config config;
@@ -201,8 +216,7 @@ public final class Backend {
         private String tlsCertificate;
         private String tlsKey;
         private StaticFiles staticFiles;
-        private final Map webSockets = new LinkedHashMap();
-        private HttpServer.WebSocketHandler webSocketRouter;
+        private WebSocketEndpoints webSocketEndpoints;
         private boolean createTables;
         private boolean createTablesGiven;
         private boolean handlersNeedADatabase;
@@ -231,22 +245,15 @@ public final class Backend {
         }
 
         /**
-         * Serves `path` as a websocket.
+         * Registers this server's websocket endpoints when it starts.
          *
-         * Registered on the server once it exists, so an endpoint is in place
-         * before the listener starts answering and no client can arrive at a path
-         * that is about to be routed.
+         * Called once, before the listener accepts anything, so there is no window
+         * in which a route exists in the application's mind and not in the
+         * server's -- which is what a `websocket(path, endpoint)` setter on a
+         * started server left open.
          */
-        public Builder websocket(String path, WebSocket endpoint) {
-            if(path != null && endpoint != null) {
-                webSockets.put(path, endpoint);
-            }
-            return this;
-        }
-
-        /** A router for websocket paths, consulted after the exact routes above. */
-        public Builder websocketRouter(HttpServer.WebSocketHandler router) {
-            this.webSocketRouter = router;
+        public Builder webSockets(WebSocketEndpoints endpoints) {
+            this.webSocketEndpoints = endpoints;
             return this;
         }
 
@@ -465,10 +472,10 @@ public final class Backend {
                 // would depend on what happened to be in a directory.
                 routers.add(staticFiles);
             }
-            boolean servesWebSockets = !webSockets.isEmpty() || webSocketRouter != null;
+            boolean servesWebSockets = webSocketEndpoints != null;
             if(routers.isEmpty() && !servesWebSockets) {
                 throw new IOException("This server has no handlers, so every request would "
-                        + "be a 404. Add one with handler(), a websocket() route, or a "
+                        + "be a 404. Add one with handler(), webSockets(), or a "
                         + "@RestController class for the build to generate one from.");
             }
             if(routers.isEmpty()) {
@@ -558,7 +565,17 @@ public final class Backend {
                                 // answers for a path it does not route.
                                 return null;
                             }
-                        }, context, webSockets, webSocketRouter);
+                        }, context, webSocketEndpoints == null ? null
+                                : new HttpServer.WebSocketRoutes() {
+                            public void register(HttpServer.WebSocketRegistry registry)
+                                    throws Exception {
+                                // The same two arguments a Handlers factory gets,
+                                // and for the same reason: an endpoint that needs
+                                // the database declares it rather than reaching
+                                // for a static.
+                                webSocketEndpoints.register(registry, pool, manager);
+                            }
+                        });
             } catch (Exception err) {
                 if(ownsContext) {
                     context.close();
