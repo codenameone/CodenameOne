@@ -94,8 +94,13 @@ jobs:
       - name: Build the framework on JDK 8
         run: |
           cd maven
+          # -Plocal-dev-javase is required to build the JavaSE port, which
+          # -am pulls in. Without it the build dies in javase's
+          # cn1-generate-build-hint-data execution, which is a long way from
+          # anything this workflow is about.
           JAVA_HOME="$JAVA_HOME_8" mvn -B -q install -DskipTests \
               -Dmaven.javadoc.skip=true -Dmaven.source.skip=true \
+              -Plocal-dev-javase \
               -Dmaven.repo.local="$GITHUB_WORKSPACE/m2" \
               -pl core,dart-transpiler,codenameone-maven-plugin,cn1app-archetype -am
 
@@ -106,6 +111,7 @@ jobs:
           cd maven
           JAVA_HOME="$JAVA_HOME_17" mvn -B -q install -DskipTests \
               -Dmaven.javadoc.skip=true -Dmaven.source.skip=true \
+              -Plocal-dev-javase \
               -Dmaven.repo.local="$GITHUB_WORKSPACE/m2" \
               -pl dart-runtime,flutter-runtime
 
