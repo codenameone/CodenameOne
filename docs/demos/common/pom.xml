@@ -19,6 +19,20 @@
             <scope>provided</scope>
         </dependency>
 
+        <!--
+          The Flutter runtime, so the developer guide's FlutterUI examples are
+          COMPILED rather than illustrative. The guide requires Java snippets to
+          live under a compiled source root for exactly this reason, and an
+          example that names an API which has since changed is worse than no
+          example. Provided scope: the demos do not ship it.
+        -->
+        <dependency>
+            <groupId>com.codenameone</groupId>
+            <artifactId>codenameone-flutter-runtime</artifactId>
+            <version>${cn1.version}</version>
+            <scope>provided</scope>
+        </dependency>
+
         <!-- INJECT DEPENDENCIES -->
     </dependencies>
 

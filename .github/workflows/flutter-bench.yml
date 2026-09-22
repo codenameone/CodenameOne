@@ -39,6 +39,11 @@ concurrency:
 permissions:
   contents: read
   pull-requests: write
+  # The framework job runs in the pr-ci-container image on ghcr, and pulling it
+  # needs this. Without it the job dies in "Initialize containers" with a bare
+  # "Error response from daemon: denied", which reads like the image is missing
+  # rather than like the token cannot see it.
+  packages: read
 
 jobs:
   # The framework is built ONCE, here, and the platform jobs consume the

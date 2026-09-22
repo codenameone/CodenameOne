@@ -1,0 +1,9 @@
+// Generated from docs/developer-guide source blocks. Edit the guide snippets here, not inline.
+
+// tag::flutter-interop-xml-001[]
+<dependency>
+    <groupId>com.codenameone</groupId>
+    <artifactId>codenameone-flutter-runtime</artifactId>
+    <version>${cn1.version}</version>
+</dependency>
+// end::flutter-interop-xml-001[]

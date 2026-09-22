@@ -46,11 +46,7 @@ archetype already contain it, commented out:
 
 [source,xml]
 ----
-<dependency>
-    <groupId>com.codenameone</groupId>
-    <artifactId>codenameone-flutter-runtime</artifactId>
-    <version>${cn1.version}</version>
-</dependency>
+include::../demos/common/src/main/snippets/developer-guide/flutter-interop.xml[tag=flutter-interop-xml-001,indent=0]
 ----
 
 Then put Dart files under `common/src/main/flutter`. The goal is already bound
@@ -86,14 +82,7 @@ ordinary component can:
 
 [source,java]
 ----
-Form hi = new Form("Dashboard", BoxLayout.y());
-hi.add(new Label("Written in Codename One"));
-
-// A Dart widget tree, compiled to Java at build time.
-hi.add(FlutterUI.wrap(new SalesChart()));
-
-hi.add(new Button("Also Codename One"));
-hi.show();
+include::../demos/common/src/main/java/com/codenameone/developerguide/flutter/FlutterInteropSnippets.java[tag=flutter-interop-java-001,indent=0]
 ----
 
 The wrapped subtree is a component like any other: it participates in the
@@ -113,15 +102,7 @@ Flutter's own `runApp`:
 
 [source,java]
 ----
-public class MyApplication {
-    public void start() {
-        if (current != null) {
-            current.show();
-            return;
-        }
-        FlutterUI.runApp(new GalleryApp());
-    }
-}
+include::../demos/common/src/main/java/com/codenameone/developerguide/flutter/FlutterInteropSnippets.java[tag=flutter-interop-java-002,indent=0]
 ----
 
 Unlike `wrap`, this path installs the Material base theme, because the widget
@@ -214,12 +195,7 @@ To run it locally against builds you already have:
 
 [source,bash]
 ----
-python3 scripts/flutter-bench/run_bench.py --list
-
-python3 scripts/flutter-bench/run_bench.py --platform macos \
-    --cn1-app     /path/to/Bench.app \
-    --flutter-app /path/to/gallery.app \
-    --json out/macos.json --markdown out/macos.md
+include::../demos/common/src/main/snippets/developer-guide/flutter-interop.sh[tag=flutter-interop-bash-001,indent=0]
 ----
 
 `--list` also reports which platform adapters have been exercised end to end,

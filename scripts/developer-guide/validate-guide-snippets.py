@@ -289,8 +289,14 @@ def java_compile_classpath():
     candidates = [
         Path("docs/demos/common/target/classes"),
         Path("maven/core/target/classes"),
+        # The Flutter runtime, so the guide's FlutterUI examples are compiled
+        # rather than taken on trust. Absent entries are dropped below, so a
+        # checkout that has not built it simply cannot use those types -- which
+        # surfaces as the snippet failing to compile, not as it being skipped.
+        Path("maven/flutter-runtime/target/classes"),
         Path.home() / ".m2/repository/com/codenameone/codenameone-core/8.0-SNAPSHOT/codenameone-core-8.0-SNAPSHOT.jar",
         Path.home() / ".m2/repository/com/codenameone/java-runtime/8.0-SNAPSHOT/java-runtime-8.0-SNAPSHOT.jar",
+        Path.home() / ".m2/repository/com/codenameone/codenameone-flutter-runtime/8.0-SNAPSHOT/codenameone-flutter-runtime-8.0-SNAPSHOT.jar",
     ]
     return os.pathsep.join(str(p) for p in candidates if p.exists())
 
