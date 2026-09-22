@@ -381,6 +381,13 @@ jobs:
         # that guard exists inside run-ios-ui-tests.sh and is disabled by an empty
         # reference set, which is exactly the situation a seeding run is in.
         if: always()
+        env:
+          # Declared HERE rather than inherited: ARTIFACTS_DIR is set in the
+          # screenshot step's own env block, and step env does not reach other
+          # steps. Without this the check reads an empty path, finds nothing and
+          # fails a leg that captured a full set -- which is exactly what it did
+          # on its first run, the same scope mistake as the warning leg above.
+          ARTIFACTS_DIR: ${{ github.workspace }}/artifacts/ios-ui-tests-metal
         run: |
           set -euo pipefail
           count=$(find "${ARTIFACTS_DIR}" -name '*.png' 2>/dev/null | wc -l | tr -d ' ')
@@ -672,13 +679,6 @@ jobs:
         # runtime and theme, which is what they are for, rather than by hardware.
         run: ./scripts/ci/boot-ios-simulator.sh 'iOS-27[0-9-]*' 'iPhone 16' iPhone16-metal27
       - name: Run iOS UI screenshot tests (Metal)
-        # SEEDING RUN: scripts/ios/screenshots-metal-27 has no images yet, and
-        # they can only come from a run on this image -- capturing them on a
-        # maintainer's machine would bake in that machine's toolchain. Tolerated
-        # on this step ALONE, so everything before it (Xcode selection, setup,
-        # build, simulator boot) still fails the job. Removed once the baselines
-        # are committed; scripts/ios/screenshots-metal-27/README.md has the steps.
-        continue-on-error: true
         env:
           # The simulator created by the step above. Without it the suite asks
           # xcodebuild for a destination named "iPhone 16", finds none on this
@@ -772,6 +772,13 @@ jobs:
         # that guard exists inside run-ios-ui-tests.sh and is disabled by an empty
         # reference set, which is exactly the situation a seeding run is in.
         if: always()
+        env:
+          # Declared HERE rather than inherited: ARTIFACTS_DIR is set in the
+          # screenshot step's own env block, and step env does not reach other
+          # steps. Without this the check reads an empty path, finds nothing and
+          # fails a leg that captured a full set -- which is exactly what it did
+          # on its first run, the same scope mistake as the warning leg above.
+          ARTIFACTS_DIR: ${{ github.workspace }}/artifacts/ios-ui-tests-metal-27
         run: |
           set -euo pipefail
           count=$(find "${ARTIFACTS_DIR}" -name '*.png' 2>/dev/null | wc -l | tr -d ' ')

@@ -58,9 +58,6 @@ PAIRS = [
         "only_in_copy": [
             "CN1_XCODE_MAJOR: '27'",
             "IOS_DEPENDENCY_ARGS: '-Dcodename1.arg.ios.themeGeneration=27'",
-            # Seeding run until screenshots-metal-27 is populated; that
-            # directory's README carries the steps that remove this.
-            "continue-on-error: true",
             "IOS_SIM_DESTINATION: 'platform=iOS Simulator,id=${{ steps.sim27.outputs.udid }}'",
         ],
         # The published port report is keyed on the port id `ios-metal` and there
