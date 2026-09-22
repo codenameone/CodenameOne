@@ -5897,12 +5897,46 @@ byte this benchmark allocates. The array note above this one already records the
 same thing from the other side -- 32-byte array headers are 20% of all bytes
 allocated per selfhost cycle before any payload.
 
-A staged path, each step independently measurable, none requiring the full
-side-registry rewrite:
+CORRECTION, and it invalidates the staged plan first written here. Bytes saved
+per object are NOT bytes saved in the heap: BiBOP rounds every allocation up to a
+size class, and the smallest class is 32 (cn1BibopClassSize = 32, 48, 64, 80,
+...). A 32-byte Node is 16 header + 16 fields, so
+
+    remove 8 header bytes  -> 24 -> still a 32-byte slot -> SAVES NOTHING
+    remove all 16          -> 16 -> still a 32-byte slot -> SAVES NOTHING
+
+The header cannot pay for itself on this object at all unless a 16-byte size
+class is added alongside. The original claim here -- "type-homogeneous pages
+alone take Node from 32 to 24 bytes, -25% allocation traffic" -- was wrong, and
+wrong in the way that matters: it counted object bytes instead of SLOT bytes.
+
+Partial header reduction pays only for objects that sit just above a class
+boundary, which makes the whole question a histogram one:
+
+    field bytes    hdr=16   hdr=8   hdr=0
+    16 (Node)      32       32      32     (16 only if a class is added)
+    32             48       48      32
+    40             64       48      48
+    48             64       64      48
+
+So the prerequisites are BOTH full header removal AND a finer size class, and
+neither is worth starting before the census below says how many bytes actually
+move. The mutator-side argument for doing it is unchanged and still the strongest
+one -- the header is half of every Node, and the array note above this round
+records 32-byte array headers as 20% of all bytes allocated per selfhost cycle --
+but "half the object" is not "half the heap" until the rounding is accounted for.
+
+The measurement that must come first: a per-class histogram of (field bytes ->
+slot bytes) over the selfhost corpus, evaluated at hdr = 16, 8 and 0, with and
+without a 16-byte class. That gives the real ceiling. Until it exists, the
+staged path is a guess.
+
+The steps themselves, for when that number justifies them:
   1. type-homogeneous BiBOP pages -> clazz comes from the page header, one line
-     shared by ~2048 objects instead of 8 bytes per object (-8/object), and
-     CN1_CLASS_OF gets FASTER rather than slower, which is the trap that sinks a
-     naive side-table (it is on every virtual dispatch and instanceof);
-  2. heapPosition folded into page metadata (-4/object);
-  3. mark bits to a side bitmap (-4/object, and marking stops writing into cache
-     lines the mutator owns -- the ~5% measured above).
+     shared by ~2048 objects instead of 8 bytes per object, and CN1_CLASS_OF gets
+     FASTER rather than slower -- which is the trap that sinks a naive side-table
+     (it is on every virtual dispatch and instanceof);
+  2. heapPosition folded into page metadata;
+  3. mark bits to a side bitmap -- this one pays regardless of rounding, because
+     it stops marking from writing into cache lines the mutator owns, which is
+     the ~5% measured above.
