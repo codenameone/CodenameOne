@@ -214,6 +214,39 @@ jobs:
             echo "to hold the gallery's unpinned dependencies at tested versions" >&2
             exit 1; }
 
+      # A benchmark records the toolchain it measured with; on Windows it also
+      # has to CHECK it. Flutter picks the CMake generator from the Visual
+      # Studio it detects and falls back to "Visual Studio 16 2019" when it
+      # detects NONE -- so an undetected Visual Studio does not say so. It fails
+      # minutes later inside CMake, claiming VS 2019 could not be found, which
+      # is true and is not the problem. vswhere's own view is printed beside
+      # Flutter's so the two can be compared: a Visual Studio that vswhere lists
+      # and Flutter does not is a different fault from one that is simply absent.
+      - name: Report the Windows toolchain, and prove Flutter can see it
+        if: ${{ runner.os == 'Windows' }}
+        shell: bash
+        run: |
+          VSWHERE="/c/Program Files (x86)/Microsoft Visual Studio/Installer/vswhere.exe"
+          if [ -x "$VSWHERE" ]; then
+            echo "== vswhere sees:"
+            "$VSWHERE" -products '*' -prerelease -format value \
+                -property installationVersion || true
+            "$VSWHERE" -products '*' -prerelease -format value \
+                -property installationPath || true
+          else
+            echo "== vswhere is not installed at the usual path"
+          fi
+          echo "== flutter doctor:"
+          flutter doctor -v 2>&1 | tee /tmp/doctor.txt || true
+          if grep -qi "Visual Studio not installed" /tmp/doctor.txt; then
+            echo "Flutter cannot see a usable Visual Studio on this runner." >&2
+            echo "It would fall back to the 'Visual Studio 16 2019' CMake generator" >&2
+            echo "and fail inside CMake rather than here. Compare the two listings" >&2
+            echo "above: if vswhere lists an install that doctor does not accept," >&2
+            echo "the pinned Flutter is older than this runner's Visual Studio." >&2
+            exit 1
+          fi
+
       # Flutter's own Linux build and Codename One's native Linux port both
       # BOTH sides need a native toolchain here, and they need different
       # things. Flutter's desktop build wants clang and a C++ standard library;
