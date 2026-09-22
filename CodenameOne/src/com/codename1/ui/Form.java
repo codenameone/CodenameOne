@@ -445,16 +445,7 @@ public class Form extends Container implements TopLevelContainer {
             int len = revalidateQueue.size();
             for (int i = 0; i < len; i++) {
                 Container cnt = revalidateQueue.get(i);
-                long started = Display.isEdtTrace() ? System.currentTimeMillis() : 0;
                 cnt.revalidateWithAnimationSafetyInternal(false);
-                if (Display.isEdtTrace()) {
-                    long cost = System.currentTimeMillis() - started;
-                    if (cost > 4) {
-                        Log.p("[edt] revalidate " + cnt.getClass().getName()
-                                + " uiid=" + cnt.getUIID() + " children=" + cnt.getComponentCount()
-                                + " took " + cost + "ms");
-                    }
-                }
             }
             revalidateQueue.clear();
 
