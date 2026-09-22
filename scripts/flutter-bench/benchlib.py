@@ -157,31 +157,91 @@ def macho_code_size(bundle):
 
 
 def elf_code_size(tree):
-    """Every ELF file under `tree`, summed: the Linux counterpart of the above.
+    """Machine code in every ELF under `tree`: the bytes of its EXECUTABLE sections.
 
-    The same trap exists on Linux. Flutter's bundle puts the Dart AOT image in
-    lib/libapp.so and the engine in lib/libflutter_linux_gtk.so, and the
-    `gallery` executable beside them is a launcher; sizing the executable alone
-    would repeat the iOS mistake. Codename One ships its executable plus any
-    native libraries it dlopens, and those are counted the same way.
+    Not whole files, for two reasons that pull the same way. Flutter's bundle
+    puts the Dart AOT image in lib/libapp.so beside the engine library, so the
+    `gallery` launcher alone would repeat the iOS mistake; every ELF is walked.
+    And Codename One's native Linux port links the application's resources INTO
+    the executable (an .incbin'd blob in .rodata), so whole-file bytes counted
+    the gallery's artwork as Codename One code -- 114 MB against Flutter's
+    51 MB, a comparison of pictures. Executable sections (SHF_EXECINSTR) are
+    compiled code on both sides and nothing else; read-only data is excluded
+    symmetrically, Flutter's Dart snapshot data included.
     """
-    return _sum_by_magic(tree, lambda head: head[:4] == b"\x7fELF")
+    return _sum_by_magic(tree, lambda head: head[:4] == b"\x7fELF", _elf_exec_bytes)
 
 
 def pe_code_size(tree):
-    """Every PE image (.exe and .dll) under `tree`, summed; see elf_code_size.
+    """Machine code in every PE image under `tree`; see elf_code_size.
 
-    Flutter's Windows Release directory is gallery.exe beside flutter_windows.dll
-    and the Dart image, so again the executable is only part of the code.
+    The same argument: Flutter's code is flutter_windows.dll plus the Dart image
+    beside gallery.exe, and Codename One's Windows build embeds its resources in
+    the executable. Sections marked IMAGE_SCN_MEM_EXECUTE are counted.
     """
-    return _sum_by_magic(tree, lambda head: head[:2] == b"MZ")
+    return _sum_by_magic(tree, lambda head: head[:2] == b"MZ", _pe_exec_bytes)
 
 
-def _sum_by_magic(tree, matches):
+def _elf_exec_bytes(data):
+    """Total size of SHF_EXECINSTR sections that occupy file bytes, or None."""
+    import struct
+    if len(data) < 64 or data[:4] != b"\x7fELF":
+        return None
+    wide = data[4] == 2
+    order = "<" if data[5] == 1 else ">"
+    try:
+        if wide:
+            shoff, = struct.unpack_from(order + "Q", data, 0x28)
+            shentsize, shnum = struct.unpack_from(order + "HH", data, 0x3A)
+        else:
+            shoff, = struct.unpack_from(order + "I", data, 0x20)
+            shentsize, shnum = struct.unpack_from(order + "HH", data, 0x2E)
+        total = 0
+        for index in range(shnum):
+            base = shoff + index * shentsize
+            if wide:
+                sh_type, sh_flags = struct.unpack_from(order + "IQ", data, base + 4)
+                sh_size, = struct.unpack_from(order + "Q", data, base + 0x20)
+            else:
+                sh_type, sh_flags = struct.unpack_from(order + "II", data, base + 4)
+                sh_size, = struct.unpack_from(order + "I", data, base + 0x14)
+            if sh_flags & 0x4 and sh_type != 8:  # SHF_EXECINSTR, not SHT_NOBITS
+                total += sh_size
+        return total
+    except struct.error:
+        return None
+
+
+def _pe_exec_bytes(data):
+    """Total raw size of IMAGE_SCN_MEM_EXECUTE sections, or None."""
+    import struct
+    try:
+        pe, = struct.unpack_from("<I", data, 0x3C)
+        if data[pe:pe + 4] != b"PE\0\0":
+            return None
+        sections, = struct.unpack_from("<H", data, pe + 6)
+        optional, = struct.unpack_from("<H", data, pe + 20)
+        table = pe + 24 + optional
+        total = 0
+        for index in range(sections):
+            base = table + index * 40
+            raw, = struct.unpack_from("<I", data, base + 16)
+            flags, = struct.unpack_from("<I", data, base + 36)
+            if flags & 0x20000000:
+                total += raw
+        return total
+    except struct.error:
+        return None
+
+
+def _sum_by_magic(tree, matches, measure=None):
     """Bytes of every regular file under `tree` whose header `matches`, or None.
 
     Identified by magic bytes rather than extension, so an unconventionally
     named library is still counted and a data file named like one is not.
+    `measure`, when given, reads the file and answers how many of its bytes
+    count; None from it means the file could not be parsed, and it is skipped
+    rather than counted whole.
     """
     if os.path.isfile(tree):
         paths = [tree]
@@ -196,11 +256,19 @@ def _sum_by_magic(tree, matches):
             continue
         try:
             with open(full, "rb") as handle:
-                if matches(handle.read(4)):
+                if not matches(handle.read(4)):
+                    continue
+                if measure is None:
                     total += os.path.getsize(full)
                     found = True
+                    continue
+                handle.seek(0)
+                counted = measure(handle.read())
         except OSError:
             continue
+        if counted is not None:
+            total += counted
+            found = True
     return total if found else None
 
 

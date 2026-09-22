@@ -78,48 +78,87 @@ class TimeStreamDeadlines(unittest.TestCase):
         self.assertLess(elapsed, 1.5)
 
 
+def _elf(text, rodata):
+    """A minimal ELF64 with an executable .text and a non-executable .rodata."""
+    import struct
+    header = bytearray(64)
+    header[:4] = b"\x7fELF"
+    header[4], header[5] = 2, 1                        # 64-bit, little-endian
+    struct.pack_into("<Q", header, 0x28, 64)           # e_shoff
+    struct.pack_into("<HH", header, 0x3A, 64, 3)       # e_shentsize, e_shnum
+    sections = bytearray(64 * 3)                       # [0] is the null section
+    struct.pack_into("<IIQ", sections, 64 + 0, 0, 1, 0x6)   # .text: PROGBITS, ALLOC|EXECINSTR
+    struct.pack_into("<Q", sections, 64 + 0x20, text)
+    struct.pack_into("<IIQ", sections, 128 + 0, 0, 1, 0x2)  # .rodata: PROGBITS, ALLOC
+    struct.pack_into("<Q", sections, 128 + 0x20, rodata)
+    return bytes(header + sections) + b"\0" * (text + rodata)
+
+
+def _pe(code, data):
+    """A minimal PE with one executable and one data section."""
+    import struct
+    image = bytearray(0x40 + 24 + 80)
+    image[:2] = b"MZ"
+    struct.pack_into("<I", image, 0x3C, 0x40)
+    image[0x40:0x44] = b"PE\0\0"
+    struct.pack_into("<H", image, 0x40 + 6, 2)         # NumberOfSections
+    struct.pack_into("<H", image, 0x40 + 20, 0)        # SizeOfOptionalHeader
+    table = 0x40 + 24
+    struct.pack_into("<I", image, table + 16, code)
+    struct.pack_into("<I", image, table + 36, 0x60000020)   # CODE|EXECUTE|READ
+    struct.pack_into("<I", image, table + 40 + 16, data)
+    struct.pack_into("<I", image, table + 40 + 36, 0x40000040)  # INITIALIZED_DATA|READ
+    return bytes(image) + b"\0" * (code + data)
+
+
 class DesktopArtifacts(unittest.TestCase):
     """A recipe hands over a DIRECTORY; the adapter finds the binary in it."""
 
     def setUp(self):
         self.dir = tempfile.mkdtemp()
 
-    def _file(self, rel, head, executable=False, size=100):
+    def _write(self, rel, content, executable=False):
         path = os.path.join(self.dir, rel)
         os.makedirs(os.path.dirname(path), exist_ok=True)
         with open(path, "wb") as handle:
-            handle.write(head + b"\0" * (size - len(head)))
+            handle.write(content)
         if executable:
             os.chmod(path, os.stat(path).st_mode | stat.S_IXUSR)
         return path
 
     def test_linux_bundle_launches_the_executable_and_sizes_every_elf(self):
-        exe = self._file("gallery", b"\x7fELF", executable=True, size=100)
-        self._file("lib/libapp.so", b"\x7fELF", executable=True, size=5000)
-        self._file("lib/libflutter_linux_gtk.so", b"\x7fELF", size=7000)
-        self._file("data/flutter_assets/AssetManifest.json", b"{}", size=900)
+        exe = self._write("gallery", _elf(100, 50), executable=True)
+        self._write("lib/libapp.so", _elf(5000, 3000), executable=True)
+        self._write("lib/libflutter_linux_gtk.so", _elf(7000, 1000))
+        self._write("data/flutter_assets/AssetManifest.json", b"{}")
         adapter = platforms.LinuxAdapter(self.dir, self.dir)
         self.assertEqual(exe, adapter._executable("flutter"),
                          "a shared library with an executable bit is not the app")
         self.assertEqual(12100, adapter.code_size("flutter"),
                          "the Dart image and the engine are code too, not just the launcher")
 
+    def test_resources_linked_into_the_executable_are_not_code(self):
+        # Codename One's native Linux port .incbin's the application's resources
+        # into .rodata; counting whole files reported the artwork as code.
+        self._write("Bench", _elf(4000, 90000), executable=True)
+        self.assertEqual(4000, platforms.LinuxAdapter(self.dir, self.dir).code_size("codenameone"))
+
     def test_linux_ambiguity_fails_loudly(self):
-        self._file("one", b"\x7fELF", executable=True)
-        self._file("two", b"\x7fELF", executable=True)
+        self._write("one", _elf(10, 0), executable=True)
+        self._write("two", _elf(10, 0), executable=True)
         with self.assertRaises(platforms.Unavailable):
             platforms.LinuxAdapter(self.dir, self.dir)._executable("flutter")
 
     def test_windows_release_directory_sizes_every_pe_image(self):
-        exe = self._file("gallery.exe", b"MZ", size=100)
-        self._file("flutter_windows.dll", b"MZ", size=9000)
-        self._file("data/app.so", b"\x7fELF", size=4000)
+        exe = self._write("gallery.exe", _pe(100, 400))
+        self._write("flutter_windows.dll", _pe(9000, 2000))
+        self._write("data/app.so", _elf(4000, 0))
         adapter = platforms.WindowsAdapter(self.dir, self.dir)
         self.assertEqual(exe, adapter._executable("flutter"))
         self.assertEqual(9100, benchlib.pe_code_size(self.dir))
 
     def test_a_file_artifact_is_used_as_is(self):
-        exe = self._file("Bench", b"\x7fELF", executable=True)
+        exe = self._write("Bench", _elf(10, 0), executable=True)
         self.assertEqual(exe, platforms.LinuxAdapter(exe, exe)._executable("codenameone"))
 
 

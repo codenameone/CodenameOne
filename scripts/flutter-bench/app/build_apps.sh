@@ -77,6 +77,14 @@ if [ "$(uname -s)" = "Linux" ] && [ -z "${DISPLAY:-}" ]; then
   XVFB="xvfb-run -a"
 fi
 
+# The Flutter entry point, on every platform. prepare.sh copies our
+# main_bench.dart into the project beside the gallery's own main.dart, and it is
+# the one that prints the start-up markers the harness times against -- but a
+# bare `flutter build` builds lib/main.dart, so the Flutter side of every
+# marker-timed platform printed nothing and was never measured. Android hid it:
+# `am start -W` times the launch without markers.
+FLUTTER_ENTRY="lib/main_bench.dart"
+
 # Kept so a recipe can read what the builder REPORTS rather than guess at its
 # layout; see cn1_reported.
 CN1_LOG="$WORK/cn1-build.log"
@@ -140,7 +148,7 @@ case "$PLATFORM" in
     # local-mac-device is the NATIVE AppKit app built on this machine, as
     # opposed to mac-os-x-native (the same build, submitted to the cloud) and
     # mac-os-x-desktop (the javase build, which bundles a JVM).
-    ( cd "$FL" && flutter build macos --release )
+    ( cd "$FL" && flutter build macos --release -t "$FLUTTER_ENTRY" )
     # UNSIGNED, on purpose and explicitly. MacOSBuildHints defaults both signing
     # identities to a real certificate rather than leaving them null, so a build
     # that names none still tries to sign and stops at "Signing for Bench
@@ -164,7 +172,7 @@ case "$PLATFORM" in
     # ios --simulator --release` is refused outright by the Flutter tool,
     # because Dart cannot AOT-compile for the simulator, so a simulator run
     # would compare Flutter's JIT debug engine against a release build.
-    ( cd "$FL" && flutter build ios --release --no-codesign )
+    ( cd "$FL" && flutter build ios --release -t "$FLUTTER_ENTRY" --no-codesign )
     # ios-source generates the Xcode project locally rather than sending the
     # build to the cloud builder.
     cn1_build ios ios-source
@@ -210,7 +218,7 @@ print(name if name in targets else (targets[0] if targets else ""))' )"
     ;;
 
   android)
-    ( cd "$FL" && flutter build apk --release )
+    ( cd "$FL" && flutter build apk --release -t "$FLUTTER_ENTRY" )
     cn1_build android android-source
     GRADLE_PROJECT="$(first "$CN1/android/target" -maxdepth 2 -type d -name '*-android-source')"
     [ -n "$GRADLE_PROJECT" ] || { echo "no generated Gradle project" >&2; exit 2; }
@@ -226,7 +234,7 @@ print(name if name in targets else (targets[0] if targets else ""))' )"
     # submitted. Needs the GTK3 development packages and a C toolchain on the
     # runner; without them the Codename One half fails loudly rather than
     # falling back to a JVM build that would not be comparable.
-    ( cd "$FL" && flutter build linux --release )
+    ( cd "$FL" && flutter build linux --release -t "$FLUTTER_ENTRY" )
     cn1_build linux local-linux-device
     echo "flutter=$FL/build/linux/x64/release/bundle"
     # The result DIRECTORY: the executable plus the libraries it ships beside
@@ -237,14 +245,14 @@ print(name if name in targets else (targets[0] if targets else ""))' )"
   windows)
     # ParparVM to a native binary through clang-cl, built here rather than
     # submitted.
-    ( cd "$FL" && flutter build windows --release )
+    ( cd "$FL" && flutter build windows --release -t "$FLUTTER_ENTRY" )
     cn1_build win local-windows-device
     echo "flutter=$FL/build/windows/x64/runner/Release"
     echo "cn1=$(dirname "$(cn1_reported Windows)")"
     ;;
 
   javascript)
-    ( cd "$FL" && flutter build web --release )
+    ( cd "$FL" && flutter build web --release -t "$FLUTTER_ENTRY" )
     # local-javascript, not the `javascript` target, which is the cloud build.
     cn1_build javascript local-javascript
     echo "flutter=$FL/build/web"
