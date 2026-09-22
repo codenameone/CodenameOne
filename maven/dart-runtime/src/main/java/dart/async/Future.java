@@ -44,6 +44,10 @@ public class Future<T> {
 
     private final Object lock = new Object();
     private boolean done;
+    /// Set while this future waits on another it was completed WITH. It counts
+    /// as completed for a second complete() -- Dart refuses that too -- but not
+    /// yet for listeners, who must see the adopted outcome.
+    private boolean adopting;
     private T value;
     private Throwable error;
     private List<Runnable> listeners;
@@ -267,13 +271,70 @@ public class Future<T> {
         }
     }
 
+    /// Completes with {@code v}, or -- when {@code v} is itself a Future --
+    /// with whatever that future completes with.
+    ///
+    /// Dart types this {@code FutureOr<T>}: a {@code then} callback that returns
+    /// a future, a {@code catchError} handler that recovers asynchronously and
+    /// {@code Completer.complete(someFuture)} all hand one over, and each must
+    /// wait for it and adopt its value OR its error. Storing the future itself
+    /// as the value completed {@code await a.then((v) => fetch(v))} at once with
+    /// a Future object where the fetched result belonged, and dropped any error
+    /// fetch raised. Adopting here covers every caller rather than each in turn.
     void complete(T v) {
+        if (v instanceof Future) {
+            adopt((Future<?>) v);
+            return;
+        }
+        synchronized (lock) {
+            if (done || adopting) {
+                throw new dart.core.StateError("Future already completed");
+            }
+        }
+        settle(v);
+    }
+
+    private void adopt(final Future<?> source) {
+        synchronized (lock) {
+            if (done || adopting) {
+                throw new dart.core.StateError("Future already completed");
+            }
+            adopting = true;
+        }
+        if (source == this) {
+            // What Dart reports for a future completed with itself; waiting would
+            // simply never finish.
+            settleError(new dart.core.TypeError("Chaining cycle detected: a Future was completed with itself"));
+            return;
+        }
+        source.onComplete(new Runnable() {
+            @Override
+            public void run() {
+                Throwable e;
+                Object val;
+                synchronized (source.lock) {
+                    e = source.error;
+                    val = source.value;
+                }
+                if (e != null) {
+                    settleError(e);
+                } else {
+                    @SuppressWarnings("unchecked")
+                    T adopted = (T) val;
+                    settle(adopted);
+                }
+            }
+        });
+    }
+
+    private void settle(T v) {
         List<Runnable> toRun;
         synchronized (lock) {
             if (done) {
                 throw new dart.core.StateError("Future already completed");
             }
             done = true;
+            adopting = false;
             value = v;
             toRun = listeners;
             listeners = null;
@@ -283,12 +344,22 @@ public class Future<T> {
     }
 
     void completeError(Object err) {
+        synchronized (lock) {
+            if (done || adopting) {
+                throw new dart.core.StateError("Future already completed");
+            }
+        }
+        settleError(err);
+    }
+
+    private void settleError(Object err) {
         List<Runnable> toRun;
         synchronized (lock) {
             if (done) {
                 throw new dart.core.StateError("Future already completed");
             }
             done = true;
+            adopting = false;
             error = err instanceof Throwable ? (Throwable) err : DartRuntime.asError(err);
             toRun = listeners;
             listeners = null;

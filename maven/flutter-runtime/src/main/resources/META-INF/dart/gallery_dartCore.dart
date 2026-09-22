@@ -48,9 +48,14 @@ abstract class Comparable<T> {
 
 @JavaName('dart.core.DateTime')
 class DateTime {
-  external DateTime(int year, [int month, int day, int hour, int minute, int second, int millisecond, int microsecond]);
+  // Dart's own defaults, stated. Without them an omitted month or day is filled
+  // with the type's zero, so DateTime(2024) reached the runtime as month 0, day 0
+  // -- indistinguishable from DateTime(2024, 3, 0), which Dart defines as the last
+  // day of February. The runtime then had to clamp both to 1, and the clamp broke
+  // the normalization calendar code relies on.
+  external DateTime(int year, [int month = 1, int day = 1, int hour = 0, int minute = 0, int second = 0, int millisecond = 0, int microsecond = 0]);
   external static DateTime now();
-  external static DateTime utc(int year, [int month, int day, int hour, int minute, int second, int millisecond, int microsecond]);
+  external static DateTime utc(int year, [int month = 1, int day = 1, int hour = 0, int minute = 0, int second = 0, int millisecond = 0, int microsecond = 0]);
   external static DateTime fromMillisecondsSinceEpoch(int millisecondsSinceEpoch, {bool isUtc});
   external int get year;
   external int get month;

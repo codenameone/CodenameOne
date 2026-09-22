@@ -118,6 +118,8 @@ public final class DartMath {
     public static final class DartRandom {
         private final Random impl;
 
+        private static final long FULL_RANGE = 1L << 32;
+
         public DartRandom() {
             impl = new Random();
         }
@@ -126,11 +128,28 @@ public final class DartMath {
             impl = new Random(seed);
         }
 
+        /// Dart's {@code Random.nextInt}, whose bound runs to {@code 1 << 32}
+        /// INCLUSIVE -- the whole unsigned 32-bit range, which is what a random
+        /// ARGB colour or a 32-bit identifier asks for. Java's nextInt(int) stops
+        /// at Integer.MAX_VALUE, and narrowing a larger bound to int made it zero
+        /// or negative, so {@code nextInt(1 << 32)} threw instead of answering.
         public long nextInt(long max) {
-            if (max <= 0) {
-                throw new dart.core.RangeError("max must be in range 0 < max ≤ 2^32, was " + max);
+            if (max <= 0 || max > FULL_RANGE) {
+                throw new dart.core.RangeError("max must be in range 0 < max <= 2^32, was " + max);
             }
-            return impl.nextInt((int) max);
+            if (max <= Integer.MAX_VALUE) {
+                return impl.nextInt((int) max);
+            }
+            // 32 unsigned bits, then rejection rather than a bare modulo: a
+            // modulo over 2^32 favours the low values whenever max does not
+            // divide it, and max here is never below 2^31, so the bias would be
+            // up to a factor of two rather than negligible.
+            long limit = FULL_RANGE - (FULL_RANGE % max);
+            long bits;
+            do {
+                bits = impl.nextInt() & 0xFFFFFFFFL;
+            } while (bits >= limit);
+            return bits % max;
         }
 
         public double nextDouble() {

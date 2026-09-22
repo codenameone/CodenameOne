@@ -246,6 +246,19 @@ public class DartList<E> extends AbstractList<E> implements RandomAccess {
     /** Dart's List.addAll — named distinctly because java.util.List.addAll(Collection) makes the overload ambiguous. */
     public void addAllIterable(Iterable<? extends E> elements) {
         checkGrowable("addAll");
+        if (elements == this) {
+            // list.addAll(list) duplicates the ORIGINAL elements in Dart. Iterating
+            // this list while appending to it never ends here: the storage is the
+            // backing ArrayList, so AbstractList's modCount never moves, and the
+            // iterator neither snapshots the length nor fails fast -- it chases the
+            // end forever. Walking the original length by index is the snapshot,
+            // and reads through get() so the primitive-backed subclasses work too.
+            int n = size();
+            for (int i = 0; i < n; i++) {
+                add(get(i));
+            }
+            return;
+        }
         for (E e : elements) {
             add(e);
         }

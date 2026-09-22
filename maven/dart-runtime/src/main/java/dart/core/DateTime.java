@@ -68,8 +68,13 @@ public final class DateTime {
         // explicitly so no residual "now" component leaks in.
         Calendar c = utc ? Calendar.getInstance(TimeZone.getTimeZone("UTC")) : Calendar.getInstance();
         c.set(Calendar.YEAR, (int) year);
-        c.set(Calendar.MONTH, (int) (month < 1 ? 1 : month) - 1);
-        c.set(Calendar.DAY_OF_MONTH, (int) (day < 1 ? 1 : day));
+        // Passed through unclamped: out-of-range components are how Dart spells
+        // calendar arithmetic. DateTime(y, m + 1, 0) is the last day of month m and
+        // month 0 is the previous December, and the lenient Calendar normalizes
+        // them exactly as Dart does. An omitted month or day arrives as 1, not 0,
+        // because the dart:core stub declares Dart's own defaults.
+        c.set(Calendar.MONTH, (int) month - 1);
+        c.set(Calendar.DAY_OF_MONTH, (int) day);
         c.set(Calendar.HOUR_OF_DAY, (int) hour);
         c.set(Calendar.MINUTE, (int) minute);
         c.set(Calendar.SECOND, (int) second);

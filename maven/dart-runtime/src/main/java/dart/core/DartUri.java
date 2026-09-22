@@ -150,7 +150,7 @@ public final class DartUri {
         }
         if (!p.isEmpty()) {
             for (String seg : p.split("/", -1)) {
-                out.add(decode(seg));
+                out.add(decodeComponent(seg));
             }
         }
         return out;
@@ -166,18 +166,34 @@ public final class DartUri {
                 }
                 int eq = pair.indexOf('=');
                 if (eq >= 0) {
-                    out.put(decode(pair.substring(0, eq)), decode(pair.substring(eq + 1)));
+                    out.put(decodeQueryComponent(pair.substring(0, eq)),
+                            decodeQueryComponent(pair.substring(eq + 1)));
                 } else {
-                    out.put(decode(pair), "");
+                    out.put(decodeQueryComponent(pair), "");
                 }
             }
         }
         return out;
     }
 
-    private static String decode(String s) {
+    /// Dart's {@code Uri.decodeComponent}, for path segments: a {@code +} is a
+    /// literal plus. URLDecoder is a form decoder and would turn it into a space,
+    /// so it is escaped first.
+    private static String decodeComponent(String s) {
         try {
             return java.net.URLDecoder.decode(s.replace("+", "%2B"), "UTF-8");
+        } catch (Exception e) {
+            return s;
+        }
+    }
+
+    /// Dart's {@code Uri.decodeQueryComponent}, for query keys and values, where
+    /// a {@code +} IS a space -- {@code ?q=hello+world} reads back as "hello world".
+    /// This is exactly URLDecoder's form decoding. The two used to share the
+    /// path rule, which kept every plus in a query literal.
+    private static String decodeQueryComponent(String s) {
+        try {
+            return java.net.URLDecoder.decode(s, "UTF-8");
         } catch (Exception e) {
             return s;
         }
