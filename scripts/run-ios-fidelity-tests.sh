@@ -155,8 +155,27 @@ rf_log "Delivered: ${CN1_COUNT} cn1 + ${FRAME_COUNT} animation frame(s); committ
 [ "$CN1_COUNT" -gt 0 ] || { rf_log "FATAL: no CN1 renders delivered"; exit 12; }
 [ "$GOLDEN_COUNT" -gt 0 ] || { rf_log "FATAL: no committed iOS goldens (run scripts/build-ios-native-ref.sh)"; exit 12; }
 
-export CN1SS_COMMENT_MARKER="<!-- CN1SS_FIDELITY_IOS_COMMENT -->"
-export CN1SS_PREVIEW_SUBDIR="ios-fidelity"
+# Identity per GOLDEN SET, not per platform. Two iOS fidelity jobs now run on the
+# same pull request -- one per OS design generation -- and a fixed marker and
+# preview path meant they updated the SAME comment and published to the SAME
+# location, so whichever finished last hid the other generation's scores and
+# could replace its linked images. The screenshot suite already hit this and had
+# to split its markers; this is the same failure one workflow over.
+#
+# ios-26-metal keeps the historical values so existing comments and preview
+# links are not orphaned; any other set gets its own.
+case "${GOLDEN_SET}" in
+  ios-26-metal)
+    export CN1SS_COMMENT_MARKER="<!-- CN1SS_FIDELITY_IOS_COMMENT -->"
+    export CN1SS_PREVIEW_SUBDIR="ios-fidelity"
+    REPORT_TITLE="Native fidelity (iOS Modern, Metal)"
+    ;;
+  *)
+    export CN1SS_COMMENT_MARKER="<!-- CN1SS_FIDELITY_${GOLDEN_SET} -->"
+    export CN1SS_PREVIEW_SUBDIR="fidelity-${GOLDEN_SET}"
+    REPORT_TITLE="Native fidelity (${GOLDEN_SET})"
+    ;;
+esac
 export CN1SS_FIDELITY_SPEC="${CN1SS_FIDELITY_SPEC:-$APP_DIR/common/src/main/resources/fidelity-tests.yaml}"
 export CN1SS_FIDELITY_PLATFORM="${CN1SS_FIDELITY_PLATFORM:-ios}"
 # NOTE: the || capture keeps `set -e` from aborting here -- the frames stage
@@ -164,7 +183,7 @@ export CN1SS_FIDELITY_PLATFORM="${CN1SS_FIDELITY_PLATFORM:-ios}"
 # reports a regression; the exit codes are combined at the end.
 rc=0
 cn1ss_process_fidelity \
-  "Native fidelity (iOS Modern, Metal)" \
+  "$REPORT_TITLE" \
   "$WORK_DIR/fidelity-compare.json" "$WORK_DIR/fidelity-summary.txt" "$WORK_DIR/fidelity-comment.md" \
   "$GOLDENS_DIR" "$PREVIEW_DIR" "$ARTIFACTS_DIR" "$BASELINE_FILE" \
   "${COMPARE_ENTRIES[@]}" || rc=$?

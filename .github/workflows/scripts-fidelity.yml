@@ -15,6 +15,20 @@ name: Native theme fidelity
   workflow_dispatch:
   pull_request:
     paths:
+      # The 26 row's trigger was CSS-only by design. The 27 row is not: it is the
+      # only check on a theme generation nothing else exercises, and a renderer,
+      # port, harness or workflow change reaches it without touching any CSS.
+      # This PR proved the gap -- it edits the workflow, GlassRecipe, the gate and
+      # the frame goldens, and neither fidelity row ran.
+      - '.github/workflows/scripts-fidelity.yml'
+      - 'scripts/build-fidelity-app.sh'
+      - 'scripts/run-ios-fidelity-tests.sh'
+      - 'scripts/run-android-fidelity-tests.sh'
+      - 'scripts/lib/cn1ss.sh'
+      - 'scripts/common/java/**'
+      - 'scripts/fidelity-app/**'
+      - '!scripts/fidelity-app/*-native-ref/**'
+      - 'CodenameOne/src/com/codename1/ui/plaf/**'
       # One entry per THEME, not per file: ios-modern is built from
       # common.css + gen26.css + gen27.css since the generation split, and this
       # list still named the theme.css that split removed -- so from that merge
@@ -270,5 +284,160 @@ jobs:
           path: |
             artifacts/ios-fidelity/**
             scripts/fidelity-app/baseline/ios-26-metal-fidelity-baseline.json
+          if-no-files-found: warn
+          retention-days: 14
+
+  # The SAME suite as fidelity-ios-metal, scored against the iOS 27 golden set on
+  # the Xcode 27 / iOS 27 image. A copy rather than a move: the 26 row keeps
+  # gating the generation applications get by default (ios.themeGeneration
+  # defaults to 26), and this row is what keeps the 27 theme honest.
+  #
+  # Identical to fidelity-ios-metal except the runner, the toolchain pin, the
+  # golden set, the simulator runtime and the artifact/baseline names --
+  # scripts/check-duplicated-ci-legs.py holds it to that.
+  fidelity-ios-metal-27:
+    name: Fidelity (iOS Modern 27, Metal)
+    # NON-GATING FOR NOW, and this is the single thing that lifts it: the
+    # ios-27-metal baseline cannot be recorded yet, so there is no ratchet for
+    # this row to enforce and it would sit red on every pull request.
+    #
+    # Why it cannot be recorded, measured rather than assumed. In dark,
+    # GlassPanelGrey and GlassPanelRed render with NO silhouette: over a flat
+    # mid-grey backdrop the material arithmetic gives 128.18, the renderer emits
+    # integers, and the panel lands on 128 -- the backdrop exactly. The native
+    # capture is not flat there, averaging 128.7 over 101 distinct values where
+    # ours has 17. ProcessScreenshots therefore reports cn1_empty for those two,
+    # and FidelityGate refuses a one-sided empty because that is also what a
+    # widget missing from our render looks like -- a distinction that has already
+    # caught a real defect and must not be softened to get this row green.
+    #
+    # Closing it needs the material model to carry sub-level detail, not a
+    # different constant: an offset that puts the arithmetic at 128.68 was tried
+    # and changed nothing on device, and the only other reachable value
+    # overshoots. See GlassRecipe.liquidPanel27.
+    #
+    # The tolerance is on the fidelity STEP, not here. At job level it would turn
+    # EVERY failure into a green tick -- Xcode selection, dependency setup,
+    # compilation, simulator boot, capture -- so the row would report success
+    # while producing none of the scores this comment promises, which is worse
+    # than no row at all.
+    permissions:
+      contents: read
+      pull-requests: write
+      issues: write
+    runs-on: xcode-27
+    timeout-minutes: 90
+    env:
+      GITHUB_TOKEN: ${{ secrets.CN1SS_GH_TOKEN }}
+      GH_TOKEN: ${{ secrets.CN1SS_GH_TOKEN }}
+      CN1SS_FAIL_ON_MISMATCH: '1'
+      CN1SS_FIDELITY_EPSILON: '2.0'
+      # Drives the capture, the app build and the comparison from ONE variable:
+      # build-ios-native-ref.sh, build-fidelity-app.sh (which turns it into
+      # ios.themeGeneration=27) and run-ios-fidelity-tests.sh all read it, so the
+      # theme the app ships and the goldens it is scored against cannot disagree.
+      CN1SS_FIDELITY_GOLDEN_SET: 'ios-27-metal'
+      # scripts/lib/xcode.sh resolves this; left at 26 on an image that ships only
+      # Xcode 27 it fails resolution rather than quietly using the wrong one.
+      CN1_XCODE_MAJOR: '27'
+      # iOS native references are COMMITTED goldens generated offline by
+      # scripts/build-ios-native-ref.sh (a real-UIWindow native app); they are not
+      # regenerated here, so no FIDELITY_UPDATE_GOLDENS.
+    steps:
+      - uses: actions/checkout@v6
+      - name: Set TMPDIR
+        run: echo "TMPDIR=${{ runner.temp }}" >> "$GITHUB_ENV"
+      - name: Cache codenameone-tools
+        uses: actions/cache@v5
+        with:
+          path: ${{ runner.temp }}/codenameone-tools
+          key: ${{ runner.os }}-cn1-tools-${{ hashFiles('scripts/setup-workspace.sh') }}
+          restore-keys: |
+            ${{ runner.os }}-cn1-tools-
+      - name: Cache Maven repository
+        uses: actions/cache@v5
+        with:
+          path: ~/.m2/repository
+          key: ${{ runner.os }}-m2-fidelity-${{ hashFiles('**/pom.xml') }}
+          restore-keys: |
+            ${{ runner.os }}-m2-
+      - name: Setup workspace
+        run: ./scripts/setup-workspace.sh -q -DskipTests
+      - name: Build iOS port
+        run: ./scripts/build-ios-port.sh -q -DskipTests
+      - name: Regenerate native themes from CSS
+        # The fidelity app bundles a committed .res; theme.css is the source of
+        # truth. Recompile here so a stale committed copy can never silently
+        # render an old theme (the cause of phantom "regressions").
+        run: ./scripts/build-native-themes.sh
+      - name: Install Metal toolchain
+        run: |
+          # Into the SAME Xcode build-ios-app.sh and the simulator build use.
+          # Downloading the toolchain for the runner's ambient Xcode installs it
+          # where the pinned one will not look.
+          # shellcheck source=/dev/null
+          source scripts/lib/xcode.sh
+          cn1_select_xcode || exit 1
+          xcodebuild -downloadComponent MetalToolchain || true
+      - name: Build fidelity app (iOS, Metal)
+        id: build
+        run: |
+          mkdir -p ~/.codenameone
+          cp maven/UpdateCodenameOne.jar ~/.codenameone/
+          ./scripts/build-fidelity-app.sh ios -q -DskipTests
+      - name: Build simulator app
+        id: simapp
+        run: |
+          set -euo pipefail
+          # build-fidelity-app.sh -> build-ios-app.sh is pinned by
+          # scripts/lib/xcode.sh; this step used to compile that project with the
+          # runner's ambient xcodebuild instead, so the project was GENERATED by
+          # one Xcode and BUILT by another. Pin both ends to the same one.
+          # shellcheck source=/dev/null
+          source scripts/lib/xcode.sh
+          cn1_select_xcode || exit 1
+          WS="$(find scripts/fidelity-app/ios/target -name '*.xcworkspace' -maxdepth 3 | head -n1)"
+          PROJ_DIR="$(dirname "$WS")"
+          SCHEME="$(xcodebuild -workspace "$WS" -list 2>/dev/null | awk '/Schemes:/{f=1;next} f&&NF{print $1; exit}')"
+          DD="$PROJ_DIR/dd"
+          # arm64-only: the macos-15 runner is Apple Silicon and the x86_64
+          # simulator slice fails to build the ParparVM SIMD code (clang
+          # '_Builtin_intrinsics.arm.neon requires feature neon' module error).
+          xcodebuild -workspace "$WS" -scheme "$SCHEME" -sdk iphonesimulator \
+            -configuration Debug -derivedDataPath "$DD" \
+            ARCHS=arm64 ONLY_ACTIVE_ARCH=YES VALID_ARCHS=arm64 \
+            CODE_SIGNING_ALLOWED=NO build
+          APP="$(find "$DD/Build/Products" -maxdepth 2 -name '*.app' -type d | head -n1)"
+          echo "app_path=$APP" >> "$GITHUB_OUTPUT"
+      - name: Boot simulator (runtime matching the golden set)
+        id: sim
+        # The golden set names the OS design generation it was captured on
+        # (ios-26-metal). The suite MUST run on a matching runtime: a different
+        # iOS generation renders different SF fonts/glyphs and produces phantom
+        # regressions. The helper fails loudly (78) if the runner lacks the
+        # runtime -- the fix is pinning a runner image/Xcode that ships it,
+        # never regenerating references on whatever the runner happens to have.
+        #
+        # It also puts every simctl call on a deadline. Inline, these four calls
+        # twice hung with no output at all and burned the job's entire 90-minute
+        # budget, ending as "cancelled" rather than as a failure; the script's
+        # header records the runs and why the one retry it does is allowed.
+        run: ./scripts/ci/boot-ios-simulator.sh 'iOS-27[0-9-]*' 'iPhone 16' iPhone16-fidelity27
+      - name: Run fidelity suite (simulator, Metal)
+        # Only THIS step tolerates failure, and only until the baseline lands --
+        # see the job header. Everything before it still fails the job.
+        continue-on-error: true
+        # The committed baseline is the ratchet floor: the gate fails the job
+        # on any regression. To re-anchor intentionally, run locally with
+        # FIDELITY_UPDATE_BASELINE=1 and commit the updated baseline JSON.
+        run: ./scripts/run-ios-fidelity-tests.sh "${{ steps.simapp.outputs.app_path }}" "${{ steps.sim.outputs.udid }}"
+      - name: Upload fidelity artifacts
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: ios-fidelity-27
+          path: |
+            artifacts/ios-fidelity/**
+            scripts/fidelity-app/baseline/ios-27-metal-fidelity-baseline.json
           if-no-files-found: warn
           retention-days: 14

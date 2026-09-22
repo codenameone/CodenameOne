@@ -88,15 +88,25 @@ case "$PLATFORM" in
     # An existing project with NO stamp is also dropped: its generation is
     # unknown, and one extra regeneration is cheaper than a silently mismatched
     # run.
+    #
+    # Removing the generated *-ios-source directory is NOT enough, measured: after
+    # a change to a CORE class the rebuild returned in 36 seconds and the emitted
+    # C still carried the previous constant, so something upstream of that
+    # directory is reused even when it is gone. The whole module target goes,
+    # along with the sources archive build-ios-app.sh writes beside it.
+    #
+    # Note the limit of this stamp: it keys on the GENERATION, so it does not fire
+    # for a core edit at the same generation. Iterating on core and the fidelity
+    # app together still needs a manual clean of these paths -- Maven does not
+    # treat a changed dependency as invalidating generated sources.
     ios_target="$SCRIPT_DIR/fidelity-app/ios/target"
     ios_stamp="$ios_target/.cn1-theme-generation"
     if [ -d "$ios_target" ]; then
       if [ ! -f "$ios_stamp" ] || [ "$(cat "$ios_stamp" 2>/dev/null)" != "$ios_generation" ]; then
-        for stale in "$ios_target"/*-ios-source; do
-          [ -e "$stale" ] || continue
-          echo "[build-fidelity-app] generation changed -> removing $stale" >&2
-          rm -rf "$stale"
-        done
+        echo "[build-fidelity-app] generation changed -> clearing $ios_target" >&2
+        rm -rf "$ios_target"
+        rm -f "$SCRIPT_DIR/../artifacts/bytecode-translator-sources.zip" 2>/dev/null || true
+        mkdir -p "$ios_target"
       fi
       # Written before the build rather than after, so the stamp always
       # describes the project on disk: the project is absent at this point, so a

@@ -199,6 +199,28 @@ public final class GlassRecipe {
     /// is a larger change than new constants; these values are the closest an
     /// affine material gets until then.
     ///
+    /// DARK'S OFFSET IS THE FIT'S OPTIMUM, 79.8, AND A NUDGE WAS TRIED AND
+    /// REVERTED. At a flat mid-grey backdrop it produces 128 * 0.378 + 79.8 =
+    /// 128.18, and the renderer emits integers, so the panel lands on 128 -- the
+    /// backdrop exactly, with no silhouette. The native capture is not flat
+    /// there: it averages 128.7 over that region across 101 distinct values,
+    /// where our render has 17.
+    ///
+    /// 80.3 was tried, because it puts the arithmetic at 128.68 against the
+    /// native's 128.7 and costs only 0.026/255 of global fit error. Measured on
+    /// device, it changed nothing: 128.68 still quantises to 128. The only other
+    /// reachable value is 129, which overshoots the native by 0.3 instead of
+    /// undershooting by 0.7, and reaching it means choosing an offset for what
+    /// the quantiser does with it rather than for what the platform draws. So
+    /// the fitted value stands.
+    ///
+    /// The consequence is recorded rather than hidden: GlassPanelGrey and
+    /// GlassPanelRed in dark render with no silhouette at all where the native
+    /// has a faint one, ProcessScreenshots reports cn1_empty for them, and
+    /// FidelityGate refuses to baseline a one-sided empty. Closing that needs the
+    /// material model to carry sub-level detail (see the non-affine note below),
+    /// not a different constant.
+    ///
     /// @param dark true for the dark appearance
     /// @return the iOS 27 glass-panel recipe
     public static GlassRecipe liquidPanel27(boolean dark) {

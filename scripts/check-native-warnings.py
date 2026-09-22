@@ -146,6 +146,12 @@ ALL_GROUPS = GATING_GROUPS + ("vendored", "sdk")
 # picking one would blame a file nobody edited.
 LEG_PORT_DIRS = {
     "ios-sim-debug": ["Ports/iOSPort/nativeSources"],
+    # Same sources, different COMPILER. The census is a per-toolchain ratchet --
+    # a new warning kind fails it -- and Xcode 27's clang does not emit the same
+    # set as Xcode 26's, so the iOS 27 leg cannot share ios-sim-debug's baseline.
+    # It tried: build-ios-metal-27 inherited that leg, failed the census on the
+    # difference, and stopped before running a single screenshot.
+    "ios-sim-debug-xcode27": ["Ports/iOSPort/nativeSources"],
     "ios-device-release": ["Ports/iOSPort/nativeSources"],
     "macos": ["Ports/MacPort", "Ports/iOSPort/nativeSources"],
     "windows-clang-cl": ["Ports/WindowsPort"],

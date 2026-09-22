@@ -46,6 +46,36 @@ so `ios-27-metal` is captured on iOS 27.0, on the same iPhone 16 model as the 26
 set. `scripts/lib/ios-sim.sh` picks the newest runtime that HAS the model, which
 is what makes that fall out rather than fail.
 
+## The `-frames` sets are NOT native captures
+
+`<set>-frames` holds **CN1 renders**, not platform ones. `run-ios-fidelity-tests.sh`
+calls them "self-goldens (CN1 vs committed CN1)": they exist to catch the CN1
+morph drifting -- a stuck frame, non-monotonic travel, a broken overshoot -- which
+a score against a native still cannot see. That makes them the one golden kind CI
+is allowed to compare against itself, and the reason seeding them is a deliberate
+local act:
+
+```
+CN1SS_FIDELITY_GOLDEN_SET=ios-27-metal FIDELITY_UPDATE_GOLDENS=1 \
+  scripts/run-ios-fidelity-tests.sh <app> <udid>
+```
+
+In CI a missing frame golden is a failure and is never self-approved.
+
+Worth stating plainly because the neighbouring `-anim` directory IS native:
+`native-*.mov` comes from `record-ios-native-anim.sh` and must be tap-driven for
+tabs. Reading `-frames` as native too leads to preparing an `xcodegen` + XCUITest
+capture for something a single flag produces.
+
+**Seeded goldens still have to be looked at**, because whatever CN1 rendered
+becomes the reference. What that check looks like, from seeding `ios-27-metal-frames`:
+the 24 names and sizes matched `ios-26-metal-frames` exactly, none were blank, the
+ten `SwitchMorph` frames came out byte-identical to the iOS 26 set (Switch uses no
+glass recipe, and iOS 27 did not change it), and the `TabsMorph` frames moved in
+dark (~6.5 mean delta) and barely in light (~0.11) -- which is precisely where the
+theme changed, since the `pill` recipe's light variant was measured unchanged. A
+seed that moved something else would have been the finding.
+
 ## Why the desktop sets come from CI
 
 The other sets are captured on a maintainer's machine. The desktop ones cannot

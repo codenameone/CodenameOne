@@ -1018,7 +1018,18 @@ public class ProcessScreenshots {
         int[] boxN = maskBBox(maskN, w, h);
         int[] boxC = maskBBox(maskC, w, h);
         if (boxN[2] <= 0 || boxC[2] <= 0) {
+            // Which SIDE is blank matters and used to be lost here. Both blank is
+            // a legitimate, measurable-in-no-way tile: iOS 27's dark glass over a
+            // flat mid-grey backdrop transforms to within a shade of that same
+            // grey (128 * 0.378 + 79.8 is 128), so panel and backdrop are one
+            // colour and the silhouette genuinely does not exist -- in the native
+            // capture as much as in ours. ONE side blank is the opposite: a widget
+            // that rendered in one and not the other, which is a regression
+            // wearing the same "empty" label. FidelityGate can only tell them
+            // apart if the distinction is recorded.
             geo.put("empty", true);
+            geo.put("native_empty", boxN[2] <= 0);
+            geo.put("cn1_empty", boxC[2] <= 0);
             return geo;
         }
         geo.put("native_bbox", bboxList(boxN));
