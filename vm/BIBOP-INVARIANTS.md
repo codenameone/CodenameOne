@@ -149,6 +149,45 @@ sized for a 40-byte one and ran off the end -- corrupted string payloads,
 
 Either key such a page by (class, size class), or exclude the class.
 
+### R14. An OWNED page is invisible to the sweep, so pinning one page per class costs a page per class OF UNCOLLECTABLE HEAP.
+
+R6 says only retired pages reach the sweep. The corollary nobody stated until it
+was measured: every page a thread holds as a cursor is heap the collector cannot
+touch until that thread lets go. With one cursor per size class that is 23 pages
+at worst. With one cursor per CLASS it is one page per class the program has
+ever allocated.
+
+Measured on the standard drivers, which are small:
+
+    hashMapChurn   pages=23  typed=17      74% of the heap pinned
+    recursion      pages=24  typed=18      75% of the heap pinned
+
+At that ratio reclaim effectively stops, and it is not subtle: two fault
+injections in `run-gc-verify` -- restoring the pre-fix page-reclaim bound, and
+tracing only half of every reference block -- both stopped producing ANY damage,
+because there was nothing left for the collector to get wrong. The gauntlet
+stayed green and the invariant validator reported zero violations over 37
+million objects throughout. Correctness was never the problem.
+
+Bounding the pinning to one GC cycle fixes the large case and cannot fix the
+small one: `objectAllocation` went from 16 typed pages to 2, while
+`hashMapChurn` went from 17 to 16 and `recursion` did not move at all. With ~18
+live classes and ~24 pages, one 64KB page per class IS the heap. A class with
+three live objects still occupies a full page.
+
+**Consequence for the header plan.** The 8.9% that type-homogeneous pages buy is
+measured in ALLOCATED BYTES -- a throughput and bandwidth number. The
+page-per-class floor is PEAK FOOTPRINT: `live classes x CN1_BIBOP_PAGE_SIZE`,
+which is ~12MB for the 194-class selfhost corpus and dominant for anything
+smaller. Those are different axes, and this VM sells the small one -- the 2.4MB
+floor. Delivering the header saving this way costs more than it saves wherever
+the heap is small.
+
+Making it viable needs a typed granularity far below 64KB (sub-page runs, or
+segregated regions with a shared page), which is a much larger change than the
+8.9% justifies on its own. The saving is real; this delivery mechanism is not
+the way to collect it.
+
 ---
 
 ## The validator
