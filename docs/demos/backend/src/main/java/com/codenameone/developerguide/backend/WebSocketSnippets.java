@@ -59,16 +59,15 @@ public static final class Echo implements WebSocket {
 // end::backend-websocket-echo[]
 
 // tag::backend-websocket-register[]
-public static Backend start() throws Exception {
-    return Backend.builder()
-            .port(8080)
+public static void main(String[] args) throws Exception {
+    Backend.builder()
             .webSockets(new Backend.WebSocketEndpoints() {
                 public void register(HttpServer.WebSocketRegistry registry,
                                      DataSource dataSource, EntityManager entities) {
                     registry.route("/echo", new Echo());
                 }
             })
-            .start();
+            .run();
 }
 // end::backend-websocket-register[]
 
@@ -145,8 +144,8 @@ public static final class Graph implements WebSocket {
 // end::backend-websocket-subprotocol[]
 
 // tag::backend-websocket-raw[]
-public static HttpServer startRaw() throws Exception {
-    return HttpServer.start(null, 8080, 512, 16, new HttpServer.Handler() {
+public static void serveForever() throws Exception {
+    HttpServer server = HttpServer.start(null, 8080, 512, 16, new HttpServer.Handler() {
         public HttpServer.Response handle(HttpServer.Request request) {
             return HttpServer.Response.text(200, "ok");
         }
@@ -155,6 +154,7 @@ public static HttpServer startRaw() throws Exception {
             registry.route("/echo", new Echo());
         }
     });
+    server.awaitTermination();
 }
 // end::backend-websocket-raw[]
 }

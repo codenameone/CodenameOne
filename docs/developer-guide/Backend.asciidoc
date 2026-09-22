@@ -458,26 +458,32 @@ what a reader cares about -- the path is relative to a class-level
 injected the same way, and two endpoints claiming one path is a build error rather
 than something registration order decides.
 
-==== Registering by hand
+==== A server that writes its own main
 
-A server assembled without the annotations asks for its endpoints the same way it
-asks for its handlers: the runtime calls back while it's starting, with whatever
-it opened.
+The annotation is the answer for an ordinary project, and most servers need
+nothing else: the build finds the endpoint and the entry point it writes registers
+it. The builder below is the same narrow case as the one under
+<<Configuration and profiles>> -- a server that writes its own `main` instead of
+using the generated one -- and it names its endpoints the same way it names its
+handlers, through a callback the runtime invokes while it starts.
 
 [source,java]
 ----
 include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/WebSocketSnippets.java[tag=backend-websocket-register,indent=0]
 ----
 
-There's no `server.websocket(path, endpoint)` to call afterward, and the absence
-is deliberate. Nothing else here is configured that way -- a controller is found
-by the build, a handler is called, a `DataSource` is handed to whoever declared
-one -- and a setter on a running server also has a window the callback doesn't: the
-listener is bound before the application gets the reference back, so an upgrade
-arriving in that gap finds a route that hasn't been added yet and is answered as
-ordinary HTTP.
+`run()` is what makes that a main: it binds, installs a shutdown handler that
+drains what's in flight, and blocks. `start()` exists for tests, which want the
+server back without a signal handler.
 
-`HttpServer` takes the same callback, for a server built without the builder:
+There's no `server.websocket(path, endpoint)` to call once the server is running,
+and the absence is deliberate. Nothing else here is configured that way, and a
+setter on a running server has a window a callback can't: the listener is bound
+before the application gets its reference back, so an upgrade arriving in that gap
+finds a route that hasn't been added yet and is answered as ordinary HTTP.
+
+`HttpServer` takes the same callback, for the rare server built without the
+builder at all:
 
 [source,java]
 ----
