@@ -43,7 +43,7 @@ import com.codename1.ui.Image;
 /// middle.
 ///
 /// @author Shai Almog
-public class CupertinoPageTransition extends Transition {
+public final class CupertinoPageTransition extends Transition {
 
     /// The arriving page's curve: fast ease in to slow ease out, a three-point cubic.
     private static final float[] ARRIVING = {

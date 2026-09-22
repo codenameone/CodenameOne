@@ -25,7 +25,6 @@ package com.codename1.ui.animations;
 
 import com.codename1.ui.Component;
 import com.codename1.ui.Container;
-import com.codename1.ui.Display;
 import com.codename1.ui.Form;
 import com.codename1.ui.Graphics;
 import com.codename1.ui.Image;
@@ -58,7 +57,7 @@ import com.codename1.ui.geom.GeneralPath;
 /// ```
 ///
 /// @author Shai Almog
-public class ContainerTransformTransition extends Transition {
+public final class ContainerTransformTransition extends Transition {
 
     /// Material's container transform curve: fast out, slow in.
     private static final float CP0 = 0.4f;
@@ -501,13 +500,17 @@ public class ContainerTransformTransition extends Transition {
             java.util.HashMap counts = new java.util.HashMap();
             int best = fallback;
             int bestN = 0;
-            for (int iter = 0; iter < rgb.length; iter++) {
-                if (((rgb[iter] >>> 24) & 0xff) < 128) {
+            for (int pixel : rgb) {
+                if (((pixel >>> 24) & 0xff) < 128) {
                     continue;
                 }
-                Integer key = Integer.valueOf(rgb[iter] & 0xffffff);
+                Integer key = Integer.valueOf(pixel & 0xffffff);
                 Object prev = counts.get(key);
-                int n = prev == null ? 1 : ((Integer) prev).intValue() + 1;
+                // instanceof rather than a bare cast inside this try: ParparVM's
+                // CHECKCAST is unchecked, so a failed cast does not throw on iOS
+                // and the catch below would never see it -- the wrong object
+                // would simply be read as an Integer.
+                int n = prev instanceof Integer ? ((Integer) prev).intValue() + 1 : 1;
                 counts.put(key, Integer.valueOf(n));
                 if (n > bestN) {
                     bestN = n;
