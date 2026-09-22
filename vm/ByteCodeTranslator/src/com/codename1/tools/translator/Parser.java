@@ -1239,6 +1239,22 @@ public class Parser extends ClassVisitor {
         for(ByteCodeClass bc : classes) {
             bc.appendStaticFieldsExtern(bldM);
         }        
+        // Eager class initialization: see ByteCodeClass.isEagerInitEligible. Emitted
+        // here because this is the one generated file that lists every class.
+        bldM.append("\n\n");
+        for(ByteCodeClass bc : classes) {
+            if(bc.isEagerInitEligible()) {
+                bldM.append("extern CN1_CLINIT_ATTR void __STATIC_INITIALIZER_").append(bc.getClsName())
+                    .append("(CODENAME_ONE_THREAD_STATE);\n");
+            }
+        }
+        bldM.append("void cn1EagerInitClasses(CODENAME_ONE_THREAD_STATE) {\n");
+        for(ByteCodeClass bc : classes) {
+            if(bc.isEagerInitEligible()) {
+                bldM.append("    __STATIC_INITIALIZER_").append(bc.getClsName()).append("(threadStateData);\n");
+            }
+        }
+        bldM.append("}\n");
         bldM.append("\n\nextern int recursionKey;\nvoid markStatics(CODENAME_ONE_THREAD_STATE) {\n    recursionKey++;\n");
         for(ByteCodeClass bc : classes) {
             bc.appendStaticFieldsMark(bldM);

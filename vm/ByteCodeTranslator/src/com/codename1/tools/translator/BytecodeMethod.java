@@ -1977,7 +1977,7 @@ public class BytecodeMethod implements SignatureSet {
                     // methods keep their class-init check; instance methods don't carry
                     // one (the receiver already forced the class to initialize). Then
                     // guard the native C stack since this frame does not bump call depth.
-                    if (staticMethod) {
+                    if (staticMethod && !ByteCodeClass.eagerInit(clsName.replace('/', '_').replace('$', '_'))) {
                         String framelessCls = clsName.replace('/', '_').replace('$', '_');
                         b.append("    if (!class__").append(framelessCls);
                         b.append(".initialized) __STATIC_INITIALIZER_").append(framelessCls);
@@ -2013,18 +2013,23 @@ public class BytecodeMethod implements SignatureSet {
                             b.append("    DEFINE_METHOD_STACK").append(spVariant).append("(");
                         }
                     } else {
-                        b.append("    if (!class__");
-                        b.append(clsName.replace('/', '_').replace('$', '_'));
-                        b.append(".initialized) __STATIC_INITIALIZER_");
-                        b.append(clsName.replace('/', '_').replace('$', '_'));
+                        // Guard omitted for an eagerly initialized class (see
+                        // ByteCodeClass.isEagerInitEligible).
+                        if (!ByteCodeClass.eagerInit(clsName.replace('/', '_').replace('$', '_'))) {
+                            b.append("    if (!class__");
+                            b.append(clsName.replace('/', '_').replace('$', '_'));
+                            b.append(".initialized) __STATIC_INITIALIZER_");
+                            b.append(clsName.replace('/', '_').replace('$', '_'));
+                            b.append("(threadStateData);\n");
+                        }
                         if (useFastMethodStack) {
                             if (usePrimitiveFastFrame) {
-                                b.append("(threadStateData);\n    DEFINE_METHOD_STACK_FAST_PRIMITIVE").append(spVariant).append("(");
+                                b.append("    DEFINE_METHOD_STACK_FAST_PRIMITIVE").append(spVariant).append("(");
                             } else {
-                                b.append("(threadStateData);\n    DEFINE_METHOD_STACK_FAST_REF").append(spVariant).append("(");
+                                b.append("    DEFINE_METHOD_STACK_FAST_REF").append(spVariant).append("(");
                             }
                         } else {
-                            b.append("(threadStateData);\n    DEFINE_METHOD_STACK").append(spVariant).append("(");
+                            b.append("    DEFINE_METHOD_STACK").append(spVariant).append("(");
                         }
                     }
                 } else {
@@ -2439,7 +2444,11 @@ public class BytecodeMethod implements SignatureSet {
             b.append("\n#if CN1_TAGGED_ACTIVE\n    if(CN1_TAG_CODE(__cn1ThisObject) == CN1_TAG_INTEGER && CN1_TAG_CODE(__cn1Arg1) == CN1_TAG_INTEGER) { return (__cn1ThisObject == __cn1Arg1) ? JAVA_TRUE : JAVA_FALSE; }\n#endif\n    ");
         }
 
-        if(includeStaticInitializer) {
+        // An eagerly initialized interface (no <clinit>) had its classToInterfaceMap
+        // rows written in initConstantPool before any Java thread existed, so there is
+        // nothing left for this guard to publish -- see
+        // ByteCodeClass.isEagerInitEligible.
+        if(includeStaticInitializer && !ByteCodeClass.eagerInit(cls)) {
             // GUARD IT. This is the INTERFACE thunk, and it used to call the class
             // initializer UNCONDITIONALLY -- every other class-init site in the
             // translator tests the flag first (see the frameless prologue above,

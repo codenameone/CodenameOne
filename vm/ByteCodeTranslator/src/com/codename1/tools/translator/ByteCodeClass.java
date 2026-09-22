@@ -2889,6 +2889,39 @@ public class ByteCodeClass {
         return size;
     }
     
+    /// EAGER INITIALIZATION. A class or interface with no <clinit> runs no user code
+    /// when it is initialized: its __STATIC_INITIALIZER only mallocs and fills its
+    /// vtable, or for an interface its classToInterfaceMap rows, then publishes
+    /// `initialized`. Nothing a program can observe depends on WHEN that happens, so
+    /// JLS initialization order does not constrain it, and cn1EagerInitClasses runs
+    /// every such initializer once at the start of initConstantPool -- before any Java
+    /// executes, on every target. From then on the per-call guard
+    /// `if(!class__X.initialized) __STATIC_INITIALIZER_X(...)` is always false, and it
+    /// is omitted at every static method entry and every interface thunk of the class
+    /// (for-each paid the Iterator thunk's twice per element). ALLOCATION SITES KEEP IT:
+    /// dropping it there measured ~11% slower on objectAllocation across four code
+    /// layouts -- see the note on CN1_FAST_NEW in cn1_globals.h.
+    ///
+    /// A class WITH a <clinit> keeps the guard: there, initialization order is
+    /// observable and must stay lazy.
+    public boolean isEagerInitEligible() {
+        if (isEliminated()) {
+            return false;
+        }
+        for (BytecodeMethod m : methods) {
+            if (m.getMethodName().indexOf("_CLINIT_") > -1) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /// Whether the class-init guard for the (mangled) class name can be omitted.
+    public static boolean eagerInit(String mangledName) {
+        ByteCodeClass c = Parser.getClassObject(mangledName);
+        return c != null && c.isEagerInitEligible();
+    }
+
     public List<BytecodeMethod> getMethods() {
         return methods;
     }

@@ -2592,6 +2592,16 @@ static inline JAVA_OBJECT cn1BibopFastAllocNoZero(CODENAME_ONE_THREAD_STATE, int
 // (the bump fast path can be reached for a class whose <clinit> hasn't run,
 // because bibopCurrent[] is shared across all classes of the same size class).
 #if !defined(CN1_DISABLE_INLINE_ALLOC) && !defined(CN1_DISABLE_BIBOP)
+/* THE ALLOCATION GUARD IS KEPT EVEN FOR AN EAGERLY INITIALIZED CLASS, and that is
+ * measured rather than assumed. Dropping it here -- the class is initialized at
+ * startup, so the check is always false -- made objectAllocation ~11% SLOWER, on every
+ * one of four code layouts (function/loop alignment 16/32/64/128; mean 28.63 -> 31.90ms),
+ * while the hot loop was otherwise instruction-for-instruction identical and the
+ * collector counters did not move. The unproven explanation: the acquire load orders
+ * the next iteration's bumpIndex load behind the previous iteration's store-release to
+ * the same word, and without it the core speculates that load early and pays for it.
+ * Static-method entries and interface thunks DO drop the guard for eager classes; only
+ * allocation sites keep it. */
 #define CN1_FAST_NEW(X) ({ \
     if(__builtin_expect(!__atomic_load_n(&class__##X.initialized, __ATOMIC_ACQUIRE), 0)) __STATIC_INITIALIZER_##X(threadStateData); \
     JAVA_OBJECT __cn1fo = cn1BibopFastAlloc(threadStateData, sizeof(struct obj__##X), &class__##X, CN1_BIBOP_CIDX(sizeof(struct obj__##X))); \
@@ -3484,6 +3494,9 @@ extern JAVA_OBJECT cn1FusedLatin1Begin(CODENAME_ONE_THREAD_STATE, int len, JAVA_
 #define cn1FusedLatin1End(so, n) (((struct obj__java_lang_String*)(so))->java_lang_String_count = (n))
 extern JAVA_OBJECT cn1MainArgs(CODENAME_ONE_THREAD_STATE, int argc, char* argv[]);
 extern void initConstantPool();
+/* Generated into cn1_class_method_index: runs the static initializer of every class
+ * and interface without a <clinit>, once, from the start of initConstantPool. */
+extern void cn1EagerInitClasses(CODENAME_ONE_THREAD_STATE);
 
 extern void initMethodStack(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject, int stackSize, int localsStackSize, int classNameId, int methodNameId);
 static inline void cn1_init_method_stack_fast(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject, int stackSize, int localsStackSize, JAVA_BOOLEAN fullClear) {

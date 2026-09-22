@@ -16719,6 +16719,15 @@ JAVA_OBJECT cn1MainArgs(CODENAME_ONE_THREAD_STATE, int argc, char* argv[]) {
 void initConstantPool() {
     cn1StartupPhase("main");
     __STATIC_INITIALIZER_java_lang_Class(getThreadLocalData());
+    // Before ANY Java runs -- including the allocations further down this function,
+    // whose classes may already be emitted without their init guard. Each initializer
+    // here only fills its own vtable or interface-map rows (no <clinit>, no user
+    // code, no Java allocation), so none depends on another having run. Every thread
+    // that later executes Java either is started after this point (pthread_create
+    // orders it after these writes) or synchronizes through a mutex before it touches
+    // a Java object, which is what lets the emitted code drop the ACQUIRE that used to
+    // publish these tables on each use.
+    cn1EagerInitClasses(getThreadLocalData());
     struct ThreadLocalData* threadStateData = getThreadLocalData();
     enteringNativeAllocations();
     JAVA_ARRAY arr = (JAVA_ARRAY)allocArray(threadStateData, CN1_CONSTANT_POOL_SIZE, &class_array1__java_lang_String, sizeof(JAVA_OBJECT), 1);
