@@ -1081,6 +1081,50 @@ public final class HttpServer {
     private static final int WS_IDLE_TIMEOUT_MILLIS =
             envInt("CN1_WS_IDLE_TIMEOUT_MS", 300000);
 
+    /**
+     * Websocket reassembly memory held across the whole process.
+     *
+     * MAX_WS_MESSAGE_BYTES bounds one message on one session, and a peer may open
+     * as many sessions as MAX_CONNECTIONS allows -- so the per-message cap
+     * multiplies. This is the ceiling on the product, the same shape as the HTTP
+     * upload accounting, and for the same reason: a budget checked after the
+     * allocation bounds nothing.
+     */
+    private static final long MAX_WS_INFLIGHT_BYTES =
+            (long)envIntAtLeast("CN1_WS_MAX_INFLIGHT_MB", 64, 1) * 1024L * 1024L;
+
+    private final java.util.concurrent.atomic.AtomicLong webSocketBytes =
+            new java.util.concurrent.atomic.AtomicLong();
+
+    /**
+     * Charges `extra` bytes against the process-wide budget, or refuses.
+     *
+     * A compare-and-set loop rather than addAndGet-then-check: the latter can
+     * overshoot the ceiling by however many sessions raced, and with an 8MB
+     * per-message cap the overshoot is the thing being bounded.
+     */
+    boolean reserveWebSocketMemory(long extra) {
+        if(extra <= 0) {
+            return true;
+        }
+        while(true) {
+            long held = webSocketBytes.get();
+            long wanted = held + extra;
+            if(wanted > MAX_WS_INFLIGHT_BYTES) {
+                return false;
+            }
+            if(webSocketBytes.compareAndSet(held, wanted)) {
+                return true;
+            }
+        }
+    }
+
+    void releaseWebSocketMemory(long amount) {
+        if(amount > 0) {
+            webSocketBytes.addAndGet(-amount);
+        }
+    }
+
     private volatile WebSocketHandler webSocketRouter;
 
     /**
@@ -1642,6 +1686,22 @@ public final class HttpServer {
      */
     public static HttpServer start(String host, int port, int backlog, int workerCount,
                                    Handler handler, Tls tls) throws IOException {
+        return start(host, port, backlog, workerCount, handler, tls, null, null);
+    }
+
+    /**
+     * - `webSocketRoutes`: path to WebSocket, installed BEFORE the listener starts
+     *   accepting
+     * - `webSocketRouter`: consulted for paths the map does not claim
+     *
+     * The routes have to go in here rather than on the returned server: this
+     * method binds the listener and starts the poller threads before it returns,
+     * so a client arriving in that window would find no websocket routes, and its
+     * upgrade would fall through to the ordinary handler and be answered as HTTP.
+     */
+    public static HttpServer start(String host, int port, int backlog, int workerCount,
+                                   Handler handler, Tls tls, Map webSocketRoutes,
+                                   WebSocketHandler webSocketRouter) throws IOException {
         // BEFORE THE BIND, because the two arms failed this differently and both
         // badly. Java SE's Executors.newFixedThreadPool throws for a non-positive
         // count -- but only after the listener and the reactor are open, so the
@@ -1716,6 +1776,11 @@ public final class HttpServer {
         final HttpServer server = new HttpServer(listener, reactor,
                 useVirtualThreads ? null : Executors.newFixedThreadPool(workerCount),
                 workerCount, handler, tls);
+        // Before any thread that could accept a connection exists.
+        if(webSocketRoutes != null) {
+            server.webSocketRoutes.putAll(webSocketRoutes);
+        }
+        server.webSocketRouter = webSocketRouter;
         if(useVirtualThreads) {
             ACTIVE_SERVER = server;
             // A poller PER HOST, because affinity is enforced by the poller: a
@@ -1952,7 +2017,9 @@ public final class HttpServer {
         // report an abnormal close for what was an orderly shutdown. 1001 is the
         // code that says "the server is going away", and the peer's echo brings
         // the connection down through the ordinary path.
-        closeWebSocketsForShutdown();
+        // A quarter of the drain window at most, so the goodbyes cannot eat the
+        // time the requests in flight were promised.
+        closeWebSocketsForShutdown(Math.max(1, Math.min(drainMillis / 4, 2000)));
         running = false;
         reactor.remove(listener.getFd());
         listener.close();
@@ -2135,6 +2202,11 @@ public final class HttpServer {
 
     /** Whether the request this thread serves is an HTTP/2 turn; see stop(). */
     private static final ThreadLocal SERVING_H2 = new ThreadLocal();
+    /**
+     * Set while a websocket callback is running, so stop() called from inside one
+     * can discount the turn that callback is itself holding.
+     */
+    private static final ThreadLocal SERVING_WS = new ThreadLocal();
 
     /**
      * workOutstanding(), minus what the calling handler is itself holding.
@@ -2168,8 +2240,13 @@ public final class HttpServer {
         // leaving it counted meant an h2 handler calling stop() still waited out
         // both windows in full -- the counter it was waiting for was its own.
         int ownTurn = Boolean.TRUE.equals(SERVING_H2.get()) ? 1 : 0;
+        // AND THE WEBSOCKET TURN, for the same reason. A callback that calls
+        // stop() owns a turn it cannot give back until stop() returns, so
+        // without this the shutdown waits out the whole drain window and then
+        // the release grace for a counter that is its own.
+        int ownWsTurn = Boolean.TRUE.equals(SERVING_WS.get()) ? 1 : 0;
         return inFlightRequests.get() > 1 || activeRequests.get() > 1
-                || http2Turns.get() > ownTurn || webSocketTurns.get() > 0
+                || http2Turns.get() > ownTurn || webSocketTurns.get() > ownWsTurn
                 || pendingWork.get() > 0;
     }
 
@@ -3148,6 +3225,15 @@ public final class HttpServer {
         Object socket = webSockets.remove(new Integer(fd));
         if(socket != null && !((WebSocketSession)socket).retire()) {
             deferredCloses.put(new Integer(fd), socket);
+            // The TLS session goes with it, or this early return skips the
+            // Tls.closeSession below and the sweep -- which only closes the
+            // descriptor -- leaks one native SSL session per slow-writer
+            // disconnect. Worse, if the number is reused the map entry is
+            // overwritten and the handle can no longer be reached at all.
+            Object deferredTls = sessions.remove(new Integer(fd));
+            if(deferredTls != null) {
+                deferredTlsSessions.put(new Integer(fd), deferredTls);
+            }
             return;
         }
         Object h2 = http2Sessions.remove(new Integer(fd));
@@ -3261,8 +3347,19 @@ public final class HttpServer {
             return false;
         }
 
-        String subprotocol = WebSocketHandshake.selectSubprotocol(
-                request.getHeader("sec-websocket-protocol"), endpoint.getSubprotocols());
+        String subprotocol;
+        try {
+            // Application code, exactly like the router above. Uncaught, it
+            // escapes serveOne entirely -- and by this point the descriptor has
+            // been taken out of the reactor, so nothing would ever close it: the
+            // client hangs and the entry sits in liveConnections until shutdown.
+            subprotocol = WebSocketHandshake.selectSubprotocol(
+                    request.getHeader("sec-websocket-protocol"), endpoint.getSubprotocols());
+        } catch (RuntimeException err) {
+            System.err.println("websocket endpoint getSubprotocols failed: " + err);
+            writeStatusOnly(conn, 500, "internal error");
+            return false;
+        }
 
         // Snapshot what the session needs BEFORE the buffer the Request was parsed
         // from stops being the one this connection holds. getHeaders() builds
@@ -3301,11 +3398,19 @@ public final class HttpServer {
                 pending, pendingLength);
         webSockets.put(new Integer(fd), socket);
         armWebSocketDeadline(fd);
+        applyWebSocketReadTimeout(fd);
 
         try {
             endpoint.onOpen(socket);
         } catch (Exception err) {
+            // CLOSED, not merely reported. An onOpen that throws is a session that
+            // never finished initialising -- authentication refused, a resource
+            // it needed missing -- and running the loop anyway leaves the client
+            // connected and every later callback working against a half-built
+            // endpoint. onText and onBinary already answer 1011 and finish; this
+            // is the same failure and gets the same answer.
             reportWebSocketError(socket, err);
+            socket.failOnOpen();
         }
         runWebSocket(fd, socket);
         return true;
@@ -3324,6 +3429,30 @@ public final class HttpServer {
     private static long webSocketDeadline() {
         return WS_IDLE_TIMEOUT_MILLIS <= 0 ? 0
                 : System.currentTimeMillis() + WS_IDLE_TIMEOUT_MILLIS;
+    }
+
+    /**
+     * Gives the DESCRIPTOR the websocket's read timeout.
+     *
+     * The reactor bookkeeping above is only half of it, and on the pooled arm it
+     * is the half that does not matter: the worker keeps the descriptor blocking
+     * inside runWebSocket, so `pooledDeadlines` is never consulted while
+     * socket.fill() waits -- what actually times the read out is SO_RCVTIMEO,
+     * installed at accept as CN1_HTTP_TIMEOUT_MS. Left alone, a healthy idle
+     * websocket on Java SE or behind TLS was closed after fifteen seconds, and
+     * CN1_WS_IDLE_TIMEOUT_MS=0 did not disable it because it never reached the
+     * socket. Measured with a two-second HTTP timeout and a five-second idle: the
+     * connection was gone both with the default and with 0.
+     */
+    private void applyWebSocketReadTimeout(int fd) {
+        try {
+            // 0 means "no timeout" to setsockopt and to the Java SE twin, which is
+            // exactly what CN1_WS_IDLE_TIMEOUT_MS=0 asks for.
+            ServerSocket.setTimeout(fd, WS_IDLE_TIMEOUT_MILLIS <= 0
+                    ? 0 : WS_IDLE_TIMEOUT_MILLIS);
+        } catch (IOException err) {
+            trace("fd=" + fd + " could not set the websocket read timeout: " + err);
+        }
     }
 
     private void armWebSocketDeadline(int fd) {
@@ -3400,6 +3529,7 @@ public final class HttpServer {
         try {
             while(!socket.isFinished()) {
                 webSocketTurns.incrementAndGet();
+                SERVING_WS.set(Boolean.TRUE);
                 try {
                     socket.pump();
                 } catch (IOException err) {
@@ -3410,6 +3540,7 @@ public final class HttpServer {
                     // otherwise hold it for the life of the connection, and stop()
                     // would wait out its whole drain window for a peer that has
                     // nothing to say.
+                    SERVING_WS.set(null);
                     webSocketTurns.decrementAndGet();
                 }
                 if(socket.isFinished()) {
@@ -3419,8 +3550,12 @@ public final class HttpServer {
                 try {
                     more = socket.fill();
                 } catch (IOException err) {
-                    // A read that fails on a live websocket is the peer going
-                    // away, which is 1006 and entirely ordinary.
+                    // Usually the peer going away, which is 1006 and entirely
+                    // ordinary -- but a reset or a genuine read error arrives here
+                    // too, and WebSocket.onError promises to name I/O failures.
+                    // Without this an application cannot tell a broken connection
+                    // from a clean EOF.
+                    reportWebSocketError(socket, err);
                     break;
                 }
                 if(!more) {
@@ -3453,14 +3588,58 @@ public final class HttpServer {
         }
     }
 
-    /** Sends 1001 to every open websocket, so a shutdown reads as one. */
-    private void closeWebSocketsForShutdown() {
+    /**
+     * Sends 1001 to every open websocket, so a shutdown reads as one -- without
+     * letting a stalled peer hold the shutdown.
+     *
+     * Each of these writes can block: a sender whose peer stopped reading is
+     * inside the socket's send timeout, and a Close frame queued behind it waits
+     * for the same lock. Done in a loop on this thread, several such sessions cost
+     * their write timeouts SERIALLY, before `running` is even cleared and long
+     * before retire() gets to shutdown(2) them -- so a deployment could hang for
+     * minutes on peers that were already gone, none of it inside drainMillis.
+     *
+     * So the goodbyes go out on their own threads and this waits a bounded moment
+     * for them. A peer that does not take its Close in that window gets the
+     * descriptor-first teardown instead, which is what it would have got anyway.
+     */
+    private void closeWebSocketsForShutdown(long budgetMillis) {
         java.util.List open;
         synchronized(webSockets) {
             open = new java.util.ArrayList(webSockets.values());
         }
+        if(open.isEmpty()) {
+            return;
+        }
+        // An AtomicInteger and a bounded poll rather than a CountDownLatch: the
+        // server-safe class library has java.util.concurrent.atomic but no
+        // CountDownLatch, and this file compiles for BOTH arms. The Java SE arm
+        // would have taken the latch happily, which is exactly how a class the
+        // translated runtime does not have gets in.
+        final java.util.concurrent.atomic.AtomicInteger outstanding =
+                new java.util.concurrent.atomic.AtomicInteger(open.size());
         for(int iter = 0 ; iter < open.size() ; iter++) {
-            ((WebSocketSession)open.get(iter)).closeForShutdown();
+            final WebSocketSession session = (WebSocketSession)open.get(iter);
+            Thread goodbye = new Thread(new Runnable() {
+                public void run() {
+                    try {
+                        session.closeForShutdown();
+                    } finally {
+                        outstanding.decrementAndGet();
+                    }
+                }
+            });
+            goodbye.setDaemon(true);
+            goodbye.start();
+        }
+        long deadline = System.currentTimeMillis() + budgetMillis;
+        while(outstanding.get() > 0 && System.currentTimeMillis() < deadline) {
+            try {
+                Thread.sleep(10);
+            } catch (InterruptedException err) {
+                Thread.currentThread().interrupt();
+                return;
+            }
         }
     }
 
@@ -3500,6 +3679,9 @@ public final class HttpServer {
      */
     private final Map deferredCloses =
             java.util.Collections.synchronizedMap(new java.util.HashMap());
+    /** The TLS session belonging to a descriptor whose close is deferred. */
+    private final Map deferredTlsSessions =
+            java.util.Collections.synchronizedMap(new java.util.HashMap());
 
     /** Closes whatever finally has no writer left inside it. */
     private void sweepDeferredCloses() {
@@ -3520,7 +3702,12 @@ public final class HttpServer {
             }
         }
         for(int iter = 0 ; iter < done.size() ; iter++) {
-            int fd = ((Integer)done.get(iter)).intValue();
+            Integer key = (Integer)done.get(iter);
+            int fd = key.intValue();
+            Object tls = deferredTlsSessions.remove(key);
+            if(tls != null) {
+                Tls.closeSession(((Long)tls).longValue());
+            }
             ServerSocket.closeFd(fd);
             openConnections.decrementAndGet();
         }
@@ -4494,10 +4681,11 @@ public final class HttpServer {
                 if(tryUpgrade(conn, fd, session, request)) {
                     return;             // this connection is no longer HTTP
                 }
-                // Refused, and a status was written. The connection stays HTTP.
-                if(conn.available() > 0) {
-                    continue;
-                }
+                // REFUSED, AND THE REFUSAL SAID `Connection: close`. Carrying on
+                // to parse whatever the client pipelined behind the handshake
+                // would execute a second request the server has already promised
+                // not to serve -- so a bad handshake followed by a side-effecting
+                // request would run that request. Honour what was written.
                 drop(fd);
                 return;
             }

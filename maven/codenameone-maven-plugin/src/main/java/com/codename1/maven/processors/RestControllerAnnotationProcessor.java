@@ -1107,7 +1107,12 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
             ctx.error(cls, "@WebSocketMapping must be a concrete class: " + cls.getBinaryName());
             return;
         }
-        if (!cls.getInterfaceInternalNames().contains(WEBSOCKET_INTERFACE)) {
+        // THE WHOLE HIERARCHY, not just the interfaces declared here. An endpoint
+        // that extends a base class implementing WebSocket, or implements a
+        // subinterface of it, is assignable to WebSocket and the registration this
+        // generates would be valid -- but a direct-interface check calls it a
+        // build error. The same walk implementsWritable already does.
+        if (!implementsWebSocket(ctx, cls, new LinkedHashSet<String>())) {
             ctx.error(cls, "@WebSocketMapping must implement com.codename1.backend.WebSocket: "
                     + cls.getBinaryName());
             return;
@@ -1128,6 +1133,17 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
                             + cls.getBinaryName() + " -> \"" + full + "\"");
                     return;
                 }
+                if (full.indexOf('?') >= 0) {
+                    // tryUpgrade strips the query before it looks a path up, so a
+                    // mapping with one in it goes into the route map under a key
+                    // nothing can ever match: the application builds, starts, and
+                    // the endpoint is simply unreachable. Refusing at build time
+                    // is the only place this is visible.
+                    ctx.error(cls, "@WebSocketMapping path must not carry a query string, "
+                            + "because routing matches the path alone: "
+                            + cls.getBinaryName() + " -> \"" + full + "\"");
+                    return;
+                }
                 WebSocketEndpoint existing = webSockets.get(full);
                 if (existing != null && !existing.binaryName.equals(cls.getBinaryName())) {
                     ctx.error(cls, "two websocket endpoints claim " + full + ": "
@@ -1144,6 +1160,27 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
                 webSockets.put(full, endpoint);
             }
         }
+    }
+
+    /** Depth-first over superclasses and interfaces, each visited once. */
+    private static boolean implementsWebSocket(ProcessorContext ctx, AnnotatedClass cls,
+            Set<String> seen) {
+        if (cls == null) {
+            return false;
+        }
+        for (String itf : cls.getInterfaceInternalNames()) {
+            if (WEBSOCKET_INTERFACE.equals(itf)) {
+                return true;
+            }
+            if (seen.add(itf) && implementsWebSocket(ctx, resolve(ctx, itf), seen)) {
+                return true;
+            }
+        }
+        String parent = cls.getSuperInternalName();
+        if (parent == null || "java/lang/Object".equals(parent) || !seen.add(parent)) {
+            return false;
+        }
+        return implementsWebSocket(ctx, resolve(ctx, parent), seen);
     }
 
     /** "/api" + "/chat" -> "/api/chat", with exactly one separator. */

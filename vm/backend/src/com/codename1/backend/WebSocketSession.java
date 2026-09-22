@@ -83,6 +83,16 @@ public final class WebSocketSession {
     /** Sticky, and set BEFORE the descriptor is closed. */
     private volatile boolean dead;
     private boolean closeSent;
+    /**
+     * Raised the moment a Close frame is sent, which is earlier than `dead`.
+     *
+     * RFC 6455 5.5.1: after sending a Close the endpoint must not send any more
+     * DATA frames. `dead` is not that point -- it is set at teardown, and between
+     * the two an echo-style callback answering a message the peer had already
+     * queued would put a data frame AFTER the Close, which a conforming peer reads
+     * as a protocol error on an otherwise orderly shutdown.
+     */
+    private volatile boolean closing;
 
     private Object attachment;
 
@@ -104,6 +114,8 @@ public final class WebSocketSession {
     private int messageOpcode = -1;
     private byte[] message = new byte[0];
     private int messageLength;
+    /** How much of the process-wide reassembly budget this session is holding. */
+    private int reserved;
     private final Utf8Stream text = new Utf8Stream();
 
     /** Control payloads are at most 125 bytes, so one small buffer always fits. */
@@ -242,6 +254,17 @@ public final class WebSocketSession {
      * the connection's read timeout rather than held forever.
      */
     public void close(int code, String reason) {
+        if(!WebSocketFrames.isValidCloseCode(code)) {
+            // 1005, 1006 and 1015 are what a LOCAL implementation reports and no
+            // endpoint may put on the wire; 1004 and anything outside the ranges
+            // has no agreed meaning. Emitting one turns a requested orderly close
+            // into a protocol error at the peer, so the request is corrected
+            // rather than honoured literally.
+            System.out.println("[http] websocket close code " + code
+                    + " cannot be sent on the wire; closing with "
+                    + WebSocketFrames.CLOSE_NORMAL + " instead");
+            code = WebSocketFrames.CLOSE_NORMAL;
+        }
         try {
             sendClose(code, reason == null ? "" : reason);
         } catch (IOException err) {
@@ -275,6 +298,11 @@ public final class WebSocketSession {
         }
         if(dead) {
             throw new IOException("websocket " + id + " is closed");
+        }
+        if(closing && opcode != WebSocketFrames.OP_CLOSE) {
+            // The Close is already on the wire; anything after it is a protocol
+            // error for the peer to report.
+            throw new IOException("websocket " + id + " is closing; no more data frames");
         }
         writers.incrementAndGet();
         try {
@@ -320,6 +348,7 @@ public final class WebSocketSession {
                 return;                      // one Close per connection, ever
             }
             closeSent = true;
+            closing = true;
         }
         byte[] reasonBytes = Utf8.encode(reason);
         // RFC 6455 5.5.1: code and reason together are a control payload, so 123
@@ -370,6 +399,9 @@ public final class WebSocketSession {
      */
     boolean retire() {
         dead = true;
+        // Whatever this session was still holding. A reservation that outlives its
+        // session shrinks the budget for every later one, permanently.
+        releaseReservation();
         // Make a parked writer fail NOW rather than after SO_SNDTIMEO. A sender
         // blocked on a slow peer is waiting for POLLOUT bounded by the socket's
         // send timeout, and on a host thread that is the whole poller stalled.
@@ -584,6 +616,18 @@ public final class WebSocketSession {
             while(grown < messageLength + length) {
                 grown *= 2;
             }
+            // RESERVED BEFORE IT IS ALLOCATED, and against a process-wide total --
+            // the per-message cap bounds ONE session, and a peer may open as many
+            // as MAX_CONNECTIONS allows. A hundred connections each parking a
+            // fragmented message just under an 8MB limit is 800MB of live heap,
+            // held for as long as the peer keeps sending control frames. The same
+            // reasoning, and the same reserve-then-allocate order, as the HTTP
+            // upload accounting in Conn.fillTo.
+            if(!server.reserveWebSocketMemory(grown - reserved)) {
+                return fail(WebSocketFrames.CLOSE_TOO_BIG,
+                        "the server is already holding its reassembly budget");
+            }
+            reserved = grown;
             byte[] bigger = new byte[grown];
             System.arraycopy(message, 0, bigger, 0, messageLength);
             message = bigger;
@@ -639,8 +683,17 @@ public final class WebSocketSession {
     private void releaseMessageBuffer() {
         if(message.length > HttpServer.MAX_IDLE_BUFFER_BYTES) {
             message = new byte[0];
+            releaseReservation();
         }
         messageLength = 0;
+    }
+
+    /** Gives the process-wide reassembly budget back. Idempotent. */
+    private void releaseReservation() {
+        if(reserved > 0) {
+            server.releaseWebSocketMemory(reserved);
+            reserved = 0;
+        }
     }
 
     private void dispatchControl() throws IOException {
@@ -706,6 +759,16 @@ public final class WebSocketSession {
     private boolean fail(int code, String why) {
         closeCode = code;
         closeReason = why;
+        // The public contract on WebSocket.onError names "a protocol violation by
+        // the peer" first, and every one of those arrives here. Without this the
+        // only failures an endpoint ever hears about are its own, so a malformed
+        // client is invisible to whatever the application logs or counts.
+        try {
+            endpoint.onError(this, new IOException(why));
+        } catch (RuntimeException ignored) {
+            // An endpoint whose error handler also throws does not get to stop the
+            // close frame going out.
+        }
         try {
             sendClose(code, why);
         } catch (IOException err) {
@@ -731,8 +794,28 @@ public final class WebSocketSession {
         finished = true;
     }
 
+    /**
+     * Ends a session whose onOpen threw, with the same answer a failing onText
+     * gets.
+     */
+    void failOnOpen() {
+        closeCode = WebSocketFrames.CLOSE_INTERNAL_ERROR;
+        closeReason = "the endpoint failed to open";
+        try {
+            sendClose(WebSocketFrames.CLOSE_INTERNAL_ERROR, "the endpoint failed to open");
+        } catch (IOException ignored) {
+        }
+        finished = true;
+    }
+
     /** Sends a 1001 and stops, for a server that is shutting down. */
     void closeForShutdown() {
+        // RECORDED, not just sent. The read loop stops without decoding the peer's
+        // echo, so onClose would otherwise report 1006 -- an abnormal close -- for
+        // a shutdown the server performed deliberately, and every endpoint's
+        // metrics would count a clean deployment as a network failure.
+        closeCode = WebSocketFrames.CLOSE_GOING_AWAY;
+        closeReason = "going away";
         try {
             sendClose(WebSocketFrames.CLOSE_GOING_AWAY, "going away");
         } catch (IOException ignored) {

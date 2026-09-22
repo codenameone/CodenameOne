@@ -215,6 +215,45 @@ public class WebSocketMappingProcessorTest {
                 alerts < chat);
     }
 
+    @Test
+    public void acceptsAnEndpointThatInheritsWebSocket() throws Exception {
+        // A direct-interface check calls this a build error even though the class
+        // is assignable to WebSocket and the registration would be valid.
+        String base =
+                "package com.example;\n"
+                + "import com.codename1.backend.WebSocket;\n"
+                + "import com.codename1.backend.WebSocketSession;\n"
+                + "public abstract class Base implements WebSocket {\n"
+                + "    public void onOpen(WebSocketSession s) { }\n"
+                + "    public void onText(WebSocketSession s, String m) { }\n"
+                + "    public void onBinary(WebSocketSession s, byte[] m, int o, int l) { }\n"
+                + "}\n";
+        String derived =
+                "package com.example;\n"
+                + "import com.codename1.backend.annotations.WebSocketMapping;\n"
+                + "@WebSocketMapping(\"/chat\")\n"
+                + "public class Derived extends Base {\n"
+                + "}\n";
+        File classes = tmp.newFolder();
+        Map<String, String> sources = new LinkedHashMap<String, String>();
+        sources.put("com.example.Base", base);
+        sources.put("com.example.Derived", derived);
+        JavaSourceCompiler.compile(sources, classes, backendClasspath());
+        ProcessorContext ctx = runContext(classes);
+        assertFalse("an endpoint inheriting WebSocket should be accepted", ctx.hasErrors());
+    }
+
+    @Test
+    public void refusesAPathWithAQueryString() throws Exception {
+        // tryUpgrade strips the query before looking the path up, so this endpoint
+        // goes into the route map under a key nothing can ever match: the
+        // application builds, starts, and the endpoint is simply unreachable.
+        String source = ENDPOINT.replace("@WebSocketMapping(\"/chat\")",
+                "@WebSocketMapping(\"/chat?room=1\")");
+        assertTrue("a mapped path with a query string is unreachable and should be refused",
+                runContext(compile("Chat", source)).hasErrors());
+    }
+
     // ------------------------------------------------------------------ helpers
 
     private File compile(String simpleName, String source) throws Exception {

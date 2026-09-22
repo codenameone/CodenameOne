@@ -246,9 +246,17 @@ cn1ss_backend_setup() {
 cn1ss_backend_build_native() {
   local root out digest
   root="$(cn1ss_repo_root)"
+  # THE TRANSLATOR AND THE BOOT CLASSPATH TOO. build.sh consumes both, so a
+  # digest over vm/backend alone is unchanged when ByteCodeTranslator or JavaAPI
+  # moves -- and this function then reuses a cached executable and never calls
+  # build.sh at all. The one leg meant to exercise the translated server would be
+  # testing a stale translator against new sources, which is exactly the
+  # regression it exists to catch.
   digest="$(find "$root/vm/backend/src" "$root/vm/backend/impl/parparvm" \
       "$root/vm/backend/native" "$root/vm/backend/demo/cn1ss" \
-      "$root/vm/backend/build.sh" -type f -print0 2>/dev/null \
+      "$root/vm/backend/build.sh" \
+      "$root/vm/ByteCodeTranslator/src" "$root/vm/JavaAPI/src" \
+      -type f -print0 2>/dev/null \
       | xargs -0 shasum 2>/dev/null | shasum | awk '{print $1}')"
   local tmp_root="${TMPDIR:-/tmp}"
   tmp_root="${tmp_root%/}"

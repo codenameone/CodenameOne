@@ -40,15 +40,18 @@ on:
       - 'maven/**'
       - '!maven/core-unittests/**'
       - '!docs/**'
-      # The screenshot transport is the Codename One backend's own websocket
-      # server (vm/backend/demo/cn1ss), so a change to the backend changes this
-      # leg's transport. Without these entries a websocket regression would break
-      # every screenshot run while triggering none of the jobs that would catch it.
-      - 'vm/backend/src/com/codename1/backend/**'
-      - 'vm/backend/impl/**'
-      - 'vm/backend/native/**'
+      # The screenshot transport is now a Codename One backend application, so the
+      # two files that are ONLY exercised here have to trigger this leg: the
+      # server itself and the script that launches it.
+      #
+      # Deliberately NOT the rest of vm/backend. The websocket protocol code is
+      # covered by maven/backend's unit tests, by vm/tests against the translated
+      # binary, and by the Autobahn conformance job -- all of which already
+      # trigger on vm/**. Fanning every backend change out to the macOS and
+      # emulator legs as well would buy nothing and cost a great deal: a change to
+      # the ORM, the database layer or the HTTP parser cannot reach this
+      # transport.
       - 'vm/backend/demo/cn1ss/**'
-      - 'vm/backend/build.sh'
   push:
     branches: [ master ]
     paths:
@@ -75,15 +78,18 @@ on:
       - 'maven/**'
       - '!maven/core-unittests/**'
       - '!docs/**'
-      # The screenshot transport is the Codename One backend's own websocket
-      # server (vm/backend/demo/cn1ss), so a change to the backend changes this
-      # leg's transport. Without these entries a websocket regression would break
-      # every screenshot run while triggering none of the jobs that would catch it.
-      - 'vm/backend/src/com/codename1/backend/**'
-      - 'vm/backend/impl/**'
-      - 'vm/backend/native/**'
+      # The screenshot transport is now a Codename One backend application, so the
+      # two files that are ONLY exercised here have to trigger this leg: the
+      # server itself and the script that launches it.
+      #
+      # Deliberately NOT the rest of vm/backend. The websocket protocol code is
+      # covered by maven/backend's unit tests, by vm/tests against the translated
+      # binary, and by the Autobahn conformance job -- all of which already
+      # trigger on vm/**. Fanning every backend change out to the macOS and
+      # emulator legs as well would buy nothing and cost a great deal: a change to
+      # the ORM, the database layer or the HTTP parser cannot reach this
+      # transport.
       - 'vm/backend/demo/cn1ss/**'
-      - 'vm/backend/build.sh'
 
 concurrency:
   # Cancel superseded runs of this workflow for the same PR branch
@@ -325,7 +331,9 @@ jobs:
         uses: actions/cache@v5
         with:
           path: ${{ runner.temp }}/cn1ss-native-cache
-          key: ${{ runner.os }}-cn1ss-native-${{ hashFiles('vm/backend/src/com/codename1/backend/**', 'vm/backend/impl/parparvm/**', 'vm/backend/native/**', 'vm/backend/demo/cn1ss/**', 'vm/backend/build.sh') }}
+          # The translator and the boot classpath are inputs to build.sh too; a key
+          # without them restores a binary built by a different translator.
+          key: ${{ runner.os }}-cn1ss-native-${{ hashFiles('vm/backend/src/com/codename1/backend/**', 'vm/backend/impl/parparvm/**', 'vm/backend/native/**', 'vm/backend/demo/cn1ss/**', 'vm/backend/build.sh', 'vm/ByteCodeTranslator/src/**', 'vm/JavaAPI/src/**') }}
 
       - name: Run JavaScript screenshot browser tests
         env:

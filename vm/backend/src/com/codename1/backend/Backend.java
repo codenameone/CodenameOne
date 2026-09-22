@@ -465,10 +465,24 @@ public final class Backend {
                 // would depend on what happened to be in a directory.
                 routers.add(staticFiles);
             }
-            if(routers.isEmpty()) {
+            boolean servesWebSockets = !webSockets.isEmpty() || webSocketRouter != null;
+            if(routers.isEmpty() && !servesWebSockets) {
                 throw new IOException("This server has no handlers, so every request would "
-                        + "be a 404. Add one with handler(), or a @RestController class for "
-                        + "the build to generate one from.");
+                        + "be a 404. Add one with handler(), a websocket() route, or a "
+                        + "@RestController class for the build to generate one from.");
+            }
+            if(routers.isEmpty()) {
+                // A WEBSOCKET-ONLY SERVER IS A REAL SERVER, and it is what the
+                // build generates for a module whose only endpoints are
+                // @WebSocketMapping. Without this that generated application
+                // compiled, started, and threw before it ever bound a port.
+                // Ordinary HTTP requests get the 404 they would have got anyway;
+                // the upgrade path is consulted before this chain runs.
+                routers.add(new HttpServer.Handler() {
+                    public HttpServer.Response handle(HttpServer.Request request) {
+                        return null;          // null is a 404 from the chain below
+                    }
+                });
             }
             final HttpServer.Handler[] chain =
                     (HttpServer.Handler[])routers.toArray(new HttpServer.Handler[routers.size()]);
@@ -544,23 +558,16 @@ public final class Backend {
                                 // answers for a path it does not route.
                                 return null;
                             }
-                        }, context);
+                        }, context, webSockets, webSocketRouter);
             } catch (Exception err) {
                 if(ownsContext) {
                     context.close();
                 }
                 throw err;
             }
-            // Before announce, so nothing reports the server as ready while a
-            // route it is about to serve is still unregistered.
-            java.util.Iterator routes = webSockets.entrySet().iterator();
-            while(routes.hasNext()) {
-                Map.Entry route = (Map.Entry)routes.next();
-                server.websocket((String)route.getKey(), (WebSocket)route.getValue());
-            }
-            if(webSocketRouter != null) {
-                server.websocketRouter(webSocketRouter);
-            }
+            // The websocket routes went in through start() above, before the
+            // listener began accepting -- registering them here instead left a
+            // window in which a valid upgrade was answered as ordinary HTTP.
             Backend backend = new Backend(server, pool, manager, config, drain);
             if(!quiet) {
                 announce(backend, listenPort, context != null);
