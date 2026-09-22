@@ -55,9 +55,25 @@ CN1="$WORK/cn1"
 MVN_REPO_ARG=""
 [ -n "$MAVEN_REPO_LOCAL" ] && MVN_REPO_ARG="-Dmaven.repo.local=$MAVEN_REPO_LOCAL"
 
+# The Codename One build needs a display. Its CSS compiler (CN1CSSCLI) opens a
+# JFrame, so on a headless runner `cn1:css` dies with HeadlessException after
+# the transpile has already succeeded -- which reads like a Flutter problem and
+# is not one. -Djava.awt.headless=true is NOT the fix: the toolchain genuinely
+# uses AWT windowing, and asking for headless turns the crash into a different
+# crash. On Linux that means xvfb, the way every other Linux leg in this
+# repository runs Maven; the macOS and Windows runners have a display already.
+XVFB=""
+if [ "$(uname -s)" = "Linux" ] && [ -z "${DISPLAY:-}" ]; then
+  command -v xvfb-run >/dev/null 2>&1 || {
+    echo "xvfb-run is needed to build on a headless Linux host, and is absent." >&2
+    echo "Install it (apt-get install xvfb) or run with a DISPLAY set." >&2
+    exit 2; }
+  XVFB="xvfb-run -a"
+fi
+
 cn1_build() {   # cn1_build <platform> <buildTarget> [extra maven args...]
   local plat="$1" target="$2"; shift 2
-  ( cd "$CN1" && mvn -B $MVN_REPO_ARG package -DskipTests \
+  ( cd "$CN1" && $XVFB mvn -B $MVN_REPO_ARG package -DskipTests \
       -DskipComplianceCheck=true \
       -Dcodename1.platform="$plat" -Dcodename1.buildTarget="$target" "$@" )
 }

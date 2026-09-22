@@ -403,6 +403,7 @@ toolchain
 toolchains
 toolset
 transferal
+transpiled
 transpiler
 unix
 unlayout

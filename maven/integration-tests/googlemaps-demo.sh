@@ -18,6 +18,7 @@ mvn -e com.codenameone:codenameone-maven-plugin:${CN1_VERSION}:generate-app-proj
   -DgroupId=com.example \
   -Dversion=1.0-SNAPSHOT \
   -DinteractiveMode=false \
+  -DjavaVersion=$CN1_ARCHETYPE_JAVA_VERSION \
   -DsourceProject=googlemaps-maven-demo-1.0.2
 
 rm -rf googlemaps-maven-demo-1.0.2

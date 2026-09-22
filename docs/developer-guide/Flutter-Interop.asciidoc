@@ -36,7 +36,7 @@ Codename One containers.
 The key design point is where the boundary sits. The runtime reimplements
 Flutter's *layout and composition* model -- constraints down, sizes up,
 elements reconciled against widgets -- but it doesn't reimplement Flutter's
-*rasteriser*. Painting is Codename One's, which is what makes the output a
+*rasterizer*. Painting is Codename One's, which is what makes the output a
 real Codename One component tree rather than a texture.
 
 === Enabling it in a project
@@ -88,7 +88,7 @@ include::../demos/common/src/main/java/com/codenameone/developerguide/flutter/Fl
 The wrapped subtree is a component like any other: it participates in the
 parent's layout, scrolls with it, and is styled by the same theme. An embedded
 subtree does *not* install the Material base theme, so dropping a
-widget into an existing screen won't restyle the screen around it.
+widget into an existing screen won't restyle the rest of it.
 
 That makes this the right shape for reusing a piece of design work -- a chart,
 a card, an onboarding pane -- without committing the rest of the application to
@@ -97,7 +97,7 @@ anything.
 === Use case: Porting an application wholesale
 
 When the Dart source *is* the application, `FlutterUI.runApp` mounts the tree
-as the root of a new `Form` and shows it, which is the direct analogue of
+as the root of a new `Form` and shows it, which is the direct analog of
 Flutter's own `runApp`:
 
 [source,java]
@@ -174,16 +174,17 @@ Three rules keep the numbers honest, and each exists because the obvious
 alternative produced a flattering result:
 
 * *Interleaved runs, best of N.* One run of each side, alternating. A machine
-  that gets busier halfway through then penalises both sides equally instead
+  that gets busier halfway through then penalizes both sides equally instead
   of whichever happened to run second, and the load average is recorded with
   every result so a surprising ratio can be checked against it.
 
 * *Start-up is a bracket, not a point.* The two runtimes don't expose the
   same event. Flutter's post-frame callback runs before that frame is
-  rasterised, while Codename One's marker fires once the form is on screen, so
-  comparing them directly charges one runtime for rasterising its first screen
-  and not the other. The benchmark therefore reports Flutter's figure as a
-  range and computes the ratio from the end least favourable to Codename One.
+  rasterized, while Codename One's marker fires once the form is on the
+  screen, so comparing them directly charges one runtime for rasterizing its
+  first screen and not the other. The benchmark therefore reports Flutter's
+  figure as a range and computes the ratio from the end least favorable to
+  Codename One.
 
 * *A platform that can't be measured says so.* iOS start-up and memory are
   reported as not measured rather than taken from a simulator, because Dart

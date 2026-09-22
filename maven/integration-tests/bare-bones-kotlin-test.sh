@@ -17,6 +17,7 @@ mvn com.codenameone:codenameone-maven-plugin:${CN1_VERSION}:generate-app-project
   -DgroupId=com.example \
   -Dversion=1.0-SNAPSHOT \
   -DinteractiveMode=false \
+  -DjavaVersion=$CN1_ARCHETYPE_JAVA_VERSION \
   -DmainName=MyApp2 \
   -DsourceProject=cn1app-archetype-kotlin-template-master
 

@@ -18,6 +18,7 @@ mvn com.codenameone:codenameone-maven-plugin:${CN1_VERSION}:generate-app-project
   -DgroupId=com.example \
   -Dversion=1.0-SNAPSHOT \
   -DinteractiveMode=false \
+  -DjavaVersion=$CN1_ARCHETYPE_JAVA_VERSION \
   -DsourceProject=KitchenSink-1.0-cn7.0.11 \
   -DarchetypeCatalog=local
 

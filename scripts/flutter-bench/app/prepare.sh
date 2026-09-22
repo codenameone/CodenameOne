@@ -178,7 +178,11 @@ echo "    archetype version $CN1_VERSION"
 # kept here. That is deliberate: it means the benchmark builds the same way a
 # user's project does, and a change that breaks the documented Flutter wiring
 # breaks the benchmark too instead of passing unnoticed.
-( cd "$WORK" && mvn -q $MVN_REPO_ARG archetype:generate \
+# NOT -q. A generation that fails under -q prints nothing at all, which is how
+# the Windows leg reported an exit code and no reason for it; a build step that
+# cannot say why it failed is worse than a noisy one.
+echo "    maven repository ${MAVEN_REPO_LOCAL:-<default>}"
+( cd "$WORK" && mvn -B $MVN_REPO_ARG archetype:generate \
     -DarchetypeArtifactId=cn1app-archetype \
     -DarchetypeGroupId=com.codenameone \
     -DarchetypeVersion="$CN1_VERSION" \

@@ -73,18 +73,18 @@ Each of these exists because the obvious alternative produced a flattering
 result, and several were caught only after being measured the wrong way first.
 
 - **Interleaved runs, best of N, load recorded.** One run of each side,
-  alternating. A machine that gets busier halfway through then penalises both
+  alternating. A machine that gets busier halfway through then penalizes both
   sides equally. On this project two walkthrough recordings desynchronised and
   looked like a timing regression; the cause was a stray simulator holding the
   machine at load 8.
 
 - **Start-up is a bracket, not a point.** The runtimes do not expose the same
   event. Flutter's `FIRSTCONTENT` is a UI-thread callback that runs *before*
-  that frame is rasterised, while Codename One's `FIRSTFRAME` fires once the
-  form is on screen. Comparing those two charges one runtime for rasterising
+  that frame is rasterized, while Codename One's `FIRSTFRAME` fires once the
+  form is on screen. Comparing those two charges one runtime for rasterizing
   its first screen and not the other. The harness reports Flutter's figure as
   a range (`FIRSTCONTENT`..`RASTERDONE`) and takes the ratio from the end least
-  favourable to Codename One.
+  favorable to Codename One.
 
 - **Executable code is every Mach-O in the bundle**, not the main executable.
   On iOS a Flutter application's own code is not in the executable at all --

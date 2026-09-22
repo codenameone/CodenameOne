@@ -18,6 +18,7 @@ mvn com.codenameone:codenameone-maven-plugin:${CN1_VERSION}:generate-app-project
   -DgroupId=com.example \
   -Dversion=1.0-SNAPSHOT \
   -DinteractiveMode=false \
+  -DjavaVersion=$CN1_ARCHETYPE_JAVA_VERSION \
   -DsourceProject=cn1-css-fonts-test-1.0
 
 rm -rf cn1-css-fonts-test-1.0
