@@ -187,18 +187,46 @@ small one: `objectAllocation` went from 16 typed pages to 2, while
 live classes and ~24 pages, one 64KB page per class IS the heap. A class with
 three live objects still occupies a full page.
 
-**Consequence for the header plan.** The 8.9% that type-homogeneous pages buy is
-measured in ALLOCATED BYTES -- a throughput and bandwidth number. The
-page-per-class floor is PEAK FOOTPRINT: `live classes x CN1_BIBOP_PAGE_SIZE`,
-which is ~12MB for the 194-class selfhost corpus and dominant for anything
-smaller. Those are different axes, and this VM sells the small one -- the 2.4MB
-floor. Delivering the header saving this way costs more than it saves wherever
-the heap is small.
+**Consequence for the header plan: it is a crossover, not a verdict.** The cost
+is FIXED -- `live classes x CN1_BIBOP_PAGE_SIZE` -- while the saving is
+PROPORTIONAL to the heap. So they cross:
 
-Making it viable needs a typed granularity far below 64KB (sub-page runs, or
-segregated regions with a shared page), which is a much larger change than the
-8.9% justifies on its own. The saving is real; this delivery mechanism is not
-the way to collect it.
+    break-even peak = classes * PAGE_SIZE / 0.089
+
+    classes   fixed cost   break-even peak (64KB pages)
+         18        1.2MB             13.3MB
+        194       12.7MB            142.9MB
+        500       32.8MB            368.2MB
+
+Above that line this is a straight win, and on the workload that matters it is a
+large one. Selfhost, against the measured 1354MB parpar / 1487MB jdk25:
+
+    saving 120.5MB - fixed cost 12.7MB = net 107.8MB
+    peak 1354MB -> 1246MB      vs jdk25  0.911 -> 0.838
+
+That would take us from beating JDK 25 on peak memory by 9% to beating it by
+16%, on the axis this VM sells.
+
+Below the line the fixed cost dominates and, worse than being merely wasteful,
+it can stall reclaim outright -- which is what broke two fault injections in
+`run-gc-verify`. The standard drivers sit far below it (7 pages clean), so the
+GATE lives in the losing region even when the product would not.
+
+**The granularity lever, and it is linear.** The fixed cost is proportional to
+page size, so shrinking the typed page moves the crossover down by the same
+factor. At 4KB typed pages the break-even falls from 13.3MB to 0.83MB for 18
+classes, and selfhost peak lands at 1234MB (0.830 of jdk25) -- below any heap
+this VM would meet, small drivers included. That, not abandonment, is what this
+needs next: a typed granularity well below CN1_BIBOP_PAGE_SIZE, which means
+either a smaller page for typed allocation or sub-page runs inside a shared one.
+
+**One assumption, flagged rather than buried.** The 8.9% was measured on
+ALLOCATED slot bytes. The arithmetic above applies it to PEAK footprint, which
+holds only if the live set's size distribution matches the allocated one. That
+is plausible -- same classes, same size classes -- but it is not measured, and
+the slot histogram could answer it directly by weighting the live set instead of
+the allocation stream. Do that before quoting 0.838 as a result rather than as
+an estimate.
 
 ---
 
