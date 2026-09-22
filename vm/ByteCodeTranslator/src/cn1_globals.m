@@ -15837,6 +15837,46 @@ static void cn1RecordAllocationSize(struct clazz* parent, int size) {
     atomic_fetch_add_explicit(&cn1AllocSizeOverflow, 1, memory_order_relaxed);
 }
 
+// ---- SLOT HISTOGRAM: what a smaller header would ACTUALLY save -------------
+// Bytes removed from an OBJECT are not bytes removed from the HEAP. BiBOP rounds
+// every allocation up to a size class and the smallest class is 32, so a 32-byte
+// Node (16 header + 16 fields) stays in a 32-byte slot whether its header is 16
+// bytes, 8, or none at all. A plan to shrink the header pays only for objects
+// that sit just above a class boundary, which makes the whole question a
+// histogram rather than an argument -- and an earlier round of this work did
+// argue it, wrongly, by counting object bytes instead of slot bytes.
+//
+// So: record the REQUESTED size of every allocation, split by array (32-byte
+// header) and scalar (16-byte header), and at exit re-round the whole
+// distribution under each candidate layout. The answer is the ceiling on the
+// entire idea, before any of it is built.
+#define CN1_SLOTHIST_MAX CN1_BIBOP_MAX_OBJECT
+static _Atomic long cn1SlotHistObj[CN1_SLOTHIST_MAX + 1];
+static _Atomic long cn1SlotHistArr[CN1_SLOTHIST_MAX + 1];
+// Above CN1_BIBOP_MAX_OBJECT there is no page slot and no rounding -- the legacy
+// heap takes the request as-is -- so those bytes are reported separately rather
+// than folded into a total that would imply a saving BiBOP never made.
+static _Atomic long long cn1SlotHistLegacyBytes = 0;
+static _Atomic long cn1SlotHistLegacyCount = 0;
+
+// The slot a request of `size` lands in. allow16 adds a hypothetical 16-byte
+// class below the current floor of 32; 0 means "no page slot fits".
+static int cn1SlotClassFor(int size, int allow16) {
+    int i;
+    if(size <= 0) {
+        size = 1;
+    }
+    if(allow16 && size <= 16) {
+        return 16;
+    }
+    for(i = 0 ; i < CN1_BIBOP_NUM_CLASSES ; i++) {
+        if(size <= cn1BibopClassSize[i]) {
+            return cn1BibopClassSize[i];
+        }
+    }
+    return 0;
+}
+
 void cn1RecordAllocation(struct clazz* parent, int size) {
     int id;
     if(parent == 0) {
@@ -15846,6 +15886,19 @@ void cn1RecordAllocation(struct clazz* parent, int size) {
     // sizes -- the out-of-range row says a class is missing, this says what size
     // it was.
     cn1RecordAllocationSize(parent, size);
+    // Slot histogram: keyed by the REQUESTED size, because that is what the size
+    // class is chosen from. Arrays are tracked apart because their header is 32
+    // bytes against a scalar's 16, so the same byte saving lands differently.
+    if(size >= 0 && size <= CN1_SLOTHIST_MAX) {
+        if(parent->isArray) {
+            atomic_fetch_add_explicit(&cn1SlotHistArr[size], 1, memory_order_relaxed);
+        } else {
+            atomic_fetch_add_explicit(&cn1SlotHistObj[size], 1, memory_order_relaxed);
+        }
+    } else {
+        atomic_fetch_add_explicit(&cn1SlotHistLegacyBytes, (long long)size, memory_order_relaxed);
+        atomic_fetch_add_explicit(&cn1SlotHistLegacyCount, 1, memory_order_relaxed);
+    }
     id = parent->classId;
     if(id < 0 || id >= CN1_ALLOC_PROFILE_SLOTS) {
         atomic_fetch_add_explicit(&cn1AllocProfOutOfRangeBytes, (long long)size,
@@ -15870,6 +15923,109 @@ void cn1RecordAllocation(struct clazz* parent, int size) {
     atomic_store_explicit(&cn1AllocProfClass[id], parent, memory_order_relaxed);
     atomic_fetch_add_explicit(&cn1AllocProfBytes[id], (long long)size, memory_order_relaxed);
     atomic_fetch_add_explicit(&cn1AllocProfCount[id], 1, memory_order_relaxed);
+}
+
+// The scenarios worth pricing. delta is how many bytes come OFF the header:
+//   0   today
+//   8   clazz* moves to a type-homogeneous page header
+//   16  the whole header moves to side metadata
+// allow16 adds a 16-byte size class beneath the present floor of 32, which is
+// the only way a 16-byte object can occupy 16 bytes rather than 32.
+static void cn1ReportSlotHistogram(void) {
+    static const struct { int delta; int allow16; const char* name; } sc[] = {
+        {  0, 0, "today            hdr=16" },
+        {  8, 0, "clazz from page  hdr=8 " },
+        { 16, 0, "side metadata    hdr=0 " },
+        {  8, 1, "hdr=8  + 16B class     " },
+        { 16, 1, "hdr=0  + 16B class     " },
+    };
+    int ns = (int)(sizeof(sc)/sizeof(sc[0]));
+    long long base = 0;
+    int i, k;
+    long long objSlot[8], arrSlot[8];
+    long long objCount = 0, arrCount = 0;
+    for(k = 0 ; k < ns ; k++) { objSlot[k] = 0; arrSlot[k] = 0; }
+    for(i = 0 ; i <= CN1_SLOTHIST_MAX ; i++) {
+        long no = atomic_load_explicit(&cn1SlotHistObj[i], memory_order_relaxed);
+        long na = atomic_load_explicit(&cn1SlotHistArr[i], memory_order_relaxed);
+        if(no == 0 && na == 0) {
+            continue;
+        }
+        objCount += no;
+        arrCount += na;
+        for(k = 0 ; k < ns ; k++) {
+            int shrunk = i - sc[k].delta;
+            int slot = cn1SlotClassFor(shrunk, sc[k].allow16);
+            if(slot == 0) {
+                slot = i;   // still oversized: no slot, no rounding, no saving
+            }
+            objSlot[k] += (long long)no * slot;
+            arrSlot[k] += (long long)na * slot;
+        }
+    }
+    base = objSlot[0] + arrSlot[0];
+    fprintf(stderr, "[SLOTHIST] page-resident allocations: %lld scalar, %lld array\n",
+            objCount, arrCount);
+    fprintf(stderr, "[SLOTHIST] legacy (> %d bytes, no slot, no rounding): %ld allocations, %lld bytes\n",
+            CN1_BIBOP_MAX_OBJECT,
+            atomic_load_explicit(&cn1SlotHistLegacyCount, memory_order_relaxed),
+            atomic_load_explicit(&cn1SlotHistLegacyBytes, memory_order_relaxed));
+    if(base == 0) {
+        fprintf(stderr, "[SLOTHIST] nothing page-resident recorded\n");
+        return;
+    }
+    for(k = 0 ; k < ns ; k++) {
+        long long tot = objSlot[k] + arrSlot[k];
+        fprintf(stderr, "[SLOTHIST] %s  slotBytes=%-14lld scalar=%-14lld array=%-14lld  %6.2f%% of today\n",
+                sc[k].name, tot, objSlot[k], arrSlot[k], 100.0 * (double)tot / (double)base);
+    }
+    // The sizes that carry the volume, so a reader can see WHERE a saving does or
+    // does not cross a class boundary instead of trusting the totals.
+    // The sizes carrying the volume, so a reader sees WHERE a saving does or does
+    // not cross a class boundary rather than trusting the totals. Selection by
+    // repeated max with a taken[] mark -- 2049 buckets, printed once at exit.
+    {
+        static char taken[CN1_SLOTHIST_MAX + 1];
+        fprintf(stderr, "[SLOTHIST] top request sizes by slot bytes today "
+                        "(req -> slot at hdr 16 / 8 / 0, and hdr 0 with a 16B class):\n");
+        for(k = 0 ; k < 12 ; k++) {
+            int bestI = -1;
+            long long bestB = -1;
+            for(i = 0 ; i <= CN1_SLOTHIST_MAX ; i++) {
+                long n;
+                long long b;
+                if(taken[i]) {
+                    continue;
+                }
+                n = atomic_load_explicit(&cn1SlotHistObj[i], memory_order_relaxed)
+                  + atomic_load_explicit(&cn1SlotHistArr[i], memory_order_relaxed);
+                if(n == 0) {
+                    continue;
+                }
+                b = (long long)n * cn1SlotClassFor(i, 0);
+                if(b > bestB) {
+                    bestB = b;
+                    bestI = i;
+                }
+            }
+            if(bestI < 0) {
+                break;
+            }
+            taken[bestI] = 1;
+            {
+                long no = atomic_load_explicit(&cn1SlotHistObj[bestI], memory_order_relaxed);
+                long na = atomic_load_explicit(&cn1SlotHistArr[bestI], memory_order_relaxed);
+                fprintf(stderr, "[SLOTHIST]   req=%-5d n=%-11ld (%ld scalar, %ld array)  "
+                                "slot %d / %d / %d / %d  slotBytes=%lld\n",
+                        bestI, no + na, no, na,
+                        cn1SlotClassFor(bestI, 0),
+                        cn1SlotClassFor(bestI - 8, 0),
+                        cn1SlotClassFor(bestI - 16, 0),
+                        cn1SlotClassFor(bestI - 16, 1),
+                        bestB);
+            }
+        }
+    }
 }
 
 // NOT comparable with the allocatedKb figure CN1_LOG_GC_OVERFLOW prints, and a
@@ -15944,6 +16100,7 @@ static void cn1ReportAllocProfile(void) {
                                              memory_order_relaxed);
         total += oor;
         fprintf(stderr, "[ALLOCPROF] totalBytes=%lld\n", total);
+        cn1ReportSlotHistogram();
         if(oor > 0) {
             fprintf(stderr, "[ALLOCPROF] %-44s bytes=%-12lld count=%-10ld "
                             "(classId past %d, highest seen %d -- RAISE THE BOUND)\n",
