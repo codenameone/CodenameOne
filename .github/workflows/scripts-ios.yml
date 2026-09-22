@@ -364,6 +364,31 @@ jobs:
           if-no-files-found: warn
           retention-days: 14
 
+      - name: The suite must have produced screenshots
+        # Runs in BOTH iOS Metal legs, and is the control that was missing.
+        #
+        # The screenshot step can be tolerated while a baseline set is being
+        # seeded -- there is nothing to compare against yet -- but "tolerated"
+        # kept turning into "produced nothing and said nothing". On the iOS 27
+        # leg that concealed three separate defects in a row: a warning census
+        # keyed to the wrong toolchain, a simulator destination that fell back to
+        # an iPad, and before those a reference directory that did not exist.
+        # Every one of them reported the job green with zero PNGs in the
+        # artifact, and each was only found by downloading that artifact by hand.
+        #
+        # A run that captures nothing is never a pass, whatever else is tolerated.
+        # Deliberately NOT expressed as a count against the reference directory:
+        # that guard exists inside run-ios-ui-tests.sh and is disabled by an empty
+        # reference set, which is exactly the situation a seeding run is in.
+        if: always()
+        run: |
+          set -euo pipefail
+          count=$(find "${ARTIFACTS_DIR}" -name '*.png' 2>/dev/null | wc -l | tr -d ' ')
+          echo "screenshots produced: ${count}"
+          if [ "${count}" -eq 0 ]; then
+            echo "::error title=No screenshots::the suite produced 0 screenshots; the leg validated nothing"
+            exit 1
+          fi
       - name: Publish Metal screenshot summary
         # Surfaces run-ios-ui-tests.sh's comparison result in the job's
         # GitHub Actions summary page so the Metal port status is visible
@@ -730,6 +755,31 @@ jobs:
       # would publish whichever leg finished last, the same clobber the comment
       # marker above already had to be split to avoid.
 
+      - name: The suite must have produced screenshots
+        # Runs in BOTH iOS Metal legs, and is the control that was missing.
+        #
+        # The screenshot step can be tolerated while a baseline set is being
+        # seeded -- there is nothing to compare against yet -- but "tolerated"
+        # kept turning into "produced nothing and said nothing". On the iOS 27
+        # leg that concealed three separate defects in a row: a warning census
+        # keyed to the wrong toolchain, a simulator destination that fell back to
+        # an iPad, and before those a reference directory that did not exist.
+        # Every one of them reported the job green with zero PNGs in the
+        # artifact, and each was only found by downloading that artifact by hand.
+        #
+        # A run that captures nothing is never a pass, whatever else is tolerated.
+        # Deliberately NOT expressed as a count against the reference directory:
+        # that guard exists inside run-ios-ui-tests.sh and is disabled by an empty
+        # reference set, which is exactly the situation a seeding run is in.
+        if: always()
+        run: |
+          set -euo pipefail
+          count=$(find "${ARTIFACTS_DIR}" -name '*.png' 2>/dev/null | wc -l | tr -d ' ')
+          echo "screenshots produced: ${count}"
+          if [ "${count}" -eq 0 ]; then
+            echo "::error title=No screenshots::the suite produced 0 screenshots; the leg validated nothing"
+            exit 1
+          fi
       - name: Publish Metal screenshot summary
         # Surfaces run-ios-ui-tests.sh's comparison result in the job's
         # GitHub Actions summary page so the Metal port status is visible
