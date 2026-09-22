@@ -211,7 +211,8 @@ class AndroidInstall(unittest.TestCase):
         compile_at = calls.index("shell cmd package compile -m speed -f com.example.bench")
         self.assertLess(compile_at, first_start, "compiled to steady state before any launch")
         starts = [c for c in calls if "am start" in c]
-        self.assertEqual(3, len(starts), "one untimed warm-up launch, then the two timed ones")
+        self.assertEqual(platforms.ANDROID_WARMUP_LAUNCHES + 2, len(starts),
+                         "the untimed warm-up launches, then the two timed ones")
         self.assertEqual(123.0, cold)
 
     def test_a_failed_install_is_reported_not_measured(self):

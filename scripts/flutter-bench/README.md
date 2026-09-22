@@ -116,7 +116,10 @@ result, and several were caught only after being measured the wrong way first.
   gate that passes in that state is indistinguishable from one that checked --
   so the run fails, says the gate is not armed, and leaves the baseline it
   recorded (`baseline-<platform>.json`) in the workflow artifact. Committing
-  that file arms the gate; re-committing it after a deliberate change (a
+  a baseline arms the gate -- but take its timing and memory figures as the
+  UPPER edge across several runs' candidates, not one run's best: Android's
+  best-of-five moved 282-418 ms across runs of unchanged code, and a baseline
+  taken from a low run fired on noise; re-committing it after a deliberate change (a
   Flutter SDK bump moves every number) re-baselines it. Each baseline carries
   its own tolerances: 2% for sizes, 25% for start-up, 15% for memory. A metric
   with no tolerance is recorded but not gated, and the file says why: macOS

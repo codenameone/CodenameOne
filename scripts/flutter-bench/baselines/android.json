@@ -1,14 +1,15 @@
 {
   "codenameone": {
     "code_bytes": 4720336,
-    "cold_start_ms": 331.0,
-    "idle_memory_bytes": 36403200,
+    "cold_start_ms": 418.0,
+    "idle_memory_bytes": 50436505,
     "install_bytes": 91589516,
     "wire_bytes": 91589516
   },
   "generated_at": "2026-09-22T19:37:15Z",
+  "notes": "Start-up and memory are the UPPER edge of what normal runs produced, not one run's best: a single run's best-of-five moved between 282 and 418 ms across six runs of unchanged code, and the first baseline, taken from a low one (331 ms), fired on noise. Memory is from the compiled-steady-state method (cmd package compile -m speed), whose mapped compiled code PSS counts -- 40.4 to 48.1 MB in its first run, against 34-37 MB before it. To be tightened as runs under the current method accumulate.",
   "platform": "android",
-  "recorded_from": "flutter-bench run 35772357318 (commit b3a601fcc8)",
+  "recorded_from": "sizes: flutter-bench run 35772357318; start-up and memory: the envelope of the runs through 35793506968 (commit fb8880b96d)",
   "schema_version": 1,
   "tolerances": {
     "code_bytes": 0.02,

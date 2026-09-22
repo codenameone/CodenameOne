@@ -65,6 +65,7 @@ LOWER_BOUND_MARKERS = {
     "flutter": re.compile(r"BENCH:FIRSTCONTENT"),
 }
 
+ANDROID_WARMUP_LAUNCHES = int(os.environ.get("BENCH_ANDROID_WARMUP", "3"))
 LAUNCH_TIMEOUT_S = float(os.environ.get("BENCH_LAUNCH_TIMEOUT", "90"))
 SETTLE_S = float(os.environ.get("BENCH_SETTLE", "12"))
 
@@ -707,11 +708,15 @@ class AndroidAdapter(Adapter):
         if compiled.returncode != 0 or "Success" not in (compiled.stdout or ""):
             raise Unavailable("could not compile the %s app ahead of time: %s"
                               % (side, ((compiled.stdout or "") + (compiled.stderr or "")).strip()))
-        # One launch that is not timed: first-run work -- creating the app's
+        # Launches that are not timed: first-run work -- creating the app's
         # data directory, first-launch caches -- belongs to installation, not
-        # to start-up.
-        self._adb("shell", "am", "start", "-W", "-n", "%s/%s" % (package, self.activities[side]))
-        self._adb("shell", "am", "force-stop", package)
+        # to start-up. Three, not one: with a single warm-up both sides still
+        # fell across all five timed runs (Codename One 1065, 1362, 478, 406,
+        # 367 ms; Flutter 1993 to 1130), because the emulator's own caches
+        # keep warming after the app's code is compiled.
+        for _ in range(ANDROID_WARMUP_LAUNCHES):
+            self._adb("shell", "am", "start", "-W", "-n", "%s/%s" % (package, self.activities[side]))
+            self._adb("shell", "am", "force-stop", package)
         self._installed.add(side)
 
     def launch_and_time(self, side):
