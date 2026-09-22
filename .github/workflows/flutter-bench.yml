@@ -162,7 +162,13 @@ jobs:
           - platform: linux
             runner: ubuntu-latest
           - platform: windows
-            runner: windows-latest
+            # PINNED, like FLUTTER_REF and for the same reason. windows-latest
+            # is Server 2025 and its Visual Studio has moved to 2026 (major
+            # 18), which Flutter 3.35.4 predates: it detects that install and
+            # reports it healthy, then maps it to no generator it knows and
+            # emits "Visual Studio 16 2019" instead. Pinning Flutter without
+            # pinning the toolchain it has to drive only moved the moving part.
+            runner: windows-2022
           - platform: javascript
             runner: ubuntu-latest
 
@@ -226,11 +232,13 @@ jobs:
         if: ${{ runner.os == 'Windows' }}
         shell: bash
         run: |
+          VS_VERSION=""
           VSWHERE="/c/Program Files (x86)/Microsoft Visual Studio/Installer/vswhere.exe"
           if [ -x "$VSWHERE" ]; then
             echo "== vswhere sees:"
-            "$VSWHERE" -products '*' -prerelease -format value \
-                -property installationVersion || true
+            VS_VERSION="$("$VSWHERE" -products '*' -prerelease -format value \
+                -property installationVersion 2>/dev/null | head -1)"
+            echo "${VS_VERSION:-<none>}"
             "$VSWHERE" -products '*' -prerelease -format value \
                 -property installationPath || true
           else
@@ -238,12 +246,24 @@ jobs:
           fi
           echo "== flutter doctor:"
           flutter doctor -v 2>&1 | tee /tmp/doctor.txt || true
-          if grep -qi "Visual Studio not installed" /tmp/doctor.txt; then
-            echo "Flutter cannot see a usable Visual Studio on this runner." >&2
-            echo "It would fall back to the 'Visual Studio 16 2019' CMake generator" >&2
-            echo "and fail inside CMake rather than here. Compare the two listings" >&2
-            echo "above: if vswhere lists an install that doctor does not accept," >&2
-            echo "the pinned Flutter is older than this runner's Visual Studio." >&2
+          # Checking that Flutter can MAP the install, not that it can see one.
+          # Presence is the wrong question: doctor reported
+          # "[OK] Visual Studio - develop Windows apps (Visual Studio Enterprise
+          # 2026 18.9.2)" on the very run this replaces, and the build then died
+          # in CMake. flutter_tools/lib/src/windows/visual_studio.dart maps major
+          # 17 and nothing else; every other major, detected or not, silently
+          # becomes the "Visual Studio 16 2019" generator. Update SUPPORTED_VS
+          # when FLUTTER_REF moves, and note that it is the CMake generator
+          # mapping that decides, not what doctor is willing to tick.
+          SUPPORTED_VS=17
+          MAJOR="$(printf '%s' "$VS_VERSION" | cut -d. -f1)"
+          if [ -z "$MAJOR" ] || [ "$MAJOR" != "$SUPPORTED_VS" ]; then
+            echo "This runner's Visual Studio is major '${MAJOR:-none}', and Flutter" >&2
+            echo "$FLUTTER_REF only maps major $SUPPORTED_VS to a CMake generator." >&2
+            echo "It would fall back to 'Visual Studio 16 2019' and fail inside" >&2
+            echo "CMake rather than here -- naming a version nobody asked for." >&2
+            echo "Pin the runner image to one carrying Visual Studio" >&2
+            echo "$SUPPORTED_VS, or move FLUTTER_REF and re-record baselines." >&2
             exit 1
           fi
 
