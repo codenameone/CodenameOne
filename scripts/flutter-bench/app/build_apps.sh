@@ -123,11 +123,43 @@ case "$PLATFORM" in
     cn1_build ios ios-source
     XCPROJ="$(first "$CN1/ios/target" -maxdepth 2 -type d -name '*-ios-source')"
     [ -n "$XCPROJ" ] || { echo "no generated Xcode project" >&2; exit 2; }
-    ( cd "$XCPROJ" && xcodebuild -project *.xcodeproj -configuration Release \
-        -sdk iphoneos CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO \
-        -derivedDataPath build build )
+    # BY TARGET, and with an explicit output directory.
+    #
+    # -derivedDataPath is refused without -scheme ("The flag -scheme,
+    # -testProductsPath, or -xctestrun is required when specifying
+    # -derivedDataPath"), and a Codename One project does not ship a shared
+    # scheme -- scripts/ios/create-shared-scheme.py exists precisely because
+    # one has to be created. That helper also wires a UI test bundle, which a
+    # size measurement has no use for. Targets are always present, and
+    # CONFIGURATION_BUILD_DIR puts the .app somewhere known instead of a hashed
+    # DerivedData directory, which is all -derivedDataPath was for.
+    TARGET="$( cd "$XCPROJ" && xcodebuild -list -project *.xcodeproj -json 2>/dev/null \
+        | python3 -c 'import json,sys
+try:
+    project = json.load(sys.stdin).get("project", {})
+except ValueError:
+    project = {}
+targets = project.get("targets") or []
+name = project.get("name")
+# The application target, which is the one named after the project; the first
+# target otherwise. Picking a test or extension target would measure the wrong
+# binary rather than fail, so the preference is explicit.
+print(name if name in targets else (targets[0] if targets else ""))' )"
+    [ -n "$TARGET" ] || {
+      echo "the generated Xcode project declares no target to build" >&2; exit 2; }
+    ( cd "$XCPROJ" && xcodebuild -project *.xcodeproj -target "$TARGET" \
+        -configuration Release -sdk iphoneos \
+        CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO \
+        CONFIGURATION_BUILD_DIR="$XCPROJ/build" build )
     echo "flutter=$FL/build/ios/iphoneos/Runner.app"
-    echo "cn1=$(first "$XCPROJ/build/Build/Products" -maxdepth 2 -name '*.app')"
+    # Directly under the build directory, because CONFIGURATION_BUILD_DIR put
+    # it there; the Build/Products/... nesting above it is DerivedData's layout,
+    # which this no longer uses.
+    CN1_APP="$(first "$XCPROJ/build" -maxdepth 1 -name '*.app')"
+    [ -n "$CN1_APP" ] || {
+      echo "xcodebuild reported success but produced no .app under" >&2
+      echo "$XCPROJ/build" >&2; exit 2; }
+    echo "cn1=$CN1_APP"
     ;;
 
   android)
