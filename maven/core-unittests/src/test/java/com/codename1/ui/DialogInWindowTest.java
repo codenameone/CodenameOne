@@ -3049,6 +3049,7 @@ class DialogInWindowTest extends UITestBase {
 
         // The keyboard is only actually asked to hide on a touch device with one
         // registered, so without both this assertion could never see anything.
+        final boolean wasTouchDevice = implementation.isTouchDevice();
         implementation.setTouchDevice(true);
         final int[] hidden = new int[1];
         Display.getInstance().setDefaultVirtualKeyboard(new com.codename1.impl.VirtualKeyboardInterface() {
@@ -3116,7 +3117,10 @@ class DialogInWindowTest extends UITestBase {
                     "a dialog closing on one window must not hide another window's keyboard");
         } finally {
             Display.getInstance().setDefaultVirtualKeyboard(null);
-            implementation.setTouchDevice(false);
+            // Put back what was there, NOT a hardcoded false: the default is true, so
+            // restoring false left every later test in the JVM on a non-touch device,
+            // where COMMAND_BEHAVIOR_BUTTON_BAR is silently rewritten to SOFTKEY.
+            implementation.setTouchDevice(wasTouchDevice);
             implementation.setFocusedEditingText(null);
             d.dispose();
             DisplayTest.flushEdt();
