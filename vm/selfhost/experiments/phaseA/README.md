@@ -76,3 +76,70 @@ Land it in smaller verifiable pieces than "make pages typed". Suggested order:
 
 Each step keeps the header intact, so every failure is a gate failure and not a
 wrong answer.
+
+---
+
+# Attempt 2: the minimal step also fails, and that is the useful part
+
+`step1-fastpath-only.patch` is the second attempt, and it is much smaller than
+the first. It changes NO pool code, NO sweep code and NO demotion logic. All it
+does is give `CN1_FAST_NEW` its own page per class, taken fresh from
+`bibopFreePool`, typed at format time, untyped and pushed to the sweep stack on
+retire. Everything else in the VM allocates exactly as before.
+
+It still breaks. `HtTorture: DIVERGE` on the gauntlet, first with wrong string
+sums and then -- after the full-page fix below -- with a NullPointerException.
+
+**That result is worth more than the patch.** Bug 2 of the first attempt (452
+`recycledSlot` violations) was blamed on the per-class pool plumbing. This
+attempt contains none of that plumbing and fails anyway, so the fault is NOT in
+the pools. It is in the basic act of giving the fast path a page that is not
+`bibopCurrent[ci]`.
+
+The hypothesis that follows, and the thing to establish before any further code:
+**something depends on there being exactly ONE owned page per (thread, size
+class).** Candidates, none yet checked:
+
+  * the sweep's treatment of `owned` pages (they are skipped outright);
+  * the O(1) page-level reclaim, which decides a whole page is dead from
+    `gcAllocedSinceSweep` + `gcLastMarkedEpoch` + `gcGraceEpoch`, all of which
+    are per page and were previously advanced by exactly one allocating cursor;
+  * `CN1_BIBOP_ACCOUNT_BYTES` and the GC trigger, which my typed acquire never
+    consults -- the ordinary path calls `cn1BibopMaybeGc` on every page
+    acquisition and this one does not;
+  * the free-list path in `cn1BibopAlloc`, which can hand out a slot from a page
+    the fast path also considers current.
+
+## Two further bugs found and fixed in this patch, worth keeping
+
+1. A FULL typed page was never retired. `bi >= CN1_BIBOP_SLOT_COUNT(ci)` simply
+   fell through to `__NEW_X`, leaving the page installed and `owned = TRUE`
+   forever -- and an owned page is skipped by the sweep, so its dead slots are
+   never reclaimed and its epoch bookkeeping never advances. Exhaustion now
+   counts as a miss and the page is retired and replaced.
+
+2. THE ASSERTION ITSELF WAS UNSAFE, and this is the more embarrassing one. It
+   reads `o->__codenameOneParentClsReference->clsName` for every slot below the
+   bump cursor, skipping only `CN1_BIBOP_FREE_MARK`. That does not cover every
+   non-object slot state -- a slot on the page free list holds an intrusive next
+   pointer over offset 0 -- so the check dereferenced a free-list pointer as a
+   clazz and took SIGSEGV (`FusedTest FAILED (exit 139)`), while reporting
+   `slot 1 of a java.lang.String page holds ?` as though it had found a real
+   violation. An invariant checker that crashes and cries wolf is worse than
+   none. It needs a slot-liveness predicate that is right for every state a slot
+   can be in, and that predicate does not currently exist in one place.
+
+## What this line of work actually needs next
+
+Not another patch. An enumeration, written down and checked against the code:
+
+  * every state a BiBOP slot can be in (live / fresh / freed onto the page free
+    list / quarantined / adopted / above the bump cursor) and how to tell them
+    apart safely from outside the allocator;
+  * every invariant the sweep and the page-level reclaim assume about `owned`,
+    about how many cursors advance a page, and about `bibopCurrent[ci]` being
+    the only one;
+  * only then, which of those a typed page changes.
+
+Three attempts have each found a real invariant by violating it. The cheapest
+way to find the fourth is to read for it rather than to run for it.
