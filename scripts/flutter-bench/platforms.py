@@ -696,6 +696,22 @@ class AndroidAdapter(Adapter):
             detail = ((out.stdout or "") + (out.stderr or "")).strip().splitlines()
             raise Unavailable("could not install the %s apk: %s"
                               % (side, detail[-1] if detail else "adb returned %d" % out.returncode))
+        # Compiled to its steady state BEFORE anything is timed. A fresh install
+        # is compiled in the background as it runs, so start-up fell across
+        # every run -- 2853, 888, 1209, 543, 418 ms in one of them -- and
+        # best-of-five picked whichever run the compiler had reached. The
+        # "best" moved 282 to 418 ms between runs of unchanged code and tripped
+        # a 25% gate. `speed` is the state an idle device optimizes an app to,
+        # applied to both sides (Flutter's own dex is small, its code is AOT).
+        compiled = self._adb("shell", "cmd", "package", "compile", "-m", "speed", "-f", package)
+        if compiled.returncode != 0 or "Success" not in (compiled.stdout or ""):
+            raise Unavailable("could not compile the %s app ahead of time: %s"
+                              % (side, ((compiled.stdout or "") + (compiled.stderr or "")).strip()))
+        # One launch that is not timed: first-run work -- creating the app's
+        # data directory, first-launch caches -- belongs to installation, not
+        # to start-up.
+        self._adb("shell", "am", "start", "-W", "-n", "%s/%s" % (package, self.activities[side]))
+        self._adb("shell", "am", "force-stop", package)
         self._installed.add(side)
 
     def launch_and_time(self, side):

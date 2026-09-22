@@ -176,6 +176,7 @@ class AndroidInstall(unittest.TestCase):
             handle.write("#!/bin/sh\n"
                          "echo \"$*\" >> '%s'\n"
                          "case \"$*\" in *\\ install\\ *|install\\ *) cat '%s';; "
+                         "*'package compile'*) echo Success;; "
                          "*'am start'*) echo 'TotalTime: 123';; esac\n"
                          % (self.log, self.result))
         os.chmod(adb, 0o755)
@@ -207,6 +208,10 @@ class AndroidInstall(unittest.TestCase):
         self.assertLess(calls.index("uninstall com.example.bench"), calls.index(installs[0]))
         first_start = next(i for i, c in enumerate(calls) if "am start" in c)
         self.assertLess(calls.index(installs[0]), first_start, "installed before it is launched")
+        compile_at = calls.index("shell cmd package compile -m speed -f com.example.bench")
+        self.assertLess(compile_at, first_start, "compiled to steady state before any launch")
+        starts = [c for c in calls if "am start" in c]
+        self.assertEqual(3, len(starts), "one untimed warm-up launch, then the two timed ones")
         self.assertEqual(123.0, cold)
 
     def test_a_failed_install_is_reported_not_measured(self):
