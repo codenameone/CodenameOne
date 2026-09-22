@@ -252,5 +252,28 @@ class GateArming(unittest.TestCase):
         self.assertEqual("armed", written["gate"]["status"])
 
 
+class StartupBracket(unittest.TestCase):
+    """The start-up ratio comes from Flutter's end least favourable to us."""
+
+    def _report(self):
+        # The first Windows run that measured both sides: Codename One 219 ms,
+        # Flutter bracketed 116 ms (FIRSTCONTENT) to 260 ms (RASTERDONE).
+        return {"codenameone": {"cold_start_ms": 219.0},
+                "flutter": {"cold_start_ms": 260.0, "cold_start_lower_ms": 116.0}}
+
+    def test_the_ratio_uses_flutters_lower_end(self):
+        entry = benchlib.verdict(self._report())["cold_start_ms"]
+        self.assertAlmostEqual(116.0 / 219.0, entry["ratio"], places=3)
+        self.assertEqual("flutter", entry["winner"],
+                         "judged by the upper end this read as a Codename One win")
+
+    def test_the_table_still_shows_the_whole_bracket(self):
+        report = self._report()
+        report.update(platform="windows", runs=5, verdict=benchlib.verdict(report))
+        text = benchlib.render_markdown([report])
+        self.assertIn("116", text)
+        self.assertIn("260", text)
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

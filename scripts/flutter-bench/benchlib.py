@@ -46,10 +46,14 @@ METRICS = [
 ]
 
 # Start-up is reported as a BRACKET, not a point, because the two runtimes do
-# not expose the same event. `cold_start_ms` is the conservative end -- the one
-# that cannot flatter us -- and `cold_start_lower_ms` is the optimistic end.
-# Only the conservative end is compared and gated; the other is carried so a
-# reader can see the width of the uncertainty rather than having to trust it.
+# not expose the same event. Flutter's `cold_start_ms` is RASTERDONE, after its
+# first frame is rasterised, and `cold_start_lower_ms` is FIRSTCONTENT, a
+# UI-thread callback before it; Codename One has one marker. The RATIO is taken
+# from Flutter's LOWER end -- the one least favourable to Codename One -- because
+# the bracket exists precisely because the events may not line up, and a ratio
+# of Flutter's time over ours only grows, and flatters us, as Flutter's figure
+# grows. Both ends are carried so a reader sees the width of the uncertainty.
+# The gate is Codename One's alone, so it is unaffected.
 BRACKET_METRIC = "cold_start_ms"
 BRACKET_LOWER = "cold_start_lower_ms"
 
@@ -338,6 +342,12 @@ def verdict(report):
     for key, _label, _unit in METRICS:
         ours = report["codenameone"].get(key)
         theirs = report["flutter"].get(key)
+        if key == BRACKET_METRIC:
+            lower = report["flutter"].get(BRACKET_LOWER)
+            if lower and theirs:
+                # The least favourable end: see BRACKET_METRIC. This used the
+                # upper end, which the report's own note said it did not.
+                theirs = min(theirs, lower)
         if ours is None or theirs is None or not ours or not theirs:
             out[key] = {"status": "not measured"}
             continue
@@ -421,7 +431,7 @@ def render_markdown(reports, title="Flutter vs Codename One"):
                     # of the gap is measurement uncertainty rather than runtime.
                     flutter_cell = "%s (%s-%s)" % (
                         flutter_cell, format_value(key, lower),
-                        format_value(key, entry["flutter"]))
+                        format_value(key, report["flutter"].get(BRACKET_METRIC)))
             lines.append("| %s | %s | %s | %.2fx | %s |" % (
                 label,
                 format_value(key, entry["codenameone"]),
