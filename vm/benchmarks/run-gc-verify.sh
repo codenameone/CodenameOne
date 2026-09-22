@@ -199,8 +199,23 @@ elif [ ! -x ./target/bin/MapTorture2-verify ]; then
     echo "BROKEN -- could not build MapTorture2 for the block self-test"
     fail=1
 else
-    hbOut="$(CN1_GC_FAULT=halfblock ./target/bin/MapTorture2-verify 2>&1)" || true
-    if printf '%s' "$hbOut" | grep -qE 'LOST|CORRUPT'; then
+    # A 4MB collection trigger, and it is what makes this a test rather than a coin flip.
+    # The damage only appears if a collection lands while live entries sit in the
+    # untraced half of a block, and at the default trigger MapTorture2 runs few enough
+    # cycles that it often does not: measured 2 of 8 runs detected on one tree and 5 of
+    # 8 on the next, so a single attempt reported BROKEN on code that was fine. At 4MB
+    # both trees detected 8 of 8, and at 1MB too.
+    #
+    # The CONTROL run at the same trigger is what keeps that honest: if a small trigger
+    # alone made MapTorture2 lose entries, "detection" would be a real bug and not the
+    # injected one, so the unfaulted run must stay clean (measured 4 of 4 on both trees).
+    hbCtl="$(CN1_GC_TRIGGER_MB=4 ./target/bin/MapTorture2-verify 2>&1)" || true
+    hbOut="$(CN1_GC_TRIGGER_MB=4 CN1_GC_FAULT=halfblock ./target/bin/MapTorture2-verify 2>&1)" || true
+    if printf '%s' "$hbCtl" | grep -qE 'LOST|CORRUPT|violations=[1-9]'; then
+        echo "BROKEN -- MapTorture2 loses entries at a 4MB trigger WITHOUT the fault (a real bug)"
+        printf '%s\n' "$hbCtl" | grep -E 'LOST|CORRUPT|violations=' | head -5
+        fail=1
+    elif printf '%s' "$hbOut" | grep -qE 'LOST|CORRUPT'; then
         echo "detected the injected half-traced block ($(printf '%s' "$hbOut" | grep -oE 'LOST[^"]*|CORRUPT[^"]*' | head -1))"
     else
         echo "BROKEN -- tracing only half of every reference block lost nothing"
