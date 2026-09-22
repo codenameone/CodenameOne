@@ -5625,3 +5625,85 @@ violation. It is load-sensitive under parallel marking (the same binary fired
 Baseline and this branch both fired 8/8 when re-measured, so it is not this
 change -- but a guard whose reliability depends on machine load will read green
 when it should not, and it is worth fixing on its own.
+
+---
+
+## Round 32: the core-scaling matrix, and why SELFHOST read NA
+
+run-matrix.sh 3 "1 2 4", both sides held to the same count
+(-XX:ActiveProcessorCount=N for HotSpot, CN1_GC_MARK_THREADS=N for us), JDK 25
+warm off its AOT cache. Machine was NOT quiet: load 17.10 at the start, another
+checkout's simulator at 534% CPU. Canary intArithmetic@1 = 59.3 ms. Every
+objectAllocation cell came back flagged (spread >15%) and those are the
+headline numbers -- treat them as indicative only.
+
+    benchmark              cores=1        cores=2        cores=4
+    writeManySmall         0.14x          0.14x          0.14x
+    valueEscape            0.52x!         0.51x          0.61x!
+    readChunked            0.84x          0.91x          0.83x
+    copyStreams            0.88x          0.81x          0.83x
+    openCloseOnly          0.89x          0.92x          0.88x
+    readFully              0.90x!         0.93x          0.93x
+    quicksort              0.93x          0.89x          0.96x
+    mathTranscendental     0.96x          0.95x          0.97x
+    arrayRandom            0.98x          0.92x          0.97x
+    writeWhole             1.00x          1.03x          1.08x
+    intArithmetic          1.02x          1.03x          1.04x
+    arraySequential        1.06x          1.04x          1.09x
+    longArithmetic         1.07x          1.09x!         1.07x
+    hashMapChurn           1.57x          1.39x          1.46x
+    recursion              1.92x          1.89x          1.96x
+    stringBuilding         1.97x          1.90x          1.56x!
+    objectAllocation       3.79x!         2.94x!         2.69x!
+
+Ten of seventeen rows beat JDK 25. objectAllocation scales with cores --
+3.79x/2.94x/2.69x, 53.2/33.9/31.7 ms -- which is the parallel grace pass of
+Round 31 doing what it was built for, and the first confirmation of it outside
+the A/B. It is still the worst row by a wide margin.
+
+**SELFHOST read NA at all three core counts, and the cause was a bug of ours.**
+bench-selfhost refuses a ratio unless every arm emits byte-identical C. It
+diverged, and the divergence came from this branch's frame-exit retirement:
+
+    retireCandidates = new java.util.HashMap<TypeInstruction, Integer>();
+
+Phase 2 numbers the guards by walking that map, and TypeInstruction overrides
+neither hashCode nor equals, so iteration runs in IDENTITY HASH order -- by
+allocation address. Two runs of the SAME self-hosted translator on the SAME
+input emitted different C; three files differed (XMLParser, Resources,
+CSSEngine), each by the same 8 lines with __cn1dead_1 and __cn1dead_2 swapped.
+
+Latent until Round 31: the parallel grace pass moved allocation addresses,
+which moved the identity hashes, which moved the iteration order. The 16-core
+matrix of the previous day verified all three arms; the next day's refused.
+Note what that means for the gate -- the divergence is reported against the
+FIRST arm to run, so it was labelled as the jdk25 arm diverging when the
+nondeterministic arm was ours. Reproducing it by running one arm twice is what
+identified it; the label did not.
+
+LinkedHashMap fixes it (insertion order is bytecode order). Second effect worth
+having: the loop stops at guard >= 8, so WHICH eight sites got retired in a
+method with more candidates was arbitrary per run too. Verified with three
+consecutive runs of the rebuilt translator, 5871 files each, 0 differing.
+
+**The row, once it could be measured** (3 rounds, load 6.30, parpar elapsed
+spread 3.0-3.6%, jdk25 0.8-3.8% -- the tightest arm in this session):
+
+                          cores=1    cores=2    cores=4
+    vs jdk25 wall          1.024x     1.038x     1.063x
+    vs jdk25 peak mem      1.013x     0.970x     0.876x
+    vs jdk8  wall          0.799x     0.822x     0.830x
+    vs jdk8  peak mem      0.686x     0.645x     0.596x
+
+Peak memory against JDK 25 improves monotonically with cores and passes 1.00x
+at two -- the shorter cycle leaves the mutator less time to run ahead, so time
+and memory move together rather than trading off, which is the same effect the
+marker-count note records. Wall clock is 1.02-1.06x and moves the WRONG way
+with cores: jdk25 gains from them (5.467/5.488/5.356s median) while we stay
+flat (5.600/5.699/5.694s). That is the AOT-vs-JIT throughput gap, not a
+collector problem, and it is where the remaining work is.
+
+NOT COMPARABLE, and worth stating because it is the obvious mistake to make
+with these numbers: the previous day's clean SELFHOST run was at 16 cores
+(1.114x wall, 0.944x peak). It cannot be used to claim this session's work
+moved the figure. A same-core-count before/after is still unmeasured.
