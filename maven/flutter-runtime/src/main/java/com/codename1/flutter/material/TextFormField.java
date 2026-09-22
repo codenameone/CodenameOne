@@ -109,6 +109,23 @@ public class TextFormField extends StatelessWidget {
         if (onChanged != null) {
             field.onChanged(onChanged);
         }
+        // maxLength, maxLines and minLines were accepted here and dropped on the
+        // way to the field, so a form field could not count its characters or
+        // grow past one line however it was configured. The text-field demo is
+        // all TextFormField: its phone number asks for a 14-character counter
+        // and its life story for three lines.
+        if (maxLength instanceof Number) {
+            field.maxLength(((Number) maxLength).longValue());
+        }
+        if (maxLines instanceof Number) {
+            field.maxLines(((Number) maxLines).longValue());
+        }
+        if (minLines instanceof Number) {
+            field.minLines(((Number) minLines).longValue());
+        }
+        if (keyboardType != null) {
+            field.keyboardType(keyboardType);
+        }
         return field;
     }
 }

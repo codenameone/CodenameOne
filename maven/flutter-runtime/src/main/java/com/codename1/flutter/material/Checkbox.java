@@ -38,6 +38,7 @@ import dart.runtime.Funcs;
 public class Checkbox extends Widget {
 
     private Boolean value;
+    private boolean tristate;
     private Funcs.VoidFunc1<Boolean> onChanged;
 
     public void value(Boolean v) {
@@ -50,10 +51,25 @@ public class Checkbox extends Widget {
 
     /**
      * Whether the checkbox has a third "indeterminate" state
-     * ({@code Checkbox.tristate}). The CN1 checkbox is binary, so this flag is
-     * accepted for API compatibility but not otherwise modelled.
+     * ({@code Checkbox.tristate}).
+     *
+     * <p>This used to be accepted and discarded, and a null value was collapsed
+     * to false -- so the selection-controls demo's indeterminate box rendered as
+     * an ordinary empty one and the dash the reference shows was nowhere in the
+     * app.</p>
      */
     public void tristate(boolean v) {
+        this.tristate = v;
+    }
+
+    /** Whether the box is in its third, indeterminate state. */
+    public boolean isIndeterminate() {
+        return tristate && value == null;
+    }
+
+    /** True when the widget states no handler, i.e. the box is disabled. */
+    public boolean isEnabled() {
+        return onChanged != null;
     }
 
     public boolean getValue() {

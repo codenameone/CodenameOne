@@ -150,8 +150,21 @@ public class TextRenderElement extends RenderElement {
             // painted entirely in the platform default.
             Font named = com.codename1.flutter.fonts.FontResolver.resolve(
                     ts.fontFamily(), ts.getFontWeight(), false);
+            // Whether the face we ended up with ALREADY carries the asked-for
+            // weight. Synthesising bold on top of a bold file doubles it.
+            boolean weighted = named != null;
             if (named != null) {
                 base = named;
+            } else if (ts.getFontSize() != null) {
+                // No bundled face, but a size was asked for -- and a size only
+                // means something on a face that can derive. See
+                // FontResolver.platformFace.
+                Font platform = com.codename1.flutter.fonts.FontResolver.platformFace(
+                        ts.getFontWeight(), false);
+                if (platform != null) {
+                    base = platform;
+                    weighted = true;
+                }
             }
             if (base == null) {
                 base = Font.getDefaultFont();
@@ -164,7 +177,7 @@ public class TextRenderElement extends RenderElement {
                 // A resolved face ALREADY carries its weight (the Bold file was
                 // picked, not the Regular one), so asking Codename One to bold
                 // it again synthesises a second helping of weight on top.
-                int weight = named == null
+                int weight = !weighted
                         && ts.getFontWeight() != null && ts.getFontWeight().isBold()
                         ? Font.STYLE_BOLD : Font.STYLE_PLAIN;
                 try {

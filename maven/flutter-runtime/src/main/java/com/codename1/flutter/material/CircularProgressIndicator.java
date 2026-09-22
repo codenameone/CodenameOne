@@ -35,7 +35,7 @@ import com.codename1.flutter.widgets.SizedBox;
  * spin are accepted; this pass reserves a square box sized to the default
  * indicator diameter, deferring the arc paint and spin animation.
  */
-public class CircularProgressIndicator extends StatelessWidget {
+public class CircularProgressIndicator extends Widget {
 
     private Double value;
     private Color color;
@@ -71,11 +71,23 @@ public class CircularProgressIndicator extends StatelessWidget {
         return value;
     }
 
+    /** The stroke width, or null for the Material default. */
+    public Double getStrokeWidth() {
+        return strokeWidth;
+    }
+
+    /** The arc colour, or null to take the theme's primary. */
+    public Color getColor() {
+        return color;
+    }
+
+    /** The track colour behind the arc, or null when there is none. */
+    public Color getBackgroundColor() {
+        return backgroundColor;
+    }
+
     @Override
-    public Widget build(BuildContext context) {
-        SizedBox box = new SizedBox();
-        box.width(36.0);
-        box.height(36.0);
-        return box;
+    public com.codename1.flutter.Element createElement() {
+        return new CircularProgressIndicatorRenderElement(this);
     }
 }

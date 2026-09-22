@@ -114,4 +114,12 @@ public final class BorderSide {
         p.style(PaintingStyle.stroke);
         return p;
     }
+
+    /** Flutter's default {@code BorderSide()}: opaque black, one logical pixel. */
+    public static BorderSide solidBlack() {
+        BorderSide s = new BorderSide();
+        s.color(new Color(0xFF000000L));
+        s.width(1);
+        return s;
+    }
 }

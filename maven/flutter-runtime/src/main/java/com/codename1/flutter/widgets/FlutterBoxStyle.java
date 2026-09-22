@@ -60,8 +60,13 @@ final class FlutterBoxStyle {
                 shape = d.getShape();
             }
             if (shape == BoxShape.circle && bg != null) {
-                face.getAllStyles().setBorder(
-                        RoundBorder.create().color(bg.rgb()).opacity(bg.alpha()));
+                // RoundBorder with no shadow, which Codename One now draws
+                // straight onto the Graphics rather than through a
+                // component-sized image -- the thing that made an image-backed
+                // circle unusable for a coach mark, whose radius animates.
+                face.getAllStyles().setBorder(RoundBorder.create()
+                        .color(bg.rgb())
+                        .opacity(bg.alpha()));
                 face.getAllStyles().setBgTransparency(0);
                 return;
             }
@@ -71,13 +76,24 @@ final class FlutterBoxStyle {
             if (radiusLp > 0 || shadowed) {
                 // Rounded corners and elevation are what make Material look like
                 // Material; a flat bgColor drops both.
+                // The cache is switched on exactly when there is a shadow, and
+                // that is a correctness requirement rather than a tuning knob:
+                // with it off, RoundRectBorder renders through
+                // createTargetComponentImage, which translates the LIVE Graphics
+                // by the shadow's shape offset and never undoes it, so every
+                // sibling painted afterwards is displaced -- and displaced
+                // again by the next shadowed box, accumulating down the page.
+                // With no shadow that offset is zero and the cheaper uncached
+                // path is exact. See CardRenderElement, where this cost the
+                // cards demo 9 device pixels per card.
                 com.codename1.ui.plaf.RoundRectBorder border =
                         com.codename1.ui.plaf.RoundRectBorder.create()
-                                .useCache(false)
+                                .useCache(shadowed)
                                 .cornerRadius(com.codename1.flutter.rendering.Dp.mm(radiusLp));
                 if (shadowed) {
                     border = border.shadowOpacity(40).shadowSpread(0.5f).shadowY(1);
                 }
+                border = withOutline(border, decoration);
                 face.getAllStyles().setBorder(border);
                 if (bg != null) {
                     face.getAllStyles().setBgColor(bg.rgb());
@@ -85,6 +101,7 @@ final class FlutterBoxStyle {
                 } else {
                     face.getAllStyles().setBgTransparency(0);
                 }
+                applyDecorationImage(face, decoration);
                 return;
             }
             if (bg != null) {
@@ -93,6 +110,7 @@ final class FlutterBoxStyle {
             } else {
                 face.getAllStyles().setBgTransparency(0);
             }
+            applyDecorationImage(face, decoration);
         } catch (Exception err) {
             // styling is best-effort; layout must survive regardless
         }
@@ -125,9 +143,111 @@ final class FlutterBoxStyle {
         }
         if (decoration instanceof BoxDecoration) {
             BoxDecoration d = (BoxDecoration) decoration;
+            // getImage() belongs here: a decoration whose ONLY content is an
+            // image paints something, and leaving it out of this test meant no
+            // component was created for it at all -- so the code that paints
+            // the image was never reached and the fix for it looked inert.
             return d.getColor() != null || d.getGradient() != null
-                    || d.getBorder() != null || d.getBoxShadow() != null;
+                    || d.getBorder() != null || d.getBoxShadow() != null
+                    || d.getImage() != null;
         }
         return decoration != null;
+    }
+
+    /**
+     * Paints a {@code BoxDecoration}'s {@link com.codename1.flutter.DecorationImage}
+     * as the component's background.
+     *
+     * <p>The decoration image was stored and never read, so every
+     * {@code BoxDecoration(image:)} in the app painted nothing at all. The cards
+     * demo is where it shows worst: {@code Ink.image} is how a Material card puts
+     * a photo behind its ink splash, so the cards kept their layout and their
+     * captions and lost every photograph.</p>
+     *
+     * <p>Codename One paints a background image from the style, so the mapping is
+     * {@code BoxFit} onto a background type. Only the fits a background can
+     * express are mapped; anything else takes {@code cover}, which is both
+     * Flutter's common case here and the one that never leaves the box
+     * part-empty.</p>
+     */
+    private static void applyDecorationImage(Component face, Object decoration) {
+        if (!(decoration instanceof BoxDecoration)) {
+            return;
+        }
+        Object raw = ((BoxDecoration) decoration).getImage();
+        if (!(raw instanceof com.codename1.flutter.DecorationImage)) {
+            return;
+        }
+        com.codename1.flutter.DecorationImage di = (com.codename1.flutter.DecorationImage) raw;
+        com.codename1.ui.Image img = load(di.getImage());
+        if (img == null) {
+            return;
+        }
+        face.getAllStyles().setBgImage(img);
+        face.getAllStyles().setBackgroundType(backgroundType(di.getFit()));
+    }
+
+    /** The CN1 background type for a {@code BoxFit}. */
+    private static byte backgroundType(com.codename1.flutter.BoxFit fit) {
+        if (fit == com.codename1.flutter.BoxFit.contain
+                || fit == com.codename1.flutter.BoxFit.scaleDown) {
+            return com.codename1.ui.plaf.Style.BACKGROUND_IMAGE_SCALED_FIT;
+        }
+        if (fit == com.codename1.flutter.BoxFit.fill) {
+            return com.codename1.ui.plaf.Style.BACKGROUND_IMAGE_SCALED;
+        }
+        return com.codename1.ui.plaf.Style.BACKGROUND_IMAGE_SCALED_FILL;
+    }
+
+    /**
+     * Decodes an {@link com.codename1.flutter.ImageProvider} that names a bundled
+     * asset. A network provider is not resolved here: a background image has no
+     * placeholder to show while it arrives.
+     */
+    private static com.codename1.ui.Image load(com.codename1.flutter.ImageProvider provider) {
+        if (!(provider instanceof com.codename1.flutter.AssetImage)) {
+            return null;
+        }
+        String name = ((com.codename1.flutter.AssetImage) provider).resolvedName();
+        try {
+            com.codename1.flutter.FlutterAssets.Resolved res =
+                    com.codename1.flutter.FlutterAssets.open(FlutterBoxStyle.class, name);
+            if (res == null) {
+                com.codename1.io.Log.p("Flutter runtime: decoration image not found: " + name);
+                return null;
+            }
+            return com.codename1.ui.EncodedImage.create(res.stream());
+        } catch (Exception cannotDecode) {
+            com.codename1.io.Log.p("Flutter runtime: could not decode decoration image " + name);
+            return null;
+        }
+    }
+
+    /**
+     * Adds a {@code BoxDecoration.border}'s stroke to a rounded border.
+     *
+     * <p>The border was consulted only to decide whether the decoration paints
+     * anything, never drawn. An outlined chip is the case that shows it: the
+     * action chip's whole appearance IS its outline, so without this it read as
+     * an icon and some text loose on the page.</p>
+     */
+    private static com.codename1.ui.plaf.RoundRectBorder withOutline(
+            com.codename1.ui.plaf.RoundRectBorder border, Object decoration) {
+        if (!(decoration instanceof BoxDecoration)) {
+            return border;
+        }
+        Object raw = ((BoxDecoration) decoration).getBorder();
+        if (!(raw instanceof com.codename1.flutter.Border)) {
+            return border;
+        }
+        com.codename1.flutter.BorderSide side = ((com.codename1.flutter.Border) raw).top();
+        if (side == null || side.color() == null) {
+            return border;
+        }
+        double w = side.width() <= 0 ? 1 : side.width();
+        return border
+                .strokeColor(side.color().rgb())
+                .strokeOpacity(side.color().alpha())
+                .stroke((float) com.codename1.flutter.rendering.Dp.px(w), false);
     }
 }

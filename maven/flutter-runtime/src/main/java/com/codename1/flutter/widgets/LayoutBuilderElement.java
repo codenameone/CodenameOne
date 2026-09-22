@@ -101,6 +101,23 @@ public class LayoutBuilderElement extends SingleChildRenderElement {
     }
 
     @Override
+    protected void performRebuild() {
+        // A REBUILD re-runs the builder, even at the same constraints.
+        //
+        // Caching against the constraints alone is right for repeated layout
+        // passes and wrong for setState: Flutter's LayoutBuilder rebuilds its
+        // builder whenever the element is dirty, because the builder closes
+        // over state that the constraints know nothing about. Keeping the
+        // cached result meant a LayoutBuilder whose state changed kept showing
+        // what it built the first time -- the gallery's feature discovery is
+        // exactly that shape, and the coach mark stayed at the zero radius it
+        // was born with however far its animation ran.
+        builtFor = null;
+        invalidateLayoutCache();
+        super.performRebuild();
+    }
+
+    @Override
     protected Size performLayout(BoxConstraints constraints) {
         BoxConstraints logical = toLogical(constraints);
         // A DRY pass must never run the builder. Codename One measures a

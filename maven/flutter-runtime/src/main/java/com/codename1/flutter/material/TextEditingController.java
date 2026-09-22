@@ -71,6 +71,20 @@ public class TextEditingController {
     }
 
     /**
+     * The value this controller holds, WITHOUT consulting the component.
+     *
+     * <p>{@link #text()} prefers the bound component's live text, which is
+     * right once the field is showing the value and wrong before it ever
+     * received one: reading it during the first apply overwrote the initial
+     * text with the empty component's, so a controller built as
+     * {@code TextEditingController(text: '25')} left the field blank and threw
+     * the 25 away. The sliders demo's editable value is exactly that.</p>
+     */
+    String rawValue() {
+        return value;
+    }
+
+    /**
      * Imperative setter (Dart {@code controller.text = v}): updates the bound
      * component when mounted and notifies listeners.
      */

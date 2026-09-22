@@ -53,8 +53,18 @@ public class FittedBox extends Widget implements HasChild {
         return child;
     }
 
+    /** How the child is scaled into the box; Flutter defaults to {@code contain}. */
+    public Object getFit() {
+        return fit;
+    }
+
+    /** Where the scaled child sits in the box; Flutter defaults to the centre. */
+    public Object getAlignment() {
+        return alignment;
+    }
+
     @Override
     public Element createElement() {
-        return new PassThroughRenderElement(this);
+        return new FittedBoxRenderElement(this);
     }
 }

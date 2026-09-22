@@ -170,6 +170,17 @@ public abstract class EffectRenderElement extends RenderElement {
         return lastConstraints;
     }
 
+    /**
+     * The render element of the single child, or null before it is mounted.
+     *
+     * <p>Exposed so a subclass can lay the child out on its own terms -- a
+     * {@link FittedBoxRenderElement} has to measure it UNBOUNDED, which is the
+     * whole difference between text that shrinks to fit and text that wraps.</p>
+     */
+    protected final RenderElement effectRenderChild() {
+        return findRenderElement(content);
+    }
+
     @Override
     protected Size performLayout(BoxConstraints constraints) {
         lastConstraints = constraints;
@@ -270,9 +281,17 @@ public abstract class EffectRenderElement extends RenderElement {
     ///         report it rather than drawing square in silence
     protected final boolean paintShapeClipped(Graphics g, Container pane, Subtree subtree,
             com.codename1.ui.geom.GeneralPath shape) {
-        if (shape == null || !g.isShapeClipSupported()) {
+        if (shape == null) {
             return false;
         }
+        // NOTE: no isShapeClipSupported gate. The subtree is rendered to a
+        // buffer below and the rounding is applied to that buffer, either by
+        // clipping the target graphics where the port supports it or by MASKING
+        // the buffer where it does not. Gating on shape-clip support meant the
+        // iOS pipeline -- which reports no support for a live paint but does
+        // support it while a transition paints into an image -- drew the demo
+        // cards with rounded corners during the transition and square ones the
+        // moment it settled.
         // INTERSECT, do not replace. setClip(Shape) installs the shape outright, so
         // whatever the ancestors had established was simply discarded -- and the nearest
         // ancestor that matters is usually a scroller. A clipped subtree inside a list
@@ -289,6 +308,25 @@ public abstract class EffectRenderElement extends RenderElement {
         int cy = g.getClipY();
         int cw = g.getClipWidth();
         int ch = g.getClipHeight();
+        // One application, around the whole subtree.
+        //
+        // NOTE: a shaped clip does NOT survive a subtree here, and that is by
+        // design in Codename One -- Component.paintComponent and
+        // paintInternalImpl save the clip as four ints and restore it with
+        // setClip(x,y,w,h), which degrades a shape to its bounding box for
+        // every sibling after the first. Making those pairs shape-aware is the
+        // change that is deliberately commented out in Component, because it
+        // alters the paint contract for every existing application.
+        //
+        // Two things were tried here and are recorded so they are not tried
+        // again. Rendering the subtree to a buffer and masking it rounds
+        // correctly on the desktop but fails on iOS -- a mutable-image detour
+        // mid-paint leaves a stale scissor (issue #5171,
+        // MutableImageClipReadbackTest) and createMask can fault for
+        // image-scale buffers (SimdLargeAllocaTest). Painting each child
+        // separately with the clip re-installed per child loses what
+        // Container.paint does around its child loop, and measured 13.97% wrong
+        // across the sweep against 2.54%.
         g.pushClip();
         try {
             g.setClip(shape);

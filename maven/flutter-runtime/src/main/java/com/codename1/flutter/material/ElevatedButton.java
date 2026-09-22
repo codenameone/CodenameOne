@@ -56,6 +56,10 @@ public class ElevatedButton extends ButtonBase {
         b.onPressed(onPressed);
         b.style(style);
         b.child(label != null ? label : icon);
+        if (label != null) {
+            b.leadingIcon(icon);
+        }
         return b;
     }
+
 }

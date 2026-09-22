@@ -45,6 +45,9 @@ import dart.runtime.Funcs;
  */
 public class CheckboxRenderElement extends RenderElement {
 
+    /** Material's checkbox glyph size in logical pixels. */
+    private static final double GLYPH_LP = 18;
+
     /** Material minimum tap target in logical pixels. */
     public static final double TAP_TARGET_LP = 48;
 
@@ -71,35 +74,86 @@ public class CheckboxRenderElement extends RenderElement {
             // headless unit tests: no CN1 components can exist
             return null;
         }
-        CheckBox cb = new CheckBox();
-        cb.setUIID("FlutterCheckbox");
-        cb.addActionListener(new ActionListener<ActionEvent>() {
+        // A LABEL painting the Material glyph, not a CN1 CheckBox.
+        //
+        // Codename One's CheckBox takes its box from the look and feel's image
+        // pair, so it has exactly two states and no way to say which glyph to
+        // draw. Material has three -- checked, empty and indeterminate -- and
+        // the demo shows all three beside a disabled row of the same. Drawing
+        // the glyph directly is the only way to say all of that, and it also
+        // puts the tick in the theme's colour rather than the look and feel's.
+        com.codename1.ui.Label box = new com.codename1.ui.Label("");
+        box.setUIID("FlutterCheckbox");
+        box.getAllStyles().setPadding(0, 0, 0, 0);
+        box.getAllStyles().setMargin(0, 0, 0, 0);
+        box.getAllStyles().setBgTransparency(0);
+        box.setFocusable(true);
+        box.addPointerReleasedListener(new ActionListener<ActionEvent>() {
             @Override
             public void actionPerformed(ActionEvent evt) {
-                if (applying) {
+                if (applying || !checkbox().isEnabled()) {
                     return;
                 }
-                // CN1 already flipped the component; report the flip, then
-                // snap back to the controlled value.
-                userToggled(((CheckBox) component()).isSelected());
+                // Material advances indeterminate -> checked; otherwise it flips.
+                userToggled(checkbox().isIndeterminate() || !configuredValue());
             }
         });
-        apply(cb);
-        return cb;
+        apply(box);
+        return box;
     }
 
     @Override
     protected void updateComponent(Component c) {
-        apply((CheckBox) c);
+        apply((com.codename1.ui.Label) c);
     }
 
-    private void apply(CheckBox cb) {
+    private void apply(com.codename1.ui.Label box) {
         applying = true;
         try {
-            cb.setSelected(configuredValue());
+            Checkbox w = checkbox();
+            char glyph;
+            if (w.isIndeterminate()) {
+                glyph = com.codename1.ui.FontImage.MATERIAL_INDETERMINATE_CHECK_BOX;
+            } else if (configuredValue()) {
+                glyph = com.codename1.ui.FontImage.MATERIAL_CHECK_BOX;
+            } else {
+                glyph = com.codename1.ui.FontImage.MATERIAL_CHECK_BOX_OUTLINE_BLANK;
+            }
+            box.getAllStyles().setFgColor(inkRgb(w));
+            box.setEnabled(w.isEnabled());
+            try {
+                com.codename1.ui.FontImage.setMaterialIcon(box, glyph, Dp.mm(GLYPH_LP));
+            } catch (Exception noIconFont) {
+                // missing icon font: the tap target is still laid out
+            }
         } finally {
             applying = false;
         }
+    }
+
+    /** Material's checkbox ink: the accent when on, an outline when off, faded when disabled. */
+    private int inkRgb(Checkbox w) {
+        com.codename1.flutter.Color ink = null;
+        com.codename1.flutter.Color behind = null;
+        try {
+            com.codename1.flutter.material.ColorScheme cs =
+                    com.codename1.flutter.material.Theme.of(this).colorScheme();
+            if (cs != null) {
+                behind = cs.surface();
+                boolean on = w.isIndeterminate() || configuredValue();
+                ink = on ? cs.primary() : cs.onSurfaceVariant();
+                if (!w.isEnabled() && cs.onSurface() != null) {
+                    ink = com.codename1.flutter.Color.alphaBlend(
+                            new com.codename1.flutter.Color(
+                                    (0x61L << 24) | (cs.onSurface().rgb() & 0xFFFFFFL)),
+                            new com.codename1.flutter.Color(0xFF000000L
+                                    | ((behind == null ? 0xFFFFFF : behind.rgb()) & 0xFFFFFF)));
+                }
+            }
+        } catch (Throwable noTheme) {
+            // an unthemed checkbox still has to paint
+        }
+        return ink == null ? 0x6200EE : ink.rgb();
     }
 
     /**
@@ -114,7 +168,7 @@ public class CheckboxRenderElement extends RenderElement {
         }
         Component c = component();
         if (c != null) {
-            apply((CheckBox) c);
+            apply((com.codename1.ui.Label) c);
         }
     }
 

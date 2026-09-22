@@ -336,7 +336,13 @@ public abstract class ScrollRenderElement extends RenderElement {
             }
         }
         double height;
-        if (shrinkWrap() || !constraints.hasBoundedHeight()) {
+        // A SingleChildScrollView takes its CHILD's height, clamped to what it
+        // was offered -- Flutter constrains the viewport to the child's size
+        // rather than filling. Filling is right for a ListView and wrong here:
+        // the progress demo is Center(SingleChildScrollView(...)), and a
+        // viewport that fills leaves the Center nothing to centre, so the two
+        // indicators sat at the top of the page against the reference's middle.
+        if (shrinkWrap() || isSingleChild() || !constraints.hasBoundedHeight()) {
             height = cs.height();
         } else {
             height = constraints.maxHeight();
@@ -388,5 +394,10 @@ public abstract class ScrollRenderElement extends RenderElement {
                 c.position(x, y);
             }
         }
+    }
+
+    /** Whether this is a SingleChildScrollView rather than a list viewport. */
+    private boolean isSingleChild() {
+        return widget() instanceof SingleChildScrollView;
     }
 }

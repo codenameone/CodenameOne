@@ -137,8 +137,49 @@ public class SliderRenderElement extends RenderElement {
             s.setMinValue(0);
             s.setMaxValue((int) steps());
             s.setProgress(configuredProgress());
+            // A Slider with no onChanged is DISABLED, and Material greys every
+            // part of it. Never set, our disabled sliders kept the accent and
+            // the demo's second slider was indistinguishable from its first.
+            s.setEnabled(slider().getOnChanged() != null);
+            applyColours(s);
         } finally {
             applying = false;
+        }
+    }
+
+    /**
+     * Paints the track and thumb from the theme, directly on the component.
+     *
+     * <p>Not through theme properties: Codename One's Slider caches its
+     * {@code *Full} styles inside {@code setUIID}, which runs when the component
+     * is created -- before a Flutter ThemeData has been turned into properties.
+     * Set that way the colours were simply missed, and the demo's sliders came
+     * up with a grey active track and a navy thumb against the reference's
+     * accent purple.</p>
+     */
+    private void applyColours(com.codename1.ui.Slider s) {
+        try {
+            ColorScheme cs = Theme.of(this).colorScheme();
+            if (cs == null || cs.primary() == null) {
+                return;
+            }
+            int accent = cs.primary().rgb();
+            int track = cs.surfaceVariant() != null
+                    ? cs.surfaceVariant().rgb() : cs.surface().rgb();
+            // Inactive track and thumb.
+            s.getSliderEmptyUnselectedStyle().setBgColor(track);
+            s.getSliderEmptyUnselectedStyle().setBgTransparency(255);
+            s.getSliderEmptyUnselectedStyle().setFgColor(accent);
+            s.getSliderEmptySelectedStyle().setBgColor(track);
+            s.getSliderEmptySelectedStyle().setBgTransparency(255);
+            s.getSliderEmptySelectedStyle().setFgColor(accent);
+            // Active track.
+            s.getSliderFullSelectedStyle().setBgColor(accent);
+            s.getSliderFullSelectedStyle().setBgTransparency(255);
+            s.getSliderFullUnselectedStyle().setBgColor(accent);
+            s.getSliderFullUnselectedStyle().setBgTransparency(255);
+        } catch (Throwable noTheme) {
+            // an unthemed slider keeps the base look
         }
     }
 

@@ -150,13 +150,34 @@ public class PopupMenuButton<T> extends Widget {
      * as a zero-sized nothing, so the menu was not merely inert but invisible.
      */
     public Widget effectiveTrigger() {
+        return effectiveTrigger(null);
+    }
+
+    /** The same, resolving the adaptive icon against {@code context}'s theme. */
+    public Widget effectiveTrigger(com.codename1.flutter.BuildContext context) {
         if (child != null) {
             return child;
         }
         if (icon != null) {
             return icon;
         }
-        return new com.codename1.flutter.widgets.Icon(com.codename1.flutter.Icons.more_vert);
+        // Flutter's default here is Icons.adaptive.more, which is HORIZONTAL
+        // on iOS and macOS and vertical everywhere else. Hard-coding more_vert
+        // put upright dots on an iOS screen where the reference shows an
+        // ellipsis, on the app bar and on every popup menu in the app.
+        Object p = null;
+        try {
+            com.codename1.flutter.material.ThemeData t =
+                    context == null ? null : Theme.of(context);
+            p = t == null ? null : t.platform();
+        } catch (Throwable noTheme) {
+            // an unthemed menu still needs an icon
+        }
+        boolean apple = p == com.codename1.flutter.TargetPlatform.iOS
+                || p == com.codename1.flutter.TargetPlatform.macOS;
+        return new com.codename1.flutter.widgets.Icon(apple
+                ? com.codename1.flutter.Icons.more_horiz
+                : com.codename1.flutter.Icons.more_vert);
     }
 
     @Override

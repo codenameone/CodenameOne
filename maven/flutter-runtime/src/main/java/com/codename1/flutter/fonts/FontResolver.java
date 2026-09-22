@@ -377,4 +377,73 @@ public final class FontResolver {
             return false;
         }
     }
+
+    /**
+     * A derivable face for a style that names no family, or names one the app
+     * does not bundle.
+     *
+     * <p>Codename One can only size a SYSTEM font in three steps, and
+     * {@link Font#derive} on one silently does nothing -- it returns a font of
+     * the original size and reports no error. Every Flutter style states its
+     * size in logical pixels, so a style with no family had its size dropped on
+     * the floor: the text field demo asked for 16sp and painted a label half
+     * again too tall, and the overflow pushed everything under it down the
+     * page.</p>
+     *
+     * <p>The {@code native:} TrueType scheme is the way out. It hands back the
+     * PLATFORM's own face -- San Francisco on iOS, Roboto on Android and in the
+     * simulator, which is what the reference renders in -- as a true type font,
+     * and a true type font derives to any pixel size. So the letterforms stay
+     * the platform's and the size finally means something.</p>
+     *
+     * <p>Returns null where the scheme is unsupported, and the caller keeps
+     * whatever the theme left on the component -- the previous behaviour.</p>
+     */
+    public static Font platformFace(FontWeight weight, boolean italic) {
+        String name = "native:" + (italic ? "Italic" : "Main") + nativeWeight(weight);
+        if (CACHE.containsKey(name)) {
+            return CACHE.get(name);
+        }
+        Font f;
+        try {
+            f = Font.createTrueTypeFont(name, name);
+        } catch (Throwable unsupported) {
+            f = null;
+        }
+        CACHE.put(name, f);
+        return f;
+    }
+
+    /**
+     * The nearest {@code native:} weight. The scheme offers five faces against
+     * Flutter's nine, and a request that falls between them rounds to the
+     * heavier neighbour the way a real family's fallback does.
+     */
+    private static String nativeWeight(FontWeight weight) {
+        if (weight == null) {
+            return "Regular";
+        }
+        switch (weight) {
+            case w100:
+                return "Thin";
+            case w200:
+            case w300:
+                return "Light";
+            case w400:
+                // "Normal", not "Regular": the native scheme's Regular is a
+                // MEDIUM face on both iOS and the desktop port, which is one
+                // step heavier than Flutter's weight 400 and is what made every
+                // run of ordinary body text read too heavy against the
+                // reference. MainNormal is the true regular weight.
+                return "Normal";
+            case w500:
+                // ...and w500 IS Medium, so the old alias is exactly right here.
+                return "Regular";
+            case w600:
+            case w700:
+                return "Bold";
+            default:
+                return "Black";
+        }
+    }
 }

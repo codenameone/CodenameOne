@@ -83,7 +83,7 @@ public class ClipRRectRenderElement extends ClipRectRenderElement {
         BorderRadius radius = radius();
         int w = pane.getWidth();
         int h = pane.getHeight();
-        if (radius == null || w <= 0 || h <= 0 || !shapeClipSupported(g)) {
+        if (radius == null || w <= 0 || h <= 0) {
             paintChildren.paint(g);
             return;
         }
@@ -108,12 +108,93 @@ public class ClipRRectRenderElement extends ClipRectRenderElement {
         // the four agree. Where they do not, the shape clip is the only mechanism -- and
         // on iOS that does nothing at all, so say so rather than drawing square in
         // silence. See EffectRenderElement.paintRoundClipped.
-        if (paintShapeClipped(g, pane, paintChildren, p)) {
+        if (!shapeClipSupported(g)) {
+            // No shaped clip at all on this port: paint the subtree plainly and
+            // still finish the corners. The wedge fill needs fillShape, not a
+            // shaped CLIP, so it works where setClip(Shape) does not.
+            paintChildren.paint(g);
+            paintCornerWedges(g, pane, ax, ay, w, h, tl, tr, br, bl);
             return;
         }
-        com.codename1.flutter.FlutterErrorReport.unimplemented("ClipRRect",
-                "this platform cannot clip to a shape, so the subtree paints square");
+        if (paintShapeClipped(g, pane, paintChildren, p)) {
+            // The clip holds for the outermost paint and degrades to a rectangle
+            // once a child component paints (Component.paintComponent restores
+            // it from four ints, deliberately). So the corners are finished HERE
+            // instead: the four wedges between the box and its rounded outline
+            // are painted over in the colour behind the box. That is one draw we
+            // own completely -- clip set, drawn, restored -- and it needs neither
+            // a shaped clip that survives the subtree nor a mutable-image detour.
+            paintCornerWedges(g, pane, ax, ay, w, h, tl, tr, br, bl);
+            return;
+        }
         paintChildren.paint(g);
+        paintCornerWedges(g, pane, ax, ay, w, h, tl, tr, br, bl);
+    }
+
+    /// The wedge path (box minus rounded box), cached against the geometry that
+    /// produced it -- it only changes when the box or the radii do.
+    private GeneralPath wedges;
+    private String wedgeKey;
+
+    /**
+     * Fills the four corner wedges with the colour behind this box.
+     *
+     * <p>Exact when what sits behind the box is a flat colour, which is the
+     * case this exists for -- a Material card on a page. When the backdrop is
+     * not a flat opaque colour there is nothing safe to paint, so the corners
+     * are left as the subtree drew them rather than covered with a guess.</p>
+     */
+    private void paintCornerWedges(Graphics g, Container pane, int x, int y, int w, int h,
+            double tl, double tr, double br, double bl) {
+        int backdrop = backdropRgb(pane);
+        if (backdrop < 0) {
+            return;
+        }
+        String key = x + "," + y + "," + w + "," + h + ","
+                + (int) tl + "," + (int) tr + "," + (int) br + "," + (int) bl;
+        if (wedges == null || !key.equals(wedgeKey)) {
+            GeneralPath path = new GeneralPath(GeneralPath.WIND_EVEN_ODD);
+            path.moveTo(x, y);
+            path.lineTo(x + w, y);
+            path.lineTo(x + w, y + h);
+            path.lineTo(x, y + h);
+            path.closePath();
+            // The rounded outline as a second subpath: under the even-odd rule
+            // it becomes a hole, so a fill paints only the corners.
+            path.append(pathFor(x, y, w, h, tl, tr, br, bl), false);
+            wedges = path;
+            wedgeKey = key;
+        }
+        int priorColor = g.getColor();
+        boolean priorAa = g.isAntiAliased();
+        g.setAntiAliased(true);
+        g.setColor(backdrop);
+        g.pushClip();
+        try {
+            g.clipRect(x, y, w, h);
+            g.fillShape(wedges);
+        } finally {
+            g.popClip();
+            g.setColor(priorColor);
+            g.setAntiAliased(priorAa);
+        }
+    }
+
+    /**
+     * The opaque colour painted behind {@code c}, or -1 when the nearest
+     * ancestor that paints anything is not a flat opaque fill.
+     */
+    private static int backdropRgb(Container c) {
+        com.codename1.ui.Component cur = c == null ? null : c.getParent();
+        while (cur != null) {
+            com.codename1.ui.plaf.Style st = cur.getStyle();
+            if (st != null && st.getBgTransparency() == (byte) 0xff
+                    && st.getBgImage() == null) {
+                return st.getBgColor();
+            }
+            cur = cur.getParent();
+        }
+        return -1;
     }
 
     private static boolean shapeClipSupported(Graphics g) {

@@ -61,9 +61,26 @@ final class FrameDriver {
         @Override
         public boolean animate() {
             frame();
-            // False: this clock paints nothing itself. Advancing a controller notifies its
-            // listeners, which mark the affected elements dirty and repaint exactly those,
-            // so returning true would add a full-form repaint per frame on top.
+            // TRUE while anything is running, because that is what keeps the
+            // clock being called.
+            //
+            // Form.loopAnimations only calls Display.repaint(this) for a
+            // non-Component animation when animate() returns true, and the EDT
+            // only keeps looping while something is pending. Returning false
+            // left the clock dependent on some OTHER component repainting, so an
+            // animation on an otherwise still page advanced a few frames a
+            // second: measured, a 500ms feature-discovery open took over two
+            // seconds and had barely started before its route was gone, against
+            // Flutter's fully-open at 0.4s. An animation that is running is by
+            // definition about to change something, so asking for the frame is
+            // not waste.
+            // FALSE: a true here makes Form.loopAnimations call
+            // Display.repaint(this), and for a bare Animation the port turns
+            // that into a FULL-FORM repaint every frame -- measured, that alone
+            // held the whole app to 14-19fps. The listeners a controller
+            // notifies already repaint exactly the elements that changed; what
+            // was missing was only something to keep the EDT looping, and a
+            // pending serial call does that for free (see requestFrame).
             return false;
         }
 
@@ -155,6 +172,15 @@ final class FrameDriver {
             RUNNING.add(c);
         }
         attach();
+        // ...and start the chain here rather than waiting for the Form to
+        // deliver the first tick. An animation that starts DURING a route push
+        // registers on the form that is still current at that instant, so that
+        // first tick never arrives, the self-scheduling chain never starts, and
+        // the controller sits frozen at its start value for good. Measured on
+        // the feature-discovery overlay: its open stalled around a quarter of
+        // the way through, which is why the coach mark came out at roughly half
+        // the radius Flutter draws.
+        requestFrame();
     }
 
     /** Removes a controller; the clock stops once none are left. */
@@ -223,6 +249,31 @@ final class FrameDriver {
         frame();
     }
 
+    private static boolean framePending;
+
+    /**
+     * Queues the next animation frame without painting anything.
+     *
+     * <p>Display.shouldEDTSleep refuses to park while a serial call is pending,
+     * so this keeps the loop turning at whatever rate the EDT can manage while
+     * leaving the painting to the elements that actually changed.</p>
+     */
+    private static void requestFrame() {
+        if (framePending || !Display.isInitialized()) {
+            return;
+        }
+        framePending = true;
+        Display.getInstance().callSerially(new Runnable() {
+            @Override
+            public void run() {
+                synchronized (FrameDriver.class) {
+                    framePending = false;
+                }
+                frame();
+            }
+        });
+    }
+
     private static void frame() {
         AnimationController[] due;
         synchronized (FrameDriver.class) {
@@ -254,6 +305,8 @@ final class FrameDriver {
         synchronized (FrameDriver.class) {
             if (RUNNING.isEmpty()) {
                 detach();
+            } else {
+                requestFrame();
             }
         }
     }

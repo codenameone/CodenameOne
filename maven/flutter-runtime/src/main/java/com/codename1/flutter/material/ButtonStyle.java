@@ -99,4 +99,9 @@ public class ButtonStyle {
     public EdgeInsets getPadding() {
         return padding;
     }
+
+    /** The requested outline shape, or null when the role's default applies. */
+    public Object getShape() {
+        return shape;
+    }
 }

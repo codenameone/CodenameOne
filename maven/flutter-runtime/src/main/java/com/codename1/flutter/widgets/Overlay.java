@@ -146,9 +146,19 @@ public class Overlay extends Widget {
             if (children.isEmpty()) {
                 return null;
             }
-            if (children.size() == 1) {
-                return children.get(0);
-            }
+            // ALWAYS a Stack, even for a lone base.
+            //
+            // Returning the base directly when there are no entries and a Stack
+            // once there is one changes the widget TYPE of the overlay's child,
+            // and a type change is exactly what Widget.canUpdate refuses -- so
+            // inserting the first entry replaced the entire route subtree
+            // instead of updating it. That is self-defeating for anything that
+            // inserts an overlay from inside the tree: the feature-discovery
+            // coach mark inserted its entry, the insert tore down the widget
+            // that had just inserted it, its animation controllers were
+            // disposed mid-run, and the replacement -- built fresh -- saw the
+            // app's one-shot "already shown" flag and never inserted anything
+            // again. The entry stayed on screen at radius zero.
             Stack stack = new Stack();
             stack.children(children);
             // The entries cover the route, so the stack takes the whole box

@@ -143,6 +143,15 @@ public class InputDecoration {
         return hintStyle;
     }
 
+    /** The hint drawn under the field, or null. */
+    public String getHelperText() {
+        return helperText;
+    }
+
+    public com.codename1.flutter.Widget getSuffixIcon() {
+        return suffixIcon;
+    }
+
     public com.codename1.flutter.Widget getPrefixIcon() {
         return prefixIcon;
     }

@@ -85,14 +85,45 @@ public class CardRenderElement extends SingleChildRenderElement {
         applyStyle(c);
     }
 
+    /// The inputs the current border was built from, so a rebuild that changes
+    /// neither reuses it.
+    ///
+    /// RoundRectBorder caches its rendered shadow against a client property keyed
+    /// by the BORDER INSTANCE, so handing the component a new instance on every
+    /// rebuild misses that cache every time -- and a miss on a shadowed border is
+    /// a full offscreen render plus a gaussian blur, plus one more client
+    /// property that is never read again. Rebuilding the style is cheap; its
+    /// border is not.
+    private int styledBg = -1;
+    private double styledElevation = -1;
+    private com.codename1.ui.plaf.Border styledBorder;
+
     private void applyStyle(Component face) {
         try {
             int bg = card().getColor() != null
                     ? card().getColor().rgb()
                     : Theme.of(this).colorScheme().surface().rgb();
             double elevation = card().getElevation() != null ? card().getElevation() : 1;
+            if (styledBorder != null && styledBg == bg && styledElevation == elevation) {
+                face.getAllStyles().setBgColor(bg);
+                face.getAllStyles().setBgTransparency(255);
+                face.getAllStyles().setBorder(styledBorder);
+                return;
+            }
+            // useCache(true) is NOT a performance choice, it is a correctness one.
+            //
+            // With the cache off, RoundRectBorder renders through
+            // createTargetComponentImage, which translates the Graphics by the
+            // shadow's shape offset and returns without undoing it. That
+            // Graphics is the live one, so the offset leaks into everything
+            // painted after this card: the cards demo drifted 9 device pixels
+            // down and 4 across per card, accumulating down the page, while the
+            // LAYOUT was exactly the reference's -- the component tree reported
+            // the right boxes and the pixels were somewhere else. The cached
+            // path renders into an offscreen image of its own, so the same
+            // unbalanced translate is discarded with it.
             RoundRectBorder border = RoundRectBorder.create()
-                    .useCache(false)
+                    .useCache(true)
                     .cornerRadius(Dp.mm(CORNER_LP));
             if (elevation > 0) {
                 border = border
@@ -103,6 +134,9 @@ public class CardRenderElement extends SingleChildRenderElement {
             face.getAllStyles().setBgColor(bg);
             face.getAllStyles().setBgTransparency(255);
             face.getAllStyles().setBorder(border);
+            styledBg = bg;
+            styledElevation = elevation;
+            styledBorder = border;
         } catch (Exception err) {
             // styling is best-effort; layout must survive regardless
         }

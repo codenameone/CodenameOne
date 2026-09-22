@@ -60,9 +60,22 @@ public class FractionalTranslationRenderElement extends EffectRenderElement {
     private final dart.runtime.Funcs.VoidFunc0 repaint = new dart.runtime.Funcs.VoidFunc0() {
         @Override
         public void call() {
+            // The pane's box depends on the fraction, so a tick has to re-derive it
+            // before the repaint -- otherwise the frame paints translated content
+            // against the previous frame's clip. It is four setters on one component,
+            // not a layout pass, which is why an animated slide stays cheap.
+            refreshPaneBounds();
             markNeedsPaint();
         }
     };
+
+    // The box Flutter laid this effect out at, BEFORE the pane was grown to make room
+    // for the translation. position() is the only writer; refreshPaneBounds re-derives
+    // the pane from it on every tick.
+    private int laidX;
+    private int laidY;
+    private int laidW;
+    private int laidH;
 
     public FractionalTranslationRenderElement(Widget widget) {
         super(widget);
@@ -118,20 +131,115 @@ public class FractionalTranslationRenderElement extends EffectRenderElement {
         return src == null ? null : src.child();
     }
 
-    @Override
-    protected void paintWithEffect(Graphics g, Container pane, Subtree paintChildren) {
-        FractionSource src = source();
-        Offset f = src == null ? null : src.fraction();
-        if (f == null || (f.dx() == 0 && f.dy() == 0)) {
-            paintChildren.paint(g);
+    /**
+     * Grows the pane to cover BOTH the laid-out box and the translated one, and moves its
+     * origin to the union's top-left.
+     *
+     * <p>This is what makes a negative translation visible at all. Codename One clips every
+     * component to its own rectangle in {@code Component.paintInternalImpl} before calling
+     * its {@code paint}, so painting the subtree shifted by {@code -w/2} inside a pane whose
+     * box is still the laid-out one drew three quarters of it into the discarded region: the
+     * gallery's feature-discovery circle, positioned at its centre and pulled back by half
+     * its size, rendered as the bottom-right quadrant of a circle with two hard straight
+     * edges meeting exactly at the centre point. No form of transform escapes that clip --
+     * it is already installed in device space by the time this runs -- so the box has to
+     * cover the pixels the effect intends to touch.</p>
+     *
+     * <p>The subtree sits at the pane's origin, so moving that origin moves the subtree with
+     * it; {@link #paintOffsetX} compensates, leaving the net shift exactly the fraction.</p>
+     */
+    private void refreshPaneBounds() {
+        Container pane = pane();
+        if (pane == null) {
             return;
         }
-        int dx = (int) Math.round(f.dx() * pane.getWidth());
-        int dy = (int) Math.round(f.dy() * pane.getHeight());
+        int[] box = translatedBox(laidX, laidY, laidW, laidH, deltaX(), deltaY());
+        pane.setX(box[0]);
+        pane.setY(box[1]);
+        pane.setWidth(box[2]);
+        pane.setHeight(box[3]);
+    }
+
+    /**
+     * The union of a box and the same box shifted by {@code (dx, dy)}, plus the
+     * translation still owed at paint time: {@code {x, y, w, h, paintDx, paintDy}}.
+     *
+     * <p>Separated out and package visible so the arithmetic can be asserted without a
+     * display: the whole defect this fixes was a box that did not cover the pixels the
+     * paint was going to touch.</p>
+     */
+    static int[] translatedBox(int x, int y, int w, int h, int dx, int dy) {
+        return new int[] {
+            x + Math.min(dx, 0),
+            y + Math.min(dy, 0),
+            w + Math.abs(dx),
+            h + Math.abs(dy),
+            Math.max(dx, 0),
+            Math.max(dy, 0),
+        };
+    }
+
+    private Container pane() {
+        com.codename1.ui.Component c = component();
+        return c instanceof Container ? (Container) c : null;
+    }
+
+    private Offset fraction() {
+        FractionSource src = source();
+        return src == null ? null : src.fraction();
+    }
+
+    private int deltaX() {
+        Offset f = fraction();
+        return f == null ? 0 : (int) Math.round(f.dx() * laidW);
+    }
+
+    private int deltaY() {
+        Offset f = fraction();
+        return f == null ? 0 : (int) Math.round(f.dy() * laidH);
+    }
+
+    /**
+     * The translation to apply while painting: the fraction minus the part already
+     * absorbed by moving the pane's origin. {@code min(d,0) + max(d,0) == d} for either
+     * sign, so the subtree lands exactly {@code d} from where it was laid out.
+     */
+    private int paintOffsetX() {
+        return Math.max(deltaX(), 0);
+    }
+
+    private int paintOffsetY() {
+        return Math.max(deltaY(), 0);
+    }
+
+    @Override
+    public void position(int x, int y) {
+        super.position(x, y);
+        Container pane = pane();
+        if (pane == null) {
+            return;
+        }
+        laidX = x;
+        laidY = y;
+        laidW = pane.getWidth();
+        laidH = pane.getHeight();
+        refreshPaneBounds();
+    }
+
+    @Override
+    protected void paintWithEffect(Graphics g, Container pane, Subtree paintChildren) {
+        int dx = paintOffsetX();
+        int dy = paintOffsetY();
         if (dx == 0 && dy == 0) {
             paintChildren.paint(g);
             return;
         }
+        // A plain integer translate, deliberately: this shifts a SUBTREE, and
+        // Container.paint translates by its own x/y on top of it. The core's child
+        // painting is written against the Graphics translation, not against an affine
+        // transform, so installing a transform here would leave that bookkeeping
+        // disagreeing with the clip. An affine belongs where a shape is rendered
+        // directly (see FlutterShapeBorderPainter), not around a subtree walk.
         g.translate(dx, dy);
         try {
             paintChildren.paint(g);

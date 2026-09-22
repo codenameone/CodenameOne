@@ -53,8 +53,21 @@ public class OutlineInputBorder extends InputBorder {
     }
 
     public BorderRadius borderRadius() {
-        return borderRadius instanceof BorderRadius ? (BorderRadius) borderRadius : null;
+        if (borderRadius instanceof BorderRadius) {
+            return (BorderRadius) borderRadius;
+        }
+        // Material's default, rather than null.
+        //
+        // Flutter states this as a DEFAULT PARAMETER VALUE, and a subclass that
+        // inherits it through `super.borderRadius = ...` does not necessarily
+        // carry it across the transpile -- Shrine's CutCornersBorder is exactly
+        // that, and its fields came out with square corners against the
+        // reference's rounded ones. An outline input border is never square.
+        return BorderRadius.circular(DEFAULT_RADIUS_LP);
     }
+
+    /** Flutter's {@code OutlineInputBorder} default corner radius. */
+    private static final double DEFAULT_RADIUS_LP = 4;
 
     public double gapPadding() {
         return gapPadding;

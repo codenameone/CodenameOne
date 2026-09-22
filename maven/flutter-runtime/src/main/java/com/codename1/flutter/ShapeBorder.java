@@ -28,4 +28,23 @@ package com.codename1.flutter;
  * Flutter's {@code ShapeBorder}.
  */
 public abstract class ShapeBorder {
+
+    /**
+     * Paints this outline -- Flutter's {@code ShapeBorder.paint}.
+     *
+     * <p>Declared HERE so an application's own border overrides it and can be
+     * called back. It was absent, so a subclass that draws itself (Shrine's
+     * CutCornersBorder chamfers its corners with a Path) declared a paint method
+     * that overrode nothing and was never reached, and the runtime fell back to
+     * approximating the outline with a rounded rectangle. Nothing about the
+     * chamfer is beyond Codename One -- it is a polygon, and GraphicsCanvas
+     * already turns a Flutter Path into one; the hook to ask for it was what was
+     * missing.</p>
+     *
+     * <p>The default draws nothing, so a border with no opinion is unchanged.</p>
+     */
+    public void paint(Canvas canvas, Rect rect, Double gapStart, double gapExtent,
+            double gapPercentage, TextDirection textDirection) {
+    }
+
 }

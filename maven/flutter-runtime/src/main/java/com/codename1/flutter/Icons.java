@@ -94,6 +94,7 @@ public final class Icons {
     public static final IconData mic = new IconData(FontImage.MATERIAL_MIC);
     public static final IconData money_off = new IconData(FontImage.MATERIAL_MONEY_OFF);
     public static final IconData more_vert = new IconData(FontImage.MATERIAL_MORE_VERT);
+    public static final IconData more_horiz = new IconData(FontImage.MATERIAL_MORE_HORIZ);
     public static final IconData not_interested = new IconData(FontImage.MATERIAL_NOT_INTERESTED);
     public static final IconData notifications = new IconData(FontImage.MATERIAL_NOTIFICATIONS);
     public static final IconData person = new IconData(FontImage.MATERIAL_PERSON);

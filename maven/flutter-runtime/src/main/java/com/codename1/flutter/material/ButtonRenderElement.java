@@ -118,7 +118,37 @@ public class ButtonRenderElement extends RenderElement {
             return false;
         }
         Widget leaf = contentWidget();
-        return !(leaf instanceof Text) && !(leaf instanceof Icon);
+        if (!(leaf instanceof Text) && !(leaf instanceof Icon)) {
+            return true;
+        }
+        // ...and a leaf reached THROUGH a widget that has its own behaviour has
+        // to be mounted too, however drawable it is.
+        //
+        // Consuming the glyph skips the wrapper entirely: it is never mounted,
+        // so its State never initialises and whatever it exists to do never
+        // happens. The gallery's demo pages wrap the options icon in a
+        // FeatureDiscovery whose whole job is to insert a coach mark on first
+        // view; the button rendered its icon perfectly and the coach mark was
+        // never built, because the widget that builds it was never alive.
+        return hasStatefulWrapper(rawContentWidget(), leaf);
+    }
+
+    /**
+     * Whether reaching {@code leaf} from {@code raw} passes through a widget
+     * with a State of its own. A pure layout wrapper (Padding, Center, a
+     * SizedBox) has no behaviour to lose and is still consumed.
+     */
+    private boolean hasStatefulWrapper(Widget raw, Widget leaf) {
+        // The SAME walk unwrapToLeaf makes, so the two cannot disagree about
+        // what lies between the button and its glyph.
+        Widget w = raw;
+        for (int depth = 0; depth < 6 && w != null && w != leaf; depth++) {
+            if (w instanceof com.codename1.flutter.StatefulWidget) {
+                return true;
+            }
+            w = com.codename1.flutter.WidgetPreview.step(w, this);
+        }
+        return false;
     }
 
     /**
@@ -175,6 +205,21 @@ public class ButtonRenderElement extends RenderElement {
         return ts == null ? null : ts.getColor();
     }
 
+    /// The colour the consumed Icon asked for, or null when it asked for none.
+    ///
+    /// The icon's own colour was never consulted -- only the button's, then the
+    /// ambient IconTheme -- so an Icon that states one lost it and wore the
+    /// bar's instead. The demo pages' settings glyph is the case that shows:
+    /// it asks for the same near-black as the info and code glyphs beside it
+    /// and came out in the primary red of the back chevron.
+    private com.codename1.flutter.Color consumedIconColor() {
+        Widget c = contentWidget();
+        if (!(c instanceof Icon)) {
+            return null;
+        }
+        return ((Icon) c).getColor();
+    }
+
     public String consumedLabel() {
         Widget c = contentWidget();
         if (c instanceof Text) {
@@ -206,7 +251,21 @@ public class ButtonRenderElement extends RenderElement {
         if (c instanceof Icon && ((Icon) c).getIcon() != null) {
             return ((Icon) c).getIcon().codePoint();
         }
+        // ...or the icon a .icon factory put beside the label. See
+        // ButtonBase.leadingIcon.
+        Widget lead = leadingIconWidget();
+        if (lead instanceof Icon && ((Icon) lead).getIcon() != null) {
+            return ((Icon) lead).getIcon().codePoint();
+        }
         return 0;
+    }
+
+    /** The icon set beside the label, looked through any wrapper. */
+    private Widget leadingIconWidget() {
+        if (!(widget() instanceof ButtonBase)) {
+            return null;
+        }
+        return ((ButtonBase) widget()).getLeadingIcon();
     }
 
     private double iconSizeLp() {
@@ -283,6 +342,15 @@ public class ButtonRenderElement extends RenderElement {
             b.setIcon(null);
         }
         b.setEnabled(onPressed() != null);
+        // AFTER setEnabled, not inside style(): style() runs first, when the
+        // button is still enabled by default, so a disabled-ink pass in there
+        // returned early every time and the bottom row of the button demo
+        // stayed the same purple as the top row.
+        try {
+            applyDisabledInk(b, Theme.of(this).colorScheme());
+        } catch (Exception noTheme) {
+            // an unthemed button keeps its base look
+        }
     }
 
     private void style(Button b) {
@@ -295,7 +363,14 @@ public class ButtonRenderElement extends RenderElement {
             all.setPaddingUnit(com.codename1.ui.plaf.Style.UNIT_TYPE_PIXELS);
             int hpad = (int) Math.round(Dp.px(CAPSULE_HPAD_LP));
             int vpad = (int) Math.round(Dp.px(CAPSULE_VPAD_LP));
-            if (w instanceof ElevatedButton) {
+            double shapeR = requestedRadiusLp();
+            if (shapeR > 0) {
+                // A style that NAMES a shape wins over the role's capsule.
+                // Shrine's NEXT asks for a 7dp bevelled rectangle and came out
+                // a full pill, because ButtonStyle.shape was held opaquely and
+                // never read.
+                applyRequestedShape(b, all, cs, w, shapeR, vpad, hpad);
+            } else if (w instanceof ElevatedButton) {
                 // Material 3's elevated button is a PALE face with a coloured label:
                 // surfaceContainerLow behind, primary on it. This painted the primary
                 // colour as the face and onPrimary as the label, which is the FILLED
@@ -350,12 +425,40 @@ public class ButtonRenderElement extends RenderElement {
             // Shrine's CANCEL says onSurface and came out in the pale pink its role gives
             // it, against the reference's near-black.
             com.codename1.flutter.Color own = consumedLabelColor();
+            if (own == null) {
+                own = consumedIconColor();
+            }
             if (own != null) {
                 all.setFgColor(own.rgb());
             }
         } catch (Exception err) {
             // styling is best-effort; the base theme look remains
         }
+    }
+
+    /**
+     * Greys a disabled button's label.
+     *
+     * <p>{@code setEnabled(false)} was already being called, but the colours
+     * above go on through {@code getAllStyles()}, which reaches the DISABLED
+     * style too -- so a disabled button was painted in the same full-strength
+     * primary as an enabled one and the button demo's bottom row was
+     * indistinguishable from its top row. Material paints a disabled label as
+     * onSurface at 38%, and Codename One's foreground is opaque, so the tint is
+     * composited against the surface here.</p>
+     */
+    private static void applyDisabledInk(Button b, ColorScheme cs) {
+        if (b.isEnabled() || cs == null || cs.onSurface() == null) {
+            return;
+        }
+        com.codename1.flutter.Color ink = cs.onSurface();
+        com.codename1.flutter.Color behind = cs.surface() != null
+                ? cs.surface() : new com.codename1.flutter.Color(0xFFFFFFFFL);
+        com.codename1.flutter.Color faded = com.codename1.flutter.Color.alphaBlend(
+                new com.codename1.flutter.Color(
+                        (0x61L << 24) | (ink.rgb() & 0xFFFFFFL)),
+                new com.codename1.flutter.Color(0xFF000000L | (behind.rgb() & 0xFFFFFF)));
+        b.getDisabledStyle().setFgColor(faded.rgb());
     }
 
     /**
@@ -460,5 +563,58 @@ public class ButtonRenderElement extends RenderElement {
             h = Math.max(h, Dp.px(40));
         }
         return constraints.constrain(new Size(w, h));
+    }
+
+    /**
+     * The corner radius the widget's {@code ButtonStyle.shape} asks for, in
+     * logical pixels, or 0 when it names none.
+     *
+     * <p>Both of Material's angular shapes are honoured the same way: Codename
+     * One draws one rounded rectangle, so a bevelled border renders with
+     * rounded corners of the same radius rather than mitred ones. Closer than a
+     * capsule, which is what it was.</p>
+     */
+    private double requestedRadiusLp() {
+        if (!(widget() instanceof ButtonBase)) {
+            return 0;
+        }
+        ButtonStyle st = ((ButtonBase) widget()).getStyle();
+        Object shape = st == null ? null : st.getShape();
+        Object radius = null;
+        if (shape instanceof com.codename1.flutter.RoundedRectangleBorder) {
+            radius = ((com.codename1.flutter.RoundedRectangleBorder) shape).getBorderRadius();
+        } else if (shape instanceof com.codename1.flutter.BeveledRectangleBorder) {
+            radius = ((com.codename1.flutter.BeveledRectangleBorder) shape).getBorderRadius();
+        }
+        if (!(radius instanceof com.codename1.flutter.BorderRadius)) {
+            return 0;
+        }
+        com.codename1.flutter.Radius tl =
+                ((com.codename1.flutter.BorderRadius) radius).topLeft();
+        return tl == null ? 0 : tl.x();
+    }
+
+    /** Paints the button with the radius its style asked for, in its role's colours. */
+    private void applyRequestedShape(Button b, com.codename1.ui.plaf.Style all,
+            ColorScheme cs, Widget w, double radiusLp, int vpad, int hpad) {
+        all.setPadding(vpad, vpad, hpad, hpad);
+        com.codename1.ui.plaf.RoundRectBorder border =
+                com.codename1.ui.plaf.RoundRectBorder.create()
+                        .useCache(false)
+                        .cornerRadius(Dp.mm(radiusLp));
+        if (w instanceof OutlinedButton) {
+            all.setFgColor(cs.primary().rgb());
+            border = border.stroke(Dp.mm(0.3), true).strokeColor(cs.primary().rgb())
+                    .strokeOpacity(160);
+            clearBackground(all);
+        } else if (w instanceof TextButton) {
+            all.setFgColor(cs.primary().rgb());
+            clearBackground(all);
+        } else {
+            all.setFgColor(cs.primary().rgb());
+            all.setBgColor(cs.surfaceContainerLow().rgb());
+            all.setBgTransparency(255);
+        }
+        all.setBorder(border);
     }
 }

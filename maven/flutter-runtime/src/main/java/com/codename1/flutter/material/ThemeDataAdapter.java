@@ -79,6 +79,15 @@ public final class ThemeDataAdapter {
         String onPrimary = hex(cs.onPrimary());
         String inversePrimary = hex(cs.inversePrimary());
 
+        String surfaceVariant = hex(cs.surfaceVariant() != null
+                ? cs.surfaceVariant() : cs.surface());
+        // Material's disabled tone: onSurface at 38% over the surface.
+        String onSurfaceFaded = hex(com.codename1.flutter.Color.alphaBlend(
+                new com.codename1.flutter.Color(
+                        (0x61L << 24) | (cs.onSurface().rgb() & 0xFFFFFFL)),
+                new com.codename1.flutter.Color(
+                        0xFF000000L | (cs.surface().rgb() & 0xFFFFFF))));
+
         Map<String, Object> p = new HashMap<String, Object>();
 
         // The Flutter canvas (root host container) and full-bleed surfaces.
@@ -99,6 +108,20 @@ public final class ThemeDataAdapter {
         fg(p, "FlutterTextButton", primary);
         fg(p, "FlutterOutlinedButton", primary);
         fg(p, "FlutterIconButton", onSurface);
+
+        // Slider. Codename One paints the Material 3 look -- a thin rounded
+        // track with the active part in the accent and a round thumb -- only
+        // when the theme asks for it; without the constants it falls back to
+        // the legacy full-height fill, which is why the sliders demo came up as
+        // flat lavender bars with no thumb at all. The painter takes the
+        // inactive track from this style's background, the thumb from its
+        // foreground, and the active track from the *Full style.
+        bg(p, "FlutterSlider", surfaceVariant);
+        fg(p, "FlutterSlider", primary);
+        bg(p, "FlutterSliderFull", primary);
+        p.put("FlutterSlider.dis#bgColor", onSurfaceFaded);
+        p.put("FlutterSlider.dis#fgColor", onSurfaceFaded);
+        p.put("FlutterSliderFull.dis#bgColor", onSurfaceFaded);
 
         // App bar; the Material 3 ThemeData default background is surface
         // (with an elevation tint), title/icons onSurface.

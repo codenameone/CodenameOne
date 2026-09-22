@@ -95,6 +95,19 @@ public class TextFieldRenderElement extends RenderElement {
                 userEdited(componentText());
             }
         });
+        // A Flutter text field does NOT take focus on arrival, and a focused
+        // Codename One field blinks a caret. Every page with a field opened
+        // showing a caret the reference does not draw -- the text-field demo,
+        // Shrine's login, the sliders demo's editable value. Codename One gives
+        // the form's initial focus to the first focusable component, so the
+        // field hands it back once, after the form is up. A later tap focuses it
+        // normally.
+        tf.addPointerPressedListener(new ActionListener<ActionEvent>() {
+            @Override
+            public void actionPerformed(ActionEvent evt) {
+                touched = true;
+            }
+        });
         tf.setDoneListener(new ActionListener<ActionEvent>() {
             @Override
             public void actionPerformed(ActionEvent evt) {
@@ -123,13 +136,21 @@ public class TextFieldRenderElement extends RenderElement {
     private Component decorated(com.codename1.ui.TextField tf) {
         com.codename1.flutter.widgets.Icon inside = iconAt(true);
         com.codename1.flutter.widgets.Icon outside = iconAt(false);
+        com.codename1.flutter.widgets.Icon suffix = suffixIcon();
         com.codename1.flutter.widgets.Icon chosen = inside != null ? inside : outside;
-        if (chosen == null || chosen.getIcon() == null) {
-            return tf;
+        if ((chosen == null || chosen.getIcon() == null) && suffix == null) {
+            return withHelper(tf, tf);
         }
         com.codename1.ui.Container row =
                 new com.codename1.ui.Container(new com.codename1.ui.layouts.BorderLayout());
-        row.add(com.codename1.ui.layouts.BorderLayout.WEST, glyphLabel(chosen));
+        if (chosen != null && chosen.getIcon() != null) {
+            row.add(com.codename1.ui.layouts.BorderLayout.WEST, glyphLabel(chosen));
+        }
+        if (suffix != null) {
+            // suffixIcon: the trailing glyph INSIDE the decoration -- the demo's
+            // password field is a visibility toggle and had none at all.
+            row.add(com.codename1.ui.layouts.BorderLayout.EAST, glyphLabel(suffix));
+        }
         row.add(com.codename1.ui.layouts.BorderLayout.CENTER, tf);
         if (inside != null) {
             // prefixIcon sits INSIDE the decoration, so the fill and the border
@@ -146,7 +167,7 @@ public class TextFieldRenderElement extends RenderElement {
             row.setUIID("Container");
             row.getAllStyles().setBgTransparency(0);
         }
-        return row;
+        return withHelper(tf, row);
     }
 
     /// The decoration's inside ({@code prefixIcon}) or outside ({@code icon})
@@ -226,6 +247,21 @@ public class TextFieldRenderElement extends RenderElement {
         try {
             TextField w = textField();
             tf.setConstraint(w.isObscureText() ? TextArea.PASSWORD : TextArea.ANY);
+            // maxLines was stored and never read, so the demo's "Life story"
+            // field -- which asks for three lines -- came up one line tall and
+            // every line the user typed scrolled the one before it out of view.
+            // Codename One's TextField IS a TextArea, so the rows are simply
+            // its own; it just has to be told it is not single-line.
+            long rows = w.getMaxLines() == null ? 1 : w.getMaxLines().longValue();
+            if (w.getMinLines() != null && w.getMinLines().longValue() > rows) {
+                rows = w.getMinLines().longValue();
+            }
+            if (rows > 1) {
+                tf.setSingleLineTextArea(false);
+                tf.setRows((int) rows);
+            } else {
+                tf.setSingleLineTextArea(true);
+            }
             tf.setEditable(w.isEnabled());
             tf.setEnabled(w.isEnabled());
             InputDecoration d = w.getDecoration();
@@ -235,9 +271,19 @@ public class TextFieldRenderElement extends RenderElement {
                 applyTextStyle(tf, d);
                 applyDecoration(decoratedRow != null ? (Component) decoratedRow : (Component) tf, d);
             }
+            releaseUnrequestedFocus(tf);
+            if (counterLabel != null) {
+                counterLabel.setText(counterText());
+            }
             rebindController();
-            if (boundController != null && !eq(tf.getText(), boundController.text())) {
-                tf.setText(boundController.text());
+            if (boundController != null) {
+                // rawValue, not text(): text() reads the bound component first,
+                // which during this very call is still empty -- and reading it
+                // REPLACES the controller's initial value with that emptiness.
+                String want = boundController.rawValue();
+                if (!eq(tf.getText(), want)) {
+                    tf.setText(want);
+                }
             }
         } finally {
             applying = false;
@@ -428,6 +474,20 @@ public class TextFieldRenderElement extends RenderElement {
                 ts.fontFamily(), ts.getFontWeight(), false);
         if (ts.getFontSize() != null || ts.getFontWeight() != null || named != null) {
             com.codename1.ui.Font base = named != null ? named : target.getFont();
+            // Whether the face already carries the weight; see TextRenderElement.
+            boolean weighted = named != null;
+            if (named == null && ts.getFontSize() != null) {
+                // The theme's font here is a SYSTEM font, which does not derive,
+                // so the requested size was being dropped. See
+                // FontResolver.platformFace.
+                com.codename1.ui.Font platform =
+                        com.codename1.flutter.fonts.FontResolver.platformFace(
+                                ts.getFontWeight(), false);
+                if (platform != null) {
+                    base = platform;
+                    weighted = true;
+                }
+            }
             if (base == null) {
                 base = com.codename1.ui.Font.getDefaultFont();
             }
@@ -435,7 +495,8 @@ public class TextFieldRenderElement extends RenderElement {
                 float sizePx = ts.getFontSize() != null
                         ? (float) Dp.px(ts.getFontSize())
                         : (base.getPixelSize() > 0 ? base.getPixelSize() : base.getHeight());
-                int weight = ts.getFontWeight() != null && ts.getFontWeight().isBold()
+                int weight = !weighted
+                        && ts.getFontWeight() != null && ts.getFontWeight().isBold()
                         ? com.codename1.ui.Font.STYLE_BOLD : com.codename1.ui.Font.STYLE_PLAIN;
                 try {
                     target.setFont(base.derive(sizePx, weight));
@@ -499,6 +560,28 @@ public class TextFieldRenderElement extends RenderElement {
         if (stated == null && themed != null) {
             stated = themed.getEnabledBorder() != null ? themed.getEnabledBorder() : themed.getBorder();
         }
+        // A border that draws ITSELF wins over anything the runtime would
+        // approximate. Shrine's fields chamfer their corners, and matching that
+        // to the nearest rounded rectangle is what made them read as square.
+        // A border class this runtime does not know draws ITSELF: it is an
+        // application subclass with its own paint, and only it knows its shape
+        // (Shrine's CutCornersBorder chamfers its corners).
+        //
+        // Class identity, not reflection: ParparVM has no Class.getMethod, and
+        // asking for one does not fail at runtime -- it fails the iOS C compile
+        // with an undeclared-function error, which is how two device builds
+        // came to fail while the recording quietly used a stale app.
+        if (paintsItself(stated)) {
+            all.setBorder(new FlutterShapeBorderPainter(
+                    (com.codename1.flutter.ShapeBorder) stated));
+            com.codename1.ui.plaf.Border own = target.getUnselectedStyle().getBorder();
+            if (own != null) {
+                target.getSelectedStyle().setBorder(own);
+                target.getPressedStyle().setBorder(own);
+                target.getDisabledStyle().setBorder(own);
+            }
+            return;
+        }
         int radiusPx = stated instanceof com.codename1.flutter.InputBorder
                 ? outlineRadiusPx((com.codename1.flutter.InputBorder) stated) : 0;
         if (radiusPx > 0) {
@@ -558,26 +641,39 @@ public class TextFieldRenderElement extends RenderElement {
     /// The default underline's colour: onSurface at 38%, composited onto what it is drawn
     /// over, because a Codename One border colour carries no alpha.
     private int underlineRgb() {
-        try {
-            ColorScheme cs = Theme.of(this).colorScheme();
-            if (cs != null && cs.onSurface() != null) {
-                return com.codename1.flutter.Color.alphaBlend(
-                        cs.onSurface().withOpacity(0.38),
-                        new com.codename1.flutter.Color(0xFF000000L | (backdropRgb() & 0xFFFFFF)))
-                        .rgb();
+        // Whatever the decoration's own border side states, then BLACK.
+        //
+        // Not onSurface at 38%: Flutter's default BorderSide is opaque black,
+        // and an InputDecorator recolours it only when the field is focused,
+        // disabled or in error. Fading it made every resting underline in the
+        // app a mid grey where the reference draws a black rule -- measured
+        // (150,150,150) against (0,0,0) on the text-field demo.
+        InputDecoration d = textField().getDecoration();
+        com.codename1.flutter.BorderSide side = sideOf(d == null ? null : d.getBorder());
+        if (side == null) {
+            InputDecorationThemeData themed = inputDecorationTheme();
+            if (themed != null) {
+                Object b = themed.getEnabledBorder() != null
+                        ? themed.getEnabledBorder() : themed.getBorder();
+                side = sideOf(b);
             }
-        } catch (Throwable noTheme) {
-            // fall through
         }
-        return 0x757575;
+        if (side != null && side.color() != null) {
+            return side.color().rgb();
+        }
+        return 0x000000;
     }
 
     /// The side an input border draws itself with, or null when it states none.
     private static com.codename1.flutter.BorderSide sideOf(Object border) {
-        if (!(border instanceof com.codename1.flutter.OutlineInputBorder)) {
+        if (!(border instanceof com.codename1.flutter.InputBorder)) {
             return null;
         }
-        return ((com.codename1.flutter.OutlineInputBorder) border).borderSide();
+        com.codename1.flutter.BorderSide side =
+                ((com.codename1.flutter.InputBorder) border).getBorderSide();
+        // BorderSide.none is our default, and it states nothing -- Flutter's
+        // default is an ordinary black side. Treat "none" as unstated.
+        return side == null || side.color() == null || side.width() <= 0 ? null : side;
     }
 
     /** The outline's corner radius in device pixels, or 0 when it has none. */
@@ -618,6 +714,10 @@ public class TextFieldRenderElement extends RenderElement {
      * tests can drive the flow without a component.
      */
     public void userEdited(String newText) {
+        if (counterLabel != null) {
+            counterLabel.setText((newText == null ? 0 : newText.length())
+                    + "/" + textField().getMaxLength());
+        }
         rebindController();
         if (boundController != null) {
             boundController.valueFromComponent(newText);
@@ -668,5 +768,156 @@ public class TextFieldRenderElement extends RenderElement {
         double w = constraints.hasBoundedWidth() ? constraints.maxWidth() : prefW;
         double h = Math.max(prefH, Dp.px(MIN_HEIGHT_LP));
         return constraints.constrain(new Size(w, h));
+    }
+
+    /** True once the user has actually pressed on this field. */
+    private boolean touched;
+    /** True once the arrival focus has been handed back. */
+    private boolean focusReleased;
+
+    /**
+     * Hands back the focus Codename One hands a field on arrival.
+     *
+     * <p>Done ONCE, and never after the user has touched the field, so tapping
+     * into it still focuses it and typing still works.</p>
+     */
+    private void releaseUnrequestedFocus(com.codename1.ui.TextField tf) {
+        if (focusReleased || touched) {
+            return;
+        }
+        try {
+            com.codename1.ui.Form f = tf.getComponentForm();
+            if (f == null) {
+                return;
+            }
+            focusReleased = true;
+            if (f.getFocused() == tf) {
+                f.setFocused(null);
+            }
+        } catch (Throwable noForm) {
+            // not on a form yet: the next apply tries again
+        }
+    }
+
+    /** The decoration's trailing glyph, or null. */
+    private com.codename1.flutter.widgets.Icon suffixIcon() {
+        InputDecoration d = textField().getDecoration();
+        Widget w = d == null ? null : d.getSuffixIcon();
+        // Looked THROUGH: the demo's password toggle is an IconButton, not a
+        // bare Icon, and matching only the bare form left it with no glyph.
+        for (int depth = 0; depth < 6 && w != null; depth++) {
+            if (w instanceof com.codename1.flutter.widgets.Icon) {
+                return (com.codename1.flutter.widgets.Icon) w;
+            }
+            if (w instanceof IconButton) {
+                w = ((IconButton) w).getIcon();
+                continue;
+            }
+            w = com.codename1.flutter.WidgetPreview.step(w, this);
+        }
+        return null;
+    }
+
+    /**
+     * The field with Material's supporting line under it: the helper text on the
+     * leading side, the character counter on the trailing side.
+     *
+     * <p>Both were stored and never drawn, so the demo showed neither the
+     * {@code 0/14} under the phone number nor "Keep it short, this is just a
+     * demo." under the life story -- and everything below sat that line's height
+     * too high.</p>
+     */
+    private Component withHelper(com.codename1.ui.TextField tf, Component field) {
+        InputDecoration d = textField().getDecoration();
+        String help = d == null ? null : d.getHelperText();
+        Long max = textField().getMaxLength();
+        if ((help == null || help.length() == 0) && max == null) {
+            return field;
+        }
+        com.codename1.ui.Container stack = new com.codename1.ui.Container(
+                new com.codename1.ui.layouts.BoxLayout(
+                        com.codename1.ui.layouts.BoxLayout.Y_AXIS));
+        stack.setUIID("Container");
+        stack.getAllStyles().setBgTransparency(0);
+        stack.getAllStyles().setPadding(0, 0, 0, 0);
+        stack.getAllStyles().setMargin(0, 0, 0, 0);
+        stack.add(field);
+        com.codename1.ui.Container line = new com.codename1.ui.Container(
+                new com.codename1.ui.layouts.BorderLayout());
+        line.setUIID("Container");
+        line.getAllStyles().setBgTransparency(0);
+        line.getAllStyles().setPadding(
+                (int) Math.round(com.codename1.flutter.rendering.Dp.px(4)), 0, 0, 0);
+        line.getAllStyles().setMargin(0, 0, 0, 0);
+        if (help != null && help.length() > 0) {
+            helperLabel = supportLabel(help);
+            // CENTER, not WEST: a WEST cell takes its preferred width and the
+            // sentence was cut off mid-word ("...just a demc").
+            line.add(com.codename1.ui.layouts.BorderLayout.CENTER, helperLabel);
+        }
+        if (max != null) {
+            counterLabel = supportLabel(counterText());
+            line.add(com.codename1.ui.layouts.BorderLayout.EAST, counterLabel);
+        }
+        stack.add(line);
+        supportLine = stack;
+        return stack;
+    }
+
+    private com.codename1.ui.Label supportLabel(String text) {
+        com.codename1.ui.Label l = new com.codename1.ui.Label(text == null ? "" : text);
+        l.setUIID("Container");
+        l.getAllStyles().setBgTransparency(0);
+        l.getAllStyles().setPadding(0, 0, 0, 0);
+        l.getAllStyles().setMargin(0, 0, 0, 0);
+        applyOne(l.getAllStyles(), supportStyle(), backdropRgb());
+        return l;
+    }
+
+    /** Material's supporting text: bodySmall in onSurfaceVariant. */
+    private com.codename1.flutter.TextStyle supportStyle() {
+        com.codename1.flutter.TextStyle st = new com.codename1.flutter.TextStyle();
+        try {
+            ThemeData t = Theme.of(this);
+            if (t != null && t.textTheme() != null && t.textTheme().bodySmall() != null) {
+                st = st.merge(t.textTheme().bodySmall());
+            }
+            ColorScheme cs = t == null ? null : t.colorScheme();
+            if (cs != null && cs.onSurfaceVariant() != null) {
+                st.color(cs.onSurfaceVariant());
+            }
+        } catch (Throwable noTheme) {
+            // an unthemed field still draws its supporting line
+        }
+        return st;
+    }
+
+    private String counterText() {
+        Long max = textField().getMaxLength();
+        if (max == null) {
+            return "";
+        }
+        String t = componentText();
+        return (t == null ? 0 : t.length()) + "/" + max.longValue();
+    }
+
+    private com.codename1.ui.Container supportLine;
+    private com.codename1.ui.Label helperLabel;
+    private com.codename1.ui.Label counterLabel;
+
+    /**
+     * Whether {@code border} is an application subclass that paints itself,
+     * rather than one of the shapes this runtime draws through a Codename One
+     * border.
+     */
+    private static boolean paintsItself(Object border) {
+        if (!(border instanceof com.codename1.flutter.ShapeBorder)
+                || border == com.codename1.flutter.InputBorder.none) {
+            return false;
+        }
+        Class<?> c = border.getClass();
+        return c != com.codename1.flutter.OutlineInputBorder.class
+                && c != com.codename1.flutter.UnderlineInputBorder.class
+                && c != com.codename1.flutter.InputBorder.class;
     }
 }

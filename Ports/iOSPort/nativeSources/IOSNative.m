@@ -13559,7 +13559,7 @@ static NSFont *cn1MacSystemFontForAlias(NSString *name, CGFloat size) {
         weight = NSFontWeightThin;
     } else if ([weightName isEqualToString:@"Light"]) {
         weight = NSFontWeightLight;
-    } else if ([weightName isEqualToString:@"Regular"]) {
+    } else if ([weightName isEqualToString:@"Regular"] || [weightName isEqualToString:@"Normal"]) {
         weight = NSFontWeightRegular;
     } else if ([weightName isEqualToString:@"Bold"]) {
         weight = NSFontWeightBold;
@@ -13587,6 +13587,13 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_createTruetypeFont___java_lang_String
     // Explicit font names continue through the existing shared loader.
     fnt = cn1MacSystemFontForAlias(str, pSize);
 #endif
+    // The system font at its true regular weight. IOSImplementation maps
+    // native:MainNormal to this sentinel because no HelveticaNeue alias reaches
+    // UIFontWeightRegular -- native:MainRegular is deliberately Medium -- and a
+    // text style asking for weight 400 was therefore rendering one step heavy.
+    if(fnt == nil && [str isEqualToString:@"CN1SystemRegular"]) {
+        fnt = [CN1Font systemFontOfSize:pSize];
+    }
     if(fnt == nil && isIOS8_2() && [str hasPrefix:@"HelveticaNeue"]) {
         if([str isEqualToString:@"HelveticaNeue-UltraLight"]) {
             fnt = [CN1Font systemFontOfSize:pSize weight:UIFontWeightUltraLight];

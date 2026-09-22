@@ -85,8 +85,28 @@ public class RenderBox extends RenderObject {
         // The layout pass writes every box's position absolutely within the
         // host, so the element already knows where it is; no component needed
         // (many elements own none).
+        //
+        // ...but "within the host" is not the screen when the subtree lives in a
+        // host of its own. A root Scaffold's app bar is hosted in the Codename
+        // One Toolbar, so its boxes are positioned from the toolbar's origin,
+        // and anything asking where it is on SCREEN was told where it is inside
+        // the bar. The gallery's feature discovery asks exactly that to place
+        // its coach mark: the circle came out low enough to change which branch
+        // of its own radius rule it took, and so the wrong size as well as the
+        // wrong place. Adding the host container's absolute position makes the
+        // answer global, which is what the name says.
         double scale = scale();
-        return new Offset(p.dx() + element.x() / scale, p.dy() + element.y() / scale);
+        // The host's own origin is NOT added here.
+        //
+        // It was, on the theory that a Toolbar-hosted subtree reports positions
+        // from the bar's origin rather than the screen's. Measured on the
+        // device, that double-counted: the feature discovery's centre came back
+        // 162 logical pixels below the icon it was asking about, which then also
+        // put its background circle in the wrong size bracket. The layout pass
+        // already writes absolute positions within the form, so the element's
+        // own x/y are the global answer.
+        return new Offset(p.dx() + element.x() / scale,
+                p.dy() + element.y() / scale);
     }
 
     /**

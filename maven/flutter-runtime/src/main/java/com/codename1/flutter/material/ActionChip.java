@@ -106,6 +106,43 @@ public class ActionChip extends StatelessWidget {
         row.mainAxisSize(MainAxisSize.min);
         row.crossAxisAlignment(CrossAxisAlignment.center);
         row.children(kids);
-        return row;
+
+        // An ActionChip is a chip. Built as a bare row it was an icon and some
+        // text loose on the page, with none of the outline that IS a chip's
+        // appearance -- Chip itself had already been given the capsule and this
+        // one had not. Material's default is an outline over the surface rather
+        // than a fill.
+        double h = 32;
+        com.codename1.flutter.BoxDecoration d =
+                new com.codename1.flutter.BoxDecoration();
+        d.borderRadius(com.codename1.flutter.BorderRadius.circular(h / 2));
+        com.codename1.flutter.BorderSide side = new com.codename1.flutter.BorderSide();
+        side.color(outlineColor(context));
+        side.width(1);
+        d.border(com.codename1.flutter.Border.all(
+                side.color(), 1, null, null));
+
+        com.codename1.flutter.widgets.Container box =
+                new com.codename1.flutter.widgets.Container();
+        box.decoration(d);
+        box.padding(com.codename1.flutter.EdgeInsets.symmetric(12, 0));
+        box.constraints(new com.codename1.flutter.rendering.BoxConstraints(
+                0, Double.POSITIVE_INFINITY, h, h));
+        box.child(row);
+        return box;
+    }
+
+    /** The chip's outline: the scheme's outline, or a mid grey without a theme. */
+    private com.codename1.flutter.Color outlineColor(BuildContext context) {
+        try {
+            ThemeData t = Theme.of(context);
+            if (t != null && t.colorScheme() != null
+                    && t.colorScheme().outline() != null) {
+                return t.colorScheme().outline();
+            }
+        } catch (Throwable noTheme) {
+            // an unthemed chip still needs an outline
+        }
+        return new com.codename1.flutter.Color(0xFF79747EL);
     }
 }

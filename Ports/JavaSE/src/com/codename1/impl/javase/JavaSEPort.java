@@ -14277,7 +14277,7 @@ public class JavaSEPort extends CodenameOneImplementation {
         Float weight;
         if ("Thin".equals(weightName)) weight = TextAttribute.WEIGHT_EXTRA_LIGHT;
         else if ("Light".equals(weightName)) weight = TextAttribute.WEIGHT_LIGHT;
-        else if ("Regular".equals(weightName)) weight = TextAttribute.WEIGHT_REGULAR;
+        else if ("Regular".equals(weightName) || "Normal".equals(weightName)) weight = TextAttribute.WEIGHT_REGULAR;
         else if ("Bold".equals(weightName)) weight = TextAttribute.WEIGHT_BOLD;
         else if ("Black".equals(weightName)) weight = TextAttribute.WEIGHT_HEAVY;
         else throw new IllegalArgumentException("Unsupported native font type: " + alias);
@@ -14320,6 +14320,15 @@ public class JavaSEPort extends CodenameOneImplementation {
 
                     case "native:MainRegular":
                         res = "Medium";
+                        break;
+
+                    // The system face at its TRUE regular weight. native:MainRegular
+                    // has meant Roboto-Medium since the alias was introduced and the
+                    // iOS port maps it one step heavy too, so the honest regular gets
+                    // a name of its own rather than a change that would restyle every
+                    // existing application.
+                    case "native:MainNormal":
+                        res = "Regular";
                         break;
 
                     case "native:MainBold":

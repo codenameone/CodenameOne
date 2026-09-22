@@ -122,6 +122,41 @@ public abstract class Element implements BuildContext {
     }
 
     /**
+     * Walks up the tree for the nearest ancestor {@code State} of {@code type}
+     * ({@code BuildContext.findAncestorStateOfType}).
+     *
+     * <p>This returned null unconditionally, and the cost was not a missing
+     * lookup but a THROWN one: the gallery's feature discovery asks for its
+     * controller this way and raises a FlutterError when the answer is null, so
+     * the coach mark the reference shows over the demo options button was never
+     * inserted -- the Overlay it would have gone into was mounted and working
+     * the whole time.</p>
+     *
+     * <p>Walks {@link #ancestor()}, not {@link #parent()}. In Flutter the whole
+     * app is one element tree and a State above the Navigator is an ancestor of
+     * every route; here each route is rooted in its own form, so the structural
+     * parent chain stops at the route and never reaches it. The gallery's
+     * discovery controller wraps the app, which is exactly that case.</p>
+     */
+    @Override
+    public <T> T findAncestorStateOfType(Class<T> type) {
+        if (type == null) {
+            return null;
+        }
+        Element e = ancestor();
+        while (e != null) {
+            if (e instanceof StatefulElement) {
+                State<?> st = ((StatefulElement) e).state();
+                if (isInstanceOf(type, st)) {
+                    return type.cast(st);
+                }
+            }
+            e = ancestorOf(e);
+        }
+        return null;
+    }
+
+    /**
      * Whether {@code o} is an instance of {@code type} — the single predicate
      * the whole inherited-widget mechanism rests on, kept in one place so any
      * future portability question about it has exactly one answer to change.

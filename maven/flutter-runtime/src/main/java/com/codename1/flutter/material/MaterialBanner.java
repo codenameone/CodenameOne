@@ -105,6 +105,12 @@ public class MaterialBanner extends StatelessWidget {
         DartList<Widget> top = new DartList<Widget>();
         if (leading != null) {
             top.add(leading);
+            // Material's gap between the leading icon and the message. Without
+            // it the icon and the text were touching at the top-left corner.
+            com.codename1.flutter.widgets.SizedBox gap =
+                    new com.codename1.flutter.widgets.SizedBox();
+            gap.width(LEADING_GAP_LP);
+            top.add(gap);
         }
         if (content != null) {
             Expanded e = new Expanded();
@@ -119,7 +125,10 @@ public class MaterialBanner extends StatelessWidget {
         rows.add(topRow);
         if (actions != null && actions.size() > 0) {
             Row actionRow = new Row();
-            actionRow.mainAxisSize(MainAxisSize.min);
+            // Actions sit at the END of the banner, not the start. Laid out from
+            // the left they read as two more links under the message rather than
+            // as the banner's buttons.
+            actionRow.mainAxisAlignment(com.codename1.flutter.MainAxisAlignment.end);
             actionRow.children(actions);
             rows.add(actionRow);
         }
@@ -127,6 +136,28 @@ public class MaterialBanner extends StatelessWidget {
         col.crossAxisAlignment(CrossAxisAlignment.stretch);
         col.mainAxisSize(MainAxisSize.min);
         col.children(rows);
-        return col;
+
+        // The banner is INSET, and it closes with a rule. Built bare it was
+        // packed hard into the top-left corner with nothing separating it from
+        // the list underneath.
+        com.codename1.flutter.widgets.Padding pad =
+                new com.codename1.flutter.widgets.Padding();
+        pad.padding(com.codename1.flutter.EdgeInsets.fromLTRB(
+                PAD_LP, PAD_LP, PAD_LP, 0));
+        pad.child(col);
+
+        DartList<Widget> stackRows = new DartList<Widget>();
+        stackRows.add(pad);
+        stackRows.add(new Divider());
+        Column outer = new Column();
+        outer.crossAxisAlignment(CrossAxisAlignment.stretch);
+        outer.mainAxisSize(MainAxisSize.min);
+        outer.children(stackRows);
+        return outer;
     }
+
+    /** Material's banner inset, in logical pixels. */
+    private static final double PAD_LP = 16;
+    /** The gap between the leading icon and the message. */
+    private static final double LEADING_GAP_LP = 16;
 }

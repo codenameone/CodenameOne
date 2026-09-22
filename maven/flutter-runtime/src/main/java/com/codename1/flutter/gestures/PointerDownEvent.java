@@ -21,28 +21,11 @@
  * Please contact Codename One through http://www.codenameone.com/ if you
  * need additional information or have any questions.
  */
-package com.codename1.flutter;
+package com.codename1.flutter.gestures;
 
-/**
- * The border drawn around a Material text field — Flutter's {@code InputBorder}.
- */
-public abstract class InputBorder extends ShapeBorder {
+/** Flutter's {@code PointerDownEvent}. */
+public class PointerDownEvent extends PointerEvent {
 
-    /** {@code InputBorder.none}: the "no border" sentinel. */
-    public static final InputBorder none = new NoInputBorder();
-
-    // Flutter's default is an ordinary BorderSide -- opaque black, one logical
-    // pixel -- not "none". Defaulting to none meant an OutlineInputBorder that
-    // states no side of its own drew a rounded background with an INVISIBLE
-    // outline, so the text-field demo's Life story and Salary boxes, whose
-    // whole decoration is that outline, rendered as bare labels.
-    BorderSide borderSide = BorderSide.solidBlack();
-
-    public void borderSide(BorderSide v) {
-        this.borderSide = v == null ? BorderSide.none : v;
-    }
-
-    public BorderSide getBorderSide() {
-        return borderSide;
+    public PointerDownEvent() {
     }
 }

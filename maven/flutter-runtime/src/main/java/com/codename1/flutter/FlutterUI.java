@@ -412,6 +412,16 @@ public final class FlutterUI {
         physics.put("@DecayMotionScaleFactorInt", "500");
         // Hundredths: 52 = 0.52, Flutter's BouncingScrollPhysics friction factor.
         physics.put("@rubberBandCoefficientInt", "52");
+        // The Material 3 slider painter is opt-in: without these the slider
+        // falls back to a legacy full-height fill with no thumb, which is what
+        // made the sliders demo a row of flat lavender bars. Sizes are
+        // Material's, converted from logical pixels at 160dpi: a 4dp track and
+        // a 20dp round thumb. The track runs CONTINUOUSLY under the thumb, as
+        // Flutter's slider draws it, rather than M3's gapped two-segment track.
+        physics.put("@sliderTrackThicknessMM", "0.635");
+        physics.put("@sliderThumbWidthMM", "3.175");
+        physics.put("@sliderThumbHeightMM", "3.175");
+        physics.put("@sliderContinuousTrackBool", "true");
         return physics;
     }
 

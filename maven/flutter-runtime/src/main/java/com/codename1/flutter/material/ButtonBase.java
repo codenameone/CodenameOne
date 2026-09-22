@@ -67,4 +67,25 @@ public abstract class ButtonBase extends Widget {
     public Element createElement() {
         return new ButtonRenderElement(this);
     }
+
+    /**
+     * The icon a {@code .icon} factory was given, beside the label.
+     *
+     * <p>Both were accepted and only one kept, so every icon button in the app
+     * was a plain label -- the button demo's "+ BUTTON" pair came up as two more
+     * "BUTTON"s. It is held HERE rather than composed into a Row with the label
+     * because a button whose child is a row is mounted as a subtree, and the
+     * button's own foreground then never reaches the text inside it: the label
+     * came out black where the reference paints it in the button's colour.
+     * Codename One's Button draws a glyph beside its text natively.</p>
+     */
+    private com.codename1.flutter.Widget leadingIcon;
+
+    public void leadingIcon(com.codename1.flutter.Widget v) {
+        this.leadingIcon = v;
+    }
+
+    public com.codename1.flutter.Widget getLeadingIcon() {
+        return leadingIcon;
+    }
 }

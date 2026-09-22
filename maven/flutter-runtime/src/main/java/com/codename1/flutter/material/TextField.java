@@ -55,6 +55,8 @@ public class TextField extends Widget {
     private String restorationId;
     private Funcs.VoidFunc0 onTap;
     private Long maxLines = 1L;
+    private Long minLines;
+    private Long maxLength;
     private DartList<String> autofillHints;
     private Object keyboardType;
     private Object textCapitalization;
@@ -88,6 +90,32 @@ public class TextField extends Widget {
     }
 
     public void minLines(long v) {
+        this.minLines = v;
+    }
+
+    /** How many lines the editor may grow to; 1 for a single-line field. */
+    public Long getMaxLines() {
+        return maxLines;
+    }
+
+    /** How many lines the editor shows before it has any content. */
+    public Long getMinLines() {
+        return minLines;
+    }
+
+    /**
+     * The character limit, which is also what makes Material draw a counter.
+     *
+     * <p>Accepted and discarded before, so the demo's phone-number field showed
+     * neither the limit nor the {@code 0/14} the reference counts out under
+     * it.</p>
+     */
+    public void maxLength(long v) {
+        this.maxLength = v;
+    }
+
+    public Long getMaxLength() {
+        return maxLength;
     }
 
     public void autofillHints(DartList<String> v) {

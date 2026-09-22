@@ -62,7 +62,7 @@ public class PopupMenuButtonRenderElement extends ButtonRenderElement {
 
     @Override
     protected Widget rawContentWidget() {
-        return button().effectiveTrigger();
+        return button().effectiveTrigger(this);
     }
 
     @Override

@@ -21,28 +21,33 @@
  * Please contact Codename One through http://www.codenameone.com/ if you
  * need additional information or have any questions.
  */
-package com.codename1.flutter;
+package com.codename1.flutter.gestures;
 
 /**
- * The border drawn around a Material text field — Flutter's {@code InputBorder}.
+ * Flutter's {@code PointerMoveEvent}.
+ *
+ * <p>Carries {@code delta} as well as {@code position} because Flutter's drag
+ * recognizers accumulate the DELTA, not the absolute position, to decide
+ * whether the touch has travelled past the slop. A synthesised move with the
+ * default zero delta therefore scrolls nothing in Flutter while scrolling
+ * normally here, where the binding works from the absolute position -- which is
+ * exactly how one scripted drag came to scroll one of the two stacks and not
+ * the other.</p>
  */
-public abstract class InputBorder extends ShapeBorder {
+public class PointerMoveEvent extends PointerEvent {
 
-    /** {@code InputBorder.none}: the "no border" sentinel. */
-    public static final InputBorder none = new NoInputBorder();
+    private com.codename1.flutter.Offset delta;
 
-    // Flutter's default is an ordinary BorderSide -- opaque black, one logical
-    // pixel -- not "none". Defaulting to none meant an OutlineInputBorder that
-    // states no side of its own drew a rounded background with an INVISIBLE
-    // outline, so the text-field demo's Life story and Salary boxes, whose
-    // whole decoration is that outline, rendered as bare labels.
-    BorderSide borderSide = BorderSide.solidBlack();
-
-    public void borderSide(BorderSide v) {
-        this.borderSide = v == null ? BorderSide.none : v;
+    public PointerMoveEvent() {
     }
 
-    public BorderSide getBorderSide() {
-        return borderSide;
+    /** How far the pointer moved since the previous event. */
+    public void delta(com.codename1.flutter.Offset v) {
+        this.delta = v;
+    }
+
+    /** How far the pointer moved since the previous event; null when unstated. */
+    public com.codename1.flutter.Offset getDelta() {
+        return delta;
     }
 }

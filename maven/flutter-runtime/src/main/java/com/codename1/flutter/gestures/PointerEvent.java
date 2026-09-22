@@ -21,28 +21,43 @@
  * Please contact Codename One through http://www.codenameone.com/ if you
  * need additional information or have any questions.
  */
-package com.codename1.flutter;
+package com.codename1.flutter.gestures;
+
+import com.codename1.flutter.Offset;
 
 /**
- * The border drawn around a Material text field — Flutter's {@code InputBorder}.
+ * A pointer event, as Flutter's {@code PointerEvent}.
+ *
+ * <p>Only what a synthesised touch needs: where it happened and which pointer
+ * it belongs to. The point of having these at all is that ONE Dart script can
+ * drive both stacks -- it hands events to {@link GestureBinding} and the
+ * framework underneath routes them, so a tap written once produces a real tap,
+ * with the real hit test and the real animations, on whichever runtime is
+ * executing it.</p>
  */
-public abstract class InputBorder extends ShapeBorder {
+public abstract class PointerEvent {
 
-    /** {@code InputBorder.none}: the "no border" sentinel. */
-    public static final InputBorder none = new NoInputBorder();
+    private Offset position = new Offset(0, 0);
+    private long pointer;
 
-    // Flutter's default is an ordinary BorderSide -- opaque black, one logical
-    // pixel -- not "none". Defaulting to none meant an OutlineInputBorder that
-    // states no side of its own drew a rounded background with an INVISIBLE
-    // outline, so the text-field demo's Life story and Salary boxes, whose
-    // whole decoration is that outline, rendered as bare labels.
-    BorderSide borderSide = BorderSide.solidBlack();
-
-    public void borderSide(BorderSide v) {
-        this.borderSide = v == null ? BorderSide.none : v;
+    protected PointerEvent() {
     }
 
-    public BorderSide getBorderSide() {
-        return borderSide;
+    /** Named parameter setter for the Dart {@code position:} parameter. */
+    public void position(Offset v) {
+        this.position = v == null ? new Offset(0, 0) : v;
+    }
+
+    /** Named parameter setter for the Dart {@code pointer:} parameter. */
+    public void pointer(long v) {
+        this.pointer = v;
+    }
+
+    public Offset position() {
+        return position;
+    }
+
+    public long pointerId() {
+        return pointer;
     }
 }
