@@ -94,7 +94,20 @@ case "$PLATFORM" in
     # opposed to mac-os-x-native (the same build, submitted to the cloud) and
     # mac-os-x-desktop (the javase build, which bundles a JVM).
     ( cd "$FL" && flutter build macos --release )
-    cn1_build ios local-mac-device
+    # UNSIGNED, on purpose and explicitly. MacOSBuildHints defaults both signing
+    # identities to a real certificate rather than leaving them null, so a build
+    # that names none still tries to sign and stops at "Signing for Bench
+    # requires selecting a development team" -- after translating and compiling
+    # the whole application. `none` is the sentinel the builder documents for
+    # this, and it makes it pass CODE_SIGNING_ALLOWED=NO to xcodebuild, which is
+    # what the ios recipe below does by hand. Both channels, because the two
+    # default independently.
+    #
+    # Nothing here is distributed, so there is nothing to sign FOR: the binary
+    # is measured and thrown away. Flutter's side is unsigned too.
+    cn1_build ios local-mac-device \
+        -Dcodename1.arg.macos.signingIdentity.appStore=none \
+        -Dcodename1.arg.macos.signingIdentity.developerID=none
     echo "flutter=$FL/build/macos/Build/Products/Release/gallery.app"
     echo "cn1=$(first "$CN1/ios/target" -maxdepth 4 -name '*.app' -type d)"
     ;;
