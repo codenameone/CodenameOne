@@ -753,15 +753,29 @@ static _Atomic long cn1GcGraceFullDrains = 0;
 // variable requires a resolver call; gcMarkObject previously resolved five.
 struct CN1GcTraceContext {
     struct gcMarkLocalBuffer* localBuffer;
-    int precise, trusted, gracePass;
+    int precise, trusted, gracePass, graceTraceFresh;
     JAVA_BOOLEAN maturing;
 };
 static __thread struct CN1GcTraceContext cn1GcTrace;
 #define cn1GcInGracePass (cn1GcTrace.gracePass)
+// Set only while the grace walk is running a fresh object's mark function directly.
+// See the fresh-child skip in gcMarkObject and the page walk that sets it.
+#define cn1GcGraceTraceFresh (cn1GcTrace.graceTraceFresh)
 #define cn1GcPreciseTrace (cn1GcTrace.precise)
 #define cn1GcTrustedRoots (cn1GcTrace.trusted)
 #define gcCurrentlyMaturing (cn1GcTrace.maturing)
 #define gcMarkLocalBuf (cn1GcTrace.localBuffer)
+
+// Declared here rather than beside the worklist: the grace walk calls a mark
+// function directly, and that is upstream of the marker machinery.
+typedef void (*gcMarkFunctionPointer)(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj, JAVA_BOOLEAN force);
+
+// How many fresh slots the grace walk collects under the trusted window before it
+// closes the window and traces them. Bounds the stack buffer; nothing else depends
+// on it.
+#ifndef CN1_GRACE_TRACE_CHUNK
+#define CN1_GRACE_TRACE_CHUNK 256
+#endif
 // Set for the current cycle when a rebuild was needed and did NOT complete, so the
 // index is missing pages that have been registered for an unbounded number of cycles.
 // A miss makes cn1ConservativeResolve reject every reference into such a page and
@@ -1056,6 +1070,8 @@ _Atomic long cn1GcCyclesAfterIdle = 0;  // started after an idle wait expired or
 // objects it pays for the whole page to find a handful of fresh ones.
 _Atomic long long cn1GraceSlotsWalked = 0;   // slots examined
 _Atomic long long cn1GraceSlotsFresh = 0;    // ...that were mark == -1
+_Atomic long long cn1GraceFreshSkipped = 0;  // fresh->fresh edges the walk covers anyway
+_Atomic long long cn1GraceTracedDirect = 0;  // fresh objects traced with no worklist trip
 _Atomic long long cn1GraceMarked = 0;        // ...and were non-leaf, so got a gcMarkObject
 _Atomic long long cn1GracePagesWalked = 0;   // pages whose slots were walked
 _Atomic long long cn1GracePagesSkipped = 0;  // pages skipped by gcAllocedSinceSweep
@@ -5029,24 +5045,61 @@ void codenameOneGCMark() {
             atomic_fetch_add_explicit(&cn1GraceSlotsWalked, (long long)gn, memory_order_relaxed);
             { long long __fresh = 0, __marked = 0;
 #endif
-            CN1_GC_TRUSTED_BEGIN();  // page-slot walk: authoritative references
-            for(int gi = 0 ; gi < gn ; gi++) {
-                JAVA_OBJECT go = cn1BibopSlot(gp, gi);
-                if(__atomic_load_n(&go->__codenameOneGcMark, __ATOMIC_ACQUIRE) == -1
-                   && go->__codenameOneParentClsReference != 0
-                   && go->__codenameOneParentClsReference->markFunction != 0) {
+            // TRACE FRESH SLOTS DIRECTLY, WITHOUT MARKING OR ENQUEUING THEM.
+            //
+            // This used to be gcMarkObject(go), which stamped the object AND pushed it
+            // so the drain would later pop it and run its mark function. Both halves of
+            // that were waste. The stamp buys nothing -- the sweep's grace rule keeps a
+            // mark == -1 slot and promotes it itself -- and the worklist trip is pure
+            // overhead for an object the walk is already standing on. Measured on
+            // objectAllocation before the change: graceMarked = 165,824,029 in 25 reps,
+            // i.e. 166M pushes, flushes under gcMarkWorklistMutex, and pops, to trace
+            // objects the walk had in hand. The profile showed the cost exactly where
+            // that predicts -- gcMarkFlushLocal at 18.5% of the GC thread and ~10% of
+            // every helper, with the helpers a further 27% in __psynch_cvwait, against
+            // only ~5% of their samples inside a real mark function.
+            //
+            // The mark function must run OUTSIDE the trusted window: it follows child
+            // words out of arbitrary classes, and the resolve guard is what rejects a
+            // word that is not an object. The slot walk itself stays inside, because a
+            // page slot IS an authoritative reference. So the two are separated --
+            // collect under trust, trace without it -- in bounded chunks so the buffer
+            // is a couple of KB of stack rather than one entry per slot.
+            for(int gi = 0 ; gi < gn ; ) {
+                JAVA_OBJECT __gbuf[CN1_GRACE_TRACE_CHUNK];
+                int __nf = 0;
+                CN1_GC_TRUSTED_BEGIN();  // page-slot walk: authoritative references
+                for(; gi < gn && __nf < CN1_GRACE_TRACE_CHUNK ; gi++) {
+                    JAVA_OBJECT go = cn1BibopSlot(gp, gi);
+                    if(__atomic_load_n(&go->__codenameOneGcMark, __ATOMIC_ACQUIRE) == -1
+                       && go->__codenameOneParentClsReference != 0
+                       && go->__codenameOneParentClsReference->markFunction != 0) {
 #ifdef CN1_GC_CONFORM
-                    __marked++;
+                        __marked++;
 #endif
-                    gcMarkObject(d, go, JAVA_FALSE);
-                }
+                        __gbuf[__nf++] = go;
+                    }
 #ifdef CN1_GC_CONFORM
-                else if(__atomic_load_n(&go->__codenameOneGcMark, __ATOMIC_RELAXED) == -1) {
-                    __fresh++;   // fresh but leaf: no subtree, nothing to do
+                    else if(__atomic_load_n(&go->__codenameOneGcMark, __ATOMIC_RELAXED) == -1) {
+                        __fresh++;   // fresh but leaf: no subtree, nothing to do
+                    }
+#endif
                 }
+                CN1_GC_TRUSTED_END();
+                cn1GcGraceTraceFresh = 1;
+                for(int __i = 0 ; __i < __nf ; __i++) {
+                    JAVA_OBJECT go = __gbuf[__i];
+                    struct clazz* __gc = go->__codenameOneParentClsReference;
+                    if(__gc != 0 && __gc->markFunction != 0) {
+                        gcMarkFunctionPointer __fp = __gc->markFunction;
+                        __fp(d, go, JAVA_FALSE);
+                    }
+                }
+                cn1GcGraceTraceFresh = 0;
+#ifdef CN1_GC_CONFORM
+                atomic_fetch_add_explicit(&cn1GraceTracedDirect, __nf, memory_order_relaxed);
 #endif
             }
-            CN1_GC_TRUSTED_END();
 #ifdef CN1_GC_CONFORM
             atomic_fetch_add_explicit(&cn1GraceSlotsFresh, __fresh + __marked, memory_order_relaxed);
             atomic_fetch_add_explicit(&cn1GraceMarked, __marked, memory_order_relaxed);
@@ -12878,7 +12931,6 @@ void codenameOneGcFree(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj) {
     free(obj);
 }
 
-typedef void (*gcMarkFunctionPointer)(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj, JAVA_BOOLEAN force);
 
 //JAVA_OBJECT* recursionBlocker = 0;
 //int recursionBlockerPosition = 0;
@@ -13410,6 +13462,25 @@ void gcMarkObject(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj, JAVA_BOOLEAN force
     // embedded header independently (it may be reached through both precise and
     // conservative graphs in different cycles).
     if(obj->__heapPosition == CN1_GC_EMBEDDED_PRIMITIVE) return;
+    // GRACE FRESH-CHILD SKIP. While the grace walk is tracing a fresh object, an edge
+    // to another FRESH page-resident object needs neither a mark nor a worklist entry:
+    //   * the sweep's grace rule keeps mark == -1 regardless (it promotes such a slot
+    //     to the current epoch rather than freeing it), so the mark buys no survival;
+    //   * the page walk visits EVERY fresh slot of every page that has allocated since
+    //     the last sweep, so this object is traced on its own account anyway. And it
+    //     cannot already have been passed: the walk marks nothing, so a slot it has
+    //     visited is indistinguishable from one it has not -- what makes this safe is
+    //     that the walk's coverage is total, not that -1 proves anything about order.
+    // Only OLDER children have to be marked from here, which is the whole reason the
+    // grace pass traces at all (an old object reachable ONLY through a fresh one).
+    // Embedded primitives returned above, so nothing reference-bearing is lost.
+    if(cn1GcGraceTraceFresh && !force && markSnapshot == -1
+       && obj->__heapPosition == CN1_BIBOP_HEAP_POS) {
+#ifdef CN1_GC_CONFORM
+        atomic_fetch_add_explicit(&cn1GraceFreshSkipped, 1, memory_order_relaxed);
+#endif
+        return;
+    }
     // SINGLE load of the class pointer, reused for every deref below. The header of a
     // conservatively-reached object can be freed/reused WHILE this function runs; loading
     // once and validating that one value removes the read-validate-reread window (the
