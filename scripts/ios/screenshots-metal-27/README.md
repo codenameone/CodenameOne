@@ -38,6 +38,26 @@ does (iOS 26.3 against 27.0 -- different SF font revision, different system
 chrome). That is also why this is a full independent set rather than a sparse
 overlay on `../screenshots-metal`; there is essentially nothing to share.
 
+## The .tolerance sidecars
+
+Copied from `../screenshots-metal`, one per test that is known not to render
+byte-identically run to run -- vector and GPU-heavy screens with anti-aliasing
+jitter, and the ones that draw live map or web content. They are the same 19
+files and the same thresholds as the iOS 26 set, because the instability is a
+property of what those screens draw, not of the OS version.
+
+Omitting them is not a theoretical problem: this set's first gating run failed on
+`SVGStatic` alone, at 0.108% of pixels and a maximum channel delta of 4 --
+comfortably inside the 0.30% / 4 its sidecar already allows on the 26 leg. The
+other 18 happened to match exactly that time and would have failed on some later
+run instead.
+
+Note this is the screenshot suite's mechanism, not the fidelity harness's:
+`scripts/fidelity-app/goldens/README.md` rejects tolerance sidecars outright for
+native references, and that difference is deliberate. A native reference defines
+what a theme is aiming at and must be exact; these screens exercise a renderer
+whose own output jitters.
+
 ## Updating afterwards
 
 As for `../screenshots-metal`: run the job, pull the artifact, compare the

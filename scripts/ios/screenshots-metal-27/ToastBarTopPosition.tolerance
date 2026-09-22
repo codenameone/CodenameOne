@@ -1,0 +1,8 @@
+# The toast's bottom edge lands a few device pixels off run-to-run: its height
+# derives from the message font/icon metrics and the layout rounds differently
+# depending on load order (observed: 10 full-width boundary rows at 3x = 0.39%
+# of pixels; the watch leg shows the same class at 2 rows). Allow a small
+# mismatch share; a real failure -- toast absent or mispositioned -- flips >5%
+# of pixels and still fails these bounds.
+maxChannelDelta=32
+maxMismatchPercent=1.5

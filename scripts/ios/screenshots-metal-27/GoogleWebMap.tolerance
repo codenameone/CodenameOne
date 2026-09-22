@@ -1,0 +1,7 @@
+# Live Google Maps via the web provider (BrowserComponent + Maps JS): tiles,
+# labels and road data load from Google and shift run-to-run, and the JS API
+# re-lays labels more freely than a native map, so the tolerance is wide. It
+# still fails loudly on a blank / blocked map or a failed key (which differs
+# across essentially the whole frame) -- the regression this test guards.
+maxChannelDelta=40
+maxMismatchPercent=35.0

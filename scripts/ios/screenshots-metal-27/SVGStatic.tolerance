@@ -1,0 +1,7 @@
+# Vector-heavy render with run-to-run anti-aliasing jitter that straddles the
+# tightened 0.05% pipeline gate (re-flagged with fresh pixels immediately
+# after its golden was refreshed, the nondeterminism signature). Keep the
+# pre-tightening gate for this screen only; a real regression still moves far
+# more than 0.30% of the frame.
+maxChannelDelta=4
+maxMismatchPercent=0.30

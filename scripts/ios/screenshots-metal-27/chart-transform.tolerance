@@ -1,0 +1,7 @@
+# 3D-transformed chart with run-to-run anti-aliasing jitter that straddles
+# the tightened 0.05% pipeline gate (flapped on a rerun with fresh pixels
+# while every other screen matched, the nondeterminism signature -- same
+# family as chart-rotated-pie). Keep the pre-tightening gate for this screen
+# only; a real regression still moves far more than 0.30% of the frame.
+maxChannelDelta=4
+maxMismatchPercent=0.30
