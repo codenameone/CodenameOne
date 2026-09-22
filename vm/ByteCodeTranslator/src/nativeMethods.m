@@ -4937,6 +4937,23 @@ static inline void cn1BuilderStore(JAVA_OBJECT builder, JAVA_INT index, JAVA_CHA
     else ((JAVA_ARRAY_CHAR*)data)[index] = value;
 }
 
+/* GROWTH THAT FITS THE STORAGE THE BUILDER ALREADY OWNS IS NOT A CALL.
+ *
+ * Every native append that runs out of capacity called Java enlargeBuffer, which
+ * calls resizeBuffer, which calls the resizeBufferImpl native -- three calls -- and
+ * when the new size still fits the block the builder is already using (its inline
+ * bytes, the CN1StackBuffer an escape-proven builder lives in, or a heap block with
+ * slack) all three together do exactly one thing: store the new capacity. In
+ * stringBuilding that chain was ~550 of ~3200 mutator samples, because a stack
+ * builder's growth from 16 to 34 always fits its stack buffer.
+ *
+ * The policy is enlargeBuffer's, byte for byte -- capacity*2+2, or the minimum when
+ * that is larger or overflows -- so capacity() reports exactly what the Java path
+ * would have set. Anything that does not fit, or is not a plain in-place case, goes
+ * to enlargeBuffer unchanged, which stays the source of truth for allocation,
+ * copying and the OutOfMemoryError on a negative minimum. */
+static JAVA_VOID cn1SbEnsure(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT builder, JAVA_INT needed);
+
 JAVA_BOOLEAN java_lang_StringBuilder_resizeBufferImpl___int_boolean_R_boolean(
         CODENAME_ONE_THREAD_STATE, JAVA_OBJECT builder, JAVA_INT capacity, JAVA_BOOLEAN wide) {
     CN1_KEEP_NATIVE_OWNER(bufferOwner, builder);
@@ -4979,6 +4996,34 @@ JAVA_BOOLEAN java_lang_StringBuilder_resizeBufferImpl___int_boolean_R_boolean(
     target->java_lang_StringBuilder_capacity = capacity;
     target->java_lang_StringBuilder_wide = wide;
     return JAVA_TRUE;
+}
+
+static JAVA_VOID cn1SbEnsure(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT builder, JAVA_INT needed) {
+    struct obj__java_lang_StringBuilder* t = (struct obj__java_lang_StringBuilder*)builder;
+    JAVA_INT cap = t->java_lang_StringBuilder_capacity;
+    if(__builtin_expect(needed >= 0, 1)) {
+        JAVA_INT grown = cap * 2 + 2;
+        if(grown < needed || grown < 0) {
+            grown = needed;
+        }
+        long long bytes = (long long)grown * (t->java_lang_StringBuilder_wide ? 2 : 1);
+        JAVA_LONG storage = t->java_lang_StringBuilder_cn1Storage;
+        long long avail = -1;
+        if(t->__heapPosition == CN1_GC_STACK_BUILDER) {
+            struct CN1StackBuffer* scope;
+            memcpy(&scope, t->__cn1InlineStorage, sizeof(scope));
+            if(storage == (JAVA_LONG)(uintptr_t)scope->initialData) {
+                avail = scope->initialBytes;
+            }
+        } else if(storage == (JAVA_LONG)(uintptr_t)t->__cn1InlineStorage) {
+            avail = (long long)sizeof(t->__cn1InlineStorage);
+        }
+        if(bytes <= avail) {
+            t->java_lang_StringBuilder_capacity = grown;
+            return;
+        }
+    }
+    java_lang_StringBuilder_enlargeBuffer___int(threadStateData, builder, needed);
 }
 
 JAVA_CHAR java_lang_StringBuilder_unit___int_R_char(CODENAME_ONE_THREAD_STATE,
@@ -5045,7 +5090,7 @@ JAVA_OBJECT java_lang_StringBuilder_append___java_lang_String_R_java_lang_String
     if(length == 0) { finishedNativeAllocations(); return builder; }
     JAVA_INT needed = count + length;
     if(needed < 0 || needed > target->java_lang_StringBuilder_capacity)
-        java_lang_StringBuilder_enlargeBuffer___int(threadStateData, builder, needed);
+        cn1SbEnsure(threadStateData, builder, needed);
     int sourceLatin1 = cn1StrIsLatin1((JAVA_OBJECT)source);
     if(!sourceLatin1 && cn1BuilderIsLatin1(builder)) {
         JAVA_ARRAY_CHAR* units = (JAVA_ARRAY_CHAR*)cn1StrChars((JAVA_OBJECT)source);
@@ -5056,7 +5101,7 @@ JAVA_OBJECT java_lang_StringBuilder_append___java_lang_String_R_java_lang_String
     }
     void* output = cn1BuilderData(builder);
     if(sourceLatin1 && cn1BuilderIsLatin1(builder)) {
-        memcpy((JAVA_ARRAY_BYTE*)output + count,
+        cn1SmallCopy((JAVA_ARRAY_BYTE*)output + count,
                (JAVA_ARRAY_BYTE*)cn1StrChars((JAVA_OBJECT)source), (size_t)length);
     } else if(!sourceLatin1 && !cn1BuilderIsLatin1(builder)) {
         cn1CharCopy((JAVA_ARRAY_CHAR*)output + count,
@@ -5088,7 +5133,7 @@ JAVA_BOOLEAN java_lang_StringBuilder_tryAppendRange___java_lang_CharSequence_int
     JAVA_INT count = target->java_lang_StringBuilder_count;
     JAVA_INT needed = count + length;
     if(needed < 0 || needed > target->java_lang_StringBuilder_capacity)
-        java_lang_StringBuilder_enlargeBuffer___int(threadStateData, builder, needed);
+        cn1SbEnsure(threadStateData, builder, needed);
     int sourceLatin1;
     const void* input;
     if(sourceBuilder) {
@@ -5144,7 +5189,7 @@ JAVA_OBJECT java_lang_StringBuilder_append___char_1ARRAY_int_int_R_java_lang_Str
     int count = target->java_lang_StringBuilder_count;
     int needed = count + length;
     if(needed < 0 || needed > target->java_lang_StringBuilder_capacity)
-        java_lang_StringBuilder_enlargeBuffer___int(threadStateData, builder, needed);
+        cn1SbEnsure(threadStateData, builder, needed);
     const JAVA_ARRAY_CHAR* input = (const JAVA_ARRAY_CHAR*)CN1_ARRAY_DATA(array) + offset;
     if(cn1BuilderIsLatin1(builder)) {
         for(int i = 0; i < length; i++) if(input[i] > 255) {
@@ -5376,7 +5421,7 @@ JAVA_OBJECT java_lang_StringBuilder_append___int_R_java_lang_StringBuilder(CODEN
     JAVA_INT needed = tlen + (neg ? 1 : 0);
     JAVA_INT count = get_field_java_lang_StringBuilder_count(__cn1ThisObject);
     if(count + needed < 0 || count + needed > get_field_java_lang_StringBuilder_capacity(__cn1ThisObject)) {
-        java_lang_StringBuilder_enlargeBuffer___int(threadStateData, __cn1ThisObject, count + needed);
+        cn1SbEnsure(threadStateData, __cn1ThisObject, count + needed);
     }
     JAVA_INT pos = count;
     if(neg) { cn1BuilderStore(__cn1ThisObject, pos++, '-'); }
@@ -5396,7 +5441,7 @@ JAVA_OBJECT java_lang_StringBuilder_append___long_R_java_lang_StringBuilder(CODE
     JAVA_INT needed = tlen + (neg ? 1 : 0);
     JAVA_INT count = get_field_java_lang_StringBuilder_count(__cn1ThisObject);
     if(count + needed < 0 || count + needed > get_field_java_lang_StringBuilder_capacity(__cn1ThisObject)) {
-        java_lang_StringBuilder_enlargeBuffer___int(threadStateData, __cn1ThisObject, count + needed);
+        cn1SbEnsure(threadStateData, __cn1ThisObject, count + needed);
     }
     JAVA_INT pos = count;
     if(neg) { cn1BuilderStore(__cn1ThisObject, pos++, '-'); }
@@ -5412,7 +5457,7 @@ JAVA_OBJECT java_lang_StringBuilder_append___char_R_java_lang_StringBuilder(CODE
     JAVA_INT len = get_field_java_lang_StringBuilder_count(__cn1ThisObject);
     JAVA_INT valueLen = get_field_java_lang_StringBuilder_capacity(__cn1ThisObject);
     if (len==valueLen) {
-        java_lang_StringBuilder_enlargeBuffer___int(threadStateData, __cn1ThisObject, len+1);
+        cn1SbEnsure(threadStateData, __cn1ThisObject, len+1);
     }
     if(__cn1Arg1 > 255 && cn1BuilderIsLatin1(__cn1ThisObject)) java_lang_StringBuilder_widen__(threadStateData, __cn1ThisObject);
     cn1BuilderStore(__cn1ThisObject, len, __cn1Arg1);

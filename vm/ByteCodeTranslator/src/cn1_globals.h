@@ -2810,6 +2810,47 @@ extern JAVA_OBJECT __NEW_INSTANCE_java_lang_OutOfMemoryError(CODENAME_ONE_THREAD
     #define CN1_COLD __attribute__((cold))
 #endif
 
+/* A copy of at most 32 bytes WITHOUT a libc call. A memcpy whose length is not a
+ * compile-time constant is emitted as a call to memmove, whatever the length --
+ * and string building is dominated by exactly such copies: "item-", ":", a few
+ * digits. Profiling stringBuilding put _platform_memmove at ~480 of ~3200 mutator
+ * samples, all from appends and toString of strings well under 32 bytes.
+ *
+ * Overlapping fixed-width moves cover every length in a band with two loads and
+ * two stores: [8,16] as two 8-byte words anchored at each end, [4,8) as two
+ * 4-byte words, (16,32] as two 16-byte halves. Each fixed-size memcpy below is
+ * folded to plain loads and stores. The source and destination must not overlap,
+ * which holds at every caller: they copy between distinct objects. */
+static inline void cn1SmallCopy(void* dst, const void* src, size_t n) {
+    char* d = (char*)dst;
+    const char* s = (const char*)src;
+    if(n >= 8) {
+        if(n <= 16) {
+            uint64_t a, b;
+            memcpy(&a, s, 8); memcpy(&b, s + n - 8, 8);
+            memcpy(d, &a, 8); memcpy(d + n - 8, &b, 8);
+        } else if(n <= 32) {
+            uint64_t a, b, c, e;
+            memcpy(&a, s, 8); memcpy(&b, s + 8, 8);
+            memcpy(&c, s + n - 16, 8); memcpy(&e, s + n - 8, 8);
+            memcpy(d, &a, 8); memcpy(d + 8, &b, 8);
+            memcpy(d + n - 16, &c, 8); memcpy(d + n - 8, &e, 8);
+        } else {
+            memcpy(d, s, n);
+        }
+    } else if(n >= 4) {
+        uint32_t a, b;
+        memcpy(&a, s, 4); memcpy(&b, s + n - 4, 4);
+        memcpy(d, &a, 4); memcpy(d + n - 4, &b, 4);
+    } else if(n > 0) {
+        d[0] = s[0];
+        d[n - 1] = s[n - 1];
+        if(n == 3) {
+            d[1] = s[1];
+        }
+    }
+}
+
 /* The static initializer: called from the entry of every static method and every
  * allocation site of its class, behind a check that is false for the whole life of
  * the program after the first call. CN1_COLD alone does not keep it out of line --
