@@ -5873,6 +5873,10 @@ void codenameOneGCSweep() {
     // permanently broken.
     cn1GcVerifyHeap(threadStateData);
 #endif
+#ifdef CN1_GC_CONFORM
+    // Live-set slot histogram: post-sweep is when "live" means live.
+    { extern void cn1SlotHistLiveSample(void); cn1SlotHistLiveSample(); }
+#endif
 #ifdef CN1_BIBOP_VALIDATE
     // Post-sweep, for the same reason: the page geometry and slot states are
     // quiescent here, and any page the sweep mangled has already been mangled.
@@ -16233,6 +16237,95 @@ static void cn1ReportSlotHistogram(void) {
     }
 }
 
+#ifdef CN1_GC_CONFORM
+// ---- LIVE-SET SLOT HISTOGRAM (CN1_SLOTHIST_LIVE=1) ---------------------------
+// The allocation-stream histogram above prices a smaller header in ALLOCATED
+// bytes -- throughput. Peak footprint is set by the LIVE set, whose size mix can
+// differ: short-lived objects dominate the stream and long-lived ones the heap.
+// vm/BIBOP-INVARIANTS.md R14 applies the stream's 8.9% to peak and flags that as
+// unmeasured; this measures it. After every sweep, every live page-resident
+// object is re-rounded under a header 8 bytes smaller, and the cycle with the
+// largest live footprint is kept -- that is the one that sets the peak.
+//
+// Request size per object: arrays from their own header
+// (CN1_ARRAY_ALLOC_BYTES(length * primitiveSize), the formula allocArray uses);
+// scalars from the census average for the class, which is exact for any class
+// allocated at one size. java.lang.String is NOT: a fused String carries its
+// characters inline and its request size is not recoverable from the object. Those
+// are assumed to save nothing, so the figure is a LOWER BOUND, and their share is
+// printed so a reader can see how much the bound concedes.
+static long long cn1LivePeakToday = 0, cn1LivePeakHdr8 = 0, cn1LivePeakString = 0;
+static long long cn1LivePeakObjs = 0;
+static int cn1LivePeakEpoch = 0;
+void cn1SlotHistLiveSample(void) {
+    static int on = -1;
+    if(on < 0) {
+        const char* e = getenv("CN1_SLOTHIST_LIVE");
+        on = (e != 0 && *e == '1') ? 1 : 0;
+    }
+    if(!on) {
+        return;
+    }
+    long long today = 0, hdr8 = 0, strBytes = 0, objs = 0;
+    CN1BibopPage* p = atomic_load_explicit(&bibopAllPages, memory_order_acquire);
+    while(p != 0) {
+        int bump = atomic_load_explicit(&p->bumpIndex, memory_order_acquire);
+        for(int i = 0 ; i < bump ; i++) {
+            int st = cn1BibopSlotState(p, i, bump);
+            if(st != CN1_SLOT_FRESH && st != CN1_SLOT_LIVE) {
+                continue;   // R2: only a live slot has a readable header
+            }
+            JAVA_OBJECT o = cn1BibopSlot(p, i);
+            struct clazz* c = o->__codenameOneParentClsReference;
+            if(c == 0) {
+                continue;
+            }
+            objs++;
+            today += p->slotSize;
+            int req;
+            if(c->isArray) {
+                JAVA_ARRAY a = (JAVA_ARRAY)o;
+                req = (int)CN1_ARRAY_ALLOC_BYTES((long)a->length * (long)a->primitiveSize);
+            } else if(cn1IsStringClass(c)) {
+                strBytes += p->slotSize;
+                hdr8 += p->slotSize;     // conservative: assume no class boundary crossed
+                continue;
+            } else {
+                int id = c->classId;
+                long n = (id >= 0 && id < CN1_ALLOC_PROFILE_SLOTS)
+                       ? atomic_load_explicit(&cn1AllocProfCount[id], memory_order_relaxed) : 0;
+                req = n > 0 ? (int)(atomic_load_explicit(&cn1AllocProfBytes[id],
+                                                         memory_order_relaxed) / n)
+                            : p->slotSize;
+            }
+            int s8 = cn1SlotClassFor(req - 8, 0);
+            hdr8 += (s8 > 0 && s8 < p->slotSize) ? s8 : p->slotSize;
+        }
+        p = atomic_load_explicit(&p->nextAll, memory_order_acquire);
+    }
+    if(today > cn1LivePeakToday) {
+        cn1LivePeakToday = today;
+        cn1LivePeakHdr8 = hdr8;
+        cn1LivePeakString = strBytes;
+        cn1LivePeakObjs = objs;
+        cn1LivePeakEpoch = currentGcMarkValue;
+    }
+}
+
+static void cn1ReportLiveSlotHistogram(void) {
+    if(cn1LivePeakToday == 0) {
+        return;
+    }
+    fprintf(stderr, "[SLOTHIST-LIVE] peak live cycle epoch=%d objects=%lld slotBytes=%lld\n",
+            cn1LivePeakEpoch, cn1LivePeakObjs, cn1LivePeakToday);
+    fprintf(stderr, "[SLOTHIST-LIVE]   hdr=8 -> %lld  %6.2f%% of today (LOWER BOUND)\n",
+            cn1LivePeakHdr8, 100.0 * (double)cn1LivePeakHdr8 / (double)cn1LivePeakToday);
+    fprintf(stderr, "[SLOTHIST-LIVE]   java.lang.String counted as saving nothing: "
+                    "%lld bytes, %.1f%% of the live set\n",
+            cn1LivePeakString, 100.0 * (double)cn1LivePeakString / (double)cn1LivePeakToday);
+}
+#endif
+
 // NOT comparable with the allocatedKb figure CN1_LOG_GC_OVERFLOW prints, and a
 // close agreement between the two is not evidence either is right. This profile
 // counts REQUESTED bytes at the moment of allocation; allocatedKb accumulates
@@ -16306,6 +16399,9 @@ static void cn1ReportAllocProfile(void) {
         total += oor;
         fprintf(stderr, "[ALLOCPROF] totalBytes=%lld\n", total);
         cn1ReportSlotHistogram();
+#ifdef CN1_GC_CONFORM
+        cn1ReportLiveSlotHistogram();
+#endif
         if(oor > 0) {
             fprintf(stderr, "[ALLOCPROF] %-44s bytes=%-12lld count=%-10ld "
                             "(classId past %d, highest seen %d -- RAISE THE BOUND)\n",

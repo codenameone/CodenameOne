@@ -220,13 +220,33 @@ this VM would meet, small drivers included. That, not abandonment, is what this
 needs next: a typed granularity well below CN1_BIBOP_PAGE_SIZE, which means
 either a smaller page for typed allocation or sub-page runs inside a shared one.
 
-**One assumption, flagged rather than buried.** The 8.9% was measured on
-ALLOCATED slot bytes. The arithmetic above applies it to PEAK footprint, which
-holds only if the live set's size distribution matches the allocated one. That
-is plausible -- same classes, same size classes -- but it is not measured, and
-the slot histogram could answer it directly by weighting the live set instead of
-the allocation stream. Do that before quoting 0.838 as a result rather than as
-an estimate.
+**The assumption, now measured -- and the estimate above was too high.** The
+8.9% was measured on the ALLOCATION STREAM and the arithmetic applied it to the
+WHOLE PEAK FOOTPRINT. Both halves were wrong. `CN1_SLOTHIST_LIVE=1` (a
+`CN1_GC_CONFORM` build) re-rounds the LIVE set after every sweep and keeps the
+cycle with the largest live footprint. Selfhost corpus:
+
+    peak live cycle            7,537,613 objects, 579MB of slot bytes
+    hdr 16 -> 8, live set      >= 6.88% saving  (LOWER BOUND)
+      excluding Strings           8.16%
+      Strings                     15.7% of the live set, counted as saving nothing,
+                                  because a fused String's request size is not
+                                  recoverable from the object
+    peak BiBOP occupied        644.9MB
+
+And the saving applies only to BiBOP-resident bytes. The legacy heap -- every
+array over 2048 bytes -- does not round and does not shrink. Redone on the right
+base:
+
+    saving   6.9%..8.2% x 645MB = 44..53MB
+    fixed    194 classes x 64KB = 12.7MB
+    net      32..40MB on a 1354MB peak = 2.4%..3.0%
+    vs jdk25 0.911 -> ~0.884..0.889         (not the 0.838 quoted above)
+
+Still positive at selfhost scale, and still a crossover rather than a verdict --
+but about a third of what the first arithmetic claimed. That sets the price of
+the sub-page typed granularity the small-heap case needs: a rewrite of the
+subsystem that took four attempts to get correct, for roughly 2.5-3% of peak.
 
 ---
 
