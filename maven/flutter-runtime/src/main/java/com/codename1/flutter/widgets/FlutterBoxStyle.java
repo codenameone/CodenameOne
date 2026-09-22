@@ -65,6 +65,7 @@ final class FlutterBoxStyle {
                 // component-sized image -- the thing that made an image-backed
                 // circle unusable for a coach mark, whose radius animates.
                 face.getAllStyles().setBorder(RoundBorder.create()
+                        .directPaint(true)
                         .color(bg.rgb())
                         .opacity(bg.alpha()));
                 face.getAllStyles().setBgTransparency(0);
