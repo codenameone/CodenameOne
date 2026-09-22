@@ -5873,6 +5873,15 @@ void codenameOneGCSweep() {
     // permanently broken.
     cn1GcVerifyHeap(threadStateData);
 #endif
+#ifdef CN1_BIBOP_VALIDATE
+    // Post-sweep, for the same reason: the page geometry and slot states are
+    // quiescent here, and any page the sweep mangled has already been mangled.
+    // See vm/BIBOP-INVARIANTS.md for what each rule number means.
+    {
+        extern long cn1BibopValidateHeap(void);
+        cn1BibopValidateHeap();
+    }
+#endif
 #ifdef CN1_ALLOC_CENSUS
     // Same reasoning as the verify hook above: post-sweep is when "live" means
     // live. cn1HeapAccounting and cn1AllocCensus were written but never called
@@ -8587,6 +8596,119 @@ static void cn1BibopMaybeGc(CODENAME_ONE_THREAD_STATE) {
     cn1PacingPark(threadStateData, CN1_PACE_BIBOP, 0);
 #endif
 }
+
+// ---- THE SLOT-STATE PREDICATE AND THE HEAP VALIDATOR -----------------------
+// See vm/BIBOP-INVARIANTS.md. The rule numbers below are that file's.
+//
+// This predicate is the thing that did not exist in one place. Every caller that
+// wanted to ask "is this slot an object?" invented its own test, and the one
+// written for the second type-homogeneous-page attempt knew about FREE_MARK but
+// not about QUAR_MARK -- which exists only under CN1_GC_VERIFY -- so it
+// dereferenced a quarantined slot's free-list pointer as a class and took
+// SIGSEGV, in the verify build only, while reporting a violation that was not
+// real. Ask through here instead.
+enum cn1BibopSlotStateKind {
+    CN1_SLOT_UNALLOCATED = 0,  // at or above bumpIndex (R1): contents undefined
+    CN1_SLOT_FREE        = 1,  // on the page free list (R2): first word is a POINTER
+    CN1_SLOT_QUARANTINED = 2,  // freed, held back one cycle (R2), CN1_GC_VERIFY only
+    CN1_SLOT_FRESH       = 3,  // mark == -1, kept by the grace rule
+    CN1_SLOT_LIVE        = 4   // mark >= 0
+};
+
+// `i` must be < the page's bumpIndex read with ACQUIRE by the caller (R1).
+// Returns the state; the header may be read ONLY for FRESH and LIVE (R2, R3).
+static int cn1BibopSlotState(CN1BibopPage* page, int i, int bumpAcquired) {
+    if(i >= bumpAcquired) {
+        return CN1_SLOT_UNALLOCATED;
+    }
+    JAVA_OBJECT o = cn1BibopSlot(page, i);
+    // R3: the mark word is the publication point; acquire, and read it FIRST.
+    int m = __atomic_load_n(&o->__codenameOneGcMark, __ATOMIC_ACQUIRE);
+    if(m == CN1_BIBOP_FREE_MARK) {
+        return CN1_SLOT_FREE;
+    }
+#ifdef CN1_GC_VERIFY
+    if(m == CN1_BIBOP_QUAR_MARK) {
+        return CN1_SLOT_QUARANTINED;
+    }
+#endif
+    if(m == -1) {
+        return CN1_SLOT_FRESH;
+    }
+    return CN1_SLOT_LIVE;
+}
+
+#ifdef CN1_BIBOP_VALIDATE
+// Walk every page and check the invariants that can be checked from outside the
+// allocator. Reports by RULE NUMBER so a failure points at the paragraph that
+// says why the rule exists. Returns the violation count.
+//
+// Deliberately NOT an abort(): the point is to enumerate everything wrong in one
+// run rather than stop at the first, and a caller that wants to fail hard can.
+long cn1BibopValidateHeap(void) {
+    long bad = 0, pages = 0, slots = 0, typedPages = 0;
+    CN1BibopPage* p = atomic_load_explicit(&bibopAllPages, memory_order_acquire);
+    while(p != 0) {
+        pages++;
+        int bump = atomic_load_explicit(&p->bumpIndex, memory_order_acquire);   /* R1 */
+
+        // R8: the page's geometry is fixed at format time and must be self-consistent.
+        if(p->classIndex < 0 || p->classIndex >= CN1_BIBOP_NUM_CLASSES) {
+            fprintf(stderr, "[BIBOP-R8] page=%p classIndex=%d out of range\n",
+                    (void*)p, p->classIndex);
+            bad++;
+        } else if(p->slotSize != cn1BibopClassSize[p->classIndex]) {
+            fprintf(stderr, "[BIBOP-R8] page=%p slotSize=%d but classIndex=%d is %d\n",
+                    (void*)p, p->slotSize, p->classIndex, cn1BibopClassSize[p->classIndex]);
+            bad++;
+        }
+        if(bump < 0 || bump > p->slotCount) {
+            fprintf(stderr, "[BIBOP-R1] page=%p bumpIndex=%d outside 0..slotCount=%d\n",
+                    (void*)p, bump, p->slotCount);
+            bad++;
+            bump = 0;   // do not walk slots off a page with a broken cursor
+        }
+
+        // R10/R11: a typed page holds one class and nothing else.
+        struct clazz* pc = p->pageClazz;
+        if(pc != 0) {
+            typedPages++;
+        }
+        for(int i = 0 ; i < bump ; i++) {
+            int st = cn1BibopSlotState(p, i, bump);
+            if(st != CN1_SLOT_FRESH && st != CN1_SLOT_LIVE) {
+                continue;   // R2: header is not readable in the other states
+            }
+            slots++;
+            JAVA_OBJECT o = cn1BibopSlot(p, i);
+            struct clazz* oc = o->__codenameOneParentClsReference;
+            // R4: a page-resident object is -3, or -4 once matured. An embedded
+            // primitive (-5) has no slot of its own and must never appear AT a
+            // slot boundary.
+            int hp = o->__heapPosition;
+            if(hp != CN1_BIBOP_HEAP_POS && hp != CN1_BIBOP_ADOPTED) {
+                fprintf(stderr, "[BIBOP-R4] page=%p slot=%d heapPosition=%d\n",
+                        (void*)p, i, hp);
+                bad++;
+            }
+            if(oc == 0) {
+                fprintf(stderr, "[BIBOP-R3] page=%p slot=%d live slot with NULL class\n",
+                        (void*)p, i);
+                bad++;
+            } else if(pc != 0 && oc != pc) {
+                fprintf(stderr, "[BIBOP-R10] typed page=%p (%s) slot=%d holds %s\n",
+                        (void*)p, pc->clsName ? pc->clsName : "?", i,
+                        oc->clsName ? oc->clsName : "?");
+                bad++;
+            }
+        }
+        p = atomic_load_explicit(&p->nextAll, memory_order_acquire);
+    }
+    fprintf(stderr, "[BIBOP-VALIDATE] pages=%ld typed=%ld objects=%ld VIOLATIONS=%ld\n",
+            pages, typedPages, slots, bad);
+    return bad;
+}
+#endif
 
 // Retire the thread's current page for class ci (if any) onto the global SWEEP
 // stack and adopt a PARTIAL (preferred) or FREE page, formatting a fresh one

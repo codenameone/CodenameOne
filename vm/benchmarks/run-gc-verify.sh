@@ -391,4 +391,44 @@ else
     fi
 fi
 
+# ---- BIBOP INVARIANT VALIDATOR ---------------------------------------------
+# -DCN1_BIBOP_VALIDATE existed long before this arm and NO GATE BUILT IT, which
+# is how three consecutive attempts at type-homogeneous pages ran without the
+# checks that would have caught them -- including the one the sweep already
+# carries verbatim ("only RETIRED pages reach the sweep"). Building it here is
+# the whole point: an invariant nobody compiles is documentation, not a check.
+#
+# The rules and the reasoning behind each are in vm/BIBOP-INVARIANTS.md; the
+# validator reports by rule number so a failure names the paragraph that says
+# what breaks.
+printf '%-16s ' "bibop-rules"
+bvBin="target/bin/Bench-bibopvalidate"
+if ./translate-and-build.sh Bench "$bvBin" -DCN1_BIBOP_VALIDATE > target/bin/bibopvalidate-build.log 2>&1; then
+    bvOut="$(./"$bvBin" 3 objectAllocation 2>&1 || true)"
+    bvLast="$(printf '%s' "$bvOut" | grep -oE 'VIOLATIONS=[0-9]+' | tail -1 | cut -d= -f2)"
+    bvObjs="$(printf '%s' "$bvOut" | grep -oE 'objects=[0-9]+' | tail -1 | cut -d= -f2)"
+    [ -z "$bvLast" ] && bvLast=""
+    [ -z "$bvObjs" ] && bvObjs=0
+    if [ -z "$bvLast" ]; then
+        # Silence is the failure mode this arm is most likely to have: the hook is
+        # post-sweep, so a run that never swept prints nothing and would otherwise
+        # read exactly like a clean one.
+        echo "BROKEN -- the validator never ran (no VIOLATIONS line; did a sweep happen?)"
+        fail=1
+    elif [ "$bvObjs" -eq 0 ]; then
+        echo "BROKEN -- validator walked 0 objects, so it proved nothing"
+        fail=1
+    elif [ "$bvLast" -ne 0 ]; then
+        echo "FAILED -- $bvLast invariant violations"
+        printf '%s\n' "$bvOut" | grep -E '\[BIBOP-R[0-9]+\]' | head -8
+        fail=1
+    else
+        echo "clean ($bvObjs objects across the page registry)"
+    fi
+else
+    echo "BROKEN -- -DCN1_BIBOP_VALIDATE did not build"
+    tail -20 target/bin/bibopvalidate-build.log
+    fail=1
+fi
+
 [ "$fail" -eq 0 ] && echo "GC-VERIFY GREEN" || { echo "GC-VERIFY FAILED"; exit 1; }

@@ -2163,6 +2163,13 @@ _Static_assert(CN1_BIBOP_CIDX(CN1_BIBOP_MAX_OBJECT + 1) == -1,
 typedef struct CN1BibopPage {
     struct CN1BibopPage* _Atomic nextAll; // append-only global registry chain
     struct CN1BibopPage* nextPool;        // FREE/PARTIAL pool / SWEEP stack link
+    /* The one class every object in this page belongs to, or NULL while the page
+     * is size-classed and may hold a mix -- which is every page today. Inert for
+     * now: nothing sets it, and the validator's R10 check is therefore a no-op.
+     * It is here so the rule can be CHECKED the moment typed pages exist, rather
+     * than after they have already corrupted something.
+     * See vm/BIBOP-INVARIANTS.md rules R10-R13. */
+    struct clazz* pageClazz;
     int classIndex;
     int slotSize;
     int slotCount;
