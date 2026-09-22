@@ -473,6 +473,7 @@ public final class Session {
     }
     public void refresh(Object entity) {
         check();
+        refreshEntry(entity);
         try {
             refresh(entity, new IdentityHashMap<Object, Boolean>());
         } catch (PersistenceException error) {
@@ -483,14 +484,18 @@ public final class Session {
             throw error;
         }
     }
-    private void refresh(Object entity, IdentityHashMap<Object, Boolean> visited) {
-        if (visited.put(entity, Boolean.TRUE) != null) {
-            return;
-        }
+    private Entry refreshEntry(Object entity) {
         Entry entry = entries.get(entity);
         if (entry == null || entry.fresh || entry.removed) {
             throw new PersistenceException("refresh requires a persisted managed entity");
         }
+        return entry;
+    }
+    private void refresh(Object entity, IdentityHashMap<Object, Boolean> visited) {
+        if (visited.put(entity, Boolean.TRUE) != null) {
+            return;
+        }
+        Entry entry = refreshEntry(entity);
         EntityModel model = entry.model;
         checkManagedIdentity(entry);
         List<Object[]> rows = read(select(model) + " WHERE " + keyCondition(model, null),
@@ -1681,6 +1686,7 @@ public final class Session {
         EntityModel model = entry.model;
         Attribute[] attrs = model.attributes();
         model.lifecycle(entry.entity, 0);
+        checkTransientAssociations(entry);
         if (!attrs[model.idIndex()].generated && !same(entry.initialId, model.identifier(entry.entity))) {
             throw new PersistenceException("Managed primary key cannot change");
         }
@@ -1691,14 +1697,6 @@ public final class Session {
             }
             Object target = model.relation(entry.entity, i);
             Entry dependency = entries.get(target);
-            if (target != null && dependency == null) {
-                EntityModel targetModel = model(relation.target);
-                Object targetId = targetModel.identifier(target);
-                if (targetId == null || (targetModel.attributes()[targetModel.idIndex()].generated &&
-                                                targetId instanceof Number && ((Number) targetId).longValue() == 0)) {
-                    throw new PersistenceException("Transient association without cascade PERSIST: " + relation.field);
-                }
-            }
             if (dependency != null && dependency.fresh) {
                 insert(dependency);
             }
@@ -1759,7 +1757,27 @@ public final class Session {
         }
         model.lifecycle(entry.entity, 1);
     }
+    private void checkTransientAssociations(Entry entry) {
+        EntityModel owner = entry.model;
+        Relationship[] relations = owner.relationships();
+        for (int i = 0; i < relations.length; i++) {
+            Relationship relation = relations[i];
+            if (relation.column < 0) {
+                continue;
+            }
+            Object target = owner.relation(entry.entity, i);
+            if (target != null && entries.get(target) == null) {
+                EntityModel targetModel = model(relation.target);
+                Object targetId = targetModel.identifier(target);
+                if (targetId == null || (targetModel.attributes()[targetModel.idIndex()].generated &&
+                        targetId instanceof Number && ((Number) targetId).longValue() == 0)) {
+                    throw new PersistenceException("Transient association without cascade PERSIST: " + relation.field);
+                }
+            }
+        }
+    }
     private void update(Entry entry) {
+        checkTransientAssociations(entry);
         EntityModel model = entry.model;
         Attribute[] attrs = model.attributes();
         Object[] now = snapshot(model, entry.entity);
@@ -1794,6 +1812,7 @@ public final class Session {
             return;
         }
         model.lifecycle(entry.entity, 2);
+        checkTransientAssociations(entry);
         now = snapshot(model, entry.entity);
         if (!same(model.identifierFromRow(now), model.identifierFromRow(entry.snapshot)) ||
                 version >= 0 && !same(now[version], entry.snapshot[version])) {

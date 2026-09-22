@@ -206,6 +206,59 @@ class ManagedSessionTest {
             s.beginTransaction();assertThrows(OptimisticLockException.class,()->s.merge(r));s.rollbackTransaction();s.close();
         } finally { em.close(); }
     }
+    @Test void suppliedDatabaseSerializesOtherHandlersAcrossSessionTransaction() throws Exception {
+        EntityManager em=manager();
+        java.util.concurrent.ExecutorService workers=java.util.concurrent.Executors.newFixedThreadPool(2);
+        Session s=em.openSession();
+        Database db=em.database();
+        try {
+            db.execute("CREATE TABLE audit (value TEXT)",new Object[0]);
+            for(int boundary=0;boundary<3;boundary++) {
+                s.beginTransaction();
+                db.execute("INSERT INTO audit VALUES ('session')",new Object[0]);
+                java.util.concurrent.CountDownLatch attempting=new java.util.concurrent.CountDownLatch(2);
+                java.util.concurrent.Future<?> raw=workers.submit(()-> {
+                    attempting.countDown();db.execute("INSERT INTO audit VALUES ('raw')",new Object[0]);return null;
+                });
+                java.util.concurrent.Future<?> callback=workers.submit(()-> {
+                    attempting.countDown();return db.transaction(connection -> {
+                        connection.execute("INSERT INTO audit VALUES ('callback')",new Object[0]);return null;
+                    });
+                });
+                assertTrue(attempting.await(5,java.util.concurrent.TimeUnit.SECONDS));
+                assertThrows(java.util.concurrent.TimeoutException.class,()->raw.get(100,java.util.concurrent.TimeUnit.MILLISECONDS));
+                assertThrows(java.util.concurrent.TimeoutException.class,()->callback.get(100,java.util.concurrent.TimeUnit.MILLISECONDS));
+                if(boundary==0) s.commitTransaction();
+                else if(boundary==1) s.rollbackTransaction();
+                else s.close();
+                raw.get(5,java.util.concurrent.TimeUnit.SECONDS);callback.get(5,java.util.concurrent.TimeUnit.SECONDS);
+                assertEquals(2,db.query("SELECT value FROM audit WHERE value <> 'session'",new Object[0]).size());
+                assertEquals(boundary==0?1:0,db.query("SELECT value FROM audit WHERE value = 'session'",new Object[0]).size());
+                db.execute("DELETE FROM audit",new Object[0]);
+            }
+        } finally {
+            s.close();workers.shutdownNow();workers.awaitTermination(5,java.util.concurrent.TimeUnit.SECONDS);em.close();
+        }
+    }
+
+    @Test void invalidRefreshPreservesPendingChangesAndTransaction() throws Exception {
+        EntityManager em=manager();
+        try {
+            Session s=em.openSession();Record saved=seed(s);
+            s.beginTransaction();saved.name="pending update";
+            Record fresh=new Record();fresh.name="pending insert";s.persist(fresh);
+            assertThrows(PersistenceException.class,()->s.refresh(fresh));
+            assertTrue(s.contains(saved));assertTrue(s.contains(fresh));
+            assertFalse(s.isRollbackOnly());
+            assertThrows(PersistenceException.class,()->s.refresh(new Record()));
+            assertTrue(s.contains(saved));assertTrue(s.contains(fresh));
+            assertFalse(s.isRollbackOnly());
+            s.commitTransaction();s.clear();
+            assertEquals("pending update",s.find(Record.class,saved.id).name);
+            assertEquals("pending insert",s.find(Record.class,fresh.id).name);s.close();
+        } finally { em.close(); }
+    }
+
     @Test void failedFlushPreservesCallbackExceptionAndRequiresRollback() throws Exception {
         EntityManager em=manager();
         RuntimeException failure=new IllegalStateException("callback failed");

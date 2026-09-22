@@ -144,6 +144,29 @@ class EntityManagerTest extends UITestBase {
     }
 
     @Test
+    void registeredDaoReattachesWhenManagersAlternate() throws Exception {
+        RecordingDao dao = new RecordingDao();
+        EntityManager.registerDao(dao);
+        RecordingDatabase firstDb = new RecordingDatabase();
+        RecordingDatabase secondDb = new RecordingDatabase();
+        EntityManager first = EntityManager.open(firstDb);
+        EntityManager second = EntityManager.open(secondDb);
+        try {
+            assertSame(dao, first.dao(SampleEntity.class));
+            assertSame(firstDb, dao.attached);
+            assertSame(dao, second.dao(SampleEntity.class));
+            assertSame(secondDb, dao.attached);
+            assertSame(dao, first.dao(SampleEntity.class));
+            assertSame(firstDb, dao.attached);
+            assertSame(dao, second.dao(SampleEntity.class));
+            assertSame(secondDb, dao.attached);
+        } finally {
+            first.close();
+            second.close();
+        }
+    }
+
+    @Test
     void openNullDatabaseThrows() {
         assertThrows(IllegalArgumentException.class, new org.junit.jupiter.api.function.Executable() {
             public void execute() {

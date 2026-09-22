@@ -404,7 +404,7 @@ public final class JpqlQuery<T> {
             for (int i = 0; i < plan.kinds.length; i++) {
                 plan.kinds[i] = kinds.get(i).intValue();
             }
-            plan.sql = "SELECT " + (distinct || !plan.fetches.isEmpty() ? "DISTINCT " : "") + projection + root.from() +
+            plan.sql = "SELECT " + (distinct ? "DISTINCT " : "") + projection + root.from() +
                        where + group + having + order;
             return plan;
         }

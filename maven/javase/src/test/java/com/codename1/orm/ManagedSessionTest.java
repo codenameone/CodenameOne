@@ -194,6 +194,24 @@ class ManagedSessionTest {
             s.beginTransaction();assertThrows(OptimisticLockException.class,()->s.merge(r));s.rollbackTransaction();s.close();
         } finally { em.close(); }
     }
+    @Test void invalidRefreshPreservesPendingChangesAndTransaction() throws Exception {
+        EntityManager em=manager();
+        try {
+            Session s=em.openSession();Record saved=seed(s);
+            s.beginTransaction();saved.name="pending update";
+            Record fresh=new Record();fresh.name="pending insert";s.persist(fresh);
+            assertThrows(PersistenceException.class,()->s.refresh(fresh));
+            assertTrue(s.contains(saved));assertTrue(s.contains(fresh));
+            assertFalse(s.isRollbackOnly());
+            assertThrows(PersistenceException.class,()->s.refresh(new Record()));
+            assertTrue(s.contains(saved));assertTrue(s.contains(fresh));
+            assertFalse(s.isRollbackOnly());
+            s.commitTransaction();s.clear();
+            assertEquals("pending update",s.find(Record.class,saved.id).name);
+            assertEquals("pending insert",s.find(Record.class,fresh.id).name);s.close();
+        } finally { em.close(); }
+    }
+
     @Test void failedFlushPreservesCallbackExceptionAndRequiresRollback() throws Exception {
         EntityManager em=manager();
         RuntimeException failure=new IllegalStateException("callback failed");

@@ -208,7 +208,11 @@ public final class EntityManager {
         return dao;
     }
 
-    /** Opens an independent managed persistence context. */
+    /**
+     * Opens an independent managed persistence context. Begin and complete each
+     * transaction on the same thread; other users of its connection wait until
+     * commit, rollback, or session close.
+     */
     public com.codename1.orm.session.Session openSession() {
         if (transactionScoped) throw new IllegalStateException("Open a session on the outer manager; the session owns its transaction");
         return new com.codename1.orm.session.Session(new SessionSqlAccess(pool, pinned, dialect));

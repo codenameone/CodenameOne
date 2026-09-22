@@ -131,6 +131,7 @@ public final class EntityManager {
         }
         Dao<T> d = (Dao<T>) daos.get(entityClass.getName());
         if (d != null) {
+            d.attach(db);
             return d;
         }
         synchronized (BY_NAME) {

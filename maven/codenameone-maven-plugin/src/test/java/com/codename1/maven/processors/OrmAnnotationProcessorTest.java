@@ -318,6 +318,78 @@ public class OrmAnnotationProcessorTest {
         } finally { session.close();em.close();loader.close(); }
     }
 
+    private java.net.URLClassLoader reviewRelations(String idType) throws Exception {
+        File classes=tmp.newFolder();
+        Map<String,String> sources=new java.util.LinkedHashMap<String,String>();
+        sources.put("review.Customer","package review; import com.codename1.annotations.*; @Entity(table=\"review_customer\") public class Customer { @Id public "+idType+" id; public String name; }");
+        sources.put("review.Purchase","package review; import com.codename1.annotations.*; @Entity(table=\"review_purchase\") public class Purchase { @Id public long id; @ManyToOne(fetch=FetchType.LAZY) public Customer customer; @OneToMany(mappedBy=\"purchase\") public java.util.List<Item> items=new java.util.ArrayList<Item>(); }");
+        sources.put("review.Item","package review; import com.codename1.annotations.*; @Entity(table=\"review_item\") public class Item { @Id public long id; @ManyToOne(fetch=FetchType.LAZY) public Purchase purchase; }");
+        JavaSourceCompiler.compile(sources,classes,Arrays.asList(testClassesDir()));
+        ProcessorContext ctx=runProcessor(classes,backendClasspath());
+        assertFalse(ctx.getErrors().toString(),ctx.hasErrors());
+        java.net.URLClassLoader loader=new java.net.URLClassLoader(new URL[]{classes.toURI().toURL()},getClass().getClassLoader());
+        loader.loadClass("cn1app.BackendDaoBootstrap").newInstance();
+        return loader;
+    }
+
+    @Test
+    public void updatingToOneRejectsUnsavedBoxedAndPrimitiveIdentifiers() throws Exception {
+        for(String idType:Arrays.asList("Long","long")) {
+            java.net.URLClassLoader loader=reviewRelations(idType);
+            Class customerType=loader.loadClass("review.Customer"),purchaseType=loader.loadClass("review.Purchase");
+            com.codename1.backend.orm.EntityManager em=com.codename1.backend.orm.EntityManager.open(com.codename1.backend.Database.open(":memory:"));
+            com.codename1.orm.session.Session session=em.openSession();
+            try {
+                session.createTables();session.beginTransaction();
+                Object customer=customerType.newInstance(),purchase=purchaseType.newInstance();
+                session.persist(customer);purchaseType.getField("customer").set(purchase,customer);
+                session.persist(purchase);session.commitTransaction();
+                Object purchaseId=purchaseType.getField("id").get(purchase);
+                // Test both replacement of a saved association and null -> unsaved.
+                for(int iteration=0;iteration<2;iteration++) {
+                    session.beginTransaction();
+                    purchaseType.getField("customer").set(purchase,customerType.newInstance());
+                    try { session.flush();fail("Unsaved "+idType+" association must fail during flush"); }
+                    catch(com.codename1.orm.session.PersistenceException expected) {
+                        assertTrue(expected.getMessage(),expected.getMessage().contains("Transient association without cascade PERSIST"));
+                    }
+                    assertTrue(session.isRollbackOnly());session.rollbackTransaction();
+                    purchase=session.find(purchaseType,purchaseId);session.initialize(purchase,"customer");
+                    org.junit.Assert.assertEquals(iteration==0, purchaseType.getField("customer").get(purchase)!=null);
+                    session.beginTransaction();purchaseType.getField("customer").set(purchase,null);session.commitTransaction();
+                }
+                // Explicitly persisting the new target is valid without a cascade.
+                session.beginTransaction();Object replacement=customerType.newInstance();session.persist(replacement);
+                purchaseType.getField("customer").set(purchase,replacement);session.commitTransaction();
+                session.clear();purchase=session.find(purchaseType,purchaseId);session.initialize(purchase,"customer");
+                org.junit.Assert.assertNotNull(purchaseType.getField("customer").get(purchase));
+            } finally { session.close();em.close();loader.close(); }
+        }
+    }
+
+    @Test
+    public void fetchJoinDoesNotForceDistinctWhenOrderingByRelatedColumn() throws Exception {
+        java.net.URLClassLoader loader=reviewRelations("long");
+        List<String> statements=new ArrayList<String>();
+        com.codename1.orm.session.SqlAccess access=(com.codename1.orm.session.SqlAccess)java.lang.reflect.Proxy.newProxyInstance(
+                getClass().getClassLoader(),new Class[]{com.codename1.orm.session.SqlAccess.class},(proxy,method,args)-> {
+                    if(method.getName().equals("quote")) return com.codename1.backend.sql.Dialect.POSTGRES.quote((String)args[0]);
+                    if(method.getName().equals("dialect")) return "postgresql";
+                    if(method.getName().equals("limit")) return com.codename1.backend.sql.Dialect.POSTGRES.limit((Integer)args[0],(Integer)args[1]);
+                    if(method.getName().equals("query")) { statements.add((String)args[0]);return Collections.emptyList(); }
+                    if(method.getName().equals("close")) return null;
+                    throw new AssertionError("Unexpected SQL adapter operation: "+method.getName());
+                });
+        com.codename1.orm.session.Session session=new com.codename1.orm.session.Session(access);
+        try {
+            session.createQuery("select p from Purchase p join fetch p.items order by p.customer.name").list();
+            assertTrue(statements.get(0),statements.get(0).contains("ORDER BY"));
+            assertFalse("Fetches load separately, so DISTINCT would reject this ORDER BY on PostgreSQL",statements.get(0).startsWith("SELECT DISTINCT "));
+            session.createQuery("select distinct p from Purchase p join fetch p.items").list();
+            assertTrue("An explicit DISTINCT remains effective",statements.get(1).startsWith("SELECT DISTINCT "));
+        } finally { session.close();loader.close(); }
+    }
+
     @Test
     public void generatesDaoWithExpectedShape() throws Exception {
         File classes = compileFixture(

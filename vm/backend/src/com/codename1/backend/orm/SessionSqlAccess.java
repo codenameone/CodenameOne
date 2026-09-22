@@ -125,10 +125,10 @@ final class SessionSqlAccess implements SqlAccess {
     }
     public void begin() throws IOException {
         if(transaction!=null) throw new IOException("Transaction already active");
-        Database db=connection();
+        Database db=supplied!=null?supplied:pool.borrow();
         try {
-            if(db.isInTransaction()) throw new IOException("Database already has an active transaction");
-            db.beginTransaction(); transaction=db;
+            if("sqlite".equals(dialect())) db.execute("PRAGMA foreign_keys = ON",new Object[0]);
+            db.beginExclusiveTransaction(); transaction=db;
         } finally { release(db); }
     }
     public void commit() throws IOException {
