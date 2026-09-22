@@ -87,18 +87,68 @@ rm -rf "$WORK/flutter"
 mkdir -p "$WORK/flutter"
 cp -R "$GALLERY/lib" "$WORK/flutter/lib"
 cp "$GALLERY/pubspec.yaml" "$WORK/flutter/pubspec.yaml"
+cp "$FLUTTER_ROOT/pubspec.lock" "$WORK/flutter/pubspec.lock"
 
 # The gallery is a MEMBER of the Flutter SDK's pub workspace, so its pubspec
 # carries `resolution: workspace` and refuses to resolve anywhere else:
 # "found no workspace root including it in parent directories". Lifting the
-# package out of the SDK means dropping that line -- the dependency versions
-# themselves are unchanged, only where they are resolved from.
+# package out of the SDK means dropping that line.
+#
+# And then taking the workspace's LOCKFILE with it, which is not optional. The
+# gallery pins almost nothing -- `google_fonts: any` -- so the only thing
+# holding its dependencies at the versions the Flutter team tests is the
+# workspace root's pubspec.lock. Without it pub resolved google_fonts 8.1.0
+# instead of 6.2.1, and the build failed on
+# "Member not found: 'GoogleFonts.robotoCondensed'" in three of the studies:
+# the benchmark would have been comparing against a gallery that does not
+# build, on a dependency nobody chose.
 python3 - "$WORK/flutter/pubspec.yaml" <<'PY_INNER'
-import io, sys
+import io, re, sys
 path = sys.argv[1]
-kept = [line for line in io.open(path, encoding="utf-8").read().splitlines()
-        if line.strip() != "resolution: workspace"]
-io.open(path, "w", encoding="utf-8").write("\n".join(kept) + "\n")
+lines = [line for line in io.open(path, encoding="utf-8").read().splitlines()
+         if line.strip() != "resolution: workspace"]
+
+# The gallery's ASSET packages are not in its own pubspec: the workspace root
+# declares them once for every member, so a package lifted out of the workspace
+# loses them and the build stops at "Could not resolve package for asset
+# packages/rally_assets/logo.png" -- an error about an asset, for a dependency
+# that is simply absent.
+#
+# Derived from the asset paths rather than hard-coded. The gallery references
+# three today (flutter_gallery_assets, rally_assets, shrine_images); a list
+# written out here would be wrong the first time it gained a fourth, and would
+# fail in the same indirect way.
+referenced = set()
+for line in lines:
+    match = re.match(r"\s*-\s+packages/([A-Za-z0-9_]+)/", line)
+    if match:
+        referenced.add(match.group(1))
+
+declared = set()
+in_deps = False
+for line in lines:
+    if re.match(r"^[a-z_]+:", line):
+        in_deps = line.startswith("dependencies:")
+        continue
+    if in_deps:
+        match = re.match(r"\s{2}([A-Za-z0-9_]+):", line)
+        if match:
+            declared.add(match.group(1))
+
+missing = sorted(referenced - declared)
+if missing:
+    out = []
+    for line in lines:
+        out.append(line)
+        if line.rstrip() == "dependencies:":
+            # Unpinned: the workspace lockfile copied beside this file is what
+            # decides the versions.
+            for name in missing:
+                out.append("  %s: any" % name)
+    lines = out
+    sys.stderr.write("    declared asset packages: %s\n" % ", ".join(missing))
+
+io.open(path, "w", encoding="utf-8").write("\n".join(lines) + "\n")
 PY_INNER
 
 # Platform scaffolding is GENERATED rather than committed: `flutter create` on
