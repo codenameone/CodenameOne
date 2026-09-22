@@ -36,6 +36,22 @@ concurrency:
   group: flutter-bench-${{ github.ref }}
   cancel-in-progress: true
 
+env:
+  # The Flutter release this benchmark measures against, PINNED rather than
+  # tracking stable.
+  #
+  # A benchmark whose reference moves on its own is not one: the gallery, its
+  # dependency resolution and Flutter's own code generation all change between
+  # releases, so a number from last week and a number from today would differ
+  # for reasons that have nothing to do with this repository. Tracking stable
+  # also broke outright -- 3.47.5's tree resolved google_fonts to a version
+  # without robotoCondensed and three studies stopped compiling.
+  #
+  # Bumping this is a deliberate act that re-baselines the comparison: expect
+  # every number to move, and re-record the baselines under
+  # scripts/flutter-bench/baselines in the same change.
+  FLUTTER_REF: '3.35.4'
+
 permissions:
   contents: read
   pull-requests: write
@@ -179,7 +195,7 @@ jobs:
       - name: Check out the Flutter SDK
         shell: bash
         run: |
-          git clone --depth 1 --branch "${FLUTTER_CHANNEL:-stable}" \
+          git clone --depth 1 --branch "$FLUTTER_REF" \
               https://github.com/flutter/flutter.git "$RUNNER_TEMP/flutter"
           echo "$RUNNER_TEMP/flutter/bin" >> "$GITHUB_PATH"
           echo "FLUTTER_ROOT=$RUNNER_TEMP/flutter" >> "$GITHUB_ENV"
@@ -193,6 +209,10 @@ jobs:
             echo "this Flutter checkout has no gallery; prepare.sh cannot run" >&2
             exit 1; }
           echo "gallery Dart files: $(find "$FLUTTER_ROOT/dev/integration_tests/new_gallery/lib" -name '*.dart' | wc -l)"
+          test -f "$FLUTTER_ROOT/pubspec.lock" || {
+            echo "the SDK checkout has no root pubspec.lock; prepare.sh needs it" >&2
+            echo "to hold the gallery's unpinned dependencies at tested versions" >&2
+            exit 1; }
 
       # Flutter's own Linux build and Codename One's native Linux port both
       # compile against GTK3; without it CMake stops at "The following required

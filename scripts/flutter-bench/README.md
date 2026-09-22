@@ -27,6 +27,25 @@ What *is* committed here is the two entry points, which are ours:
 `app/cn1/Bench.java` and `app/flutter/main_bench.dart`. Each prints the
 start-up marker the harness times against.
 
+The SDK version is **pinned** in the workflow (`FLUTTER_REF`), not tracked from
+`stable`. A benchmark whose reference moves on its own is not one -- the
+gallery, its dependency resolution and Flutter's own code generation all change
+between releases, so a number from last week and a number from today would
+differ for reasons unrelated to this repository. It is not hypothetical:
+tracking `stable` broke outright when 3.47.5's tree resolved `google_fonts` to
+a version without `robotoCondensed` and three studies stopped compiling.
+Bumping the pin re-baselines the comparison, so expect every number to move and
+re-record `baselines/` in the same change.
+
+Lifting the gallery out of the SDK's pub workspace takes two things with it.
+Its **lockfile**, because the gallery pins almost nothing (`google_fonts: any`)
+and the workspace root is the only thing holding its dependencies at tested
+versions. And its **asset packages** -- `flutter_gallery_assets`,
+`rally_assets`, `shrine_images` -- which the workspace root declares once for
+every member, so a lifted package loses them entirely. Those are derived from
+the pubspec's own asset paths rather than listed, so a fourth would be picked
+up on its own.
+
 ## Running it locally
 
 ```bash
