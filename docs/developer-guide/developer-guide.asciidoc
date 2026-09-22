@@ -97,6 +97,8 @@ include::Game-Builder.asciidoc[]
 
 include::Game-Assets.asciidoc[]
 
+include::Flutter-Interop.asciidoc[]
+
 = Data, media and networking
 
 include::io.asciidoc[]
