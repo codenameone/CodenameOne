@@ -97,13 +97,22 @@ cn1_build() {   # cn1_build <platform> <buildTarget> [extra maven args...]
 }
 
 
-cn1_reported() {  # cn1_reported <what>: the path a native builder logged
+emit() {  # emit <side> <path>: hand an artifact path to the workflow, or fail
+  # A missing artifact FAILS the build. An empty path used to reach the harness,
+  # which reported the platform "not measured" and let the job pass -- macOS and
+  # JavaScript were both green that way without measuring anything.
+  [ -n "$2" ] && [ -e "$2" ] || {
+    echo "no $1 artifact to measure (got '${2}')" >&2; exit 2; }
+  printf '%s=%s\n' "$1" "$2"
+}
+
+cn1_reported() {  # cn1_reported <phrase>: the path a builder logged after <phrase>
   # The native Linux and Windows builders print where they put the binary
   # ("Built native Linux executable: <path>"). The recipes used to look for a
   # "*-<target>" directory instead, a layout those builders never produce --
   # they write to a "result" directory -- so the artifact path came back empty.
   local path
-  path="$(sed -n "s/.*Built native $1 executable: //p" "$CN1_LOG" | tail -1 | tr -d '\r')"
+  path="$(sed -n "s/.*$1 //p" "$CN1_LOG" | tail -1 | tr -d '\r')"
   # On Windows the builder logs D:\a\...\Bench.exe. Git Bash's dirname does not
   # split on a backslash, so it is normalized to D:/a/.../Bench.exe first, a
   # form both this shell and the native Windows Python downstream accept.
@@ -111,7 +120,7 @@ cn1_reported() {  # cn1_reported <what>: the path a native builder logged
     path="$(cygpath -m "$path")"
   fi
   [ -n "$path" ] && [ -e "$path" ] || {
-    echo "the Codename One build did not report a native $1 executable" >&2; exit 2; }
+    echo "the Codename One build did not report: $1" >&2; exit 2; }
   printf '%s\n' "$path"
 }
 
@@ -163,8 +172,10 @@ case "$PLATFORM" in
     cn1_build ios local-mac-device \
         -Dcodename1.arg.macos.signingIdentity.appStore=none \
         -Dcodename1.arg.macos.signingIdentity.developerID=none
-    echo "flutter=$FL/build/macos/Build/Products/Release/gallery.app"
-    echo "cn1=$(first "$CN1/ios/target" -maxdepth 4 -name '*.app' -type d)"
+    emit flutter "$FL/build/macos/Build/Products/Release/gallery.app"
+    # What the builder reports, not a search: the app is six levels down, and
+    # a four-level search found nothing and left the platform "not measured".
+    emit cn1 "$(cn1_reported 'Built native macOS application:')"
     ;;
 
   ios)
@@ -206,7 +217,7 @@ print(name if name in targets else (targets[0] if targets else ""))' )"
         -configuration Release -sdk iphoneos \
         CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO \
         CONFIGURATION_BUILD_DIR="$XCPROJ/build" build )
-    echo "flutter=$FL/build/ios/iphoneos/Runner.app"
+    emit flutter "$FL/build/ios/iphoneos/Runner.app"
     # Directly under the build directory, because CONFIGURATION_BUILD_DIR put
     # it there; the Build/Products/... nesting above it is DerivedData's layout,
     # which this no longer uses.
@@ -214,7 +225,7 @@ print(name if name in targets else (targets[0] if targets else ""))' )"
     [ -n "$CN1_APP" ] || {
       echo "xcodebuild reported success but produced no .app under" >&2
       echo "$XCPROJ/build" >&2; exit 2; }
-    echo "cn1=$CN1_APP"
+    emit cn1 "$CN1_APP"
     ;;
 
   android)
@@ -223,10 +234,10 @@ print(name if name in targets else (targets[0] if targets else ""))' )"
     GRADLE_PROJECT="$(first "$CN1/android/target" -maxdepth 2 -type d -name '*-android-source')"
     [ -n "$GRADLE_PROJECT" ] || { echo "no generated Gradle project" >&2; exit 2; }
     ( cd "$GRADLE_PROJECT" && ./gradlew assembleRelease )
-    echo "flutter=$FL/build/app/outputs/flutter-apk/app-release.apk"
+    emit flutter "$FL/build/app/outputs/flutter-apk/app-release.apk"
     CN1_APK="$(first "$GRADLE_PROJECT" -name '*-release*.apk' -not -name '*-debugsigned.apk')"
     [ -n "$CN1_APK" ] || { echo "assembleRelease produced no apk" >&2; exit 2; }
-    echo "cn1=$(sign_for_install "$CN1_APK")"
+    emit cn1 "$(sign_for_install "$CN1_APK")"
     ;;
 
   linux)
@@ -236,10 +247,10 @@ print(name if name in targets else (targets[0] if targets else ""))' )"
     # falling back to a JVM build that would not be comparable.
     ( cd "$FL" && flutter build linux --release -t "$FLUTTER_ENTRY" )
     cn1_build linux local-linux-device
-    echo "flutter=$FL/build/linux/x64/release/bundle"
+    emit flutter "$FL/build/linux/x64/release/bundle"
     # The result DIRECTORY: the executable plus the libraries it ships beside
     # itself, which count toward both installed and code size.
-    echo "cn1=$(dirname "$(cn1_reported Linux)")"
+    emit cn1 "$(dirname "$(cn1_reported 'Built native Linux executable:')")"
     ;;
 
   windows)
@@ -247,16 +258,23 @@ print(name if name in targets else (targets[0] if targets else ""))' )"
     # submitted.
     ( cd "$FL" && flutter build windows --release -t "$FLUTTER_ENTRY" )
     cn1_build win local-windows-device
-    echo "flutter=$FL/build/windows/x64/runner/Release"
-    echo "cn1=$(dirname "$(cn1_reported Windows)")"
+    emit flutter "$FL/build/windows/x64/runner/Release"
+    emit cn1 "$(dirname "$(cn1_reported 'Built native Windows executable:')")"
     ;;
 
   javascript)
     ( cd "$FL" && flutter build web --release -t "$FLUTTER_ENTRY" )
     # local-javascript, not the `javascript` target, which is the cloud build.
     cn1_build javascript local-javascript
-    echo "flutter=$FL/build/web"
-    echo "cn1=$(first "$CN1/javascript/target" -maxdepth 3 -type d -name 'javascript')"
+    emit flutter "$FL/build/web"
+    # The builder writes the browser bundle as a zip; the adapter serves a
+    # directory, so it is unpacked and the directory holding index.html used.
+    WEB_ZIP="$(cn1_reported 'Wrote browser bundle to')"
+    rm -rf "$WORK/cn1-web"; mkdir -p "$WORK/cn1-web"
+    ( cd "$WORK/cn1-web" && unzip -q "$WEB_ZIP" )
+    WEB_INDEX="$(find "$WORK/cn1-web" -name index.html | awk '{ print length, $0 }' | sort -n | head -1 | cut -d' ' -f2-)"
+    [ -n "$WEB_INDEX" ] || { echo "the browser bundle has no index.html" >&2; exit 2; }
+    emit cn1 "$(dirname "$WEB_INDEX")"
     ;;
 
   *)
