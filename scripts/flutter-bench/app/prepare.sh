@@ -236,16 +236,58 @@ GENERATED_MAIN="$COMMON/src/main/java/com/example/bench/Bench.java"
   exit 2; }
 cp "$HERE/cn1/Bench.java" "$GENERATED_MAIN"
 
-# Assets. flutter pub get above put the package in the pub cache; find it there
-# rather than hard-coding a version.
-ASSETS="$(find "${PUB_CACHE:-$HOME/.pub-cache}/hosted" -maxdepth 3 -type d \
-    -name 'flutter_gallery_assets-*' 2>/dev/null | sort | tail -1)"
-if [ -n "$ASSETS" ] && [ -d "$ASSETS/lib" ]; then
-  python3 "$HERE/stage_assets.py" "$ASSETS/lib" "$COMMON/src/main/resources"
-else
-  echo "    WARNING: flutter_gallery_assets not in the pub cache;" >&2
-  echo "             the Codename One build will render without artwork" >&2
-fi
+# Assets. Asked of pub's own answer rather than guessed from a cache path:
+# `flutter pub get` above wrote .dart_tool/package_config.json, which names
+# where every resolved package actually lives, on every platform.
+#
+# The guess it replaces was "$PUB_CACHE, or ~/.pub-cache" -- the default on
+# Linux and macOS only. Windows puts the cache under LOCALAPPDATA, so find
+# searched a directory that does not exist and exited non-zero; with its stderr
+# sent to /dev/null and pipefail on, the script died on this assignment having
+# printed nothing whatsoever. That is a silent failure twice over, so the path
+# is no longer guessed and no longer silenced.
+ASSETS="$(python3 - "$WORK/flutter/.dart_tool/package_config.json" <<'PY_ASSETS'
+import io, json, os, re, sys
+try:
+    cfg = json.load(io.open(sys.argv[1], encoding="utf-8"))
+except (IOError, OSError, ValueError):
+    sys.exit(0)
+for pkg in cfg.get("packages", []):
+    if pkg.get("name") != "flutter_gallery_assets":
+        continue
+    uri = pkg.get("rootUri", "")
+    if uri.startswith("file:"):
+        # Parsed here rather than through url2pathname, which is a DIFFERENT
+        # function per platform: the POSIX build returns "/C:/Users/..." for a
+        # Windows file URI, leading slash and all, so testing this on a Mac
+        # would have proved nothing about the platform it is for.
+        try:
+            from urllib.parse import urlparse, unquote
+        except ImportError:
+            from urlparse import urlparse
+            from urllib import unquote
+        path = unquote(urlparse(uri).path)
+        if re.match(r"^/[A-Za-z]:", path):
+            path = path[1:]
+    else:
+        # Relative entries are relative to the .dart_tool directory itself.
+        path = os.path.join(os.path.dirname(os.path.abspath(sys.argv[1])), uri)
+    # Forward slashes so the surrounding shell can test the path on Windows too.
+    print(os.path.normpath(path).replace("\\", "/"))
+    break
+PY_ASSETS
+)"
+
+# Fatal, not a warning. A build with no artwork is a SMALLER build, so letting
+# it through would report an installed size flattering to Codename One and not
+# comparable with Flutter's -- the exact class of quietly-unfair number the rest
+# of this harness exists to avoid.
+[ -n "$ASSETS" ] && [ -d "$ASSETS/lib" ] || {
+  echo "flutter_gallery_assets was not resolved (looked in" >&2
+  echo "$WORK/flutter/.dart_tool/package_config.json); the Codename One build" >&2
+  echo "would render without artwork and its size would not be comparable." >&2
+  exit 2; }
+python3 "$HERE/stage_assets.py" "$ASSETS/lib" "$COMMON/src/main/resources"
 
 cat > "$WORK/prepared.json" <<JSON
 {
