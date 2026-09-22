@@ -15858,6 +15858,9 @@ static _Atomic long cn1SlotHistArr[CN1_SLOTHIST_MAX + 1];
 // than folded into a total that would imply a saving BiBOP never made.
 static _Atomic long long cn1SlotHistLegacyBytes = 0;
 static _Atomic long cn1SlotHistLegacyCount = 0;
+static _Atomic long cn1SlotHistLegacyArr = 0;
+static _Atomic long cn1SlotHistLegacyObj = 0;
+static _Atomic int  cn1SlotHistLegacyObjMax = 0;
 
 // The slot a request of `size` lands in. allow16 adds a hypothetical 16-byte
 // class below the current floor of 32; 0 means "no page slot fits".
@@ -15898,6 +15901,18 @@ void cn1RecordAllocation(struct clazz* parent, int size) {
     } else {
         atomic_fetch_add_explicit(&cn1SlotHistLegacyBytes, (long long)size, memory_order_relaxed);
         atomic_fetch_add_explicit(&cn1SlotHistLegacyCount, 1, memory_order_relaxed);
+        // Split, because it decides whether CN1_CLASS_OF can be branch-free. A
+        // page-resident object can take its class from the page by arithmetic
+        // alone; a legacy object cannot. If every legacy allocation is an ARRAY,
+        // scalars are always page-resident and their class lookup needs no test.
+        if(parent->isArray) {
+            atomic_fetch_add_explicit(&cn1SlotHistLegacyArr, 1, memory_order_relaxed);
+        } else {
+            atomic_fetch_add_explicit(&cn1SlotHistLegacyObj, 1, memory_order_relaxed);
+            if(size > atomic_load_explicit(&cn1SlotHistLegacyObjMax, memory_order_relaxed)) {
+                atomic_store_explicit(&cn1SlotHistLegacyObjMax, size, memory_order_relaxed);
+            }
+        }
     }
     id = parent->classId;
     if(id < 0 || id >= CN1_ALLOC_PROFILE_SLOTS) {
@@ -15969,6 +15984,10 @@ static void cn1ReportSlotHistogram(void) {
     base = objSlot[0] + arrSlot[0];
     fprintf(stderr, "[SLOTHIST] page-resident allocations: %lld scalar, %lld array\n",
             objCount, arrCount);
+    fprintf(stderr, "[SLOTHIST] legacy split: %ld array, %ld scalar (largest scalar %d bytes)\n",
+            atomic_load_explicit(&cn1SlotHistLegacyArr, memory_order_relaxed),
+            atomic_load_explicit(&cn1SlotHistLegacyObj, memory_order_relaxed),
+            atomic_load_explicit(&cn1SlotHistLegacyObjMax, memory_order_relaxed));
     fprintf(stderr, "[SLOTHIST] legacy (> %d bytes, no slot, no rounding): %ld allocations, %lld bytes\n",
             CN1_BIBOP_MAX_OBJECT,
             atomic_load_explicit(&cn1SlotHistLegacyCount, memory_order_relaxed),

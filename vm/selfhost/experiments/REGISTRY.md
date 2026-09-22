@@ -5940,3 +5940,73 @@ The steps themselves, for when that number justifies them:
   3. mark bits to a side bitmap -- this one pays regardless of rounding, because
      it stops marking from writing into cache lines the mutator owns, which is
      the ~5% measured above.
+
+---
+
+## Round 36: the header design, reasoned out rather than measured
+
+Directive for this round: small-gain measurement on this host has been
+unreliable, so decide by reasoning about mechanism and correctness, then explain
+any later mismatch rather than gating the change on a noisy number.
+
+**What the header actually costs, and where it can go.** The object header is 16
+bytes: clazz* (8) + gcMark (4) + heapPosition (4). Slot histogram over the
+selfhost corpus, 26.8M allocations, NET of the side table the removed bytes
+would need:
+
+    today                       hdr=16              100.00%
+    clazz* -> 4-byte classId    hdr=12               98.28%
+    clazz from page             hdr=8                91.14%
+    gcMark+heapPos to side, 8B/slot                 102.38%   LOSES
+    gcMark+heapPos to side, 0.25B/slot               91.49%
+    whole header out, 0.25B/slot                     82.18%
+    whole header out + 16B size class                77.31%
+
+The rule the table teaches: per-PAGE metadata is amortised free (one word shared
+by ~2048 objects), per-SLOT metadata is not (one word per object wherever it
+lives). clazz is the only header field removable for free.
+
+**Three landmines found by reading the code, each of which would have been found
+late and expensively.**
+
+1. THE STRING TWIN USES THE CLASS POINTER'S ADDRESS AS DATA.
+   class__java_lang_String, _i8 and _i16 are byte-identical structs sharing one
+   classId; which one an object points to IS its Latin-1 coder bit. A 4-byte
+   classId cannot distinguish three structs with the same id, so the classId
+   plan is dead. Page-derived class is compatible -- a page per twin keeps
+   pointer identity -- which is the opposite of what the byte counts suggest.
+
+2. EVERY LEGACY ALLOCATION IS AN ARRAY. Measured: 21,958 legacy allocations,
+   21,958 arrays, 0 scalars (largest scalar seen: 0 bytes above the 2048 floor).
+   So scalars are ALWAYS page-resident and their class can come from the page by
+   arithmetic alone -- pageOf(o) is o & ~(PAGE_SIZE-1), no load. Arrays keep
+   their clazz field and their size-classed pages, which also sidesteps arrays
+   being one class at many sizes. Scalars are 153.5MB of the 169MB saving.
+
+3. THE PER-THREAD CURRENT PAGE IS KEYED BY SIZE CLASS, NOT CLASS. That is the
+   real structural cost: with type-homogeneous pages a thread alternating
+   between two classes of the same size would push and re-acquire a page on
+   every allocation. It has to become per-class, and CN1_FAST_NEW already passes
+   &class__X as a compile-time constant, so the translator can emit a dense
+   CN1_ALLOC_IDX_X and the fast path stays a direct index.
+
+**The cost that decides whether this ships:** a current page per class per
+thread is 194 classes x 64KB = ~12MB per allocating thread, against 23 size
+classes x 64KB = 1.5MB today. Acceptable only because Codename One allocates
+essentially on one thread (the EDT); it would be the objection on a
+many-mutator-thread VM, and it is the number to watch if the class count grows.
+
+**Plan.**
+  A. page->pageClazz, per-class partial pools, per-class current page indexed by
+     a translator-emitted constant. Object header UNCHANGED -- pure refactor,
+     gates must stay green with no behaviour change.
+  B. remove clazz* from the scalar header; CN1_CLASS_OF becomes
+     pageOf(o)->pageClazz for scalars, arrays keep the field.
+  C. a 16-byte size class (+4.5%, no metadata at all).
+
+**Context for the contention finding of Round 35.** The page header already
+carries a cache-line split whose note records the same effect measured there --
+78.5/79.9/103.4/103.3ms at 1/2/4/8 markers before it, "32% slower purely from
+adding marker threads that have idle cores to run on". Today's 2-vs-4 marker gap
+(25.3 vs 26.7ms) is the residual of a known, already-attacked problem, which is
+independent support for moving collector-written words off the mutator's lines.
