@@ -4922,7 +4922,21 @@ public class BytecodeMethod implements SignatureSet {
                 continue;
             }
             if (retireCandidates == null) {
-                retireCandidates = new java.util.HashMap<TypeInstruction, Integer>();
+                // LinkedHashMap, and the generated C is WRONG-BY-DIVERGENCE without it.
+                // Phase 2 numbers the guards by walking this map, so iteration order
+                // decides which site gets __cn1dead_1 and which gets __cn1dead_2. A
+                // HashMap keyed by TypeInstruction -- which overrides neither hashCode
+                // nor equals -- iterates in IDENTITY HASH order, i.e. by allocation
+                // address, so two runs of the SAME translator on the SAME input emit
+                // different C. Measured: three files (XMLParser, Resources, CSSEngine)
+                // differed between two runs of the self-hosted translator, each by the
+                // same 8 lines with _1 and _2 exchanged. Semantically harmless -- the
+                // guards are independent -- but it breaks the byte-identical output
+                // invariant the whole selfhost benchmark is gated on, which is why the
+                // SELFHOST row read NA. Insertion order here is bytecode order (the
+                // loop above walks `instructions`), so this is also the order a reader
+                // of the generated C expects.
+                retireCandidates = new java.util.LinkedHashMap<TypeInstruction, Integer>();
             }
             retireCandidates.put(ti, Integer.valueOf(local));
         }
