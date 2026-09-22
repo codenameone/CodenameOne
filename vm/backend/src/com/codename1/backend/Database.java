@@ -652,32 +652,44 @@ public final class Database {
      * discovering the conflict at the first write; the other two get a plain
      * BEGIN, which is what they support.
      */
+    private boolean managedTransaction;
+
+    /** Whether a transaction opened through this Database API is active. */
+    public synchronized boolean isInTransaction() { return managedTransaction; }
+
+    /** Begins an explicitly bounded transaction, pinning SQLite's write lock. */
+    public synchronized void beginTransaction() throws IOException {
+        if (managedTransaction) throw new IOException("Transaction already active");
+        control(sqlite == null ? "BEGIN" : "BEGIN IMMEDIATE");
+        managedTransaction = true;
+    }
+
+    /** Commits the transaction opened through this API. */
+    public synchronized void commitTransaction() throws IOException {
+        if (!managedTransaction) throw new IOException("No active transaction");
+        control("COMMIT");
+        managedTransaction = false;
+    }
+
+    /** Rolls back the transaction opened through this API. */
+    public synchronized void rollbackTransaction() throws IOException {
+        if (!managedTransaction) throw new IOException("No active transaction");
+        control("ROLLBACK");
+        managedTransaction = false;
+    }
+
     public synchronized Object transaction(Work body) throws Exception {
-        if(sqlite != null) {
-            final Work outer = body;
-            final Database self = this;
-            return sqlite.transaction(new Db.Work() {
-                public Object run(Db ignored) throws Exception {
-                    return outer.run(self);
-                }
-            });
-        }
-        control("BEGIN");
+        beginTransaction();
         boolean committed = false;
         try {
             Object result = body.run(this);
-            control("COMMIT");
+            commitTransaction();
             committed = true;
             return result;
         } finally {
-            if(!committed) {
-                try {
-                    control("ROLLBACK");
-                } catch (Exception err) {
-                    // The original failure is the one worth reporting; a rollback
-                    // that also fails must not replace it.
-                    System.err.println("rollback failed: " + err);
-                }
+            if (!committed) {
+                try { rollbackTransaction(); }
+                catch (Exception err) { System.err.println("rollback failed: " + err); }
             }
         }
     }

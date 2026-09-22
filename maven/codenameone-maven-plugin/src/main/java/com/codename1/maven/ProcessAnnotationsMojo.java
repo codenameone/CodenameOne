@@ -209,6 +209,13 @@ public class ProcessAnnotationsMojo extends AbstractCN1Mojo {
             }
         }
 
+        for (AnnotationProcessor processor : processors) {
+            if (processor instanceof com.codename1.maven.processors.OrmAnnotationProcessor) {
+                try { ((com.codename1.maven.processors.OrmAnnotationProcessor) processor).enhance(ctx); }
+                catch (ProcessingException error) { throw new MojoFailureException(error.getMessage(),error); }
+            }
+        }
+
         if (!emitted.isEmpty()) {
             getLog().info("cn1: emitted " + emitted.size() + " generated class(es) under "
                     + outputDirectory);

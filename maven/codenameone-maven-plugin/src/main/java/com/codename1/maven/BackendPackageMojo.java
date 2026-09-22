@@ -298,6 +298,7 @@ public class BackendPackageMojo extends AbstractMojo {
                 }
             }
             processor.finish(ctx);
+            entities.enhance(ctx);
         } catch (ProcessingException err) {
             throw new MojoExecutionException("Could not process @RestController: "
                     + err.getMessage(), err);

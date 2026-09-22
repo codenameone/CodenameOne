@@ -1,0 +1,1092 @@
+/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.orm.session;
+
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.IdentityHashMap;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+
+/**
+ * A bounded, non-thread-safe persistence context. Writes require an explicit
+ * transaction; closing never commits. Instances returned by find are unique by
+ * entity type and identifier until clear, detach, rollback, or close.
+ */
+public final class Session {
+    private final SqlAccess sql;
+    private final Map<String,EntityModel<?>> models;
+    private final Map<Key,Object> identities=new LinkedHashMap<Key,Object>();
+    private final IdentityHashMap<Object,Entry> entries=new IdentityHashMap<Object,Entry>();
+    private int loading,deferredFetch,aliasSequence;
+    String nextAlias() { return "q"+(aliasSequence++); }
+    EntityModel model(String name) {
+        EntityModel result=null;
+        for(EntityModel candidate:models.values()) {
+            String binary=candidate.type().getName();
+            if(binary.equals(name) || binary.substring(Math.max(binary.lastIndexOf('.'),binary.lastIndexOf('$'))+1).equals(name)) {
+                if(result!=null) throw new IllegalArgumentException("Ambiguous entity name: "+name);
+                result=candidate;
+            }
+        }
+        if(result==null) throw new IllegalArgumentException("Unknown entity: "+name);
+        return result;
+    }
+    public <T> JpqlQuery<T> createQuery(String statement,Class<T> resultType) {
+        check();return new JpqlQuery<T>(this,statement,resultType);
+    }
+    public JpqlQuery<Object> createQuery(String statement) { return createQuery(statement,Object.class); }
+
+    private boolean closed, transaction, rollbackOnly, flushing;
+
+    public Session(SqlAccess sql) { this(sql,Models.snapshot()); }
+    public Session(SqlAccess sql, Map<String,EntityModel<?>> models) {
+        if(sql==null || models==null) throw new IllegalArgumentException("sql/models is null");
+        this.sql=sql;
+        this.models=new LinkedHashMap<String,EntityModel<?>>(models);
+    }
+    public void beginTransaction() {
+        check();
+        if(transaction) throw new PersistenceException("Transaction already active");
+        try { sql.begin(); transaction=true; rollbackOnly=false; }
+        catch(IOException e) { throw failure(e); }
+    }
+    public void commitTransaction() {
+        requireTransaction();
+        if(rollbackOnly) throw new PersistenceException("Transaction requires rollback");
+        try { flush(); sql.commit(); transaction=false; }
+        catch(IOException e) { rollbackOnly=true; throw failure(e); }
+        catch(RuntimeException e) { rollbackOnly=true; throw e; }
+    }
+    public void rollbackTransaction() {
+        check();
+        if(!transaction) throw new PersistenceException("No active transaction");
+        try { sql.rollback(); transaction=false; rollbackOnly=false; }
+        catch(IOException e) { rollbackOnly=true; throw failure(e); }
+        finally { clear(); }
+    }
+    public boolean isTransactionActive() { return transaction; }
+    public boolean isRollbackOnly() { return rollbackOnly; }
+    public boolean contains(Object entity) { check(); Entry entry=entries.get(entity);return entry!=null && !entry.removed; }
+    public void detach(Object entity) {
+        check();detach(entity,new IdentityHashMap<Object,Boolean>());
+    }
+    private void detach(Object entity,IdentityHashMap<Object,Boolean> visited) {
+        if(visited.put(entity,Boolean.TRUE)!=null) return;
+        Entry entry=entries.get(entity);
+        if(entry==null) return;
+        EntityState state=state(entity);
+        Relationship[] relations=entry.model.relationships();
+        for(int i=0;i<relations.length;i++) {
+            if((relations[i].cascade & Relationship.DETACH)==0 || (state!=null && !state.loaded[i])) continue;
+            Object value=entry.model.relation(entity,i);
+            if(value==null) continue;
+            if(relations[i].many) for(Object child:relatedValues(value)) detach(child,visited);
+            else detach(value,visited);
+        }
+        detachOne(entity);
+    }
+    private void detachOne(Object entity) {
+        Entry entry=entries.remove(entity);
+        if(entry!=null) identities.remove(new Key(entry.model.hierarchyRoot().getName(),entry.snapshot==null?entry.initialId:entry.model.identifierFromRow(entry.snapshot)));
+        EntityState state=state(entity);
+        if(state!=null) { state.attached=false;state.session=null; }
+    }
+    public void clear() {
+        check();
+        for(Object entity:entries.keySet()) { EntityState state=state(entity); if(state!=null) { state.attached=false;state.session=null; } }
+        entries.clear(); identities.clear();
+    }
+    public void close() {
+        if(closed) return;
+        try {
+            if(transaction) rollbackTransaction();
+        } finally {
+            clear(); closed=true;
+            try { sql.close(); } catch(IOException e) { throw failure(e); }
+        }
+    }
+    public <T> T find(Class<T> type,Object id) {
+        check(); EntityModel<T> model=model(type);
+        if(id==null) throw new IllegalArgumentException("id is null");
+        Object[] keyValues=model.keyValues(id);
+        Key key=new Key(model.hierarchyRoot().getName(),keyValues.length==1?keyValues[0]:Identifier.of(keyValues));
+        Object cached=identities.get(key);
+        if(cached!=null) { checkManagedIdentity(entries.get(cached));return entries.get(cached).removed || !type.isInstance(cached)?null:(T)cached; }
+        autoFlush();
+        List<Object[]> rows=read(select(model)+" WHERE "+keyCondition(model,null),
+                keyValues,kinds(model));
+        return rows.isEmpty()?null:hydrate(model,rows.get(0));
+    }
+    /** Reads or locks a row inside this session's transaction. */
+    public <T> T find(Class<T> type,Object id,LockMode mode) {
+        if(mode==null) throw new IllegalArgumentException("lock mode is null");
+        if(mode==LockMode.NONE) return find(type,id);
+        requireTransaction();String clause=sql.lockClause(mode);autoFlush();
+        EntityModel<T> model=model(type);
+        Object[] keyValues=model.keyValues(id);
+        List<Object[]> rows=read(select(model)+" WHERE "+keyCondition(model,null)+clause,keyValues,kinds(model));
+        if(rows.isEmpty()) return null;
+        T cached=(T)identities.get(new Key(model.hierarchyRoot().getName(),keyValues.length==1?keyValues[0]:Identifier.of(keyValues)));int version=model.versionIndex();
+        if(cached!=null && version>=0 && !same(model.get(cached,version),rows.get(0)[version])) {
+            rollbackOnly=true;throw new OptimisticLockException("Stale entity while acquiring lock: "+model.table());
+        }
+        return hydrate(model,rows.get(0));
+    }
+    public void lock(Object entity,LockMode mode) {
+        if(!contains(entity)) throw new PersistenceException("lock requires a managed entity");
+        if(mode!=LockMode.NONE) { requireTransaction();autoFlush(); }
+        checkManagedIdentity(entries.get(entity));EntityModel model=model(entity.getClass());
+        if(find(model.type(),model.identifier(entity),mode)==null) {
+            rollbackOnly=true;throw new OptimisticLockException("Row no longer exists");
+        }
+    }
+    public <T> void persist(T entity) {
+        try { persistInternal(entity); }
+        catch(RuntimeException error) { if(transaction) rollbackOnly=true;throw error; }
+    }
+    private <T> void persistInternal(T entity) {
+        requireTransaction();
+        if(entity==null) throw new IllegalArgumentException("entity is null");
+        if(entries.containsKey(entity)) { entries.get(entity).removed=false;return; }
+        EntityState previous=state(entity);
+        if(previous!=null && previous.attached && previous.session!=this) throw new PersistenceException("Entity already belongs to another session");
+        EntityModel<T> model=model((Class<T>)entity.getClass());
+        int id=model.idIndex();
+        Object value=model.identifier(entity);
+        if(model.generation()!=0) {
+            if(value!=null && (!(value instanceof Number) || ((Number)value).longValue()!=0))
+                throw new PersistenceException("persist requires a new entity; use merge for detached entities");
+            try { model.set(entity,id,sql.nextIdentifier(model.generation(),model.generator(),model.attributes()[id].kind)); }
+            catch(IOException error) { rollbackOnly=true;throw failure(error); }
+            value=model.identifier(entity);
+        }
+        if(model.attributes()[id].generated && value!=null && (!(value instanceof Number) || ((Number)value).longValue()!=0))
+            throw new PersistenceException("persist requires a new entity; use merge for detached entities");
+        if(!model.attributes()[id].generated) model.keyValues(value);
+        Entry e=new Entry(model,entity,null); e.fresh=true;e.initialId=value instanceof byte[]?((byte[])value).clone():value;
+        if(!model.attributes()[id].generated) claim(model,entity);
+        entries.put(entity,e); attachState(e,true,null); cascadePersist(e);
+    }
+    public <T> T merge(T entity) {
+        try { return merge(entity,new IdentityHashMap<Object,Object>()); }
+        catch(RuntimeException error) { if(transaction) rollbackOnly=true;throw error; }
+    }
+    private <T> T merge(T entity,IdentityHashMap<Object,Object> merging) {
+        requireTransaction();
+        if(merging.containsKey(entity)) return (T)merging.get(entity);
+        if(entity==null) throw new IllegalArgumentException("entity is null");
+        if(entries.containsKey(entity)) return entity;
+        EntityModel<T> model=model((Class<T>)entity.getClass());
+        Object id=model.identifier(entity);
+        boolean generated=model.attributes()[model.idIndex()].generated || model.generation()!=0;
+        T managed=id==null || (generated && id instanceof Number && ((Number)id).longValue()==0)
+                ?null:find(model.type(),id);
+        if(managed==null) {
+            if(generated && id!=null && (!(id instanceof Number) || ((Number)id).longValue()!=0))
+                throw new OptimisticLockException("Detached row no longer exists: "+model.table());
+            managed=model.create();
+            copy(model,entity,managed); persist(managed);
+        } else {
+            int version=model.versionIndex();
+            if(version>=0 && !same(model.get(entity,version),model.get(managed,version)))
+                throw new OptimisticLockException("Stale entity: "+model.table());
+            copy(model,entity,managed);
+        }
+        merging.put(entity,managed);
+        Relationship[] relations=model.relationships();EntityState sourceState=state(entity);
+        for(int i=0;i<relations.length;i++) {
+            if(sourceState!=null && !sourceState.loaded[i]) continue;
+            Relationship relation=relations[i];Object value=model.relation(entity,i);
+            if(relation.element) {
+                List rows=elementRows(relation,value);List copy=new ArrayList();Map mapping=new LinkedHashMap();
+                for(Object item:rows) { ElementRow row=(ElementRow)item;Object element=Elements.read(relation.target,row.value);if(relation.mapKey.length()>0) mapping.put(row.key,element);else copy.add(element); }
+                initialize(managed,i);model.relation(managed,i,relation.mapKey.length()>0?mapping:copy);continue;
+            }
+            if(relation.many && value!=null) {
+                List children=new ArrayList();
+                for(Object child:relatedValues(value)) children.add(mergeTarget(relation,child,merging));
+                value=children;
+            } else if(value!=null) value=mergeTarget(relation,value,merging);
+            initialize(managed,i);
+            model.relation(managed,i,value);EntityState targetState=state(managed);
+            if(targetState!=null) targetState.loaded[i]=true;
+        }
+        return managed;
+    }
+    private Object mergeTarget(Relationship relation,Object child,IdentityHashMap<Object,Object> merging) {
+        if((relation.cascade & Relationship.MERGE)!=0) return merge(child,merging);
+        EntityModel target=model(relation.target);Object id=target.identifier(child);
+        Object managed=id==null?null:find(relation.target,id);
+        if(managed==null) throw new PersistenceException("Transient association without cascade MERGE: "+relation.field);
+        return managed;
+    }
+    public void remove(Object entity) {
+        try { removeInternal(entity); }
+        catch(RuntimeException error) { if(transaction) rollbackOnly=true;throw error; }
+    }
+    private void removeInternal(Object entity) {
+        requireTransaction(); Entry entry=entries.get(entity);
+        if(entry==null) throw new PersistenceException("remove requires a managed entity");
+        if(entry.removed) return;
+        checkManagedIdentity(entry);entry.removed=true;
+        Relationship[] relations=entry.model.relationships();
+        for(int i=0;i<relations.length;i++) {
+            if((relations[i].cascade & Relationship.REMOVE)==0 && !relations[i].orphanRemoval) continue;
+            initialize(entity,i);Object value=entry.model.relation(entity,i);
+            if(value==null) continue;
+            if(relations[i].many) for(Object child:relatedValues(value)) remove(child);
+            else remove(value);
+        }
+        if(entry.fresh) detach(entity);
+    }
+    public void refresh(Object entity) {
+        check();
+        try { refresh(entity,new IdentityHashMap<Object,Boolean>()); }
+        catch(PersistenceException error) { if(transaction) rollbackOnly=true;clear();throw error; }
+    }
+    private void refresh(Object entity,IdentityHashMap<Object,Boolean> visited) {
+        if(visited.put(entity,Boolean.TRUE)!=null) return;
+        Entry entry=entries.get(entity);
+        if(entry==null || entry.fresh || entry.removed) throw new PersistenceException("refresh requires a persisted managed entity");
+        EntityModel model=entry.model;checkManagedIdentity(entry);
+        List<Object[]> rows=read(select(model)+" WHERE "+keyCondition(model,null),
+                model.keyValues(model.identifier(entity)),kinds(model));
+        if(rows.isEmpty()) {
+            if(transaction) rollbackOnly=true;
+            throw new OptimisticLockException("Row no longer exists: "+model.table());
+        }
+        EntityState previous=state(entity);
+        boolean[] previouslyLoaded=previous==null?new boolean[0]:previous.loaded.clone();
+        attachState(entry,false,rows.get(0));
+        assign(model,entity,rows.get(0));entry.snapshot=snapshot(model,entity);
+        Relationship[] relations=model.relationships();
+        loading++;
+        try {
+            for(int i=0;i<relations.length;i++) {
+                boolean cascade=(relations[i].cascade & Relationship.REFRESH)!=0;
+                if(!relations[i].lazy || (cascade && previouslyLoaded[i])) initialize(entity,i);
+                if(!cascade || !state(entity).loaded[i]) continue;
+                Object value=model.relation(entity,i);
+                if(value==null) continue;
+                if(relations[i].many) for(Object child:relatedValues(value)) refresh(child,visited);
+                else refresh(value,visited);
+            }
+            model.lifecycle(entity,6);
+        } finally { loading--; }
+    }
+    public void flush() {
+        requireTransaction();
+        if(rollbackOnly) throw new PersistenceException("Transaction requires rollback");
+        if(flushing) return;
+        flushing=true;
+        try {
+            int previous;
+            do {
+                previous=entries.size();
+                for(Entry entry:new ArrayList<Entry>(entries.values())) if(!entry.removed) cascadePersist(entry);
+            } while(previous!=entries.size());
+            List<Entry> pending=new ArrayList<Entry>(entries.values());
+            for(Entry e:pending) if(e.fresh) insert(e);
+            for(Entry e:pending) if(!e.removed) update(e);
+            for(Entry e:pending) if(!e.removed) syncCollections(e);
+            prepareDeletes();
+            for(Entry e:new ArrayList<Entry>(entries.values())) if(e.removed && entries.containsKey(e.entity)) delete(e);
+        } catch(RuntimeException e) { rollbackOnly=true; throw e; }
+        finally { flushing=false; }
+    }
+    /** Increments in SQL and refreshes an already managed instance. */
+    public <T> boolean increment(Class<T> type,Object id,String field,long amount) {
+        requireTransaction(); flush(); EntityModel<T> model=model(type);
+        int index=model.index(field),version=model.versionIndex(); Attribute a=model.attributes()[index];
+        if(a.id || a.version || (a.kind!=Attribute.INTEGER && a.kind!=Attribute.BIGINT))
+            throw new IllegalArgumentException("Counter must be a non-key integral field: "+field);
+        String statement="UPDATE "+q(model.table())+" SET "+q(a.column)+" = "+q(a.column)+" + ?";
+        if(version>=0) { String v=q(model.attributes()[version].column); statement+=", "+v+" = "+v+" + 1"; }
+        long min=a.kind==Attribute.INTEGER?Integer.MIN_VALUE:Long.MIN_VALUE;
+        long max=a.kind==Attribute.INTEGER?Integer.MAX_VALUE:Long.MAX_VALUE;
+        long lower=amount<0?min-amount:min,upper=amount>0?max-amount:max;
+        if(lower>upper) return false;
+        statement+=" WHERE "+keyCondition(model,null)+" AND "+q(a.column)+" >= ? AND "+q(a.column)+" <= ?";
+        if(version>=0) statement+=" AND "+q(model.attributes()[version].column)+" < "+(model.attributes()[version].kind==Attribute.INTEGER?Integer.MAX_VALUE:Long.MAX_VALUE);
+        List<Object> arguments=new ArrayList<Object>();arguments.add(Long.valueOf(amount));
+        Object[] keyValues=model.keyValues(id);arguments.addAll(Arrays.asList(keyValues));
+        arguments.add(Long.valueOf(lower));arguments.add(Long.valueOf(upper));
+        int changed=write(statement,arguments.toArray());
+        Object managed=identities.get(new Key(model.hierarchyRoot().getName(),keyValues.length==1?keyValues[0]:Identifier.of(keyValues)));
+        if(changed>0 && managed!=null) refresh(managed);
+        return changed>0;
+    }
+    public <T> Query<T> query(Class<T> type) { check(); return new Query<T>(this,model(type)); }
+    /** Creates missing tables and their constraints. Existing schemas require migrations. */
+    public void createTables() {
+        check();
+        if(transaction) throw new PersistenceException("Create schemas outside application transactions");
+        List<String> created=new ArrayList<String>();
+        List<ForeignKey> foreignKeys=new ArrayList<ForeignKey>();
+        for(EntityModel<?> model:models.values()) {
+            if(model.generation()!=0) {
+                try { sql.prepareGenerator(model.generation(),model.generator()); }
+                catch(IOException error) { throw failure(error); }
+            }
+            if(!describe(model.table()).isEmpty()) continue;
+            StringBuilder statement=new StringBuilder("CREATE TABLE ").append(q(model.table())).append(" (");
+            Attribute[] attrs=model.attributes();
+            for(int i=0;i<attrs.length;i++) {
+                if(i>0) statement.append(", ");
+                Attribute a=attrs[i];statement.append(q(a.column)).append(' ');
+                if(a.generated) statement.append(sql.generatedKeyColumn(a.kind,q(a.column)));
+                else statement.append(columnType(model,i)).append(a.nullable && !a.id?"":" NOT NULL");
+            }
+            if(!attrs[model.idIndex()].generated) statement.append(", PRIMARY KEY (").append(quoted(keyColumns(model))).append(')');
+            List<ForeignKey> keys=new ArrayList<ForeignKey>();
+            for(Relationship relation:model.relationships()) if(relation.column>=0)
+                keys.add(new ForeignKey(model.table(),foreignColumns(model,relation),model(relation.target).table(),keyColumns(model(relation.target))));
+            if("sqlite".equals(sql.dialect())) for(ForeignKey key:keys) statement.append(", ").append(foreignDeclaration(key));
+            else foreignKeys.addAll(keys);
+            write(statement.append(')').toString(),new Object[0]);created.add(model.table());
+        }
+        for(EntityModel<?> model:models.values()) for(Relationship relation:model.relationships()) {
+            if(!relation.many || relation.mappedBy.length()>0 || !describe(relation.joinTable).isEmpty()) continue;
+            if(relation.element) { createElementTable(model,relation,foreignKeys);created.add(relation.joinTable);continue; }
+            EntityModel target=model(relation.target);
+            String[] owner=joinColumns(relation.joinColumn,model),child=joinColumns(relation.inverseJoinColumn,target);
+            StringBuilder definition=new StringBuilder("CREATE TABLE ").append(q(relation.joinTable)).append(" (");
+            appendJoinDefinition(definition,owner,model);definition.append(", ");appendJoinDefinition(definition,child,target);
+            if(relation.orderColumn.length()>0) definition.append(", ").append(q(relation.orderColumn)).append(" INTEGER NOT NULL");
+            definition.append(", PRIMARY KEY (").append(quoted(owner)).append(", ").append(relation.orderColumn.length()==0?quoted(child):q(relation.orderColumn)).append(')');
+            ForeignKey ownerKey=new ForeignKey(relation.joinTable,owner,model.table(),keyColumns(model));
+            ForeignKey childKey=new ForeignKey(relation.joinTable,child,target.table(),keyColumns(target));
+            if("sqlite".equals(sql.dialect())) definition.append(", ").append(foreignDeclaration(ownerKey)).append(", ").append(foreignDeclaration(childKey));
+            else { foreignKeys.add(ownerKey);foreignKeys.add(childKey); }
+            write(definition.append(')').toString(),new Object[0]);created.add(relation.joinTable);
+            createIndex(relation.joinTable,"",relation.unique,child);
+        }
+        for(ForeignKey key:foreignKeys) write("ALTER TABLE "+q(key.table)+" ADD "+foreignDeclaration(key),new Object[0]);
+        List<String> indexed=new ArrayList<String>();
+        for(EntityModel<?> model:models.values()) if(created.contains(model.table()) && !indexed.contains(model.table())) {
+            indexed.add(model.table());
+            for(Relationship relation:model.relationships()) if(relation.column>=0)
+                createIndex(model.table(),"",relation.unique,foreignColumns(model,relation));
+            for(Index index:model.indexes()) {
+                String[] fields=index.fields(),columns=new String[fields.length];
+                if(fields.length==0) throw new PersistenceException("An index needs at least one field");
+                for(int i=0;i<fields.length;i++) columns[i]=model.attributes()[model.index(fields[i])].column;
+                createIndex(model.table(),index.name,index.unique,columns);
+            }
+        }
+    }
+    private List<Object[]> describe(String table) {
+        try { return sql.describe(table); } catch(IOException error) { throw failure(error); }
+    }
+    private String columnType(EntityModel model,int index) {
+        Attribute attr=model.attributes()[index];
+        if(attr.declaredType!=null) return attr.declaredType;
+        boolean key=attr.id;
+        for(Index definition:model.indexes()) for(String field:definition.fields()) if(field.equals(attr.field)) key=true;
+        for(Relationship relation:model.relationships()) if(relation.column>=0 && index>=relation.column && index<relation.column+model(relation.target).idIndexes().length) key=true;
+        if(!key) return sql.columnType(attr.kind);
+        String declaration=sql.assignedKeyColumn(attr.kind);int end=declaration.indexOf(" PRIMARY KEY");
+        return end<0?sql.columnType(attr.kind):declaration.substring(0,end).replace(" NOT NULL","");
+    }
+    private String constraintName(String prefix,String table,String[] columns) {
+        StringBuilder text=new StringBuilder(table);for(String column:columns) text.append('/').append(column);
+        return "cn1_"+prefix+"_"+Integer.toHexString(text.toString().hashCode());
+    }
+    private String foreignDeclaration(ForeignKey key) {
+        String statement="CONSTRAINT "+q(constraintName("fk",key.table,key.columns))+" FOREIGN KEY ("+quoted(key.columns)+") REFERENCES "+q(key.target)+" ("+quoted(key.targetColumns)+")";
+        if(!"mysql".equals(sql.dialect())) statement+=" DEFERRABLE INITIALLY DEFERRED";
+        return statement;
+    }
+    private void createIndex(String table,String name,boolean unique,String[] columns) {
+        if(name.length()==0) name=constraintName(unique?"unique":"index",table,columns);
+        write("CREATE "+(unique?"UNIQUE ":"")+"INDEX "+q(name)+" ON "+q(table)+" ("+quoted(columns)+")",new Object[0]);
+    }
+    private static final class ForeignKey {
+        final String table,target;final String[] columns,targetColumns;
+        ForeignKey(String table,String[] columns,String target,String[] targetColumns) { this.table=table;this.columns=columns;this.target=target;this.targetColumns=targetColumns; }
+    }
+    /** Read-only validation of mapped columns, nullability, storage types, and primary keys. */
+    public void validateSchema() {
+        check();List<String> errors=new ArrayList<String>();
+        for(EntityModel model:models.values()) {
+            List<Object[]> columns=describe(model.table());
+            if(columns.isEmpty()) { errors.add("Missing table "+model.table());continue; }
+            Attribute[] attrs=model.attributes();
+            for(int i=0;i<attrs.length;i++) {
+                Attribute attr=attrs[i];Object[] found=null;
+                for(Object[] column:columns) if(attr.column.equalsIgnoreCase((String)column[0])) { found=column;break; }
+                if(found==null) { errors.add("Missing column "+model.table()+"."+attr.column);continue; }
+                boolean primary=((Number)found[3]).intValue()!=0,required=((Number)found[2]).intValue()!=0 || primary;
+                if(primary!=attr.id) errors.add("Primary key mismatch on "+model.table()+"."+attr.column);
+                if(!attr.nullable && !required) errors.add("Missing NOT NULL on "+model.table()+"."+attr.column);
+                if(typeFamily((String)found[1])!=typeFamily(columnType(model,i))) errors.add("Storage type mismatch on "+model.table()+"."+attr.column);
+            }
+            for(Object[] column:columns) if(((Number)column[3]).intValue()!=0) {
+                boolean mapped=false;for(Attribute attr:attrs) if(attr.id && attr.column.equalsIgnoreCase((String)column[0])) mapped=true;
+                if(!mapped) errors.add("Unmapped primary key column "+model.table()+"."+column[0]);
+            }
+        }
+        for(EntityModel owner:models.values()) for(Relationship relation:owner.relationships()) if(relation.many && relation.mappedBy.length()==0) {
+            List<Object[]> columns=describe(relation.joinTable);
+            if(columns.isEmpty()) { errors.add("Missing collection table "+relation.joinTable);continue; }
+            List<String> required=new ArrayList<String>(Arrays.asList(joinColumns(relation.joinColumn,owner)));
+            if(relation.element) {
+                required.add(relation.inverseJoinColumn);required.add(relation.orderColumn);
+                if(relation.mapKey.length()>0) required.add(relation.mapKey);
+            } else {
+                required.addAll(Arrays.asList(joinColumns(relation.inverseJoinColumn,model(relation.target))));
+                if(relation.orderColumn.length()>0) required.add(relation.orderColumn);
+            }
+            for(String name:required) {
+                boolean present=false;for(Object[] column:columns) if(name.equalsIgnoreCase((String)column[0])) present=true;
+                if(!present) errors.add("Missing collection column "+relation.joinTable+"."+name);
+            }
+        }
+        if(!errors.isEmpty()) throw new PersistenceException("Schema validation failed: "+errors);
+    }
+    private static String[] split(String text,char separator) {
+        List<String> parts=new ArrayList<String>();int start=0;
+        for(int i=0;i<=text.length();i++) {
+            if(i==text.length() || (separator==' '?Character.isWhitespace(text.charAt(i)):text.charAt(i)==separator)) {
+                String value=text.substring(start,i).trim();if(value.length()>0) parts.add(value);start=i+1;
+            }
+        }
+        return parts.toArray(new String[parts.size()]);
+    }
+    private static int typeFamily(String type) {
+        StringBuilder lower=new StringBuilder();for(int i=0;i<type.length();i++) { char ch=type.charAt(i);lower.append(ch>='A' && ch<='Z'?(char)(ch+32):ch); }String name=lower.toString();
+        if(name.indexOf("int")>=0 || name.indexOf("serial")>=0 || name.indexOf("bool")>=0) return 1;
+        if(name.indexOf("char")>=0 || name.indexOf("text")>=0 || name.indexOf("clob")>=0) return 2;
+        if(name.indexOf("real")>=0 || name.indexOf("double")>=0 || name.indexOf("float")>=0 || name.indexOf("decimal")>=0 || name.indexOf("numeric")>=0) return 3;
+        if(name.indexOf("blob")>=0 || name.indexOf("binary")>=0 || name.indexOf("bytea")>=0) return 4;
+        if(name.indexOf("date")>=0 || name.indexOf("time")>=0) return 5;
+        return 0;
+    }
+    /** Counts a relationship without materializing its entities. */
+    public long count(Object entity,String field) {
+        check(); EntityModel owner=model(entity.getClass());Relationship relation=owner.relationships()[owner.relationIndex(field)];
+        Object id=owner.identifier(entity);
+        autoFlush();
+        if(relation.element) return countJoin(relation.joinTable,joinColumns(relation.joinColumn,owner),owner.keyValues(id));
+        EntityModel target=model(relation.target);
+        if(relation.column>=0) return owner.get(entity,relation.column)==null?0:1;
+        if(relation.mappedBy.length()>0) {
+            Relationship inverse=target.relationships()[target.relationIndex(relation.mappedBy)];
+            if(inverse.column>=0) return inverseQuery(target,inverse,owner,id).count();
+            return countJoin(inverse.joinTable,joinColumns(inverse.inverseJoinColumn,owner),owner.keyValues(id));
+        }
+        return countJoin(relation.joinTable,joinColumns(relation.joinColumn,owner),owner.keyValues(id));
+    }
+    private long countJoin(String table,String[] columns,Object[] key) {
+        return ((Number)read("SELECT COUNT(*) FROM "+q(table)+" WHERE "+matches(columns,null),key,new int[]{Attribute.BIGINT}).get(0)[0]).longValue();
+    }
+    private Query inverseQuery(EntityModel target,Relationship inverse,EntityModel owner,Object id) {
+        Query query=query(target.type());Object[] values=owner.keyValues(id);
+        for(int i=0;i<values.length;i++) query.eq(target.attributes()[inverse.column+i].field,values[i]);
+        return query;
+    }
+    <T> List<T> hydrateAll(EntityModel<T> model,List<Object[]> rows,List<String> fetches) {
+        List<T> result=new ArrayList<T>();
+        deferredFetch++;
+        try { for(Object[] row:rows) result.add(hydrate(model,row)); }
+        finally { deferredFetch--; }
+        fetchAll(model,result,fetches);
+        return result;
+    }
+    private <T> void fetchAll(EntityModel<T> owner,List<T> roots,List<String> fetches) {
+        Relationship[] relations=owner.relationships();
+        loading++;
+        try {
+            for(int i=0;i<relations.length;i++) {
+                Relationship relation=relations[i];
+                if(relation.lazy && !fetches.contains(relation.field)) continue;
+                List<Object> keys=new ArrayList<Object>();List<T> unloaded=new ArrayList<T>();
+                for(T entity:roots) {
+                    EntityState state=state(entity);
+                    if(state==null || state.loaded[i] || state.fetching[i]) continue;
+                    unloaded.add(entity);
+                    Object key=relation.column>=0?state.keys[i]:owner.identifier(entity);
+                    if(key!=null && !keys.contains(key)) keys.add(key);
+                }
+                if(unloaded.isEmpty()) continue;
+                if(relation.element) { for(T entity:unloaded) initialize(entity,i);continue; }
+                EntityModel target=model(relation.target);
+                for(T entity:unloaded) state(entity).fetching[i]=true;
+                try {
+                if(owner.idIndexes().length>1 || target.idIndexes().length>1 || relation.orderBy.length()>0 || relation.mapKey.length()>0) {
+                    for(T entity:unloaded) initialize(entity,i);
+                } else if(relation.column>=0) {
+                    if(!keys.isEmpty()) readBatches(relation.target,target.attributes()[target.idIndex()].field,keys);
+                    for(T entity:unloaded) initialize(entity,i);
+                } else if(relation.mappedBy.length()>0) {
+                    Relationship inverse=target.relationships()[target.relationIndex(relation.mappedBy)];
+                    if(inverse.column<0) { for(T entity:unloaded) initialize(entity,i);continue; }
+                    List children=readBatches(relation.target,target.attributes()[inverse.column].field,keys);
+                    for(T entity:unloaded) {
+                        List matches=new ArrayList();Object id=owner.identifier(entity);
+                        for(Object child:children) if(same(target.get(child,inverse.column),id)) matches.add(child);
+                        if(!relation.many && matches.size()>1) throw new PersistenceException("One-to-one relationship returned multiple rows");
+                        Object value=relation.many?matches:matches.isEmpty()?null:matches.get(0);
+                        owner.relation(entity,i,value);state(entity).loaded[i]=true;
+                        Entry entry=entries.get(entity);if(entry!=null && relation.many) entry.collections[i]=relationKeys(relation,value);
+                    }
+                } else for(T entity:unloaded) initialize(entity,i);
+                } finally { for(T entity:unloaded) state(entity).fetching[i]=false; }
+            }
+        } finally { loading--; }
+    }
+
+    private List readBatches(Class type,String field,List<Object> keys) {
+        List result=new ArrayList();
+        for(int start=0;start<keys.size();start+=400)
+            result.addAll(query(type).in(field,keys.subList(start,Math.min(start+400,keys.size())).toArray()).list());
+        return result;
+    }
+
+    public boolean isLoaded(Object entity,String field) {
+        check(); EntityModel model=model(entity.getClass());
+        EntityState state=state(entity);
+        return state==null || state.loaded[model.relationIndex(field)];
+    }
+    public void initialize(Object entity,String field) { initialize(entity,model(entity.getClass()).relationIndex(field)); }
+    void beforeAssignment(Object entity,int index) {
+        Relationship relation=model(entity.getClass()).relationships()[index];
+        if(relation.many || relation.orphanRemoval && relation.column<0) initialize(entity,index);
+    }
+    void initialize(Object entity,int index) {
+        check(); EntityState state=state(entity);
+        if(state==null || state.loaded[index]) return;
+        if(!state.attached || state.session!=this) throw new LazyInitializationException("Entity is detached");
+        EntityModel model=model(entity.getClass()); Relationship relation=model.relationships()[index];
+        if(relation.element) {
+            Object value=loadElements(model,entity,relation);model.relation(entity,index,value);state.loaded[index]=true;
+            Entry entry=entries.get(entity);if(entry!=null) entry.collections[index]=elementRows(relation,value);
+            return;
+        }
+        EntityModel target=model(relation.target);
+        Object value;
+        loading++;
+        try {
+            if(relation.column>=0) {
+                value=state.keys[index]==null?null:find(relation.target,state.keys[index]);
+                if(value==null && state.keys[index]!=null) throw new PersistenceException("Missing relationship target: "+model.type().getName()+"."+relation.field);
+            }
+            else {
+                List found;
+                if(relation.mappedBy.length()>0) {
+                    Relationship inverse=target.relationships()[target.relationIndex(relation.mappedBy)];
+                    if(inverse.column>=0) {
+                        Query query=inverseQuery(target,inverse,model,model.identifier(entity));
+                        for(String clause:split(relation.orderBy,',')) if(clause.trim().length()>0) {
+                            String[] parts=split(clause.trim(),' ');query.orderBy(parts[0],parts.length==1 || !"DESC".equalsIgnoreCase(parts[1]));
+                        }
+                        found=query.list();
+                    } else {
+                        found=readJoin(model,target,inverse.joinTable,inverse.inverseJoinColumn,inverse.joinColumn,model.identifier(entity),relation);
+                    }
+                } else found=readJoin(model,target,relation.joinTable,relation.joinColumn,relation.inverseJoinColumn,model.identifier(entity),relation);
+                if(relation.many) value=found;
+                else {
+                    if(found.size()>1) throw new PersistenceException("One-to-one relationship returned multiple rows: "+relation.field);
+                    value=found.isEmpty()?null:found.get(0);
+                }
+            }
+            model.relation(entity,index,value); state.loaded[index]=true;
+            Entry entry=entries.get(entity);
+            if(entry!=null) entry.collections[index]=relationshipKeys(relation,value);
+        } finally { loading--; }
+    }
+    private List readJoin(EntityModel owner,EntityModel target,String table,String ownerColumn,String targetColumn,Object id,Relationship relation) {
+        if(table.length()==0) throw new PersistenceException("Missing join table");
+        String[] targetColumns=joinColumns(targetColumn,target),ownerColumns=joinColumns(ownerColumn,owner);
+        StringBuilder statement=new StringBuilder("SELECT ");
+        for(Attribute attribute:target.attributes()) {
+            if(statement.length()>7) statement.append(", ");statement.append("t.").append(q(attribute.column));
+        }
+        statement.append(" FROM ").append(tableSource(target)).append(" t INNER JOIN ").append(q(table)).append(" l ON ");
+        statement.append(joinEquality(keyColumns(target),"t",targetColumns,"l"));
+        statement.append(" WHERE ").append(matches(ownerColumns,"l"));
+        if(relation.orderColumn.length()>0) statement.append(" ORDER BY l.").append(q(relation.orderColumn));
+        else if(relation.orderBy.length()>0) {
+            statement.append(" ORDER BY ");boolean first=true;
+            for(String clause:split(relation.orderBy,',')) {
+                String[] parts=split(clause.trim(),' ');if(!first) statement.append(',');first=false;
+                statement.append("t.").append(q(target.attributes()[target.index(parts[0])].column)).append(parts.length>1 && "DESC".equalsIgnoreCase(parts[1])?" DESC":" ASC");
+            }
+        }
+        return hydrateAll(target,read(statement.toString(),owner.keyValues(id),kinds(target)),new ArrayList<String>());
+    }
+    private EntityState state(Object entity) { return entity instanceof ManagedEntity?((ManagedEntity)entity).__cn1OrmState():null; }
+    private void attachState(Entry entry,boolean loaded,Object[] values) {
+        Relationship[] relations=entry.model.relationships();
+        entry.collections=new List[relations.length];
+        if(relations.length==0) return;
+        if(!(entry.entity instanceof ManagedEntity)) throw new PersistenceException("Entity has not been enhanced: "+entry.model.type().getName());
+        EntityState state=new EntityState(this,entry.entity,relations.length);
+        ((ManagedEntity)entry.entity).__cn1OrmState(state);
+        for(int i=0;i<relations.length;i++) {
+            state.loaded[i]=loaded || !entry.model.hasRelationship(entry.entity,i);
+            if(values!=null && relations[i].column>=0) {
+                EntityModel target=model(relations[i].target);int count=target.idIndexes().length;
+                Object[] key=new Object[count];boolean any=false;
+                for(int part=0;part<count;part++) { key[part]=values[relations[i].column+part];any|=key[part]!=null; }
+                if(any) { target.keyValues(key);state.keys[i]=count==1?key[0]:Identifier.of(key); }
+            }
+            if(loaded) entry.collections[i]=new ArrayList();
+            else if(relations[i].column>=0) {
+                entry.collections[i]=new ArrayList();
+                if(state.keys[i]!=null) entry.collections[i].add(state.keys[i]);
+            }
+        }
+    }
+    private void cascadePersist(Entry entry) {
+        Relationship[] relations=entry.model.relationships();
+        for(int i=0;i<relations.length;i++) {
+            if((relations[i].cascade & Relationship.PERSIST)==0) continue;
+            EntityState state=state(entry.entity);
+            if(state!=null && !state.loaded[i]) continue;
+            Object value=entry.model.relation(entry.entity,i);
+            if(value==null) continue;
+            if(relations[i].many) for(Object child:relatedValues(value)) persist(child);
+            else persist(value);
+        }
+    }
+    private static final class ElementRow {
+        final Object key,value;
+        ElementRow(Object key,Object value) { this.key=key;this.value=Values.storage(value); }
+        public boolean equals(Object other) { return other instanceof ElementRow && same(key,((ElementRow)other).key) && same(value,((ElementRow)other).value); }
+        public int hashCode() { return (key==null?0:key.hashCode())*31+(value==null?0:value.hashCode()); }
+    }
+    private List elementRows(Relationship relation,Object collection) {
+        List result=new ArrayList();if(collection==null) return result;
+        if(relation.mapKey.length()>0) for(Object item:((Map)collection).entrySet()) {
+            Map.Entry entry=(Map.Entry)item;
+            if(!(entry.getKey() instanceof String)) throw new PersistenceException("Element maps require non-null String keys");
+            checkElement(relation,entry.getValue());result.add(new ElementRow(entry.getKey(),entry.getValue()));
+        } else for(Object value:relatedValues(collection)) { checkElement(relation,value);result.add(new ElementRow(null,value)); }
+        return result;
+    }
+    private void checkElement(Relationship relation,Object value) {
+        if(value!=null && !relation.target.isInstance(value)) throw new PersistenceException("Wrong element type: "+relation.field);
+    }
+    private void createElementTable(EntityModel owner,Relationship relation,List<ForeignKey> foreignKeys) {
+        String[] columns=joinColumns(relation.joinColumn,owner);
+        StringBuilder definition=new StringBuilder("CREATE TABLE ").append(q(relation.joinTable)).append(" (");appendJoinDefinition(definition,columns,owner);
+        definition.append(", ").append(q(relation.orderColumn)).append(" INTEGER NOT NULL, ").append(q(relation.inverseJoinColumn)).append(' ').append(sql.columnType(Elements.kind(relation.target)));
+        if(relation.mapKey.length()>0) {
+            String type=sql.assignedKeyColumn(Attribute.TEXT).replace(" PRIMARY KEY","").replace(" NOT NULL","");
+            definition.append(", ").append(q(relation.mapKey)).append(' ').append(type).append(" NOT NULL");
+        }
+        definition.append(", PRIMARY KEY (").append(quoted(columns)).append(", ").append(q(relation.mapKey.length()>0?relation.mapKey:relation.orderColumn)).append(')');
+        ForeignKey key=new ForeignKey(relation.joinTable,columns,owner.table(),keyColumns(owner));
+        if("sqlite".equals(sql.dialect())) definition.append(", ").append(foreignDeclaration(key));else foreignKeys.add(key);
+        write(definition.append(')').toString(),new Object[0]);
+    }
+    private Object loadElements(EntityModel owner,Object entity,Relationship relation) {
+        boolean map=relation.mapKey.length()>0;
+        String selection=q(relation.inverseJoinColumn)+(map?", "+q(relation.mapKey):"");
+        int[] kinds=map?new int[]{Elements.kind(relation.target),Attribute.TEXT}:new int[]{Elements.kind(relation.target)};
+        List<Object[]> rows=read("SELECT "+selection+" FROM "+q(relation.joinTable)+" WHERE "+matches(joinColumns(relation.joinColumn,owner),null)+" ORDER BY "+q(relation.orderColumn),owner.keyValues(owner.identifier(entity)),kinds);
+        List values=new ArrayList();Map mapping=new LinkedHashMap();
+        for(Object[] row:rows) {
+            Object value=Elements.read(relation.target,row[0]);
+            if(map) mapping.put(row[1],value);else values.add(value);
+        }
+        return map?mapping:values;
+    }
+    private void syncElements(Entry entry,int index,Relationship relation,Object collection) {
+        List rows=elementRows(relation,collection);if(rows.equals(entry.collections[index])) return;
+        String[] ownerColumns=joinColumns(relation.joinColumn,entry.model);Object[] owner=entry.model.keyValues(entry.model.identifier(entry.entity));
+        write("DELETE FROM "+q(relation.joinTable)+" WHERE "+matches(ownerColumns,null),owner);
+        for(int i=0;i<rows.size();i++) {
+            ElementRow row=(ElementRow)rows.get(i);boolean map=relation.mapKey.length()>0;
+            Object[] values=map?new Object[]{Integer.valueOf(i),row.value,row.key}:new Object[]{Integer.valueOf(i),row.value};
+            Object[] args=concat(owner,values);
+            write("INSERT INTO "+q(relation.joinTable)+" ("+quoted(ownerColumns)+", "+q(relation.orderColumn)+", "+q(relation.inverseJoinColumn)+(map?", "+q(relation.mapKey):"")+") VALUES ("+placeholders(args.length)+")",args);
+        }
+        entry.collections[index]=rows;
+    }
+
+    private static Iterable relatedValues(Object value) { return value instanceof Map?((Map)value).values():(Iterable)value; }
+    private List relationshipKeys(Relationship relation,Object value) {
+        if(relation.many) return relationKeys(relation,value);
+        List result=new ArrayList();
+        if(value!=null) { EntityModel target=model(relation.target);result.add(target.identifier(value)); }
+        return result;
+    }
+    private List relationKeys(Relationship relation,Object value) {
+        if(relation.element) return elementRows(relation,value);
+        List result=new ArrayList();
+        if(value!=null) {
+            EntityModel target=model(relation.target);
+            if(value instanceof Map) for(Object item:((Map)value).entrySet()) {
+                Map.Entry mapping=(Map.Entry)item;
+                if(mapping.getKey()==null || mapping.getValue()==null || !mapping.getKey().equals(target.domainValue(mapping.getValue(),target.index(relation.mapKey))))
+                    throw new PersistenceException("Map key does not match its entity attribute: "+relation.field);
+            }
+            for(Object child:relatedValues(value)) {
+                if(child==null) throw new PersistenceException("Null relationship element: "+relation.field);
+                Object id=target.identifier(child);
+                if(id==null || (target.attributes()[target.idIndex()].generated && id instanceof Number && ((Number)id).longValue()==0))
+                    throw new PersistenceException("Transient association without cascade PERSIST: "+relation.field);
+                result.add(id);
+            }
+        }
+        return result;
+    }
+    private void syncCollections(Entry entry) {
+        Relationship[] relations=entry.model.relationships(); EntityState state=state(entry.entity);
+        for(int i=0;i<relations.length;i++) {
+            Relationship relation=relations[i];
+            if(state==null || !state.loaded[i]) continue;
+            Object value=entry.model.relation(entry.entity,i);
+            if(relation.element) { syncElements(entry,i,relation,value);continue; }
+            List keys=relationshipKeys(relation,value),old=entry.collections[i];
+            if(old==null) old=new ArrayList();
+            Object owner=entry.model.identifier(entry.entity);
+            if(relation.many && relation.mappedBy.length()==0) {
+                EntityModel target=model(relation.target);
+                String[] ownerColumns=joinColumns(relation.joinColumn,entry.model),targetColumns=joinColumns(relation.inverseJoinColumn,target);
+                Object[] ownerKey=entry.model.keyValues(owner);
+                if(relation.orderColumn.length()>0) {
+                    if(!keys.equals(old)) {
+                        write("DELETE FROM "+q(relation.joinTable)+" WHERE "+matches(ownerColumns,null),ownerKey);
+                        for(int position=0;position<keys.size();position++) {
+                            Object[] args=concat(concat(ownerKey,target.keyValues(keys.get(position))),new Object[]{Integer.valueOf(position)});
+                            write("INSERT INTO "+q(relation.joinTable)+" ("+quoted(ownerColumns)+", "+quoted(targetColumns)+", "+q(relation.orderColumn)+") VALUES ("+placeholders(args.length)+")",args);
+                        }
+                    }
+                } else {
+                for(Object id:old) if(!keys.contains(id)) write("DELETE FROM "+q(relation.joinTable)+" WHERE "+matches(ownerColumns,null)+" AND "+matches(targetColumns,null),concat(ownerKey,target.keyValues(id)));
+                for(Object id:keys) if(!old.contains(id)) {
+                    Object[] args=concat(ownerKey,target.keyValues(id));
+                    write("INSERT INTO "+q(relation.joinTable)+" ("+quoted(ownerColumns)+", "+quoted(targetColumns)+") VALUES ("+placeholders(args.length)+")",args);
+                }
+            }
+            }
+            if(relation.orphanRemoval) for(Object id:old) if(!keys.contains(id)) {
+                Object orphan=find(relation.target,id);
+                if(orphan!=null) remove(orphan);
+            }
+            entry.collections[i]=keys;
+        }
+    }
+
+    <T> EntityModel<T> model(Class<T> type) {
+        EntityModel<T> model=(EntityModel<T>)models.get(type.getName());
+        if(model==null) throw new PersistenceException("No generated model registered for "+type.getName());
+        return model;
+    }
+    void check() { if(closed) throw new PersistenceException("Session is closed"); }
+    void requireTransaction() { check(); if(!transaction) throw new PersistenceException("An active transaction is required"); }
+    void autoFlush() { check(); if(transaction && !flushing && loading==0) flush(); }
+    String q(String value) { return sql.quote(value); }
+    String limit(int count,int offset) { return sql.limit(count,offset); }
+    String discriminatorCondition(EntityModel model,String alias) {
+        if(model.discriminatorIndex()<0) return "";
+        String[] values=model.discriminatorValues();if(values.length==0) return "1=0";
+        StringBuilder condition=new StringBuilder(alias==null?"":alias+".").append(q(model.attributes()[model.discriminatorIndex()].column)).append(" IN (");
+        for(int i=0;i<values.length;i++) {
+            if(i>0) condition.append(',');condition.append("'").append(values[i].replace("'","''")).append("'");
+        }
+        return condition.append(')').toString();
+    }
+    String tableSource(EntityModel model) {
+        String filter=discriminatorCondition(model,null);
+        return filter.length()==0?q(model.table()):"(SELECT * FROM "+q(model.table())+" WHERE "+filter+")";
+    }
+    String select(EntityModel model) {
+        StringBuilder out=new StringBuilder("SELECT "); Attribute[] attrs=model.attributes();
+        for(int i=0;i<attrs.length;i++) { if(i>0) out.append(", "); out.append(q(attrs[i].column)); }
+        return out.append(" FROM ").append(tableSource(model)).append(" cn1_entity").toString();
+    }
+    int[] kinds(EntityModel model) {
+        Attribute[] attrs=model.attributes(); int[] kinds=new int[attrs.length];
+        for(int i=0;i<attrs.length;i++) kinds[i]=attrs[i].kind;
+        return kinds;
+    }
+    List<Object[]> read(String statement,Object[] params,int[] kinds) {
+        check(); try { return sql.query(statement,params,kinds); }
+        catch(IOException e) { if(transaction) rollbackOnly=true; throw failure(e); }
+    }
+    int write(String statement,Object[] params) {
+        check(); try { return sql.execute(statement,params); }
+        catch(IOException e) { if(transaction) rollbackOnly=true; throw failure(e); }
+    }
+    <T> T hydrate(EntityModel<T> model,Object[] values) {
+        try { return hydrateInternal(model,values); }
+        catch(RuntimeException error) { if(transaction) rollbackOnly=true;clear();throw error; }
+    }
+    private <T> T hydrateInternal(EntityModel<T> model,Object[] values) {
+        if(model.discriminatorIndex()>=0) {
+            Object tag=values[model.discriminatorIndex()];EntityModel selected=null;
+            for(EntityModel candidate:models.values()) if(candidate.hierarchyRoot()==model.hierarchyRoot() && candidate.discriminatorValue().equals(tag)) { selected=candidate;break; }
+            if(selected==null || !model.type().isAssignableFrom(selected.type())) throw new PersistenceException("Unknown or incompatible discriminator: "+tag);
+            model=selected;
+        }
+        Key key=new Key(model.hierarchyRoot().getName(),model.identifierFromRow(values));
+        T entity=(T)identities.get(key);
+        if(entity!=null) { checkManagedIdentity(entries.get(entity));return entity; }
+        entity=model.create();
+        Entry entry=new Entry(model,entity,null); attachState(entry,false,values);
+        assign(model,entity,values); claim(model,entity); entries.put(entity,entry);
+        entry.snapshot=snapshot(model,entity);
+        Relationship[] relations=model.relationships();
+        loading++;
+        try { if(deferredFetch==0) for(int i=0;i<relations.length;i++) if(!relations[i].lazy) initialize(entity,i); }
+        finally { loading--; }
+        model.lifecycle(entity,6);
+        return entity;
+    }
+    private void insert(Entry entry) {
+        if(!entry.fresh || entry.inserting) return;
+        entry.inserting=true;
+        EntityModel model=entry.model; Attribute[] attrs=model.attributes();
+        model.lifecycle(entry.entity,0);
+        if(!attrs[model.idIndex()].generated && !same(entry.initialId,model.identifier(entry.entity)))
+            throw new PersistenceException("Managed primary key cannot change");
+        for(int i=0;i<model.relationships().length;i++) {
+            Relationship relation=model.relationships()[i];
+            if(relation.column<0) continue;
+            Object target=model.relation(entry.entity,i); Entry dependency=entries.get(target);
+            if(target!=null && dependency==null) {
+                EntityModel targetModel=model(relation.target);Object targetId=targetModel.identifier(target);
+                if(targetId==null || (targetModel.attributes()[targetModel.idIndex()].generated && targetId instanceof Number && ((Number)targetId).longValue()==0))
+                    throw new PersistenceException("Transient association without cascade PERSIST: "+relation.field);
+            }
+            if(dependency!=null && dependency.fresh) insert(dependency);
+        }
+        StringBuilder cols=new StringBuilder(),marks=new StringBuilder(); List<Object> args=new ArrayList<Object>();
+        int version=model.versionIndex(); if(version>=0) model.set(entry.entity,version,Long.valueOf(0));
+        for(int i=0;i<attrs.length;i++) {
+            if(attrs[i].generated) continue;
+            if(args.size()>0) { cols.append(", "); marks.append(", "); }
+            cols.append(q(attrs[i].column)); marks.append('?');
+            Object bound=model.get(entry.entity,i);
+            for(int ri=0;ri<model.relationships().length;ri++) if(model.relationships()[ri].column>=0 && i>=model.relationships()[ri].column && i<model.relationships()[ri].column+model(model.relationships()[ri].target).idIndexes().length) {
+                Entry dependency=entries.get(model.relation(entry.entity,ri));
+                if(dependency!=null && dependency.fresh) bound=null;
+            }
+            args.add(bound);
+        }
+        String statement=args.isEmpty()?sql.insertDefaults(q(model.table())):
+                "INSERT INTO "+q(model.table())+" ("+cols+") VALUES ("+marks+")";
+        int id=model.idIndex();
+        if(attrs[id].generated) {
+            try { model.set(entry.entity,id,Long.valueOf(sql.insert(statement,args.toArray(),attrs[id].column))); }
+            catch(IOException e) { throw failure(e); }
+        } else write(statement,args.toArray());
+        claim(model,entry.entity); entry.fresh=false; entry.inserting=false; entry.snapshot=snapshot(model,entry.entity);
+        int arg=0;
+        for(int i=0;i<attrs.length;i++) if(!attrs[i].generated) {
+            Object value=args.get(arg++);
+            entry.snapshot[i]=value instanceof byte[]?((byte[])value).clone():value;
+        }
+        model.lifecycle(entry.entity,1);
+    }
+    private void update(Entry entry) {
+        EntityModel model=entry.model; Attribute[] attrs=model.attributes(); Object[] now=snapshot(model,entry.entity);
+        int version=model.versionIndex();
+        if(!same(model.identifierFromRow(now),model.identifierFromRow(entry.snapshot))) throw new PersistenceException("Managed primary key cannot change");
+        if(version>=0 && !same(now[version],entry.snapshot[version])) throw new PersistenceException("Version is managed by the ORM");
+        boolean dirty=false;
+        for(int i=0;i<attrs.length;i++) if(!attrs[i].id && !attrs[i].version && !same(now[i],entry.snapshot[i])) dirty=true;
+        EntityState state=state(entry.entity);
+        Relationship[] relations=model.relationships();
+        for(int i=0;i<relations.length;i++) if(state!=null && state.loaded[i] && relations[i].many) {
+            List current=relationKeys(relations[i],model.relation(entry.entity,i));
+            List previous=entry.collections[i];
+            if(previous==null || ((relations[i].element || relations[i].orderColumn.length()>0)?!current.equals(previous):current.size()!=previous.size() || !current.containsAll(previous))) dirty=true;
+        }
+        if(!dirty) return;
+        model.lifecycle(entry.entity,2); now=snapshot(model,entry.entity);
+        if(!same(model.identifierFromRow(now),model.identifierFromRow(entry.snapshot)) || version>=0 && !same(now[version],entry.snapshot[version]))
+            throw new PersistenceException("Lifecycle callback changed an identifier or version");
+        List<Object> args=new ArrayList<Object>(); StringBuilder set=new StringBuilder();
+        for(int i=0;i<attrs.length;i++) {
+            if(attrs[i].id || attrs[i].version || same(now[i],entry.snapshot[i])) continue;
+            if(args.size()>0) set.append(", ");
+            set.append(q(attrs[i].column)).append(" = ?"); args.add(now[i]);
+        }
+        if(args.isEmpty() && version<0) return;
+        Long next=null;
+        if(version>=0) {
+            long previous=((Number)entry.snapshot[version]).longValue();
+            if(previous==(attrs[version].kind==Attribute.INTEGER?Integer.MAX_VALUE:Long.MAX_VALUE)) throw new PersistenceException("Version overflow");
+            next=Long.valueOf(previous+1);
+            if(set.length()>0) set.append(", ");
+            set.append(q(attrs[version].column)).append(" = ?"); args.add(next);
+        }
+        String where=condition(entry,args);
+        int changed=write("UPDATE "+q(model.table())+" SET "+set+" WHERE "+where,args.toArray());
+        if(changed!=1) throw new OptimisticLockException("Stale or missing row: "+model.table());
+        if(version>=0) model.set(entry.entity,version,next);
+        entry.snapshot=snapshot(model,entry.entity);
+        model.lifecycle(entry.entity,3);
+    }
+    private void prepareDeletes() {
+        for(Entry entry:new ArrayList<Entry>(entries.values())) if(entry.removed) {
+            checkManagedIdentity(entry);
+            StringBuilder changes=new StringBuilder();
+            for(Relationship relation:entry.model.relationships()) if(relation.column>=0 && entry.model.attributes()[relation.column].nullable) {
+                for(String column:foreignColumns(entry.model,relation)) {
+                    if(changes.length()>0) changes.append(", ");changes.append(q(column)).append(" = NULL");
+                }
+            }
+            if(changes.length()>0) {
+                List<Object> args=new ArrayList<Object>();String where=condition(entry,args);
+                if(write("UPDATE "+q(entry.model.table())+" SET "+changes+" WHERE "+where,args.toArray())!=1)
+                    throw new OptimisticLockException("Stale row during deletion: "+entry.model.table());
+            }
+        }
+    }
+    private void delete(Entry entry) {
+        if(!entries.containsKey(entry.entity)) return;
+        if(entry.deleting) throw new PersistenceException("Cyclic non-nullable delete dependencies");
+        entry.deleting=true;
+        for(Entry dependent:new ArrayList<Entry>(entries.values())) if(dependent!=entry && dependent.removed) {
+            for(Relationship relation:dependent.model.relationships()) {
+                if(relation.column<0 || dependent.model.attributes()[relation.column].nullable || !relation.target.isInstance(entry.entity)) continue;
+                Object[] fk=new Object[entry.model.idIndexes().length];for(int i=0;i<fk.length;i++) fk[i]=dependent.snapshot[relation.column+i];
+                Object key=fk.length==1?fk[0]:Identifier.of(fk);
+                if(same(key,entry.model.identifier(entry.entity))) delete(dependent);
+            }
+        }
+        entry.model.lifecycle(entry.entity,4);checkManagedIdentity(entry);
+        for(EntityModel owner:models.values()) for(Relationship relation:owner.relationships()) if(relation.many && relation.mappedBy.length()==0) {
+            if(owner.type().isInstance(entry.entity)) write("DELETE FROM "+q(relation.joinTable)+" WHERE "+matches(joinColumns(relation.joinColumn,owner),null),owner.keyValues(owner.identifier(entry.entity)));
+            if(!relation.element && relation.target.isInstance(entry.entity)) write("DELETE FROM "+q(relation.joinTable)+" WHERE "+matches(joinColumns(relation.inverseJoinColumn,entry.model),null),entry.model.keyValues(entry.model.identifier(entry.entity)));
+        }
+        List<Object> args=new ArrayList<Object>(); String where=condition(entry,args);
+        int changed=write("DELETE FROM "+q(entry.model.table())+" WHERE "+where,args.toArray());
+        if(changed!=1) throw new OptimisticLockException("Stale or missing row: "+entry.model.table());
+        detachOne(entry.entity);entry.model.lifecycle(entry.entity,5);
+    }
+    private void checkManagedIdentity(Entry entry) {
+        if(entry.snapshot==null) return;
+        if(!same(entry.model.identifierFromRow(entry.snapshot),entry.model.identifier(entry.entity))) throw new PersistenceException("Managed primary key cannot change");
+        int version=entry.model.versionIndex();
+        if(version>=0 && !same(entry.snapshot[version],entry.model.get(entry.entity,version))) throw new PersistenceException("Version is managed by the ORM");
+    }
+    private String condition(Entry entry,List<Object> args) {
+        EntityModel model=entry.model; int version=model.versionIndex();
+        for(int index:model.idIndexes()) args.add(entry.snapshot[index]);
+        String where=keyCondition(model,null);
+        if(version>=0) { where+=" AND "+q(model.attributes()[version].column)+" = ?"; args.add(entry.snapshot[version]); }
+        return where;
+    }
+    static Object[] concat(Object[] left,Object[] right) {
+        Object[] out=new Object[left.length+right.length];System.arraycopy(left,0,out,0,left.length);System.arraycopy(right,0,out,left.length,right.length);return out;
+    }
+    static String placeholders(int count) {
+        StringBuilder result=new StringBuilder();for(int i=0;i<count;i++) { if(i>0) result.append(", ");result.append('?'); }return result.toString();
+    }
+    String[] keyColumns(EntityModel model) {
+        int[] keys=model.idIndexes();String[] columns=new String[keys.length];
+        for(int i=0;i<keys.length;i++) columns[i]=model.attributes()[keys[i]].column;return columns;
+    }
+    String[] joinColumns(String prefix,EntityModel model) {
+        String[] keys=keyColumns(model);String[] columns=new String[keys.length];
+        for(int i=0;i<keys.length;i++) columns[i]=prefix+(keys.length==1?"":"_"+keys[i]);return columns;
+    }
+    String[] foreignColumns(EntityModel owner,Relationship relation) {
+        String[] columns=new String[model(relation.target).idIndexes().length];
+        for(int i=0;i<columns.length;i++) columns[i]=owner.attributes()[relation.column+i].column;return columns;
+    }
+    String matches(String[] columns,String alias) {
+        StringBuilder result=new StringBuilder();
+        for(String column:columns) {
+            if(result.length()>0) result.append(" AND ");if(alias!=null) result.append(alias).append('.');
+            result.append(q(column)).append(" = ?");
+        }
+        return result.toString();
+    }
+    String quoted(String[] columns) {
+        StringBuilder result=new StringBuilder();for(String column:columns) { if(result.length()>0) result.append(", ");result.append(q(column)); }return result.toString();
+    }
+    String joinEquality(String[] left,String leftAlias,String[] right,String rightAlias) {
+        if(left.length!=right.length) throw new PersistenceException("Relationship key widths differ");
+        StringBuilder result=new StringBuilder();
+        for(int i=0;i<left.length;i++) {
+            if(i>0) result.append(" AND ");
+            result.append(leftAlias).append('.').append(q(left[i])).append(" = ").append(rightAlias).append('.').append(q(right[i]));
+        }
+        return result.toString();
+    }
+    private void appendJoinDefinition(StringBuilder statement,String[] names,EntityModel model) {
+        int[] ids=model.idIndexes();
+        for(int i=0;i<ids.length;i++) {
+            if(i>0) statement.append(", ");
+            Attribute attr=model.attributes()[ids[i]];
+            String type=attr.declaredType;
+            if(type==null) {
+                String keyType=sql.assignedKeyColumn(attr.kind);
+                int end=keyType.indexOf(" PRIMARY KEY");type=end<0?sql.columnType(attr.kind):keyType.substring(0,end).replace(" NOT NULL","");
+            }
+            statement.append(q(names[i])).append(' ').append(type).append(" NOT NULL");
+        }
+    }
+    String keyCondition(EntityModel model,String alias) {
+        StringBuilder result=new StringBuilder();
+        for(int id:model.idIndexes()) {
+            if(result.length()>0) result.append(" AND ");
+            if(alias!=null) result.append(alias).append('.');
+            result.append(q(model.attributes()[id].column)).append(" = ?");
+        }
+        return result.toString();
+    }
+    private void claim(EntityModel model,Object entity) {
+        Key key=key(model,entity); Object existing=identities.get(key);
+        if(existing!=null && existing!=entity) throw new PersistenceException("Two instances have the same identity: "+model.table());
+        identities.put(key,entity);
+    }
+    private static Key key(EntityModel model,Object entity) { return new Key(model.hierarchyRoot().getName(),model.identifier(entity)); }
+    private static void assign(EntityModel model,Object entity,Object[] values) { model.read(entity,values); }
+    private static void copy(EntityModel model,Object from,Object to) { assign(model,to,snapshot(model,from)); }
+    private static Object[] snapshot(EntityModel model,Object entity) {
+        Object[] result=new Object[model.attributes().length];
+        for(int i=0;i<result.length;i++) {
+            Object value=model.get(entity,i);
+            result[i]=value instanceof byte[]?((byte[])value).clone():value;
+        }
+        return result;
+    }
+    private static boolean same(Object a,Object b) {
+        if(a instanceof byte[] && b instanceof byte[]) return Arrays.equals((byte[])a,(byte[])b);
+        return a==b || (a!=null && a.equals(b));
+    }
+    private static PersistenceException failure(IOException e) { return new PersistenceException(e.getMessage(),e); }
+    private static final class Entry {
+        final EntityModel model; final Object entity; Object[] snapshot; Object initialId; boolean fresh,removed,inserting,deleting; List[] collections;
+        Entry(EntityModel model,Object entity,Object[] snapshot) { this.model=model; this.entity=entity; this.snapshot=snapshot; }
+    }
+    private static final class Key {
+        final String type; final Object id;
+        Key(String type,Object id) { this.type=type; this.id=id instanceof byte[]?((byte[])id).clone():id instanceof Integer || id instanceof Short || id instanceof Byte?Long.valueOf(((Number)id).longValue()):id; }
+        public int hashCode() { return 31*type.hashCode()+(id==null?0:id instanceof byte[]?Arrays.hashCode((byte[])id):id.hashCode()); }
+        public boolean equals(Object o) { return o instanceof Key && type.equals(((Key)o).type) && same(id,((Key)o).id); }
+    }
+}

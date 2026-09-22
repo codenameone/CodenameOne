@@ -39,7 +39,6 @@ import org.objectweb.asm.Opcodes;
 import java.io.File;
 import java.net.URL;
 import java.nio.file.Files;
-import java.net.URL;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -59,6 +58,265 @@ public class OrmAnnotationProcessorTest {
 
     @Rule
     public TemporaryFolder tmp = new TemporaryFolder();
+
+    @Test
+    public void dependencyEnhancementRefreshPreservesNewApplicationClasses() throws Exception {
+        File dependency=tmp.newFolder("relation-dependency"),classes=tmp.newFolder("relation-app");
+        Map<String,String> sources=new java.util.LinkedHashMap<String,String>();
+        sources.put("overlay.Parent","package overlay; import com.codename1.annotations.*; @Entity public class Parent { @Id public long id; }");
+        sources.put("overlay.Child","package overlay; import com.codename1.annotations.*; @Entity public class Child { @Id public long id; @ManyToOne(fetch=FetchType.LAZY) public Parent parent; }");
+        sources.put("overlay.Reader","package overlay; public class Reader { public Parent read(Child child) { return child.parent; } }");
+        JavaSourceCompiler.compile(sources,dependency,Arrays.asList(testClassesDir()));
+        List<String> classpath=new ArrayList<String>(backendClasspath());classpath.add(dependency.getAbsolutePath());
+        ProcessorContext first=runProcessor(classes,classpath);assertFalse(first.getErrors().toString(),first.hasErrors());
+        File copied=new File(classes,"overlay/Reader.class");assertTrue(copied.isFile());
+        byte[] originalDependency=Files.readAllBytes(new File(dependency,"overlay/Reader.class").toPath());
+        assertFalse(Arrays.equals(originalDependency,Files.readAllBytes(copied.toPath())));
+        compileInto(classes,"overlay.Reader","package overlay; public class Reader { public String applicationCode() { return \"preserved\"; } }");
+        byte[] applicationClass=Files.readAllBytes(copied.toPath());
+        ProcessorContext second=runProcessor(classes,classpath);assertFalse(second.getErrors().toString(),second.hasErrors());
+        org.junit.Assert.assertArrayEquals(applicationClass,Files.readAllBytes(copied.toPath()));
+        org.junit.Assert.assertArrayEquals(originalDependency,Files.readAllBytes(new File(dependency,"overlay/Reader.class").toPath()));
+        assertTrue(new File(classes,"overlay/Child.class").isFile());
+    }
+
+    @Test
+    public void clientPropertyScalarsAndCharactersUseManagedStorageConversions() throws Exception {
+        File classes=tmp.newFolder("property-scalars");
+        Map<String,String> sources=new java.util.LinkedHashMap<String,String>();
+        sources.put("propertymodel.Bean","package propertymodel; import com.codename1.annotations.*; import com.codename1.properties.*; @Entity(table=\"property_beans\") public class Bean implements PropertyBusinessObject { @Id public long id; @Version public long version; public char symbol; public final IntProperty<Bean> counter=new IntProperty<Bean>(\"counter\",0); public final CharProperty<Bean> letter=new CharProperty<Bean>(\"letter\",'Q'); private final PropertyIndex index=new PropertyIndex(this,\"Bean\",counter,letter); public PropertyIndex getPropertyIndex() { return index; } }");
+        JavaSourceCompiler.compile(sources,classes,Arrays.asList(testClassesDir()));
+        ProcessorContext ctx=runProcessor(classes);assertFalse(ctx.getErrors().toString(),ctx.hasErrors());
+        java.net.URLClassLoader loader=new java.net.URLClassLoader(new URL[]{classes.toURI().toURL()},getClass().getClassLoader());loader.loadClass("cn1app.DaoBootstrap").newInstance();Class type=loader.loadClass("propertymodel.Bean");
+        Class.forName("org.sqlite.JDBC");
+        com.codename1.orm.EntityManager em=com.codename1.orm.EntityManager.open(new com.codename1.impl.javase.SEDatabase(java.sql.DriverManager.getConnection("jdbc:sqlite::memory:")));
+        com.codename1.orm.session.Session s=em.openSession();
+        try {
+            s.createTables();s.beginTransaction();Object bean=type.newInstance();s.persist(bean);s.commitTransaction();Object id=type.getField("id").get(bean);s.clear();
+            Object loaded=s.query(type).eq("letter",Character.valueOf('Q')).eq("symbol",Character.valueOf((char)0)).first();org.junit.Assert.assertNotNull(loaded);
+            s.beginTransaction();assertTrue(s.increment(type,id,"counter",3));s.commitTransaction();
+            org.junit.Assert.assertEquals(Integer.valueOf(3),((com.codename1.properties.Property)type.getField("counter").get(loaded)).get());
+            s.beginTransaction();((com.codename1.properties.Property)type.getField("letter").get(loaded)).set(Character.valueOf('Z'));s.commitTransaction();s.clear();
+            org.junit.Assert.assertEquals(Character.valueOf('Z'),((com.codename1.properties.Property)type.getField("letter").get(s.find(type,id))).get());
+        } finally { s.close();em.close();loader.close(); }
+    }
+
+    @Test
+    public void scalarElementCollectionsSupportLazyReadsDirtyCheckingAndMembership() throws Exception {
+        File classes=tmp.newFolder("elements");Map<String,String> sources=new java.util.LinkedHashMap<String,String>();
+        sources.put("elements.Profile","package elements; import com.codename1.annotations.*; @Entity(table=\"element_profiles\") public class Profile { @Id public long id; @Version public long version; @ElementCollection public java.util.List<String> tags=new java.util.ArrayList<String>(); @ElementCollection public java.util.Set<Integer> flags=new java.util.LinkedHashSet<Integer>(); @ElementCollection public java.util.Map<String,java.util.Date> dates=new java.util.LinkedHashMap<String,java.util.Date>(); }");
+        sources.put("elements.Reader","package elements; public class Reader { public static java.util.List<String> tags(Profile p) { return p.tags; } public static java.util.Set<Integer> flags(Profile p) { return p.flags; } public static java.util.Map<String,java.util.Date> dates(Profile p) { return p.dates; } }");
+        JavaSourceCompiler.compile(sources,classes,Arrays.asList(testClassesDir()));
+        ProcessorContext client=runProcessor(classes);assertFalse(client.getErrors().toString(),client.hasErrors());
+        ProcessorContext ctx=runProcessor(classes,backendClasspath());assertFalse(ctx.getErrors().toString(),ctx.hasErrors());
+        java.net.URLClassLoader loader=new java.net.URLClassLoader(new URL[]{classes.toURI().toURL()},getClass().getClassLoader());loader.loadClass("cn1app.BackendDaoBootstrap").newInstance();Class type=loader.loadClass("elements.Profile"),reader=loader.loadClass("elements.Reader");
+        com.codename1.backend.orm.EntityManager em=com.codename1.backend.orm.EntityManager.open(com.codename1.backend.Database.open(":memory:"));com.codename1.orm.session.Session s=em.openSession();
+        try {
+            s.createTables();s.beginTransaction();Object profile=type.newInstance();((List)type.getField("tags").get(profile)).addAll(Arrays.asList("a","b","a",null));((Set)type.getField("flags").get(profile)).add(7);((Map)type.getField("dates").get(profile)).put("start",new java.util.Date(1000));s.persist(profile);s.commitTransaction();Object id=type.getField("id").get(profile);s.clear();
+            profile=s.find(type,id);assertFalse(s.isLoaded(profile,"tags"));org.junit.Assert.assertEquals(4,s.count(profile,"tags"));assertFalse(s.isLoaded(profile,"tags"));
+            org.junit.Assert.assertSame(profile,s.query(type).containsElement("tags","a").first());org.junit.Assert.assertEquals(1,s.query(type).containsElement("tags",null).count());
+            org.junit.Assert.assertEquals(Arrays.asList("a","b","a",null),reader.getMethod("tags",type).invoke(null,profile));org.junit.Assert.assertEquals(java.util.Collections.singleton(7),reader.getMethod("flags",type).invoke(null,profile));
+            Map dates=(Map)reader.getMethod("dates",type).invoke(null,profile);s.beginTransaction();((java.util.Date)dates.get("start")).setTime(2000);((List)reader.getMethod("tags",type).invoke(null,profile)).remove(0);s.commitTransaction();s.clear();
+            profile=s.find(type,id);org.junit.Assert.assertEquals(Arrays.asList("b","a",null),reader.getMethod("tags",type).invoke(null,profile));org.junit.Assert.assertEquals(2000,((java.util.Date)((Map)reader.getMethod("dates",type).invoke(null,profile)).get("start")).getTime());
+            s.detach(profile);((List)reader.getMethod("tags",type).invoke(null,profile)).add("merged");s.beginTransaction();profile=s.merge(profile);s.commitTransaction();org.junit.Assert.assertEquals(4,s.count(profile,"tags"));
+            s.beginTransaction();s.remove(profile);s.commitTransaction();org.junit.Assert.assertEquals(0,s.query(type).count());
+        } finally { s.close();em.close();loader.close(); }
+    }
+
+    @Test
+    public void orderedListsAndEntityMapsRoundTripWithoutLosingDuplicateLinks() throws Exception {
+        File classes=tmp.newFolder("collections");Map<String,String> sources=new java.util.LinkedHashMap<String,String>();
+        sources.put("collections.Thing","package collections; import com.codename1.annotations.*; @Entity(table=\"collection_things\") public class Thing { @Id public long id; public String label; }");
+        sources.put("collections.Box","package collections; import com.codename1.annotations.*; @Entity(table=\"collection_boxes\") public class Box { @Id public long id; @Version public long version; @ManyToMany(cascade=CascadeType.PERSIST) @OrderColumn public java.util.List<Thing> sequence=new java.util.ArrayList<Thing>(); @OneToMany(cascade=CascadeType.PERSIST) @MapKey(name=\"label\") public java.util.Map<String,Thing> named=new java.util.LinkedHashMap<String,Thing>(); }");
+        sources.put("collections.Reader","package collections; public class Reader { public static java.util.List<Thing> sequence(Box b) { return b.sequence; } public static java.util.Map<String,Thing> named(Box b) { return b.named; } }");
+        JavaSourceCompiler.compile(sources,classes,Arrays.asList(testClassesDir()));
+        ProcessorContext client=runProcessor(classes);assertFalse(client.getErrors().toString(),client.hasErrors());
+        ProcessorContext ctx=runProcessor(classes,backendClasspath());assertFalse(ctx.getErrors().toString(),ctx.hasErrors());
+        java.net.URLClassLoader loader=new java.net.URLClassLoader(new URL[]{classes.toURI().toURL()},getClass().getClassLoader());loader.loadClass("cn1app.BackendDaoBootstrap").newInstance();
+        Class boxType=loader.loadClass("collections.Box"),thingType=loader.loadClass("collections.Thing"),reader=loader.loadClass("collections.Reader");
+        com.codename1.backend.orm.EntityManager em=com.codename1.backend.orm.EntityManager.open(com.codename1.backend.Database.open(":memory:"));com.codename1.orm.session.Session s=em.openSession();
+        try {
+            s.createTables();s.beginTransaction();Object box=boxType.newInstance(),a=thingType.newInstance(),b=thingType.newInstance();thingType.getField("label").set(a,"a");thingType.getField("label").set(b,"b");
+            List sequence=(List)boxType.getField("sequence").get(box);sequence.add(a);sequence.add(b);sequence.add(a);Map named=(Map)boxType.getField("named").get(box);named.put("a",a);named.put("b",b);
+            s.persist(box);s.commitTransaction();Object id=boxType.getField("id").get(box);s.clear();box=s.find(boxType,id);
+            assertFalse(s.isLoaded(box,"sequence"));sequence=(List)reader.getMethod("sequence",boxType).invoke(null,box);org.junit.Assert.assertSame(sequence.get(0),sequence.get(2));
+            named=(Map)reader.getMethod("named",boxType).invoke(null,box);org.junit.Assert.assertSame(sequence.get(0),named.get("a"));org.junit.Assert.assertSame(sequence.get(1),named.get("b"));
+            s.beginTransaction();Object first=sequence.remove(0);sequence.add(first);s.commitTransaction();s.clear();box=s.find(boxType,id);
+            sequence=(List)reader.getMethod("sequence",boxType).invoke(null,box);org.junit.Assert.assertEquals("b",thingType.getField("label").get(sequence.get(0)));org.junit.Assert.assertSame(sequence.get(1),sequence.get(2));
+            org.junit.Assert.assertEquals(3,s.count(box,"sequence"));s.beginTransaction();s.remove(box);s.commitTransaction();org.junit.Assert.assertEquals(2,s.query(thingType).count());
+        } finally { s.close();em.close();loader.close(); }
+    }
+
+    @Test
+    public void polymorphicSingleTableInheritancePreservesIdentityAndSubtypeQueries() throws Exception {
+        File classes=tmp.newFolder("inheritance");Map<String,String> sources=new java.util.LinkedHashMap<String,String>();
+        sources.put("hierarchy.Animal","package hierarchy; import com.codename1.annotations.*; @Entity(table=\"hierarchy_animals\") @Inheritance public abstract class Animal { @Id public long id; @Version public long version; public String name; @DbTransient public int callbacks; @PrePersist public void baseCallback() { callbacks++; } }");
+        sources.put("hierarchy.Cat","package hierarchy; import com.codename1.annotations.*; @Entity @DiscriminatorValue(\"cat\") public class Cat extends Animal { public int lives; @PrePersist public void catCallback() { callbacks+=10; } }");
+        sources.put("hierarchy.Dog","package hierarchy; import com.codename1.annotations.*; @Entity @DiscriminatorValue(\"dog\") public class Dog extends Animal { public String breed; @ManyToOne(fetch=FetchType.LAZY,cascade=CascadeType.PERSIST) public Keeper keeper; }");
+        sources.put("hierarchy.Keeper","package hierarchy; import com.codename1.annotations.*; @Entity(table=\"hierarchy_keepers\") public class Keeper { @Id public long id; public String name; }");
+        sources.put("hierarchy.Shelter","package hierarchy; import com.codename1.annotations.*; @Entity(table=\"hierarchy_shelters\") public class Shelter { @Id public long id; @OneToMany(cascade=CascadeType.ALL,orphanRemoval=true) public java.util.List<Animal> animals=new java.util.ArrayList<Animal>(); }");
+        sources.put("hierarchy.Reader","package hierarchy; public class Reader { public static Keeper keeper(Dog d) { return d.keeper; } public static java.util.List<Animal> animals(Shelter s) { return s.animals; } }");
+        JavaSourceCompiler.compile(sources,classes,Arrays.asList(testClassesDir()));
+        ProcessorContext client=runProcessor(classes);assertFalse(client.getErrors().toString(),client.hasErrors());
+        ProcessorContext ctx=runProcessor(classes,backendClasspath());assertFalse(ctx.getErrors().toString(),ctx.hasErrors());
+        java.net.URLClassLoader loader=new java.net.URLClassLoader(new URL[]{classes.toURI().toURL()},getClass().getClassLoader());
+        loader.loadClass("cn1app.BackendDaoBootstrap").newInstance();Class base=loader.loadClass("hierarchy.Animal"),catType=loader.loadClass("hierarchy.Cat"),dogType=loader.loadClass("hierarchy.Dog"),keeperType=loader.loadClass("hierarchy.Keeper"),shelterType=loader.loadClass("hierarchy.Shelter"),reader=loader.loadClass("hierarchy.Reader");
+        com.codename1.backend.orm.EntityManager em=com.codename1.backend.orm.EntityManager.open(com.codename1.backend.Database.open(":memory:"));
+        com.codename1.orm.session.Session s=em.openSession();
+        try {
+            em.createTables();s.validateSchema();s.beginTransaction();
+            Object cat=catType.newInstance(),dog=dogType.newInstance(),keeper=keeperType.newInstance(),shelter=shelterType.newInstance();
+            base.getField("name").set(cat,"Milo");catType.getField("lives").setInt(cat,9);base.getField("name").set(dog,"Fido");dogType.getField("breed").set(dog,"terrier");dogType.getField("keeper").set(dog,keeper);
+            List animals=(List)shelterType.getField("animals").get(shelter);animals.add(cat);animals.add(dog);s.persist(shelter);s.commitTransaction();
+            org.junit.Assert.assertEquals(11,base.getField("callbacks").getInt(cat));
+            Object catId=base.getField("id").get(cat),dogId=base.getField("id").get(dog),shelterId=shelterType.getField("id").get(shelter);s.clear();
+            Object foundCat=s.find(base,catId);org.junit.Assert.assertEquals(catType,foundCat.getClass());org.junit.Assert.assertSame(foundCat,s.find(catType,catId));
+            org.junit.Assert.assertNull(s.find(dogType,catId));org.junit.Assert.assertEquals(2,s.query(base).count());org.junit.Assert.assertEquals(1,s.query(catType).count());
+            Object foundDog=s.find(base,dogId);assertFalse(s.isLoaded(foundDog,"keeper"));org.junit.Assert.assertNotNull(reader.getMethod("keeper",dogType).invoke(null,foundDog));
+            List loaded=(List)reader.getMethod("animals",shelterType).invoke(null,s.find(shelterType,shelterId));org.junit.Assert.assertEquals(2,loaded.size());
+            s.beginTransaction();catType.getField("lives").setInt(foundCat,8);s.commitTransaction();s.clear();org.junit.Assert.assertEquals(8,catType.getField("lives").getInt(s.find(base,catId)));
+            s.beginTransaction();org.junit.Assert.assertEquals(1,s.createQuery("update Cat c set c.name = :name").setParameter("name","Kitty").executeUpdate());s.commitTransaction();
+            org.junit.Assert.assertEquals("Fido",base.getField("name").get(s.find(base,dogId)));
+            s.beginTransaction();s.remove(s.find(shelterType,shelterId));s.commitTransaction();org.junit.Assert.assertEquals(0,s.query(base).count());
+        } finally { s.close();em.close();loader.close(); }
+    }
+
+    @Test
+    public void convertersAndUniqueIndexesPreserveDomainValues() throws Exception {
+        File classes=tmp.newFolder("converted");Map<String,String> sources=new java.util.LinkedHashMap<String,String>();
+        sources.put("converted.Code","package converted; public class Code { public String value; public Code(String value) { this.value=value; } }");
+        sources.put("converted.CodeConverter","package converted; public class CodeConverter implements com.codename1.orm.session.AttributeConverter<Code,String> { public String toDatabase(Code c) { return c==null?null:c.value; } public Code fromDatabase(String value) { return value==null?null:new Code(value); } }");
+        sources.put("converted.Entry","package converted; import com.codename1.annotations.*; @Entity(indexes=@Index(name=\"converted_code\",fields=\"code\",unique=true)) public class Entry { @Id public long id; @Convert(converter=CodeConverter.class) public Code code; }");
+        JavaSourceCompiler.compile(sources,classes,Arrays.asList(testClassesDir()));
+        ProcessorContext client=runProcessor(classes);assertFalse(client.getErrors().toString(),client.hasErrors());
+        ProcessorContext ctx=runProcessor(classes,backendClasspath());assertFalse(ctx.getErrors().toString(),ctx.hasErrors());
+        java.net.URLClassLoader loader=new java.net.URLClassLoader(new URL[]{classes.toURI().toURL()},getClass().getClassLoader());
+        loader.loadClass("cn1app.BackendDaoBootstrap").newInstance();Class type=loader.loadClass("converted.Entry"),codeType=loader.loadClass("converted.Code");
+        com.codename1.backend.orm.EntityManager em=com.codename1.backend.orm.EntityManager.open(com.codename1.backend.Database.open(":memory:"));
+        com.codename1.orm.session.Session s=em.openSession();
+        try {
+            s.createTables();s.validateSchema();s.beginTransaction();Object entity=type.newInstance(),code=codeType.getConstructor(String.class).newInstance("ABC");type.getField("code").set(entity,code);s.persist(entity);s.commitTransaction();
+            Object id=type.getField("id").get(entity);s.clear();Object loaded=s.query(type).eq("code",code).first();
+            org.junit.Assert.assertEquals("ABC",codeType.getField("value").get(type.getField("code").get(loaded)));
+            s.beginTransaction();codeType.getField("value").set(type.getField("code").get(loaded),"DEF");s.commitTransaction();s.clear();
+            org.junit.Assert.assertEquals("DEF",codeType.getField("value").get(type.getField("code").get(s.find(type,id))));
+            s.beginTransaction();Object duplicate=type.newInstance();type.getField("code").set(duplicate,codeType.getConstructor(String.class).newInstance("DEF"));s.persist(duplicate);
+            try { s.commitTransaction();fail("Unique index must reject duplicate domain values"); } catch(com.codename1.orm.session.PersistenceException expected) { s.rollbackTransaction(); }
+        } finally { s.close();em.close();loader.close(); }
+    }
+
+    @Test
+    public void compositeIdentifiersRoundTripThroughRelationsAndJoinTables() throws Exception {
+        File classes=tmp.newFolder("composite");
+        Map<String,String> sources=new java.util.LinkedHashMap<String,String>();
+        sources.put("composite.Key","package composite; import com.codename1.annotations.*; @Embeddable public class Key { public String tenant; public long number; }");
+        sources.put("composite.Account","package composite; import com.codename1.annotations.*; @Entity public class Account { @EmbeddedId public Key key; @Version public long version; public long counter; @OneToMany(mappedBy=\"account\",cascade=CascadeType.ALL,orphanRemoval=true) public java.util.List<Item> items=new java.util.ArrayList<Item>(); @ManyToMany(cascade=CascadeType.PERSIST) public java.util.Set<Label> labels=new java.util.LinkedHashSet<Label>(); }");
+        sources.put("composite.Item","package composite; import com.codename1.annotations.*; @Entity public class Item { @Id public long id; @ManyToOne(fetch=FetchType.LAZY) public Account account; }");
+        sources.put("composite.Label","package composite; import com.codename1.annotations.*; @Entity public class Label { @Id(autoIncrement=false) public String locale; @Id(autoIncrement=false) public long number; public String text; }");
+        sources.put("composite.Reader","package composite; public class Reader { public static Account account(Item i) { return i.account; } public static java.util.Set<Label> labels(Account a) { return a.labels; } }");
+        JavaSourceCompiler.compile(sources,classes,Arrays.asList(testClassesDir()));
+        ProcessorContext ctx=runProcessor(classes,backendClasspath());assertFalse(ctx.getErrors().toString(),ctx.hasErrors());
+        java.net.URLClassLoader loader=new java.net.URLClassLoader(new URL[]{classes.toURI().toURL()},getClass().getClassLoader());
+        loader.loadClass("cn1app.BackendDaoBootstrap").newInstance();
+        Class accountType=loader.loadClass("composite.Account"),keyType=loader.loadClass("composite.Key"),itemType=loader.loadClass("composite.Item"),labelType=loader.loadClass("composite.Label"),reader=loader.loadClass("composite.Reader");
+        com.codename1.backend.orm.EntityManager em=com.codename1.backend.orm.EntityManager.open(com.codename1.backend.Database.open(":memory:"));
+        com.codename1.orm.session.Session session=em.openSession();
+        try {
+            Object key=keyType.newInstance();keyType.getField("tenant").set(key,"tenant-a");keyType.getField("number").setLong(key,7);
+            Object account=accountType.newInstance();accountType.getField("key").set(account,key);
+            Object item=itemType.newInstance();itemType.getField("account").set(item,account);((List)accountType.getField("items").get(account)).add(item);
+            Object label=labelType.newInstance();labelType.getField("locale").set(label,"en");labelType.getField("number").setLong(label,3);labelType.getField("text").set(label,"gold");((Set)accountType.getField("labels").get(account)).add(label);
+            session.createTables();session.beginTransaction();session.persist(account);session.commitTransaction();
+            Object itemId=itemType.getField("id").get(item);session.clear();
+            Object loadedItem=session.find(itemType,itemId),loaded=reader.getMethod("account",itemType).invoke(null,loadedItem);
+            org.junit.Assert.assertSame(loaded,session.find(accountType,key));
+            org.junit.Assert.assertEquals(1,session.count(loaded,"items"));org.junit.Assert.assertEquals(1,session.count(loaded,"labels"));
+            Object loadedLabel=((Set)reader.getMethod("labels",accountType).invoke(null,loaded)).iterator().next();
+            org.junit.Assert.assertSame(loadedLabel,session.find(labelType,com.codename1.orm.session.Identifier.of("en",3)));
+            org.junit.Assert.assertEquals(1,session.query(accountType).join("labels").eq("labels.text","gold").count());
+            org.junit.Assert.assertSame(loaded,session.query(accountType).join("items").eq("items.id",itemId).first());
+            session.beginTransaction();assertTrue(session.increment(accountType,key,"counter",5));session.commitTransaction();
+            org.junit.Assert.assertEquals(5,accountType.getField("counter").getLong(loaded));
+            session.beginTransaction();session.remove(loaded);session.commitTransaction();
+            org.junit.Assert.assertNull(session.find(accountType,key));org.junit.Assert.assertEquals(0,session.query(itemType).count());
+            org.junit.Assert.assertEquals(1,session.query(labelType).count());
+        } finally { session.close();em.close();loader.close(); }
+    }
+
+    @Test
+    public void embeddedValuesAndMappedSuperclassRoundTrip() throws Exception {
+        File classes=tmp.newFolder("embedded");
+        java.util.Map<String,String> sources=new java.util.LinkedHashMap<String,String>();
+        sources.put("embedded.Base","package embedded; import com.codename1.annotations.*; @MappedSuperclass public class Base { @Id public long id; }");
+        sources.put("embedded.Address","package embedded; import com.codename1.annotations.*; @Embeddable public class Address { public String city; public int postalCode; }");
+        sources.put("embedded.Contact","package embedded; import com.codename1.annotations.*; @Entity public class Contact extends Base { @Embedded public Address address; @Version public long version; @DbTransient public int callbacks; @PrePersist public void inserting() { callbacks++; } }");
+        JavaSourceCompiler.compile(sources,classes,Arrays.asList(testClassesDir()));
+        ProcessorContext ctx=runProcessor(classes,backendClasspath());assertFalse(ctx.getErrors().toString(),ctx.hasErrors());
+        java.net.URLClassLoader loader=new java.net.URLClassLoader(new URL[]{classes.toURI().toURL()},getClass().getClassLoader());
+        loader.loadClass("cn1app.BackendDaoBootstrap").newInstance();
+        Class type=loader.loadClass("embedded.Contact"),addressType=loader.loadClass("embedded.Address");
+        com.codename1.backend.orm.EntityManager em=com.codename1.backend.orm.EntityManager.open(com.codename1.backend.Database.open(":memory:"));
+        com.codename1.orm.session.Session session=em.openSession();
+        try {
+            session.createTables();session.beginTransaction();Object entity=type.newInstance();session.persist(entity);session.commitTransaction();
+            org.junit.Assert.assertEquals(1,type.getField("callbacks").getInt(entity));
+            Object id=type.getField("id").get(entity);session.clear();entity=session.find(type,id);org.junit.Assert.assertNull(type.getField("address").get(entity));
+            session.beginTransaction();Object address=addressType.newInstance();addressType.getField("city").set(address,"Paris");addressType.getField("postalCode").setInt(address,75000);type.getField("address").set(entity,address);session.commitTransaction();
+            session.clear();Object found=session.query(type).eq("address.city","Paris").first();
+            org.junit.Assert.assertEquals(75000,addressType.getField("postalCode").getInt(type.getField("address").get(found)));
+            session.beginTransaction();type.getField("address").set(found,null);session.commitTransaction();
+            session.clear();org.junit.Assert.assertNull(type.getField("address").get(session.find(type,id)));
+        } finally { session.close();em.close();loader.close(); }
+    }
+
+    @Test
+    public void generatedRelationsLoadLazilyAndPreserveIdentity() throws Exception {
+        File classes=tmp.newFolder("managed-relations");
+        java.util.Map<String,String> sources=new java.util.LinkedHashMap<String,String>();
+        sources.put("managed.Parent","package managed; import com.codename1.annotations.*; @Entity public class Parent { @Id public long id; public String name; @OneToMany(mappedBy=\"parent\", cascade=CascadeType.ALL, orphanRemoval=true) public java.util.List<Child> children=new java.util.ArrayList<Child>(); }");
+        sources.put("managed.Base","package managed; import com.codename1.annotations.*; @MappedSuperclass public class Base { @ManyToOne(fetch=FetchType.LAZY) public Parent parent; public Parent readParent() { return parent; } }");
+        sources.put("managed.Child","package managed; import com.codename1.annotations.*; @Entity public class Child extends Base { @Id public long id; @Version public long version; public String name; }");
+        sources.put("managed.ChildCn1Mapper","package managed; public class ChildCn1Mapper { public static Parent serialize(Child c) { return c.parent; } }");
+        sources.put("managed.Reader","package managed; public class Reader { public static Parent parent(Child c) { return c.readParent(); } public static java.util.List<Child> children(Parent p) { return p.children; } }");
+        JavaSourceCompiler.compile(sources,classes,Arrays.asList(testClassesDir()));
+        ProcessorContext ctx=runProcessor(classes,backendClasspath());
+        assertFalse("generated relations: "+ctx.getErrors(),ctx.hasErrors());
+        // A second pass must not duplicate state fields or accessor methods.
+        ctx=runProcessor(classes,backendClasspath());assertFalse(ctx.hasErrors());
+        java.net.URLClassLoader loader=new java.net.URLClassLoader(new URL[]{classes.toURI().toURL()},getClass().getClassLoader());
+        loader.loadClass("cn1app.BackendDaoBootstrap").newInstance();
+        Class parentType=loader.loadClass("managed.Parent"),childType=loader.loadClass("managed.Child"),reader=loader.loadClass("managed.Reader");
+        com.codename1.backend.orm.EntityManager em=com.codename1.backend.orm.EntityManager.open(com.codename1.backend.Database.open(":memory:"));
+        com.codename1.orm.session.Session session=em.openSession();
+        try {
+            session.createTables();session.beginTransaction();
+            Object parent=parentType.newInstance(),child=childType.newInstance();
+            parentType.getField("name").set(parent,"parent");childType.getField("name").set(child,"child");
+            childType.getField("parent").set(child,parent);
+            ((java.util.List)parentType.getField("children").get(parent)).add(child);
+            session.persist(parent);session.commitTransaction();
+            Object parentId=parentType.getField("id").get(parent),childId=childType.getField("id").get(child);
+            session.clear();
+            Object loadedChild=session.find(childType,childId);
+            assertFalse(session.isLoaded(loadedChild,"parent"));
+            try { loader.loadClass("managed.ChildCn1Mapper").getMethod("serialize",childType).invoke(null,loadedChild);fail("Serialization must not initialize an association"); }
+            catch(java.lang.reflect.InvocationTargetException expected) { assertTrue(expected.getCause() instanceof com.codename1.orm.session.LazyInitializationException); }
+            assertFalse(session.isLoaded(loadedChild,"parent"));
+            Object loadedParent=reader.getMethod("parent",childType).invoke(null,loadedChild);
+            assertTrue(session.isLoaded(loadedChild,"parent"));
+            org.junit.Assert.assertSame(loadedParent,session.find(parentType,parentId));
+            assertFalse(session.isLoaded(loadedParent,"children"));
+            java.util.List children=(java.util.List)reader.getMethod("children",parentType).invoke(null,loadedParent);
+            org.junit.Assert.assertEquals(1,children.size());org.junit.Assert.assertSame(loadedChild,children.get(0));
+            session.beginTransaction();children.clear();session.commitTransaction();
+            org.junit.Assert.assertEquals(0,session.query(childType).count());
+            session.clear();Object detached=session.find(parentType,parentId);session.close();
+            try { reader.getMethod("children",parentType).invoke(null,detached);fail("Detached lazy read must fail"); }
+            catch(java.lang.reflect.InvocationTargetException expected) {
+                assertTrue(expected.getCause() instanceof com.codename1.orm.session.LazyInitializationException);
+            }
+        } finally { session.close();em.close();loader.close(); }
+    }
 
     @Test
     public void generatesDaoWithExpectedShape() throws Exception {

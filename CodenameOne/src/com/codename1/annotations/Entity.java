@@ -57,4 +57,5 @@ import java.lang.annotation.Target;
 public @interface Entity {
     /// SQL table name. Defaults to the simple class name when blank.
     String table() default "";
+    Index[] indexes() default {};
 }

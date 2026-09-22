@@ -71,6 +71,12 @@ public final class PropertyTypeKind {
         return new PropertyTypeKind(Kind.ENUM, binaryName, null);
     }
 
+    public static PropertyTypeKind scalar(String binary) {
+        String[] types={"java.lang.String","java.lang.Integer","java.lang.Long","java.lang.Short","java.lang.Byte","java.lang.Character","java.lang.Double","java.lang.Float","java.lang.Boolean","java.util.Date","byte[]"};
+        Kind[] kinds={Kind.STRING,Kind.INT,Kind.LONG,Kind.SHORT,Kind.BYTE,Kind.CHAR,Kind.DOUBLE,Kind.FLOAT,Kind.BOOLEAN,Kind.DATE,Kind.BYTE_ARRAY};
+        for(int i=0;i<types.length;i++) if(types[i].equals(binary)) return new PropertyTypeKind(kinds[i],binary,null);
+        return new PropertyTypeKind(Kind.UNSUPPORTED,binary,null);
+    }
     public static PropertyTypeKind of(FieldInfo field) {
         String desc = field.getDescriptor();
         if (desc == null || desc.length() == 0) {
@@ -137,8 +143,8 @@ public final class PropertyTypeKind {
                     || "com.codename1.properties.ByteProperty".equals(binary)
                     || "com.codename1.properties.CharProperty".equals(binary)) {
                 String elem = firstGenericArg(field.getSignature());
-                if (elem == null) {
-                    // Pre-erasure-only inference for typed subclasses:
+                if (!"com.codename1.properties.Property".equals(binary) || elem == null) {
+                    // Typed subclasses carry the owner, not the value, as their generic argument:
                     if ("com.codename1.properties.StringProperty".equals(binary)) elem = "java.lang.String";
                     else if ("com.codename1.properties.IntProperty".equals(binary)) elem = "java.lang.Integer";
                     else if ("com.codename1.properties.LongProperty".equals(binary)) elem = "java.lang.Long";

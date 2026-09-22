@@ -1,0 +1,88 @@
+/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.backend.orm;
+
+import com.codename1.backend.Database;
+import com.codename1.orm.session.*;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Assumptions;
+import java.util.concurrent.*;
+import static org.junit.jupiter.api.Assertions.*;
+
+/** Opt-in wire-protocol tests; creates and removes only a uniquely named test schema. */
+class ManagedSessionDatabaseTest {
+    @Test void realDatabaseSupportsSequencesTransactionsCountersAndRowLocks() throws Exception {
+        String url=System.getenv("CN1_ORM_TEST_DATABASE_URL");
+        Assumptions.assumeTrue(url!=null && url.length()>0,"Set CN1_ORM_TEST_DATABASE_URL to an isolated PostgreSQL/MySQL/MariaDB database");
+        Database db=Database.open(url);
+        boolean mysql="mysql".equals(db.dialect().getName());
+        String schema="cn1_orm_test_"+Long.toHexString(System.nanoTime());
+        String quoted=db.dialect().quote(schema);
+        String selectSchema=(mysql?"USE ":"SET search_path TO ")+quoted;
+        db.execute((mysql?"CREATE DATABASE ":"CREATE SCHEMA ")+quoted,new Object[0]);
+        db.execute(selectSchema,new Object[0]);
+        Models.register(new ManagedSessionTest.Model() {
+            public int generation() { return 2; }
+            public String generator() { return "record_sequence"; }
+            public Attribute[] attributes() {
+                Attribute[] attrs=super.attributes().clone();
+                attrs[0]=new Attribute("id","id",Attribute.BIGINT,true,false,false,false);return attrs;
+            }
+        });
+        EntityManager manager=EntityManager.open(db);Session session=manager.openSession();
+        ExecutorService workers=Executors.newFixedThreadPool(2);
+        try {
+            session.createTables();session.validateSchema();session.beginTransaction();
+            ManagedSessionTest.Record entity=new ManagedSessionTest.Record();entity.name="record";entity.bytes=new byte[]{1,2};session.persist(entity);
+            assertTrue(entity.id>0);session.commitTransaction();session.clear();
+            assertArrayEquals(new byte[]{1,2},session.find(ManagedSessionTest.Record.class,entity.id).bytes);
+            session.beginTransaction();session.lock(session.find(ManagedSessionTest.Record.class,entity.id),LockMode.PESSIMISTIC_WRITE);
+            CountDownLatch attempting=new CountDownLatch(1);
+            Future<Long> waiting=workers.submit(()-> {
+                Database other=Database.open(url);other.execute(selectSchema,new Object[0]);EntityManager em=EntityManager.open(other);Session s=em.openSession();
+                try {
+                    s.beginTransaction();attempting.countDown();
+                    ManagedSessionTest.Record locked=s.find(ManagedSessionTest.Record.class,entity.id,LockMode.PESSIMISTIC_WRITE);
+                    locked.counter++;s.commitTransaction();return locked.counter;
+                } finally { s.close();em.close(); }
+            });
+            assertTrue(attempting.await(5,TimeUnit.SECONDS));
+            assertThrows(TimeoutException.class,()->waiting.get(100,TimeUnit.MILLISECONDS));
+            session.commitTransaction();assertEquals(1L,waiting.get(5,TimeUnit.SECONDS).longValue());
+            Callable<Void> increment=()-> {
+                Database other=Database.open(url);other.execute(selectSchema,new Object[0]);EntityManager em=EntityManager.open(other);Session s=em.openSession();
+                try { for(int i=0;i<5;i++) { s.beginTransaction();assertTrue(s.increment(ManagedSessionTest.Record.class,entity.id,"counter",1));s.commitTransaction(); }return null; }
+                finally { s.close();em.close(); }
+            };
+            Future<Void> first=workers.submit(increment),second=workers.submit(increment);first.get(10,TimeUnit.SECONDS);second.get(10,TimeUnit.SECONDS);
+            session.clear();assertEquals(11,session.find(ManagedSessionTest.Record.class,entity.id).counter);
+            assertEquals(11,session.find(ManagedSessionTest.Record.class,entity.id).version);
+            session.beginTransaction();assertEquals(1,session.createQuery("update Record r set r.name=:name where r.id=:id").setParameter("name","updated").setParameter("id",entity.id).executeUpdate());session.commitTransaction();
+            assertEquals("updated",session.find(ManagedSessionTest.Record.class,entity.id).name);
+        } finally {
+            workers.shutdownNow();workers.awaitTermination(5,TimeUnit.SECONDS);
+            try { session.close();db.execute((mysql?"DROP DATABASE ":"DROP SCHEMA ")+quoted+(mysql?"":" CASCADE"),new Object[0]); }
+            finally { manager.close(); }
+        }
+    }
+}

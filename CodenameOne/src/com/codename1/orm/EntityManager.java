@@ -60,6 +60,8 @@ public final class EntityManager {
 
     private static final Map<String, Dao<?>> BY_NAME = new HashMap<String, Dao<?>>();
 
+    private static final Map<String, DaoFactory<?>> FACTORIES = new HashMap<String, DaoFactory<?>>();
+    private final Map<String, Dao<?>> daos = new HashMap<String, Dao<?>>();
     private final Database db;
     private boolean closed;
 
@@ -97,7 +99,19 @@ public final class EntityManager {
         if (dao == null) {
             throw new IllegalArgumentException("dao is null");
         }
-        BY_NAME.put(dao.type().getName(), dao);
+        synchronized (BY_NAME) {
+            FACTORIES.remove(dao.type().getName());
+            BY_NAME.put(dao.type().getName(), dao);
+        }
+    }
+
+    /// Registers a factory for generated DAOs. Each manager gets its own instance.
+    public static <T> void registerDaoFactory(Class<T> type, DaoFactory<T> factory) {
+        if (type == null || factory == null) throw new IllegalArgumentException("type/factory is null");
+        synchronized (BY_NAME) {
+            BY_NAME.remove(type.getName());
+            FACTORIES.put(type.getName(), factory);
+        }
     }
 
     /// Returns the dao for `entityClass`, freshly attached to this
@@ -109,7 +123,15 @@ public final class EntityManager {
         if (entityClass == null) {
             throw new IllegalArgumentException("entityClass is null");
         }
-        Dao<T> d = (Dao<T>) BY_NAME.get(entityClass.getName());
+        if (com.codename1.orm.session.Models.requiresSession(entityClass))
+            throw new IllegalStateException("Relationships and @Version require openSession() managed persistence");
+        if (closed) throw new IllegalStateException("Entity manager is closed");
+        Dao<T> d = (Dao<T>) daos.get(entityClass.getName());
+        if (d != null) return d;
+        synchronized (BY_NAME) {
+            DaoFactory<T> factory = (DaoFactory<T>) FACTORIES.get(entityClass.getName());
+            d = factory == null ? (Dao<T>) BY_NAME.get(entityClass.getName()) : factory.create();
+        }
         if (d == null) {
             throw new IllegalStateException("No dao registered for "
                     + entityClass.getName() + ". Add @Entity and ensure the "
@@ -117,7 +139,14 @@ public final class EntityManager {
                     + "the generated DaoBootstrap populates this registry at startup.");
         }
         d.attach(db);
+        daos.put(entityClass.getName(), d);
         return d;
+    }
+
+    /// Opens an independent managed persistence context over this manager's database.
+    public com.codename1.orm.session.Session openSession() {
+        if (closed) throw new IllegalStateException("Entity manager is closed");
+        return new com.codename1.orm.session.Session(new SessionSqlAccess(db));
     }
 
     /// The underlying `Database`. Use it for raw SQL when the dao surface

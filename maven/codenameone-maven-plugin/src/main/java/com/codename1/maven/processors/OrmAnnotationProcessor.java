@@ -115,6 +115,13 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
     /// concludes "not a backend module" for the one build that most certainly
     /// is one.
     private Boolean forcedFlavour;
+    private Set<String> dependencyOverlays = Collections.emptySet();
+
+    /** Runs after every processor has written its classes, including generated callers. */
+    public void enhance(ProcessorContext ctx) throws ProcessingException {
+        try { OrmEnhancer.enhance(accepted,ctx); }
+        catch(IOException error) { throw new ProcessingException("ORM enhancement failed: "+error.getMessage(),error); }
+    }
 
     @Override
     public Set<String> getAnnotationDescriptors() {
@@ -124,6 +131,8 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
     @Override
     public void start(ProcessorContext ctx) throws ProcessingException {
         accepted.clear();
+        try { dependencyOverlays=OrmEnhancer.prepare(ctx); }
+        catch(IOException error) { throw new ProcessingException("Could not refresh enhanced dependencies",error); }
         if (forcedFlavour != null) {
             backend = forcedFlavour.booleanValue();
             return;
@@ -264,6 +273,7 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
     private void processClass(AnnotatedClass cls, ProcessorContext ctx, boolean fromThisModule)
             throws ProcessingException {
         if (cls.isSynthetic()) return;
+        if (fromThisModule && dependencyOverlays.contains(cls.getBinaryName())) return;
         AnnotationValues entityAnn = cls.getClassAnnotation(ENTITY_DESC);
         if (entityAnn == null) return;
         // A DELETED ENTITY LEAVES ITS CLASS FILE BEHIND. Maven does not clean
@@ -287,7 +297,7 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
                 cls, ctx.getCompileSourceRoots(), ctx.getSourceEncoding())) {
             return;
         }
-        if (cls.isAbstract() || cls.isInterface()) {
+        if (cls.isInterface()) {
             ctx.error(cls, "@Entity requires a concrete class; " + cls.getBinaryName()
                     + " is abstract or an interface");
             return;
@@ -321,20 +331,22 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
                     + "its own.");
             return;
         }
-        if (!hasPublicNoArgConstructor(cls)) {
+        if (!cls.isAbstract() && !hasPublicNoArgConstructor(cls)) {
             ctx.error(cls, "@Entity class " + cls.getBinaryName()
                     + " must declare a public no-arg constructor");
             return;
         }
 
         EntityClass ec = new EntityClass();
-        ec.binaryName = cls.getBinaryName();
+        ec.binaryName = cls.getBinaryName();ec.abstractClass=cls.isAbstract();ec.parent=cls.getSuperInternalName();
         ec.simpleName = simpleName(cls.getBinaryName());
         ec.packageName = packageOf(cls.getBinaryName());
         ec.daoSimpleName = ec.simpleName + (backend ? BACKEND_DAO_SUFFIX : "Cn1Dao");
         ec.daoBinaryName = (ec.packageName.length() == 0)
                 ? ec.daoSimpleName
                 : ec.packageName + "." + ec.daoSimpleName;
+        Object indexes=entityAnn.get("indexes");
+        if(indexes instanceof List) for(Object index:(List)indexes) ec.indexes.add((AnnotationValues)index);
         String table = entityAnn.getString("table");
         ec.tableName = (table == null || table.length() == 0) ? ec.simpleName : table;
         if (backend && tooLongForAnEngine(ec.tableName)) {
@@ -346,14 +358,53 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
             return;
         }
 
-        for (FieldInfo f : cls.getFields()) {
+        String[] events={"PrePersist","PostPersist","PreUpdate","PostUpdate","PreRemove","PostRemove","PostLoad"};
+        for (MethodInfo method : persistentMethods(cls,ctx)) for (int event=0;event<events.length;event++) {
+            if (method.getAnnotations().containsKey("Lcom/codename1/annotations/"+events[event]+";")) {
+                if (!method.isPublic() || !"()V".equals(method.getDescriptor()) || method.isStatic()) {
+                    ctx.error(cls,"Lifecycle callback must be a public non-static void method with no parameters: "+method.getName());
+                } else ec.callbacks[event]=ec.callbacks[event]==null?method.getName():ec.callbacks[event]+"(); e."+method.getName();
+            }
+        }
+
+        for (FieldPath fieldPath : persistentFields(cls,ec,ctx,"",new LinkedHashSet<String>())) {
+            FieldInfo f=fieldPath.field;
             if (f.isStatic()) continue;
             if (f.getName().startsWith("this$")) continue;
             if (f.getAnnotation(DB_TRANSIENT_DESC) != null) continue;
-            if (!f.isPublic()) continue; // accessor-style entities are v2
+            if (!f.isPublic()) {
+                for(String annotation:f.getAnnotations().keySet()) {
+                    if(annotation.equals(ID_DESC) || annotation.equals(COLUMN_DESC) || annotation.equals("Lcom/codename1/annotations/Version;")
+                        || annotation.equals("Lcom/codename1/annotations/OneToOne;") || annotation.equals("Lcom/codename1/annotations/OneToMany;")
+                        || annotation.equals("Lcom/codename1/annotations/ManyToOne;") || annotation.equals("Lcom/codename1/annotations/ManyToMany;")
+                        || annotation.matches("Lcom/codename1/annotations/(ElementCollection|Convert|GeneratedValue|JoinColumn|JoinTable|MapKey|MapKeyColumn|OrderBy|OrderColumn);"))
+                        ctx.error(cls,"Persistent annotated fields currently require public access: "+f.getName());
+                }
+                continue;
+            }
+            RelationField relationship = relation(f, ec, ctx);
+            if (relationship != null) {
+                if(fieldPath.prefix.length()>0) { ctx.error(cls,"Relationships inside embeddables are not supported: "+fieldPath.path);continue; }
+                relationship.declaringType=fieldPath.declaringType;relationship.index=ec.relations.size(); ec.relations.add(relationship); continue; }
             PersistedField pf = new PersistedField();
-            pf.fieldName = f.getName();
+            pf.fieldName = fieldPath.path;pf.declaringType=fieldPath.declaringType;
+            pf.embeddedParent = fieldPath.prefix;
+            pf.version = f.getAnnotation("Lcom/codename1/annotations/Version;") != null;
             pf.kind = PropertyTypeKind.of(f);
+            if(f.isFinal() && pf.kind.kind!=PropertyTypeKind.Kind.PROPERTY) ctx.error(cls,"Persistent fields must be writable: "+pf.fieldName);
+            AnnotationValues conversion=f.getAnnotation("Lcom/codename1/annotations/Convert;");
+            if(conversion!=null) {
+                Object converter=conversion.get("converter"),storage=conversion.get("storageType");
+                if(!(converter instanceof org.objectweb.asm.Type)) { ctx.error(cls,"Missing converter for "+pf.fieldName);continue; }
+                pf.converter=((org.objectweb.asm.Type)converter).getClassName();pf.domainType=org.objectweb.asm.Type.getType(f.getDescriptor()).getClassName();
+                pf.kind=PropertyTypeKind.scalar(storage instanceof org.objectweb.asm.Type?((org.objectweb.asm.Type)storage).getClassName():"java.lang.String");
+                AnnotatedClass converterClass=findType(pf.converter,ctx);
+                if(converterClass==null || !hasPublicNoArgConstructor(converterClass)) ctx.error(cls,"Converter requires a public no-arg constructor: "+pf.converter);
+                if(f.getAnnotation(ID_DESC)!=null || pf.version) ctx.error(cls,"Identifier and version fields cannot declare converters");
+            }
+            AnnotatedClass enumClass = pf.kind.kind == PropertyTypeKind.Kind.REFERENCE ? findType(pf.kind.binaryName,ctx) : null;
+            if (pf.kind.kind == PropertyTypeKind.Kind.REFERENCE && enumClass != null && enumClass.isEnum())
+                pf.kind = PropertyTypeKind.enumType(pf.kind.binaryName);
             if (pf.kind.kind == PropertyTypeKind.Kind.REFERENCE
                     || pf.kind.kind == PropertyTypeKind.Kind.LIST
                     || pf.kind.kind == PropertyTypeKind.Kind.LIST_PROPERTY) {
@@ -378,6 +429,7 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
                 continue;
             }
             AnnotationValues col = f.getAnnotation(COLUMN_DESC);
+            pf.unique=col!=null && col.getBoolOrDefault("unique",false);
             String colName = null;
             String colType = null;
             boolean nullable = true;
@@ -386,7 +438,7 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
                 colType = col.getString("type");
                 nullable = col.getBoolOrDefault("nullable", true);
             }
-            pf.columnName = (colName == null || colName.length() == 0) ? pf.fieldName : colName;
+            pf.columnName = (colName == null || colName.length() == 0) ? pf.fieldName.replace('.', '_') : fieldPath.prefix.replace('.', '_')+colName;
             pf.sqlType = (colType == null || colType.length() == 0) ? defaultSqlType(pf.kind) : colType;
             // The EXPLICIT type, separately: the client flavour needs a type for
             // every column and defaults it to SQLite's, while the backend one
@@ -398,6 +450,16 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
 
             pf.dialectKind = dialectKind(pf.kind);
             pf.boxed = isBoxed(pf.kind);
+            if (pf.version) {
+                if (pf.kind.kind != PropertyTypeKind.Kind.INT && pf.kind.kind != PropertyTypeKind.Kind.LONG) {
+                    ctx.error(cls, "@Version requires an int or long field: " + pf.fieldName);
+                }
+                if (f.getAnnotation(ID_DESC) != null) ctx.error(cls, "@Version cannot also be @Id: " + pf.fieldName);
+                for (PersistedField previous : ec.fields) {
+                    if (previous.version) ctx.error(cls, "An entity can have only one @Version field");
+                }
+                pf.nullable = false;
+            }
             if (backend && isJavaPrimitive(pf)) {
                 // A PRIMITIVE CANNOT HOLD NULL, so the column it is stored in
                 // must not allow one: a nullable column read into an int gave
@@ -458,10 +520,23 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
                 continue;
             }
 
+            if(fieldPath.prefix.length()>0 && (col==null || col.getBoolOrDefault("nullable",true))) pf.nullable=true;
             AnnotationValues idAnn = f.getAnnotation(ID_DESC);
-            if (idAnn != null) {
+            if (idAnn != null || (ec.embeddedId!=null && pf.fieldName.startsWith(ec.embeddedId+"."))) {
                 pf.isId = true;
-                pf.autoIncrement = idAnn.getBoolOrDefault("autoIncrement", true);
+                pf.autoIncrement = idAnn!=null && idAnn.getBoolOrDefault("autoIncrement", true);
+                AnnotationValues generator=f.getAnnotation("Lcom/codename1/annotations/GeneratedValue;");
+                if(generator!=null) {
+                    Object strategy=generator.get("strategy");
+                    String name=strategy instanceof String[]?((String[])strategy)[1]:"IDENTITY";
+                    ec.generation="UUID".equals(name)?1:"SEQUENCE".equals(name)?2:"TABLE".equals(name)?3:0;
+                    ec.generator=generator.getStringOrDefault("generator","");
+                    if(ec.generator.length()==0) ec.generator=ec.tableName+"_"+pf.columnName;
+                    pf.autoIncrement=ec.generation==0;
+                    if(ec.generation==1 && pf.kind.kind!=PropertyTypeKind.Kind.STRING) ctx.error(cls,"UUID generation requires a String identifier");
+                    if(ec.generation>1 && pf.kind.kind!=PropertyTypeKind.Kind.INT && pf.kind.kind!=PropertyTypeKind.Kind.LONG)
+                        ctx.error(cls,"Sequence/table generation requires an int or long identifier");
+                }
                 if (backend && pf.autoIncrement && !isGeneratableKey(pf.kind)) {
                     // A DATABASE COUNTS. Every other type fails somewhere the
                     // build cannot see: a String key is refused by SQLite, whose
@@ -508,20 +583,18 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
                             + " is a byte[], which MySQL cannot make a primary key without "
                             + "a prefix length. Use a String or an integer key.");
                 }
-                if (ec.idField != null) {
-                    ctx.error(cls, "@Entity " + ec.binaryName
-                            + " has more than one @Id field");
-                    continue;
-                }
-                ec.idField = pf;
+                if(ec.idField==null) ec.idField=pf;
+                ec.idFields.add(pf);pf.nullable=false;
             }
             ec.fields.add(pf);
         }
 
         if (ec.idField == null) {
-            ctx.error(cls, "@Entity " + ec.binaryName + " requires exactly one @Id field");
+            ctx.error(cls, "@Entity " + ec.binaryName + " requires at least one @Id field");
             return;
         }
+        if(ec.idFields.size()>1) for(PersistedField field:ec.idFields)
+            if(field.autoIncrement || ec.generation!=0) ctx.error(cls,"Composite identifiers must be assigned; use @Id(autoIncrement=false)");
         // TWO FIELDS, ONE COLUMN. Every statement then names the column twice:
         // the CREATE TABLE is refused for a duplicate column, and against a
         // schema somebody else created -- where the ORM creates nothing -- a read
@@ -550,13 +623,54 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
 
     @Override
     public void finish(ProcessorContext ctx) throws ProcessingException {
-        if (backend) {
+        {
             // BEFORE the emptiness check, because the entities need not be in
             // this module at all. An entity is the one class both halves of an
             // application own, so the natural place for it is a module the app
             // and the server both depend on -- and then the backend module's own
             // compiled classes hold none of them.
             scanClasspathEntities(ctx);
+        }
+        resolveRelations(ctx);
+        resolveHierarchies(ctx);
+        for(EntityClass entity:accepted.values()) {
+            Set<String> fields=new LinkedHashSet<String>(),columns=new LinkedHashSet<String>(),indexNames=new LinkedHashSet<String>();
+            for(PersistedField field:entity.fields) {
+                fields.add(field.fieldName);
+                if(!columns.add(field.columnName.toLowerCase(java.util.Locale.ROOT))) ctx.error("Duplicate column on "+entity.binaryName+": "+field.columnName);
+            }
+            for(AnnotationValues index:entity.indexes) {
+                String name=index.getStringOrDefault("name","");
+                if(name.length()==0 || tooLongForAnEngine(name) || !indexNames.add(name)) ctx.error("Invalid or duplicate index name: "+name);
+                Object indexed=index.get("fields");
+                if(!(indexed instanceof List) || ((List)indexed).isEmpty()) ctx.error("Index needs mapped fields: "+name);
+                else for(Object field:(List)indexed) if(!fields.contains(field)) ctx.error("Unknown index field: "+field);
+            }
+        }
+        Map<String,String> schemaTables=new LinkedHashMap<String,String>(),schemaIndexes=new LinkedHashMap<String,String>();
+        boolean tableGenerators=false;
+        for(EntityClass entity:accepted.values()) {
+            String owner=entity.hierarchyRoot==null?entity.binaryName:entity.hierarchyRoot;
+            claimSchemaName(schemaTables,entity.tableName,owner,ctx);
+            tableGenerators|=entity.generation>1;
+            for(PersistedField field:entity.fields) if(backend && tooLongForAnEngine(field.columnName)) ctx.error("Column name exceeds the portable limit: "+field.columnName);
+            for(AnnotationValues index:entity.indexes) claimSchemaName(schemaIndexes,index.getStringOrDefault("name",""),owner,ctx);
+        }
+        if(tableGenerators && schemaTables.containsKey("cn1_orm_sequences")) ctx.error("cn1_orm_sequences is reserved for identifier generation");
+        for(EntityClass entity:accepted.values()) for(RelationField relation:entity.relations) if(relation.many && relation.mappedBy.length()==0) {
+            String owner=(entity.hierarchyRoot==null?entity.binaryName:entity.hierarchyRoot)+"."+relation.field;
+            claimSchemaName(schemaTables,relation.table,owner,ctx);
+            Set<String> columns=new LinkedHashSet<String>();
+            List<String> physical=new ArrayList<String>();
+            for(PersistedField key:entity.idFields) physical.add(relation.ownerColumn+(entity.idFields.size()==1?"":"_"+key.columnName));
+            if(relation.element) {
+                physical.add(relation.targetColumn);physical.add(relation.orderColumn);if(relation.mapKey.length()>0) physical.add(relation.mapKey);
+            } else {
+                EntityClass target=accepted.get(relation.target);
+                if(target!=null) for(PersistedField key:target.idFields) physical.add(relation.targetColumn+(target.idFields.size()==1?"":"_"+key.columnName));
+                if(relation.orderColumn.length()>0) physical.add(relation.orderColumn);
+            }
+            for(String column:physical) if(column.length()==0 || !columns.add(column.toLowerCase(java.util.Locale.ROOT)) || backend && tooLongForAnEngine(column)) ctx.error("Invalid or duplicate collection column: "+owner+"."+column);
         }
         if (ctx.hasErrors()) return;
         if (accepted.isEmpty()) {
@@ -571,7 +685,8 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
                 continue;
             }
             sources.put(ec.daoBinaryName,
-                    backend ? generateBackendDaoSource(ec) : generateDaoSource(ec));
+                    ec.hierarchyRoot!=null?generateHierarchyRegistration(ec,backend):backend ? generateBackendDaoSource(ec) : generateDaoSource(ec));
+            sources.put(ec.binaryName + (backend ? "Cn1BackendModel" : "Cn1Model"), generateModelSource(ec, backend));
         }
         if (ctx.hasErrors()) return;
         // THE BOOTSTRAP IS NOT CHECKED, and the difference from the daos above
@@ -601,6 +716,7 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
                 cp.add(new java.io.File(element));
             }
             JavaSourceCompiler.compile(sources, ctx.getOutputClassDir(), cp);
+            OrmEnhancer.enhance(accepted, ctx);
         } catch (IOException ioe) {
             throw new ProcessingException("Could not compile generated dao sources: "
                     + ioe.getMessage(), ioe);
@@ -613,6 +729,471 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
     // ---------------------------------------------------------------
     // Source generation
     // ---------------------------------------------------------------
+
+    private AnnotatedClass findType(String binary,ProcessorContext ctx) {
+        String internal=binary.replace('.','/');AnnotatedClass found=ctx.lookup(internal);
+        if(found!=null && !dependencyOverlays.contains(binary)) return found;
+        for(String path:ctx.getCompileClasspath()) {
+            File file=new File(path);
+            try {
+                if(file.isDirectory()) {
+                    File type=new File(file,internal+".class");
+                    if(type.isFile()) {
+                        InputStream in=new java.io.FileInputStream(type);
+                        try { return ClassScanner.readClass(in,type); } finally { in.close(); }
+                    }
+                } else if(file.isFile()) {
+                    ZipFile zip=new ZipFile(file);
+                    try { ZipEntry entry=zip.getEntry(internal+".class");if(entry!=null) return readEntry(zip,entry,file,ctx); }
+                    finally { zip.close(); }
+                }
+            } catch(IOException error) { ctx.error("Cannot inspect "+binary+": "+error.getMessage()); }
+            catch(ProcessingException error) { ctx.error("Cannot inspect "+binary+": "+error.getMessage()); }
+        }
+        return null;
+    }
+
+    private void claimSchemaName(Map<String,String> names,String name,String owner,ProcessorContext ctx) {
+        if(name.length()==0 || backend && tooLongForAnEngine(name)) { ctx.error("Invalid schema name: "+name);return; }
+        String previous=names.put(name.toLowerCase(java.util.Locale.ROOT),owner);
+        if(previous!=null && !previous.equals(owner)) ctx.error("Schema name '"+name+"' is shared by "+previous+" and "+owner);
+    }
+
+    private List<MethodInfo> persistentMethods(AnnotatedClass cls,ProcessorContext ctx) {
+        List<MethodInfo> result=new ArrayList<MethodInfo>();
+        String parent=cls.getSuperInternalName();
+        if(parent!=null && !"java/lang/Object".equals(parent)) {
+            AnnotatedClass base=findType(parent.replace('/','.'),ctx);
+            if(base!=null && (base.getClassAnnotation("Lcom/codename1/annotations/MappedSuperclass;")!=null || base.getClassAnnotation(ENTITY_DESC)!=null))
+                result.addAll(persistentMethods(base,ctx));
+        }
+        Set<String> events=new LinkedHashSet<String>();
+        for(MethodInfo method:cls.getMethods()) {
+            for(int i=result.size()-1;i>=0;i--) if(result.get(i).getName().equals(method.getName()) && result.get(i).getDescriptor().equals(method.getDescriptor())) result.remove(i);
+            for(String annotation:method.getAnnotations().keySet()) {
+                if(annotation.matches("Lcom/codename1/annotations/(PrePersist|PostPersist|PreUpdate|PostUpdate|PreRemove|PostRemove|PostLoad);"))
+                    if(!events.add(annotation)) ctx.error(cls,"Duplicate lifecycle callback: "+annotation);
+            }
+            result.add(method);
+        }
+        return result;
+    }
+
+    private List<FieldPath> persistentFields(AnnotatedClass cls,EntityClass entity,ProcessorContext ctx,
+                                             String prefix,Set<String> visiting) {
+        List<FieldPath> result=new ArrayList<FieldPath>();
+        if(!visiting.add(cls.getBinaryName())) { ctx.error("Recursive embedded value: "+cls.getBinaryName());return result; }
+        String parent=cls.getSuperInternalName();
+        if(parent!=null && !"java/lang/Object".equals(parent)) {
+            AnnotatedClass base=findType(parent.replace('/','.'),ctx);
+            if(base!=null && (base.getClassAnnotation("Lcom/codename1/annotations/MappedSuperclass;")!=null || base.getClassAnnotation(ENTITY_DESC)!=null))
+                result.addAll(persistentFields(base,entity,ctx,prefix,visiting));
+        }
+        for(FieldInfo field:cls.getFields()) {
+            if(field.isStatic() || field.getAnnotation(DB_TRANSIENT_DESC)!=null) continue;
+            String path=prefix+field.getName();
+            if(field.getAnnotation("Lcom/codename1/annotations/Embedded;")!=null || field.getAnnotation("Lcom/codename1/annotations/EmbeddedId;")!=null) {
+                if(field.getAnnotation("Lcom/codename1/annotations/EmbeddedId;")!=null) {
+                    if(entity.embeddedId!=null) ctx.error("Multiple embedded identifiers");
+                    entity.embeddedId=path;
+                }
+                if(!field.isPublic() || field.isFinal()) { ctx.error("Embedded field must be public and writable: "+path);continue; }
+                String type=org.objectweb.asm.Type.getType(field.getDescriptor()).getClassName();
+                AnnotatedClass embedded=findType(type,ctx);
+                if(embedded==null || embedded.getClassAnnotation("Lcom/codename1/annotations/Embeddable;")==null
+                        || !hasPublicNoArgConstructor(embedded)) { ctx.error("Embedded value requires @Embeddable and a public no-arg constructor: "+path);continue; }
+                entity.embedded.put(path,type);
+                for(FieldPath nested:persistentFields(embedded,entity,ctx,path+".",visiting)) result.add(new FieldPath(nested.field,nested.path,nested.prefix,cls.getBinaryName()));
+            } else result.add(new FieldPath(field,path,prefix,cls.getBinaryName()));
+        }
+        visiting.remove(cls.getBinaryName());return result;
+    }
+
+    private RelationField relation(FieldInfo field, EntityClass owner, ProcessorContext ctx) {
+        String prefix="Lcom/codename1/annotations/";
+        AnnotationValues annotation=null; String kind=null;
+        for(String candidate:new String[]{"ManyToOne","OneToOne","OneToMany","ManyToMany","ElementCollection"}) {
+            AnnotationValues value=field.getAnnotation(prefix+candidate+";");
+            if(value!=null) {
+                if(annotation!=null) ctx.error("Multiple relationship annotations on "+owner.binaryName+"."+field.getName());
+                annotation=value;kind=candidate;
+            }
+        }
+        if(annotation==null) return null;
+        if(field.isFinal()) ctx.error("Relationship fields must be writable: "+owner.binaryName+"."+field.getName());
+        RelationField relation=new RelationField(); relation.field=field.getName();relation.descriptor=field.getDescriptor();
+        relation.element="ElementCollection".equals(kind);relation.many=relation.element || kind.endsWith("ToMany");relation.unique="OneToOne".equals(kind) || "OneToMany".equals(kind);relation.kind=kind;
+        relation.mappedBy=annotation.getStringOrDefault("mappedBy","");
+        AnnotationValues mapKey=field.getAnnotation(prefix+"MapKey;"),orderColumn=field.getAnnotation(prefix+"OrderColumn;"),orderBy=field.getAnnotation(prefix+"OrderBy;");
+        relation.mapKey=mapKey==null?"":mapKey.getStringOrDefault("name","");
+        relation.orderColumn=orderColumn==null?"":orderColumn.getStringOrDefault("name","list_position");
+        if(orderColumn!=null && relation.orderColumn.length()==0) relation.orderColumn="list_position";
+        relation.orderBy=orderBy==null?"":orderBy.getStringOrDefault("value","");
+        boolean map="Ljava/util/Map;".equals(field.getDescriptor());
+        if(relation.element) {
+            AnnotationValues keyColumn=field.getAnnotation(prefix+"MapKeyColumn;");
+            if(map) { relation.mapKey=keyColumn==null?"map_key":keyColumn.getStringOrDefault("name","map_key");if(relation.mapKey.length()==0) relation.mapKey="map_key"; }
+            if(relation.orderColumn.length()==0) relation.orderColumn="element_position";
+            if(relation.orderBy.length()>0 || mapKey!=null) ctx.error("Scalar elements use OrderColumn/MapKeyColumn: "+relation.field);
+        }
+        if(map && relation.mapKey.length()==0) ctx.error("Map relationships require @MapKey(name=...): "+relation.field);
+        if(!map && mapKey!=null) ctx.error("MapKey requires a Map field: "+relation.field);
+        if(orderColumn!=null && (!"Ljava/util/List;".equals(field.getDescriptor()) || relation.mappedBy.length()>0)) ctx.error("OrderColumn requires an owning List with a join table: "+relation.field);
+        if(orderColumn!=null && orderBy!=null) ctx.error("Choose OrderBy or OrderColumn: "+relation.field);
+        if(!relation.many && (mapKey!=null || orderColumn!=null || orderBy!=null)) ctx.error("Collection metadata requires a to-many relationship");
+        relation.orphan=annotation.getBoolOrDefault("orphanRemoval",false);
+        if(("ManyToMany".equals(kind) || "ManyToOne".equals(kind)) && relation.orphan)
+            ctx.error("orphanRemoval requires OneToOne or OneToMany: "+owner.binaryName+"."+relation.field);
+        if("ManyToOne".equals(kind) && relation.mappedBy.length()>0) ctx.error("ManyToOne must own its join column");
+        relation.lazy=relation.many;
+        Object fetch=annotation.get("fetch");if(fetch instanceof String[]) relation.lazy="LAZY".equals(((String[])fetch)[1]);
+        Object cascades=annotation.get("cascade");
+        if(cascades instanceof List) for(Object cascade:(List)cascades) {
+            String op=((String[])cascade)[1];
+            if("ALL".equals(op)) relation.cascade=31;
+            else if("PERSIST".equals(op)) relation.cascade|=1;
+            else if("MERGE".equals(op)) relation.cascade|=2;
+            else if("REMOVE".equals(op)) relation.cascade|=4;
+            else if("REFRESH".equals(op)) relation.cascade|=8;
+            else if("DETACH".equals(op)) relation.cascade|=16;
+        }
+        relation.target=org.objectweb.asm.Type.getType(field.getDescriptor()).getClassName();
+        if(relation.many) {
+            String signature=field.getSignature();
+            int start=signature==null?-1:signature.indexOf("<L");
+            int end=start<0?-1:signature.indexOf(';',start);
+            if(start<0 || end<0) ctx.error("Relationship needs a concrete collection element type: "+owner.binaryName+"."+relation.field);
+            else {
+                if(map) { start=end;end=signature.indexOf(';',start+2); }
+                if(end<0) ctx.error("Map requires a concrete entity value type: "+relation.field);
+                else relation.target=signature.substring(start+2,end).replace('/','.');
+            }
+            if(!"Ljava/util/List;".equals(field.getDescriptor()) && !"Ljava/util/Set;".equals(field.getDescriptor()) && !map)
+                ctx.error("Relationship collection must use List, Set or Map: "+owner.binaryName+"."+relation.field);
+        }
+        AnnotationValues join=field.getAnnotation(prefix+"JoinColumn;");
+        relation.columnName=join==null?relation.field+"_id":join.getStringOrDefault("name",relation.field+"_id");
+        if(relation.columnName.length()==0) relation.columnName=relation.field+"_id";
+        relation.nullable=annotation.getBoolOrDefault("optional",true) && (join==null || join.getBoolOrDefault("nullable",true));
+        AnnotationValues table=field.getAnnotation(prefix+"JoinTable;");
+        relation.table=table==null?owner.tableName+"_"+relation.field:table.getStringOrDefault("name",owner.tableName+"_"+relation.field);
+        relation.ownerColumn=table==null?"owner_id":table.getStringOrDefault("joinColumn","owner_id");
+        relation.targetColumn=table==null?"target_id":table.getStringOrDefault("inverseJoinColumn","target_id");
+        if(relation.table.length()==0) relation.table=owner.tableName+"_"+relation.field;
+        if(relation.ownerColumn.length()==0) relation.ownerColumn="owner_id";
+        if(relation.targetColumn.length()==0) relation.targetColumn="target_id";
+        if(relation.mappedBy.length()>0 && (join!=null || table!=null)) ctx.error("Inverse associations must not declare join columns or tables: "+relation.field);
+        if(relation.many && join!=null) ctx.error("Use mappedBy or JoinTable for a to-many association: "+relation.field);
+        if(!relation.many && table!=null) ctx.error("To-one associations use JoinColumn: "+relation.field);
+        if(relation.element) {
+            relation.targetColumn=annotation.getStringOrDefault("column","element_value");
+            if(map && (field.getSignature()==null || !field.getSignature().contains("<Ljava/lang/String;"))) ctx.error("Scalar maps require String keys: "+relation.field);
+            PropertyTypeKind scalar=PropertyTypeKind.scalar(relation.target);
+            if(scalar.kind==PropertyTypeKind.Kind.UNSUPPORTED || scalar.kind==PropertyTypeKind.Kind.BYTE_ARRAY) ctx.error("ElementCollection requires a supported scalar value: "+relation.target);
+        }
+        return relation;
+    }
+
+    private void resolveRelations(ProcessorContext ctx) {
+        for(EntityClass owner:accepted.values()) for(RelationField relation:owner.relations) {
+            if(relation.element) continue;
+            EntityClass target=accepted.get(relation.target);
+            if(target==null) { ctx.error("Relationship target is not an available @Entity: "+relation.target);continue; }
+            if(relation.mapKey.length()>0) {
+                boolean found=false;for(PersistedField field:target.fields) if(field.fieldName.equals(relation.mapKey) && field.relation==null) found=true;
+                if(!found) ctx.error("MapKey must name a target basic field: "+relation.mapKey);
+            }
+            if(relation.orderBy.length()>0) for(String clause:relation.orderBy.split(",")) {
+                String[] parts=clause.trim().split("\\s+");boolean found=false;
+                for(PersistedField field:target.fields) if(field.fieldName.equals(parts[0])) found=true;
+                if(!found || parts.length>2 || parts.length==2 && !"ASC".equalsIgnoreCase(parts[1]) && !"DESC".equalsIgnoreCase(parts[1])) ctx.error("Invalid OrderBy: "+clause);
+            }
+            if(relation.mappedBy.length()>0) {
+                RelationField inverse=null;
+                for(RelationField candidate:target.relations) if(candidate.field.equals(relation.mappedBy)) inverse=candidate;
+                if(inverse==null || accepted.get(inverse.target)==null || !descends(owner,accepted.get(inverse.target)) || inverse.mappedBy.length()>0
+                    || !("OneToMany".equals(relation.kind)?"ManyToOne":relation.kind).equals(inverse.kind))
+                    ctx.error("Invalid mappedBy for "+owner.binaryName+"."+relation.field);
+            } else if(!relation.many) {
+                relation.column=owner.fields.size();
+                for(int part=0;part<target.idFields.size();part++) {
+                    PersistedField key=target.idFields.get(part);
+                    PersistedField fk=new PersistedField();
+                    fk.declaringType=relation.declaringType;
+                    fk.fieldName=relation.field+(target.idFields.size()==1?"":"."+key.fieldName);
+                    fk.columnName=relation.columnName+(target.idFields.size()==1?"":"_"+key.columnName);
+                    fk.kind=key.kind;fk.dialectKind=key.dialectKind;fk.boxed=key.boxed;fk.sqlType=key.sqlType;
+                    fk.explicitSqlType=key.explicitSqlType;fk.nullable=relation.nullable;fk.relation=relation;fk.relationPart=part;
+                    owner.fields.add(fk);
+                }
+            }
+        }
+    }
+
+    private boolean descends(EntityClass child,EntityClass ancestor) {
+        EntityClass current=child;
+        while(current!=null) {
+            if(current==ancestor) return true;
+            current=current.parent==null?null:accepted.get(current.parent.replace('/','.'));
+        }
+        return false;
+    }
+    private void resolveHierarchies(ProcessorContext ctx) {
+        for(EntityClass root:accepted.values()) {
+            AnnotatedClass definition=findType(root.binaryName,ctx);
+            AnnotationValues inheritance=definition.getClassAnnotation("Lcom/codename1/annotations/Inheritance;");
+            if(inheritance==null) continue;
+            if(root.parent!=null && accepted.containsKey(root.parent.replace('/','.'))) { ctx.error("Inheritance must be declared on the entity root: "+root.binaryName);continue; }
+            String discriminator=inheritance.getStringOrDefault("discriminatorColumn","entity_type");
+            List<EntityClass> family=new ArrayList<EntityClass>();family.add(root);
+            for(EntityClass child:accepted.values()) if(child!=root && descends(child,root)) family.add(child);
+            Map<String,PersistedField> fields=new LinkedHashMap<String,PersistedField>();Map<String,RelationField> relations=new LinkedHashMap<String,RelationField>();
+            Set<String> values=new LinkedHashSet<String>();List<AnnotationValues> inheritedIndexes=new ArrayList<AnnotationValues>();
+            for(EntityClass member:family) {
+                inheritedIndexes.addAll(member.indexes);member.hierarchyRoot=root.binaryName;member.tableName=root.tableName;
+                AnnotationValues tag=findType(member.binaryName,ctx).getClassAnnotation("Lcom/codename1/annotations/DiscriminatorValue;");
+                member.discriminatorValue=tag==null?member.simpleName:tag.getStringOrDefault("value",member.simpleName);
+                if(!member.discriminatorValue.matches("[A-Za-z0-9_$]{1,63}") || !values.add(member.discriminatorValue)) ctx.error("Invalid or duplicate discriminator: "+member.discriminatorValue);
+                for(PersistedField field:member.fields) {
+                    PersistedField prior=fields.get(field.fieldName);
+                    if(prior==null) {
+                        if(member!=root && !field.isId && !field.version) field.nullable=true;
+                        fields.put(field.fieldName,field);
+                    } else if(!prior.declaringType.equals(field.declaringType)) ctx.error("Hidden inherited persistent field: "+member.binaryName+"."+field.fieldName);
+                }
+                for(RelationField relation:member.relations) if(!relations.containsKey(relation.field)) relations.put(relation.field,relation);
+            }
+            PersistedField tag=new PersistedField();tag.fieldName="__cn1_discriminator";tag.columnName=discriminator;
+            tag.kind=PropertyTypeKind.scalar("java.lang.String");tag.dialectKind=KIND_TEXT;tag.sqlType="TEXT";tag.discriminator=true;
+            fields.put(tag.fieldName,tag);
+            List<PersistedField> all=new ArrayList<PersistedField>(fields.values());
+            int index=0;for(RelationField relation:relations.values()) {
+                relation.index=index++;relation.column=-1;
+                for(int i=0;i<all.size();i++) if(all.get(i).relation!=null && all.get(i).relation.field.equals(relation.field)) {
+                    if(relation.column<0) relation.column=i;all.get(i).relation=relation;
+                }
+            }
+            for(EntityClass member:family) {
+                member.fields.clear();member.fields.addAll(all);member.relations.clear();member.relations.addAll(relations.values());member.indexes.clear();member.indexes.addAll(inheritedIndexes);
+                for(EntityClass descendant:family) if(!descendant.abstractClass && descends(descendant,member)) member.discriminators.add(descendant.discriminatorValue);
+            }
+        }
+        for(EntityClass member:accepted.values()) if(member.hierarchyRoot==null && (member.abstractClass || member.parent!=null && accepted.containsKey(member.parent.replace('/','.'))))
+            ctx.error("Entity inheritance requires @Inheritance on the root: "+member.binaryName);
+    }
+    private static String generateHierarchyRegistration(EntityClass entity,boolean backend) {
+        return (entity.packageName.length()==0?"":"package "+entity.packageName+";\n")
+            +(backend?"@com.codename1.backend.annotations.Generated\n":"")
+            +"public final class "+entity.daoSimpleName+" { public static void register() { com.codename1.orm.session.Models.register(new "+entity.simpleName+(backend?"Cn1BackendModel":"Cn1Model")+"()); }}\n";
+    }
+    private static String storageConversion(String type,String value) {
+        String method="java.lang.Integer".equals(type)?"asIntObject":"java.lang.Long".equals(type)?"asLongObject":
+            "java.lang.Short".equals(type)?"asShortObject":"java.lang.Byte".equals(type)?"asByteObject":
+            "java.lang.Double".equals(type)?"asDoubleObject":"java.lang.Float".equals(type)?"asFloatObject":
+            "java.lang.Boolean".equals(type)?"asBooleanObject":"java.lang.Character".equals(type)?"asCodeUnitObject":
+            "java.util.Date".equals(type)?"asDate":"byte[]".equals(type)?"asBytes":"asString";
+        return "com.codename1.orm.session.Values."+method+"("+value+")";
+    }
+    private static String embeddedNullCondition(String path) {
+        StringBuilder condition=new StringBuilder();
+        int dot=path.indexOf('.');
+        while(dot>=0) {
+            condition.append("e.").append(path.substring(0,dot)).append(" == null || ");
+            dot=path.indexOf('.',dot+1);
+        }
+        return condition.append("e.").append(path).append(" == null").toString();
+    }
+
+    private static String generateModelSource(EntityClass ec, boolean backend) {
+        String pkg = "com.codename1.orm.session.";
+        String simple = ec.simpleName + (backend ? "Cn1BackendModel" : "Cn1Model");
+        StringBuilder sb = new StringBuilder();
+        if (!ec.packageName.isEmpty()) sb.append("package ").append(ec.packageName).append(";\n");
+        sb.append("public final class ").append(simple).append(" extends ").append(pkg)
+          .append("EntityModel<").append(ec.binaryName).append("> {\n")
+          .append("  private static final ").append(pkg).append("Attribute[] ATTRS = {\n");
+        for (int i = 0; i < ec.fields.size(); i++) {
+            PersistedField f = ec.fields.get(i);
+            int kind = f.dialectKind;
+            if (f.kind.kind == PropertyTypeKind.Kind.PROPERTY) {
+                String type=f.kind.elementBinaryName;
+                kind="java.lang.String".equals(type)?KIND_TEXT:
+                    "java.lang.Double".equals(type) || "java.lang.Float".equals(type)?KIND_REAL:
+                    "java.lang.Integer".equals(type) || "java.lang.Short".equals(type) || "java.lang.Byte".equals(type) || "java.lang.Character".equals(type)?KIND_INTEGER:KIND_BIGINT;
+            }
+            sb.append("    new ").append(pkg).append("Attribute(\"").append(escape(f.fieldName))
+              .append("\", \"").append(escape(f.columnName)).append("\", ").append(kind)
+              .append(", ").append(f.isId).append(", ").append(f.isId && f.autoIncrement)
+              .append(", ").append(f.nullable).append(", ").append(f.version).append(", ")
+              .append(f.explicitSqlType==null?"null":"\""+escape(f.explicitSqlType)+"\"").append(")")
+              .append(i + 1 < ec.fields.size() ? ",\n" : "\n");
+        }
+        sb.append("  };\n  public Class<").append(ec.binaryName).append("> type() { return ")
+          .append(ec.binaryName).append(".class; }\n")
+          .append("  public String table() { return \"").append(escape(ec.tableName)).append("\"; }\n")
+          .append("  public ").append(pkg).append("Attribute[] attributes() { return ATTRS.clone(); }\n")
+          .append("  public ").append(ec.binaryName).append(" create() { ").append(ec.abstractClass?"throw new IllegalStateException(\"Abstract entity\");":"return new "+ec.binaryName+"();").append(" }\n")
+          .append("  public Object get(").append(ec.binaryName).append(" e, int index) {\n    switch(index) {\n");
+        for (int i = 0; i < ec.fields.size(); i++) {
+            PersistedField f = ec.fields.get(i);
+            int accessStart=sb.length();
+            if(f.discriminator) { sb.append("case ").append(i).append(": return \"").append(escape(ec.discriminatorValue)).append("\";\n");continue; }
+            sb.append("    case ").append(i).append(": return ");
+            if(f.embeddedParent!=null && f.embeddedParent.length()>0) {
+                String parent=f.embeddedParent.substring(0,f.embeddedParent.length()-1);
+                sb.append(embeddedNullCondition(parent)).append(" ? null : ");
+            }
+            if (f.kind.kind == PropertyTypeKind.Kind.PROPERTY) {
+                sb.append(pkg).append("Values.storage(e.").append(f.fieldName).append(".get())");
+            }
+            else emitBackendRead(sb, f);
+            sb.append(";\n");
+            if(ec.hierarchyRoot!=null) {
+                String access=sb.substring(accessStart).replaceAll("(?<![\\w.$])e\\.",java.util.regex.Matcher.quoteReplacement("(("+f.declaringType+")(Object)e)."));sb.setLength(accessStart);
+                sb.append(access.replace("return ","if(!((Object)e instanceof "+f.declaringType+")) return null; return "));
+            }
+        }
+        sb.append("    default: throw new IllegalArgumentException(\"Unknown attribute\");\n    }\n  }\n")
+          .append("  public void set(").append(ec.binaryName).append(" e, int index, Object value) {\n")
+          .append("    try { switch(index) {\n");
+        for (int i = 0; i < ec.fields.size(); i++) {
+            PersistedField f = ec.fields.get(i);
+            int accessStart=sb.length();
+            if(f.discriminator) { sb.append("case ").append(i).append(": return;\n");continue; }
+            sb.append("    case ").append(i).append(": ");
+            if (f.kind.kind == PropertyTypeKind.Kind.PROPERTY) {
+                String type=f.kind.elementBinaryName;
+                String convert="java.lang.Integer".equals(type)?"asIntObject":"java.lang.Long".equals(type)?"asLongObject":
+                    "java.lang.Short".equals(type)?"asShortObject":"java.lang.Byte".equals(type)?"asByteObject":
+                    "java.lang.Double".equals(type)?"asDoubleObject":"java.lang.Float".equals(type)?"asFloatObject":
+                    "java.lang.Boolean".equals(type)?"asBooleanObject":"java.lang.Character".equals(type)?"asCodeUnitObject":"java.util.Date".equals(type)?"asDate":"asString";
+                sb.append("e.").append(f.fieldName).append(".set(").append(pkg).append("Values.").append(convert).append("(value));");
+            } else {
+                StringBuilder setter = new StringBuilder();
+                emitBackendWrite(setter, f);
+                sb.append(setter.toString().replace(ORM, pkg));
+            }
+            sb.append(" return;\n");
+            if(ec.hierarchyRoot!=null) {
+                String access=sb.substring(accessStart).replaceAll("(?<![\\w.$])e\\.",java.util.regex.Matcher.quoteReplacement("(("+f.declaringType+")(Object)e)."));sb.setLength(accessStart);
+                sb.append(access.replace("case "+i+": ","case "+i+": if(!((Object)e instanceof "+f.declaringType+")) return; "));
+            }
+        }
+        sb.append("    default: throw new IllegalArgumentException(\"Unknown attribute\");\n")
+          .append("    }} catch(Exception ex) { throw new ").append(pkg)
+          .append("PersistenceException(ex.getMessage(),ex); }\n  }\n");
+        sb.append("public Object domainValue(").append(ec.binaryName).append(" e,int index) { switch(index) {\n");
+        for(int i=0;i<ec.fields.size();i++) {
+            PersistedField field=ec.fields.get(i);
+            if(field.relation!=null || field.discriminator) continue;
+            sb.append("case ").append(i).append(": ");
+            if(ec.hierarchyRoot!=null) sb.append("if(!((Object)e instanceof ").append(field.declaringType).append(")) return null; ");
+            String access="e."+field.fieldName;
+            if(ec.hierarchyRoot!=null) access="(("+field.declaringType+")(Object)e)."+field.fieldName;
+            sb.append("return ").append(access).append(field.kind.kind==PropertyTypeKind.Kind.PROPERTY?".get()":"").append(";\n");
+        }
+        sb.append("default:return get(e,index);}}\n");
+        sb.append("  public ").append(pkg).append("Relationship[] relationships() { return new ")
+          .append(pkg).append("Relationship[] {\n");
+        for (RelationField relation : ec.relations) {
+            sb.append("new ").append(pkg).append("Relationship(\"").append(escape(relation.field)).append("\", ")
+              .append(relation.target).append(".class, ").append(relation.many).append(", ").append(relation.lazy)
+              .append(", ").append(relation.column).append(", ").append('"').append(escape(relation.mappedBy)).append("\", ").append('"')
+              .append(escape(relation.table)).append("\", ").append('"').append(escape(relation.ownerColumn)).append("\", ").append('"')
+              .append(escape(relation.targetColumn)).append("\", ").append(relation.cascade).append(", ").append(relation.orphan).append(", ").append(relation.unique).append(", \"").append(escape(relation.mapKey)).append("\", \"").append(escape(relation.orderColumn)).append("\", \"").append(escape(relation.orderBy)).append("\", ").append(relation.element).append("),\n");
+        }
+        sb.append("}; }\n  public Object relation(").append(ec.binaryName).append(" e, int index) { switch(index) {\n");
+        for (RelationField relation : ec.relations) {
+            sb.append("case ").append(relation.index).append(": return ");
+            if(ec.hierarchyRoot!=null) sb.append("!((Object)e instanceof ").append(relation.declaringType).append(") ? null : ((").append(relation.declaringType).append(")(Object)e).");
+            else sb.append("e.");
+            sb.append(relation.field).append(";\n");
+        }
+        sb.append("default: throw new IllegalArgumentException(); }}\n  public void relation(").append(ec.binaryName).append(" e, int index, Object value) { switch(index) {\n");
+        for (RelationField relation : ec.relations) {
+            String type = org.objectweb.asm.Type.getType(relation.descriptor).getClassName();
+            sb.append("case ").append(relation.index).append(": ");
+            if(ec.hierarchyRoot!=null) sb.append("if(!((Object)e instanceof ").append(relation.declaringType).append(")) return; ((").append(relation.declaringType).append(")(Object)e).");
+            else sb.append("e.");
+            sb.append(relation.field).append(" = ");
+            if ("java.util.Map".equals(type) && relation.element) sb.append("(java.util.Map)value");
+            else if ("java.util.Map".equals(type)) sb.append("com.codename1.orm.session.Models.mapBy((java.util.Collection)value,").append(relation.target).append(".class,\"").append(escape(relation.mapKey)).append("\")");
+            else if ("java.util.Set".equals(type)) sb.append("value == null ? null : new java.util.LinkedHashSet((java.util.Collection)value)");
+            else sb.append("(").append(type).append(")value");
+            sb.append("; return;\n");
+        }
+        sb.append("default: throw new IllegalArgumentException(); }}\n");
+        if(!ec.embedded.isEmpty()) {
+            sb.append("  public boolean requiresSession() { return true; }\n")
+              .append("  public void read(").append(ec.binaryName).append(" e,Object[] values) {\n");
+            for(Map.Entry<String,String> embedded:ec.embedded.entrySet()) {
+                String path=embedded.getKey();int lastDot=path.lastIndexOf('.');
+                if(lastDot>=0) sb.append("if(!(").append(embeddedNullCondition(path.substring(0,lastDot))).append(")) {\n");
+                sb.append("e.").append(path).append(" = (");boolean first=true;
+                for(int i=0;i<ec.fields.size();i++) if(ec.fields.get(i).fieldName.startsWith(path+".")) {
+                    if(!first) sb.append(" && ");first=false;sb.append("values[").append(i).append("] == null");
+                }
+                if(first) sb.append("true");
+                sb.append(") ? null : new ").append(embedded.getValue()).append("();\n");
+                if(lastDot>=0) sb.append("}\n");
+            }
+            for(int i=0;i<ec.fields.size();i++) {
+                PersistedField field=ec.fields.get(i);
+                if(field.embeddedParent!=null && field.embeddedParent.length()>0 && !ec.embedded.containsKey(field.embeddedParent.substring(0,field.embeddedParent.length()-1))) continue;
+                if(field.embeddedParent!=null && field.embeddedParent.length()>0)
+                    sb.append("if(!(").append(embeddedNullCondition(field.embeddedParent.substring(0,field.embeddedParent.length()-1))).append(")) ");
+                sb.append("set(e,").append(i).append(",values[").append(i).append("]);\n");
+            }
+            sb.append("}\n");
+        }
+        sb.append("public ").append(pkg).append("Index[] indexes() { return new ").append(pkg).append("Index[]{");
+        for(AnnotationValues index:ec.indexes) {
+            sb.append("new ").append(pkg).append("Index(\"").append(escape(index.getStringOrDefault("name",""))).append("\", ")
+                .append(index.getBoolOrDefault("unique",false));
+            Object fields=index.get("fields");if(fields instanceof List) for(Object field:(List)fields) sb.append(",\"").append(escape((String)field)).append("\"");
+            sb.append("),");
+        }
+        for(PersistedField field:ec.fields) if(field.unique)
+            sb.append("new ").append(pkg).append("Index(\"\",true,\"").append(escape(field.fieldName)).append("\"),");
+        sb.append("};}\n");
+        boolean converters=false;for(PersistedField field:ec.fields) if(field.converter!=null) converters=true;
+        if(converters) {
+            if(ec.embedded.isEmpty()) sb.append("public boolean requiresSession() { return true; }\n");
+            sb.append("public Object parameter(int index,Object value) { switch(index) {\n");
+            for(int i=0;i<ec.fields.size();i++) {
+                PersistedField field=ec.fields.get(i);
+                if(field.converter!=null) sb.append("case ").append(i).append(": return ").append(pkg).append("Values.storage(new ").append(field.converter)
+                    .append("().toDatabase((").append(field.domainType).append(")value));\n");
+            }
+            sb.append("default:return super.parameter(index,value);}}\n");
+        }
+        if(ec.embeddedId!=null) {
+            String type=ec.embedded.get(ec.embeddedId);
+            sb.append("public Object[] keyValues(Object key) { if(key instanceof ").append(type)
+                .append(") { ").append(type).append(" value=(").append(type).append(")key; return super.keyValues(new Object[]{");
+            for(int i=0;i<ec.idFields.size();i++) {
+                if(i>0) sb.append(',');sb.append("value.").append(ec.idFields.get(i).fieldName.substring(ec.embeddedId.length()+1));
+            }
+            sb.append("}); } return super.keyValues(key); }\n");
+        }
+        if(ec.generation!=0) sb.append("public int generation() { return ").append(ec.generation)
+          .append("; }\npublic String generator() { return ").append('"').append(escape(ec.generator)).append("\"; }\n");
+        if(ec.hierarchyRoot!=null) {
+            sb.append("public Class hierarchyRoot() { return ").append(ec.hierarchyRoot).append(".class; }\n")
+                .append("public int discriminatorIndex() { return ").append(ec.fields.size()-1).append("; }\n")
+                .append("public String discriminatorValue() { return \"").append(escape(ec.discriminatorValue)).append("\"; }\n")
+                .append("public String[] discriminatorValues() { return new String[]{");
+            for(String value:ec.discriminators) sb.append('"').append(escape(value)).append("\",");
+            sb.append("}; }\npublic boolean hasRelationship(").append(ec.binaryName).append(" e,int index) { switch(index) {");
+            for(RelationField relation:ec.relations) sb.append("case ").append(relation.index).append(": return (Object)e instanceof ").append(relation.declaringType).append(';');
+            sb.append("default:return false;} }\n");
+        }
+        sb.append("  public void lifecycle(").append(ec.binaryName).append(" e,int event) { switch(event) {\n");
+        for (int event=0;event<ec.callbacks.length;event++) if(ec.callbacks[event]!=null)
+            sb.append("case ").append(event).append(": e.").append(ec.callbacks[event]).append("(); return;\n");
+        sb.append("default: return; }}\n}\n");
+        return sb.toString();
+    }
 
     private static String generateDaoSource(EntityClass ec) {
         StringBuilder sb = new StringBuilder(4096);
@@ -628,7 +1209,12 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
         // this once per generated dao at app start; the call triggers
         // this class's <clinit> and installs the dao in EntityManager.
         sb.append("    public static void register() {\n");
-        sb.append("        com.codename1.orm.EntityManager.registerDao(new ").append(ec.daoSimpleName).append("());\n");
+        sb.append("        com.codename1.orm.session.Models.register(new ").append(ec.simpleName)
+          .append(ec.daoSimpleName.endsWith(BACKEND_DAO_SUFFIX) ? "Cn1BackendModel" : "Cn1Model").append("());\n");
+        sb.append("        com.codename1.orm.EntityManager.registerDaoFactory(").append(ec.binaryName)
+          .append(".class, new com.codename1.orm.DaoFactory<").append(ec.binaryName).append(">() {\n")
+          .append("            public com.codename1.orm.Dao<").append(ec.binaryName).append("> create() { return new ")
+          .append(ec.daoSimpleName).append("(); }\n        });\n");
         sb.append("    }\n\n");
 
         sb.append("    public ").append(ec.daoSimpleName).append("() {\n");
@@ -1167,6 +1753,8 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
         // The hook the generated bootstrap calls. Same name and same shape as
         // the client flavour's, so one bootstrap source serves both.
         sb.append("    public static void register() {\n");
+        sb.append("        com.codename1.orm.session.Models.register(new ").append(ec.simpleName)
+          .append(ec.daoSimpleName.endsWith(BACKEND_DAO_SUFFIX) ? "Cn1BackendModel" : "Cn1Model").append("());\n");
         sb.append("        ").append(ORM).append("EntityManager.register(new ")
           .append(ec.daoSimpleName).append("());\n");
         sb.append("    }\n\n");
@@ -1222,8 +1810,19 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
     /// A field as a bound parameter: Long, Double, String, byte[] or null,
     /// which is the set `Database` binds and returns on every engine.
     private static void emitBackendRead(StringBuilder sb, PersistedField f) {
-        String field = "e." + f.fieldName;
+        String field = "e." + (f.relation==null?f.fieldName:f.relation.field);
+        if (f.relation != null) {
+            sb.append("com.codename1.orm.session.Models.foreignKey(e, ").append(f.relation.index)
+              .append(", ").append(field).append(", ").append(f.relationPart).append(")");
+            return;
+        }
+        if(f.converter!=null) {
+            sb.append("com.codename1.orm.session.Values.storage(new ").append(f.converter).append("().toDatabase(").append(field).append("))");return;
+        }
         switch (f.kind.kind) {
+            case ENUM:
+                sb.append(field).append(" == null ? null : ").append(field).append(".name()");
+                return;
             case STRING:
             case BYTE_ARRAY:
                 sb.append(field);
@@ -1365,9 +1964,17 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
     /// `Values`: the same column is a Long from one engine and exact text from
     /// another, and neither is the field's type.
     private static void emitBackendWrite(StringBuilder sb, PersistedField f) {
-        String field = "e." + f.fieldName;
+        if(f.converter!=null) {
+            String conversion=storageConversion(f.kind.binaryName,"value");
+            sb.append("e.").append(f.fieldName).append(" = new ").append(f.converter).append("().fromDatabase(").append(conversion).append(");");return;
+        }
+        String field = "e." + (f.relation==null?f.fieldName:f.relation.field);
         String values = ORM + "Values.";
+        if (f.relation != null) return;
         switch (f.kind.kind) {
+            case ENUM:
+                sb.append(field).append(" = value == null ? null : ").append(f.kind.binaryName).append(".valueOf(").append(values).append("asString(value));");
+                return;
             case STRING:
                 sb.append(field).append(" = ").append(values).append("asString(value);");
                 return;
@@ -1517,7 +2124,19 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
     }
 
     private static void emitFieldRead(StringBuilder sb, PersistedField f, String inst) {
+        if(f.converter!=null) {
+            sb.append("com.codename1.orm.session.Values.storage(new ").append(f.converter).append("().toDatabase(").append(inst).append('.').append(f.fieldName).append("))");return;
+        }
+        if (f.relation != null) {
+            sb.append("com.codename1.orm.session.Models.foreignKey(").append(inst).append(", ")
+              .append(f.relation.index).append(", ").append(inst).append('.').append(f.relation.field).append(", ").append(f.relationPart).append(")");
+            return;
+        }
         switch (f.kind.kind) {
+            case ENUM:
+                sb.append(inst).append('.').append(f.fieldName).append(" == null ? null : ")
+                  .append(inst).append('.').append(f.fieldName).append(".name()");
+                return;
             case STRING: case BYTE_ARRAY:
                 // Strings go through Database#execute(String, Object...) as
                 // String params; byte[] is passed through unchanged for the
@@ -1574,7 +2193,17 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
 
     private static void emitFieldWrite(StringBuilder sb, PersistedField f, String inst,
                                        String row, String idx) {
+        if(f.converter!=null) {
+            String read=row+(f.kind.kind==PropertyTypeKind.Kind.BYTE_ARRAY?".getBlob(":".getString(")+idx+")";
+            sb.append(inst).append('.').append(f.fieldName).append(" = new ").append(f.converter).append("().fromDatabase(").append(storageConversion(f.kind.binaryName,read)).append(");\n");return;
+        }
+        if (f.relation != null) return;
         switch (f.kind.kind) {
+            case ENUM:
+                sb.append("                String _enum = ").append(row).append(".getString(").append(idx).append(");\n")
+                  .append("                ").append(inst).append('.').append(f.fieldName).append(" = _enum == null ? null : ")
+                  .append(f.kind.binaryName).append(".valueOf(_enum);\n");
+                return;
             case STRING:
                 sb.append("                ").append(inst).append('.').append(f.fieldName)
                         .append(" = ").append(row).append(".getString(").append(idx).append(");\n");
@@ -1638,6 +2267,8 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
         if ("java.lang.String".equals(elem)) {
             sb.append("                ").append(inst).append('.').append(f.fieldName).append(".set(")
                     .append(row).append(".getString(").append(idx).append("));\n");
+        } else if ("java.lang.Character".equals(elem)) {
+            sb.append(inst).append('.').append(f.fieldName).append(".set(com.codename1.orm.session.Values.asCodeUnitObject(").append(row).append(".getString(").append(idx).append(")));\n");
         } else if ("java.lang.Integer".equals(elem)) {
             sb.append("                ").append(inst).append('.').append(f.fieldName).append(".set(Integer.valueOf(")
                     .append(row).append(".getInteger(").append(idx).append(")));\n");
@@ -1733,24 +2364,54 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
     // Accumulator types
     // ---------------------------------------------------------------
 
+    static final class FieldPath {
+        final FieldInfo field;final String path,prefix,declaringType;
+        FieldPath(FieldInfo field,String path,String prefix,String declaringType) { this.field=field;this.path=path;this.prefix=prefix;this.declaringType=declaringType; }
+    }
+
+    static final class RelationField {
+        String field, descriptor, target, mappedBy, columnName, table, ownerColumn, targetColumn,kind,declaringType;
+        String mapKey="",orderColumn="",orderBy="";
+        boolean many,lazy,orphan,nullable,unique,element;
+        int cascade,index,column=-1;
+    }
+
     static final class EntityClass {
         String binaryName;
+        String parent,hierarchyRoot,discriminatorValue;
+        boolean abstractClass;
+        final List<String> discriminators=new ArrayList<String>();
         String packageName;
         String simpleName;
         String daoBinaryName;
         String daoSimpleName;
         String tableName;
+        int generation;
+        String generator;
         PersistedField idField;
+        String embeddedId;
+        final List<PersistedField> idFields=new ArrayList<PersistedField>();
+        final Map<String,String> embedded=new LinkedHashMap<String,String>();
+        final String[] callbacks=new String[7];
+        final List<AnnotationValues> indexes=new ArrayList<AnnotationValues>();
+        final List<RelationField> relations = new ArrayList<RelationField>();
         final List<PersistedField> fields = new ArrayList<PersistedField>();
     }
 
     static final class PersistedField {
         String fieldName;
+        String embeddedParent;
+        String converter,domainType,declaringType;
+        boolean discriminator;
         String columnName;
         String sqlType;
         boolean nullable;
         boolean isId;
         boolean autoIncrement;
+        boolean version;
+        boolean unique;
+        RelationField relation;
+        int relationPart;
         PropertyTypeKind kind;
         /// @Column(type) as the developer wrote it, or null when absent.
         String explicitSqlType;

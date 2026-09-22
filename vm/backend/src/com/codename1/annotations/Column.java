@@ -43,6 +43,7 @@ public @interface Column {
 
     /** When false the column is declared NOT NULL at table-create time. */
     boolean nullable() default true;
+    boolean unique() default false;
 
     /**
      * An explicit SQL type, for the case where the inferred one is not what the

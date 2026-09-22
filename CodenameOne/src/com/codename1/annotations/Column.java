@@ -41,6 +41,9 @@ public @interface Column {
     /// When false the column gets a `NOT NULL` constraint at table-create time.
     boolean nullable() default true;
 
+    /// Creates a unique index when the managed schema is created.
+    boolean unique() default false;
+
     /// Optional explicit SQL type. Use the SQLite type names (`TEXT`,
     /// `INTEGER`, `REAL`, `BLOB`, `NUMERIC`). When blank the processor infers
     /// the type from the field's Java type.
