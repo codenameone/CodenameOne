@@ -1031,6 +1031,17 @@ public final class HttpServer {
         if(path == null || endpoint == null) {
             throw new IllegalArgumentException("a websocket route needs both a path and an endpoint");
         }
+        // Matched against the request's CANONICAL path, so a key carrying a
+        // percent escape or a query could never be selected however a client
+        // spelled its request. Refusing beats registering something unreachable.
+        if(path.indexOf('%') >= 0) {
+            throw new IllegalArgumentException("a websocket path is matched after "
+                    + "percent-decoding, so register the decoded form, not: " + path);
+        }
+        if(path.indexOf('?') >= 0) {
+            throw new IllegalArgumentException("a websocket path is matched without "
+                    + "its query string, so register the path alone, not: " + path);
+        }
         webSocketRoutes.put(path, endpoint);
     }
 
@@ -2072,6 +2083,13 @@ public final class HttpServer {
                 // inside its handler and has a response still to write. Closing it
                 // here is closing the answer to the request that asked for the
                 // shutdown.
+                continue;
+            }
+            if(deferredCloses.containsKey(new Integer(fd))) {
+                // A websocket writer is still inside this descriptor. Closing it
+                // frees a number that thread is about to use -- the whole reason
+                // retireWebSocketsForShutdown deferred it. sweepDeferredCloses
+                // closes it when the writer leaves.
                 continue;
             }
             ServerSocket.closeFd(fd);
@@ -3289,12 +3307,18 @@ public final class HttpServer {
      * ordinary HTTP one.
      */
     private boolean tryUpgrade(Conn conn, int fd, long session, Request request) {
+        // THE CANONICAL PATH, which is what pathIs compares for every HTTP route.
+        // Taking the raw target substring instead meant `/ch%61t` missed the
+        // websocket route for `/chat` and fell through to the catch-all router or
+        // a 404 -- so which endpoint served a client, and which credentials it was
+        // checked against, depended on how the client spelled the URI. pathFrom
+        // excludes the query and decodes the unreserved octets, exactly as the
+        // HTTP router sees them.
+        String path = request.pathFrom(0);
         String target = request.getTarget();
-        String path = target;
         String query = null;
         int question = target == null ? -1 : target.indexOf('?');
         if(question >= 0) {
-            path = target.substring(0, question);
             query = target.substring(question + 1);
         }
 
@@ -3446,9 +3470,15 @@ public final class HttpServer {
      */
     private void applyWebSocketReadTimeout(int fd) {
         try {
+            // THE RECEIVE DEADLINE ONLY. setTimeout sets both directions, and
+            // using it here quietly moved the SEND bound from fifteen seconds to
+            // five minutes -- and with CN1_WS_IDLE_TIMEOUT_MS=0 removed it
+            // altogether, so a peer that stopped reading could block a broadcast
+            // thread for ever. The send deadline stays exactly as accept left it.
+            //
             // 0 means "no timeout" to setsockopt and to the Java SE twin, which is
-            // exactly what CN1_WS_IDLE_TIMEOUT_MS=0 asks for.
-            ServerSocket.setTimeout(fd, WS_IDLE_TIMEOUT_MILLIS <= 0
+            // what CN1_WS_IDLE_TIMEOUT_MS=0 asks for -- of the read alone.
+            ServerSocket.setReceiveTimeout(fd, WS_IDLE_TIMEOUT_MILLIS <= 0
                     ? 0 : WS_IDLE_TIMEOUT_MILLIS);
         } catch (IOException err) {
             trace("fd=" + fd + " could not set the websocket read timeout: " + err);
@@ -3611,29 +3641,58 @@ public final class HttpServer {
         if(open.isEmpty()) {
             return;
         }
-        // An AtomicInteger and a bounded poll rather than a CountDownLatch: the
-        // server-safe class library has java.util.concurrent.atomic but no
-        // CountDownLatch, and this file compiles for BOTH arms. The Java SE arm
-        // would have taken the latch happily, which is exactly how a class the
-        // translated runtime does not have gets in.
-        final java.util.concurrent.atomic.AtomicInteger outstanding =
-                new java.util.concurrent.atomic.AtomicInteger(open.size());
-        for(int iter = 0 ; iter < open.size() ; iter++) {
-            final WebSocketSession session = (WebSocketSession)open.get(iter);
+        // A BOUNDED FLEET, not one thread per session. Each goodbye can block --
+        // a peer that stopped reading holds its sender, and the Close queues
+        // behind it -- so these cannot run on this thread in a loop. But nor can
+        // there be one thread each: Thread.start() on the translated runtime is a
+        // pthread with a 16MB stack that ABORTS THE PROCESS if creation fails, and
+        // the default connection ceiling is 4096. A graceful shutdown that exhausts
+        // threads, or kills the process outright, is worse than an abrupt one.
+        //
+        // So a small fixed number of threads walk the list through a shared cursor,
+        // and the wait below is bounded whatever they get through. Whoever is not
+        // reached gets the descriptor-first teardown, which is what they would
+        // have got anyway.
+        final java.util.List sessions = open;
+        final java.util.concurrent.atomic.AtomicInteger cursor =
+                new java.util.concurrent.atomic.AtomicInteger();
+        final java.util.concurrent.atomic.AtomicInteger running =
+                new java.util.concurrent.atomic.AtomicInteger();
+        int fleet = open.size() < SHUTDOWN_GOODBYE_THREADS
+                ? open.size() : SHUTDOWN_GOODBYE_THREADS;
+        running.set(fleet);
+        for(int iter = 0 ; iter < fleet ; iter++) {
             Thread goodbye = new Thread(new Runnable() {
                 public void run() {
                     try {
-                        session.closeForShutdown();
+                        while(true) {
+                            int next = cursor.getAndIncrement();
+                            if(next >= sessions.size()) {
+                                return;
+                            }
+                            try {
+                                ((WebSocketSession)sessions.get(next)).closeForShutdown();
+                            } catch (RuntimeException ignored) {
+                                // One peer's failure is not the others' problem.
+                            }
+                        }
                     } finally {
-                        outstanding.decrementAndGet();
+                        running.decrementAndGet();
                     }
                 }
             });
             goodbye.setDaemon(true);
-            goodbye.start();
+            try {
+                goodbye.start();
+            } catch (Throwable err) {
+                // Out of threads is exactly the condition this bound exists to
+                // avoid, and it is not a reason to fail the shutdown.
+                running.decrementAndGet();
+                break;
+            }
         }
         long deadline = System.currentTimeMillis() + budgetMillis;
-        while(outstanding.get() > 0 && System.currentTimeMillis() < deadline) {
+        while(running.get() > 0 && System.currentTimeMillis() < deadline) {
             try {
                 Thread.sleep(10);
             } catch (InterruptedException err) {
@@ -3642,6 +3701,15 @@ public final class HttpServer {
             }
         }
     }
+
+    /**
+     * How many threads say goodbye at shutdown.
+     *
+     * Small on purpose: they exist only so one stalled peer cannot hold the
+     * others, and each is a real OS thread on the translated runtime.
+     */
+    private static final int SHUTDOWN_GOODBYE_THREADS =
+            envIntAtLeast("CN1_WS_SHUTDOWN_THREADS", 8, 1);
 
     /**
      * Marks every remaining session unusable before stop()'s raw descriptor sweep.
@@ -3657,7 +3725,23 @@ public final class HttpServer {
             webSockets.clear();
         }
         for(int iter = 0 ; iter < open.size() ; iter++) {
-            ((WebSocketSession)open.get(iter)).retire();
+            WebSocketSession session = (WebSocketSession)open.get(iter);
+            if(!session.retire()) {
+                // A WRITER IS STILL INSIDE IT, and the sweep after this closes
+                // descriptors directly. Discarding the answer here means freeing a
+                // number that thread is about to write into -- and an external
+                // websocket writer is not counted by workOutstanding(), so stop()
+                // can return and a restarted server can be handed the same number
+                // while the old write is still in flight. That is the
+                // cross-connection corruption drop()'s deferred close exists to
+                // prevent, so it gets the same treatment here.
+                Integer key = new Integer(session.getFd());
+                deferredCloses.put(key, session);
+                Object tls = sessions.remove(key);
+                if(tls != null) {
+                    deferredTlsSessions.put(key, tls);
+                }
+            }
         }
     }
 

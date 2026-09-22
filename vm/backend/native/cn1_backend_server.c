@@ -791,6 +791,29 @@ JAVA_VOID com_codename1_backend_ServerSocket_closeFdImpl___int(CODENAME_ONE_THRE
  * Return value ignored deliberately: ENOTCONN means the peer already went, which
  * is the state the caller was asking for.
  */
+/*
+ * The receive deadline alone, leaving SO_SNDTIMEO untouched.
+ *
+ * setTimeoutImpl above sets both on purpose. A websocket needs them apart: its
+ * read allowance is minutes or unlimited because it is idle by design, while a
+ * send to a peer that stopped reading must still time out or a broadcast thread
+ * blocks for ever.
+ */
+JAVA_INT com_codename1_backend_ServerSocket_setReceiveTimeoutImpl___int_int_R_int(CODENAME_ONE_THREAD_STATE, JAVA_INT fd, JAVA_INT millis) {
+#ifdef _WIN32
+    (void)fd; (void)millis;
+    return -1;
+#else
+    struct timeval tv;
+    if(fd < 0) {
+        return -1;
+    }
+    tv.tv_sec = millis / 1000;
+    tv.tv_usec = (millis % 1000) * 1000;
+    return setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, (const char*)&tv, sizeof(tv)) == 0 ? 0 : -1;
+#endif
+}
+
 JAVA_VOID com_codename1_backend_ServerSocket_shutdownImpl___int(CODENAME_ONE_THREAD_STATE, JAVA_INT fd) {
 #ifndef _WIN32
     if(fd >= 0) {

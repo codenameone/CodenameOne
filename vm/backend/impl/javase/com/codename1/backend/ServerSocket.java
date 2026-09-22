@@ -275,6 +275,17 @@ public final class ServerSocket {
      * Quiet about failure on purpose: every reason it can fail (the peer already
      * went, the descriptor was already shut) is a state the caller wanted anyway.
      */
+    /**
+     * The receive deadline alone. See the note on the ParparVM twin.
+     *
+     * Declared to throw even though this arm never does: the two implementations
+     * are compiled against the same callers, so a signature that differs between
+     * them builds on one and fails on the other.
+     */
+    public static void setReceiveTimeout(int fd, int millis) throws IOException {
+        Deadlines.setReceive(fd, millis);
+    }
+
     public static void shutdown(int fd) {
         Object entry = Descriptors.get(fd);
         if(entry instanceof java.nio.channels.SocketChannel) {

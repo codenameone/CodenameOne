@@ -22,7 +22,6 @@
  */
 package com.demo;
 
-import com.codename1.backend.Base64;
 import com.codename1.backend.Crypto;
 import com.codename1.backend.Tcp;
 
@@ -46,6 +45,9 @@ import java.io.IOException;
  */
 final class SelfCheck {
     private static final String TEST_NAME = "__cn1ss_selfcheck__";
+    /** RFC 6455 1.3's worked example, and the accept value it prints. */
+    private static final String RFC_KEY = "dGhlIHNhbXBsZSBub25jZQ==";
+    private static final String RFC_ACCEPT = "s3pPLMBiTxaQ9kYGzzhZRbK+xOo=";
 
     private SelfCheck() {
     }
@@ -54,8 +56,12 @@ final class SelfCheck {
         Tcp connection = null;
         try {
             connection = Tcp.connect("127.0.0.1", port, 5000);
-            byte[] nonce = Crypto.randomBytes(16);
-            String key = Base64.encode(nonce);
+            // RFC 6455 1.3's own key, so the expected accept value is the one the
+            // standard prints. A random key would work too, but then this check
+            // could only compare the server against itself -- and the thing most
+            // worth catching here is a translated SHA-1 binding that is missing or
+            // wrong, which self-consistency cannot see.
+            String key = RFC_KEY;
             String request = "GET / HTTP/1.1\r\nHost: 127.0.0.1\r\n"
                     + "Upgrade: websocket\r\nConnection: Upgrade\r\n"
                     + "Sec-WebSocket-Version: 13\r\nSec-WebSocket-Key: " + key + "\r\n\r\n";
@@ -65,6 +71,19 @@ final class SelfCheck {
             String head = readUntilBlankLine(connection);
             if(!head.startsWith("HTTP/1.1 101")) {
                 System.err.println("[cn1ss] selfcheck: no 101, got " + firstLine(head));
+                return false;
+            }
+            // THE ACCEPT VALUE, not just the status. A 101 says the server took
+            // the upgrade; it does not say the handshake is one a browser will
+            // accept. If Crypto.sha1's native went missing -- which is what
+            // CN1_BACKEND_HTTPS=0 does, and what a mistyped symbol does silently
+            // -- this server would still answer 101, every conforming client
+            // would reject it, and the leg would find out only after the
+            // forty-minute screenshot suite.
+            if(head.indexOf("Sec-WebSocket-Accept: " + RFC_ACCEPT) < 0) {
+                System.err.println("[cn1ss] selfcheck: wrong Sec-WebSocket-Accept; expected "
+                        + RFC_ACCEPT + " for the RFC 6455 key. The SHA-1 binding is "
+                        + "missing or wrong.");
                 return false;
             }
 

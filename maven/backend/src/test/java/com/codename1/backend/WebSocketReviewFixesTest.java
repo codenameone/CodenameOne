@@ -102,6 +102,60 @@ class WebSocketReviewFixesTest {
     }
 
     @Test
+    @DisplayName("a percent-spelled path reaches the same endpoint as the plain one")
+    void pathsAreRoutedCanonically() throws Exception {
+        // pathIs canonicalizes percent-encoded unreserved octets for every HTTP
+        // route. Routing websockets on the raw target substring instead meant
+        // /ch%61t missed the /chat endpoint and fell through to a catch-all or a
+        // 404 -- so which endpoint served a client, and which credentials it was
+        // checked against, depended on how the client spelled the URI.
+        HttpServer server = HttpServer.start("127.0.0.1", 0, 16, 4, null);
+        try {
+            server.websocket("/chat", silent());
+            int port = server.getPort();
+            RawWebSocketClient plain = new RawWebSocketClient(port, "/chat", null);
+            try {
+                assertTrue(plain.getStatusLine().startsWith("HTTP/1.1 101"),
+                        plain.getStatusLine());
+            } finally {
+                plain.close();
+            }
+            RawWebSocketClient escaped = new RawWebSocketClient(port, "/ch%61t", null);
+            try {
+                assertTrue(escaped.getStatusLine().startsWith("HTTP/1.1 101"),
+                        "an equivalent spelling must reach the same endpoint: "
+                                + escaped.getStatusLine());
+            } finally {
+                escaped.close();
+            }
+        } finally {
+            server.stop(500);
+        }
+    }
+
+    @Test
+    @DisplayName("a route that could never match is refused at registration")
+    void unreachableRoutesAreRefused() throws Exception {
+        HttpServer server = HttpServer.start("127.0.0.1", 0, 8, 2, null);
+        try {
+            // Matched after percent-decoding and without the query, so either of
+            // these would register something no request could ever select.
+            assertThrows(IllegalArgumentException.class, new org.junit.jupiter.api.function.Executable() {
+                public void execute() {
+                    server.websocket("/ch%61t", silent());
+                }
+            });
+            assertThrows(IllegalArgumentException.class, new org.junit.jupiter.api.function.Executable() {
+                public void execute() {
+                    server.websocket("/chat?room=1", silent());
+                }
+            });
+        } finally {
+            server.stop(500);
+        }
+    }
+
+    @Test
     @DisplayName("a close code that may not go on the wire is corrected, not sent")
     void outboundCloseCodesAreValidated() {
         // 1005, 1006 and 1015 are what a LOCAL implementation reports; a peer that

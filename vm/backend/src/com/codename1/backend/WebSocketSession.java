@@ -316,6 +316,13 @@ public final class WebSocketSession {
                 if(dead) {
                     throw new IOException("websocket " + id + " is closed");
                 }
+                // AGAIN, under the lock. The check before this one is outside it,
+                // so a sender can pass it, pause, and take the lock after another
+                // thread has written the Close -- and then put a data frame after
+                // it, which is the exact thing the flag exists to prevent.
+                if(closing && opcode != WebSocketFrames.OP_CLOSE) {
+                    throw new IOException("websocket " + id + " is closing; no more data frames");
+                }
                 int headerLength = WebSocketFrames.writeHeader(header, 0, opcode, true, false,
                         length);
                 // One write where it fits. On a fresh connection two writes are two
@@ -337,6 +344,16 @@ public final class WebSocketSession {
                     HttpServer.writeTo(fd, tlsSession, payload, offset, length);
                 }
             }
+        } catch (IOException err) {
+            // THE STREAM IS NOW UNTRUSTWORTHY. By the time a write fails the
+            // header, or part of the payload, may already be on the wire -- so the
+            // peer is waiting for bytes that will never come, and the next send
+            // would be read as the remainder of that frame rather than as a new
+            // one. A send inside a callback gets endpointFailed to sort this out;
+            // one from a broadcast thread has no such wrapper, and used to just
+            // rethrow and leave the session open.
+            dead = true;
+            throw err;
         } finally {
             writers.decrementAndGet();
         }
