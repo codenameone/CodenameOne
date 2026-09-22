@@ -77,13 +77,60 @@ if [ "$(uname -s)" = "Linux" ] && [ -z "${DISPLAY:-}" ]; then
   XVFB="xvfb-run -a"
 fi
 
+# Kept so a recipe can read what the builder REPORTS rather than guess at its
+# layout; see cn1_reported.
+CN1_LOG="$WORK/cn1-build.log"
+
 cn1_build() {   # cn1_build <platform> <buildTarget> [extra maven args...]
   local plat="$1" target="$2"; shift 2
   ( cd "$CN1" && $XVFB mvn -B $MVN_REPO_ARG package -DskipTests \
       -DskipComplianceCheck=true \
-      -Dcodename1.platform="$plat" -Dcodename1.buildTarget="$target" "$@" )
+      -Dcodename1.platform="$plat" -Dcodename1.buildTarget="$target" "$@" ) 2>&1 | tee "$CN1_LOG"
 }
 
+
+cn1_reported() {  # cn1_reported <what>: the path a native builder logged
+  # The native Linux and Windows builders print where they put the binary
+  # ("Built native Linux executable: <path>"). The recipes used to look for a
+  # "*-<target>" directory instead, a layout those builders never produce --
+  # they write to a "result" directory -- so the artifact path came back empty.
+  local path
+  path="$(sed -n "s/.*Built native $1 executable: //p" "$CN1_LOG" | tail -1 | tr -d '\r')"
+  # On Windows the builder logs D:\a\...\Bench.exe. Git Bash's dirname does not
+  # split on a backslash, so it is normalized to D:/a/.../Bench.exe first, a
+  # form both this shell and the native Windows Python downstream accept.
+  if [ -n "$path" ] && command -v cygpath >/dev/null 2>&1; then
+    path="$(cygpath -m "$path")"
+  fi
+  [ -n "$path" ] && [ -e "$path" ] || {
+    echo "the Codename One build did not report a native $1 executable" >&2; exit 2; }
+  printf '%s\n' "$path"
+}
+
+sign_for_install() {  # sign_for_install <apk>: prints an installable apk path
+  # assembleRelease with no signing configuration produces
+  # app-release-unsigned.apk, which adb refuses to install at all. Flutter's
+  # release template signs with the debug key, so signing ours with the same
+  # key is the like-for-like choice, and it keeps the sizes comparable: both
+  # sides then carry a signature block.
+  local apk="$1" signer keystore out
+  signer="$(ls -d "${ANDROID_HOME:-${ANDROID_SDK_ROOT:-}}"/build-tools/*/apksigner 2>/dev/null | sort -V | tail -1)"
+  [ -n "$signer" ] || { echo "apksigner not found under the Android SDK" >&2; exit 2; }
+  if "$signer" verify "$apk" >/dev/null 2>&1; then
+    printf '%s\n' "$apk"; return
+  fi
+  keystore="$HOME/.android/debug.keystore"
+  if [ ! -f "$keystore" ]; then
+    mkdir -p "$(dirname "$keystore")"
+    keytool -genkeypair -keystore "$keystore" -storepass android -keypass android \
+        -alias androiddebugkey -keyalg RSA -keysize 2048 -validity 10000 \
+        -dname "CN=Android Debug,O=Android,C=US" >/dev/null
+  fi
+  out="${apk%.apk}-debugsigned.apk"
+  "$signer" sign --ks "$keystore" --ks-pass pass:android --key-pass pass:android \
+      --ks-key-alias androiddebugkey --out "$out" "$apk"
+  printf '%s\n' "$out"
+}
 first() {       # first existing match, or empty
   find "$@" 2>/dev/null | head -1
 }
@@ -169,7 +216,9 @@ print(name if name in targets else (targets[0] if targets else ""))' )"
     [ -n "$GRADLE_PROJECT" ] || { echo "no generated Gradle project" >&2; exit 2; }
     ( cd "$GRADLE_PROJECT" && ./gradlew assembleRelease )
     echo "flutter=$FL/build/app/outputs/flutter-apk/app-release.apk"
-    echo "cn1=$(first "$GRADLE_PROJECT" -name '*-release*.apk')"
+    CN1_APK="$(first "$GRADLE_PROJECT" -name '*-release*.apk' -not -name '*-debugsigned.apk')"
+    [ -n "$CN1_APK" ] || { echo "assembleRelease produced no apk" >&2; exit 2; }
+    echo "cn1=$(sign_for_install "$CN1_APK")"
     ;;
 
   linux)
@@ -180,7 +229,9 @@ print(name if name in targets else (targets[0] if targets else ""))' )"
     ( cd "$FL" && flutter build linux --release )
     cn1_build linux local-linux-device
     echo "flutter=$FL/build/linux/x64/release/bundle"
-    echo "cn1=$(first "$CN1/linux/target" -maxdepth 4 -type d -name '*-linux-device')"
+    # The result DIRECTORY: the executable plus the libraries it ships beside
+    # itself, which count toward both installed and code size.
+    echo "cn1=$(dirname "$(cn1_reported Linux)")"
     ;;
 
   windows)
@@ -189,7 +240,7 @@ print(name if name in targets else (targets[0] if targets else ""))' )"
     ( cd "$FL" && flutter build windows --release )
     cn1_build win local-windows-device
     echo "flutter=$FL/build/windows/x64/runner/Release"
-    echo "cn1=$(first "$CN1/win/target" -maxdepth 4 -type d -name '*-windows-device')"
+    echo "cn1=$(dirname "$(cn1_reported Windows)")"
     ;;
 
   javascript)

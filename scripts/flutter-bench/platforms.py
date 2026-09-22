@@ -20,7 +20,9 @@ import glob
 import os
 import re
 import shutil
+import queue
 import subprocess
+import threading
 import time
 
 import benchlib
@@ -120,8 +122,8 @@ class Adapter(object):
 
     # -- shared helpers -------------------------------------------------
 
-    def _time_stream(self, side, read_line, started):
-        """Times from `started` to the side's markers, reading `read_line`.
+    def _time_stream(self, side, reader, started):
+        """Times from `started` to the side's markers, reading from `reader`.
 
         The clock is started by the caller immediately before the process is
         spawned, so it spans process creation too -- which is part of what a
@@ -130,23 +132,75 @@ class Adapter(object):
 
         Returns (upper_ms, lower_ms). `lower_ms` is None for a side that emits
         only one marker, and the report then treats the bracket as a point.
+
+        Both limits are enforced by the CLOCK, never by the child's output.
+        `reader` is a _LineReader, whose get() gives up after a timeout, so a
+        launch that hangs before its marker is abandoned at LAUNCH_TIMEOUT_S,
+        and an application that goes quiet after its last marker -- which is
+        what a healthy one does -- is let go at SETTLE_S. With a blocking
+        readline both waited for one more line that might never come, and the
+        job sat until the workflow's own two-hour timeout.
         """
         marker = MARKERS[side]
         lower_marker = LOWER_BOUND_MARKERS.get(side)
         upper = None
         lower = None
         deadline = started + LAUNCH_TIMEOUT_S
-        while time.time() < deadline:
-            line = read_line()
-            if line is None:
+        while True:
+            now = time.time()
+            if now >= deadline:
                 break
+            if upper is not None and now - started >= SETTLE_S:
+                break
+            limit = deadline if upper is None else min(deadline, started + SETTLE_S)
+            line = reader.get(max(0.0, limit - now))
+            if line is _LineReader.EOF:
+                break
+            if line is None:
+                continue  # timed out; the checks above decide whether to stop
             if lower is None and lower_marker and lower_marker.search(line):
                 lower = (time.time() - started) * 1000.0
             if upper is None and marker.search(line):
                 upper = (time.time() - started) * 1000.0
-            if upper is not None and time.time() - started > SETTLE_S:
-                break
         return upper, lower
+
+
+class _LineReader(object):
+    """A child's output as lines that can be waited for WITH A TIMEOUT.
+
+    A pipe's readline() blocks until the child writes or exits, and nothing in
+    the standard library puts a timeout on it portably -- select() does not
+    work on pipes on Windows. So one daemon thread per stream does the blocking
+    read and hands lines over through a queue, and the reader waits on the
+    queue instead.
+    """
+
+    EOF = object()
+
+    def __init__(self, stream, on_line=None):
+        self._lines = queue.Queue()
+        self._on_line = on_line
+        thread = threading.Thread(target=self._pump, args=(stream,))
+        thread.daemon = True
+        thread.start()
+
+    def _pump(self, stream):
+        try:
+            for line in iter(stream.readline, ""):
+                if self._on_line is not None:
+                    self._on_line(line)
+                self._lines.put(line)
+        except (OSError, ValueError):
+            pass  # the stream was closed under us; that is an end too
+        finally:
+            self._lines.put(_LineReader.EOF)
+
+    def get(self, timeout):
+        """The next line, _LineReader.EOF at the end, or None on timeout."""
+        try:
+            return self._lines.get(timeout=timeout)
+        except queue.Empty:
+            return None
 
 
 # ----------------------------------------------------------------------
@@ -169,8 +223,7 @@ class _ProcessAdapter(Adapter):
             [exe], stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
             text=True, bufsize=1, env=dict(os.environ, BENCH_MARKERS="1"))
         try:
-            upper, lower = self._time_stream(
-                side, lambda: proc.stdout.readline() or None, started)
+            upper, lower = self._time_stream(side, _LineReader(proc.stdout), started)
             memory = self._memory(proc.pid) if upper is not None else None
             return upper, lower, memory
         finally:
@@ -236,7 +289,8 @@ class MacOSAdapter(_ProcessAdapter):
 
 
 class LinuxAdapter(_ProcessAdapter):
-    """Linux desktop: Flutter's `linux` target against Codename One's JavaSE.
+    """Linux desktop: Flutter's `linux` bundle against Codename One's NATIVE
+    Linux port (ParparVM to an ELF against GTK3/Cairo), not the JVM build.
 
     NOT YET EXERCISED. The mechanics are straightforward -- both sides are
     ELF executables that print to stdout, and /proc reports memory exactly --
@@ -269,16 +323,11 @@ class LinuxAdapter(_ProcessAdapter):
         return self.apps[side]
 
     def _executable(self, side):
-        path = self.apps[side]
-        if os.path.isfile(path) and os.access(path, os.X_OK):
-            return path
-        raise Unavailable("no executable at %s" % path)
+        return _launchable(self.apps[side], _is_linux_executable, "ELF executable")
 
     def code_size(self, side):
-        try:
-            return os.path.getsize(self._executable(side))
-        except (OSError, Unavailable):
-            return None
+        """Every ELF in the artifact: see benchlib.elf_code_size for why."""
+        return benchlib.elf_code_size(self.apps[side])
 
     def _memory(self, pid):
         """VmRSS from /proc, which is what Linux memory limits act on."""
@@ -290,6 +339,59 @@ class LinuxAdapter(_ProcessAdapter):
         except OSError:
             return None
         return None
+
+
+def _launchable(artifact, is_executable, kind):
+    """The one binary to launch in a desktop artifact.
+
+    The recipes hand over what each toolchain produces, which is a DIRECTORY:
+    Flutter's Linux bundle and Windows Release folder, and the result folder
+    of Codename One's native builders. Popen cannot launch a directory, so
+    accepting only an executable file reported every desktop side as having no
+    executable at all. A file is still taken as-is.
+
+    Top level only, deliberately: the libraries each runtime ships beside its
+    launcher live in subfolders or carry library names, and more than one
+    candidate is reported rather than guessed at -- launching the wrong one
+    would time something that is not the application.
+    """
+    if os.path.isfile(artifact):
+        if is_executable(artifact):
+            return artifact
+        raise Unavailable("%s is not an %s" % (artifact, kind))
+    if not os.path.isdir(artifact):
+        raise Unavailable("no artifact at %s" % artifact)
+    found = sorted(os.path.join(artifact, name) for name in os.listdir(artifact)
+                   if is_executable(os.path.join(artifact, name)))
+    if len(found) == 1:
+        return found[0]
+    if not found:
+        raise Unavailable("no %s in %s" % (kind, artifact))
+    raise Unavailable("more than one %s in %s, refusing to guess: %s"
+                      % (kind, artifact, ", ".join(os.path.basename(f) for f in found)))
+
+
+def _is_linux_executable(path):
+    """An ELF regular file with the execute bit that is not a shared library.
+
+    The name decides the library case, because the ELF type cannot: a modern
+    position-independent executable is ET_DYN exactly like a .so, and builds
+    commonly leave the execute bit set on libraries too.
+    """
+    name = os.path.basename(path)
+    if not os.path.isfile(path) or os.path.islink(path) or not os.access(path, os.X_OK):
+        return False
+    if name.endswith(".so") or ".so." in name:
+        return False
+    try:
+        with open(path, "rb") as handle:
+            return handle.read(4) == b"\x7fELF"
+    except OSError:
+        return False
+
+
+def _is_windows_executable(path):
+    return os.path.isfile(path) and path.lower().endswith(".exe")
 
 
 class WindowsAdapter(_ProcessAdapter):
@@ -317,13 +419,11 @@ class WindowsAdapter(_ProcessAdapter):
         return self.apps[side]
 
     def _executable(self, side):
-        return self.apps[side]
+        return _launchable(self.apps[side], _is_windows_executable, ".exe")
 
     def code_size(self, side):
-        try:
-            return os.path.getsize(self._executable(side))
-        except OSError:
-            return None
+        """Every PE image in the artifact: see benchlib.pe_code_size for why."""
+        return benchlib.pe_code_size(self.apps[side])
 
     def _memory(self, pid):
         out = benchlib.run([
@@ -409,17 +509,14 @@ class IOSAdapter(Adapter):
         pid_line = re.compile(r"^%s:\s*([0-9]+)\s*$" % re.escape(bundle))
         seen = {}
 
-        def read_line():
-            line = proc.stdout.readline()
-            if not line:
-                return None
+        def note_pid(line):
             match = pid_line.match(line.strip())
             if match:
                 seen["pid"] = int(match.group(1))
-            return line
 
         try:
-            upper, lower = self._time_stream(side, read_line, started)
+            upper, lower = self._time_stream(
+                side, _LineReader(proc.stdout, on_line=note_pid), started)
             memory = None
             if upper is not None:
                 memory = self._memory(bundle, seen.get("pid"))
@@ -490,6 +587,7 @@ class AndroidAdapter(Adapter):
         self.packages = packages
         self.activities = activities
         self.apks = apks
+        self._installed = set()
 
     def _adb(self, *args):
         cmd = ["adb"]
@@ -538,7 +636,29 @@ class AndroidAdapter(Adapter):
             "wire_bytes": self.wire_size_override(side),
         }
 
+    def _install(self, side):
+        """Installs the APK that was sized, once per run, replacing any other.
+
+        Launching without installing measured nothing on a fresh emulator --
+        the package was simply not there -- and on a reused device it could
+        measure whatever older build happened to be installed under the same
+        package, beside the size of the one that was built. Uninstalling first
+        rather than `install -r` also clears a copy signed with another key,
+        which `-r` refuses to replace.
+        """
+        if side in self._installed:
+            return
+        package = self.packages[side]
+        self._adb("uninstall", package)  # absent is fine; that is the usual case
+        out = self._adb("install", "-t", self.apks[side])
+        if out.returncode != 0 or "Success" not in (out.stdout or ""):
+            detail = ((out.stdout or "") + (out.stderr or "")).strip().splitlines()
+            raise Unavailable("could not install the %s apk: %s"
+                              % (side, detail[-1] if detail else "adb returned %d" % out.returncode))
+        self._installed.add(side)
+
     def launch_and_time(self, side):
+        self._install(side)
         package = self.packages[side]
         self._adb("shell", "am", "force-stop", package)
         self._adb("shell", "logcat", "-c")

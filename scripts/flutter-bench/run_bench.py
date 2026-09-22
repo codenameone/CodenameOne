@@ -125,7 +125,10 @@ def main(argv=None):
     parser.add_argument("--markdown")
     parser.add_argument("--workdir", default="/tmp")
     parser.add_argument("--gate", action="store_true",
-                        help="fail when a metric regresses past its baseline")
+                        help="fail when a metric regresses past its baseline, "
+                             "or when there is no baseline to compare against")
+    parser.add_argument("--baseline-out",
+                        help="write a baseline recorded from this run here")
     parser.add_argument("--list", action="store_true",
                         help="list adapters and whether each has been exercised")
     parser.add_argument("--render", nargs="*",
@@ -169,16 +172,30 @@ def main(argv=None):
 
     print(benchlib.render_markdown([report]))
 
+    if args.baseline_out:
+        _ensure_dir(args.baseline_out)
+        with open(args.baseline_out, "w") as handle:
+            json.dump(benchlib.baseline_candidate(report), handle, indent=2, sort_keys=True)
+        print("wrote baseline candidate %s" % args.baseline_out)
+
     findings = []
+    unarmed = False
     if args.gate:
-        baseline = benchlib.load_baseline(
-            os.path.join(BASELINES, "%s.json" % adapter.id))
+        relative = "scripts/flutter-bench/baselines/%s.json" % adapter.id
+        baseline = benchlib.load_baseline(os.path.join(BASELINES, "%s.json" % adapter.id))
         if baseline is None:
-            print("no baseline for %s yet; recording this run as the first"
-                  % adapter.id)
+            # A FAILURE, not a note. This used to print "recording this run as
+            # the first" and succeed -- while recording nothing -- so every run
+            # took this branch and the gate that was advertised never compared
+            # anything. An unarmed gate has to be visible where a gate's result
+            # is read, which is the job's status.
+            unarmed = True
+            report["gate"] = {"status": "unarmed", "baseline": relative,
+                              "reason": "no committed baseline for %s" % adapter.id}
         else:
             findings = benchlib.check_regressions(report, baseline)
             report["regressions"] = findings
+            report["gate"] = {"status": "armed", "baseline": relative}
 
     _write(args, report, [report])
 
@@ -186,6 +203,10 @@ def main(argv=None):
         print("\nREGRESSION")
         for line in benchlib.render_regressions(adapter.id, findings):
             print("  " + line)
+        return 1
+    if unarmed:
+        print("\nGATE NOT ARMED: %s has no committed baseline. Commit the candidate "
+              "this run wrote (--baseline-out) as %s." % (adapter.id, report["gate"]["baseline"]))
         return 1
     return 0
 

@@ -1,0 +1,184 @@
+#!/usr/bin/env python3
+"""Tests for the adapter mechanics that do not need a real build or device.
+
+    python3 scripts/flutter-bench/test_platforms.py
+
+Marker timing against real child processes, and how a desktop artifact
+directory is resolved to the binary to launch and the code to size. The
+measurements themselves still need real builds; see test_benchlib.py.
+"""
+
+import os
+import stat
+import subprocess
+import sys
+import tempfile
+import time
+import unittest
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+
+import benchlib  # noqa: E402
+import platforms  # noqa: E402
+
+
+def _child(code):
+    return subprocess.Popen([sys.executable, "-u", "-c", code],
+                            stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                            text=True, bufsize=1)
+
+
+class TimeStreamDeadlines(unittest.TestCase):
+    """The limits hold whatever the child does, because the clock enforces them."""
+
+    def setUp(self):
+        self._saved = (platforms.LAUNCH_TIMEOUT_S, platforms.SETTLE_S)
+        platforms.LAUNCH_TIMEOUT_S = 2.0
+        platforms.SETTLE_S = 1.0
+        self.adapter = platforms.Adapter()
+
+    def tearDown(self):
+        platforms.LAUNCH_TIMEOUT_S, platforms.SETTLE_S = self._saved
+
+    def _time(self, side, code):
+        proc = _child(code)
+        try:
+            started = time.time()
+            result = self.adapter._time_stream(side, platforms._LineReader(proc.stdout), started)
+            return result, time.time() - started
+        finally:
+            proc.kill()
+            proc.wait()
+
+    def test_a_silent_hang_is_abandoned_at_the_launch_timeout(self):
+        (upper, lower), elapsed = self._time("codenameone", "import time; time.sleep(60)")
+        self.assertIsNone(upper)
+        self.assertLess(elapsed, 5.0, "a blocking read would have waited out the child")
+
+    def test_a_quiet_app_after_its_marker_is_let_go_at_settle(self):
+        # What a HEALTHY app does: print the marker, then nothing. The loop used
+        # to wait for another line before it would look at the settle time.
+        (upper, _), elapsed = self._time(
+            "codenameone", "import time; print('BENCH:FIRSTFRAME'); time.sleep(60)")
+        self.assertIsNotNone(upper)
+        self.assertLess(elapsed, 2.5)
+        self.assertGreaterEqual(elapsed, 0.9, "the idle period is still waited for")
+
+    def test_the_flutter_bracket_is_still_read(self):
+        (upper, lower), _ = self._time(
+            "flutter", "import time; print('BENCH:FIRSTCONTENT'); time.sleep(0.2);"
+                       "print('BENCH:RASTERDONE'); time.sleep(60)")
+        self.assertIsNotNone(lower)
+        self.assertIsNotNone(upper)
+        self.assertLessEqual(lower, upper)
+
+    def test_an_exit_ends_the_wait(self):
+        (upper, _), elapsed = self._time("codenameone", "print('unrelated')")
+        self.assertIsNone(upper)
+        self.assertLess(elapsed, 1.5)
+
+
+class DesktopArtifacts(unittest.TestCase):
+    """A recipe hands over a DIRECTORY; the adapter finds the binary in it."""
+
+    def setUp(self):
+        self.dir = tempfile.mkdtemp()
+
+    def _file(self, rel, head, executable=False, size=100):
+        path = os.path.join(self.dir, rel)
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        with open(path, "wb") as handle:
+            handle.write(head + b"\0" * (size - len(head)))
+        if executable:
+            os.chmod(path, os.stat(path).st_mode | stat.S_IXUSR)
+        return path
+
+    def test_linux_bundle_launches_the_executable_and_sizes_every_elf(self):
+        exe = self._file("gallery", b"\x7fELF", executable=True, size=100)
+        self._file("lib/libapp.so", b"\x7fELF", executable=True, size=5000)
+        self._file("lib/libflutter_linux_gtk.so", b"\x7fELF", size=7000)
+        self._file("data/flutter_assets/AssetManifest.json", b"{}", size=900)
+        adapter = platforms.LinuxAdapter(self.dir, self.dir)
+        self.assertEqual(exe, adapter._executable("flutter"),
+                         "a shared library with an executable bit is not the app")
+        self.assertEqual(12100, adapter.code_size("flutter"),
+                         "the Dart image and the engine are code too, not just the launcher")
+
+    def test_linux_ambiguity_fails_loudly(self):
+        self._file("one", b"\x7fELF", executable=True)
+        self._file("two", b"\x7fELF", executable=True)
+        with self.assertRaises(platforms.Unavailable):
+            platforms.LinuxAdapter(self.dir, self.dir)._executable("flutter")
+
+    def test_windows_release_directory_sizes_every_pe_image(self):
+        exe = self._file("gallery.exe", b"MZ", size=100)
+        self._file("flutter_windows.dll", b"MZ", size=9000)
+        self._file("data/app.so", b"\x7fELF", size=4000)
+        adapter = platforms.WindowsAdapter(self.dir, self.dir)
+        self.assertEqual(exe, adapter._executable("flutter"))
+        self.assertEqual(9100, benchlib.pe_code_size(self.dir))
+
+    def test_a_file_artifact_is_used_as_is(self):
+        exe = self._file("Bench", b"\x7fELF", executable=True)
+        self.assertEqual(exe, platforms.LinuxAdapter(exe, exe)._executable("codenameone"))
+
+
+class AndroidInstall(unittest.TestCase):
+    """The APK that was sized is the one launched, installed fresh."""
+
+    def setUp(self):
+        self.bin = tempfile.mkdtemp()
+        self.log = os.path.join(self.bin, "calls.log")
+        self.result = os.path.join(self.bin, "install_result")
+        with open(self.result, "w") as handle:
+            handle.write("Success")
+        adb = os.path.join(self.bin, "adb")
+        with open(adb, "w") as handle:
+            handle.write("#!/bin/sh\n"
+                         "echo \"$*\" >> '%s'\n"
+                         "case \"$*\" in *\\ install\\ *|install\\ *) cat '%s';; "
+                         "*'am start'*) echo 'TotalTime: 123';; esac\n"
+                         % (self.log, self.result))
+        os.chmod(adb, 0o755)
+        self._path = os.environ["PATH"]
+        os.environ["PATH"] = self.bin + os.pathsep + self._path
+        self._settle = platforms.SETTLE_S
+        platforms.SETTLE_S = 0
+        apk = os.path.join(self.bin, "app.apk")
+        open(apk, "wb").close()
+        self.adapter = platforms.AndroidAdapter(
+            None, {"codenameone": "com.example.bench", "flutter": "com.x.gallery"},
+            {"codenameone": ".Main", "flutter": ".MainActivity"},
+            {"codenameone": apk, "flutter": apk})
+
+    def tearDown(self):
+        os.environ["PATH"] = self._path
+        platforms.SETTLE_S = self._settle
+
+    def _calls(self):
+        with open(self.log) as handle:
+            return [line.strip() for line in handle]
+
+    def test_uninstalls_then_installs_before_the_first_launch_only(self):
+        cold, _, _ = self.adapter.launch_and_time("codenameone")
+        self.adapter.launch_and_time("codenameone")
+        calls = self._calls()
+        installs = [c for c in calls if c.startswith("install")]
+        self.assertEqual(1, len(installs), "once per run, not per launch: %s" % calls)
+        self.assertLess(calls.index("uninstall com.example.bench"), calls.index(installs[0]))
+        first_start = next(i for i, c in enumerate(calls) if "am start" in c)
+        self.assertLess(calls.index(installs[0]), first_start, "installed before it is launched")
+        self.assertEqual(123.0, cold)
+
+    def test_a_failed_install_is_reported_not_measured(self):
+        with open(self.result, "w") as handle:
+            handle.write("Failure [INSTALL_PARSE_FAILED_NO_CERTIFICATES]")
+        with self.assertRaises(platforms.Unavailable) as caught:
+            self.adapter.launch_and_time("flutter")
+        self.assertIn("NO_CERTIFICATES", str(caught.exception))
+        self.assertFalse(any("am start" in c for c in self._calls()),
+                         "nothing may be timed when the install failed")
+
+
+if __name__ == "__main__":
+    unittest.main()

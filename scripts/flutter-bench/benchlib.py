@@ -58,6 +58,19 @@ METRIC_LABELS = dict((key, label) for key, label, _unit in METRICS)
 
 SIDES = ("codenameone", "flutter")
 
+# The band a freshly recorded baseline gets, per metric. Size is deterministic
+# on a runner, so it gets a tight band; wall-clock start-up on a shared runner
+# is not, and a band tight enough to catch a real regression there would fire on
+# load alone; memory at rest sits between the two. Written INTO each baseline
+# file, so a platform that needs a different band says so in the file itself.
+DEFAULT_TOLERANCES = {
+    "install_bytes": 0.02,
+    "code_bytes": 0.02,
+    "wire_bytes": 0.02,
+    "cold_start_ms": 0.25,
+    "idle_memory_bytes": 0.15,
+}
+
 
 # ----------------------------------------------------------------------
 # Sizing. Portable: every platform ships either a directory tree or a
@@ -140,20 +153,54 @@ def macho_code_size(bundle):
     asks "how many bytes of compiled code does this application ship", which
     is the same question on both sides however each chooses to lay them out.
     """
+    return _sum_by_magic(bundle, lambda head: head[:4] in _MACHO_MAGIC)
+
+
+def elf_code_size(tree):
+    """Every ELF file under `tree`, summed: the Linux counterpart of the above.
+
+    The same trap exists on Linux. Flutter's bundle puts the Dart AOT image in
+    lib/libapp.so and the engine in lib/libflutter_linux_gtk.so, and the
+    `gallery` executable beside them is a launcher; sizing the executable alone
+    would repeat the iOS mistake. Codename One ships its executable plus any
+    native libraries it dlopens, and those are counted the same way.
+    """
+    return _sum_by_magic(tree, lambda head: head[:4] == b"\x7fELF")
+
+
+def pe_code_size(tree):
+    """Every PE image (.exe and .dll) under `tree`, summed; see elf_code_size.
+
+    Flutter's Windows Release directory is gallery.exe beside flutter_windows.dll
+    and the Dart image, so again the executable is only part of the code.
+    """
+    return _sum_by_magic(tree, lambda head: head[:2] == b"MZ")
+
+
+def _sum_by_magic(tree, matches):
+    """Bytes of every regular file under `tree` whose header `matches`, or None.
+
+    Identified by magic bytes rather than extension, so an unconventionally
+    named library is still counted and a data file named like one is not.
+    """
+    if os.path.isfile(tree):
+        paths = [tree]
+    else:
+        paths = []
+        for root, _dirs, files in os.walk(tree):
+            paths.extend(os.path.join(root, name) for name in files)
     total = 0
     found = False
-    for root, _dirs, files in os.walk(bundle):
-        for name in files:
-            full = os.path.join(root, name)
-            if os.path.islink(full):
-                continue
-            try:
-                with open(full, "rb") as handle:
-                    if handle.read(4) in _MACHO_MAGIC:
-                        total += os.path.getsize(full)
-                        found = True
-            except OSError:
-                continue
+    for full in paths:
+        if os.path.islink(full):
+            continue
+        try:
+            with open(full, "rb") as handle:
+                if matches(handle.read(4)):
+                    total += os.path.getsize(full)
+                    found = True
+        except OSError:
+            continue
     return total if found else None
 
 
@@ -321,6 +368,10 @@ def render_markdown(reports, title="Flutter vs Codename One"):
                          "as a range and the ratio uses the end least "
                          "favourable to Codename One.")
             lines.append("")
+        gate_line = render_gate(report)
+        if gate_line:
+            lines.append(gate_line)
+            lines.append("")
         for note in report.get("notes", []) or []:
             lines.append("> %s" % note)
         if report.get("notes"):
@@ -394,6 +445,42 @@ def check_regressions(report, baseline):
                 "over_by": round((actual / float(expected) - 1.0) * 100.0, 1),
             })
     return findings
+
+
+def baseline_candidate(report):
+    """A baseline recorded from this run, ready to commit as-is.
+
+    Only Codename One's figures, for the same reason only they are gated.
+    Written by every gated run, so re-baselining after a deliberate change --
+    a Flutter SDK bump moves every number -- is copying one file, not
+    re-deriving it by hand.
+    """
+    values = {}
+    for key, _label, _unit in METRICS:
+        value = report.get("codenameone", {}).get(key)
+        if value is not None:
+            values[key] = value
+    return {
+        "schema_version": 1,
+        "platform": report.get("platform"),
+        "generated_at": report.get("generated_at"),
+        "tolerances": dict((k, DEFAULT_TOLERANCES[k]) for k in values if k in DEFAULT_TOLERANCES),
+        "codenameone": values,
+    }
+
+
+def render_gate(report):
+    """One line saying whether this platform's numbers were actually gated."""
+    gate = report.get("gate")
+    if not gate:
+        return None
+    if gate.get("status") == "armed":
+        findings = report.get("regressions") or []
+        return ("**Gate:** %s against the committed baseline."
+                % ("REGRESSED" if findings else "within tolerance"))
+    return ("**Gate: NOT ARMED** -- %s. This run's candidate baseline is attached "
+            "to the workflow as an artifact; committing it as `%s` arms the gate."
+            % (gate.get("reason", "no baseline"), gate.get("baseline", "baselines/<platform>.json")))
 
 
 def render_regressions(platform_id, findings):

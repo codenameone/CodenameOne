@@ -1,17 +1,17 @@
 #!/usr/bin/env python3
-"""Folds benchmark results into the website's port status data.
+"""Folds benchmark results into one document for the website's data.
 
-    scripts/flutter-bench/port_status.py --results 'out/*.json' \
-        --out docs/website/data/port_status_reports
+    scripts/flutter-bench/port_status.py --results 'out/result-*.json' \
+        --out <dir>
 
-Writes ONE file, `flutter_benchmark.json`, beside the per-port reports rather
-than adding a key to each of them. That is deliberate: the port status
-contract check (`scripts/website/validate_port_status.mjs`) asserts the
-rendered page's exact shape -- 10 performance rows of 12 cells, 8 deployment
-rows -- so widening the existing reports would fail a check that has nothing
-to do with this benchmark, and the failure would point at the page rather than
-at the change that caused it. A separate file can be rendered into its own
-section without disturbing those counts.
+Writes ONE file, `<dir>/flutter_benchmark.json`. The nightly workflow publishes
+it to the port-status-data branch as benchmarks/flutter.json (publish_benchmark.py),
+and the website build resolves it into data/port_status_flutter_benchmark.json
+(scripts/website/sync_port_status_reports.sh), the same road every port's own
+status report travels. It is a separate document rather than a key on each port
+report because it is not a port report: the per-port acceptance check would
+rightly reject it, and the Port Status page's contract check asserts that page's
+exact shape.
 
 The file records, per platform, both sides' figures and the ratio, plus the
 provenance needed to know what produced them: the commit, the Flutter SDK

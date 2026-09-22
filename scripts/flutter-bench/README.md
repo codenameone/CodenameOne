@@ -54,17 +54,19 @@ scripts/flutter-bench/app/prepare.sh --work /tmp/fbench \
 
 scripts/flutter-bench/app/build_apps.sh --work /tmp/fbench --platform macos
 
-python3 scripts/flutter-bench/run_bench.py --platform macos \
-    --cn1-app     /tmp/fbench/cn1/javase/target/....app \
-    --flutter-app /tmp/fbench/flutter/build/macos/Build/Products/Release/gallery.app \
-    --json /tmp/macos.json
+# the cn1= and flutter= paths build_apps.sh printed
+scripts/flutter-bench/app/measure.sh macos <cn1-artifact> <flutter-artifact> /tmp/fbench-out
 ```
+
+`measure.sh` is what every CI leg runs, so a local run measures exactly what CI
+does. It writes `result-<platform>.json` and `baseline-<platform>.json`.
 
 `run_bench.py --list` reports which platform adapters have been **exercised
 end to end**, which is deliberately not the same question as which ones exist.
 
 ```bash
-python3 scripts/flutter-bench/test_benchlib.py   # the arithmetic, 21 tests
+python3 scripts/flutter-bench/test_benchlib.py    # the arithmetic and the gate
+python3 scripts/flutter-bench/test_platforms.py   # marker timing, artifacts, installs
 ```
 
 ## Why the numbers are shaped the way they are
@@ -109,6 +111,21 @@ result, and several were caught only after being measured the wrong way first.
   are outside our control, so a Flutter SDK upgrade that grows their build
   must not turn our build red.
 
+- **A platform with no baseline FAILS.** The gate compares against
+  `baselines/<platform>.json`. Without one there is nothing to compare, and a
+  gate that passes in that state is indistinguishable from one that checked --
+  so the run fails, says the gate is not armed, and leaves the baseline it
+  recorded (`baseline-<platform>.json`) in the workflow artifact. Committing
+  that file arms the gate; re-committing it after a deliberate change (a
+  Flutter SDK bump moves every number) re-baselines it. Each baseline carries
+  its own tolerances: 2% for sizes, 25% for start-up, 15% for memory.
+
+- **Deadlines are enforced by the clock.** Output is read on a thread with a
+  timeout, so a launch that hangs before its marker is abandoned at the launch
+  timeout and a healthy application that goes quiet after its last marker is
+  let go at the settle time. A blocking `readline()` waited for one more line
+  in both cases, and the job sat until the workflow's own timeout.
+
 ## Nothing here uses the cloud builder
 
 Every recipe in `app/build_apps.sh` builds on the machine it runs on. The
@@ -135,9 +152,42 @@ and the GTK3 development packages respectively. Where one is missing the
 Codename One half fails loudly rather than falling back to a JVM build that
 would quietly produce an incomparable number.
 
+## Per-platform mechanics
+
+- **Desktop artifacts are directories.** Flutter's Linux bundle and Windows
+  Release folder, and the result folder of Codename One's native builders, are
+  handed over whole; the adapter launches the one executable at the top level
+  and refuses to guess if there is more than one. The Codename One path comes
+  from what the native builder logs ("Built native Linux executable: ..."),
+  not from a guessed directory name.
+- **Code size is every native image**, as on Apple platforms: all ELF files on
+  Linux and all PE images on Windows. Flutter's Dart image is lib/libapp.so and
+  its engine a separate library, so the launcher alone would be a fraction of
+  its code.
+- **Linux measures under Xvfb.** Both applications are GTK programs. The
+  xvfb-run around the Maven build ends with that build, so the measurement
+  starts its own.
+- **Android runs on an emulator** (the same API level and image as the Android
+  port's instrumentation leg), and each APK is installed fresh -- uninstalled
+  first -- so the build that was sized is the build that is launched. Codename
+  One's `assembleRelease` output is unsigned, which `adb` refuses to install;
+  it is signed with the debug key, as Flutter's release template already is,
+  so both sides carry a signature. Its launcher activity is `.BenchStub`, not
+  `.MainActivity`.
+
+## Where the numbers go
+
+Every run posts the comment on the pull request. A nightly or dispatched run
+on master also publishes the folded results to the `port-status-data` branch
+as `benchmarks/flutter.json`, and the website build resolves that into
+`data/port_status_flutter_benchmark.json`. It is not rendered on the Port
+Status page, which by design carries no framework comparison.
+
 ## Known constraints
 
 - **No adapter has been exercised end to end yet.** The Codename One side of
   the `macos` recipe has been built from a prepared tree, and `prepare.sh`
   itself is verified; the native compile steps and every other platform are
   not. `run_bench.py --list` reports this rather than implying otherwise.
+- **No baseline is committed yet**, so every measured platform currently fails
+  its gate by design until its first recorded baseline is committed.

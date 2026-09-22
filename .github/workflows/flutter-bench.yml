@@ -307,28 +307,58 @@ jobs:
           grep '^cn1='     "${RUNNER_TEMP}/paths.txt" >> "$GITHUB_OUTPUT"
           grep '^flutter=' "${RUNNER_TEMP}/paths.txt" >> "$GITHUB_OUTPUT"
 
+      # Every leg runs the same measure.sh; the legs differ only in what wraps it.
+      #
+      # Linux runs under Xvfb because both applications are GTK programs that
+      # need a display. build_apps.sh's xvfb-run does not help here: it lives
+      # exactly as long as the Maven build it wraps, so the Measure step started
+      # with no display at all and the adapter reported the platform
+      # unavailable after both applications had built.
       - name: Measure
-        # --gate compares this run against the committed baseline for the
-        # platform and exits non-zero past the tolerance band. Reported through
-        # the job's own status rather than swallowed, but the comment is still
-        # published below so a reviewer sees the numbers that failed it.
+        if: ${{ matrix.platform != 'android' }}
         shell: bash
         run: |
-          python3 scripts/flutter-bench/run_bench.py \
-              --platform "${{ matrix.platform }}" \
-              --cn1-app     "${{ steps.build.outputs.cn1 }}" \
-              --flutter-app "${{ steps.build.outputs.flutter }}" \
-              --cn1-bundle com.example.bench \
-              --flutter-bundle com.codenameone.bench.gallery \
-              --json "${RUNNER_TEMP}/result-${{ matrix.platform }}.json" \
-              --gate
+          prefix=""
+          if [ "$RUNNER_OS" = "Linux" ]; then
+            prefix="xvfb-run -a"
+          fi
+          $prefix scripts/flutter-bench/app/measure.sh "${{ matrix.platform }}" \
+              "${{ steps.build.outputs.cn1 }}" "${{ steps.build.outputs.flutter }}" \
+              "${RUNNER_TEMP}/bench-out"
 
+      # Android needs a device. A hosted runner has none, so the adapter found no
+      # emulator and recorded the whole platform as unavailable after building
+      # both APKs. Same emulator, API level and image as the Android port's own
+      # instrumentation leg (scripts-android.yml).
+      - name: Enable KVM for the Android emulator
+        if: ${{ matrix.platform == 'android' }}
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - name: Measure on an Android emulator
+        if: ${{ matrix.platform == 'android' }}
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 36
+          arch: x86_64
+          target: google_apis
+          disk-size: 4096M
+          # One line: the action runs each line of `script` in its own shell.
+          script: scripts/flutter-bench/app/measure.sh android "${{ steps.build.outputs.cn1 }}" "${{ steps.build.outputs.flutter }}" "${{ runner.temp }}/bench-out"
+
+      # The result and the baseline recorded from it. The baseline is what a
+      # human commits to arm the gate, so it travels with the result rather than
+      # having to be re-derived.
       - name: Upload the result
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: flutter-bench-${{ matrix.platform }}
-          path: ${{ runner.temp }}/result-${{ matrix.platform }}.json
+          path: |
+            ${{ runner.temp }}/bench-out/result-${{ matrix.platform }}.json
+            ${{ runner.temp }}/bench-out/baseline-${{ matrix.platform }}.json
           if-no-files-found: warn
 
   publish:
@@ -339,6 +369,12 @@ jobs:
     # comment as well would leave the failure with no explanation attached.
     if: always()
     runs-on: ubuntu-latest
+    # Write access for the scheduled publication to the port-status-data
+    # branch. Job-scoped, and job permissions replace the workflow's, so the
+    # comment's permission is restated.
+    permissions:
+      contents: write
+      pull-requests: write
     steps:
       - uses: actions/checkout@v4
 
@@ -352,7 +388,7 @@ jobs:
       - name: Render the comment
         run: |
           python3 scripts/flutter-bench/run_bench.py \
-              --render 'results/*.json' \
+              --render 'results/result-*.json' \
               --markdown flutter-benchmark.md
           cat flutter-benchmark.md
 
@@ -369,12 +405,24 @@ jobs:
               reportPath: 'flutter-benchmark.md',
             });
 
-      - name: Update the port status performance data
-        if: ${{ github.event_name == 'schedule' }}
+      # Published to the data branch the website build reads, the way every
+      # port's own status is. Writing it into docs/website in this job's
+      # checkout, as this step used to, put it where nothing would ever see it:
+      # the checkout is discarded when the job ends and nothing committed it.
+      # Master-only, like the port reports, so a branch's numbers never reach
+      # the public page.
+      - name: Publish the benchmark to the port status data
+        if: >-
+          github.ref == 'refs/heads/master' &&
+          (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch')
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           python3 scripts/flutter-bench/port_status.py \
-              --results 'results/*.json' \
-              --out docs/website/data/port_status_reports
+              --results 'results/result-*.json' \
+              --out "${RUNNER_TEMP}/port-status"
+          python3 scripts/flutter-bench/publish_benchmark.py \
+              "${RUNNER_TEMP}/port-status/flutter_benchmark.json" "${{ github.repository }}"
 
       - name: Upload the rendered report
         if: always()

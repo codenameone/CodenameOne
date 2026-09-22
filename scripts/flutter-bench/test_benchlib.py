@@ -11,6 +11,7 @@ real builds and real devices, and `run_bench.py --list` reports which of them
 have ever been run rather than pretending otherwise.
 """
 
+import json
 import os
 import sys
 import tempfile
@@ -178,6 +179,77 @@ class MarkdownTest(unittest.TestCase):
         report = _report({"install_bytes": 10}, {"install_bytes": 20})
         wins, measured = benchlib.tally([report])
         self.assertEqual((wins, measured), (1, 1))
+
+
+class GateArming(unittest.TestCase):
+    """A gate with no baseline must say so where gates are read: the exit status."""
+
+    def _report(self, install=1000):
+        return {"platform": "fake", "generated_at": "2026-01-01T00:00:00Z",
+                "codenameone": {"install_bytes": install, "cold_start_ms": 500.0,
+                                "code_bytes": None},
+                "flutter": {"install_bytes": 2000}}
+
+    def test_candidate_holds_only_codenameone_values_with_their_bands(self):
+        c = benchlib.baseline_candidate(self._report())
+        self.assertEqual({"install_bytes": 1000, "cold_start_ms": 500.0}, c["codenameone"])
+        self.assertEqual({"install_bytes": 0.02, "cold_start_ms": 0.25}, c["tolerances"])
+        self.assertEqual([], benchlib.check_regressions(self._report(), c),
+                         "a run compared against its own candidate is within tolerance")
+
+    def test_unarmed_gate_is_rendered_as_such(self):
+        report = dict(self._report(), gate={"status": "unarmed", "reason": "no committed baseline",
+                                            "baseline": "scripts/flutter-bench/baselines/fake.json"})
+        self.assertIn("NOT ARMED", benchlib.render_gate(report))
+
+    def _main(self, baseline):
+        import run_bench
+        work = tempfile.mkdtemp()
+        report = self._report()
+
+        class Stub(object):
+            id = "fake"
+            label = "Fake"
+            exercised = True
+
+            def available(self):
+                return True, None
+
+            def notes(self):
+                return []
+
+        saved = (run_bench.build_adapter, run_bench.measure, run_bench.BASELINES)
+        run_bench.build_adapter = lambda args: Stub()
+        run_bench.measure = lambda adapter, runs, workdir: (
+            {side: {"artifact": "x", "install_bytes": report[side]["install_bytes"],
+                    "cold_start_runs": [500.0], "cold_start_lower_runs": [],
+                    "idle_memory_runs": []} for side in benchlib.SIDES}, [])
+        run_bench.BASELINES = work
+        try:
+            if baseline is not None:
+                with open(os.path.join(work, "fake.json"), "w") as handle:
+                    json.dump(baseline, handle)
+            out = os.path.join(work, "result.json")
+            candidate = os.path.join(work, "candidate.json")
+            code = run_bench.main(["--platform", "fake", "--gate", "--json", out,
+                                   "--baseline-out", candidate, "--runs", "1"])
+            with open(out) as handle:
+                written = json.load(handle)
+            return code, written, os.path.exists(candidate)
+        finally:
+            run_bench.build_adapter, run_bench.measure, run_bench.BASELINES = saved
+
+    def test_a_missing_baseline_fails_the_run_and_leaves_a_candidate(self):
+        code, written, candidate_written = self._main(None)
+        self.assertEqual(1, code, "an unarmed gate must not report success")
+        self.assertEqual("unarmed", written["gate"]["status"])
+        self.assertTrue(candidate_written)
+
+    def test_an_armed_gate_within_tolerance_passes(self):
+        baseline = {"codenameone": {"install_bytes": 1000}, "tolerances": {"install_bytes": 0.02}}
+        code, written, _ = self._main(baseline)
+        self.assertEqual(0, code)
+        self.assertEqual("armed", written["gate"]["status"])
 
 
 if __name__ == "__main__":
