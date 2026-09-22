@@ -118,7 +118,11 @@ result, and several were caught only after being measured the wrong way first.
   recorded (`baseline-<platform>.json`) in the workflow artifact. Committing
   that file arms the gate; re-committing it after a deliberate change (a
   Flutter SDK bump moves every number) re-baselines it. Each baseline carries
-  its own tolerances: 2% for sizes, 25% for start-up, 15% for memory.
+  its own tolerances: 2% for sizes, 25% for start-up, 15% for memory. A metric
+  with no tolerance is recorded but not gated, and the file says why: macOS
+  start-up is one, because the hosted runner spread a single run from 465 to
+  2588 ms at a load of 12-32, and no band wide enough to ignore that catches
+  anything.
 
 - **Deadlines are enforced by the clock.** Output is read on a thread with a
   timeout, so a launch that hangs before its marker is abandoned at the launch
