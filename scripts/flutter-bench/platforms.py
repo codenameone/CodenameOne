@@ -669,13 +669,15 @@ class AndroidAdapter(Adapter):
         }
 
     def notes(self):
+        # Each note parenthesized: a list of bare adjacent literals is where a
+        # missing comma silently merges two items, so every boundary is explicit.
         return [
-            "Android sizes are for the arm64-v8a slice a phone is delivered, on both "
-            "sides; Flutter's release apk carries three ABIs and would otherwise count "
-            "its engine about three times.",
-            "Android start-up and memory come from an x86_64 emulator with a software "
-            "GPU. They compare the two runtimes on one machine; they are not phone "
-            "timings, and a renderer that leans on the GPU is penalised more there.",
+            ("Android sizes are for the arm64-v8a slice a phone is delivered, on both "
+             "sides; Flutter's release apk carries three ABIs and would otherwise count "
+             "its engine about three times."),
+            ("Android start-up and memory come from an x86_64 emulator with a software "
+             "GPU. They compare the two runtimes on one machine; they are not phone "
+             "timings, and a renderer that leans on the GPU is penalised more there."),
         ]
 
     def _install(self, side):
