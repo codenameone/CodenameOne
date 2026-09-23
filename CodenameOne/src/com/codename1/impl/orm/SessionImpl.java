@@ -51,9 +51,22 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
     private int deferredFetch;
     private int aliasSequence;
     String deleteFrom(String table, String alias) {
+        // Older platform SQLite versions do not accept a DELETE target alias.
+        if ("sqlite".equals(sql.dialect())) {
+            return "DELETE FROM " + q(table);
+        }
         // MariaDB before 11.6 needs the target alias before FROM.
         String prefix = "mysql".equals(sql.dialect()) ? "DELETE " + alias + " FROM " : "DELETE FROM ";
         return prefix + q(table) + " AS " + alias;
+    }
+    QueryImpl queryForDelete(EntityModel model) {
+        return new QueryImpl(this, model, "sqlite".equals(sql.dialect()) ? q(model.table()) : nextAlias());
+    }
+    String orderValue(String expression, int kind) {
+        return sql.orderValue(expression, kind);
+    }
+    String orderBy(String expression, boolean ascending, int kind) {
+        return sql.orderBy(expression, ascending, kind);
     }
     String nextAlias() {
         return "q" + (aliasSequence++);
@@ -63,7 +76,7 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
         for (EntityModel candidate : models.values()) {
             String binary = candidate.type().getName();
             if (binary.equals(name) ||
-                    binary.substring(Math.max(binary.lastIndexOf('.'), binary.lastIndexOf('$')) + 1).equals(name)) {
+                    binary.substring(binary.lastIndexOf('.') + 1).equals(name)) {
                 if (result != null) {
                     throw new IllegalArgumentException("Ambiguous entity name: " + name);
                 }
@@ -1293,9 +1306,9 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
                     statement.append(',');
                 }
                 first = false;
-                statement.append("t.")
-                        .append(q(target.attributes()[target.index(parts[0])].column))
-                        .append(parts.length > 1 && "DESC".equalsIgnoreCase(parts[1]) ? " DESC" : " ASC");
+                Attribute attribute = target.attributes()[target.index(parts[0])];
+                statement.append(orderBy("t." + q(attribute.column),
+                        !(parts.length > 1 && "DESC".equalsIgnoreCase(parts[1])), attribute.kind));
             }
         } else if (relation.orderColumn.length() > 0) {
             statement.append(" ORDER BY l.").append(q(relation.orderColumn));

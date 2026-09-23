@@ -88,25 +88,35 @@ class ManagedSessionTest {
         EntityManager em=manager();
         try {
             Session s=em.openSession();Record r=seed(s);
-            assertSame(r,s.createQuery("select r from Record r where r.name = :name and (r.counter = 0 or r.counter > 3)",Record.class).setParameter("name","first").first());
-            assertEquals(Long.valueOf(1),s.createQuery("select count(r) from Record r",Long.class).first());
-            com.codename1.orm.session.JpqlQuery<Record> selection=s.createQuery("select r from Record r where r.name in :names and r.counter < 1e2",Record.class);
+            assertSame(r,s.createQuery("select r from ManagedSessionTest$Record r where r.name = :name and (r.counter = 0 or r.counter > 3)",Record.class).setParameter("name","first").first());
+            assertEquals(Long.valueOf(1),s.createQuery("select count(r) from ManagedSessionTest$Record r",Long.class).first());
+            com.codename1.orm.session.JpqlQuery<Record> selection=s.createQuery("select r from ManagedSessionTest$Record r where r.name in :names and r.counter < 1e2",Record.class);
             assertSame(r,selection.setParameter("names",java.util.Arrays.asList("first","second")).first());
             assertNull(selection.setParameter("names",java.util.Collections.emptyList()).first());
             assertSame(r,selection.setParameter("names",new String[]{"first"}).first());
-            assertNull(s.createQuery("select r from Record r where r.name = :name",Record.class).setParameter("name","' OR 1=1 --").first());
-            Object[] projection=s.createQuery("select r.name, sum(r.counter) from Record r group by r.name having count(r) > 0 order by r.name",Object[].class).first();
+            assertNull(s.createQuery("select r from ManagedSessionTest$Record r where r.name = :name",Record.class).setParameter("name","' OR 1=1 --").first());
+            Object[] projection=s.createQuery("select r.name, sum(r.counter) from ManagedSessionTest$Record r group by r.name having count(r) > 0 order by r.name",Object[].class).first();
             assertEquals("first",projection[0]);assertEquals(0,((Number)projection[1]).longValue());
-            assertArrayEquals(new Object[]{"first","first"},s.createQuery("select r.name,r.name from Record r",Object[].class).first());
-            assertEquals(Long.valueOf(1),s.createQuery("select count(r) from Record r where exists (select x.id from Record x where x.id = r.id)",Long.class).first());
-            assertThrows(IllegalArgumentException.class,()->s.createQuery("select r from Record r where r.id = :id",Record.class).list());
-            assertThrows(IllegalArgumentException.class,()->s.createQuery("select r from Record r; delete from Record",Record.class));
-            assertThrows(IllegalArgumentException.class,()->s.createQuery("select unsupported(r.name) from Record r",String.class));
+            assertArrayEquals(new Object[]{"first","first"},s.createQuery("select r.name,r.name from ManagedSessionTest$Record r",Object[].class).first());
+            assertEquals(Long.valueOf(1),s.createQuery("select count(r) from ManagedSessionTest$Record r where exists (select x.id from ManagedSessionTest$Record x where x.id = r.id)",Long.class).first());
+            assertThrows(IllegalArgumentException.class,()->s.createQuery("select r from ManagedSessionTest$Record r where r.id = :id",Record.class).list());
+            assertThrows(IllegalArgumentException.class,()->s.createQuery("select r from ManagedSessionTest$Record r; delete from ManagedSessionTest$Record",Record.class));
+            assertThrows(IllegalArgumentException.class,()->s.createQuery("select unsupported(r.name) from ManagedSessionTest$Record r",String.class));
             s.beginTransaction();r.name="flushed";
-            assertEquals(1,s.createQuery("update Record r set r.counter = r.counter + :delta where r.name = :name").setParameter("delta",4L).setParameter("name","flushed").executeUpdate());
+            assertEquals(1,s.createQuery("update ManagedSessionTest$Record r set r.counter = r.counter + :delta where r.name = :name").setParameter("delta",4L).setParameter("name","flushed").executeUpdate());
             assertFalse(s.contains(r));s.commitTransaction();assertEquals(4,s.find(Record.class,r.id).counter);
-            s.beginTransaction();assertEquals(1,s.createQuery("delete from Record r where r.counter between 3 and 5").executeUpdate());s.commitTransaction();
+            s.beginTransaction();assertEquals(1,s.createQuery("delete from ManagedSessionTest$Record r where r.counter between 3 and 5").executeUpdate());s.commitTransaction();
             assertEquals(0,s.query(Record.class).count());s.close();
+        } finally { em.close(); }
+    }
+
+    @Test void sqliteBulkDeletePreservesCorrelatedPredicatesWithoutTargetAliases() throws Exception {
+        EntityManager em=manager();
+        try {
+            Session s=em.openSession();Record first=seed(s);s.beginTransaction();Record kept=new Record();kept.name="keep";s.persist(kept);s.commitTransaction();
+            s.beginTransaction();
+            assertEquals(1,s.createQuery("delete from ManagedSessionTest$Record r where exists (select x.id from ManagedSessionTest$Record x where x.id = r.id and x.name = :name)").setParameter("name","first").executeUpdate());
+            s.commitTransaction();assertNull(s.find(Record.class,first.id));assertNotNull(s.find(Record.class,kept.id));assertEquals(1,s.query(Record.class).count());s.close();
         } finally { em.close(); }
     }
 

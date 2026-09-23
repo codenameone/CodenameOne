@@ -59,6 +59,13 @@ class ManagedSessionDatabaseTest {
             ManagedSessionTest.Record entity=new ManagedSessionTest.Record();entity.name="record";entity.bytes=new byte[]{1,2};session.persist(entity);
             assertTrue(entity.id>0);session.commitTransaction();session.clear();
             assertArrayEquals(new byte[]{1,2},session.find(ManagedSessionTest.Record.class,entity.id).bytes);
+            session.beginTransaction();
+            ManagedSessionTest.Record unnamed=new ManagedSessionTest.Record(),upper=new ManagedSessionTest.Record();upper.name="Z";session.persist(unnamed);session.persist(upper);session.commitTransaction();
+            assertEquals(unnamed.id,session.query(ManagedSessionTest.Record.class).orderBy("name",true).first().id);
+            assertEquals(upper.id,session.query(ManagedSessionTest.Record.class).orderBy("name",true).offset(1).first().id);
+            assertEquals(entity.id,session.query(ManagedSessionTest.Record.class).orderBy("name",false).first().id);
+            assertEquals(java.util.Arrays.asList(null,"Z","record"),session.createQuery("select distinct r.name from ManagedSessionTest$Record r order by r.name",String.class).list());
+            assertEquals(upper.id,session.createQuery("select distinct r from ManagedSessionTest$Record r order by r.name",ManagedSessionTest.Record.class).offset(1).first().id);
             session.beginTransaction();session.lock(session.find(ManagedSessionTest.Record.class,entity.id),LockMode.PESSIMISTIC_WRITE);
             CountDownLatch attempting=new CountDownLatch(1);
             Future<Long> waiting=workers.submit(()-> {
@@ -80,9 +87,9 @@ class ManagedSessionDatabaseTest {
             Future<Void> first=workers.submit(increment),second=workers.submit(increment);first.get(10,TimeUnit.SECONDS);second.get(10,TimeUnit.SECONDS);
             session.clear();assertEquals(11,session.find(ManagedSessionTest.Record.class,entity.id).counter);
             assertEquals(11,session.find(ManagedSessionTest.Record.class,entity.id).version);
-            session.beginTransaction();assertEquals(1,session.createQuery("update Record r set r.name=:name where r.id=:id").setParameter("name","updated").setParameter("id",entity.id).executeUpdate());session.commitTransaction();
+            session.beginTransaction();assertEquals(1,session.createQuery("update ManagedSessionTest$Record r set r.name=:name where r.id=:id").setParameter("name","updated").setParameter("id",entity.id).executeUpdate());session.commitTransaction();
             assertEquals("updated",session.find(ManagedSessionTest.Record.class,entity.id).name);
-            session.beginTransaction();assertEquals(1,session.createQuery("delete from Record r where r.id=:id").setParameter("id",entity.id).executeUpdate());session.commitTransaction();
+            session.beginTransaction();assertEquals(1,session.createQuery("delete from ManagedSessionTest$Record r where r.id=:id").setParameter("id",entity.id).executeUpdate());session.commitTransaction();
             assertNull(session.find(ManagedSessionTest.Record.class,entity.id));
         } finally {
             workers.shutdownNow();workers.awaitTermination(5,TimeUnit.SECONDS);

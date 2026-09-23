@@ -189,6 +189,9 @@ Keep `@Id` for identity-column generation. `@GeneratedValue` selects `UUID`
 native sequences; other engines use a transactional generator table. UUIDs are
 version 4. Identity IDs become available on flush; the other strategies allocate
 on persist. Production migrations must provision the selected generators.
+Mappings with a cycle of required owning to-one links and identity-generated
+keys are rejected during processing: the first insert cannot supply every
+required key. Use assigned or preallocated keys for such cycles.
 
 For composite IDs, use several `@Id(autoIncrement=false)` fields or one
 `@EmbeddedId` whose type is `@Embeddable`. Lookup accepts
@@ -200,7 +203,8 @@ key components. Generated composite IDs are rejected.
 abstract roots and polymorphic queries. `@DiscriminatorValue("customer")`
 assigns a stable discriminator to a concrete subtype. A base-class lookup and a
 subclass lookup return the same managed instance for the same row. Use explicit
-discriminator values when class names may change.
+discriminator values when class names may change. Every hierarchy member uses
+the root's identifier generator, including its default generator name.
 
 ==== Lists, maps, and owned values
 

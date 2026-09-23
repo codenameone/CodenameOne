@@ -238,6 +238,11 @@ public class OrmAnnotationProcessorTest {
             org.junit.Assert.assertSame(s.find(type,id),s.createQuery("select e from converted.Entry e where e.code between :low and :high",type).setParameter("low",low).setParameter("high",high).first());
             org.junit.Assert.assertNull(s.createQuery("select e from converted.Entry e where e.code not between :low and :high",type).setParameter("low",low).setParameter("high",high).first());
             org.junit.Assert.assertNull(s.createQuery("select e from converted.Entry e where e.code between :low and :high",type).setParameter("low",codeType.getConstructor(String.class).newInstance("X")).setParameter("high",high).first());
+            Object pattern=codeType.getConstructor(String.class).newInstance("D%");
+            org.junit.Assert.assertSame(s.find(type,id),s.createQuery("select e from converted.Entry e where e.code like :pattern",type).setParameter("pattern",pattern).first());
+            org.junit.Assert.assertNull(s.createQuery("select e from converted.Entry e where e.code not like :pattern",type).setParameter("pattern",pattern).first());
+            org.junit.Assert.assertSame(s.find(type,id),s.createQuery("select e from converted.Entry e where e.code like :pattern escape :escape",type).setParameter("pattern",pattern).setParameter("escape","!").first());
+            org.junit.Assert.assertNull(s.createQuery("select e from converted.Entry e where e.code like :pattern",type).setParameter("pattern",null).first());
             s.beginTransaction();Object replacement=codeType.getConstructor(String.class).newInstance("BULK");
             org.junit.Assert.assertEquals(1,s.createQuery("update converted.Entry e set e.code = :code where e.id = :id").setParameter("code",replacement).setParameter("id",id).executeUpdate());s.commitTransaction();
             org.junit.Assert.assertEquals("BULK",codeType.getField("value").get(type.getField("code").get(s.find(type,id))));
@@ -618,6 +623,70 @@ public class OrmAnnotationProcessorTest {
     }
 
     @Test
+    public void hierarchyMembersShareSequenceAndTableGenerators() throws Exception {
+        for(String strategy:Arrays.asList("SEQUENCE","TABLE")) for(String generator:Arrays.asList("","shared_ids")) {
+            File classes=tmp.newFolder();Map<String,String> sources=new java.util.LinkedHashMap<String,String>();
+            sources.put("sharedids.Base","package sharedids; import com.codename1.annotations.*; import com.codename1.annotations.db.*; @Entity(table=\"shared_entities\") @Inheritance public abstract class Base { @Id @GeneratedValue(strategy=GenerationType."+strategy+",generator=\""+generator+"\") public long id; }");
+            sources.put("sharedids.First","package sharedids; import com.codename1.annotations.*; @Entity public class First extends Base { }");
+            sources.put("sharedids.Second","package sharedids; import com.codename1.annotations.*; @Entity public class Second extends Base { }");
+            JavaSourceCompiler.compile(sources,classes,Arrays.asList(testClassesDir()));
+            ProcessorContext client=runProcessor(classes);assertFalse(client.getErrors().toString(),client.hasErrors());
+            ProcessorContext backend=runProcessor(classes,backendClasspath());assertFalse(backend.getErrors().toString(),backend.hasErrors());
+            try(java.net.URLClassLoader loader=new java.net.URLClassLoader(new URL[]{classes.toURI().toURL()},getClass().getClassLoader())) {
+                for(String suffix:Arrays.asList("Cn1Model","Cn1BackendModel")) {
+                    com.codename1.impl.orm.EntityModel root=(com.codename1.impl.orm.EntityModel)loader.loadClass("sharedids.Base"+suffix).newInstance();
+                    for(String name:Arrays.asList("First","Second")) {
+                        com.codename1.impl.orm.EntityModel child=(com.codename1.impl.orm.EntityModel)loader.loadClass("sharedids."+name+suffix).newInstance();
+                        org.junit.Assert.assertEquals(root.generator(),child.generator());org.junit.Assert.assertEquals(root.generation(),child.generation());
+                    }
+                }
+                loader.loadClass("cn1app.BackendDaoBootstrap").newInstance();Class base=loader.loadClass("sharedids.Base"),first=loader.loadClass("sharedids.First"),second=loader.loadClass("sharedids.Second");
+                com.codename1.backend.orm.EntityManager em=com.codename1.backend.orm.EntityManager.open(com.codename1.backend.Database.open(":memory:"));com.codename1.orm.session.Session session=em.openSession();
+                try {
+                    session.createTables();session.beginTransaction();Object a=first.newInstance(),b=second.newInstance();session.persist(a);session.persist(b);session.commitTransaction();
+                    Object aid=base.getField("id").get(a),bid=base.getField("id").get(b);assertFalse(aid.equals(bid));session.clear();
+                    org.junit.Assert.assertEquals(first,session.find(base,aid).getClass());org.junit.Assert.assertEquals(second,session.find(base,bid).getClass());org.junit.Assert.assertEquals(2,session.query(base).count());
+                } finally { session.close();em.close(); }
+            }
+        }
+    }
+
+    @Test
+    public void requiredIdentityCyclesAreRejectedBeforeSchemaCreation() throws Exception {
+        for(String required:Arrays.asList("@ManyToOne(optional=false)","@ManyToOne @JoinColumn(nullable=false)","@OneToOne(optional=false)")) {
+            for(int length:new int[]{1,2,3}) {
+                Map<String,String> sources=new java.util.LinkedHashMap<String,String>();
+                for(int i=0;i<length;i++) sources.put("requiredcycle.Node"+i,"package requiredcycle; import com.codename1.annotations.*; import com.codename1.annotations.db.*; @Entity public class Node"+i+" { @Id public long id; "+required+" public Node"+((i+1)%length)+" next; }");
+                rejectsMappingForBothRuntimes(sources,"Required relationship cycle with identity-generated keys");
+            }
+        }
+        // A required dependency chain is valid, as is a cycle whose keys exist before INSERT.
+        for(boolean cycle:new boolean[]{false,true}) {
+            File classes=tmp.newFolder();Map<String,String> sources=new java.util.LinkedHashMap<String,String>();
+            String key=cycle?"@Id @GeneratedValue(strategy=GenerationType.TABLE)":"@Id";
+            sources.put("requiredcontrol.Owner","package requiredcontrol; import com.codename1.annotations.*; import com.codename1.annotations.db.*; @Entity public class Owner { "+key+" public long id; @ManyToOne(optional=false) public Target target; }");
+            sources.put("requiredcontrol.Target","package requiredcontrol; import com.codename1.annotations.*; import com.codename1.annotations.db.*; @Entity public class Target { "+key+" public long id; "+(cycle?"@ManyToOne(optional=false) public Owner owner;":"")+" }");
+            JavaSourceCompiler.compile(sources,classes,Arrays.asList(testClassesDir()));ProcessorContext client=runProcessor(classes);assertFalse(client.getErrors().toString(),client.hasErrors());ProcessorContext backend=runProcessor(classes,backendClasspath());assertFalse(backend.getErrors().toString(),backend.hasErrors());
+        }
+    }
+
+    @Test
+    public void jpqlPreservesDollarSignsInTopLevelEntityNames() throws Exception {
+        File classes=tmp.newFolder();
+        JavaSourceCompiler.compile(JavaSourceCompiler.singleSource("dollar.Invoice$Archive","package dollar; import com.codename1.annotations.*; @Entity(table=\"dollar_archive\") public class Invoice$Archive { @Id public long id; }"),classes,Arrays.asList(testClassesDir()));
+        ProcessorContext client=runProcessor(classes);assertFalse(client.getErrors().toString(),client.hasErrors());ProcessorContext backend=runProcessor(classes,backendClasspath());assertFalse(backend.getErrors().toString(),backend.hasErrors());
+        try(java.net.URLClassLoader loader=new java.net.URLClassLoader(new URL[]{classes.toURI().toURL()},getClass().getClassLoader())) {
+            loader.loadClass("cn1app.BackendDaoBootstrap").newInstance();Class type=loader.loadClass("dollar.Invoice$Archive");
+            com.codename1.backend.orm.EntityManager em=com.codename1.backend.orm.EntityManager.open(com.codename1.backend.Database.open(":memory:"));com.codename1.orm.session.Session session=em.openSession();
+            try {
+                session.createTables();session.beginTransaction();Object entity=type.newInstance();session.persist(entity);session.commitTransaction();
+                for(String name:Arrays.asList("Invoice$Archive","dollar.Invoice$Archive")) org.junit.Assert.assertSame(entity,session.createQuery("select e from "+name+" e",type).first());
+                try { session.createQuery("select e from Archive e",type);fail("A dollar suffix is not an entity name"); } catch(IllegalArgumentException expected) { assertTrue(expected.getMessage().contains("Unknown entity")); }
+            } finally { session.close();em.close(); }
+        }
+    }
+
+    @Test
     public void derivedIndexesCannotDuplicateUniqueColumnsOrRelationshipIndexes() throws Exception {
         for(String field:Arrays.asList("code","target")) {
             Map<String,String> sources=new java.util.LinkedHashMap<String,String>();
@@ -701,6 +770,8 @@ public class OrmAnnotationProcessorTest {
                 getClass().getClassLoader(),new Class[]{com.codename1.impl.orm.SqlAccess.class},(proxy,method,args)-> {
                     if(method.getName().equals("quote")) return com.codename1.backend.sql.Dialect.POSTGRES.quote((String)args[0]);
                     if(method.getName().equals("dialect")) return "postgresql";
+                    if(method.getName().equals("orderBy")) return com.codename1.backend.sql.Dialect.POSTGRES.orderBy((String)args[0],(Boolean)args[1],((Integer)args[2])==com.codename1.impl.orm.Attribute.TEXT);
+                    if(method.getName().equals("orderValue")) return com.codename1.backend.sql.Dialect.POSTGRES.comparison((String)args[0],((Integer)args[1])==com.codename1.impl.orm.Attribute.TEXT);
                     if(method.getName().equals("limit")) return com.codename1.backend.sql.Dialect.POSTGRES.limit((Integer)args[0],(Integer)args[1]);
                     if(method.getName().equals("query")) { statements.add((String)args[0]);return Collections.emptyList(); }
                     if(method.getName().equals("close")) return null;

@@ -100,24 +100,24 @@ class ManagedSessionTest {
         EntityManager em=manager();
         try {
             Session s=em.openSession();Record r=seed(s);
-            assertSame(r,s.createQuery("select r from Record r where r.name = :name and (r.counter = 0 or r.counter > 3)",Record.class).setParameter("name","first").first());
-            assertEquals(Long.valueOf(1),s.createQuery("select count(r) from Record r",Long.class).first());
-            com.codename1.orm.session.JpqlQuery<Record> selection=s.createQuery("select r from Record r where r.name in :names and r.counter < 1e2",Record.class);
+            assertSame(r,s.createQuery("select r from ManagedSessionTest$Record r where r.name = :name and (r.counter = 0 or r.counter > 3)",Record.class).setParameter("name","first").first());
+            assertEquals(Long.valueOf(1),s.createQuery("select count(r) from ManagedSessionTest$Record r",Long.class).first());
+            com.codename1.orm.session.JpqlQuery<Record> selection=s.createQuery("select r from ManagedSessionTest$Record r where r.name in :names and r.counter < 1e2",Record.class);
             assertSame(r,selection.setParameter("names",java.util.Arrays.asList("first","second")).first());
             assertNull(selection.setParameter("names",java.util.Collections.emptyList()).first());
             assertSame(r,selection.setParameter("names",new String[]{"first"}).first());
-            assertNull(s.createQuery("select r from Record r where r.name = :name",Record.class).setParameter("name","' OR 1=1 --").first());
-            Object[] projection=s.createQuery("select r.name, sum(r.counter) from Record r group by r.name having count(r) > 0 order by r.name",Object[].class).first();
+            assertNull(s.createQuery("select r from ManagedSessionTest$Record r where r.name = :name",Record.class).setParameter("name","' OR 1=1 --").first());
+            Object[] projection=s.createQuery("select r.name, sum(r.counter) from ManagedSessionTest$Record r group by r.name having count(r) > 0 order by r.name",Object[].class).first();
             assertEquals("first",projection[0]);assertEquals(0,((Number)projection[1]).longValue());
-            assertArrayEquals(new Object[]{"first","first"},s.createQuery("select r.name,r.name from Record r",Object[].class).first());
-            assertEquals(Long.valueOf(1),s.createQuery("select count(r) from Record r where exists (select x.id from Record x where x.id = r.id)",Long.class).first());
-            assertThrows(IllegalArgumentException.class,()->s.createQuery("select r from Record r where r.id = :id",Record.class).list());
-            assertThrows(IllegalArgumentException.class,()->s.createQuery("select r from Record r; delete from Record",Record.class));
-            assertThrows(IllegalArgumentException.class,()->s.createQuery("select unsupported(r.name) from Record r",String.class));
+            assertArrayEquals(new Object[]{"first","first"},s.createQuery("select r.name,r.name from ManagedSessionTest$Record r",Object[].class).first());
+            assertEquals(Long.valueOf(1),s.createQuery("select count(r) from ManagedSessionTest$Record r where exists (select x.id from ManagedSessionTest$Record x where x.id = r.id)",Long.class).first());
+            assertThrows(IllegalArgumentException.class,()->s.createQuery("select r from ManagedSessionTest$Record r where r.id = :id",Record.class).list());
+            assertThrows(IllegalArgumentException.class,()->s.createQuery("select r from ManagedSessionTest$Record r; delete from ManagedSessionTest$Record",Record.class));
+            assertThrows(IllegalArgumentException.class,()->s.createQuery("select unsupported(r.name) from ManagedSessionTest$Record r",String.class));
             s.beginTransaction();r.name="flushed";
-            assertEquals(1,s.createQuery("update Record r set r.counter = r.counter + :delta where r.name = :name").setParameter("delta",4L).setParameter("name","flushed").executeUpdate());
+            assertEquals(1,s.createQuery("update ManagedSessionTest$Record r set r.counter = r.counter + :delta where r.name = :name").setParameter("delta",4L).setParameter("name","flushed").executeUpdate());
             assertFalse(s.contains(r));s.commitTransaction();assertEquals(4,s.find(Record.class,r.id).counter);
-            s.beginTransaction();assertEquals(1,s.createQuery("delete from Record r where r.counter between 3 and 5").executeUpdate());s.commitTransaction();
+            s.beginTransaction();assertEquals(1,s.createQuery("delete from ManagedSessionTest$Record r where r.counter between 3 and 5").executeUpdate());s.commitTransaction();
             assertEquals(0,s.query(Record.class).count());s.close();
         } finally { em.close(); }
     }
@@ -135,11 +135,62 @@ class ManagedSessionTest {
             java.util.Map<String,EntityModel<?>> models=new java.util.LinkedHashMap<String,EntityModel<?>>();models.put(Record.class.getName(),new Model());
             Session s=new com.codename1.impl.orm.SessionImpl(access,models);
             try {
-                s.beginTransaction();assertEquals(1,s.createQuery("delete from Record r where r.name = :name").setParameter("name","delete me").executeUpdate());s.commitTransaction();
+                s.beginTransaction();assertEquals(1,s.createQuery("delete from ManagedSessionTest$Record r where r.name = :name").setParameter("name","delete me").executeUpdate());s.commitTransaction();
                 String prefix="mysql".equals(dialect.getName())?"DELETE q0 FROM ":"DELETE FROM ";
-                assertEquals(prefix+dialect.quote("managed_record")+" AS q0 WHERE (q0."+dialect.quote("name")+" = ?)",statements.get(0));
+                String target=dialect.quote("managed_record");
+                assertEquals("sqlite".equals(dialect.getName())?"DELETE FROM "+target+" WHERE ("+target+"."+dialect.quote("name")+" = ?)":prefix+target+" AS q0 WHERE (q0."+dialect.quote("name")+" = ?)",statements.get(0));
             } finally { s.close(); }
         }
+    }
+
+    @Test void managedOrderingUsesDialectForTextNumericAndExpressionTerms() throws Exception {
+        for(com.codename1.backend.sql.Dialect dialect:new com.codename1.backend.sql.Dialect[]{com.codename1.backend.sql.Dialect.SQLITE,com.codename1.backend.sql.Dialect.POSTGRES,com.codename1.backend.sql.Dialect.MYSQL,com.codename1.backend.sql.Dialect.MARIADB}) {
+            java.util.List<String> statements=new java.util.ArrayList<String>();
+            com.codename1.impl.orm.BackendSqlAccess adapter=new com.codename1.impl.orm.BackendSqlAccess(null,null,dialect);
+            com.codename1.impl.orm.SqlAccess access=(com.codename1.impl.orm.SqlAccess)java.lang.reflect.Proxy.newProxyInstance(getClass().getClassLoader(),new Class[]{com.codename1.impl.orm.SqlAccess.class},(proxy,method,args)-> {
+                if(method.getName().equals("query")) {
+                    String statement=(String)args[0];statements.add(statement);
+                    long markers=statement.chars().filter(c->c=='?').count();assertEquals(markers,((Object[])args[1]).length,statement);
+                    for(Object value:(Object[])args[1]) assertEquals("Z",value);
+                    return java.util.Collections.emptyList();
+                }
+                return method.invoke(adapter,args);
+            });
+            java.util.Map<String,EntityModel<?>> models=new java.util.LinkedHashMap<String,EntityModel<?>>();models.put(Record.class.getName(),new Model() {
+                public com.codename1.impl.orm.Relationship[] relationships() {
+                    return new com.codename1.impl.orm.Relationship[]{new com.codename1.impl.orm.Relationship("peers",Record.class,true,true,-1,"","record_peers","owner_id","target_id",0,false)};
+                }
+            });
+            Session s=new com.codename1.impl.orm.SessionImpl(access,models);
+            try {
+                for(boolean ascending:new boolean[]{true,false}) {
+                    s.query(Record.class).orderBy("name",ascending).orderBy("counter",!ascending).limit(2).offset(1).list();
+                    String builder=statements.get(statements.size()-1);String alias=ascending?"q0":"q2";
+                    String expected=dialect.orderBy(alias+"."+dialect.quote("name"),ascending,true)+", "+dialect.orderBy(alias+"."+dialect.quote("counter"),!ascending,false);
+                    assertTrue(builder.contains(" ORDER BY "+expected),builder);
+                    s.createQuery("select r from ManagedSessionTest$Record r order by lower(r.name) "+(ascending?"asc":"desc")+", r.counter "+(ascending?"desc":"asc"),Record.class).limit(2).offset(1).list();
+                    String jpql=statements.get(statements.size()-1);alias=ascending?"q1":"q3";
+                    expected=dialect.orderBy("LOWER("+alias+"."+dialect.quote("name")+")",ascending,true)+", "+dialect.orderBy(alias+"."+dialect.quote("counter"),!ascending,false);
+                    assertTrue(jpql.contains(" ORDER BY "+expected),jpql);
+                }
+                s.query(Record.class).join("peers").orderBy("name",true).list();
+                String distinct=statements.get(statements.size()-1),column="q4."+dialect.quote("name");
+                assertTrue(distinct.startsWith("SELECT DISTINCT "),distinct);assertTrue(distinct.contains(dialect.comparison(column,true)+", "),distinct);assertTrue(distinct.contains(" ORDER BY "+dialect.orderBy(column,true,true)),distinct);
+                s.createQuery("select distinct r.name from ManagedSessionTest$Record r order by r.name",String.class).list();
+                distinct=statements.get(statements.size()-1);column="q5."+dialect.quote("name");assertTrue(distinct.startsWith("SELECT DISTINCT "+dialect.comparison(column,true)+" AS cn1_scalar_0"),distinct);assertTrue(distinct.contains(" ORDER BY "+dialect.orderBy(column,true,true)),distinct);
+                s.createQuery("select r from ManagedSessionTest$Record r order by coalesce(r.name, :fallback)",Record.class).setParameter("fallback","Z").list();
+            } finally { s.close(); }
+        }
+    }
+
+    @Test void sqliteBulkDeletePreservesCorrelatedPredicatesWithoutTargetAliases() throws Exception {
+        EntityManager em=manager();
+        try {
+            Session s=em.openSession();Record first=seed(s);s.beginTransaction();Record kept=new Record();kept.name="keep";s.persist(kept);s.commitTransaction();
+            s.beginTransaction();
+            assertEquals(1,s.createQuery("delete from ManagedSessionTest$Record r where exists (select x.id from ManagedSessionTest$Record x where x.id = r.id and x.name = :name)").setParameter("name","first").executeUpdate());
+            s.commitTransaction();assertNull(s.find(Record.class,first.id));assertNotNull(s.find(Record.class,kept.id));assertEquals(1,s.query(Record.class).count());s.close();
+        } finally { em.close(); }
     }
 
     @Test void counterOverflowAndCrossSessionTransactionReadsAreRejected() throws Exception {

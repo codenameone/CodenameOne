@@ -291,7 +291,7 @@ public final class JpqlQueryImpl<T> implements com.codename1.orm.session.JpqlQue
             if (take("DELETE")) {
                 plan.mutation = true;
                 expect("FROM");
-                root();
+                root(true);
                 String where = take("WHERE") ? " WHERE " + expression().sql : "";
                 String filter = session.discriminatorCondition(root.model, root.rootAlias);
                 if (filter.length() > 0) {
@@ -383,13 +383,22 @@ public final class JpqlQueryImpl<T> implements com.codename1.orm.session.JpqlQue
                     if (out.length() > 0) {
                         out.append(", ");
                     }
-                    out.append(expression().sql);
-                    if (take("DESC")) {
-                        out.append(" DESC");
-                    } else {
+                    int firstBinding = bindings.size();
+                    Expr term = expression();
+                    List<Object> termBindings = new ArrayList<Object>(bindings.subList(firstBinding, bindings.size()));
+                    boolean ascending = !take("DESC");
+                    if (ascending) {
                         take("ASC");
-                        out.append(" ASC");
                     }
+                    String rendered = session.orderBy(term.sql, ascending, term.kind);
+                    // Some dialects repeat a term to normalize NULL placement.
+                    // Each repeated expression also needs its own bound values.
+                    for (int occurrence = rendered.indexOf(term.sql) + term.sql.length();
+                            (occurrence = rendered.indexOf(term.sql, occurrence)) >= 0;
+                            occurrence += term.sql.length()) {
+                        bindings.addAll(termBindings);
+                    }
+                    out.append(rendered);
                 } while (take(","));
                 order = " ORDER BY " + out;
             }
@@ -399,7 +408,10 @@ public final class JpqlQueryImpl<T> implements com.codename1.orm.session.JpqlQue
                 if (projection.length() > 0) {
                     projection.append(", ");
                 }
-                projection.append(expr.sql);
+                // PostgreSQL requires the collated ORDER BY expression in a
+                // DISTINCT projection, even when the underlying column is selected.
+                projection.append(!distinct ? expr.sql : expr.entity != null ? root.rootColumns(true)
+                        : session.orderValue(expr.sql, expr.kind));
                 if (expr.entity != null) {
                     if (selections.size() != 1) {
                         throw error("Entity/scalar mixed projections are not supported");
@@ -430,9 +442,12 @@ public final class JpqlQueryImpl<T> implements com.codename1.orm.session.JpqlQue
             }
         }
         private void root() {
+            root(false);
+        }
+        private void root(boolean delete) {
             String entity = path();
             EntityModel model = session.model(entity);
-            root = session.query(model.type());
+            root = delete ? session.queryForDelete(model) : session.query(model.type());
             take("AS");
             rootName = identifier(peek()) && !clause(peek()) ? next() : entity.substring(entity.lastIndexOf('.') + 1);
             aliases.put(rootName, new Alias(root, ""));
@@ -526,7 +541,9 @@ public final class JpqlQueryImpl<T> implements com.codename1.orm.session.JpqlQue
                         Attribute.BOOLEAN);
             }
             if (take("LIKE")) {
-                String sql = left.sql + (not ? " NOT LIKE " : " LIKE ") + add().sql;
+                Expr pattern = add();
+                bindType(left, pattern);
+                String sql = left.sql + (not ? " NOT LIKE " : " LIKE ") + pattern.sql;
                 if (take("ESCAPE")) {
                     sql += " ESCAPE " + add().sql;
                 }

@@ -66,6 +66,12 @@ public final class BackendSqlAccess implements SqlAccess {
         if(mode==com.codename1.orm.session.LockMode.PESSIMISTIC_WRITE) return " FOR UPDATE";
         return "mysql".equals(dialect.getName())?" LOCK IN SHARE MODE":" FOR SHARE";
     }
+    public String orderValue(String expression,int kind) {
+        return dialect.comparison(expression,kind==Attribute.TEXT);
+    }
+    public String orderBy(String expression,boolean ascending,int kind) {
+        return dialect.orderBy(expression,ascending,kind==Attribute.TEXT);
+    }
     public String limit(int count,int offset) { return dialect.limit(count,offset); }
     private Database connection() throws IOException {
         Database db=transaction!=null?transaction:supplied!=null?supplied:pool.borrow();

@@ -76,9 +76,12 @@ public final class QueryImpl<T> implements com.codename1.orm.session.Query<T> {
         return this;
     }
     QueryImpl(SessionImpl session, EntityModel<T> model) {
+        this(session, model, session.nextAlias());
+    }
+    QueryImpl(SessionImpl session, EntityModel<T> model, String rootAlias) {
         this.session = session;
         this.model = model;
-        this.rootAlias = session.nextAlias();
+        this.rootAlias = rootAlias;
     }
     /// Tests membership in an owned scalar collection without loading it.
     @Override
@@ -175,7 +178,7 @@ public final class QueryImpl<T> implements com.codename1.orm.session.Query<T> {
         if (order.length() > 0) {
             order.append(", ");
         }
-        order.append(name).append(ascending ? " ASC" : " DESC");
+        order.append(session.orderBy(name, ascending, kind(field)));
         return this;
     }
     @Override
@@ -217,7 +220,8 @@ public final class QueryImpl<T> implements com.codename1.orm.session.Query<T> {
             if (i > 0) {
                 selection.append(", ");
             }
-            selection.append(rootAlias).append('.').append(session.q(attributes[i].column));
+            String column = rootAlias + "." + session.q(attributes[i].column);
+            selection.append(pluralJoin ? session.orderValue(column, attributes[i].kind) : column);
         }
         String sql = selection + from() + where() + (order.length() == 0 ? "" : " ORDER BY " + order) +
                      session.limit(max, offset);
@@ -344,12 +348,16 @@ public final class QueryImpl<T> implements com.codename1.orm.session.Query<T> {
         return target.attributes()[target.index(dot < 0 ? field : field.substring(dot + 1))].kind;
     }
     String rootColumns() {
+        return rootColumns(false);
+    }
+    String rootColumns(boolean distinct) {
         StringBuilder result = new StringBuilder();
         for (Attribute a : model.attributes()) {
             if (result.length() > 0) {
                 result.append(", ");
             }
-            result.append(rootAlias).append('.').append(session.q(a.column));
+            String column = rootAlias + "." + session.q(a.column);
+            result.append(distinct ? session.orderValue(column, a.kind) : column);
         }
         return result.toString();
     }

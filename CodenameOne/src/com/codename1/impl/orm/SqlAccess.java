@@ -48,6 +48,10 @@ public interface SqlAccess {
     String insertDefaults(String quotedTable);
     /// Returns the pagination clause; a negative limit means unlimited results.
     String limit(int limit, int offset);
+    /// Applies ordering collation to a selected expression so DISTINCT can order it.
+    String orderValue(String expression, int kind);
+    /// Renders an ordering term with portable null placement and text collation.
+    String orderBy(String expression, boolean ascending, int kind);
     /// Returns the lock clause, or rejects a mode unsupported by the database.
     String lockClause(LockMode mode);
     /// Executes a bound query and returns ordered rows matching the supplied storage kinds.

@@ -633,6 +633,7 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
         }
         resolveRelations(ctx);
         resolveHierarchies(ctx);
+        validateRequiredIdentityCycles(ctx);
         for(EntityClass entity:accepted.values()) {
             Set<String> fields=new LinkedHashSet<String>(),columns=new LinkedHashSet<String>(),indexNames=new LinkedHashSet<String>();
             for(PersistedField field:entity.fields) {
@@ -1007,6 +1008,31 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
         }
         return false;
     }
+    private void validateRequiredIdentityCycles(ProcessorContext ctx) {
+        for(EntityClass entity:accepted.values()) {
+            if(entity.idFields.size()==1 && entity.idFields.get(0).autoIncrement
+                    && hasRequiredPath(entity,entity,new LinkedHashSet<EntityClass>())) {
+                ctx.error("Required relationship cycle with identity-generated keys: "+entity.binaryName
+                    +". Use preallocated identifiers or make a link nullable.");
+            }
+        }
+    }
+
+    private boolean hasRequiredPath(EntityClass current,EntityClass goal,Set<EntityClass> visited) {
+        if(!visited.add(current)) return false;
+        for(RelationField relation:current.relations) {
+            // Use the actual foreign-key nullability after hierarchy resolution.
+            if(relation.column<0 || current.fields.get(relation.column).nullable) continue;
+            EntityClass target=accepted.get(relation.target);
+            if(target==null) continue;
+            for(EntityClass candidate:accepted.values()) {
+                if(!descends(candidate,target)) continue;
+                if(candidate==goal || hasRequiredPath(candidate,goal,visited)) return true;
+            }
+        }
+        return false;
+    }
+
     private void resolveHierarchies(ProcessorContext ctx) {
         for(EntityClass root:accepted.values()) {
             AnnotatedClass definition=findType(root.binaryName,ctx);
@@ -1020,6 +1046,7 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
             Set<String> values=new LinkedHashSet<String>();List<AnnotationValues> inheritedIndexes=new ArrayList<AnnotationValues>();
             for(EntityClass member:family) {
                 inheritedIndexes.addAll(member.indexes);member.hierarchyRoot=root.binaryName;member.tableName=root.tableName;
+                member.generation=root.generation;member.generator=root.generator;
                 AnnotationValues tag=findType(member.binaryName,ctx).getClassAnnotation("Lcom/codename1/annotations/db/DiscriminatorValue;");
                 member.discriminatorValue=tag==null?member.simpleName:tag.getStringOrDefault("value",member.simpleName);
                 if(!member.discriminatorValue.matches("[A-Za-z0-9_$]{1,63}") || !values.add(member.discriminatorValue)) ctx.error("Invalid or duplicate discriminator: "+member.discriminatorValue);

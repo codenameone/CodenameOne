@@ -91,6 +91,16 @@ public final class SessionSqlAccess implements SqlAccess {
         return "INSERT INTO " + table + " DEFAULT VALUES";
     }
     @Override
+    public String orderValue(String expression, int kind) {
+        return expression;
+    }
+    @Override
+    public String orderBy(String expression, boolean ascending, int kind) {
+        // SQLite already sorts nulls low and text in binary order. Avoid the
+        // NULLS FIRST/LAST syntax unavailable on older supported devices.
+        return expression + (ascending ? " ASC" : " DESC");
+    }
+    @Override
     public String lockClause(com.codename1.orm.session.LockMode mode) {
         if (mode == com.codename1.orm.session.LockMode.NONE) {
             return "";
