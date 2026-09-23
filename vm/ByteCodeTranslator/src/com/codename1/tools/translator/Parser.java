@@ -1265,7 +1265,8 @@ public class Parser extends ClassVisitor {
         bldM.append("void cn1EagerInitPureClasses(CODENAME_ONE_THREAD_STATE) {\n");
         for(ByteCodeClass bc : classes) {
             if(bc.isEagerInitEligible() && bc.hasClinit()) {
-                bldM.append("    __STATIC_INITIALIZER_").append(bc.getClsName()).append("(threadStateData);\n");
+                bldM.append("    cn1RunEagerInitializer(threadStateData, __STATIC_INITIALIZER_").append(bc.getClsName())
+                    .append(", \"").append(bc.getClsName()).append("\");\n");
             }
         }
         bldM.append("}\n");

@@ -16859,6 +16859,38 @@ JAVA_OBJECT cn1MainArgs(CODENAME_ONE_THREAD_STATE, int argc, char* argv[]) {
     return arrObj;
 }
 
+// Runs one PURE static initializer at startup (ByteCodeClass.isEagerInitEligible)
+// under a catch-all. A pure initializer has no inputs, so it either always completes
+// or always throws -- a fault in its own table code -- and one that throws must cost
+// that class, not the process: run lazily it would have failed only if and when the
+// class was used, and on the clean target an exception nothing catches ends the
+// process. So the failure is reported and startup carries on; the class keeps
+// whatever its initializer had written, as it would on an app target, where an
+// uncaught throw has always simply returned.
+//
+// Nothing else needs undoing. The class monitor the initializer holds is its own
+// block on the try stack, which throwException releases while unwinding to this
+// catch, and the offsets restored below are the only thread state a frame changes.
+void cn1RunEagerInitializer(CODENAME_ONE_THREAD_STATE, void (*initializer)(CODENAME_ONE_THREAD_STATE), const char* className) {
+    int callStack = threadStateData->callStackOffset;
+    int objectStack = threadStateData->threadObjectStackOffset;
+    int tryBlock = threadStateData->tryBlockOffset;
+    jmp_buf destination;
+    if(CN1_TRY_SETJMP(destination)) {
+        threadStateData->callStackOffset = callStack;
+        threadStateData->threadObjectStackOffset = objectStack;
+        threadStateData->tryBlockOffset = tryBlock;
+        threadStateData->exception = JAVA_NULL;
+        // '[' first: the gauntlet's host/target comparison drops diagnostic lines.
+        fprintf(stderr, "[CN1] the static initializer of %s threw at startup; that class will not work\n", className);
+        fflush(stderr);
+        return;
+    }
+    BEGIN_TRY(0, destination);   // exceptionClass 0 catches everything
+    initializer(threadStateData);
+    threadStateData->tryBlockOffset = tryBlock;
+}
+
 void initConstantPool() {
     cn1StartupPhase("main");
     __STATIC_INITIALIZER_java_lang_Class(getThreadLocalData());
