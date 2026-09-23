@@ -135,4 +135,26 @@ public class DartRuntimeTest {
         assertThrows(dart.core.RangeError.class, () -> DartRuntime.toStringAsFixed(1.0, 21));
         assertThrows(dart.core.RangeError.class, () -> DartRuntime.toStringAsFixed(1.0, -1));
     }
+
+    // --- shifts and rounding ---------------------------------------------------
+
+    @Test
+    public void shiftsFollowDartsCountRules() {
+        assertEquals(0, DartRuntime.shr(1, 64));
+        assertEquals(-1, DartRuntime.shr(-8, 64));
+        assertEquals(0, DartRuntime.shl(1, 64));
+        assertEquals(0, DartRuntime.ushr(-1, 64));
+        assertEquals(8, DartRuntime.shl(1, 3));
+        assertThrows(dart.core.ArgumentError.class, () -> DartRuntime.shl(1, -1));
+    }
+
+    @Test
+    public void roundingGoesHalfAwayFromZero() {
+        assertEquals(-2, DartRuntime.round(-1.5));
+        assertEquals(3, DartRuntime.round(2.5));
+        assertEquals(0, DartRuntime.round(0.49999999999999994), "not floor(d + 0.5)");
+        assertEquals(-2.0, DartRuntime.roundToDouble(-1.5), 0.0);
+        assertEquals("-0.0", DartRuntime.doubleStr(DartRuntime.roundToDouble(-0.4)), "the sign of zero is kept");
+        assertThrows(dart.core.UnsupportedError.class, () -> DartRuntime.round(Double.NaN));
+    }
 }

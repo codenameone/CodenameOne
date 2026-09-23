@@ -260,12 +260,35 @@ public class DartMap<K, V> extends LinkedHashMap<K, V> {
     }
 
     /** Dart's {@code Map.entries} getter — an iterable of key/value pairs. */
+    /**
+     * Dart's {@code map.entries}: a live view, as Dart's is -- an iterable kept and
+     * walked after the map changed sees the change. It used to copy the entries up
+     * front, so a retained view went stale.
+     */
     public DartIterable<MapEntry<K, V>> entries() {
-        DartList<MapEntry<K, V>> out = new DartList<>();
-        for (Map.Entry<K, V> e : entrySet()) {
-            out.add(new MapEntry<>(e.getKey(), e.getValue()));
-        }
-        return out.asIterable();
+        return entriesOf(this);
+    }
+
+    /** A live MapEntry view over any Java map's entries. */
+    static <K, V> DartIterable<MapEntry<K, V>> entriesOf(final Map<K, V> map) {
+        return DartIterable.wrap(new Iterable<MapEntry<K, V>>() {
+            @Override
+            public java.util.Iterator<MapEntry<K, V>> iterator() {
+                final java.util.Iterator<Map.Entry<K, V>> it = map.entrySet().iterator();
+                return new java.util.Iterator<MapEntry<K, V>>() {
+                    @Override
+                    public boolean hasNext() {
+                        return it.hasNext();
+                    }
+
+                    @Override
+                    public MapEntry<K, V> next() {
+                        Map.Entry<K, V> e = it.next();
+                        return new MapEntry<K, V>(e.getKey(), e.getValue());
+                    }
+                };
+            }
+        });
     }
 
     /** Dart's {@code Map.removeWhere(test)}. */

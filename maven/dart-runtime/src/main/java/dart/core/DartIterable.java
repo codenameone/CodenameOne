@@ -133,6 +133,9 @@ public class DartIterable<E> implements Iterable<E> {
     }
 
     public DartIterable<E> take(long count) {
+        // Dart refuses a negative count; it silently meant "nothing" here, and the
+        // mirrored skip(-1) returned everything.
+        RangeError.checkNotNegative(count, "count");
         Iterable<E> src = this;
         return new DartIterable<>(() -> new Iterator<E>() {
             private final Iterator<E> it = src.iterator();
@@ -155,6 +158,7 @@ public class DartIterable<E> implements Iterable<E> {
     }
 
     public DartIterable<E> skip(long count) {
+        RangeError.checkNotNegative(count, "count");
         Iterable<E> src = this;
         return new DartIterable<>(() -> {
             Iterator<E> it = src.iterator();
@@ -259,6 +263,16 @@ public class DartIterable<E> implements Iterable<E> {
         for (E e : this) {
             action.call(e);
         }
+    }
+
+    /**
+     * The name the emitter uses for Dart's forEach on every collection receiver --
+     * DartList and DartSet need it to stay clear of java.lang.Iterable's own forEach.
+     * Without it here, forEach on an Iterable -- the result of map or where --
+     * generated a call javac rejected.
+     */
+    public void forEachDart(Funcs.VoidFunc1<E> action) {
+        forEach(action);
     }
 
     public <R> R fold(R initialValue, Funcs.Func2<R, E, R> combine) {

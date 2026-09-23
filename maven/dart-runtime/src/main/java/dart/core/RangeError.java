@@ -51,6 +51,15 @@ public class RangeError extends ArgumentError {
      * paying a full method-stack frame on every in-range index access — the
      * dominant cost of tight index loops (e.g. quicksort) on ParparVM.
      */
+    /** Dart's {@code RangeError.checkNotNegative}. */
+    public static long checkNotNegative(long value, String name) {
+        if (value < 0) {
+            throw new RangeError("Invalid value: Not greater than or equal to 0: " + value
+                    + (name == null ? "" : " (" + name + ")"));
+        }
+        return value;
+    }
+
     public static void indexError(long index, long length) {
         throw new RangeError("RangeError (index): Invalid value: Not in inclusive range 0.." + (length - 1) + ": " + index);
     }

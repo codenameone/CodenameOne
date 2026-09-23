@@ -232,6 +232,40 @@ public final class DString {
         return s.substring(0, (int) m.start()) + to + s.substring((int) m.end());
     }
 
+    /**
+     * Dart's String.trim: strips Dart's whitespace -- Unicode spaces and line
+     * separators included, a non-breaking space among them. Java's trim only strips
+     * characters at or below U+0020, so text pasted with non-breaking spaces stayed
+     * padded after a trim.
+     */
+    public static String trim(String s) {
+        int start = 0;
+        int end = s.length();
+        while (start < end && isDartWhitespace(s.charAt(start))) {
+            start++;
+        }
+        while (end > start && isDartWhitespace(s.charAt(end - 1))) {
+            end--;
+        }
+        return start == 0 && end == s.length() ? s : s.substring(start, end);
+    }
+
+    /** The code units Dart's trim treats as whitespace. */
+    static boolean isDartWhitespace(char c) {
+        if (c <= 0x20) {
+            return c == 0x20 || (c >= 0x09 && c <= 0x0D);
+        }
+        return c == 0x85 || c == 0xA0 || c == 0x1680 || (c >= 0x2000 && c <= 0x200A)
+                || c == 0x2028 || c == 0x2029 || c == 0x202F || c == 0x205F
+                || c == 0x3000 || c == 0xFEFF;
+    }
+
+    /** Dart's {@code startsWith(pattern, index)}: whether the pattern occurs at index. */
+    public static boolean startsWith(String s, String pattern, long index) {
+        RangeError.checkValueInInterval(index, 0, s.length(), "index");
+        return s.startsWith(pattern, (int) index);
+    }
+
     public static boolean contains(String s, String other) {
         return s.contains(other);
     }

@@ -124,6 +124,7 @@ public final class DartLongList extends DartList<Long> {
         checkGrowable("add");
         ensure(len + 1);
         a[len++] = value;
+        modCount++;
         return true;
     }
 
@@ -160,6 +161,7 @@ public final class DartLongList extends DartList<Long> {
         System.arraycopy(a, index, a, index + 1, len - index);
         a[index] = element;
         len++;
+        modCount++;
     }
 
     @Override
@@ -169,6 +171,7 @@ public final class DartLongList extends DartList<Long> {
         long old = a[index];
         System.arraycopy(a, index + 1, a, index, len - index - 1);
         len--;
+        modCount++;
         return old;
     }
 }

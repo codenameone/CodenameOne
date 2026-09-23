@@ -296,6 +296,74 @@ public final class DartLongMap extends AbstractMap<Long, Long> {
         });
     }
 
+    // The Dart Map API the emitter calls on any Map receiver. A Map<int, int> is
+    // specialised to this class, which had only part of it, so entries, addAll,
+    // idxSet, putIfAbsent, removeWhere and update on one generated calls javac
+    // rejected. Boxed, like the generic map; the primitive paths stay above.
+
+    public DartIterable<MapEntry<Long, Long>> entries() {
+        return DartMap.entriesOf(this);
+    }
+
+    public void addAll(java.util.Map<? extends Long, ? extends Long> other) {
+        if (other != null) {
+            for (Map.Entry<? extends Long, ? extends Long> e : other.entrySet()) {
+                putLong(e.getKey().longValue(), e.getValue().longValue());
+            }
+        }
+    }
+
+    public void addEntries(Iterable<? extends MapEntry<Long, Long>> entries) {
+        if (entries != null) {
+            for (MapEntry<Long, Long> e : entries) {
+                putLong(e.key().longValue(), e.value().longValue());
+            }
+        }
+    }
+
+    public Long idxSet(Long key, Long value) {
+        putLong(key.longValue(), value.longValue());
+        return value;
+    }
+
+    public Long putIfAbsentDart(Long key, Funcs.Func0<Long> ifAbsent) {
+        if (containsKeyLong(key.longValue())) {
+            return idxLong(key.longValue());
+        }
+        Long v = ifAbsent.call();
+        putLong(key.longValue(), v.longValue());
+        return v;
+    }
+
+    public void removeWhere(Funcs.Func2<Long, Long, Boolean> test) {
+        // Collected first, then removed: this map's views do not support removal
+        // through their iterators.
+        java.util.List<Long> doomed = new java.util.ArrayList<Long>();
+        for (Map.Entry<Long, Long> e : entrySet()) {
+            if (Boolean.TRUE.equals(test.call(e.getKey(), e.getValue()))) {
+                doomed.add(e.getKey());
+            }
+        }
+        for (Long k : doomed) {
+            removeLong(k.longValue());
+        }
+    }
+
+    public Long update(Long key, Funcs.Func1<Long, Long> update, Funcs.Func0<Long> ifAbsent) {
+        long k = key.longValue();
+        if (containsKeyLong(k)) {
+            Long v = update.call(idxLong(k));
+            putLong(k, v.longValue());
+            return v;
+        }
+        if (ifAbsent != null) {
+            Long v = ifAbsent.call();
+            putLong(k, v.longValue());
+            return v;
+        }
+        throw new ArgumentError("Key not in map: " + key);
+    }
+
     public void forEachDart(Funcs.VoidFunc2<Long, Long> action) {
         for (int e = 0; e < entryCount; e++) {
             if (present[e]) {

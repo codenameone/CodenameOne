@@ -131,6 +131,7 @@ public final class DartDoubleList extends DartList<Double> {
         checkGrowable("add");
         ensure(len + 1);
         a[len++] = value;
+        modCount++;
         return true;
     }
 
@@ -167,6 +168,7 @@ public final class DartDoubleList extends DartList<Double> {
         System.arraycopy(a, index, a, index + 1, len - index);
         a[index] = element;
         len++;
+        modCount++;
     }
 
     @Override
@@ -176,6 +178,7 @@ public final class DartDoubleList extends DartList<Double> {
         double old = a[index];
         System.arraycopy(a, index + 1, a, index, len - index - 1);
         len--;
+        modCount++;
         return old;
     }
 }

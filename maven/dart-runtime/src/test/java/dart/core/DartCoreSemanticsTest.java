@@ -373,4 +373,91 @@ public class DartCoreSemanticsTest {
         assertEquals(a.hashCode(), b.hashCode());
         assertFalse(a.equals(DartUri.parse("https://example.com/A")), "the path is case sensitive");
     }
+
+    // --- collections, round 4 ---------------------------------------------------
+
+    @Test
+    public void anIdentitySetKeepsEqualElementsApart() {
+        DartSet<Object> s = DartSet.identity();
+        String a = new String("v");
+        String b = new String("v");
+        assertTrue(s.add(a));
+        assertTrue(s.add(b), "an equal but distinct element is new");
+        assertFalse(s.add(a));
+        assertEquals(2, s.size());
+        assertFalse(s.contains("v"));
+        assertTrue(s.remove(a));
+        assertEquals(1, s.size());
+    }
+
+    @Test
+    public void entriesIsALiveView() {
+        DartMap<Object, Object> m = new DartMap<Object, Object>();
+        m.put("a", 1L);
+        DartIterable<MapEntry<Object, Object>> entries = m.entries();
+        m.put("b", 2L);
+        assertEquals(2, entries.length(), "a retained view sees the later entry");
+    }
+
+    @Test
+    public void takeAndSkipRefuseANegativeCount() {
+        DartList<Object> l = new DartList<Object>();
+        l.add("x");
+        assertThrows(RangeError.class, () -> l.take(-1));
+        assertThrows(RangeError.class, () -> l.skip(-1));
+        assertEquals(1, l.take(5).length());
+    }
+
+    @Test
+    public void aListModifiedWhileIteratedFailsInsteadOfLooping() {
+        DartList<Object> l = new DartList<Object>();
+        l.add("a");
+        l.add("b");
+        assertThrows(java.util.ConcurrentModificationException.class, () -> {
+            for (Object x : l) {
+                l.add(x);
+            }
+        });
+        DartLongList longs = DartLongList.ofLongs(1, 2);
+        assertThrows(java.util.ConcurrentModificationException.class, () -> {
+            for (Long x : longs) {
+                longs.addLong(x);
+            }
+        });
+    }
+
+    @Test
+    public void aSpecialisedIntMapHasTheDartMapApi() {
+        DartLongMap m = DartLongMap.ofLongs(1, 10, 2, 20);
+        long sum = 0;
+        for (MapEntry<Long, Long> e : m.entries()) {
+            sum += e.key() + e.value();
+        }
+        assertEquals(33, sum);
+        m.update(1L, v -> v + 1, null);
+        assertEquals(Long.valueOf(11), m.idx(1));
+        assertEquals(Long.valueOf(7), m.putIfAbsentDart(3L, () -> 7L));
+        m.removeWhere((k, v) -> v > 15);
+        assertEquals(2, m.length(), "20 removed; 11 and 7 remain");
+        m.idxSet(4L, 4L);
+        assertTrue(m.containsKeyLong(4));
+    }
+
+    @Test
+    public void anIterableHasForEachDart() {
+        DartList<Object> l = new DartList<Object>();
+        l.add("a");
+        l.add("b");
+        final StringBuilder sb = new StringBuilder();
+        l.asIterable().forEachDart(x -> sb.append(x));
+        assertEquals("ab", sb.toString());
+    }
+
+    @Test
+    public void trimAndStartsWithFollowDart() {
+        assertEquals("padded", DString.trim("\u00a0 padded \u2003\u2028"));
+        assertEquals("x", DString.trim("\ufeffx"));
+        assertTrue(DString.startsWith("abc", "b", 1));
+        assertThrows(RangeError.class, () -> DString.startsWith("abc", "a", 4));
+    }
 }

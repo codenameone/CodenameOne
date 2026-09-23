@@ -261,6 +261,64 @@ public final class DartRuntime {
         return rest;
     }
 
+    // --- int shifts and double rounding, with Dart's rules ----------------------
+    //
+    // Java masks a long shift count to its low six bits, so 1 >> 64 was 1 and
+    // 1 << -1 a value, where Dart answers 0 and throws. Java's Math.round rounds a
+    // half toward positive infinity, so (-1.5).round() was -1 where Dart rounds half
+    // away from zero to -2. The emitter keeps a native shift for a constant count
+    // of 0..63, where the two agree.
+
+    private static long checkShift(long count) {
+        if (count < 0) {
+            throw new dart.core.ArgumentError("Invalid argument: negative shift count " + count);
+        }
+        return count;
+    }
+
+    /** Dart's {@code a << b}. */
+    public static long shl(long a, long b) {
+        return checkShift(b) >= 64 ? 0L : a << b;
+    }
+
+    /** Dart's {@code a >> b}: arithmetic, so a negative value shifts to -1. */
+    public static long shr(long a, long b) {
+        return checkShift(b) >= 64 ? (a < 0 ? -1L : 0L) : a >> b;
+    }
+
+    /** Dart's {@code a >>> b}. */
+    public static long ushr(long a, long b) {
+        return checkShift(b) >= 64 ? 0L : a >>> b;
+    }
+
+    /**
+     * Dart's {@code double.roundToDouble()}: half away from zero, keeping the sign
+     * of a zero result. Computed from the floor rather than as floor(d + 0.5),
+     * which rounds 0.49999999999999994 up to 1.
+     */
+    public static double roundToDouble(double d) {
+        if (d != d || Double.isInfinite(d)) {
+            return d;
+        }
+        if (d < 0) {
+            return -roundHalfUpNonNegative(-d);
+        }
+        return roundHalfUpNonNegative(d);
+    }
+
+    private static double roundHalfUpNonNegative(double d) {
+        double f = Math.floor(d);
+        return d - f >= 0.5 ? f + 1 : f;
+    }
+
+    /** Dart's {@code double.round()}: as {@link #roundToDouble}, as an int. */
+    public static long round(double d) {
+        if (d != d || Double.isInfinite(d)) {
+            throw new dart.core.UnsupportedError("Unsupported operation: " + doubleStr(d) + ".round()");
+        }
+        return (long) roundToDouble(d);
+    }
+
     /** Dart's unary minus on a value of unknown static type. */
     public static Object dynNegate(Object a) {
         if (a instanceof Number) {

@@ -161,12 +161,17 @@ public class DartList<E> extends AbstractList<E> implements RandomAccess {
     @Override
     public boolean add(E e) {
         checkGrowable("add");
+        // Every structural change moves AbstractList's modCount. The storage is a
+        // separate ArrayList, so without this the iterator never saw a change:
+        // `for (x in l) l.add(x)` chased the growing size forever where Dart throws.
+        modCount++;
         return impl.add(e);
     }
 
     @Override
     public void add(int index, E element) {
         checkGrowable("insert");
+        modCount++;
         impl.add(index, element);
     }
 
@@ -174,6 +179,7 @@ public class DartList<E> extends AbstractList<E> implements RandomAccess {
     public E remove(int index) {
         checkGrowable("removeAt");
         RangeError.checkValidIndex(index, size());
+        modCount++;
         return impl.remove(index);
     }
 

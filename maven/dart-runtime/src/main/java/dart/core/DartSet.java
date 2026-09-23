@@ -110,9 +110,9 @@ public class DartSet<E> extends LinkedHashSet<E> {
         return s;
     }
 
-    /** Dart's {@code Set.identity()} (approximated by insertion order). */
+    /** Dart's {@code Set.identity()}: elements match only when they are the same object. */
     public static <E> DartSet<E> identity() {
-        return new DartSet<>();
+        return new DartIdentitySet<E>();
     }
 
     public long length() {
