@@ -593,8 +593,10 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
             ctx.error(cls, "@Entity " + ec.binaryName + " requires at least one @Id field");
             return;
         }
-        if(ec.idFields.size()>1) for(PersistedField field:ec.idFields)
+        if(ec.idFields.size()>1) for(PersistedField field:ec.idFields) {
             if(field.autoIncrement || ec.generation!=0) ctx.error(cls,"Composite identifiers must be assigned; use @Id(autoIncrement=false)");
+            if(field.dialectKind==KIND_BLOB) ctx.error(cls,"Composite identifiers cannot contain binary components: "+field.fieldName);
+        }
         // TWO FIELDS, ONE COLUMN. Every statement then names the column twice:
         // the CREATE TABLE is refused for a duplicate column, and against a
         // schema somebody else created -- where the ORM creates nothing -- a read
@@ -1310,6 +1312,19 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
             }
             sb.append("default:return false;} }\n");
         }
+        sb.append("public boolean required(int index) { switch(index) {");
+        for(int i=0;i<ec.fields.size();i++) if(ec.fields.get(i).declaredRequired) sb.append("case ").append(i).append(": return true;");
+        sb.append("default:return false;} }\n");
+        sb.append("public boolean counter(int index) { switch(index) {");
+        for(int i=0;i<ec.fields.size();i++) {
+            PersistedField field=ec.fields.get(i);
+            if(field.converter==null && field.relation==null
+                    && (field.kind.kind==PropertyTypeKind.Kind.INT || field.kind.kind==PropertyTypeKind.Kind.LONG
+                        || field.kind.kind==PropertyTypeKind.Kind.PROPERTY && ("java.lang.Integer".equals(field.kind.elementBinaryName)
+                            || "java.lang.Long".equals(field.kind.elementBinaryName))))
+                sb.append("case ").append(i).append(": return true;");
+        }
+        sb.append("default:return false;} }\n");
         sb.append("  public void lifecycle(").append(ec.binaryName).append(" e,int event) { switch(event) {\n");
         for (int event=0;event<ec.callbacks.length;event++) if(ec.callbacks[event]!=null)
             sb.append("case ").append(event).append(": e.").append(ec.callbacks[event]).append("(); return;\n");

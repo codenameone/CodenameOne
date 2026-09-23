@@ -142,6 +142,10 @@ update/delete. String and numeric literals and named values become bound SQL
 parameters. `IN :values` and `IN (:values)` accept an `Iterable` or object array,
 including an empty collection. Unsupported syntax is rejected. Scalar projections return the
 stored scalar representation; multiple scalar projections return `Object[]`.
+A `DISTINCT` query can order only by selected expressions. Text range comparisons
+and `LIKE` patterns are case-sensitive across supported databases. An explicit
+`LIKE ... ESCAPE` uses a literal or named parameter for both the pattern and the
+escape character.
 
 [source,java]
 ----
@@ -150,7 +154,9 @@ include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/M
 
 Bulk mutations use `executeUpdate()` inside a transaction. They flush pending
 managed changes, bypass per-entity callbacks and cascades, and clear the context
-so later reads can't reuse stale entities.
+so later reads can't reuse stale entities. Bulk assignments to required subtype
+fields need a non-null literal or named parameter. Other assignment expressions
+are rejected for those fields.
 
 An `int` or `long` field annotated `@Version` is maintained by the session.
 Updates and deletes compare its previous value and throw
@@ -158,7 +164,10 @@ Updates and deletes compare its previous value and throw
 `session.increment(Entity.class, id, "counter", delta)` performs database
 arithmetic, advances the version when present, and refreshes an already-managed
 instance. It returns false for a missing row or an increment outside the
-counter/version range. It requires a transaction.
+counter/version range. It requires a transaction and an `int`, `Integer`, `long`,
+or `Long` attribute without a converter, including properties holding those
+numeric types. Other values stored as integers, such as
+booleans and dates, aren't counters.
 
 ==== Values and callbacks
 

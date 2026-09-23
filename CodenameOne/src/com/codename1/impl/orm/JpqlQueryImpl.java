@@ -58,7 +58,8 @@ public final class JpqlQueryImpl<T> implements com.codename1.orm.session.JpqlQue
     public JpqlQueryImpl<T> setParameter(String name, Object value) {
         boolean found = false;
         for (Object binding : plan.bindings) {
-            if (binding instanceof Parameter && ((Parameter) binding).name.equals(name)) {
+            if (binding instanceof Parameter && ((Parameter) binding).name.equals(name)
+                    || binding instanceof LikeBinding && ((LikeBinding) binding).uses(name)) {
                 found = true;
             }
         }
@@ -151,7 +152,16 @@ public final class JpqlQueryImpl<T> implements com.codename1.orm.session.JpqlQue
         List<Object> values = new ArrayList<Object>();
         String statement = plan.sql;
         for (Object binding : plan.bindings) {
-            if (binding instanceof Parameter) {
+            if (binding instanceof LikeBinding) {
+                LikeBinding like = (LikeBinding) binding;
+                Object pattern = boundValue(like.pattern);
+                Object escape = like.escaped ? boundValue(like.escape) : null;
+                if (pattern != null && !(pattern instanceof String)
+                        || like.escaped && (!(escape instanceof String) || ((String) escape).length() != 1)) {
+                    throw new IllegalArgumentException("LIKE requires a string pattern and a one-character ESCAPE");
+                }
+                values.add(session.likePattern((String) pattern, (String) escape));
+            } else if (binding instanceof Parameter) {
                 Parameter parameter = (Parameter) binding;
                 if (!parameters.containsKey(parameter.name)) {
                     throw new IllegalArgumentException("Unbound named parameter: " + parameter.name);
@@ -186,16 +196,45 @@ public final class JpqlQueryImpl<T> implements com.codename1.orm.session.JpqlQue
         }
         return new Bound(statement, values.toArray());
     }
+    private Object boundValue(Object binding) {
+        if (!(binding instanceof Parameter)) {
+            return binding;
+        }
+        Parameter parameter = (Parameter) binding;
+        if (!parameters.containsKey(parameter.name)) {
+            throw new IllegalArgumentException("Unbound named parameter: " + parameter.name);
+        }
+        return parameter.convert(parameters.get(parameter.name));
+    }
+    private static final class LikeBinding {
+        final Object pattern;
+        final Object escape;
+        final boolean escaped;
+        LikeBinding(Object pattern, Object escape, boolean escaped) {
+            this.pattern = pattern;
+            this.escape = escape;
+            this.escaped = escaped;
+        }
+        boolean uses(String name) {
+            return pattern instanceof Parameter && ((Parameter) pattern).name.equals(name)
+                    || escape instanceof Parameter && ((Parameter) escape).name.equals(name);
+        }
+    }
     private static final class Parameter {
         final String name;
         String marker;
         QueryImpl query;
         String field;
+        boolean nonNull;
         Parameter(String name) {
             this.name = name;
         }
         Object convert(Object value) {
-            return query == null ? Values.storage(value) : query.parameter(field, value);
+            Object converted = query == null ? Values.storage(value) : query.parameter(field, value);
+            if (nonNull && converted == null) {
+                throw new IllegalArgumentException("Null parameter for a required subtype attribute: " + name);
+            }
+            return converted;
         }
     }
     private static final class Alias {
@@ -216,6 +255,9 @@ public final class JpqlQueryImpl<T> implements com.codename1.orm.session.JpqlQue
         QueryImpl query;
         String field;
         Parameter parameter;
+        final List<Expr> children = new ArrayList<Expr>();
+        boolean literal;
+        Object literalValue;
         Expr(String sql, int kind) {
             this(sql, kind, null);
         }
@@ -276,6 +318,9 @@ public final class JpqlQueryImpl<T> implements com.codename1.orm.session.JpqlQue
                     target.query = root;
                     target.field = field;
                     bindType(target, value);
+                    if (attribute.nullable && root.model.required(root.model.index(field))) {
+                        requireNonNull(value);
+                    }
                     assignments.append(target.sql).append(" = ").append(value.sql);
                 } while (take(","));
                 String where = take("WHERE") ? " WHERE " + expression().sql : "";
@@ -389,6 +434,9 @@ public final class JpqlQueryImpl<T> implements com.codename1.orm.session.JpqlQue
                     int firstBinding = bindings.size();
                     Expr term = expression();
                     List<Object> termBindings = new ArrayList<Object>(bindings.subList(firstBinding, bindings.size()));
+                    if (distinct && (!termBindings.isEmpty() || !selected(term, selections))) {
+                        throw error("DISTINCT ordering must use a selected expression");
+                    }
                     boolean ascending = !take("DESC");
                     if (ascending) {
                         take("ASC");
@@ -425,7 +473,7 @@ public final class JpqlQueryImpl<T> implements com.codename1.orm.session.JpqlQue
                     }
                 } else {
                     projection.append(" AS cn1_scalar_").append(kinds.size());
-                    kinds.add(Integer.valueOf(expr.kind));
+                    kinds.add(Integer.valueOf(expr.kind < 0 ? Attribute.TEXT : expr.kind));
                 }
             }
             if (!plan.fetches.isEmpty() && !SessionImpl.sameInstance(plan.entity, root.model)) {
@@ -540,17 +588,32 @@ public final class JpqlQueryImpl<T> implements com.codename1.orm.session.JpqlQue
                 Expr high = add();
                 bindType(left, low);
                 bindType(left, high);
-                return new Expr(left.sql + (not ? " NOT BETWEEN " : " BETWEEN ") + low.sql + " AND " + high.sql,
+                return new Expr(session.orderValue(left.sql, left.kind) + (not ? " NOT BETWEEN " : " BETWEEN ")
+                        + "(" + session.orderValue(low.sql, low.kind) + ") AND (" + session.orderValue(high.sql, high.kind) + ")",
                         Attribute.BOOLEAN);
             }
             if (take("LIKE")) {
+                int firstBinding = bindings.size();
                 Expr pattern = add();
                 bindType(left, pattern);
-                String sql = left.sql + (not ? " NOT LIKE " : " LIKE ") + pattern.sql;
-                if (take("ESCAPE")) {
-                    sql += " ESCAPE " + add().sql;
+                boolean escaped = take("ESCAPE");
+                Expr escape = escaped ? add() : null;
+                String sql;
+                if ((pattern.parameter != null || pattern.literal)
+                        && (!escaped || escape.parameter != null || escape.literal)) {
+                    while (bindings.size() > firstBinding) {
+                        bindings.remove(bindings.size() - 1);
+                    }
+                    bindings.add(new LikeBinding(pattern.parameter == null ? pattern.literalValue : pattern.parameter,
+                            !escaped ? null : escape.parameter == null ? escape.literalValue : escape.parameter, escaped));
+                    sql = left.sql + session.likeOperator(escaped);
+                } else {
+                    if (escaped) {
+                        throw error("LIKE with ESCAPE requires literal or parameter patterns and escapes");
+                    }
+                    sql = left.sql + session.likeOperator(false).replace("?", session.likeExpression(pattern.sql));
                 }
-                return new Expr(sql, Attribute.BOOLEAN);
+                return new Expr(not ? "NOT (" + sql + ")" : sql, Attribute.BOOLEAN);
             }
             if (not) {
                 throw error("Expected IN, LIKE or BETWEEN after NOT");
@@ -562,6 +625,10 @@ public final class JpqlQueryImpl<T> implements com.codename1.orm.session.JpqlQue
                 Expr right = add();
                 bindType(left, right);
                 bindType(right, left);
+                if (">".equals(op) || "<".equals(op) || ">=".equals(op) || "<=".equals(op)) {
+                    return new Expr("(" + session.orderValue(left.sql, left.kind) + " " + op + " "
+                            + session.orderValue(right.sql, right.kind) + ")", Attribute.BOOLEAN);
+                }
                 return binary(left, op, right, Attribute.BOOLEAN);
             }
             return left;
@@ -587,7 +654,7 @@ public final class JpqlQueryImpl<T> implements com.codename1.orm.session.JpqlQue
         private Expr primary() {
             if (take("-")) {
                 Expr value = primary();
-                return new Expr("-" + value.sql, value.kind);
+                return wrap("-" + value.sql, value);
             }
             if (take("+")) {
                 return primary();
@@ -600,32 +667,33 @@ public final class JpqlQueryImpl<T> implements com.codename1.orm.session.JpqlQue
                 }
                 Expr value = expression();
                 expect(")");
-                return new Expr("(" + value.sql + ")", value.kind, value.entity);
+                return wrap("(" + value.sql + ")", value);
             }
             String token = next();
             if (token.startsWith(":")) {
                 Parameter parameter = new Parameter(token.substring(1));
                 bindings.add(parameter);
-                Expr result = new Expr("?", Attribute.TEXT);
+                Expr result = new Expr("?", -1);
                 result.parameter = parameter;
                 return result;
             }
             if (token.startsWith("'")) {
-                bindings.add(token.substring(1, token.length() - 1).replace("''", "'"));
-                return new Expr("?", Attribute.TEXT);
+                String value = token.substring(1, token.length() - 1).replace("''", "'");
+                bindings.add(value);
+                return literal("?", Attribute.TEXT, value);
             }
             if ("NULL".equalsIgnoreCase(token)) {
-                return new Expr("NULL", Attribute.TEXT);
+                return literal("NULL", -1, null);
             }
             if ("TRUE".equalsIgnoreCase(token) || "FALSE".equalsIgnoreCase(token)) {
-                return new Expr("TRUE".equalsIgnoreCase(token) ? "1" : "0", Attribute.BOOLEAN);
+                return literal("TRUE".equalsIgnoreCase(token) ? "1" : "0", Attribute.BOOLEAN, Boolean.valueOf("TRUE".equalsIgnoreCase(token)));
             }
             if (Character.isDigit(token.charAt(0))) {
                 Object value = token.indexOf('.') >= 0 || token.indexOf('e') >= 0 || token.indexOf('E') >= 0
                                        ? (Object) Double.valueOf(token)
                                        : Long.valueOf(Long.parseLong(token));
                 bindings.add(value);
-                return new Expr("?", value instanceof Double ? Attribute.REAL : Attribute.BIGINT);
+                return literal("?", value instanceof Double ? Attribute.REAL : Attribute.BIGINT, value);
             }
             if (!identifier(token)) {
                 throw error("Expected expression");
@@ -666,9 +734,24 @@ public final class JpqlQueryImpl<T> implements com.codename1.orm.session.JpqlQue
                     }
                 }
                 int kind = "COUNT".equals(function) || "LENGTH".equals(function) ? Attribute.BIGINT
-                           : "AVG".equals(function)                                ? Attribute.REAL
-                                                                                     : args.get(0).kind;
-                return new Expr(sql.append(')').toString(), kind);
+                           : "AVG".equals(function) ? Attribute.REAL
+                           : "COALESCE".equals(function) ? commonKind(args) : args.get(0).kind;
+                Expr result = new Expr(sql.append(')').toString(), kind);
+                // These functions preserve their operands' domain representation.
+                if (!"COUNT".equals(function) && !"LENGTH".equals(function)) {
+                    result.children.addAll(args);
+                    for (Expr arg : args) {
+                        if (arg.query != null) {
+                            for (Expr other : args) {
+                                bindType(arg, other);
+                            }
+                            result.query = arg.query;
+                            result.field = arg.field;
+                            break;
+                        }
+                    }
+                }
+                return result;
             }
             StringBuilder path = new StringBuilder(token);
             while (take(".")) {
@@ -692,10 +775,75 @@ public final class JpqlQueryImpl<T> implements com.codename1.orm.session.JpqlQue
             result.field = field;
             return result;
         }
+        private Expr literal(String sql, int kind, Object value) {
+            Expr result = new Expr(sql, kind);
+            result.literal = true;
+            result.literalValue = value;
+            return result;
+        }
+        private Expr wrap(String sql, Expr value) {
+            Expr result = new Expr(sql, value.kind, value.entity);
+            result.children.add(value);
+            result.query = value.query;
+            result.field = value.field;
+            result.parameter = value.parameter;
+            result.literal = value.literal;
+            result.literalValue = value.literalValue;
+            return result;
+        }
+        private int commonKind(List<Expr> args) {
+            int kind = -1;
+            for (Expr arg : args) {
+                if (arg.kind < 0) {
+                    continue;
+                }
+                if (kind < 0) {
+                    kind = arg.kind;
+                }
+                else if (kind != arg.kind) {
+                    boolean numeric = (kind == Attribute.INTEGER || kind == Attribute.BIGINT || kind == Attribute.REAL)
+                            && (arg.kind == Attribute.INTEGER || arg.kind == Attribute.BIGINT || arg.kind == Attribute.REAL);
+                    if (!numeric) {
+                        throw error("Function operands need compatible storage types");
+                    }
+                    kind = kind == Attribute.REAL || arg.kind == Attribute.REAL ? Attribute.REAL : Attribute.BIGINT;
+                }
+            }
+            return kind;
+        }
+        private void requireNonNull(Expr value) {
+            if (value.parameter != null) {
+                value.parameter.nonNull = true;
+            } else if (!value.literal || value.literalValue == null) {
+                throw error("Bulk assignment to a required subtype attribute needs a non-null literal or parameter");
+            }
+        }
+        private boolean selected(Expr term, List<Expr> selections) {
+            for (Expr selection : selections) {
+                if (selection.entity == null && selection.sql.equals(term.sql)) {
+                    return true;
+                }
+                if (selection.entity != null && SessionImpl.sameInstance(term.query, root) && term.field != null
+                        && term.sql.equals(root.column(term.field))) {
+                    for (Attribute attribute : root.model.attributes()) {
+                        if (attribute.field.equals(term.field)) {
+                            return true;
+                        }
+                    }
+                }
+            }
+            return false;
+        }
         private void bindType(Expr attribute, Expr value) {
-            if (attribute.query != null && value.parameter != null) {
+            if (attribute.query == null) {
+                return;
+            }
+            if (value.parameter != null && value.parameter.query == null) {
                 value.parameter.query = attribute.query;
                 value.parameter.field = attribute.field;
+            }
+            for (Expr child : value.children) {
+                bindType(attribute, child);
             }
         }
         private String subquery() {
@@ -747,7 +895,10 @@ public final class JpqlQueryImpl<T> implements com.codename1.orm.session.JpqlQue
             if (left.entity != null || right.entity != null) {
                 throw error("Compare entity identifiers explicitly");
             }
-            return new Expr("(" + left.sql + " " + op + " " + right.sql + ")", kind);
+            Expr result = new Expr("(" + left.sql + " " + op + " " + right.sql + ")", kind);
+            result.children.add(left);
+            result.children.add(right);
+            return result;
         }
         private int numeric(Expr a, Expr b) {
             return a.kind == Attribute.REAL || b.kind == Attribute.REAL ? Attribute.REAL : Attribute.BIGINT;

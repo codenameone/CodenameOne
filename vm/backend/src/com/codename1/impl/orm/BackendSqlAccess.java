@@ -60,6 +60,15 @@ public final class BackendSqlAccess implements SqlAccess {
     public String generatedKeyColumn(int kind,String name) { return dialect.generatedKeyColumn(kind,name); }
     public String assignedKeyColumn(int kind) { return dialect.assignedKeyColumn(kind); }
     public String insertDefaults(String table) { return dialect.insertDefaults(table); }
+    public String likeOperator(boolean escaped) {
+        return escaped && !"sqlite".equals(dialect()) ? " LIKE ? ESCAPE '!'" : dialect.likeOperator();
+    }
+    public String likePattern(String pattern,String escape) {
+        return escape==null ? dialect.likePattern(pattern) : SqlPatterns.normalize(pattern,escape,"sqlite".equals(dialect()));
+    }
+    public String likeExpression(String expression) {
+        return "sqlite".equals(dialect()) ? SqlPatterns.globExpression(expression) : expression;
+    }
     public String lockClause(com.codename1.orm.session.LockMode mode) {
         if(mode==com.codename1.orm.session.LockMode.NONE) return "";
         if("sqlite".equals(dialect.getName())) throw new UnsupportedOperationException("SQLite does not support pessimistic row locks");
@@ -91,6 +100,9 @@ public final class BackendSqlAccess implements SqlAccess {
                 Map row=(Map)item;
                 Object[] values=row.values().toArray();
                 if(values.length!=kinds.length) throw new IOException("Unexpected SQL projection width");
+                for(int i=0;i<values.length;i++) {
+                    if(kinds[i]==Attribute.REAL && values[i] instanceof Number) values[i]=Double.valueOf(((Number)values[i]).doubleValue());
+                }
                 result.add(values);
             }
             return result;

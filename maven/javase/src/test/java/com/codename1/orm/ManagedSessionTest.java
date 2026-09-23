@@ -48,6 +48,7 @@ class ManagedSessionTest {
         };
         public Class<Record> type() { return Record.class; }
         public String table() { return "managed_record"; }
+        public boolean counter(int index) { return index==2; }
         public Attribute[] attributes() { return attrs; }
         public Record create() { return new Record(); }
         public Object get(Record r,int i) {
@@ -119,6 +120,45 @@ class ManagedSessionTest {
             s.beginTransaction();
             assertEquals(1,s.createQuery("delete from ManagedSessionTest$Record r where exists (select x.id from ManagedSessionTest$Record x where x.id = r.id and x.name = :name)").setParameter("name","first").executeUpdate());
             s.commitTransaction();assertNull(s.find(Record.class,first.id));assertNotNull(s.find(Record.class,kept.id));assertEquals(1,s.query(Record.class).count());s.close();
+        } finally { em.close(); }
+    }
+
+    @Test void coalesceAndDistinctProjectionValidationArePortable() throws Exception {
+        EntityManager em=manager();
+        try {
+            Session session=em.openSession();seed(session);
+            assertEquals(Long.valueOf(0),session.createQuery("select coalesce(NULL, r.counter) from ManagedSessionTest$Record r",Long.class).first());
+            assertEquals(Long.valueOf(0),session.createQuery("select coalesce(:missing, NULL, r.counter) from ManagedSessionTest$Record r",Long.class).setParameter("missing",null).first());
+            assertEquals(Double.valueOf(0),session.createQuery("select coalesce(NULL, r.counter, 1.5) from ManagedSessionTest$Record r",Double.class).first());
+            assertEquals("first",session.createQuery("select coalesce(NULL, r.name) from ManagedSessionTest$Record r",String.class).first());
+            assertThrows(IllegalArgumentException.class,()->session.createQuery("select distinct r.name from ManagedSessionTest$Record r order by r.id",String.class));
+            assertThrows(IllegalArgumentException.class,()->session.createQuery("select distinct r from ManagedSessionTest$Record r order by lower(r.name)",Record.class));
+            assertEquals("first",session.createQuery("select distinct lower(r.name) from ManagedSessionTest$Record r order by lower(r.name)",String.class).first());session.close();
+        } finally { em.close(); }
+    }
+
+    @Test void likePredicatesUseCaseSensitiveWildcardsAndExplicitEscapes() throws Exception {
+        EntityManager em=manager();
+        try {
+            Session session=em.openSession();session.createTables();session.beginTransaction();
+            for(String name:new String[]{"Alpha","alpha","a*b?c[d]","100%","100_","a\\b"}) { Record row=new Record();row.name=name;session.persist(row); }session.commitTransaction();
+            assertEquals(1,session.query(Record.class).like("name","A%").list().size());
+            assertEquals(1,session.createQuery("select r from ManagedSessionTest$Record r where r.name like :pattern",Record.class).setParameter("pattern","A%").list().size());
+            assertEquals(5,session.createQuery("select r from ManagedSessionTest$Record r where r.name not like 'A%'",Record.class).list().size());
+            for(String pattern:new String[]{"a*b?c[d]","a\\b"}) { assertEquals(pattern,session.query(Record.class).like("name",pattern).first().name); }
+            assertEquals("100%",session.createQuery("select r from ManagedSessionTest$Record r where r.name like :pattern escape :escape",Record.class).setParameter("pattern","100!%").setParameter("escape","!").first().name);
+            assertEquals("100_",session.createQuery("select r from ManagedSessionTest$Record r where r.name like '100!_' escape '!'",Record.class).first().name);
+            assertEquals(1,session.createQuery("select r from ManagedSessionTest$Record r where r.name like upper(:pattern)",Record.class).setParameter("pattern","a%").list().size());
+            assertEquals(6,session.createQuery("select r from ManagedSessionTest$Record r where r.name like r.name",Record.class).list().size());
+            assertTrue(session.createQuery("select r from ManagedSessionTest$Record r where r.name like :pattern",Record.class).setParameter("pattern",null).list().isEmpty());session.close();
+        } finally { em.close(); }
+    }
+
+    @Test void schemaValidationRejectsUnexpectedNotNull() throws Exception {
+        EntityManager em=manager();
+        try {
+            em.database().execute("CREATE TABLE managed_record (id INTEGER PRIMARY KEY AUTOINCREMENT, version INTEGER NOT NULL, counter INTEGER NOT NULL, name TEXT NOT NULL, bytes BLOB)",new Object[0]);
+            Session session=em.openSession();PersistenceException error=assertThrows(PersistenceException.class,session::validateSchema);assertTrue(error.getMessage().contains("Unexpected NOT NULL on managed_record.name"));session.close();
         } finally { em.close(); }
     }
 

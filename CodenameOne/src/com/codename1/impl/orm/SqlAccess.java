@@ -52,6 +52,12 @@ public interface SqlAccess {
     String orderValue(String expression, int kind);
     /// Renders an ordering term with portable null placement and text collation.
     String orderBy(String expression, boolean ascending, int kind);
+    /// Returns a portable LIKE operator with one pattern placeholder.
+    String likeOperator(boolean escaped);
+    /// Converts a bound LIKE pattern; null escape means no escape character.
+    String likePattern(String pattern, String escape);
+    /// Converts an unescaped SQL pattern expression for the dialect's LIKE operator.
+    String likeExpression(String expression);
     /// Returns the lock clause, or rejects a mode unsupported by the database.
     String lockClause(LockMode mode);
     /// Executes a bound query and returns ordered rows matching the supplied storage kinds.

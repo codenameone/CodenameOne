@@ -81,6 +81,13 @@ class ManagedSessionDatabaseTest {
             assertEquals(unnamed.id,session.query(ManagedSessionTest.Record.class).orderBy("name",true).first().id);
             assertEquals(upper.id,session.query(ManagedSessionTest.Record.class).orderBy("name",true).offset(1).first().id);
             assertEquals(entity.id,session.query(ManagedSessionTest.Record.class).orderBy("name",false).first().id);
+            assertEquals(entity.id,session.query(ManagedSessionTest.Record.class).gt("name","Z").first().id);
+            assertEquals(upper.id,session.query(ManagedSessionTest.Record.class).le("name","Z").first().id);
+            assertEquals(entity.id,session.createQuery("select r from ManagedSessionTest$Record r where r.name > :bound",ManagedSessionTest.Record.class).setParameter("bound","Z").first().id);
+            assertEquals(2,session.createQuery("select r from ManagedSessionTest$Record r where r.name between 'Z' and 'z'",ManagedSessionTest.Record.class).list().size());
+            assertTrue(session.query(ManagedSessionTest.Record.class).like("name","R%").list().isEmpty());
+            assertEquals(entity.id,session.createQuery("select r from ManagedSessionTest$Record r where r.name like :pattern",ManagedSessionTest.Record.class).setParameter("pattern","r%").first().id);
+            assertEquals(entity.id,session.createQuery("select r from ManagedSessionTest$Record r where r.name like :pattern escape :escape",ManagedSessionTest.Record.class).setParameter("pattern","r%").setParameter("escape","!").first().id);
             assertEquals(java.util.Arrays.asList(null,"Z","record"),session.createQuery("select distinct r.name from ManagedSessionTest$Record r order by r.name",String.class).list());
             assertEquals(upper.id,session.createQuery("select distinct r from ManagedSessionTest$Record r order by r.name",ManagedSessionTest.Record.class).offset(1).first().id);
             session.beginTransaction();session.lock(session.find(ManagedSessionTest.Record.class,entity.id),LockMode.PESSIMISTIC_WRITE);

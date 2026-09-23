@@ -151,7 +151,11 @@ public final class QueryImpl<T> implements com.codename1.orm.session.Query<T> {
     }
     @Override
     public QueryImpl<T> like(String field, String pattern) {
-        return compare(field, "LIKE", pattern);
+        String name = column(field);
+        conjunction();
+        predicates.append(name).append(session.likeOperator(false));
+        params.add(session.likePattern(pattern, null));
+        return this;
     }
     @Override
     public QueryImpl<T> isNull(String field) {
@@ -260,6 +264,9 @@ public final class QueryImpl<T> implements com.codename1.orm.session.Query<T> {
     }
     private QueryImpl<T> compare(String field, String op, Object value) {
         String name = column(field);
+        if (">".equals(op) || "<".equals(op) || ">=".equals(op) || "<=".equals(op)) {
+            name = session.orderValue(name, kind(field));
+        }
         boolean unary = op.startsWith("IS ");
         if (!unary && value == null) {
             throw new IllegalArgumentException("Null comparison requires isNull/isNotNull");

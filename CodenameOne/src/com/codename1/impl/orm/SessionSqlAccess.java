@@ -101,6 +101,18 @@ public final class SessionSqlAccess implements SqlAccess {
         return expression + (ascending ? " ASC" : " DESC");
     }
     @Override
+    public String likeOperator(boolean escaped) {
+        return " GLOB ?";
+    }
+    @Override
+    public String likePattern(String pattern, String escape) {
+        return SqlPatterns.normalize(pattern, escape, true);
+    }
+    @Override
+    public String likeExpression(String expression) {
+        return SqlPatterns.globExpression(expression);
+    }
+    @Override
     public String lockClause(com.codename1.orm.session.LockMode mode) {
         if (mode == com.codename1.orm.session.LockMode.NONE) {
             return "";

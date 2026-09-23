@@ -234,6 +234,9 @@ public class OrmAnnotationProcessorTest {
             org.junit.Assert.assertSame(s.find(type,id),s.createQuery("select e from converted.Entry e where e.code in (:first, :second)",type).setParameter("first",included).setParameter("second",excluded).first());
             org.junit.Assert.assertNull(s.createQuery("select e from converted.Entry e where e.code not in (:first, :second)",type).setParameter("first",excluded).setParameter("second",included).first());
             org.junit.Assert.assertSame(s.find(type,id),s.createQuery("select e from converted.Entry e where e.code in ('missing', :second)",type).setParameter("second",included).first());
+            org.junit.Assert.assertSame(s.find(type,id),s.createQuery("select e from converted.Entry e where e.code = coalesce((:code), e.code)",type).setParameter("code",included).first());
+            org.junit.Assert.assertSame(s.find(type,id),s.createQuery("select e from converted.Entry e where coalesce(:code, e.code) = e.code",type).setParameter("code",null).first());
+            s.beginTransaction();org.junit.Assert.assertEquals(1,s.createQuery("update converted.Entry e set e.code = coalesce(:code, e.code)").setParameter("code",included).executeUpdate());s.commitTransaction();
             Object low=codeType.getConstructor(String.class).newInstance("D"),high=codeType.getConstructor(String.class).newInstance("Z");
             org.junit.Assert.assertSame(s.find(type,id),s.createQuery("select e from converted.Entry e where e.code between :low and :high",type).setParameter("low",low).setParameter("high",high).first());
             org.junit.Assert.assertNull(s.createQuery("select e from converted.Entry e where e.code not between :low and :high",type).setParameter("low",low).setParameter("high",high).first());
@@ -698,6 +701,63 @@ public class OrmAnnotationProcessorTest {
                     try { session.flush();fail("Missing required subtype field must fail on update"); } catch(com.codename1.orm.session.PersistenceException expected) { assertTrue(expected.getMessage(),expected.getMessage().contains("Required"));session.rollbackTransaction(); }
                 }
                 child=session.find(childType,id);session.beginTransaction();childType.getField("code").set(child,"changed");session.commitTransaction();assertFalse(session.isLoaded(child,"target"));
+                try { session.createQuery("update requiredsub.Child c set c.code = NULL");fail("Bulk NULL must reject a required subtype column"); } catch(IllegalArgumentException expected) { assertTrue(expected.getMessage().contains("required subtype")); }
+                try { session.createQuery("update requiredsub.Base c set c.code = coalesce(NULL, NULL)");fail("Unknown-nullability bulk expressions must be rejected"); } catch(IllegalArgumentException expected) { assertTrue(expected.getMessage().contains("required subtype")); }
+                session.beginTransaction();try { session.createQuery("update requiredsub.Child c set c.code = :value").setParameter("value",null).executeUpdate();fail("Null bulk parameters must be rejected"); } catch(IllegalArgumentException expected) { assertTrue(expected.getMessage().contains("required subtype")); }session.rollbackTransaction();
+                session.beginTransaction();org.junit.Assert.assertEquals(1,session.createQuery("update requiredsub.Child c set c.code = :value").setParameter("value","bulk").executeUpdate());session.commitTransaction();org.junit.Assert.assertEquals("bulk",childType.getField("code").get(session.find(childType,id)));
+            } finally { session.close();em.close(); }
+        }
+    }
+
+    @Test
+    public void compositeBinaryIdentifiersAreRejectedForBothRuntimes() throws Exception {
+        Map<String,String> sources=new java.util.LinkedHashMap<String,String>();
+        sources.put("binarykey.Entry","package binarykey; import com.codename1.annotations.*; @Entity public class Entry { @Id(autoIncrement=false) public byte[] binary; @Id(autoIncrement=false) public long part; }");
+        rejectsMappingForBothRuntimes(sources,"Composite identifiers cannot contain binary components");
+    }
+
+    @Test
+    public void siblingOnlyCollectionsDoNotDirtyUnchangedEntities() throws Exception {
+        File classes=tmp.newFolder();Map<String,String> sources=new java.util.LinkedHashMap<String,String>();
+        sources.put("cleansibling.Base","package cleansibling; import com.codename1.annotations.*; import com.codename1.annotations.db.*; @Entity(table=\"clean_sibling\") @Inheritance public abstract class Base { @Id public long id; @Version public long version; @DbTransient public int updates; @PostUpdate public void updated() { updates++; } }");
+        sources.put("cleansibling.WithCollection","package cleansibling; import com.codename1.annotations.*; import com.codename1.annotations.db.*; @Entity public class WithCollection extends Base { @ElementCollection public java.util.List<String> tags=new java.util.ArrayList<String>(); }");
+        sources.put("cleansibling.Empty","package cleansibling; import com.codename1.annotations.*; @Entity public class Empty extends Base { }");
+        JavaSourceCompiler.compile(sources,classes,Arrays.asList(testClassesDir()));ProcessorContext ctx=runProcessor(classes,backendClasspath());assertFalse(ctx.getErrors().toString(),ctx.hasErrors());
+        try(java.net.URLClassLoader loader=new java.net.URLClassLoader(new URL[]{classes.toURI().toURL()},getClass().getClassLoader())) {
+            loader.loadClass("cn1app.BackendDaoBootstrap").newInstance();Class type=loader.loadClass("cleansibling.Empty");
+            com.codename1.backend.orm.EntityManager em=com.codename1.backend.orm.EntityManager.open(com.codename1.backend.Database.open(":memory:"));com.codename1.orm.session.Session session=em.openSession();
+            try { session.createTables();session.beginTransaction();Object entity=type.newInstance();session.persist(entity);session.commitTransaction();Object id=type.getField("id").get(entity);session.clear();entity=session.find(type,id);session.beginTransaction();session.query(type).list();session.flush();session.commitTransaction();org.junit.Assert.assertEquals(0,type.getField("version").getLong(entity));org.junit.Assert.assertEquals(0,type.getField("updates").getInt(entity));session.clear();org.junit.Assert.assertEquals(0,type.getField("version").getLong(session.find(type,id))); }
+            finally { session.close();em.close(); }
+        }
+    }
+
+    @Test
+    public void inverseOneToOneFetchSnapshotsSupportOrphanRemoval() throws Exception {
+        for(boolean eager:new boolean[]{false,true}) {
+            File classes=tmp.newFolder();Map<String,String> sources=new java.util.LinkedHashMap<String,String>();
+            sources.put("inverseorphan.Parent","package inverseorphan; import com.codename1.annotations.*; import com.codename1.annotations.db.*; @Entity(table=\"inverse_orphan_parents\") public class Parent { @Id public long id; @OneToOne(mappedBy=\"parent\",fetch=FetchType."+(eager?"EAGER":"LAZY")+",orphanRemoval=true) public Child child; }");
+            sources.put("inverseorphan.Child","package inverseorphan; import com.codename1.annotations.*; import com.codename1.annotations.db.*; @Entity(table=\"inverse_orphan_children\") public class Child { @Id public long id; @OneToOne(fetch=FetchType.LAZY) public Parent parent; }");
+            JavaSourceCompiler.compile(sources,classes,Arrays.asList(testClassesDir()));ProcessorContext ctx=runProcessor(classes,backendClasspath());assertFalse(ctx.getErrors().toString(),ctx.hasErrors());
+            try(java.net.URLClassLoader loader=new java.net.URLClassLoader(new URL[]{classes.toURI().toURL()},getClass().getClassLoader())) {
+                loader.loadClass("cn1app.BackendDaoBootstrap").newInstance();Class parentType=loader.loadClass("inverseorphan.Parent"),childType=loader.loadClass("inverseorphan.Child");com.codename1.backend.orm.EntityManager em=com.codename1.backend.orm.EntityManager.open(com.codename1.backend.Database.open(":memory:"));com.codename1.orm.session.Session session=em.openSession();
+                try { session.createTables();session.beginTransaction();Object parent=parentType.newInstance(),child=childType.newInstance();childType.getField("parent").set(child,parent);session.persist(parent);session.persist(child);session.commitTransaction();Object id=parentType.getField("id").get(parent);session.clear();parent=eager?session.query(parentType).first():session.createQuery("select p from inverseorphan.Parent p join fetch p.child",parentType).first();assertTrue(session.isLoaded(parent,"child"));org.junit.Assert.assertNotNull(parentType.getField("child").get(parent));session.beginTransaction();parentType.getField("child").set(parent,null);session.commitTransaction();org.junit.Assert.assertEquals(0,session.query(childType).count());org.junit.Assert.assertNotNull(session.find(parentType,id)); }
+                finally { session.close();em.close(); }
+            }
+        }
+    }
+
+    @Test
+    public void countersRejectNonIntLongDomainTypes() throws Exception {
+        File classes=tmp.newFolder();Map<String,String> sources=new java.util.LinkedHashMap<String,String>();
+        sources.put("countertypes.NumberConverter","package countertypes; public class NumberConverter implements com.codename1.orm.session.AttributeConverter<String,Long> { public Long toDatabase(String value) { return value==null?null:Long.valueOf(value); } public String fromDatabase(Long value) { return value==null?null:value.toString(); } }");
+        sources.put("countertypes.Entry","package countertypes; import com.codename1.annotations.*; import com.codename1.annotations.db.*; @Entity(table=\"counter_types\") public class Entry { @Id public long id; public int integer; public long whole; public Integer boxed=0; public Long boxedLong=0L; public byte narrow; public short small; public char letter; public boolean enabled; public java.util.Date moment; @Convert(converter=NumberConverter.class,storageType=Long.class) public String converted; }");
+        JavaSourceCompiler.compile(sources,classes,Arrays.asList(testClassesDir()));ProcessorContext client=runProcessor(classes);assertFalse(client.getErrors().toString(),client.hasErrors());ProcessorContext backend=runProcessor(classes,backendClasspath());assertFalse(backend.getErrors().toString(),backend.hasErrors());
+        try(java.net.URLClassLoader loader=new java.net.URLClassLoader(new URL[]{classes.toURI().toURL()},getClass().getClassLoader())) {
+            loader.loadClass("cn1app.BackendDaoBootstrap").newInstance();Class type=loader.loadClass("countertypes.Entry");com.codename1.backend.orm.EntityManager em=com.codename1.backend.orm.EntityManager.open(com.codename1.backend.Database.open(":memory:"));com.codename1.orm.session.Session session=em.openSession();
+            try { session.createTables();session.beginTransaction();Object entity=type.newInstance();session.persist(entity);session.commitTransaction();Object id=type.getField("id").get(entity);session.beginTransaction();
+                for(String field:Arrays.asList("narrow","small","letter","enabled","moment","converted")) { try { session.increment(type,id,field,1);fail("Not a Java int/long counter: "+field); } catch(IllegalArgumentException expected) { } }
+                for(String field:Arrays.asList("integer","whole","boxed","boxedLong")) assertTrue(session.increment(type,id,field,1));session.commitTransaction();
+                for(String suffix:Arrays.asList("Cn1Model","Cn1BackendModel")) { com.codename1.impl.orm.EntityModel model=(com.codename1.impl.orm.EntityModel)loader.loadClass("countertypes.Entry"+suffix).newInstance();for(String field:Arrays.asList("narrow","small","letter","enabled","moment","converted")) assertFalse(model.counter(model.index(field))); }
             } finally { session.close();em.close(); }
         }
     }

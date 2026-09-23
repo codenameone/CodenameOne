@@ -72,6 +72,14 @@ public abstract class EntityModel<T> {
     public boolean required(T entity, int index) {
         return !attributes()[index].nullable;
     }
+    /// Returns whether any mapped subtype requires this column to contain a value.
+    public boolean required(int index) {
+        return !attributes()[index].nullable;
+    }
+    /// True only for unconverted int/Integer or long/Long values, including numeric properties.
+    public boolean counter(int index) {
+        return false;
+    }
     public Object parameter(int index, Object value) {
         return Values.storage(value);
     }

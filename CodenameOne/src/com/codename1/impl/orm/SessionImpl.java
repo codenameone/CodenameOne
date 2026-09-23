@@ -71,6 +71,15 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
     String orderBy(String expression, boolean ascending, int kind) {
         return sql.orderBy(expression, ascending, kind);
     }
+    String likeOperator(boolean escaped) {
+        return sql.likeOperator(escaped);
+    }
+    String likePattern(String pattern, String escape) {
+        return sql.likePattern(pattern, escape);
+    }
+    String likeExpression(String expression) {
+        return sql.likeExpression(expression);
+    }
     String nextAlias() {
         return "q" + (aliasSequence++);
     }
@@ -698,7 +707,7 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
         int index = model.index(field);
         int version = model.versionIndex();
         Attribute a = model.attributes()[index];
-        if (a.id || a.version || (a.kind != Attribute.INTEGER && a.kind != Attribute.BIGINT)) {
+        if (a.id || a.version || !model.counter(index)) {
             throw new IllegalArgumentException("Counter must be a non-key integral field: " + field);
         }
         String statement = "UPDATE " + q(model.table()) + " SET " + q(a.column) + " = " + q(a.column) + " + ?";
@@ -963,8 +972,9 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
                 if (primary != attr.id) {
                     errors.add("Primary key mismatch on " + model.table() + "." + attr.column);
                 }
-                if (!attr.nullable && !required) {
-                    errors.add("Missing NOT NULL on " + model.table() + "." + attr.column);
+                if (attr.nullable == required) {
+                    errors.add((required ? "Unexpected NOT NULL on " : "Missing NOT NULL on ")
+                            + model.table() + "." + attr.column);
                 }
                 if (typeFamily((String) found[1]) != typeFamily(columnType(model, i))) {
                     errors.add("Storage type mismatch on " + model.table() + "." + attr.column);
@@ -1187,8 +1197,8 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
                             owner.relation(entity, i, value);
                             state(entity).loaded[i] = true;
                             Entry entry = entries.get(entity);
-                            if (entry != null && relation.many) {
-                                entry.collections[i] = relationKeys(relation, value);
+                            if (entry != null) {
+                                entry.collections[i] = relationshipKeys(relation, value);
                             }
                         }
                     } else {
@@ -1387,7 +1397,7 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
                     state.keys[i] = count == 1 ? key[0] : Identifier.of(key);
                 }
             }
-            if (loaded) {
+            if (state.loaded[i]) {
                 entry.collections[i] = new ArrayList();
             } else if (relations[i].column >= 0) {
                 entry.collections[i] = new ArrayList();
