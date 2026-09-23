@@ -86,6 +86,12 @@ public final class DartLongList extends DartList<Long> {
     }
 
     /** Dart's List&lt;int&gt;.from(elements). */
+    /** {@link #fromLongs(Iterable)} with Dart's {@code growable:} flag. */
+    public static DartLongList fromLongs(Iterable<? extends Number> elements, boolean growable) {
+        DartLongList grown = fromLongs(elements);
+        return new DartLongList(grown.a, grown.len, growable);
+    }
+
     public static DartLongList fromLongs(Iterable<? extends Number> elements) {
         DartLongList l = new DartLongList();
         for (Number e : elements) {

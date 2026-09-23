@@ -92,6 +92,18 @@ public class DartList<E> extends AbstractList<E> implements RandomAccess {
         return l;
     }
 
+    /**
+     * Dart's {@code List.from(elements, growable: ...)}. The flag used to be dropped,
+     * so a {@code growable: false} copy still accepted add and removeAt.
+     */
+    public static <E> DartList<E> from(Iterable<E> elements, boolean growable) {
+        ArrayList<E> impl = new ArrayList<E>();
+        for (E e : elements) {
+            impl.add(e);
+        }
+        return new DartList<E>(impl, growable);
+    }
+
     public static <E> DartList<E> from(Iterable<E> elements) {
         DartList<E> l = new DartList<>();
         for (E e : elements) {
@@ -285,6 +297,16 @@ public class DartList<E> extends AbstractList<E> implements RandomAccess {
         for (E e : elements) {
             add(e);
         }
+    }
+
+    /** Dart's {@code indexOf(element, start)}: the first match at or after start. */
+    public long indexOfDart(E element, long start) {
+        for (int i = (int) Math.max(0, start); i < size(); i++) {
+            if (DartRuntime.eq(get(i), element)) {
+                return i;
+            }
+        }
+        return -1;
     }
 
     /** Dart's List.indexOf — long-typed; named to avoid clashing with java.util.List.indexOf(Object). */

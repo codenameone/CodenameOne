@@ -460,4 +460,14 @@ public class DartCoreSemanticsTest {
         assertTrue(DString.startsWith("abc", "b", 1));
         assertThrows(RangeError.class, () -> DString.startsWith("abc", "a", 4));
     }
+
+    @Test
+    public void fromHonoursGrowableAndIndexOfTakesAStart() {
+        DartList<Object> fixed = DartList.from(java.util.Arrays.<Object>asList("a", "b"), false);
+        assertThrows(UnsupportedError.class, () -> fixed.add("c"));
+        DartLongList longs = DartLongList.fromLongs(java.util.Arrays.asList(1L, 2L), false);
+        assertThrows(UnsupportedError.class, () -> longs.addLong(3));
+        DartList<Object> l = DartList.of((Object) 1L, 2L, 1L);
+        assertEquals(2, l.indexOfDart(1L, 1));
+    }
 }

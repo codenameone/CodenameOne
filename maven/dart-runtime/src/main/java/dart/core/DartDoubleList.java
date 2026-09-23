@@ -94,6 +94,12 @@ public final class DartDoubleList extends DartList<Double> {
     }
 
     /** Dart's List&lt;double&gt;.from(elements). */
+    /** {@link #fromDoubles(Iterable)} with Dart's {@code growable:} flag. */
+    public static DartDoubleList fromDoubles(Iterable<? extends Number> elements, boolean growable) {
+        DartDoubleList grown = fromDoubles(elements);
+        return new DartDoubleList(grown.a, grown.len, growable);
+    }
+
     public static DartDoubleList fromDoubles(Iterable<? extends Number> elements) {
         DartDoubleList l = new DartDoubleList();
         for (Number e : elements) {
