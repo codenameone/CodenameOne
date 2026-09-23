@@ -377,6 +377,7 @@ readback
 recurse
 redeclaring
 redeclaration
+redeclares
 Redeclare
 reparent
 reparented
@@ -772,3 +773,7 @@ Podman
 # The open-source library whose iproxy tool relays a TCP port to an iPhone over
 # USB. A project name, spelled lowercase by its authors.
 libimobiledevice
+# -----------------------------------------------------------------------------
+# The GNOME desktop's design language, which names the Linux desktop native
+# theme (Native-Themes.asciidoc).
+Adwaita

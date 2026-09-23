@@ -69,7 +69,6 @@ public class CodenameOneSettingsStub implements Runnable, WindowListener {
     private static final boolean APP_FULLSCREEN = false;
     private static final String APP_DESKTOP_TITLEBAR = "native";
     private static final boolean APP_DESKTOP_INTERACTIVE_SCROLLBARS = true;
-    private static final boolean isWindows = File.separatorChar == '\\';
 
     private static JFrame frm;
     private CodenameOneSettings mainApp;
@@ -96,11 +95,8 @@ public class CodenameOneSettingsStub implements Runnable, WindowListener {
         JavaSEPort.setFullScreen(APP_FULLSCREEN);
         JavaSEPort.setDesktopTitleBarMode(APP_DESKTOP_TITLEBAR);
         JavaSEPort.setDesktopInteractiveScrollbars(APP_DESKTOP_INTERACTIVE_SCROLLBARS);
-        if (isWindows) {
-            JavaSEPort.setFontFaces("ArialUnicodeMS", "SansSerif", "Monospaced");
-        } else {
-            JavaSEPort.setFontFaces("Arial", "SansSerif", "Monospaced");
-        }
+        // No setFontFaces here: the desktop native theme picks the platform's own face
+        // (Segoe UI Variable, SF or Cantarell), and an explicit face would override it.
 
         frm = new JFrame(APP_TITLE);
         Toolkit tk = Toolkit.getDefaultToolkit();

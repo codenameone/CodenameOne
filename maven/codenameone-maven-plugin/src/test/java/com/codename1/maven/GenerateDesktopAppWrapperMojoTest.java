@@ -28,6 +28,7 @@ import org.apache.maven.project.MavenProject;
 import java.nio.file.Path;
 import java.nio.file.Files;
 
+import java.io.File;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.Properties;
@@ -181,6 +182,61 @@ class GenerateDesktopAppWrapperMojoTest {
             }
             assertEquals("legacy", packaged.getProperty("desktop.themeMode"), hint);
         }
+    }
+
+    /**
+     * A packaged desktop app has no settings file at runtime, so what this goal writes is
+     * all it ever reads. The device builds and cn1:run merge the hints declared as
+     * annotations; this goal read only codenameone_settings.properties, so an app that
+     * said {@code @DesktopBuild(themeMode = "aqua")} previewed as Aqua and shipped as
+     * legacy. Drives the real merge against a real processor fingerprint.
+     */
+    @Test
+    void annotationDeclaredHintsReachThePackagedApp(@TempDir Path root) throws Exception {
+        final File common = root.resolve("common-classes").toFile();
+        final File annotations = new File(Class.forName("com.codename1.annotations.buildhints.DesktopBuild")
+                .getProtectionDomain().getCodeSource().getLocation().toURI());
+        com.codename1.maven.annotations.JavaSourceCompiler.compile(
+                com.codename1.maven.annotations.JavaSourceCompiler.singleSource(
+                        "com.example.MyApp",
+                        "package com.example;\n"
+                                + "import com.codename1.annotations.buildhints.*;\n"
+                                + "@DesktopBuild(themeMode = \"aqua\")\n"
+                                + "public class MyApp {\n}\n"),
+                common, java.util.Collections.singletonList(annotations));
+        String digest = com.codename1.maven.processors.BuildHintAnnotationProcessor.sourceDigest(
+                com.codename1.maven.annotations.ClassScanner.readClass(
+                        new File(common, "com/example/MyApp.class")));
+        Path manifest = common.toPath().resolve("META-INF/codenameone/build-hints.properties");
+        Files.createDirectories(manifest.getParent());
+        Files.write(manifest, ("cn1.buildHints.mainClass=com.example.MyApp\n"
+                + "cn1.buildHints.sourceDigest=" + digest + "\n"
+                + "codename1.arg.desktop.themeMode=aqua\n").getBytes(StandardCharsets.ISO_8859_1));
+
+        GenerateDesktopAppWrapperMojo mojo = new GenerateDesktopAppWrapperMojo();
+        // The javase module: its own output, then the common module it depends on.
+        final File javaseClasses = root.resolve("javase-classes").toFile();
+        mojo.project = new MavenProject() {
+            @Override
+            public java.util.List<String> getCompileClasspathElements() {
+                return java.util.Arrays.asList(javaseClasses.getAbsolutePath(),
+                        common.getAbsolutePath(), annotations.getAbsolutePath());
+            }
+        };
+        mojo.project.getBuild().setOutputDirectory(javaseClasses.getAbsolutePath());
+        mojo.properties = new Properties();
+        mojo.properties.setProperty("codename1.packageName", "com.example");
+        mojo.properties.setProperty("codename1.mainName", "MyApp");
+
+        mojo.applyAnnotationBuildHints();
+        mojo.generateThemeConfiguration();
+
+        Properties packaged = new Properties();
+        try (InputStream in = Files.newInputStream(javaseClasses.toPath().resolve("codenameone-desktop.properties"))) {
+            packaged.load(in);
+        }
+        assertEquals("aqua", packaged.getProperty("desktop.themeMode"),
+                "the annotation's value must be what the packaged app installs");
     }
 
     @Test

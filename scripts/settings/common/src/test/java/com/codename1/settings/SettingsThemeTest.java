@@ -82,50 +82,72 @@ public class SettingsThemeTest {
     }
 
     @Test
-    public void everyProgrammaticUiidHasLightAndDarkCssRules() throws Exception {
+    public void everyProgrammaticUiidHasACssRuleAndNoDarkTwin() throws Exception {
         String source = Files.readString(APP_SOURCE, StandardCharsets.UTF_8);
         String css = Files.readString(THEME_CSS, StandardCharsets.UTF_8);
         Set<String> uiids = referencedUiids(source);
-        assertFalse(uiids.isEmpty(), "Expected to find uiid(\"...\") references in CodenameOneSettings.java");
+        assertFalse(uiids.isEmpty(), "Expected to find \"Settings...\" UIIDs in CodenameOneSettings.java");
         Set<String> selectors = cssSelectors(css);
         for (String uiid : uiids) {
             assertTrue(selectors.contains(uiid),
-                    "Missing light CSS selector for UIID '" + uiid + "'. "
+                    "Missing CSS selector for UIID '" + uiid + "'. "
                             + "CN1 CSS selectors target component UIIDs, per Initializr skill guidance.");
-            assertTrue(selectors.contains(uiid + "Dark"),
-                    "Missing dark CSS selector for UIID '" + uiid + "Dark'. "
-                            + "The Settings app toggles by appending 'Dark' at runtime, so every styled UIID needs both.");
         }
+        for (String selector : selectors) {
+            assertFalse(selector.startsWith("Settings") && selector.endsWith("Dark"),
+                    "'" + selector + "' is a dark twin UIID. Dark mode is the native one now: the "
+                            + "@media (prefers-color-scheme: dark) block compiles to $Dark styles the "
+                            + "framework picks per style, so the app never switches UIIDs.");
+        }
+        assertFalse(source.contains("+ \"Dark\""),
+                "The app must not append 'Dark' to a UIID; CN.setDarkMode drives the $Dark styles.");
+    }
+
+    /// Settings has no palette of its own: surfaces and text bind to the variables every
+    /// desktop native theme declares, so the same stylesheet reads as Fluent, Aqua or
+    /// Adwaita depending on which one is underneath. Only the brand is fixed.
+    @Test
+    public void colorsComeFromTheNativePaletteExceptTheBrand() throws Exception {
+        String css = Files.readString(THEME_CSS, StandardCharsets.UTF_8);
+        String source = Files.readString(APP_SOURCE, StandardCharsets.UTF_8);
+        assertTrue(source.contains("themeMode = \"native\""),
+                "Settings must opt into the platform's desktop theme; unset means legacy.");
+        for (String variable : new String[]{"--window-bg-color", "--control-bg-color", "--text-color",
+                "--text-secondary-color", "--window-bg-color-dark", "--text-color-dark"}) {
+            assertTrue(css.contains("var(" + variable + ")"), "theme.css should bind to " + variable);
+        }
+        assertTrue(css.contains("@media (prefers-color-scheme: dark)"));
+        assertTrue(css.contains("--accent-color: #2F6BFF;"), "the brand accent is Codename One blue");
+        assertTrue(css.contains("--accent-color-dark: #4D86FF;"));
+        assertTrue(css.contains("background-color: #B8D532;"), "Save keeps the brand lime");
+        assertFalse(css.contains("#071B4D") || css.contains("#102B66"),
+                "The old navy page palette must not come back; it hid the native theme entirely.");
     }
 
     @Test
-    public void darkThemeMatchesReferencePalette() throws Exception {
+    public void controlsDeriveFromTheirNativeUiids() throws Exception {
         String css = Files.readString(THEME_CSS, StandardCharsets.UTF_8);
-        String[] colors = {
-                "#071B4D",
-                "#102B66",
-                "#163575",
-                "#0E2A61",
-                "#4C6EA8",
-                "#7390C0",
-                "#F5F8FF",
-                "#A8B8DA",
-                "#7E93BC",
-                "#4D86FF",
-                "#B8D532"
-        };
-        for (String color : colors) {
-            assertTrue(css.contains(color), "Dark theme should include reference color " + color);
-        }
+        assertDerives(css, "SettingsField", "TextField");
+        assertDerives(css, "SettingsSearchBox", "TextField");
+        assertDerives(css, "SettingsPrimary", "RaisedButton");
+        assertDerives(css, "SettingsOutline", "Button");
+        assertDerives(css, "SettingsCard", "GroupBox");
+        assertDerives(css, "SettingsRow", "GroupBox");
+        assertDerives(css, "SettingsRailItem", "ListRenderer");
+        assertDerives(css, "SettingsPopupMenu", "PopupContentPane");
+        String source = Files.readString(APP_SOURCE, StandardCharsets.UTF_8);
+        assertFalse(source.contains("SettingsSwitch"),
+                "A Switch reads its track and thumb constants by UIID, so a renamed switch "
+                        + "loses the native theme's switch geometry. Use the plain Switch UIID.");
     }
 
     @Test
     public void focusedInputsRemainVisibleInDarkMode() throws Exception {
         String css = Files.readString(THEME_CSS, StandardCharsets.UTF_8);
-        assertTrue(css.contains("SettingsSearchBoxFocusedDark"));
-        assertTrue(css.contains("SettingsSearchFieldDark, SettingsSearchFieldDark.selected"));
-        assertTrue(css.contains("border-color: #4D86FF"));
-        assertTrue(css.contains("color: #F5F8FF"));
+        String dark = css.substring(css.indexOf("@media (prefers-color-scheme: dark)"));
+        assertTrue(dark.contains("SettingsSearchBoxFocused { background-color: var(--view-bg-color-dark)"));
+        assertTrue(dark.contains("border: 2px solid #4D86FF"));
+        assertTrue(dark.contains("SettingsSearchField, SettingsSearchField.selected { color: var(--text-color-dark)"));
     }
 
     @Test
@@ -197,18 +219,15 @@ public class SettingsThemeTest {
                         + "catalog alone does not mean a row survives losing its declaration.");
     }
 
-    /// The desktop scrollbar is drawn from UIIDs the look and feel names itself,
-    /// so it is invisible until the theme gives it a colour -- and it cannot use
-    /// the app's Dark-suffix trick, because nothing asks for a "DesktopScrollDark".
+    /// The desktop scrollbar is drawn from UIIDs the look and feel names itself. The
+    /// native desktop themes style them for both appearances, so the app no longer
+    /// paints a fixed thumb color over the platform's.
     @Test
-    public void desktopScrollbarIsStyledForBothThemes() throws Exception {
+    public void desktopScrollbarIsLeftToTheNativeTheme() throws Exception {
         String css = Files.readString(THEME_CSS, StandardCharsets.UTF_8);
         Set<String> selectors = cssSelectors(css);
-        assertTrue(selectors.contains("DesktopScroll"));
-        assertTrue(selectors.contains("DesktopScrollThumb"));
-        assertFalse(selectors.contains("DesktopScrollThumbDark"),
-                "The scrollbar UIIDs are fixed by the look and feel; a Dark twin is never "
-                        + "asked for, so its colour has to read on both pages.");
+        assertFalse(selectors.contains("DesktopScroll"));
+        assertFalse(selectors.contains("DesktopScrollThumb"));
     }
 
     @Test
@@ -241,7 +260,8 @@ public class SettingsThemeTest {
         assertMmFontAtLeast(css, "SettingsForm", 3.2);
         assertMmFontAtLeast(css, "SettingsToolbarBrand", 3.4);
         assertMmFontAtLeast(css, "SettingsPageTitle", 5.5);
-        assertMmFontAtLeast(css, "SettingsField", 3.0);
+        // SettingsField takes the native TextField's size (3.4mm to 3.9mm across the
+        // desktop themes) so its placeholder lines up; it declares none of its own.
         assertMmFontAtLeast(css, "SettingsPopupLabel", 3.0);
         assertMmFontAtLeast(css, "SettingsExtensionTitle", 3.6);
         assertMmFontAtLeast(css, "SettingsExtensionText", 2.8);
@@ -259,9 +279,20 @@ public class SettingsThemeTest {
                 selector + " font size must remain at least " + minimum + "mm for Retina readability.");
     }
 
+    private static void assertDerives(String css, String selector, String parent) {
+        Matcher rule = Pattern.compile("(?m)^\\s*" + Pattern.quote(selector)
+                        + "\\s*(?:,[^\\{]+)?\\{([^}]*)}", Pattern.DOTALL).matcher(css);
+        assertTrue(rule.find(), "Missing CSS rule for " + selector);
+        assertTrue(rule.group(1).contains("cn1-derive: " + parent + ";"),
+                selector + " should derive from the native " + parent);
+    }
+
     private static Set<String> referencedUiids(String source) {
         LinkedHashSet<String> uiids = new LinkedHashSet<String>();
-        Matcher matcher = Pattern.compile("uiid\\(\"([A-Za-z0-9_]+)\"\\)").matcher(source);
+        // Every "Settings..." literal is a UIID except thread names (passed to a Thread
+        // that is then started) and the string compared against in font sizing.
+        Matcher matcher = Pattern.compile("\"(Settings[A-Za-z0-9_]+)\"(?!\\)\\.start\\(|\\.equals\\()")
+                .matcher(source);
         while (matcher.find()) {
             uiids.add(matcher.group(1));
         }
