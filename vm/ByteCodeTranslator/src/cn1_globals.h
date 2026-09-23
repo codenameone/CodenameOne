@@ -1900,6 +1900,55 @@ struct ThreadLocalData {
 
 //#define BLOCK_FOR_GC() while(threadStateData->threadBlockedByGC) { usleep(500); }
 
+// WAITING OUT A STOP. A parked thread used to poll threadBlockedByGC with usleep(500)
+// (usleep(1000) on the legacy allocation paths), so every handshake cost the mutator at
+// least that long however quickly the collector released it -- the collector scans a
+// parked thread in microseconds. Measured on objectAllocation: every start-of-mark
+// handshake sat in the 512-1024us bucket, 9% of wall at one marker and the fixed cost
+// that made small collection triggers slow. So the wait spins briefly, then yields, and
+// only then sleeps -- in 50us steps, not 500.
+//
+// The flag is read with an explicit atomic load: it is a plain field, and the old loops
+// only re-read it because usleep is an opaque call. Spinning is safe for the collector's
+// scan of this thread: its stack was captured before it parked, and the spin only writes
+// below the captured stack pointer, as the usleep call did.
+#ifndef _WIN32
+#include <unistd.h>
+#include <sched.h>
+#endif
+static inline void cn1CpuRelax(void) {
+#if defined(__aarch64__) || defined(__arm__)
+    __asm__ __volatile__("yield" ::: "memory");
+#elif defined(__x86_64__) || defined(__i386__)
+    __asm__ __volatile__("pause" ::: "memory");
+#else
+    __asm__ __volatile__("" ::: "memory");
+#endif
+}
+static inline void cn1ThreadYield(void) {
+#ifdef _WIN32
+    usleep(0);          /* the compatibility layer has no sched_yield */
+#else
+    sched_yield();
+#endif
+}
+static inline void cn1GcHandshakeBackoff(int* spins) {
+    int s = (*spins)++;
+    if(s < 512) {
+        cn1CpuRelax();
+    } else if(s < 640) {
+        cn1ThreadYield();
+    } else {
+        usleep(50);
+    }
+}
+#define CN1_GC_WAIT_UNBLOCKED(ts) do { \
+        int cn1__gcw = 0; \
+        while(__atomic_load_n(&(ts)->threadBlockedByGC, __ATOMIC_ACQUIRE)) { \
+            cn1GcHandshakeBackoff(&cn1__gcw); \
+        } \
+    } while(0)
+
 #ifdef CN1_ON_DEVICE_DEBUG
 // One row of the variable side-table: a single (line, slot, typeCode) tuple.
 // typeCode is the JVM type descriptor first char (I/J/F/D/Z/B/S/C/L/[).

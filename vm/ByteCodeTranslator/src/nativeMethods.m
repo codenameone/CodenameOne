@@ -2982,9 +2982,7 @@ JAVA_VOID monitorEnter(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj) {
         err = pthread_mutex_lock(&data->__codenameOneMutex);
         data->counter++;
         data->ownerThread = own;
-        while (threadStateData->threadBlockedByGC) {
-            usleep(100);
-        }
+        CN1_GC_WAIT_UNBLOCKED(threadStateData);
         threadStateData->threadActive = JAVA_TRUE;
 
 
@@ -3440,9 +3438,7 @@ JAVA_VOID java_lang_Thread_sleepImpl___long(CODENAME_ONE_THREAD_STATE, JAVA_LONG
         // usleep shim has no useconds_t typedef (same reason the old code cast here)
         usleep((JAVA_INT)remainMicros);
     }
-    while(threadStateData->threadBlockedByGC) {
-        usleep(1000);
-    }
+    CN1_GC_WAIT_UNBLOCKED(threadStateData);
     threadStateData->threadActive = JAVA_TRUE;
 #ifdef CN1_CONSERVATIVE_GC_ROOTS
     // Mirror CN1_RESUME_THREAD: drop the capture so a stale SP can never

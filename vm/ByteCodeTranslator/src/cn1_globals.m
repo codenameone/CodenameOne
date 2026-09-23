@@ -2877,7 +2877,7 @@ static void cn1GcRescanBlock(CODENAME_ONE_THREAD_STATE, JAVA_LONG block) {
         // A registered mover does nothing but copy references between its register and
         // its release -- no allocation, no safepoint -- so this is bounded by one memmove.
         if(++spins > 64) {
-            sched_yield();
+            cn1ThreadYield();
         }
     }
     cn1GcMarkRefBlock(threadStateData, block, JAVA_FALSE);
@@ -4916,6 +4916,13 @@ void codenameOneGCMark() {
                     // A non-lightweight thread is never waited for, and now contributes 0.
                     long long __wt0 = cn1GcNowNs();
 #endif
+                    // Spin, then yield, before the counted sleep below: a thread asked to
+                    // stop usually parks within microseconds (its next allocation page or
+                    // monitor), and polling at 500us held every handshake -- and the
+                    // mutator inside it -- that long. See CN1_GC_WAIT_UNBLOCKED. The
+                    // counted phase is unchanged, so totalwait, the report and the
+                    // force-stop escalation still measure what they measured.
+                    int cn1__parkSpins = 0;
                     while(t->threadActive) {
                         if(vtOfState != 0) {
                             /*
@@ -5002,6 +5009,10 @@ void codenameOneGCMark() {
                              * decline to wait.
                              */
                             break;
+                        }
+                        if(cn1__parkSpins < 640) {
+                            cn1GcHandshakeBackoff(&cn1__parkSpins);
+                            continue;
                         }
                         usleep(500);
                         totalwait += 500;
@@ -8594,9 +8605,12 @@ static void cn1PacingPark(CODENAME_ONE_THREAD_STATE, int which, long long pendin
                 // `volume > cap` true for longer, which is what made it reachable.
                 if(threadStateData->threadBlockedByGC) {
                     threadStateData->threadActive = JAVA_FALSE;
-                    while(threadStateData->threadBlockedByGC) {
-                        if(!cn1VirtualThreadYieldIfVirtual()) {
-                            usleep((JAVA_INT)(500));
+                    {
+                        int cn1__gcw = 0;
+                        while(__atomic_load_n(&threadStateData->threadBlockedByGC, __ATOMIC_ACQUIRE)) {
+                            if(!cn1VirtualThreadYieldIfVirtual()) {
+                                cn1GcHandshakeBackoff(&cn1__gcw);
+                            }
                         }
                     }
                     threadStateData->threadActive = JAVA_TRUE;
@@ -8617,17 +8631,23 @@ static void cn1PacingPark(CODENAME_ONE_THREAD_STATE, int which, long long pendin
             // mark functions on it -- underneath a scan in progress, which loses
             // reachable objects. Wait the block out first, exactly as the tail of
             // this function does.
-            while(threadStateData->threadBlockedByGC) {
-                if(!cn1VirtualThreadYieldIfVirtual()) {
-                    usleep((JAVA_INT)(500));
+            {
+                int cn1__gcw = 0;
+                while(__atomic_load_n(&threadStateData->threadBlockedByGC, __ATOMIC_ACQUIRE)) {
+                    if(!cn1VirtualThreadYieldIfVirtual()) {
+                        cn1GcHandshakeBackoff(&cn1__gcw);
+                    }
                 }
             }
             threadStateData->threadActive = JAVA_TRUE;
         }
         threadStateData->threadActive = JAVA_FALSE;
-        while(threadStateData->threadBlockedByGC) {
-            if(!cn1VirtualThreadYieldIfVirtual()) {
-                usleep((JAVA_INT)(500));
+        {
+            int cn1__gcw = 0;
+            while(__atomic_load_n(&threadStateData->threadBlockedByGC, __ATOMIC_ACQUIRE)) {
+                if(!cn1VirtualThreadYieldIfVirtual()) {
+                    cn1GcHandshakeBackoff(&cn1__gcw);
+                }
             }
         }
         threadStateData->threadActive = JAVA_TRUE;
@@ -8806,9 +8826,7 @@ static void cn1PacingPark(CODENAME_ONE_THREAD_STATE, int which, long long pendin
     // Honour a stop-the-world before resuming, exactly like every other park here: the
     // loop above can exit while a mark is still running and the collector believes this
     // thread is paused.
-    while(threadStateData->threadBlockedByGC) {
-        usleep((JAVA_INT)(500));
-    }
+    CN1_GC_WAIT_UNBLOCKED(threadStateData);
     threadStateData->threadActive = JAVA_TRUE;
     CN1_STALL_ADD(__stallBudget, CN1_STALL_PACING_BUDGET, threadStateData);
 }
@@ -8843,9 +8861,7 @@ static void cn1BibopMaybeGc(CODENAME_ONE_THREAD_STATE) {
         CN1_GC_PARK_CAPTURE(threadStateData);
         CN1_STALL_T0(__stallHs);
         threadStateData->threadActive = JAVA_FALSE;
-        while(threadStateData->threadBlockedByGC) {
-            usleep((JAVA_INT)(500));
-        }
+        CN1_GC_WAIT_UNBLOCKED(threadStateData);
         threadStateData->threadActive = JAVA_TRUE;
         CN1_STALL_ADD(__stallHs, CN1_STALL_HANDSHAKE, threadStateData);
     }
@@ -12990,9 +13006,7 @@ cn1GcMallocRetry:
             if(throttle) {
                 usleep((JAVA_INT)(1000));
             }
-            while(threadStateData->threadBlockedByGC) {
-                usleep((JAVA_INT)(1000));
-            }
+            CN1_GC_WAIT_UNBLOCKED(threadStateData);
             threadStateData->threadActive = JAVA_TRUE;
             CN1_STALL_ADD(__stallLow, CN1_STALL_LOWMEM, threadStateData);
         }
@@ -13098,9 +13112,7 @@ cn1GcMallocRetry:
         }
 #endif
         // Then honour the handshake, unbounded, exactly like every other park here.
-        while(threadStateData->threadBlockedByGC) {
-            usleep((JAVA_INT)(1000));
-        }
+        CN1_GC_WAIT_UNBLOCKED(threadStateData);
         invokedGC = NO;
         threadStateData->threadActive = JAVA_TRUE;
         // Retry by LOOPING, not by recursing. This used to be
@@ -13140,9 +13152,7 @@ cn1GcMallocRetry:
             CN1_GC_PARK_CAPTURE(threadStateData);   // PHASE 3b: native-stack capture at park
             CN1_STALL_T0(__stallLegHs);
             threadStateData->threadActive = JAVA_FALSE;
-            while(threadStateData->threadBlockedByGC) {
-                usleep(1000);
-            }
+            CN1_GC_WAIT_UNBLOCKED(threadStateData);
             threadStateData->threadActive = JAVA_TRUE;
             CN1_STALL_ADD(__stallLegHs, CN1_STALL_HANDSHAKE, threadStateData);
         }
@@ -13246,9 +13256,7 @@ cn1GcMallocRetry:
             }
 #endif
             // Honour the stop-the-world before resuming, exactly like every other park.
-            while(threadStateData->threadBlockedByGC) {
-                usleep((JAVA_INT)(1000));
-            }
+            CN1_GC_WAIT_UNBLOCKED(threadStateData);
             invokedGC = NO;
             threadStateData->threadActive = JAVA_TRUE;
             CN1_STALL_ADD(__stallPending, CN1_STALL_PENDING_FULL, threadStateData);
