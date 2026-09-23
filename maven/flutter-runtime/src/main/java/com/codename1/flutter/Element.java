@@ -274,6 +274,7 @@ public abstract class Element implements BuildContext {
             // without that every consumer is a one-shot read.
             if (a instanceof com.codename1.flutter.widgets.InheritedElement) {
                 ((com.codename1.flutter.widgets.InheritedElement) a).addDependent(this);
+                dependsOn(a);
             }
             return type.cast(a.widget);
         }
@@ -329,6 +330,11 @@ public abstract class Element implements BuildContext {
 
     @Override
     public Object providerValueOfType(Class<?> type) {
+        return providerValueOfType(type, true);
+    }
+
+    @Override
+    public Object providerValueOfType(Class<?> type, boolean listen) {
         Element a = ancestorOf(this);
         int providers = 0;
         while (a != null) {
@@ -344,7 +350,10 @@ public abstract class Element implements BuildContext {
                     // runs again. Every control whose job is to set a field on a model
                     // then looked dead -- the handler ran, the model changed, the screen
                     // did not.
-                    a.addProviderDependent(this);
+                    if (listen) {
+                        a.addProviderDependent(this);
+                        dependsOn(a);
+                    }
                     return v;
                 }
             }
@@ -359,6 +368,28 @@ public abstract class Element implements BuildContext {
     /// Flutter tracks this as an InheritedWidget dependency; a provider here is an
     /// ordinary widget, so the dependency has to be recorded by hand.
     private java.util.List<Element> providerDependents;
+
+    /// What this element has registered itself with as a dependent -- inherited
+    /// elements and providers -- so unmount can take itself back out. Flutter keeps the
+    /// same set. Without it only the forward edge existed: a popped route's elements
+    /// stayed in a long-lived Theme's or provider's list, and with them, through their
+    /// parent links, the whole popped tree, until that ancestor happened to notify.
+    private java.util.List<Element> dependencies;
+
+    private void dependsOn(Element on) {
+        if (dependencies == null) {
+            dependencies = new java.util.ArrayList<Element>(2);
+        }
+        if (!dependencies.contains(on)) {
+            dependencies.add(on);
+        }
+    }
+
+    void removeProviderDependent(Element dependent) {
+        if (providerDependents != null) {
+            providerDependents.remove(dependent);
+        }
+    }
 
     void addProviderDependent(Element dependent) {
         if (dependent == null || dependent == this) {
@@ -433,7 +464,7 @@ public abstract class Element implements BuildContext {
     @Override
     @SuppressWarnings("unchecked")
     public <T> T read(Class<T> type) {
-        return (T) providerValueOfType(type);
+        return (T) providerValueOfType(type, false);
     }
 
     // ------------------------------------------------------------------
@@ -532,6 +563,15 @@ public abstract class Element implements BuildContext {
     public void unmount() {
         this.mounted = false;
         this.dirty = false;
+        if (dependencies != null) {
+            for (Element on : dependencies) {
+                if (on instanceof com.codename1.flutter.widgets.InheritedElement) {
+                    ((com.codename1.flutter.widgets.InheritedElement) on).removeDependent(this);
+                }
+                on.removeProviderDependent(this);
+            }
+            dependencies = null;
+        }
         Key k = widget == null ? null : widget.getKey();
         // Only if the key still points HERE: a GlobalKey that moved to another
         // element must not be cleared by the one it left.

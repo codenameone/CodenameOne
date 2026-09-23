@@ -80,14 +80,10 @@ public class FlutterAssets {
     private static final double[] VARIANTS = {1.5, 2.0, 3.0, 4.0};
 
     /**
-     * Asset paths to try for {@code assetPath} at the given device pixel
-     * ratio, most preferred first — Flutter's resolution rule: the smallest
-     * variant at least as dense as the screen, then denser ones, then the
-     * closest lower ones, and finally the unscaled asset.
-     *
-     * <p>Flutter reads the available variants from a build-generated manifest;
-     * we probe instead, so the order is what matters and a missing variant
-     * simply falls through to the next candidate.</p>
+     * Every asset path that may hold a variant of {@code assetPath}: the scaled
+     * variants, densest-useful first, and the unscaled asset last. Flutter reads
+     * the available variants from a build-generated manifest; we probe these
+     * instead, and {@link #chooseVariant} picks among the ones present.
      */
     public static String[] variantCandidates(String assetPath, double dpr) {
         int slash = assetPath.lastIndexOf('/');
@@ -159,15 +155,76 @@ public class FlutterAssets {
         } catch (Throwable t) {
             // headless: keep the unscaled asset
         }
+        // Every variant is probed and the choice made from what is there: Flutter's
+        // rule depends on WHICH variants exist, so no fixed probe order can express
+        // it. Taking the first present one of a fixed order chose 3.0x over 2.0x at
+        // 2.1x, decoding over twice the pixels Flutter would.
         String[] candidates = variantCandidates(assetPath, dpr);
+        java.io.InputStream[] streams = new java.io.InputStream[candidates.length];
+        double[] ratios = new double[candidates.length];
+        int found = 0;
         for (int i = 0; i < candidates.length; i++) {
             java.io.InputStream is = com.codename1.ui.Display.getInstance()
                     .getResourceAsStream(cls, resourceName(candidates[i]));
             if (is != null) {
-                return new Resolved(is, ratioOf(candidates[i], assetPath));
+                streams[found] = is;
+                ratios[found] = ratioOf(candidates[i], assetPath);
+                found++;
             }
         }
-        return null;
+        if (found == 0) {
+            return null;
+        }
+        double[] available = new double[found];
+        System.arraycopy(ratios, 0, available, 0, found);
+        double best = chooseVariant(dpr, available);
+        Resolved chosen = null;
+        for (int i = 0; i < found; i++) {
+            if (chosen == null && ratios[i] == best) {
+                chosen = new Resolved(streams[i], ratios[i]);
+            } else {
+                try {
+                    streams[i].close();
+                } catch (java.io.IOException ignored) {
+                    // a resource stream that will not close holds nothing we need
+                }
+            }
+        }
+        return chosen;
+    }
+
+    /** Flutter's {@code _kLowDprLimit}. */
+    private static final double LOW_DPR_LIMIT = 2.0;
+
+    /**
+     * Flutter's {@code AssetImage._findBestVariant}: the exact ratio if present;
+     * otherwise, between the nearest lower and upper variants, the upper one on a
+     * low-density screen (below 2.0, where upscaling artefacts show) or past their
+     * midpoint, and the lower one otherwise; with only one side present, that side.
+     * The unscaled asset counts as 1.0.
+     */
+    static double chooseVariant(double dpr, double[] available) {
+        double lower = Double.NaN;
+        double upper = Double.NaN;
+        for (int i = 0; i < available.length; i++) {
+            double r = available[i];
+            if (r == dpr) {
+                return r;
+            }
+            if (r < dpr && (Double.isNaN(lower) || r > lower)) {
+                lower = r;
+            }
+            if (r > dpr && (Double.isNaN(upper) || r < upper)) {
+                upper = r;
+            }
+        }
+        if (Double.isNaN(lower)) {
+            return upper;
+        }
+        if (Double.isNaN(upper)) {
+            return lower;
+        }
+        return dpr < LOW_DPR_LIMIT || dpr > (lower + upper) / 2 ? upper : lower;
     }
 
     /** The density a resolved candidate was authored for. */

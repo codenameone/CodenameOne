@@ -74,6 +74,11 @@ public class InheritedElement extends StatelessElement {
         dependents.remove(e);
     }
 
+    /** How many elements currently depend on this one; for tests. */
+    int dependentCount() {
+        return dependents.size();
+    }
+
     @Override
     public void update(Widget newWidget) {
         Widget old = widget();

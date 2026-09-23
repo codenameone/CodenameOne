@@ -91,6 +91,17 @@ public interface BuildContext {
     Object providerValueOfType(Class<?> type);
 
     /**
+     * {@link #providerValueOfType(Class)}, registering this context as a dependent --
+     * rebuilt when the value changes -- only when {@code listen} is true. A read
+     * ({@code context.read}, {@code Provider.of(context, listen: false)}) must not
+     * subscribe, or the reader rebuilds on every notification that only watchers should
+     * get.
+     */
+    default Object providerValueOfType(Class<?> type, boolean listen) {
+        return providerValueOfType(type);
+    }
+
+    /**
      * Whether the element backing this context is still in the tree
      * ({@code BuildContext.mounted}). Elements override this; the default is
      * {@code true} for lightweight contexts that never detach.

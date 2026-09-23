@@ -688,8 +688,9 @@ class MaterialPageRoute<T> extends Route<T> {
 @JavaName('com.codename1.flutter.navigation.Navigator')
 class Navigator extends Widget {
   external Navigator({Key? key});
-  external static void push(BuildContext context, MaterialPageRoute route);
-  external static void pop(BuildContext context);
+  // push completes with the value the route is popped with, as Flutter's does.
+  external static Future<Object?> push(BuildContext context, MaterialPageRoute route);
+  external static void pop(BuildContext context, [Object? result]);
   external static NavigatorState of(BuildContext context, {bool? rootNavigator});
   external static String restorablePush(BuildContext context, dynamic routeBuilder, {dynamic arguments});
   external static bool maybePop(BuildContext context);

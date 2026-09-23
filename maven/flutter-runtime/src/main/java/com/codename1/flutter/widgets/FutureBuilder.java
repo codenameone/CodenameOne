@@ -30,10 +30,9 @@ import com.codename1.flutter.Widget;
 import dart.runtime.Funcs;
 
 /**
- * Builds itself from the latest snapshot of a {@code Future} — Flutter's
- * {@code FutureBuilder<T>}. This pass builds once with a waiting
- * {@link AsyncSnapshot} (the initial data, if any); resolving the future and
- * rebuilding on completion lands with the async-rebuild machinery.
+ * Builds itself from the latest snapshot of a {@code Future} -- Flutter's
+ * {@code FutureBuilder<T>}. The snapshot and the subscription live in
+ * {@link FutureBuilderElement}, as a State would hold them in Flutter.
  *
  * @param <T> the future's value type
  */
@@ -55,17 +54,26 @@ public class FutureBuilder<T> extends StatelessWidget {
         this.builder = v;
     }
 
+    Object getFuture() {
+        return future;
+    }
+
+    T getInitialData() {
+        return initialData;
+    }
+
+    @Override
+    public com.codename1.flutter.Element createElement() {
+        return new FutureBuilderElement(this);
+    }
+
     @Override
     public Widget build(BuildContext context) {
-        if (builder == null) {
-            return null;
-        }
-        AsyncSnapshot snapshot;
-        if (initialData != null) {
-            snapshot = new AsyncSnapshot(ConnectionState.waiting, initialData, null, null);
-        } else {
-            snapshot = new AsyncSnapshot();
-        }
-        return builder.call(context, snapshot);
+        return buildWith(context, initialData != null
+                ? new AsyncSnapshot(ConnectionState.none, initialData, null, null) : new AsyncSnapshot());
+    }
+
+    Widget buildWith(BuildContext context, AsyncSnapshot snapshot) {
+        return builder == null ? null : builder.call(context, snapshot);
     }
 }

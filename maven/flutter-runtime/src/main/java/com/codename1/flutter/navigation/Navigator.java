@@ -146,8 +146,13 @@ public class Navigator extends StatelessWidget {
 
     /**
      * Pushes the route: builds its page in a new Form and shows it.
+     *
+     * @return the route's result: completes when the route is popped, with the value
+     *         given to {@code pop}, or null -- Flutter's {@code Future<T?>}. It used to
+     *         answer nothing, so {@code await Navigator.push(...)} could not wait for
+     *         the page to close.
      */
-    public static void push(BuildContext context, MaterialPageRoute route) {
+    public static dart.async.Future<Object> push(BuildContext context, MaterialPageRoute route) {
         RouteEntry e = new RouteEntry(route);
         if (Display.isInitialized()) {
             // The form to come BACK to, which during a pop's transition is not the
@@ -188,6 +193,7 @@ public class Navigator extends StatelessWidget {
         } else {
             stack.add(e);
         }
+        return e.popped.future();
     }
 
     /**
@@ -195,6 +201,14 @@ public class Navigator extends StatelessWidget {
      * Popping the last (base) route is a no-op.
      */
     public static void pop(BuildContext context) {
+        pop(context, null);
+    }
+
+    /**
+     * Flutter's {@code Navigator.pop(context, result)}: pops as {@link #pop(BuildContext)}
+     * does and completes the popped route's future with {@code result}.
+     */
+    public static void pop(BuildContext context, Object result) {
         if (Dialogs.popTopDialog()) {
             return;
         }
@@ -203,6 +217,7 @@ public class Navigator extends StatelessWidget {
             return;
         }
         RouteEntry e = stack.remove(stack.size() - 1);
+        e.popped.complete(result);
         if (e.previousForm != null) {
             // The way out mirrors the way in. showBack() plays the transition of the form
             // being RETURNED TO, in reverse -- and that form carries whatever animation
@@ -410,16 +425,46 @@ public class Navigator extends StatelessWidget {
      * opened cleanly.
      */
     public static boolean pushNamed(BuildContext context, String name, Object arguments) {
+        return pushNamedForResult(context, name, arguments) != null;
+    }
+
+    /**
+     * {@link #pushNamed(BuildContext, String, Object)} answering the route's result
+     * future, or null when nothing was pushed.
+     */
+    static dart.async.Future<Object> pushNamedForResult(BuildContext context, String name, Object arguments) {
         Route route = resolveRoute(context, name, arguments);
         if (route instanceof MaterialPageRoute) {
             // Name the screen so any error it raises reports where it happened.
             com.codename1.flutter.FlutterErrorReport.route(name);
-            push(context, (MaterialPageRoute) route);
-            return true;
+            return push(context, (MaterialPageRoute) route);
         }
         com.codename1.flutter.FlutterErrorReport.noRoute(name, route == null ? null
                 : "(unsupported route type " + route.getClass().getName() + ")");
-        return false;
+        return null;
+    }
+
+    /**
+     * What a push answers when nothing could be pushed. An already-completed null: a
+     * caller awaiting it must not hang on a page that never opened, and the failure has
+     * been reported where it happened.
+     */
+    private static dart.async.Future<Object> nothingPushed() {
+        return dart.async.Future.value(null);
+    }
+
+    private static dart.async.Future<Object> orNothing(dart.async.Future<Object> pushed) {
+        return pushed != null ? pushed : nothingPushed();
+    }
+
+    /** A push of any route: a MaterialPageRoute is shown, anything else is reported. */
+    private static dart.async.Future<Object> pushAny(BuildContext context, Object route) {
+        if (route instanceof MaterialPageRoute) {
+            return push(context, (MaterialPageRoute) route);
+        }
+        com.codename1.flutter.FlutterErrorReport.noRoute(null, route == null ? "(null route)"
+                : "(unsupported route type " + route.getClass().getName() + ")");
+        return nothingPushed();
     }
 
     /**
@@ -438,13 +483,12 @@ public class Navigator extends StatelessWidget {
     private static final NavigatorState STATE = new NavigatorState() {
         @Override
         public void pop(Object result) {
-            Navigator.pop(null);
+            Navigator.pop(null, result);
         }
 
         @Override
-        public Object pushNamed(String routeName, Object arguments) {
-            Navigator.pushNamed(null, routeName, arguments);
-            return null;
+        public dart.async.Future<Object> pushNamed(String routeName, Object arguments) {
+            return orNothing(pushNamedForResult(null, routeName, arguments));
         }
 
         @Override
@@ -455,18 +499,15 @@ public class Navigator extends StatelessWidget {
         }
 
         @Override
-        public Object pushReplacementNamed(String routeName, Object arguments, Object result) {
-            Navigator.pop(null);
-            Navigator.pushNamed(null, routeName, arguments);
-            return null;
+        public dart.async.Future<Object> pushReplacementNamed(String routeName, Object arguments, Object result) {
+            // The replaced route completes with `result`, as Flutter's does.
+            Navigator.pop(null, result);
+            return orNothing(pushNamedForResult(null, routeName, arguments));
         }
 
         @Override
-        public Object push(Object route) {
-            if (route instanceof MaterialPageRoute) {
-                Navigator.push(null, (MaterialPageRoute) route);
-            }
-            return null;
+        public dart.async.Future<Object> push(Object route) {
+            return pushAny(null, route);
         }
 
         @Override
@@ -476,8 +517,12 @@ public class Navigator extends StatelessWidget {
         }
 
         @Override
-        public Object maybePop(Object result) {
-            return Boolean.valueOf(Navigator.maybePop(null));
+        public dart.async.Future<Boolean> maybePop(Object result) {
+            if (stack.isEmpty()) {
+                return dart.async.Future.value(Boolean.FALSE);
+            }
+            Navigator.pop(null, result);
+            return dart.async.Future.value(Boolean.TRUE);
         }
 
         @Override
@@ -628,13 +673,12 @@ public class Navigator extends StatelessWidget {
 
         @Override
         public void pop(Object result) {
-            Navigator.pop(context);
+            Navigator.pop(context, result);
         }
 
         @Override
-        public Object pushNamed(String routeName, Object arguments) {
-            Navigator.pushNamed(context, routeName, arguments);
-            return null;
+        public dart.async.Future<Object> pushNamed(String routeName, Object arguments) {
+            return orNothing(pushNamedForResult(context, routeName, arguments));
         }
 
         @Override
@@ -644,18 +688,15 @@ public class Navigator extends StatelessWidget {
         }
 
         @Override
-        public Object pushReplacementNamed(String routeName, Object arguments, Object result) {
-            Navigator.pop(context);
-            Navigator.pushNamed(context, routeName, arguments);
-            return null;
+        public dart.async.Future<Object> pushReplacementNamed(String routeName, Object arguments, Object result) {
+            // The replaced route completes with `result`, as Flutter's does.
+            Navigator.pop(context, result);
+            return orNothing(pushNamedForResult(context, routeName, arguments));
         }
 
         @Override
-        public Object push(Object route) {
-            if (route instanceof MaterialPageRoute) {
-                Navigator.push(context, (MaterialPageRoute) route);
-            }
-            return null;
+        public dart.async.Future<Object> push(Object route) {
+            return pushAny(context, route);
         }
 
         @Override
@@ -665,8 +706,12 @@ public class Navigator extends StatelessWidget {
         }
 
         @Override
-        public Object maybePop(Object result) {
-            return Boolean.valueOf(Navigator.maybePop(context));
+        public dart.async.Future<Boolean> maybePop(Object result) {
+            if (stack.isEmpty()) {
+                return dart.async.Future.value(Boolean.FALSE);
+            }
+            Navigator.pop(context, result);
+            return dart.async.Future.value(Boolean.TRUE);
         }
 
         @Override
@@ -708,6 +753,8 @@ public class Navigator extends StatelessWidget {
 
     private static final class RouteEntry {
         final MaterialPageRoute route;
+        /** Completed by the pop that removes this route, with that pop's result. */
+        final dart.async.Completer<Object> popped = new dart.async.Completer<Object>();
         Form form;
         Form previousForm;
         Element rootElement;

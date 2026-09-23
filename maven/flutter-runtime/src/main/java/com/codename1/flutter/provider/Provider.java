@@ -77,6 +77,6 @@ public class Provider extends SingleChildWidget implements InheritedValueProvide
     /** {@code Provider.of<T>(context, listen: ...)}. */
     @SuppressWarnings("unchecked")
     public static <T> T of(BuildContext context, boolean listen, Class<T> type) {
-        return (T) context.providerValueOfType(type);
+        return (T) context.providerValueOfType(type, listen);
     }
 }

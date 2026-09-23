@@ -58,19 +58,19 @@ public abstract class NavigatorState {
     public void popUntil(dart.runtime.Funcs.Func1<Route<Object>, Boolean> predicate) {
     }
 
-    /** Push a named route ({@code NavigatorState.pushNamed}). */
-    public Object pushNamed(String routeName, Object arguments) {
-        return null;
+    /** Push a named route ({@code NavigatorState.pushNamed}); completes with its pop result. */
+    public dart.async.Future<Object> pushNamed(String routeName, Object arguments) {
+        return dart.async.Future.value(null);
     }
 
     /** Replace the current route ({@code NavigatorState.pushReplacementNamed}). */
-    public Object pushReplacementNamed(String routeName, Object arguments, Object result) {
-        return null;
+    public dart.async.Future<Object> pushReplacementNamed(String routeName, Object arguments, Object result) {
+        return dart.async.Future.value(null);
     }
 
     /** Pop if possible ({@code NavigatorState.maybePop}). */
-    public Object maybePop(Object result) {
-        return null;
+    public dart.async.Future<Boolean> maybePop(Object result) {
+        return dart.async.Future.value(Boolean.FALSE);
     }
 
     /**
@@ -82,11 +82,11 @@ public abstract class NavigatorState {
     }
 
     /**
-     * Push the given route onto the navigator ({@code NavigatorState.push}).
-     * The route is not retained by this minimal model; the returned pop-result
-     * future is always absent.
+     * Push the given route onto the navigator ({@code NavigatorState.push}); the
+     * returned future completes with the route's pop result. Navigator's own states
+     * override this; the base answers an already-completed null.
      */
-    public Object push(Object route) {
-        return null;
+    public dart.async.Future<Object> push(Object route) {
+        return dart.async.Future.value(null);
     }
 }
