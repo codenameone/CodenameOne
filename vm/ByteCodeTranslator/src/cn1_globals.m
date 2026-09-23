@@ -2975,9 +2975,14 @@ void cn1RefBlockClear(CODENAME_ONE_THREAD_STATE, JAVA_LONG block, JAVA_INT from,
 // general marker's call frame and TLS lookup. Conservative/grace descendants
 // must still validate addresses before reading any object header.
 int cn1GcFieldMarkEpoch(JAVA_BOOLEAN force) {
-    // Parallel claims already discard marked objects regardless of force.
-    // Serial forced rescans must visit them again using the force-visited table.
+    // Marked objects are discarded regardless of force, serial or parallel (see
+    // gcMarkObject). Only a barrier-free build re-walks them for a forced root.
+#if defined(CN1_DISABLE_SATB)
     int precise = cn1GcPreciseTrace && (!force || gcMarkLocalBuf != 0);
+#else
+    (void)force;
+    int precise = cn1GcPreciseTrace;
+#endif
 #ifdef CN1_GC_VERIFY
     if(cn1GcVerifyActive || cn1GcFaultFreeLive) precise = 0;
 #endif
@@ -14071,7 +14076,23 @@ void gcMarkObject(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj, JAVA_BOOLEAN force
     // Serial path: byte-for-byte the original behavior (single writer, plain store).
     // if this is a Class object or already marked this should be ignored
     if(obj->__codenameOneGcMark == markVal) {
+        // NO FORCED RE-TRACE UNDER SATB, the same rule the parallel claim above
+        // already follows. An object carrying this cycle's mark was pushed when it
+        // was marked (or the push overflowed, which the belt rescans), so its
+        // children are traced or queued; re-walking it proves nothing new. It was
+        // also ruinous here: markStatics runs once PER THREAD with force set and
+        // bumps recursionKey each time, so every cycle re-walked the whole
+        // statics-reachable graph N times through a 4096-bucket chained table.
+        // Measured on the self-hosting corpus at CN1_GC_MARK_THREADS=1 -- the
+        // Windows default and any 2-CPU POSIX host -- 362-415s and 3.2GB against
+        // 4.8s at four markers, with 99% of the collector in
+        // cn1ForceVisitedTestAndSet. A barrier-free build has no snapshot
+        // guarantee to lean on and keeps the re-trace.
+#if defined(CN1_DISABLE_SATB)
         if(force) {
+#else
+        if(0) {
+#endif
             if(cn1ForceVisitedTestAndSet(obj, recursionKey)) {
                 return;
             }

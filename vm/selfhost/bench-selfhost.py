@@ -189,6 +189,16 @@ def main(args):
     work.mkdir(parents=True, exist_ok=False)
     out = work / 'out'
     env = {k: v for k, v in os.environ.items() if not k.startswith('CN1_')}
+    # THE CORE-COUNT AXIS HAS TO REACH BOTH ARMS. run-matrix.sh sets
+    # CN1_GC_MARK_THREADS for ours and CN1_SELFHOST_JDK_OPTS
+    # (-XX:ActiveProcessorCount) for the JVM, and the CN1_ filter above dropped
+    # the first while nothing read the second -- so its 1, 2 and 4 core selfhost
+    # rows were three runs of ONE configuration. That hid a serial marker taking
+    # 362s on this corpus against 4.8s at four markers. Pass exactly these
+    # through; every other CN1_ knob stays filtered.
+    if os.environ.get('CN1_GC_MARK_THREADS'):
+        env['CN1_GC_MARK_THREADS'] = os.environ['CN1_GC_MARK_THREADS']
+    jdk_opts = os.environ.get('CN1_SELFHOST_JDK_OPTS', '').split()
     env['LC_ALL'] = 'C'
     env['CN1_RESOURCE_PATH'] = str(REPO / 'vm/ByteCodeTranslator/src')
     system = platform.system()
@@ -215,6 +225,7 @@ def main(args):
                 out.mkdir()
                 command = [executable]
                 if name != 'parpar':
+                    command += jdk_opts
                     command += ['-cp', str(host) + ':' + asm,
                                 'com.codename1.tools.translator.ByteCodeTranslator']
                 command += ['clean', ';'.join(map(str, [javaapi] + corpus)), str(out),
