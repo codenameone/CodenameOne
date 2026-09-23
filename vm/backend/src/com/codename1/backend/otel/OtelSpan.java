@@ -149,7 +149,10 @@ final class OtelSpan extends Span {
         String type = error.getClass().getName();
         String message = error.getMessage();
         statusCode = 2;
-        statusMessage = message == null ? type : message;
+        // Bounded like the event attribute below. The export queue is bounded by
+        // span COUNT, so an unbounded message per failing request is how that bound
+        // stops bounding memory.
+        statusMessage = bound(message == null ? type : message);
         if(events.size() >= MAX_EVENTS) {
             droppedEvents++;
             return this;
@@ -169,7 +172,7 @@ final class OtelSpan extends Span {
             return this;
         }
         statusCode = 2;
-        statusMessage = description;
+        statusMessage = description == null ? null : bound(description);
         return this;
     }
 
@@ -213,6 +216,10 @@ final class OtelSpan extends Span {
         if(sampled && !discarded) {
             tracer.ended(this);
         }
+    }
+
+    private static String bound(String value) {
+        return value.length() > MAX_VALUE_LENGTH ? value.substring(0, MAX_VALUE_LENGTH) : value;
     }
 
     private long nowEpochNanos() {

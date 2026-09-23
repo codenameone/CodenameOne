@@ -101,6 +101,65 @@ class TraceContextTest {
     }
 
     @Test
+    @DisplayName("a tracestate that is not a valid list is discarded whole")
+    void tracestateGrammar() {
+        assertNull(TraceContext.vetTracestate("bad"), "a member with no key=value");
+        assertNull(TraceContext.vetTracestate("a=1,a=2"), "a key twice");
+        assertNull(TraceContext.vetTracestate("Upper=1"), "keys are lower case");
+        assertNull(TraceContext.vetTracestate("a=x,b=has=equals"));
+        StringBuilder many = new StringBuilder();
+        for(int i = 0 ; i < 33 ; i++) {
+            many.append(i == 0 ? "" : ",").append("k").append(i).append("=v");
+        }
+        assertNull(TraceContext.vetTracestate(many.toString()), "33 members");
+        assertEquals("tenant@sys=1,k/_-*=v v", TraceContext.vetTracestate("tenant@sys=1,k/_-*=v v"));
+        assertEquals("a=1,,b=2", TraceContext.vetTracestate(" a=1,,b=2 "),
+                "empty members are allowed, and a valid list passes through as it came");
+    }
+
+    @Test
+    @DisplayName("a sampler that takes no argument ignores one it was given")
+    void samplerArgumentOnlyForRatio() throws Exception {
+        // A shared template sets OTEL_TRACES_SAMPLER_ARG for whatever sampler it
+        // expects; a service that chose always_on must still start.
+        assertTrue(Sampler.parse("always_on", "not-a-number").sample(false, false, 1));
+        assertFalse(Sampler.parse("parentbased_always_off", "x").sample(false, false, 1));
+        assertRefused("parentbased_traceidratio", "x");
+    }
+
+    @Test
+    @DisplayName("a logged endpoint loses its userinfo and its query")
+    void endpointRedaction() {
+        assertEquals("https://<redacted>@collector.example/v1/traces?<redacted>",
+                BatchExporter.redact("https://user:secret@collector.example/v1/traces?token=t"));
+        assertEquals("http://collector.example:4318/v1/traces",
+                BatchExporter.redact("http://collector.example:4318/v1/traces"));
+    }
+
+    @Test
+    @DisplayName("a partial success is read from either encoding")
+    void partialSuccessDecoding() throws Exception {
+        long[] rejected = new long[1];
+        String[] message = new String[1];
+        byte[] proto = io.opentelemetry.proto.collector.trace.v1.ExportTraceServiceResponse
+                .newBuilder()
+                .setPartialSuccess(io.opentelemetry.proto.collector.trace.v1
+                        .ExportTracePartialSuccess.newBuilder()
+                        .setRejectedSpans(3).setErrorMessage("too old").build())
+                .build().toByteArray();
+        OtlpSchema.protobufPartialSuccess(proto, rejected, message);
+        assertEquals(3, rejected[0]);
+        assertEquals("too old", message[0]);
+        rejected[0] = 0;
+        message[0] = null;
+        OtlpSchema.jsonPartialSuccess(
+                "{\"partialSuccess\":{\"rejectedSpans\":\"5\",\"errorMessage\":\"bad\"}}",
+                rejected, message);
+        assertEquals(5, rejected[0]);
+        assertEquals("bad", message[0]);
+    }
+
+    @Test
     @DisplayName("the ratio sampler agrees with itself for one trace id")
     void samplerIsDeterministicPerTrace() throws Exception {
         Sampler half = Sampler.parse("traceidratio", "0.5");

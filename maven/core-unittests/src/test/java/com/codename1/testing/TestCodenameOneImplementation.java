@@ -1487,6 +1487,10 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
     }
 
     public void reset() {
+        // Back to the default a test class starts from. Runs on every UITestBase
+        // teardown, so a test that switches touch off and forgets -- or restores the
+        // wrong value -- cannot decide the command behaviour of the classes after it.
+        touchDevice = true;
         minimized = false;
         usesInvokeAndBlockForEditString = false;
         windowManager = null;

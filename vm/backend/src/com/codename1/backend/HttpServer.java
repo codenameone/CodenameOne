@@ -5226,6 +5226,10 @@ public final class HttpServer {
                 // finally that closes this stream's request.
                 Span span = Tracing.startServer(request, tls != null);
                 Exception handlerError = null;
+                // -1 until the response has been SUBMITTED to the session, as on the
+                // HTTP/1 path: a respond() that throws is a response the peer never
+                // got, and must not be reported as the status the handler chose.
+                int submittedStatus = -1;
                 try {
                     response = handler.handle(request);
                     if(response == null) {
@@ -5382,6 +5386,7 @@ public final class HttpServer {
                         queuedBodyBytes += bodyBytes;
                     }
                 }
+                submittedStatus = response.status;
                 requestsServed.incrementAndGet();
                 if(queuedBodyBytes > MAX_QUEUED_H2_BODY_BYTES
                         || Http2.pendingBodyFiles() > MAX_OPEN_H2_FILES
@@ -5419,11 +5424,12 @@ public final class HttpServer {
                     SERVING_FD.set(null);
                     SERVING_H2.set(null);
                     if(span != null) {
-                        // The status the handler chose. When the session refused
-                        // the body for lack of room the peer saw a 503 instead;
-                        // that is a server-wide condition, visible in the h2
-                        // counters, and not what this handler answered.
-                        Tracing.endServer(span, response.status, handlerError);
+                        // The status the handler chose once it was submitted, or -1
+                        // when submitting threw. When the session refused the body
+                        // for lack of room the peer saw a 503 instead; that is a
+                        // server-wide condition, visible in the h2 counters, and not
+                        // what this handler answered.
+                        Tracing.endServer(span, submittedStatus, handlerError);
                     }
                 }
             }

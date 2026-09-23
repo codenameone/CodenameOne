@@ -60,6 +60,13 @@ public final class TelemetrySpan {
     String name;
     final long startEpochNanos;
     long endEpochNanos;
+    /// The clock this span reads: an epoch time and a monotonic reading taken at the
+    /// same moment, inherited from a local parent so every span of one trace sits on
+    /// one timeline. A device's wall clock is corrected while the app runs --
+    /// network time, the user, a time zone change -- and a child that read it for
+    /// itself could start before its parent, or long after the parent had ended.
+    final long anchorEpochNanos;
+    final long anchorNano;
     final Map<String, Object> attributes;
     int droppedAttributes;
     /// Each an Object[] {Long time, String name, Map attributes}.
@@ -73,6 +80,11 @@ public final class TelemetrySpan {
 
     TelemetrySpan(Telemetry.State owner, String name, int kind, String traceId, String spanId,
                   String parentSpanId, boolean sampled) {
+        this(owner, name, kind, traceId, spanId, parentSpanId, sampled, null);
+    }
+
+    TelemetrySpan(Telemetry.State owner, String name, int kind, String traceId, String spanId,
+                  String parentSpanId, boolean sampled, TelemetrySpan localParent) {
         this.owner = owner;
         this.name = name == null ? "" : name;
         this.kind = kind;
@@ -80,7 +92,14 @@ public final class TelemetrySpan {
         this.spanId = spanId;
         this.parentSpanId = parentSpanId;
         this.sampled = sampled;
-        this.startEpochNanos = System.currentTimeMillis() * 1000000L;
+        if (localParent != null) {
+            this.anchorEpochNanos = localParent.anchorEpochNanos;
+            this.anchorNano = localParent.anchorNano;
+        } else {
+            this.anchorEpochNanos = System.currentTimeMillis() * 1000000L;
+            this.anchorNano = System.nanoTime();
+        }
+        this.startEpochNanos = now();
         this.attributes = sampled ? new LinkedHashMap<String, Object>() : null;
         this.events = sampled ? new ArrayList<Object[]>() : null;
     }
@@ -153,7 +172,9 @@ public final class TelemetrySpan {
         String type = error.getClass().getName();
         String message = error.getMessage();
         statusCode = 2;
-        statusMessage = message == null ? type : message;
+        // Bounded like the event attribute below: an exception message can be any
+        // size, and the export queue is bounded by span count, not bytes.
+        statusMessage = bound(message == null ? type : message);
         if (events.size() >= MAX_EVENTS) {
             droppedEvents++;
             return this;
@@ -164,7 +185,7 @@ public final class TelemetrySpan {
             attrs.put("exception.message", message.length() > MAX_VALUE_LENGTH
                     ? message.substring(0, MAX_VALUE_LENGTH) : message);
         }
-        Object[] event = {Long.valueOf(System.currentTimeMillis() * 1000000L), "exception", attrs};
+        Object[] event = {Long.valueOf(now()), "exception", attrs};
         events.add(event);
         return this;
     }
@@ -177,7 +198,7 @@ public final class TelemetrySpan {
     public TelemetrySpan setError(String description) {
         if (sampled && !ended) {
             statusCode = 2;
-            statusMessage = description;
+            statusMessage = description == null ? null : bound(description);
         }
         return this;
     }
@@ -228,13 +249,20 @@ public final class TelemetrySpan {
             return;
         }
         ended = true;
-        endEpochNanos = System.currentTimeMillis() * 1000000L;
-        if (endEpochNanos < startEpochNanos) {
-            // A wall clock stepped back mid-span; a span may not end before it began.
-            endEpochNanos = startEpochNanos;
-        }
+        endEpochNanos = now();
         if (sampled && owner != null) {
             owner.ended(this);
         }
+    }
+
+    /// Epoch nanoseconds on this trace's clock: the anchor plus the monotonic time
+    /// since it. Never earlier than the anchor, whatever the platform's clock does.
+    private long now() {
+        long elapsed = System.nanoTime() - anchorNano;
+        return anchorEpochNanos + (elapsed < 0 ? 0 : elapsed);
+    }
+
+    private static String bound(String value) {
+        return value.length() > MAX_VALUE_LENGTH ? value.substring(0, MAX_VALUE_LENGTH) : value;
     }
 }

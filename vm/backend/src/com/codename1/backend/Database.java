@@ -295,9 +295,9 @@ public final class Database {
         Throwable failure = null;
         try {
             List rows = queryUntraced(sql, params);
-            if(span.isRecording()) {
-                span.setAttribute("db.response.returned_rows", (long)rows.size());
-            }
+            // Through the guarded hook: a tracer that throws here must not turn a
+            // query that succeeded into a failure, and discard its rows.
+            Tracing.setAttribute(span, "db.response.returned_rows", rows.size());
             return rows;
         } catch (IOException err) {
             failure = err;

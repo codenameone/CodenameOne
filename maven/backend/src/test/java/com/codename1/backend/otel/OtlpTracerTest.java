@@ -220,7 +220,11 @@ class OtlpTracerTest {
                 .tracing(new OtlpTracer())
                 .handler(new HttpServer.Handler() {
                     public HttpServer.Response handle(HttpServer.Request request) throws Exception {
-                        throw new IllegalStateException("boom");
+                        StringBuilder huge = new StringBuilder("boom");
+                        while(huge.length() < 20000) {
+                            huge.append(" and more");
+                        }
+                        throw new IllegalStateException(huge.toString());
                     }
                 })
                 .start();
@@ -240,6 +244,8 @@ class OtlpTracerTest {
         assertEquals(io.opentelemetry.proto.trace.v1.Status.StatusCode.STATUS_CODE_ERROR,
                 span.getStatus().getCode());
         assertEquals("exception", span.getEvents(0).getName());
+        assertEquals(OtelSpan.MAX_VALUE_LENGTH, span.getStatus().getMessage().length(),
+                "the status description is bounded like the event attribute");
         assertEquals("java.lang.IllegalStateException",
                 attribute(span.getEvents(0).getAttributesList(), "exception.type"));
         assertEquals(0, span.getParentSpanId().size(), "a root span has no parent");
@@ -298,6 +304,142 @@ class OtlpTracerTest {
         assertEquals("Api-Token traces", authorizations.get(0));
         assertEquals(Integer.valueOf(1), authorizationCounts.get(0),
                 "two Authorization headers went to the collector");
+    }
+
+    @Test
+    @DisplayName("a tracer that throws while decorating a query does not fail the query")
+    void aBrokenTracerCannotFailAQuery() throws Exception {
+        Database db = Database.open(":memory:");
+        db.execute("CREATE TABLE t (v INTEGER)", null);
+        db.execute("INSERT INTO t (v) VALUES (1)", null);
+        Tracing.install(new ThrowingTracer());
+        try {
+            assertEquals(1, db.query("SELECT v FROM t", null).size(),
+                    "the rows a query fetched must reach the caller whatever the tracer does");
+        } finally {
+            Tracing.install(null);
+            db.close();
+        }
+    }
+
+    /** A tracer whose spans throw from every decoration. */
+    private static final class ThrowingTracer implements com.codename1.backend.Tracer {
+        public boolean open(Config config) {
+            return true;
+        }
+
+        public com.codename1.backend.Span startSpan(String name, int kind,
+                com.codename1.backend.Span parent, String traceparent, String tracestate) {
+            return new com.codename1.backend.Span() {
+                public com.codename1.backend.Span setAttribute(String key, String value) {
+                    throw new IllegalStateException("tracer bug");
+                }
+
+                public com.codename1.backend.Span setAttribute(String key, long value) {
+                    throw new IllegalStateException("tracer bug");
+                }
+
+                public com.codename1.backend.Span setAttribute(String key, double value) {
+                    throw new IllegalStateException("tracer bug");
+                }
+
+                public com.codename1.backend.Span setAttribute(String key, boolean value) {
+                    throw new IllegalStateException("tracer bug");
+                }
+
+                public com.codename1.backend.Span recordException(Throwable error) {
+                    throw new IllegalStateException("tracer bug");
+                }
+
+                public com.codename1.backend.Span setError(String description) {
+                    throw new IllegalStateException("tracer bug");
+                }
+
+                public com.codename1.backend.Span updateName(String name) {
+                    return this;
+                }
+
+                public String getName() {
+                    return "x";
+                }
+
+                public int getKind() {
+                    return KIND_CLIENT;
+                }
+
+                public boolean isRecording() {
+                    return true;
+                }
+
+                public String traceparent() {
+                    return null;
+                }
+
+                public String tracestate() {
+                    return null;
+                }
+
+                public void discard() {
+                }
+
+                public void end() {
+                }
+            };
+        }
+
+        public void flush(int timeoutMillis) {
+        }
+
+        public void shutdown(int timeoutMillis) {
+        }
+
+        public HttpServer.Handler relay() {
+            return null;
+        }
+
+        public void metrics(java.util.Map out) {
+        }
+    }
+
+    @Test
+    @DisplayName("spans a collector rejects in a partial success are not counted as exported")
+    void partialSuccessIsCounted() throws Exception {
+        collector.removeContext("/v1/traces");
+        collector.createContext("/v1/traces", (HttpExchange exchange) -> {
+            readAll(exchange.getRequestBody());
+            byte[] answer = io.opentelemetry.proto.collector.trace.v1.ExportTraceServiceResponse
+                    .newBuilder()
+                    .setPartialSuccess(io.opentelemetry.proto.collector.trace.v1
+                            .ExportTracePartialSuccess.newBuilder()
+                            .setRejectedSpans(1).setErrorMessage("span too old").build())
+                    .build().toByteArray();
+            exchange.getResponseHeaders().add("Content-Type", "application/x-protobuf");
+            exchange.sendResponseHeaders(200, answer.length);
+            exchange.getResponseBody().write(answer);
+            exchange.close();
+        });
+        int port = freePort();
+        Backend backend = Backend.builder(Config.of(settings(port), "test"))
+                .quiet()
+                .tracing(new OtlpTracer("pets"))
+                .handler(new HttpServer.Handler() {
+                    public HttpServer.Response handle(HttpServer.Request request) throws Exception {
+                        return HttpServer.Response.text(200, "ok");
+                    }
+                })
+                .start();
+        java.util.Map metrics;
+        try {
+            HttpURLConnection connection = (HttpURLConnection)new URL(
+                    "http://127.0.0.1:" + port + "/x").openConnection();
+            assertEquals(200, connection.getResponseCode());
+            Tracing.getTracer().flush(5000);
+            metrics = backend.getServer().getMetrics();
+        } finally {
+            backend.stop();
+        }
+        assertEquals(Long.valueOf(1), metrics.get("spansRejected"), String.valueOf(metrics));
+        assertEquals(Long.valueOf(0), metrics.get("spansExported"), String.valueOf(metrics));
     }
 
     @Test

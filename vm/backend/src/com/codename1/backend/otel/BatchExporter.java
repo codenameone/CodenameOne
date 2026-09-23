@@ -72,6 +72,9 @@ final class BatchExporter implements Runnable {
     private long exportedSpans;
     private long droppedSpans;
     private long failedExports;
+    private long rejectedSpans;
+    /** Spans the collector rejected in the last successful POST; see post(). */
+    private long lastRejected;
     private long relayedPayloads;
     private long droppedRelayed;
     private String lastError;
@@ -173,6 +176,9 @@ final class BatchExporter implements Runnable {
             out.put("spansDropped", Long.valueOf(droppedSpans));
             out.put("spansQueued", Integer.valueOf(queue.size()));
             out.put("traceExportsFailed", Long.valueOf(failedExports));
+            if(rejectedSpans > 0) {
+                out.put("spansRejected", Long.valueOf(rejectedSpans));
+            }
             if(relayedPayloads > 0 || droppedRelayed > 0) {
                 out.put("clientExportsRelayed", Long.valueOf(relayedPayloads));
                 out.put("clientExportsDropped", Long.valueOf(droppedRelayed));
@@ -277,7 +283,11 @@ final class BatchExporter implements Runnable {
         boolean sent = post(body, protobuf ? "application/x-protobuf" : "application/json");
         synchronized(lock) {
             if(sent) {
-                exportedSpans += batch.size();
+                // A 200 can still carry a partial success: the collector names how
+                // many spans it dropped, and those were not exported.
+                long rejected = Math.min(lastRejected, batch.size());
+                exportedSpans += batch.size() - rejected;
+                rejectedSpans += rejected;
             } else {
                 droppedSpans += batch.size();
             }
@@ -290,6 +300,7 @@ final class BatchExporter implements Runnable {
      * hammering it, and the next batch is already queued behind this one.
      */
     private boolean post(byte[] body, String contentType) {
+        lastRejected = 0;
         for(int attempt = 0 ; attempt < 2 ; attempt++) {
             List lines = new ArrayList(headers.size() + 1);
             lines.add("Content-Type: " + contentType);
@@ -298,6 +309,9 @@ final class BatchExporter implements Runnable {
             try {
                 Web.Result result = Web.request("POST", endpoint, lines, body);
                 status = result.getStatus();
+                if(status >= 200 && status < 300) {
+                    lastRejected = partialSuccess(result, contentType);
+                }
             } catch (Exception err) {
                 recordFailure("could not reach the collector: " + err.getMessage());
                 status = -1;
@@ -323,6 +337,42 @@ final class BatchExporter implements Runnable {
     }
 
     /**
+     * The OTLP partial-success answer: an ExportTraceServiceResponse whose
+     * partial_success reports rejected spans and why. A collector answers 200 for a
+     * batch it only partly accepted, so without reading this every dropped span was
+     * counted as exported and nobody could tell. Decoded in whichever encoding the
+     * collector answered in; anything unreadable is taken as full success, which is
+     * what a 200 without the field means.
+     *
+     * @return the number of spans rejected, 0 for none
+     */
+    private long partialSuccess(Web.Result result, String requestType) {
+        byte[] body = result.getBody();
+        if(body == null || body.length == 0) {
+            return 0;
+        }
+        String type = result.getHeader("content-type");
+        boolean json = type != null ? type.regionMatches(true, 0, "application/json", 0, 16)
+                : !requestType.startsWith("application/x-protobuf");
+        long[] rejected = new long[1];
+        String[] message = new String[1];
+        try {
+            if(json) {
+                OtlpSchema.jsonPartialSuccess(result.getBodyAsString(), rejected, message);
+            } else {
+                OtlpSchema.protobufPartialSuccess(body, rejected, message);
+            }
+        } catch (Exception err) {
+            return 0;
+        }
+        if(rejected[0] > 0 || (message[0] != null && message[0].length() > 0)) {
+            recordFailure("the collector rejected " + rejected[0] + " span(s)"
+                    + (message[0] == null || message[0].length() == 0 ? "" : ": " + message[0]));
+        }
+        return rejected[0] < 0 ? 0 : rejected[0];
+    }
+
+    /**
      * Counted always, printed once per hundred. A missing collector is common --
      * a developer laptop, a misconfigured deployment -- and a line per batch would
      * bury everything else the server logs.
@@ -340,9 +390,23 @@ final class BatchExporter implements Runnable {
         }
     }
 
-    /** The endpoint without its query, which is where a token would travel. */
+    /**
+     * The endpoint as it may be logged: no query, where a token would travel, and
+     * no userinfo, where a password would. Both are how collectors are commonly
+     * authenticated, and this string goes into every failure line and every
+     * refused-configuration message.
+     */
     static String redact(String url) {
         int query = url.indexOf('?');
-        return query < 0 ? url : url.substring(0, query) + "?<redacted>";
+        String out = query < 0 ? url : url.substring(0, query);
+        int scheme = out.indexOf("://");
+        if(scheme >= 0) {
+            int at = out.indexOf('@', scheme + 3);
+            int slash = out.indexOf('/', scheme + 3);
+            if(at >= 0 && (slash < 0 || at < slash)) {
+                out = out.substring(0, scheme + 3) + "<redacted>@" + out.substring(at + 1);
+            }
+        }
+        return query < 0 ? out : out + "?<redacted>";
     }
 }

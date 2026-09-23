@@ -661,6 +661,7 @@ public final class NetworkManager {
             if (tracer != null) {
                 try {
                     request.tracerParent = tracer.requestQueued(request);
+                    request.tracerParentOwner = tracer;
                 } catch (Throwable t) {
                     Log.e(t);
                 }

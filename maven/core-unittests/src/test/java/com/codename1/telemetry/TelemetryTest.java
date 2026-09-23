@@ -108,6 +108,9 @@ class TelemetryTest extends UITestBase {
         assertEquals(Span.SpanKind.SPAN_KIND_INTERNAL, checkout.getKind());
         assertEquals(API, attribute(get.getAttributesList(), "url.full"),
                 "the query string is never recorded");
+        // One clock per trace: the request sits inside the action that caused it.
+        assertTrue(get.getStartTimeUnixNano() >= checkout.getStartTimeUnixNano());
+        assertTrue(get.getEndTimeUnixNano() <= checkout.getEndTimeUnixNano());
         assertEquals("200", attribute(get.getAttributesList(), "http.response.status_code"));
 
         TestCodenameOneImplementation.TestConnection export = connection(COLLECTOR);
@@ -311,6 +314,66 @@ class TelemetryTest extends UITestBase {
             NetworkManager.setNetworkTracer(null);
         }
         assertEquals(1, ended[0]);
+    }
+
+    @Test
+    void aQueuedParentGoesOnlyToTheTracerThatCapturedIt() throws Exception {
+        // Swapped between queueing and running: the new tracer must not be handed
+        // the old one's opaque context.
+        final Object[] handed = new Object[] {"unset"};
+        final com.codename1.io.NetworkTracer second = new com.codename1.io.NetworkTracer() {
+            @Override
+            public Object requestQueued(ConnectionRequest request) {
+                return null;
+            }
+
+            @Override
+            public Object beforeRequest(ConnectionRequest request, Object parent) {
+                handed[0] = parent;
+                return null;
+            }
+
+            @Override
+            public void afterRequest(ConnectionRequest request, Object attempt, int status,
+                                     Throwable error) {
+            }
+        };
+        NetworkManager.setNetworkTracer(new com.codename1.io.NetworkTracer() {
+            @Override
+            public Object requestQueued(ConnectionRequest request) {
+                NetworkManager.setNetworkTracer(second);
+                return "the first tracer's context";
+            }
+
+            @Override
+            public Object beforeRequest(ConnectionRequest request, Object parent) {
+                return null;
+            }
+
+            @Override
+            public void afterRequest(ConnectionRequest request, Object attempt, int status,
+                                     Throwable error) {
+            }
+        });
+        try {
+            NetworkManager.getInstance().addToQueueAndWait(request(API + "?handover"));
+        } finally {
+            NetworkManager.setNetworkTracer(null);
+        }
+        assertNull(handed[0], "another tracer's context was passed on");
+    }
+
+    @Test
+    void anExceptionStatusIsBounded() {
+        Telemetry.install(new TelemetryConfig().direct("http://collector.test"));
+        TelemetrySpan span = Telemetry.startSpan("big");
+        StringBuilder huge = new StringBuilder();
+        while (huge.length() < 20000) {
+            huge.append("0123456789");
+        }
+        span.recordException(new RuntimeException(huge.toString()));
+        assertEquals(TelemetrySpan.MAX_VALUE_LENGTH, span.statusMessage.length());
+        span.end();
     }
 
     // ------------------------------------------------------------------

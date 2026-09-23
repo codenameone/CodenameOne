@@ -597,4 +597,110 @@ final class OtlpSchema {
         System.arraycopy(sink.bytes(), 0, out, 0, out.length);
         return out;
     }
+
+    /**
+     * ExportTraceServiceResponse's partial_success, as OTLP/JSON writes it:
+     * {@code {"partialSuccess":{"rejectedSpans":"3","errorMessage":"..."}}}.
+     */
+    static void jsonPartialSuccess(String body, long[] rejected, String[] message) throws IOException {
+        Object parsed = Json.parse(body);
+        if(!(parsed instanceof Map)) {
+            return;
+        }
+        Object partial = ((Map)parsed).get("partialSuccess");
+        if(!(partial instanceof Map)) {
+            return;
+        }
+        Object count = ((Map)partial).get("rejectedSpans");
+        if(count != null) {
+            rejected[0] = number(f("rejectedSpans", 1, INT64), count);
+        }
+        Object text = ((Map)partial).get("errorMessage");
+        if(text instanceof String) {
+            message[0] = (String)text;
+        }
+    }
+
+    /**
+     * The same from the binary form: field 1 of the response is the
+     * ExportTracePartialSuccess message, whose field 1 is rejected_spans (int64)
+     * and field 2 error_message (string). Unknown fields are skipped, as protobuf
+     * requires, so a newer collector's response still reads.
+     */
+    static void protobufPartialSuccess(byte[] body, long[] rejected, String[] message)
+            throws IOException {
+        int[] at = new int[1];
+        while(at[0] < body.length) {
+            long key = readVarint(body, at);
+            int field = (int)(key >>> 3);
+            int wire = (int)(key & 7);
+            if(field == 1 && wire == 2) {
+                int length = (int)readVarint(body, at);
+                int end = at[0] + length;
+                if(length < 0 || end > body.length) {
+                    throw new IOException("truncated response");
+                }
+                while(at[0] < end) {
+                    long inner = readVarint(body, at);
+                    int innerField = (int)(inner >>> 3);
+                    int innerWire = (int)(inner & 7);
+                    if(innerField == 1 && innerWire == 0) {
+                        rejected[0] = readVarint(body, at);
+                    } else if(innerField == 2 && innerWire == 2) {
+                        int n = (int)readVarint(body, at);
+                        if(n < 0 || at[0] + n > end) {
+                            throw new IOException("truncated response");
+                        }
+                        message[0] = new String(body, at[0], n, "UTF-8");
+                        at[0] += n;
+                    } else {
+                        skip(body, at, innerWire);
+                    }
+                }
+            } else {
+                skip(body, at, wire);
+            }
+        }
+    }
+
+    private static long readVarint(byte[] data, int[] at) throws IOException {
+        long value = 0;
+        for(int shift = 0 ; shift < 64 ; shift += 7) {
+            if(at[0] >= data.length) {
+                throw new IOException("truncated varint");
+            }
+            int b = data[at[0]++] & 0xff;
+            value |= (long)(b & 0x7f) << shift;
+            if((b & 0x80) == 0) {
+                return value;
+            }
+        }
+        throw new IOException("varint too long");
+    }
+
+    private static void skip(byte[] data, int[] at, int wire) throws IOException {
+        switch(wire) {
+            case 0:
+                readVarint(data, at);
+                return;
+            case 1:
+                at[0] += 8;
+                break;
+            case 2:
+                int n = (int)readVarint(data, at);
+                if(n < 0) {
+                    throw new IOException("negative length");
+                }
+                at[0] += n;
+                break;
+            case 5:
+                at[0] += 4;
+                break;
+            default:
+                throw new IOException("unsupported wire type " + wire);
+        }
+        if(at[0] > data.length) {
+            throw new IOException("truncated field");
+        }
+    }
 }

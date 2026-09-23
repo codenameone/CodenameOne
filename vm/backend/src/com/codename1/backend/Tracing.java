@@ -403,6 +403,20 @@ public final class Tracing {
         return span;
     }
 
+    /** An integer attribute on a span, guarded like every other hook. */
+    static void setAttribute(Span span, String key, long value) {
+        if(span == null) {
+            return;
+        }
+        try {
+            if(span.isRecording()) {
+                span.setAttribute(key, value);
+            }
+        } catch (RuntimeException err) {
+            failed(err);
+        }
+    }
+
     /** Ends a statement's span. */
     static void endDatabase(Span span, Throwable error) {
         if(span == null) {

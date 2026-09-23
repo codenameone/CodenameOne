@@ -49,19 +49,6 @@ final class Sampler {
     /** From the sampler's name and its argument, which is the ratio for the ratio forms. */
     static Sampler parse(String name, String argument) throws IOException {
         String n = name == null || name.trim().length() == 0 ? "parentbased_always_on" : name.trim();
-        double ratio = 1;
-        if(argument != null && argument.trim().length() > 0) {
-            try {
-                ratio = Double.parseDouble(argument.trim());
-            } catch (NumberFormatException err) {
-                throw new IOException("The sampler argument must be a number between 0 and 1 "
-                        + "and is '" + argument + "'");
-            }
-            if(!(ratio >= 0 && ratio <= 1)) {
-                throw new IOException("The sampler argument must be between 0 and 1 and is "
-                        + argument);
-            }
-        }
         if("always_on".equals(n)) {
             return new Sampler(false, 1);
         }
@@ -69,7 +56,7 @@ final class Sampler {
             return new Sampler(false, 0);
         }
         if("traceidratio".equals(n)) {
-            return new Sampler(false, ratio);
+            return new Sampler(false, ratio(argument));
         }
         if("parentbased_always_on".equals(n)) {
             return new Sampler(true, 1);
@@ -78,13 +65,37 @@ final class Sampler {
             return new Sampler(true, 0);
         }
         if("parentbased_traceidratio".equals(n)) {
-            return new Sampler(true, ratio);
+            return new Sampler(true, ratio(argument));
         }
         // Refused rather than defaulted: a deployment that asked for a sampler
         // this does not know believes it is getting it.
         throw new IOException("Unknown sampler '" + n + "'. Use always_on, always_off, "
                 + "traceidratio, parentbased_always_on, parentbased_always_off or "
                 + "parentbased_traceidratio.");
+    }
+
+    /**
+     * The ratio argument, read ONLY by the samplers that take one. A shared
+     * deployment template sets OTEL_TRACES_SAMPLER_ARG for whichever sampler it
+     * expects, and a service that chose always_on must not refuse to start over an
+     * argument it never uses. Absent means 1, as the specification says.
+     */
+    private static double ratio(String argument) throws IOException {
+        if(argument == null || argument.trim().length() == 0) {
+            return 1;
+        }
+        double ratio;
+        try {
+            ratio = Double.parseDouble(argument.trim());
+        } catch (NumberFormatException err) {
+            throw new IOException("The sampler argument must be a number between 0 and 1 "
+                    + "and is '" + argument + "'");
+        }
+        if(!(ratio >= 0 && ratio <= 1)) {
+            throw new IOException("The sampler argument must be between 0 and 1 and is "
+                    + argument);
+        }
+        return ratio;
     }
 
     /**

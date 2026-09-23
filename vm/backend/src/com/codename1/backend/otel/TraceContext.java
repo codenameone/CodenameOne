@@ -146,10 +146,14 @@ final class TraceContext {
 
     /**
      * The tracestate to carry on, or null. It is opaque to this server -- vendors
-     * keep their own state in it -- so it is passed through as it came, but only if
-     * it is within the specification's 512 characters and holds nothing that
-     * could not appear in a header value. Anything else is dropped, which the
-     * specification allows.
+     * keep their own state in it -- so a valid one is passed through exactly as it
+     * came. A header that is not a valid list is DISCARDED whole, which is what the
+     * specification requires of a receiver: forwarding it would hand the next hop a
+     * value a strict parser rejects, and with it every vendor's entry.
+     *
+     * Valid means at most 32 members, each {@code key=value} with the grammar the
+     * specification gives (below), no key twice, and no more than 512 characters in
+     * all. Empty members -- ",," -- are allowed and dropped by the grammar itself.
      */
     static String vetTracestate(String state) {
         if(state == null) {
@@ -159,12 +163,82 @@ final class TraceContext {
         if(s.length() == 0 || s.length() > 512) {
             return null;
         }
-        for(int iter = 0 ; iter < s.length() ; iter++) {
-            char c = s.charAt(iter);
-            if(c < 0x20 || c > 0x7e) {
+        java.util.HashSet keys = new java.util.HashSet();
+        int members = 0;
+        int at = 0;
+        while(at <= s.length()) {
+            int comma = s.indexOf(',', at);
+            if(comma < 0) {
+                comma = s.length();
+            }
+            String member = s.substring(at, comma).trim();
+            at = comma + 1;
+            if(member.length() == 0) {
+                continue;
+            }
+            int eq = member.indexOf('=');
+            if(eq <= 0 || !validKey(member.substring(0, eq))
+                    || !validValue(member.substring(eq + 1))) {
+                return null;
+            }
+            if(!keys.add(member.substring(0, eq)) || ++members > 32) {
                 return null;
             }
         }
-        return s;
+        return members == 0 ? null : s;
+    }
+
+    /**
+     * {@code simple-key = lcalpha 0*255( lcalpha / DIGIT / "_" / "-"/ "*" / "/" )}, or
+     * {@code multi-tenant-key = tenant-id "@" system-id} where the tenant is
+     * {@code ( lcalpha / DIGIT ) 0*240( ... )} and the system
+     * {@code lcalpha 0*13( ... )}.
+     */
+    static boolean validKey(String key) {
+        int at = key.indexOf('@');
+        if(at < 0) {
+            return key.length() <= 256 && isLower(key.charAt(0)) && keyChars(key, 1);
+        }
+        String tenant = key.substring(0, at);
+        String system = key.substring(at + 1);
+        return tenant.length() >= 1 && tenant.length() <= 241
+                && (isLower(tenant.charAt(0)) || isDigit(tenant.charAt(0))) && keyChars(tenant, 1)
+                && system.length() >= 1 && system.length() <= 14
+                && isLower(system.charAt(0)) && keyChars(system, 1);
+    }
+
+    private static boolean keyChars(String text, int from) {
+        for(int iter = from ; iter < text.length() ; iter++) {
+            char c = text.charAt(iter);
+            if(!isLower(c) && !isDigit(c) && c != '_' && c != '-' && c != '*' && c != '/') {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /**
+     * {@code value = 0*255(chr) nblk-chr}: printable ASCII except comma and equals,
+     * spaces allowed inside but not at the end, 256 characters at most.
+     */
+    static boolean validValue(String value) {
+        if(value.length() == 0 || value.length() > 256) {
+            return false;
+        }
+        for(int iter = 0 ; iter < value.length() ; iter++) {
+            char c = value.charAt(iter);
+            if(c < 0x20 || c > 0x7e || c == ',' || c == '=') {
+                return false;
+            }
+        }
+        return value.charAt(value.length() - 1) != ' ';
+    }
+
+    private static boolean isLower(char c) {
+        return c >= 'a' && c <= 'z';
+    }
+
+    private static boolean isDigit(char c) {
+        return c >= '0' && c <= '9';
     }
 }

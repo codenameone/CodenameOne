@@ -2,7 +2,7 @@
 == Distributed tracing with OpenTelemetry
 
 OpenTelemetry tracing follows one user action from the app through every service
-it touches. When the user taps "checkout", the trace shows the tap, the requests
+it touches. When the user taps the checkout button, the trace shows the tap, the requests
 the app made, what the backend did with each one and which database query was
 slow, as one timeline. Codename One produces these traces in the standard OTLP
 format, so any OpenTelemetry collector or tracing backend can display them.
@@ -72,7 +72,7 @@ decides not to record still sends `traceparent`, flagged as not sampled, and the
 backend's default sampler follows the app's decision. Each trace is therefore
 recorded completely or not at all.
 
-A span records the request's method, host, path and status. It never records the
+A span records the request's method, host, path, and status. It never records the
 query string, request bodies or response bodies.
 
 Whether trace data needs the user's consent depends on what the app records and

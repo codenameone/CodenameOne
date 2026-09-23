@@ -617,7 +617,7 @@ annotation, on any class in the backend module:
 include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/TracingSnippets.java[tag=backend-otel-annotation,indent=0]
 ----
 
-or, without touching the source, in `application.properties`:
+Without touching the source, set it in `application.properties` instead:
 
 ----
 cn1.otel.enabled=true
@@ -632,7 +632,7 @@ Either one makes the generated entry point install a tracer. From then on:
 * every `Database` statement is a client span carrying the SQL as the code wrote
   it, placeholders and all -- the bound values are never recorded;
 * an incoming `traceparent` makes the request part of the caller's trace, which is
-  how a Codename One app's spans and the backend's connect (see
+  how a Codename One app's spans connect to the backend's own (see
   <<opentelemetry-tracing>>).
 
 A WebSocket connection isn't a span. It can stay open for hours and carry any
@@ -655,7 +655,7 @@ same way it configures everything else it runs:
 
 | `OTEL_EXPORTER_OTLP_ENDPOINT` | `cn1.otel.endpoint` | The collector's base URL; `/v1/traces` is appended. Defaults to `http://localhost:4318`.
 | `OTEL_EXPORTER_OTLP_TRACES_ENDPOINT` | `cn1.otel.traces.endpoint` | The full URL, used as it is.
-| `OTEL_EXPORTER_OTLP_HEADERS` | `cn1.otel.headers` | `name=value` pairs, comma separated, values percent-encoded.
+| `OTEL_EXPORTER_OTLP_HEADERS` | `cn1.otel.headers` | `name=value` pairs, comma separated, with each value URL-encoded.
 | `OTEL_EXPORTER_OTLP_PROTOCOL` | `cn1.otel.protocol` | `http/protobuf` or `http/json`. gRPC isn't supported.
 | `OTEL_SERVICE_NAME` | `cn1.otel.service.name` | Overrides the annotation's `serviceName`.
 | `OTEL_RESOURCE_ATTRIBUTES` | `cn1.otel.resource.attributes` | Extra resource attributes, `key=value` pairs.
@@ -693,7 +693,7 @@ application's own, and `Tracing.inSpan` times a block of work as a child span.
 
 ==== Relaying the app's spans
 
-A mobile app should not carry the collector's credentials: anything inside an app
+A mobile app shouldn't carry the collector's credentials: anything inside an app
 package can be read by whoever installs it. With `cn1.otel.relay=true` the backend
 accepts the app's spans at `/otel/v1/traces`, adds its own credentials and
 forwards them to the same collector:

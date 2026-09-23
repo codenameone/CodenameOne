@@ -575,6 +575,8 @@ transcoder
 dedup
 # Analytics chapter: analytics vendors / APIs and privacy-law acronyms.
 Matomo
+# Observability backend named in the tracing chapters (OTLP ingest example).
+Dynatrace
 GA4
 CCPA
 SPI

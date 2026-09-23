@@ -1185,7 +1185,8 @@ public class ConnectionRequest implements IOProgressListener {
             // initConnection() writes the headers, and outside it so a subclass
             // that overrides it cannot drop the trace context.
             try {
-                tracerAttempt = tracer.beforeRequest(this, tracerParent);
+                tracerAttempt = tracer.beforeRequest(this,
+                        tracer == tracerParentOwner ? tracerParent : null);
                 tracerOwner = tracerAttempt == null ? null : tracer;
             } catch (Throwable t) {
                 Log.e(t);
@@ -1559,6 +1560,12 @@ public class ConnectionRequest implements IOProgressListener {
     /// What the [NetworkTracer] returned when this request was queued: the context
     /// its spans are children of. Kept across retries, which are the same request.
     Object tracerParent;
+
+    /// The tracer that produced [#tracerParent]. The context is that tracer's own
+    /// state, so it is handed only to that tracer: one installed between queuing and
+    /// running gets no parent rather than an object it cannot interpret -- or, for a
+    /// telemetry reinstall, a trace id belonging to the previous installation.
+    NetworkTracer tracerParentOwner;
 
     /// The attempt in flight, as the tracer's own state; null when none is being
     /// traced. Set on the network thread and cleared there when the attempt ends.

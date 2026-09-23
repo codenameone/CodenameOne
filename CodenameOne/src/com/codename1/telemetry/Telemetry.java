@@ -212,7 +212,7 @@ public final class Telemetry {
                 sampled = sample(traceBytes);
             }
             return new TelemetrySpan(this, name, kind, traceId, Hash.toHex(spanBytes), parentId,
-                    sampled);
+                    sampled, parentId == null ? null : parent);
         }
 
         /// Secure random bytes, or null when the platform has none. Asked here,
