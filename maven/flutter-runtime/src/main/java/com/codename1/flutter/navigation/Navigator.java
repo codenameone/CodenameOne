@@ -197,6 +197,16 @@ public class Navigator extends StatelessWidget {
     }
 
     /**
+     * Whether a pop would close anything: an open dialog -- which pop dismisses first,
+     * as the route above the page -- or a pushed page. The page stack alone was checked,
+     * so with a dialog over the base route maybePop answered false without closing it
+     * and a system-back handler could not dismiss the dialog.
+     */
+    static boolean poppable() {
+        return com.codename1.flutter.material.Dialogs.openDialogCount() > 0 || !stack.isEmpty();
+    }
+
+    /**
      * Pops the topmost dialog if one is open, else the topmost pushed route.
      * Popping the last (base) route is a no-op.
      */
@@ -518,7 +528,7 @@ public class Navigator extends StatelessWidget {
 
         @Override
         public dart.async.Future<Boolean> maybePop(Object result) {
-            if (stack.isEmpty()) {
+            if (!poppable()) {
                 return dart.async.Future.value(Boolean.FALSE);
             }
             Navigator.pop(null, result);
@@ -527,7 +537,7 @@ public class Navigator extends StatelessWidget {
 
         @Override
         public boolean canPop() {
-            return !stack.isEmpty();
+            return poppable();
         }
 
         @Override
@@ -707,7 +717,7 @@ public class Navigator extends StatelessWidget {
 
         @Override
         public dart.async.Future<Boolean> maybePop(Object result) {
-            if (stack.isEmpty()) {
+            if (!poppable()) {
                 return dart.async.Future.value(Boolean.FALSE);
             }
             Navigator.pop(context, result);
@@ -716,7 +726,7 @@ public class Navigator extends StatelessWidget {
 
         @Override
         public boolean canPop() {
-            return !stack.isEmpty();
+            return poppable();
         }
 
         @Override
@@ -744,7 +754,7 @@ public class Navigator extends StatelessWidget {
      * popped ({@code Navigator.maybePop}).
      */
     public static boolean maybePop(BuildContext context) {
-        if (stack.isEmpty()) {
+        if (!poppable()) {
             return false;
         }
         pop(context);

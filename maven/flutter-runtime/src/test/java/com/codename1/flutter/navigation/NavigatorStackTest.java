@@ -117,4 +117,16 @@ class NavigatorStackTest {
         assertEquals(0, built[0], "no Display: the page never mounts, the builder never runs");
         assertEquals(1, Navigator.stackSize());
     }
+
+    @Test
+    void anOpenDialogCanBePoppedFromTheBaseRoute() {
+        // A dialog over the base route: the page stack is empty, but the dialog is the
+        // route on top, and maybePop -- what a system-back handler calls -- must close it.
+        Dialogs.showDialog(null, (context) -> new ProbeBox(10, 10));
+        NavigatorState nav = Navigator.of(null, null);
+        assertEquals(true, nav.canPop());
+        nav.maybePop(null);
+        assertEquals(0, Dialogs.openDialogCount());
+        assertEquals(false, nav.canPop());
+    }
 }
