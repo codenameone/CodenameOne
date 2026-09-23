@@ -193,7 +193,7 @@ public final class EntityManager {
         if(entity == null) {
             throw new IllegalArgumentException("No entity class");
         }
-        if (com.codename1.orm.session.Models.requiresSession(entity))
+        if (com.codename1.impl.orm.Models.requiresSession(entity))
             throw new IllegalStateException("Relationships and @Version require openSession() managed persistence");
         Dao<T> dao = (Dao<T>)daos.get(entity.getName());
         if(dao == null) {
@@ -209,13 +209,15 @@ public final class EntityManager {
     }
 
     /**
-     * Opens an independent managed persistence context. Begin and complete each
-     * transaction on the same thread; other users of its connection wait until
-     * commit, rollback, or session close.
+     * Opens an independent managed persistence context. The caller must close it.
+     * Begin and complete each transaction on the same thread; other users of its
+     * connection wait until commit, rollback, or session close. Closing never commits.
+     * @return a new persistence context with independent managed entity state
+     * @throws IllegalStateException if called on a transaction-scoped manager
      */
     public com.codename1.orm.session.Session openSession() {
         if (transactionScoped) throw new IllegalStateException("Open a session on the outer manager; the session owns its transaction");
-        return new com.codename1.orm.session.Session(new SessionSqlAccess(pool, pinned, dialect));
+        return new com.codename1.impl.orm.SessionImpl(new com.codename1.impl.orm.BackendSqlAccess(pool, pinned, dialect));
     }
 
     /**
@@ -226,9 +228,9 @@ public final class EntityManager {
      */
     public void createTables() throws IOException {
         EntityDefinition[] all = registered();
-        Map<String, com.codename1.orm.session.EntityModel<?>> models = com.codename1.orm.session.Models.snapshot();
+        Map<String, com.codename1.impl.orm.EntityModel<?>> models = com.codename1.impl.orm.Models.snapshot();
         boolean managedSchema = false;
-        for (com.codename1.orm.session.EntityModel model : models.values()) {
+        for (com.codename1.impl.orm.EntityModel model : models.values()) {
             if (model.requiresSession()) { managedSchema = true; break; }
         }
         if (managedSchema) {
@@ -449,7 +451,7 @@ public final class EntityManager {
             claimedNames.add(claimed);
             claimedBy.add(definition.type().getName());
             try {
-                if(!com.codename1.orm.session.Models.requiresSession(definition.type()))
+                if(!com.codename1.impl.orm.Models.requiresSession(definition.type()))
                     out.put(definition.type().getName(), new Table(definition, dialect));
             } catch (IllegalStateException err) {
                 // An entity with no @Id, which the generator refuses at build

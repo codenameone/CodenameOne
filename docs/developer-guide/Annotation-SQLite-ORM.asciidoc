@@ -60,7 +60,9 @@ include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/g
 === Managed sessions and relationships
 
 The managed ORM layer uses the same entity annotations on the client and the
-backend. Open a `com.codename1.orm.session.Session` with
+backend. New mappings, including relationships, `@Version`, and `@GeneratedValue`,
+live in `com.codename1.annotations.db`. The existing `@Entity`, `@Id`, `@Column`,
+and `@DbTransient` annotations remain in `com.codename1.annotations`. Open a `com.codename1.orm.session.Session` with
 `EntityManager.openSession()`. Keep one session per unit of work. A session is
 not thread-safe; a backend pooled entity manager can still be shared between
 requests, with a separate session for each request.
@@ -80,6 +82,10 @@ the managed copy; it doesn't attach the supplied detached instance.
 ----
 include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/ManagedOrmSnippets.java[tag=managed-orm-unit-of-work,indent=0]
 ----
+
+The public `Session`, `Query`, and `JpqlQuery` interfaces describe application
+operations. Generated metadata, field-access hooks, and SQL adapters live under
+`com.codename1.impl.orm`; application code shouldn't depend on those classes.
 
 Closing a session rolls back any active transaction. It never commits. A
 rollback clears the persistence context. An optimistic-lock or database failure

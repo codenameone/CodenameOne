@@ -23,7 +23,17 @@
 package com.codename1.orm.session;
 
 /// Reflection-free conversion between a domain value and one SQL scalar.
+/// Implementations used by Convert must have a public no-argument constructor.
+/// Both methods receive null values and must define how to represent them.
+/// @param <T> domain value type
+/// @param <S> SQL scalar type declared by the mapping
 public interface AttributeConverter<T, S> {
+    /// Converts an entity field value to its stored scalar representation.
+    /// @param value domain value, possibly null
+    /// @return scalar value accepted by the declared storage type, or null
     S toDatabase(T value);
+    /// Converts a stored scalar to the entity field's domain type.
+    /// @param value stored value, possibly null
+    /// @return reconstructed domain value, or null
     T fromDatabase(S value);
 }

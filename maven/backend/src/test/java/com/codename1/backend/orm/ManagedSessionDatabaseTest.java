@@ -24,6 +24,9 @@ package com.codename1.backend.orm;
 
 import com.codename1.backend.Database;
 import com.codename1.orm.session.*;
+import com.codename1.impl.orm.Attribute;
+import com.codename1.impl.orm.Models;
+
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Assumptions;
 import java.util.concurrent.*;

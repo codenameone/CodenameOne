@@ -60,11 +60,29 @@ public class OrmAnnotationProcessorTest {
     public TemporaryFolder tmp = new TemporaryFolder();
 
     @Test
+    public void managedPublicContractsDoNotExposeRuntimePlumbing() {
+        Class<?>[] contracts = {
+            com.codename1.orm.session.Session.class,
+            com.codename1.orm.session.Query.class,
+            com.codename1.orm.session.JpqlQuery.class
+        };
+        for (Class<?> contract : contracts) {
+            assertTrue(contract.getName(), contract.isInterface());
+            for (java.lang.reflect.Method method : contract.getMethods()) {
+                assertFalse(method.toString(), method.getGenericReturnType().getTypeName().contains(".impl."));
+                for (java.lang.reflect.Type parameter : method.getGenericParameterTypes()) {
+                    assertFalse(method.toString(), parameter.getTypeName().contains(".impl."));
+                }
+            }
+        }
+    }
+
+    @Test
     public void dependencyEnhancementRefreshPreservesNewApplicationClasses() throws Exception {
         File dependency=tmp.newFolder("relation-dependency"),classes=tmp.newFolder("relation-app");
         Map<String,String> sources=new java.util.LinkedHashMap<String,String>();
-        sources.put("overlay.Parent","package overlay; import com.codename1.annotations.*; @Entity public class Parent { @Id public long id; }");
-        sources.put("overlay.Child","package overlay; import com.codename1.annotations.*; @Entity public class Child { @Id public long id; @ManyToOne(fetch=FetchType.LAZY) public Parent parent; }");
+        sources.put("overlay.Parent","package overlay; import com.codename1.annotations.*; import com.codename1.annotations.db.*; @Entity public class Parent { @Id public long id; }");
+        sources.put("overlay.Child","package overlay; import com.codename1.annotations.*; import com.codename1.annotations.db.*; @Entity public class Child { @Id public long id; @ManyToOne(fetch=FetchType.LAZY) public Parent parent; }");
         sources.put("overlay.Reader","package overlay; public class Reader { public Parent read(Child child) { return child.parent; } }");
         JavaSourceCompiler.compile(sources,dependency,Arrays.asList(testClassesDir()));
         List<String> classpath=new ArrayList<String>(backendClasspath());classpath.add(dependency.getAbsolutePath());
@@ -84,7 +102,7 @@ public class OrmAnnotationProcessorTest {
     public void clientPropertyScalarsAndCharactersUseManagedStorageConversions() throws Exception {
         File classes=tmp.newFolder("property-scalars");
         Map<String,String> sources=new java.util.LinkedHashMap<String,String>();
-        sources.put("propertymodel.Bean","package propertymodel; import com.codename1.annotations.*; import com.codename1.properties.*; @Entity(table=\"property_beans\") public class Bean implements PropertyBusinessObject { @Id public long id; @Version public long version; public char symbol; public final IntProperty<Bean> counter=new IntProperty<Bean>(\"counter\",0); public final CharProperty<Bean> letter=new CharProperty<Bean>(\"letter\",'Q'); private final PropertyIndex index=new PropertyIndex(this,\"Bean\",counter,letter); public PropertyIndex getPropertyIndex() { return index; } }");
+        sources.put("propertymodel.Bean","package propertymodel; import com.codename1.annotations.*; import com.codename1.annotations.db.*; import com.codename1.properties.*; @Entity(table=\"property_beans\") public class Bean implements PropertyBusinessObject { @Id public long id; @Version public long version; public char symbol; public final IntProperty<Bean> counter=new IntProperty<Bean>(\"counter\",0); public final CharProperty<Bean> letter=new CharProperty<Bean>(\"letter\",'Q'); private final PropertyIndex index=new PropertyIndex(this,\"Bean\",counter,letter); public PropertyIndex getPropertyIndex() { return index; } }");
         JavaSourceCompiler.compile(sources,classes,Arrays.asList(testClassesDir()));
         ProcessorContext ctx=runProcessor(classes);assertFalse(ctx.getErrors().toString(),ctx.hasErrors());
         java.net.URLClassLoader loader=new java.net.URLClassLoader(new URL[]{classes.toURI().toURL()},getClass().getClassLoader());loader.loadClass("cn1app.DaoBootstrap").newInstance();Class type=loader.loadClass("propertymodel.Bean");
@@ -104,7 +122,7 @@ public class OrmAnnotationProcessorTest {
     @Test
     public void scalarElementCollectionsSupportLazyReadsDirtyCheckingAndMembership() throws Exception {
         File classes=tmp.newFolder("elements");Map<String,String> sources=new java.util.LinkedHashMap<String,String>();
-        sources.put("elements.Profile","package elements; import com.codename1.annotations.*; @Entity(table=\"element_profiles\") public class Profile { @Id public long id; @Version public long version; @ElementCollection public java.util.List<String> tags=new java.util.ArrayList<String>(); @ElementCollection public java.util.Set<Integer> flags=new java.util.LinkedHashSet<Integer>(); @ElementCollection public java.util.Map<String,java.util.Date> dates=new java.util.LinkedHashMap<String,java.util.Date>(); }");
+        sources.put("elements.Profile","package elements; import com.codename1.annotations.*; import com.codename1.annotations.db.*; @Entity(table=\"element_profiles\") public class Profile { @Id public long id; @Version public long version; @ElementCollection public java.util.List<String> tags=new java.util.ArrayList<String>(); @ElementCollection public java.util.Set<Integer> flags=new java.util.LinkedHashSet<Integer>(); @ElementCollection public java.util.Map<String,java.util.Date> dates=new java.util.LinkedHashMap<String,java.util.Date>(); }");
         sources.put("elements.Reader","package elements; public class Reader { public static java.util.List<String> tags(Profile p) { return p.tags; } public static java.util.Set<Integer> flags(Profile p) { return p.flags; } public static java.util.Map<String,java.util.Date> dates(Profile p) { return p.dates; } }");
         JavaSourceCompiler.compile(sources,classes,Arrays.asList(testClassesDir()));
         ProcessorContext client=runProcessor(classes);assertFalse(client.getErrors().toString(),client.hasErrors());
@@ -126,8 +144,8 @@ public class OrmAnnotationProcessorTest {
     @Test
     public void orderedListsAndEntityMapsRoundTripWithoutLosingDuplicateLinks() throws Exception {
         File classes=tmp.newFolder("collections");Map<String,String> sources=new java.util.LinkedHashMap<String,String>();
-        sources.put("collections.Thing","package collections; import com.codename1.annotations.*; @Entity(table=\"collection_things\") public class Thing { @Id public long id; public String label; }");
-        sources.put("collections.Box","package collections; import com.codename1.annotations.*; @Entity(table=\"collection_boxes\") public class Box { @Id public long id; @Version public long version; @ManyToMany(cascade=CascadeType.PERSIST) @OrderColumn public java.util.List<Thing> sequence=new java.util.ArrayList<Thing>(); @OneToMany(cascade=CascadeType.PERSIST) @MapKey(name=\"label\") public java.util.Map<String,Thing> named=new java.util.LinkedHashMap<String,Thing>(); }");
+        sources.put("collections.Thing","package collections; import com.codename1.annotations.*; import com.codename1.annotations.db.*; @Entity(table=\"collection_things\") public class Thing { @Id public long id; public String label; }");
+        sources.put("collections.Box","package collections; import com.codename1.annotations.*; import com.codename1.annotations.db.*; @Entity(table=\"collection_boxes\") public class Box { @Id public long id; @Version public long version; @ManyToMany(cascade=CascadeType.PERSIST) @OrderColumn public java.util.List<Thing> sequence=new java.util.ArrayList<Thing>(); @OneToMany(cascade=CascadeType.PERSIST) @MapKey(name=\"label\") public java.util.Map<String,Thing> named=new java.util.LinkedHashMap<String,Thing>(); }");
         sources.put("collections.Reader","package collections; public class Reader { public static java.util.List<Thing> sequence(Box b) { return b.sequence; } public static java.util.Map<String,Thing> named(Box b) { return b.named; } }");
         JavaSourceCompiler.compile(sources,classes,Arrays.asList(testClassesDir()));
         ProcessorContext client=runProcessor(classes);assertFalse(client.getErrors().toString(),client.hasErrors());
@@ -150,11 +168,11 @@ public class OrmAnnotationProcessorTest {
     @Test
     public void polymorphicSingleTableInheritancePreservesIdentityAndSubtypeQueries() throws Exception {
         File classes=tmp.newFolder("inheritance");Map<String,String> sources=new java.util.LinkedHashMap<String,String>();
-        sources.put("hierarchy.Animal","package hierarchy; import com.codename1.annotations.*; @Entity(table=\"hierarchy_animals\") @Inheritance public abstract class Animal { @Id public long id; @Version public long version; public String name; @DbTransient public int callbacks; @PrePersist public void baseCallback() { callbacks++; } }");
-        sources.put("hierarchy.Cat","package hierarchy; import com.codename1.annotations.*; @Entity @DiscriminatorValue(\"cat\") public class Cat extends Animal { public int lives; @PrePersist public void catCallback() { callbacks+=10; } }");
-        sources.put("hierarchy.Dog","package hierarchy; import com.codename1.annotations.*; @Entity @DiscriminatorValue(\"dog\") public class Dog extends Animal { public String breed; @ManyToOne(fetch=FetchType.LAZY,cascade=CascadeType.PERSIST) public Keeper keeper; }");
-        sources.put("hierarchy.Keeper","package hierarchy; import com.codename1.annotations.*; @Entity(table=\"hierarchy_keepers\") public class Keeper { @Id public long id; public String name; }");
-        sources.put("hierarchy.Shelter","package hierarchy; import com.codename1.annotations.*; @Entity(table=\"hierarchy_shelters\") public class Shelter { @Id public long id; @OneToMany(cascade=CascadeType.ALL,orphanRemoval=true) public java.util.List<Animal> animals=new java.util.ArrayList<Animal>(); }");
+        sources.put("hierarchy.Animal","package hierarchy; import com.codename1.annotations.*; import com.codename1.annotations.db.*; @Entity(table=\"hierarchy_animals\") @Inheritance public abstract class Animal { @Id public long id; @Version public long version; public String name; @DbTransient public int callbacks; @PrePersist public void baseCallback() { callbacks++; } }");
+        sources.put("hierarchy.Cat","package hierarchy; import com.codename1.annotations.*; import com.codename1.annotations.db.*; @Entity @DiscriminatorValue(\"cat\") public class Cat extends Animal { public int lives; @PrePersist public void catCallback() { callbacks+=10; } }");
+        sources.put("hierarchy.Dog","package hierarchy; import com.codename1.annotations.*; import com.codename1.annotations.db.*; @Entity @DiscriminatorValue(\"dog\") public class Dog extends Animal { public String breed; @ManyToOne(fetch=FetchType.LAZY,cascade=CascadeType.PERSIST) public Keeper keeper; }");
+        sources.put("hierarchy.Keeper","package hierarchy; import com.codename1.annotations.*; import com.codename1.annotations.db.*; @Entity(table=\"hierarchy_keepers\") public class Keeper { @Id public long id; public String name; }");
+        sources.put("hierarchy.Shelter","package hierarchy; import com.codename1.annotations.*; import com.codename1.annotations.db.*; @Entity(table=\"hierarchy_shelters\") public class Shelter { @Id public long id; @OneToMany(cascade=CascadeType.ALL,orphanRemoval=true) public java.util.List<Animal> animals=new java.util.ArrayList<Animal>(); }");
         sources.put("hierarchy.Reader","package hierarchy; public class Reader { public static Keeper keeper(Dog d) { return d.keeper; } public static java.util.List<Animal> animals(Shelter s) { return s.animals; } }");
         JavaSourceCompiler.compile(sources,classes,Arrays.asList(testClassesDir()));
         ProcessorContext client=runProcessor(classes);assertFalse(client.getErrors().toString(),client.hasErrors());
@@ -186,7 +204,7 @@ public class OrmAnnotationProcessorTest {
         File classes=tmp.newFolder("converted");Map<String,String> sources=new java.util.LinkedHashMap<String,String>();
         sources.put("converted.Code","package converted; public class Code { public String value; public Code(String value) { this.value=value; } }");
         sources.put("converted.CodeConverter","package converted; public class CodeConverter implements com.codename1.orm.session.AttributeConverter<Code,String> { public String toDatabase(Code c) { return c==null?null:c.value; } public Code fromDatabase(String value) { return value==null?null:new Code(value); } }");
-        sources.put("converted.Entry","package converted; import com.codename1.annotations.*; @Entity(indexes=@Index(name=\"converted_code\",fields=\"code\",unique=true)) public class Entry { @Id public long id; @Convert(converter=CodeConverter.class) public Code code; }");
+        sources.put("converted.Entry","package converted; import com.codename1.annotations.*; import com.codename1.annotations.db.*; @Entity(indexes=@Index(name=\"converted_code\",fields=\"code\",unique=true)) public class Entry { @Id public long id; @Convert(converter=CodeConverter.class) public Code code; }");
         JavaSourceCompiler.compile(sources,classes,Arrays.asList(testClassesDir()));
         ProcessorContext client=runProcessor(classes);assertFalse(client.getErrors().toString(),client.hasErrors());
         ProcessorContext ctx=runProcessor(classes,backendClasspath());assertFalse(ctx.getErrors().toString(),ctx.hasErrors());
@@ -209,10 +227,10 @@ public class OrmAnnotationProcessorTest {
     public void compositeIdentifiersRoundTripThroughRelationsAndJoinTables() throws Exception {
         File classes=tmp.newFolder("composite");
         Map<String,String> sources=new java.util.LinkedHashMap<String,String>();
-        sources.put("composite.Key","package composite; import com.codename1.annotations.*; @Embeddable public class Key { public String tenant; public long number; }");
-        sources.put("composite.Account","package composite; import com.codename1.annotations.*; @Entity public class Account { @EmbeddedId public Key key; @Version public long version; public long counter; @OneToMany(mappedBy=\"account\",cascade=CascadeType.ALL,orphanRemoval=true) public java.util.List<Item> items=new java.util.ArrayList<Item>(); @ManyToMany(cascade=CascadeType.PERSIST) public java.util.Set<Label> labels=new java.util.LinkedHashSet<Label>(); }");
-        sources.put("composite.Item","package composite; import com.codename1.annotations.*; @Entity public class Item { @Id public long id; @ManyToOne(fetch=FetchType.LAZY) public Account account; }");
-        sources.put("composite.Label","package composite; import com.codename1.annotations.*; @Entity public class Label { @Id(autoIncrement=false) public String locale; @Id(autoIncrement=false) public long number; public String text; }");
+        sources.put("composite.Key","package composite; import com.codename1.annotations.*; import com.codename1.annotations.db.*; @Embeddable public class Key { public String tenant; public long number; }");
+        sources.put("composite.Account","package composite; import com.codename1.annotations.*; import com.codename1.annotations.db.*; @Entity public class Account { @EmbeddedId public Key key; @Version public long version; public long counter; @OneToMany(mappedBy=\"account\",cascade=CascadeType.ALL,orphanRemoval=true) public java.util.List<Item> items=new java.util.ArrayList<Item>(); @ManyToMany(cascade=CascadeType.PERSIST) public java.util.Set<Label> labels=new java.util.LinkedHashSet<Label>(); }");
+        sources.put("composite.Item","package composite; import com.codename1.annotations.*; import com.codename1.annotations.db.*; @Entity public class Item { @Id public long id; @ManyToOne(fetch=FetchType.LAZY) public Account account; }");
+        sources.put("composite.Label","package composite; import com.codename1.annotations.*; import com.codename1.annotations.db.*; @Entity public class Label { @Id(autoIncrement=false) public String locale; @Id(autoIncrement=false) public long number; public String text; }");
         sources.put("composite.Reader","package composite; public class Reader { public static Account account(Item i) { return i.account; } public static java.util.Set<Label> labels(Account a) { return a.labels; } }");
         JavaSourceCompiler.compile(sources,classes,Arrays.asList(testClassesDir()));
         ProcessorContext ctx=runProcessor(classes,backendClasspath());assertFalse(ctx.getErrors().toString(),ctx.hasErrors());
@@ -247,9 +265,9 @@ public class OrmAnnotationProcessorTest {
     public void embeddedValuesAndMappedSuperclassRoundTrip() throws Exception {
         File classes=tmp.newFolder("embedded");
         java.util.Map<String,String> sources=new java.util.LinkedHashMap<String,String>();
-        sources.put("embedded.Base","package embedded; import com.codename1.annotations.*; @MappedSuperclass public class Base { @Id public long id; }");
-        sources.put("embedded.Address","package embedded; import com.codename1.annotations.*; @Embeddable public class Address { public String city; public int postalCode; }");
-        sources.put("embedded.Contact","package embedded; import com.codename1.annotations.*; @Entity public class Contact extends Base { @Embedded public Address address; @Version public long version; @DbTransient public int callbacks; @PrePersist public void inserting() { callbacks++; } }");
+        sources.put("embedded.Base","package embedded; import com.codename1.annotations.*; import com.codename1.annotations.db.*; @MappedSuperclass public class Base { @Id public long id; }");
+        sources.put("embedded.Address","package embedded; import com.codename1.annotations.*; import com.codename1.annotations.db.*; @Embeddable public class Address { public String city; public int postalCode; }");
+        sources.put("embedded.Contact","package embedded; import com.codename1.annotations.*; import com.codename1.annotations.db.*; @Entity public class Contact extends Base { @Embedded public Address address; @Version public long version; @DbTransient public int callbacks; @PrePersist public void inserting() { callbacks++; } }");
         JavaSourceCompiler.compile(sources,classes,Arrays.asList(testClassesDir()));
         ProcessorContext ctx=runProcessor(classes,backendClasspath());assertFalse(ctx.getErrors().toString(),ctx.hasErrors());
         java.net.URLClassLoader loader=new java.net.URLClassLoader(new URL[]{classes.toURI().toURL()},getClass().getClassLoader());
@@ -273,9 +291,9 @@ public class OrmAnnotationProcessorTest {
     public void generatedRelationsLoadLazilyAndPreserveIdentity() throws Exception {
         File classes=tmp.newFolder("managed-relations");
         java.util.Map<String,String> sources=new java.util.LinkedHashMap<String,String>();
-        sources.put("managed.Parent","package managed; import com.codename1.annotations.*; @Entity public class Parent { @Id public long id; public String name; @OneToMany(mappedBy=\"parent\", cascade=CascadeType.ALL, orphanRemoval=true) public java.util.List<Child> children=new java.util.ArrayList<Child>(); }");
-        sources.put("managed.Base","package managed; import com.codename1.annotations.*; @MappedSuperclass public class Base { @ManyToOne(fetch=FetchType.LAZY) public Parent parent; public Parent readParent() { return parent; } }");
-        sources.put("managed.Child","package managed; import com.codename1.annotations.*; @Entity public class Child extends Base { @Id public long id; @Version public long version; public String name; }");
+        sources.put("managed.Parent","package managed; import com.codename1.annotations.*; import com.codename1.annotations.db.*; @Entity public class Parent { @Id public long id; public String name; @OneToMany(mappedBy=\"parent\", cascade=CascadeType.ALL, orphanRemoval=true) public java.util.List<Child> children=new java.util.ArrayList<Child>(); }");
+        sources.put("managed.Base","package managed; import com.codename1.annotations.*; import com.codename1.annotations.db.*; @MappedSuperclass public class Base { @ManyToOne(fetch=FetchType.LAZY) public Parent parent; public Parent readParent() { return parent; } }");
+        sources.put("managed.Child","package managed; import com.codename1.annotations.*; import com.codename1.annotations.db.*; @Entity public class Child extends Base { @Id public long id; @Version public long version; public String name; }");
         sources.put("managed.ChildCn1Mapper","package managed; public class ChildCn1Mapper { public static Parent serialize(Child c) { return c.parent; } }");
         sources.put("managed.Reader","package managed; public class Reader { public static Parent parent(Child c) { return c.readParent(); } public static java.util.List<Child> children(Parent p) { return p.children; } }");
         JavaSourceCompiler.compile(sources,classes,Arrays.asList(testClassesDir()));
@@ -321,9 +339,9 @@ public class OrmAnnotationProcessorTest {
     private java.net.URLClassLoader reviewRelations(String idType) throws Exception {
         File classes=tmp.newFolder();
         Map<String,String> sources=new java.util.LinkedHashMap<String,String>();
-        sources.put("review.Customer","package review; import com.codename1.annotations.*; @Entity(table=\"review_customer\") public class Customer { @Id public "+idType+" id; public String name; }");
-        sources.put("review.Purchase","package review; import com.codename1.annotations.*; @Entity(table=\"review_purchase\") public class Purchase { @Id public long id; @ManyToOne(fetch=FetchType.LAZY) public Customer customer; @OneToMany(mappedBy=\"purchase\") public java.util.List<Item> items=new java.util.ArrayList<Item>(); }");
-        sources.put("review.Item","package review; import com.codename1.annotations.*; @Entity(table=\"review_item\") public class Item { @Id public long id; @ManyToOne(fetch=FetchType.LAZY) public Purchase purchase; }");
+        sources.put("review.Customer","package review; import com.codename1.annotations.*; import com.codename1.annotations.db.*; @Entity(table=\"review_customer\") public class Customer { @Id public "+idType+" id; public String name; }");
+        sources.put("review.Purchase","package review; import com.codename1.annotations.*; import com.codename1.annotations.db.*; @Entity(table=\"review_purchase\") public class Purchase { @Id public long id; @ManyToOne(fetch=FetchType.LAZY) public Customer customer; @OneToMany(mappedBy=\"purchase\") public java.util.List<Item> items=new java.util.ArrayList<Item>(); }");
+        sources.put("review.Item","package review; import com.codename1.annotations.*; import com.codename1.annotations.db.*; @Entity(table=\"review_item\") public class Item { @Id public long id; @ManyToOne(fetch=FetchType.LAZY) public Purchase purchase; }");
         JavaSourceCompiler.compile(sources,classes,Arrays.asList(testClassesDir()));
         ProcessorContext ctx=runProcessor(classes,backendClasspath());
         assertFalse(ctx.getErrors().toString(),ctx.hasErrors());
@@ -371,8 +389,8 @@ public class OrmAnnotationProcessorTest {
     public void fetchJoinDoesNotForceDistinctWhenOrderingByRelatedColumn() throws Exception {
         java.net.URLClassLoader loader=reviewRelations("long");
         List<String> statements=new ArrayList<String>();
-        com.codename1.orm.session.SqlAccess access=(com.codename1.orm.session.SqlAccess)java.lang.reflect.Proxy.newProxyInstance(
-                getClass().getClassLoader(),new Class[]{com.codename1.orm.session.SqlAccess.class},(proxy,method,args)-> {
+        com.codename1.impl.orm.SqlAccess access=(com.codename1.impl.orm.SqlAccess)java.lang.reflect.Proxy.newProxyInstance(
+                getClass().getClassLoader(),new Class[]{com.codename1.impl.orm.SqlAccess.class},(proxy,method,args)-> {
                     if(method.getName().equals("quote")) return com.codename1.backend.sql.Dialect.POSTGRES.quote((String)args[0]);
                     if(method.getName().equals("dialect")) return "postgresql";
                     if(method.getName().equals("limit")) return com.codename1.backend.sql.Dialect.POSTGRES.limit((Integer)args[0],(Integer)args[1]);
@@ -380,7 +398,7 @@ public class OrmAnnotationProcessorTest {
                     if(method.getName().equals("close")) return null;
                     throw new AssertionError("Unexpected SQL adapter operation: "+method.getName());
                 });
-        com.codename1.orm.session.Session session=new com.codename1.orm.session.Session(access);
+        com.codename1.orm.session.Session session=new com.codename1.impl.orm.SessionImpl(access);
         try {
             session.createQuery("select p from Purchase p join fetch p.items order by p.customer.name").list();
             assertTrue(statements.get(0),statements.get(0).contains("ORDER BY"));
@@ -395,7 +413,7 @@ public class OrmAnnotationProcessorTest {
         File classes = compileFixture(
                 "com.example.User",
                 "package com.example;\n"
-                        + "import com.codename1.annotations.*;\n"
+                        + "import com.codename1.annotations.*; import com.codename1.annotations.db.*;\n"
                         + "@Entity(table=\"users\")\n"
                         + "public class User {\n"
                         + "    @Id(autoIncrement=true) public long id;\n"
@@ -431,7 +449,7 @@ public class OrmAnnotationProcessorTest {
         JavaSourceCompiler.compile(
                 JavaSourceCompiler.singleSource("com.example.NoId",
                         "package com.example;\n"
-                                + "import com.codename1.annotations.*;\n"
+                                + "import com.codename1.annotations.*; import com.codename1.annotations.db.*;\n"
                                 + "@Entity public class NoId {\n"
                                 + "    public String name;\n"
                                 + "    public NoId() {}\n"
@@ -454,7 +472,7 @@ public class OrmAnnotationProcessorTest {
             JavaSourceCompiler.compile(
                     JavaSourceCompiler.singleSource("com.example.Typo",
                             "package com.example;\n"
-                                    + "import com.codename1.annotations.*;\n"
+                                    + "import com.codename1.annotations.*; import com.codename1.annotations.db.*;\n"
                                     + "@Entity public class Typo {\n"
                                     + "    @Id public long id;\n"
                                     + "    public Typo() {}\n"
@@ -488,7 +506,7 @@ public class OrmAnnotationProcessorTest {
                 JavaSourceCompiler.compile(
                         JavaSourceCompiler.singleSource("com.example.Fine",
                                 "package com.example;\n"
-                                        + "import com.codename1.annotations.*;\n"
+                                        + "import com.codename1.annotations.*; import com.codename1.annotations.db.*;\n"
                                         + "@Entity public class Fine {\n"
                                         + "    @Id public long id;\n"
                                         + "    public Fine() {}\n"
@@ -518,7 +536,7 @@ public class OrmAnnotationProcessorTest {
         JavaSourceCompiler.compile(
                 JavaSourceCompiler.singleSource("com.example.Outer",
                         "package com.example;\n"
-                                + "import com.codename1.annotations.*;\n"
+                                + "import com.codename1.annotations.*; import com.codename1.annotations.db.*;\n"
                                 + "public class Outer {\n"
                                 + "    @Entity public static class Nested {\n"
                                 + "        @Id public long id;\n"
@@ -542,7 +560,7 @@ public class OrmAnnotationProcessorTest {
         JavaSourceCompiler.compile(
                 JavaSourceCompiler.singleSource("com.example.Od$d",
                         "package com.example;\n"
-                                + "import com.codename1.annotations.*;\n"
+                                + "import com.codename1.annotations.*; import com.codename1.annotations.db.*;\n"
                                 + "@Entity public class Od$d {\n"
                                 + "    @Id public long id;\n"
                                 + "    public String label;\n"
@@ -560,7 +578,7 @@ public class OrmAnnotationProcessorTest {
         JavaSourceCompiler.compile(
                 JavaSourceCompiler.singleSource("com.example.Order",
                         "package com.example;\n"
-                                + "import com.codename1.annotations.*;\n"
+                                + "import com.codename1.annotations.*; import com.codename1.annotations.db.*;\n"
                                 + "@Entity public class Order {\n"
                                 + "    @Id public long id;\n"
                                 + "    public java.util.List<String> tags;\n"
@@ -579,7 +597,7 @@ public class OrmAnnotationProcessorTest {
         File classes = compileFixture(
                 "com.example.Note",
                 "package com.example;\n"
-                        + "import com.codename1.annotations.*;\n"
+                        + "import com.codename1.annotations.*; import com.codename1.annotations.db.*;\n"
                         + "@Entity(table=\"notes\")\n"
                         + "public class Note {\n"
                         + "    @Id public long id;\n"
@@ -629,7 +647,7 @@ public class OrmAnnotationProcessorTest {
         File classes = compileFixture(
                 "com.example.Memo",
                 "package com.example;\n"
-                        + "import com.codename1.annotations.*;\n"
+                        + "import com.codename1.annotations.*; import com.codename1.annotations.db.*;\n"
                         + "@Entity public class Memo {\n"
                         + "    @Id public long id;\n"
                         + "    public String title;\n"
@@ -657,7 +675,7 @@ public class OrmAnnotationProcessorTest {
         File classes = compileFixture(
                 "com.example.Card",
                 "package com.example;\n"
-                        + "import com.codename1.annotations.*;\n"
+                        + "import com.codename1.annotations.*; import com.codename1.annotations.db.*;\n"
                         + "@Entity public class Card {\n"
                         + "    @Id public long id;\n"
                         + "    public String title;\n"
@@ -680,7 +698,7 @@ public class OrmAnnotationProcessorTest {
         File classes = compileFixture(
                 "com.example.Gauge",
                 "package com.example;\n"
-                        + "import com.codename1.annotations.*;\n"
+                        + "import com.codename1.annotations.*; import com.codename1.annotations.db.*;\n"
                         + "@Entity public class Gauge {\n"
                         + "    @Id public long id;\n"
                         + "    @Column(nullable=true) public int reading;\n"
@@ -704,7 +722,7 @@ public class OrmAnnotationProcessorTest {
         File classes = compileFixture(
                 "com.example.Draft",
                 "package com.example;\n"
-                        + "import com.codename1.annotations.*;\n"
+                        + "import com.codename1.annotations.*; import com.codename1.annotations.db.*;\n"
                         + "@Entity public class Draft {\n"
                         + "    @Id public long id;\n"
                         + "    public String title;\n"
@@ -751,7 +769,7 @@ public class OrmAnnotationProcessorTest {
         assertTrue("could not create the source package", pkgDir.mkdirs());
         File source = new File(pkgDir, "Ledger.java");
         String entity = "package com.example;\n"
-                + "import com.codename1.annotations.*;\n"
+                + "import com.codename1.annotations.*; import com.codename1.annotations.db.*;\n"
                 + "@Entity public class Ledger {\n"
                 + "    @Id public long id;\n"
                 + "    public String memo;\n"
@@ -793,7 +811,7 @@ public class OrmAnnotationProcessorTest {
         File classes = compileFixture(
                 "com.example.Grade",
                 "package com.example;\n"
-                        + "import com.codename1.annotations.*;\n"
+                        + "import com.codename1.annotations.*; import com.codename1.annotations.db.*;\n"
                         + "@Entity public class Grade {\n"
                         + "    @Id public long id;\n"
                         + "    @Column(type=\"CHAR(1)\") public char letter;\n"
@@ -812,7 +830,7 @@ public class OrmAnnotationProcessorTest {
         File classes = compileFixture(
                 "com.example.Mark",
                 "package com.example;\n"
-                        + "import com.codename1.annotations.*;\n"
+                        + "import com.codename1.annotations.*; import com.codename1.annotations.db.*;\n"
                         + "@Entity public class Mark {\n"
                         + "    @Id public long id;\n"
                         + "    public char letter;\n"
@@ -839,7 +857,7 @@ public class OrmAnnotationProcessorTest {
         File classes = compileFixture(
                 "com.example.Wide",
                 "package com.example;\n"
-                        + "import com.codename1.annotations.*;\n"
+                        + "import com.codename1.annotations.*; import com.codename1.annotations.db.*;\n"
                         + "@Entity(table=\"" + longName + "\")\n"
                         + "public class Wide {\n"
                         + "    @Id public long id;\n"
@@ -861,7 +879,7 @@ public class OrmAnnotationProcessorTest {
         File classes = compileFixture(
                 "com.example.WideColumn",
                 "package com.example;\n"
-                        + "import com.codename1.annotations.*;\n"
+                        + "import com.codename1.annotations.*; import com.codename1.annotations.db.*;\n"
                         + "@Entity public class WideColumn {\n"
                         + "    @Id public long id;\n"
                         + "    @Column(name=\"" + longName + "\") public String v;\n"
@@ -883,7 +901,7 @@ public class OrmAnnotationProcessorTest {
         File classes = compileFixture(
                 "com.example.Fits",
                 "package com.example;\n"
-                        + "import com.codename1.annotations.*;\n"
+                        + "import com.codename1.annotations.*; import com.codename1.annotations.db.*;\n"
                         + "@Entity(table=\"" + atLimit + "\")\n"
                         + "public class Fits {\n"
                         + "    @Id public long id;\n"
@@ -904,7 +922,7 @@ public class OrmAnnotationProcessorTest {
         File classes = compileFixture(
                 "com.example.Invoice",
                 "package com.example;\n"
-                        + "import com.codename1.annotations.*;\n"
+                        + "import com.codename1.annotations.*; import com.codename1.annotations.db.*;\n"
                         + "@Entity public class Invoice {\n"
                         + "    @Id @Column(type=\"BIGINT UNSIGNED\") public long id;\n"
                         + "    public Invoice() {}\n"
@@ -923,7 +941,7 @@ public class OrmAnnotationProcessorTest {
         File classes = compileFixture(
                 "com.example.Voucher",
                 "package com.example;\n"
-                        + "import com.codename1.annotations.*;\n"
+                        + "import com.codename1.annotations.*; import com.codename1.annotations.db.*;\n"
                         + "@Entity public class Voucher {\n"
                         + "    @Id(autoIncrement=false) @Column(type=\"CHAR(36)\")\n"
                         + "    public String code;\n"
@@ -942,7 +960,7 @@ public class OrmAnnotationProcessorTest {
         File classes = compileFixture(
                 "com.example.Session",
                 "package com.example;\n"
-                        + "import com.codename1.annotations.*;\n"
+                        + "import com.codename1.annotations.*; import com.codename1.annotations.db.*;\n"
                         + "@Entity public class Session {\n"
                         + "    @Id public String token;\n"
                         + "    public Session() {}\n"
@@ -967,7 +985,7 @@ public class OrmAnnotationProcessorTest {
             File classes = compileFixture(
                     "com.example.Bad",
                     "package com.example;\n"
-                            + "import com.codename1.annotations.*;\n"
+                            + "import com.codename1.annotations.*; import com.codename1.annotations.db.*;\n"
                             + "@Entity public class Bad {\n"
                             + "    @Id " + field + "\n"
                             + "    public Bad() {}\n"
@@ -982,7 +1000,7 @@ public class OrmAnnotationProcessorTest {
             File classes = compileFixture(
                     "com.example.Good",
                     "package com.example;\n"
-                            + "import com.codename1.annotations.*;\n"
+                            + "import com.codename1.annotations.*; import com.codename1.annotations.db.*;\n"
                             + "@Entity public class Good {\n"
                             + "    @Id " + field + "\n"
                             + "    public Good() {}\n"
@@ -1003,7 +1021,7 @@ public class OrmAnnotationProcessorTest {
         File classes = compileFixture(
                 "com.example.Clash",
                 "package com.example;\n"
-                        + "import com.codename1.annotations.*;\n"
+                        + "import com.codename1.annotations.*; import com.codename1.annotations.db.*;\n"
                         + "@Entity public class Clash {\n"
                         + "    @Id public long id;\n"
                         + "    @Column(name=\"label\") public String name;\n"
@@ -1018,7 +1036,7 @@ public class OrmAnnotationProcessorTest {
         File folded = compileFixture(
                 "com.example.Folded",
                 "package com.example;\n"
-                        + "import com.codename1.annotations.*;\n"
+                        + "import com.codename1.annotations.*; import com.codename1.annotations.db.*;\n"
                         + "@Entity public class Folded {\n"
                         + "    @Id public long id;\n"
                         + "    @Column(name=\"label\") public String name;\n"
@@ -1042,7 +1060,7 @@ public class OrmAnnotationProcessorTest {
         File shared = compileFixture(
                 "com.example.Shared",
                 "package com.example;\n"
-                        + "import com.codename1.annotations.*;\n"
+                        + "import com.codename1.annotations.*; import com.codename1.annotations.db.*;\n"
                         + "@Entity public class Shared {\n"
                         + "    @Id public long id;\n"
                         + "    public String name;\n"
@@ -1060,13 +1078,13 @@ public class OrmAnnotationProcessorTest {
     @Test
     public void ignoresVersionedEntitiesInMultiReleaseJars() throws Exception {
         File base = compileFixture("com.example.Shared",
-                "package com.example; import com.codename1.annotations.*; "
+                "package com.example; import com.codename1.annotations.*; import com.codename1.annotations.db.*; "
                 + "@Entity public class Shared { @Id public long id; public String name; }");
         File versioned = compileFixture("com.example.Shared",
-                "package com.example; import com.codename1.annotations.*; "
+                "package com.example; import com.codename1.annotations.*; import com.codename1.annotations.db.*; "
                 + "@Entity public class Shared { @Id public long id; public String later; }");
         File onlyVersioned = compileFixture("com.example.Later",
-                "package com.example; import com.codename1.annotations.*; "
+                "package com.example; import com.codename1.annotations.*; import com.codename1.annotations.db.*; "
                 + "@Entity public class Later { @Id public long id; }");
         File jar = tmp.newFile("multi-release.jar");
         java.util.jar.Manifest manifest = new java.util.jar.Manifest();
@@ -1110,7 +1128,7 @@ public class OrmAnnotationProcessorTest {
         // fails on a class that is not there -- which is what native packaging
         // did for every project that had both.
         String entity = "package com.example;\n"
-                + "import com.codename1.annotations.*;\n"
+                + "import com.codename1.annotations.*; import com.codename1.annotations.db.*;\n"
                 + "@Entity public class Stored {\n"
                 + "    @Id public long id;\n"
                 + "    public String name;\n"

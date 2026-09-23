@@ -24,9 +24,14 @@ package com.codename1.orm.session;
 
 /// An ORM failure, including an underlying database failure during lazy access.
 public class PersistenceException extends RuntimeException {
+    /// Creates an exception describing the persistence failure.
+    /// @param message failure description
     public PersistenceException(String message) {
         super(message);
     }
+    /// Creates an exception retaining the underlying failure.
+    /// @param message failure description
+    /// @param cause underlying failure
     public PersistenceException(String message, Throwable cause) {
         super(message, cause);
     }

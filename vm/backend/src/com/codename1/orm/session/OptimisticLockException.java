@@ -24,6 +24,8 @@ package com.codename1.orm.session;
 
 /// The row was changed or removed since it was loaded.
 public final class OptimisticLockException extends PersistenceException {
+    /// Creates an exception describing the persistence failure.
+    /// @param message failure description
     public OptimisticLockException(String message) {
         super(message);
     }

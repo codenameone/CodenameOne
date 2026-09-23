@@ -24,7 +24,7 @@
 ///
 /// Open a [Session] with the runtime's `EntityManager.openSession()` method.
 /// A session maintains entity identity, detects changes, and loads relationships
-/// using generated [EntityModel] metadata. Writes require an active transaction;
+/// using metadata generated at build time. Writes require an active transaction;
 /// closing a session rolls back an active transaction and detaches its entities.
 /// Sessions are not thread-safe. Initialize associations needed by the UI before
 /// detaching entities, and perform client database access off the event thread.

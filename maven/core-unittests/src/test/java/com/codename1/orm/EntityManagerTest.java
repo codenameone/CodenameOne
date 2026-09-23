@@ -131,7 +131,7 @@ class EntityManagerTest extends UITestBase {
 
     @Test
     void generatedFactoriesIsolateManagersAndReuseWithinOneManager() throws Exception {
-        EntityManager.registerDaoFactory(SampleEntity.class, new DaoFactory<SampleEntity>() {
+        com.codename1.impl.orm.DaoRegistry.registerFactory(SampleEntity.class, new com.codename1.impl.orm.DaoFactory<SampleEntity>() {
             public Dao<SampleEntity> create() { return new RecordingDao(); }
         });
         RecordingDatabase firstDb=new RecordingDatabase(),secondDb=new RecordingDatabase();

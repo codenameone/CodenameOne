@@ -24,7 +24,7 @@ package com.codenameone.developerguide.snippets;
 
 import com.codename1.annotations.Entity;
 import com.codename1.annotations.Id;
-import com.codename1.annotations.ManyToOne;
+import com.codename1.annotations.db.ManyToOne;
 import com.codename1.orm.EntityManager;
 import com.codename1.orm.session.Session;
 import java.util.List;

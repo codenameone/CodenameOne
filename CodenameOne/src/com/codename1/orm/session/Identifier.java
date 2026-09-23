@@ -22,6 +22,7 @@
  */
 package com.codename1.orm.session;
 
+import com.codename1.impl.orm.Values;
 import java.util.Arrays;
 
 /// Immutable composite identity, in the model's declared identifier-field order.
@@ -40,16 +41,29 @@ public final class Identifier {
             this.values[i] = value;
         }
     }
+    /// Creates a composite identifier, normalizing scalar storage representations.
+    /// Integral byte, short, and int values compare as longs. Copies the supplied
+    /// array; components should be immutable. Binary components are unsupported.
+    /// @param values key components in declared identifier-field order
+    /// @return composite identifier for session lookup
+    /// @throws IllegalArgumentException if a component is binary
     public static Identifier of(Object... values) {
         return new Identifier(values);
     }
+    /// Returns a copy of the normalized key component array.
+    /// @return components in identifier-field order
     public Object[] values() {
         return values.clone();
     }
+    /// Compares normalized components in identifier-field order.
+    /// @param other object to compare
+    /// @return true if the other identifier has equal components
     @Override
     public boolean equals(Object other) {
         return other instanceof Identifier && Arrays.equals(values, ((Identifier) other).values);
     }
+    /// Computes a hash from the normalized key components.
+    /// @return component-based hash code
     @Override
     public int hashCode() {
         return Arrays.hashCode(values);

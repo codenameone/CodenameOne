@@ -23,9 +23,9 @@
 package com.codename1.orm;
 
 import com.codename1.impl.javase.SEDatabase;
-import com.codename1.orm.session.Attribute;
-import com.codename1.orm.session.EntityModel;
-import com.codename1.orm.session.Models;
+import com.codename1.impl.orm.Attribute;
+import com.codename1.impl.orm.EntityModel;
+import com.codename1.impl.orm.Models;
 import com.codename1.orm.session.OptimisticLockException;
 import com.codename1.orm.session.PersistenceException;
 import com.codename1.orm.session.Session;

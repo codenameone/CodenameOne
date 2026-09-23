@@ -360,7 +360,7 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
 
         String[] events={"PrePersist","PostPersist","PreUpdate","PostUpdate","PreRemove","PostRemove","PostLoad"};
         for (MethodInfo method : persistentMethods(cls,ctx)) for (int event=0;event<events.length;event++) {
-            if (method.getAnnotations().containsKey("Lcom/codename1/annotations/"+events[event]+";")) {
+            if (method.getAnnotations().containsKey("Lcom/codename1/annotations/db/"+events[event]+";")) {
                 if (!method.isPublic() || !"()V".equals(method.getDescriptor()) || method.isStatic()) {
                     ctx.error(cls,"Lifecycle callback must be a public non-static void method with no parameters: "+method.getName());
                 } else ec.callbacks[event]=ec.callbacks[event]==null?method.getName():ec.callbacks[event]+"(); e."+method.getName();
@@ -374,10 +374,10 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
             if (f.getAnnotation(DB_TRANSIENT_DESC) != null) continue;
             if (!f.isPublic()) {
                 for(String annotation:f.getAnnotations().keySet()) {
-                    if(annotation.equals(ID_DESC) || annotation.equals(COLUMN_DESC) || annotation.equals("Lcom/codename1/annotations/Version;")
-                        || annotation.equals("Lcom/codename1/annotations/OneToOne;") || annotation.equals("Lcom/codename1/annotations/OneToMany;")
-                        || annotation.equals("Lcom/codename1/annotations/ManyToOne;") || annotation.equals("Lcom/codename1/annotations/ManyToMany;")
-                        || annotation.matches("Lcom/codename1/annotations/(ElementCollection|Convert|GeneratedValue|JoinColumn|JoinTable|MapKey|MapKeyColumn|OrderBy|OrderColumn);"))
+                    if(annotation.equals(ID_DESC) || annotation.equals(COLUMN_DESC) || annotation.equals("Lcom/codename1/annotations/db/Version;")
+                        || annotation.equals("Lcom/codename1/annotations/db/OneToOne;") || annotation.equals("Lcom/codename1/annotations/db/OneToMany;")
+                        || annotation.equals("Lcom/codename1/annotations/db/ManyToOne;") || annotation.equals("Lcom/codename1/annotations/db/ManyToMany;")
+                        || annotation.matches("Lcom/codename1/annotations/db/(ElementCollection|Convert|GeneratedValue|JoinColumn|JoinTable|MapKey|MapKeyColumn|OrderBy|OrderColumn);"))
                         ctx.error(cls,"Persistent annotated fields currently require public access: "+f.getName());
                 }
                 continue;
@@ -389,10 +389,10 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
             PersistedField pf = new PersistedField();
             pf.fieldName = fieldPath.path;pf.declaringType=fieldPath.declaringType;
             pf.embeddedParent = fieldPath.prefix;
-            pf.version = f.getAnnotation("Lcom/codename1/annotations/Version;") != null;
+            pf.version = f.getAnnotation("Lcom/codename1/annotations/db/Version;") != null;
             pf.kind = PropertyTypeKind.of(f);
             if(f.isFinal() && pf.kind.kind!=PropertyTypeKind.Kind.PROPERTY) ctx.error(cls,"Persistent fields must be writable: "+pf.fieldName);
-            AnnotationValues conversion=f.getAnnotation("Lcom/codename1/annotations/Convert;");
+            AnnotationValues conversion=f.getAnnotation("Lcom/codename1/annotations/db/Convert;");
             if(conversion!=null) {
                 Object converter=conversion.get("converter"),storage=conversion.get("storageType");
                 if(!(converter instanceof org.objectweb.asm.Type)) { ctx.error(cls,"Missing converter for "+pf.fieldName);continue; }
@@ -525,7 +525,7 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
             if (idAnn != null || (ec.embeddedId!=null && pf.fieldName.startsWith(ec.embeddedId+"."))) {
                 pf.isId = true;
                 pf.autoIncrement = idAnn!=null && idAnn.getBoolOrDefault("autoIncrement", true);
-                AnnotationValues generator=f.getAnnotation("Lcom/codename1/annotations/GeneratedValue;");
+                AnnotationValues generator=f.getAnnotation("Lcom/codename1/annotations/db/GeneratedValue;");
                 if(generator!=null) {
                     Object strategy=generator.get("strategy");
                     String name=strategy instanceof String[]?((String[])strategy)[1]:"IDENTITY";
@@ -764,14 +764,14 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
         String parent=cls.getSuperInternalName();
         if(parent!=null && !"java/lang/Object".equals(parent)) {
             AnnotatedClass base=findType(parent.replace('/','.'),ctx);
-            if(base!=null && (base.getClassAnnotation("Lcom/codename1/annotations/MappedSuperclass;")!=null || base.getClassAnnotation(ENTITY_DESC)!=null))
+            if(base!=null && (base.getClassAnnotation("Lcom/codename1/annotations/db/MappedSuperclass;")!=null || base.getClassAnnotation(ENTITY_DESC)!=null))
                 result.addAll(persistentMethods(base,ctx));
         }
         Set<String> events=new LinkedHashSet<String>();
         for(MethodInfo method:cls.getMethods()) {
             for(int i=result.size()-1;i>=0;i--) if(result.get(i).getName().equals(method.getName()) && result.get(i).getDescriptor().equals(method.getDescriptor())) result.remove(i);
             for(String annotation:method.getAnnotations().keySet()) {
-                if(annotation.matches("Lcom/codename1/annotations/(PrePersist|PostPersist|PreUpdate|PostUpdate|PreRemove|PostRemove|PostLoad);"))
+                if(annotation.matches("Lcom/codename1/annotations/db/(PrePersist|PostPersist|PreUpdate|PostUpdate|PreRemove|PostRemove|PostLoad);"))
                     if(!events.add(annotation)) ctx.error(cls,"Duplicate lifecycle callback: "+annotation);
             }
             result.add(method);
@@ -786,21 +786,21 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
         String parent=cls.getSuperInternalName();
         if(parent!=null && !"java/lang/Object".equals(parent)) {
             AnnotatedClass base=findType(parent.replace('/','.'),ctx);
-            if(base!=null && (base.getClassAnnotation("Lcom/codename1/annotations/MappedSuperclass;")!=null || base.getClassAnnotation(ENTITY_DESC)!=null))
+            if(base!=null && (base.getClassAnnotation("Lcom/codename1/annotations/db/MappedSuperclass;")!=null || base.getClassAnnotation(ENTITY_DESC)!=null))
                 result.addAll(persistentFields(base,entity,ctx,prefix,visiting));
         }
         for(FieldInfo field:cls.getFields()) {
             if(field.isStatic() || field.getAnnotation(DB_TRANSIENT_DESC)!=null) continue;
             String path=prefix+field.getName();
-            if(field.getAnnotation("Lcom/codename1/annotations/Embedded;")!=null || field.getAnnotation("Lcom/codename1/annotations/EmbeddedId;")!=null) {
-                if(field.getAnnotation("Lcom/codename1/annotations/EmbeddedId;")!=null) {
+            if(field.getAnnotation("Lcom/codename1/annotations/db/Embedded;")!=null || field.getAnnotation("Lcom/codename1/annotations/db/EmbeddedId;")!=null) {
+                if(field.getAnnotation("Lcom/codename1/annotations/db/EmbeddedId;")!=null) {
                     if(entity.embeddedId!=null) ctx.error("Multiple embedded identifiers");
                     entity.embeddedId=path;
                 }
                 if(!field.isPublic() || field.isFinal()) { ctx.error("Embedded field must be public and writable: "+path);continue; }
                 String type=org.objectweb.asm.Type.getType(field.getDescriptor()).getClassName();
                 AnnotatedClass embedded=findType(type,ctx);
-                if(embedded==null || embedded.getClassAnnotation("Lcom/codename1/annotations/Embeddable;")==null
+                if(embedded==null || embedded.getClassAnnotation("Lcom/codename1/annotations/db/Embeddable;")==null
                         || !hasPublicNoArgConstructor(embedded)) { ctx.error("Embedded value requires @Embeddable and a public no-arg constructor: "+path);continue; }
                 entity.embedded.put(path,type);
                 for(FieldPath nested:persistentFields(embedded,entity,ctx,path+".",visiting)) result.add(new FieldPath(nested.field,nested.path,nested.prefix,cls.getBinaryName()));
@@ -810,7 +810,7 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
     }
 
     private RelationField relation(FieldInfo field, EntityClass owner, ProcessorContext ctx) {
-        String prefix="Lcom/codename1/annotations/";
+        String prefix="Lcom/codename1/annotations/db/";
         AnnotationValues annotation=null; String kind=null;
         for(String candidate:new String[]{"ManyToOne","OneToOne","OneToMany","ManyToMany","ElementCollection"}) {
             AnnotationValues value=field.getAnnotation(prefix+candidate+";");
@@ -941,7 +941,7 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
     private void resolveHierarchies(ProcessorContext ctx) {
         for(EntityClass root:accepted.values()) {
             AnnotatedClass definition=findType(root.binaryName,ctx);
-            AnnotationValues inheritance=definition.getClassAnnotation("Lcom/codename1/annotations/Inheritance;");
+            AnnotationValues inheritance=definition.getClassAnnotation("Lcom/codename1/annotations/db/Inheritance;");
             if(inheritance==null) continue;
             if(root.parent!=null && accepted.containsKey(root.parent.replace('/','.'))) { ctx.error("Inheritance must be declared on the entity root: "+root.binaryName);continue; }
             String discriminator=inheritance.getStringOrDefault("discriminatorColumn","entity_type");
@@ -951,7 +951,7 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
             Set<String> values=new LinkedHashSet<String>();List<AnnotationValues> inheritedIndexes=new ArrayList<AnnotationValues>();
             for(EntityClass member:family) {
                 inheritedIndexes.addAll(member.indexes);member.hierarchyRoot=root.binaryName;member.tableName=root.tableName;
-                AnnotationValues tag=findType(member.binaryName,ctx).getClassAnnotation("Lcom/codename1/annotations/DiscriminatorValue;");
+                AnnotationValues tag=findType(member.binaryName,ctx).getClassAnnotation("Lcom/codename1/annotations/db/DiscriminatorValue;");
                 member.discriminatorValue=tag==null?member.simpleName:tag.getStringOrDefault("value",member.simpleName);
                 if(!member.discriminatorValue.matches("[A-Za-z0-9_$]{1,63}") || !values.add(member.discriminatorValue)) ctx.error("Invalid or duplicate discriminator: "+member.discriminatorValue);
                 for(PersistedField field:member.fields) {
@@ -984,7 +984,7 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
     private static String generateHierarchyRegistration(EntityClass entity,boolean backend) {
         return (entity.packageName.length()==0?"":"package "+entity.packageName+";\n")
             +(backend?"@com.codename1.backend.annotations.Generated\n":"")
-            +"public final class "+entity.daoSimpleName+" { public static void register() { com.codename1.orm.session.Models.register(new "+entity.simpleName+(backend?"Cn1BackendModel":"Cn1Model")+"()); }}\n";
+            +"public final class "+entity.daoSimpleName+" { public static void register() { com.codename1.impl.orm.Models.register(new "+entity.simpleName+(backend?"Cn1BackendModel":"Cn1Model")+"()); }}\n";
     }
     private static String storageConversion(String type,String value) {
         String method="java.lang.Integer".equals(type)?"asIntObject":"java.lang.Long".equals(type)?"asLongObject":
@@ -992,7 +992,7 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
             "java.lang.Double".equals(type)?"asDoubleObject":"java.lang.Float".equals(type)?"asFloatObject":
             "java.lang.Boolean".equals(type)?"asBooleanObject":"java.lang.Character".equals(type)?"asCodeUnitObject":
             "java.util.Date".equals(type)?"asDate":"byte[]".equals(type)?"asBytes":"asString";
-        return "com.codename1.orm.session.Values."+method+"("+value+")";
+        return "com.codename1.impl.orm.Values."+method+"("+value+")";
     }
     private static String embeddedNullCondition(String path) {
         StringBuilder condition=new StringBuilder();
@@ -1005,7 +1005,7 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
     }
 
     private static String generateModelSource(EntityClass ec, boolean backend) {
-        String pkg = "com.codename1.orm.session.";
+        String pkg = "com.codename1.impl.orm.";
         String simple = ec.simpleName + (backend ? "Cn1BackendModel" : "Cn1Model");
         StringBuilder sb = new StringBuilder();
         if (!ec.packageName.isEmpty()) sb.append("package ").append(ec.packageName).append(";\n");
@@ -1080,7 +1080,7 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
             }
         }
         sb.append("    default: throw new IllegalArgumentException(\"Unknown attribute\");\n")
-          .append("    }} catch(Exception ex) { throw new ").append(pkg)
+          .append("    }} catch(Exception ex) { throw new com.codename1.orm.session.")
           .append("PersistenceException(ex.getMessage(),ex); }\n  }\n");
         sb.append("public Object domainValue(").append(ec.binaryName).append(" e,int index) { switch(index) {\n");
         for(int i=0;i<ec.fields.size();i++) {
@@ -1117,7 +1117,7 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
             else sb.append("e.");
             sb.append(relation.field).append(" = ");
             if ("java.util.Map".equals(type) && relation.element) sb.append("(java.util.Map)value");
-            else if ("java.util.Map".equals(type)) sb.append("com.codename1.orm.session.Models.mapBy((java.util.Collection)value,").append(relation.target).append(".class,\"").append(escape(relation.mapKey)).append("\")");
+            else if ("java.util.Map".equals(type)) sb.append("com.codename1.impl.orm.Models.mapBy((java.util.Collection)value,").append(relation.target).append(".class,\"").append(escape(relation.mapKey)).append("\")");
             else if ("java.util.Set".equals(type)) sb.append("value == null ? null : new java.util.LinkedHashSet((java.util.Collection)value)");
             else sb.append("(").append(type).append(")value");
             sb.append("; return;\n");
@@ -1209,10 +1209,10 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
         // this once per generated dao at app start; the call triggers
         // this class's <clinit> and installs the dao in EntityManager.
         sb.append("    public static void register() {\n");
-        sb.append("        com.codename1.orm.session.Models.register(new ").append(ec.simpleName)
+        sb.append("        com.codename1.impl.orm.Models.register(new ").append(ec.simpleName)
           .append(ec.daoSimpleName.endsWith(BACKEND_DAO_SUFFIX) ? "Cn1BackendModel" : "Cn1Model").append("());\n");
-        sb.append("        com.codename1.orm.EntityManager.registerDaoFactory(").append(ec.binaryName)
-          .append(".class, new com.codename1.orm.DaoFactory<").append(ec.binaryName).append(">() {\n")
+        sb.append("        com.codename1.impl.orm.DaoRegistry.registerFactory(").append(ec.binaryName)
+          .append(".class, new com.codename1.impl.orm.DaoFactory<").append(ec.binaryName).append(">() {\n")
           .append("            public com.codename1.orm.Dao<").append(ec.binaryName).append("> create() { return new ")
           .append(ec.daoSimpleName).append("(); }\n        });\n");
         sb.append("    }\n\n");
@@ -1753,7 +1753,7 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
         // The hook the generated bootstrap calls. Same name and same shape as
         // the client flavour's, so one bootstrap source serves both.
         sb.append("    public static void register() {\n");
-        sb.append("        com.codename1.orm.session.Models.register(new ").append(ec.simpleName)
+        sb.append("        com.codename1.impl.orm.Models.register(new ").append(ec.simpleName)
           .append(ec.daoSimpleName.endsWith(BACKEND_DAO_SUFFIX) ? "Cn1BackendModel" : "Cn1Model").append("());\n");
         sb.append("        ").append(ORM).append("EntityManager.register(new ")
           .append(ec.daoSimpleName).append("());\n");
@@ -1812,12 +1812,12 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
     private static void emitBackendRead(StringBuilder sb, PersistedField f) {
         String field = "e." + (f.relation==null?f.fieldName:f.relation.field);
         if (f.relation != null) {
-            sb.append("com.codename1.orm.session.Models.foreignKey(e, ").append(f.relation.index)
+            sb.append("com.codename1.impl.orm.Models.foreignKey(e, ").append(f.relation.index)
               .append(", ").append(field).append(", ").append(f.relationPart).append(")");
             return;
         }
         if(f.converter!=null) {
-            sb.append("com.codename1.orm.session.Values.storage(new ").append(f.converter).append("().toDatabase(").append(field).append("))");return;
+            sb.append("com.codename1.impl.orm.Values.storage(new ").append(f.converter).append("().toDatabase(").append(field).append("))");return;
         }
         switch (f.kind.kind) {
             case ENUM:
@@ -2125,10 +2125,10 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
 
     private static void emitFieldRead(StringBuilder sb, PersistedField f, String inst) {
         if(f.converter!=null) {
-            sb.append("com.codename1.orm.session.Values.storage(new ").append(f.converter).append("().toDatabase(").append(inst).append('.').append(f.fieldName).append("))");return;
+            sb.append("com.codename1.impl.orm.Values.storage(new ").append(f.converter).append("().toDatabase(").append(inst).append('.').append(f.fieldName).append("))");return;
         }
         if (f.relation != null) {
-            sb.append("com.codename1.orm.session.Models.foreignKey(").append(inst).append(", ")
+            sb.append("com.codename1.impl.orm.Models.foreignKey(").append(inst).append(", ")
               .append(f.relation.index).append(", ").append(inst).append('.').append(f.relation.field).append(", ").append(f.relationPart).append(")");
             return;
         }
@@ -2268,7 +2268,7 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
             sb.append("                ").append(inst).append('.').append(f.fieldName).append(".set(")
                     .append(row).append(".getString(").append(idx).append("));\n");
         } else if ("java.lang.Character".equals(elem)) {
-            sb.append(inst).append('.').append(f.fieldName).append(".set(com.codename1.orm.session.Values.asCodeUnitObject(").append(row).append(".getString(").append(idx).append(")));\n");
+            sb.append(inst).append('.').append(f.fieldName).append(".set(com.codename1.impl.orm.Values.asCodeUnitObject(").append(row).append(".getString(").append(idx).append(")));\n");
         } else if ("java.lang.Integer".equals(elem)) {
             sb.append("                ").append(inst).append('.').append(f.fieldName).append(".set(Integer.valueOf(")
                     .append(row).append(".getInteger(").append(idx).append(")));\n");

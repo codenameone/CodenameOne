@@ -31,8 +31,8 @@ import java.util.zip.*;
 
 /** Enhances entity state and field access without reflection or runtime proxies. */
 final class OrmEnhancer {
-    private static final String MANAGED="com/codename1/orm/session/ManagedEntity";
-    private static final String STATE="com/codename1/orm/session/EntityState";
+    private static final String MANAGED="com/codename1/impl/orm/ManagedEntity";
+    private static final String STATE="com/codename1/impl/orm/EntityState";
     private static final String STATE_DESC="L"+STATE+";";
     private static final String MANIFEST="META-INF/cn1/orm-enhanced-dependencies.list";
     private OrmEnhancer() {}

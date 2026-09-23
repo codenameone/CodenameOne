@@ -425,7 +425,7 @@
     </Match>
     <!-- Nullable Boolean columns must preserve SQL NULL rather than coerce it to false. -->
     <Match>
-        <Class name="com.codename1.orm.session.Values" />
+        <Class name="com.codename1.impl.orm.Values" />
         <Method name="asBooleanObject" />
         <Bug pattern="NP_BOOLEAN_RETURN_NULL" />
     </Match>

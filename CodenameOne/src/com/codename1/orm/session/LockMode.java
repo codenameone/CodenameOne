@@ -22,4 +22,11 @@
  */
 package com.codename1.orm.session;
 /// Explicit row-lock modes. SQLite does not support these row locks.
-public enum LockMode { NONE, PESSIMISTIC_READ, PESSIMISTIC_WRITE }
+public enum LockMode {
+    /// Performs ordinary reads without requesting a row lock.
+    NONE,
+    /// Requests a shared row lock until transaction completion.
+    PESSIMISTIC_READ,
+    /// Requests an exclusive row lock until transaction completion.
+    PESSIMISTIC_WRITE
+}
