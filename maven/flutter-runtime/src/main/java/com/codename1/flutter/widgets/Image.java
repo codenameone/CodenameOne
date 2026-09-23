@@ -48,6 +48,8 @@ public class Image extends Widget {
     private byte[] memoryBytes;
     /// The provider's own key for a memory image, so a new buffer reloads.
     private String memoryKey;
+    /// Encoded pixels per logical pixel for a memory image: MemoryImage's scale.
+    private double memoryScale = 1;
     private Double width;
     /// Flutter's decode-size hints. cacheWidth/cacheHeight decode the asset at
     /// that many DEVICE pixels, so they bound the picture's intrinsic size --
@@ -123,6 +125,12 @@ public class Image extends Widget {
                 dart.typed_data.Uint8List data = ((com.codename1.flutter.MemoryImage) inner).getBytes();
                 this.memoryBytes = data == null ? null : data.toBytes();
                 this.memoryKey = key;
+                // Kept, not dropped: MemoryImage(bytes, scale: 2.0) says two encoded
+                // pixels make one logical one. Without it the render element sized
+                // the picture as if each were one logical pixel -- twice as large
+                // as asked, with every fit computed against the wrong size.
+                double scale = ((com.codename1.flutter.MemoryImage) inner).getScale();
+                this.memoryScale = scale > 0 ? scale : 1;
             } else {
                 com.codename1.flutter.FlutterErrorReport.unimplemented("ImageProvider",
                         inner.getClass().getName() + " resolves to no asset or URL ("
@@ -244,6 +252,11 @@ public class Image extends Widget {
     /// The encoded bytes of a memory image, or null.
     public byte[] getMemoryBytes() {
         return memoryBytes;
+    }
+
+    /// Encoded pixels per logical pixel for a memory image (1 unless given).
+    public double getMemoryScale() {
+        return memoryScale;
     }
 
     @Override

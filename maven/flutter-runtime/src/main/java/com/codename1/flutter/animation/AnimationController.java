@@ -107,6 +107,7 @@ public class AnimationController extends Animation<Double> {
      */
     public void value(double v) {
         stop(false);
+        requestedValue = v;
         double clamped = clamp(v);
         this.currentValue = clamped;
         AnimationStatus newStatus = statusForValue(clamped);
@@ -120,10 +121,31 @@ public class AnimationController extends Animation<Double> {
 
     public void lowerBound(double v) {
         this.lowerBound = v;
+        rebaseOnBounds();
     }
 
     public void upperBound(double v) {
         this.upperBound = v;
+        rebaseOnBounds();
+    }
+
+    /// The value last asked for through value(), or null if none was.
+    private Double requestedValue;
+
+    /// Re-derives the value after a bound changes -- which in Flutter only happens
+    /// at construction, where the bounds are final.
+    ///
+    /// Flutter starts a controller at its lower bound unless `value:` is given.
+    /// The no-argument Java controller starts at 0 and the bound setters only
+    /// stored the bound, so AnimationController(lowerBound: 10, upperBound: 20)
+    /// reported and animated from 0 -- outside its own range -- with the wrong
+    /// status. The transpiler also applies named arguments as setters in source
+    /// order, so `value: 15` given before the bounds had already been clamped
+    /// against the default 0..1 and stored as 1. Keeping the requested value and
+    /// re-clamping it here makes the result independent of that order.
+    private void rebaseOnBounds() {
+        currentValue = requestedValue != null ? clamp(requestedValue) : lowerBound;
+        status = statusForValue(currentValue);
     }
 
     public void vsync(TickerProvider v) {

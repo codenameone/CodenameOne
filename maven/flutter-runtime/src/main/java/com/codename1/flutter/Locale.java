@@ -53,4 +53,30 @@ public class Locale {
     public String toString() {
         return countryCode == null ? languageCode : languageCode + "_" + countryCode;
     }
+
+    /// Value equality over the codes, as Flutter's Locale has. Inheriting
+    /// identity made two separately built Locale("en", "US") values unequal, so a
+    /// check against Localizations.localeOf(context) failed and locale-keyed maps
+    /// and sets missed, although the codes matched.
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) {
+            return true;
+        }
+        if (!(o instanceof Locale)) {
+            return false;
+        }
+        Locale other = (Locale) o;
+        return same(languageCode, other.languageCode) && same(countryCode, other.countryCode);
+    }
+
+    @Override
+    public int hashCode() {
+        int h = languageCode == null ? 0 : languageCode.hashCode();
+        return 31 * h + (countryCode == null ? 0 : countryCode.hashCode());
+    }
+
+    private static boolean same(String a, String b) {
+        return a == null ? b == null : a.equals(b);
+    }
 }

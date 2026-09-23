@@ -474,6 +474,29 @@ public abstract class Element implements BuildContext {
         }
         this.inheritedElements = inheritedFrom(parent != null ? parent : contextFallback);
         this.mounted = true;
+        registerGlobalKey();
+    }
+
+    /// Points a GlobalKey on this element's widget at this element, as Flutter's
+    /// Element.mount registers it.
+    ///
+    /// GlobalKey.attach and detach existed and nothing called them, so
+    /// currentState, currentContext and currentWidget stayed null for the life of
+    /// every keyed widget -- `formKey.currentState!.validate()` and navigator-key
+    /// access failed with the target visibly on screen. Done here, the one path
+    /// every element mounts through, rather than per widget type.
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    private void registerGlobalKey() {
+        Key k = widget == null ? null : widget.getKey();
+        if (k instanceof GlobalKey) {
+            ((GlobalKey) k).attach(globalKeyState(), this, widget);
+        }
+    }
+
+    /// The State a GlobalKey exposes as currentState: null for elements that have
+    /// none. StatefulElement answers its State.
+    protected Object globalKeyState() {
+        return null;
     }
 
     private static java.util.Map<Class<?>, Element> inheritedFrom(Element from) {
@@ -496,6 +519,9 @@ public abstract class Element implements BuildContext {
      */
     public void update(Widget newWidget) {
         this.widget = newWidget;
+        // canUpdate guarantees the same key, so a GlobalKey stays with this
+        // element; its currentWidget has to follow the new configuration.
+        registerGlobalKey();
     }
 
     /**
@@ -506,6 +532,12 @@ public abstract class Element implements BuildContext {
     public void unmount() {
         this.mounted = false;
         this.dirty = false;
+        Key k = widget == null ? null : widget.getKey();
+        // Only if the key still points HERE: a GlobalKey that moved to another
+        // element must not be cleared by the one it left.
+        if (k instanceof GlobalKey && ((GlobalKey<?>) k).currentContext() == this) {
+            ((GlobalKey<?>) k).detach();
+        }
     }
 
     /**

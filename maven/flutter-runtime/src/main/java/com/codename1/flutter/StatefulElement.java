@@ -44,6 +44,11 @@ public class StatefulElement extends ComposedElement {
     }
 
     @Override
+    protected Object globalKeyState() {
+        return state;
+    }
+
+    @Override
     protected void firstBuild() {
         state.initState();
         // Flutter runs didChangeDependencies right after initState and before the first

@@ -48,17 +48,28 @@ public class Key {
         return value;
     }
 
+    /// A key WITH a value compares by that value; one without compares by
+    /// identity. Only the protected no-argument constructor makes a key without a
+    /// value, and the keys built through it -- UniqueKey, GlobalKey -- are the
+    /// ones Flutter compares by identity. Treating two null values as equal made
+    /// every UniqueKey of a class equal to every other (hash 0 for all), so
+    /// Widget.canUpdate kept an element and its State that a fresh UniqueKey was
+    /// meant to replace, and keyed reconciliation collapsed distinct siblings;
+    /// every GlobalKey likewise equalled every other. ValueKey and ObjectKey keep
+    /// their own rules.
     @Override
     public boolean equals(Object o) {
         if (!(o instanceof Key) || o.getClass() != getClass()) {
             return false;
         }
-        Object ov = ((Key) o).value;
-        return value == null ? ov == null : value.equals(ov);
+        if (value == null) {
+            return this == o;
+        }
+        return value.equals(((Key) o).value);
     }
 
     @Override
     public int hashCode() {
-        return value == null ? 0 : value.hashCode();
+        return value == null ? System.identityHashCode(this) : value.hashCode();
     }
 }

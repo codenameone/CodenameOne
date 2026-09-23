@@ -117,6 +117,9 @@ public class ImageRenderElement extends RenderElement {
                 // asset's are -- same size bookkeeping, same downsampling.
                 img = downsample(encodedWithKnownSize(
                         new java.io.ByteArrayInputStream(image().getMemoryBytes())));
+                // The provider's scale is exactly what an asset variant's ratio is:
+                // encoded pixels per logical pixel.
+                assetRatio = image().getMemoryScale();
             } else if (image().getUrl() != null) {
                 int pw = (int) Math.max(1, Math.round(Dp.px(
                         image().getWidth() != null ? image().getWidth() : FALLBACK_EXTENT_LP)));

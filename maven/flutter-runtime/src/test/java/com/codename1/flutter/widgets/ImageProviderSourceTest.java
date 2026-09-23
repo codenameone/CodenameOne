@@ -80,6 +80,19 @@ public class ImageProviderSourceTest {
     }
 
     @Test
+    public void memoryImageKeepsItsScale() {
+        MemoryImage provider = new MemoryImage(new Uint8List(4));
+        provider.scale(2.0);
+        Image img = new Image();
+        img.image(provider);
+        assertEquals(2.0, img.getMemoryScale(), 0.0,
+                "two encoded pixels per logical pixel, not one");
+        Image plain = new Image();
+        plain.image(new MemoryImage(new Uint8List(4)));
+        assertEquals(1.0, plain.getMemoryScale(), 0.0);
+    }
+
+    @Test
     public void aDifferentBufferIsADifferentSource() {
         Image a = new Image();
         a.image(new MemoryImage(new Uint8List(4)));
