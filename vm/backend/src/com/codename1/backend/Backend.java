@@ -24,7 +24,9 @@ package com.codename1.backend;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 import com.codename1.backend.orm.EntityDefinition;
 import com.codename1.backend.orm.EntityManager;
@@ -181,6 +183,21 @@ public final class Backend {
                 throws Exception;
     }
 
+    /**
+     * Where a server's websocket endpoints come from.
+     *
+     * Deliberately the same shape as {@link Handlers}: the server calls this once
+     * while it is starting, with whatever it opened, and the callback registers
+     * what it wants. A controller is found by the build, a Handler is called, a
+     * DataSource is handed over -- nothing in this runtime is configured by an
+     * application reaching into a started server, and websockets are not the
+     * exception.
+     */
+    public interface WebSocketEndpoints {
+        void register(HttpServer.WebSocketRegistry registry, DataSource dataSource,
+                      EntityManager entities) throws Exception;
+    }
+
     /** Collects what a server needs and starts one. */
     public static final class Builder {
         private Config config;
@@ -199,6 +216,7 @@ public final class Backend {
         private String tlsCertificate;
         private String tlsKey;
         private StaticFiles staticFiles;
+        private WebSocketEndpoints webSocketEndpoints;
         private boolean createTables;
         private boolean createTablesGiven;
         private boolean handlersNeedADatabase;
@@ -223,6 +241,19 @@ public final class Backend {
         /** Adds handlers built once the database exists. See {@link Handlers}. */
         public Builder handlers(Handlers factory) {
             this.factory = factory;
+            return this;
+        }
+
+        /**
+         * Registers this server's websocket endpoints when it starts.
+         *
+         * Called once, before the listener accepts anything, so there is no window
+         * in which a route exists in the application's mind and not in the
+         * server's -- which is what a `websocket(path, endpoint)` setter on a
+         * started server left open.
+         */
+        public Builder webSockets(WebSocketEndpoints endpoints) {
+            this.webSocketEndpoints = endpoints;
             return this;
         }
 
@@ -441,10 +472,24 @@ public final class Backend {
                 // would depend on what happened to be in a directory.
                 routers.add(staticFiles);
             }
-            if(routers.isEmpty()) {
+            boolean servesWebSockets = webSocketEndpoints != null;
+            if(routers.isEmpty() && !servesWebSockets) {
                 throw new IOException("This server has no handlers, so every request would "
-                        + "be a 404. Add one with handler(), or a @RestController class for "
-                        + "the build to generate one from.");
+                        + "be a 404. Add one with handler(), webSockets(), or a "
+                        + "@RestController class for the build to generate one from.");
+            }
+            if(routers.isEmpty()) {
+                // A WEBSOCKET-ONLY SERVER IS A REAL SERVER, and it is what the
+                // build generates for a module whose only endpoints are
+                // @WebSocketMapping. Without this that generated application
+                // compiled, started, and threw before it ever bound a port.
+                // Ordinary HTTP requests get the 404 they would have got anyway;
+                // the upgrade path is consulted before this chain runs.
+                routers.add(new HttpServer.Handler() {
+                    public HttpServer.Response handle(HttpServer.Request request) {
+                        return null;          // null is a 404 from the chain below
+                    }
+                });
             }
             final HttpServer.Handler[] chain =
                     (HttpServer.Handler[])routers.toArray(new HttpServer.Handler[routers.size()]);
@@ -520,13 +565,26 @@ public final class Backend {
                                 // answers for a path it does not route.
                                 return null;
                             }
-                        }, context);
+                        }, context, webSocketEndpoints == null ? null
+                                : new HttpServer.WebSocketRoutes() {
+                            public void register(HttpServer.WebSocketRegistry registry)
+                                    throws Exception {
+                                // The same two arguments a Handlers factory gets,
+                                // and for the same reason: an endpoint that needs
+                                // the database declares it rather than reaching
+                                // for a static.
+                                webSocketEndpoints.register(registry, pool, manager);
+                            }
+                        });
             } catch (Exception err) {
                 if(ownsContext) {
                     context.close();
                 }
                 throw err;
             }
+            // The websocket routes went in through start() above, before the
+            // listener began accepting -- registering them here instead left a
+            // window in which a valid upgrade was answered as ordinary HTTP.
             Backend backend = new Backend(server, pool, manager, config, drain);
             if(!quiet) {
                 announce(backend, listenPort, context != null);

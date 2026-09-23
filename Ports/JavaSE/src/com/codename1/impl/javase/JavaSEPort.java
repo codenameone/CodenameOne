@@ -247,6 +247,9 @@ public class JavaSEPort extends CodenameOneImplementation {
     private final java.util.Map<java.awt.Font, Boolean> desktopAliasFonts =
             new java.util.WeakHashMap<java.awt.Font, Boolean>();
     private Boolean darkMode;
+    /// True once the simulator's Dark/Light Mode menu exists; its "Unsupported" choice means
+    /// null on purpose there, so the OS is consulted only by a packaged desktop app.
+    private boolean simulatorAppearanceMenu;
     private AutoLocalizationBundle autoLocalizationBundle;
     private boolean autoUpdateDefaultResourceBundle;
     private float largerTextScale = 1.0f;
@@ -638,7 +641,115 @@ public class JavaSEPort extends CodenameOneImplementation {
 
     @Override
     public Boolean isDarkMode() {
+        if (darkMode == null && !simulatorAppearanceMenu && !isSimulator()) {
+            // A packaged desktop app has no Dark/Light menu to ask, so it asks the OS the
+            // way the native Windows, Linux and macOS ports do. Without this every $Dark
+            // style in a desktop native theme was unreachable outside the simulator.
+            return osDarkMode();
+        }
         return darkMode;
+    }
+
+    private static boolean osDarkModeResolved;
+    private static Boolean osDarkMode;
+
+    private static Boolean osDarkMode() {
+        if (!osDarkModeResolved) {
+            osDarkModeResolved = true;
+            try {
+                if (IS_MAC) {
+                    osDarkMode = parseMacAppearance(runAppearanceQuery("defaults", "read", "-g", "AppleInterfaceStyle"));
+                } else if (IS_LINUX) {
+                    osDarkMode = parseGnomeColorScheme(runAppearanceQuery("gsettings", "get",
+                            "org.gnome.desktop.interface", "color-scheme"));
+                } else if (File.separatorChar == '\\') {
+                    osDarkMode = parseWindowsAppsUseLightTheme(runAppearanceQuery("reg", "query",
+                            "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Themes\\Personalize",
+                            "/v", "AppsUseLightTheme"));
+                }
+            } catch (Throwable t) {
+                osDarkMode = null;
+            }
+        }
+        return osDarkMode;
+    }
+
+    /// Runs a short OS query and returns its standard output, or null when it failed or did
+    /// not finish in time. A missing key is a non-zero exit with no output, which the parsers
+    /// treat as the platform's default.
+    private static String runAppearanceQuery(String... command) throws IOException, InterruptedException {
+        ProcessBuilder pb = new ProcessBuilder(command);
+        pb.redirectErrorStream(true);
+        Process p = pb.start();
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        InputStream in = p.getInputStream();
+        try {
+            byte[] buf = new byte[512];
+            long deadline = System.currentTimeMillis() + 2000;
+            while (System.currentTimeMillis() < deadline) {
+                while (in.available() > 0) {
+                    int n = in.read(buf);
+                    if (n < 0) {
+                        break;
+                    }
+                    out.write(buf, 0, n);
+                }
+                try {
+                    p.exitValue();
+                    int n;
+                    while ((n = in.read(buf)) > 0) {
+                        out.write(buf, 0, n);
+                    }
+                    return new String(out.toByteArray(), "UTF-8");
+                } catch (IllegalThreadStateException running) {
+                    Thread.sleep(20);
+                }
+            }
+            p.destroy();
+            return null;
+        } finally {
+            in.close();
+        }
+    }
+
+    /// `defaults read -g AppleInterfaceStyle` prints "Dark" in dark mode; in light mode the
+    /// key does not exist and the command prints an error instead.
+    static Boolean parseMacAppearance(String output) {
+        if (output == null) {
+            return null;
+        }
+        return output.trim().equalsIgnoreCase("Dark") ? Boolean.TRUE : Boolean.FALSE;
+    }
+
+    /// `gsettings get org.gnome.desktop.interface color-scheme` prints 'default',
+    /// 'prefer-dark' or 'prefer-light'. Anything else (no GNOME schema) is unknown.
+    static Boolean parseGnomeColorScheme(String output) {
+        if (output == null) {
+            return null;
+        }
+        String v = output.trim();
+        if (v.indexOf("prefer-dark") >= 0) {
+            return Boolean.TRUE;
+        }
+        if (v.indexOf("prefer-light") >= 0 || v.indexOf("default") >= 0) {
+            return Boolean.FALSE;
+        }
+        return null;
+    }
+
+    /// `reg query ... /v AppsUseLightTheme` prints a REG_DWORD line ending in 0x0 (dark) or
+    /// 0x1 (light). An absent value means the Windows default, which is light.
+    static Boolean parseWindowsAppsUseLightTheme(String output) {
+        if (output == null) {
+            return null;
+        }
+        int idx = output.indexOf("REG_DWORD");
+        if (idx < 0) {
+            return Boolean.FALSE;
+        }
+        String v = output.substring(idx + "REG_DWORD".length()).trim();
+        return v.startsWith("0x0") && (v.length() == 3 || !Character.isLetterOrDigit(v.charAt(3)))
+                ? Boolean.TRUE : Boolean.FALSE;
     }
 
     
@@ -3048,8 +3159,32 @@ public class JavaSEPort extends CodenameOneImplementation {
     }
 
     static void setSimulatorDesktopNativeTheme(String platformName, boolean uwpDesktopSkin) {
-        setNativeTheme(uwpDesktopSkin ? "/winTheme.res"
-                : resolveDesktopNativeThemeResource(platformName, buildHint("desktop.themeMode"), "/iOS7Theme.res"));
+        String menuChoice = System.getProperty("cn1.forceSimulatorTheme",
+                Preferences.userNodeForPackage(JavaSEPort.class).get("simulatorNativeTheme", null));
+        String resource = uwpDesktopSkin ? "/winTheme.res"
+                : resolveSimulatorDesktopNativeTheme(platformName, menuChoice, buildHint("desktop.themeMode"));
+        setNativeTheme(resource);
+        currentSimulatorNativeTheme = resource == null ? null
+                : resource.substring(1, resource.length() - ".res".length());
+    }
+
+    /// The theme the Desktop pseudo-skin installs. The Native Theme menu is the same one a
+    /// phone skin uses, and it used to be read only by the phone path -- so picking "Windows
+    /// 11 Fluent" with Desktop.skin active restarted the simulator into exactly the theme it
+    /// already had. A named choice now wins here too. "auto" (and "embedded", which has no
+    /// skin to take a theme from on the desktop) defers to the project's desktop.themeMode
+    /// hint, the same resolution the packaged desktop app runs, with iOS 7 kept as the
+    /// fallback for a project that opted into nothing.
+    static String resolveSimulatorDesktopNativeTheme(String platformName, String menuChoice, String hintMode) {
+        if (menuChoice != null) {
+            menuChoice = menuChoice.trim();
+            if (menuChoice.length() > 0 && !"auto".equalsIgnoreCase(menuChoice)
+                    && !"embedded".equalsIgnoreCase(menuChoice)
+                    && JavaSEPort.class.getResource("/" + menuChoice + ".res") != null) {
+                return "/" + menuChoice + ".res";
+            }
+        }
+        return resolveDesktopNativeThemeResource(platformName, hintMode, "/iOS7Theme.res");
     }
 
     private static String resolveDesktopNativeThemeResource(String platformName, String mode, String legacyResource) {
@@ -8244,6 +8379,7 @@ public class JavaSEPort extends CodenameOneImplementation {
         darkModeGroup.add(lightModeItem);
         darkModeGroup.add(unsupportedModeItem);
 
+        simulatorAppearanceMenu = true;
         String savedDarkMode = pref.get("cn1.simulator.darkMode", "unsupported");
         if ("dark".equals(savedDarkMode)) {
             darkMode = Boolean.TRUE;

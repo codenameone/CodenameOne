@@ -429,6 +429,183 @@ The server half is off by default. Every existing project carries these
 interfaces for its client alone, and generating server classes into those builds
 would grow them for nothing.
 
+=== Real-time with WebSockets
+
+The server speaks RFC 6455, so a Codename One app can hold a live connection to a
+Codename One server with the same language on both ends. The client half is
+`com.codename1.io.WebSocket`, which every port has shipped for years; this is the
+other half of it.
+
+An endpoint implements `com.codename1.backend.WebSocket`:
+
+[source,java]
+----
+include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/WebSocketSnippets.java[tag=backend-websocket-echo,indent=0]
+----
+
+The build finds it, the way it finds a `@RestController`:
+
+[source,java]
+----
+include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/WebSocketSnippets.java[tag=backend-websocket-annotated,indent=0]
+----
+
+The annotation goes on the type rather than on a method, because a `@GetMapping`
+marks a call and a WebSocket is a connection: its contract is seven callbacks that
+share per-connection state, which is an object. What it keeps from `@GetMapping` is
+what a reader cares about -- the path is relative to a class-level
+`@RequestMapping`, a constructor taking a `DataSource` or an `EntityManager` is
+injected the same way, and two endpoints claiming one path is a build error rather
+than something registration order decides.
+
+==== A server that writes its own main
+
+The annotation is the answer for an ordinary project, and most servers need
+nothing else: the build finds the endpoint and the entry point it writes registers
+it. The builder below is the same narrow case as the one under
+<<Configuration and profiles>> -- a server that writes its own `main` instead of
+using the generated one -- and it names its endpoints the same way it names its
+handlers, through a callback the runtime invokes while it starts.
+
+[source,java]
+----
+include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/WebSocketSnippets.java[tag=backend-websocket-register,indent=0]
+----
+
+`run()` is what makes that a main: it binds, installs a shutdown handler that
+drains what's in flight, and blocks. `start()` exists for tests, which want the
+server back without a signal handler.
+
+There's no `server.websocket(path, endpoint)` to call once the server is running,
+and the absence is deliberate. Nothing else here is configured that way, and a
+setter on a running server has a window a callback can't: the listener is bound
+before the application gets its reference back, so an upgrade arriving in that gap
+finds a route that hasn't been added yet and is answered as ordinary HTTP.
+
+`HttpServer` takes the same callback, for the rare server built without the
+builder at all:
+
+[source,java]
+----
+include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/WebSocketSnippets.java[tag=backend-websocket-raw,indent=0]
+----
+
+Only `onOpen`, `onText` and `onBinary` have to be written. `onPing`, `onPong`,
+`onClose` and `onError` have empty defaults, and a PING is answered with its PONG
+before the endpoint is told, so an endpoint that ignores them still keeps its
+connections alive.
+
+==== One endpoint, many connections
+
+An endpoint is created once for the route, not once per client, which is the same
+shape a `@RestController` has. Everything belonging to one client lives on the
+`WebSocketSession` the callbacks are handed, and `setAttachment` is where an
+endpoint puts its own per-connection state.
+
+Messages arrive whole. A client that splits a two megabyte upload into thirty-two
+frames produces one `onBinary`, and a text message is validated as UTF-8 before it
+is decoded, so a handler never sees a replacement character standing in for bytes
+the client didn't send. The array passed to `onBinary` is the session's own
+reassembly buffer and is valid only until that call returns -- the same contract
+`HttpServer.Request` carries, and for the same reason. An endpoint that keeps the
+bytes copies the range it wants.
+
+==== Sending from somewhere else
+
+A callback runs on the thread that owns its connection, and the server reads
+nothing more from that connection until it returns. An endpoint may therefore
+block, and a slow one slows down its own client and nobody else's.
+
+Sending is the other way round: a session may be written to from any thread, which
+is what makes a broadcast possible.
+
+[source,java]
+----
+include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/WebSocketSnippets.java[tag=backend-websocket-broadcast,indent=0]
+----
+
+Each session serializes its own writers, so two threads can't interleave halves of
+two messages on one connection. What the server doesn't do is queue: `sendText`
+writes to the socket and blocks if the peer has stopped reading. That's honest
+back pressure rather than a buffer that grows until the machine runs out, but it
+means one unresponsive client can hold up a loop that broadcasts to every other
+one. A server with many clients and large messages should broadcast from a small
+pool rather than from the receiving thread.
+
+==== Subprotocols
+
+An endpoint that speaks more than one protocol lists them best first:
+
+[source,java]
+----
+include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/WebSocketSnippets.java[tag=backend-websocket-subprotocol,indent=0]
+----
+
+The server's order decides, not the client's, so a client can't select a
+deprecated protocol over a current one by listing it first. When nothing matches,
+the handshake still succeeds and names no protocol, which is what the standard
+describes; `getSubprotocol` then answers null.
+
+==== A connection, not a request
+
+A WebSocket is a connection that stopped being HTTP, and the difference is
+something an author can feel.
+
+Under virtual threads -- the default on the packaged runtime -- each connection
+owns one, and a parked virtual thread costs a stack rather than an operating system
+thread. Ten thousand mostly silent connections is the workload that model was built
+for.
+
+On the thread pool it's a worker per connection for as long as the connection
+lasts. That's the mode the local development loop always runs in, because the JVM
+has no virtual threads here, and it's also the mode any TLS server runs in. A
+pooled deployment serving many WebSockets has to size `workers` for them, because
+unlike a request they don't give the worker back.
+
+That makes `workers` the ceiling on concurrent connections in pool mode, and going
+past it fails in a way worth knowing about: the process stays healthy, the listener
+stays bound, and new connections are simply refused, because no worker ever comes
+back to accept them. An eight-worker server driven by the conformance suite
+reached case 9.4.4 and refused everything after it. The server says so now --
+it logs once when WebSockets hold half the pool -- and the two ways out are more
+workers or a shorter `CN1_WS_IDLE_TIMEOUT_MS`, so abandoned connections give their
+worker back sooner. On virtual threads none of this applies.
+
+The idle timeout is separate for the same reason. `CN1_HTTP_TIMEOUT_MS` sheds a
+client that began a request and stopped; a WebSocket is idle by design and would
+be shed within seconds by that rule. `CN1_WS_IDLE_TIMEOUT_MS` governs these
+instead, defaults to five minutes, and accepts 0 for connections that may stay
+silent indefinitely. `CN1_WS_MAX_MESSAGE_MB` bounds reassembly, because a message
+is as large as the peer chooses to make it.
+
+`getMetrics()` reports `webSocketConnections`, and an open session doesn't count
+towards `activeRequests` -- it's a connection, and counting it would make an idle
+server read as permanently saturated.
+
+`stop()` sends every open connection a 1001 "going away" close before the drain
+window, so a shutdown reads as one to the client rather than as a network failure.
+
+==== How the frame layer is checked
+
+Most of RFC 6455 is about frames a conformant client never sends, which is how a
+server ends up wrong in ways nothing it talks to will reveal. The
+https://github.com/crossbario/autobahn-testsuite[Autobahn|Testsuite] is what finds
+those, and `vm/backend/ws-conformance.sh` runs it:
+
+----
+vm/backend/ws-conformance.sh --arm javase     # or --arm native
+----
+
+It needs Docker or Podman, starts an echo server, and drives ~300 cases through
+it. The gate has no per-case tolerance: every case must pass, and `NON-STRICT`
+counts as a failure, because a lenient frame parser is the thing this is looking
+for. The set of cases that ran also has to match a committed manifest, so the
+suite can't shrink unnoticed to the ones that happen to pass.
+
+Sections 12 and 13 are excluded while permessage-deflate is unimplemented. They're
+excluded rather than tolerated: accepting their result as a pass would also accept
+it for a case that used to work.
+
 === What it costs
 
 Same handler, three ways, plus Go for an outside reference. Two pinned cores, 64
@@ -588,6 +765,13 @@ no TLS, and what it does need is exactly what a translated binary is good at.
   duration, so one idle TLS client per core would occupy every one of them. The
   server says so at startup when it makes that choice.
 * Native builds target Linux. Development happens anywhere a JVM runs.
+* WebSockets are RFC 6455 over HTTP/1.1. There is no permessage-deflate, so
+  messages go out uncompressed no matter how compressible, and no RFC 8441, so
+  a browser that reaches this server over HTTP/2 opens a second connection for its
+  WebSocket rather than carrying it on the first. Both are what every client
+  already falls back to. `wss` works on the packaged runtime through the same TLS
+  the rest of the server uses, and not in the local loop, which terminates no
+  TLS.
 
 The reasons to choose this are cold start, footprint, deployment shape, and one
 language across the app and its server. If none of those matter for the service in

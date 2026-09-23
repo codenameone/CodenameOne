@@ -24,6 +24,9 @@ on:
       - 'scripts/check-ios-sdk-deltas.py'
       - 'scripts/lib/xcode.sh'
       - 'scripts/run-ios-ui-tests.sh'
+      # The iOS legs boot their simulator through this helper and read its
+      # `udid` output, so a change to it alone must exercise them.
+      - 'scripts/ci/boot-ios-simulator.sh'
       - 'scripts/run-watch-ui-tests.sh'
       - 'scripts/run-tv-ui-tests.sh'
       - 'scripts/run-ios-native-tests.sh'
@@ -51,6 +54,19 @@ on:
       - '!docs/**'
       - 'maven/**'
       - '!maven/core-unittests/**'
+      # The screenshot transport is now a Codename One backend application, so the
+      # two files that are ONLY exercised here have to trigger this leg: the
+      # server itself and the script that launches it.
+      #
+      # Deliberately NOT the rest of vm/backend. The websocket protocol code is
+      # covered by maven/backend's unit tests, by vm/tests against the translated
+      # binary, and by the Autobahn conformance job -- all of which already
+      # trigger on vm/**. Fanning every backend change out to the macOS and
+      # emulator legs as well would buy nothing and cost a great deal: a change to
+      # the ORM, the database layer or the HTTP parser cannot reach this
+      # transport.
+      - 'vm/backend/demo/cn1ss/**'
+      - 'scripts/lib/cn1ss.sh'
   push:
     branches: [ master ]
     paths:
@@ -63,6 +79,9 @@ on:
       - 'scripts/check-ios-sdk-deltas.py'
       - 'scripts/lib/xcode.sh'
       - 'scripts/run-ios-ui-tests.sh'
+      # The iOS legs boot their simulator through this helper and read its
+      # `udid` output, so a change to it alone must exercise them.
+      - 'scripts/ci/boot-ios-simulator.sh'
       - 'scripts/run-watch-ui-tests.sh'
       - 'scripts/run-tv-ui-tests.sh'
       - 'scripts/run-ios-native-tests.sh'
@@ -90,6 +109,19 @@ on:
       - '!docs/**'
       - 'maven/**'
       - '!maven/core-unittests/**'
+      # The screenshot transport is now a Codename One backend application, so the
+      # two files that are ONLY exercised here have to trigger this leg: the
+      # server itself and the script that launches it.
+      #
+      # Deliberately NOT the rest of vm/backend. The websocket protocol code is
+      # covered by maven/backend's unit tests, by vm/tests against the translated
+      # binary, and by the Autobahn conformance job -- all of which already
+      # trigger on vm/**. Fanning every backend change out to the macOS and
+      # emulator legs as well would buy nothing and cost a great deal: a change to
+      # the ORM, the database layer or the HTTP parser cannot reach this
+      # transport.
+      - 'vm/backend/demo/cn1ss/**'
+      - 'scripts/lib/cn1ss.sh'
 
 jobs:
   build-port:
@@ -364,6 +396,51 @@ jobs:
           if-no-files-found: warn
           retention-days: 14
 
+      - name: The suite must have compared screenshots
+        # Runs in BOTH iOS Metal legs, and is the control that was missing.
+        #
+        # The screenshot step can be tolerated while a baseline set is being
+        # seeded -- there is nothing to compare against yet -- but "tolerated"
+        # kept turning into "produced nothing and said nothing". On the iOS 27
+        # leg that concealed three separate defects in a row: a warning census
+        # keyed to the wrong toolchain, a simulator destination that fell back to
+        # an iPad, and before those a reference directory that did not exist.
+        # Every one of them reported the job green with zero PNGs in the
+        # artifact, and each was only found by downloading that artifact by hand.
+        #
+        # A run that captures nothing is never a pass, whatever else is tolerated.
+        # Deliberately NOT expressed as a count against the reference directory:
+        # that guard exists inside run-ios-ui-tests.sh and is disabled by an empty
+        # reference set, which is exactly the situation a seeding run is in.
+        if: always()
+        env:
+          # Declared HERE rather than inherited: ARTIFACTS_DIR is set in the
+          # screenshot step's own env block, and step env does not reach other
+          # steps. Without this the check reads an empty path, finds nothing and
+          # fails a leg that captured a full set -- which is exactly what it did
+          # on its first run, the same scope mistake as the warning leg above.
+          ARTIFACTS_DIR: ${{ github.workspace }}/artifacts/ios-ui-tests-metal
+        #
+        # Counted from the COMPARISON REPORT, not from PNGs on disk. The runner
+        # keeps only the captures that failed comparison, so a run in which all
+        # 155 matched leaves zero PNGs behind -- indistinguishable, by file
+        # count, from a run that never started. That was this check's first
+        # version, and it failed the iOS 27 leg on the very run where every
+        # screenshot matched its baseline. The report exists only once the suite
+        # reached the screenshot stage, and lists every screenshot it compared.
+        run: |
+          set -euo pipefail
+          report="${ARTIFACTS_DIR}/screenshot-compare.json"
+          if [ ! -f "${report}" ]; then
+            echo "::error title=No screenshots::no comparison report at ${report}; the suite never reached the screenshot stage"
+            exit 1
+          fi
+          count=$(python3 -c 'import json,sys; print(len(json.load(open(sys.argv[1])).get("results") or []))' "${report}")
+          echo "screenshots compared: ${count}"
+          if [ "${count}" -eq 0 ]; then
+            echo "::error title=No screenshots::the suite compared 0 screenshots; the leg validated nothing"
+            exit 1
+          fi
       - name: Publish Metal screenshot summary
         # Surfaces run-ios-ui-tests.sh's comparison result in the job's
         # GitHub Actions summary page so the Metal port status is visible
@@ -462,13 +539,6 @@ jobs:
       # what makes the 27 baselines render the iOS 27 theme instead of scoring the
       # iOS 26 one against iOS 27 goldens.
       IOS_DEPENDENCY_ARGS: '-Dcodename1.arg.ios.themeGeneration=27'
-      # Its OWN warning ratchet. The census is per-TOOLCHAIN -- a new warning
-      # kind fails it -- and Xcode 27's clang does not emit the same set as
-      # Xcode 26's. Sharing ios-sim-debug's baseline, this job failed the census
-      # and stopped before running a single screenshot, while the tolerated step
-      # below reported the job green: a leg that produced nothing and said
-      # nothing. Baseline seeded from this job's own build log.
-      CN1_WARNING_LEG: ios-sim-debug-xcode27
       # Optional: when set, build-ios-app.sh writes it as a bundled resource so
       # the GoogleWebMap screenshot test renders a live Google map; absent (e.g.
       # fork PRs with no access to the secret) the test skips.
@@ -638,15 +708,27 @@ jobs:
             --project-dir "$(dirname "${{ steps.build-ios-app.outputs.workspace }}")"/*-src
         timeout-minutes: 20
 
+      - name: Boot an iPhone 16 on iOS 27
+        id: sim27
+        # run-ios-ui-tests.sh asks xcodebuild for a destination named "iPhone 16",
+        # and -showdestinations lists only simulators that ALREADY EXIST. This
+        # image pre-creates iPhone 17 / 17e / 18 Pro / 18 Pro Max / Air and no
+        # iPhone 16, so the suite logged "Simulator auto-selection did not return
+        # a destination" and captured on whatever fallback_sim_destination
+        # happened to return -- an iPad, on the run that exposed this. A baseline
+        # taken on an arbitrary device is one nobody can reason about, and it
+        # moves the day the image's device list changes.
+        #
+        # The device TYPE is available even though no instance is, so create one.
+        # Same model as the iOS 26 leg on purpose: the two sets then differ by
+        # runtime and theme, which is what they are for, rather than by hardware.
+        run: ./scripts/ci/boot-ios-simulator.sh 'iOS-27[0-9-]*' 'iPhone 16' iPhone16-metal27
       - name: Run iOS UI screenshot tests (Metal)
-        # SEEDING RUN: scripts/ios/screenshots-metal-27 has no images yet, and
-        # they can only come from a run on this image -- capturing them on a
-        # maintainer's machine would bake in that machine's toolchain. Tolerated
-        # on this step ALONE, so everything before it (Xcode selection, setup,
-        # build, simulator boot) still fails the job. Removed once the baselines
-        # are committed; scripts/ios/screenshots-metal-27/README.md has the steps.
-        continue-on-error: true
         env:
+          # The simulator created by the step above. Without it the suite asks
+          # xcodebuild for a destination named "iPhone 16", finds none on this
+          # image, and silently captures on a fallback device.
+          IOS_SIM_DESTINATION: 'platform=iOS Simulator,id=${{ steps.sim27.outputs.udid }}'
           ARTIFACTS_DIR: ${{ github.workspace }}/artifacts/ios-ui-tests-metal-27
           # Golden set for the iOS simulator. See
           # scripts/ios/screenshots-metal/README.md.
@@ -692,7 +774,7 @@ jobs:
           # codebase, which is why the tool exits 2 rather than passing when the
           # compile count falls short of the manifest.
           CN1_WARNING_CENSUS: '1'
-          CN1_WARNING_LEG: ios-sim-debug
+          CN1_WARNING_LEG: ios-sim-debug-xcode27
           # build-ios-app.sh stages the manifest under the default artifacts dir,
           # which is not the per-step one above.
           CN1_WARNING_MANIFEST: ${{ github.workspace }}/artifacts/cn1-source-manifest.txt
@@ -718,6 +800,51 @@ jobs:
       # would publish whichever leg finished last, the same clobber the comment
       # marker above already had to be split to avoid.
 
+      - name: The suite must have compared screenshots
+        # Runs in BOTH iOS Metal legs, and is the control that was missing.
+        #
+        # The screenshot step can be tolerated while a baseline set is being
+        # seeded -- there is nothing to compare against yet -- but "tolerated"
+        # kept turning into "produced nothing and said nothing". On the iOS 27
+        # leg that concealed three separate defects in a row: a warning census
+        # keyed to the wrong toolchain, a simulator destination that fell back to
+        # an iPad, and before those a reference directory that did not exist.
+        # Every one of them reported the job green with zero PNGs in the
+        # artifact, and each was only found by downloading that artifact by hand.
+        #
+        # A run that captures nothing is never a pass, whatever else is tolerated.
+        # Deliberately NOT expressed as a count against the reference directory:
+        # that guard exists inside run-ios-ui-tests.sh and is disabled by an empty
+        # reference set, which is exactly the situation a seeding run is in.
+        if: always()
+        env:
+          # Declared HERE rather than inherited: ARTIFACTS_DIR is set in the
+          # screenshot step's own env block, and step env does not reach other
+          # steps. Without this the check reads an empty path, finds nothing and
+          # fails a leg that captured a full set -- which is exactly what it did
+          # on its first run, the same scope mistake as the warning leg above.
+          ARTIFACTS_DIR: ${{ github.workspace }}/artifacts/ios-ui-tests-metal-27
+        #
+        # Counted from the COMPARISON REPORT, not from PNGs on disk. The runner
+        # keeps only the captures that failed comparison, so a run in which all
+        # 155 matched leaves zero PNGs behind -- indistinguishable, by file
+        # count, from a run that never started. That was this check's first
+        # version, and it failed the iOS 27 leg on the very run where every
+        # screenshot matched its baseline. The report exists only once the suite
+        # reached the screenshot stage, and lists every screenshot it compared.
+        run: |
+          set -euo pipefail
+          report="${ARTIFACTS_DIR}/screenshot-compare.json"
+          if [ ! -f "${report}" ]; then
+            echo "::error title=No screenshots::no comparison report at ${report}; the suite never reached the screenshot stage"
+            exit 1
+          fi
+          count=$(python3 -c 'import json,sys; print(len(json.load(open(sys.argv[1])).get("results") or []))' "${report}")
+          echo "screenshots compared: ${count}"
+          if [ "${count}" -eq 0 ]; then
+            echo "::error title=No screenshots::the suite compared 0 screenshots; the leg validated nothing"
+            exit 1
+          fi
       - name: Publish Metal screenshot summary
         # Surfaces run-ios-ui-tests.sh's comparison result in the job's
         # GitHub Actions summary page so the Metal port status is visible

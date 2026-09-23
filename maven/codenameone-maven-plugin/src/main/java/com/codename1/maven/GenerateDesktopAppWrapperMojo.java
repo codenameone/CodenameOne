@@ -26,6 +26,7 @@ import org.apache.commons.io.IOUtils;
 import org.apache.maven.plugin.MojoExecutionException;
 import org.apache.maven.plugin.MojoFailureException;
 import org.apache.maven.plugins.annotations.Mojo;
+import org.apache.maven.plugins.annotations.ResolutionScope;
 
 import javax.imageio.ImageIO;
 import java.awt.*;
@@ -58,16 +59,42 @@ import static com.codename1.maven.PathUtil.path;
  * override - useful when an app needs custom Swing setup that's outside what
  * the build-hint surface covers.
  */
-@Mojo(name="generate-desktop-app-wrapper")
+// COMPILE resolution, because the build hints declared as annotations on the main class
+// are read off the compile classpath: the application's common module, compiled and
+// annotation-processed before this platform module generates its sources.
+@Mojo(name="generate-desktop-app-wrapper", requiresDependencyResolution = ResolutionScope.COMPILE)
 public class GenerateDesktopAppWrapperMojo extends AbstractCN1Mojo {
     private static final String GENERATED_SOURCES_DIR = "cn1-desktop";
 
     @Override
     protected void executeImpl() throws MojoExecutionException, MojoFailureException {
+        applyAnnotationBuildHints();
         generateIcons();
         generateThemeConfiguration();
         generateStub();
         registerCustomStubSourceRoot();
+    }
+
+    /// Overlays the hints declared as annotations (`@DesktopBuild(themeMode = ...)`,
+    /// `@Build(nativeTheme = ...)`) onto the settings every value below is read from.
+    ///
+    /// The device builds and `cn1:run` have always applied them; this is the packaged
+    /// desktop app's only chance to, because the app carries no settings file of its
+    /// own -- whatever this goal bakes into the stub and codenameone-desktop.properties
+    /// is all it ever reads. Without it every annotated desktop hint was silently
+    /// dropped from a packaged app while the same project previewed correctly in the
+    /// simulator. The merge is the device build's, so the precedence is too: -D over
+    /// the annotation, and an annotation declared again in the properties file fails.
+    void applyAnnotationBuildHints() throws MojoFailureException {
+        if (properties == null || project == null) {
+            return;
+        }
+        try {
+            mergeAnnotationBuildHints(properties, project.getCompileClasspathElements());
+        } catch (org.apache.maven.artifact.DependencyResolutionRequiredException ex) {
+            throw new MojoFailureException("Cannot read the build hints declared as annotations: "
+                    + ex.getMessage(), ex);
+        }
     }
 
     // Written even when a custom/archetype stub suppresses source generation. Packaged apps

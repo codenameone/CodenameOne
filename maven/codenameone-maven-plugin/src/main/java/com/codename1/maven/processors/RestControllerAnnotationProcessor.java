@@ -80,6 +80,8 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
     private static final String REQUEST_HEADER = PKG + "RequestHeader;";
     private static final String REQUEST_BODY = PKG + "RequestBody;";
     private static final String RESPONSE_STATUS = PKG + "ResponseStatus;";
+    private static final String WEBSOCKET_MAPPING = PKG + "WebSocketMapping;";
+    private static final String WEBSOCKET_INTERFACE = "com/codename1/backend/WebSocket";
 
     /** Mapping annotation to the HTTP method it stands for. */
     private static final Map<String, String> MAPPINGS;
@@ -146,6 +148,21 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
     public static final String MAIN_CLASS_RESOURCE = "META-INF/cn1-backend-main";
 
     private final TreeMap<String, Controller> controllers = new TreeMap<String, Controller>();
+    /**
+     * Path to the source name of the endpoint serving it, sorted so the generated
+     * entry point is byte-identical across builds.
+     */
+    private final TreeMap<String, WebSocketEndpoint> webSockets =
+            new TreeMap<String, WebSocketEndpoint>();
+
+    /** One @WebSocketMapping class. */
+    private static final class WebSocketEndpoint {
+        String binaryName;
+        String sourceName;
+        String packageName;
+        String injection;
+        String path;
+    }
 
     /**
      * Every route shape seen so far, across every controller, to the method that
@@ -211,11 +228,20 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
 
     @Override
     public Set<String> getAnnotationDescriptors() {
-        return Collections.singleton(CONTROLLER);
+        Set<String> out = new java.util.LinkedHashSet<String>();
+        out.add(CONTROLLER);
+        out.add(WEBSOCKET_MAPPING);
+        return out;
     }
 
     @Override
     public void processClass(AnnotatedClass cls, ProcessorContext ctx) throws ProcessingException {
+        if (cls.getClassAnnotation(WEBSOCKET_MAPPING) != null) {
+            processWebSocket(cls, ctx);
+            // Falls through on purpose: nothing stops one class being both a
+            // controller and a websocket endpoint, and refusing that would be an
+            // arbitrary rule rather than a real constraint.
+        }
         if (cls.getClassAnnotation(CONTROLLER) == null) {
             return;
         }
@@ -1059,6 +1085,118 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
         return false;
     }
 
+
+    /**
+     * Records one `@WebSocketMapping`, refusing everything the generated entry
+     * point could not honour.
+     *
+     * Every refusal here is a build error rather than a start-up one, and that is
+     * the point: an endpoint that does not implement WebSocket, or a path two
+     * endpoints both claim, produces a server that starts and then serves the
+     * wrong thing -- or nothing -- at a path the author believes is covered.
+     */
+    private void processWebSocket(AnnotatedClass cls, ProcessorContext ctx) {
+        // Same stale-class guard the controller path uses: Maven leaves the old
+        // .class behind when a source file is deleted without a clean, and an
+        // endpoint that no longer exists would go on being registered.
+        if (!BuildHintAnnotationProcessor.hasBackingSource(cls, ctx.getCompileSourceRoots(),
+                ctx.getSourceEncoding())) {
+            return;
+        }
+        if (cls.isInterface() || cls.isAbstract()) {
+            ctx.error(cls, "@WebSocketMapping must be a concrete class: " + cls.getBinaryName());
+            return;
+        }
+        // THE WHOLE HIERARCHY, not just the interfaces declared here. An endpoint
+        // that extends a base class implementing WebSocket, or implements a
+        // subinterface of it, is assignable to WebSocket and the registration this
+        // generates would be valid -- but a direct-interface check calls it a
+        // build error. The same walk implementsWritable already does.
+        if (!implementsWebSocket(ctx, cls, new LinkedHashSet<String>())) {
+            ctx.error(cls, "@WebSocketMapping must implement com.codename1.backend.WebSocket: "
+                    + cls.getBinaryName());
+            return;
+        }
+        List<String> paths = pathsOf(cls.getClassAnnotation(WEBSOCKET_MAPPING));
+        List<String> bases = pathsOf(cls.getClassAnnotation(REQUEST_MAPPING));
+        if (bases.isEmpty()) {
+            bases.add("");
+        }
+        if (paths.isEmpty()) {
+            paths.add("");
+        }
+        for (String base : bases) {
+            for (String path : paths) {
+                String full = joinPaths(base, path);
+                if (full.length() == 0 || full.charAt(0) != '/') {
+                    ctx.error(cls, "@WebSocketMapping path must start with '/': "
+                            + cls.getBinaryName() + " -> \"" + full + "\"");
+                    return;
+                }
+                if (full.indexOf('?') >= 0) {
+                    // tryUpgrade strips the query before it looks a path up, so a
+                    // mapping with one in it goes into the route map under a key
+                    // nothing can ever match: the application builds, starts, and
+                    // the endpoint is simply unreachable. Refusing at build time
+                    // is the only place this is visible.
+                    ctx.error(cls, "@WebSocketMapping path must not carry a query string, "
+                            + "because routing matches the path alone: "
+                            + cls.getBinaryName() + " -> \"" + full + "\"");
+                    return;
+                }
+                WebSocketEndpoint existing = webSockets.get(full);
+                if (existing != null && !existing.binaryName.equals(cls.getBinaryName())) {
+                    ctx.error(cls, "two websocket endpoints claim " + full + ": "
+                            + existing.binaryName + " and " + cls.getBinaryName());
+                    return;
+                }
+                WebSocketEndpoint endpoint = new WebSocketEndpoint();
+                endpoint.binaryName = cls.getBinaryName();
+                endpoint.sourceName = cls.getSourceName();
+                endpoint.packageName =
+                        RestClientAnnotationProcessor.packageOf(endpoint.binaryName);
+                endpoint.injection = injectionOf(cls);
+                endpoint.path = full;
+                webSockets.put(full, endpoint);
+            }
+        }
+    }
+
+    /** Depth-first over superclasses and interfaces, each visited once. */
+    private static boolean implementsWebSocket(ProcessorContext ctx, AnnotatedClass cls,
+            Set<String> seen) {
+        if (cls == null) {
+            return false;
+        }
+        for (String itf : cls.getInterfaceInternalNames()) {
+            if (WEBSOCKET_INTERFACE.equals(itf)) {
+                return true;
+            }
+            if (seen.add(itf) && implementsWebSocket(ctx, resolve(ctx, itf), seen)) {
+                return true;
+            }
+        }
+        String parent = cls.getSuperInternalName();
+        if (parent == null || "java/lang/Object".equals(parent) || !seen.add(parent)) {
+            return false;
+        }
+        return implementsWebSocket(ctx, resolve(ctx, parent), seen);
+    }
+
+    /** "/api" + "/chat" -> "/api/chat", with exactly one separator. */
+    private static String joinPaths(String base, String path) {
+        String left = base == null ? "" : base;
+        String right = path == null ? "" : path;
+        if (left.endsWith("/")) {
+            left = left.substring(0, left.length() - 1);
+        }
+        if (right.length() > 0 && right.charAt(0) != '/') {
+            right = "/" + right;
+        }
+        String joined = left + right;
+        return joined.length() == 0 ? "/" : joined;
+    }
+
     private static List<String> pathsOf(AnnotationValues values) {
         List<String> out = new ArrayList<String>();
         if (values == null) {
@@ -1108,7 +1246,11 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
         if (ctx.hasErrors()) {
             return;
         }
-        if (controllers.isEmpty()) {
+        // A module with only websocket endpoints is a real server and needs an
+        // entry point exactly as much as one with only controllers does. Guarding
+        // on controllers alone left it with no main at all -- and the failure is
+        // that the build succeeds and produces nothing runnable.
+        if (controllers.isEmpty() && webSockets.isEmpty()) {
             // NOTHING LEFT, so a marker from an earlier build has to go. Maven
             // keeps target/classes across a build without clean, and returning
             // early without this left the marker naming a bootstrap that still
@@ -1143,8 +1285,13 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
             }
             sources.put(router, generateRouter(c));
         }
-        Controller first = controllers.values().iterator().next();
-        String bootstrap = qualify(first.packageName, "BackendApplication");
+        // WHERE THE ENTRY POINT GOES. The first controller's package, as before --
+        // but a module may now have websocket endpoints and no controller at all,
+        // and this used to be an unguarded iterator().next() on an empty map.
+        String entryPackage = controllers.isEmpty()
+                ? webSockets.values().iterator().next().packageName
+                : controllers.values().iterator().next().packageName;
+        String bootstrap = qualify(entryPackage, "BackendApplication");
         // A class of this name already in that package would be OVERWRITTEN in the
         // output directory by the one compiled below -- silently, because the
         // generated source compiles perfectly well. The packaged application then
@@ -1152,13 +1299,13 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
         // startup it did: TLS, middleware, pooling. Refusing is the only safe
         // answer, since there is no way to tell which one they meant.
         if (isNotOurOwnOutput(ctx, bootstrap)) {
-            ctx.error(first.packageName + ".BackendApplication already "
+            ctx.error(entryPackage + ".BackendApplication already "
                     + "exists, and the generated entry point would replace it. Rename "
                     + "that class, or move the controllers into another package.");
             return;
         }
         daos = hasGeneratedDaos(ctx);
-        sources.put(bootstrap, generateBootstrap(first.packageName));
+        sources.put(bootstrap, generateBootstrap(entryPackage));
         try {
             List<File> cp = new ArrayList<File>();
             cp.add(ctx.getOutputClassDir());
@@ -2354,13 +2501,37 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
         // left here is the part that differs between one server and the next:
         // which controllers there are and what each of them is given.
         sb.append("        com.codename1.backend.Backend.builder()\n");
-        if (needsDatabase()) {
+        if (needsDatabase() || needsDatabaseForWebSockets()) {
             // A controller that declares a DataSource or an EntityManager needs
             // a database, and this is where the build says so: the builder opens
             // one for a server that has no entities either, which is how a
             // development profile's in-memory default reaches a controller that
             // asked only for the pool.
             sb.append("                .requiresDataSource()\n");
+        }
+        // A CALLBACK, like .handlers below, not a setter on a started server. The
+        // runtime invokes this while it is starting and before the listener
+        // accepts, so there is no window in which a generated route exists here
+        // and not in the server.
+        //
+        // Sorted by path (webSockets is a TreeMap), which keeps the generated
+        // source byte-identical between builds -- a bootstrap whose text depends
+        // on scan order recompiles for no reason and diffs noisily.
+        if (!webSockets.isEmpty()) {
+            sb.append("                .webSockets(new com.codename1.backend.Backend.WebSocketEndpoints() {\n");
+            sb.append("            public void register(\n");
+            sb.append("                    com.codename1.backend.HttpServer.WebSocketRegistry registry,\n");
+            sb.append("                    com.codename1.backend.DataSource dataSource,\n");
+            sb.append("                    com.codename1.backend.orm.EntityManager entities)\n");
+            sb.append("                    throws Exception {\n");
+            for (WebSocketEndpoint endpoint : webSockets.values()) {
+                sb.append("                registry.route(\"").append(endpoint.path)
+                  .append("\", new ").append(endpoint.sourceName).append("(")
+                  .append(argumentForInjection(endpoint.injection, endpoint.binaryName))
+                  .append("));\n");
+            }
+            sb.append("            }\n");
+            sb.append("        })\n");
         }
         sb.append("                .handlers(new com.codename1.backend.Backend.Handlers() {\n");
         sb.append("            public com.codename1.backend.HttpServer.Handler[] create(\n");
@@ -2400,15 +2571,31 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
     /// healthy and fails on the first request that touches it. The check names
     /// the controller, and it runs before the server binds.
     private static String argumentFor(Controller c) {
-        if ("ENTITIES".equals(c.injection)) {
+        return argumentForInjection(c.injection, c.binaryName);
+    }
+
+    /// The same rule for a websocket endpoint, which declares a dependency the
+    /// same way a controller does.
+    private static String argumentForInjection(String injection, String binaryName) {
+        if ("ENTITIES".equals(injection)) {
             return "com.codename1.backend.Backend.requireEntities(entities, \""
-                    + c.binaryName + "\")";
+                    + binaryName + "\")";
         }
-        if ("DATASOURCE".equals(c.injection)) {
+        if ("DATASOURCE".equals(injection)) {
             return "com.codename1.backend.Backend.requireDataSource(dataSource, \""
-                    + c.binaryName + "\")";
+                    + binaryName + "\")";
         }
         return "";
+    }
+
+    /// Whether any websocket endpoint declared a constructor that needs one.
+    private boolean needsDatabaseForWebSockets() {
+        for (WebSocketEndpoint endpoint : webSockets.values()) {
+            if ("ENTITIES".equals(endpoint.injection) || "DATASOURCE".equals(endpoint.injection)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /// Whether this module has server-side daos for the entry point to register.

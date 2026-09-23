@@ -84,7 +84,7 @@ import com.codename1.annotations.buildhints.*;
 
 @Android(themeMode = ThemeMode.MODERN)
 @Build(nativeTheme = ThemeMode.MODERN)
-@DesktopBuild(height = 820, interactiveScrollbars = Toggle.ON, titleBar = DesktopTitleBar.NATIVE, width = 1260)
+@DesktopBuild(height = 820, interactiveScrollbars = Toggle.ON, themeMode = "native", titleBar = DesktopTitleBar.NATIVE, width = 1260)
 @Ios(themeMode = ThemeMode.MODERN)
 public class CodenameOneSettings extends Lifecycle {
     public enum Section { BASIC, BUILD_HINTS, EXTENSIONS, ADVANCED }
@@ -215,7 +215,7 @@ public class CodenameOneSettings extends Lifecycle {
                 super.pinchReleased(x, y);
             }
         };
-        form.setUIID(uiid("SettingsForm"));
+        form.setUIID("SettingsForm");
         form.getTextSelection().setEnabled(true);
         installMenuCommands();
         buildShell();
@@ -270,7 +270,7 @@ public class CodenameOneSettings extends Lifecycle {
         renderPage();
         pageViewport = new Container(fillsViewport ? new BorderLayout() : BoxLayout.y());
         pageViewport.setScrollableY(!fillsViewport);
-        pageViewport.setUIID(uiid("SettingsPage"));
+        pageViewport.setUIID("SettingsPage");
         TableLayout contentLayout = new TableLayout(1, 2);
         Container pageRow = new Container(contentLayout);
         // Hints take the full width for the same reason Extensions does: a form
@@ -302,7 +302,7 @@ public class CodenameOneSettings extends Lifecycle {
     }
 
     private Button toolbarIcon(char icon) {
-        Button b = new Button("", uiid("SettingsToolbarButton"));
+        Button b = new Button("", "SettingsToolbarButton");
         b.setMaterialIcon(icon, 3.8f);
         return b;
     }
@@ -328,23 +328,23 @@ public class CodenameOneSettings extends Lifecycle {
     private Container configureToolbar() {
         Container tb = new Container();
         tb.setLayout(new BorderLayout());
-        tb.setUIID(uiid("SettingsChrome"));
+        tb.setUIID("SettingsChrome");
 
         Container left = new Container(BoxLayout.x());
-        Button brand = new Button("Settings", uiid("SettingsToolbarBrand"));
+        Button brand = new Button("Settings", "SettingsToolbarBrand");
         brand.setMaterialIcon(FontImage.MATERIAL_SETTINGS, 3.8f);
         left.add(brand);
         String appName = toolbarAppName();
         if (appName.length() > 0) {
-            Label appNameLabel = new Label(appName, uiid("SettingsAppName"));
+            Label appNameLabel = new Label(appName, "SettingsAppName");
             left.add(appNameLabel);
         }
 
         Container path = new Container(new BorderLayout());
-        path.setUIID(uiid("SettingsPathChip"));
-        Label pathText = new Label(toolbarPathText(), uiid("SettingsPathText"));
+        path.setUIID("SettingsPathChip");
+        Label pathText = new Label(toolbarPathText(), "SettingsPathText");
         pathText.setEndsWith3Points(true);
-        Label pathIcon = new Label("", uiid("SettingsPathIcon"));
+        Label pathIcon = new Label("", "SettingsPathIcon");
         pathIcon.setMaterialIcon(FontImage.MATERIAL_FOLDER_OPEN, 3.2f);
         path.add(BorderLayout.WEST, pathIcon);
         path.add(BorderLayout.CENTER, pathText);
@@ -352,7 +352,7 @@ public class CodenameOneSettings extends Lifecycle {
         Container right = new Container(BoxLayout.x());
         Button open = toolbarIcon(FontImage.MATERIAL_FOLDER_OPEN);
         open.addActionListener(e -> openProjectFolder());
-        Button save = new Button("Save", uiid("SettingsSave"));
+        Button save = new Button("Save", "SettingsSave");
         save.setMaterialIcon(FontImage.MATERIAL_SAVE, 3.2f);
         save.addActionListener(e -> saveSettings());
         Button theme = toolbarIcon(darkMode ? FontImage.MATERIAL_BRIGHTNESS_5 : FontImage.MATERIAL_BRIGHTNESS_3);
@@ -385,7 +385,7 @@ public class CodenameOneSettings extends Lifecycle {
         d.setDisposeWhenPointerOutOfBounds(true);
         d.setAnimateShow(true);
         Container menu = new Container(BoxLayout.y());
-        menu.setUIID(uiid("SettingsPopupMenu"));
+        menu.setUIID("SettingsPopupMenu");
         popupAction(menu, "Update", FontImage.MATERIAL_REFRESH, () -> {
             d.dispose();
             extensionCatalog = null;
@@ -409,8 +409,8 @@ public class CodenameOneSettings extends Lifecycle {
             Display.getInstance().exitApplication();
         });
         d.add(BorderLayout.CENTER, menu);
-        d.setUIID(uiid("SettingsPopupMenu"));
-        d.getContentPane().setUIID(uiid("SettingsPopupMenu"));
+        d.setUIID("SettingsPopupMenu");
+        d.getContentPane().setUIID("SettingsPopupMenu");
         int right = CN.convertToPixels(2f);
         int top = anchor.getAbsoluteY() + anchor.getHeight() - CN.convertToPixels(0.5f);
         int menuWidth = Display.getInstance().getDisplayWidth() * 18 / 100;
@@ -426,18 +426,18 @@ public class CodenameOneSettings extends Lifecycle {
     private void showAboutDialog() {
         Dialog d = new Dialog("About Codename One Settings", new BorderLayout());
         Container content = new Container(BoxLayout.y());
-        content.setUIID(uiid("SettingsDialogContent"));
-        content.add(new Label("Codename One Settings", uiid("SettingsCardTitle")));
-        content.add(new Label("Version " + appVersion(), uiid("SettingsRowMeta")));
-        content.add(new Label("Java " + prop("java.version", "unknown"), uiid("SettingsRowMeta")));
-        content.add(new Label(prop("java.vm.name", "JVM"), uiid("SettingsRowMeta")));
-        content.add(new Label(prop("os.name", "OS") + " " + prop("os.version", ""), uiid("SettingsRowMeta")));
+        content.setUIID("SettingsDialogContent");
+        content.add(new Label("Codename One Settings", "SettingsCardTitle"));
+        content.add(new Label("Version " + appVersion(), "SettingsRowMeta"));
+        content.add(new Label("Java " + prop("java.version", "unknown"), "SettingsRowMeta"));
+        content.add(new Label(prop("java.vm.name", "JVM"), "SettingsRowMeta"));
+        content.add(new Label(prop("os.name", "OS") + " " + prop("os.version", ""), "SettingsRowMeta"));
         if (binding != null && binding.projectDir() != null) {
-            Label project = new Label(binding.projectDir(), uiid("SettingsRowMeta"));
+            Label project = new Label(binding.projectDir(), "SettingsRowMeta");
             project.setEndsWith3Points(true);
             content.add(project);
         }
-        Button close = new Button("Close", uiid("SettingsPrimary"));
+        Button close = new Button("Close", "SettingsPrimary");
         close.addActionListener(e -> d.dispose());
         content.add(FlowLayout.encloseRight(close));
         d.add(BorderLayout.CENTER, content);
@@ -455,10 +455,10 @@ public class CodenameOneSettings extends Lifecycle {
 
     private void popupAction(Container menu, String text, char icon, Runnable action) {
         Container row = new Container(new BorderLayout());
-        row.setUIID(uiid("SettingsPopupItem"));
-        Button b = new Button(text, uiid("SettingsPopupLabel"));
+        row.setUIID("SettingsPopupItem");
+        Button b = new Button(text, "SettingsPopupLabel");
         b.addActionListener(e -> action.run());
-        Label iconLabel = new Label("", uiid("SettingsPopupIcon"));
+        Label iconLabel = new Label("", "SettingsPopupIcon");
         iconLabel.setMaterialIcon(icon, 2.8f);
         row.add(BorderLayout.CENTER, b);
         row.add(BorderLayout.EAST, iconLabel);
@@ -468,9 +468,9 @@ public class CodenameOneSettings extends Lifecycle {
 
     private void popupToggle(Container menu, String text, boolean on, Runnable action) {
         Container row = new Container(new BorderLayout());
-        row.setUIID(uiid("SettingsPopupItem"));
-        Label label = new Label(text, uiid("SettingsPopupToggleLabel"));
-        Switch sw = new Switch(uiid("SettingsSwitch"));
+        row.setUIID("SettingsPopupItem");
+        Label label = new Label(text, "SettingsPopupToggleLabel");
+        Switch sw = new Switch();
         sw.setValue(on);
         sw.addActionListener(e -> action.run());
         row.add(BorderLayout.CENTER, label).add(BorderLayout.EAST, sw);
@@ -485,7 +485,7 @@ public class CodenameOneSettings extends Lifecycle {
 
     private Container rail() {
         Container side = new Container(BoxLayout.y());
-        side.setUIID(uiid("SettingsRail"));
+        side.setUIID("SettingsRail");
         nav(side, Section.BASIC, FontImage.MATERIAL_TUNE, "Basic");
         nav(side, Section.BUILD_HINTS, FontImage.MATERIAL_TUNE, "Hints");
         nav(side, Section.EXTENSIONS, FontImage.MATERIAL_EXTENSION, "Ext");
@@ -493,7 +493,7 @@ public class CodenameOneSettings extends Lifecycle {
     }
 
     private void nav(Container side, Section target, char icon, String text) {
-        Button item = new Button(text, uiid(section == target ? "SettingsRailItemSelected" : "SettingsRailItem"));
+        Button item = new Button(text, section == target ? "SettingsRailItemSelected" : "SettingsRailItem");
         item.setTextPosition(Component.BOTTOM);
         item.setMaterialIcon(icon, 3.8f);
         item.addActionListener(e -> go(target));
@@ -522,7 +522,7 @@ public class CodenameOneSettings extends Lifecycle {
         // height -- adding the watch main, the standalone switch and the TV main to a four-row
         // grid left the last row compressed or clipped.
         Container grid = new Container(new GridLayout(5, 2));
-        grid.setUIID(uiid("SettingsFieldGrid"));
+        grid.setUIID("SettingsFieldGrid");
         grid.add(textFieldGroup("Title", "codename1.displayName", false));
         grid.add(textFieldGroup("Description", "codename1.description", false));
         grid.add(textFieldGroup("Version", "codename1.version", false));
@@ -544,10 +544,10 @@ public class CodenameOneSettings extends Lifecycle {
         page.add(grid);
         page.add(iconDrop());
         page.add(divider());
-        Label premiumTitle = new Label("PREMIUM FEATURES", uiid("SettingsSectionTag"));
+        Label premiumTitle = new Label("PREMIUM FEATURES", "SettingsSectionTag");
         page.add(premiumTitle);
         Container premium = new Container(new GridLayout(1, 2));
-        premium.setUIID(uiid("SettingsFieldGrid"));
+        premium.setUIID("SettingsFieldGrid");
         premium.add(versionedBuildField());
         premium.add(includeSourceField());
         page.add(premium);
@@ -555,12 +555,12 @@ public class CodenameOneSettings extends Lifecycle {
 
     private Component versionedBuildField() {
         Container fieldGroup = new Container(BoxLayout.y());
-        fieldGroup.setUIID(uiid("SettingsFieldGroup"));
-        Label fieldLabel = new Label("Versioned Build", uiid("SettingsFieldLabel"));
+        fieldGroup.setUIID("SettingsFieldGroup");
+        Label fieldLabel = new Label("Versioned Build", "SettingsFieldLabel");
         Picker version = new Picker();
         version.setType(Display.PICKER_TYPE_STRINGS);
         version.setStrings(versionChoices());
-        version.setUIID(uiid("SettingsField"));
+        version.setUIID("SettingsField");
         String current = settings.getBuildHint("build.version");
         version.setSelectedString(current == null || current.length() == 0 ? "none" : current);
         version.addActionListener(e -> {
@@ -581,13 +581,13 @@ public class CodenameOneSettings extends Lifecycle {
 
     private Component includeSourceField() {
         Container fieldGroup = new Container(BoxLayout.y());
-        fieldGroup.setUIID(uiid("SettingsFieldGroup"));
-        Label fieldLabel = new Label("Include Source", uiid("SettingsFieldLabel"));
+        fieldGroup.setUIID("SettingsFieldGroup");
+        Label fieldLabel = new Label("Include Source", "SettingsFieldLabel");
         Container row = new Container(new BorderLayout());
-        row.setUIID(uiid("SettingsToggleRow"));
-        Label label = new Label("Bundle project source", uiid("SettingsRowMeta"));
+        row.setUIID("SettingsToggleRow");
+        Label label = new Label("Bundle project source", "SettingsRowMeta");
         row.add(BorderLayout.CENTER, label);
-        Switch includeSource = new Switch(uiid("SettingsSwitch"));
+        Switch includeSource = new Switch();
         includeSource.setValue("1".equals(settings.getBuildHint("build.incSources")));
         includeSource.addActionListener(e -> {
             if (includeSource.isValue()) {
@@ -610,27 +610,27 @@ public class CodenameOneSettings extends Lifecycle {
         // labelled "Search build hints" under a heading that says "Build Hints"
         // was explaining itself twice anyway.
         Container filter = new Container(new BorderLayout());
-        filter.setUIID(uiid("SettingsFilterRow"));
-        filter.add(BorderLayout.WEST, new Label("Build Hints", uiid("SettingsPageTitle")));
+        filter.setUIID("SettingsFilterRow");
+        filter.add(BorderLayout.WEST, new Label("Build Hints", "SettingsPageTitle"));
         TextField search = new TextField(hintFilter, "Search build hints");
-        search.setUIID(uiid("SettingsField"));
+        search.setUIID("SettingsField");
         search.addDataChangedListener((type, index) -> {
             hintFilter = search.getText() == null ? "" : search.getText();
             renderBuildHintsList();
         });
         Container searchCell = BorderLayout.center(search);
-        searchCell.setUIID(uiid("SettingsHintSearchCell"));
+        searchCell.setUIID("SettingsHintSearchCell");
         filter.add(BorderLayout.CENTER, searchCell);
-        hintCount = new Label("", uiid("SettingsRowMeta"));
+        hintCount = new Label("", "SettingsRowMeta");
         Container countCell = BorderLayout.center(hintCount);
-        countCell.setUIID(uiid("SettingsHintSearchCell"));
+        countCell.setUIID("SettingsHintSearchCell");
         filter.add(BorderLayout.EAST, countCell);
         header.add(filter);
         header.add(customHintRow());
         page.add(BorderLayout.NORTH, header);
         hintList = new HintList();
         hintList.setName("buildHintsList");
-        hintList.setUIID(uiid("SettingsList"));
+        hintList.setUIID("SettingsList");
         page.add(BorderLayout.CENTER, hintList);
         renderBuildHintsList();
     }
@@ -638,16 +638,16 @@ public class CodenameOneSettings extends Lifecycle {
     private Component customHintRow() {
         TableLayout layout = new TableLayout(1, 3);
         Container row = new Container(layout);
-        row.setUIID(uiid("SettingsRow"));
+        row.setUIID("SettingsRow");
         TextField key = new TextField("", "custom.hint.name");
-        key.setUIID(uiid("SettingsField"));
+        key.setUIID("SettingsField");
         TextField value = new TextField("", "value");
-        value.setUIID(uiid("SettingsField"));
+        value.setUIID("SettingsField");
         Container keyCell = BorderLayout.center(key);
-        keyCell.setUIID(uiid("SettingsHintKeyCell"));
+        keyCell.setUIID("SettingsHintKeyCell");
         Container valueCell = BorderLayout.center(value);
-        valueCell.setUIID(uiid("SettingsHintValueCell"));
-        Button add = new Button("Add", uiid("SettingsOutline"));
+        valueCell.setUIID("SettingsHintValueCell");
+        Button add = new Button("Add", "SettingsOutline");
         add.addActionListener(e -> {
             String k = key.getText() == null ? "" : key.getText().trim();
             if (k.startsWith(SettingsProperties.BUILD_HINT_PREFIX)) {
@@ -805,7 +805,7 @@ public class CodenameOneSettings extends Lifecycle {
 
     private Component hintRow(BuildHintMetadata meta) {
         Container row = new Container(BoxLayout.y());
-        row.setUIID(uiid("SettingsRow"));
+        row.setUIID("SettingsRow");
         // Look the hint up by its canonical name: a deprecated alias configures the
         // same effective setting, so cn1.androidTheme is owned whenever an
         // annotation owns and.themeMode. Matching on the exact name left the alias
@@ -817,19 +817,19 @@ public class CodenameOneSettings extends Lifecycle {
         String value = active ? settings.getBuildHint(meta.name()) : "";
         BuildHintType effectiveType = effectiveHintType(meta, value);
         Container text = new Container(BoxLayout.y());
-        Label name = new Label(meta.name(), uiid("SettingsRowTitle"));
+        Label name = new Label(meta.name(), "SettingsRowTitle");
         name.setEndsWith3Points(true);
         Container metaLine = new Container(new FlowLayout(Component.LEFT, Component.CENTER));
-        Label desc = new Label(meta.platform() + " / " + effectiveType, uiid("SettingsRowMeta"));
+        Label desc = new Label(meta.platform() + " / " + effectiveType, "SettingsRowMeta");
         metaLine.add(desc);
         if (active) {
-            metaLine.add(new Label("Active", uiid("SettingsActiveBadge")));
+            metaLine.add(new Label("Active", "SettingsActiveBadge"));
         }
         if (ownedBy != null) {
-            metaLine.add(new Label(ownedBy, uiid("SettingsRowMeta")));
+            metaLine.add(new Label(ownedBy, "SettingsRowMeta"));
         }
         if (meta.aliasOf() != null) {
-            metaLine.add(new Label("alias of " + meta.aliasOf(), uiid("SettingsRowMeta")));
+            metaLine.add(new Label("alias of " + meta.aliasOf(), "SettingsRowMeta"));
         }
         text.add(name).add(metaLine);
         // Both spellings declared. They are ONE setting -- the builder reads the
@@ -842,7 +842,7 @@ public class CodenameOneSettings extends Lifecycle {
                     + " are two spellings of one setting, and both are declared. "
                     + meta.name() + " is the one that takes effect. Remove it to fall back to "
                     + meta.aliasOf() + ".");
-            both.setUIID(uiid("SettingsRowText"));
+            both.setUIID("SettingsRowText");
             both.setEditable(false);
             both.setFocusable(false);
             text.add(both);
@@ -858,7 +858,7 @@ public class CodenameOneSettings extends Lifecycle {
                       + "on the right, or delete the annotation attribute."
                     : "Set by " + ownedBy + " on the main class. "
                       + "Change it there -- declaring it here as well fails the build.");
-            owned.setUIID(uiid("SettingsRowText"));
+            owned.setUIID("SettingsRowText");
             owned.setEditable(false);
             owned.setFocusable(false);
             text.add(owned);
@@ -883,8 +883,8 @@ public class CodenameOneSettings extends Lifecycle {
             row.add(header);
         } else {
             Container controls = new Container(new FlowLayout(Component.LEFT, Component.CENTER));
-            controls.setUIID(uiid("SettingsHintEditor"));
-            Button add = new Button("Add", uiid("SettingsOutline"));
+            controls.setUIID("SettingsHintEditor");
+            Button add = new Button("Add", "SettingsOutline");
             add.setMaterialIcon(FontImage.MATERIAL_ADD, 1.2f);
             String seed = defaultHintValue(meta);
             if (seed != null) {
@@ -908,9 +908,9 @@ public class CodenameOneSettings extends Lifecycle {
                 // So the row asks for a value and writes nothing until it has
                 // one. Add is what reveals the field, not what saves.
                 TextField pending = new TextField("", "value");
-                pending.setUIID(uiid("SettingsField"));
+                pending.setUIID("SettingsField");
                 configureHintField(pending, meta);
-                Button save = new Button("Save", uiid("SettingsOutline"));
+                Button save = new Button("Save", "SettingsOutline");
                 save.addActionListener(e -> {
                     String typed = pending.getText() == null ? "" : pending.getText().trim();
                     if (typed.length() == 0) {
@@ -943,7 +943,7 @@ public class CodenameOneSettings extends Lifecycle {
         String description = meta.description();
         if (description != null && description.trim().length() > 0) {
             TextArea details = new TextArea(description);
-            details.setUIID(uiid("SettingsRowText"));
+            details.setUIID("SettingsRowText");
             details.setEditable(false);
             details.setFocusable(false);
             // One row is the FLOOR, not the size: growByContent takes the area to
@@ -971,16 +971,16 @@ public class CodenameOneSettings extends Lifecycle {
     private Component activeHintEditor(Container row, BuildHintMetadata meta, String value,
             BuildHintType effectiveType) {
         Container controls = new Container(new BorderLayout());
-        controls.setUIID(uiid("SettingsHintEditor"));
+        controls.setUIID("SettingsHintEditor");
         if (effectiveType == BuildHintType.BOOLEAN) {
-            Switch toggle = new Switch(uiid("SettingsSwitch"));
+            Switch toggle = new Switch();
             toggle.setValue("true".equalsIgnoreCase(value));
             toggle.addActionListener(e -> settings.setBuildHint(meta.name(), toggle.isValue() ? "true" : "false"));
             controls.add(BorderLayout.CENTER,
                     new Container(new FlowLayout(Component.RIGHT, Component.CENTER)).add(toggle));
         } else {
             TextField valueField = new TextField(value, "value");
-            valueField.setUIID(uiid(isValidHintValue(meta, value) ? "SettingsField" : "SettingsFieldError"));
+            valueField.setUIID(isValidHintValue(meta, value) ? "SettingsField" : "SettingsFieldError");
             // Next to the name the field is as wide as it asks to be, and a
             // TextField asks for its column count. Its old width came from the
             // 28% cell of a band that no longer exists, so it has to ask for
@@ -997,9 +997,9 @@ public class CodenameOneSettings extends Lifecycle {
                     // the developer meant is unambiguous, and only one spelling of
                     // it works everywhere.
                     settings.setBuildHint(meta.name(), canonicalHintValue(meta, next));
-                    valueField.setUIID(uiid("SettingsField"));
+                    valueField.setUIID("SettingsField");
                 } else {
-                    valueField.setUIID(uiid("SettingsFieldError"));
+                    valueField.setUIID("SettingsFieldError");
                 }
                 valueField.repaint();
             });
@@ -1028,7 +1028,7 @@ public class CodenameOneSettings extends Lifecycle {
     /// removing the declaration is the resolution in both, and the second copy
     /// this replaced was the reason the conflict row had no way out at all.
     private Button removeHintButton(Container row, BuildHintMetadata meta) {
-        Button remove = new Button("", uiid("SettingsSmallIconButton"));
+        Button remove = new Button("", "SettingsSmallIconButton");
         remove.setMaterialIcon(FontImage.MATERIAL_DELETE, 2.2f);
         remove.addActionListener(e -> {
             settings.removeBuildHint(meta.name());
@@ -1182,19 +1182,19 @@ public class CodenameOneSettings extends Lifecycle {
         Dialog d = new Dialog(meta == null ? "Add Build Hint" : "Edit Build Hint", new BorderLayout());
         d.setDisposeWhenPointerOutOfBounds(true);
         Container content = new Container(BoxLayout.y());
-        content.setUIID(uiid("SettingsDialogContent"));
+        content.setUIID("SettingsDialogContent");
         TextField key = new TextField(meta == null ? "" : meta.name(), "hint.name");
-        key.setUIID(uiid("SettingsField"));
+        key.setUIID("SettingsField");
         TextArea value = new TextArea(meta == null ? "" : settings.getBuildHint(meta.name()));
         value.setHint("value");
-        value.setUIID(uiid("SettingsArea"));
+        value.setUIID("SettingsArea");
         value.setRows(5);
-        content.add(new Label("Key", uiid("SettingsFieldLabel"))).add(key);
-        content.add(new Label("Value", uiid("SettingsFieldLabel"))).add(value);
+        content.add(new Label("Key", "SettingsFieldLabel")).add(key);
+        content.add(new Label("Value", "SettingsFieldLabel")).add(value);
         Button ok = new Button(new Command("Apply"));
-        ok.setUIID(uiid("SettingsPrimary"));
+        ok.setUIID("SettingsPrimary");
         Button cancel = new Button(new Command("Cancel"));
-        cancel.setUIID(uiid("SettingsOutline"));
+        cancel.setUIID("SettingsOutline");
         content.add(FlowLayout.encloseRight(cancel, ok));
         d.add(BorderLayout.CENTER, content);
         if (ok.getCommand() == d.showDialog()) {
@@ -1213,21 +1213,22 @@ public class CodenameOneSettings extends Lifecycle {
     private void renderExtensions() {
         page.add(pageTitle("Extensions", "Install & update 3rd-party libraries (cn1libs) and native extensions."));
         Container searchCard = new Container(new BorderLayout());
-        searchCard.setUIID(uiid("SettingsSearchBox"));
-        Label searchIcon = new Label("", uiid("SettingsSearchIcon"));
+        searchCard.setUIID("SettingsSearchBox");
+        Label searchIcon = new Label("", "SettingsSearchIcon");
         searchIcon.setMaterialIcon(FontImage.MATERIAL_SEARCH, 2.8f);
         TextField query = new TextField(extensionFilter, "Search extensions...");
-        query.setUIID(uiid("SettingsSearchField"));
+        query.setUIID("SettingsSearchField");
+        query.getHintLabel().setUIID("SettingsSearchHint");
         query.addFocusListener(new FocusListener() {
             @Override
             public void focusGained(Component cmp) {
-                searchCard.setUIID(uiid("SettingsSearchBoxFocused"));
+                searchCard.setUIID("SettingsSearchBoxFocused");
                 searchCard.repaint();
             }
 
             @Override
             public void focusLost(Component cmp) {
-                searchCard.setUIID(uiid("SettingsSearchBox"));
+                searchCard.setUIID("SettingsSearchBox");
                 searchCard.repaint();
             }
         });
@@ -1250,7 +1251,7 @@ public class CodenameOneSettings extends Lifecycle {
         results.removeAll();
         List<ExtensionDescriptor> found = extensionCatalog == null ? MavenCentralSearch.curated() : extensionCatalog;
         Container grid = new Container(BoxLayout.y());
-        grid.setUIID(uiid("SettingsExtensionGrid"));
+        grid.setUIID("SettingsExtensionGrid");
         Container row = null;
         int count = 0;
         int columns = extensionColumns();
@@ -1258,7 +1259,7 @@ public class CodenameOneSettings extends Lifecycle {
             if (matchesExtension(d, extensionFilter)) {
                 if (count % columns == 0) {
                     row = new Container(new GridLayout(1, columns));
-                    row.setUIID(uiid("SettingsExtensionRow"));
+                    row.setUIID("SettingsExtensionRow");
                     grid.add(row);
                 }
                 row.add(extensionRow(d));
@@ -1267,7 +1268,7 @@ public class CodenameOneSettings extends Lifecycle {
         }
         if (count == 0) {
             results.add(new Label(extensionCatalog == null ? "Loading extension catalog..." : "No extensions match the current filter.",
-                    uiid("SettingsRowMeta")));
+                    "SettingsRowMeta"));
         } else {
             results.add(grid);
         }
@@ -1463,10 +1464,10 @@ public class CodenameOneSettings extends Lifecycle {
     private Component extensionRow(ExtensionDescriptor descriptor) {
         boolean expanded = Boolean.TRUE.equals(expandedExtensions.get(extensionKey(descriptor)));
         Container row = new Container(new BorderLayout());
-        row.setUIID(uiid("SettingsExtensionCard"));
+        row.setUIID("SettingsExtensionCard");
         Container text = new Container(BoxLayout.y());
-        text.setUIID(uiid("SettingsExtensionBody"));
-        Label title = new Label(displayExtensionName(descriptor), uiid("SettingsExtensionTitle"));
+        text.setUIID("SettingsExtensionBody");
+        Label title = new Label(displayExtensionName(descriptor), "SettingsExtensionTitle");
         title.setEndsWith3Points(true);
         title.addPointerReleasedListener(e -> {
             expandedExtensions.put(extensionKey(descriptor), !expanded);
@@ -1478,7 +1479,7 @@ public class CodenameOneSettings extends Lifecycle {
         addExtensionDescription(description, descriptor.description(), expanded ? 4 : 2);
         text.add(description);
         Container meta = new Container(new GridLayout(1, 2));
-        meta.setUIID(uiid("SettingsExtensionMetaGrid"));
+        meta.setUIID("SettingsExtensionMetaGrid");
         meta.add(extensionMeta("License", displayLicense(descriptor.license())));
         meta.add(extensionMeta("Platforms", descriptor.platforms()));
         text.add(meta);
@@ -1488,20 +1489,20 @@ public class CodenameOneSettings extends Lifecycle {
         }
         if (expanded) {
             if (descriptor.warning().length() > 0) {
-                text.add(new Label(descriptor.warning(), uiid("SettingsExtensionWarning")));
+                text.add(new Label(descriptor.warning(), "SettingsExtensionWarning"));
             }
             if (descriptor.dependency() != null) {
-                Label dependency = new Label(displayDependency(descriptor.dependency()), uiid("SettingsExtensionMeta"));
+                Label dependency = new Label(displayDependency(descriptor.dependency()), "SettingsExtensionMeta");
                 dependency.setEndsWith3Points(true);
                 text.add(dependency);
             } else if (descriptor.fileName().length() > 0) {
-                Label file = new Label(descriptor.fileName(), uiid("SettingsExtensionMeta"));
+                Label file = new Label(descriptor.fileName(), "SettingsExtensionMeta");
                 file.setEndsWith3Points(true);
                 text.add(file);
-                text.add(new Label("Legacy cn1lib - may be out of date", uiid("SettingsExtensionWarning")));
+                text.add(new Label("Legacy cn1lib - may be out of date", "SettingsExtensionWarning"));
             }
             if (descriptor.author().length() > 0) {
-                Label author = new Label("By " + descriptor.author(), uiid("SettingsExtensionMeta"));
+                Label author = new Label("By " + descriptor.author(), "SettingsExtensionMeta");
                 author.setEndsWith3Points(true);
                 text.add(author);
             }
@@ -1511,7 +1512,7 @@ public class CodenameOneSettings extends Lifecycle {
         if (descriptor.dependency() != null) {
             boolean installed = isDependencyInstalled(descriptor.dependency());
             Button add = new Button(installed ? "Installed ✓" : "Download",
-                    uiid(installed ? "SettingsSave" : "SettingsExtensionPrimary"));
+                    installed ? "SettingsSave" : "SettingsExtensionPrimary");
             add.addActionListener(e -> {
                 if (installed) {
                     offerUninstall(descriptor);
@@ -1523,7 +1524,7 @@ public class CodenameOneSettings extends Lifecycle {
         } else if (descriptor.fileName().length() > 0) {
             boolean installed = isLegacyCn1LibInstalled(descriptor);
             Button install = new Button(installed ? "Installed ✓" : "Install",
-                    uiid(installed ? "SettingsSave" : "SettingsExtensionPrimary"));
+                    installed ? "SettingsSave" : "SettingsExtensionPrimary");
             install.addActionListener(e -> {
                 if (installed) {
                     offerUninstall(descriptor);
@@ -1583,7 +1584,7 @@ public class CodenameOneSettings extends Lifecycle {
     private void addExtensionDescription(Container text, String description, int maxLines) {
         List<String> lines = wrapExtensionText(description, 38, maxLines);
         for (String line : lines) {
-            Label l = new Label(line, uiid("SettingsExtensionText"));
+            Label l = new Label(line, "SettingsExtensionText");
             l.setEndsWith3Points(true);
             text.add(l);
         }
@@ -1621,14 +1622,14 @@ public class CodenameOneSettings extends Lifecycle {
         if (value == null || value.trim().length() == 0) {
             return;
         }
-        text.add(new Label(label + " " + value.trim(), uiid("SettingsExtensionMeta")));
+        text.add(new Label(label + " " + value.trim(), "SettingsExtensionMeta"));
     }
 
     private Component extensionMeta(String label, String value) {
         Container c = new Container(BoxLayout.y());
-        c.setUIID(uiid("SettingsExtensionMetaColumn"));
-        Label l = new Label(label, uiid("SettingsExtensionMetaLabel"));
-        Label v = new Label(value == null || value.trim().length() == 0 ? "-" : value.trim(), uiid("SettingsExtensionMetaValue"));
+        c.setUIID("SettingsExtensionMetaColumn");
+        Label l = new Label(label, "SettingsExtensionMetaLabel");
+        Label v = new Label(value == null || value.trim().length() == 0 ? "-" : value.trim(), "SettingsExtensionMetaValue");
         v.setEndsWith3Points(true);
         c.add(l).add(v);
         return c;
@@ -1636,7 +1637,7 @@ public class CodenameOneSettings extends Lifecycle {
 
     private Container extensionTags(ExtensionDescriptor descriptor) {
         Container tags = new Container(new FlowLayout(Component.LEFT, Component.CENTER));
-        tags.setUIID(uiid("SettingsExtensionTagRow"));
+        tags.setUIID("SettingsExtensionTagRow");
         String raw = descriptor.tags();
         if (raw != null && raw.trim().length() > 0) {
             String[] pieces = raw.split("[,;]");
@@ -1644,7 +1645,7 @@ public class CodenameOneSettings extends Lifecycle {
             for (String piece : pieces) {
                 String tag = piece.trim();
                 if (tag.length() > 0) {
-                    tags.add(new Label(displayTag(tag), uiid("SettingsExtensionTags")));
+                    tags.add(new Label(displayTag(tag), "SettingsExtensionTags"));
                     added++;
                     if (added >= 2) {
                         break;
@@ -1854,8 +1855,8 @@ public class CodenameOneSettings extends Lifecycle {
 
     private Container pageTitle(String title, String sub) {
         Container c = new Container(BoxLayout.y());
-        Label heading = new Label(title, uiid("SettingsPageTitle"));
-        Label subtitle = new Label(sub, uiid("SettingsSub"));
+        Label heading = new Label(title, "SettingsPageTitle");
+        Label subtitle = new Label(sub, "SettingsSub");
         c.add(heading);
         c.add(subtitle);
         return c;
@@ -1863,11 +1864,11 @@ public class CodenameOneSettings extends Lifecycle {
 
     private Component iconDrop() {
         Container wrap = new Container(BoxLayout.y());
-        Label iconLabel = new Label("Icon", uiid("SettingsFieldLabel"));
+        Label iconLabel = new Label("Icon", "SettingsFieldLabel");
         wrap.add(iconLabel);
         Container drop = new Container(new BorderLayout());
-        drop.setUIID(uiid("SettingsIconDrop"));
-        Label icon = new Label("", uiid("SettingsIconPreview"));
+        drop.setUIID("SettingsIconDrop");
+        Label icon = new Label("", "SettingsIconPreview");
         Image preview = loadProjectIconPreview();
         if (preview != null) {
             int imageSize = CN.convertToPixels(12f);
@@ -1876,12 +1877,12 @@ public class CodenameOneSettings extends Lifecycle {
             icon.setText("M");
         }
         Container text = new Container(BoxLayout.y());
-        text.add(new Label(projectIconName(), uiid("SettingsRowTitle")));
-        text.add(new Label("Opaque square PNG, 512x512 or 1024x1024.", uiid("SettingsRowMeta")));
-        Button replace = new Button("Replace", uiid("SettingsOutline"));
+        text.add(new Label(projectIconName(), "SettingsRowTitle"));
+        text.add(new Label("Opaque square PNG, 512x512 or 1024x1024.", "SettingsRowMeta"));
+        Button replace = new Button("Replace", "SettingsOutline");
         replace.addActionListener(e -> replaceIcon());
         Container replaceCell = new Container(new FlowLayout(Component.CENTER, Component.CENTER));
-        replaceCell.setUIID(uiid("SettingsIconAction"));
+        replaceCell.setUIID("SettingsIconAction");
         replaceCell.add(replace);
         drop.add(BorderLayout.WEST, icon).add(BorderLayout.CENTER, text).add(BorderLayout.EAST, replaceCell);
         wrap.add(drop);
@@ -2015,22 +2016,22 @@ public class CodenameOneSettings extends Lifecycle {
 
     private Component divider() {
         Container c = new Container();
-        c.setUIID(uiid("SettingsDivider"));
+        c.setUIID("SettingsDivider");
         return c;
     }
 
     private Component fieldPair(Component left, Component right) {
         Container row = new Container(new GridLayout(1, 2));
-        row.setUIID(uiid("SettingsFieldPair"));
+        row.setUIID("SettingsFieldPair");
         row.add(left).add(right);
         return row;
     }
 
     private Component staticField(String label, String value) {
         Container fieldGroup = new Container(BoxLayout.y());
-        fieldGroup.setUIID(uiid("SettingsFieldGroup"));
-        Label fieldLabel = new Label(label, uiid("SettingsFieldLabel"));
-        Label val = new Label(value, uiid("SettingsField"));
+        fieldGroup.setUIID("SettingsFieldGroup");
+        Label fieldLabel = new Label(label, "SettingsFieldLabel");
+        Label val = new Label(value, "SettingsField");
         val.getAllStyles().setFont(Font.createSystemFont(Font.FACE_SYSTEM, Font.STYLE_PLAIN, Font.SIZE_SMALL)
                 .derive(CN.convertToPixels(1.75f), Font.STYLE_PLAIN));
         fieldGroup.add(fieldLabel).add(val);
@@ -2039,13 +2040,12 @@ public class CodenameOneSettings extends Lifecycle {
 
     private Component switchField(String label, String value) {
         Container fieldGroup = new Container(BoxLayout.y());
-        fieldGroup.setUIID(uiid("SettingsFieldGroup"));
-        Label fieldLabel = new Label(label, uiid("SettingsFieldLabel"));
+        fieldGroup.setUIID("SettingsFieldGroup");
+        Label fieldLabel = new Label(label, "SettingsFieldLabel");
         Container row = new Container(new BorderLayout());
-        row.setUIID(uiid("SettingsToggleRow"));
-        row.add(BorderLayout.CENTER, new Label(value, uiid("SettingsRowMeta")));
-        Container sw = new Container();
-        sw.setUIID(uiid("SettingsSwitch"));
+        row.setUIID("SettingsToggleRow");
+        row.add(BorderLayout.CENTER, new Label(value, "SettingsRowMeta"));
+        Switch sw = new Switch();
         row.add(BorderLayout.EAST, sw);
         fieldGroup.add(fieldLabel).add(row);
         return fieldGroup;
@@ -2053,16 +2053,16 @@ public class CodenameOneSettings extends Lifecycle {
 
     private Container card(String title) {
         Container c = new Container(BoxLayout.y());
-        c.setUIID(uiid("SettingsCard"));
-        c.add(new Label(title, uiid("SettingsCardTitle")));
+        c.setUIID("SettingsCard");
+        c.add(new Label(title, "SettingsCardTitle"));
         return c;
     }
 
     private void row(Container parent, String label, String value) {
         Container r = new Container(new BorderLayout());
-        r.setUIID(uiid("SettingsCardRow"));
-        r.add(BorderLayout.WEST, new Label(label, uiid("SettingsRowTitle")));
-        r.add(BorderLayout.CENTER, new Label(value == null || value.length() == 0 ? "[not set]" : value, uiid("SettingsRowMeta")));
+        r.setUIID("SettingsCardRow");
+        r.add(BorderLayout.WEST, new Label(label, "SettingsRowTitle"));
+        r.add(BorderLayout.CENTER, new Label(value == null || value.length() == 0 ? "[not set]" : value, "SettingsRowMeta"));
         parent.add(r);
     }
 
@@ -2079,35 +2079,35 @@ public class CodenameOneSettings extends Lifecycle {
      */
     private Component switchGroup(String label, String key) {
         Container fieldGroup = new Container(BoxLayout.y());
-        fieldGroup.setUIID(uiid("SettingsFieldGroup"));
-        Switch sw = new Switch(uiid("SettingsSwitch"));
+        fieldGroup.setUIID("SettingsFieldGroup");
+        Switch sw = new Switch();
         sw.setValue("true".equals(settings.get(key)));
         sw.addActionListener(e -> settings.set(key, sw.isValue() ? "true" : "false"));
-        fieldGroup.add(new Label(label, uiid("SettingsFieldLabel"))).add(sw);
+        fieldGroup.add(new Label(label, "SettingsFieldLabel")).add(sw);
         return fieldGroup;
     }
 
     private Component textFieldGroup(String label, String key, boolean secret) {
         Container fieldGroup = new Container(BoxLayout.y());
-        fieldGroup.setUIID(uiid("SettingsFieldGroup"));
+        fieldGroup.setUIID("SettingsFieldGroup");
         TextField field = new SettingsTextField(settings.get(key));
-        field.setUIID(uiid("SettingsField"));
+        field.setUIID("SettingsField");
         field.setEnableInputScroll(false);
         field.setScrollVisible(false);
         if (secret) {
             field.setConstraint(TextField.PASSWORD);
         }
         field.addDataChangedListener((type, index) -> settings.set(key, field.getText()));
-        Label fieldLabel = new Label(label, uiid("SettingsFieldLabel"));
+        Label fieldLabel = new Label(label, "SettingsFieldLabel");
         fieldGroup.add(fieldLabel).add(field);
         return fieldGroup;
     }
 
     private void actionRow(Container parent, String label, String value, Runnable action) {
         Container r = new Container(new BorderLayout());
-        r.setUIID(uiid("SettingsCardRow"));
-        r.add(BorderLayout.CENTER, new Label(label + ": " + value, uiid("SettingsRowMeta")));
-        Button open = new Button("Open", uiid("SettingsOutline"));
+        r.setUIID("SettingsCardRow");
+        r.add(BorderLayout.CENTER, new Label(label + ": " + value, "SettingsRowMeta"));
+        Button open = new Button("Open", "SettingsOutline");
         open.setMaterialIcon(FontImage.MATERIAL_OPEN_IN_NEW);
         open.addActionListener(e -> action.run());
         r.add(BorderLayout.EAST, open);
@@ -2250,7 +2250,7 @@ public class CodenameOneSettings extends Lifecycle {
     }
 
     private float baseFontMm(String uiid) {
-        String id = stripDark(uiid);
+        String id = uiid == null ? "" : uiid;
         if ("SettingsPageTitle".equals(id)) {
             return 6f;
         }
@@ -2305,16 +2305,9 @@ public class CodenameOneSettings extends Lifecycle {
     }
 
     private boolean isBoldUiid(String uiid) {
-        String id = stripDark(uiid);
+        String id = uiid == null ? "" : uiid;
         return id.indexOf("Title") >= 0 || id.indexOf("Primary") >= 0 || id.indexOf("Save") >= 0
                 || id.indexOf("Outline") >= 0 || id.indexOf("SectionTag") >= 0;
-    }
-
-    private String stripDark(String uiid) {
-        if (uiid == null) {
-            return "";
-        }
-        return uiid.endsWith("Dark") ? uiid.substring(0, uiid.length() - 4) : uiid;
     }
 
     private void installMenuCommands() {
@@ -2350,10 +2343,6 @@ public class CodenameOneSettings extends Lifecycle {
         cmd.setDesktopMenu(Command.DESKTOP_MENU_FILE);
         cmd.setDesktopShortcut(shortcut);
         return cmd;
-    }
-
-    private String uiid(String base) {
-        return darkMode ? base + "Dark" : base;
     }
 
     private static final class SettingsTextField extends TextField {
