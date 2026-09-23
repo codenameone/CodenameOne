@@ -309,9 +309,20 @@ class GcOverflowSpiralIntegrationTest {
         // AND THAT THE FIX IS WHAT PREVENTED IT. Zero overflows is also what a run that
         // never allocated much would report, so the guard needs evidence that the pass
         // actually reached the drain threshold and drained instead of overflowing.
-        assertTrue(graceDrains > 0,
-                "The grace pass never drained mid-walk, so this workload never pushed"
-                        + " enough to approach the worklist limit and the assertion above"
+        //
+        // Two ways the pass can have handled that volume, and either is the evidence. It
+        // drains the worklist mid-walk (graceDrains), or -- since fresh objects are traced
+        // in place and never enqueued at all -- it traces them directly (graceTraced), in
+        // which case mid-walk drains are structurally rare and counting only them made
+        // this guard fail on a collector that had removed the hazard outright. The bar
+        // for the second is a per-cycle average above the 65536-entry worklist the
+        // spiral was reported on: that much, pushed the old way, overflows every cycle.
+        long graceTraced = parseTrace(output, "graceTraced=");
+        assertTrue(graceDrains > 0 || (cycles > 0 && graceTraced / cycles > 65536),
+                "The grace pass neither drained mid-walk nor traced more than 65536 fresh"
+                        + " objects per cycle in place (graceTraced=" + graceTraced
+                        + " cycles=" + cycles + "), so this workload never produced the"
+                        + " volume that overflowed the worklist and the assertion above"
                         + " proves nothing. Check that the app still allocates small"
                         + " reference-carrying objects at volume.\n--- run ---\n" + output);
 

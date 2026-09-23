@@ -731,6 +731,9 @@ static void cn1ReportPacingParks(void) {
 // RAM the machine running it happened to have free.
 static _Atomic long cn1GcOverflowCycles = 0;
 static _Atomic long cn1GcGraceDrains = 0;
+// Fresh objects the grace pass traced IN PLACE -- the volume that used to go through the
+// worklist and overflow it (issue #5537). Counted per chunk, not per object.
+static _Atomic long cn1GcGraceTraced = 0;
 // Calls to the FULL gcMarkDrain, which rescans allObjectsInHeap from index 0 every time.
 // A cycle makes a fixed handful of them by construction (roots, each grace pass, the
 // belt, the SATB fixpoint), so this figure tracks the cycle count and nothing else.
@@ -947,10 +950,11 @@ static void cn1ReportGcOverflow(void) {
     long triggerKb = (long)(atomic_load_explicit(&bibopGcTriggerBytes,
                                                  memory_order_relaxed) / 1024);
 #endif
-    fprintf(stderr, "[GC-OVERFLOW] overflowCycles=%ld graceDrains=%ld fullDrains=%ld"
+    fprintf(stderr, "[GC-OVERFLOW] overflowCycles=%ld graceDrains=%ld graceTraced=%ld fullDrains=%ld"
                     " graceFullDrains=%ld cycles=%d allocatedKb=%lld triggerKb=%ld\n",
             atomic_load_explicit(&cn1GcOverflowCycles, memory_order_relaxed),
             atomic_load_explicit(&cn1GcGraceDrains, memory_order_relaxed),
+            atomic_load_explicit(&cn1GcGraceTraced, memory_order_relaxed),
             atomic_load_explicit(&cn1GcFullDrains, memory_order_relaxed),
             atomic_load_explicit(&cn1GcGraceFullDrains, memory_order_relaxed),
             currentGcMarkValue,
@@ -4550,6 +4554,9 @@ static void gcMarkGraceWalkPages(CODENAME_ONE_THREAD_STATE) {
 #endif
                 }
                 CN1_GC_TRUSTED_END();
+                if(__nf > 0) {
+                    atomic_fetch_add_explicit(&cn1GcGraceTraced, __nf, memory_order_relaxed);
+                }
                 cn1GcGraceTraceFresh = 1;
                 for(int __i = 0 ; __i < __nf ; __i++) {
                     JAVA_OBJECT go = __gbuf[__i];

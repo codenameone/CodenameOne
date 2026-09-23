@@ -181,11 +181,14 @@ class GcSteadyStateIntegrationTest {
     private static final long DEVICE_FREE_MB = 4;
 
     /**
-     * Ints in the fixture's per-node throwaway array for the legacy-path scenarios. 160 =
-     * 640 bytes, over CN1_BIBOP_MAX_OBJECT, so every node's array takes the legacy
-     * calloc + allObjectsInHeap + per-thread-pending-table path.
+     * Ints in the fixture's per-node throwaway array for the legacy-path scenarios. 640 =
+     * 2560 bytes of payload, over CN1_BIBOP_MAX_OBJECT (2048), so every node's array takes
+     * the legacy calloc + allObjectsInHeap + per-thread-pending-table path. It was 160
+     * while that ceiling was 512 bytes; raising the ceiling turned those arrays into
+     * ordinary page objects and left scenario 10 measuring nothing -- which its own
+     * non-vacuity guard reported. Keep this above the ceiling if the ceiling moves again.
      */
-    private static final int LEGACY_CHURN_INTS = 160;
+    private static final int LEGACY_CHURN_INTS = 640;
 
     /**
      * How much bigger the unfiltered SATB log must be than the filtered one. Measured
