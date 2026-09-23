@@ -70,8 +70,9 @@
   "generatedAt": 1790179200000,
   "window": {"from": 1790092800000, "to": 1790179200000},
   "summary": {
-    "fcm":  {"ACCEPTED": 7412, "FAILED": 119},
-    "apns": {"ACCEPTED": 3310, "FAILED": 6}
+    "fcm":  {"ACCEPTED": 7412, "FAILED": 1},
+    "apns": {"ACCEPTED": 3310},
+    "web":  {"DEAD": 1}
   },
   "events": [
     {

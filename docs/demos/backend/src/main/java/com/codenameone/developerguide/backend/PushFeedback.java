@@ -22,6 +22,7 @@
  */
 package com.codenameone.developerguide.backend;
 
+import com.codename1.backend.Crypto;
 import com.codename1.backend.HttpServer;
 import com.codename1.backend.annotations.PostMapping;
 import com.codename1.backend.annotations.RequestMapping;
@@ -30,10 +31,6 @@ import com.codename1.io.JSONParser;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
-import java.util.concurrent.ConcurrentHashMap;
-import javax.crypto.Mac;
-import javax.crypto.spec.SecretKeySpec;
 
 /**
  * Receives the delivery-feedback digest and prunes the device keys the
@@ -44,23 +41,31 @@ import javax.crypto.spec.SecretKeySpec;
 @RequestMapping("/push")
 public class PushFeedback {
 
+    /**
+     * Your durable store. Both operations belong in ONE transaction: a marker
+     * written before the deletion commits turns a retry into a silent skip,
+     * and a deletion without a marker is applied twice.
+     */
+    public interface DeviceStore {
+        boolean alreadyApplied(String deliveryId);
+
+        void removeKeyAndMarkApplied(String deliveryId, String deviceKey) throws Exception;
+    }
+
+    /** Assigned once at start-up; there is no dependency injection here. */
+    static DeviceStore store;
+
     /** The signing secret shown in Push > Settings. Read it from configuration. */
     private static final String SECRET = System.getenv("CN1_PUSH_CALLBACK_SECRET");
 
     /** Reject a digest whose timestamp is older than this, to bound replay. */
     private static final long MAX_AGE_MS = 5 * 60 * 1000L;
 
-    /** Stand-in for your device table. */
-    private final Set<String> deviceKeys = ConcurrentHashMap.newKeySet();
-
-    /** Digests already applied, so a resend changes nothing. */
-    private final Set<String> seenDeliveries = ConcurrentHashMap.newKeySet();
-
     @PostMapping("/feedback")
     public HttpServer.Response feedback(HttpServer.Request request) throws Exception {
         String body = request.getBody();
         if (!verified(request.getHeader("X-CN1-Signature"), body)) {
-            // Anything but 2xx makes the sender keep the window and resend it,
+            // Anything but 2xx keeps the window at the sender and resends it,
             // which is what you want while a secret rotation is half-applied.
             return new HttpServer.Response(401, "text/plain",
                     "bad signature".getBytes(StandardCharsets.UTF_8));
@@ -70,34 +75,50 @@ public class PushFeedback {
         if (events != null) {
             for (Object entry : events) {
                 Map event = (Map) entry;
-                // Delivery ids repeat: a digest is at-least-once, and a
-                // truncated one is followed by the next page immediately.
-                if (!seenDeliveries.add((String) event.get("deliveryId"))) {
+                String deliveryId = (String) event.get("deliveryId");
+                // Digests are at-least-once, and a truncated one is followed by
+                // its next page immediately, so the same event can arrive twice.
+                if (store.alreadyApplied(deliveryId)) {
                     continue;
                 }
                 if ("INVALID_TARGET".equals(event.get("reason"))) {
-                    // The provider says this key is dead. Match on token
-                    // rather than device: cn1-gcm- and cn1-fcm- are accepted
-                    // aliases for the same key and the digest reports the
-                    // canonical one.
-                    deviceKeys.remove((String) event.get("token"));
+                    // token is absent for web push, which reports endpoint --
+                    // the identifier is normalized on admission and its
+                    // original spelling is not recoverable.
+                    String key = (String) event.get("token");
+                    if (key == null) {
+                        key = (String) event.get("endpoint");
+                    }
+                    store.removeKeyAndMarkApplied(deliveryId, key);
                 }
             }
         }
-        // 2xx is an acknowledgement that this window is durably applied: it
-        // advances the sender's watermark and the window is never sent again.
-        // Answer it after the writes above have committed, not before.
+        // 2xx acknowledges that this window is durably applied: it advances the
+        // sender's watermark and the window is never sent again. Answer it
+        // after the writes above have committed, not alongside them.
         return new HttpServer.Response(200, "text/plain",
                 "ok".getBytes(StandardCharsets.UTF_8));
     }
 
+    // throws, because String.getBytes(Charset) is a CHECKED throw in the
+    // ParparVM class library even though it is not one on a JVM.
     private static boolean verified(String header, String body) throws Exception {
         if (header == null || SECRET == null) {
             return false;
         }
         long timestamp = 0;
         String provided = null;
-        for (String part : header.split(",")) {
+        // Parsed by hand: java.lang.String has no split() in the ParparVM class
+        // library, so the obvious version of this compiles for the development
+        // run and fails the native package step.
+        int cursor = 0;
+        while (cursor < header.length()) {
+            int comma = header.indexOf(',', cursor);
+            if (comma < 0) {
+                comma = header.length();
+            }
+            String part = header.substring(cursor, comma);
+            cursor = comma + 1;
             int equals = part.indexOf('=');
             if (equals < 1) {
                 continue;
@@ -114,29 +135,30 @@ public class PushFeedback {
                 || Math.abs(System.currentTimeMillis() - timestamp) > MAX_AGE_MS) {
             return false;
         }
-        Mac mac = Mac.getInstance("HmacSHA256");
-        mac.init(new SecretKeySpec(SECRET.getBytes(StandardCharsets.UTF_8), "HmacSHA256"));
-        byte[] digest = mac.doFinal(
+        // Crypto, not javax.crypto: this class is recompiled against the
+        // ParparVM class library by cn1:backend-package, and that library has
+        // no JCE. equalsConstantTime is here for the same reason a hand-written
+        // loop would be -- an early exit on the first differing byte lets a MAC
+        // be forged one byte at a time.
+        byte[] expected = Crypto.hmacSha256(SECRET.getBytes(StandardCharsets.UTF_8),
                 (timestamp + "." + body).getBytes(StandardCharsets.UTF_8));
-        StringBuilder expected = new StringBuilder(digest.length * 2);
-        for (byte b : digest) {
-            expected.append(Character.forDigit((b >> 4) & 0xf, 16))
-                    .append(Character.forDigit(b & 0xf, 16));
-        }
-        return constantTimeEquals(expected.toString(), provided);
+        return Crypto.equalsConstantTime(expected, decodeHex(provided));
     }
 
-    /** Never compare a signature with equals(): it returns on the first
-     * differing byte and that timing is enough to recover one. */
-    private static boolean constantTimeEquals(String expected, String provided) {
-        if (expected.length() != provided.length()) {
-            return false;
+    private static byte[] decodeHex(String value) {
+        if (value.length() % 2 != 0) {
+            return new byte[0];
         }
-        int difference = 0;
-        for (int i = 0; i < expected.length(); i++) {
-            difference |= expected.charAt(i) ^ provided.charAt(i);
+        byte[] out = new byte[value.length() / 2];
+        for (int i = 0; i < out.length; i++) {
+            int high = Character.digit(value.charAt(i * 2), 16);
+            int low = Character.digit(value.charAt(i * 2 + 1), 16);
+            if (high < 0 || low < 0) {
+                return new byte[0];
+            }
+            out[i] = (byte) ((high << 4) | low);
         }
-        return difference == 0;
+        return out;
     }
 }
 // end::push-feedback-backend[]
