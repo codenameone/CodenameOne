@@ -9671,6 +9671,42 @@ static JAVA_BOOLEAN cn1SweepRemoving = JAVA_FALSE;
 
 // Allocate a small non-array object from the per-thread page for its size class.
 // Returns 0 only if pages cannot be obtained (caller falls back to the heap).
+// A RECYCLED slot for CN1_FAST_NEW, whose inline path only bumps. On a page the sweep has
+// given a free list -- every page, once the heap is small enough to be reused -- a miss
+// used to go to __NEW_X and the whole slow path per object (codenameOneGcMalloc,
+// cn1BibopAlloc with its pthread_once, the class-initializer call). This is only the
+// free-list branch of that path, kept OUT of line on purpose: the inline fast path stays
+// byte-for-byte what it was, because trimming or growing it has measured slower on every
+// attempt (REGISTRY Rounds 38 and 39). Answers 0 when there is no current page or its free
+// list is empty; the caller then takes __NEW_X exactly as before.
+JAVA_OBJECT cn1BibopAllocRecycled(CODENAME_ONE_THREAD_STATE, int size, struct clazz* parent, int ci) {
+    if(ci < 0 || constantPoolObjects == 0) {
+        return 0;
+    }
+#ifndef CN1_CONSERVATIVE_GC_ROOTS
+    if(threadStateData->nativeAllocationMode) {
+        return 0;
+    }
+#endif
+    CN1BibopPage* p = threadStateData->bibopCurrent[ci];
+    if(p == 0 || p->freeList == 0) {
+        return 0;
+    }
+    CN1_CLAZZ_REGISTER(parent);
+    JAVA_OBJECT o = (JAVA_OBJECT)p->freeList;
+    p->freeList = *(void**)o;
+    p->freeCount--;
+    cn1BibopInitSlot(threadStateData, o, size, parent);
+#ifndef CN1_BIBOP_NO_FASTSWEEP
+    __atomic_store_n(&p->gcAllocedSinceSweep, JAVA_TRUE, __ATOMIC_RELAXED);
+#endif
+    CN1_BIBOP_ACCOUNT_BYTES(threadStateData, p->slotSize);
+#ifdef CN1_GC_CONFORM
+    cn1RecordAllocation(parent, size);
+#endif
+    return o;
+}
+
 static JAVA_OBJECT cn1BibopAlloc(CODENAME_ONE_THREAD_STATE, int size, struct clazz* parent) {
     pthread_once(&bibopOnce, cn1BibopDoInit);
     CN1_CLAZZ_REGISTER(parent);

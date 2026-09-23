@@ -2467,6 +2467,9 @@ void cn1RecordAllocation(struct clazz* parent, int size);
 
 // Inlined bump fast path. Returns 0 (slow path: page full / free-list present /
 // ineligible / oversized) -> caller falls back to __NEW_X / codenameOneGcMalloc.
+// Out of line, and only reached when the inline bump path misses: a slot from the
+// current page's FREE LIST, which the inline path does not take. See the definition.
+extern JAVA_OBJECT cn1BibopAllocRecycled(CODENAME_ONE_THREAD_STATE, int size, struct clazz* parent, int ci);
 static inline JAVA_OBJECT cn1BibopFastAlloc(CODENAME_ONE_THREAD_STATE, int size, struct clazz* parent, int ci) {
     if(ci < 0) return (JAVA_OBJECT)0; // oversized: folded away for big types
     // EVERY allocation path must register the class BEFORE the object publishes --
@@ -2687,7 +2690,10 @@ static inline JAVA_OBJECT cn1BibopFastAllocNoZero(CODENAME_ONE_THREAD_STATE, int
 #define CN1_FAST_NEW(X) ({ \
     if(__builtin_expect(!__atomic_load_n(&class__##X.initialized, __ATOMIC_ACQUIRE), 0)) __STATIC_INITIALIZER_##X(threadStateData); \
     JAVA_OBJECT __cn1fo = cn1BibopFastAlloc(threadStateData, sizeof(struct obj__##X), &class__##X, CN1_BIBOP_CIDX(sizeof(struct obj__##X))); \
-    if(__builtin_expect(__cn1fo == (JAVA_OBJECT)0, 0)) __cn1fo = __NEW_##X(threadStateData); \
+    if(__builtin_expect(__cn1fo == (JAVA_OBJECT)0, 0)) { \
+        __cn1fo = cn1BibopAllocRecycled(threadStateData, sizeof(struct obj__##X), &class__##X, CN1_BIBOP_CIDX(sizeof(struct obj__##X))); \
+        if(__cn1fo == (JAVA_OBJECT)0) __cn1fo = __NEW_##X(threadStateData); \
+    } \
     __cn1fo; })
 // No-body-zero variant (init-before-publish). The slow-path fallback __NEW_X
 // still fully zeroes (calloc) -- correct, just un-elided on the rare page-full
