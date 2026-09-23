@@ -63,7 +63,9 @@ public class DartMap<K, V> extends LinkedHashMap<K, V> {
     static Object[] numericTwins(Object key) {
         if (key instanceof Double) {
             double d = ((Double) key).doubleValue();
-            if (d == Math.rint(d) && d >= -9.223372036854775808E18 && d < 9.223372036854775808E18) {
+            // Integral and inside the long range, tested with a cast: Math.rint is not
+            // in ParparVM's JavaAPI, and calling it broke every native build.
+            if (d >= -9.223372036854775808E18 && d < 9.223372036854775808E18 && (double) (long) d == d) {
                 Long asInt = Long.valueOf((long) d);
                 return d == 0 ? new Object[] {asInt, Double.valueOf(-d)} : new Object[] {asInt};
             }
