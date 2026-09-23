@@ -6181,3 +6181,65 @@ nothing), so synthetic memory pressure is not what the remaining gap is. And mor
 markers help (37ms at 1, ~27ms at 2 or 4), so it is not interference from them.
 What remains is 89% of the main thread inside the benchmark's own loop -- the inlined
 allocator, whose fast path measured slower every time it was trimmed (Round 38).
+
+## Round 40: the core-count axis was never applied to selfhost, and what it hid
+
+**The matrix's selfhost rows measured one configuration three times.** run-matrix.sh
+sets CN1_GC_MARK_THREADS for ParparVM and CN1_SELFHOST_JDK_OPTS
+(-XX:ActiveProcessorCount) for the JVM; bench-selfhost.py filtered every CN1_
+variable out of its children's environment and never read the second. Every 1/2/4
+core selfhost cell in Rounds 35-39 is default markers against a default JVM. Fixed
+in 607215c5db, and the first honest run found two things.
+
+**One marker took 362-415s and 3.2GB on the hello corpus, against 4.8s at four.**
+The serial marker is what Windows ships and what any 2-CPU POSIX host derives
+(ncpu - 1). markStatics runs once per thread with force set and bumps recursionKey
+each time, so the serial path re-walked the entire statics-reachable graph N times a
+cycle through the 4096-bucket chained force-visited table: 99% of the collector's
+samples in cn1ForceVisitedTestAndSet. Under SATB a marked object was pushed when it
+was marked, so the serial path now discards it the way the parallel claim always
+has; only -DCN1_DISABLE_SATB keeps the re-trace. One marker is now 4.81s.
+
+Matrix after both fixes (3 rounds, quiet machine, warm AOT JDK 25):
+
+| | 1 core | 2 cores | 4 cores |
+|---|---|---|---|
+| selfhost wall | 0.74x | 0.76x | 0.84x |
+| selfhost peak | **2.05x** (1812MB vs 886MB) | 0.78x | 0.84x |
+| objectAllocation | 2.05x | 2.19x | 3.35x |
+
+The 1-core memory cell is the real one now, and it is not a policy knob. JDK 25 at
+ActiveProcessorCount=1 selects SerialGC and peaks at ~860MB. Ours at one marker:
+
+| ceiling | wall | peak |
+|---|---|---|
+| 192MB (default) | 4.67s | 1789MB |
+| 128MB | 4.76s | 1439MB |
+| 96MB | 4.86s | 1462MB |
+| 64MB | 5.01s | 1508MB |
+
+Below 128MB a lower ceiling makes the peak WORSE. The CN1_GC_CONFORM partition at
+one marker, mid-run: footprint ~1.5GB = resident pages ~870MB (live slots ~460MB,
+**dead free-listed slots ~400MB**) + native storage and side tables 270-440MB
+(ArrayList/HashMap backing blocks, ~250MB live, 1.1GB churned through malloc) + a
+residual growing to ~380MB. At four markers the same shape, smaller: dead slots
+~220MB, residual to ~250MB. MallocNanoZone=0 and MallocSpaceEfficient=1 move the
+peak by 0% and -5%. So the gap is fragmentation (dead slots on pages that cannot be
+released) plus malloc residue from native storage, on top of a live set already
+near the JVM's whole footprint.
+
+At four markers the ceiling IS a clean trade, re-measured on honest survival:
+
+| ceiling | wall vs JDK | peak vs JDK |
+|---|---|---|
+| 192MB | 0.92x | 0.97x |
+| 128MB | 0.93x | 0.91x |
+| 96MB | 0.94x | 0.85x |
+
+A 40% survival threshold instead of 25% changed nothing. The default stays at
+192MB for now: it wins both axes at 2 and 4 cores, and at 1 core no ceiling closes
+the gap.
+
+Also landed: e055d35b77, a CN1_FAST_NEW miss pops the current page's free list out
+of line before the full slow path. Selfhost -1..-2% wall at a 16MB trigger, neutral
+at adaptive; microbenchmarks neutral.
