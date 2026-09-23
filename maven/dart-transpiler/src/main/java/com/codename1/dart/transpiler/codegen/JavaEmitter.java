@@ -1303,6 +1303,21 @@ public final class JavaEmitter {
         boolean asyncFuture = m.isAsync && (rt.is("Future") || rt.is("FutureOr"));
         boolean savedNarrow = ctx.narrowReturnToInt;
         ctx.narrowReturnToInt = forceIntReturn;
+        // An async function's exceptions belong to the Future it returns. Emitted
+        // bare, a throw in the body -- or an await rethrowing a failed future --
+        // left the Java method before any Future existed, so the caller got a
+        // synchronous exception where Dart hands back a failed future to await
+        // or catchError. The body is bracketed so a throw becomes Future.error.
+        // RuntimeException, as an untyped Dart `catch` is emitted: every Dart
+        // throw surfaces as one (DartRuntime.asError wraps non-exceptions), and
+        // a VM error such as a stack overflow is not turned into a value.
+        String asyncErr = null;
+        if (asyncFuture && (m.body != null || m.exprBody != null)) {
+            ctx.importClass("dart.async.Future");
+            asyncErr = ctx.newTemp();
+            ctx.writer().line("try {");
+            ctx.indent(1);
+        }
         if (m.body != null) {
             emitStatements(m.body, ctx);
             if (asyncFuture && !endsWithJump(m.body)) {
@@ -1325,6 +1340,14 @@ public final class JavaEmitter {
                     ctx.writer().line("return " + coerce(o, rt, ctx) + ";");
                 }
             }
+        }
+        if (asyncErr != null) {
+            ctx.indent(-1);
+            ctx.writer().line("} catch (RuntimeException " + asyncErr + ") {");
+            ctx.indent(1);
+            ctx.writer().line("return Future.error(" + asyncErr + ");");
+            ctx.indent(-1);
+            ctx.writer().line("}");
         }
         ctx.narrowReturnToInt = savedNarrow;
         sb.append(ctx.popWriter());
