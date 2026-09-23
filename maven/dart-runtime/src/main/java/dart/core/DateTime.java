@@ -29,37 +29,52 @@ import java.util.TimeZone;
 
 /**
  * Dart's {@code dart:core} DateTime: an instant on the timeline, stored as
- * milliseconds since the Unix epoch plus a UTC/local flag. Field access is
- * computed on demand through {@link java.util.Calendar}.
+ * microseconds since the Unix epoch plus a UTC/local flag, as the Dart VM keeps
+ * it. Field access is computed on demand through {@link java.util.Calendar}.
+ *
+ * <p>It used to keep milliseconds and discard the microsecond argument, so two
+ * instants a microsecond apart compared equal, differed by zero, and a
+ * sub-millisecond Duration added nothing.</p>
  */
 public final class DateTime {
 
-    private final long epochMillis;
+    private final long epochMicros;
     private final boolean utc;
 
-    private DateTime(long epochMillis, boolean utc) {
-        this.epochMillis = epochMillis;
+    private DateTime(long epochMicros, boolean utc) {
+        this.epochMicros = epochMicros;
         this.utc = utc;
     }
 
     /** Local-time constructor mirroring {@code DateTime(year, [month, day, ...])}. */
     public DateTime(long year, long month, long day, long hour, long minute,
                     long second, long millisecond, long microsecond) {
-        this(build(year, month, day, hour, minute, second, millisecond, false), false);
+        this(build(year, month, day, hour, minute, second, millisecond, false) * 1000L + microsecond, false);
     }
 
     public static DateTime now() {
-        return new DateTime(System.currentTimeMillis(), false);
+        return new DateTime(System.currentTimeMillis() * 1000L, false);
     }
 
     /** UTC constructor mirroring {@code DateTime.utc(year, [month, day, ...])}. */
     public static DateTime utc(long year, long month, long day, long hour, long minute,
                                long second, long millisecond, long microsecond) {
-        return new DateTime(build(year, month, day, hour, minute, second, millisecond, true), true);
+        return new DateTime(build(year, month, day, hour, minute, second, millisecond, true) * 1000L
+                + microsecond, true);
     }
 
     public static DateTime fromMillisecondsSinceEpoch(long millisecondsSinceEpoch, boolean isUtc) {
-        return new DateTime(millisecondsSinceEpoch, isUtc);
+        return new DateTime(millisecondsSinceEpoch * 1000L, isUtc);
+    }
+
+    public static DateTime fromMicrosecondsSinceEpoch(long microsecondsSinceEpoch, boolean isUtc) {
+        return new DateTime(microsecondsSinceEpoch, isUtc);
+    }
+
+    /** Milliseconds since the epoch, rounded toward negative infinity as Dart does. */
+    private long epochMillis() {
+        long q = epochMicros / 1000L;
+        return (epochMicros % 1000L != 0 && epochMicros < 0) ? q - 1 : q;
     }
 
     private static long build(long year, long month, long day, long hour, long minute,
@@ -84,7 +99,7 @@ public final class DateTime {
 
     private int field(int f) {
         Calendar c = utc ? Calendar.getInstance(TimeZone.getTimeZone("UTC")) : Calendar.getInstance();
-        c.setTime(new Date(epochMillis));
+        c.setTime(new Date(epochMillis()));
         return c.get(f);
     }
 
@@ -116,6 +131,10 @@ public final class DateTime {
         return field(Calendar.MILLISECOND);
     }
 
+    public long microsecond() {
+        return epochMicros - epochMillis() * 1000L;
+    }
+
     /** Dart weekday: Monday == 1 .. Sunday == 7. */
     public long weekday() {
         int calDow = field(Calendar.DAY_OF_WEEK); // SUNDAY==1 .. SATURDAY==7
@@ -123,52 +142,52 @@ public final class DateTime {
     }
 
     public long millisecondsSinceEpoch() {
-        return epochMillis;
+        return epochMillis();
     }
 
     public long microsecondsSinceEpoch() {
-        return epochMillis * 1000L;
+        return epochMicros;
     }
 
     public DateTime add(Duration duration) {
-        return new DateTime(epochMillis + duration.inMilliseconds(), utc);
+        return new DateTime(epochMicros + duration.inMicroseconds(), utc);
     }
 
     public DateTime subtract(Duration duration) {
-        return new DateTime(epochMillis - duration.inMilliseconds(), utc);
+        return new DateTime(epochMicros - duration.inMicroseconds(), utc);
     }
 
     public Duration difference(DateTime other) {
-        return Duration.ofMicroseconds((epochMillis - other.epochMillis) * 1000L);
+        return Duration.ofMicroseconds(epochMicros - other.epochMicros);
     }
 
     public boolean isBefore(DateTime other) {
-        return epochMillis < other.epochMillis;
+        return epochMicros < other.epochMicros;
     }
 
     public boolean isAfter(DateTime other) {
-        return epochMillis > other.epochMillis;
+        return epochMicros > other.epochMicros;
     }
 
     public boolean isAtSameMomentAs(DateTime other) {
-        return epochMillis == other.epochMillis;
+        return epochMicros == other.epochMicros;
     }
 
     public DateTime toLocal() {
-        return utc ? new DateTime(epochMillis, false) : this;
+        return utc ? new DateTime(epochMicros, false) : this;
     }
 
     public DateTime toUtc() {
-        return utc ? this : new DateTime(epochMillis, true);
+        return utc ? this : new DateTime(epochMicros, true);
     }
 
     public long compareTo(DateTime other) {
-        return epochMillis < other.epochMillis ? -1 : (epochMillis > other.epochMillis ? 1 : 0);
+        return epochMicros < other.epochMicros ? -1 : (epochMicros > other.epochMicros ? 1 : 0);
     }
 
     /** The underlying instant as a {@link java.util.Date} (used by DateFormat). */
     public Date toJavaDate() {
-        return new Date(epochMillis);
+        return new Date(epochMillis());
     }
 
     public boolean isUtc() {
@@ -182,13 +201,13 @@ public final class DateTime {
         // isAtSameMomentAs is the instant-only comparison. Comparing instants
         // alone made them equal here, so a local and a UTC value collapsed into
         // one map or set key.
-        return o instanceof DateTime && ((DateTime) o).epochMillis == epochMillis
+        return o instanceof DateTime && ((DateTime) o).epochMicros == epochMicros
                 && ((DateTime) o).utc == utc;
     }
 
     @Override
     public int hashCode() {
-        return (int) (epochMillis ^ (epochMillis >>> 32));
+        return (int) (epochMicros ^ (epochMicros >>> 32));
     }
 
     @Override
@@ -196,12 +215,13 @@ public final class DateTime {
     /// same with a trailing {@code Z}. This returned java.util.Date's locale text in
     /// the host's time zone, so one transpiled value printed differently on each
     /// device, a UTC value lost its Z, and nothing expecting a Dart date string could
-    /// parse it back. Microseconds are not kept by this class, so they never print;
-    /// Dart omits them when they are zero too.
+    /// parse it back. Microseconds print as three more digits when they are not zero,
+    /// as Dart prints them.
     public String toString() {
+        long micros = microsecond();
         String text = fourDigits(year()) + "-" + twoDigits(month()) + "-" + twoDigits(day())
                 + " " + twoDigits(hour()) + ":" + twoDigits(minute()) + ":" + twoDigits(second())
-                + "." + threeDigits(millisecond());
+                + "." + threeDigits(millisecond()) + (micros == 0 ? "" : threeDigits(micros));
         return utc ? text + "Z" : text;
     }
 

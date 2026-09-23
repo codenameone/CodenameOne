@@ -272,6 +272,22 @@ public final class DartUri {
 
     private String canonical;
 
+    /**
+     * Value equality over the canonical text, as Dart's Uri has: two separate parses
+     * of one URL are equal, and https://EXAMPLE.com/a equals https://example.com/a.
+     * Inherited identity made every parse unequal to every other, so a Uri could
+     * never find its entry in a map or set.
+     */
+    @Override
+    public boolean equals(Object o) {
+        return o instanceof DartUri && toString().equals(o.toString());
+    }
+
+    @Override
+    public int hashCode() {
+        return toString().hashCode();
+    }
+
     private static String canonicalText(String t) {
         int end = t.length();
         for (int i = 0; i < t.length(); i++) {

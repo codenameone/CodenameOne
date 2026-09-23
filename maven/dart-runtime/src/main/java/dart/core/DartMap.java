@@ -191,9 +191,9 @@ public class DartMap<K, V> extends LinkedHashMap<K, V> {
         return m;
     }
 
-    /** Dart's {@code Map.identity()} — identity-keyed map (approximated by insertion order). */
+    /** Dart's {@code Map.identity()}: keys match only when they are the same object. */
     public static <K, V> DartMap<K, V> identity() {
-        return new DartMap<>();
+        return new DartIdentityMap<K, V>();
     }
 
     /** Dart's map[key]. */

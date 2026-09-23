@@ -166,6 +166,9 @@ public final class DString {
     }
 
     public static long indexOf(String s, String other, long start) {
+        // Dart range-checks the start; Java clamps a negative one to 0 and answers
+        // -1 past the end, so 'abc'.indexOf('a', -1) found the 'a'.
+        RangeError.checkValueInInterval(start, 0, s.length(), "start");
         return s.indexOf(other, (int) start);
     }
 
@@ -248,20 +251,108 @@ public final class DString {
 
     /** Dart's int.parse. */
     public static long parseInt(String s) {
-        try {
-            return Long.parseLong(s.trim());
-        } catch (NumberFormatException e) {
+        Long v = tryParseInt(s);
+        if (v == null) {
             throw new dart.core.FormatException("Invalid radix-10 number: " + s);
+        }
+        return v.longValue();
+    }
+
+    /** Dart's int.parse with {@code radix:}. */
+    public static long parseInt(String s, long radix) {
+        Long v = tryParseInt(s, radix);
+        if (v == null) {
+            throw new dart.core.FormatException("Invalid radix-" + radix + " number: " + s);
+        }
+        return v.longValue();
+    }
+
+    /** Dart's int.tryParse: decimal, or hexadecimal with a 0x prefix. */
+    public static Long tryParseInt(String s) {
+        return parseSigned(s, -1);
+    }
+
+    /** Dart's int.tryParse with {@code radix:} -- 2 to 36, no 0x prefix. */
+    public static Long tryParseInt(String s, long radix) {
+        if (radix < 2 || radix > 36) {
+            throw new RangeError("Invalid value: Not in inclusive range 2..36: " + radix);
+        }
+        return parseSigned(s, (int) radix);
+    }
+
+    /**
+     * Dart's integer syntax: surrounding whitespace, an optional sign, then digits
+     * in {@code radix} -- or, with no radix given, decimal digits or 0x and hex
+     * digits. Null when the text is not that.
+     */
+    private static Long parseSigned(String s, int radix) {
+        if (s == null) {
+            return null;
+        }
+        String t = s.trim();
+        boolean negative = false;
+        if (t.startsWith("-") || t.startsWith("+")) {
+            negative = t.charAt(0) == '-';
+            t = t.substring(1);
+        }
+        int r = radix;
+        if (r < 0) {
+            if (t.length() > 2 && t.charAt(0) == '0' && (t.charAt(1) == 'x' || t.charAt(1) == 'X')) {
+                t = t.substring(2);
+                r = 16;
+            } else {
+                r = 10;
+            }
+        }
+        if (t.isEmpty()) {
+            return null;
+        }
+        for (int i = 0; i < t.length(); i++) {
+            if (Character.digit(t.charAt(i), r) < 0) {
+                return null;   // also rejects a second sign, which parseLong would take
+            }
+        }
+        try {
+            return Long.valueOf(Long.parseLong(negative ? "-" + t : t, r));
+        } catch (NumberFormatException e) {
+            return null;   // out of range
         }
     }
 
-    /** Dart's int.tryParse. */
-    public static Long tryParseInt(String s) {
-        try {
-            return Long.parseLong(s.trim());
-        } catch (NumberFormatException e) {
-            return null;
+    /**
+     * Dart's String.toUpperCase: locale independent, one UTF-16 unit at a time, so
+     * a sharp s (U+00DF) is left alone, as Dart leaves it. Java's String.toUpperCase follows
+     * the default locale, and under Turkish folds i to a dotted capital.
+     */
+    public static String toUpperCase(String s) {
+        char[] out = null;
+        for (int i = 0; i < s.length(); i++) {
+            char c = s.charAt(i);
+            char u = Character.toUpperCase(c);
+            if (u != c) {
+                if (out == null) {
+                    out = s.toCharArray();
+                }
+                out[i] = u;
+            }
         }
+        return out == null ? s : new String(out);
+    }
+
+    /** Dart's String.toLowerCase: locale independent, as {@link #toUpperCase}. */
+    public static String toLowerCase(String s) {
+        char[] out = null;
+        for (int i = 0; i < s.length(); i++) {
+            char c = s.charAt(i);
+            char l = Character.toLowerCase(c);
+            if (l != c) {
+                if (out == null) {
+                    out = s.toCharArray();
+                }
+                out[i] = l;
+            }
+        }
+        return out == null ? s : new String(out);
     }
 
     /** Dart's double.parse. */

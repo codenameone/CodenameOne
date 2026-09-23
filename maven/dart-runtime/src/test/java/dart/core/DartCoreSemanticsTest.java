@@ -284,4 +284,93 @@ public class DartCoreSemanticsTest {
         assertEquals(Long.valueOf(42), DString.tryParseInt(" 42 "));
         assertThrows(FormatException.class, () -> DString.parseInt("nope"));
     }
+
+    // --- values recorded from the Dart SDK -------------------------------------
+
+    @Test
+    public void aDateTimeKeepsItsMicroseconds() {
+        DateTime a = DateTime.utc(2024, 1, 15, 10, 30, 0, 0, 1);
+        DateTime b = DateTime.utc(2024, 1, 15, 10, 30, 0, 0, 999);
+        assertFalse(a.equals(b));
+        assertEquals(998, b.difference(a).inMicroseconds());
+        assertEquals(1, a.microsecond());
+        assertEquals("2024-01-15 10:30:00.000001Z", a.toString());
+        assertEquals("2024-01-15 10:30:00.000Z", DateTime.utc(2024, 1, 15, 10, 30, 0, 0, 0).toString());
+        assertEquals(a.microsecondsSinceEpoch() + 5,
+                a.add(Duration.ofMicroseconds(5)).microsecondsSinceEpoch(), "a sub-millisecond add counts");
+        DateTime early = DateTime.fromMicrosecondsSinceEpoch(-1, true);
+        assertEquals(-1, early.millisecondsSinceEpoch(), "milliseconds round toward negative infinity");
+        assertEquals(999, early.microsecond());
+    }
+
+    @Test
+    public void anIdentityMapKeepsEqualKeysApart() {
+        DartMap<Object, String> m = DartMap.identity();
+        String a = new String("k");
+        String b = new String("k");
+        m.put(a, "first");
+        m.put(b, "second");
+        assertEquals(2, m.size(), "equal but distinct keys are two entries");
+        assertEquals("first", m.get(a));
+        assertEquals("second", m.get(b));
+        assertEquals(null, m.get("k"));
+        assertEquals(java.util.Arrays.asList(a, b), new java.util.ArrayList<Object>(m.keySet()));
+        m.remove(a);
+        assertEquals(1, m.size());
+    }
+
+    @Test
+    public void doublesPrintInDartNotation() {
+        // Recorded from the Dart SDK.
+        String[][] cases = {
+            {"0.0001", "0.0001"}, {"0.000001", "0.000001"}, {"1e-7", "1e-7"},
+            {"1e16", "10000000000000000.0"}, {"1e20", "100000000000000000000.0"},
+            {"1e21", "1e+21"}, {"1.5e22", "1.5e+22"}, {"12345678.9", "12345678.9"},
+            {"123.456", "123.456"}, {"-0.0005", "-0.0005"}, {"2.5e-10", "2.5e-10"},
+            {"0.1", "0.1"}, {"100.0", "100.0"}, {"1e300", "1e+300"},
+        };
+        for (String[] c : cases) {
+            assertEquals(c[1], dart.runtime.DartRuntime.doubleStr(Double.parseDouble(c[0])), c[0]);
+        }
+    }
+
+    @Test
+    public void intParseTakesARadixAndHex() {
+        assertEquals(255, DString.parseInt("ff", 16));
+        assertEquals(Long.valueOf(255), DString.tryParseInt("0xFF"));
+        assertEquals(Long.valueOf(-16), DString.tryParseInt("-0x10"));
+        assertEquals(Long.valueOf(1295), DString.tryParseInt("zz", 36));
+        assertEquals(null, DString.tryParseInt("12", 2));
+        assertEquals(null, DString.tryParseInt("--1"));
+        assertThrows(RangeError.class, () -> DString.tryParseInt("1", 37));
+    }
+
+    @Test
+    public void caseConversionIgnoresTheDefaultLocale() {
+        java.util.Locale saved = java.util.Locale.getDefault();
+        try {
+            java.util.Locale.setDefault(new java.util.Locale("tr", "TR"));
+            assertEquals("ISTANBUL", DString.toUpperCase("istanbul"), "no dotted capital I");
+            assertEquals("title", DString.toLowerCase("TITLE"), "no dotless i");
+        } finally {
+            java.util.Locale.setDefault(saved);
+        }
+        assertEquals("STRA\u00dfE", DString.toUpperCase("stra\u00dfe"), "Dart leaves the sharp s alone");
+    }
+
+    @Test
+    public void indexOfRangeChecksItsStart() {
+        assertThrows(RangeError.class, () -> DString.indexOf("abc", "a", -1));
+        assertThrows(RangeError.class, () -> DString.indexOf("abc", "a", 4));
+        assertEquals(-1, DString.indexOf("abc", "c", 3), "the length itself is a valid start");
+    }
+
+    @Test
+    public void equivalentUrisAreEqual() {
+        DartUri a = DartUri.parse("https://EXAMPLE.com/a");
+        DartUri b = DartUri.parse("https://example.com/a");
+        assertEquals(a, b);
+        assertEquals(a.hashCode(), b.hashCode());
+        assertFalse(a.equals(DartUri.parse("https://example.com/A")), "the path is case sensitive");
+    }
 }

@@ -415,21 +415,65 @@ public final class DartRuntime {
             }
             return l + ".0";
         }
-        String s = Double.toString(d);
-        int e = s.indexOf('E');
-        if (e < 0) {
-            return s;
+        return dartNotation(d);
+    }
+
+    /**
+     * The layout Dart gives a double's shortest digits -- the JavaScript
+     * Number-to-String rule: plain notation for magnitudes from 1e-7 up to 1e21,
+     * exponent notation outside it. Java's own thresholds are 1e-3 and 1e7, so its
+     * text was wrong in both bands: 0.0001 printed as 1e-4 and 12345678.9 as
+     * 1.23456789e+7. Java's digits are reused -- they are the shortest that round
+     * trip -- and only the point moves.
+     */
+    private static String dartNotation(double d) {
+        String s = Double.toString(Math.abs(d));
+        int ePos = s.indexOf('E');
+        String mantissa = ePos < 0 ? s : s.substring(0, ePos);
+        int exp10 = ePos < 0 ? 0 : Integer.parseInt(s.substring(ePos + 1));
+        int dot = mantissa.indexOf('.');
+        String digits = dot < 0 ? mantissa : mantissa.substring(0, dot) + mantissa.substring(dot + 1);
+        // n: where the decimal point falls, counted in digits from the left.
+        int n = (dot < 0 ? mantissa.length() : dot) + exp10;
+        int lead = 0;
+        while (lead < digits.length() - 1 && digits.charAt(lead) == '0') {
+            lead++;
         }
-        // Normalize Java's "1.0E21" to Dart's "1e+21" style.
-        String mantissa = s.substring(0, e);
-        String exp = s.substring(e + 1);
-        if (mantissa.endsWith(".0")) {
-            mantissa = mantissa.substring(0, mantissa.length() - 2);
+        digits = digits.substring(lead);
+        n -= lead;
+        int end = digits.length();
+        while (end > 1 && digits.charAt(end - 1) == '0') {
+            end--;
         }
-        if (!exp.startsWith("-")) {
-            exp = "+" + exp;
+        digits = digits.substring(0, end);
+        int k = digits.length();
+        StringBuilder out = new StringBuilder();
+        if (d < 0) {
+            out.append('-');
         }
-        return mantissa + "e" + exp;
+        if (k <= n && n <= 21) {
+            out.append(digits);
+            for (int i = k; i < n; i++) {
+                out.append('0');
+            }
+            return out.append(".0").toString();
+        }
+        if (0 < n && n <= 21) {
+            return out.append(digits, 0, n).append('.').append(digits, n, k).toString();
+        }
+        if (-6 < n && n <= 0) {
+            out.append("0.");
+            for (int i = n; i < 0; i++) {
+                out.append('0');
+            }
+            return out.append(digits).toString();
+        }
+        int e = n - 1;
+        out.append(digits.charAt(0));
+        if (k > 1) {
+            out.append('.').append(digits, 1, k);
+        }
+        return out.append('e').append(e < 0 ? '-' : '+').append(Math.abs(e)).toString();
     }
 
     /**
