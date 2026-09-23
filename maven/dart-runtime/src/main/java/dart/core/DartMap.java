@@ -53,6 +53,73 @@ public class DartMap<K, V> extends LinkedHashMap<K, V> {
         return System.identityHashCode(this);
     }
 
+    /**
+     * The other boxed forms Dart's {@code ==} equates with a numeric key: 1 with
+     * 1.0, and 0.0 with -0.0 and 0. Empty for anything that is not a number, so a
+     * String key pays one instanceof. Java's wrappers are equal only within their
+     * own class, which made {@code {1: 'a'}[1.0]} null and {@code m[1.0] = 'b'} a
+     * second entry beside the int 1.
+     */
+    static Object[] numericTwins(Object key) {
+        if (key instanceof Double) {
+            double d = ((Double) key).doubleValue();
+            if (d == Math.rint(d) && d >= -9.223372036854775808E18 && d < 9.223372036854775808E18) {
+                Long asInt = Long.valueOf((long) d);
+                return d == 0 ? new Object[] {asInt, Double.valueOf(-d)} : new Object[] {asInt};
+            }
+            return NO_TWINS;
+        }
+        if (key instanceof Long || key instanceof Integer) {
+            long l = ((Number) key).longValue();
+            double d = (double) l;
+            if ((long) d == l && d < 9.223372036854775808E18) {
+                return l == 0 ? new Object[] {Double.valueOf(0.0), Double.valueOf(-0.0)}
+                        : new Object[] {Double.valueOf(d)};
+            }
+        }
+        return NO_TWINS;
+    }
+
+    static final Object[] NO_TWINS = new Object[0];
+
+    /**
+     * The key this map already stores for {@code key} under Dart's {@code ==}, or
+     * {@code key} itself. Dart keeps the key an entry was first stored under, so
+     * {@code m[1.0] = 'b'} on a map holding 1 updates that entry and the key stays 1.
+     */
+    private Object storedKey(Object key) {
+        if (!(key instanceof Number) || super.containsKey(key)) {
+            return key;
+        }
+        for (Object twin : numericTwins(key)) {
+            if (super.containsKey(twin)) {
+                return twin;
+            }
+        }
+        return key;
+    }
+
+    @Override
+    public V get(Object key) {
+        return super.get(storedKey(key));
+    }
+
+    @Override
+    public boolean containsKey(Object key) {
+        return super.containsKey(storedKey(key));
+    }
+
+    @Override
+    @SuppressWarnings("unchecked")
+    public V put(K key, V value) {
+        return super.put((K) storedKey(key), value);
+    }
+
+    @Override
+    public V remove(Object key) {
+        return super.remove(storedKey(key));
+    }
+
     public DartMap() {
     }
 

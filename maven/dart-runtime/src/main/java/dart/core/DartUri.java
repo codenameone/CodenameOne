@@ -74,7 +74,7 @@ public final class DartUri {
         }
         int colon = s.indexOf(':');
         if (colon > 0 && isScheme(s.substring(0, colon))) {
-            scheme = s.substring(0, colon).toLowerCase();
+            scheme = asciiLower(s.substring(0, colon));
             s = s.substring(colon + 1);
         }
         if (s.startsWith("//")) {
@@ -113,8 +113,34 @@ public final class DartUri {
             } else {
                 host = authority;
             }
+            // Dart canonicalises a registered name to lower case, so
+            // https://EXAMPLE.COM/ and https://example.com/ have the same host --
+            // host allowlists, route matches and host-keyed caches depend on it.
+            host = asciiLower(host);
         }
         path = s;
+    }
+
+    /**
+     * ASCII-only lower case. Schemes and host names are ASCII by definition, and
+     * String.toLowerCase is locale sensitive: on a Turkish device "HTTP" folds
+     * its I to a dotless i and no longer equals "http".
+     */
+    private static String asciiLower(String s) {
+        if (s == null) {
+            return null;
+        }
+        char[] out = null;
+        for (int i = 0; i < s.length(); i++) {
+            char c = s.charAt(i);
+            if (c >= 'A' && c <= 'Z') {
+                if (out == null) {
+                    out = s.toCharArray();
+                }
+                out[i] = (char) (c + ('a' - 'A'));
+            }
+        }
+        return out == null ? s : new String(out);
     }
 
     private static boolean isScheme(String s) {
@@ -231,8 +257,73 @@ public final class DartUri {
         }
     }
 
+    /**
+     * The text with its scheme and host folded to lower case, as Dart's Uri prints
+     * them: Uri.parse('HTTPS://EXAMPLE.COM/P').toString() is https://example.com/P.
+     * The path, query and fragment are case sensitive and stay as written.
+     */
     @Override
     public String toString() {
-        return text;
+        if (canonical == null) {
+            canonical = canonicalText(text);
+        }
+        return canonical;
+    }
+
+    private String canonical;
+
+    private static String canonicalText(String t) {
+        int end = t.length();
+        for (int i = 0; i < t.length(); i++) {
+            char c = t.charAt(i);
+            if (c == '?' || c == '#') {
+                end = i;
+                break;
+            }
+        }
+        char[] out = null;
+        int rest = 0;
+        int colon = t.indexOf(':');
+        if (colon > 0 && colon < end && isScheme(t.substring(0, colon))) {
+            out = foldRange(t, out, 0, colon);
+            rest = colon + 1;
+        }
+        if (t.startsWith("//", rest)) {
+            int authStart = rest + 2;
+            int authEnd = end;
+            for (int i = authStart; i < end; i++) {
+                if (t.charAt(i) == '/') {
+                    authEnd = i;
+                    break;
+                }
+            }
+            int at = t.indexOf('@', authStart);
+            int hostStart = at >= 0 && at < authEnd ? at + 1 : authStart;
+            int hostEnd = authEnd;
+            if (hostStart < authEnd && t.charAt(hostStart) == '[') {
+                int close = t.indexOf(']', hostStart);
+                hostEnd = close >= 0 && close < authEnd ? close : authEnd;
+            } else {
+                int pc = t.indexOf(':', hostStart);
+                if (pc >= 0 && pc < authEnd) {
+                    hostEnd = pc;
+                }
+            }
+            out = foldRange(t, out, hostStart, hostEnd);
+        }
+        return out == null ? t : new String(out);
+    }
+
+    private static char[] foldRange(String t, char[] out, int from, int to) {
+        for (int i = from; i < to; i++) {
+            char c = t.charAt(i);
+            if (c >= 'A' && c <= 'Z') {
+                if (out == null) {
+                    out = t.toCharArray();
+                }
+                out[i] = (char) (c + ('a' - 'A'));
+            }
+        }
+        return out;
     }
 }

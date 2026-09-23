@@ -38,7 +38,32 @@ public final class DartComparable {
      * value as {@code a} orders before, equal to, or after {@code b}.
      */
     @SuppressWarnings({"unchecked", "rawtypes"})
-    public static long compare(Comparable a, Comparable b) {
-        return a.compareTo(b);
+    public static long compare(Object a, Object b) {
+        if (a instanceof Number && b instanceof Number) {
+            return compareNumbers((Number) a, (Number) b);
+        }
+        if (a instanceof Comparable) {
+            return ((Comparable) a).compareTo(b);
+        }
+        throw new TypeError("type '" + (a == null ? "Null" : a.getClass().getName())
+                + "' is not a subtype of type 'Comparable'");
+    }
+
+    /**
+     * Dart's {@code num.compareTo} across int and double. Java's wrappers only
+     * compare within their own class, so a List&lt;num&gt; holding 2 and 1.5
+     * threw ClassCastException from Long.compareTo(Double) instead of sorting.
+     * Double.compare gives Dart's order for doubles too: -0.0 before 0.0, NaN
+     * after everything.
+     */
+    private static long compareNumbers(Number a, Number b) {
+        boolean ai = a instanceof Long || a instanceof Integer || a instanceof Short || a instanceof Byte;
+        boolean bi = b instanceof Long || b instanceof Integer || b instanceof Short || b instanceof Byte;
+        if (ai && bi) {
+            long x = a.longValue();
+            long y = b.longValue();
+            return x < y ? -1 : x > y ? 1 : 0;
+        }
+        return Double.compare(a.doubleValue(), b.doubleValue());
     }
 }

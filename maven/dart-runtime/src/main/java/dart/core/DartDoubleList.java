@@ -49,6 +49,15 @@ public final class DartDoubleList extends DartList<Double> {
         this.len = len;
     }
 
+    /**
+     * A fixed-length list over {@code backing} itself, not a copy: writes through
+     * it land in the array. Dart's Float64List views -- vector_math's
+     * {@code Matrix4.storage} -- are exactly that.
+     */
+    public static DartDoubleList view(double[] backing) {
+        return new DartDoubleList(backing, backing.length, false);
+    }
+
     /** Literal helper for Dart's &lt;double&gt;[a, b, c]. */
     public static DartDoubleList ofDoubles(double... elements) {
         double[] backing = elements.length == 0 ? new double[8] : Arrays.copyOf(elements, Math.max(8, elements.length));

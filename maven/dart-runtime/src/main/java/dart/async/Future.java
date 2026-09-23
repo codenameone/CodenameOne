@@ -512,6 +512,13 @@ public class Future<T> {
         }
     }
 
+    /** True once completed, or once completed WITH a future that has not settled yet. */
+    boolean isCompletedOrAdopting() {
+        synchronized (lock) {
+            return done || adopting;
+        }
+    }
+
     boolean isDone() {
         synchronized (lock) {
             return done;

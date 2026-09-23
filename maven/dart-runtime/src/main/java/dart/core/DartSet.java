@@ -58,6 +58,38 @@ public class DartSet<E> extends LinkedHashSet<E> {
     public DartSet() {
     }
 
+    /**
+     * The element this set already holds for {@code e} under Dart's {@code ==}, or
+     * {@code e} itself -- {@code <num>{1}.contains(1.0)} is true in Dart, and adding
+     * 1.0 leaves the set as {1}. See {@link DartMap#numericTwins}.
+     */
+    private Object storedElement(Object e) {
+        if (!(e instanceof Number) || super.contains(e)) {
+            return e;
+        }
+        for (Object twin : DartMap.numericTwins(e)) {
+            if (super.contains(twin)) {
+                return twin;
+            }
+        }
+        return e;
+    }
+
+    @Override
+    public boolean contains(Object e) {
+        return super.contains(storedElement(e));
+    }
+
+    @Override
+    public boolean add(E e) {
+        return storedElement(e) == e ? super.add(e) : false;
+    }
+
+    @Override
+    public boolean remove(Object e) {
+        return super.remove(storedElement(e));
+    }
+
     @SafeVarargs
     public static <E> DartSet<E> of(E... elements) {
         DartSet<E> s = new DartSet<>();

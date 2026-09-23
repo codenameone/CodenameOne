@@ -79,6 +79,16 @@ public final class StringBuffer {
 
     /** Dart's {@code StringBuffer.writeCharCode(int charCode)}. */
     public void writeCharCode(long charCode) {
+        if (charCode < 0 || charCode > 0x10FFFF) {
+            throw new RangeError("Invalid value: Not in inclusive range 0..1114111: " + charCode);
+        }
+        if (charCode > 0xFFFF) {
+            // A supplementary code point is TWO UTF-16 code units. Narrowing it to
+            // one char kept only the low bits: 0x1F600 became U+F600.
+            long v = charCode - 0x10000;
+            sb.append((char) (0xD800 + (v >> 10))).append((char) (0xDC00 + (v & 0x3FF)));
+            return;
+        }
         sb.append((char) charCode);
     }
 

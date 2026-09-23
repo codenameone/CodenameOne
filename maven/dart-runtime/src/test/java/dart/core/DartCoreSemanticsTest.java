@@ -200,4 +200,88 @@ public class DartCoreSemanticsTest {
         assertEquals("a$1c", DString.replaceAll("abc", new RegExp("(b)"), "$1"), "the replacement is literal");
         assertEquals("a-b2", DString.replaceFirst("a1b2", new RegExp("[0-9]"), "-"));
     }
+
+    // --- numbers as keys, sorting, text ----------------------------------------
+
+    @Test
+    public void aDoubleKeyFindsTheEqualIntKey() {
+        DartMap<Object, String> m = new DartMap<Object, String>();
+        m.put(Long.valueOf(1), "a");
+        assertEquals("a", m.get(Double.valueOf(1.0)), "{1: 'a'}[1.0]");
+        m.put(Double.valueOf(1.0), "b");
+        assertEquals(1, m.size(), "m[1.0] = 'b' updates the entry for 1");
+        assertTrue(m.keySet().iterator().next() instanceof Long, "and the key stays the int 1");
+        assertEquals("b", m.get(Long.valueOf(1)));
+        m.put(Double.valueOf(0.0), "zero");
+        assertEquals("zero", m.get(Double.valueOf(-0.0)), "0.0 == -0.0");
+        assertEquals("zero", m.remove(Long.valueOf(0)));
+        assertFalse(m.containsKey(Double.valueOf(0.0)));
+    }
+
+    @Test
+    public void aSetHoldsOneOfEachEqualNumber() {
+        DartSet<Object> s = new DartSet<Object>();
+        s.add(Long.valueOf(1));
+        assertTrue(s.contains(Double.valueOf(1.0)));
+        assertFalse(s.add(Double.valueOf(1.0)), "adding 1.0 to {1} changes nothing");
+        assertEquals(1, s.size());
+        assertTrue(s.remove(Double.valueOf(1.0)));
+        assertTrue(s.isEmpty());
+    }
+
+    @Test
+    public void mixedNumbersSortNumerically() {
+        DartList<Object> l = new DartList<Object>();
+        l.add(Long.valueOf(2));
+        l.add(Double.valueOf(1.5));
+        l.add(Long.valueOf(1));
+        l.sortDefault();   // what the emitter calls for a bare sort()
+        assertEquals(java.util.Arrays.<Object>asList(Long.valueOf(1), Double.valueOf(1.5), Long.valueOf(2)), l);
+        assertTrue(DartComparable.compare(Long.valueOf(1), Double.valueOf(1.5)) < 0);
+    }
+
+    @Test
+    public void equalIntMapsAreNotEqualMaps() {
+        DartLongMap a = new DartLongMap();
+        DartLongMap b = new DartLongMap();
+        a.putLong(1, 2);
+        b.putLong(1, 2);
+        assertFalse(a.equals(b), "<int, int>{1: 2} == <int, int>{1: 2} is false in Dart");
+        assertTrue(a.equals(a));
+    }
+
+    @Test
+    public void writeCharCodeWritesASurrogatePairAboveTheBmp() {
+        StringBuffer sb = new StringBuffer();
+        sb.writeCharCode(0x1F600);
+        assertEquals("\uD83D\uDE00", sb.toString());
+        assertThrows(RangeError.class, () -> new StringBuffer().writeCharCode(0x110000));
+    }
+
+    @Test
+    public void theHostAndSchemeAreCanonicallyLowerCase() {
+        DartUri u = DartUri.parse("HTTPS://User@EXAMPLE.COM:8080/Path?Q=V#Frag");
+        assertEquals("https", u.scheme());
+        assertEquals("example.com", u.host());
+        assertEquals("https://User@example.com:8080/Path?Q=V#Frag", u.toString(),
+                "the path, query, fragment and user info keep their case");
+        assertEquals("fe80::1", DartUri.parse("http://[FE80::1]:80/").host());
+    }
+
+    @Test
+    public void padLeftRepeatsTheWholePaddingOncePerMissingPosition() {
+        // Recorded from the Dart SDK: 'x'.padLeft(4, 'ab') is 'abababx', NOT
+        // 'ababx'. The padding is prepended once per missing position whatever its
+        // length, which the Dart documentation spells out for multi-character
+        // padding such as '&nbsp;'.
+        assertEquals("abababx", DString.padLeft("x", 4, "ab"));
+        assertEquals("xababab", DString.padRight("x", 4, "ab"));
+    }
+
+    @Test
+    public void tryParseAnswersNullAndParseThrowsFormatException() {
+        assertEquals(null, DString.tryParseInt("x1"));
+        assertEquals(Long.valueOf(42), DString.tryParseInt(" 42 "));
+        assertThrows(FormatException.class, () -> DString.parseInt("nope"));
+    }
 }

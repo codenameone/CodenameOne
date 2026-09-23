@@ -372,7 +372,12 @@ public class DartList<E> extends AbstractList<E> implements RandomAccess {
             arr[i] = get(i);
         }
         if (compare == null) {
-            java.util.Arrays.sort(arr);
+            // Dart's default order is Comparable.compare, which compares int and
+            // double numerically; Arrays.sort's natural order throws across them.
+            java.util.Arrays.sort(arr, (a, b) -> {
+                long r = DartComparable.compare(a, b);
+                return r < 0 ? -1 : (r > 0 ? 1 : 0);
+            });
         } else {
             java.util.Arrays.sort(arr, (a, b) -> {
                 long r = compare.call((E) a, (E) b);

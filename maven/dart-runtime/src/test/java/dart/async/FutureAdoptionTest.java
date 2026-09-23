@@ -260,4 +260,31 @@ public class FutureAdoptionTest {
     public void waitOnNothingCompletesWithAnEmptyList() {
         assertEquals(0, Future.wait(new java.util.ArrayList<Future<?>>()).valueOrThrow().size());
     }
+
+    // --- Completer and Timer ---------------------------------------------------
+
+    @Test
+    public void aCompleterAdoptingAPendingFutureIsCompleted() {
+        Completer<Object> c = new Completer<Object>();
+        Completer<Object> inner = new Completer<Object>();
+        c.complete(inner.future());
+        assertTrue(c.isCompleted(), "complete(pendingFuture) has been called, so it is completed");
+        assertThrows(dart.core.StateError.class, () -> c.complete("again"));
+        inner.complete("v");
+        assertEquals("v", c.future().valueOrThrow());
+    }
+
+    @Test
+    @Timeout(value = 10, threadMode = Timeout.ThreadMode.SEPARATE_THREAD)
+    public void aNegativeTimerStillFires() throws Exception {
+        final java.util.concurrent.CountDownLatch fired = new java.util.concurrent.CountDownLatch(1);
+        new Timer(dart.core.Duration.ofMicroseconds(-5000L), new Funcs.VoidFunc0() {
+            @Override
+            public void call() {
+                fired.countDown();
+            }
+        });
+        assertTrue(fired.await(5, java.util.concurrent.TimeUnit.SECONDS),
+                "a negative delay fires as soon as possible, as though it were zero");
+    }
 }

@@ -42,7 +42,14 @@ public class Completer<T> {
         future.completeError(error);
     }
 
+    /**
+     * Dart's {@code isCompleted}: true once complete or completeError has been
+     * called -- including complete(aFuture) while that future is still pending.
+     * Asking whether the returned future had SETTLED reported false through that
+     * adoption window, so the usual {@code if (!c.isCompleted) c.complete(...)}
+     * guard let a second completion through and it threw StateError.
+     */
     public boolean isCompleted() {
-        return future.isDone();
+        return future.isCompletedOrAdopting();
     }
 }

@@ -66,6 +66,21 @@ public final class DartLongMap extends AbstractMap<Long, Long> {
     // dropped. (A slot-local key/value mirror was tried and REVERTED: it 5x'd the table memory and
     // the cache/GC pressure on a large map outweighed avoiding the chase; interleaving key+value is
     // the memory-neutral win instead -- it removes the second random miss without adding any array.)
+    /// Identity, like {@link DartMap}: Dart maps compare by identity unless a type
+    /// overrides {@code operator ==}. The emitter specialises a Map&lt;int, int&gt; to
+    /// this class, which inherited AbstractMap's structural equality, so two equal
+    /// literals compared == and collapsed into one key where Dart keeps two.
+    @Override
+    public boolean equals(Object other) {
+        return this == other;
+    }
+
+    /// Consistent with {@link #equals}: identity.
+    @Override
+    public int hashCode() {
+        return System.identityHashCode(this);
+    }
+
     public DartLongMap() {
         data = new long[16];       // 8 entries * 2 slots
         present = new boolean[8];
