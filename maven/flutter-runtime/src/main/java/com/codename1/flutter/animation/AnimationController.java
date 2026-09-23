@@ -171,31 +171,35 @@ public class AnimationController extends Animation<Double> {
     // Playback controls
     // ------------------------------------------------------------------
 
-    public void forward(Double from) {
+    public dart.async.Future<Object> forward(Double from) {
         if (from != null) {
             currentValue = clamp(from);
         }
         repeating = false;
+        dart.async.Future<Object> done = newRun();
         beginRun(upperBound, durationMs, AnimationStatus.forward);
+        return done;
     }
 
     /** No-argument {@code forward()} — usable as a bare {@code VoidCallback} tear-off. */
-    public void forward() {
-        forward(null);
+    public dart.async.Future<Object> forward() {
+        return forward(null);
     }
 
     /** No-argument {@code reverse()} — usable as a bare {@code VoidCallback} tear-off. */
-    public void reverse() {
-        reverse(null);
+    public dart.async.Future<Object> reverse() {
+        return reverse(null);
     }
 
-    public void reverse(Double from) {
+    public dart.async.Future<Object> reverse(Double from) {
         if (from != null) {
             currentValue = clamp(from);
         }
         repeating = false;
         long d = reverseDurationMs >= 0 ? reverseDurationMs : durationMs;
+        dart.async.Future<Object> done = newRun();
         beginRun(lowerBound, d, AnimationStatus.reverse);
+        return done;
     }
 
     /**
@@ -206,20 +210,25 @@ public class AnimationController extends Animation<Double> {
      * fling's settle) and {@code animationBehavior} are captured for API shape;
      * this runtime plays a plain timed run to the target bound.
      */
-    public void fling(double velocity, Object springDescription, AnimationBehavior animationBehavior) {
+    public dart.async.Future<Object> fling(double velocity, Object springDescription,
+                                          AnimationBehavior animationBehavior) {
         repeating = false;
+        dart.async.Future<Object> done = newRun();
         if (velocity < 0.0) {
             beginRun(lowerBound, durationMs, AnimationStatus.reverse);
         } else {
             beginRun(upperBound, durationMs, AnimationStatus.forward);
         }
+        return done;
     }
 
-    public void animateTo(double target, Duration duration, Curve curve) {
+    public dart.async.Future<Object> animateTo(double target, Duration duration, Curve curve) {
         repeating = false;
         AnimationStatus dir = target >= currentValue
                 ? AnimationStatus.forward : AnimationStatus.reverse;
+        dart.async.Future<Object> done = newRun();
         beginRun(clamp(target), simulationMillis(target, duration, dir), dir, curve);
+        return done;
     }
 
     /**
@@ -254,11 +263,30 @@ public class AnimationController extends Animation<Double> {
         return Math.round(base * remaining);
     }
 
-    public void animateBack(double target, Duration duration, Curve curve) {
+    public dart.async.Future<Object> animateBack(double target, Duration duration, Curve curve) {
         repeating = false;
+        dart.async.Future<Object> done = newRun();
         beginRun(clamp(target),
                 simulationMillis(target, duration, AnimationStatus.reverse),
                 AnimationStatus.reverse, curve);
+        return done;
+    }
+
+    /// The future the CURRENT run completes, as Flutter's TickerFuture: it
+    /// completes when this run reaches its target, and never when the run is
+    /// stopped or replaced by another -- Flutter's plain TickerFuture does not
+    /// complete on cancellation either.
+    ///
+    /// These controls were void, so `await controller.forward()` returned at once
+    /// and `.then(...)` ran before the first frame: "reverse, then remove the
+    /// widget" removed it while the reverse was still to play. Created BEFORE the
+    /// run begins, because a zero-length run finishes inside beginRun.
+    private dart.async.Completer<Object> runCompleter;
+
+    private dart.async.Future<Object> newRun() {
+        dart.async.Completer<Object> c = new dart.async.Completer<Object>();
+        runCompleter = c;
+        return c.future();
     }
 
     public void repeat(Double min, Double max, Boolean reverse, Duration period) {
@@ -272,6 +300,8 @@ public class AnimationController extends Animation<Double> {
     }
 
     public void stop(Boolean canceled) {
+        // A stopped run's future never completes, as in Flutter.
+        runCompleter = null;
         running = false;
         generation++;
         // Leave the frame clock immediately; it stops itself once nothing is running.
@@ -434,6 +464,14 @@ public class AnimationController extends Animation<Double> {
         if (terminal != status) {
             status = terminal;
             notifyStatusListeners(status);
+        }
+        // Completed after the listeners have seen the final value, so code that
+        // awaited the run observes the finished state. A repeating run never
+        // completes -- it has no end -- which is also Flutter's behaviour.
+        if (!repeating && runCompleter != null) {
+            dart.async.Completer<Object> c = runCompleter;
+            runCompleter = null;
+            c.complete(null);
         }
         if (repeating && Display.isInitialized()) {
             if (repeatReverse) {

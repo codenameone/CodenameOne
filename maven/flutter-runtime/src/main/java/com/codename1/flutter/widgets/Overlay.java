@@ -119,7 +119,17 @@ public class Overlay extends Widget {
             state.attach(this);
             Overlay o = widget;
             if (o.initialEntries != null) {
-                state.entries().addAll(o.initialEntries);
+                // Attached as OverlayState.insert attaches, minus the rebuild --
+                // the first build is about to include them. Copied in bare, they
+                // had no owner: markNeedsBuild() did nothing and remove() marked
+                // the entry unmounted without the rebuild that takes it off
+                // screen, so an initial entry could never be dismissed.
+                for (OverlayEntry entry : o.initialEntries) {
+                    if (entry != null && !state.entries().contains(entry)) {
+                        entry.attach(state);
+                        state.entries().add(entry);
+                    }
+                }
             }
         }
 

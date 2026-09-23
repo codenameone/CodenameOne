@@ -79,14 +79,14 @@ class AnimationController extends Animation<double> {
   external set value(double v);
   // Drives the controller with a spring toward its bound at the given velocity —
   // Flutter's `AnimationController.fling`.
-  external void fling({double? velocity, Object? springDescription, AnimationBehavior? animationBehavior});
+  external Future<void> fling({double? velocity, Object? springDescription, AnimationBehavior? animationBehavior});
   external Duration? get duration;
   external set duration(Duration? v);
   external Animation<double> get view;
-  external void forward({double? from});
-  external void reverse({double? from});
-  external void animateTo(double target, {Duration? duration, Curve? curve});
-  external void animateBack(double target, {Duration? duration, Curve? curve});
+  external Future<void> forward({double? from});
+  external Future<void> reverse({double? from});
+  external Future<void> animateTo(double target, {Duration? duration, Curve? curve});
+  external Future<void> animateBack(double target, {Duration? duration, Curve? curve});
   external void repeat({double? min, double? max, bool? reverse, Duration? period});
   external void stop({bool? canceled});
   external void reset();
