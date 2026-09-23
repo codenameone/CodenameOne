@@ -359,6 +359,46 @@ jobs:
           [ "$code" = "200" ] || { echo "MISSING on R2: codenameone-guibuilder (HTTP $code)" >&2; exit 1; }
           echo "ok: codenameone-guibuilder ${GITHUB_REF_NAME} on R2"
 
+      # --- Flutter runtime and Dart runtime -----------------------------------
+      # codenameone-dart-runtime and codenameone-flutter-runtime compile at
+      # release 17, so the maven/ reactor only includes them on JDK 17 (the
+      # flutter-modules profile) and the JDK 8 core pass above never builds them.
+      # Without this pass a project that declares codenameone-flutter-runtime at a
+      # released version -- as the archetype documentation says to -- cannot
+      # resolve it. The transpiler itself builds on JDK 8 and ships with the core.
+      - name: Build and stage the Flutter runtimes
+        id: deploy_flutter
+        continue-on-error: true
+        if: >-
+          always() && (steps.deploy.outcome == 'success' ||
+          steps.r2_core.outcome == 'success')
+        run: |
+          export GPG_TTY=$(tty)
+          cd maven
+          # -pl without -am: the parent and core were released above and are in
+          # the local repository at this version; re-staging them here would
+          # produce new signatures for artifacts that are already immutable on R2.
+          # With -pl the plugin stages under the FIRST reactor module's target --
+          # maven/dart-runtime/target/central-staging, holding both runtimes --
+          # not under maven/target, so the core tree is left untouched.
+          xvfb-run -a mvn deploy -Psign-artifacts -Dgpg.passphrase=$MAVEN_GPG_PASSPHRASE \
+            -pl dart-runtime,flutter-runtime -DskipTests -DskipPublishing=true
+        env:
+          MAVEN_GPG_PASSPHRASE: ${{ secrets.MAVEN_GPG_PASSPHRASE }}
+
+      - name: Publish Flutter runtimes to R2
+        id: r2_flutter
+        continue-on-error: true
+        if: always() && steps.deploy_flutter.conclusion != 'skipped'
+        run: |
+          bash maven/scripts/r2/publish-staging-to-r2.sh maven/dart-runtime/target/central-staging
+          for artifact in codenameone-dart-runtime codenameone-flutter-runtime; do
+            url="${R2_BASE_URL}/com/codenameone/${artifact}/${GITHUB_REF_NAME}/${artifact}-${GITHUB_REF_NAME}.pom?cb=${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+            code=$(curl -s -o /dev/null -w "%{http_code}" "$url")
+            [ "$code" = "200" ] || { echo "MISSING on R2: $artifact (HTTP $code)" >&2; exit 1; }
+            echo "ok: $artifact ${GITHUB_REF_NAME} on R2"
+          done
+
       - name: Mark the R2 release complete
         id: r2_mark_complete
         continue-on-error: true
@@ -387,12 +427,14 @@ jobs:
           steps.deploy_certificatewizard.outcome == 'success' &&
           steps.deploy_settings.outcome == 'success' &&
           steps.deploy_guibuilder.outcome == 'success' &&
+          steps.deploy_flutter.outcome == 'success' &&
           steps.r2_core.outcome == 'success' &&
           steps.r2_core_confirm.outcome == 'success' &&
           steps.r2_gamebuilder.outcome == 'success' &&
           steps.r2_certificatewizard.outcome == 'success' &&
           steps.r2_settings.outcome == 'success' &&
-          steps.r2_guibuilder.outcome == 'success'
+          steps.r2_guibuilder.outcome == 'success' &&
+          steps.r2_flutter.outcome == 'success'
         run: bash maven/scripts/r2/mark-release-complete.sh "${GITHUB_REF_NAME}"
 
       - name: Regenerate R2 metadata and archetype catalog
@@ -445,12 +487,14 @@ jobs:
           bad "${{ steps.deploy_certificatewizard.outcome }}" && fail "Signing Wizard build"
           bad "${{ steps.deploy_settings.outcome }}" && fail "Settings build"
           bad "${{ steps.deploy_guibuilder.outcome }}" && fail "GUI Builder build"
+          bad "${{ steps.deploy_flutter.outcome }}" && fail "Flutter runtimes build"
           bad "${{ steps.r2_core.outcome }}" && fail "core reactor -> R2"
           bad "${{ steps.r2_core_confirm.outcome }}" && fail "core artifacts missing on R2"
           bad "${{ steps.r2_gamebuilder.outcome }}" && fail "Game Builder -> R2"
           bad "${{ steps.r2_certificatewizard.outcome }}" && fail "Signing Wizard -> R2"
           bad "${{ steps.r2_settings.outcome }}" && fail "Settings -> R2"
           bad "${{ steps.r2_guibuilder.outcome }}" && fail "GUI Builder -> R2"
+          bad "${{ steps.r2_flutter.outcome }}" && fail "Flutter runtimes -> R2"
           bad "${{ steps.r2_mark_complete.outcome }}" && fail "marking the R2 release complete"
           bad "${{ steps.r2_metadata.outcome }}" && fail "R2 metadata regeneration"
           # A skipped marker is not a legitimate skip: it is how a release ends up
