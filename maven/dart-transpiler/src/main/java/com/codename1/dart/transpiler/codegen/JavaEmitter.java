@@ -4007,6 +4007,15 @@ public final class JavaEmitter {
             return coerce(new Out("DartRuntime.dynBinary(\"" + baseOp + "\", " + readCode + ", "
                     + rhs.code + ")", TypeRef.DYNAMIC), vt, ctx);
         }
+        if (vt != null && vt.is("String") && baseOp.equals("*")) {
+            ctx.importClass("dart.core.DString");
+            return "DString.repeat(" + readCode + ", " + rhs.code + ")";
+        }
+        if (vt != null && vt.is("num") && !baseOp.equals("/")) {
+            // A num slot keeps an int an int, as the binary operator does.
+            ctx.importClass("dart.runtime.DartRuntime");
+            return "((Number) DartRuntime.dynBinary(\"" + baseOp + "\", " + readCode + ", " + rhs.code + "))";
+        }
         if (baseOp.equals("~/") || baseOp.equals("%")) {
             ctx.importClass("dart.runtime.DartRuntime");
             String fn = baseOp.equals("~/") ? "tdiv" : "mod";
@@ -4267,7 +4276,9 @@ public final class JavaEmitter {
                     : compoundValue(lcode, lhs.type, a, ctx);
             return new Out(base + ".set$" + prop + "(" + value + ")", lhs.type);
         }
-        if (!a.op.equals("=") && isDynamic(lhs.type)) {
+        if (!a.op.equals("=") && (isDynamic(lhs.type)
+                || (lhs.type != null && lhs.type.is("num") && !a.op.equals("/="))
+                || (lhs.type != null && lhs.type.is("String") && a.op.equals("*=")))) {
             // `x += 1` on a dynamic x: Java's compound operators do not apply to Object.
             return new Out(lcode + " = " + compoundValue(lcode, lhs.type, a, ctx), lhs.type);
         }
@@ -4519,6 +4530,12 @@ public final class JavaEmitter {
             }
             return new Out(paren(l.code) + " / " + paren(r.code), TypeRef.DOUBLE);
         }
+        // Dart's String repetition, `'ab' * 3`. Only the dynamic path handled it, so the
+        // typed form reached the fallback and emitted a Java string multiplication.
+        if (b.op.equals("*") && l.type != null && l.type.is("String") && r.type != null && r.type.is("int")) {
+            ctx.importClass("dart.core.DString");
+            return new Out("DString.repeat(" + l.code + ", " + r.code + ")", TypeRef.STRING);
+        }
         // Dart's `List + List` concatenation -> a new DartList.
         if (b.op.equals("+") && l.type != null && l.type.is("List") && r.type != null && r.type.is("List")) {
             ctx.importClass("dart.core.DartList");
@@ -4541,9 +4558,22 @@ public final class JavaEmitter {
             boolean arith = b.op.equals("+") || b.op.equals("-") || b.op.equals("*") || b.op.equals("/");
             boolean cmp = b.op.equals("<") || b.op.equals(">") || b.op.equals("<=") || b.op.equals(">=");
             if (lok && rok && (arith || cmp)) {
+                // Dispatched on the VALUES, as Dart does: an int held in a num stays an
+                // int (num n = 1; n + 1 is the int 2) and compares exactly above 2^53.
+                // Converting every num to double lost both. Only / always yields a
+                // double, so it keeps the double path.
+                ctx.importClass("dart.runtime.DartRuntime");
+                if (cmp) {
+                    return new Out("DartRuntime.dynCompare(\"" + b.op + "\", " + l.code + ", " + r.code + ")",
+                            TypeRef.BOOL);
+                }
+                if (!b.op.equals("/")) {
+                    return new Out("((Number) DartRuntime.dynBinary(\"" + b.op + "\", " + l.code + ", "
+                            + r.code + "))", new TypeRef("num"));
+                }
                 String lc = l.type.is("num") ? "((Number) " + paren(l.code) + ").doubleValue()" : l.code;
                 String rc = r.type.is("num") ? "((Number) " + paren(r.code) + ").doubleValue()" : r.code;
-                return new Out(paren(lc) + " " + b.op + " " + paren(rc), cmp ? TypeRef.BOOL : TypeRef.DOUBLE);
+                return new Out(paren(lc) + " " + b.op + " " + paren(rc), TypeRef.DOUBLE);
             }
         }
         // Integer shifts with Dart's count rules; a constant count of 0..63 is where
@@ -4811,6 +4841,12 @@ public final class JavaEmitter {
             // conditional body unifies its arms to that type (e.g. an onGenerateRoute arrow whose
             // switch arms are Route values).
             Out o = emitExpr(l.exprBody, lambdaReturn, ctx);
+            if (lambdaReturn != null && o.type != null && o.type.is("num")
+                    && (lambdaReturn.is("double") || lambdaReturn.is("int"))) {
+                // num arithmetic is a Number; a lambda typed to return a double or int
+                // (fold's combiner, a double-returning builder) needs that primitive.
+                o = new Out(coerce(o, lambdaReturn, ctx), lambdaReturn);
+            }
             String lifted = ctx.popWriter();
             lastLambdaVoid = o.type != null && o.type.is("void");
             if (lifted.isEmpty()) {
@@ -5483,7 +5519,10 @@ public final class JavaEmitter {
             }
             if (n.equals("indexOf")) {
                 Out v = emitExpr(pos.get(0), null, ctx);
-                return new Out(target.code + ".indexOfDart(" + boxIfPrimitive(v, ctx) + ")", TypeRef.INT);
+                // indexOf(element, start): the start was dropped, so a scan from an
+                // offset began again at 0.
+                String start = pos.size() > 1 ? ", " + emitExpr(pos.get(1), TypeRef.INT, ctx).code : "";
+                return new Out(target.code + ".indexOfDart(" + boxIfPrimitive(v, ctx) + start + ")", TypeRef.INT);
             }
             if (n.equals("join")) {
                 String sep = pos.isEmpty() ? "\"\"" : emitExpr(pos.get(0), null, ctx).code;
@@ -5531,7 +5570,20 @@ public final class JavaEmitter {
             }
             if (n.equals("fold")) {
                 Out init = emitExpr(pos.get(0), null, ctx);
-                Out combine = emitExpr(pos.get(1), null, ctx);
+                // The combiner is (R, E) -> R with R the seed's type, so its result is
+                // coerced to R: `fold(0.0, (num sum, int e) => sum + e)` computes a num
+                // and must hand back the double the seed made R.
+                TypeRef seed = init.type != null && !init.type.is("dynamic") && !init.type.is("var")
+                        ? init.type : null;
+                TypeRef combineType = null;
+                if (seed != null) {
+                    combineType = new TypeRef("Function");
+                    combineType.funcParams = new ArrayList<TypeRef>();
+                    combineType.funcParams.add(seed);
+                    combineType.funcParams.add(elem != null ? elem : TypeRef.DYNAMIC);
+                    combineType.funcReturn = seed;
+                }
+                Out combine = emitExpr(pos.get(1), combineType, ctx);
                 // The generic result R is inferred from the (boxed) seed; unbox it
                 // back to a primitive when the seed is numeric so it flows straight
                 // into arithmetic / a primitive-typed return.
@@ -5772,7 +5824,9 @@ public final class JavaEmitter {
         }
         if (cc.ctorName.equals("from")) {
             String src = emitExpr(pos.get(0), null, ctx).code;
-            return new Out(cls + witness + "from" + sfx + "(" + src + ")", listType);
+            // growable: false was parsed above and then dropped for from().
+            return new Out(cls + witness + "from" + sfx + "(" + src
+                    + (growable != null ? ", " + growable : "") + ")", listType);
         }
         String len = emitExpr(pos.get(0), TypeRef.INT, ctx).code;
         if (cc.ctorName.equals("filled")) {
@@ -7314,9 +7368,10 @@ public final class JavaEmitter {
             }
             return "((double) " + paren(o.code) + ")";
         }
-        // Unbox an Object/dynamic value flowing into a Java primitive numeric target
-        // (e.g. an untyped lambda param assigned to a `long`/`double` setter).
-        if (!target.nullable && isDynamicType(o.type)) {
+        // Unbox an Object/dynamic value -- or a num, which is a Java Number -- flowing into
+        // a Java primitive numeric target (e.g. an untyped lambda param assigned to a
+        // `long`/`double` setter, or num arithmetic passed on as a double).
+        if (!target.nullable && (isDynamicType(o.type) || (o.type != null && o.type.is("num")))) {
             if (target.is("int")) {
                 return "((Number) " + paren(o.code) + ").longValue()";
             }
