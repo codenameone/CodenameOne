@@ -3474,6 +3474,7 @@ extern void initConstantPool();
 /* Generated into cn1_class_method_index: runs the static initializer of every class
  * and interface without a <clinit>, once, from the start of initConstantPool. */
 extern void cn1EagerInitClasses(CODENAME_ONE_THREAD_STATE);
+extern void cn1EagerInitPureClasses(CODENAME_ONE_THREAD_STATE);
 
 extern void initMethodStack(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject, int stackSize, int localsStackSize, int classNameId, int methodNameId);
 static inline void cn1_init_method_stack_fast(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject, int stackSize, int localsStackSize, JAVA_BOOLEAN fullClear) {

@@ -23,12 +23,29 @@
 
 package com.codename1.tools.translator;
 
+import com.codename1.tools.translator.bytecodes.Field;
+import com.codename1.tools.translator.bytecodes.IInc;
+import com.codename1.tools.translator.bytecodes.Instruction;
+import com.codename1.tools.translator.bytecodes.Invoke;
+import com.codename1.tools.translator.bytecodes.Jump;
+import com.codename1.tools.translator.bytecodes.LabelInstruction;
+import com.codename1.tools.translator.bytecodes.Ldc;
+import com.codename1.tools.translator.bytecodes.LineNumber;
+import com.codename1.tools.translator.bytecodes.LocalVariable;
+import com.codename1.tools.translator.bytecodes.MultiArray;
+import com.codename1.tools.translator.bytecodes.SwitchInstruction;
+import com.codename1.tools.translator.bytecodes.TypeInstruction;
+import com.codename1.tools.translator.bytecodes.VarOp;
+import com.codename1.tools.translator.bytecodes.BasicInstruction;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
+import java.util.TreeMap;
 import java.util.TreeSet;
+import org.objectweb.asm.Opcodes;
 
 /**
  * Parsed class file
@@ -1212,17 +1229,23 @@ public class ByteCodeClass {
                     b.append(bf.getFieldName().replace('$', '_'));
                     // Match the initializer's acquire/release completion check.
                     // TLS lookup and initialization are cold after the first access.
-                    b.append("() {\n    if (!__atomic_load_n(&__").append(bf.getClsName());
-                    b.append("_LOADED__, __ATOMIC_ACQUIRE)) __STATIC_INITIALIZER_");
-                    b.append(bf.getClsName());
+                    // No guard at all for an eagerly initialized class: it was
+                    // initialized before any Java ran (isEagerInitEligible).
+                    boolean accessGuard = !eagerInit(bf.getClsName());
+                    b.append("() {\n");
+                    if (accessGuard) {
+                        b.append("    if (!__atomic_load_n(&__").append(bf.getClsName());
+                        b.append("_LOADED__, __ATOMIC_ACQUIRE)) __STATIC_INITIALIZER_");
+                        b.append(bf.getClsName()).append("(getThreadLocalData());\n");
+                    }
                     if (bf.isVolatile()) {
-                        b.append("(getThreadLocalData());\n     return atomic_load_explicit(&STATIC_FIELD_");
+                        b.append("     return atomic_load_explicit(&STATIC_FIELD_");
                         b.append(bf.getClsName());
                         b.append("_");
                         b.append(bf.getFieldName());
                         b.append(", memory_order_acquire);\n}\n\n");
                     } else {
-                        b.append("(getThreadLocalData());\n     return STATIC_FIELD_");
+                        b.append("     return STATIC_FIELD_");
                         b.append(bf.getClsName());
                         b.append("_");
                         b.append(bf.getFieldName());
@@ -1239,19 +1262,20 @@ public class ByteCodeClass {
                         b.append("CODENAME_ONE_THREAD_STATE, ");
                     }
                     b.append(bf.getCDefinition());
-                    b.append(" __cn1StaticVal) {\n    if (!__atomic_load_n(&__").append(bf.getClsName());
-                    b.append("_LOADED__, __ATOMIC_ACQUIRE)) __STATIC_INITIALIZER_");
-                    b.append(bf.getClsName());
+                    b.append(" __cn1StaticVal) {\n    ");
+                    if (accessGuard) {
+                        b.append("if (!__atomic_load_n(&__").append(bf.getClsName());
+                        b.append("_LOADED__, __ATOMIC_ACQUIRE)) __STATIC_INITIALIZER_");
+                        b.append(bf.getClsName());
+                        b.append(bf.isObjectType() ? "(threadStateData);\n    " : "(getThreadLocalData());\n    ");
+                    }
                     if (bf.isObjectType()) {
-                        b.append("(threadStateData);\n    ");
                         // SATB insertion barrier: record the reference being stored, so
                         // a static that takes a child mid-mark keeps it alive.
                         b.append("CN1_WRITE_BARRIER(JAVA_NULL, __cn1StaticVal);\n    ");
                         // SATB deletion barrier: preserve the overwritten static reference.
                         b.append("CN1_SATB_DELETE(&STATIC_FIELD_").append(bf.getClsName())
                          .append("_").append(bf.getFieldName()).append(");\n    ");
-                    } else {
-                        b.append("(getThreadLocalData());\n    ");
                     }
                     if (bf.isVolatile()) {
                         b.append("atomic_store_explicit(&STATIC_FIELD_");
@@ -2889,31 +2913,251 @@ public class ByteCodeClass {
         return size;
     }
     
-    /// EAGER INITIALIZATION. A class or interface with no <clinit> runs no user code
-    /// when it is initialized: its __STATIC_INITIALIZER only mallocs and fills its
-    /// vtable, or for an interface its classToInterfaceMap rows, then publishes
-    /// `initialized`. Nothing a program can observe depends on WHEN that happens, so
-    /// JLS initialization order does not constrain it, and cn1EagerInitClasses runs
-    /// every such initializer once at the start of initConstantPool -- before any Java
-    /// executes, on every target. From then on the per-call guard
-    /// `if(!class__X.initialized) __STATIC_INITIALIZER_X(...)` is always false, and it
-    /// is omitted at every static method entry and every interface thunk of the class
-    /// (for-each paid the Iterator thunk's twice per element). ALLOCATION SITES KEEP IT:
-    /// dropping it there measured ~11% slower on objectAllocation across four code
-    /// layouts -- see the note on CN1_FAST_NEW in cn1_globals.h.
+    /// EAGER INITIALIZATION. A class or interface whose initialization runs no code a
+    /// program can observe the timing of is initialized once at startup, before any
+    /// Java executes, and every guard on it -- `if(!class__X.initialized)
+    /// __STATIC_INITIALIZER_X(...)` at each static method entry and interface thunk,
+    /// and the acquire in each get_static_/set_static_ accessor -- is omitted, because
+    /// from then on it is always false. Two kinds qualify:
     ///
-    /// A class WITH a <clinit> keeps the guard: there, initialization order is
-    /// observable and must stay lazy.
+    /// - A class with NO <clinit>. Its __STATIC_INITIALIZER only mallocs and fills its
+    ///   vtable, or for an interface its classToInterfaceMap rows. These run first, in
+    ///   cn1EagerInitClasses, at the very start of initConstantPool.
+    /// - A class whose <clinit> is PURE (see computePureClinits): it reads and writes
+    ///   only its own static fields, constants, string literals and arrays it creates,
+    ///   and calls nothing. Its effects are confined to its own statics, which nothing
+    ///   can read before the first use of the class, so when it runs is unobservable.
+    ///   These run in cn1EagerInitPureClasses, once the constant pool is published
+    ///   (string literals are built from it on first use) and still before any Java.
+    ///
+    /// Note what "initialization" means here: ParparVM initializes each class on the
+    /// first use of ITS OWN statics, static methods or allocation -- the generated
+    /// initializer never runs a superclass's -- so a class's eligibility does not
+    /// depend on its supertypes.
+    ///
+    /// ALLOCATION SITES KEEP THE GUARD: dropping it there measured ~11% slower on
+    /// objectAllocation across four code layouts -- see the note on CN1_FAST_NEW in
+    /// cn1_globals.h.
+    ///
+    /// The one behaviour a pure initializer can change by running early: it has no
+    /// inputs, so it either always completes or always throws (an index or size fault
+    /// in its own table code). One that always throws makes the class unusable in every
+    /// run; running it eagerly moves that failure from the first use to startup.
     public boolean isEagerInitEligible() {
         if (isEliminated()) {
             return false;
         }
+        return !hasClinit() || pureClinit;
+    }
+
+    public boolean hasClinit() {
         for (BytecodeMethod m : methods) {
             if (m.getMethodName().indexOf("_CLINIT_") > -1) {
-                return false;
+                return true;
             }
         }
-        return true;
+        return false;
+    }
+
+    private boolean pureClinit;
+
+    /// Why each rejected <clinit> was rejected, keyed by its first blocking
+    /// instruction, for the census line Parser prints.
+    static final Map<String, Integer> PURE_CLINIT_BLOCKERS = new TreeMap<String, Integer>();
+    static int pureClinitCount;
+    static int clinitCount;
+
+    /// Decides pureClinit for every class, on the RAW bytecode: before optimize() or
+    /// any fusion pass has replaced instructions with composite ones, which are
+    /// rejected here by construction because only raw instruction classes are
+    /// accepted. Runs once, after the dead-class cull and before code generation.
+    ///
+    /// A FIXPOINT, started pessimistic. A pure <clinit> may allocate an instance of a
+    /// class that is itself eager (`static final Boolean TRUE = new Boolean(true)`,
+    /// every enum constant), so one class's answer can depend on another's; iterating
+    /// up from "nothing is pure" means two classes can never justify each other.
+    static void computePureClinits(List<ByteCodeClass> classes) {
+        PURE_CLINIT_BLOCKERS.clear();
+        pureClinitCount = 0;
+        clinitCount = 0;
+        for (ByteCodeClass c : classes) {
+            c.pureClinit = false;
+        }
+        boolean changed = true;
+        while (changed) {
+            changed = false;
+            PURE_CLINIT_BLOCKERS.clear();
+            pureClinitCount = 0;
+            clinitCount = 0;
+            for (ByteCodeClass c : classes) {
+                BytecodeMethod clinit = c.clinitMethod();
+                if (clinit == null) {
+                    continue;
+                }
+                clinitCount++;
+                if (c.pureClinit) {
+                    pureClinitCount++;
+                    continue;
+                }
+                // IDENTITY, not equals: BytecodeMethod.equals compares name and signature only,
+                // so an enum's E.<init>(String,int) and the Enum.<init>(String,int) it
+                // calls are "equal", and a HashMap reads the in-progress subclass
+                // constructor as recursion.
+                String blocker = c.pureBodyBlocker(clinit, false, new java.util.IdentityHashMap<BytecodeMethod, String>());
+                if (blocker == null) {
+                    c.pureClinit = true;
+                    pureClinitCount++;
+                    changed = true;
+                } else {
+                    Integer n = PURE_CLINIT_BLOCKERS.get(blocker);
+                    PURE_CLINIT_BLOCKERS.put(blocker, n == null ? 1 : n + 1);
+                }
+            }
+        }
+    }
+
+    private BytecodeMethod clinitMethod() {
+        for (BytecodeMethod m : methods) {
+            if (m.getMethodName().indexOf("_CLINIT_") > -1) {
+                return m;
+            }
+        }
+        return null;
+    }
+
+    private BytecodeMethod findMethod(String name, String desc) {
+        for (BytecodeMethod m : methods) {
+            if (m.getMethodName().equals(name) && desc.equals(m.getSignature())) {
+                return m;
+            }
+        }
+        return null;
+    }
+
+    /// null when every instruction of `m` is allowed, else why not. `ctor` selects
+    /// the constructor rules: a constructor may touch fields but no statics at all,
+    /// since ANY static it reached would be another class's initialization or a
+    /// write the <clinit> did not make. `memo` holds each method's answer for this
+    /// query -- an enum's <clinit> calls the same constructor once per constant --
+    /// and IN_PROGRESS for a method still being examined, so recursion is rejected
+    /// rather than assumed pure.
+    private String pureBodyBlocker(BytecodeMethod m, boolean ctor, java.util.Map<BytecodeMethod, String> memo) {
+        if (memo.containsKey(m)) {
+            String known = memo.get(m);
+            return known == IN_PROGRESS ? "recursion" : known;
+        }
+        // No bytecode is not "does nothing": a native or abstract body is code this
+        // analysis cannot see.
+        if (m.isNative() || m.isAbstract() || m.isSynchronizedMethod()) {
+            memo.put(m, "native-abstract-or-synchronized");
+            return "native-abstract-or-synchronized";
+        }
+        memo.put(m, IN_PROGRESS);
+        String result = null;
+        for (Instruction i : m.getInstructions()) {
+            result = pureClinitBlocker(i, ctor, memo);
+            if (result != null) {
+                break;
+            }
+        }
+        memo.put(m, result);
+        return result;
+    }
+
+    private static final String IN_PROGRESS = new String("in-progress");
+
+    /// null when the instruction is allowed in a pure <clinit> (or, with `ctor`, in a
+    /// constructor it calls), else a short name for why not. A WHITELIST: an
+    /// instruction class not named here is rejected, so a new instruction type cannot
+    /// silently become "pure".
+    ///
+    /// Everything such code can reach is an object it created itself or an immutable
+    /// literal, which is why field access is allowed: nothing else can observe it.
+    private String pureClinitBlocker(Instruction i, boolean ctor, java.util.Map<BytecodeMethod, String> visiting) {
+        if (i instanceof LabelInstruction || i instanceof LineNumber || i instanceof LocalVariable
+                || i instanceof VarOp || i instanceof IInc || i instanceof Jump
+                || i instanceof SwitchInstruction || i instanceof MultiArray) {
+            return null;
+        }
+        if (i instanceof Ldc) {
+            Object v = ((Ldc) i).getValue();
+            // A class literal materializes a Class object; anything else (a method
+            // handle, a condy) is not a plain constant.
+            return (v instanceof Number || v instanceof String) ? null : "ldc-nonconstant";
+        }
+        if (i instanceof Field) {
+            Field f = (Field) i;
+            int op = f.getOpcode();
+            if (op == Opcodes.GETFIELD || op == Opcodes.PUTFIELD) {
+                return null;
+            }
+            if (ctor) {
+                return "static-in-constructor";
+            }
+            // Another class's static would initialize THAT class -- an observable,
+            // order-dependent effect.
+            return getOriginalClassName().equals(f.getOwner()) ? null : "foreign-static";
+        }
+        if (i instanceof TypeInstruction) {
+            int op = i.getOpcode();
+            // ANEWARRAY creates an array; it does not initialize the element class.
+            if (op == Opcodes.ANEWARRAY) {
+                return null;
+            }
+            if (op == Opcodes.NEW) {
+                // Allocation initializes the class, so it must be one whose
+                // initialization is itself unobservable. Its constructor is checked
+                // at the INVOKESPECIAL that follows.
+                String t = ((TypeInstruction) i).getTypeName();
+                if (t.equals(getOriginalClassName())) {
+                    return null;
+                }
+                ByteCodeClass tc = Parser.getClassObject(t.replace('/', '_').replace('$', '_'));
+                return (tc != null && tc.isEagerInitEligible()) ? null : "new-noneager";
+            }
+            return "type-" + op;
+        }
+        if (i instanceof Invoke) {
+            Invoke inv = (Invoke) i;
+            String owner = inv.getOwner();
+            if (inv.getOpcode() == Opcodes.INVOKESPECIAL && inv.getName().equals("<init>")) {
+                if (owner.equals("java/lang/Object")) {
+                    return null;
+                }
+                ByteCodeClass oc = Parser.getClassObject(owner.replace('/', '_').replace('$', '_'));
+                BytecodeMethod target = oc == null ? null : oc.findMethod("__INIT__", inv.getDesc());
+                if (target == null) {
+                    return "ctor-unresolved";
+                }
+                String inner = oc.pureBodyBlocker(target, true, visiting);
+                return inner == null ? null : (inner.startsWith("ctor:") ? inner : "ctor:" + inner);
+            }
+            // The class's own static helpers -- javac compiles an enum's $VALUES
+            // initializer into a synthetic private static $values().
+            if (!ctor && inv.getOpcode() == Opcodes.INVOKESTATIC && owner.equals(getOriginalClassName())) {
+                BytecodeMethod target = findMethod(inv.getName(), inv.getDesc());
+                if (target == null) {
+                    return "static-unresolved";
+                }
+                String inner = pureBodyBlocker(target, false, visiting);
+                return inner == null ? null : (inner.startsWith("static:") ? inner : "static:" + inner);
+            }
+            return "invoke";
+        }
+        if (i instanceof BasicInstruction) {
+            int op = i.getOpcode();
+            if (op == Opcodes.NOP || (op >= Opcodes.ACONST_NULL && op <= Opcodes.SIPUSH)
+                    || (op >= Opcodes.IALOAD && op <= Opcodes.SALOAD)
+                    || (op >= Opcodes.IASTORE && op <= Opcodes.SASTORE)
+                    || (op >= Opcodes.POP && op <= Opcodes.LXOR)
+                    || (op >= Opcodes.I2L && op <= Opcodes.DCMPG)
+                    || (op >= Opcodes.IRETURN && op <= Opcodes.RETURN)
+                    || op == Opcodes.NEWARRAY || op == Opcodes.ARRAYLENGTH) {
+                return null;
+            }
+            return "op-" + op;
+        }
+        return i.getClass().getSimpleName();
     }
 
     /// Whether the class-init guard for the (mangled) class name can be omitted.

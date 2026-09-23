@@ -16902,6 +16902,10 @@ void initConstantPool() {
     #endif
     constantPoolObjects = tmpConstantPoolObjects;
     invokedGC = NO;
+    // The classes whose <clinit> is pure (ByteCodeClass.isEagerInitEligible): after
+    // the pool is published, because they may read string literals, and before any
+    // other Java runs -- the generated code has already omitted their init guards.
+    cn1EagerInitPureClasses(threadStateData);
 
     // preallocate the shared StackOverflowError with a pre-filled trace (see
     // cn1ThrowStackOverflow above); built HERE where stack is plentiful

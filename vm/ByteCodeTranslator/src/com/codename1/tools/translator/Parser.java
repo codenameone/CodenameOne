@@ -536,6 +536,9 @@ public class Parser extends ClassVisitor {
             System.out.println(ho);
         }
         if (BytecodeMethod.FRAMELESS_CENSUS) {
+            System.out.println("[EAGER-INIT] clinits=" + ByteCodeClass.clinitCount
+                + " pure=" + ByteCodeClass.pureClinitCount
+                + " first blocker (reason -> classes): " + ByteCodeClass.PURE_CLINIT_BLOCKERS);
             int t = BytecodeMethod.censusTotal;
             System.out.println("[FRAMELESS] methods=" + t
                 + " frameless=" + BytecodeMethod.censusEligible
@@ -1248,9 +1251,20 @@ public class Parser extends ClassVisitor {
                     .append("(CODENAME_ONE_THREAD_STATE);\n");
             }
         }
+        // Two phases. Classes with no <clinit> only build tables and run first, before
+        // anything else in initConstantPool. Classes with a PURE <clinit> run Java --
+        // they allocate arrays and read string literals -- so they run once the
+        // constant pool is published, still before any other Java.
         bldM.append("void cn1EagerInitClasses(CODENAME_ONE_THREAD_STATE) {\n");
         for(ByteCodeClass bc : classes) {
-            if(bc.isEagerInitEligible()) {
+            if(bc.isEagerInitEligible() && !bc.hasClinit()) {
+                bldM.append("    __STATIC_INITIALIZER_").append(bc.getClsName()).append("(threadStateData);\n");
+            }
+        }
+        bldM.append("}\n");
+        bldM.append("void cn1EagerInitPureClasses(CODENAME_ONE_THREAD_STATE) {\n");
+        for(ByteCodeClass bc : classes) {
+            if(bc.isEagerInitEligible() && bc.hasClinit()) {
                 bldM.append("    __STATIC_INITIALIZER_").append(bc.getClsName()).append("(threadStateData);\n");
             }
         }
@@ -1385,6 +1399,9 @@ public class Parser extends ClassVisitor {
                 removedClass.setEliminated(true);
                 neliminated++;
             }
+            // On the raw bytecode, before any fusion pass below rewrites instructions:
+            // see ByteCodeClass.isEagerInitEligible.
+            ByteCodeClass.computePureClinits(classes);
 
             // Fuse all-String StringBuilder concat chains into String.cn1ConcatN
             // BEFORE the cull, not during code generation.
