@@ -27,16 +27,18 @@ import com.codename1.html5.js.canvas.CanvasRenderingContext2D;
 
 /**
  * Records a complete named Liquid Glass material for ordered host-side replay.
- * The host applies the native affine colour transform, browser Gaussian blur,
+ * The host applies the native colour material (affine plus the luminance curve),
+ * the iOS 27 edge outline, browser Gaussian blur,
  * rounded shape mask, edge refraction and specular rim to the surface's own
  * already-painted pixels.
  */
 public final class GlassRegion implements ExecutableOp {
     private final int x, y, width, height;
-    private final float radius, cornerRadius, saturation, scale, offset, refraction, specular;
+    private final float radius, cornerRadius, saturation, scale, offset, refraction, specular, curve, curveMid, outline;
 
     public GlassRegion(int x, int y, int width, int height, float radius, float cornerRadius,
-            float saturation, float scale, float offset, float refraction, float specular) {
+            float saturation, float scale, float offset, float refraction, float specular,
+            float curve, float curveMid, float outline) {
         this.x = x;
         this.y = y;
         this.width = width;
@@ -48,6 +50,9 @@ public final class GlassRegion implements ExecutableOp {
         this.offset = offset;
         this.refraction = refraction;
         this.specular = specular;
+        this.curve = curve;
+        this.curveMid = curveMid;
+        this.outline = outline;
     }
 
     @Override
@@ -56,7 +61,7 @@ public final class GlassRegion implements ExecutableOp {
             return;
         }
         ((SurfaceCommandRecorder) context).glassSelfRegion(x, y, width, height,
-                radius, cornerRadius, saturation, scale, offset, refraction, specular);
+                radius, cornerRadius, saturation, scale, offset, refraction, specular, curve, curveMid, outline);
     }
 
     @Override

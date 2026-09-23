@@ -169,10 +169,18 @@ for (const frame of frames) {
 
 for (const recipe of [
   { name: 'pill-light', saturation: 1.8, scale: 1, offset: 108, expected: 0x5d960bce },
-  { name: 'pill-dark', saturation: 2.5, scale: 0.3, offset: 13, expected: 0x836a16cf }
+  { name: 'pill-dark', saturation: 2.5, scale: 0.3, offset: 13, expected: 0x836a16cf },
+  // iOS 27 dark chrome and pill carry the luminance curve. A shipped recipe and
+  // a synthetic negative curve, because the term is squared and a sign slip in
+  // one backend would still match a single positive pin.
+  { name: 'chrome27-dark', saturation: 4.5, scale: 0.349, offset: 96.6,
+    curve: 1.65, curveMid: 0.45, expected: 0xc7afb510 },
+  { name: 'negative-curve', saturation: 2.7, scale: 0.398, offset: 77.7,
+    curve: -0.108, curveMid: 0.65, expected: 0x3d2787db }
 ]) {
   const material = glassPattern(64, 40);
-  sandbox.applyMaterial(material, recipe.saturation, recipe.scale, recipe.offset);
+  sandbox.applyMaterial(material, recipe.saturation, recipe.scale, recipe.offset,
+      recipe.curve || 0, recipe.curveMid || 0);
   const actual = crc32(rgbaToArgb(material));
   if (actual !== recipe.expected) {
     throw new Error(`Glass material parity failed for ${recipe.name}: `
@@ -188,3 +196,23 @@ if (opticsCrc !== 0x8057dd7a) {
   throw new Error(`Glass optics parity failed: expected 8057dd7a, got ${opticsCrc.toString(16)}`);
 }
 console.log(`glass optics parity PASS crc=${opticsCrc.toString(16)}`);
+
+// The iOS 27 edge outline, which darkens the RAW backdrop under the edge (the
+// last argument) weighted by the horizontal component of the edge normal. A
+// capsule exercises the rounded-end branch, a rounded rectangle the straight
+// sides, the corners and the unweighted top and bottom; two strengths catch a
+// weight applied in the wrong place.
+for (const probe of [
+  { name: 'capsule-0.95', corner: -1, outline: 0.95, expected: 0xa8a79b12 },
+  { name: 'rounded-0.95', corner: 6, outline: 0.95, expected: 0x2f4e7f99 },
+  { name: 'rounded-0.55', corner: 6, outline: 0.55, expected: 0xee2536c0 }
+]) {
+  const outlined = sandbox.applyOptics(glassPattern(52, 32), 52, 32, 6,
+      40, 20, probe.corner, 0.4, 0.5, probe.outline, glassPattern(40, 20));
+  const outlineCrc = crc32(rgbaToArgb(outlined));
+  if (outlineCrc !== probe.expected) {
+    throw new Error(`Glass outline parity failed for ${probe.name}: `
+        + `expected ${probe.expected.toString(16)}, got ${outlineCrc.toString(16)}`);
+  }
+  console.log(`glass outline parity PASS ${probe.name} crc=${outlineCrc.toString(16)}`);
+}

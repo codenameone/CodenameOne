@@ -41,15 +41,19 @@
  * MEASURED EFFECT of what is currently here, scored on an iPhone 16 / iOS 27.0
  * simulator against goldens/ios-27-metal, 68 tiles:
  *
- *            mean      light     dark
- *   before   90.34%    92.89%    87.80%
- *   after    92.83%    93.39%    92.27%
+ *                          mean      light     dark
+ *   before                 90.34%    92.89%    87.80%
+ *   27 recipes             92.83%    93.39%    92.27%
+ *   + dark curve, outline  92.95%    93.37%    92.54%
  *
- * 15 tiles improved, 51 unchanged, 2 regressed by 0.3 (TextField dark, which is
- * within the documented non-affine dark error). The six dark glass panels each
- * gained 21-24 points. Tabs_normal_dark remains the worst tile at 68.75%: its
- * material is the pill recipe, whose dark fit is the poorest of the three, and
- * the travelling selection lens on top of it is a separate op again.
+ * The 27 recipes improved 15 tiles, left 51 unchanged and cost TextField dark
+ * 0.3; the six dark glass panels each gained 21-24 points. The dark pill's
+ * luminance curve then took Tabs dark from 68.75% to 73.45% and TabsGeom dark
+ * from 87.73% to 90.72%. The edge outline gained the dark panels up to 0.15 and
+ * cost the light ones about 0.1, because it sits one pixel inward of the native
+ * line (see GlassRecipe.getOutline) -- and it is what gives the dark panel over
+ * a flat grey a silhouette at all. Tabs_normal_dark is still the worst tile; the
+ * travelling selection lens on top of the pill is a separate op.
  */
 
 #Constants {
@@ -68,9 +72,11 @@
      * 1.3%, which is what makes it trustworthy on iOS 27.
      *
      * Measured LIGHT chrome and pill as UNCHANGED from iOS 26; the 27 recipes
-     * reuse those numbers verbatim. Dark moved in all three, and is approximate
-     * there -- iOS 27's dark glass has a non-linear luminance response that an
-     * affine material cannot express (see GlassRecipe.liquidPanel27). */
+     * reuse those numbers as the material. Dark moved in all three, and dark
+     * chrome and pill bend -- a luminance curve on top of the affine transform
+     * (GlassRecipe.getCurve). iOS 27 also draws a thin dark outline around the
+     * sides of its panel and pill glass, in both appearances
+     * (GlassRecipe.getOutline). */
     ToolbarGlassRecipe: "chrome27";
     TitleAreaGlassRecipe: "chrome27";
     TabsContainerGlassRecipe: "pill27";

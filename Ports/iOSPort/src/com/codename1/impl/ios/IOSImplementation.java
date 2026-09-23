@@ -3327,6 +3327,11 @@ public class IOSImplementation extends CodenameOneImplementation {
 
     @Override
     public boolean glassRegion(Object graphics, int x, int y, int width, int height, float radius, float cornerRadius, float sat, float scale, float offset, float refract, float specular) {
+        return glassRegion(graphics, x, y, width, height, radius, cornerRadius, sat, scale, offset, refract, specular, 0f, 0f, 0f);
+    }
+
+    @Override
+    public boolean glassRegion(Object graphics, int x, int y, int width, int height, float radius, float cornerRadius, float sat, float scale, float offset, float refract, float specular, float curve, float curveMid, float outline) {
         if (radius <= 0f || width <= 0 || height <= 0) {
             return true;
         }
@@ -3338,7 +3343,7 @@ public class IOSImplementation extends CodenameOneImplementation {
         // glass patch back -- the SAME recipe as the offscreen branch below, so a
         // running app gets real Liquid Glass, not just a plain blur.
         if (ng.associatedImage == null) {
-            nativeInstance.nativeGlassScreenRegion(x, y, width, height, radius, cornerRadius, sat, scale, offset, refract, specular);
+            nativeInstance.nativeGlassScreenRegion(x, y, width, height, radius, cornerRadius, sat, scale, offset, refract, specular, curve, curveMid, outline);
             return true;
         }
         // Flush whatever has been painted into the image so its peer is current, read
@@ -3389,7 +3394,16 @@ public class IOSImplementation extends CodenameOneImplementation {
         // Reverse-engineered iOS UIVisualEffectView material: an affine colour
         // transform (saturation boost + scale + offset floor) of the backdrop before
         // blurring (this is the backdrop-filter path only).
-        glassMaterialInPlace(prgb, sat, scale, offset);
+        int[] raw = null;
+        if (outline > 0f) {
+            // The outline darkens the BACKDROP under the edge, so keep the raw
+            // pixels under the component before the material transforms them.
+            raw = new int[rw * rh];
+            for (int yy = 0; yy < rh; yy++) {
+                System.arraycopy(prgb, (yy + pad) * bw + pad, raw, yy * rw, rw);
+            }
+        }
+        glassMaterialInPlace(prgb, sat, scale, offset, curve, curveMid);
         NativeImage blurredPadded = new NativeImage("backdrop-filter glass");
         blurredPadded.peer = nativeInstance.gausianBlurImage(createImageFromARGB(prgb, bw, bh), radius);
         blurredPadded.width = bw;
@@ -3402,7 +3416,7 @@ public class IOSImplementation extends CodenameOneImplementation {
         int[] pbargb = new int[bw * bh];
         getRGB(blurredPadded, pbargb, 0, 0, 0, bw, bh);
         int[] out = new int[rw * rh];
-        applyGlassOptics(pbargb, bw, bh, pad, out, rw, rh, cornerRadius, refract, specular);
+        applyGlassOptics(pbargb, bw, bh, pad, out, rw, rh, cornerRadius, refract, specular, outline, raw);
         NativeImage blurred = new NativeImage("backdrop-filter glass");
         blurred.peer = createImageFromARGB(out, rw, rh);
         blurred.width = rw;
@@ -3450,10 +3464,14 @@ public class IOSImplementation extends CodenameOneImplementation {
      * brightest at the top (the iOS "glint"). </li>
      * <li><b>Shape mask</b>: anti-aliased coverage from the SDF, so the glass clips to
      * the rounded/pill shape with a crisp 1px edge.</li>
+     * <li><b>Edge outline</b> (iOS 27 only, outline &gt; 0): the thin dark line on
+     * the sides of the glass, drawn over raw (the unmaterialled backdrop under the
+     * component, rw x rh); see GlassRecipe.getOutline.</li>
      * </ul>
      */
     private static void applyGlassOptics(int[] src, int bw, int bh, int pad, int[] out,
-            int rw, int rh, float cornerRadius, float refract, float specular) {
+            int rw, int rh, float cornerRadius, float refract, float specular,
+            float outline, int[] raw) {
         float hw = rw / 2f, hh = rh / 2f;
         float r = cornerRadius < 0f ? Math.min(hw, hh) : Math.min(cornerRadius, Math.min(hw, hh));
         if (r < 0f) r = 0f;
@@ -3494,10 +3512,47 @@ public class IOSImplementation extends CodenameOneImplementation {
                     gg = gg + add > 255 ? 255 : gg + add;
                     bb = bb + add > 255 ? 255 : bb + add;
                 }
+                // iOS 27 edge outline (GlassRecipe.getOutline): on the outermost
+                // pixel, composite the glass over the raw backdrop and darken it,
+                // weighted by the horizontal component of the edge normal -- full on
+                // the sides, fading round the corners, none along top and bottom.
+                if (outline > 0f && depth < 1f) {
+                    float wx;
+                    if (dx > 0 && dy > 0) {
+                        wx = outside > 0f ? ax / outside : 0f;
+                    } else {
+                        wx = dx >= dy ? 1f : 0f;
+                    }
+                    float ow = outline * wx;
+                    if (ow > 0f) {
+                        int bk = raw[y * rw + x];
+                        rr = glassOutlineChannel(rr, (bk >> 16) & 0xff, alpha, ow);
+                        gg = glassOutlineChannel(gg, (bk >> 8) & 0xff, alpha, ow);
+                        bb = glassOutlineChannel(bb, bk & 0xff, alpha, ow);
+                        out[y * rw + x] = 0xff000000 | (rr << 16) | (gg << 8) | bb;
+                        continue;
+                    }
+                }
                 int a = (int) (alpha * 255f);
                 out[y * rw + x] = (a << 24) | (rr << 16) | (gg << 8) | bb;
             }
         }
+    }
+
+    /// One channel of the iOS 27 edge outline: glass `c` at coverage `alpha`
+    /// composited over backdrop `b`, then darkened by min(76 * w, 0.78 * w * b).
+    /// At full strength that is max(b - 76, 0.22 * b), the measured native line.
+    private static int glassOutlineChannel(int c, int b, float alpha, float w) {
+        float v = c * alpha;
+        float under = b * (1f - alpha);
+        v = v + under;
+        float dark = 76f * w;
+        float alt = 0.78f * w * b;
+        if (alt < dark) {
+            dark = alt;
+        }
+        v = v - dark;
+        return v <= 0f ? 0 : (v >= 255f ? 255 : (int) (v + 0.5f));
     }
 
     /** Bilinear ARGB sample with edge clamping; used by the glass edge refraction. */
@@ -3527,8 +3582,14 @@ public class IOSImplementation extends CodenameOneImplementation {
      * each (blurred) backdrop pixel. For each channel c:
      * c' = clamp( (lum + (c - lum) * sat) * scale + offset ) where lum is the
      * pixel luma. The offset term is the white/dark frost floor. Alpha preserved.
+     *
+     * Plus an optional luminance CURVE, curve * 255 * (lum/255 - curveMid)^2,
+     * added to every channel. Zero for every affine material; iOS 27's dark glass
+     * bends, and no affine constants can express that (GlassRecipe.liquidPanel27).
+     * Skipped outright at zero so an affine material stays bit-identical.
      */
-    private static void glassMaterialInPlace(int[] argb, float sat, float scale, float offset) {
+    private static void glassMaterialInPlace(int[] argb, float sat, float scale, float offset, float curve, float curveMid) {
+        boolean curved = curve != 0f;
         for (int i = 0; i < argb.length; i++) {
             int p = argb[i];
             int a = p & 0xff000000;
@@ -3537,6 +3598,13 @@ public class IOSImplementation extends CodenameOneImplementation {
             r = (lum + (r - lum) * sat) * scale + offset;
             g = (lum + (g - lum) * sat) * scale + offset;
             b = (lum + (b - lum) * sat) * scale + offset;
+            if (curved) {
+                float d = lum / 255f - curveMid;
+                float k = curve * 255f * d * d;
+                r += k;
+                g += k;
+                b += k;
+            }
             int ri = r < 0 ? 0 : (r > 255 ? 255 : (int) r);
             int gi = g < 0 ? 0 : (g > 255 ? 255 : (int) g);
             int bi = b < 0 ? 0 : (b > 255 ? 255 : (int) b);

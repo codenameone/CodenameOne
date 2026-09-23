@@ -172,6 +172,48 @@ public class GlassRecipeTest extends UITestBase {
     }
 
     @Test
+    public void onlyIOS27DarkChromeAndPillAreCurved() {
+        // The curve term is what distinguishes iOS 27's dark chrome and pill,
+        // whose measured residual against the best affine fit is a parabola in
+        // backdrop luma. Everywhere else the material is affine and the recipe must
+        // say so exactly -- including the dark panel, where the curve was measured
+        // on device and made every affected tile worse (see liquidPanel27).
+        for (int i = 0; i < 2; i++) {
+            boolean dark = i == 1;
+            assertEquals(0f, GlassRecipe.plainBlur().getCurve(), 0f, "blur curve");
+            assertEquals(0f, GlassRecipe.liquidChrome(dark).getCurve(), 0f, "chrome curve");
+            assertEquals(0f, GlassRecipe.liquidPill(dark).getCurve(), 0f, "pill curve");
+            assertEquals(0f, GlassRecipe.liquidPanel(dark).getCurve(), 0f, "panel curve");
+        }
+        assertEquals(0f, GlassRecipe.liquidChrome27(false).getCurve(), 0f, "light chrome27 curve");
+        assertEquals(0f, GlassRecipe.liquidPill27(false).getCurve(), 0f, "light pill27 curve");
+        assertEquals(0f, GlassRecipe.liquidPanel27(false).getCurve(), 0f, "light panel27 curve");
+        assertTrue(GlassRecipe.liquidChrome27(true).getCurve() != 0f, "dark chrome27 lost its curve");
+        assertTrue(GlassRecipe.liquidPill27(true).getCurve() != 0f, "dark pill27 lost its curve");
+        assertEquals(0f, GlassRecipe.liquidPanel27(true).getCurve(), 0f, "dark panel27 curve");
+    }
+
+    @Test
+    public void onlyIOS27PanelAndPillDrawTheEdgeOutline() {
+        // The dark edge line is new in iOS 27 -- the iOS 26 captures have none --
+        // and it is measured on the panel and pill tiles in BOTH appearances.
+        // Nothing measures the chrome bar's sides, so it gets none rather than a
+        // guess. Keeping every other recipe at zero is what keeps the iOS 26
+        // renders, and the ports that ignore the parameter, unchanged.
+        for (int i = 0; i < 2; i++) {
+            boolean dark = i == 1;
+            assertEquals(0f, GlassRecipe.plainBlur().getOutline(), 0f, "blur outline");
+            assertEquals(0f, GlassRecipe.liquidChrome(dark).getOutline(), 0f, "chrome outline");
+            assertEquals(0f, GlassRecipe.liquidPill(dark).getOutline(), 0f, "pill outline");
+            assertEquals(0f, GlassRecipe.liquidPanel(dark).getOutline(), 0f, "panel outline");
+            assertEquals(0f, GlassRecipe.liquidChrome27(dark).getOutline(), 0f, "chrome27 outline");
+            assertTrue(GlassRecipe.liquidPill27(dark).getOutline() > 0f, "pill27 lost its outline");
+            assertTrue(GlassRecipe.liquidPanel27(dark).getOutline() > 0f, "panel27 lost its outline");
+            assertTrue(GlassRecipe.liquidPanel27(dark).getOutline() <= 1f, "panel27 outline is a 0..1 strength");
+        }
+    }
+
+    @Test
     public void everyRecipeNamedByAShippedThemeResolves() throws Exception {
         String[] themes = {"iOSModernTheme.res", "iOSModern27Theme.res"};
         int checked = 0;
@@ -207,7 +249,7 @@ public class GlassRecipeTest extends UITestBase {
         return dark ? "dark" : "light";
     }
 
-    /// Full identity: kind and all five material parameters.
+    /// Full identity: kind and all eight material and optics parameters.
     private static void assertSameRecipe(GlassRecipe expected, GlassRecipe actual, String what) {
         assertNotNull(actual, what + " did not resolve");
         assertEquals(expected.getKind(), actual.getKind(), what + " kind");
@@ -216,6 +258,9 @@ public class GlassRecipeTest extends UITestBase {
         assertEquals(expected.getOffset(), actual.getOffset(), 0.0001f, what + " offset");
         assertEquals(expected.getRefraction(), actual.getRefraction(), 0.0001f, what + " refraction");
         assertEquals(expected.getSpecular(), actual.getSpecular(), 0.0001f, what + " specular");
+        assertEquals(expected.getCurve(), actual.getCurve(), 0.0001f, what + " curve");
+        assertEquals(expected.getCurveMid(), actual.getCurveMid(), 0.0001f, what + " curveMid");
+        assertEquals(expected.getOutline(), actual.getOutline(), 0.0001f, what + " outline");
     }
 
     private static boolean differs(GlassRecipe a, GlassRecipe b) {
@@ -224,13 +269,17 @@ public class GlassRecipeTest extends UITestBase {
                 || a.getScale() != b.getScale()
                 || a.getOffset() != b.getOffset()
                 || a.getRefraction() != b.getRefraction()
-                || a.getSpecular() != b.getSpecular();
+                || a.getSpecular() != b.getSpecular()
+                || a.getCurve() != b.getCurve()
+                || a.getCurveMid() != b.getCurveMid()
+                || a.getOutline() != b.getOutline();
     }
 
     private static void assertSameMaterial(GlassRecipe a, GlassRecipe b, String what) {
         assertEquals(a.getSaturation(), b.getSaturation(), 0.0001f, what + " saturation");
         assertEquals(a.getScale(), b.getScale(), 0.0001f, what + " scale");
         assertEquals(a.getOffset(), b.getOffset(), 0.0001f, what + " offset");
+        assertEquals(a.getCurve(), b.getCurve(), 0.0001f, what + " curve");
     }
 
     private static void assertDifferentMaterial(GlassRecipe a, GlassRecipe b, String what) {

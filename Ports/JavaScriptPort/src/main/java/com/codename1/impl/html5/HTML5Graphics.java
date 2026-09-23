@@ -461,9 +461,10 @@ public class HTML5Graphics {
      * {@link com.codename1.impl.html5.graphics.GlassRegion}.
      */
     public void glassRegion(int x, int y, int width, int height, float radius, float cornerRadius,
-            float saturation, float scale, float offset, float refraction, float specular) {
+            float saturation, float scale, float offset, float refraction, float specular,
+            float curve, float curveMid, float outline) {
         dispatchOp(new com.codename1.impl.html5.graphics.GlassRegion(x, y, width, height,
-                radius, cornerRadius, saturation, scale, offset, refraction, specular));
+                radius, cornerRadius, saturation, scale, offset, refraction, specular, curve, curveMid, outline));
     }
 
     /**

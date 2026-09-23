@@ -105,7 +105,7 @@ public final class IOSNative {
     // Queues a live-screen "Liquid Glass" MATERIAL op (the full backdrop-filter
     // recipe -- material + blur + rounded-rect mask + refraction + specular),
     // matching the offscreen IOSImplementation.glassRegion. Enqueued in paint order.
-    native void nativeGlassScreenRegion(int x, int y, int width, int height, float radius, float cornerRadius, float sat, float scale, float offset, float refract, float specular);
+    native void nativeGlassScreenRegion(int x, int y, int width, int height, float radius, float cornerRadius, float sat, float scale, float offset, float refract, float specular, float curve, float curveMid, float outline);
     // Queues a live-screen iOS 26 selection-drop LENS op (magnify + chromatic
     // aberration + dark->accent tint over the painted content). See lensScreenRegionX.
     native void nativeLensScreenRegion(int x, int y, int width, int height, float cornerRadius, float magnify, float aberration, int tintColor, float tintStrength);

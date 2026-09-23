@@ -2695,10 +2695,11 @@ void Java_com_codename1_impl_ios_IOSImplementation_nativeBlurScreenRegionImpl
 
 void Java_com_codename1_impl_ios_IOSImplementation_nativeGlassScreenRegionImpl
 (int x, int y, int width, int height, float radius, float cornerRadius, float sat,
- float scale, float offset, float refract, float specular) {
+ float scale, float offset, float refract, float specular, float curve, float curveMid, float outline) {
     BlurRegion* f = [[BlurRegion alloc] initWithGlassArgs:x ypos:y w:width h:height r:radius
                                              cornerRadius:cornerRadius sat:sat scale:scale
-                                                   offset:offset refract:refract specular:specular];
+                                                   offset:offset refract:refract specular:specular
+                                                    curve:curve curveMid:curveMid outline:outline];
     [CodenameOne_GLViewController upcoming:f];
 #ifndef CN1_USE_ARC
     [f release];

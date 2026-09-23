@@ -2648,8 +2648,12 @@
   // Mirrors IOSImplementation.glassMaterialInPlace(). Math.fround preserves
   // the native float evaluation points so the material does not drift by a
   // channel value merely because JavaScript normally evaluates as double.
-  function glassMaterialInPlace(data, saturation, scale, offset) {
+  // The curve term (curve * 255 * (lum / 255 - curveMid)^2, added to every
+  // channel) is zero for every recipe but iOS 27 dark, whose material bends.
+  function glassMaterialInPlace(data, saturation, scale, offset, curve, curveMid) {
     var sat = Math.fround(saturation), scl = Math.fround(scale), off = Math.fround(offset);
+    var crv = Math.fround(curve || 0), mid = Math.fround(curveMid || 0);
+    var curved = crv !== 0;
     var lr = Math.fround(0.2126), lg = Math.fround(0.7152), lb = Math.fround(0.0722);
     for (var i = 0; i < data.length; i += 4) {
       var r = Math.fround(data[i]), g = Math.fround(data[i + 1]), b = Math.fround(data[i + 2]);
@@ -2661,6 +2665,13 @@
           glassFloatMul(glassFloatAdd(g, -lum), sat)), scl), off);
       b = glassFloatAdd(glassFloatMul(glassFloatAdd(lum,
           glassFloatMul(glassFloatAdd(b, -lum), sat)), scl), off);
+      if (curved) {
+        var d = glassFloatAdd(Math.fround(lum / 255), -mid);
+        var k = glassFloatMul(glassFloatMul(glassFloatMul(crv, 255), d), d);
+        r = glassFloatAdd(r, k);
+        g = glassFloatAdd(g, k);
+        b = glassFloatAdd(b, k);
+      }
       data[i] = r < 0 ? 0 : (r > 255 ? 255 : r | 0);
       data[i + 1] = g < 0 ? 0 : (g > 255 ? 255 : g | 0);
       data[i + 2] = b < 0 ? 0 : (b > 255 ? 255 : b | 0);
@@ -2694,8 +2705,26 @@
   // Mirrors IOSImplementation.applyGlassOptics(). The returned patch retains
   // the native shape alpha and is composited with drawImage below, just like
   // IOSImplementation draws its generated ARGB image back onto the target.
+  // One channel of the iOS 27 edge outline; mirrors
+  // IOSImplementation.glassOutlineChannel float for float.
+  function glassOutlineChannel(c, b, alpha, w) {
+    var v = glassFloatMul(c, alpha);
+    var under = glassFloatMul(b, Math.fround(1 - alpha));
+    v = glassFloatAdd(v, under);
+    var dark = glassFloatMul(76, w);
+    var alt = glassFloatMul(glassFloatMul(Math.fround(0.78), w), b);
+    if (alt < dark) {
+      dark = alt;
+    }
+    v = glassFloatAdd(v, -dark);
+    return v <= 0 ? 0 : (v >= 255 ? 255 : (glassFloatAdd(v, 0.5) | 0));
+  }
+
+  // raw: the unmaterialled backdrop under the component (RGBA, width x height),
+  // only read when outline > 0 -- the iOS 27 edge line darkens the BACKDROP.
   function applyGlassOptics(blurred, bufferWidth, bufferHeight, pad,
-                             width, height, cornerRadius, refraction, specular) {
+                             width, height, cornerRadius, refraction, specular,
+                             outline, raw) {
     var result = new Uint8ClampedArray(width * height * 4);
     var hw = Math.fround(width / 2), hh = Math.fround(height / 2);
     var radius = cornerRadius < 0 ? Math.min(hw, hh)
@@ -2704,6 +2733,7 @@
     var band = glassFloatMul(Math.min(hw, hh), Math.fround(0.6));
     var rimWidth = Math.fround(3.0);
     var refract = Math.fround(refraction), spec = Math.fround(specular);
+    var edgeLine = Math.fround(outline || 0);
     for (var yy = 0; yy < height; yy++) {
       var py = Math.fround(yy + 0.5);
       for (var xx = 0; xx < width; xx++) {
@@ -2744,6 +2774,22 @@
           blue = Math.min(255, blue + add);
         }
         var index = (yy * width + xx) * 4;
+        if (edgeLine > 0 && depth < 1 && raw) {
+          var wx;
+          if (dx > 0 && dy > 0) {
+            wx = outside > 0 ? Math.fround(ax / outside) : 0;
+          } else {
+            wx = dx >= dy ? 1 : 0;
+          }
+          var lineWeight = glassFloatMul(edgeLine, wx);
+          if (lineWeight > 0) {
+            result[index] = glassOutlineChannel(red, raw[index], coverage, lineWeight);
+            result[index + 1] = glassOutlineChannel(green, raw[index + 1], coverage, lineWeight);
+            result[index + 2] = glassOutlineChannel(blue, raw[index + 2], coverage, lineWeight);
+            result[index + 3] = 255;
+            continue;
+          }
+        }
         result[index] = red;
         result[index + 1] = green;
         result[index + 2] = blue;
@@ -2795,7 +2841,8 @@
   }
 
   function applyGlassSelfRegion(ctx, x, y, width, height, blurRadius, cornerRadius,
-                                saturation, scale, offset, refraction, specular) {
+                                saturation, scale, offset, refraction, specular, curve, curveMid,
+                                outline) {
     if (!ctx.canvas || width <= 0 || height <= 0) {
       return;
     }
@@ -2844,7 +2891,15 @@
         padded[targetIndex + 3] = available[sourceIndex + 3];
       }
     }
-    glassMaterialInPlace(padded, saturation, scale, offset);
+    var raw = null;
+    if (outline > 0) {
+      raw = new Uint8ClampedArray(rw * rh * 4);
+      for (var rowY = 0; rowY < rh; rowY++) {
+        var from = ((rowY + pad) * bufferWidth + pad) * 4;
+        raw.set(padded.subarray(from, from + rw * 4), rowY * rw * 4);
+      }
+    }
+    glassMaterialInPlace(padded, saturation, scale, offset, curve, curveMid);
 
     var materialCanvas = createGlassScratchCanvas(bufferWidth, bufferHeight);
     var blurredCanvas = createGlassScratchCanvas(bufferWidth, bufferHeight);
@@ -2866,7 +2921,7 @@
     var blurred = blurredContext.getImageData(0, 0, bufferWidth, bufferHeight).data;
     var scaledCorner = cornerRadius * rect.scale;
     var output = applyGlassOptics(blurred, bufferWidth, bufferHeight, pad,
-                                   rw, rh, scaledCorner, refraction, specular);
+                                   rw, rh, scaledCorner, refraction, specular, outline, raw);
     var outputCanvas = createGlassScratchCanvas(rw, rh);
     var outputContext = outputCanvas && outputCanvas.getContext('2d');
     if (!outputContext) {
@@ -3034,11 +3089,13 @@
           var _gx = nums[ni++], _gy = nums[ni++], _gw = nums[ni++], _gh = nums[ni++];
           var _gblur = nums[ni++], _gcr = nums[ni++], _gsat = nums[ni++];
           var _gscale = nums[ni++], _goffset = nums[ni++], _grefract = nums[ni++];
-          var _gspecular = nums[ni++];
+          var _gspecular = nums[ni++], _gcurve = nums[ni++], _gcurveMid = nums[ni++];
+          var _goutline = nums[ni++];
           if (_gw > 0 && _gh > 0 && ctx.canvas) {
             try {
               applyGlassSelfRegion(ctx, _gx, _gy, _gw, _gh, _gblur, _gcr,
-                                   _gsat, _gscale, _goffset, _grefract, _gspecular);
+                                   _gsat, _gscale, _goffset, _grefract, _gspecular,
+                                   _gcurve, _gcurveMid, _goutline);
             } catch (_egr) {
             }
           }
