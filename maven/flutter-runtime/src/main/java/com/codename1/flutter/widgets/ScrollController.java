@@ -118,8 +118,6 @@ public class ScrollController {
     }
 
     void notifyListeners() {
-        for (Funcs.VoidFunc0 l : new ArrayList<Funcs.VoidFunc0>(listeners)) {
-            l.call();
-        }
+        com.codename1.flutter.foundation.Listeners.notify(listeners);
     }
 }

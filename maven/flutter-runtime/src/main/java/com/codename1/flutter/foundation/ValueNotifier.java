@@ -74,9 +74,7 @@ public class ValueNotifier<T> extends ValueListenable<T> {
     }
 
     public void notifyListeners() {
-        for (Funcs.VoidFunc0 l : new ArrayList<Funcs.VoidFunc0>(listeners)) {
-            l.call();
-        }
+        Listeners.notify(listeners);
     }
 
     public void dispose() {

@@ -178,9 +178,6 @@ public class PageController implements Listenable {
     }
 
     private void notifyListeners() {
-        // copy so a listener may add or remove during dispatch
-        for (Funcs.VoidFunc0 l : new ArrayList<Funcs.VoidFunc0>(listeners)) {
-            l.call();
-        }
+        com.codename1.flutter.foundation.Listeners.notify(listeners);
     }
 }

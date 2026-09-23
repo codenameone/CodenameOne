@@ -64,10 +64,7 @@ public interface ChangeNotifier extends Listenable {
     }
 
     default void notifyListeners() {
-        // copy so listeners may add/remove during dispatch
-        for (Funcs.VoidFunc0 l : new ArrayList<Funcs.VoidFunc0>(listenersOf(this))) {
-            l.call();
-        }
+        Listeners.notify(listenersOf(this));
     }
 
     default void dispose() {

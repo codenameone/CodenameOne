@@ -99,9 +99,7 @@ public class FocusNode {
     void setHasFocus(boolean focus) {
         if (this.hasFocus != focus) {
             this.hasFocus = focus;
-            for (Funcs.VoidFunc0 l : new ArrayList<Funcs.VoidFunc0>(listeners)) {
-                l.call();
-            }
+            com.codename1.flutter.foundation.Listeners.notify(listeners);
         }
     }
 }
