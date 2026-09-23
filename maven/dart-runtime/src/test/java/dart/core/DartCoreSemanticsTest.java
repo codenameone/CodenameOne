@@ -507,4 +507,43 @@ public class DartCoreSemanticsTest {
         assertTrue(DartUri.tryParse("http://[::1]:80/x") != null);
         assertTrue(DartUri.tryParse("") != null);
     }
+
+    // --- round 7 ----------------------------------------------------------------
+
+    @Test
+    public void intMapIterationFailsFastWhenTheMapGrows() {
+        final DartLongMap m = DartLongMap.ofLongs(1, 1);
+        assertThrows(java.util.ConcurrentModificationException.class,
+                () -> m.forEachDart((k, v) -> m.putLong(m.length() + 1, v)),
+                "a callback that adds keys must not be chased forever");
+        DartLongMap updating = DartLongMap.ofLongs(1, 1, 2, 2);
+        updating.forEachDart((k, v) -> updating.putLong(k, v + 10));
+        assertEquals(Long.valueOf(11), updating.idx(1), "a value update is not a structural change");
+    }
+
+    @Test
+    public void addAllMatchesKeysWithDartEquality() {
+        DartMap<Object, String> m = new DartMap<Object, String>();
+        m.put(Long.valueOf(1), "a");
+        java.util.Map<Object, String> more = new java.util.HashMap<Object, String>();
+        more.put(Double.valueOf(1.0), "b");
+        m.addAll(more);
+        assertEquals(1, m.size(), "{1: 'a'}.addAll({1.0: 'b'}) is {1: b}");
+        assertEquals("b", m.get(Long.valueOf(1)));
+    }
+
+    @Test
+    public void aStartBeyondIntDoesNotWrap() {
+        DartList<Object> l = DartList.of((Object) 1L);
+        assertEquals(-1, l.indexOfDart(1L, 4294967296L), "2^32 must not wrap to 0");
+        assertEquals(-1, l.indexWhere(x -> true, 4294967296L));
+    }
+
+    @Test
+    public void dartsOwnAnswersForNegativeRepeatAndGenerate() {
+        // Both recorded from the Dart SDK, against review findings that expected throws:
+        // 'ab' * -1 is the empty string, and Iterable.generate(-1) is empty.
+        assertEquals("", DString.repeat("ab", -1));
+        assertEquals(0, DartIterable.generate(-1, i -> i).length());
+    }
 }

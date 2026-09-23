@@ -287,4 +287,35 @@ public class FutureAdoptionTest {
         assertTrue(fired.await(5, java.util.concurrent.TimeUnit.SECONDS),
                 "a negative delay fires as soon as possible, as though it were zero");
     }
+
+    @Test
+    public void thenOnErrorHandlesOnlyTheSourceFailure() {
+        Future<Object> failed = Future.error(new IllegalStateException("source"));
+        Future<Object> handled = failed.then(new Funcs.Func1<Object, Object>() {
+            @Override
+            public Object call(Object v) {
+                return "value";
+            }
+        }, (Object) new Funcs.Func1<Object, Object>() {
+            @Override
+            public Object call(Object e) {
+                return "handled";
+            }
+        });
+        assertEquals("handled", handled.valueOrThrow());
+
+        final IllegalArgumentException fromOnValue = new IllegalArgumentException("onValue");
+        Future<Object> escaped = Future.value((Object) 1L).then(new Funcs.Func1<Object, Object>() {
+            @Override
+            public Object call(Object v) {
+                throw fromOnValue;
+            }
+        }, (Object) new Funcs.Func1<Object, Object>() {
+            @Override
+            public Object call(Object e) {
+                return "not me";
+            }
+        });
+        assertSame(fromOnValue, assertThrows(IllegalArgumentException.class, escaped::valueOrThrow));
+    }
 }

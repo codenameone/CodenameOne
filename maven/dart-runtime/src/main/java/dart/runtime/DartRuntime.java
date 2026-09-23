@@ -188,14 +188,16 @@ public final class DartRuntime {
                 if (op.equals("^")) {
                     return Long.valueOf(l ^ r);
                 }
+                // Dart's shift-count rules, as the typed operators get -- changing
+                // only an operand's static type must not change the result.
                 if (op.equals("<<")) {
-                    return Long.valueOf(l << r);
+                    return Long.valueOf(shl(l, r));
                 }
                 if (op.equals(">>")) {
-                    return Long.valueOf(l >> r);
+                    return Long.valueOf(shr(l, r));
                 }
                 if (op.equals(">>>")) {
-                    return Long.valueOf(l >>> r);
+                    return Long.valueOf(ushr(l, r));
                 }
             }
         }

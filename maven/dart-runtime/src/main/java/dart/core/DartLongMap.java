@@ -158,7 +158,20 @@ public final class DartLongMap extends AbstractMap<Long, Long> {
         }
     }
 
+    /// Bumped by every structural change -- a new key, a removal, a clear -- but not by
+    /// a value update, which Dart does not count as one. forEach and the iterators fail
+    /// fast when it moves under them: a callback that added entries used to be chased
+    /// forever along the growing entry count, hanging the app, where Dart throws.
+    private int version;
+
+    private void checkVersion(int expected) {
+        if (version != expected) {
+            throw new java.util.ConcurrentModificationException();
+        }
+    }
+
     private void appendEntry(int slot, long key, long value) {
+        version++;
         if (entryCount == present.length) {
             data = java.util.Arrays.copyOf(data, data.length * 2);
             present = java.util.Arrays.copyOf(present, present.length * 2);
@@ -242,6 +255,7 @@ public final class DartLongMap extends AbstractMap<Long, Long> {
                 present[e] = false;
                 index[slot] = DELETED;
                 liveSize--;
+                version++;
                 return old;
             }
             slot = (slot + 1) & mask;
@@ -365,9 +379,11 @@ public final class DartLongMap extends AbstractMap<Long, Long> {
     }
 
     public void forEachDart(Funcs.VoidFunc2<Long, Long> action) {
+        final int v = version;
         for (int e = 0; e < entryCount; e++) {
             if (present[e]) {
                 action.call(data[e << 1], data[(e << 1) + 1]);
+                checkVersion(v);
             }
         }
     }
@@ -418,6 +434,7 @@ public final class DartLongMap extends AbstractMap<Long, Long> {
 
     @Override
     public void clear() {
+        version++;
         entryCount = 0;
         liveSize = 0;
         java.util.Arrays.fill(index, EMPTY);
@@ -428,9 +445,11 @@ public final class DartLongMap extends AbstractMap<Long, Long> {
 
     private Iterator<Long> keyIterator() {
         return new Iterator<Long>() {
+            final int v = version;
             int e = nextLive(0);
             public boolean hasNext() { return e < entryCount; }
             public Long next() {
+                checkVersion(v);
                 if (e >= entryCount) { throw new NoSuchElementException(); }
                 long k = data[e << 1]; e = nextLive(e + 1); return k;
             }
@@ -439,9 +458,11 @@ public final class DartLongMap extends AbstractMap<Long, Long> {
 
     private Iterator<Long> valueIterator() {
         return new Iterator<Long>() {
+            final int ver = version;
             int e = nextLive(0);
             public boolean hasNext() { return e < entryCount; }
             public Long next() {
+                checkVersion(ver);
                 if (e >= entryCount) { throw new NoSuchElementException(); }
                 long v = data[(e << 1) + 1]; e = nextLive(e + 1); return v;
             }
@@ -464,11 +485,13 @@ public final class DartLongMap extends AbstractMap<Long, Long> {
             }
             public Iterator<Map.Entry<Long, Long>> iterator() {
                 return new Iterator<Map.Entry<Long, Long>>() {
+                    final int v = version;
                     int e = nextLive(0);
                     public boolean hasNext() {
                         return e < entryCount;
                     }
                     public Map.Entry<Long, Long> next() {
+                        checkVersion(v);
                         if (e >= entryCount) {
                             throw new NoSuchElementException();
                         }

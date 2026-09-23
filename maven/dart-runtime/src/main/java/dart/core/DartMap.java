@@ -122,6 +122,18 @@ public class DartMap<K, V> extends LinkedHashMap<K, V> {
         return super.remove(storedKey(key));
     }
 
+    /**
+     * Through {@link #put}, so every copy -- addAll, Map.from, Map.of -- matches keys
+     * with Dart's ==. LinkedHashMap's own putAll bypasses the overridden put, so adding
+     * {1.0: 'b'} to {1: 'a'} made a second entry instead of updating the first.
+     */
+    @Override
+    public void putAll(Map<? extends K, ? extends V> other) {
+        for (Map.Entry<? extends K, ? extends V> e : other.entrySet()) {
+            put(e.getKey(), e.getValue());
+        }
+    }
+
     public DartMap() {
     }
 

@@ -238,6 +238,70 @@ public class Future<T> {
     }
 
     /**
+     * Dart's {@code then(onValue, onError: handler)}. The handler receives THIS
+     * future's error, never one thrown by onValue -- that one fails the returned
+     * future, as in Dart. The named onError used to be dropped by the transpiler, so
+     * a failure skipped the handler and the chain stayed failed. The handler may take
+     * the error, or the error and a stack trace, and may return a value or nothing.
+     */
+    public Future<Object> then(final Funcs.Func1<T, Object> onValue, final Object onError) {
+        if (onError == null) {
+            return then(onValue);
+        }
+        final Future<Object> next = new Future<Object>();
+        onComplete(new Runnable() {
+            @Override
+            public void run() {
+                if (error != null) {
+                    try {
+                        next.complete(callErrorHandler(onError, error));
+                    } catch (Throwable t) {
+                        next.completeError(t);
+                    }
+                    return;
+                }
+                try {
+                    next.complete(onValue.call(value));
+                } catch (Throwable t) {
+                    next.completeError(t);
+                }
+            }
+        });
+        return next;
+    }
+
+    /** {@link #then(Funcs.Func1, Object)} with a void onValue body. */
+    public Future<Object> then(final Funcs.VoidFunc1<T> onValue, final Object onError) {
+        return then(new Funcs.Func1<T, Object>() {
+            @Override
+            public Object call(T v) {
+                onValue.call(v);
+                return null;
+            }
+        }, onError);
+    }
+
+    /** Invokes an error handler of any shape a Dart handler transpiles to. */
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    private static Object callErrorHandler(Object handler, Object err) {
+        if (handler instanceof Funcs.Func1) {
+            return ((Funcs.Func1) handler).call(err);
+        }
+        if (handler instanceof Funcs.VoidFunc1) {
+            ((Funcs.VoidFunc1) handler).call(err);
+            return null;
+        }
+        if (handler instanceof Funcs.Func2) {
+            return ((Funcs.Func2) handler).call(err, null);
+        }
+        if (handler instanceof Funcs.VoidFunc2) {
+            ((Funcs.VoidFunc2) handler).call(err, null);
+            return null;
+        }
+        throw new dart.core.ArgumentError("onError is not a function");
+    }
+
+    /**
      * {@code then} with a void callback body — the common statement-body
      * {@code .then((_) { ... })} shape, which transpiles to a
      * {@link Funcs.VoidFunc1}. Mirrors {@link #then(Funcs.Func1)} but discards

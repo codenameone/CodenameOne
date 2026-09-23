@@ -157,4 +157,10 @@ public class DartRuntimeTest {
         assertEquals("-0.0", DartRuntime.doubleStr(DartRuntime.roundToDouble(-0.4)), "the sign of zero is kept");
         assertThrows(dart.core.UnsupportedError.class, () -> DartRuntime.round(Double.NaN));
     }
+
+    @Test
+    public void dynamicShiftsFollowTheTypedRules() {
+        assertEquals(Long.valueOf(0), DartRuntime.dynBinary("<<", 1L, 64L));
+        assertThrows(dart.core.ArgumentError.class, () -> DartRuntime.dynBinary("<<", 1L, -1L));
+    }
 }

@@ -305,6 +305,10 @@ public class DartList<E> extends AbstractList<E> implements RandomAccess {
 
     /** Dart's {@code indexOf(element, start)}: the first match at or after start. */
     public long indexOfDart(E element, long start) {
+        // Decided on the long: narrowing first wrapped 2^32 to 0 and searched from the top.
+        if (start >= size()) {
+            return -1;
+        }
         for (int i = (int) Math.max(0, start); i < size(); i++) {
             if (DartRuntime.eq(get(i), element)) {
                 return i;
@@ -340,6 +344,9 @@ public class DartList<E> extends AbstractList<E> implements RandomAccess {
 
     /** Dart's {@code List.indexWhere(test, [start])}. */
     public long indexWhere(Funcs.Func1<E, Boolean> test, long start) {
+        if (start >= size()) {
+            return -1;
+        }
         for (int i = (int) Math.max(0, start); i < size(); i++) {
             if (Boolean.TRUE.equals(test.call(get(i)))) {
                 return i;
