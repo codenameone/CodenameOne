@@ -64,7 +64,11 @@ public final class DartTranspiler {
         }
         Collections.sort(dartFiles);
 
-        String digest = digest(dartFiles) + stubDigest(req.stubClasspath);
+        // The output PACKAGE is part of what was generated, so it is part of the
+        // key: changing cn1.flutter.package alone used to leave every generated
+        // source declared in the old package, because nothing else had changed.
+        String digest = digest(dartFiles) + stubDigest(req.stubClasspath)
+                + "-pkg:" + req.packageName;
         if (req.stateFile != null && req.stateFile.exists() && req.outputDir != null && req.outputDir.exists()) {
             try {
                 String prev = new String(Files.readAllBytes(req.stateFile.toPath()), StandardCharsets.UTF_8).trim();
@@ -194,10 +198,70 @@ public final class DartTranspiler {
         return Integer.toHexString(sb.toString().hashCode());
     }
 
+    private static String fingerprint;
+
+    /**
+     * A digest of the transpiler's OWN code, so that any change to what it emits
+     * invalidates a cached result without anyone having to remember to.
+     *
+     * <p>VERSION was meant to do this and had to be bumped by hand; it stayed
+     * "m1-1" through every emission change since the first milestone. A project
+     * that upgraded its plugin kept a state file whose digest still matched, so
+     * the transpile was skipped and the generated sources stayed whatever the
+     * previous transpiler had produced. Hashing the jar (or the class directory
+     * in a development build) the transpiler was loaded from makes that
+     * automatic. Computed once per JVM.</p>
+     */
+    private static synchronized String transpilerFingerprint() {
+        if (fingerprint != null) {
+            return fingerprint;
+        }
+        try {
+            File where = new File(DartTranspiler.class.getProtectionDomain()
+                    .getCodeSource().getLocation().toURI());
+            MessageDigest md = MessageDigest.getInstance("SHA-1");
+            List<File> parts = new ArrayList<File>();
+            if (where.isDirectory()) {
+                collectFiles(where, parts);
+                Collections.sort(parts);
+            } else {
+                parts.add(where);
+            }
+            for (File f : parts) {
+                md.update(Files.readAllBytes(f.toPath()));
+            }
+            StringBuilder sb = new StringBuilder();
+            for (byte b : md.digest()) {
+                sb.append(String.format("%02x", b));
+            }
+            fingerprint = sb.toString();
+        } catch (Exception e) {
+            // Unknown code source: never match a previous state, rather than risk
+            // reusing output from a different transpiler.
+            fingerprint = "unknown-" + System.nanoTime();
+        }
+        return fingerprint;
+    }
+
+    private static void collectFiles(File dir, List<File> out) {
+        File[] children = dir.listFiles();
+        if (children == null) {
+            return;
+        }
+        for (File c : children) {
+            if (c.isDirectory()) {
+                collectFiles(c, out);
+            } else {
+                out.add(c);
+            }
+        }
+    }
+
     private String digest(List<File> files) {
         try {
             MessageDigest md = MessageDigest.getInstance("SHA-1");
             md.update(VERSION.getBytes(StandardCharsets.UTF_8));
+            md.update(transpilerFingerprint().getBytes(StandardCharsets.UTF_8));
             for (File f : files) {
                 md.update(f.getAbsolutePath().getBytes(StandardCharsets.UTF_8));
                 md.update(Files.readAllBytes(f.toPath()));
