@@ -20,6 +20,11 @@
  * Please contact Codename One through http://www.codenameone.com/ if you
  * need additional information or have any questions.
  */
+// Guide samples for server stacks that are not Codename One. This directory is
+// NOT a Maven module and nothing builds it: the guide's snippet validator skips
+// includes under src/main/java, so these carry no dependencies and are read
+// rather than compiled.
+
 package com.codenameone.developerguide.serverframeworks;
 
 /**
