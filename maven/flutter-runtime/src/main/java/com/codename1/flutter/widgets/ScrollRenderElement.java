@@ -295,6 +295,15 @@ public abstract class ScrollRenderElement extends RenderElement {
         public boolean userDragging() {
             return isDragActivated();
         }
+
+        /** Moves the scroll position -- what a ScrollController's jumpTo drives. */
+        public void scrollToPosition(int px, boolean horizontal) {
+            if (horizontal) {
+                setScrollX(px);
+            } else {
+                setScrollY(px);
+            }
+        }
     }
 
     @Override

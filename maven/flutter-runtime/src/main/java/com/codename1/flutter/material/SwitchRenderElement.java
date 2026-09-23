@@ -96,6 +96,10 @@ public class SwitchRenderElement extends RenderElement {
         applying = true;
         try {
             sw.setValue(configuredValue());
+            // A null onChanged is Flutter's disabled switch; the checkbox and button
+            // renderers already mirror that, and the switch kept enabled styling,
+            // focus and pointer behaviour.
+            sw.setEnabled(switchWidget().getOnChanged() != null);
         } finally {
             applying = false;
         }

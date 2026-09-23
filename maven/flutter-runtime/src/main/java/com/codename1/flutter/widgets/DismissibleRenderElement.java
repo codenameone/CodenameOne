@@ -419,29 +419,76 @@ public class DismissibleRenderElement extends RenderElement {
             animateTo(0, RESTORE_MS, false, null);
             return;
         }
-        DismissDirection dir = directionOf(dragX);
+        final DismissDirection dir = directionOf(dragX);
         boolean past = Math.abs(dragX) / width >= thresholdFor(dir);
-        if (past && confirmed(dir)) {
-            animateTo(dragX < 0 ? -width : width, DISMISS_MS, true, dir);
-        } else {
+        if (!past) {
             animateTo(0, RESTORE_MS, false, null);
+            return;
         }
+        final double target = dragX < 0 ? -width : width;
+        confirm(dir, new dart.runtime.Funcs.VoidFunc1<Boolean>() {
+            @Override
+            public void call(Boolean ok) {
+                if (ok.booleanValue()) {
+                    animateTo(target, DISMISS_MS, true, dir);
+                } else {
+                    animateTo(0, RESTORE_MS, false, null);
+                }
+            }
+        });
     }
 
-    /// {@code confirmDismiss}, which may veto. The transpiler unwraps the Dart Future, so
-    /// the answer arrives as a Boolean; anything else is taken as consent, since a widget
-    /// that supplies no answer is not refusing.
-    private boolean confirmed(DismissDirection dir) {
+    /**
+     * {@code confirmDismiss}, which may veto -- and usually answers with a Future, from
+     * an async callback or a dialog. That future used to count as consent, because only a
+     * Boolean was looked at: an asynchronous "no", or a failed confirmation, dismissed the
+     * row at once and ran onDismissed anyway. A Future now decides when it completes (an
+     * error vetoes), and the row holds where it was dragged until then, as in Flutter. No
+     * callback, or an answer that is neither, is consent.
+     */
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    private void confirm(DismissDirection dir, final dart.runtime.Funcs.VoidFunc1<Boolean> decide) {
         dart.runtime.Funcs.Func1<DismissDirection, Object> c = dismissible().getConfirmDismiss();
         if (c == null) {
-            return true;
+            decide.call(Boolean.TRUE);
+            return;
         }
+        Object answer;
         try {
-            Object answer = c.call(dir);
-            return !(answer instanceof Boolean) || ((Boolean) answer).booleanValue();
+            answer = c.call(dir);
         } catch (Throwable t) {
             com.codename1.flutter.FlutterErrorReport.record(t);
-            return false;
+            decide.call(Boolean.FALSE);
+            return;
+        }
+        if (answer instanceof dart.async.Future) {
+            ((dart.async.Future) answer).then(new dart.runtime.Funcs.VoidFunc1<Object>() {
+                @Override
+                public void call(Object v) {
+                    onEdt(decide, Boolean.valueOf(!(v instanceof Boolean) || ((Boolean) v).booleanValue()));
+                }
+            }).catchError(new dart.runtime.Funcs.VoidFunc1<Object>() {
+                @Override
+                public void call(Object error) {
+                    com.codename1.flutter.FlutterErrorReport.record(error);
+                    onEdt(decide, Boolean.FALSE);
+                }
+            });
+            return;
+        }
+        decide.call(Boolean.valueOf(!(answer instanceof Boolean) || ((Boolean) answer).booleanValue()));
+    }
+
+    private static void onEdt(final dart.runtime.Funcs.VoidFunc1<Boolean> decide, final Boolean ok) {
+        if (com.codename1.ui.Display.isInitialized() && !com.codename1.ui.CN.isEdt()) {
+            com.codename1.ui.CN.callSerially(new Runnable() {
+                @Override
+                public void run() {
+                    decide.call(ok);
+                }
+            });
+        } else {
+            decide.call(ok);
         }
     }
 

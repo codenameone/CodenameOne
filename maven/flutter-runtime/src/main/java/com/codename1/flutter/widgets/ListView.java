@@ -78,6 +78,11 @@ public class ListView extends Widget {
         this.controller = v;
     }
 
+    /** The controller driving this list, or null. */
+    public ScrollController getController() {
+        return controller;
+    }
+
     public ScrollPhysics getPhysics() {
         return physics;
     }
@@ -131,6 +136,11 @@ public class ListView extends Widget {
         }
         if (primary != null) {
             l.primary(primary.booleanValue());
+        }
+        // Declared by the builder and dropped: a builder list's controller never
+        // reached the list.
+        if (controller instanceof ScrollController) {
+            l.controller((ScrollController) controller);
         }
         return l;
     }

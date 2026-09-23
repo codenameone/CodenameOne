@@ -45,10 +45,9 @@ import java.io.InputStream;
  *   <li><b>asset</b>: loaded from {@code /assets/&lt;name&gt;} on the
  *       classpath (the app build copies {@code src/main/flutter/assets}
  *       there) as an EncodedImage.</li>
- *   <li><b>network</b>: a {@link URLImage} with a transparent placeholder
- *       sized from the width/height parameters (or 100lp), downloaded to
- *       storage and scaled by the URLImage adapter — the BoxFit for network
- *       images is therefore approximated by RESIZE_SCALE.</li>
+ *   <li><b>network</b>: downloaded (or read from the storage cache) and
+ *       decoded at its natural size, like an asset, so BoxFit sees the real
+ *       aspect ratio; nothing is shown until the bytes arrive.</li>
  * </ul>
  *
  * <p>Sizing: explicit width/height tighten the incoming constraints; the
@@ -60,8 +59,6 @@ import java.io.InputStream;
  * natural size.</p>
  */
 public class ImageRenderElement extends RenderElement {
-
-    private static final double FALLBACK_EXTENT_LP = 100;
 
     private com.codename1.ui.Image img;
     private String loadedSource;
@@ -121,37 +118,13 @@ public class ImageRenderElement extends RenderElement {
                 // encoded pixels per logical pixel.
                 assetRatio = image().getMemoryScale();
             } else if (image().getUrl() != null) {
-                int pw = (int) Math.max(1, Math.round(Dp.px(
-                        image().getWidth() != null ? image().getWidth() : FALLBACK_EXTENT_LP)));
-                int ph = (int) Math.max(1, Math.round(Dp.px(
-                        image().getHeight() != null ? image().getHeight() : FALLBACK_EXTENT_LP)));
-                EncodedImage placeholder = EncodedImage.createFromImage(
-                        com.codename1.ui.Image.createImage(pw, ph, 0x0), false);
-                final java.util.Map<?, ?> headers = image().getHeaders();
-                if (headers == null) {
-                    img = URLImage.createToStorage(placeholder,
-                            "flutter-img-" + image().getUrl().hashCode(),
-                            image().getUrl(), URLImage.RESIZE_SCALE);
-                } else {
-                    // NetworkImage(url, headers: ...): the headers ride on the
-                    // request through URLImage's per-image decorator. The storage
-                    // key covers them too, so a picture fetched with one user's
-                    // credentials is not served back from the cache for another's.
-                    img = URLImage.createToStorage(placeholder,
-                            "flutter-img-" + image().getUrl().hashCode() + "-h" + headers.hashCode(),
-                            image().getUrl(), URLImage.RESIZE_SCALE,
-                            new URLImage.RequestDecorator() {
-                                @Override
-                                public void decorate(com.codename1.io.ConnectionRequest req) {
-                                    for (java.util.Map.Entry<?, ?> e : headers.entrySet()) {
-                                        if (e.getKey() != null && e.getValue() != null) {
-                                            req.addRequestHeader(String.valueOf(e.getKey()),
-                                                    String.valueOf(e.getValue()));
-                                        }
-                                    }
-                                }
-                            });
-                }
+                // Fetched and decoded at its NATURAL size, then applied like an asset.
+                // URLImage with RESIZE_SCALE resampled the download to the placeholder's
+                // exact box -- a square 100lp one when no size was given -- and this
+                // element read the placeholder's size as the image's own, so BoxFit
+                // contain/cover could never recover the real aspect ratio. Until the
+                // bytes arrive there is simply no image, as in Flutter.
+                fetchNetworkImage(l, source, image().getUrl(), image().getHeaders());
             }
         } catch (Exception err) {
             Log.p("Flutter runtime: could not load image " + source);
@@ -162,6 +135,11 @@ public class ImageRenderElement extends RenderElement {
         // shrinkToBox) and the size this box reports must not change when that
         // happens -- a natural size that shrank would shrink the box, which
         // would shrink the picture again.
+        applyLoaded(l);
+    }
+
+    /** Takes the current {@code img} as the natural size and hands it to the component. */
+    private void applyLoaded(Label l) {
         naturalW = img == null ? 0 : img.getWidth();
         naturalH = img == null ? 0 : img.getHeight();
         if (l instanceof FittedImage) {
@@ -207,6 +185,104 @@ public class ImageRenderElement extends RenderElement {
     ///
     /// Anything whose header is not recognised falls back to the old behaviour,
     /// so an unsupported format is slower but never wrong.
+    /**
+     * The storage key for a network image: a SHA-256 over the URL and the sorted request
+     * headers. It was the URL's String.hashCode (plus the header map's), and URLImage
+     * serves whatever is already stored or pending under a key -- two URLs with the same
+     * 32-bit hash, which is easy to construct, got each other's picture, including one
+     * fetched with another user's credentials.
+     */
+    static String storageKey(String url, java.util.Map<?, ?> headers) {
+        StringBuilder sb = new StringBuilder(url);
+        if (headers != null && !headers.isEmpty()) {
+            java.util.List<String> lines = new java.util.ArrayList<String>();
+            for (java.util.Map.Entry<?, ?> e : headers.entrySet()) {
+                lines.add(String.valueOf(e.getKey()) + ": " + String.valueOf(e.getValue()));
+            }
+            java.util.Collections.sort(lines);
+            for (String line : lines) {
+                sb.append('\n').append(line);
+            }
+        }
+        byte[] digest;
+        try {
+            digest = com.codename1.security.Hash.sha256(sb.toString().getBytes("UTF-8"));
+        } catch (java.io.UnsupportedEncodingException e) {
+            digest = com.codename1.security.Hash.sha256(sb.toString().getBytes());
+        }
+        // A table rather than Character.forDigit, which ParparVM's JavaAPI lacks.
+        String digits = "0123456789abcdef";
+        StringBuilder hex = new StringBuilder("flutter-img-");
+        for (int i = 0; i < digest.length; i++) {
+            int b = digest[i] & 0xff;
+            hex.append(digits.charAt(b >> 4)).append(digits.charAt(b & 0xf));
+        }
+        return hex.toString();
+    }
+
+    /** Loads a network image from the storage cache, or downloads and caches it. */
+    private void fetchNetworkImage(final Label l, final String source, String url,
+            final java.util.Map<?, ?> headers) {
+        final String key = storageKey(url, headers);
+        final com.codename1.io.Storage storage = com.codename1.io.Storage.getInstance();
+        if (storage.exists(key)) {
+            java.io.InputStream in = null;
+            try {
+                in = storage.createInputStream(key);
+                img = downsample(encodedWithKnownSize(in));
+                return;
+            } catch (java.io.IOException e) {
+                storage.deleteStorageFile(key);   // a damaged cache entry: fetch again
+            } finally {
+                com.codename1.io.Util.cleanup(in);
+            }
+        }
+        final com.codename1.io.ConnectionRequest req = new com.codename1.io.ConnectionRequest(url, false);
+        req.setDuplicateSupported(true);
+        if (headers != null) {
+            for (java.util.Map.Entry<?, ?> e : headers.entrySet()) {
+                if (e.getKey() != null && e.getValue() != null) {
+                    req.addRequestHeader(String.valueOf(e.getKey()), String.valueOf(e.getValue()));
+                }
+            }
+        }
+        req.addResponseListener(new com.codename1.ui.events.ActionListener<com.codename1.io.NetworkEvent>() {
+            @Override
+            public void actionPerformed(com.codename1.io.NetworkEvent evt) {
+                final byte[] data = req.getResponseData();
+                if (data == null || data.length == 0) {
+                    return;
+                }
+                com.codename1.ui.CN.callSerially(new Runnable() {
+                    @Override
+                    public void run() {
+                        if (!source.equals(loadedSource) || !isMounted()) {
+                            return;   // the widget moved on to another image
+                        }
+                        try {
+                            img = downsample(encodedWithKnownSize(new java.io.ByteArrayInputStream(data)));
+                        } catch (java.io.IOException e) {
+                            Log.p("Flutter runtime: could not decode image " + source);
+                            return;
+                        }
+                        java.io.OutputStream out = null;
+                        try {
+                            out = storage.createOutputStream(key);
+                            out.write(data);
+                        } catch (java.io.IOException e) {
+                            // not cached; it will simply be fetched again next time
+                        } finally {
+                            com.codename1.io.Util.cleanup(out);
+                        }
+                        applyLoaded(l);
+                        markNeedsLayout();
+                    }
+                });
+            }
+        });
+        com.codename1.io.NetworkManager.getInstance().addToQueue(req);
+    }
+
     private static com.codename1.ui.Image encodedWithKnownSize(java.io.InputStream in)
             throws java.io.IOException {
         byte[] data = com.codename1.io.Util.readInputStream(in);

@@ -146,6 +146,53 @@ public class GestureDetector extends Widget {
         return onVerticalDragEnd;
     }
 
+    public com.codename1.flutter.gestures.GestureDragStartCallback getOnVerticalDragStart() {
+        return onVerticalDragStart;
+    }
+
+    public com.codename1.flutter.gestures.GestureDragUpdateCallback getOnVerticalDragUpdate() {
+        return onVerticalDragUpdate;
+    }
+
+    public com.codename1.flutter.gestures.GestureDragStartCallback getOnHorizontalDragStart() {
+        return onHorizontalDragStart;
+    }
+
+    public com.codename1.flutter.gestures.GestureDragUpdateCallback getOnHorizontalDragUpdate() {
+        return onHorizontalDragUpdate;
+    }
+
+    public com.codename1.flutter.gestures.GestureDragEndCallback getOnHorizontalDragEnd() {
+        return onHorizontalDragEnd;
+    }
+
+    public com.codename1.flutter.gestures.GestureDragStartCallback getOnPanStart() {
+        return onPanStart;
+    }
+
+    public com.codename1.flutter.gestures.GestureDragUpdateCallback getOnPanUpdate() {
+        return onPanUpdate;
+    }
+
+    public com.codename1.flutter.gestures.GestureDragEndCallback getOnPanEnd() {
+        return onPanEnd;
+    }
+
+    /** Whether any vertical-drag callback is set. */
+    boolean handlesVerticalDrag() {
+        return onVerticalDragStart != null || onVerticalDragUpdate != null || onVerticalDragEnd != null;
+    }
+
+    /** Whether any horizontal-drag callback is set. */
+    boolean handlesHorizontalDrag() {
+        return onHorizontalDragStart != null || onHorizontalDragUpdate != null || onHorizontalDragEnd != null;
+    }
+
+    /** Whether any pan callback is set. */
+    boolean handlesPan() {
+        return onPanStart != null || onPanUpdate != null || onPanEnd != null;
+    }
+
     public Funcs.VoidFunc0 getOnLongPress() {
         return onLongPress;
     }

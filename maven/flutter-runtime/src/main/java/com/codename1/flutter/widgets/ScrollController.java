@@ -81,12 +81,18 @@ public class ScrollController {
 
     public Future<Object> animateTo(double offset, Duration duration, Curve curve) {
         scrollPosition.jumpTo(offset);
+        if (client != null) {
+            client.scrollToOffset(offset);
+        }
         notifyListeners();
         return Future.value(null);
     }
 
     public void jumpTo(double value) {
         scrollPosition.jumpTo(value);
+        if (client != null) {
+            client.scrollToOffset(value);
+        }
         notifyListeners();
     }
 
@@ -109,12 +115,50 @@ public class ScrollController {
     // Framework plumbing
     // ------------------------------------------------------------------
 
+    /**
+     * The scrollable a controller drives: the mounted list moves itself to an offset.
+     *
+     * <p>A ListView used to store its controller and never attach it, so hasClients
+     * stayed false, user scrolling never reached offset or the listeners, and
+     * jumpTo/animateTo moved only this detached model while the list sat still.</p>
+     */
+    interface Client {
+        /** Scrolls to {@code offset} logical pixels. */
+        void scrollToOffset(double offset);
+    }
+
+    private Client client;
+
     void attach() {
+        this.attached = true;
+    }
+
+    /** Attaches the scrollable this controller drives. */
+    void attach(Client c) {
+        this.client = c;
         this.attached = true;
     }
 
     void detach() {
         this.attached = false;
+        this.client = null;
+    }
+
+    /** Detaches {@code c}, if it is still the one attached. */
+    void detach(Client c) {
+        if (client == c) {
+            detach();
+        }
+    }
+
+    /** The user scrolled the attached list to {@code offset} logical pixels. */
+    void userScrolled(double offset, double maxExtent, double viewport) {
+        scrollPosition.applyViewportDimension(viewport);
+        scrollPosition.applyContentDimensions(0, maxExtent);
+        if (scrollPosition.pixels() != offset) {
+            scrollPosition.setPixels(offset);
+            notifyListeners();
+        }
     }
 
     void notifyListeners() {

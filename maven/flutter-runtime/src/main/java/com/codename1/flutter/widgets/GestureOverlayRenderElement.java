@@ -256,8 +256,37 @@ public class GestureOverlayRenderElement extends RenderElement {
             super.pointerPressed(x, y);
         }
 
+        /** The drag this detector claimed for the current press: one of the DRAG_ constants. */
+        private int dragAxis = DRAG_NONE;
+        private int lastX;
+        private int lastY;
+
         @Override
         public void pointerDragged(int x, int y) {
+            // A drag this detector has callbacks for is ITS drag, as in Flutter's gesture
+            // arena where the innermost recognizer wins: once claimed, every move goes to
+            // those callbacks and no enclosing scrollable moves. An inner scrollable still
+            // takes precedence. These callbacks used to be stored and never read, so a
+            // carousel, a slider or a panning surface rendered and never moved.
+            GestureDetector g = gesture();
+            if (dragAxis == DRAG_NONE && g != null && movedBeyondSlop(x, y)
+                    && !(forwardTo != null && isScrollPane(forwardTo))) {
+                dragAxis = claimAxis(x - pressX, y - pressY, g.handlesVerticalDrag(),
+                        g.handlesHorizontalDrag(), g.handlesPan());
+                if (dragAxis != DRAG_NONE) {
+                    // Whatever was pressed inside us is not getting a tap now.
+                    dragInitiated();
+                    fireDragStart(g);
+                    lastX = pressX;
+                    lastY = pressY;
+                }
+            }
+            if (dragAxis != DRAG_NONE) {
+                fireDragUpdate(g, x, y);
+                lastX = x;
+                lastY = y;
+                return;
+            }
             // Past the slop this is a scroll, not a tap, and Flutter drops the splash --
             // whether or not Codename One has decided to call it a drag yet. Waiting for
             // its verdict leaves a highlight standing on a row the finger has left.
@@ -346,53 +375,125 @@ public class GestureOverlayRenderElement extends RenderElement {
                 if (g != null) {
                     fire(g.getOnTap());
                 }
-            } else if (wasDrag) {
-                fireVerticalDragEnd(x, y);
+            } else if (dragAxis != DRAG_NONE) {
+                fireDragEnd(x, y);
             }
+            dragAxis = DRAG_NONE;
             suppressTap = false;
         }
 
+        private double lp(double px) {
+            double scale = com.codename1.flutter.rendering.Dp.scale();
+            return scale > 0 ? px / scale : px;
+        }
+
+        private com.codename1.flutter.Offset global(int x, int y) {
+            return new com.codename1.flutter.Offset(lp(x), lp(y));
+        }
+
+        private com.codename1.flutter.Offset local(int x, int y) {
+            return new com.codename1.flutter.Offset(lp(x - getAbsoluteX()), lp(y - getAbsoluteY()));
+        }
+
+        private void fireDragStart(GestureDetector g) {
+            com.codename1.flutter.gestures.GestureDragStartCallback cb =
+                    dragAxis == DRAG_VERTICAL ? g.getOnVerticalDragStart()
+                    : dragAxis == DRAG_HORIZONTAL ? g.getOnHorizontalDragStart() : g.getOnPanStart();
+            if (cb == null) {
+                return;
+            }
+            try {
+                cb.call(new com.codename1.flutter.gestures.DragStartDetails(global(pressX, pressY),
+                        local(pressX, pressY)));
+            } catch (Throwable t) {
+                com.codename1.flutter.FlutterErrorReport.record(t);
+            }
+        }
+
+        private void fireDragUpdate(GestureDetector g, int x, int y) {
+            if (g == null) {
+                return;
+            }
+            com.codename1.flutter.gestures.GestureDragUpdateCallback cb =
+                    dragAxis == DRAG_VERTICAL ? g.getOnVerticalDragUpdate()
+                    : dragAxis == DRAG_HORIZONTAL ? g.getOnHorizontalDragUpdate() : g.getOnPanUpdate();
+            if (cb == null) {
+                return;
+            }
+            double dx = lp(x - lastX);
+            double dy = lp(y - lastY);
+            com.codename1.flutter.Offset delta = dragAxis == DRAG_VERTICAL ? new com.codename1.flutter.Offset(0.0, dy)
+                    : dragAxis == DRAG_HORIZONTAL ? new com.codename1.flutter.Offset(dx, 0.0)
+                    : new com.codename1.flutter.Offset(dx, dy);
+            Double primary = dragAxis == DRAG_VERTICAL ? Double.valueOf(dy)
+                    : dragAxis == DRAG_HORIZONTAL ? Double.valueOf(dx) : null;
+            try {
+                cb.call(new com.codename1.flutter.gestures.DragUpdateDetails(global(x, y), local(x, y),
+                        delta, primary));
+            } catch (Throwable t) {
+                com.codename1.flutter.FlutterErrorReport.record(t);
+            }
+        }
+
         /**
-         * Reports the end of a vertical drag, with the speed it finished at.
-         *
-         * <p>A gesture that turned out to be a drag used to end in silence: the callback
-         * was stored and never invoked, anywhere. Flick gestures therefore did nothing at
-         * all, and the ones that matter are the ones with no other route -- the gallery's
-         * splash screen is entered with a downward flick and left with an upward one, and
-         * with neither working it could be neither opened as intended nor left.</p>
+         * Reports the end of the claimed drag, with the speed it finished at.
          *
          * <p>Velocity is measured over the WHOLE press rather than the last few moves.
          * That understates a flick that began slowly, which is the safe direction to be
          * wrong in: it misses a gesture rather than inventing one, and every caller here
-         * compares against a threshold.</p>
+         * compares against a threshold. (The gallery's splash screen is entered with a
+         * downward flick and left with an upward one.)</p>
          */
-        private void fireVerticalDragEnd(int x, int y) {
+        private void fireDragEnd(int x, int y) {
             GestureDetector g = gesture();
-            if (g == null || g.getOnVerticalDragEnd() == null) {
+            if (g == null) {
                 return;
             }
-            double dy = y - pressY;
-            if (Math.abs(dy) <= Math.abs(x - pressX)) {
-                // Mostly sideways: not this gesture.
+            com.codename1.flutter.gestures.GestureDragEndCallback cb =
+                    dragAxis == DRAG_VERTICAL ? g.getOnVerticalDragEnd()
+                    : dragAxis == DRAG_HORIZONTAL ? g.getOnHorizontalDragEnd() : g.getOnPanEnd();
+            if (cb == null) {
                 return;
             }
             long ms = com.codename1.ui.animations.AnimationTime.now() - pressAt;
             if (ms <= 0) {
                 ms = 1;
             }
-            double scale = com.codename1.flutter.rendering.Dp.scale();
-            double lpPerSecond = (scale > 0 ? dy / scale : dy) * 1000.0 / ms;
-            com.codename1.flutter.gestures.DragEndDetails d =
-                    new com.codename1.flutter.gestures.DragEndDetails(
-                            new com.codename1.flutter.gestures.Velocity(
-                                    new com.codename1.flutter.Offset(0.0, lpPerSecond)),
-                            Double.valueOf(lpPerSecond));
+            double vx = dragAxis == DRAG_VERTICAL ? 0 : lp(x - pressX) * 1000.0 / ms;
+            double vy = dragAxis == DRAG_HORIZONTAL ? 0 : lp(y - pressY) * 1000.0 / ms;
+            Double primary = dragAxis == DRAG_VERTICAL ? Double.valueOf(vy)
+                    : dragAxis == DRAG_HORIZONTAL ? Double.valueOf(vx) : null;
             try {
-                g.getOnVerticalDragEnd().call(d);
+                cb.call(new com.codename1.flutter.gestures.DragEndDetails(
+                        new com.codename1.flutter.gestures.Velocity(new com.codename1.flutter.Offset(vx, vy)),
+                        primary));
             } catch (Throwable t) {
                 com.codename1.flutter.FlutterErrorReport.record(t);
             }
         }
+    }
+
+    static final int DRAG_NONE = 0;
+    static final int DRAG_VERTICAL = 1;
+    static final int DRAG_HORIZONTAL = 2;
+    static final int DRAG_PAN = 3;
+
+    /**
+     * Which drag a detector claims once the pointer has passed the slop: vertical when
+     * it has vertical callbacks and the motion is mostly vertical, horizontal likewise,
+     * otherwise a pan if it has pan callbacks -- and none, leaving the motion to an
+     * enclosing scrollable, when it has no callback for this direction.
+     */
+    static int claimAxis(double dx, double dy, boolean vertical, boolean horizontal, boolean pan) {
+        double ax = Math.abs(dx);
+        double ay = Math.abs(dy);
+        if (vertical && ay >= ax) {
+            return DRAG_VERTICAL;
+        }
+        if (horizontal && ax > ay) {
+            return DRAG_HORIZONTAL;
+        }
+        return pan ? DRAG_PAN : DRAG_NONE;
     }
 
     /// Flutter's {@code kTouchSlop}: how far a pointer may travel and still be a tap.
