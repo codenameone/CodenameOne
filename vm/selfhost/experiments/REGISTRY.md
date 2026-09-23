@@ -6134,3 +6134,50 @@ measured 11% on every layout. Removing loads and stores from this loop reshapes 
 core orders the next iteration's bumpIndex load against the previous release store to
 the same word, and on this hardware that costs more than the instructions saved. Not
 understood well enough to engineer; reverted.
+
+## Round 39: the collector's per-cycle cost on the mutator, and a survival figure that lied
+
+Matrix against warm AOT JDK 25 after it (3 rounds; load 4.8 rising to 32, so the
+4-core column is the least trustworthy):
+
+| | 1 core | 2 cores | 4 cores |
+|---|---|---|---|
+| objectAllocation (was 2.59x / 4.31x / 3.98x) | 1.78x | 3.26x | 2.70x |
+| selfhost wall | 0.94x | 0.93x | 0.97x |
+| selfhost peak | 0.93x | 0.89x | 0.97x |
+
+What landed, each gated (gauntlet, gc-verify with all seven self-tests biting, Gate A,
+60-120 self-host repro runs) and A/B'd interleaved against its parent:
+
+- **43a4c5624a -- handshakes wake in microseconds.** Parked threads polled with
+  usleep(500/1000) and the collector polled threadActive the same way, so every
+  stop cost the mutator >=512us. Spin, yield, then 50us sleeps: handshake stall at
+  1 marker 229ms -> 61ms (p50 512us -> 4us).
+- **2c16e75897 -- the init-before-publish fast path takes recycled slots.** It only
+  bumped; every allocation into a page the sweep had given a free list fell to the
+  full slow path. objectAllocation 0.690 settled, and the code-layout bimodality it
+  had shown for weeks disappeared -- the slow layouts were the recycled-page mode.
+- **f86906296c -- generated mark functions stop stamping their object.** A leftover
+  from when marking chained to Object's mark function. Since Round 33 the grace pass
+  traces fresh objects by calling their mark function directly, precisely so as not
+  to mark them, and the tail store marked every one: survival read the whole fresh
+  generation (75-80% on a 512-node live set), the trigger doubled to its ceiling and
+  the heap sat at ~600MB. Found by counting: 0 slots at the current epoch at mark
+  start, millions at sweep start, ~1,200 stamps by gcMarkObject. objectAllocation
+  peak 1002MB -> 92MB; time +22%, because the collector now runs as often as the
+  policy means it to.
+
+Tried and reverted, measured with the same builder on both arms:
+
+- **Parallel page sweep across the marker pool: +19-22%** on objectAllocation, with
+  and without batching the pool pushes. Spreading the sweep made the mutator slower,
+  so the per-page lock was not the cost.
+- **Preferring empty pages over recycled partial ones: +28%.** Reusing just-swept
+  partial pages is FASTER than bumping fresh ones.
+
+Two things settled on the way. The mutator is never parked on this workload once the
+survival figure is honest (bibopParks=0, and CN1_GC_PACING_CAP_MB=4096 changes
+nothing), so synthetic memory pressure is not what the remaining gap is. And more
+markers help (37ms at 1, ~27ms at 2 or 4), so it is not interference from them.
+What remains is 89% of the main thread inside the benchmark's own loop -- the inlined
+allocator, whose fast path measured slower every time it was trimmed (Round 38).
