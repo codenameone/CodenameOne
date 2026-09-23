@@ -103,7 +103,8 @@ Use the Console for operator-driven messages, stored audiences, campaigns, analy
 
 === Learn which sends failed
 
-A send is acknowledged when it's admitted, not when it arrives. Both wire APIs
+A notification is acknowledged when it's admitted, not when it arrives. Both
+wire APIs
 answer before any provider has been asked -- the classic endpoint replies
 `queued` -- so the verdict lands seconds later, after your request has already
 returned. Nothing in the response can tell you that a device key is dead, and
@@ -225,7 +226,7 @@ include::../demos/serverframeworks/src/main/java/com/codenameone/developerguide/
 The contract is a signed JSON POST, so a receiver in Go, Python, PHP, Ruby or a
 JVM framework is the same three steps: HMAC-SHA256 over `<t>.<raw body>`,
 constant-time compare against `v1`, reject a `t` outside your age window. Then
-apply the events idempotently and answer 2xx once they're stored.
+apply each event no more than once, and answer 2xx after it's stored.
 
 === Build audiences in the Console
 
