@@ -251,28 +251,14 @@ public final class DartRuntime {
     }
 
     /**
-     * Answers {@code value} once {@code evaluatedFirst} has been evaluated. The
-     * transpiler uses it to evaluate call arguments in Dart's source order when
-     * that differs from the parameter order: Java evaluates arguments left to
-     * right, so {@code f(after($t1 = b(), $t2 = a()), ...)} runs b before a.
+     * Answers {@code rest} once {@code evaluated} has been evaluated. The transpiler
+     * chains it to evaluate call arguments in Dart's source order when that differs
+     * from the parameter order -- {@code seq($t1 = b(), seq($t2 = a(), true))} runs b
+     * before a, because Java evaluates arguments left to right. Not generic, so it
+     * never takes part in the call's type inference.
      */
-    public static <T> T after(Object evaluatedFirst, T value) {
-        return value;
-    }
-
-    /** {@link #after(Object, Object)} for an int slot, without boxing. */
-    public static long after(Object evaluatedFirst, long value) {
-        return value;
-    }
-
-    /** {@link #after(Object, Object)} for a double slot, without boxing. */
-    public static double after(Object evaluatedFirst, double value) {
-        return value;
-    }
-
-    /** {@link #after(Object, Object)} for a bool slot, without boxing. */
-    public static boolean after(Object evaluatedFirst, boolean value) {
-        return value;
+    public static boolean seq(Object evaluated, boolean rest) {
+        return rest;
     }
 
     /** Dart's unary minus on a value of unknown static type. */

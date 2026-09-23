@@ -884,7 +884,14 @@ public final class JavaEmitter {
                 }
             }
             CtorDecl superCtor = progSuper.defaultCtor();
-            w.line("super(" + canonicalArgs(superCtor, superArgs, ctx) + ");");
+            // Nothing may precede super(...), so its arguments cannot be sequenced
+            // through lifted temps; they keep the parameter order.
+            inSuperInitializer = true;
+            try {
+                w.line("super(" + canonicalArgs(superCtor, superArgs, ctx) + ");");
+            } finally {
+                inSuperInitializer = false;
+            }
         } else if (ct.superInit != null && ct.superInit.args != null
                 && stubClassOf(c.superclass) != null) {
             for (NamedArg na : ct.superInit.args.named) {
@@ -6071,21 +6078,106 @@ public final class JavaEmitter {
         return sb.toString();
     }
 
-    /** An argument whose evaluation can neither have an effect nor observe one. */
-    private static boolean orderFree(Expr e) {
-        if (e instanceof IntLit || e instanceof DoubleLit || e instanceof BoolLit || e instanceof NullLit
-                || e instanceof Lambda) {
+    /** Set while emitting a super(...) initializer, where no statement may come first. */
+    private boolean inSuperInitializer;
+
+    /**
+     * Whether evaluating {@code e} can have an effect another argument could observe:
+     * an assignment, an increment, an await, a cascade, or a call to a function or to
+     * a method of this object -- {@code log('b')}, {@code _next()}. Calls on a value or
+     * a class ({@code color.withOpacity(.5)}, {@code EdgeInsets.all(8)},
+     * {@code Theme.of(context)}) and constructor calls are taken to have none. That is
+     * the line Flutter code sits on: every widget constructor has named arguments in
+     * whatever order the author wrote them, and treating all of them as effects would
+     * sequence nearly every call in a build method for no observable difference.
+     */
+    private static boolean hasEffect(Expr e) {
+        if (e == null || e instanceof IntLit || e instanceof DoubleLit || e instanceof BoolLit
+                || e instanceof NullLit || e instanceof Ident || e instanceof ThisExpr
+                || e instanceof SuperExpr || e instanceof Lambda) {
+            return false;
+        }
+        if (e instanceof Assign || e instanceof IncDec || e instanceof AwaitExpr || e instanceof Cascade) {
             return true;
         }
         if (e instanceof StringLit) {
             for (Object part : ((StringLit) e).parts) {
-                if (!(part instanceof String)) {
-                    return false;
+                if (part instanceof Expr && hasEffect((Expr) part)) {
+                    return true;
                 }
             }
-            return true;
+            return false;
+        }
+        if (e instanceof PropertyGet) {
+            return hasEffect(((PropertyGet) e).target);
+        }
+        if (e instanceof IndexGet) {
+            return hasEffect(((IndexGet) e).target) || hasEffect(((IndexGet) e).index);
+        }
+        if (e instanceof ParenExpr) {
+            return hasEffect(((ParenExpr) e).inner);
+        }
+        if (e instanceof NotNullAssert) {
+            return hasEffect(((NotNullAssert) e).operand);
+        }
+        if (e instanceof Unary) {
+            return hasEffect(((Unary) e).operand);
+        }
+        if (e instanceof Binary) {
+            return hasEffect(((Binary) e).left) || hasEffect(((Binary) e).right);
+        }
+        if (e instanceof Conditional) {
+            Conditional c = (Conditional) e;
+            return hasEffect(c.condition) || hasEffect(c.thenExpr) || hasEffect(c.elseExpr);
+        }
+        if (e instanceof CtorCall) {
+            return argsHaveEffect(((CtorCall) e).args);
+        }
+        if (e instanceof Call) {
+            Call c = (Call) e;
+            boolean ownOrFunction = c.target == null || c.target instanceof ThisExpr;
+            boolean onAClass = c.target == null && c.name != null && !c.name.isEmpty()
+                    && Character.isUpperCase(c.name.charAt(0));
+            if (ownOrFunction && !onAClass) {
+                return true;
+            }
+            return hasEffect(c.target) || argsHaveEffect(c.args);
+        }
+        if (e instanceof ListLit) {
+            for (Expr x : ((ListLit) e).elements) {
+                if (hasEffect(x)) {
+                    return true;
+                }
+            }
+            return false;
+        }
+        // Anything else is assumed to be able to: sequencing an argument that did
+        // not need it costs a temp, while skipping one that did reorders effects.
+        return true;
+    }
+
+    private static boolean argsHaveEffect(Args args) {
+        for (Expr x : args.positional) {
+            if (hasEffect(x)) {
+                return true;
+            }
+        }
+        for (NamedArg na : args.named) {
+            if (hasEffect(na.value)) {
+                return true;
+            }
         }
         return false;
+    }
+
+    /**
+     * An argument whose position relative to an effect matters: one that has an
+     * effect, or a bare variable read, which an effect can change --
+     * {@code f(b: x, a: log())} must read x before log() runs. Constants, reads through
+     * a class ({@code ReplyColors.white50}) and constructor calls are left in place.
+     */
+    private static boolean orderSensitive(Expr e) {
+        return e instanceof Ident || hasEffect(e);
     }
 
     private static boolean sourceBefore(Expr a, Expr b) {
@@ -6095,44 +6187,60 @@ public final class JavaEmitter {
     /**
      * The argument list of a program-class call whose arguments must be evaluated in a
      * different order from the parameters they fill, or null when the plain
-     * canonical-order emission already evaluates them in source order.
+     * canonical-order emission is already faithful.
      *
      * <p>Dart evaluates arguments left to right as written, and named arguments may be
      * written in any order: {@code f(b: log('b'), a: log('a'))} logs b first. Emitting
      * them in the callee's parameter order ran whichever parameter is declared first.
-     * When that differs and an argument can have or observe an effect, every such
-     * argument is assigned to a temp, in source order, inside the first argument slot
-     * that holds one -- {@code f(DartRuntime.after($t1 = log('b'), DartRuntime.after($t2 =
-     * log('a'), $t2)), $t1)} -- relying on Java's own left-to-right argument
-     * evaluation. Only the temps' DECLARATIONS are lifted into statements; hoisting the
-     * evaluation itself would run an argument even on a branch not taken, as in
+     * That only matters when an argument has an effect ({@link #hasEffect}) and the
+     * written order of the {@linkplain #orderSensitive order-sensitive} arguments
+     * differs from their parameter order; then each of those is assigned to a temp, in
+     * source order, inside
+     * the first slot that holds one: {@code f((DartRuntime.seq($t1 = log('b'),
+     * DartRuntime.seq($t2 = log('a'), true)) ? $t2 : $t2), $t1)}. Java evaluates
+     * arguments left to right, and a conditional over the same temp keeps that slot's
+     * exact type. Only the temps' DECLARATIONS are lifted into statements; lifting the
+     * evaluation would run an argument even on a branch not taken, as in
      * {@code x == null ? null : Foo(b: x.bar(), a: 1)}.</p>
+     *
+     * <p>Not applied inside a super(...) initializer, where no declaration may precede
+     * the call, nor to an argument whose type a temp cannot name (a function value, or
+     * one javac infers); those stay in place.</p>
      */
     private String sourceOrderedArgs(CtorDecl ct, ClassDecl owner, Args args, Ctx ctx) {
-        if (args.named.isEmpty()) {
+        if (args.named.isEmpty() || inSuperInitializer) {
             return null;
         }
         // Which parameter slot each call-site argument fills.
         Map<Expr, Integer> slotOf = new java.util.IdentityHashMap<Expr, Integer>();
         int posIdx = 0;
+        boolean anyEffect = false;
         for (int i = 0; i < ct.params.size(); i++) {
             Param p = ct.params.get(i);
+            Expr supplied = null;
             if (!p.named) {
                 if (posIdx < args.positional.size()) {
-                    slotOf.put(args.positional.get(posIdx++), Integer.valueOf(i));
+                    supplied = args.positional.get(posIdx++);
                 }
             } else {
                 for (NamedArg na : args.named) {
                     if (na.name.equals(p.name)) {
-                        slotOf.put(na.value, Integer.valueOf(i));
+                        supplied = na.value;
                         break;
                     }
                 }
             }
+            if (supplied != null) {
+                slotOf.put(supplied, Integer.valueOf(i));
+                anyEffect |= hasEffect(supplied);
+            }
+        }
+        if (!anyEffect) {
+            return null;
         }
         List<Expr> ordered = new ArrayList<Expr>();
         for (Expr e : slotOf.keySet()) {
-            if (!orderFree(e)) {
+            if (orderSensitive(e)) {
                 ordered.add(e);
             }
         }
@@ -6155,35 +6263,46 @@ public final class JavaEmitter {
         String[] slotCode = new String[ct.params.size()];
         List<String> assigns = new ArrayList<String>();
         int anchor = -1;
+        String anchorTemp = null;
+        TypeRef anchorType = null;
         for (Expr e : ordered) {
             int slot = slotOf.get(e).intValue();
             TypeRef pt = paramType(owner, ct.params.get(slot), ctx);
             Out o = emitExpr(e, pt, ctx);
             TypeRef at = o.type;
-            if (at == null || at.is("var")) {
-                // A type javac infers but this emitter cannot name: no temp can hold it.
+            String jt = at == null || at.is("var") || at.funcParams != null || at.is("Function")
+                    ? null : javaType(at, false, ctx);
+            if (jt == null || (jt.equals("Object") && !isDynamicType(pt))) {
+                // No temp can hold this value with the type the slot needs; it stays put.
                 slotCode[slot] = coerce(o, pt, ctx);
                 continue;
             }
             String tmp = ctx.newTemp();
-            ctx.writer().line(javaType(at, false, ctx) + " " + tmp + ";");
-            assigns.add("(" + tmp + " = " + o.code + ")");
+            ctx.writer().line(jt + " " + tmp + ";");
+            assigns.add(tmp + " = " + o.code);
             slotCode[slot] = coerce(new Out(tmp, at, o.fromError), pt, ctx);
             if (anchor < 0 || slot < anchor) {
                 anchor = slot;
+                anchorTemp = tmp;
+                anchorType = at;
             }
         }
         if (anchor < 0) {
             return null;
         }
         ctx.importClass("dart.runtime.DartRuntime");
+        String chain = "true";
+        for (int k = assigns.size() - 1; k >= 0; k--) {
+            chain = "DartRuntime.seq(" + assigns.get(k) + ", " + chain + ")";
+        }
+        slotCode[anchor] = coerce(new Out("(" + chain + " ? " + anchorTemp + " : " + anchorTemp + ")",
+                anchorType), paramType(owner, ct.params.get(anchor), ctx), ctx);
         StringBuilder sb = new StringBuilder();
-        posIdx = 0;
         for (int i = 0; i < ct.params.size(); i++) {
             Param p = ct.params.get(i);
-            TypeRef pt = paramType(owner, p, ctx);
             String code = slotCode[i];
             if (code == null) {
+                TypeRef pt = paramType(owner, p, ctx);
                 Expr supplied = null;
                 for (Map.Entry<Expr, Integer> en : slotOf.entrySet()) {
                     if (en.getValue().intValue() == i) {
@@ -6196,11 +6315,6 @@ public final class JavaEmitter {
                     code = coerce(emitExpr(p.defaultValue, pt, ctx), pt, ctx);
                 } else {
                     code = zeroValue(pt);
-                }
-            }
-            if (i == anchor) {
-                for (int k = assigns.size() - 1; k >= 0; k--) {
-                    code = "DartRuntime.after(" + assigns.get(k) + ", " + code + ")";
                 }
             }
             if (i > 0) {
