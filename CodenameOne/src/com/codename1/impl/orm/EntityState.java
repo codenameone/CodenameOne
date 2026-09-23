@@ -73,7 +73,7 @@ public final class EntityState {
         if (!attached) {
             throw new LazyInitializationException("Entity is detached");
         }
-        session.initialize(entity, index);
+        session.initializeForAccess(entity, index);
     }
     public void assigned(int index) {
         loaded[index] = true;

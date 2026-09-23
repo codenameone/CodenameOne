@@ -68,6 +68,10 @@ public abstract class EntityModel<T> {
     public String generator() {
         return table() + "_id";
     }
+    /// Returns the declared non-null requirement for this concrete entity's attribute.
+    public boolean required(T entity, int index) {
+        return !attributes()[index].nullable;
+    }
     public Object parameter(int index, Object value) {
         return Values.storage(value);
     }

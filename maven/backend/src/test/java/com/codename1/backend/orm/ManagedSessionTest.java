@@ -139,6 +139,9 @@ class ManagedSessionTest {
                 String prefix="mysql".equals(dialect.getName())?"DELETE q0 FROM ":"DELETE FROM ";
                 String target=dialect.quote("managed_record");
                 assertEquals("sqlite".equals(dialect.getName())?"DELETE FROM "+target+" WHERE ("+target+"."+dialect.quote("name")+" = ?)":prefix+target+" AS q0 WHERE (q0."+dialect.quote("name")+" = ?)",statements.get(0));
+                s.beginTransaction();assertEquals(1,s.createQuery("update ManagedSessionTest$Record r set r.counter = r.counter where r.name = :name").setParameter("name","delete me").executeUpdate());s.commitTransaction();
+                String alias="sqlite".equals(dialect.getName())?target:"q1";
+                assertEquals("UPDATE "+target+("sqlite".equals(dialect.getName())?"":" AS q1")+" SET "+dialect.quote("counter")+" = "+alias+"."+dialect.quote("counter")+" WHERE ("+alias+"."+dialect.quote("name")+" = ?)",statements.get(1));
             } finally { s.close(); }
         }
     }
@@ -187,6 +190,8 @@ class ManagedSessionTest {
         EntityManager em=manager();
         try {
             Session s=em.openSession();Record first=seed(s);s.beginTransaction();Record kept=new Record();kept.name="keep";s.persist(kept);s.commitTransaction();
+            s.beginTransaction();
+            assertEquals(1,s.createQuery("update ManagedSessionTest$Record r set r.counter = r.counter + :delta where exists (select x.id from ManagedSessionTest$Record x where x.id = r.id and x.name = :name)").setParameter("delta",2L).setParameter("name","first").executeUpdate());s.commitTransaction();assertEquals(2,s.find(Record.class,first.id).counter);assertEquals(0,s.find(Record.class,kept.id).counter);
             s.beginTransaction();
             assertEquals(1,s.createQuery("delete from ManagedSessionTest$Record r where exists (select x.id from ManagedSessionTest$Record x where x.id = r.id and x.name = :name)").setParameter("name","first").executeUpdate());
             s.commitTransaction();assertNull(s.find(Record.class,first.id));assertNotNull(s.find(Record.class,kept.id));assertEquals(1,s.query(Record.class).count());s.close();

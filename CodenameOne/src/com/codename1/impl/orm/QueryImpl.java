@@ -67,6 +67,19 @@ public final class QueryImpl<T> implements com.codename1.orm.session.Query<T> {
         ensureJoin(path, true);
         return this;
     }
+    void fetchJoin(String field, boolean left) {
+        Relationship relation = model.relationships()[model.relationIndex(field)];
+        if (!relation.element) {
+            ensureJoin(field, left);
+        } else if (!joins.containsKey(field)) {
+            String alias = rootAlias + "_j" + (joins.size() + 1);
+            String sql = (left ? " LEFT JOIN " : " INNER JOIN ") + session.q(relation.joinTable) + " " + alias
+                    + " ON " + session.joinEquality(session.joinColumns(relation.joinColumn, model), alias,
+                            session.keyColumns(model), rootAlias);
+            joins.put(field, new Join(model, alias, sql));
+            pluralJoin = true;
+        }
+    }
     private final List<String> fetches = new ArrayList<String>();
     /// Overrides mapping laziness for the named direct relationship.
     @Override

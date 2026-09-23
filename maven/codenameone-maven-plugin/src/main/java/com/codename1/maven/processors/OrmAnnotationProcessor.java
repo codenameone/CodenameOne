@@ -632,12 +632,13 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
             scanClasspathEntities(ctx);
         }
         resolveRelations(ctx);
+        for(EntityClass entity:accepted.values()) for(PersistedField field:entity.fields) field.declaredRequired=!field.nullable;
         resolveHierarchies(ctx);
         validateRequiredIdentityCycles(ctx);
         for(EntityClass entity:accepted.values()) {
             Set<String> fields=new LinkedHashSet<String>(),columns=new LinkedHashSet<String>(),indexNames=new LinkedHashSet<String>();
             for(PersistedField field:entity.fields) {
-                fields.add(field.fieldName);
+                if(!fields.add(field.fieldName)) ctx.error("Duplicate persistent Java path on "+entity.binaryName+": "+field.fieldName);
                 if(!columns.add(field.columnName.toLowerCase(java.util.Locale.ROOT))) ctx.error("Duplicate column on "+entity.binaryName+": "+field.columnName);
             }
             for(AnnotationValues index:entity.indexes) {
@@ -855,8 +856,14 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
                 result.addAll(persistentFields(base,entity,ctx,prefix,visiting));
         }
         for(FieldInfo field:cls.getFields()) {
-            if(field.isStatic() || field.getAnnotation(DB_TRANSIENT_DESC)!=null) continue;
             String path=prefix+field.getName();
+            for(FieldPath inherited:result) {
+                if(inherited.field.isPublic() && !inherited.declaringType.equals(cls.getBinaryName())
+                        && (inherited.path.equals(path) || inherited.path.startsWith(path+"."))) {
+                    ctx.error("Hidden inherited persistent field: "+cls.getBinaryName()+"."+path);
+                }
+            }
+            if(field.isStatic() || field.getAnnotation(DB_TRANSIENT_DESC)!=null) continue;
             if(field.getAnnotation("Lcom/codename1/annotations/db/Embedded;")!=null || field.getAnnotation("Lcom/codename1/annotations/db/EmbeddedId;")!=null) {
                 if(field.getAnnotation("Lcom/codename1/annotations/db/EmbeddedId;")!=null) {
                     if(entity.embeddedId!=null) ctx.error("Multiple embedded identifiers");
@@ -1295,6 +1302,12 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
             for(String value:ec.discriminators) sb.append('"').append(escape(value)).append("\",");
             sb.append("}; }\npublic boolean hasRelationship(").append(ec.binaryName).append(" e,int index) { switch(index) {");
             for(RelationField relation:ec.relations) sb.append("case ").append(relation.index).append(": return (Object)e instanceof ").append(relation.declaringType).append(';');
+            sb.append("default:return false;} }\n");
+            sb.append("public boolean required(").append(ec.binaryName).append(" e,int index) { switch(index) {");
+            for(int i=0;i<ec.fields.size();i++) {
+                PersistedField field=ec.fields.get(i);
+                if(field.declaredRequired) sb.append("case ").append(i).append(": return (Object)e instanceof ").append(field.declaringType).append(';');
+            }
             sb.append("default:return false;} }\n");
         }
         sb.append("  public void lifecycle(").append(ec.binaryName).append(" e,int event) { switch(event) {\n");
@@ -2515,6 +2528,7 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
         String columnName;
         String sqlType;
         boolean nullable;
+        boolean declaredRequired;
         boolean isId;
         boolean autoIncrement;
         boolean version;

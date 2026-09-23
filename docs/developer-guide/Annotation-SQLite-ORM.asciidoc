@@ -190,8 +190,11 @@ native sequences; other engines use a transactional generator table. UUIDs are
 version 4. Identity IDs become available on flush; the other strategies allocate
 on persist. Production migrations must provision the selected generators.
 Mappings with a cycle of required owning to-one links and identity-generated
-keys are rejected during processing: the first insert cannot supply every
-required key. Use assigned or preallocated keys for such cycles.
+keys are rejected during processing: the first insert can't supply every
+required key. SQLite and PostgreSQL support required cycles with keys assigned
+before insertion because their foreign keys are deferred until commit.
+MySQL and MariaDB enforce foreign keys immediately, so sessions reject required
+cycles before creating tables or writing data, even when the keys are known.
 
 For composite IDs, use several `@Id(autoIncrement=false)` fields or one
 `@EmbeddedId` whose type is `@Embeddable`. Lookup accepts

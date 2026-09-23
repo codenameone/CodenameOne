@@ -254,7 +254,7 @@ public final class JpqlQueryImpl<T> implements com.codename1.orm.session.JpqlQue
             Plan plan = new Plan(bindings);
             if (take("UPDATE")) {
                 plan.mutation = true;
-                root();
+                root(true);
                 expect("SET");
                 StringBuilder assignments = new StringBuilder();
                 do {
@@ -283,7 +283,7 @@ public final class JpqlQueryImpl<T> implements com.codename1.orm.session.JpqlQue
                 if (filter.length() > 0) {
                     where = where.length() == 0 ? " WHERE " + filter : where + " AND " + filter;
                 }
-                plan.sql = "UPDATE " + session.q(root.model.table()) + " AS " + root.rootAlias + " SET " + assignments +
+                plan.sql = session.updateTable(root.model.table(), root.rootAlias) + " SET " + assignments +
                            where;
                 refuseImplicitBulkJoins();
                 return plan;
@@ -337,6 +337,9 @@ public final class JpqlQueryImpl<T> implements com.codename1.orm.session.JpqlQue
                     }
                     root.model.relationIndex(joinPath);
                     plan.fetches.add(joinPath);
+                }
+                if (fetch) {
+                    root.fetchJoin(joinPath, left);
                 } else if (left) {
                     root.leftJoin(joinPath);
                 } else {
@@ -393,10 +396,10 @@ public final class JpqlQueryImpl<T> implements com.codename1.orm.session.JpqlQue
                     String rendered = session.orderBy(term.sql, ascending, term.kind);
                     // Some dialects repeat a term to normalize NULL placement.
                     // Each repeated expression also needs its own bound values.
-                    for (int occurrence = rendered.indexOf(term.sql) + term.sql.length();
-                            (occurrence = rendered.indexOf(term.sql, occurrence)) >= 0;
-                            occurrence += term.sql.length()) {
+                    int occurrence = rendered.indexOf(term.sql, rendered.indexOf(term.sql) + term.sql.length());
+                    while (occurrence >= 0) {
                         bindings.addAll(termBindings);
+                        occurrence = rendered.indexOf(term.sql, occurrence + term.sql.length());
                     }
                     out.append(rendered);
                 } while (take(","));
@@ -444,10 +447,10 @@ public final class JpqlQueryImpl<T> implements com.codename1.orm.session.JpqlQue
         private void root() {
             root(false);
         }
-        private void root(boolean delete) {
+        private void root(boolean mutation) {
             String entity = path();
             EntityModel model = session.model(entity);
-            root = delete ? session.queryForDelete(model) : session.query(model.type());
+            root = mutation ? session.queryForMutation(model) : session.query(model.type());
             take("AS");
             rootName = identifier(peek()) && !clause(peek()) ? next() : entity.substring(entity.lastIndexOf('.') + 1);
             aliases.put(rootName, new Alias(root, ""));

@@ -360,9 +360,12 @@ public class OrmAnnotationProcessorTest {
             assertTrue(session.isLoaded(loadedChild,"parent"));
             org.junit.Assert.assertSame(loadedParent,session.find(parentType,parentId));
             assertFalse(session.isLoaded(loadedParent,"children"));
+            session.beginTransaction();Object pendingChild=childType.newInstance();childType.getField("parent").set(pendingChild,loadedParent);session.persist(pendingChild);
             java.util.List children=(java.util.List)reader.getMethod("children",parentType).invoke(null,loadedParent);
-            org.junit.Assert.assertEquals(1,children.size());org.junit.Assert.assertSame(loadedChild,children.get(0));
-            session.beginTransaction();children.clear();session.commitTransaction();
+            org.junit.Assert.assertEquals(2,children.size());assertTrue(children.contains(loadedChild));assertTrue(children.contains(pendingChild));assertTrue(childType.getField("id").getLong(pendingChild)>0);
+            session.commitTransaction();session.clear();loadedParent=session.find(parentType,parentId);session.beginTransaction();pendingChild=childType.newInstance();childType.getField("parent").set(pendingChild,loadedParent);session.persist(pendingChild);
+            session.initialize(loadedParent,"children");children=(java.util.List)reader.getMethod("children",parentType).invoke(null,loadedParent);org.junit.Assert.assertEquals(3,children.size());assertTrue(children.contains(pendingChild));
+            children.clear();session.commitTransaction();
             org.junit.Assert.assertEquals(0,session.query(childType).count());
             session.clear();Object detached=session.find(parentType,parentId);session.close();
             try { reader.getMethod("children",parentType).invoke(null,detached);fail("Detached lazy read must fail"); }
@@ -617,8 +620,85 @@ public class OrmAnnotationProcessorTest {
                     session.createTables();session.beginTransaction();Object a=type.newInstance(),b=type.newInstance();if(assigned) { type.getField("id").set(a,"a");type.getField("id").set(b,"b"); }type.getField("next").set(a,b);type.getField("next").set(b,a);session.persist(a);session.flush();
                     for(Object entity:Arrays.asList(a,b)) { org.junit.Assert.assertEquals(0,type.getField("version").getLong(entity));org.junit.Assert.assertEquals(1,type.getField("inserts").getInt(entity));org.junit.Assert.assertEquals(0,type.getField("updates").getInt(entity)); }
                     session.commitTransaction();Object id=type.getField("id").get(a);session.clear();a=session.find(type,id);session.initialize(a,"next");b=type.getField("next").get(a);org.junit.Assert.assertNotNull(b);session.initialize(b,"next");org.junit.Assert.assertSame(a,type.getField("next").get(b));
+                    session.beginTransaction();session.remove(a);session.remove(b);session.commitTransaction();org.junit.Assert.assertEquals(0,session.query(type).count());
                 } finally { session.close();em.close(); }
             }
+        }
+    }
+
+    @Test
+    public void mysqlRejectsRequiredCyclesBeforeAnyDatabaseOperation() throws Exception {
+        for(String key:Arrays.asList("@Id(autoIncrement=false) public String id;","@Id @GeneratedValue(strategy=GenerationType.UUID) public String id;","@Id @GeneratedValue(strategy=GenerationType.SEQUENCE) public long id;","@Id @GeneratedValue(strategy=GenerationType.TABLE) public long id;")) {
+            File classes=tmp.newFolder();JavaSourceCompiler.compile(JavaSourceCompiler.singleSource("mysqlcycle.Node","package mysqlcycle; import com.codename1.annotations.*; import com.codename1.annotations.db.*; @Entity public class Node { "+key+" @ManyToOne(optional=false) public Node next; }"),classes,Arrays.asList(testClassesDir()));
+            ProcessorContext ctx=runProcessor(classes,backendClasspath());assertFalse(ctx.getErrors().toString(),ctx.hasErrors());
+            try(java.net.URLClassLoader loader=new java.net.URLClassLoader(new URL[]{classes.toURI().toURL()},getClass().getClassLoader())) {
+                com.codename1.impl.orm.EntityModel model=(com.codename1.impl.orm.EntityModel)loader.loadClass("mysqlcycle.NodeCn1BackendModel").newInstance();
+                Map<String,com.codename1.impl.orm.EntityModel<?>> models=new java.util.LinkedHashMap<String,com.codename1.impl.orm.EntityModel<?>>();models.put(model.type().getName(),model);
+                for(String dialect:Arrays.asList("mysql","sqlite","postgresql")) {
+                    com.codename1.impl.orm.SqlAccess access=(com.codename1.impl.orm.SqlAccess)java.lang.reflect.Proxy.newProxyInstance(getClass().getClassLoader(),new Class[]{com.codename1.impl.orm.SqlAccess.class},(proxy,method,args)-> {
+                        if(method.getName().equals("dialect")) return dialect;
+                        if(method.getName().equals("close")) return null;
+                        throw new AssertionError("No database operation is allowed: "+method.getName());
+                    });
+                    try { new com.codename1.impl.orm.SessionImpl(access,models).close();if(dialect.equals("mysql")) fail("Immediate foreign keys cannot insert a required cycle"); }
+                    catch(com.codename1.orm.session.PersistenceException expected) { assertTrue(dialect.equals("mysql"));assertTrue(expected.getMessage().contains("required relationship cycles")); }
+                }
+            }
+        }
+    }
+
+    @Test
+    public void fetchJoinsApplyInnerAndLeftSemanticsBeforePagination() throws Exception {
+        try(java.net.URLClassLoader loader=cascadeReviewFixture()) {
+            Class parentType=loader.loadClass("cascades.Parent"),childType=loader.loadClass("cascades.Child");
+            com.codename1.backend.orm.EntityManager em=com.codename1.backend.orm.EntityManager.open(com.codename1.backend.Database.open(":memory:"));com.codename1.orm.session.Session session=em.openSession();
+            try {
+                session.createTables();session.beginTransaction();Object empty=parentType.newInstance(),populated=parentType.newInstance(),child=childType.newInstance(),second=childType.newInstance();session.persist(empty);session.flush();session.persist(child);session.persist(second);parentType.getField("selected").set(populated,child);((List)parentType.getField("children").get(populated)).addAll(Arrays.asList(child,second));((List)parentType.getField("tags").get(populated)).add("tag");session.persist(populated);session.commitTransaction();
+                Object id=parentType.getField("id").get(populated);session.clear();
+                for(String field:Arrays.asList("children","selected","tags")) {
+                    List inner=session.createQuery("select distinct p from cascades.Parent p join fetch p."+field+" order by p.id",parentType).limit(1).list();org.junit.Assert.assertEquals(1,inner.size());org.junit.Assert.assertEquals(id,parentType.getField("id").get(inner.get(0)));assertTrue(session.isLoaded(inner.get(0),field));
+                    List left=session.createQuery("select distinct p from cascades.Parent p left join fetch p."+field+" order by p.id",parentType).list();org.junit.Assert.assertEquals(2,left.size());org.junit.Assert.assertEquals(id,parentType.getField("id").get(left.get(1)));assertTrue(session.isLoaded(left.get(0),field));session.clear();
+                }
+            } finally { session.close();em.close(); }
+        }
+    }
+
+    @Test
+    public void hiddenMappedSuperclassFieldsAreRejectedForBothRuntimes() throws Exception {
+        for(String child:Arrays.asList("@Column(name=\"child_code\") public String code;","@DbTransient public String code;","public static String code;")) {
+            Map<String,String> sources=new java.util.LinkedHashMap<String,String>();
+            sources.put("hidden.Base","package hidden; import com.codename1.annotations.*; import com.codename1.annotations.db.*; @MappedSuperclass public class Base { @Column(name=\"base_code\") public String code; }");
+            sources.put("hidden.Child","package hidden; import com.codename1.annotations.*; import com.codename1.annotations.db.*; @Entity public class Child extends Base { @Id public long id; "+child+" }");
+            rejectsMappingForBothRuntimes(sources,"Hidden inherited persistent field");
+        }
+    }
+
+    @Test
+    public void subtypeRequirementsSurviveNullableSingleTableColumns() throws Exception {
+        File classes=tmp.newFolder();Map<String,String> sources=new java.util.LinkedHashMap<String,String>();
+        sources.put("requiredsub.Base","package requiredsub; import com.codename1.annotations.*; import com.codename1.annotations.db.*; @Entity @Inheritance public abstract class Base { @Id public long id; }");
+        sources.put("requiredsub.Child","package requiredsub; import com.codename1.annotations.*; import com.codename1.annotations.db.*; @Entity public class Child extends Base { @Column(nullable=false) public String code; @ManyToOne(optional=false,fetch=FetchType.LAZY,cascade=CascadeType.PERSIST) public Target target; }");
+        sources.put("requiredsub.Sibling","package requiredsub; import com.codename1.annotations.*; @Entity public class Sibling extends Base { }");
+        sources.put("requiredsub.Target","package requiredsub; import com.codename1.annotations.*; @Entity public class Target { @Id public Long id; }");
+        JavaSourceCompiler.compile(sources,classes,Arrays.asList(testClassesDir()));ProcessorContext client=runProcessor(classes);assertFalse(client.getErrors().toString(),client.hasErrors());ProcessorContext backend=runProcessor(classes,backendClasspath());assertFalse(backend.getErrors().toString(),backend.hasErrors());
+        try(java.net.URLClassLoader loader=new java.net.URLClassLoader(new URL[]{classes.toURI().toURL()},getClass().getClassLoader())) {
+            loader.loadClass("cn1app.BackendDaoBootstrap").newInstance();Class childType=loader.loadClass("requiredsub.Child"),targetType=loader.loadClass("requiredsub.Target"),siblingType=loader.loadClass("requiredsub.Sibling");
+            com.codename1.backend.orm.EntityManager em=com.codename1.backend.orm.EntityManager.open(com.codename1.backend.Database.open(":memory:"));com.codename1.orm.session.Session session=em.openSession();
+            try {
+                session.createTables();session.beginTransaction();session.persist(siblingType.newInstance());session.commitTransaction();
+                for(String missing:Arrays.asList("code","target")) {
+                    session.beginTransaction();Object child=childType.newInstance();if(!missing.equals("code")) childType.getField("code").set(child,"valid");if(!missing.equals("target")) childType.getField("target").set(child,targetType.newInstance());session.persist(child);
+                    try { session.flush();fail("Missing required subtype field must fail on insert"); } catch(com.codename1.orm.session.PersistenceException expected) { assertTrue(expected.getMessage(),expected.getMessage().contains("Required"));session.rollbackTransaction(); }
+                }
+                session.beginTransaction();Object child=childType.newInstance();childType.getField("code").set(child,"valid");childType.getField("target").set(child,targetType.newInstance());session.persist(child);session.commitTransaction();Object id=childType.getField("id").get(child);session.clear();
+                for(String missing:Arrays.asList("code","target")) {
+                    child=session.find(childType,id);session.beginTransaction();childType.getField(missing).set(child,null);
+                    // Reflection bypasses enhancement; initialize before assigning a relationship.
+                    if(missing.equals("target")) { session.initialize(child,"target");childType.getField("target").set(child,null); }
+                    try { session.flush();fail("Missing required subtype field must fail on update"); } catch(com.codename1.orm.session.PersistenceException expected) { assertTrue(expected.getMessage(),expected.getMessage().contains("Required"));session.rollbackTransaction(); }
+                }
+                child=session.find(childType,id);session.beginTransaction();childType.getField("code").set(child,"changed");session.commitTransaction();assertFalse(session.isLoaded(child,"target"));
+            } finally { session.close();em.close(); }
         }
     }
 
@@ -781,7 +861,8 @@ public class OrmAnnotationProcessorTest {
         try {
             session.createQuery("select p from Purchase p join fetch p.items order by p.customer.name").list();
             assertTrue(statements.get(0),statements.get(0).contains("ORDER BY"));
-            assertFalse("Fetches load separately, so DISTINCT would reject this ORDER BY on PostgreSQL",statements.get(0).startsWith("SELECT DISTINCT "));
+            assertTrue(statements.get(0),statements.get(0).contains("INNER JOIN \"review_item\""));
+            assertFalse("Fetch joins must not force DISTINCT for an unselected ordering expression",statements.get(0).startsWith("SELECT DISTINCT "));
             session.createQuery("select distinct p from Purchase p join fetch p.items").list();
             assertTrue("An explicit DISTINCT remains effective",statements.get(1).startsWith("SELECT DISTINCT "));
         } finally { session.close();loader.close(); }

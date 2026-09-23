@@ -59,7 +59,10 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
         String prefix = "mysql".equals(sql.dialect()) ? "DELETE " + alias + " FROM " : "DELETE FROM ";
         return prefix + q(table) + " AS " + alias;
     }
-    QueryImpl queryForDelete(EntityModel model) {
+    String updateTable(String table, String alias) {
+        return "UPDATE " + q(table) + ("sqlite".equals(sql.dialect()) ? "" : " AS " + alias);
+    }
+    QueryImpl queryForMutation(EntityModel model) {
         return new QueryImpl(this, model, "sqlite".equals(sql.dialect()) ? q(model.table()) : nextAlias());
     }
     String orderValue(String expression, int kind) {
@@ -112,6 +115,32 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
         }
         this.sql = sql;
         this.models = new LinkedHashMap<String, EntityModel<?>>(models);
+        if ("mysql".equals(sql.dialect())) {
+            for (EntityModel model : this.models.values()) {
+                if (hasRequiredPath(model, model, new ArrayList<EntityModel>())) {
+                    throw new PersistenceException("MySQL/MariaDB does not support required relationship cycles: "
+                            + model.type().getName());
+                }
+            }
+        }
+    }
+    private boolean hasRequiredPath(EntityModel current, EntityModel goal, List<EntityModel> visited) {
+        if (visited.contains(current)) {
+            return false;
+        }
+        visited.add(current);
+        for (Relationship relation : current.relationships()) {
+            if (relation.column < 0 || current.attributes()[relation.column].nullable) {
+                continue;
+            }
+            for (EntityModel candidate : models.values()) {
+                if (relation.target.isAssignableFrom(candidate.type())
+                        && (sameInstance(candidate, goal) || hasRequiredPath(candidate, goal, visited))) {
+                    return true;
+                }
+            }
+        }
+        return false;
     }
     @Override
     public void beginTransaction() {
@@ -1196,7 +1225,19 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
     }
     @Override
     public void initialize(Object entity, String field) {
-        initialize(entity, model(entity.getClass()).relationIndex(field));
+        initializeForAccess(entity, model(entity.getClass()).relationIndex(field));
+    }
+    void initializeForAccess(Object entity, int index) {
+        check();
+        EntityState state = state(entity);
+        if (state == null || state.loaded[index]) {
+            return;
+        }
+        if (!state.attached || !sameInstance(state.session, this)) {
+            throw new LazyInitializationException("Entity is detached");
+        }
+        autoFlush();
+        initialize(entity, index);
     }
     void beforeAssignment(Object entity, int index) {
         Relationship relation = model(entity.getClass()).relationships()[index];
@@ -1805,9 +1846,9 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
                                         model(model.relationships()[ri].target).idIndexes().length) {
                     Entry dependency = entries.get(model.relation(entry.entity, ri));
                     if (dependency != null && dependency.fresh &&
-                            dependency.model.attributes()[dependency.model.idIndex()].generated) {
-                        // Assigned keys are already known and deferred foreign
-                        // keys can reference them during a cyclic insert.
+                            (dependency.model.attributes()[dependency.model.idIndex()].generated || "mysql".equals(sql.dialect()))) {
+                        // MySQL also defers known keys until their rows exist.
+                        // Required cycles are rejected when the session opens.
                         bound = null;
                         if (entry.deferredForeignKeys == null) {
                             entry.deferredForeignKeys = new boolean[attrs.length];
@@ -1886,6 +1927,21 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
     }
     private void checkTransientAssociations(Entry entry) {
         EntityModel owner = entry.model;
+        Attribute[] attributes = owner.attributes();
+        for (int i = 0; i < attributes.length; i++) {
+            boolean association = false;
+            for (Relationship relation : owner.relationships()) {
+                if (relation.column >= 0 && i >= relation.column
+                        && i < relation.column + model(relation.target).idIndexes().length) {
+                    association = true;
+                }
+            }
+            if (!association && !attributes[i].generated && !attributes[i].version && owner.required(entry.entity, i)
+                    && owner.get(entry.entity, i) == null) {
+                throw new PersistenceException("Required attribute is null: " + owner.type().getName() + "."
+                        + attributes[i].field);
+            }
+        }
         Relationship[] relations = owner.relationships();
         for (int i = 0; i < relations.length; i++) {
             Relationship relation = relations[i];
@@ -1893,6 +1949,10 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
                 continue;
             }
             Object target = owner.relation(entry.entity, i);
+            if (target == null && owner.required(entry.entity, relation.column)
+                    && owner.get(entry.entity, relation.column) == null) {
+                throw new PersistenceException("Required relationship is null: " + relation.field);
+            }
             if (target != null && entries.get(target) == null) {
                 EntityModel targetModel = model(relation.target);
                 Object targetId = targetModel.identifier(target);
@@ -2015,6 +2075,9 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
             return;
         }
         if (entry.deleting) {
+            if ("sqlite".equals(sql.dialect()) || "postgresql".equals(sql.dialect())) {
+                return;
+            }
             throw new PersistenceException("Cyclic non-nullable delete dependencies");
         }
         entry.deleting = true;

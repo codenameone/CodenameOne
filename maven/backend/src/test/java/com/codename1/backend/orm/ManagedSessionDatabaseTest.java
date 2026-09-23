@@ -34,6 +34,23 @@ import static org.junit.jupiter.api.Assertions.*;
 
 /** Opt-in wire-protocol tests; creates and removes only a uniquely named test schema. */
 class ManagedSessionDatabaseTest {
+    static class Cycle implements com.codename1.impl.orm.ManagedEntity {
+        long id; Cycle next; com.codename1.impl.orm.EntityState state;
+        public com.codename1.impl.orm.EntityState __cn1OrmState() { return state; }
+        public void __cn1OrmState(com.codename1.impl.orm.EntityState value) { state=value; }
+    }
+    static class CycleModel extends com.codename1.impl.orm.EntityModel<Cycle> {
+        public Class<Cycle> type() { return Cycle.class; }
+        public String table() { return "required_cycle"; }
+        public Attribute[] attributes() { return new Attribute[]{new Attribute("id","id",Attribute.BIGINT,true,false,false,false),new Attribute("next","next_id",Attribute.BIGINT,false,false,false,false)}; }
+        public Cycle create() { return new Cycle(); }
+        public Object get(Cycle value,int index) { return index==0?value.id:value.next==null?null:Long.valueOf(value.next.id); }
+        public void set(Cycle value,int index,Object field) { if(index==0) value.id=((Number)field).longValue(); }
+        public com.codename1.impl.orm.Relationship[] relationships() { return new com.codename1.impl.orm.Relationship[]{new com.codename1.impl.orm.Relationship("next",Cycle.class,false,false,1,"","","","",0,false)}; }
+        public Object relation(Cycle value,int index) { return value.next; }
+        public void relation(Cycle value,int index,Object target) { value.next=(Cycle)target; }
+    }
+
     @Test void realDatabaseSupportsSequencesTransactionsCountersAndRowLocks() throws Exception {
         String url=System.getenv("CN1_ORM_TEST_DATABASE_URL");
         Assumptions.assumeTrue(url!=null && url.length()>0,"Set CN1_ORM_TEST_DATABASE_URL to an isolated PostgreSQL/MySQL/MariaDB database");
@@ -91,6 +108,17 @@ class ManagedSessionDatabaseTest {
             assertEquals("updated",session.find(ManagedSessionTest.Record.class,entity.id).name);
             session.beginTransaction();assertEquals(1,session.createQuery("delete from ManagedSessionTest$Record r where r.id=:id").setParameter("id",entity.id).executeUpdate());session.commitTransaction();
             assertNull(session.find(ManagedSessionTest.Record.class,entity.id));
+            java.util.Map<String,com.codename1.impl.orm.EntityModel<?>> cycleModels=new java.util.LinkedHashMap<String,com.codename1.impl.orm.EntityModel<?>>();cycleModels.put(Cycle.class.getName(),new CycleModel());
+            com.codename1.impl.orm.BackendSqlAccess cycleAccess=new com.codename1.impl.orm.BackendSqlAccess(null,db,db.dialect());
+            if(mysql) {
+                assertThrows(com.codename1.orm.session.PersistenceException.class,()->new com.codename1.impl.orm.SessionImpl(cycleAccess,cycleModels));
+            } else {
+                Session cycles=new com.codename1.impl.orm.SessionImpl(cycleAccess,cycleModels);
+                try {
+                    cycles.createTables();Cycle a=new Cycle(),b=new Cycle();a.id=1;b.id=2;a.next=b;b.next=a;cycles.beginTransaction();cycles.persist(a);cycles.persist(b);cycles.commitTransaction();assertEquals(2,cycles.query(Cycle.class).count());
+                    cycles.beginTransaction();cycles.remove(a);cycles.remove(b);cycles.commitTransaction();assertEquals(0,cycles.query(Cycle.class).count());
+                } finally { cycles.close(); }
+            }
         } finally {
             workers.shutdownNow();workers.awaitTermination(5,TimeUnit.SECONDS);
             try { session.close();db.execute((mysql?"DROP DATABASE ":"DROP SCHEMA ")+quoted+(mysql?"":" CASCADE"),new Object[0]); }
