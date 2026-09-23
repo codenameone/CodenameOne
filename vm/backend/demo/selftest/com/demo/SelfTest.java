@@ -210,6 +210,7 @@ public class SelfTest {
     }
 
     public static void main(String[] args) throws Exception {
+        threadLocalInitialization();
         crypto();
         jwt();
         base64Url();
@@ -235,6 +236,61 @@ public class SelfTest {
     }
 
     // ------------------------------------------------------------------
+
+    private static void threadLocalInitialization() {
+        final int[] attempts = new int[1];
+        ThreadLocal<String> retry = new ThreadLocal<String>() {
+            protected String initialValue() {
+                if(++attempts[0] == 1) {
+                    throw new IllegalStateException("first initialization fails");
+                }
+                return "ready";
+            }
+        };
+        boolean threw = false;
+        try {
+            retry.get();
+        } catch (IllegalStateException expected) {
+            threw = true;
+        }
+        check("ThreadLocal propagates initializer failure", "true", String.valueOf(threw));
+        check("ThreadLocal retries initialization", "ready", retry.get());
+        check("ThreadLocal caches successful initialization", "ready", retry.get());
+        check("ThreadLocal initializes twice after one failure", "2", String.valueOf(attempts[0]));
+        retry.remove();
+        check("ThreadLocal initializes after remove", "ready", retry.get());
+        check("ThreadLocal remove resets initialization", "3", String.valueOf(attempts[0]));
+        retry.set(null);
+        check("ThreadLocal preserves an explicit null", "null", String.valueOf(retry.get()));
+        check("ThreadLocal null does not reinitialize", "3", String.valueOf(attempts[0]));
+
+        final int[] removals = new int[1];
+        ThreadLocal<String> removesDuringInitialization = new ThreadLocal<String>() {
+            protected String initialValue() {
+                removals[0]++;
+                remove();
+                set("temporary");
+                return "final";
+            }
+        };
+        check("ThreadLocal installs after initializer removes entry", "final",
+                removesDuringInitialization.get());
+        check("ThreadLocal retains initializer result", "final",
+                removesDuringInitialization.get());
+        check("ThreadLocal does not repeat a successful initializer", "1",
+                String.valueOf(removals[0]));
+        ThreadLocal<String> overridesSet = new ThreadLocal<String>() {
+            protected String initialValue() { return "initialized"; }
+            public void set(String value) {
+                throw new IllegalStateException("get must not invoke an overridden set");
+            }
+        };
+        check("ThreadLocal initialization does not invoke overridden set", "initialized",
+                overridesSet.get());
+        overridesSet.remove();
+        retry.remove();
+        removesDuringInitialization.remove();
+    }
 
     private static void crypto() throws Exception {
         // Known-answer tests, not round trips. A round trip passes just as happily
@@ -1318,6 +1374,41 @@ public class SelfTest {
      * <p>The escape case is the one that cannot be explained away as an encoding
      * detail: it is the database's own data choosing what character to become.
      */
+    /**
+     * A Date and a Character bound through raw SQL are stored the way the ORM
+     * stores them.
+     *
+     * <p>Database.execute normalised only Boolean, so the other two scalars
+     * whose Java form is not what the column holds reached the driver as objects
+     * the engines render with String.valueOf. SQLite's integer affinity stores
+     * that text without complaint, while PostgreSQL and a strict MySQL refuse it
+     * as invalid integer input -- so the same statement wrote a row on one
+     * engine and failed on the others, and what SQLite wrote did not compare
+     * equal to what the generated dao writes for the same value.
+     */
+    private static void rawSqlEncodesDatesAndCharsLikeTheOrm() throws Exception {
+        String path = "/tmp/cn1-selftest-scalars-" + System.currentTimeMillis() + ".db";
+        Database db = Database.open(path);
+        try {
+            db.execute("DROP TABLE IF EXISTS scalars", null);
+            db.execute("CREATE TABLE scalars (id INTEGER, whenMs INTEGER, ch INTEGER)", null);
+            java.util.Date when = new java.util.Date(1234567890L);
+            db.execute("INSERT INTO scalars (id, whenMs, ch) VALUES (?, ?, ?)",
+                    new Object[] {Long.valueOf(1L), when, new Character('x')});
+            List rows = db.query("SELECT whenMs, ch FROM scalars WHERE id = ?",
+                    new Object[] {Long.valueOf(1L)});
+            check("a Date binds as its millisecond value", "1234567890",
+                    String.valueOf(com.codename1.backend.orm.Values.asLong(((Map)rows.get(0)).get("whenMs"), -1L)));
+            // 'x' is 120. The ORM stores the code unit, so raw SQL has to as well
+            // or a query written either way misses rows written the other.
+            check("a Character binds as its code unit", "120",
+                    String.valueOf(com.codename1.backend.orm.Values.asLong(((Map)rows.get(0)).get("ch"), -1L)));
+        } finally {
+            db.close();
+            new java.io.File(path).delete();
+        }
+    }
+
     private static void storedTextComesBackUnchanged() throws Exception {
         String path = "/tmp/cn1-selftest-text-" + System.currentTimeMillis() + ".db";
         Database db = Database.open(path);
@@ -1334,18 +1425,10 @@ public class SelfTest {
             // database -- the check would pass by testing nothing. Assembling it
             // at runtime is the only way the seven characters exist to be stored.
             String escapeText = new String(new char[]{'~', '~', 'u', '0', '0', '4', '1'});
-            // AN EMBEDDED NUL, built the same way and for the same reason. It is a
-            // legal character in a Java string -- JSON carries them -- and
-            // getBytes("UTF-8") encodes it as one zero byte, so binding the value
-            // by its C length stopped there and stored "a" while reporting success.
-            // The Java SE arm goes through JDBC and stored all three characters,
-            // which made it another divergence rather than a plain truncation.
-            String nulText = new String(new char[]{'a', '\0', 'b'});
             String[] values = new String[] {
                 "caf\u00e9",
                 "\ud83d\ude00 smile",
                 escapeText,
-                nulText,
                 "plain ascii",
             };
             for(int iter = 0 ; iter < values.length ; iter++) {
@@ -1360,6 +1443,32 @@ public class SelfTest {
                 check("stored text round trips: " + describeChars(values[iter]),
                         describeChars(values[iter]), describeChars(got));
             }
+            // AN EMBEDDED NUL USED TO BE ONE OF THE VALUES ABOVE, and is now
+            // refused before it reaches any engine. It is a legal character in a
+            // Java string -- JSON carries them -- and this check existed because
+            // getBytes("UTF-8") encodes it as one zero byte, so binding the
+            // value by its C length stopped there and stored "a" while
+            // reporting success, while the Java SE arm went through JDBC and
+            // stored all three. That divergence is gone the only way it could
+            // be: PostgreSQL cannot hold a zero byte in a text value at all, so
+            // no encoding makes the three agree and the bind is refused. The
+            // truncation it guarded is unreachable now rather than merely
+            // tested -- a value that cannot be bound cannot be cut short.
+            //
+            // A NUL inside a byte[] is untouched, which is where one belongs.
+            String nulText = new String(new char[]{'a', '\0', 'b'});
+            String refusedNul;
+            try {
+                db.execute("INSERT INTO texts (id, body) VALUES (?, ?)",
+                        new Object[]{Integer.valueOf(99), nulText});
+                refusedNul = "accepted";
+            } catch (Exception err) {
+                refusedNul = "refused";
+            }
+            check("a NUL in bound text is refused, not truncated", "refused", refusedNul);
+            check("and nothing was written", "0",
+                    String.valueOf(db.query("SELECT body FROM texts WHERE id = ?",
+                            new Object[]{Integer.valueOf(99)}).size()));
         } finally {
             db.close();
             new java.io.File(path).delete();
@@ -3896,6 +4005,72 @@ public class SelfTest {
      * file. This check runs on BOTH arms, which is the point: it is the two
      * answering alike that was missing.
      */
+    /**
+     * An open that failed for a reason OTHER than the file being absent.
+     *
+     * <p>-1 means "no such file", which a caller may treat as an optional file
+     * nobody wrote; -2 means "there is something there and it could not be
+     * opened", which nobody may quietly ignore -- Config refuses to start on it,
+     * because a deployment whose TLS certificate and key are named in a file it
+     * cannot read would otherwise come up in plaintext.
+     *
+     * <p>Provoked with an over-long name rather than a permission bit, so this
+     * needs no chmod and answers the same whether or not the tests run as root.
+     * Both arms have to agree, and they did not at first: the JVM's
+     * FileChannel.open throws a plain FileSystemException for a path under a
+     * non-directory while the native arm read that errno as "absent".
+     */
+    private static void anUnopenableFileIsNotAnAbsentOne() throws Exception {
+        StringBuilder tooLong = new StringBuilder("/tmp/");
+        for(int iter = 0 ; iter < 600 ; iter++) {
+            tooLong.append('x');
+        }
+        int refused = FileIo.openRead(tooLong.toString());
+        if(refused >= 0) {
+            FileIo.close(refused);
+        }
+        check("an unopenable path is told apart from an absent one", "-2",
+                String.valueOf(refused));
+        // A path under a file rather than a directory, which is the case the two
+        // arms disagreed about.
+        int underAFile = FileIo.openRead("/etc/hosts/nope");
+        if(underAFile >= 0) {
+            FileIo.close(underAFile);
+        }
+        check("and so is a path under a non-directory", "-2", String.valueOf(underAFile));
+        // THE CONTROL: a name that is merely absent still answers -1, so this
+        // cannot pass by reporting -2 for everything.
+        int absent = FileIo.openRead("/tmp/cn1-selftest-no-such-file");
+        if(absent >= 0) {
+            FileIo.close(absent);
+        }
+        check("while a file that is simply not there answers -1", "-1",
+                String.valueOf(absent));
+        // A DANGLING SYMLINK, which both arms used to collapse into "absent":
+        // open() follows the link and reports the missing TARGET, giving the same
+        // ENOENT a path that names nothing gives. A deployment whose
+        // application.properties is a symlink into a volume that failed to mount
+        // therefore read as "no configuration" -- every file-based setting fell
+        // back to an environment default, and a server naming its TLS certificate
+        // and key in that file came up in PLAINTEXT.
+        //
+        // The link is made by whoever runs this rather than here, because FileIo
+        // has no symlink call and adding a native for a test is a worse trade
+        // than skipping when it is absent. vm/backend/verify.sh makes it.
+        String dangling = "/tmp/cn1-selftest-dangling-link";
+        int danglingFd = FileIo.openRead(dangling);
+        if(danglingFd >= 0) {
+            FileIo.close(danglingFd);
+        }
+        if(danglingFd == -1) {
+            System.out.println("NOTE dangling-symlink check skipped: create "
+                    + dangling + " pointing at a missing target to run it");
+        } else {
+            check("a dangling symlink is told apart from an absent file", "-2",
+                    String.valueOf(danglingFd));
+        }
+    }
+
     private static void aTruncatingPathOpensNothing() throws Exception {
         int truncated = FileIo.openRead("/etc/hosts\u0000.png");
         if(truncated >= 0) {
@@ -5522,6 +5697,7 @@ public class SelfTest {
         urlComponentsKeepTheirUnicode();
         boundParametersMustMatchThePlaceholders();
         storedTextComesBackUnchanged();
+        rawSqlEncodesDatesAndCharsLikeTheOrm();
         scramIterationCountIsBounded();
         scramRefusesAPasswordItCannotPrepare();
         aTruncatedMySqlHeaderIsRefused();
@@ -5574,6 +5750,7 @@ public class SelfTest {
         aChunkedResponseEndsWhereItsFramingSays();
         aResponseEndsAtItsDeclaredLength();
         aTruncatingPathOpensNothing();
+        anUnopenableFileIsNotAnAbsentOne();
         aTlsVerificationNameWithANulIsRefused();
         aHeadResponseIsNotReadAsTruncated();
         aNullMethodIsGet();

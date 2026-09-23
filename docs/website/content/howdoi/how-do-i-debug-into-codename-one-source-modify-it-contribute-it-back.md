@@ -30,7 +30,7 @@ The real educational value here is that the framework source is not off-limits. 
 
 ## Further Reading
 
-- [Developer Guide](/developer-guide/)
+- [Developer Guide](/developer-guide/working-with-codenameone-sources/)
 - [How Do I Find Problems In My Application Using The Codename One Tools And The Standard IDE Tools?](/how-do-i/how-do-i-find-problems-in-my-application-using-the-codename-one-tools-and-the-standard-ide-tools/)
 - [How Do I Debug On An Android Device](/how-do-i/how-do-i-debug-on-an-android-device/)
 - [How Do I Use The Include Sources Feature To Debug The Native Code On iOS/Android Etc.](/how-do-i/how-do-i-use-the-include-sources-feature-to-debug-the-native-code-on-iosandroid-etc/)

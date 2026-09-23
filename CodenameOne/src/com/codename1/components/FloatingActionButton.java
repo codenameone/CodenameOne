@@ -461,6 +461,11 @@ public class FloatingActionButton extends Button {
             }
             final Container con = createPopupContent(subMenu);
             Dialog d = new Dialog();
+            // Framework chrome, never an operating system window: this popup is POSITIONED by the
+            // framework, and native window mode documents those margins as ignored, so in a window
+            // it comes out centred and loses the placement that is its whole point. See
+            // TooltipManager for the full note.
+            d.setNativeWindowMode(false);
             d.setDialogUIID("Container");
             d.getContentPane().setUIID("Container");
             d.setLayout(new BorderLayout());

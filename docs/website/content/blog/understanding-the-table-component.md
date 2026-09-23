@@ -12,7 +12,7 @@ author: Shai Almog
 ![Header Image](/blog/understanding-the-table-component/table-post-title.png)
 
 [Table](/javadoc/com/codename1/ui/table/Table/) is a composite component  
-(but it isn’t a [lead component](/manual/components/#lead-component-sidebar)),  
+(but it isn’t a [lead component](/developer-guide/the-components-of-codename-one/#lead-component-sidebar)),\
 this means it is a subclass of [Container](/javadoc/com/codename1/ui/Container/).  
 It’s effectively built from multiple components.
 

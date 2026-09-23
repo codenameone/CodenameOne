@@ -13,7 +13,7 @@ author: Shai Almog
 
 I was working on documenting the SQLite support in Codename One, you can see some of that work both in the  
 [db package](/javadoc/com/codename1/db/package-summary/) and in the  
-[developer guide](/manual/files-storage-networking/). As a demo for  
+[developer guide](/developer-guide/io/). As a demo for\
 SQL I decided to just create a tool that allows you to type arbitrary SQL to execute it on the device and see  
 the results in a `Table`…​
 

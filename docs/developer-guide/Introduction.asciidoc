@@ -81,7 +81,7 @@ Lightweight architecture is the "`not so secrete sauce`" to Codename One's porta
 
 One of the big accomplishments in Codename One is its unique ability to embed "`heavyweight`" widgets into place among the "`lightweights.`" This is crucial for apps such as Uber where the cars and widgets on top are implemented as Codename One components yet below them, you have the native map component.
 
-Codename One achieves fast performance by drawing using the native gaming APIs of most platforms for example: OpenGL ES on iOS. The core technologies behind Codename One are all open source including most of the stuff developed by Codename One itself, for example: ParparVM but also the full library, platform ports, designer tool, device skins etc.
+Codename One achieves fast performance by drawing using the native gaming APIs of most platforms for example: Metal on iOS. The core technologies behind Codename One are all open source including most of the stuff developed by Codename One itself, for example: ParparVM but also the full library, platform ports, designer tool, device skins etc.
 
 .Lightweight Architecture Origin
 ****

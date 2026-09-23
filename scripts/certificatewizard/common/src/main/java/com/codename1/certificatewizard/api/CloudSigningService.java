@@ -211,32 +211,40 @@ public final class CloudSigningService implements SigningService {
     /// Sequential rather than parallel, and profiles second: the certificate pass is the one
     /// whose failure means the key is unusable, and reporting that is more useful than reporting
     /// whichever of the two happened to answer first.
+    ///
+    /// **A failure of either half is a failed sync, including 404.** The profile half used to be
+    /// allowed to answer 404 or 405 and still be reported as a success, as a compatibility shim
+    /// for "a wizard newer than the signing service it is talking to". That window never actually
+    /// existed in a release -- the service route shipped first and the first wizard that calls it
+    /// shipped four days later -- and the shim cost more than it could ever have bought, because
+    /// 404 is also what the service answers when APPLE said 404. The message it discards is
+    /// literally *"Apple no longer has this item ... Use Sync with Apple to bring your Codename
+    /// One account back in step"*, so the one reply that most needs showing was the one reported
+    /// as "Synced with Apple". Issue #5832 is a developer watching profiles they deleted in the
+    /// portal survive a sync that said it worked.
     public void reconcile(OnComplete<Result<Void>> callback) {
-        certificatesApi.reconcileCertificates(bearerToken, r -> {
+        reconcile(bearerToken, certificatesApi, profilesApi, callback);
+    }
+
+    /// The sequencing on its own, so a test can drive it with fakes. This class builds its API
+    /// clients in its constructor (`RestClients.create`, which wants a live CN1 runtime), so
+    /// there is no other way to assert what a given pair of replies is reported as -- and what a
+    /// reply is reported as is the whole of issue #5832.
+    static void reconcile(String bearerToken, CertificatesApi certs, ProfilesApi profs,
+                          OnComplete<Result<Void>> callback) {
+        certs.reconcileCertificates(bearerToken, r -> {
             if (!ok(r)) {
                 callback.completed(Result.fail(error(r)));
                 return;
             }
-            profilesApi.reconcileProfiles(bearerToken, rr -> {
-                if (ok(rr) || endpointAbsent(rr)) {
-                    // endpointAbsent: a wizard newer than the signing service it is talking to.
-                    // The two ship separately, so for the window where an older service is
-                    // deployed the certificate half must still work rather than the whole sync
-                    // failing on a route that does not exist yet. Every other status is a real
-                    // failure and is reported.
+            profs.reconcileProfiles(bearerToken, rr -> {
+                if (ok(rr)) {
                     callback.completed(Result.<Void>ok(null));
                     return;
                 }
                 callback.completed(Result.<Void>fail(error(rr)));
             });
         });
-    }
-
-    /// Whether this reply means the route is not there at all, as opposed to the request being
-    /// refused. 404 is what a service without the profile reconcile answers; 405 is what one
-    /// answers that has the /profiles/{id} routes but not this one.
-    private static boolean endpointAbsent(Response<?> r) {
-        return r != null && (r.getResponseCode() == 404 || r.getResponseCode() == 405);
     }
 
     public void revokeCertificate(Long id, OnComplete<Result<Void>> callback) {

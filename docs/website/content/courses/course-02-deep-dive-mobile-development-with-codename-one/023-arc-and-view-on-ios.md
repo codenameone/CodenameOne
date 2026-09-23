@@ -29,6 +29,6 @@ So the point of this lesson is not really ARC trivia for its own sake. It is und
 
 ## Further Reading
 
-- [Developer Guide](/developer-guide/)
+- [Developer Guide](/developer-guide/working-with-ios/)
 - [How Do I Access Native Device Functionality, Invoke Native Interfaces](/how-do-i/how-do-i-access-native-device-functionality-invoke-native-interfaces/)
 - [Camera iOS Port Basics](/courses/course-02-deep-dive-mobile-development-with-codename-one/022-camera-ios-port-basics/)

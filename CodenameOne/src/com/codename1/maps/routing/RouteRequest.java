@@ -35,7 +35,8 @@ import java.util.List;
 ///
 /// ```java
 /// RouteRequest req = new RouteRequest(home, office)
-///         .addWaypoint(daycare)
+///         .setOriginLabel("Home").setDestinationLabel("Office")
+///         .addWaypoint(daycare, "Daycare")
 ///         .setTravelMode(TravelMode.DRIVING)
 ///         .setAlternatives(true);
 /// ```
@@ -44,6 +45,10 @@ public final class RouteRequest {
     private final LatLng origin;
     private final LatLng destination;
     private final List waypoints = new ArrayList();
+    private final List waypointLabels = new ArrayList();
+    private String originLabel;
+    private String destinationLabel;
+    private boolean showStopLabels = true;
     private TravelMode travelMode = TravelMode.DRIVING;
     private boolean alternatives;
     private boolean steps = true;
@@ -69,8 +74,15 @@ public final class RouteRequest {
     /// order. Backends route through waypoints in the order added; none of
     /// them reorder to optimize the trip.
     public RouteRequest addWaypoint(LatLng waypoint) {
+        return addWaypoint(waypoint, null);
+    }
+
+    /// Adds a stop with a display name for [Routing#showRoute]. A `null`
+    /// waypoint is ignored; a blank name uses the numbered default label.
+    public RouteRequest addWaypoint(LatLng waypoint, String label) {
         if (waypoint != null) {
             waypoints.add(waypoint);
+            waypointLabels.add(label);
         }
         return this;
     }
@@ -81,6 +93,61 @@ public final class RouteRequest {
     /// else being slipped in behind it for a [RouteService] to choke on.
     public List getWaypoints() {
         return Collections.unmodifiableList(waypoints);
+    }
+
+    /// Optional display names in the same order as [#getWaypoints()]. Entries
+    /// may be `null`; [Routing#showRoute] then uses "Stop 1", "Stop 2", etc.
+    public List getWaypointLabels() {
+        return Collections.unmodifiableList(waypointLabels);
+    }
+
+    /// The optional name displayed at the journey's start.
+    public String getOriginLabel() {
+        return originLabel;
+    }
+
+    /// Names the start marker. Blank or `null` uses "Start". This is display
+    /// text only: it does not change the coordinates sent to the service.
+    public RouteRequest setOriginLabel(String label) {
+        originLabel = label;
+        return this;
+    }
+
+    /// The optional name displayed at the destination.
+    public String getDestinationLabel() {
+        return destinationLabel;
+    }
+
+    /// Names the destination marker. Blank or `null` uses "Destination".
+    public RouteRequest setDestinationLabel(String label) {
+        destinationLabel = label;
+        return this;
+    }
+
+    /// Whether [Routing#showRoute] adds labeled start, stop and destination
+    /// markers. True by default. [Routing#findRoute] only returns route data.
+    public boolean isShowStopLabels() {
+        return showStopLabels;
+    }
+
+    /// Enables or disables the labeled markers added by [Routing#showRoute].
+    public RouteRequest setShowStopLabels(boolean show) {
+        showStopLabels = show;
+        return this;
+    }
+
+    // Freeze geometry and display metadata together before asynchronous routing.
+    RouteRequest snapshot() {
+        RouteRequest copy = new RouteRequest(origin, destination);
+        copy.waypoints.addAll(waypoints);
+        copy.waypointLabels.addAll(waypointLabels);
+        copy.originLabel = originLabel;
+        copy.destinationLabel = destinationLabel;
+        copy.showStopLabels = showStopLabels;
+        copy.travelMode = travelMode;
+        copy.alternatives = alternatives;
+        copy.steps = steps;
+        return copy;
     }
 
     /// How the traveller moves; [TravelMode#DRIVING] unless changed.

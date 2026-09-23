@@ -40,7 +40,39 @@ public final class LinuxNative {
     /* ---------------------------------------------------------- lifecycle */
 
     /** Writes a line to the native debug log (OutputDebugString + stderr). */
+    /**
+     * Rebuilds the window's native menu bar from one encoded row per command:
+     * {@code "<menuHint>\t<label>\t<shortcutKeyChar>\t<shortcutModifiers>\t<commandId>"},
+     * rows separated by {@code '\n'}.
+     *
+     * <p>The same encoding the macOS and Windows ports use, deliberately: the three ParparVM
+     * desktop ports share it so a second format is not a second thing to keep in step with
+     * Command's placement constants.</p>
+     *
+     * <p>An empty or null spec removes the bar and packs nothing above the drawing area,
+     * which is the layout every existing screenshot was captured with. A selection comes
+     * back as a {@code CN1_EVENT_MENU_COMMAND} through pollEvent carrying the command id.</p>
+     */
+    public static native void menuSetCommands(String spec);
+
+    /// The modifier keys for the current keystroke, as a bitmask: 1 shift, 2 control, 4 alt.
+    ///
+    /// Same encoding as the macOS and Windows ports. Latched from the GTK key event, which is
+    /// what Shift-Tab needs: it asks whether Shift is held while handling the Tab, and the Tab
+    /// event carries that.
+    public static native int currentModifiers();
+
     public static native void nativeLog(String message);
+    /**
+     * The desktop's colour scheme: 1 dark, 0 light, -1 unknown.
+     *
+     * Three states rather than a boolean because on Linux "unknown" is real -- a
+     * session with no settings daemon has no answer, and reporting that as light
+     * would be a guess presented as a fact. LinuxImplementation.isDarkMode() maps
+     * -1 to null, which UIManager's dark-mode resolution tests for explicitly.
+     */
+    public static native int systemColorScheme();
+
 
     /* ------------------------------------------------------------- VideoIO */
     /** True when the GStreamer runtime backing VideoIO is available (libgstreamer-1.0 loadable). */
@@ -190,6 +222,11 @@ public final class LinuxNative {
     public static native void desktopWindowDestroy(int slot);
 
     public static native void desktopWindowShow(int slot, boolean visible);
+
+    /// Sets the MAIN window's title. The desktopWindow* family above addresses secondary
+    /// Window peers by slot; this is the one the form title goes to in desktop "native"
+    /// title-bar mode, where the CN1 title area is suppressed. A no-op when headless.
+    public static native void mainWindowSetTitle(String title);
 
     public static native void desktopWindowSetTitle(int slot, String title);
 
@@ -667,6 +704,20 @@ public final class LinuxNative {
      * {@code null} on failure. Backs {@link LinuxSecureStorage}.
      */
     public static native byte[] dpapiProtect(byte[] data);
+
+    /**
+     * Whether a usable Secret Service is actually reachable from this process.
+     *
+     * <p>Reachable, not merely installed. Loading libsecret says nothing about the session
+     * behind it: on a headless machine, or one with a broken D-Bus or no keyring daemon, the
+     * library loads and every write still fails. This performs a lookup for a token that cannot
+     * exist, which contacts the service and stores nothing -- {@link #dpapiProtect(byte[])}
+     * would answer the same question by writing a secret into the user's keyring, which is no
+     * way to answer a capability query.
+     *
+     * @return true when a Secret Service answered
+     */
+    public static native boolean secretServiceAvailable();
 
     /** Inverse of {@link #dpapiProtect}: decrypts a DPAPI blob, or {@code null}. */
     public static native byte[] dpapiUnprotect(byte[] data);

@@ -117,6 +117,71 @@ class Cn1AppArchetypeCertificateWizardTest {
         }
     }
 
+    /**
+     * A generated Java 17 project must hand an agent the skill through all three
+     * discovery conventions, and through the same paths the Initializr uses:
+     * {@code AGENTS.md} at the root, the skill itself under
+     * {@code .agent-skills/codename-one/}, and a thin redirect stub at
+     * {@code .claude/skills/codename-one/SKILL.md}.
+     *
+     * This module shipped the full skill under {@code .claude/} alone (issue #5699),
+     * which left an archetype-generated project with no root pointer and no
+     * vendor-neutral copy -- so Codex and anything else that does not happen to know
+     * Claude Code's directory layout never found it, while the identical project
+     * downloaded from the Initializr was fine.
+     *
+     * All three come from one source directory, staged into the archetype JAR at build
+     * time, so there is nothing under archetype-resources/ to read here. What is worth
+     * pinning is that the wiring still names those paths, and that the two shared files
+     * are still where the pom expects them.
+     */
+    @Test
+    void agentSkillIsGeneratedInTheSameLayoutAsTheInitializr() throws Exception {
+        File initializrResources =
+                new File("../../scripts/initializr/common/src/main/resources");
+        // Stored under a name that is NOT AGENTS.md on purpose: that name is one agents
+        // look for by themselves, and a file called that inside this repository would be
+        // read as instructions for the Codename One tree rather than for a generated app.
+        assertTrue(new File(initializrResources, "agent-skill-agents-md.md").isFile(),
+                "the archetype pom stages the AGENTS.md body from " + initializrResources);
+        assertFalse(new File(initializrResources, "AGENTS.md").isFile(),
+                "the AGENTS.md body must not be stored under the reserved name");
+        assertTrue(new File(initializrResources, "agent-skill-claude-stub.md").isFile(),
+                "the archetype pom stages the Claude stub from " + initializrResources);
+        assertTrue(new File(initializrResources, "skill/SKILL.md").isFile(),
+                "the archetype pom stages the skill itself from " + initializrResources);
+
+        String pom = archetypeFile("pom.xml");
+        assertTrue(pom.contains("archetype-resources/.agent-skills/codename-one"),
+                "the skill must be staged under .agent-skills/, not only under .claude/");
+        assertTrue(pom.contains("archetype-resources/AGENTS.md"),
+                "the root AGENTS.md pointer must be staged into the archetype");
+        assertTrue(pom.contains("archetype-resources/.claude/skills/codename-one/SKILL.md"),
+                "the Claude stub must be staged at its single-file path");
+
+        String metadata = archetypeFile("src/main/resources/META-INF/maven/archetype-metadata.xml");
+        for (String declared : new String[] {
+                "<directory>.agent-skills</directory>",
+                "<directory>.claude</directory>",
+                "<include>AGENTS.md</include>" }) {
+            assertTrue(metadata.contains(declared),
+                    "archetype-metadata.xml must extract " + declared);
+        }
+
+        // Java 8 projects get none of it: the skill's guidance is Java 17 throughout.
+        String postGenerate = archetypeFile("src/main/resources/META-INF/archetype-post-generate.groovy");
+        for (String stripped : new String[] { "\".claude\"", "\".agent-skills\"", "\"AGENTS.md\"" }) {
+            assertTrue(postGenerate.contains(stripped),
+                    "archetype-post-generate.groovy must strip " + stripped + " for Java 8");
+        }
+    }
+
+    private static String archetypeFile(String path) throws Exception {
+        File file = new File("../cn1app-archetype", path);
+        assertTrue(file.isFile(), "Missing archetype file " + file.getAbsolutePath());
+        return new String(Files.readAllBytes(file.toPath()), StandardCharsets.UTF_8);
+    }
+
     private static String pluginDescriptor() throws Exception {
         File pom = new File("pom.xml");
         assertTrue(pom.isFile(), "expected the plugin pom at " + pom.getAbsolutePath());

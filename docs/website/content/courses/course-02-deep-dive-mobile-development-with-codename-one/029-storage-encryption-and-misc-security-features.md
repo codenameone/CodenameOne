@@ -27,6 +27,6 @@ So the practical rule for these features is simple: use them when they protect s
 
 ## Further Reading
 
-- [Developer Guide](/developer-guide/)
+- [Developer Guide](/developer-guide/security/#_storage_encryption)
 - [Security Basics and Certificate Pinning](/courses/course-02-deep-dive-mobile-development-with-codename-one/028-security-basics-and-certificate-pinning/)
 - [How Do I Use Crash Protection, Get Device Logs](/how-do-i/how-do-i-use-crash-protection-get-device-logs/)

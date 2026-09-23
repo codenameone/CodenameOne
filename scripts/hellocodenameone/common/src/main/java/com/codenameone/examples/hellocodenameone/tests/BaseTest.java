@@ -312,4 +312,40 @@ public abstract class BaseTest extends AbstractTest {
         captureStarted = false;
         captureStage = "retry-created";
     }
+
+    /**
+     * <p>Lays out a Form that was built off-screen and sized with the raw setters, for
+     * painting into an Image.</p>
+     *
+     * <p>{@code layoutContainer()} is NOT enough and must not be used here.
+     * {@link com.codename1.ui.Container#layoutContainer()} lays out only when the container
+     * is already marked dirty -- it is {@code if (shouldLayout)} and nothing else -- and
+     * {@code setWidth}/{@code setHeight} are raw setters that mark nothing. A Form resized
+     * that way is therefore still "laid out", at whatever size it had when it was built,
+     * which is the display size.</p>
+     *
+     * <p>These captures used to survive that by accident. Adding a child marks the CONTENT
+     * PANE dirty and the flag propagates to the parent, but only on a transition -- see
+     * {@code Container.setShouldLayout}, which returns early when the value is unchanged --
+     * so whether the Form itself got marked depended on something else having touched it.
+     * Attaching the Toolbar was that something else.</p>
+     *
+     * <p>Desktop "native" title bar mode never attaches the Toolbar: the title goes to the
+     * OS window and the commands to the native menu bar. One invalidation disappeared with
+     * it, every off-screen host Form silently kept the display size, its children were laid
+     * out at 0x0, and ten animation filmstrips captured six empty cells in the Form's
+     * background colour. Empty cells are still a picture, so every one of those captures
+     * succeeded and the goldens would have recorded the blank.</p>
+     *
+     * <p>{@code forceRevalidate()} is the public API for "things changed underneath, lay
+     * this out again", and it does not depend on anything else having marked the tree.</p>
+     *
+     * @param host the off-screen Form or Container to lay out
+     */
+    protected static void layoutOffScreen(com.codename1.ui.Container host) {
+        if (host == null) {
+            return;
+        }
+        host.forceRevalidate();
+    }
 }

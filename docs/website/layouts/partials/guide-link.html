@@ -1,0 +1,27 @@
+{{- /* Resolve legacy guide links in generated API comments as well as Markdown. */ -}}
+{{- $destination := . -}}
+{{- $local := replaceRE `^https?://(www\.)?codenameone\.com` "" $destination -}}
+{{- if findRE `^/(manual|developer-guide)(/|#|\?|\.html|$)` $local -}}
+  {{- with index site.Data "guide-links" -}}
+    {{- $url := urls.Parse $local -}}
+    {{- $target := "" -}}
+    {{- if and $url.Fragment (index .paths $url.Path) -}}
+      {{- $target = index .anchors $url.Fragment | default "" -}}
+    {{- end -}}
+    {{- if not $target -}}
+      {{- with index .paths $url.Path -}}
+        {{- $target = . -}}
+        {{- with $url.Fragment -}}{{- $target = printf "%s#%s" $target . -}}{{- end -}}
+      {{- end -}}
+    {{- end -}}
+    {{- if $target -}}
+      {{- if $url.RawQuery -}}
+        {{- $resolved := urls.Parse $target -}}
+        {{- $target = printf "%s?%s" $resolved.Path $url.RawQuery -}}
+        {{- with $resolved.Fragment -}}{{- $target = printf "%s#%s" $target . -}}{{- end -}}
+      {{- end -}}
+      {{- $destination = $target -}}
+    {{- end -}}
+  {{- end -}}
+{{- end -}}
+{{- return $destination -}}

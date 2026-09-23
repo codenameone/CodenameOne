@@ -10,11 +10,14 @@
 # the golden set (ios-26-metal -> an iOS 26 runtime) -- never on CI.
 #
 # Usage: record-ios-native-anim.sh [tabs|switch] [light|dark] [simulator_udid] [seconds]
+#
+# With no UDID the simulator is derived from CN1SS_FIDELITY_GOLDEN_SET, so the
+# recording cannot land in a golden set captured on a different OS generation.
 set -euo pipefail
 
 ANIM="${1:-tabs}"
 APPEARANCE="${2:-light}"
-UDID="${3:-17853196-A8A7-45F2-8F06-24E8257945E6}"
+UDID="${3:-}"
 SECONDS_TO_RECORD="${4:-6}"
 BUNDLE_ID="com.codenameone.fidelity.nativeref"
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -23,6 +26,24 @@ OUT_DIR="$ROOT/scripts/fidelity-app/goldens/${GOLDEN_SET}-anim"
 OUT="$OUT_DIR/native-${ANIM}-${APPEARANCE}.mov"
 
 log() { echo "[record-native-anim] $*"; }
+
+# Toolchain selection lives in one place; see scripts/lib/xcode.sh. This used to
+# be bare `xcrun`/`xcodebuild`, i.e. whatever `xcode-select` pointed at, which on
+# a machine with two Xcodes is a different toolchain from every pinned build --
+# the exact way a motion reference gets recorded against an OS nothing else here
+# was built for.
+# shellcheck source=lib/xcode.sh
+source "$(dirname "${BASH_SOURCE[0]}")/lib/xcode.sh"
+cn1_select_xcode log || exit 1
+log "Using Xcode $CN1_XCODE_VERSION ($DEVELOPER_DIR)"
+
+# With no UDID, derive the simulator from the golden set; see lib/ios-sim.sh.
+# shellcheck source=lib/ios-sim.sh
+source "$(dirname "${BASH_SOURCE[0]}")/lib/ios-sim.sh"
+if [ -z "$UDID" ]; then
+    UDID="$(cn1_resolve_ios_sim_udid "$GOLDEN_SET" log)" || exit 1
+    log "Resolved simulator for $GOLDEN_SET: $UDID"
+fi
 
 # Build + install the NativeRef app (same app as the still references; the
 # animate mode is selected via environment at launch).

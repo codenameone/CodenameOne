@@ -16,7 +16,7 @@ certificate wizard (Apple tightened TLS access) there was hardly anything major 
 a lot of our efforts on refining our offering on all fronts e.g.  
 [better demos](/sql-playground-sql-tutorial-in-the-browser-iphone-ios-android-windows/),  
 [themes](/blog/template-clean-modern-ui-kit.html),  
-[docs](/manual/), [compatibility](/blog/file-url-java-mobile-compatibility.html) and  
+[docs](/developer-guide/), [compatibility](/blog/file-url-java-mobile-compatibility.html) and\
 [tools](/blog/further-refined-cross-platform-mobile-gui-builder.html).
 
 Things will probably stay relatively easy until November although I think a big focus will shift into handling  

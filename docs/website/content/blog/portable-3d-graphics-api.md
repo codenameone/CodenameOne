@@ -105,7 +105,7 @@ A portable 3D API is useful on its own, for product viewers, data visualization,
 
 If you render something and it doesn't look right on one of the backends, please [file an issue](https://github.com/codenameone/CodenameOne/issues) with the model or code attached. Five GPU backends mean five ways for an edge case to hide, and real reports are how the generators improve.
 
-The new [3D Graphics and Shaders chapter](/developer-guide/#_3d_graphics_and_shaders) in the developer guide covers both API levels in depth, including the shader generation model and per-platform notes. [Friday's release post](/blog/native-java-win32-3d-gaming-printing-and-wallet/) has the full index of this week's posts, and {{< post-link path="/blog/game-development-api-box2d" text="tomorrow's post" >}} builds games on top of this API.
+The new [3D Graphics and Shaders chapter](/developer-guide/3d-graphics/#_3d_graphics_and_shaders) in the developer guide covers both API levels in depth, including the shader generation model and per-platform notes. [Friday's release post](/blog/native-java-win32-3d-gaming-printing-and-wallet/) has the full index of this week's posts, and {{< post-link path="/blog/game-development-api-box2d" text="tomorrow's post" >}} builds games on top of this API.
 
 ---
 

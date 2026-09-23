@@ -1,4 +1,4 @@
-{{- $dest := .Destination | safeURL -}}
+{{- $dest := partial "guide-link.html" .Destination | safeURL -}}
 {{- $text := .Text | safeHTML -}}
 {{- $title := .Title -}}
 

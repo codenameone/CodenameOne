@@ -22,7 +22,7 @@
  */
 #import <Foundation/Foundation.h>
 #import "ExecutableOp.h"
-#import "CN1ES2compat.h"
+#import "CN1RenderBackend.h"
 
 #ifdef CN1_USE_METAL
 

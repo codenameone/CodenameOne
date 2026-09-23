@@ -20,12 +20,10 @@
  * Please contact Codename One through http://www.codenameone.com/ if you 
  * need additional information or have any questions.
  */
-#import "CN1ES2compat.h"
+#import "CN1RenderBackend.h"
 #import "ResetAffine.h"
 #import "CodenameOne_GLViewController.h"
-#ifdef USE_ES2
 #import "SetTransform.h"
-#endif
 #include "xmlvm.h"
 #include "TargetConditionals.h"
 #if TARGET_OS_WATCH
@@ -46,17 +44,10 @@ extern float currentScaleY;
 
 -(id)init {
 #if !TARGET_OS_WATCH
-#ifdef USE_ES2
-#ifdef CN1_USE_METAL
-    // The Mac Catalyst stub GLKit header omits the GLKMatrix4Identity
-    // constant; assemble an identity matrix literal so this path compiles
-    // without GLKit math symbols. Behavior is identical to the GL path.
-    GLKMatrix4 identity = (GLKMatrix4){ { 1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1 } };
+    // No library supplies an identity constant for CN1Matrix4; write the
+    // literal.
+    CN1Matrix4 identity = (CN1Matrix4){ { 1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1 } };
     [SetTransform currentTransform:identity];
-#else
-    [SetTransform currentTransform:GLKMatrix4Identity];
-#endif
-#endif
 #endif // !TARGET_OS_WATCH
 
     return self;
@@ -70,32 +61,10 @@ extern float currentScaleY;
 }
 #else
 -(void)execute {
-    //_glMatrixMode(GL_PROJECTION);
-    //GLErrorLog;
-#ifdef USE_ES2
-#ifdef CN1_USE_METAL
-    GLKMatrix4 identity = (GLKMatrix4){ { 1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1 } };
+    CN1Matrix4 identity = (CN1Matrix4){ { 1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1 } };
     SetTransform *f = [[SetTransform alloc] initWithArgs:identity originX:0 originY:0];
-#else
-    SetTransform *f = [[SetTransform alloc] initWithArgs:GLKMatrix4Identity originX:0 originY:0];
-#endif
     [f execute];
     [f release];
-#endif
-#ifndef CN1_USE_METAL
-    _glLoadIdentity();
-    GLErrorLog;
-    _glOrthof(0, Java_com_codename1_impl_ios_IOSImplementation_getDisplayWidthImpl(), 0, Java_com_codename1_impl_ios_IOSImplementation_getDisplayHeightImpl(), -1, 1);
-    GLErrorLog;
-    _glMatrixMode(GL_MODELVIEW);
-    GLErrorLog;
-    _glLoadIdentity();
-    GLErrorLog;
-    _glScalef(1, -1, 1);
-    GLErrorLog;
-    _glTranslatef(0, -Java_com_codename1_impl_ios_IOSImplementation_getDisplayHeightImpl(), 0);
-    GLErrorLog;
-#endif // !CN1_USE_METAL
     currentScaleX = 1;
     currentScaleY = 1;
 }

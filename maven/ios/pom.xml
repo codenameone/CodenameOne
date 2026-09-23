@@ -128,9 +128,11 @@
                                 <zip destfile="${project.build.directory}/codenameone/iosport-bundle/nativeios.jar">
                                     <fileset dir="${codename1.nativeios.dir}">
                                         <exclude name="iOSModernTheme.res"/>
+                                        <exclude name="iOSModern27Theme.res"/>
                                     </fileset>
                                     <fileset dir="${project.basedir}/../../Themes">
                                         <include name="iOSModernTheme.res"/>
+                                        <include name="iOSModern27Theme.res"/>
                                     </fileset>
                                 </zip>
                                 <copy file="${project.build.directory}/${project.build.finalName}-jar-with-dependencies.jar" tofile="${project.build.directory}/codenameone/iosport-bundle/iOSPort.jar" overwrite="true"/>

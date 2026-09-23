@@ -31,7 +31,7 @@ The video is useful as a picture of the overall flow, but the modern thing to re
 - [Build Server](/build-server/)
 - [Development Environment](/development-environment/)
 - [Hello World](/hello-world/)
-- [Developer Guide](/developer-guide/)
+- [Developer Guide](/developer-guide/signing/#certificate-wizard)
 
 ## Discussion
 

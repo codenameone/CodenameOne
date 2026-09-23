@@ -27,34 +27,6 @@
 #import <mach/mach_host.h>
 
 
-extern void logGlErrorAt(const char *f, int l) {
-#if defined(CN1_USE_METAL) || TARGET_OS_WATCH
-    // No GL context on the Metal backend (and no GL symbols at all on
-    // the Mac Catalyst slice). Callers still expand GLErrorLog macros
-    // unconditionally; honour them with a no-op so the rendering ops
-    // don't need to be touched for this single log helper.
-    (void)f;
-    (void)l;
-#else
-    GLenum err = glGetError();
-    if(err != GL_NO_ERROR) {
-        switch(err) {
-            case GL_INVALID_ENUM:
-                CN1Log(@"GL Error at %@:%i - GL_INVALID_ENUM", [NSString stringWithUTF8String:f], l);
-                break;
-            case GL_INVALID_VALUE:
-                CN1Log(@"GL Error at %@:%i - GL_INVALID_VALUE", [NSString stringWithUTF8String:f], l);
-                break;
-            case GL_INVALID_OPERATION:
-                CN1Log(@"GL Error at %@:%i - GL_INVALID_OPERATION", [NSString stringWithUTF8String:f], l);
-                break;
-            default:
-                CN1Log(@"GL Error at %@:%i - %i", [NSString stringWithUTF8String:f], l, err);
-                break;
-        }
-    }
-#endif
-}
 
 @implementation ExecutableOp
 static BOOL blockDrawing = NO;

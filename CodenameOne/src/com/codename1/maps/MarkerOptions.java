@@ -41,6 +41,7 @@ public final class MarkerOptions {
     private LatLng position;
     private EncodedImage icon;
     private String title;
+    private String label;
     private String snippet;
     private float anchorU = 0.5f;
     private float anchorV = 1.0f;
@@ -71,6 +72,16 @@ public final class MarkerOptions {
     /// Sets the info-window title.
     public MarkerOptions title(String title) {
         this.title = title;
+        return this;
+    }
+
+    /// Sets a persistent label beside the pin on [MapView] (including a
+    /// [NativeMap] using its vector fallback). Unlike [#title], this text is
+    /// visible without tapping. Native providers still use the info-window
+    /// title, so set both when the marker should work on either surface.
+    /// `null` or blank text leaves the pin unlabeled.
+    public MarkerOptions label(String label) {
+        this.label = label;
         return this;
     }
 
@@ -114,6 +125,10 @@ public final class MarkerOptions {
 
     String getTitle() {
         return title;
+    }
+
+    String getLabel() {
+        return label;
     }
 
     String getSnippet() {

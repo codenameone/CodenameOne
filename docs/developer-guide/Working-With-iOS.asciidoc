@@ -21,19 +21,31 @@ If you've access to a Mac, connect the device, open Xcode, and use the device ex
 
 [[section-ios-launch-screen]]
 [[ios-launch-storyboard]]
-=== Launch screen storyboard best practices
+=== Launch screen best practices
 
-Launch screen storyboards are the default approach for Codename One iOS builds. Apple requires a storyboard-based launch experience for modern devices, so the legacy screenshot generator was removed in favor of a single adaptive layout. You can still opt back into the old behavior by setting the `ios.generateSplashScreens=true` build hint, but it's best to use a storyboard unless your use case can't be expressed with Auto Layout.
+Every iOS build declares a launch screen. Apps linked with the iOS 27 SDK or later are rejected unless the bundle declares one of `UILaunchStoryboardName`, `UILaunchStoryboards`, `UILaunchScreen` or `UILaunchScreens`, and `UIRequiresFullScreen` isn't a substitute for any of them. The build checks the finished `Info.plist` and fails if none of the four is there, so an `ios.plistInject` that removes the generated key stops the build rather than producing an archive the App Store refuses.
+
+What the build declares by default is `UILaunchScreen`: the system background color, which follows light and dark mode on its own, with `Launch.Foreground.png` centered on it. That's deliberate rather than a simplification. Every Codename One app runs on the UIScene lifecycle, and SplashBoard doesn't render a launch *storyboard* for a scene-based app -- it animates from a black frame instead. Since iOS prefers the storyboard whenever both keys are present, declaring one would mean a black launch.
+
+You can still take the storyboard, and the build still ships `LaunchScreen.storyboard` for you to point at. Declare the key yourself, which overrides the generated one:
+
+[source]
+----
+codename1.arg.ios.plistInject=<key>UILaunchStoryboardName</key><string>LaunchScreen</string>
+----
+
+Do that only if you've verified the result on the devices you ship to. The same applies to `UILaunchStoryboards` and `UILaunchScreens`: declare either one through `ios.plistInject` and the build leaves your launch experience alone.
+
+The `ios.generateSplashScreens`, `ios.uiscene` and `ios.launchStoryboardName` build hints have been removed, and a build that still sets one fails with a message explaining what replaced it. The first named the pre-storyboard `Default*.png` generator, which iOS stopped using long ago; the second selected the legacy `UIApplicationDelegate` lifecycle, which Apple no longer permits; the third named the storyboard for a key only that legacy lifecycle emitted.
 
 ==== Key files
 
-The build server provides a minimal launch storyboard automatically. Customize it by adding any of the following files under your project's `ios/src/main/resources` directory:
+The build provides the default launch screen automatically. Customize it by adding either of the following files under your project's `ios/src/main/resources` directory:
 
-. `Launch.Foreground.png` - Shown in the center of the screen instead of your app icon.
-. `Launch.Background.png` - Drawn behind the content to provide a color or illustration.
-. `LaunchScreen.storyboard` - A custom storyboard created in Xcode that replaces the default layout entirely.
+. `Launch.Foreground.png` - Shown in the center of the screen instead of your app icon. Used by the default `UILaunchScreen`.
+. `Launch.Background.png` - Drawn behind the content to provide a color or illustration. Read by `LaunchScreen.storyboard`, so it only applies if you opt into the storyboard as shown above.
 
-IMPORTANT: Make sure to add the `ios.multitasking=true` build hint or your launch storyboard won't be used.
+You can also replace `LaunchScreen.storyboard` itself with a custom storyboard created in Xcode.
 
 ==== Designing a flexible Layout
 
@@ -58,14 +70,14 @@ The default storyboard expects PNG assets with the following characteristics. Al
 |Provide optional `Launch.Foreground@2x.png` (304×304) and `Launch.Foreground@3x.png` (456×456) for sharper output. Use transparency to let the background show through.
 
 |`Launch.Background.png`
-|Full-screen backdrop
+|Full-screen backdrop, storyboard only
 |1024×1024
 |Supply complementary `Launch.Background@2x.png` (2048×2048) and `Launch.Background@3x.png` (3072×3072) if you rely on artwork instead of a flat color. Keep file sizes small (<2 MB) to avoid slowing startup.
 
 |`LaunchScreen.storyboard`
 |Complete custom layout
 |N/A
-|Target iOS 12.0 and later, enable Auto Layout, and include constraints for every view. Avoid timers or code connections.
+|Only used if you declare `UILaunchStoryboardName` through `ios.plistInject`. Enable Auto Layout and include constraints for every view. Avoid timers or code connections.
 |===
 
 ==== Testing changes
@@ -139,22 +151,11 @@ beta testing. Make sure to use a release build target.
 
 === Metal renderer
 
-// vale-skip: Microsoft.Avoid: "rendering backend" is Apple's term of art for an alternate Metal/OpenGL rendering pipeline, not a back-end server.
-iOS builds use the Metal rendering backend by default. The Metal pipeline drives a `CAMetalLayer`, replacing the legacy OpenGL ES 2 path on `CAEAGLLayer`. OpenGL ES is deprecated on iOS and Metal is the supported graphics API going forward, so new projects pick it up automatically.
-
-To opt out and fall back to the OpenGL ES 2 backend, set the build hint:
-
-[source]
------
-codename1.arg.ios.metal=false
------
-
-If you hit a rendering regression after the default flip, opting out with `ios.metal=false` is a safe escape hatch, but please file an issue with a reproducer so the Metal path can be fixed.
+iOS builds render through Metal. The pipeline drives a `CAMetalLayer`; there is no second renderer to choose between, and nothing to configure to get it.
 
 === Choosing a color space for the Metal renderer
 
-// vale-skip: Microsoft.Avoid: "rendering backend" is Apple's term of art for an alternate Metal/OpenGL rendering pipeline, not a back-end server.
-With the Metal renderer (the default), the `CAMetalLayer` is configured with the sRGB color space. This matches the behavior of the legacy OpenGL ES 2 backend on `CAEAGLLayer`: CG-rasterized images and gradients (which are tagged `DeviceRGB` in their `CGBitmapContext`) end up displayed with the same brightness on both backends.
+The `CAMetalLayer` is configured with the sRGB color space. CG-rasterized images and gradients, which are tagged `DeviceRGB` in their `CGBitmapContext`, are displayed with the brightness their tag implies.
 
 // vale-skip: Microsoft.Adverbs: "strictly device-RGB" is a precise color-pipeline qualifier (excluding sRGB conversion), not a softener.
 For most apps the default is the right choice. Apps that need a different color profile -- for example, wide-gamut artwork that should be displayed in Display P3, or a strictly device-RGB pipeline that matches a custom rendering toolchain -- can override the choice with the `ios.metal.colorSpace` build hint:
@@ -184,9 +185,6 @@ For most apps the default is the right choice. Apps that need a different color 
 | `none`
 | Leaves `metalLayer.colorspace` unset, so Metal uses the system default for the device.
 |===
-
-// vale-skip: Microsoft.Avoid: "OpenGL ES 2 backend" names the alternate rendering pipeline, not a server.
-NOTE: The hint only takes effect on the Metal backend (the default). If you have opted out with `ios.metal=false`, the layer is `CAEAGLLayer` and the color space is fixed by the system.
 
 === Accessing insecure URLs
 

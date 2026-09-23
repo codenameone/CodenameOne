@@ -3167,6 +3167,7 @@ public final class GeneratedAccess_com_codename1_health {
         if ("EXERCISE_TIME".equals(name)) return com.codename1.health.HealthDataType.EXERCISE_TIME;
         if ("FLIGHTS_CLIMBED".equals(name)) return com.codename1.health.HealthDataType.FLIGHTS_CLIMBED;
         if ("HEART_RATE".equals(name)) return com.codename1.health.HealthDataType.HEART_RATE;
+        if ("HEART_RATE_VARIABILITY_RMSSD".equals(name)) return com.codename1.health.HealthDataType.HEART_RATE_VARIABILITY_RMSSD;
         if ("HEART_RATE_VARIABILITY_SDNN".equals(name)) return com.codename1.health.HealthDataType.HEART_RATE_VARIABILITY_SDNN;
         if ("HEIGHT".equals(name)) return com.codename1.health.HealthDataType.HEIGHT;
         if ("HYDRATION".equals(name)) return com.codename1.health.HealthDataType.HYDRATION;

@@ -1,0 +1,15 @@
+# actionlint configuration. See scripts/check-workflows.sh.
+
+self-hosted-runner:
+  # windows-11-arm is a REAL GitHub-hosted label -- parparvm-tests-windows.yml runs on it
+  # and has done for months. actionlint ships a static list of known labels and that list
+  # lags GitHub's, so the label is reported as unknown.
+  #
+  # Declared here rather than by muting the runner-label rule, so a genuine typo in a
+  # runs-on is still caught.
+  labels:
+    - windows-11-arm
+    # xcode-27 is the GitHub-hosted macOS 27 / Xcode 27 image, published as a
+    # public preview (actions/runner-images#14404). Same situation as the label
+    # above: real, hosted, and newer than actionlint's built-in list.
+    - xcode-27

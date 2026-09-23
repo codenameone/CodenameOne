@@ -677,6 +677,21 @@ class DatabaseUsageScanTest {
         assertTrue(usage.usesDatabaseCipher(), "unreadable means assume the cipher is needed");
     }
 
+    @Test
+    void anUnreadableClassLeavesTheVaultQuestionOpen() throws IOException {
+        // The vault answer cannot go the same way as the cipher's. Charging an unreadable class
+        // the cipher adds a dependency; charging it the vault links a private CommonCrypto SPI
+        // into a binary Apple scans. So it was recorded as NO -- which is the other silent wrong
+        // answer: an unreadable dependency that really does use Vault shipped with AES-GCM
+        // compiled out, and nothing asked the developer anything. Open is the honest state, and
+        // it is the one the budget-refusal path already reports.
+        writeUnreadableClass("com/example/App.class");
+        Executor.DatabaseUsage usage = executor.scanForDatabaseUsage(root);
+        assertFalse(usage.usesVault(), "an unreadable class is not proof that it DOES use one");
+        assertTrue(usage.isVaultUnknown(),
+                "nor is it proof that it does not; the builder has to ask");
+    }
+
     /**
      * Writes a real class that refers to the given internal names.
      *
@@ -689,6 +704,16 @@ class DatabaseUsageScanTest {
     private void writeClass(String path, String... references) throws IOException {
         File f = new File(root, path.replace('/', File.separatorChar));
         assertTrue(f.getParentFile().isDirectory() || f.getParentFile().mkdirs());
+        OutputStream out = new FileOutputStream(f);
+        try {
+            out.write(classBytes(path, references));
+        } finally {
+            out.close();
+        }
+    }
+
+    /// The same class, as bytes, for the archive tests that never put one on disk.
+    private byte[] classBytes(String path, String... references) {
         String internalName = path.substring(0, path.length() - ".class".length());
         org.objectweb.asm.ClassWriter w = new org.objectweb.asm.ClassWriter(0);
         w.visit(org.objectweb.asm.Opcodes.V1_8, org.objectweb.asm.Opcodes.ACC_PUBLIC,
@@ -708,12 +733,7 @@ class DatabaseUsageScanTest {
         m.visitMaxs(2, 1);
         m.visitEnd();
         w.visitEnd();
-        OutputStream out = new FileOutputStream(f);
-        try {
-            out.write(w.toByteArray());
-        } finally {
-            out.close();
-        }
+        return w.toByteArray();
     }
 
     /** Display declares openOrCreate(String, DatabaseConfig), so it names both. */
@@ -730,6 +750,279 @@ class DatabaseUsageScanTest {
         writeClass("com/codename1/impl/AbstractDBCursor.class", "com/codename1/db/Row");
         writeClass("com/codename1/testing/DatabaseConformanceSuite.class",
                 "com/codename1/db/DatabaseConfig");
+    }
+
+    /// Every class of the vault package, exactly as the builders see it in the staged tree.
+    private void writeVaultFramework() throws IOException {
+        String[] vault = {
+            "AssociatedData", "Bytes", "KdfProfile", "KeyHandle", "KeyUsage", "Protection",
+            "ProtectionReport", "SecureEnvelope", "SecureStorageDeviceProtection", "UnlockPolicy",
+            "Vault", "VaultCapabilities", "VaultError", "VaultException", "VaultKeyHandle",
+            "VaultMetadata", "VaultOptions", "package-info"
+        };
+        for (int iter = 0; iter < vault.length; iter++) {
+            // Each of these carries the package in its own name, which is what made the package
+            // prove its own use before they were excluded.
+            writeClass("com/codename1/security/vault/" + vault[iter] + ".class",
+                    "com/codename1/security/vault/Vault");
+        }
+        writeClass("com/codename1/security/vault/spi/DeviceProtection.class",
+                "com/codename1/security/vault/ProtectionReport");
+        writeClass("com/codename1/security/SecureStorage.class",
+                "com/codename1/security/vault/ProtectionReport");
+    }
+
+    @Test
+    void aNestedArchiveIsScannedForTheVaultAfterTheDatabaseIsAlreadyKnown() throws IOException {
+        // The nested loop stopped on the first two answers. It was written when there were two
+        // questions and was not revisited when the vault became the third, so a classes.jar whose
+        // EARLY class used an encrypted database answered both and ended the scan before a later
+        // class in the same jar that uses the vault. usesVault came back false, IPhoneBuilder left
+        // AES-GCM out of the binary, and the vault failed on the device in an application whose
+        // dependency demonstrably uses it.
+        //
+        // Entry order is the whole point of this test: a ZipInputStream reads in write order, so
+        // the database class has to go in first for the loop to be able to stop early.
+        File lib = new File(root, "libs");
+        assertTrue(lib.mkdirs());
+        java.io.ByteArrayOutputStream inner = new java.io.ByteArrayOutputStream();
+        java.util.zip.ZipOutputStream innerZip = new java.util.zip.ZipOutputStream(inner);
+        try {
+            innerZip.putNextEntry(new java.util.zip.ZipEntry("com/vendor/Secure.class"));
+            innerZip.write(classCalling("rawKey"));
+            innerZip.closeEntry();
+            innerZip.putNextEntry(new java.util.zip.ZipEntry("com/vendor/Vaulted.class"));
+            innerZip.write(classBytes("com/vendor/Vaulted.class",
+                    "com/codename1/security/vault/Vault"));
+            innerZip.closeEntry();
+        } finally {
+            innerZip.close();
+        }
+        java.util.zip.ZipOutputStream aar = new java.util.zip.ZipOutputStream(
+                new FileOutputStream(new File(lib, "secure.aar")));
+        try {
+            aar.putNextEntry(new java.util.zip.ZipEntry("classes.jar"));
+            aar.write(inner.toByteArray());
+            aar.closeEntry();
+        } finally {
+            aar.close();
+        }
+
+        Executor.DatabaseUsage usage = executor.scanForDatabaseUsage(root);
+        assertTrue(usage.usesDatabase(), "the early class uses the database");
+        assertTrue(usage.usesDatabaseCipher(), "and encrypts it");
+        assertTrue(usage.usesVault(),
+                "the later class in the same nested jar uses the vault, and the scan must not "
+                + "have stopped once the first two questions were answered");
+    }
+
+    @Test
+    void aBudgetRefusalLeavesTheVaultQuestionOpenRatherThanAnsweringNo() throws IOException {
+        // A refused scan read an unknown fraction of the archive. The handler already assumes the
+        // database and its cipher ARE used, on the reasoning that unknown is not absent and being
+        // wrong that way costs a fatter binary -- but the vault cannot be guessed the same way,
+        // because being wrong THAT way links a private CommonCrypto SPI into a binary Apple
+        // scans. So it answers neither, and says so.
+        File lib = new File(root, "libs");
+        assertTrue(lib.mkdirs());
+        java.io.ByteArrayOutputStream inner = new java.io.ByteArrayOutputStream();
+        java.util.zip.ZipOutputStream innerZip = new java.util.zip.ZipOutputStream(inner);
+        try {
+            // Past PERM_SCAN_MAX_ENTRIES, so the scan is refused before it can finish.
+            for (int iter = 0; iter <= Executor.PERM_SCAN_MAX_ENTRIES + 10; iter++) {
+                innerZip.putNextEntry(new java.util.zip.ZipEntry("com/vendor/f" + iter + ".txt"));
+                innerZip.write(new byte[]{1});
+                innerZip.closeEntry();
+            }
+        } finally {
+            innerZip.close();
+        }
+        java.util.zip.ZipOutputStream aar = new java.util.zip.ZipOutputStream(
+                new FileOutputStream(new File(lib, "huge.aar")));
+        try {
+            aar.putNextEntry(new java.util.zip.ZipEntry("classes.jar"));
+            aar.write(inner.toByteArray());
+            aar.closeEntry();
+        } finally {
+            aar.close();
+        }
+
+        Executor.DatabaseUsage usage = executor.scanForDatabaseUsage(root);
+        assertTrue(usage.usesDatabase(), "a refused archive is assumed to use the database");
+        assertTrue(usage.usesDatabaseCipher(), "and its cipher");
+        assertFalse(usage.usesVault(),
+                "a refusal must not be reported as a positive vault answer either");
+        assertTrue(usage.isVaultUnknown(),
+                "it must be reported as OPEN, so the builder can ask rather than guess");
+    }
+
+    @Test
+    void aCompleteScanLeavesNothingOpen() throws IOException {
+        // The other direction: an ordinary submission must not set the flag, or the builder would
+        // stop every build asking a question the scan had already answered.
+        writeFramework();
+        writeClass("com/example/MyApp.class", "com/codename1/ui/Form");
+
+        Executor.DatabaseUsage usage = executor.scanForDatabaseUsage(root);
+        assertFalse(usage.isVaultUnknown(), "a scan that finished answers the question");
+    }
+
+    @Test
+    void theVaultPackageDoesNotProveItsOwnUse() throws IOException {
+        // The staged tree is the application merged with the framework, so every vault class is
+        // in it whether or not anything calls one -- and each carries its own package name in its
+        // constant pool. Scanning them found the string and reported the application as a vault
+        // user, which on iOS links the private CommonCrypto GCM SPI into a binary Apple scans.
+        writeFramework();
+        writeVaultFramework();
+        writeClass("com/example/MyApp.class", "com/codename1/ui/Form");
+
+        Executor.DatabaseUsage usage = executor.scanForDatabaseUsage(root);
+        assertFalse(usage.usesVault(),
+                "the vault package's reference to itself is not the application's");
+    }
+
+    @Test
+    void anApplicationThatDoesUseTheVaultIsStillSeen() throws IOException {
+        // The exclusion above must not become a blanket one: an application really naming a vault
+        // type is what the gate exists to find.
+        writeFramework();
+        writeVaultFramework();
+        writeClass("com/example/MyApp.class", "com/codename1/security/vault/Vault");
+
+        assertTrue(executor.scanForDatabaseUsage(root).usesVault());
+    }
+
+    @Test
+    void namingOnlyThePolicyTypesIsNotUsingTheVault() throws IOException {
+        // Protection and ProtectionReport are the parameter and the return type of the
+        // SecureStorage policy overloads, so an application that only asks what a store already
+        // provides -- and never creates a Vault or seals an envelope -- named the package. That
+        // was classified as vault use, which on iOS enables CN1_INCLUDE_CRYPTO_GCM and links the
+        // private CommonCrypto GCM SPI symbols into a binary Apple scans: the exact outcome this
+        // gating exists to prevent, reached by an application that does no vault crypto at all.
+        writeFramework();
+        writeVaultFramework();
+        writeClass("com/example/MyApp.class",
+                "com/codename1/security/vault/Protection",
+                "com/codename1/security/vault/ProtectionReport",
+                "com/codename1/security/vault/VaultException",
+                "com/codename1/security/vault/UnlockPolicy",
+                "com/codename1/security/vault/VaultCapabilities");
+
+        assertFalse(executor.scanForDatabaseUsage(root).usesVault(),
+                "asking a store what it provides does not need AES-GCM");
+    }
+
+    @Test
+    void everyVaultTypeThatReachesGcmIsStillDetected() throws IOException {
+        // The narrowing above must not drop an entry point. These three are the public types whose
+        // use reaches the GCM implementation, and each on its own has to answer yes -- including
+        // SecureStorageDeviceProtection, which seals and opens envelopes itself and can therefore
+        // be reached without ever naming Vault.
+        String[] reachesGcm = {
+            "com/codename1/security/vault/Vault",
+            "com/codename1/security/vault/SecureEnvelope",
+            "com/codename1/security/vault/SecureStorageDeviceProtection"
+        };
+        for (int iter = 0; iter < reachesGcm.length; iter++) {
+            delete(root);
+            setUpRoot();
+            writeFramework();
+            writeVaultFramework();
+            writeClass("com/example/MyApp.class", reachesGcm[iter]);
+            assertTrue(executor.scanForDatabaseUsage(root).usesVault(),
+                    reachesGcm[iter] + " reaches AES-GCM and must be detected");
+        }
+    }
+
+    @Test
+    void theAbstractKeyHandleIsNotItselfGcmUse() throws IOException {
+        // KeyHandle was on the list and should not have been. It is fully abstract -- every
+        // method including seal and open -- so a class-file reference to it carries no GCM
+        // implementation, and an application declaring a KeyHandle-typed API, or subclassing it
+        // for its own non-GCM purpose, was charged the private CommonCrypto SPI for a type
+        // reference alone.
+        //
+        // Nothing is lost by the omission, and this is the fact that makes it safe rather than a
+        // judgement call: Vault.operationalKey is the ONLY producer of a KeyHandle anywhere in
+        // the framework, so an application holding one has named Vault, which IS on the list.
+        writeFramework();
+        writeVaultFramework();
+        writeClass("com/example/MyApp.class", "com/codename1/security/vault/KeyHandle");
+
+        assertFalse(executor.scanForDatabaseUsage(root).usesVault(),
+                "an abstract type with no implementation is not use of the implementation");
+    }
+
+    @Test
+    void aTypeWhoseNameMerelyStartsWithAGcmTypesNameIsNotOne() throws IOException {
+        // The match is a substring, because the caller holds an internal name, a descriptor or a
+        // signature and cannot say which. VaultMetadata, VaultException, VaultError and
+        // VaultOptions all begin with "Vault" and none of them is it.
+        writeFramework();
+        writeVaultFramework();
+        writeClass("com/example/MyApp.class",
+                "com/codename1/security/vault/VaultError",
+                "com/codename1/security/vault/VaultOptions");
+
+        assertFalse(executor.scanForDatabaseUsage(root).usesVault(),
+                "VaultError is not Vault");
+    }
+
+    @Test
+    void anInnerClassOfAGcmTypeCounts() throws IOException {
+        // '$' has to be accepted where a letter is not, or a lambda or anonymous class compiled
+        // into Vault would be missed.
+        writeFramework();
+        writeVaultFramework();
+        writeClass("com/example/MyApp.class", "com/codename1/security/vault/Vault$Opened");
+
+        assertTrue(executor.scanForDatabaseUsage(root).usesVault(),
+                "an inner class of Vault is Vault");
+    }
+
+    @Test
+    void anApplicationClassInsideTheVaultPackageIsStillScanned() throws IOException {
+        // Excluded by name, never as a directory. The package is the framework's by convention
+        // and not by ownership, so a helper an application or a library puts there has to be
+        // scanned like any other application class.
+        writeFramework();
+        writeVaultFramework();
+        writeClass("com/codename1/security/vault/MyHelper.class",
+                "com/codename1/security/vault/Vault");
+
+        assertTrue(executor.scanForDatabaseUsage(root).usesVault());
+    }
+
+    @Test
+    void theExclusionListCoversEveryClassInTheVaultPackage() {
+        // A list held by hand goes stale silently, and the failure is the one above coming back:
+        // a class added to the package later charges every application the vault. Held against
+        // the sources rather than trusted.
+        java.io.File pkg = new java.io.File("../../CodenameOne/src/com/codename1/security/vault");
+        assertTrue(pkg.isDirectory(), "vault sources not found at " + pkg.getAbsolutePath());
+        int checked = 0;
+        java.io.File[] roots = {pkg, new java.io.File(pkg, "spi")};
+        for (int dir = 0; dir < roots.length; dir++) {
+            java.io.File[] files = roots[dir].listFiles();
+            assertTrue(files != null && files.length > 0, "empty: " + roots[dir]);
+            for (int iter = 0; iter < files.length; iter++) {
+                String name = files[iter].getName();
+                if (!name.endsWith(".java")) {
+                    continue;
+                }
+                String relative = "com/codename1/security/vault/"
+                        + (dir == 1 ? "spi/" : "")
+                        + name.substring(0, name.length() - ".java".length());
+                assertTrue(Executor.isFrameworkDatabaseClass(relative + ".class"),
+                        relative + " is in the vault package but is not excluded from the usage "
+                        + "scan, so its own name will report every application as a vault user");
+                checked++;
+            }
+        }
+        assertTrue(checked >= 18, "only " + checked + " vault classes seen, so this checked "
+                + "nothing like the whole package");
     }
 
     @Test

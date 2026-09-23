@@ -120,7 +120,7 @@ ____Significantly enhanced developer guide
 We redid the developer guide from the ground up converting  
 it to asciidoc and integrating it into the website in a more fluent way. We increased its breadth by over  
 50%.  
-Check it out [here](/manual/) or download the [pdf](/files/developer-guide.pdf). 
+Check it out [here](/developer-guide/) or download the [pdf](/files/developer-guide.pdf).
 
 ____iOS Beta Test Support (testflight)
 

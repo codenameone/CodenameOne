@@ -29,7 +29,7 @@ This lesson also highlights a broader truth about mobile networking: the app is 
 
 ## Further Reading
 
-- [Developer Guide](/developer-guide/)
+- [Developer Guide](/developer-guide/io/)
 - [How Do I Access Remote Webservices, Perform Operations On The Server](/how-do-i/how-do-i-access-remote-webservices-perform-operations-on-the-server/)
 - [How Do I Use HTTP, Sockets, Webservices & Websockets](/how-do-i/how-do-i-use-http-sockets-webservices-websockets/)
 - [Threading and the EDT](/courses/course-01-java-for-mobile-devices/011-threading-and-the-edt/)

@@ -62,14 +62,16 @@ public final class Reactor {
     }
 
     public void add(int fd, int events) throws IOException {
-        if(registerImpl(poller, fd, events, false) != 0) {
-            throw new IOException("Could not watch fd " + fd);
+        int err = registerImpl(poller, fd, events, false);
+        if(err != 0) {
+            throw new IOException("Could not watch fd " + fd + " (errno " + (-err) + ")");
         }
     }
 
     public void modify(int fd, int events) throws IOException {
-        if(registerImpl(poller, fd, events, true) != 0) {
-            throw new IOException("Could not re-arm fd " + fd);
+        int err = registerImpl(poller, fd, events, true);
+        if(err != 0) {
+            throw new IOException("Could not re-arm fd " + fd + " (errno " + (-err) + ")");
         }
     }
 

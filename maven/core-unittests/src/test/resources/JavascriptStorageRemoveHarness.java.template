@@ -1,0 +1,99 @@
+/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+import java.util.*;
+
+public class JavascriptStorageRemoveHarness {
+    private static final byte STATUS_OK = 0;
+    private static final Storage storage = new Storage();
+    private static String gate;
+    private static int scenario;
+    private static boolean injected;
+    static class Log {
+        static final int WARNING = 1;
+        static void p(String ignored, int level) { }
+    }
+    static class Storage {
+        final Map<String, Object> values = new HashMap<String, Object>();
+        static Storage getInstance() { return storage; }
+        void deleteStorageFile(String entry) {
+            if (scenario != 5) values.remove(entry);
+        }
+    }
+    private static String encryptedKey(String account) { return "encrypted." + account; }
+    private static String legacyKey(String account) { return "legacy." + account; }
+    private static Object readUncached(String entry) { return storage.values.get(entry); }
+    private static boolean definitelyGone(String entry) { return !storage.values.containsKey(entry); }
+    private static String reasonOf(RuntimeException failed) { return failed.getMessage(); }
+    private static boolean gateAccepted(byte[] answer) { return answer != null && answer[0] == STATUS_OK; }
+    private static byte[] nativeRead(String entry) {
+        if (scenario == 4) return new byte[] {1};
+        String saved = gate;
+        if (!injected) {
+            injected = true;
+            if (scenario == 1) {
+                gate = "new";
+                storage.values.put(entry, "new");
+            } else if (scenario == 2) {
+                storage.values.put("legacy.account", "new-plaintext");
+            }
+        }
+        return ("\0" + (saved == null ? "" : saved)).getBytes(java.nio.charset.StandardCharsets.UTF_8);
+    }
+    private static byte[] nativeForgetIf(String entry, String expected) {
+        if (scenario == 3) {
+            gate = "new";
+            storage.values.put(entry, "new");
+        } else if (scenario == 6) {
+            gate = "new";
+        } else if (expected.equals(gate)) {
+            gate = null;
+        }
+        return new byte[] {0};
+    }
+    private static void check(boolean condition, String message) {
+        if (!condition) throw new AssertionError(message + " (scenario " + scenario + ")");
+    }
+    public static void verify() {
+        JavascriptStorageRemoveHarness h = new JavascriptStorageRemoveHarness();
+        for (scenario = 0; scenario < 7; scenario++) {
+            storage.values.clear();
+            storage.values.put("encrypted.account", "old");
+            storage.values.put("legacy.account", "old-plaintext");
+            gate = "old";
+            injected = false;
+            boolean removed = h.remove("account");
+            check(removed == (scenario == 0), "only a confirmed removal can report success");
+            if (scenario == 1 || scenario == 3) {
+                check("new".equals(storage.values.get("encrypted.account")),
+                        "a completed concurrent replacement must remain readable");
+                check("new".equals(gate), "replacement gate must survive");
+            }
+            if (scenario == 2) check("new-plaintext".equals(storage.values.get("legacy.account")),
+                    "a newer plaintext entry must survive");
+            if (scenario == 4 || scenario == 5) check("old".equals(storage.values.get("encrypted.account")),
+                    "failed read or ignored deletion must preserve the original");
+            if (scenario == 6) check("new".equals(gate), "a surviving gate must prevent success");
+        }
+    }
+    /* PRODUCTION_METHODS */
+}

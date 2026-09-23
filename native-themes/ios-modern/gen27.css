@@ -1,0 +1,78 @@
+/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+/*
+ * iOS 27 generation layer.
+ *
+ * Appended AFTER common.css, so every rule here overrides the common one for
+ * the same UIID property by property, and #Constants keys override key by key.
+ * See native-themes/README.md for the cascade rules the build relies on.
+ *
+ * Contents are driven by measurement, not by reading release notes: capture the
+ * native reference on an iOS 27 simulator
+ * (CN1SS_FIDELITY_GOLDEN_SET=ios-27-metal scripts/build-ios-native-ref.sh) and
+ * compare it tile by tile against goldens/ios-26-metal. 31 of 68 tiles differ,
+ * concentrated in the Liquid Glass surfaces and the bar and button chrome built
+ * on them; the classic form controls -- TextField, Dialog, CheckBox,
+ * RadioButton, Switch, Slider, ProgressBar -- are byte-identical and belong in
+ * common.css.
+ *
+ * Tuning proceeds delta by delta; each entry below names what was measured.
+ *
+ * MEASURED EFFECT of what is currently here, scored on an iPhone 16 / iOS 27.0
+ * simulator against goldens/ios-27-metal, 68 tiles:
+ *
+ *            mean      light     dark
+ *   before   90.34%    92.89%    87.80%
+ *   after    92.83%    93.39%    92.27%
+ *
+ * 15 tiles improved, 51 unchanged, 2 regressed by 0.3 (TextField dark, which is
+ * within the documented non-affine dark error). The six dark glass panels each
+ * gained 21-24 points. Tabs_normal_dark remains the worst tile at 68.75%: its
+ * material is the pill recipe, whose dark fit is the poorest of the three, and
+ * the travelling selection lens on top of it is a separate op again.
+ */
+
+#Constants {
+    /* THE LIQUID GLASS MATERIALS, RETUNED FOR iOS 27.
+     *
+     * The recipes are typed and named (com.codename1.ui.plaf.GlassRecipe) rather
+     * than loose numbers, so a generation switch is a change of NAME here and the
+     * constants live in one reviewed place with the measurement that produced
+     * them. GlassRecipe.liquidPanel27 carries that derivation in full.
+     *
+     * In short: the material is the affine transform
+     *     c' = clamp((lum + (c - lum) * sat) * scale + offset)
+     * whose iOS 26 constants are known, so each ios-26-metal golden pixel can be
+     * inverted back to its backdrop and the matching ios-27-metal pixel fitted
+     * against it. The fit reproduces the known iOS 26 chrome constants to within
+     * 1.3%, which is what makes it trustworthy on iOS 27.
+     *
+     * Measured LIGHT chrome and pill as UNCHANGED from iOS 26; the 27 recipes
+     * reuse those numbers verbatim. Dark moved in all three, and is approximate
+     * there -- iOS 27's dark glass has a non-linear luminance response that an
+     * affine material cannot express (see GlassRecipe.liquidPanel27). */
+    ToolbarGlassRecipe: "chrome27";
+    TitleAreaGlassRecipe: "chrome27";
+    TabsContainerGlassRecipe: "pill27";
+    glassRecipeDefault: "panel27";
+}

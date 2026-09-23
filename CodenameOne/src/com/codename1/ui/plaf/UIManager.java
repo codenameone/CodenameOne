@@ -666,6 +666,56 @@ public class UIManager {
         return getComponentStyleImpl(id, false, type + "#");
     }
 
+    /// True when a custom style was installed programmatically or the theme declares an entry for the style
+    /// type on this UIID -- `Button.hover#bgColor`, `Button.hover#derive` and so on.
+    ///
+    /// This exists because {@link #getComponentCustomStyle(String, String)} *never returns
+    /// null*: asked for a type the theme says nothing about, it falls through to a copy of
+    /// the blank default style, whose background is white and whose foreground is black. For
+    /// `press` and `dis` that is harmless, because the shipped themes declare them wherever a
+    /// component consults them. For a state a component may consult on any UIID -- hover is
+    /// the first -- it is not: a theme written before that state existed would repaint every
+    /// hovered component in the blank default, which reads as a rendering bug and has no
+    /// obvious cause. So a caller that can tolerate "no such style" asks here first and skips
+    /// the state entirely.
+    ///
+    /// The dark spelling is checked as well, because a theme is free to declare a state only
+    /// inside `@media (prefers-color-scheme: dark)`, which the CSS compiler emits as
+    /// `$Dark&lt;UIID&gt;`.
+    ///
+    /// The answer is memoised for a whole theme generation by the same style-definition index
+    /// that backs dark-style resolution, so the linear scan behind it happens once per UIID
+    /// and type, not once per query.
+    ///
+    /// #### Parameters
+    ///
+    /// - `id`: the component id whose custom style we are asking about
+    ///
+    /// - `type`: the style type, e.g. `hover`
+    ///
+    /// #### Returns
+    ///
+    /// true when that custom style is installed or declared for this UIID
+    public boolean hasComponentCustomStyle(String id, String type) {
+        if (type == null || type.length() == 0) {
+            return false;
+        }
+        String dotted = (id == null || id.length() == 0) ? "" : dottedId(id);
+        String suffix = dotted + type + "#";
+        // Typed installations live in styles, while generated custom-style prototypes
+        // live in prefixedStyles. Only the former explicitly opts a UIID into hover.
+        if (styles.get(suffix) != null || hasStyleDefinition(suffix)) {
+            return true;
+        }
+        // A $Dark-only declaration counts ONLY while dark mode is actually on. In light
+        // mode the caller goes on to ask for the LIGHT key, which does not exist, and
+        // getComponentCustomStyle builds it out of blank defaults -- so a theme that
+        // declares $DarkButton.hover# and no light hover would drop the button to the
+        // default colours on hover instead of leaving its normal style alone.
+        Boolean darkMode = CN.isDarkMode();
+        return darkMode != null && darkMode.booleanValue() && hasStyleDefinition("$Dark" + suffix);
+    }
+
     /// Returns the selected style of the component with the given baseStyle or a **new instance** of the default
     /// style, but overrides styles based on the directives in the styleStrings.
     ///
@@ -725,12 +775,15 @@ public class UIManager {
                     // Cached on prefix + id, exactly as the unprefixed styles
                     // are. The returned Style is a copy either way, so a
                     // caller still gets its own mutable instance.
-                    if (programmaticStyleInstalled) {
+                    // The typed setter stores an explicit prototype under id + prefix.
+                    // Detecting its existence alone is insufficient: return its values too.
+                    style = styles.get(id + prefix);
+                    if (style == null && programmaticStyleInstalled) {
                         // Rebuild every time, exactly as this did before the
                         // cache existed: a base installed programmatically can
                         // be mutated by whoever installed it without telling us.
                         style = createStyle(id, prefix, false);
-                    } else {
+                    } else if (style == null) {
                         String key = prefixedKey(prefix, id);
                         style = prefixedStyles.get(key);
                         if (style == null) {
@@ -1226,6 +1279,64 @@ public class UIManager {
             themeProps.put("ScrollThumb.padding", "0,0,0,0");
             themeProps.put("ScrollThumb.margin", "0,0,0,0");
             themeProps.put("ScrollThumb.bgColor", foreground);
+        }
+
+        // The interactive desktop scrollbar draws through its own four UIIDs
+        // (LookAndFeel.initScroll picks them when interactiveScrollBool is on) so that turning
+        // it on never restyles the mobile bar. Nothing seeded them, which meant a theme that
+        // enabled the constant without also defining all four got a track and a thumb built
+        // from the blank default style: an invisible scrollbar, drawn, reserving a gutter, with
+        // nothing reporting a problem. The seeds below are the mobile ones plus the two things
+        // the desktop bar needs and the mobile one does not -- a gutter wide enough to grab
+        // (the track UIID's horizontal padding is what reserves it) and thumb hover/pressed
+        // states, so the highlight exists even before a theme styles it.
+        //
+        // Guarded like every other seed here, so a theme that defines these suppresses them
+        // rather than fighting them. All three desktop native themes do.
+        if (installedTheme == null || !installedTheme.containsKey("DesktopScroll.derive")) {
+            themeProps.put("DesktopScroll.margin", "0,0,0,0");
+            int gutter = Math.max(2, Display.getInstance().convertToPixels(3, true) / 2);
+            themeProps.put("DesktopScroll.padding", "0," + gutter + ",0," + gutter);
+            themeProps.put("DesktopScroll.transparency", "0");
+        }
+        if (installedTheme == null || !installedTheme.containsKey("DesktopScrollThumb.derive")) {
+            themeProps.put("DesktopScrollThumb.padding", "0,0,0,0");
+            themeProps.put("DesktopScrollThumb.margin", "0,0,0,0");
+            themeProps.put("DesktopScrollThumb.bgColor", foreground);
+            // Distinct states, not three derives of one style. The point of this fallback is
+            // that hover and drag are VISIBLE before a theme styles them, and deriving both
+            // from the unchanged base gave three identical appearances -- the highlight the
+            // comment above promises never appeared.
+            //
+            // Opacity rather than colour, because there is no darker shade available to move
+            // to: `foreground` here is pure black in light mode and pure white in dark, so a
+            // "darker on hover" rule has nowhere to go and would have to branch on the
+            // appearance. A thumb that is partly transparent at rest, more opaque under the
+            // pointer and fully opaque while dragged reads correctly in both, and is what the
+            // platforms themselves do.
+            themeProps.put("DesktopScrollThumb.transparency", "140");
+            themeProps.put("DesktopScrollThumb.sel#derive", "DesktopScrollThumb");
+            themeProps.put("DesktopScrollThumb.sel#transparency", "200");
+            themeProps.put("DesktopScrollThumb.press#derive", "DesktopScrollThumb");
+            themeProps.put("DesktopScrollThumb.press#transparency", "255");
+        }
+        if (installedTheme == null || !installedTheme.containsKey("DesktopHorizontalScroll.derive")) {
+            themeProps.put("DesktopHorizontalScroll.margin", "0,0,0,0");
+            int gutter = Math.max(2, Display.getInstance().convertToPixels(3, true) / 2);
+            themeProps.put("DesktopHorizontalScroll.padding", gutter + ",0," + gutter + ",0");
+            themeProps.put("DesktopHorizontalScroll.transparency", "0");
+        }
+        if (installedTheme == null
+                || !installedTheme.containsKey("DesktopHorizontalScrollThumb.derive")) {
+            themeProps.put("DesktopHorizontalScrollThumb.padding", "0,0,0,0");
+            themeProps.put("DesktopHorizontalScrollThumb.margin", "0,0,0,0");
+            themeProps.put("DesktopHorizontalScrollThumb.bgColor", foreground);
+            // Same three states as the vertical thumb above, for the same reason.
+            themeProps.put("DesktopHorizontalScrollThumb.transparency", "140");
+            themeProps.put("DesktopHorizontalScrollThumb.sel#derive", "DesktopHorizontalScrollThumb");
+            themeProps.put("DesktopHorizontalScrollThumb.sel#transparency", "200");
+            themeProps.put("DesktopHorizontalScrollThumb.press#derive", "DesktopHorizontalScrollThumb");
+            themeProps.put("DesktopHorizontalScrollThumb.press#transparency", "255");
         }
 
         if (installedTheme == null || !installedTheme.containsKey("SliderFull.derive")) {
@@ -2383,8 +2494,12 @@ public class UIManager {
         } else {
             id = id + ".";
         }
-        if (Arrays.toString(styleString).equals(parseCache().get(cacheKey)) && ((selected && selectedStyles.containsKey(id)) || (!selected && this.styles.containsKey(id)))) {
-
+        // A cached normal style does not prove a custom state survived theme refresh.
+        // Check the same cache that getComponentStyleImpl reads for this prefix.
+        boolean cachedStyle = selected ? selectedStyles.containsKey(id)
+                : ((prefix == null || prefix.length() == 0) ? this.styles.containsKey(id)
+                : prefixedStyles.containsKey(prefixedKey(prefix, id)));
+        if (Arrays.toString(styleString).equals(parseCache().get(cacheKey)) && cachedStyle) {
             return getComponentStyleImpl(originalId, selected, prefix);
         }
         parseCache().put(cacheKey, Arrays.toString(styleString));
@@ -2403,7 +2518,9 @@ public class UIManager {
             resetThemeProps(null);
         }
         if (baseStyle != null) {
-            themeProps.put(id + "derive", baseStyle);
+            // Hover inline overrides inherit the hover state itself. Deriving from the
+            // bare UIID would discard unspecified hover colors, padding and borders.
+            themeProps.put(id + "derive", "hover#".equals(prefix) ? baseStyle + ".hover" : baseStyle);
         } else {
             themeProps.remove(id + "derive");
         }

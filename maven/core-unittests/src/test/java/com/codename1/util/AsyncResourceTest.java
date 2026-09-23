@@ -31,6 +31,48 @@ import static org.junit.jupiter.api.Assertions.*;
 class AsyncResourceTest extends UITestBase {
 
     @FormTest
+    void guardedCompletionPublishesUnderMonitorAndInvokesCallbacksOutsideIt() {
+        final Object monitor = new Object();
+        final AsyncResource<String> result = new AsyncResource<String>();
+        final boolean[] validated = new boolean[1];
+        final boolean[] observed = new boolean[1];
+        final boolean[] delivered = new boolean[1];
+        result.addObserver((source, ignored) -> {
+            assertFalse(Thread.holdsLock(monitor));
+            assertTrue(result.isReady());
+            observed[0] = true;
+        });
+        result.ready(value -> {
+            assertFalse(Thread.holdsLock(monitor));
+            assertTrue(validated[0]);
+            assertEquals("ready", value);
+            delivered[0] = true;
+        });
+        result.complete("ready", monitor, () -> {
+            assertTrue(Thread.holdsLock(monitor));
+            assertFalse(result.isDone());
+            validated[0] = true;
+        });
+        assertTrue(observed[0]);
+        assertTrue(delivered[0]);
+    }
+
+    @FormTest
+    void refusedGuardedCompletionLeavesTheResourcePending() {
+        AsyncResource<String> result = new AsyncResource<String>();
+        RuntimeException refused = new RuntimeException("state changed");
+        final boolean[] delivered = new boolean[1];
+        result.ready(value -> delivered[0] = true);
+        assertSame(refused, assertThrows(RuntimeException.class,
+                () -> result.complete("stale", new Object(), () -> { throw refused; })));
+        assertFalse(result.isDone());
+        assertFalse(delivered[0]);
+        result.complete("retried");
+        assertEquals("retried", result.get());
+        assertTrue(delivered[0]);
+    }
+
+    @FormTest
     void allCompletesWhenAllResourcesFinish() throws Exception {
         AsyncResource<String> first = new AsyncResource<String>();
         AsyncResource<String> second = new AsyncResource<String>();

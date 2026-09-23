@@ -244,8 +244,11 @@ if ! grep -q '^BENCHSUITE ' "$RAW"; then
   exit 1
 fi
 
-SUSPENSION_REPORT="$DIST/suspension-report.txt"
-[ -f "$SUSPENSION_REPORT" ] || SUSPENSION_REPORT="$(find "$OUT" -name suspension-report.txt -print -quit || true)"
+# The report is written NEXT TO the bundle directory and named after it, not in
+# it -- the bundle is the application's public web root. The find is the
+# fallback for a layout that is not the one this script builds.
+SUSPENSION_REPORT="$(dirname "$DIST")/$(basename "$DIST")-suspension-report.txt"
+[ -f "$SUSPENSION_REPORT" ] || SUSPENSION_REPORT="$(find "$OUT" -name '*suspension-report.txt' -print -quit || true)"
 
 BUNDLE_BYTES=$(cat "$DIST"/translated_app*.js | wc -c | tr -d ' ')
 YIELDS=$(cat "$DIST"/translated_app*.js | grep -o 'yield\*' | wc -l | tr -d ' ')

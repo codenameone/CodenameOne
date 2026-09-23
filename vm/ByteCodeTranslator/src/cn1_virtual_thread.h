@@ -153,6 +153,20 @@ void cn1VirtualThreadForEach(void (*fn)(struct cn1VirtualThread* vt, void* ctx),
 /** True while this virtual thread is the one executing on some OS thread. */
 int cn1VirtualThreadIsRunning(struct cn1VirtualThread* vt);
 
+/**
+ * Claim a virtual thread's pending-allocation table for the collector.
+ *
+ * Returns 1 when the caller may migrate the table and must call
+ * cn1VirtualThreadGcRelease afterwards; 0 when the virtual thread is running, in
+ * which case nothing is held and the table must be left alone. Reading
+ * cn1VirtualThreadIsRunning instead leaves a check-to-use window in which the
+ * carrier resumes the thread and the migration empties a table being appended
+ * to. See the comment on gcClaim.
+ */
+int cn1VirtualThreadGcClaim(struct cn1VirtualThread* vt);
+void cn1VirtualThreadGcRelease(struct cn1VirtualThread* vt);
+void cn1VirtualThreadSpinHint(void);
+
 /** The argument the body was created with, so a caller can free it after. */
 void* cn1VirtualThreadArg(struct cn1VirtualThread* vt);
 
@@ -243,6 +257,16 @@ static inline struct cn1VirtualThread* cn1VirtualThreadForStackAddress(
     (void)addr; (void)count; (void)snapshot; return 0;
 }
 static inline int   cn1VirtualThreadIsRunning(struct cn1VirtualThread* co) { (void)co; return 0; }
+/*
+ * 0 is "the claim was NOT taken", which is the safe answer and not just the
+ * convenient one: the caller reads a failed claim as "this virtual thread may be
+ * running" and leaves its pending-allocation table alone, costing a deferred
+ * reclaim. Answering 1 would license the migration. Unreachable either way here,
+ * since without virtual threads no thread state ever resolves to one.
+ */
+static inline int   cn1VirtualThreadGcClaim(struct cn1VirtualThread* co) { (void)co; return 0; }
+static inline void  cn1VirtualThreadGcRelease(struct cn1VirtualThread* co) { (void)co; }
+static inline void  cn1VirtualThreadSpinHint(void) { }
 static inline void  cn1VirtualThreadStackBounds(struct cn1VirtualThread* co, void** lo, void** hi) {
     (void)co; if(lo) { *lo = 0; } if(hi) { *hi = 0; }
 }

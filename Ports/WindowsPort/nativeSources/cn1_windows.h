@@ -115,7 +115,18 @@ typedef enum {
     /* Touchpad pinch phases, kept on the same numbers the Linux port uses so the
      * two desktop wire protocols do not drift apart. */
     CN1_EVENT_PINCH_BEGIN = 20,
-    CN1_EVENT_PINCH_END = 21
+    CN1_EVENT_PINCH_END = 21,
+    /* Pointer motion with NO button held. Dropped entirely before the desktop
+     * themes existed, because a mobile port has no use for it: WM_MOUSEMOVE with
+     * an empty button mask simply returned. It is what drives Component's hover
+     * style, so without it a Fluent button never lights up under the cursor and
+     * the theme's hover rules are dead entries in the .res. */
+    CN1_EVENT_POINTER_HOVER = 22,
+    /* A native menu bar item was chosen. keyCode carries the Codename One command id the
+     * Java side handed out in setNativeCommands; x, y and windowId are unused. Routed
+     * through the same queue as every other event so the command runs on the EDT rather
+     * than on the pump thread, which is the rule the whole bridge is built on. */
+    CN1_EVENT_MENU_COMMAND = 23
 } CN1EventType;
 
 /* Fixed-point scale for the gesture keyCode field (see CN1_EVENT_PINCH). */
@@ -290,6 +301,18 @@ int cn1WinTouchFlag(void);
 int cn1WinHandleGesture(HWND hwnd, int windowId, LPARAM lParam);
 #endif
 int  cn1WinPollEvent(CN1Event* out);
+
+/* ------------------------------------------------------------------ menu bar
+ *
+ * cn1_windows_menu.cpp. The spec is the row format setNativeCommands encodes:
+ * "<menuHint>\t<label>\t<shortcutKeyChar>\t<shortcutModifiers>\t<commandId>", rows
+ * separated by '\n'. An empty or NULL spec removes the menu bar. */
+void cn1WinMenuSetCommands(const char* spec);
+
+/* Handles WM_COMMAND for a menu selection. Returns 1 when the id belonged to the menu bar
+ * and an event was pushed, 0 when it did not and the message should fall through. */
+int  cn1WinMenuHandleCommand(WPARAM wParam);
+int  cn1WinMenuHandleAccelerator(int vkey);
 LRESULT CALLBACK cn1WinWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam);
 LRESULT cn1WinAccessibilityObject(HWND hwnd, WPARAM wParam, LPARAM lParam);
 
@@ -300,6 +323,12 @@ LRESULT cn1WinAccessibilityObject(HWND hwnd, WPARAM wParam, LPARAM lParam);
 #define CN1_MAX_DESKTOP_WINDOWS 32
 /* Marshals window creation onto the pump thread, which must own the HWND. */
 #define WM_CN1_DESKTOPWINDOW (WM_APP + 25)
+
+/* Rebuilding the native menu bar. SetMenu has to run on the thread that owns the window,
+ * so cn1_windows_menu.cpp SENDS this (blocking) rather than posting it: the menu is in
+ * place before the native returns, and a form shown immediately afterwards cannot race it.
+ * lParam carries the UTF-8 spec; see cn1WinMenuSetCommands. */
+#define WM_CN1_MENU (WM_APP + 26)
 void cn1WinDesktopHandleMessage(WPARAM wParam, LPARAM lParam);
 HWND cn1WinDesktopHwnd(int slot);
 int  cn1WinDesktopSlotForHwnd(HWND hwnd);

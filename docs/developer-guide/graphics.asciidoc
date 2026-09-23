@@ -507,11 +507,11 @@ For example: this code allows you to draw a rather complex image of duke:
 
 [source,java]
 ----
-include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/GraphicsJava023Snippet.java[tag=graphics-java-023,indent=0]
+include::../demos/common/src/main/java/com/codenameone/developerguide/screenshots/GraphicsShapedClippingFigure.java[tag=graphics-java-023,indent=0]
 ----
 
 .Shape Clipping used to clip the image of duke within the given shape
-image::img/shaped-clipping.png[Shape Clipping used to clip the image of duke within the given shape,scaledwidth=20%]
+image::img/generated/shaped-clipping.png[Shape Clipping used to clip the image of duke within the given shape,scaledwidth=20%]
 
 TIP: Notice that this functionality isn't available on all platforms so you need to test if shaped clipping is supported using https://www.codenameone.com/javadoc/com/codename1/ui/Graphics.html#isShapeClipSupported()[isShapeClipSupported()].
 
@@ -783,9 +783,9 @@ To verify that locking might be a problem you can launch the performance monitor
 
 ==== MultiImage
 
-Multi images don't physically exist as a concept within the Codename One API so there is no way to actually create them and they're in no way distinguishable from `EnclodedImage`.
+Multi images don't physically exist as a concept within the Codename One API so there is no way to actually create them and they're in no way distinguishable from `EncodedImage`.
 
-The built-in support for multi images is in the resource file loading logic where a MultiImage is decoded and the version that matches the current DPI is physically loaded. From that point on user code can treat it like any other `EnclodedImage`.
+The built-in support for multi images is in the resource file loading logic where a MultiImage is decoded and the version that matches the current DPI is physically loaded. From that point on user code can treat it like any other `EncodedImage`.
 
 The 9-image borders use multi images by default to keep their appearance more refined on the different DPI’s.
 

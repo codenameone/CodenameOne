@@ -82,7 +82,7 @@ A new "modless" dialog that can "float" on top of the UI using the layered pane 
 
 Significantly enhanced developer guide
 
-We redid the developer guide from the ground up converting it to asciidoc and integrating it into the website in a more fluent way. We increased its breadth by over 50%. Check it our [here](/manual/) or download the [pdf](/files/developer-guide.pdf).
+We redid the developer guide from the ground up converting it to asciidoc and integrating it into the website in a more fluent way. We increased its breadth by over 50%. Check it our [here](/developer-guide/) or download the [pdf](/files/developer-guide.pdf).
 
 iOS Beta Test Support (testflight)
 

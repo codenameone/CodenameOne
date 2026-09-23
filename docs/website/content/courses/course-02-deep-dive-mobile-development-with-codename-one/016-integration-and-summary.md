@@ -27,7 +27,7 @@ The wider lesson here is that good architecture does not need to arrive all at o
 
 ## Further Reading
 
-- [Developer Guide](/developer-guide/)
+- [Developer Guide](/developer-guide/advanced-topics-under-the-hood/#_native_interfaces)
 - [Overview and Basic Model](/courses/course-02-deep-dive-mobile-development-with-codename-one/015-overview-and-basic-model/)
 - [How Do I Use Properties To Speed Development](/how-do-i/how-do-i-use-properties-to-speed-development/)
 - [How Do I Localize/Translate My Application, Apply i18n/l10n to My App](/how-do-i/how-do-i-localizetranslate-my-application-apply-i18nl10n-internationalizationlocalization-to-my-app/)

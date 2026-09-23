@@ -4992,6 +4992,111 @@ public abstract class CodenameOneImplementation {
     public void setNativeCommands(Vector commands) {
     }
 
+    /// Whether this platform actually has a native menu system for
+    /// `#setNativeCommands(Vector)` to put commands on.
+    ///
+    /// False here, and the default matters: `setNativeCommands` is a no-op on a platform
+    /// that has no menu bar, and `MenuBar.updateCommands` calls it and RETURNS -- it draws
+    /// no soft buttons, because on a platform with a real menu bar drawing them too would
+    /// duplicate every command. So on a platform without one, asking for
+    /// `Display#COMMAND_BEHAVIOR_NATIVE` did not fall back to anything: the commands went to
+    /// a method that discards them and were never drawn at all. Silently, since nothing in
+    /// that path can tell "handled natively" from "dropped".
+    ///
+    /// That was latent until a theme asked for it. The desktop native themes declare
+    /// `commandBehavior: Native`, which is right for the platforms they model and which two
+    /// of the ports that will install them -- Windows and Linux -- cannot honour yet.
+    ///
+    /// A port overrides this to true when it really puts the commands somewhere the user can
+    /// reach them. Everything else keeps whatever Codename One draws itself.
+    ///
+    /// #### Returns
+    ///
+    /// true if this platform has a native menu bar
+    public boolean isNativeCommandsSupported() {
+        return false;
+    }
+
+    /// Runs a command the platform's native menu bar just reported, through the form that owns
+    /// it so the form-level routing is not skipped.
+    ///
+    /// `Command#actionPerformed` alone is not enough. `Form#dispatchCommand` calls it and then,
+    /// if the event was not consumed, runs the listeners registered with
+    /// `Form#addCommandListener`, an `actionCommand()` override and the pop guard. While the
+    /// Toolbar was still on screen the same command was reachable through it and the difference
+    /// did not show; a desktop native theme hides the Toolbar, which makes the native menu the
+    /// only route and the skipped routing simply stop happening.
+    ///
+    /// The owning form is resolved HERE, when the item is chosen, rather than when the menu was
+    /// published. Publishing happens from `MenuBar#addCommand`, which runs while a form is being
+    /// built and before `show()` makes it current -- so a form captured at that moment is the
+    /// PREVIOUS one, and showing the new form does not republish. At selection time the form
+    /// whose menu is on screen is simply the current one.
+    ///
+    /// Ownership is then confirmed rather than assumed: a command that the current form does not
+    /// carry -- a stale click during a transition, say -- is run directly rather than dispatched
+    /// through a form it does not belong to.
+    ///
+    /// #### Parameters
+    ///
+    /// - `cmd`: the command the native menu reported; ignored when null or disabled
+    protected void dispatchNativeMenuCommand(Command cmd) {
+        if (cmd == null) {
+            return;
+        }
+        if (!cmd.isEnabled()) {
+            // A disabled Command must not run because its menu item was clicked. The row format
+            // carries no enabled flag, so the native item is created enabled and stays
+            // clickable; greying it out as well needs another field and a matching change in
+            // every native parser. This is the half that prevents the damage.
+            return;
+        }
+        Form current = Display.getInstance().getCurrent();
+        ActionEvent ev = new ActionEvent(cmd);
+        if (current != null && formCarriesCommand(current, cmd)) {
+            current.dispatchCommand(cmd, ev);
+            return;
+        }
+        cmd.actionPerformed(ev);
+    }
+
+    /// True when the form lists this command, including as its back command.
+    ///
+    /// #### Parameters
+    ///
+    /// - `f`: the form to search
+    ///
+    /// - `cmd`: the command
+    ///
+    /// #### Returns
+    ///
+    /// true when the command belongs to the form
+    private static boolean formCarriesCommand(Form f, Command cmd) {
+        if (f.getBackCommand() == cmd) { //NOPMD CompareObjectsWithEquals
+            return true;
+        }
+        int count = f.getCommandCount();
+        for (int i = 0; i < count; i++) {
+            if (f.getCommand(i) == cmd) { //NOPMD CompareObjectsWithEquals
+                return true;
+            }
+        }
+        // getCommandCount covers the MenuBar, which is only part of what was published.
+        // Form.initComponentImpl publishes toolbar.getAllNativeMenuCommands() when the desktop
+        // chrome hides the Toolbar, and that set also carries the left bar, the right bar and
+        // the overflow -- the commands the Toolbar API actually recommends. Searching only the
+        // MenuBar therefore failed to recognise exactly those, and they fell through to the
+        // direct call this method exists to avoid.
+        com.codename1.ui.Toolbar tb = f.getToolbar();
+        if (tb != null) {
+            Vector published = tb.getAllNativeMenuCommands();
+            if (published != null && published.contains(cmd)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     /// Returns the desktop title-bar mode for this platform: one of {@code "native"} (OS title
     /// bar + native menu bar), {@code "custom"} (undecorated window where the CN1 Toolbar acts as
     /// the title bar) or {@code "toolbar"} (legacy in-app CN1 Toolbar). Returns {@code "toolbar"}
@@ -5004,6 +5109,24 @@ public abstract class CodenameOneImplementation {
     /// the desktop title-bar mode, never null
     public String getDesktopTitleBarMode() {
         return "toolbar";
+    }
+
+    /// The desktop title-bar mode this platform was explicitly asked for, or null when nobody
+    /// asked. Distinct from {@link #getDesktopTitleBarMode()}, which is documented to answer a
+    /// usable mode and therefore cannot express "unset" - it answers {@code "toolbar"} both for
+    /// a port with no opinion and for a project that deliberately chose the legacy look.
+    ///
+    /// That distinction is the whole point: it is what lets a native theme carry a
+    /// {@code desktopTitleBarMode} constant (Windows and macOS keep a system title bar and want
+    /// {@code native}; GNOME's HeaderBar IS the title bar and wants {@code custom}) without
+    /// overriding a project that set the build hint by hand. A build hint answers here; a theme
+    /// constant only gets consulted when this returns null.
+    ///
+    /// #### Returns
+    ///
+    /// the explicitly configured mode, or null when nothing configured one
+    public String getConfiguredDesktopTitleBarMode() {
+        return null;
     }
 
     /// Minimizes the native desktop window when the application draws its own (custom mode)
@@ -10782,6 +10905,23 @@ public abstract class CodenameOneImplementation {
                 commandBehavior = Display.COMMAND_BEHAVIOR_SOFTKEY;
             }
         }
+        if (commandBehavior == Display.COMMAND_BEHAVIOR_NATIVE && !isNativeCommandsSupported()) {
+            // Normalised here for the same reason BUTTON_BAR is normalised above: this is
+            // where a behaviour the platform cannot honour gets turned into one it can, and
+            // doing it here fixes every reader at once rather than each in turn.
+            //
+            // NATIVE is the one behaviour whose unsupported case is silent. MenuBar.
+            // updateCommands hands the commands to setNativeCommands and returns without
+            // drawing soft buttons -- correct where there is a real menu bar, since drawing
+            // them too would duplicate every command, and on a platform without one it means
+            // the commands go to a method that discards them and are never drawn at all.
+            // Nothing downstream can tell that from "the platform handled it".
+            //
+            // Latent until a theme asked for it, which the desktop native themes now do:
+            // they declare commandBehavior: Native, which is right for the platforms they
+            // model and which the Windows and Linux ports cannot honour yet.
+            commandBehavior = Display.COMMAND_BEHAVIOR_DEFAULT;
+        }
         this.commandBehavior = commandBehavior;
         notifyCommandBehavior(commandBehavior);
     }
@@ -13099,6 +13239,86 @@ public abstract class CodenameOneImplementation {
         byte[] out = new byte[bytes];
         secureRandomBytes(out);
         return out;
+    }
+
+    /// Derives key material from a password with PBKDF2, per RFC 8018.
+    ///
+    /// Used by [com.codename1.security.vault.KdfProfile], which is the portable password KDF
+    /// behind every vault envelope. The default returns `null`, meaning "no native derivation
+    /// here", and the caller falls back to a pure Java loop over HMAC that produces identical
+    /// bytes. Returning null rather than throwing is deliberate: a missing hook must degrade to
+    /// slow, never to a weaker derivation or a failure.
+    ///
+    /// A port SHOULD override this. Six hundred thousand iterations of software HMAC-SHA-256 is
+    /// seconds of a phone's time and considerably worse in a translated JavaScript worker, and
+    /// every platform Codename One targets has a native PBKDF2 a few lines away.
+    ///
+    /// #### Parameters
+    ///
+    /// - `hashAlgorithm`: the PRF hash, currently always `"SHA-256"`
+    ///
+    /// - `password`: the password bytes, already UTF-8 encoded by the caller. Implementations
+    ///   must not re-encode, normalise or null-terminate them: the derived bytes have to match
+    ///   every other port's exactly.
+    ///
+    /// - `salt`: the salt
+    ///
+    /// - `iterations`: the iteration count, already range-checked by the caller
+    ///
+    /// - `length`: how many bytes to derive
+    ///
+    /// #### Returns
+    ///
+    /// the derived bytes, or `null` when this port has no native derivation
+    ///
+    /// Do not conclude from a search for overrides of this method which ports derive
+    /// natively. Android, iOS and JavaSE override it in Java; the JavaScript port does not
+    /// and still derives through `crypto.subtle.deriveBits`, because it replaces THIS method
+    /// by native binding (`port.js`, alongside `aesEncrypt`, `rsaEncrypt`, `sign` and
+    /// `verify`) rather than by subclassing. A reviewer who greps for the signature sees
+    /// three ports and concludes the browser runs the portable fallback's 600,000 rounds in
+    /// translated JavaScript; it does not.
+    public byte[] pbkdf2(String hashAlgorithm, byte[] password, byte[] salt, int iterations, int length) {
+        return null;
+    }
+
+    /// One storage entry is definitely absent.
+    public static final int STORAGE_ENTRY_ABSENT = 0;
+
+    /// One storage entry is definitely present.
+    public static final int STORAGE_ENTRY_PRESENT = 1;
+
+    /// This port could not tell whether the entry is there.
+    public static final int STORAGE_ENTRY_UNKNOWN = 2;
+
+    /// Whether one storage entry exists, keeping "could not tell" distinct from "no".
+    ///
+    /// `storageFileExists` returns a boolean and therefore cannot express the third answer, so a
+    /// port that hits a transient backend failure has to report one of the two it has -- and
+    /// every port that catches reports `false`. The browser is the clearest case: a temporary
+    /// IndexedDB error becomes "this entry is not here", which for a vault's own metadata record
+    /// means "this device is not enrolled". An enrolment then follows, writing fresh metadata
+    /// under a NEW data key over a vault whose secrets were all sealed under the old one.
+    ///
+    /// The default derives the third state away, which is exactly right for every port whose
+    /// existence check cannot fail -- a file system stat either answers or throws. A port
+    /// overrides this only when its storage can fail in a way it can recognise.
+    public int storageEntryState(String name) {
+        return storageFileExists(name) ? STORAGE_ENTRY_PRESENT : STORAGE_ENTRY_ABSENT;
+    }
+
+    /// Returns the port-specific device protection used by
+    /// [com.codename1.security.vault.Vault] to remember an unlocked vault across restarts.
+    ///
+    /// Default implementation returns `null`, and the vault falls back to a portable
+    /// implementation that keeps a wrapping key in
+    /// [com.codename1.security.SecureStorage] -- which is the right answer on every port whose
+    /// secure storage is the OS key store. A port overrides this only when it can do better than
+    /// a key it can read back: the browser does, because a non-extractable `CryptoKey` in
+    /// IndexedDB can wrap and unwrap without the wrapping key ever existing as bytes the page can
+    /// touch.
+    public com.codename1.security.vault.spi.DeviceProtection getDeviceProtection() {
+        return null;
     }
 
     // -------------------------------------------------------------------

@@ -130,6 +130,28 @@ static NSDictionary *cn1hkTypeMap(void) {
                   forKey:@"heart_rate_variability_sdnn"];
             [m setObject:HKQuantityTypeIdentifierVO2Max forKey:@"vo2_max"];
         }
+        // RMSSD is new in iOS 27, and unlike every identifier above it the
+        // SYMBOL is absent from older SDKs -- so this needs a compile-time
+        // guard as well as the runtime one. The tree still builds with Xcode 26
+        // by default (scripts/lib/xcode.sh pins CN1_XCODE_MAJOR=26), and an
+        // unguarded reference would simply fail to compile there.
+        //
+        // Measured: __IPHONE_OS_VERSION_MAX_ALLOWED is 260200 for the Xcode 26.2
+        // SDKs and 270100 for the Xcode 27.1 SDKs, on device and simulator
+        // alike.
+        //
+        // The consequence is worth stating plainly: an application built with
+        // an Xcode older than 27 reports this type as unsupported even when it
+        // runs on iOS 27. That is the honest answer -- the binary genuinely has
+        // no reference to the identifier -- and the portable API already has a
+        // way to say it. Substituting SDNN would be worse: they are different
+        // statistics over the same intervals, not two spellings of one.
+#if defined(__IPHONE_OS_VERSION_MAX_ALLOWED) && __IPHONE_OS_VERSION_MAX_ALLOWED >= 270000
+        if (@available(iOS 27.0, *)) {
+            [m setObject:HKQuantityTypeIdentifierHeartRateVariabilityRMSSD
+                  forKey:@"heart_rate_variability_rmssd"];
+        }
+#endif
         map = [[NSDictionary dictionaryWithDictionary:m] retain];
     });
     return map;
@@ -170,7 +192,8 @@ static HKUnit *cn1hkUnit(NSString *portableId) {
     if ([portableId isEqualToString:@"body_temperature"]) {
         return [HKUnit degreeCelsiusUnit];
     }
-    if ([portableId isEqualToString:@"heart_rate_variability_sdnn"]) {
+    if ([portableId isEqualToString:@"heart_rate_variability_sdnn"]
+        || [portableId isEqualToString:@"heart_rate_variability_rmssd"]) {
         return [HKUnit secondUnitWithMetricPrefix:HKMetricPrefixMilli];
     }
     if ([portableId isEqualToString:@"oxygen_saturation"]
@@ -218,7 +241,8 @@ static NSString *cn1hkUnitSymbol(NSString *portableId) {
     if ([portableId isEqualToString:@"body_temperature"]) {
         return @"degC";
     }
-    if ([portableId isEqualToString:@"heart_rate_variability_sdnn"]) {
+    if ([portableId isEqualToString:@"heart_rate_variability_sdnn"]
+        || [portableId isEqualToString:@"heart_rate_variability_rmssd"]) {
         return @"ms";
     }
     if ([portableId isEqualToString:@"oxygen_saturation"]

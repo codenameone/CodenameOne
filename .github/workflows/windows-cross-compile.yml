@@ -128,7 +128,9 @@ jobs:
             # and this step does not set pipefail. Reading the wrong one would make every
             # attempt look successful, which is the opposite failure to the one being
             # fixed and would hide everything.
-            JAVA_HOME="$JDK_8_HOME" mvn -B -pl windows -am -DskipTests \
+            # Recheck missing releases after a transient repository error instead of
+            # replaying Maven's cached resolution failure on every retry.
+            JAVA_HOME="$JDK_8_HOME" mvn -B -U -pl windows -am -DskipTests \
                  '-Dmaven.javadoc.skip=true' '-Plocal-dev-javase' $goal 2>&1 \
                  | tee /tmp/windows-cross-build.log
             status=${PIPESTATUS[0]}

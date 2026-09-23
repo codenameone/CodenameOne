@@ -28,6 +28,9 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
+import org.junit.jupiter.api.extension.ExtensionContext;
+import org.junit.jupiter.api.extension.RegisterExtension;
+import org.junit.jupiter.api.extension.TestWatcher;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -37,11 +40,12 @@ import java.net.Socket;
 import java.net.InetSocketAddress;
 import java.net.ServerSocket;
 import java.nio.charset.StandardCharsets;
+import java.security.KeyStore;
+import java.security.cert.CertificateFactory;
 import java.security.cert.X509Certificate;
 import javax.net.ssl.SSLContext;
+import javax.net.ssl.TrustManagerFactory;
 import javax.net.ssl.SSLSocket;
-import javax.net.ssl.TrustManager;
-import javax.net.ssl.X509TrustManager;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -94,6 +98,75 @@ class BackendHttpIntegrationTest {
     private static Path work;
     private static String skipReason;
 
+    /**
+     * On a failure, say what each server process said and whether it is still
+     * alive.
+     *
+     * Every server here already redirects its combined output to a file and
+     * nothing ever read one back, so an intermittent failure arrived as
+     * "expected: <200> but was: <-1>" and nothing else. That does not
+     * distinguish the three answers that matter -- the server refused the
+     * request, the server never saw it, or the server is gone -- and without
+     * the distinction there is nothing to debug from. Two CI runs were lost to
+     * exactly that: an upload answered with an empty reply in 20ms, twice, with
+     * no way to tell whether a connection was dropped or a process had died.
+     *
+     * A watcher rather than a message on each assertion, because the next
+     * occurrence will not be in a test that was thought to need one.
+     */
+    @RegisterExtension
+    static final TestWatcher SERVER_DIAGNOSTICS = new TestWatcher() {
+        @Override
+        public void testFailed(ExtensionContext context, Throwable cause) {
+            dumpServerDiagnostics(context.getDisplayName());
+        }
+    };
+
+    private static void dumpServerDiagnostics(String test) {
+        if (work == null) {
+            return;
+        }
+        System.err.println("---- backend servers after the failure of: " + test + " ----");
+        dumpServer("main", server, work.resolve("server.log"));
+        dumpServer("tls", tlsServer, work.resolve("tls-server.log"));
+        dumpServer("busy", busyServer, work.resolve("busy-server.log"));
+        dumpServer("small-upload", smallUploadServer, smallUploadLog);
+    }
+
+    /** The last few lines are the useful part; a healthy server logs once at startup. */
+    private static void dumpServer(String name, Process process, Path log) {
+        String state;
+        if (process == null) {
+            state = "never started";
+        } else if (process.isAlive()) {
+            state = "alive";
+        } else {
+            state = "EXITED with " + process.exitValue();
+        }
+        System.err.println("[" + name + "] " + state);
+        if (log == null || !Files.exists(log)) {
+            System.err.println("[" + name + "] no log file");
+            return;
+        }
+        try {
+            // Decoded leniently and split by hand: this is a native process's
+            // combined output, so a partial write can leave bytes that are not
+            // valid UTF-8, and a diagnostic that throws while reporting a failure
+            // replaces the failure it was meant to explain.
+            String text = new String(Files.readAllBytes(log), StandardCharsets.UTF_8);
+            String[] lines = text.split("\n");
+            int from = Math.max(0, lines.length - 40);
+            if (from > 0) {
+                System.err.println("[" + name + "] ... " + from + " earlier line(s) omitted");
+            }
+            for (int i = from; i < lines.length; i++) {
+                System.err.println("[" + name + "] " + lines[i]);
+            }
+        } catch (IOException err) {
+            System.err.println("[" + name + "] log could not be read: " + err);
+        }
+    }
+
     @BeforeAll
     void startServer() throws Exception {
         if (CompilerHelper.isWindows()) {
@@ -140,8 +213,9 @@ class BackendHttpIntegrationTest {
         build.environment().put("CN1_BACKEND_DEMO", "demo/petserver");
         build.redirectErrorStream(true);
         Process p = build.start();
-        String buildLog = readFully(p.getInputStream());
-        boolean built = p.waitFor(20, TimeUnit.MINUTES) && p.exitValue() == 0
+        boolean[] timedOut = new boolean[1];
+        String buildLog = BackendTestSupport.awaitOutput(p, 20, TimeUnit.MINUTES, timedOut);
+        boolean built = !timedOut[0] && p.exitValue() == 0
                 && Files.isExecutable(binary);
         if (!built) {
             String tail = buildLog.length() > 3000
@@ -910,6 +984,118 @@ class BackendHttpIntegrationTest {
         } finally {
             socket.close();
         }
+    }
+
+    /**
+     * A descriptor number handed to a new connection must not be cleaned up by the
+     * old one that just let it go.
+     *
+     * A connection closes itself: drop() runs inside its virtual thread, before the
+     * thread returns to advance(). The kernel can hand that descriptor NUMBER to
+     * accept() the instant it is closed, and host 0 accepts while every other host
+     * is running its own virtual threads -- so by the time advance() cleared "its"
+     * per-descriptor slots, they could already belong to a connection that had been
+     * accepted since, on that same host. What got cleared was the arm flag, and the
+     * next time the new connection parked it was added to an epoll set that already
+     * held the descriptor: EEXIST, an IOException, and a connection dropped with no
+     * response at all.
+     *
+     * That is an empty reply to a valid request, which is how it was seen -- as
+     * "expected: <200> but was: <-1>" from the split-body test below, intermittently,
+     * on Linux only. Only on Linux because kqueue's EV_ADD re-creates a filter that
+     * already exists rather than refusing it, so the same mis-cleared flag heals
+     * itself on macOS and the development loop never saw this.
+     *
+     * The shape of the test is churn (short connections closing constantly, so
+     * descriptor numbers are recycled) around a request that has to PARK: the head
+     * arrives, then a gap, then the body. A request answered from bytes that are
+     * already buffered never parks and never reaches the re-arm.
+     *
+     * Honest about what it is: the window is the kernel's, so this catches a
+     * regression probabilistically rather than every time -- against an unfixed
+     * server with the window widened by 1ms it was 26 failures in 294 requests, and
+     * unwidened it is rarer. It cannot report a FALSE failure though, which is the
+     * property that matters: every assertion here is something a correct server
+     * never does.
+     */
+    @Test
+    @DisplayName("a recycled descriptor is not cleaned up by the connection that released it")
+    void aRecycledDescriptorKeepsItsNewConnection() throws Exception {
+        final long until = System.currentTimeMillis() + 15000;
+        final byte[] small = ("[\"" + repeat('a', 1024) + "\"]").getBytes(StandardCharsets.UTF_8);
+        Thread[] churn = new Thread[16];
+        for (int i = 0; i < churn.length; i++) {
+            churn[i] = new Thread(new Runnable() {
+                public void run() {
+                    while (System.currentTimeMillis() < until) {
+                        try {
+                            // Connection: close, so each one ends in a drop() from
+                            // inside its own virtual thread -- which is the moment
+                            // the descriptor number becomes available again.
+                            rawOn(port, "POST /echo HTTP/1.1\r\nHost: x\r\n"
+                                    + "Content-Type: application/json\r\nContent-Length: "
+                                    + small.length + "\r\nConnection: close\r\n\r\n", small);
+                        } catch (Exception ignored) {
+                            // A churn connection losing a race is not the subject;
+                            // the probe below is.
+                        }
+                    }
+                }
+            });
+            churn[i].start();
+        }
+
+        int answered = 0;
+        StringBuilder failures = new StringBuilder();
+        byte[] body = ("[\"" + repeat('a', 4096) + "\"]").getBytes(StandardCharsets.UTF_8);
+        try {
+            while (System.currentTimeMillis() < until) {
+                Socket socket = new Socket();
+                socket.connect(new InetSocketAddress("127.0.0.1", port), 5000);
+                socket.setSoTimeout(20000);
+                try {
+                    OutputStream out = socket.getOutputStream();
+                    out.write(("POST /echo HTTP/1.1\r\nHost: x\r\nContent-Type: application/json\r\n"
+                            + "Content-Length: " + body.length + "\r\nConnection: close\r\n\r\n")
+                            .getBytes(StandardCharsets.UTF_8));
+                    out.flush();
+                    // Long enough that the head is parsed and the virtual thread is
+                    // parked on the body when the churn recycles descriptors.
+                    Thread.sleep(50);
+                    out.write(body);
+                    out.flush();
+                    byte[] response = readFullyBytes(socket.getInputStream());
+                    answered++;
+                    if (status(response) != 200) {
+                        failures.append("\n  request ").append(answered).append(" answered ")
+                                .append(status(response)).append(" in ")
+                                .append(response.length).append(" byte(s)");
+                    }
+                } finally {
+                    socket.close();
+                }
+            }
+        } finally {
+            for (int i = 0; i < churn.length; i++) {
+                churn[i].join(30000);
+            }
+        }
+
+        assertTrue(answered > 0, "the probe never completed a request");
+        assertEquals(0, failures.length(),
+                "a parked request was dropped while descriptors were being recycled:"
+                        + failures);
+
+        // The drop is silent from the client's side -- an empty reply and nothing
+        // else -- so the server's own report is the second half of this. An empty
+        // response could also be a server that died; this line is what tells the
+        // two apart, and it is the message that was missing when this cost two CI
+        // runs to diagnose.
+        String log = new String(Files.readAllBytes(work.resolve("server.log")),
+                StandardCharsets.UTF_8);
+        assertEquals(-1, log.indexOf("could not re-arm fd="),
+                "the server re-armed a descriptor that was already in its poller, "
+                        + "which means a connection was dropped without a response:\n" + log);
     }
 
     private static String repeat(char c, int count) {
@@ -1699,12 +1885,37 @@ class BackendHttpIntegrationTest {
     private SSLSocket openTls() throws Exception {
         Assumptions.assumeTrue(tlsServer != null && tlsPort != 0,
                 "no TLS server (openssl unavailable, or it did not start)");
+        // PINNED to the certificate startTlsServer just generated, rather than a
+        // TrustManager whose check methods are empty.
+        //
+        // The empty one was here first and it verifies nothing at all -- including
+        // that the server presented the certificate it was configured with, which
+        // is the one thing a TLS test is in a position to assert. It is also the
+        // shape every "disable certificate checking" answer on the internet has,
+        // so it is worth not leaving a copy of it in this repository to be found
+        // and pasted somewhere it is not a throwaway localhost socket. CodeQL
+        // agrees and flags it as a high-severity alert.
+        //
+        // Path validation only: these sockets connect to 127.0.0.1 while the
+        // certificate names localhost, and a raw SSLSocket does no hostname check
+        // unless one is asked for. Pinning the self-signed certificate as a trust
+        // anchor is exactly the assertion that fits.
+        X509Certificate pinned;
+        InputStream certBytes = Files.newInputStream(work.resolve("cert.pem"));
+        try {
+            pinned = (X509Certificate) CertificateFactory.getInstance("X.509")
+                    .generateCertificate(certBytes);
+        } finally {
+            certBytes.close();
+        }
+        KeyStore anchors = KeyStore.getInstance(KeyStore.getDefaultType());
+        anchors.load(null, null);
+        anchors.setCertificateEntry("backend", pinned);
+        TrustManagerFactory trust = TrustManagerFactory.getInstance(
+                TrustManagerFactory.getDefaultAlgorithm());
+        trust.init(anchors);
         SSLContext context = SSLContext.getInstance("TLS");
-        context.init(null, new TrustManager[]{ new X509TrustManager() {
-            public void checkClientTrusted(X509Certificate[] chain, String authType) { }
-            public void checkServerTrusted(X509Certificate[] chain, String authType) { }
-            public X509Certificate[] getAcceptedIssuers() { return new X509Certificate[0]; }
-        } }, null);
+        context.init(null, trust.getTrustManagers(), null);
         SSLSocket socket = (SSLSocket) context.getSocketFactory()
                 .createSocket("127.0.0.1", tlsPort);
         socket.setSoTimeout(20000);

@@ -134,12 +134,22 @@ class ResultTokenizer {
             if (stack == 0) {
                 pos = i;
                 predicate = false;
-                break;
-            } else {
-                sbuf.append(ch);
+                return sbuf.toString();
             }
+            sbuf.append(ch);
         }
-        return sbuf.toString();
+        // Ran out of expression with the bracket still open. Falling out of
+        // the loop left pos where it was and predicate still set, so tokenize()
+        // called next() again, which called this again from the same position,
+        // appended the same tail again, and never terminated: the process died
+        // with an OutOfMemoryError rather than reporting anything. It is
+        // reachable from a well-formed expression, because a predicate holding
+        // a nested one is split at its comparator before it is tokenized and
+        // the left side then carries an unmatched '['.
+        pos = length;
+        predicate = false;
+        throw new IllegalArgumentException(
+                "Syntax error: unclosed predicate in: " + expression);
     }
 
     private String next() {

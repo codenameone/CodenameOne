@@ -709,14 +709,14 @@ public class MacOSBuildHints {
      * Which native theme the generated stub installs, as
      * IOSImplementation.setIosMode() takes it.
      *
-     * <p>{@code modern} by DEFAULT, which is where macOS parts company with iOS.
+     * <p>{@code aqua} by DEFAULT, which is where macOS parts company with iOS.
      * iOS defaults to {@code auto} and therefore to the legacy iOS 7 theme
      * deliberately, so that existing applications and their screenshot goldens
      * are not disturbed. This port has neither: it has never shipped, so there
-     * is nothing to disturb, and defaulting it to a pre-flat iOS theme would
-     * give a brand new macOS port an iPhone 7 look and -- because iOS7Theme.res
-     * carries no $Dark styles at all -- no dark mode whatsoever, however
-     * carefully the application asks for one.</p>
+     * is nothing to disturb, and defaulting it to an iOS theme of any generation
+     * would give a macOS application an iPhone design language -- which is what
+     * it did until this change, because the Aqua theme's own flip was deferred
+     * until its screenshot baselines could be reseeded alongside it.</p>
      *
      * <p>{@code macos.themeMode} names it directly, the legacy macNative.
      * spelling is accepted like every other setting here, and the cross platform
@@ -726,8 +726,31 @@ public class MacOSBuildHints {
     public String getThemeMode() {
         String mode = hint(source, "themeMode", null);
         if (mode == null) {
+            // Aqua by default on macOS, which is where this target parts company with iOS.
+            // iOS keeps its legacy theme so applications already shipped, and their
+            // screenshot baselines, keep rendering as before; this port has no such
+            // history with an Aqua theme, and defaulting to "modern" put an iPhone design
+            // language on a desktop. The cross-platform `nativeTheme` hint is still
+            // honoured, with `legacy` mapping to ios7.
             String shared = source.get("nativeTheme", source.get("cn1.nativeTheme", null));
-            mode = "legacy".equalsIgnoreCase(shared) ? "ios7" : "modern";
+            if ("legacy".equalsIgnoreCase(shared)) {
+                mode = "ios7";
+            } else if (shared != null) {
+                // An explicit cross-platform request is honoured as written. Only the
+                // UNSET case changes to aqua: someone who asked for `nativeTheme=modern`
+                // asked for the modern iOS look and still gets it.
+                mode = shared;
+            } else {
+                // Aqua. This port had been defaulting to the modern iOS theme, which is an
+                // iPhone design language on a Mac -- and which it only ever did because the
+                // flip restyles every screen and reseeds this port's committed screenshot
+                // baselines. Those are reseeded in this same change, from the CI runner that
+                // captures them, which is what the deferral was waiting for.
+                //
+                // macos.themeMode still names any of the others explicitly, including
+                // "modern" for an application that wants the iOS look on a Mac.
+                mode = "aqua";
+            }
         }
         // Interpolated into generated Java source, so it is constrained to the
         // vocabulary the runtime understands rather than passed through. A hint
@@ -738,11 +761,17 @@ public class MacOSBuildHints {
                 return THEME_MODES[iter];
             }
         }
+        // A value the whitelist rejects behaves as if the hint were unset.
         return "modern";
     }
 
     /// Every value IOSImplementation.installNativeTheme() acts on.
     private static final String[] THEME_MODES = {
+        // aqua / native select the macOS theme. Without them in this list the documented
+        // macos.themeMode=aqua was sanitized to "modern" and reached
+        // MacImplementation.nativeThemeResourceName() as a value it answers null for, so
+        // the Aqua theme could not be selected at all -- by a hint or by default.
+        "aqua", "native",
         "modern", "liquid", "material", "ios7", "flat", "auto",
     };
 

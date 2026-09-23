@@ -46,6 +46,9 @@
 extern "C" {
 #endif
 
+/* Shared source decoding for main and secondary window pointer events. */
+int cn1LinuxPointerSourceFlag(GdkEvent* event);
+
 /*
  * A drawing target: a Cairo context over a backing image surface. The on-screen
  * window target and every mutable/offscreen image share this struct, so all the

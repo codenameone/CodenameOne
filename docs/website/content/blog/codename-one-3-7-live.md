@@ -61,7 +61,7 @@ In addition to that we made numerous enhancements to the UX of the GUI builder f
 
   * **Terse Syntax** – New [CN API](/blog/static-global-context.html) allows developers to write more concise code, new helper API’s such as `addAll` & a jquery style [component selector](/blog/jquery-css-style-selectors-for-cn1.html)
 
-  * **Security Oriented API’s** – New API’s for detecting certificates on https servers as well as API’s for touch ID, jailbreak detection and [more](/manual/security.html)
+  * **Security Oriented API’s** – New API’s for detecting certificates on https servers as well as API’s for touch ID, jailbreak detection and [more](/developer-guide/security/)
 
   * **Thread Helper & Threadsafe SQLite API’s** – A new API for communicating with threads & a new [threadsafe wrapper for sqlite](/blog/threadsafe-sqlite.html)
 

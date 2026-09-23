@@ -39,8 +39,7 @@ import java.util.Calendar;
  * family, generates the per-channel {@code .entitlements} plists, the
  * {@code ExportOptions-AppStore-Mac.plist} / {@code ExportOptions-
  * DeveloperID-Mac.plist} archive-export plists, the Mac iconset under
- * {@code Images.xcassets/Mac.appiconset/}, the GLKit / OpenGL ES stub
- * headers used by the Mac Catalyst slice, and finally a Ruby
+ * {@code Images.xcassets/Mac.appiconset/}, and finally a Ruby
  * {@code xcodeproj}-based script that injects the {@code
  * SUPPORTS_MACCATALYST=YES} family of build settings plus the
  * {@code DEAD_CODE_STRIPPING / EXCLUDED_SOURCE_FILE_NAMES} workarounds
@@ -114,9 +113,8 @@ class MacNativeBuilder {
 
     /**
      * Parse the {@code macNative.*} hint family off the request and
-     * stash the values for later. Caller is expected to flip {@code
-     * useMetal=true} and update the minimum deployment target since
-     * Catalyst won't link OpenGL ES.
+     * stash the values for later. Caller is expected to raise the minimum
+     * deployment target to the Catalyst floor.
      */
     void parseHints(BuildRequest request) {
         enabled = "true".equals(request.getArg("macNative.enabled", "false"));
@@ -295,7 +293,7 @@ class MacNativeBuilder {
     String parparvmOptionalFrameworksArg() {
         return "-Doptional.frameworks=AddressBookUI.framework;"
                 + "AddressBook.framework;MessageUI.framework;"
-                + "MediaPlayer.framework;GLKit.framework;OpenGLES.framework;"
+                + "MediaPlayer.framework;"
                 // ARKit world tracking is unavailable on the Mac slice; linked
                 // on iOS when the app references com.codename1.ar.
                 + "ARKit.framework";
@@ -586,86 +584,12 @@ class MacNativeBuilder {
     }
 
     /**
-     * Stub headers for GLKit and OpenGL ES, used only by the Mac
-     * Catalyst slice via {@code HEADER_SEARCH_PATHS[sdk=macosx*]}.
-     * These satisfy the umbrella {@code #import} lines in the iOS-port
-     * headers ({@code GLViewController.h}, {@code EAGLView.h},
-     * {@code CN1ES2compat.h}, etc.) so the project compiles for Mac.
-     * Real GL calls are preprocessed out by {@code #ifdef CN1_USE_METAL}
-     * or in {@code EXCLUDED_SOURCE_FILE_NAMES}-excluded .m files.
-     */
-    void writeStubHeaders(File appSrcDir) throws IOException {
-        File stubsDir = new File(appSrcDir, "macCatalystStubs");
-        File openGLES = new File(stubsDir, "OpenGLES");
-        File openGLESes1 = new File(openGLES, "ES1");
-        File openGLESes2 = new File(openGLES, "ES2");
-        File glkit = new File(stubsDir, "GLKit");
-        openGLESes1.mkdirs();
-        openGLESes2.mkdirs();
-        glkit.mkdirs();
-        writeStub(new File(openGLES, "EAGL.h"),
-                "#ifndef CN1_MAC_CATALYST_STUB_EAGL_H\n"
-                + "#define CN1_MAC_CATALYST_STUB_EAGL_H\n"
-                + "#import <Foundation/Foundation.h>\n"
-                + "@interface EAGLContext : NSObject @end\n"
-                + "typedef enum { kEAGLRenderingAPIOpenGLES1 = 1,"
-                + " kEAGLRenderingAPIOpenGLES2 = 2,"
-                + " kEAGLRenderingAPIOpenGLES3 = 3 } EAGLRenderingAPI;\n"
-                + "#endif\n");
-        String glTypes =
-                "#ifndef CN1_MAC_CATALYST_STUB_GLES_TYPES\n"
-                + "#define CN1_MAC_CATALYST_STUB_GLES_TYPES\n"
-                + "typedef unsigned int   GLenum;\n"
-                + "typedef unsigned int   GLuint;\n"
-                + "typedef int            GLint;\n"
-                + "typedef int            GLsizei;\n"
-                + "typedef float          GLfloat;\n"
-                + "typedef float          GLclampf;\n"
-                + "typedef unsigned char  GLubyte;\n"
-                + "typedef unsigned char  GLboolean;\n"
-                + "typedef void           GLvoid;\n"
-                + "typedef signed char    GLbyte;\n"
-                + "typedef short          GLshort;\n"
-                + "typedef unsigned short GLushort;\n"
-                + "typedef int            GLfixed;\n"
-                + "typedef unsigned int   GLbitfield;\n"
-                + "typedef long           GLintptr;\n"
-                + "typedef long           GLsizeiptr;\n"
-                + "#endif\n";
-        writeStub(new File(openGLESes1, "gl.h"), glTypes);
-        writeStub(new File(openGLESes1, "glext.h"), "");
-        writeStub(new File(openGLESes2, "gl.h"), glTypes);
-        writeStub(new File(openGLESes2, "glext.h"), "");
-        writeStub(new File(glkit, "GLKit.h"),
-                "#ifndef CN1_MAC_CATALYST_STUB_GLKIT_H\n"
-                + "#define CN1_MAC_CATALYST_STUB_GLKIT_H\n"
-                + "#import <Foundation/Foundation.h>\n"
-                + "#import <OpenGLES/ES2/gl.h>\n"
-                + "typedef struct { float m[16]; } GLKMatrix4;\n"
-                + "typedef struct { float v[4];  } GLKVector4;\n"
-                + "typedef struct { float v[3];  } GLKVector3;\n"
-                + "typedef struct { float v[2];  } GLKVector2;\n"
-                + "@interface GLKView : NSObject @end\n"
-                + "@interface GLKBaseEffect : NSObject @end\n"
-                + "@interface GLKTextureLoader : NSObject @end\n"
-                + "@interface GLKTextureInfo : NSObject @end\n"
-                + "#endif\n");
-        owner.log("Wrote Mac Catalyst stub headers under " + stubsDir.getAbsolutePath());
-    }
-
-    private static void writeStub(File f, String content) throws IOException {
-        try (Writer w = new OutputStreamWriter(Files.newOutputStream(f.toPath()), StandardCharsets.UTF_8)) {
-            w.write(content);
-        }
-    }
-
-    /**
      * Patch the generated {@code project.pbxproj} via Ruby + the
      * {@code xcodeproj} gem so the app target gains {@code
      * SUPPORTS_MACCATALYST=YES}, the right deployment targets, the
      * signing wiring per channel, and the workarounds needed for the
      * Catalyst slice (excluded GL-only sources, stub-header search
-     * path, OpenGLES iOS-only re-link, etc.).
+     * path, etc.).
      */
     void applyXcodeSettings(BuildRequest request, File tmpFile, String buildVersion)
             throws BuildException {
@@ -751,54 +675,29 @@ class MacNativeBuilder {
                         .append(IPhoneBuilder.escapeRubyStr(signingIdentityAppStore)).append("'\n");
             }
         }
-        // OpenGL ES backbone files have no Mac Catalyst equivalent (GLKit /
-        // OpenGLES headers are missing from recent macOS SDKs). Exclude them
-        // from the Mac slice via EXCLUDED_SOURCE_FILE_NAMES so the build
-        // compiles. The rendering-op .m files have internal #ifdef CN1_USE_METAL
-        // guards that route to the Metal path on Mac.
-        // All four iOS XIBs trigger an IBAgent-macOS-UIKit internal error
+        // The iOS XIBs trigger an IBAgent-macOS-UIKit internal error
         // when compiled for the Mac slice (observed on Xcode 26.x).
         // CodenameOne_GLAppDelegate.m has a TARGET_OS_MACCATALYST branch
         // that passes nil to initWithNibName: on Mac, so the runtime never
         // tries to load these NIBs by name and excluding them at compile
         // time is safe. The iOS slice keeps loading them normally.
         s.append("  bs['EXCLUDED_SOURCE_FILE_NAMES[sdk=macosx*]'] = ")
-                .append("'CN1ES2compat.m CN1ES1compat.m EAGLView.m ")
-                .append("CodenameOne_GLViewController.xib MainWindow.xib ")
-                .append("CodenameOne_METALViewController.xib MainWindowMETAL.xib'\n");
-        // Header search path stubs for the Mac slice: the iOS port ships an
-        // umbrella set of empty/stub GLKit and OpenGLES headers under
-        // macCatalystStubs/.
-        s.append("  bs['HEADER_SEARCH_PATHS[sdk=macosx*]'] = ")
-                .append("'$(inherited) $(SRCROOT)/").append(IPhoneBuilder.escapeRubyStr(mainClass))
-                .append("-src/macCatalystStubs'\n");
+                .append("'CodenameOne_GLViewController.xib ")
+                .append("CodenameOne_METALViewController.xib'\n");
         s.append("end\n");
-        // OpenGLES.framework is absent from the macOS SDK. Drop the
-        // OpenGLES build-file entry from the unconditional Frameworks phase
-        // and re-add it only for the iOS slice via OTHER_LDFLAGS[sdk=iphoneos*].
-        // GLKit stays in the build phase but is marked Weak so any genuinely-
-        // absent symbol surfaces at runtime, not link.
         s.append("removed_refs = []\n");
         s.append("target.frameworks_build_phase.files.to_a.each do |bf|\n")
                 .append("  ref = bf.file_ref\n")
                 .append("  next unless ref && ref.path\n")
                 .append("  base = File.basename(ref.path)\n")
-                .append("  if base == 'OpenGLES.framework'\n")
-                .append("    removed_refs << ref\n")
-                .append("    bf.remove_from_project\n")
-                .append("  elsif base == 'WatchConnectivity.framework'\n")
+                .append("  if base == 'WatchConnectivity.framework'\n")
                 // WatchConnectivity does not exist on Mac Catalyst -- CN1WatchConnectivity.h
                 // already compiles its code out there via !TARGET_OS_MACCATALYST -- but the
                 // framework REFERENCE stayed in the shared phase, so the Catalyst slice linked
-                // against something the macOS SDK does not ship. Same treatment as OpenGLES:
-                // out of the unconditional phase, back in for the iOS SDKs below.
+                // against something the macOS SDK does not ship: out of the unconditional
+                // phase, back in for the iOS SDKs below.
                 .append("    removed_refs << ref\n")
                 .append("    bf.remove_from_project\n")
-                .append("  elsif base == 'GLKit.framework'\n")
-                .append("    bf.settings ||= {}\n")
-                .append("    attrs = (bf.settings['ATTRIBUTES'] || []).dup\n")
-                .append("    attrs << 'Weak' unless attrs.include?('Weak')\n")
-                .append("    bf.settings['ATTRIBUTES'] = attrs\n")
                 .append("  end\n")
                 .append("end\n");
         // Force DEAD_CODE_STRIPPING=YES for the Mac slice. The iOS port
@@ -809,18 +708,14 @@ class MacNativeBuilder {
         // in Debug, so those refs surface as link errors without this flag.
         s.append("target.build_configurations.each do |config|\n")
                 .append("  bs = config.build_settings\n")
-                .append("  existing = bs['OTHER_LDFLAGS[sdk=iphoneos*]'] || '$(inherited)'\n")
-                .append("  bs['OTHER_LDFLAGS[sdk=iphoneos*]'] = existing + ' -framework OpenGLES'\n")
-                .append("  existing_sim = bs['OTHER_LDFLAGS[sdk=iphonesimulator*]'] || '$(inherited)'\n")
-                .append("  bs['OTHER_LDFLAGS[sdk=iphonesimulator*]'] = existing_sim + ' -framework OpenGLES'\n")
                 // Only when the app actually uses the wearable API, so a project that does not
                 // link nothing extra -- and unconditionally safe either way, since the flag is
                 // scoped to the iOS SDKs the framework exists on.
                 .append(owner.usesWearable()
-                        ? "  bs['OTHER_LDFLAGS[sdk=iphoneos*]'] = "
-                                + "bs['OTHER_LDFLAGS[sdk=iphoneos*]'] + ' -framework WatchConnectivity'\n"
-                                + "  bs['OTHER_LDFLAGS[sdk=iphonesimulator*]'] = "
-                                + "bs['OTHER_LDFLAGS[sdk=iphonesimulator*]'] + ' -framework WatchConnectivity'\n"
+                        ? "  existing = bs['OTHER_LDFLAGS[sdk=iphoneos*]'] || '$(inherited)'\n"
+                                + "  bs['OTHER_LDFLAGS[sdk=iphoneos*]'] = existing + ' -framework WatchConnectivity'\n"
+                                + "  existing_sim = bs['OTHER_LDFLAGS[sdk=iphonesimulator*]'] || '$(inherited)'\n"
+                                + "  bs['OTHER_LDFLAGS[sdk=iphonesimulator*]'] = existing_sim + ' -framework WatchConnectivity'\n"
                         : "")
                 .append("  bs['DEAD_CODE_STRIPPING[sdk=macosx*]'] = 'YES'\n")
                 .append("end\n");

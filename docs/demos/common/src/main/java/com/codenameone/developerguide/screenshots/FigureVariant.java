@@ -33,12 +33,19 @@ public final class FigureVariant {
     private final GuideFigure figure;
     private final FigureDevice device;
     private final boolean darkMode;
+    private final boolean landscape;
     private final String fileName;
 
     public FigureVariant(GuideFigure figure, FigureDevice device, boolean darkMode, String fileName) {
+        this(figure, device, darkMode, false, fileName);
+    }
+
+    public FigureVariant(GuideFigure figure, FigureDevice device, boolean darkMode, boolean landscape,
+            String fileName) {
         this.figure = figure;
         this.device = device;
         this.darkMode = darkMode;
+        this.landscape = landscape;
         this.fileName = fileName;
     }
 
@@ -52,6 +59,27 @@ public final class FigureVariant {
 
     public boolean darkMode() {
         return darkMode;
+    }
+
+    /// Whether this figure is rendered with the device turned on its side.
+    ///
+    /// The orientation rides on the variant rather than being a device of its
+    /// own, because a landscape profile would mean another JVM per run -- the
+    /// density and retina properties are static and read at construction -- and
+    /// another execution in two poms plus a workflow step, all for the two
+    /// figures in the guide whose subject needs the wider screen.
+    public boolean landscape() {
+        return landscape;
+    }
+
+    /// Width this variant renders at, which is the device's height when it is
+    /// turned on its side.
+    public int width() {
+        return landscape ? device.height() : device.width();
+    }
+
+    public int height() {
+        return landscape ? device.width() : device.height();
     }
 
     /// File name written into the output directory, including the extension.

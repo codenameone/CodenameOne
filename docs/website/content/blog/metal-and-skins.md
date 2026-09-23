@@ -151,7 +151,7 @@ Apple-iPhone-16-Pro.skin/
   skin.properties     # platform metadata, safe-area, PPI, display rect
 ```
 
-The full developer-guide chapter at [Skin-Designer.asciidoc](https://github.com/codenameone/CodenameOne/blob/master/docs/developer-guide/Skin-Designer.asciidoc) walks through every stage with annotated screenshots and documents the `skin.properties` keys the wizard writes (`roundScreen`, `displayX/Y/Width/Height`, `safePortrait*`, `safeLandscape*`, `overrideNames`, system font families, PPI, and pixel ratio).
+The full developer-guide chapter at [Skin-Designer.asciidoc](/developer-guide/skin-designer/) walks through every stage with annotated screenshots and documents the `skin.properties` keys the wizard writes (`roundScreen`, `displayX/Y/Width/Height`, `safePortrait*`, `safeLandscape*`, `overrideNames`, system font families, PPI, and pixel ratio).
 
 ### Eating our own dog food
 

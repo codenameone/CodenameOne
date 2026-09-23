@@ -36,18 +36,16 @@ import java.nio.charset.StandardCharsets;
  *
  * <p>Unlike the Apple Watch port (which has no UIKit / Metal and therefore ships
  * a dedicated Core Graphics backend), tvOS is much closer to iOS: it has UIKit,
- * UIView, {@code UIApplicationMain} and Metal -- it simply lacks OpenGL ES /
- * GLKit. tvOS is therefore handled exactly like the Mac Catalyst slice
- * ({@link MacNativeBuilder}): the build runs with {@code CN1_USE_METAL} (the
- * iOS default), the OpenGL-only source files are excluded, GLKit / OpenGLES
- * umbrella imports resolve to stub headers, and the absent frameworks are
- * weak-linked. The shared {@code UIApplicationMain} entry, the Metal view
- * controller and the UIKit peers are reused as-is.
+ * UIView, {@code UIApplicationMain} and Metal. tvOS is therefore handled exactly
+ * like the Mac Catalyst slice ({@link MacNativeBuilder}): the build runs with
+ * {@code CN1_USE_METAL} and the frameworks tvOS lacks are weak-linked. The
+ * shared {@code UIApplicationMain} entry, the Metal view controller and the
+ * UIKit peers are reused as-is.
  *
  * <p>Because tvOS uses a different SDK ({@code appletvos}) it cannot be a
  * variant of the {@code iphoneos} app target the way Mac Catalyst is; so -- like
  * the watch builder -- this delegate <b>adds a second Xcode target</b> that
- * compiles the same ParparVM-generated sources (minus the GL-only files) for
+ * compiles the same ParparVM-generated sources for
  * tvOS. Every change is additive: with the hint off the iOS build is
  * byte-for-byte unchanged.
  */
@@ -66,16 +64,12 @@ class TvNativeBuilder {
     // trigger. Empty when neither tvMain nor tvNative.mainClass is set.
     private String tvMain;
 
-    // OpenGL-only source files with no tvOS substitute (tvOS has no OpenGL ES /
-    // GLKit). Excluded from the tvOS target exactly as MacNativeBuilder excludes
-    // them from the Mac Catalyst slice; the rendering-op .m files take their
-    // internal `#elif defined(CN1_USE_METAL)` branch on tvOS. The four iOS XIBs
-    // are excluded for the same reason they are on Mac (IBAgent UIKit errors /
-    // the runtime never loads them by name on the non-iPhone slice).
+    // Source files with no tvOS substitute. The two iOS XIBs are excluded for
+    // the same reason they are on Mac (IBAgent UIKit errors / the runtime never
+    // loads them by name on the non-iPhone slice).
     private static final String EXCLUDED_TV_SOURCES =
-            "CN1ES2compat.m CN1ES1compat.m EAGLView.m "
-            + "CodenameOne_GLViewController.xib MainWindow.xib "
-            + "CodenameOne_METALViewController.xib MainWindowMETAL.xib "
+            "CodenameOne_GLViewController.xib "
+            + "CodenameOne_METALViewController.xib "
             // App Intents and the snippet renderer are staged into <Main>-src for the iOS
             // app target, and this builder copies that directory wholesale -- so declaring
             // an intent made the tvOS slice compile App Intents types that need tvOS 16
@@ -95,11 +89,10 @@ class TvNativeBuilder {
     // Frameworks the iOS port links that are unavailable on tvOS; ParparVM
     // weak-links these (see -Doptional.frameworks) so the iOS slice is unchanged
     // while the tvOS slice tolerates the absent symbols. The tvOS SDK actually
-    // ships the OpenGLES / GLKit / MessageUI headers (deprecated), so only the
-    // genuinely-absent frameworks need weak-linking. OpenGL ES is not used at
-    // runtime (the slice renders via Metal); WebKit has no tvOS equivalent.
+    // ships the MessageUI headers (deprecated), so only the genuinely-absent
+    // frameworks need weak-linking. WebKit has no tvOS equivalent.
     private static final String TV_OPTIONAL_FRAMEWORKS =
-            "WebKit.framework;OpenGLES.framework;GLKit.framework;"
+            "WebKit.framework;"
             // CarPlay.framework is iOS-only (absent on tvOS); it is linked on the iOS slice when the
             // app references com.codename1.car, so weak-link it for the tvOS slice.
             + "CarPlay.framework;"
@@ -387,9 +380,9 @@ class TvNativeBuilder {
                 .append("  tv_target = xcproj.new_target(:application, tv_name, :tvos, '")
                 .append(IPhoneBuilder.escapeRubyStr(minDeploymentTarget)).append("')\n")
                 .append("end\n")
-                // Compile the shared ParparVM sources for tvOS, minus the OpenGL-
-                // only files. Reuse the app target's compile sources so we track
-                // exactly what was generated (incl. the translated Stub + main()).
+                // Compile the shared ParparVM sources for tvOS. Reuse the app
+                // target's compile sources so we track exactly what was
+                // generated (incl. the translated Stub + main()).
                 .append("excluded = %w[").append(EXCLUDED_TV_SOURCES).append("]\n")
                 .append("app_target.source_build_phase.files.to_a.each do |bf|\n")
                 .append("  ref = bf.file_ref\n")
@@ -429,16 +422,6 @@ class TvNativeBuilder {
             s.append("  bs['DEVELOPMENT_TEAM'] = '").append(resolvedTeamId).append("'\n");
         }
         s.append("end\n");
-
-        // The iOS XIBs / OpenGLES.framework have no tvOS equivalent. Drop GL
-        // framework refs from the tvOS target (GLKit/OpenGLES are absent on tvOS;
-        // the GL types come from the stub headers, the rendering uses Metal).
-        s.append("gl = %w[OpenGLES.framework GLKit.framework]\n")
-                .append("tv_target.frameworks_build_phase.files.to_a.each do |bf|\n")
-                .append("  ref = bf.file_ref\n")
-                .append("  next unless ref && ref.path\n")
-                .append("  bf.remove_from_project if gl.include?(File.basename(ref.path))\n")
-                .append("end\n");
 
         // Add the generated tvOS Info.plist file reference to the project group so
         // INFOPLIST_FILE resolves.

@@ -33,7 +33,7 @@ The hard part of native interfaces is often not the code itself but the configur
 
 ## Further Reading
 
-- [Developer Guide](/developer-guide/)
+- [Developer Guide](/developer-guide/advanced-topics-under-the-hood/#_native_interfaces)
 - [Build Hints](/build-hints/)
 - [Build Server](/build-server/)
 - [How Do I Access Native Device Functionality? Invoke Native Interfaces?](/how-do-i/how-do-i-access-native-device-functionality-invoke-native-interfaces/)

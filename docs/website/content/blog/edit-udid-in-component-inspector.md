@@ -12,7 +12,7 @@ author: Shai Almog
 ![Header Image](/blog/edit-udid-in-component-inspector/edit-udid.png)
 
 One of the hard things to debug in Codename One is UIID/Padding/Margin placement which is often tricky to  
-get "just right". I use the [Component Inspector](/manual/index/) quite a lot to  
+get "just right". I use the [Component Inspector](/developer-guide/introduction/) quite a lot to\
 review a layout that misbehaves and gain further insight into what’s happening in runtime.
 
 __ |  You can gain insight into the Codename One component hierarchy by running the simulator and selecting the  

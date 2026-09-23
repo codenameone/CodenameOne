@@ -60,10 +60,39 @@ fi
 # a macOS monospace font that may appear in docs, skins or font lists). The name is
 # split below so this script never matches its own tripwire.
 forbidden_editor='mona''co'
-if git -C "$ROOT/../.." grep -in "$forbidden_editor" -- \
-    'scripts/cn1playground' \
-    'CodenameOne/src'; then
-  echo "Removed browser-editor dependency is still referenced by playground/core files" >&2
+
+# The playground's own tree is small and controlled, so the bare name is forbidden
+# there outright.
+if git -C "$ROOT/../.." grep -in "$forbidden_editor" -- 'scripts/cn1playground'; then
+  echo "Removed browser-editor dependency is still referenced by playground files" >&2
+  exit 1
+fi
+
+# CodenameOne/src is four thousand files of framework source, and the bare name over
+# it is not a tripwire -- it is a guarantee of an eventual false positive, because the
+# name is also a country and a font. It already fired: PhoneNumberField's dialing-code
+# table lists the principality, and this job went red on a pull request that had
+# touched neither the editor nor that file.
+#
+# So over core the name counts only where it is shaped like a DEPENDENCY -- adjacent
+# to '-', '.' or '/'. That is every way the editor is actually referenced (the npm
+# package name, the JS namespace before .editor.create, the loader path under /min/vs)
+# and none of the ways the word occurs in prose, in a dialing-code table, or in a font
+# stack that also names Menlo.
+#
+# The residual is a bare-word reference from core alone, which the setEngineURL check
+# above already covers for the file that would carry it.
+#
+# Note the workflow only triggers on scripts/cn1playground changes, so this core scan
+# runs only alongside a playground change. That is why it went two and a half weeks
+# without noticing the table above.
+# No \b here, deliberately: `git grep -E` honours neither \b nor \< on macOS (measured
+# on Apple Git 2.54 -- `\bpublic\b` matches zero lines in a file with thirty), so a
+# word-boundary pattern would be a gate that passes on a developer machine because it
+# matches NOTHING and only really runs on Linux CI.
+if git -C "$ROOT/../.." grep -inE "[-./]${forbidden_editor}|${forbidden_editor}[-./]" \
+    -- 'CodenameOne/src'; then
+  echo "Removed browser-editor dependency is still referenced by core files" >&2
   exit 1
 fi
 

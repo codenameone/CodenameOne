@@ -123,7 +123,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > Hi,  
 > there is a code sample within the JavaDocs that covers just that use case: [https://www.codenameone.com…](</javadoc/com/codename1/components/ImageViewer/>)  
 > It’s also included in the developer guide section of the ImageViewer:  
-> [https://www.codenameone.com…](</manual/components/#_imageviewer>)
+> [https://www.codenameone.com…](</developer-guide/the-components-of-codename-one/#_imageviewer>)
 >
 
 

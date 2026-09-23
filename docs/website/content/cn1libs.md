@@ -18,4 +18,4 @@ To submit your own library, open a pull request in the source repository:
 [github.com/codenameone/CodenameOneLibs](https://github.com/codenameone/CodenameOneLibs)
 
 For format details, see the developer guide section on libraries:
-[Developer Guide: Libraries (cn1lib)](/manual/advanced-topics.html#_libraries_cn1lib)
+[Developer Guide: Libraries (cn1lib)](/developer-guide/advanced-topics-under-the-hood/#_libraries_cn1lib)

@@ -43,10 +43,22 @@ if [ -d gen ]; then GEN="gen"; fi
 # slf4j-api on the classpath as well -- without it the driver's service entry
 # throws while being instantiated and DriverManager reports "no suitable driver",
 # which names neither the real cause nor the missing jar.
+#
+# BOTH REPOSITORIES, newest wins. It used to read $HOME/.m2 alone, which made
+# this depend on whatever the machine happened to have: in CI that is a restored
+# maven cache, so the same commit found the driver on one run and reported "No
+# suitable driver found for jdbc:sqlite::memory:" on the next. The repo-local
+# .m2-repo is where the build installs, and sqlite-jdbc is in the reactor, so
+# looking there first makes the answer a property of this checkout.
+#
+# Sorted by the FILE NAME rather than the path, because the two roots interleave
+# otherwise and the version lives in the basename.
+REPO_ROOT="$(cd ../.. && pwd)"
+M2_LOCAL="${CN1_M2:-$REPO_ROOT/.m2-repo}"
 newest_jar() {
-    ls -1 "$HOME/.m2/repository/$1/$2/"*/"$2"-*.jar 2>/dev/null \
+    ls -1 "$M2_LOCAL/$1/$2/"*/"$2"-*.jar "$HOME/.m2/repository/$1/$2/"*/"$2"-*.jar 2>/dev/null \
         | grep -v -- '-sources\.jar$' | grep -v -- '-javadoc\.jar$' \
-        | sort -V | tail -1
+        | awk -F/ '{print $NF"\t"$0}' | sort -V | tail -1 | cut -f2-
 }
 DRIVERS="$CN1_BACKEND_JDBC_JARS"
 if [ -z "$DRIVERS" ]; then

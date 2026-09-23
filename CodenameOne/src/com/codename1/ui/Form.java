@@ -134,7 +134,13 @@ public class Form extends Container implements TopLevelContainer {
     private Component dragged;
     // Last component whose interactive scrollbar showed a hover highlight, so the highlight can be
     // cleared when the pointer moves to a different scrollable (desktop interactive scrollbars only)
-    private Component lastInteractiveScrollHover;
+    private final HoverTracker hoverTracker = new HoverTracker();
+
+    @Override
+    HoverTracker getHoverTracker() {
+        return hoverTracker;
+    }
+
     private boolean enableCursors;
     private TextSelection textSelection;
     private ArrayList<Component> componentsAwaitingRelease;
@@ -165,6 +171,48 @@ public class Form extends Container implements TopLevelContainer {
     private com.codename1.router.PopGuard popGuard;
     /// Default color for the screen tint when a dialog or a menu is shown
     private int tintColor;
+
+    /// The tint this form was last handed by a theme.
+    ///
+    /// show() runs initLaf() whenever the form has no transition animator, and
+    /// initLaf() used to assign the theme's tint unconditionally. A tint set
+    /// before showing -- the order every sample uses, because there is nothing
+    /// to set it on beforehand -- was therefore overwritten on the way to the
+    /// screen, and the dialog that followed dimmed in the wrong colour with
+    /// nothing to say why.
+    ///
+    /// What is remembered is the theme's own answer rather than a flag saying
+    /// the application chose, because the framework sets this tint too:
+    /// ComboBox, the toolbar overflow, the floating action button submenu and
+    /// GlassTutorial each save the current tint, force their own, and put the
+    /// old one back through this same setter. A flag would mark that restore as
+    /// an application's choice and a later theme change would then be ignored.
+    /// Comparing against the theme's last answer reads all of it correctly: a
+    /// restore puts back exactly what the theme gave, so the form is still
+    /// following the theme, while a value the theme never handed out is one
+    /// somebody meant.
+    ///
+    /// One case this cannot separate, and does not try to: an application that
+    /// sets the tint to precisely the colour the theme is handing out at that
+    /// moment. Such a form follows the next theme change rather than staying on
+    /// the value it named. Telling that apart from the framework putting the
+    /// same colour back needs to know which call site it came from, and two of
+    /// the four -- FloatingActionButton and GlassTutorial -- are outside this
+    /// package, so it would mean a public method about tint bookkeeping that
+    /// applications have no use for. The assignment it would protect changes
+    /// nothing at the moment it is made, and what it would preserve is a colour
+    /// identical to the theme's own.
+    ///
+    /// Nor does any of this change what happens when the theme changes while an
+    /// override is up and the override is then torn down: the form holds the
+    /// previous theme's tint until something shows it again. That is the four
+    /// call sites' own doing -- each captures a colour, and puts that captured
+    /// colour back however much time has passed -- and it predates this. Measured
+    /// on the unconditional assignment this replaced, from the same sequence:
+    /// both leave the form on the tint that was current when the override began.
+    private int themeTintColor;
+
+    private boolean themeTintColorKnown;
     /// Listeners for key release events
     private HashMap<Integer, ArrayList<ActionListener>> keyListeners;
     /// Listeners for game key release events
@@ -851,9 +899,29 @@ public class Form extends Container implements TopLevelContainer {
     }
 
     /// Returns the configured desktop title-bar mode ({@code native}, {@code custom} or
-    /// {@code toolbar}). Sourced from the implementation (desktop ports report the real mode;
-    /// everything else returns {@code toolbar}).
+    /// {@code toolbar}).
+    ///
+    /// Three sources in order. The build hint wins: a project that spelled out
+    /// {@code desktop.titleBar} means it, and a theme must not talk it out of that. Then the
+    /// installed theme's {@code desktopTitleBarMode} constant, which is how the desktop native
+    /// themes express the convention of the platform they model -- Windows and macOS keep a
+    /// system title bar and ask for {@code native}, GNOME's HeaderBar is the title bar and asks
+    /// for {@code custom}. Then whatever the port reports, which is {@code toolbar} everywhere
+    /// that is not a desktop.
+    ///
+    /// The theme step is gated on {@link Display#isDesktop()} so a mobile port that somehow
+    /// loaded a desktop theme still renders its ordinary chrome.
     String getDesktopTitleBarMode() {
+        String configured = Display.impl.getConfiguredDesktopTitleBarMode();
+        if (configured != null && configured.length() > 0) {
+            return configured;
+        }
+        if (Display.getInstance().isDesktop()) {
+            String themed = getUIManager().getThemeConstant("desktopTitleBarMode", null);
+            if (themed != null && themed.length() > 0) {
+                return themed;
+            }
+        }
         return Display.impl.getDesktopTitleBarMode();
     }
 
@@ -871,8 +939,17 @@ public class Form extends Container implements TopLevelContainer {
     /// Indicates the {@code native} desktop title-bar mode, where the CN1 Toolbar is hidden entirely:
     /// the form title goes into the real OS window title bar and the commands are bridged to a native
     /// menu bar. Inert (false) on mobile.
+    ///
+    /// Conditional on the platform actually HAVING a native menu bar. Hiding the Toolbar takes
+    /// away the side menu, which is the only place the commands are drawn, so doing it on a
+    /// port whose `setNativeCommands` discards them removes every command from the
+    /// application. The title still goes to the OS title bar on such a port -- that part
+    /// works everywhere -- and the Toolbar stays, which is the legacy look rather than a
+    /// broken one.
     boolean isDesktopHideToolbar() {
-        return Display.getInstance().isDesktop() && "native".equals(getDesktopTitleBarMode());
+        return Display.getInstance().isDesktop()
+                && "native".equals(getDesktopTitleBarMode())
+                && Display.impl.isNativeCommandsSupported();
     }
 
     /// Indicates the {@code custom} desktop title-bar mode, where the CN1 Toolbar stays visible and
@@ -1605,7 +1682,19 @@ public class Form extends Container implements TopLevelContainer {
             menuBar.initMenuBar(this);
         }
 
-        tintColor = laf.getDefaultFormTintColor();
+        int themeTint = laf.getDefaultFormTintColor();
+        // The marker only moves when the theme's answer is actually taken. A
+        // theme refresh can land while one of those temporary overrides is up
+        // -- the system appearance changing under an open ComboBox is enough --
+        // and advancing it there would leave the marker on a colour this form
+        // never wore. The override's teardown then restores the previous theme
+        // default, which no longer matches the marker, and the form would read
+        // as having chosen that colour for the rest of its life.
+        if (!themeTintColorKnown || tintColor == themeTintColor) {
+            tintColor = themeTint;
+            themeTintColor = themeTint;
+            themeTintColorKnown = true;
+        }
         tactileTouchDuration = laf.getTactileTouchDuration();
     }
 
@@ -1856,7 +1945,28 @@ public class Form extends Container implements TopLevelContainer {
             formLayeredPane = new Container(new LayeredLayout()) {
                 @Override
                 protected void paintBackground(Graphics g) {
-                    if (getComponentCount() > 0) {
+                    // The form underneath this overlay only has to be drawn when the
+                    // overlay is painted on its own: a repaint targeting just the layered
+                    // pane would otherwise composite its children over stale pixels.
+                    //
+                    // During the form's own paint pass the form has already drawn
+                    // everything beneath us - this pane is one of its children - so
+                    // drawing it again here paints the whole tree a second time into the
+                    // same frame. Opaque fills survive that unchanged, which is why it
+                    // stayed hidden, but every translucent pixel composites twice:
+                    // antialiased glyphs and drop shadows come out visibly darker.
+                    //
+                    // The guard above is why this was never seen. The pane is empty until
+                    // something adds itself to it, and the one thing that does -
+                    // InteractionDialog, the lightweight Picker popup among others -
+                    // arrives through Container's deferred insertion, which was dropped
+                    // entirely until issue #5606 was fixed. A pane that never had children
+                    // never ran this painter.
+                    //
+                    // inInternalPaint marks the form's own pass, and is the same
+                    // discriminator Form.paint() already uses to avoid drawing its
+                    // background twice.
+                    if (getComponentCount() > 0 && !inInternalPaint) {
                         if (super.isVisible()) {
                             super.setVisible(false);
                             Form.this.paint(g);
@@ -2782,6 +2892,10 @@ public class Form extends Container implements TopLevelContainer {
         componentsAwaitingRelease = null;
         pressedCmp = null;
         dragged = null;
+        // A form that is going away must not leave a component believing the pointer is still
+        // over it: the flag would survive into the next time the form is shown, and the
+        // component would paint hovered with the pointer somewhere else entirely.
+        hoverTracker.pointerOver(null, -1, -1);
     }
 
     /// The four kinds of pointer listener an embedded form hands to its host.
@@ -3778,10 +3892,45 @@ public class Form extends Container implements TopLevelContainer {
         return new TabIterator(out, start);
     }
 
+    /// The traversal order a desktop keyboard walks with Tab.
+    ///
+    /// Deliberately NOT `#buildTabIterator(Container, Component)`, whose filter is opt-in:
+    /// `Component#getPreferredTabIndex()` defaults to -1 and `TextArea` is the only class in the
+    /// framework that ever calls `setPreferredTabIndex(0)`, so that iterator holds text areas and
+    /// nothing else. That is right for what built it -- "next field while editing", which is what
+    /// `TextEditUtil` and `Picker` use it for -- and wrong for Tab, which would then walk between
+    /// a form's text fields and skip every button, checkbox and slider between them.
+    ///
+    /// A desktop keyboard should reach whatever the pointer reaches, so the filter here is
+    /// focusability itself. An explicit `preferredTabIndex` still wins: those components sort to
+    /// the front in the order they were numbered, which is the whole point of setting one.
+    /// Everything else keeps document order, because `Collections#sort` is stable and
+    /// `ComponentSelector` walks the tree in the order the form reads.
+    ///
+    /// #### Parameters
+    ///
+    /// - `root`: the top level to walk
+    ///
+    /// - `start`: the component to start from
+    ///
+    /// #### Returns
+    ///
+    /// the desktop traversal iterator
+    static TabIterator buildDesktopTabIterator(Container root, Component start) {
+        root.updateTabIndices(0);
+        java.util.List<Component> out = new ArrayList<Component>();
+        out.addAll(ComponentSelector.select("*", root).filter(new DesktopTabIteratorFilter()));
+        Collections.sort(out, new DesktopTabIteratorComparator());
+        return new TabIterator(out, start);
+    }
+
     /// {@inheritDoc}
     @Override
     public void keyPressed(int keyCode) {
         int game = Display.getInstance().getGameAction(keyCode);
+        if (desktopKeyPressed(keyCode)) {
+            return;
+        }
         if (menuBar.handlesKeycode(keyCode) && !focusedHandlesInput(keyCode)) {
             menuBar.keyPressed(keyCode);
             return;
@@ -3877,6 +4026,167 @@ public class Form extends Container implements TopLevelContainer {
                 && focused.getComponentForm() == this; //NOPMD CompareObjectsWithEquals
     }
 
+    /// Horizontal tab. Ports deliver Tab as its character code, which is what
+    /// `JavaSEPort.C.getCode` returns for a key event whose `getKeyChar()` is defined -- Tab's
+    /// is, so it arrives here as 9 rather than as an AWT virtual key.
+    private static final int KEY_TAB = 9;
+
+    /// Escape, likewise delivered as its character code.
+    private static final int KEY_ESCAPE = 27;
+
+    /// The two keyboard conventions every desktop toolkit has and Codename One never had.
+    ///
+    /// **Tab / Shift-Tab moves focus.** The traversal order itself is not new -- `TabIterator`,
+    /// `getNextComponent` and `preferredTabIndex` have been here for years -- but nothing was
+    /// ever wired to the key, so the only consumers were "next field while editing" paths in
+    /// the ports. On a desktop a form that cannot be operated from the keyboard is not a
+    /// desktop form.
+    ///
+    /// **Escape means cancel.** On a `Dialog` it does what the window's own close control does,
+    /// which is already written as "the back command, or dispose when there isn't one". On a
+    /// plain form it fires the back command and does nothing at all when there is none -- Escape
+    /// must never be able to exit an application.
+    ///
+    /// Enter needs nothing here: ports already map it to `GAME_KEY_CODE_FIRE` and
+    /// `keyReleased` already fires `getDefaultCommand()` on `GAME_FIRE`.
+    ///
+    /// The whole method is gated on `Display#isDesktop()`, so no mobile key dispatch and no
+    /// mobile screenshot baseline moves. Returning true means the key was consumed.
+    ///
+    /// #### Parameters
+    ///
+    /// - `keyCode`: the code being dispatched
+    ///
+    /// #### Returns
+    ///
+    /// true when this form handled the key and dispatch should stop
+    /// Set when an Escape PRESS was consumed here, so the matching RELEASE can be swallowed.
+    ///
+    /// Escape is not merely a desktop convention, it is the back key: JavaSEPort's
+    /// getBackKeyCode returns VK_ESCAPE and Display.init assigns that to MenuBar.backSK. So
+    /// without this the one keystroke acts twice -- the press invokes the back command here,
+    /// and the release satisfies menuBar.handlesKeycode(backSK) in keyReleased and invokes it
+    /// again. Two screens pop for one Escape.
+    ///
+    /// Static, not per instance, because the release does not necessarily arrive at the form
+    /// that consumed the press: a Dialog disposes on the press and the release is then
+    /// delivered to its owner, which is exactly the case where a second back would fire on the
+    /// wrong screen. One keystroke is in flight at a time and this is EDT-only state, so a
+    /// plain static is the whole mechanism -- no locking, per this codebase's threading model.
+    private static boolean escapeConsumedOnPress;
+
+    private boolean desktopKeyPressed(int keyCode) {
+        if (!Display.getInstance().isDesktop()) {
+            return false;
+        }
+        if (keyCode == KEY_TAB) {
+            // Known limitation, on the two ParparVM desktop ports: this is not reached while a
+            // native text editor holds the keystroke. The Win32 EDIT control answers
+            // DLGC_WANTALLKEYS, and the GTK handler deliberately returns FALSE so a focused
+            // peer keeps its own input -- returning TRUE there unconditionally is what once
+            // made typing into the native editor show nothing. So the commonest desktop case,
+            // tabbing from one text field to the next, still traverses nothing on Windows and
+            // Linux; tabbing between non-editing components works everywhere.
+            //
+            // Closing it means intercepting Tab inside each port's native editor and
+            // committing before forwarding, which is surgery on the text-input path of two
+            // ports that cannot be exercised from here. Left for a change that can be run on
+            // both, rather than written blind against the one path with a history of
+            // swallowing every keystroke.
+            return moveFocusByTab(Display.getInstance().isShiftKeyDown());
+        }
+        if (keyCode == KEY_ESCAPE) {
+            if (escapePressed()) {
+                escapeConsumedOnPress = true;
+                return true;
+            }
+            // Not consumed -- no back command to run. Fall through so the existing MenuBar
+            // path keeps whatever it did before, including minimizeOnBack.
+            return false;
+        }
+        return false;
+    }
+
+    /// True when the Escape release belongs to a press this class already acted on, in which
+    /// case the caller must not let it reach the MenuBar back-key path as well.
+    ///
+    /// #### Parameters
+    ///
+    /// - `keyCode`: the key being released
+    ///
+    /// #### Returns
+    ///
+    /// true when the release has been swallowed
+    private boolean desktopKeyReleased(int keyCode) {
+        if (keyCode == KEY_ESCAPE && escapeConsumedOnPress) {
+            escapeConsumedOnPress = false;
+            return true;
+        }
+        return false;
+    }
+
+    /// Moves focus one step along the tab order, wrapping at either end so the keyboard can
+    /// never strand itself. Answers false when there is nothing else focusable, leaving the key
+    /// to ordinary dispatch.
+    ///
+    /// #### Parameters
+    ///
+    /// - `backwards`: true for Shift-Tab
+    boolean moveFocusByTab(boolean backwards) {
+        Component from = focused;
+        if (from == null || from.getComponentForm() != this) { //NOPMD CompareObjectsWithEquals
+            initFocused();
+            from = focused;
+        }
+        TabIterator order = buildDesktopTabIterator(this, from);
+        Component next = backwards ? order.getPrevious() : order.getNext();
+        if (next == null) {
+            // Ran off the end. Wrap, so the keyboard can never strand itself at the last
+            // control of a form with no way back except the pointer.
+            java.util.List<Component> all = order.getComponents();
+            if (all.isEmpty()) {
+                return false;
+            }
+            next = backwards ? all.get(all.size() - 1) : all.get(0);
+        }
+        if (next == from) { //NOPMD CompareObjectsWithEquals
+            return false;
+        }
+        setFocused(next);
+        next.scrollRectToVisible(0, 0, next.getWidth(), next.getHeight(), next);
+        return true;
+    }
+
+    /// Escape on an ordinary form: the back command when there is one, nothing otherwise.
+    /// `Dialog` overrides this to close itself.
+    boolean escapePressed() {
+        Command back = getBackCommand();
+        if (back == null) {
+            return false;
+        }
+        // Exactly the order the hardware back key uses in MenuBar.keyReleased, because on the
+        // desktop this IS the hardware back key -- JavaSEPort.getBackKeyCode() returns
+        // VK_ESCAPE. Two things follow from that and both were wrong here:
+        //
+        // The guard is consulted BEFORE the command runs. Asking afterwards means a veto
+        // arrives once the back command has already navigated away or discarded the state it
+        // was guarding. A vetoed Escape still counts as handled, so the caller suppresses the
+        // matching release and the MenuBar path does not get to retry it.
+        //
+        // And one event is carried through the dispatch, so a command that consumes it
+        // suppresses the form-level routing. Building a second event for actionCommandImpl
+        // meant consumption could not be seen there.
+        if (!checkPopGuard(com.codename1.router.PopReason.HARDWARE_BACK)) {
+            return true;
+        }
+        ActionEvent ev = new ActionEvent(back, ActionEvent.Type.Command);
+        back.actionPerformed(ev);
+        if (!ev.isConsumed()) {
+            actionCommandImpl(back, ev);
+        }
+        return true;
+    }
+
     /// Space, the lowest code that stands for a character a text component can receive.
     private static final int FIRST_PRINTABLE_KEY_CODE = 32;
 
@@ -3887,6 +4197,9 @@ public class Form extends Container implements TopLevelContainer {
     @Override
     public void keyReleased(int keyCode) {
         int game = Display.getInstance().getGameAction(keyCode);
+        if (desktopKeyReleased(keyCode)) {
+            return;
+        }
         if (menuBar.handlesKeycode(keyCode) && !focusedHandlesInput(keyCode)) {
             menuBar.keyReleased(keyCode);
             return;
@@ -4512,6 +4825,24 @@ public class Form extends Container implements TopLevelContainer {
         }
     }
 
+    /// The component a hover at these coordinates resolves to: the deepest one that accepts
+    /// pointer events, mapped to its lead parent. Resolution only -- nothing is dispatched --
+    /// so a caller that just needs to know what is under the pointer does not also fire a
+    /// component's hover callback or start a tooltip timer.
+    Component hoverTargetAt(int x, int y) {
+        Container actual = getActualPane(formLayeredPane, x, y);
+        // getComponentAt returns the container itself for an outside point. A window
+        // leave must resolve to nothing, even when the root pane has a hover style.
+        if (actual == null || !actual.contains(x, y)) {
+            return null;
+        }
+        Component cmp = actual.getComponentAt(x, y);
+        while (cmp != null && cmp.isIgnorePointerEvents()) {
+            cmp = cmp.getParent();
+        }
+        return cmp == null ? null : LeadUtil.leadParentImpl(cmp);
+    }
+
     /// {@inheritDoc}
     @Override
     public void pointerHover(int[] x, int[] y) {
@@ -4521,51 +4852,32 @@ public class Form extends Container implements TopLevelContainer {
             return;
         }
 
-        Container actual = getActualPane(formLayeredPane, x[0], y[0]);
-        if (actual != null) {
-            Component cmp = actual.getComponentAt(x[0], y[0]);
-            while (cmp != null && cmp.isIgnorePointerEvents()) {
-                cmp = cmp.getParent();
-            }
+        Component cmp = hoverTargetAt(x[0], y[0]);
+        // Callbacks must observe the entered/left states, and navigation inside a
+        // callback must be able to clear them without a later update restoring them.
+        // Null also clears the previous target when the pointer leaves the surface.
+        hoverTracker.pointerOver(cmp, x[0], y[0]);
+        try {
             if (cmp != null) {
-                cmp = LeadUtil.leadParentImpl(cmp);
-
                 if (!isScrollWheeling && cmp.isFocusable() && cmp.isEnabled() && !Display.getInstance().isDesktop()) {
                     setFocused(cmp);
                 }
                 LeadUtil.pointerHover(cmp, x, y);
-                updateInteractiveScrollHover(cmp, x[0], y[0]);
             }
-            if (TooltipManager.getInstance() != null) {
-                String tip = cmp.getTooltip();
-                if (tip != null && tip.length() > 0) {
-                    TooltipManager.getInstance().prepareTooltip(tip, cmp);
-                } else {
-                    TooltipManager.getInstance().clearTooltip();
-                }
+        } finally {
+            hoverTracker.clearDetached(this);
+        }
+        TooltipManager tm = TooltipManager.getInstance();
+        if (tm != null) {
+            String tip = hoverTracker.isOver(cmp) ? cmp.getTooltip() : null;
+            if (tip != null && tip.length() > 0) {
+                tm.prepareTooltip(tip, cmp);
+            } else {
+                tm.clearTooltip();
             }
         }
     }
 
-    /// Routes a hover to the nearest scrollable ancestor of the hovered component so an interactive
-    /// (desktop) scrollbar can highlight its thumb, and clears the highlight on the previously
-    /// hovered scrollable. Inert unless interactive scrollbars are enabled.
-    private void updateInteractiveScrollHover(Component cmp, int x, int y) {
-        if (!getUIManager().getLookAndFeel().isInteractiveScroll()) {
-            return;
-        }
-        Component scrollable = cmp;
-        while (scrollable != null && !scrollable.isScrollableY() && !scrollable.isScrollableX()) {
-            scrollable = scrollable.getParent();
-        }
-        if (lastInteractiveScrollHover != null && lastInteractiveScrollHover != scrollable) { //NOPMD CompareObjectsWithEquals
-            lastInteractiveScrollHover.clearInteractiveScrollHover();
-        }
-        if (scrollable != null) {
-            scrollable.updateInteractiveScrollHover(x, y);
-        }
-        lastInteractiveScrollHover = scrollable;
-    }
 
     /// Returns true if there is only one focusable member in this form. This is useful
     /// so setHandlesInput would always be true for this case.
@@ -4638,6 +4950,7 @@ public class Form extends Container implements TopLevelContainer {
     /// {@inheritDoc}
     @Override
     public void pointerReleased(int x, int y) {
+        final boolean hoverOnRelease = HoverTracker.canHoverOnRelease();
         // A press that never became a drag releases the operation the press staged, so a
         // later gesture somewhere else cannot start the drag this one declined to.
         //
@@ -4832,6 +5145,22 @@ public class Form extends Container implements TopLevelContainer {
             }
         } finally {
             currentPointerPress = null;
+            // Hover is deliberately NOT tracked during a drag -- pointerHover returns early
+            // while dragged is set -- so the release is where it has to be caught up. If the
+            // pointer then stays put no further motion event arrives (Windows sends none for
+            // a stationary cursor), which left whatever was hovered when the drag began still
+            // lit and whatever is under the pointer now never lit. Resolved rather than
+            // dispatched, so the release does not also fire a hover callback or a tooltip.
+            //
+            // In the finally, beside the other piece of end-of-gesture bookkeeping, because
+            // this method returns from six places inside the try above and a catch-up after
+            // the block is reached by none of them.
+            // A release callback may navigate and deinitialize this form. Do not
+            // restore the hover that deinitialization just cleared on a hidden form.
+            // During a transition, getCurrent() can still name that deinitialized source.
+            if (hoverOnRelease && isInitialized() && isTopLevelShowing()) {
+                hoverTracker.pointerOver(hoverTargetAt(x, y), x, y);
+            }
         }
     }
 
@@ -5514,6 +5843,18 @@ public class Form extends Container implements TopLevelContainer {
             return current;
         }
 
+        /// The components in traversal order, unmodifiable.
+        ///
+        /// Exposed so a caller that ran off either end can wrap round to the other one without
+        /// rebuilding the order it just walked.
+        ///
+        /// #### Returns
+        ///
+        /// the traversal order
+        public java.util.List<Component> getComponents() {
+            return Collections.unmodifiableList(components);
+        }
+
         /// Sets the current component in the iterator.  This reposition the iterator
         /// to the given component.
         ///
@@ -5715,6 +6056,81 @@ public class Form extends Container implements TopLevelContainer {
         @Override
         public boolean filter(Component c) {
             return c.getTabIndex() >= 0 && c.isVisible() && c.isFocusable() && c.isEnabled() && !c.isHidden(true);
+        }
+    }
+
+    /// Everything a pointer could reach, which is what a desktop keyboard must reach too.
+    /// Note the absence of the `getTabIndex() >= 0` test the mobile filter opens with: that test
+    /// is what makes the ordinary iterator opt-in, and opting in is exactly what nothing except
+    /// `TextArea` does.
+    private static class DesktopTabIteratorFilter implements Filter {
+        @Override
+        public boolean filter(Component c) {
+            return c.isVisible() && c.isFocusable() && c.isEnabled() && !c.isHidden(true)
+                    && isReachableForTraversal(c);
+        }
+    }
+
+    /// True when the user could actually get to this component by tabbing to it.
+    ///
+    /// The flags on the component itself are not enough. `Tabs` keeps every page in the
+    /// hierarchy and its TabsLayout positions the inactive ones beside the visible one, by an
+    /// x or y offset, without marking anything invisible -- so every control on every hidden
+    /// tab passed a check that only asked the component about itself, and Tab walked focus
+    /// into a page nobody can see.
+    ///
+    /// The test is deliberately not "is it inside the visible viewport". An item scrolled
+    /// below the fold is off screen too, and it MUST stay in the order: tabbing to it is how a
+    /// desktop scrolls it into view. What separates the two is whether an ancestor can ever
+    /// bring the component into view. A scrollable ancestor can; a fixed one cannot, and a
+    /// component lying outside a fixed ancestor's box is clipped away for good. Tabs' page
+    /// host is a plain Container, which is what makes the hidden pages unreachable and the
+    /// scrolled list item reachable.
+    ///
+    /// #### Parameters
+    ///
+    /// - `c`: the candidate
+    ///
+    /// #### Returns
+    ///
+    /// true when it can be reached
+    private static boolean isReachableForTraversal(Component c) {
+        Component child = c;
+        Container parent = c.getParent();
+        while (parent != null) {
+            if (!parent.isVisible()) {
+                return false;
+            }
+            if (!parent.isScrollableX() && !parent.isScrollableY()
+                    && (child.getX() + child.getWidth() <= 0
+                        || child.getY() + child.getHeight() <= 0
+                        || child.getX() >= parent.getWidth()
+                        || child.getY() >= parent.getHeight())) {
+                return false;
+            }
+            child = parent;
+            parent = parent.getParent();
+        }
+        return true;
+    }
+
+    /// Orders the desktop traversal: an explicitly numbered component first, in its number's
+    /// order, and everything else in document order behind it.
+    ///
+    /// Zero counts as unnumbered, not as first. `setPreferredTabIndex(0)` is how
+    /// `Component#setTraversable(boolean)` says "join the order", never "be the first" --
+    /// reading it as a position would put every `TextArea` ahead of the label above it.
+    private static class DesktopTabIteratorComparator implements Comparator<Component> {
+        @Override
+        public int compare(Component o1, Component o2) {
+            int i1 = positionOf(o1);
+            int i2 = positionOf(o2);
+            return i1 < i2 ? -1 : i2 < i1 ? 1 : 0;
+        }
+
+        private int positionOf(Component c) {
+            int idx = c.getPreferredTabIndex();
+            return idx > 0 ? idx : Integer.MAX_VALUE;
         }
     }
 }

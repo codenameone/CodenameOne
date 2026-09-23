@@ -163,6 +163,16 @@ public @interface Ios {
     /// different team IDs for debug and release builds respectively.
     String teamId() default "";
 
+    /// `26` (default) or `27`: which iOS design generation the modern theme
+    /// targets. Consulted only when [#themeMode()] resolves to modern/liquid;
+    /// every other mode ignores it.
+    ///
+    /// Unset means 26, so an application that says nothing keeps the theme it
+    /// has. `27` selects the generation built from
+    /// `native-themes/ios-modern/gen27.css`.
+    @Hint(valuePattern = "26|27")
+    IosThemeGeneration themeGeneration() default IosThemeGeneration.DEFAULT;
+
     /// `auto` (default), `modern`, `ios7`, `legacy`. `auto` (unset) keeps the
     /// existing iOS 7 flat theme so pre-refactor screenshot goldens and apps see
     /// no behavior change. `modern` / `liquid` opts in to the CSS-generated iOS
@@ -173,14 +183,31 @@ public @interface Ios {
     @Hint(valuePattern = "auto|modern|ios7|legacy")
     ThemeMode themeMode() default ThemeMode.DEFAULT;
 
-    /// true/false (defaults to true). Enables iOS UIScene lifecycle support.
-    /// UIScene lets iOS manage one or more app UI sessions independently,
-    /// improving lifecycle handling in modern iOS versions. Apple has indicated
-    /// UIScene will be required starting with iOS 27, so this is now on by
-    /// default; set the flag to `false` only if you need to temporarily fall back
-    /// to the legacy `UIApplicationDelegate` lifecycle.
-    Toggle uiscene() default Toggle.DEFAULT;
-
     /// Allows intercepting a URL call using the syntax `<string>urlPrefix<string>`
     String urlScheme() default "";
+
+    /// Which Xcode the build server compiles with.
+    ///
+    /// Unset lets the server choose: it prefers its own default and falls back
+    /// to the newest Xcode it carries, so a server that hasn't been re-imaged
+    /// keeps building. Naming one opts out of that fallback -- a version the
+    /// server doesn't have fails the build rather than substituting a toolchain
+    /// nobody asked for, which would archive against an unintended SDK with
+    /// nothing in the log to say so.
+    ///
+    /// Builds are claimed off a shared queue, so an Xcode that some servers
+    /// carry and others don't makes a build pass or fail at random. That's a
+    /// fleet out of step and worth reporting, not a hint to tune.
+    ///
+    /// The constants are the majors a current build server image carries, a set
+    /// that belongs to the image rather than to this framework. To name a
+    /// version outside them -- a minor such as `27.1`, or a major shipped since
+    /// this release -- write a plain `codename1.arg.ios.xcode_version=<version>`
+    /// line in `codenameone_settings.properties`. Leaving this attribute at
+    /// [IosXcodeVersion#DEFAULT] writes nothing, so the two don't conflict.
+    ///
+    /// Read only by the build service; a local build uses the Xcode
+    /// `xcode-select` points at and ignores this.
+    @Hint(name = "ios.xcode_version", external = true)
+    IosXcodeVersion xcodeVersion() default IosXcodeVersion.DEFAULT;
 }

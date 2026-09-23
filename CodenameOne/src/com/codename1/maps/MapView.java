@@ -411,6 +411,11 @@ public class MapView extends Container implements MapSurface {
         for (Object markerObj : markers) {
             drawMarker(g, (Marker) markerObj);
         }
+        // Draw labels last so routes and later pins cannot paint over them.
+        List labelBounds = new ArrayList();
+        for (Object markerObj : markers) {
+            drawMarkerLabel(g, (Marker) markerObj, labelBounds);
+        }
     }
 
     private void drawPolyline(Graphics g, Polyline pl) {
@@ -500,6 +505,92 @@ public class MapView extends Container implements MapSurface {
         g.setColor(0xe53935);
         g.drawString(glyph, gx, gy);
         g.setAlpha(prevAlpha);
+    }
+
+    private void drawMarkerLabel(Graphics g, Marker marker, List occupied) {
+        String label = marker.getLabel();
+        if (!marker.isVisible() || label == null || label.trim().length() == 0) {
+            return;
+        }
+        Point point = engine.latLngToScreen(marker.getPosition());
+        int px = point.getX();
+        int py = point.getY();
+        if (px < 0 || py < 0 || px > getWidth() || py > getHeight()) {
+            return;
+        }
+        Font font = Font.getDefaultFont();
+        int padding = Math.max(2, CN.convertToPixels(1));
+        int available = getWidth() - padding * 4;
+        if (available <= 0 || getHeight() < font.getHeight() + padding * 2) {
+            return;
+        }
+        // Keep long place names inside the viewport without changing the model.
+        if (font.stringWidth(label) > available) {
+            String ellipsis = "...";
+            int end = label.length();
+            while (end > 0 && font.stringWidth(label.substring(0, end) + ellipsis) > available) {
+                end--;
+            }
+            if (end == 0) {
+                return;
+            }
+            label = label.substring(0, end) + ellipsis;
+        }
+        int width = font.stringWidth(label) + padding * 2;
+        int height = font.getHeight() + padding * 2;
+        int x = Math.max(0, Math.min(px - width / 2, getWidth() - width));
+        // Prefer below the pin's tip, away from its icon; flip at the bottom edge.
+        int y = py + padding;
+        if (y + height > getHeight()) {
+            int iconHeight = marker.getIcon() == null ? markerFont().getHeight() : marker.getIcon().getHeight();
+            y = Math.max(0, py - (int) (iconHeight * marker.getAnchorV()) - height - padding);
+        }
+        // Nearby stops (including a round trip's start and destination) must
+        // not paint their names on top of each other. Try rows below/above.
+        int preferredY = y;
+        boolean placed = false;
+        for (int offset = 0; offset < getHeight(); offset += height + padding) {
+            if (markerLabelFits(x, preferredY + offset, width, height, occupied)) {
+                y = preferredY + offset;
+                placed = true;
+                break;
+            }
+            if (offset > 0 && markerLabelFits(x, preferredY - offset, width, height, occupied)) {
+                y = preferredY - offset;
+                placed = true;
+                break;
+            }
+        }
+        if (!placed) {
+            return;
+        }
+        occupied.add(new int[]{x, y, width, height});
+        Font previousFont = g.getFont();
+        int previousAlpha = g.getAlpha();
+        int previousColor = g.getColor();
+        g.setAlpha(255);
+        g.setColor(0xffffff);
+        g.fillRoundRect(x, y, width, height, padding * 2, padding * 2);
+        g.setFont(font);
+        g.setColor(0x222222);
+        g.drawString(label, x + padding, y + padding);
+        g.setFont(previousFont);
+        g.setAlpha(previousAlpha);
+        g.setColor(previousColor);
+    }
+
+    private boolean markerLabelFits(int x, int y, int width, int height, List occupied) {
+        if (y < 0 || y + height > getHeight()) {
+            return false;
+        }
+        for (Object item : occupied) {
+            int[] box = (int[]) item;
+            if (x < box[0] + box[2] && x + width > box[0]
+                    && y < box[1] + box[3] && y + height > box[1]) {
+                return false;
+            }
+        }
+        return true;
     }
 
     private Font markerFont() {

@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License version 2 only, as
@@ -125,6 +126,10 @@ public class FidelitySpecParser {
             spec.setDefaultTileWidthMm(parseInt(value, spec.getDefaultTileWidthMm()));
         } else if ("tile_height_mm".equals(key)) {
             spec.setDefaultTileHeightMm(parseInt(value, spec.getDefaultTileHeightMm()));
+        } else if ("tile_width_px".equals(key)) {
+            spec.setDefaultTileWidthPx(parseInt(value, spec.getDefaultTileWidthPx()));
+        } else if ("tile_height_px".equals(key)) {
+            spec.setDefaultTileHeightPx(parseInt(value, spec.getDefaultTileHeightPx()));
         } else if ("bg".equals(key)) {
             spec.setBackgroundHex(value);
         } else if ("appearances".equals(key)) {
@@ -147,6 +152,12 @@ public class FidelitySpecParser {
             component.setNativeKindIos(value);
         } else if ("native_android".equals(key)) {
             component.setNativeKindAndroid(value);
+        } else if ("native_win".equals(key)) {
+            component.setNativeKindWindows(value);
+        } else if ("native_mac".equals(key)) {
+            component.setNativeKindMac(value);
+        } else if ("native_gnome".equals(key)) {
+            component.setNativeKindGnome(value);
         } else if ("text".equals(key)) {
             component.setText(value);
         } else if ("backdrop".equals(key)) {
@@ -157,6 +168,10 @@ public class FidelitySpecParser {
             component.setTileWidthMm(parseInt(value, -1));
         } else if ("tile_height_mm".equals(key)) {
             component.setTileHeightMm(parseInt(value, -1));
+        } else if ("tile_width_px".equals(key)) {
+            component.setTileWidthPx(parseInt(value, -1));
+        } else if ("tile_height_px".equals(key)) {
+            component.setTileHeightPx(parseInt(value, -1));
         } else if ("states".equals(key)) {
             component.setStates(splitList(value));
         } else if ("platforms".equals(key)) {

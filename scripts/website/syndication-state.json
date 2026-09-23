@@ -2123,6 +2123,139 @@
         "tags_set": true,
         "canonical_set": true,
         "syndicated_at": "2026-09-15T00:01:11+00:00"
+      },
+      "devto": {
+        "id": 4661234,
+        "url": "https://dev.to/codenameone/we-stopped-waiting-for-platform-changes-to-find-us-4f15",
+        "syndicated_at": "2026-09-15T17:40:13+00:00"
+      },
+      "medium": {
+        "url": "https://medium.com/@Codename_One/we-stopped-waiting-for-platform-changes-to-find-us-566ee9018cc8?postPublishedType=initial",
+        "syndicated_at": "2026-09-15T19:01:29+00:00"
+      }
+    },
+    "private-contact-picker": {
+      "hashnode": {
+        "url": "https://debugagent.com/pick-one-contact-without-asking-for-the-address-book",
+        "published": true,
+        "draft_url": "https://hashnode.com/draft/6aa9dc107d960c121a845a36",
+        "cover_set": true,
+        "subheading_set": true,
+        "tags_set": true,
+        "canonical_set": true,
+        "syndicated_at": "2026-09-16T00:01:12+00:00"
+      },
+      "devto": {
+        "id": 4669906,
+        "url": "https://dev.to/codenameone/pick-one-contact-without-asking-for-the-address-book-578c",
+        "syndicated_at": "2026-09-16T17:39:19+00:00"
+      },
+      "medium": {
+        "url": "https://medium.com/@Codename_One/pick-one-contact-without-asking-for-the-address-book-40a44b76cd61?postPublishedType=initial",
+        "syndicated_at": "2026-09-16T19:01:54+00:00"
+      }
+    },
+    "performance-work-between-benchmarks": {
+      "hashnode": {
+        "url": "https://debugagent.com/lies-damn-lies-and-benchmarks",
+        "published": true,
+        "draft_url": "https://hashnode.com/draft/6aac7f0c10121822668d45d0",
+        "cover_set": true,
+        "subheading_set": true,
+        "tags_set": true,
+        "canonical_set": true,
+        "syndicated_at": "2026-09-18T00:01:08+00:00"
+      },
+      "devto": {
+        "id": 4687125,
+        "url": "https://dev.to/codenameone/lies-damn-lies-and-benchmarks-1f4p",
+        "syndicated_at": "2026-09-18T17:04:19+00:00"
+      },
+      "foojay": {
+        "id": 62,
+        "url": "https://github.com/foojayio/website/pull/62",
+        "pull_request_url": "https://github.com/foojayio/website/pull/62",
+        "status": "submitted",
+        "published": false,
+        "syndicated_at": "2026-09-18T17:04:35+00:00"
+      },
+      "medium": {
+        "url": "https://medium.com/p/335c13fda7d8/edit",
+        "syndicated_at": "2026-09-18T19:02:23+00:00"
+      }
+    },
+    "parparvm-gc-small-heaps": {
+      "hashnode": {
+        "url": "https://debugagent.com/what-go-taught-us-about-java-garbage-collection",
+        "published": true,
+        "draft_url": "https://hashnode.com/draft/6aadd08dbef4ed95a6696337",
+        "cover_set": true,
+        "subheading_set": true,
+        "tags_set": true,
+        "canonical_set": true,
+        "syndicated_at": "2026-09-19T00:01:08+00:00"
+      },
+      "devto": {
+        "id": 4695229,
+        "url": "https://dev.to/codenameone/what-go-taught-us-about-java-garbage-collection-25ha",
+        "syndicated_at": "2026-09-19T16:28:01+00:00"
+      },
+      "medium": {
+        "url": "https://medium.com/p/9d366328ed49/edit",
+        "syndicated_at": "2026-09-19T19:00:35+00:00"
+      }
+    },
+    "hashmap-misses-probe-sequence": {
+      "hashnode": {
+        "url": "https://debugagent.com/faster-maps-chasing-swiss-speed",
+        "published": true,
+        "draft_url": "https://hashnode.com/draft/6aaf22113a322f44e7900163",
+        "cover_set": true,
+        "subheading_set": true,
+        "tags_set": true,
+        "canonical_set": true,
+        "syndicated_at": "2026-09-20T00:01:11+00:00"
+      },
+      "devto": {
+        "id": 4700812,
+        "url": "https://dev.to/codenameone/faster-maps-chasing-swiss-speed-pl7",
+        "syndicated_at": "2026-09-20T16:47:29+00:00"
+      },
+      "medium": {
+        "url": "https://medium.com/p/c644f89ec993/edit",
+        "syndicated_at": "2026-09-20T17:01:25+00:00"
+      }
+    },
+    "startup-cost-before-first-paint": {
+      "hashnode": {
+        "url": "https://debugagent.com/faster-starts-less-javascript-overhead",
+        "published": true,
+        "draft_url": "https://hashnode.com/draft/6ab073916db0cef128157930",
+        "cover_set": true,
+        "subheading_set": true,
+        "tags_set": true,
+        "canonical_set": true,
+        "syndicated_at": "2026-09-21T00:01:14+00:00"
+      },
+      "devto": {
+        "id": 4709942,
+        "url": "https://dev.to/codenameone/faster-starts-less-javascript-overhead-297m",
+        "syndicated_at": "2026-09-21T18:40:10+00:00"
+      },
+      "medium": {
+        "url": "https://medium.com/p/8cd5f0d19069/edit",
+        "syndicated_at": "2026-09-21T19:01:33+00:00"
+      }
+    },
+    "continuity-restoring-work": {
+      "devto": {
+        "id": 4718195,
+        "url": "https://dev.to/codenameone/native-drag-and-drop-meets-cross-device-continuity-36nd",
+        "syndicated_at": "2026-09-22T17:38:06+00:00"
+      },
+      "medium": {
+        "url": "https://medium.com/p/2547af3e68f0/edit",
+        "syndicated_at": "2026-09-22T19:02:29+00:00"
       }
     }
   }

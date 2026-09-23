@@ -4653,7 +4653,12 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                 }
             };
             backgroundMediaServiceConnection = mConnection;
-            boolean boundSuccess = getContext().bindService(serviceIntent, mConnection, getContext().BIND_AUTO_CREATE);
+            // Context.BIND_AUTO_CREATE, not getContext().BIND_AUTO_CREATE: it is a static
+            // constant, so reading it through an instance calls getContext() only to throw the
+            // result away -- which is what SpotBugs reports as
+            // RV_RETURN_VALUE_IGNORED_NO_SIDE_EFFECT.
+            boolean boundSuccess = getContext().bindService(serviceIntent, mConnection,
+                    Context.BIND_AUTO_CREATE);
             if (!boundSuccess) {
                 throw new RuntimeException("Failed to bind background media service for uri "+uri);
             }
@@ -5972,7 +5977,12 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             if (mode == null) {
                 String shared = d.getProperty("nativeTheme",
                         d.getProperty("cn1.nativeTheme", null));
-                if ("modern".equalsIgnoreCase(shared)) {
+                // "native" is "modern plus the desktop": the desktop half belongs to
+                // the JavaSE port, and Android's own answer to "the platform's own
+                // look" is Material either way. Without it the value fell through to
+                // the hololight default below, so asking for the native look got the
+                // legacy one.
+                if ("modern".equalsIgnoreCase(shared) || "native".equalsIgnoreCase(shared)) {
                     mode = "material";
                 } else if ("legacy".equalsIgnoreCase(shared)) {
                     mode = "hololight";
@@ -14236,7 +14246,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                         FileSystemStorage.getInstance().toNativePath(databaseName), null,
                         KEEP_ON_CORRUPTION);
             } else {
-                db = getContext().openOrCreateDatabase(databaseName, getContext().MODE_PRIVATE,
+                db = getContext().openOrCreateDatabase(databaseName, Context.MODE_PRIVATE,
                         null, KEEP_ON_CORRUPTION);
             }
         } catch (RuntimeException didNotOpen) {
@@ -18594,6 +18604,74 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     @Override
     public byte[] aesDecrypt(String transformation, byte[] key, byte[] iv, byte[] aad, byte[] ciphertext) {
         return androidAes(transformation, key, iv, aad, ciphertext, javax.crypto.Cipher.DECRYPT_MODE);
+    }
+
+    /// PBKDF2 through the JCE, over the password **bytes** the caller supplied.
+    ///
+    /// Not `SecretKeyFactory` with a `PBEKeySpec`, which takes a `char[]` and encodes it with
+    /// whichever rule the provider happens to use -- and the whole point of this derivation is
+    /// that Android, iOS and a browser produce identical bytes from identical input. The loop
+    /// below is RFC 8018 over `Mac`, which has no latitude in it, so the bytes are the ones the
+    /// portable fallback in `KdfProfile` and the browser's `deriveBits` produce.
+    @Override
+    public byte[] pbkdf2(String hashAlgorithm, byte[] password, byte[] salt, int iterations, int length) {
+        try {
+            String macName = "HmacSHA256";
+            if (hashAlgorithm != null && hashAlgorithm.indexOf("512") >= 0) {
+                macName = "HmacSHA512";
+            }
+            if (password == null || password.length == 0) {
+                // SecretKeySpec throws IllegalArgumentException for a zero-length key, which is
+                // not a GeneralSecurityException and would escape the catch below. Answering
+                // null is this method's own contract for "no native derivation here", so the
+                // caller falls back to the portable implementation, which zero-pads the key the
+                // way RFC 2104 says to.
+                return null;
+            }
+            javax.crypto.Mac mac = javax.crypto.Mac.getInstance(macName);
+            mac.init(new javax.crypto.spec.SecretKeySpec(password, macName));
+            int hashLength = mac.getMacLength();
+            int blocks = (length + hashLength - 1) / hashLength;
+            byte[] out = new byte[blocks * hashLength];
+            byte[] block = new byte[salt.length + 4];
+            System.arraycopy(salt, 0, block, 0, salt.length);
+            for (int index = 1; index <= blocks; index++) {
+                block[salt.length] = (byte) (index >>> 24);
+                block[salt.length + 1] = (byte) (index >>> 16);
+                block[salt.length + 2] = (byte) (index >>> 8);
+                block[salt.length + 3] = (byte) index;
+                byte[] u = mac.doFinal(block);
+                byte[] accumulated = new byte[hashLength];
+                System.arraycopy(u, 0, accumulated, 0, hashLength);
+                for (int round = 1; round < iterations; round++) {
+                    u = mac.doFinal(u);
+                    for (int iter = 0; iter < hashLength; iter++) {
+                        accumulated[iter] ^= u[iter];
+                    }
+                }
+                System.arraycopy(accumulated, 0, out, (index - 1) * hashLength, hashLength);
+                // Wiped as soon as it has been copied out. The portable implementation these
+                // mirror -- KdfProfile.pbkdf2Portable -- has always done this, and these two
+                // copies drifted from it: every one of these arrays holds the derived key, so
+                // SecureEnvelope wiping the array it is GIVEN cleared one copy of three.
+                //
+                // What cannot be wiped is each round's `u`: Mac.doFinal allocates a new array
+                // and the previous one is unreachable before there is anywhere to zero it from.
+                // That is inherent to the JCE shape rather than an omission here, and it is the
+                // same in the portable version.
+                java.util.Arrays.fill(accumulated, (byte) 0);
+                java.util.Arrays.fill(u, (byte) 0);
+            }
+            byte[] exact = new byte[length];
+            System.arraycopy(out, 0, exact, 0, length);
+            java.util.Arrays.fill(out, (byte) 0);
+            java.util.Arrays.fill(block, (byte) 0);
+            return exact;
+        } catch (java.security.GeneralSecurityException e) {
+            // Null, not an exception: the contract is "no native derivation here", and the caller
+            // falls back to the portable loop rather than failing the unlock.
+            return null;
+        }
     }
 
     private static byte[] androidAes(String transformation, byte[] key, byte[] iv, byte[] aad, byte[] input, int mode) {

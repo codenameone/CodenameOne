@@ -33,7 +33,7 @@ The best way to adapt a design in Codename One today is to treat the mockup as a
 
 ## Further Reading
 
-- [Developer Guide](/developer-guide/)
+- [Developer Guide](/developer-guide/advanced-theming/)
 - [Themeing](/themeing/)
 - [Layout Basics](/layout-basics/)
 - [How Do I Create A 9 Piece Image Border](/how-do-i/how-do-i-create-a-9-piece-image-border/)

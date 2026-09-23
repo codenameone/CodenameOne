@@ -89,6 +89,34 @@ public class MacImplementation extends IOSImplementation {
         return new String[] {"desktop", "tablet", "mac"};
     }
 
+    /// @inheritDoc
+    ///
+    /// Aqua unless the application asks for an iOS theme by name. The port previously
+    /// inherited IOSImplementation's chain, whose only choices are iOSModernTheme,
+    /// iOS7Theme and iPhoneTheme, so a native Mac application installed an iPhone design
+    /// language however its build hints were set. Bundling MacOSAquaTheme.res alongside
+    /// them changed nothing on its own -- nothing loaded it.
+    ///
+    /// `modern` / `liquid` and `ios7` / `flat` stay meaningful and return null so the iOS
+    /// chain handles them, which is how a project that deliberately wants the iOS look on
+    /// macOS keeps it.
+    @Override
+    protected String nativeThemeResourceName(String mode) {
+        if (mode == null || "auto".equals(mode) || "aqua".equals(mode) || "native".equals(mode)) {
+            return "MacOSAquaTheme";
+        }
+        return null;
+    }
+
+    @Override
+    protected String nativeFontName(String fontName) {
+        // Aqua uses AppKit's regular weight and system italics. The iOS-style
+        // modes deliberately retain their historical medium/Helvetica mapping;
+        // changing those aliases would restyle existing modern-mode Mac apps.
+        return nativeThemeResourceName(nativeThemeMode()) != null
+                ? fontName : super.nativeFontName(fontName);
+    }
+
     /// The natives this class needs directly. The window manager owns its own;
     /// density is asked for long before any secondary window exists.
     private final MacNative macNative = new MacNative();

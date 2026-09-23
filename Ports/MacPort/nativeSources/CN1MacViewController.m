@@ -82,9 +82,6 @@ static CodenameOne_GLViewController *singletonInstance = nil;
     return [CN1MacHost sharedHost].renderingView;
 }
 
-/// Historic name from the OpenGL ES backend. There is no EAGL anything here;
-/// the selector is kept because the shared code calls it.
-///
 /// The ACTIVE rendering view, not the main one. The shared drawing ops that ask
 /// for it -- BlurRegion's blur, glass and lens, which read the framebuffer back
 /// and restart it -- run inside whichever window is painting, so answering the
@@ -92,7 +89,11 @@ static CodenameOne_GLViewController *singletonInstance = nil;
 /// following queued drawing pointed at the wrong target. The property already
 /// falls back to the main view whenever no window has claimed the paint, which
 /// is every other caller's case.
-- (id)eaglView {
+///
+/// That is also why this is NOT -view above, which answers the main window's
+/// surface. Two selectors, two different answers, and the shared code picks
+/// deliberately between them.
+- (id)renderingView {
     return [CN1MacHost sharedHost].activeRenderingView;
 }
 

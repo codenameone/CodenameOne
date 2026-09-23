@@ -381,6 +381,24 @@
           return subtle.verify(signatureAlgorithm, key, cn1CryptoBytes(request.signature), cn1CryptoBytes(request.data));
         });
     }
+    if (op === 'pbkdf2') {
+      // RFC 8018 PBKDF2, the one password KDF a browser has. The iteration
+      // count arrives already range-checked by KdfProfile -- clamping it here
+      // instead would put the bound on the side of the boundary an attacker who
+      // can edit stored bytes is on.
+      var kdfHash = cn1CryptoHash(request.hash || 'SHA-256');
+      return subtle.importKey('raw', cn1CryptoBytes(request.password), { name: 'PBKDF2' },
+          false, ['deriveBits'])
+        .then(function(key) {
+          return subtle.deriveBits({
+            name: 'PBKDF2',
+            salt: cn1CryptoBytes(request.salt),
+            iterations: request.iterations | 0,
+            hash: kdfHash
+          }, key, (request.length | 0) * 8);
+        })
+        .then(cn1CryptoResult);
+    }
     if (op === 'generateRsaKeyPair') {
       var generationAlgorithm = {
         name: 'RSA-OAEP',
@@ -401,6 +419,1081 @@
     }
     throw new Error('Unsupported Web Crypto bridge operation: ' + op);
   });
+
+  // CN1_VAULT_BRIDGE_BEGIN -- JavascriptVaultBridgeTest slices between these two
+  // markers and runs what is between them under Node against a stub IndexedDB.
+  // The code here therefore must not reach outside ``global``, ``hostBridge`` and
+  // ``cn1CryptoApi``; adding a dependency on something else in this file breaks
+  // the only test that executes it.
+  // --------------------------------------------------------------------------
+  // Vault device protection -- com.codename1.impl.html5.HTML5DeviceProtection.
+  //
+  // The browser has no key store, and it does have one thing that is close
+  // enough to be worth building on: a CryptoKey created with
+  // ``extractable: false``, kept in IndexedDB. The page can encrypt and decrypt
+  // with it and ``crypto.subtle.exportKey`` on it rejects, so what lands on
+  // disk in the origin's storage is ciphertext beside a key handle that never
+  // becomes bytes here. That is the whole mechanism; everything below is
+  // plumbing and failure classification.
+  //
+  // What it is not: it is not hardware backing (the browser does not say and
+  // cannot be asked), it is not protection from a copied profile (the copy
+  // contains this IndexedDB and the key works there), and it is not protection
+  // from script in this origin (which calls the same decrypt the application
+  // does). The Java side says all three in its class documentation; this
+  // comment repeats them because the temptation to overstate lives here.
+  // --------------------------------------------------------------------------
+
+  var CN1_VAULT_DB = 'cn1-vault';
+  var CN1_VAULT_STORE = 'keys';
+  var CN1_VAULT_NONCE = 12;
+
+  // Status codes, and they must stay in step with HTML5DeviceProtection.
+  var CN1V_OK = 0;
+  var CN1V_KEY_MISSING = 1;
+  var CN1V_AUTH_FAILED = 2;
+  var CN1V_CRYPTO_UNAVAILABLE = 3;
+  var CN1V_STORAGE_UNAVAILABLE = 4;
+  var CN1V_QUOTA_EXCEEDED = 5;
+  var CN1V_INSECURE_CONTEXT = 6;
+  var CN1V_TEMPORARILY_UNREADABLE = 7;
+  var CN1V_UNKNOWN = 8;
+  var CN1V_CANCELLED = 9;
+  var CN1V_POLICY_NOT_MET = 10;
+
+  var cn1VaultDbPromise = null;
+
+  function cn1VaultIndexedDb() {
+    return global.indexedDB || (global.window && global.window.indexedDB) || null;
+  }
+
+  function cn1VaultSecureContext() {
+    // ``isSecureContext`` is defined in workers as well as windows. Treated as
+    // false when absent rather than true: a runtime old enough not to define it
+    // is not one to grant a security claim to.
+    if (typeof global.isSecureContext === 'boolean') {
+      return global.isSecureContext;
+    }
+    if (global.window && typeof global.window.isSecureContext === 'boolean') {
+      return global.window.isSecureContext;
+    }
+    return false;
+  }
+
+  function cn1VaultOpenDb() {
+    // Cached, because every wrap and unwrap opens it and an IndexedDB open is
+    // not free. Dropped on failure so a browser that recovers -- site data
+    // cleared and re-granted, a private window that changed its mind -- is
+    // retried rather than remembered as broken.
+    if (cn1VaultDbPromise) {
+      return cn1VaultDbPromise;
+    }
+    var factory = cn1VaultIndexedDb();
+    if (!factory) {
+      return Promise.reject({ cn1VaultStatus: CN1V_STORAGE_UNAVAILABLE });
+    }
+    cn1VaultDbPromise = new Promise(function(resolve, reject) {
+      var request;
+      try {
+        request = factory.open(CN1_VAULT_DB, 1);
+      } catch (e) {
+        reject({ cn1VaultStatus: CN1V_STORAGE_UNAVAILABLE });
+        return;
+      }
+      request.onupgradeneeded = function() {
+        var db = request.result;
+        if (!db.objectStoreNames.contains(CN1_VAULT_STORE)) {
+          db.createObjectStore(CN1_VAULT_STORE, { keyPath: 'id' });
+        }
+      };
+      request.onsuccess = function() {
+        var db = request.result;
+        // A connection the browser closes under us -- the user clears site data,
+        // the origin is evicted, a version change lands in another tab -- must
+        // not stay in the cache. Every later transaction on it throws, and the
+        // cached promise would keep handing the same dead connection back.
+        db.onclose = function() { cn1VaultDbPromise = null; };
+        db.onversionchange = function() {
+          cn1VaultDbPromise = null;
+          try { db.close(); } catch (ignored) { /* already closing */ }
+        };
+        resolve(db);
+      };
+      request.onerror = function() { reject({ cn1VaultStatus: CN1V_STORAGE_UNAVAILABLE }); };
+      request.onblocked = function() { reject({ cn1VaultStatus: CN1V_TEMPORARILY_UNREADABLE }); };
+    });
+    cn1VaultDbPromise['catch'](function() { cn1VaultDbPromise = null; });
+    return cn1VaultDbPromise;
+  }
+
+  /// Settles when the transaction actually commits.
+  ///
+  /// An IndexedDB request fires ``onsuccess`` while its transaction is still open, so a value
+  /// returned at that point describes a write that has not happened yet: the transaction can
+  /// still abort -- quota, a storage failure, the tab going away -- and everything in it is
+  /// discarded. Handing back a freshly generated key there let the caller wrap real records
+  /// under a key that never became durable, and after a reload the ciphertext beside it, up to
+  /// and including a managed database key, opened with nothing.
+  function cn1VaultCommit(tx) {
+    return new Promise(function(resolve, reject) {
+      tx.oncomplete = function() { resolve(); };
+      tx.onabort = function() {
+        reject(tx.error || { cn1VaultStatus: CN1V_STORAGE_UNAVAILABLE });
+      };
+      // Deliberately NO tx.onerror. preventDefault on a request error stops the default action
+      // -- the abort -- but it does not stop the event PROPAGATING, so a handled ConstraintError
+      // still reaches the transaction. Rejecting there failed the commit for the very case the
+      // handling exists to allow, and the loser of two racing ensureKey calls reported a storage
+      // failure instead of adopting the winner's key. Abort is the authoritative signal: an
+      // error that was not handled aborts, and onabort fires then anyway.
+    });
+  }
+
+  function cn1VaultRequest(store, operation) {
+    return new Promise(function(resolve, reject) {
+      var request;
+      try {
+        request = operation(store);
+      } catch (e) {
+        reject(e);
+        return;
+      }
+      request.onsuccess = function() { resolve(request.result); };
+      request.onerror = function(event) {
+        // Stopped here rather than left to bubble: an unhandled IndexedDB
+        // request error aborts its transaction, which would turn a benign
+        // "this key already exists" into a failed write of everything else.
+        if (request.error && request.error.name === 'ConstraintError') {
+          // preventDefault is what actually stops it. Settling this promise says
+          // nothing to the DOM, so without this the error goes on to abort the
+          // transaction anyway -- which nothing noticed until the commit wait
+          // started observing the outcome, and then the LOSER of two racing
+          // ensureKey calls reported STORAGE_UNAVAILABLE instead of adopting the
+          // winner's key. The comment above described the intent; this line is
+          // the part that carries it out.
+          if (event && event.preventDefault) {
+            event.preventDefault();
+          }
+          resolve(undefined);
+        } else {
+          reject(request.error || { cn1VaultStatus: CN1V_STORAGE_UNAVAILABLE });
+        }
+      };
+    });
+  }
+
+  function cn1VaultRead(keyId) {
+    return cn1VaultOpenDb().then(function(db) {
+      var tx;
+      try {
+        tx = db.transaction(CN1_VAULT_STORE, 'readonly');
+      } catch (closed) {
+        // Opening a transaction on a closed connection throws rather than
+        // calling an error handler. Caught here so the caller sees a storage
+        // failure and not "no key", which is the answer that would have the
+        // Java side create a replacement.
+        cn1VaultDbPromise = null;
+        throw closed;
+      }
+      return cn1VaultRequest(tx.objectStore(CN1_VAULT_STORE), function(store) {
+        return store.get(String(keyId));
+      });
+    });
+  }
+
+  function cn1VaultEnsureKey(keyId) {
+    var api = cn1CryptoApi();
+    return cn1VaultRead(keyId).then(function(existing) {
+      if (existing && existing.key) {
+        return existing.key;
+      }
+      return api.subtle.generateKey({ name: 'AES-GCM', length: 256 }, false, ['encrypt', 'decrypt'])
+        .then(function(key) {
+          return cn1VaultOpenDb().then(function(db) {
+            var tx = db.transaction(CN1_VAULT_STORE, 'readwrite');
+            // ``add`` and not ``put``. This is the whole of the cross-tab
+            // convergence: two tabs that both found nothing each generate a
+            // key, and the store accepts exactly one of them -- the second
+            // fails with a ConstraintError, which cn1VaultRequest turns into
+            // ``undefined`` rather than an error. The loser then re-reads and
+            // adopts the winner's key. ``put`` would let the loser overwrite
+            // the winner, and every record the winner had already wrapped
+            // would be unopenable.
+            return cn1VaultRequest(tx.objectStore(CN1_VAULT_STORE), function(store) {
+              return store.add({ id: String(keyId), key: key, created: 0 });
+            }).then(function(added) {
+              // Committed before the key is handed back. A ConstraintError has already been
+              // turned into ``undefined`` above rather than left to bubble, so the transaction
+              // is still live either way and this waits for its real outcome.
+              return cn1VaultCommit(tx).then(function() {
+                if (added !== undefined) {
+                  return key;
+                }
+                return cn1VaultRead(keyId).then(function(settled) {
+                  if (settled && settled.key) {
+                    return settled.key;
+                  }
+                  throw { cn1VaultStatus: CN1V_STORAGE_UNAVAILABLE };
+                });
+              });
+            });
+          });
+        });
+    });
+  }
+
+  function cn1VaultBytes(value) {
+    if (value == null) {
+      return new Uint8Array(0);
+    }
+    return value instanceof Uint8Array ? value : new Uint8Array(value);
+  }
+
+  /// A string as the UTF-8 bytes a Java native expects after the status byte.
+  ///
+  /// TextEncoder where it exists, which is every browser this port supports; the manual encoder
+  /// is there because the bridge also runs under the test harness, where it may not.
+  function cn1VaultUtf8Bytes(text) {
+    var value = String(text == null ? '' : text);
+    if (typeof TextEncoder === 'function') {
+      return new TextEncoder().encode(value);
+    }
+    var out = [];
+    for (var i = 0; i < value.length; i++) {
+      var cp = value.charCodeAt(i);
+      if (cp >= 0xd800 && cp <= 0xdbff && i + 1 < value.length) {
+        var next = value.charCodeAt(i + 1);
+        if (next >= 0xdc00 && next <= 0xdfff) {
+          cp = 0x10000 + ((cp - 0xd800) << 10) + (next - 0xdc00);
+          i++;
+        }
+      }
+      if (cp < 0x80) {
+        out.push(cp);
+      } else if (cp < 0x800) {
+        out.push(0xc0 | (cp >> 6), 0x80 | (cp & 0x3f));
+      } else if (cp < 0x10000) {
+        out.push(0xe0 | (cp >> 12), 0x80 | ((cp >> 6) & 0x3f), 0x80 | (cp & 0x3f));
+      } else {
+        out.push(0xf0 | (cp >> 18), 0x80 | ((cp >> 12) & 0x3f),
+                 0x80 | ((cp >> 6) & 0x3f), 0x80 | (cp & 0x3f));
+      }
+    }
+    return new Uint8Array(out);
+  }
+
+  function cn1VaultReply(status, payload) {
+    var body = payload == null ? new Uint8Array(0) : cn1VaultBytes(payload);
+    var out = new Array(body.length + 1);
+    out[0] = status & 0xff;
+    for (var i = 0; i < body.length; i++) {
+      out[i + 1] = body[i] & 0xff;
+    }
+    return out;
+  }
+
+  function cn1VaultStatusOf(error) {
+    if (error && typeof error.cn1VaultStatus === 'number') {
+      return error.cn1VaultStatus;
+    }
+    var name = error && error.name ? String(error.name) : '';
+    if (name === 'QuotaExceededError') {
+      return CN1V_QUOTA_EXCEEDED;
+    }
+    if (name === 'OperationError') {
+      // What Web Crypto reports for a failed AES-GCM tag. It is also what it
+      // reports for some malformed inputs, and the two are not distinguishable
+      // from here -- which is fine, because telling a caller which of them it
+      // was would tell an attacker too.
+      return CN1V_AUTH_FAILED;
+    }
+    if (name === 'NotSupportedError' || name === 'InvalidAccessError') {
+      return CN1V_CRYPTO_UNAVAILABLE;
+    }
+    if (name === 'InvalidStateError' || name === 'UnknownError') {
+      return CN1V_STORAGE_UNAVAILABLE;
+    }
+    if (!cn1VaultSecureContext()) {
+      return CN1V_INSECURE_CONTEXT;
+    }
+    return CN1V_UNKNOWN;
+  }
+
+  function cn1VaultCapabilities() {
+    var bits = 0;
+    if (cn1VaultSecureContext()) {
+      bits |= 1;
+    }
+    var api = global.crypto || (global.window && global.window.crypto);
+    if (api && api.subtle) {
+      bits |= 2;
+    }
+    // Opening a database does not prove it can commit a non-extractable CryptoKey. Quota and
+    // structured-clone failures must keep remembered policies unavailable, too.
+    return cn1VaultProbeStorage().then(function() {
+      bits |= 4;
+      return cn1VaultPersisted();
+    }, function() {
+      return false;
+    }).then(function(persisted) {
+      if (persisted) {
+        bits |= 8;
+      }
+      return cn1VaultClientCapabilities.then(function(caps) {
+        if (cn1VaultPrfCapable(caps)) {
+          bits |= 16;
+        }
+        return cn1VaultReply(CN1V_OK, [bits]);
+      });
+    });
+  }
+
+  function cn1VaultProbeStorage() {
+    var id;
+    var addedProbe = false;
+    return Promise.resolve().then(function() {
+      if (!cn1VaultSecureContext()) {
+        throw { cn1VaultStatus: CN1V_INSECURE_CONTEXT };
+      }
+      var api = cn1CryptoApi();
+      var random = cn1VaultRandom(32);
+      id = 'probe:';
+      for (var i = 0; i < random.length; i++) {
+        id += ('0' + random[i].toString(16)).slice(-2);
+      }
+      return api.subtle.generateKey({ name: 'AES-GCM', length: 256 }, false,
+        ['encrypt', 'decrypt']);
+    }).then(function(key) {
+      return cn1VaultOpenDb().then(function(db) {
+        var tx = db.transaction(CN1_VAULT_STORE, 'readwrite');
+        return cn1VaultRequest(tx.objectStore(CN1_VAULT_STORE), function(store) {
+          return store.add({ id: id, key: key, created: 0 });
+        }).then(function(added) {
+          addedProbe = added !== undefined;
+          return cn1VaultCommit(tx).then(function() {
+            if (added === undefined) {
+              throw { cn1VaultStatus: CN1V_STORAGE_UNAVAILABLE };
+            }
+            return cn1VaultRead(id);
+          });
+        });
+      }).then(function(found) {
+        if (!found || !found.key || found.key.extractable !== false) {
+          throw { cn1VaultStatus: CN1V_STORAGE_UNAVAILABLE };
+        }
+        // The clone must remain a usable key, not just a record that resembles one.
+        var nonce = cn1VaultRandom(CN1_VAULT_NONCE);
+        return cn1CryptoApi().subtle.encrypt({ name: 'AES-GCM', iv: nonce }, found.key,
+          new Uint8Array([1])).then(function(sealed) {
+          return cn1CryptoApi().subtle.decrypt({ name: 'AES-GCM', iv: nonce }, key, sealed);
+        });
+      });
+    }).then(function() {
+      return removeProbe();
+    }, function(error) {
+      return removeProbe().then(function() { throw error; }, function() { throw error; });
+    });
+
+    function removeProbe() {
+      if (!addedProbe) {
+        return Promise.resolve();
+      }
+      return cn1VaultOpenDb().then(function(db) {
+        var tx = db.transaction(CN1_VAULT_STORE, 'readwrite');
+        return cn1VaultRequest(tx.objectStore(CN1_VAULT_STORE), function(store) {
+          return store.delete(id);
+        }).then(function() {
+          return cn1VaultCommit(tx);
+        });
+      }).then(function() {
+        return cn1VaultRead(id);
+      }).then(function(remaining) {
+        if (remaining) {
+          throw { cn1VaultStatus: CN1V_STORAGE_UNAVAILABLE };
+        }
+      });
+    }
+  }
+
+  function cn1VaultPersisted() {
+    var nav = global.navigator || (global.window && global.window.navigator);
+    if (!nav || !nav.storage || typeof nav.storage.persisted !== 'function') {
+      return Promise.resolve(false);
+    }
+    return nav.storage.persisted().then(function(value) {
+      return !!value;
+    }, function() {
+      return false;
+    });
+  }
+
+  function cn1VaultPrfCapable(caps) {
+    // Presence of the API, plus the one PRF signal a browser exposes without a
+    // ceremony. Whether a given AUTHENTICATOR implements the extension is still
+    // only discoverable by performing one -- so this bit says "worth offering"
+    // rather than "supported", and the Java side treats it the same way.
+    //
+    // What it must not do is say yes on a browser that has WebAuthn and no PRF
+    // at all: that set CAP_WEBAUTHN_PRF, VaultCapabilities then advertised
+    // REQUIRE_USER_VERIFICATION, applications offered a policy to the user, and
+    // enrolment failed later when the ceremony came back with no prf.enabled.
+    // getClientCapabilities is the browser saying so up front where it exists.
+    var w = global.window || global;
+    if (!(w.PublicKeyCredential && typeof w.PublicKeyCredential === 'function'
+        && w.navigator && w.navigator.credentials)) {
+      return false;
+    }
+    if (caps && typeof caps === 'object') {
+      // Present and false is a definite no; absent means the browser does not
+      // report this, and the ceremony stays the only way to find out.
+      if (caps.extensionPrf === false || caps['extension:prf'] === false) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  // Start once at bridge load. Capability requests await the same result instead of treating
+  // a pending definitive answer as support. Missing/refused APIs leave the ceremony as the
+  // remaining signal, just as browsers without getClientCapabilities do.
+  var cn1VaultClientCapabilities = (function () {
+    try {
+      var w = global.window || global;
+      if (w.PublicKeyCredential
+          && typeof w.PublicKeyCredential.getClientCapabilities === 'function') {
+        return Promise.resolve(w.PublicKeyCredential.getClientCapabilities()).then(function (caps) {
+          return caps;
+        }, function () {
+          return null;
+        });
+      }
+    } catch (ignored) {
+      // Nothing here may prevent the bridge from loading.
+    }
+    return Promise.resolve(null);
+  })();
+
+
+  // --------------------------------------------------------------------------
+  // Passkey-derived key material, via the WebAuthn PRF extension.
+  //
+  // A passkey signature is not an encryption key, and the common mistake is to
+  // treat one as the other -- signing a fixed challenge and hashing the
+  // signature gives something that looks stable and is not: signatures are
+  // randomised, and ECDSA's are different every time. The PRF extension is the
+  // part of WebAuthn that genuinely does derive a key: the authenticator
+  // evaluates its own HMAC secret over a salt we supply, so the same credential
+  // and the same salt give the same 32 bytes every time, and no other credential
+  // can produce them.
+  //
+  // What that buys over the IndexedDB device key: the material does not exist
+  // until the user verifies to the authenticator. A copied browser profile
+  // carries the credential id, which is not a secret, and cannot produce the
+  // PRF output without the authenticator and the user. That is the one place a
+  // browser can offer something the non-extractable CryptoKey cannot.
+  //
+  // What it does not buy: anything at all once the vault is unlocked. The
+  // derived key is in the page's memory from that moment, exactly as the other
+  // path's is.
+  // --------------------------------------------------------------------------
+
+  var CN1_PRF_STORE_PREFIX = 'prf:';
+
+  function cn1VaultWebAuthn() {
+    var w = global.window || global;
+    if (!w.navigator || !w.navigator.credentials || !w.PublicKeyCredential) {
+      return null;
+    }
+    return w.navigator.credentials;
+  }
+
+  function cn1VaultRandom(length) {
+    var out = new Uint8Array(length);
+    cn1CryptoApi().getRandomValues(out);
+    return out;
+  }
+
+  // No relying-party id is set, anywhere in this file, and that is deliberate.
+  // Left unset the browser uses the origin's own effective domain, which is what
+  // a single-origin application wants; setting it from ``location.hostname``
+  // adds a way to get a subdomain deployment wrong and buys nothing.
+  //
+  // Worth knowing separately, because it looks like the same problem and is not:
+  // **WebAuthn does not work on an IP-address origin at all.** A relying-party
+  // id has to be a domain, an IP literal is not one, and Chrome answers
+  // ``SecurityError: This is an invalid domain.`` no matter what is passed --
+  // measured against 127.0.0.1. Serve the application from a hostname, which for
+  // local development means ``localhost`` rather than ``127.0.0.1``.
+
+  function cn1VaultPrfRecord(keyId) {
+    return cn1VaultRead(CN1_PRF_STORE_PREFIX + keyId);
+  }
+
+  /// Stores the credential and answers with the record that actually SETTLED.
+  ///
+  /// Not with the one passed in. ``add`` converges two tabs on a single credential, and the
+  /// loser's own record is discarded -- so a tab that asked for a device-bound passkey and lost
+  /// the race to a tab that did not would otherwise report success and then derive under the
+  /// syncable credential the winner stored. The caller has to see what won in order to judge it,
+  /// so the settled record is what comes back.
+  /// Adds one secure-storage record if its id is free, and answers whichever record settled.
+  ///
+  /// ``add`` and not ``put``, for the reason the device key gives: two tabs opening the same
+  /// managed database both find nothing, both generate a value, and the store must accept
+  /// exactly one. The loser's add fails with a ConstraintError -- which cn1VaultRequest turns
+  /// into ``undefined`` -- and it then re-reads and adopts the winner's record. With ``put`` the
+  /// loser would overwrite the winner, and the database the winner had already created under its
+  /// value would not open again.
+  function cn1SecureStoreSetIfAbsent(entry, sealed) {
+    return cn1VaultOpenDb().then(function(db) {
+      var tx = db.transaction(CN1_VAULT_STORE, 'readwrite');
+      var id = CN1_SECURE_STORE_PREFIX + String(entry);
+      return cn1VaultRequest(tx.objectStore(CN1_VAULT_STORE), function(store) {
+        return store.add({ id: id, sealed: String(sealed), created: 0 });
+      }).then(function() {
+        return cn1VaultCommit(tx).then(function() {
+          // Re-read ALWAYS, not only when the add was refused. A successful add says this tab
+          // won the create; it does not say the record still holds what this tab wrote, because
+          // cn1SecureStoreSet puts into the same id and an ordinary set() from another tab can
+          // land between the add and this answer. Returning ``sealed`` there sent the caller
+          // back its own superseded ciphertext, which it then mirrored into ordinary storage
+          // over the newer value -- a lost update that the atomic create was supposed to rule
+          // out. Whatever the store actually holds is the only answer that cannot be stale.
+          // The add's own result is therefore not read at all, and the refusal path costs
+          // nothing extra: it always needed this read.
+          return cn1VaultOpenDb().then(function(again) {
+            var read = again.transaction(CN1_VAULT_STORE, 'readonly');
+            return cn1VaultRequest(read.objectStore(CN1_VAULT_STORE), function(store) {
+              return store.get(id);
+            }).then(function(found) {
+              if (found && typeof found.sealed === 'string') {
+                return found.sealed;
+              }
+              // Gone between the write and the read -- another tab removed it. Nothing is
+              // stored, and reporting this tab's own value would be a lie about what persisted.
+              throw new Error('NotFoundError');
+            });
+          });
+        });
+      });
+    });
+  }
+
+  /// Reads one secure-storage record without creating it.
+  ///
+  /// The mirror into ordinary Storage needs to know whether the record it is about to copy is
+  /// still the one the store holds. Doing that by calling the create again would be wrong in the
+  /// one case that matters -- a record deleted in between would be RE-CREATED by the probe -- so
+  /// this is its own read-only op.
+  function cn1SecureStoreRead(entry) {
+    return cn1VaultOpenDb().then(function(db) {
+      var read = db.transaction(CN1_VAULT_STORE, 'readonly');
+      return cn1VaultRequest(read.objectStore(CN1_VAULT_STORE), function(store) {
+        return store.get(CN1_SECURE_STORE_PREFIX + String(entry));
+      }).then(function(found) {
+        // An absent record answers the empty string, which the Java side treats as "nothing to
+        // agree with" rather than as a value.
+        return found && typeof found.sealed === 'string' ? found.sealed : '';
+      });
+    });
+  }
+
+  /// Writes one secure-storage record, replacing whatever was there.
+  ///
+  /// ``put`` and not ``add``, because this is set(): last write wins is what it means. What it
+  /// is FOR is that an ordinary set() has to settle in the same place a create does. It used to
+  /// write ordinary Storage only, so a tab paused inside setIfAbsent -- past its "nothing here"
+  /// check -- could create the gate afterwards and mirror its own candidate over the value this
+  /// call had already stored. With both writers going through this store, the create's re-read
+  /// sees the newer record and adopts it, and the one window left is two concurrent set() calls,
+  /// where last-write-wins is the contract rather than a lost update.
+  function cn1SecureStoreSet(entry, sealed) {
+    return cn1VaultOpenDb().then(function(db) {
+      var tx = db.transaction(CN1_VAULT_STORE, 'readwrite');
+      return cn1VaultRequest(tx.objectStore(CN1_VAULT_STORE), function(store) {
+        return store.put({
+          id: CN1_SECURE_STORE_PREFIX + String(entry),
+          sealed: String(sealed),
+          created: 0
+        });
+      }).then(function() {
+        // Durable before it is called done, for the reason on cn1VaultCommit.
+        return cn1VaultCommit(tx);
+      });
+    });
+  }
+
+  /// Releases the gate for one entry ONLY while it still holds the record the caller wrote.
+  ///
+  /// A rollback deletes the gate because the value it just settled could not be mirrored. By the
+  /// time it runs, another tab may have replaced that record through cn1SecureStoreSet -- and
+  /// deleting unconditionally then discards a value whose set() has already reported success,
+  /// after which a third tab that had observed absence wins the empty gate and mirrors over it.
+  /// The comparison and the delete are in ONE transaction, so nothing can land between them.
+  ///
+  /// Declining is not a failure: it means somebody else owns the record now, which is exactly
+  /// when the caller must not remove it.
+  function cn1SecureStoreForgetIf(entry, expected) {
+    return cn1VaultOpenDb().then(function(db) {
+      var tx = db.transaction(CN1_VAULT_STORE, 'readwrite');
+      var id = CN1_SECURE_STORE_PREFIX + String(entry);
+      var store = tx.objectStore(CN1_VAULT_STORE);
+      return cn1VaultRequest(store, function(s) {
+        return s.get(id);
+      }).then(function(found) {
+        if (!found || typeof found.sealed !== 'string' || found.sealed !== String(expected)) {
+          return cn1VaultCommit(tx);
+        }
+        return cn1VaultRequest(store, function(s) {
+          return s.delete(id);
+        }).then(function() {
+          return cn1VaultCommit(tx);
+        });
+      });
+    });
+  }
+
+  /// Releases the gate for one entry, so a later create can win it again.
+  ///
+  /// remove() clears the value from ordinary storage; without this the record that settled the
+  /// race would stay, and the next setIfAbsent would answer with a credential the caller had
+  /// just been told was forgotten.
+  function cn1SecureStoreForget(entry) {
+    return cn1VaultOpenDb().then(function(db) {
+      var tx = db.transaction(CN1_VAULT_STORE, 'readwrite');
+      return cn1VaultRequest(tx.objectStore(CN1_VAULT_STORE), function(store) {
+        return store.delete(CN1_SECURE_STORE_PREFIX + String(entry));
+      }).then(function() {
+        // Durable before it is called done, for the reason on cn1VaultCommit: a delete that is
+        // still only in a transaction can be lost, and the gate would then outlive the value.
+        return cn1VaultCommit(tx);
+      });
+    });
+  }
+
+  /// Keeps secure-storage records from colliding with the device key and the passkey records,
+  /// which share this object store.
+  var CN1_SECURE_STORE_PREFIX = 'cn1ss.';
+
+  function cn1VaultStorePrfRecord(keyId, record) {
+    return cn1VaultOpenDb().then(function(db) {
+      var tx = db.transaction(CN1_VAULT_STORE, 'readwrite');
+      return cn1VaultRequest(tx.objectStore(CN1_VAULT_STORE), function(store) {
+        // ``add`` for the same reason the device key uses it: two tabs enrolling
+        // at once must converge on one credential rather than the second
+        // replacing the first, whose wraps would then be unopenable.
+        return store.add({
+          id: CN1_PRF_STORE_PREFIX + keyId,
+          credentialId: record.credentialId,
+          salt: record.salt,
+          backupEligible: record.backupEligible,
+          deviceBound: record.deviceBound,
+          created: 0
+        });
+      }).then(function(added) {
+        // Durable before it is described as stored, for the reason on cn1VaultCommit.
+        return cn1VaultCommit(tx).then(function() {
+          if (added !== undefined) {
+            return record;
+          }
+          return cn1VaultPrfRecord(keyId);
+        });
+      });
+    });
+  }
+
+  /// Whether a created credential is allowed to leave this device.
+  ///
+  /// Attachment is the wrong thing to ask. ``authenticatorAttachment: 'platform'``
+  /// is satisfied by an iCloud Keychain passkey, which is platform-attached and
+  /// syncs to every device on the account -- so a check written against
+  /// attachment reports device-binding it does not have.
+  ///
+  /// The flag that actually answers it is BE (backup eligible) in the
+  /// authenticator data: set means the credential may be copied off this device,
+  /// whether or not it has been yet. BS (backup state) says whether it currently
+  /// is. Byte 32 of the authenticator data holds the flags; BE is 0x08, BS 0x10.
+  ///
+  /// Returns null when the browser will not hand over the authenticator data, in
+  /// which case backup eligibility is unknown -- and a caller that required
+  /// device binding must treat unknown as "not guaranteed".
+  function cn1VaultBackupFlags(credential) {
+    try {
+      var response = credential && credential.response;
+      if (!response || typeof response.getAuthenticatorData !== 'function') {
+        return null;
+      }
+      var data = new Uint8Array(response.getAuthenticatorData());
+      if (data.length < 33) {
+        return null;
+      }
+      var flags = data[32];
+      return { backupEligible: (flags & 0x08) !== 0, backedUp: (flags & 0x10) !== 0 };
+    } catch (e) {
+      return null;
+    }
+  }
+
+  /// Whether a stored credential satisfies a device-bound requirement.
+  ///
+  /// Both halves matter and they are different questions. ``backupEligible`` is the BE flag the
+  /// authenticator set: 1 means the credential may sync, and it is also what this port stores
+  /// when the authenticator would not say. ``deviceBound`` records that the credential was
+  /// CREATED under the platform constraint -- without it a roaming security key qualifies, since
+  /// it never syncs to a cloud and so reports backupEligible 0 while being physically carried
+  /// from device to device. Requiring only the flag accepted exactly that.
+  function cn1VaultRecordIsDeviceBound(record) {
+    return !!record && record.backupEligible === 0 && record.deviceBound === 1;
+  }
+
+  /// Creates a passkey and confirms the authenticator will actually evaluate a PRF.
+  ///
+  /// ``prf.enabled`` from the creation ceremony is the only honest signal here:
+  /// most authenticators do not return PRF *results* during creation, so a flow
+  /// that expected them would report every working authenticator as unsupported.
+  /// The salt is generated now and stored beside the credential id, because the
+  /// derived key is a function of both and a lost salt is a lost vault.
+  function cn1VaultPrfEnroll(keyId, userName, deviceBound) {
+    var credentials = cn1VaultWebAuthn();
+    if (!credentials) {
+      return Promise.resolve(cn1VaultReply(CN1V_UNKNOWN, null));
+    }
+    return cn1VaultPrfRecord(keyId).then(function(existing) {
+      if (existing && existing.credentialId) {
+        // An existing credential still has to satisfy the policy being asked for NOW.
+        // Reporting OK on its mere existence is how a vault enrolled with a syncable
+        // passkey kept being re-wrapped under it after the application added
+        // requireDeviceBoundPasskey() -- the strong name over the weaker thing, which
+        // is the one outcome that option exists to prevent. backupEligible is stored
+        // as 1 both for "may leave this device" and for "would not say", and neither
+        // is device bound, so compliance is exactly backupEligible === 0.
+        if (deviceBound && !cn1VaultRecordIsDeviceBound(existing)) {
+          return cn1VaultReply(CN1V_POLICY_NOT_MET, null);
+        }
+        return cn1VaultReply(CN1V_OK, null);
+      }
+      var userId = cn1VaultRandom(16);
+      var options = {
+        challenge: cn1VaultRandom(32),
+        rp: { name: 'Codename One' },
+        user: {
+          id: userId,
+          name: userName || 'vault',
+          displayName: userName || 'vault'
+        },
+        pubKeyCredParams: [
+          { type: 'public-key', alg: -7 },
+          { type: 'public-key', alg: -257 }
+        ],
+        authenticatorSelection: {
+          residentKey: 'required',
+          requireResidentKey: true,
+          userVerification: 'required'
+        },
+        extensions: { prf: {} }
+      };
+      if (deviceBound) {
+        // Narrows the field to authenticators built into this machine. Necessary
+        // and not sufficient -- the BE flag below is what actually decides -- but
+        // it keeps the chooser from offering a phone or a security key for a
+        // credential we are about to refuse anyway.
+        options.authenticatorSelection.authenticatorAttachment = 'platform';
+      }
+      return credentials.create({ publicKey: options }).then(function(credential) {
+        var results = credential.getClientExtensionResults
+          ? credential.getClientExtensionResults() : {};
+        if (!results || !results.prf || !results.prf.enabled) {
+          // The authenticator registered a passkey and will not evaluate a PRF.
+          // Reported as unsupported rather than kept: a credential that cannot
+          // derive is a prompt with nothing behind it.
+          return cn1VaultReply(CN1V_UNKNOWN, null);
+        }
+        var flags = cn1VaultBackupFlags(credential);
+        if (deviceBound && (flags === null || flags.backupEligible)) {
+          // Refused rather than kept. The application asked for a key that cannot
+          // leave this device, and this credential either may leave it or will
+          // not say -- and a credential kept here would silently be the weaker
+          // thing under the stronger name. The passkey itself stays on the
+          // authenticator; only this vault's reference to it is dropped.
+          return cn1VaultReply(CN1V_POLICY_NOT_MET, null);
+        }
+        var record = {
+          credentialId: new Uint8Array(credential.rawId),
+          salt: cn1VaultRandom(32),
+          backupEligible: flags === null ? 1 : (flags.backupEligible ? 1 : 0),
+          deviceBound: deviceBound ? 1 : 0
+        };
+        return cn1VaultStorePrfRecord(keyId, record).then(function(settled) {
+          // Judged against what settled, not against what this tab created. Another tab can
+          // win the add between the read at the top of this function and here, and if it was
+          // not asking for a device-bound credential its syncable one is now the vault's --
+          // which is exactly the credential requireDeviceBoundPasskey() exists to refuse.
+          if (!settled || !settled.credentialId) {
+            return cn1VaultReply(CN1V_STORAGE_UNAVAILABLE, null);
+          }
+          if (deviceBound && !cn1VaultRecordIsDeviceBound(settled)) {
+            return cn1VaultReply(CN1V_POLICY_NOT_MET, null);
+          }
+          return cn1VaultReply(CN1V_OK, null);
+        });
+      }, function(error) {
+        return cn1VaultReply(cn1VaultPrfStatusOf(error), null);
+      });
+    }, function(error) {
+      return cn1VaultReply(cn1VaultStatusOf(error), null);
+    });
+  }
+
+  /// Derives the 32 bytes for this vault, prompting the user.
+  function cn1VaultPrfDerive(keyId) {
+    var credentials = cn1VaultWebAuthn();
+    if (!credentials) {
+      return Promise.resolve(cn1VaultReply(CN1V_UNKNOWN, null));
+    }
+    return cn1VaultPrfRecord(keyId).then(function(record) {
+      if (!record || !record.credentialId) {
+        return cn1VaultReply(CN1V_KEY_MISSING, null);
+      }
+      var options = {
+        challenge: cn1VaultRandom(32),
+        allowCredentials: [{
+          type: 'public-key',
+          id: cn1VaultBytes(record.credentialId)
+        }],
+        userVerification: 'required',
+        extensions: { prf: { eval: { first: cn1VaultBytes(record.salt) } } }
+      };
+      return credentials.get({ publicKey: options }).then(function(assertion) {
+        var results = assertion.getClientExtensionResults
+          ? assertion.getClientExtensionResults() : {};
+        var first = results && results.prf && results.prf.results
+          ? results.prf.results.first : null;
+        if (!first) {
+          return cn1VaultReply(CN1V_UNKNOWN, null);
+        }
+        return cn1VaultReply(CN1V_OK, new Uint8Array(first));
+      }, function(error) {
+        return cn1VaultReply(cn1VaultPrfStatusOf(error), null);
+      });
+    }, function(error) {
+      return cn1VaultReply(cn1VaultStatusOf(error), null);
+    });
+  }
+
+  /// Whether a passkey is enrolled for this vault, asked without prompting anybody.
+  ///
+  /// Separate from deriving on purpose: a capability question must not put a
+  /// biometric prompt on screen, and a caller deciding whether to offer the
+  /// option would otherwise have to ask for the thing it is offering.
+  function cn1VaultPrfState(keyId) {
+    return cn1VaultPrfRecord(keyId).then(function(record) {
+      if (!record || !record.credentialId) {
+        return cn1VaultReply(CN1V_OK, [0, 0]);
+      }
+      // Second byte: 1 when the credential may leave this device, or when the
+      // browser would not say. Unknown is reported as "may leave" on purpose --
+      // an application describing its own protection to a user must not round a
+      // missing answer up into a guarantee.
+      return cn1VaultReply(CN1V_OK, [1, record.backupEligible ? 1 : 0]);
+    }, function(error) {
+      return cn1VaultReply(cn1VaultStatusOf(error), null);
+    });
+  }
+
+  function cn1VaultPrfForget(keyId) {
+    return cn1VaultOpenDb().then(function(db) {
+      var tx = db.transaction(CN1_VAULT_STORE, 'readwrite');
+      return cn1VaultRequest(tx.objectStore(CN1_VAULT_STORE), function(store) {
+        return store['delete'](CN1_PRF_STORE_PREFIX + String(keyId));
+      }).then(function() {
+        // A deletion is not a deletion until its transaction commits, for the same reason a
+        // write is not a write. Reporting OK on the request alone let "forget this device"
+        // succeed while the record survived the abort -- and a later enrolment would then find
+        // it and adopt it.
+        return cn1VaultCommit(tx).then(function() {
+          return cn1VaultReply(CN1V_OK, null);
+        });
+      });
+      // then(null, fn) and not then(ok, fn): a handler passed as the SECOND argument sees only
+      // the rejection of the promise it is attached to, never one raised inside its own sibling
+      // -- so the commit rejection above sailed past it and became an unhandled rejection.
+    }).then(null, function(error) {
+      return cn1VaultReply(cn1VaultStatusOf(error), null);
+    });
+  }
+
+  function cn1VaultPrfStatusOf(error) {
+    var name = error && error.name ? String(error.name) : '';
+    if (name === 'NotAllowedError' || name === 'AbortError') {
+      // The user dismissed the prompt, or it timed out. Not a failure to report
+      // as one: the difference between "cancelled" and "failed" is the
+      // difference between an error dialog and no dialog.
+      return CN1V_CANCELLED;
+    }
+    if (name === 'InvalidStateError') {
+      // A credential for this relying party already exists on the authenticator.
+      return CN1V_KEY_MISSING;
+    }
+    if (name === 'NotSupportedError' || name === 'ConstraintError') {
+      return CN1V_UNKNOWN;
+    }
+    if (name === 'SecurityError') {
+      return CN1V_INSECURE_CONTEXT;
+    }
+    return cn1VaultStatusOf(error);
+  }
+
+  hostBridge.register('__cn1_vault__', function(request) {
+    var op = request && request.op;
+    try {
+      if (op === 'capabilities') {
+        return cn1VaultCapabilities();
+      }
+      if (op === 'keyState') {
+        return cn1VaultRead(request.keyId).then(function(existing) {
+          return cn1VaultReply(CN1V_OK, [existing && existing.key ? 1 : 0]);
+        }, function(error) {
+          // Deliberately not "absent". A store that could not be asked and a
+          // store that answered "nothing here" lead to opposite decisions on
+          // the Java side, and collapsing them is how a device key that was
+          // there all along gets replaced.
+          return cn1VaultReply(cn1VaultStatusOf(error), null);
+        });
+      }
+      if (op === 'secureStoreForgetIf') {
+        return cn1SecureStoreForgetIf(request.entry, request.sealed).then(function() {
+          return cn1VaultReply(CN1V_OK, null);
+        }, function(error) {
+          return cn1VaultReply(cn1VaultStatusOf(error), null);
+        });
+      }
+      if (op === 'secureStoreForget') {
+        return cn1SecureStoreForget(request.entry).then(function() {
+          return cn1VaultReply(CN1V_OK, null);
+        }, function(error) {
+          return cn1VaultReply(cn1VaultStatusOf(error), null);
+        });
+      }
+      if (op === 'secureStoreRead') {
+        return cn1SecureStoreRead(request.entry).then(function(sealed) {
+          return cn1VaultReply(CN1V_OK, cn1VaultUtf8Bytes(sealed));
+        }, function(error) {
+          return cn1VaultReply(cn1VaultStatusOf(error), null);
+        });
+      }
+      if (op === 'secureStoreSet') {
+        return cn1SecureStoreSet(request.entry, request.sealed).then(function() {
+          return cn1VaultReply(CN1V_OK, null);
+        }, function(error) {
+          return cn1VaultReply(cn1VaultStatusOf(error), null);
+        });
+      }
+      if (op === 'secureStoreSetIfAbsent') {
+        return cn1SecureStoreSetIfAbsent(request.entry, request.sealed).then(function(settled) {
+          return cn1VaultReply(CN1V_OK, cn1VaultUtf8Bytes(settled));
+        }, function(error) {
+          return cn1VaultReply(cn1VaultStatusOf(error), null);
+        });
+      }
+      if (op === 'ensureKey') {
+        return cn1VaultEnsureKey(request.keyId).then(function() {
+          return cn1VaultReply(CN1V_OK, null);
+        }, function(error) {
+          return cn1VaultReply(cn1VaultStatusOf(error), null);
+        });
+      }
+      if (op === 'wrap') {
+        var api = cn1CryptoApi();
+        return cn1VaultEnsureKey(request.keyId).then(function(key) {
+          var nonce = new Uint8Array(CN1_VAULT_NONCE);
+          // Fresh for every wrap, from the platform CSPRNG. A repeated nonce
+          // under one AES-GCM key is catastrophic rather than merely weak, and
+          // there is no code path here that can supply one from outside.
+          api.getRandomValues(nonce);
+          var algorithm = { name: 'AES-GCM', iv: nonce, tagLength: 128 };
+          if (request.aad != null) {
+            algorithm.additionalData = cn1VaultBytes(request.aad);
+          }
+          return api.subtle.encrypt(algorithm, key, cn1VaultBytes(request.data))
+            .then(function(cipher) {
+              var body = new Uint8Array(CN1_VAULT_NONCE + cipher.byteLength);
+              body.set(nonce, 0);
+              body.set(new Uint8Array(cipher), CN1_VAULT_NONCE);
+              return cn1VaultReply(CN1V_OK, body);
+            });
+        }, function(error) {
+          return cn1VaultReply(cn1VaultStatusOf(error), null);
+        })['catch'](function(error) {
+          return cn1VaultReply(cn1VaultStatusOf(error), null);
+        });
+      }
+      if (op === 'unwrap') {
+        var cryptoApi = cn1CryptoApi();
+        var sealed = cn1VaultBytes(request.data);
+        if (sealed.length <= CN1_VAULT_NONCE) {
+          return cn1VaultReply(CN1V_UNKNOWN, null);
+        }
+        return cn1VaultRead(request.keyId).then(function(existing) {
+          if (!existing || !existing.key) {
+            // Definite, because the read succeeded. This is the one answer that
+            // lets the Java side create a replacement key.
+            return cn1VaultReply(CN1V_KEY_MISSING, null);
+          }
+          var algorithm = {
+            name: 'AES-GCM',
+            iv: sealed.subarray(0, CN1_VAULT_NONCE),
+            tagLength: 128
+          };
+          if (request.aad != null) {
+            algorithm.additionalData = cn1VaultBytes(request.aad);
+          }
+          return cryptoApi.subtle.decrypt(algorithm, existing.key, sealed.subarray(CN1_VAULT_NONCE))
+            .then(function(plain) {
+              return cn1VaultReply(CN1V_OK, new Uint8Array(plain));
+            }, function() {
+              // No partial result, no "here is what we got". A failed tag means
+              // the bytes are not trustworthy and there is nothing to hand back.
+              return cn1VaultReply(CN1V_AUTH_FAILED, null);
+            });
+        }, function(error) {
+          return cn1VaultReply(cn1VaultStatusOf(error), null);
+        });
+      }
+      if (op === 'prfEnroll') {
+        return cn1VaultPrfEnroll(String(request.keyId), request.userName, !!request.deviceBound);
+      }
+      if (op === 'prfDerive') {
+        return cn1VaultPrfDerive(String(request.keyId));
+      }
+      if (op === 'prfState') {
+        return cn1VaultPrfState(String(request.keyId));
+      }
+      if (op === 'prfForget') {
+        return cn1VaultPrfForget(String(request.keyId));
+      }
+      if (op === 'deleteKey') {
+        return cn1VaultOpenDb().then(function(db) {
+          var tx = db.transaction(CN1_VAULT_STORE, 'readwrite');
+          return cn1VaultRequest(tx.objectStore(CN1_VAULT_STORE), function(store) {
+            return store['delete'](String(request.keyId));
+          }).then(function() {
+            // Committed before it is called deleted; see cn1VaultPrfForget.
+            return cn1VaultCommit(tx).then(function() {
+              return cn1VaultReply(CN1V_OK, null);
+            });
+          });
+          // then(null, fn); see cn1VaultPrfForget for why the second-argument form is wrong here.
+        }).then(null, function(error) {
+          return cn1VaultReply(cn1VaultStatusOf(error), null);
+        });
+      }
+    } catch (e) {
+      return cn1VaultReply(cn1VaultStatusOf(e), null);
+    }
+    return cn1VaultReply(CN1V_UNKNOWN, null);
+  });
+
+  // CN1_VAULT_BRIDGE_END
 
   var hostRefNextId = 1;
   var hostRefById = {};
@@ -2255,6 +3348,11 @@
     if (!s || !s.canvas || !el) {
       return null;
     }
+    // These are CSSOM property writes, not inline CSS, and a generated Content-Security-Policy
+    // does not govern them: style-src covers <style> elements and style="" attributes, and the
+    // spec has no hook in CSSStyleDeclaration's setters. A review round read this as blocked
+    // under the generated policy; the thing that really was blocked was the style="" attribute
+    // the page itself carried, which index.html now sets from its stylesheet instead.
     if (r.cssWidth != null && s.canvas.style) {
       s.canvas.style.width = r.cssWidth;
     }
@@ -4130,9 +5228,16 @@
         // thumbnail on a white page in most browsers. Wrap it in a page-filling
         // <img> so the printout actually shows the image.
         var dataUrl = 'data:' + mimeType + ';base64,' + b64;
+        // A srcdoc document inherits the embedder's CSP, so this <style> is governed by
+        // the generated style-src and would be dropped -- taking the page-filling layout
+        // with it -- unless its hash is listed. The marker below is what
+        // JavascriptSecurityHeaders scans for: it hashes the literal out of the bridge as
+        // it was emitted, so the policy always describes the text that actually ships.
+        // Keep it a single-line, single-quoted literal with no escapes; the generator
+        // fails the build rather than guess if that stops being true.
+        var printStyle = /* cn1-csp-style */ '@page{margin:0}html,body{margin:0;padding:0;background:#fff}img{display:block;width:100%;height:auto}';
         var html = '<!DOCTYPE html><html><head><meta charset="utf-8">'
-          + '<style>@page{margin:0}html,body{margin:0;padding:0;background:#fff}'
-          + 'img{display:block;width:100%;height:auto}</style></head>'
+          + '<style>' + printStyle + '</style></head>'
           + '<body><img src="' + dataUrl + '"></body></html>';
         try { iframe.srcdoc = html; }
         catch (e) { iframe.src = 'data:text/html;charset=utf-8,' + encodeURIComponent(html); }
@@ -5001,6 +6106,14 @@
           tryLoad(0);
           return;
         }
+        // Legacy path, reached only where the CSS Font Loading API above is missing. The
+        // rule is built from the font's own name and URL, so it has no fixed text and
+        // cannot be hashed into style-src the way the print style above is -- a generated
+        // CSP therefore blocks it. That is detectable rather than silent: a <style> the
+        // policy refused never gets a CSSOM sheet, so styleEl.sheet stays null, and this
+        // reports the font as not loaded instead of claiming success for a rule that was
+        // dropped.
+        var styleBlocked = false;
         if (typeof document !== 'undefined' && document.head) {
           var styleEl = document.createElement('style');
           var escapedName = cssStringEscape(fontName);
@@ -5011,6 +6124,13 @@
               + "src: url('" + escapedUrl + "') format('" + escapedFormat + "'); }"
           ));
           document.head.appendChild(styleEl);
+          styleBlocked = !styleEl.sheet;
+        }
+        if (styleBlocked) {
+          resolve({ loaded: false, path: 'styleOnly',
+            error: 'the @font-face rule was blocked by the page Content-Security-Policy; '
+              + 'this browser has no CSS Font Loading API to use instead' });
+          return;
         }
         if (typeof WebFont !== 'undefined' && typeof WebFont.load === 'function') {
           WebFont.load({

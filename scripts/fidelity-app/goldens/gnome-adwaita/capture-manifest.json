@@ -1,0 +1,34 @@
+{
+  "schema": 1,
+  "platform": "gnome",
+  "golden_set": "gnome-adwaita",
+  "mode": "capture",
+  "toolkit": {
+    "name": "GTK4",
+    "gtk": "4.14.5",
+    "libadwaita": "1.5.0",
+    "gsk_renderer": "cairo"
+  },
+  "display": {
+    "scale_factor": 1,
+    "gdk_scale": "1",
+    "gdk_dpi_scale": "1"
+  },
+  "appearance": {
+    "color_scheme": "dark",
+    "dark": true,
+    "high_contrast": false,
+    "animations_enabled": false
+  },
+  "fonts": {
+    "gtk_font_name": "Cantarell 11",
+    "resolved": ""
+  },
+  "window": {
+    "active": true
+  },
+  "tiles_written": 104,
+  "backdrop_by_appearance": {"light": "#FAFAFA", "dark": "#242424"},
+  "states_identical_to_normal": ["DesktopTextField_hover_light", "DesktopTextField_hover_dark"],
+  "blockers": []
+}

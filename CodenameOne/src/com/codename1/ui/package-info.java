@@ -124,7 +124,7 @@
 ///
 /// ### Dialog
 ///
-/// ![](https://www.codenameone.com/developer-guide/img/components-dialog-modal-south.png)
+/// ![](https://www.codenameone.com/developer-guide/img/generated/components-dialog-modal-south.png)
 /// `com.codename1.ui.Dialog` allows us to notify/ask the user in a modal/modless way.
 ///
 /// ### InfiniteContainer
@@ -141,7 +141,7 @@
 ///
 /// ### List
 ///
-/// ![](https://www.codenameone.com/developer-guide/img/components-generic-list-cell-renderer.png)
+/// ![](https://www.codenameone.com/developer-guide/img/generated/components-generic-list-cell-renderer.png)
 /// `com.codename1.ui.List` a list of items, this is a rather elaborate component to work with!
 /// We often
 /// recommend just using `com.codename1.ui.Container`, `com.codename1.ui.InfiniteContainer` or
@@ -165,7 +165,7 @@
 ///
 /// ### SwipeableContainer
 ///
-/// ![](https://www.codenameone.com/developer-guide/img/components-swipablecontainer.png)
+/// ![](https://www.codenameone.com/developer-guide/img/generated/components-swipablecontainer.png)
 /// `com.codename1.ui.SwipeableContainer` enables side swipe gesture to expose additional
 /// functionality
 ///
@@ -179,12 +179,12 @@
 ///
 /// ### Carousel
 ///
-/// ![](https://www.codenameone.com/developer-guide/img/components-tabs-swipe1.png)
+/// ![](https://www.codenameone.com/developer-guide/img/generated/components-tabs-swipe1.png)
 /// `com.codename1.ui.Tabs` can also be used as a swipe carousel
 ///
 /// ### TextArea/Field
 ///
-/// ![](https://www.codenameone.com/developer-guide/img/components-text-component.png)
+/// ![](https://www.codenameone.com/developer-guide/img/generated/components-text-component.png)
 /// `com.codename1.ui.TextArea` & `com.codename1.ui.TextField` allow for user input
 /// via
 /// the keyboard (virtual or otherwise)
@@ -204,7 +204,7 @@
 ///
 /// ### Tree
 ///
-/// ![](https://www.codenameone.com/developer-guide/img/components-tree-xml.png)
+/// ![](https://www.codenameone.com/developer-guide/img/generated/components-tree-xml.png)
 /// `com.codename1.ui.tree.Tree` displays data in a tree like hierarchy
 ///
 /// ### ChartComponent
@@ -226,7 +226,7 @@
 ///
 /// ### InteractionDialog
 ///
-/// ![](https://www.codenameone.com/developer-guide/img/components-interaction-dialog.png)
+/// ![](https://www.codenameone.com/developer-guide/img/generated/components-interaction-dialog.png)
 /// `com.codename1.components.InteractionDialog` an "always on top" `com.codename1.ui.Dialog`
 /// used for non-form modal UI patterns. You can make static `Dialog.show(...)` use
 /// `InteractionDialog` by default with the theme constant `defaultInteractionDialogModeBool`

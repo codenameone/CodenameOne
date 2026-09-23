@@ -65,3 +65,76 @@ if [ ! -f "backend/target/classes/$ROUTER_DIR/ApiRouter.class" ]; then
   echo "no router was generated for the @RestController" >&2
   exit 1
 fi
+
+# `cn1:backend-package` -- the goal that turns the module above into a native
+# binary -- ON A JDK THAT IS NOT 8, with JDK_8_HOME deliberately unset.
+#
+# It used to demand a JDK 8 and refuse to run without one, so a developer on a
+# current JDK was told to install a compiler from 2014 to build a server. Nothing
+# noticed, because nothing had ever run this goal: the checks above stop at
+# process-classes, and the two platform builds are behind their own SDK checks.
+# The premise was that a newer javac emits class files the translator cannot read;
+# it does not, because the compile passes -source 1.8 -target 1.8 and the class
+# file version is 52 whichever javac produces it.
+#
+# So the variable is REMOVED from the environment rather than left alone. With it
+# set -- and CI sets it -- the goal would take that path and this would pass while
+# the developer's build still failed.
+#
+# CN1_BACKEND_PACKAGE_JDK names the JDK to use; without it, whatever is running.
+# The point of the check is a JDK that is not 8, so a caller that has one says so.
+BACKEND_PACKAGE_JDK="${CN1_BACKEND_PACKAGE_JDK:-$JAVA_HOME}"
+if [ -z "$BACKEND_PACKAGE_JDK" ]; then
+  echo "neither CN1_BACKEND_PACKAGE_JDK nor JAVA_HOME names a JDK" >&2
+  exit 1
+fi
+if ! command -v clang >/dev/null 2>&1; then
+  # Skipping is a result, and a silent one reads exactly like a pass. Required
+  # says which machines must not skip: CI sets it, a laptop without clang does not.
+  if [ "${CN1_BACKEND_PACKAGE_REQUIRED:-0}" = "1" ]; then
+    echo "clang is required to package a backend and is not on PATH" >&2
+    exit 1
+  fi
+  echo "NOTE skipping cn1:backend-package: no clang on PATH"
+else
+  echo "packaging the backend natively with $BACKEND_PACKAGE_JDK"
+  env -u JDK_8_HOME JAVA_HOME="$BACKEND_PACKAGE_JDK" \
+    mvn -pl backend -Dcodename1.platform=backend cn1:backend-package
+
+  BACKEND_BIN="backend/target/myapp1-backend"
+  if [ ! -x "$BACKEND_BIN" ]; then
+    echo "cn1:backend-package produced no executable at $BACKEND_BIN" >&2
+    exit 1
+  fi
+  # RUN it. "The file exists" would have passed on a binary that cannot start,
+  # and the whole claim of this goal is a server you can deploy -- so the check is
+  # an actual request answered by an actual process. /healthz is the route the
+  # generated Api declares.
+  BACKEND_PORT="${CN1_BACKEND_PACKAGE_PORT:-18080}"
+  PORT="$BACKEND_PORT" "./$BACKEND_BIN" > backend/target/backend-run.log 2>&1 &
+  BACKEND_PID=$!
+  trap 'kill -9 $BACKEND_PID 2>/dev/null || true; set_auto_bundle_pref false' EXIT
+  HEALTH=""
+  for attempt in $(seq 1 60); do
+    HEALTH="$(curl -s -m 1 "http://127.0.0.1:$BACKEND_PORT/healthz" || true)"
+    if [ "$HEALTH" = "ok" ]; then
+      break
+    fi
+    # The process dying is the failure this loop must not sit through for a
+    # minute; kill -0 asks whether it is still there.
+    if ! kill -0 $BACKEND_PID 2>/dev/null; then
+      echo "the packaged backend exited before answering:" >&2
+      cat backend/target/backend-run.log >&2
+      exit 1
+    fi
+    sleep 1
+  done
+  kill -9 $BACKEND_PID 2>/dev/null || true
+  trap 'set_auto_bundle_pref false' EXIT
+  if [ "$HEALTH" != "ok" ]; then
+    echo "the packaged backend did not answer /healthz with ok (got '$HEALTH'):" >&2
+    cat backend/target/backend-run.log >&2
+    exit 1
+  fi
+  echo "the packaged backend answered /healthz"
+fi

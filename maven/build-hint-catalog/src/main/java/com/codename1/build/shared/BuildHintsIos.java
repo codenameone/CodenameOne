@@ -516,14 +516,6 @@ final class BuildHintsIos {
                 .def("false")
                 .platform("ios"));
 
-        h.add(new Hint("ios.generateSplashScreens")
-                .group(HintGroup.IOS)
-                .type(HintType.BOOLEAN)
-                .def("false")
-                .platform("ios")
-                .doc("Boolean true/false defaults to false. Enables legacy generation of splash screen images "
-                        + "instead of the current launch storyboards."));
-
         h.add(new Hint("ios.glAppDelegateBody")
                 .group(HintGroup.IOS)
                 .type(HintType.STRING)
@@ -654,12 +646,6 @@ final class BuildHintsIos {
                 .def("true")
                 .platform("ios"));
 
-        h.add(new Hint("ios.launchStoryboardName")
-                .group(HintGroup.IOS)
-                .type(HintType.STRING)
-                .def("LaunchScreen")
-                .platform("ios"));
-
         h.add(new Hint("ios.locationUsageDescription")
                 .group(HintGroup.IOS)
                 .type(HintType.STRING)
@@ -679,17 +665,6 @@ final class BuildHintsIos {
                 .platform("ios")
                 .doc("iOS's own native map provider, overriding `maps.provider`."));
 
-        h.add(new Hint("ios.metal")
-                .group(HintGroup.IOS)
-                .type(HintType.BOOLEAN)
-                .def("true")
-                .platform("ios")
-                .doc("Boolean true/false defaults to true. Selects the Metal rendering backend "
-                        + "(`CAMetalLayer`) over the legacy OpenGL ES 2 path (`CAEAGLLayer`). Metal is the "
-                        + "supported iOS graphics API; OpenGL ES is deprecated. Set to `false` to opt out if you "
-                        + "hit a Metal-only rendering regression. See link:#_metal_renderer[Working with iOS / "
-                        + "Metal renderer] for details."));
-
         h.add(new Hint("ios.metal.colorSpace")
                 .group(HintGroup.IOS)
                 .type(HintType.STRING)
@@ -697,7 +672,7 @@ final class BuildHintsIos {
                 .platform("ios")
                 .doc("Selects the `CAMetalLayer.colorspace` for the Metal renderer. Accepts `sRGB` (default), "
                         + "`displayP3`, `deviceRGB`, `linearSRGB`, `extendedSRGB`, `extendedLinearSRGB`, or `none`. "
-                        + "Has no effect when `ios.metal=false`. See "
+                        + "See "
                         + "link:#_choosing_a_color_space_for_the_metal_renderer[Working with iOS / Choosing a color "
                         + "space] for the full table."));
 

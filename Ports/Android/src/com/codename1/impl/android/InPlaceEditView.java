@@ -338,8 +338,10 @@ public class InPlaceEditView extends FrameLayout{
      * This is only used when in async edit mode.
      */
     static void showActiveTextEditorAgain() {
-        if (sInstance != null) {
-            sInstance.showTextEditorAgain();
+        // Read once. See isActiveTextEditorHidden for why.
+        InPlaceEditView instance = sInstance;
+        if (instance != null) {
+            instance.showTextEditorAgain();
         }
     }
 
@@ -516,8 +518,10 @@ public class InPlaceEditView extends FrameLayout{
      * <p>This is just a static wrapper around {@link #hideTextEditor()}</p>
      */
     static void hideActiveTextEditor() {
-        if (sInstance != null) {
-            sInstance.hideTextEditor();
+        // Read once. See isActiveTextEditorHidden for why.
+        InPlaceEditView instance = sInstance;
+        if (instance != null) {
+            instance.hideTextEditor();
         }
     }
 
@@ -586,8 +590,28 @@ public class InPlaceEditView extends FrameLayout{
      * @return
      */
     static boolean isActiveTextEditorHidden() {
-        if (sInstance != null) {
-            return sInstance.isTextEditorHidden();
+        // Read sInstance ONCE into a local.
+        //
+        // This is not a lock and not a volatile -- Codename One is single
+        // threaded and the framework adds none. It is the other half of that
+        // same arrangement: sInstance is owned by the ANDROID UI thread, which
+        // assigns it in edit() and clears it in releaseEdit(), both inside
+        // runOnUiThread. This method is called from the CN1 EDT, during layout
+        // and from reLayoutEdit. Two threads, so the field can change between
+        // two reads of it -- and a null check followed by a call IS two reads.
+        //
+        // Measured: InPlaceEditViewTest, which races reLayoutEdit against
+        // stopEditing fifty times over, lands in exactly that window --
+        // "Attempt to invoke direct method 'boolean
+        // InPlaceEditView.isTextEditorHidden()' on a null object reference",
+        // with the null check having already passed.
+        //
+        // Reading once cannot tear: the value is a reference, the local is
+        // thread-confined, and a stale-but-non-null instance is the same thing
+        // the caller would have got had it arrived a microsecond earlier.
+        InPlaceEditView instance = sInstance;
+        if (instance != null) {
+            return instance.isTextEditorHidden();
         }
         return true;
     }
@@ -1167,7 +1191,9 @@ public class InPlaceEditView extends FrameLayout{
     }
 
     static boolean activeEditorContains(int x, int y) {
-        return sInstance != null && sInstance.editorContains(x, y);
+        // Read once. See isActiveTextEditorHidden for why.
+        InPlaceEditView instance = sInstance;
+        return instance != null && instance.editorContains(x, y);
     }
 
     private boolean editorContains(int x, int y) {
@@ -1504,11 +1530,15 @@ public class InPlaceEditView extends FrameLayout{
      * Returns true if an edit is currently in progress, false otherwise
      */
     public static boolean isEditing() {
-        return (sInstance == null) ? false : sInstance.mIsEditing;
+        // Read once. See isActiveTextEditorHidden for why.
+        InPlaceEditView instance = sInstance;
+        return (instance == null) ? false : instance.mIsEditing;
     }
 
     public static int lastEditEndReason() {
-        return (sInstance == null) ? REASON_UNDEFINED : sInstance.mLastEndEditReason;
+        // Read once. See isActiveTextEditorHidden for why.
+        InPlaceEditView instance = sInstance;
+        return (instance == null) ? REASON_UNDEFINED : instance.mLastEndEditReason;
     }
 
     public static void endEdit() {
@@ -1533,8 +1563,10 @@ public class InPlaceEditView extends FrameLayout{
     }
 
     public static void stopEdit(boolean forceVKBClose) {
-        if (sInstance != null) {
-            sInstance.endEditing(REASON_UNDEFINED, false, forceVKBClose, 0);
+        // Read once. See isActiveTextEditorHidden for why.
+        InPlaceEditView instance = sInstance;
+        if (instance != null) {
+            instance.endEditing(REASON_UNDEFINED, false, forceVKBClose, 0);
         }
     }
 

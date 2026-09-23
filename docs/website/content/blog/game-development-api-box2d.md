@@ -136,7 +136,7 @@ And [GamingDemoSample](https://github.com/codenameone/CodenameOne/tree/master/Sa
 
 ## Where to go from here
 
-The new [Game Development chapter](/developer-guide/#_game_development) in the developer guide covers the loop, sprites, physics, and audio in detail, including [case studies](/developer-guide/#_sample_games) that walk through the card game and the isometric checkers above section by section.
+The new [Game Development chapter](/developer-guide/game-development/#_game_development) in the developer guide covers the loop, sprites, physics, and audio in detail, including [case studies](/developer-guide/game-development/#_sample_games) that walk through the card game and the isometric checkers above section by section.
 
 If you build something with this, we genuinely want to see it, and if you hit a wall, [file an issue](https://github.com/codenameone/CodenameOne/issues) with the smallest game that reproduces it.
 

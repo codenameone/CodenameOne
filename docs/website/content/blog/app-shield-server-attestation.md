@@ -154,7 +154,7 @@ It also cannot cover traffic it cannot see. `ConnectionRequest`-based APIs get a
 
 Certificate pinning has its own operational risk. App Shield pins public keys rather than whole certificates, so a certificate renewal on the same key does not break the app. You should still roll out the server policy in monitor mode first, measure the `would_deny` traffic, and only then reject requests.
 
-The complete wire format, failure statuses, transport boundaries, pin lifecycle, and backend examples are in the [App Shield developer guide](https://github.com/codenameone/CodenameOne/blob/master/docs/developer-guide/App-Shield.asciidoc).
+The complete wire format, failure statuses, transport boundaries, pin lifecycle, and backend examples are in the [App Shield developer guide](/developer-guide/app-shield/).
 
 ## OpenType fonts now work without renaming
 

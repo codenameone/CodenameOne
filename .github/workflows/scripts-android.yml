@@ -39,6 +39,19 @@ name: Test Android build scripts
       - 'tests/**'
       - '!tests/**/*.md'
       - '!docs/**'
+      # The screenshot transport is now a Codename One backend application, so the
+      # two files that are ONLY exercised here have to trigger this leg: the
+      # server itself and the script that launches it.
+      #
+      # Deliberately NOT the rest of vm/backend. The websocket protocol code is
+      # covered by maven/backend's unit tests, by vm/tests against the translated
+      # binary, and by the Autobahn conformance job -- all of which already
+      # trigger on vm/**. Fanning every backend change out to the macOS and
+      # emulator legs as well would buy nothing and cost a great deal: a change to
+      # the ORM, the database layer or the HTTP parser cannot reach this
+      # transport.
+      - 'vm/backend/demo/cn1ss/**'
+      - 'scripts/lib/cn1ss.sh'
   push:
     branches:
       - master
@@ -72,6 +85,19 @@ name: Test Android build scripts
       - 'tests/**'
       - '!tests/**/*.md'
       - '!docs/**'
+      # The screenshot transport is now a Codename One backend application, so the
+      # two files that are ONLY exercised here have to trigger this leg: the
+      # server itself and the script that launches it.
+      #
+      # Deliberately NOT the rest of vm/backend. The websocket protocol code is
+      # covered by maven/backend's unit tests, by vm/tests against the translated
+      # binary, and by the Autobahn conformance job -- all of which already
+      # trigger on vm/**. Fanning every backend change out to the macOS and
+      # emulator legs as well would buy nothing and cost a great deal: a change to
+      # the ORM, the database layer or the HTTP parser cannot reach this
+      # transport.
+      - 'vm/backend/demo/cn1ss/**'
+      - 'scripts/lib/cn1ss.sh'
 
 # The token in secrets.CN1SS_GH_TOKEN was generated on
 # Oct 16th 2025. If in Oct 2026 builds start failing, it
@@ -317,7 +343,14 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: android-instrumentation-logs
-          path: artifacts/connectedAndroidTest*.log
+          # The comparison also writes a PNG for every screenshot that did not match a
+          # stored golden, including one that has no golden at all. Uploading only the log
+          # left those on the runner, so there was no way to seed an Android golden from
+          # CI -- a new suite test could be added, captured and reported as missing here
+          # forever, and the only route to a golden was an emulator on somebody's desk.
+          path: |
+            artifacts/connectedAndroidTest*.log
+            artifacts/*.png
           if-no-files-found: warn
           retention-days: 14
           compression-level: 6
@@ -326,7 +359,10 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: android-instrumentation-logs-${{ matrix.id }}
-          path: artifacts/connectedAndroidTest*.log
+          # Same reason as the default leg above.
+          path: |
+            artifacts/connectedAndroidTest*.log
+            artifacts/*.png
           if-no-files-found: warn
           retention-days: 14
           compression-level: 6

@@ -32,7 +32,7 @@ Codename One is the only platform that…​
 
 To learn more about Codename One check out the [about page](/about/) you can [download it for free right now](/download/).
 
-As part of the release we significantly refined our developer guide which is now also available in [print form on Amazon](https://www.amazon.com/dp/1549910035). Notice that this guide is available for free [here](https://www.codenameone.com/manual/) & in [pdf format](https://www.codenameone.com/files/developer-guide.pdf). This developer guide is a community effort which you can contribute to as explained [here](/blog/tip-edit-docs-fun-profit/).
+As part of the release we significantly refined our developer guide which is now also available in [print form on Amazon](https://www.amazon.com/dp/1549910035). Notice that this guide is available for free [here](/developer-guide/) & in [pdf format](https://www.codenameone.com/files/developer-guide.pdf). This developer guide is a community effort which you can contribute to as explained [here](/blog/tip-edit-docs-fun-profit/).
 
 ### Highlights of this Release
 

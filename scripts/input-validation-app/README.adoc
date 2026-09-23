@@ -45,6 +45,12 @@ the expected time.
   same touch chain as tap, so a recognizer that cancels touches mid-press
   causes this step to time out.
 
+| `browserkeytype`
+| Hardware keys reach an HTML input inside `BrowserComponent` (issue #5740).
+  The browser's DOM input callback must report the typed text. Runs before
+  `keytype` so no CN1 native editor can mask the peer-specific regression.
+  The driver retries the focus tap while the local page loads.
+
 | `keytype`
 | Typed characters reach a CN1 `TextField.DataChangedListener`. The
   driver taps the field to bring up native iOS editing, then synthesises
@@ -107,6 +113,18 @@ APP_BUNDLE=$(find ios/target -name '*.app' -type d | head -n 1)
 brew install xcodegen   # one-time
 ./drivers/run-ios.sh "$APP_BUNDLE"
 ----
+
+The native routing checks run without a generated app or simulator:
+
+----
+python3 scripts/ios/keyboard-peer-tests/check.py
+----
+
+Run from the repository root on macOS with Xcode installed. These checks
+exercise the production iOS and Catalyst press handlers with stubbed UIKit
+focus and Java delivery, covering nested peers, window isolation, focus
+changes, mixed releases, cancellation, and native editor startup. The
+simulator suite above verifies typing through the real WebKit input path.
 
 == CI
 

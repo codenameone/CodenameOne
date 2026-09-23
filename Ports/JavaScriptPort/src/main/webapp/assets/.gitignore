@@ -2,4 +2,8 @@
 # JS port run can fetch them as webapp assets. The canonical .res lives in
 # Themes/ and is committed; this mirror is a build artifact.
 iOSModernTheme.res
+iOSModern27Theme.res
 AndroidMaterialTheme.res
+GnomeAdwaitaTheme.res
+WindowsFluentTheme.res
+MacOSAquaTheme.res

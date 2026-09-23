@@ -252,7 +252,7 @@ build_developer_guide_for_site() {
       exit
     }
     in_body { print }
-  ' "${html_out}/developer-guide-full.html" > "${guide_fragment_path}"
+  ' "${html_out}/developer-guide-full.html" | sed 's|src="img/|src="/developer-guide/img/|g' > "${guide_fragment_path}"
 
   if [ -f "${html_out}/asciidoctor.css" ]; then
     cp "${html_out}/asciidoctor.css" "${guide_dir}/asciidoctor.css"
@@ -422,6 +422,8 @@ PY
     echo "Scoped Asciidoctor stylesheet could not be generated for Developer Guide." >&2
     exit 1
   fi
+  ruby "${SCRIPT_DIR}/generate_developer_guide.rb"
+
   # Keep guide assets under /developer-guide/ so relative image links (e.g. img/foo.png) resolve.
   rsync -a \
     --exclude 'sketch/' \

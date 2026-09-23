@@ -316,9 +316,9 @@
       "width_ratio": 1.0
     },
     "TextField_disabled_light": {
-      "center_offset": 0.0,
-      "height_ratio": 1.0,
-      "width_ratio": 1.0
+      "center_offset": 0.71,
+      "height_ratio": 0.996,
+      "width_ratio": 0.9991
     },
     "TextField_normal_dark": {
       "center_offset": 0.0,

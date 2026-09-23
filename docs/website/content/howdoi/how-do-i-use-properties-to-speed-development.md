@@ -28,7 +28,7 @@ So the best way to think about properties is as a productivity tool for model-dr
 
 ## Further Reading
 
-- [Developer Guide](/developer-guide/)
+- [Developer Guide](/developer-guide/io/#_properties)
 - [Properties Are Amazing](/blog/properties-are-amazing/)
 - [How Do I Use Storage, File System And SQL](/how-do-i/how-do-i-use-storage-file-system-sql/)
 

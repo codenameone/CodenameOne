@@ -40,7 +40,7 @@ import com.codename1.annotations.buildhints.*;
  * IAP wiring never ripples into the screenshot/notification CI workflows.
  */
 @Android(licenseKey = "CN1TESTPLACEHOLDERKEYNOTFORPRODUCTIONxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxIDAQAB", useAndroidX = Toggle.ON)
-@Ios(applicationQueriesSchemes = {"cydia"}, newStorageLocation = Toggle.ON, uiscene = Toggle.ON)
+@Ios(applicationQueriesSchemes = {"cydia"}, newStorageLocation = Toggle.ON)
 @IosPrivacy(cameraUsageDescription = "Used by the CI smoke test to verify the com.codename1.camera native bridge compiles. The app never opens a camera session.")
 public class PurchaseTestApp extends Lifecycle {
     @Override

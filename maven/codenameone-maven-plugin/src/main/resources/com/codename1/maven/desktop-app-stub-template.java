@@ -58,10 +58,6 @@ public class __MAIN_NAME__Stub implements Runnable, WindowListener {
     public static final String BUILD_KEY = "";
     public static final String PACKAGE_NAME = "";
     public static final String BUILT_BY_USER = "";
-    private static final boolean isWindows;
-    static {
-        isWindows = File.separatorChar == '\\';
-    }
 
     private static final String[] fontFaces = null;
 
@@ -101,14 +97,9 @@ public class __MAIN_NAME__Stub implements Runnable, WindowListener {
         JavaSEPort.setDesktopTitleBarMode(APP_DESKTOP_TITLEBAR);
         JavaSEPort.setDesktopInteractiveScrollbars(APP_DESKTOP_INTERACTIVE_SCROLLBARS);
 
+        // Keep JavaSEPort's platform system font unless the app explicitly overrides it.
         if(fontFaces != null) {
             JavaSEPort.setFontFaces(fontFaces[0], fontFaces[1], fontFaces[2]);
-        } else {
-            if(isWindows) {
-                JavaSEPort.setFontFaces("ArialUnicodeMS", "SansSerif", "Monospaced");
-            } else {
-                JavaSEPort.setFontFaces("Arial", "SansSerif", "Monospaced");
-            }
         }
 
         frm = new JFrame(APP_TITLE);

@@ -944,6 +944,17 @@ class CleanTargetIntegrationTest {
                 // (which calls initDisplay synchronously).
                 "        com.codename1.impl.windows.WindowsNative.enableOffscreenCapture();\n" +
                 "        Display.init(null);\n" +
+                // The suite builds its own launcher instead of the port's generated stub, so NONE
+                // of the properties that stub sets are present here -- including desktop.titleBar,
+                // which hellocodenameone's codenameone_settings.properties sets to "native" and
+                // which Executor.desktopTitleBarStubProperty emits for a real build. Without it
+                // this suite renders chrome no shipped app has: the port resolves "toolbar",
+                // keeps the legacy title area, and every golden records a title strip that a
+                // built application does not draw.
+                //
+                // Immediately after Display.init, where the generated stub sets its own
+                // properties. Nothing goes before Display.init.
+                "        Display.getInstance().setProperty(\"desktop.titleBar\", \"native\");\n" +
                 // Deterministic validation for the native fault->exception handler
                 // (cn1WinFaultToException). initDisplay (called synchronously by
                 // Display.init above) installs the vectored handler, so a null deref
@@ -1852,6 +1863,33 @@ class CleanTargetIntegrationTest {
         Files.write(cmakeLists, replacement.getBytes(StandardCharsets.UTF_8));
     }
 
+    /// The END of a failed command's output, which is where the reason is.
+    ///
+    /// A failing cross-compile put its whole ninja log -- roughly 2,300 lines, nearly all of it
+    /// CRT deprecation warnings -- into the assertion message, and the message was then truncated
+    /// by the surefire/Actions pipeline ONE LINE before the part that matters: the run that this
+    /// was written for ends at "FAILED: [code=255] WinFormApp.exe" with the linker's own
+    /// diagnostic, the next line, cut off. A build failure that reports everything except why is
+    /// not diagnosable from CI at all, which is how that one stayed unexplained across several
+    /// runs on two branches.
+    ///
+    /// The tail rather than the head, because ninja prints progress first and the failing command
+    /// last. The count of dropped lines is kept so the message cannot look like the whole story.
+    static String tailOf(String output) {
+        String[] lines = output.split("\n", -1);
+        int keep = 200;
+        if (lines.length <= keep) {
+            return output;
+        }
+        StringBuilder b = new StringBuilder();
+        b.append("... ").append(lines.length - keep)
+                .append(" earlier line(s) omitted; the last ").append(keep).append(" follow\n");
+        for (int iter = lines.length - keep; iter < lines.length; iter++) {
+            b.append(lines[iter]).append('\n');
+        }
+        return b.toString();
+    }
+
     static String runCommand(List<String> command, Path workingDir) throws Exception {
         ProcessBuilder builder = new ProcessBuilder(command);
         builder.directory(workingDir.toFile());
@@ -1862,7 +1900,8 @@ class CleanTargetIntegrationTest {
             output = reader.lines().collect(Collectors.joining("\n"));
         }
         int exit = process.waitFor();
-        assertEquals(0, exit, "Command failed: " + String.join(" ", command) + "\nOutput:\n" + output);
+        assertEquals(0, exit, "Command failed: " + String.join(" ", command)
+                + "\nOutput (tail):\n" + tailOf(output));
         return output;
     }
 

@@ -1,0 +1,286 @@
+name: Cloud starter canary
+
+# Exercises the onboarding starter a NEW USER actually receives, end to end:
+# sign in, download the personalised ZIP from the console, run the shipped
+# launcher with a real Maven, and require the cloud build to finish.
+#
+# The starter is generated and personalised server-side and then resolves its
+# dependencies over the network on the user's machine. Neither is visible to a
+# check that reads the template out of a repository or stubs Maven out, and both
+# have broken in ways that made a first build impossible while every offline
+# check stayed green. So this runs against the live service, nightly.
+#
+on:
+  # Keep the assertions honest on a PR that edits them. This leg runs no build
+  # and touches no network, so it costs seconds.
+  pull_request:
+    paths:
+      - 'scripts/ci/starter-canary/**'
+      - '.github/workflows/starter-canary.yml'
+  schedule:
+    # 04:40 UTC: after the server-side weekly version refresh has settled, and
+    # away from the blog/syndication slots.
+    - cron: '40 4 * * *'
+  workflow_dispatch:
+    inputs:
+      target:
+        description: 'Build target (never iphone/macos -- 8 credits each)'
+        default: 'javascript'
+      skip_build:
+        description: 'Artefact checks only, no cloud build'
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  # Never let two canaries submit builds at once: a free/basic account is
+  # limited to one in-flight build, so the second would fail for a reason that
+  # has nothing to do with the starter.
+  group: starter-canary
+  cancel-in-progress: false
+
+jobs:
+  self-test:
+    name: Canary assertions still fire
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+      - run: python scripts/ci/starter-canary/test_starter_canary.py
+
+  canary:
+    # Never talk to production from a pull request: forks get no secrets, and a
+    # PR must not spend the canary account's build credits.
+    if: github.event_name != 'pull_request'
+    strategy:
+      # One runner must not mask the other: past breakages have been
+      # unix-only (the execute bit) and Windows-only (the batch launcher).
+      fail-fast: false
+      # The workflow-level concurrency group serialises separate RUNS, not the
+      # legs inside one run. These two share a single build account, which
+      # allows one build in flight, and each identifies its own build by
+      # diffing the account's build list -- so running them together risks a
+      # rejected submission and, worse, one leg adopting the other's build and
+      # masking a platform-specific launcher failure.
+      max-parallel: 1
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    # Must exceed everything starter_canary.py can spend: HTTP_ALLOWANCE 10m +
+    # SEED_TIMEOUT 10m + LAUNCH_TIMEOUT 30m + POLL_TIMEOUT 20m = 70m, plus
+    # checkout/python/JDK setup. Cut it below that and the runner kills the job
+    # before the canary can write its report, turning slow-but-healthy into a
+    # reported outage. A test asserts the relationship.
+    timeout-minutes: 85
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+
+      # The starter enforces JDK 17+ through maven-enforcer; give the runner a
+      # JDK that satisfies the same gate a user's machine has to.
+      - name: Set up JDK 17
+        uses: actions/setup-java@v5
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+
+      # The Maven CSS goal initializes Java AWT while compiling theme.css.
+      # GitHub's Linux runner has no display, so without Xvfb a healthy starter
+      # fails locally before it can submit its cloud build. Windows already has
+      # a desktop session and must not try to install or invoke xvfb-run.
+      - name: Install Xvfb for CSS compilation
+        if: runner.os == 'Linux'
+        run: bash scripts/ci/apt-get-install.sh xvfb
+
+      - name: Run the canary
+        id: canary
+        continue-on-error: true
+        env:
+          CN1_CANARY_EMAIL: ${{ secrets.CN1_CANARY_EMAIL }}
+          CN1_CANARY_PASSWORD: ${{ secrets.CN1_CANARY_PASSWORD }}
+          CANARY_REPORT: ${{ runner.temp }}/canary.json
+          # Through `env`, never interpolated into the script body. A dispatch
+          # input expanded straight into `run:` is evaluated by the shell before
+          # python ever sees it, so a value like $(...) would execute with all
+          # three credentials in the environment. The allowlist runs far too
+          # late to help with that.
+          CANARY_TARGET: ${{ github.event.inputs.target || 'javascript' }}
+          CANARY_SKIP_BUILD: ${{ github.event.inputs.skip_build || 'false' }}
+        # `python`, not `python3`: this runs under Git Bash on the Windows
+        # runner, which provides no python3 shim, while setup-python puts
+        # `python` on PATH for every platform.
+        shell: bash
+        run: |
+          set -u
+          skip=""
+          command=(python)
+          if [ "$RUNNER_OS" = "Linux" ]; then
+            command=(xvfb-run -a python)
+          fi
+          if [ "$CANARY_SKIP_BUILD" = "true" ]; then
+            skip="--skip-build"
+          fi
+          "${command[@]}" scripts/ci/starter-canary/starter_canary.py \
+            --target "$CANARY_TARGET" \
+            $skip \
+            --report "$CANARY_REPORT"
+
+      - name: Ensure a report exists
+        if: always()
+        shell: bash
+        run: |
+          report="${{ runner.temp }}/canary.json"
+          if [ ! -f "$report" ]; then
+            printf '%s' '{"ok":false,"error":"the canary produced no report at all -- it crashed before it could write one."}' > "$report"
+          fi
+          cat "$report"
+
+      - name: Upload report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: canary-${{ matrix.os }}
+          path: ${{ runner.temp }}/canary.json
+
+      - name: Fail the job when the canary failed
+        if: steps.canary.outcome != 'success'
+        run: exit 1
+
+  alert:
+    needs: canary
+    if: always() && github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - name: Collect the per-runner reports
+        uses: actions/download-artifact@v4
+        with:
+          path: reports
+          pattern: canary-*
+        continue-on-error: true
+
+      - name: Open, update, or close the starter alert
+        uses: actions/github-script@v8
+        env:
+          # Assign directly so this is harder to miss than an Actions-only
+          # failure, mirroring the syndication watchdog.
+          ALERT_ASSIGNEE: ${{ vars.STARTER_CANARY_ASSIGNEE || 'shai-almog' }}
+        with:
+          script: |
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+            const title = 'Cloud starter is broken for new users';
+            const marker = '<!-- starter-canary -->';
+            const reminderMarker = '<!-- starter-canary-reminder -->';
+
+            const fs = require('fs');
+            const read = (dir, label) => {
+              const file = `reports/canary-${dir}/canary.json`;
+              if (!fs.existsSync(file)) {
+                return { problem: `${label}: the canary job produced no report (it did not run, or the runner died).` };
+              }
+              const raw = fs.readFileSync(file, 'utf8');
+              try {
+                const data = JSON.parse(raw);
+                if (!data.ok) return { problem: `${label}: ${data.error}` };
+                // An artefact-only dispatch proves nothing about cloud builds.
+                // Treating it as recovery would close an open outage and claim
+                // both platforms built, without a build having been submitted.
+                return { inconclusive: data.stage !== 'build' };
+              } catch (e) {
+                return { problem: `${label}: unreadable canary report -- ${raw.slice(0, 300)}` };
+              }
+            };
+
+            const results = [
+              read('ubuntu-latest', 'Linux'),
+              read('windows-latest', 'Windows'),
+            ];
+            const problems = results.map(r => r.problem).filter(Boolean);
+            const inconclusive = problems.length === 0 && results.some(r => r.inconclusive);
+
+            const issues = await github.paginate(github.rest.issues.listForRepo, {
+              owner, repo, state: 'open', per_page: 100,
+            });
+            let issue = issues.find(candidate =>
+              !candidate.pull_request &&
+              candidate.title === title &&
+              (candidate.body || '').includes(marker)
+            );
+
+            if (inconclusive) {
+              // Leave any open issue exactly as it is: not proven broken, and
+              // certainly not proven fixed.
+              await core.summary
+                .addHeading('Cloud starter canary')
+                .addRaw('Artefact checks passed; no cloud build was submitted, so this run neither confirms nor clears an outage.')
+                .write();
+              return;
+            }
+
+            if (problems.length === 0) {
+              await core.summary.addHeading('Cloud starter canary').addRaw('Healthy').write();
+              if (issue) {
+                await github.rest.issues.createComment({
+                  owner, repo, issue_number: issue.number,
+                  body: `${reminderMarker}\nRecovered at ${new Date().toISOString()}. A new user can download the starter and complete a cloud build on both Linux and Windows.`,
+                });
+                await github.rest.issues.update({
+                  owner, repo, issue_number: issue.number,
+                  state: 'closed', state_reason: 'completed',
+                });
+              }
+              return;
+            }
+
+            const run = `${context.serverUrl}/${owner}/${repo}/actions/runs/${context.runId}`;
+            const body = [
+              marker,
+              'The nightly canary could not complete a first cloud build the way a new user does.',
+              '',
+              ...problems.map(p => `- ${p}`),
+              '',
+              `Run: ${run}`,
+              `Last checked: ${new Date().toISOString()}`,
+              '',
+              'This check signs in, downloads the personalised starter from the console, and runs the shipped launcher against the live service. A failure here means a new user cannot complete a first cloud build at all. The cause is usually server-side: the starter generator, the vendored starter template, or the console sign-in redirect.',
+            ].join('\n');
+
+            const assignees = process.env.ALERT_ASSIGNEE ? [process.env.ALERT_ASSIGNEE] : undefined;
+            if (!issue) {
+              const created = await github.rest.issues.create({ owner, repo, title, body, assignees });
+              issue = created.data;
+            } else {
+              await github.rest.issues.update({ owner, repo, issue_number: issue.number, body, assignees });
+              const comments = await github.paginate(github.rest.issues.listComments, {
+                owner, repo, issue_number: issue.number, per_page: 100,
+              });
+              const reminders = comments.filter(c => (c.body || '').includes(reminderMarker));
+              const last = reminders.at(-1);
+              const ageHours = last ? (Date.now() - Date.parse(last.created_at)) / 3600000 : Infinity;
+              if (ageHours >= 24) {
+                await github.rest.issues.createComment({
+                  owner, repo, issue_number: issue.number,
+                  body: `${reminderMarker}\nStill failing as of ${new Date().toISOString()}. See the updated issue body.`,
+                });
+              }
+            }
+
+            await core.summary
+              .addHeading('Cloud starter canary failure')
+              .addList(problems)
+              .addLink(`Tracking issue #${issue.number}`, issue.html_url)
+              .write();
+            core.setFailed(`The cloud starter is broken; tracking issue #${issue.number}`);

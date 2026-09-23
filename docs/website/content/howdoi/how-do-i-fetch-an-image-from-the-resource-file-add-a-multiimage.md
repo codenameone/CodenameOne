@@ -28,7 +28,7 @@ The older page talks about fetching images from the resource file through the re
 ## Further Reading
 
 - [Themeing](/themeing/)
-- [Developer Guide](/developer-guide/)
+- [Developer Guide](/developer-guide/graphics/)
 - [How Do I Create A 9 Piece Image Border](/how-do-i/how-do-i-create-a-9-piece-image-border/)
 - [How Do I Improve Application Performance Or Track Down Performance Issues](/how-do-i/how-do-i-improve-application-performance-or-track-down-performance-issues/)
 

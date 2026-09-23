@@ -146,7 +146,7 @@ The security lead we are building comes from covering these boundaries together.
 
 App Hardening still cannot stop a determined attacker who controls the device. It does not replace authorization, rate limits, secure key custody, or review of the operation your backend performs. It makes static analysis and casual tampering more expensive across every artifact you ship, which is the job an obfuscation layer can defend.
 
-Start with `standard`, submit a release cloud build, and check the hardening report before moving to a stronger profile. The [App Hardening guide](https://github.com/codenameone/CodenameOne/blob/master/docs/developer-guide/App-Hardening.asciidoc) documents every hint, exclusion, and local-build boundary.
+Start with `standard`, submit a release cloud build, and check the hardening report before moving to a stronger profile. The [App Hardening guide](/developer-guide/app-hardening/) documents every hint, exclusion, and local-build boundary.
 
 ---
 

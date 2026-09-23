@@ -47,11 +47,11 @@ public final class IOSNative {
     //native void startMainThread(Runnable r);
     native void initVM();
 
-    /// Returns true on iOS builds compiled with -Dios.metal=true (i.e.
-    /// CN1_USE_METAL is defined in CN1ES2compat.h). Java-side code that
-    /// needs to branch between the GL and Metal mutable-image rendering
-    /// paths queries this once at init -- there is no other reliable
-    /// source of truth on the Java side since the build flag only
+    /// Returns true when CN1_USE_METAL is defined in CN1RenderBackend.h, which
+    /// is every slice but watchOS. Java-side code that needs to branch
+    /// between the Core Graphics and Metal mutable-image rendering paths
+    /// queries this once at init -- there is no other reliable source of
+    /// truth on the Java side, since which slice is being built only
     /// affects native compilation.
     native boolean isMetalRendering();
     native boolean calendarSupported();
@@ -185,7 +185,7 @@ public final class IOSNative {
 
     /// Metal-only multi-stop gradient bridge to CN1MetalFillGradient. positions
     /// holds stopCount entries in [0, 1]; premultipliedRgba holds stopCount * 4
-    /// floats. On GL builds this method is a no-op. mutable is true when the
+    /// floats. It is a no-op where Metal is absent. mutable is true when the
     /// fill targets the current mutable image's offscreen MTLTexture.
     native void fillGradient(int kind, int stopCount, float[] positions, float[] premultipliedRgba,
                              int cycleMethod, float angleOrFromAngle,
@@ -2249,6 +2249,11 @@ public final class IOSNative {
     native int aesGcm(int encrypt, byte[] key, byte[] iv,
                       byte[] aad, byte[] in, byte[] out);
 
+    /// PBKDF2 over the password **bytes**, which is what makes the derived key match the one
+    /// Android and a browser derive from the same password. `hashKind` is 256 or 512. Returns the
+    /// number of bytes written into `out`, or a negative CN1_CRYPTO_E_* code.
+    native int pbkdf2(int hashKind, byte[] password, byte[] salt, int iterations, byte[] out);
+
     native int rsaEncrypt(int paddingKind, byte[] x509, byte[] in, byte[] out);
 
     native int rsaDecrypt(int paddingKind, byte[] pkcs8, byte[] in, byte[] out);
@@ -2576,5 +2581,47 @@ public final class IOSNative {
      * @param appGroup the group identifier
      */
     native boolean clearAppClipInviteHandoff(String appGroup);
+
+    // --- Foldable / hinge (UIHinge), implemented in nativeSources/CN1Hinge.m ---
+    //
+    // Apple's foldable API is API_AVAILABLE(ios(27.1)) -- 27.1, not 27.0 -- and
+    // is absent from the Xcode 26 SDK the tree still builds with by default.
+    // CN1Hinge.m compiles the whole implementation out on such an SDK and keeps
+    // these symbols answering "no hinge", so the port links either way and
+    // nothing here is conditional.
+
+    /**
+     * Installs the hinge observer on the root view, once. Idempotent, safe from
+     * any thread, and a no-op on a device or SDK without the hinge API.
+     */
+    native void startHingeMonitoring();
+
+    /**
+     * Whether this display reports a fold at all -- asked of the reserved
+     * regions rather than of the hinge observer, so a caller that arrives
+     * before the first update still gets a real answer instead of a premature
+     * "not foldable".
+     */
+    native boolean isFoldableDisplay();
+
+    /**
+     * The last UIHingeStatus: 0 unknown, 1 closed, 2 partially open, 3 fully
+     * open, or -1 when no hinge has been observed.
+     */
+    native int getHingeStatus();
+
+    /**
+     * The last hinge angle in whole degrees, or -1 when unknown. UIHinge reports
+     * radians; the conversion happens natively so only one unit crosses the
+     * boundary.
+     */
+    native int getHingeAngleDegrees();
+
+    /**
+     * Fills {@code out} with the active fold region in display pixels
+     * (x, y, width, height) and returns its kind: 0 none, 1 occlusion,
+     * 2 division. {@code out} is left untouched when the answer is 0.
+     */
+    native int getFoldRegion(int[] out);
 
 }

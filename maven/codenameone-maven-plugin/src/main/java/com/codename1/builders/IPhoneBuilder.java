@@ -65,7 +65,6 @@ import java.util.regex.Pattern;
  * @author Steve Hannah
  */
 public class IPhoneBuilder extends Executor {
-    private boolean useMetal;
 
     // macNative.enabled=true switches this iOS build to also emit a native Mac
     // variant of the same app. All Mac-specific code lives in MacNativeBuilder
@@ -77,6 +76,13 @@ public class IPhoneBuilder extends Executor {
     // Graphics backend. Like macNativeBuilder this is inert unless the project
     // declares a codename1.watchMain, keeping the iOS build unchanged.
     private final WatchNativeBuilder watchNativeBuilder = new WatchNativeBuilder(this);
+    /// The iOS design generation the modern theme targets: "26" or "27".
+    /// Read from ios.themeGeneration, validated in build(), and emitted into the
+    /// generated stub. Package-private so WatchNativeBuilder and
+    /// MacOSNativeBuilder emit the SAME value -- a phone and its watch resolving
+    /// to different generations would be a skew nobody would think to look for.
+    String iosThemeGeneration = "26";
+
 
     /// Where each entry-point stub lives once they have been separated, or null when there is one
     /// translation and the classpath is untouched. See WatchNativeBuilder.isolateStub.
@@ -99,7 +105,6 @@ public class IPhoneBuilder extends Executor {
     /// Where the tunnel stub was moved so each translator pass is handed one
     /// main; null when no packet-tunnel extension is generated.
     private File vpnTunnelStubDir;
-
 
     // tvNative.* delegate: adds an Apple TV (tvOS) target. tvOS is handled like
     // the Mac Catalyst slice (Metal + GL stub headers + GL-only sources excluded)
@@ -140,6 +145,16 @@ public class IPhoneBuilder extends Executor {
     /// not go through getDeploymentTarget().
     private String sdkDeploymentFloor;
 
+    /// The major version of the iOS SDK this build links against, or -1 when it cannot be
+    /// told. Read once in build(); the launch-metadata rules below are conditional on it
+    /// because Apple's are: an SDK 26 bundle is unaffected by either of them.
+    private int iosSdkMajor = -1;
+
+    /// The first iOS SDK that requires a launch screen and the UIScene lifecycle of every
+    /// app linked against it. See iOS & iPadOS 27 release notes, UIKit items 168247372
+    /// (launch screen) and 141837548 (scene lifecycle), and TN3187.
+    static final int FIRST_SDK_REQUIRING_LAUNCH_METADATA = 27;
+
     // StringBuilder used for constructing ruby script with xcodeproj
     // which adds localized strings files to the project.
     private StringBuilder installLocalizedStringsScript = new StringBuilder();
@@ -165,6 +180,12 @@ public class IPhoneBuilder extends Executor {
     private boolean usesAppReview;
     private boolean usesWalletApi;
     private boolean usesCryptoAPI;
+
+    /// Whether the APPLICATION uses com.codename1.security.vault, attributed by
+    /// scanForDatabaseUsage rather than by a package check. Drives AES-GCM, which is private SPI.
+    private boolean usesVault;
+    /// Part of the submission could not be scanned, so vault use was neither found nor ruled out.
+    private boolean vaultUnknown;
     private boolean usesCryptoGcm;
     private boolean usesBiometrics;
     private boolean usesNfc;
@@ -1173,7 +1194,6 @@ public class IPhoneBuilder extends Executor {
         return statement == null ? "" : "            " + statement;
     }
 
-
     boolean phoneUsesHealthData(BuildRequest request) {
         // App-wide, which is the grain the API scan works at and the grain this answer is
         // reported at. A per-root reachability walk used to narrow it per target; it was deleted
@@ -1186,7 +1206,6 @@ public class IPhoneBuilder extends Executor {
         return usesHealthRead || usesHealthWrite || usesHealthWorkout
                 || healthCapabilityDeclared(request);
     }
-
 
     /// Whether the detected usage READS from the store, per root.
     ///
@@ -1204,7 +1223,6 @@ public class IPhoneBuilder extends Executor {
     boolean phoneWritesHealthData() {
         return usesHealthWrite || usesHealthWorkout;
     }
-
 
     /// HealthKit asked for explicitly, by any of its spellings.
     private boolean healthCapabilityDeclared(BuildRequest request) {
@@ -1708,8 +1726,6 @@ public class IPhoneBuilder extends Executor {
         return false;
     }
 
-
-
     
     private File getResDir() {
         return new File(tmpFile, "res");
@@ -1815,6 +1831,55 @@ public class IPhoneBuilder extends Executor {
         }
     }
 
+    /**
+     * Whether an on-device-debug proxy host is the loopback interface, and so needs
+     * no local-network declaration.
+     *
+     * Deliberately a SMALL allow-list rather than a parse: everything it does not
+     * recognise is treated as the local network, which is the answer that keeps a
+     * debugging session working. The whole 127/8 block counts, because loopback is
+     * 127.0.0.1 by convention and not by rule.
+     */
+    static boolean isLoopbackDebugProxyHost(String host) {
+        if (host == null) {
+            return false;
+        }
+        String trimmed = host.trim();
+        // Brackets are how a literal IPv6 address is written in a host position.
+        if (trimmed.startsWith("[") && trimmed.endsWith("]")) {
+            trimmed = trimmed.substring(1, trimmed.length() - 1).trim();
+        }
+        if (trimmed.equalsIgnoreCase("localhost")
+                || trimmed.equals("::1")
+                || trimmed.equals("0:0:0:0:0:0:0:1")) {
+            return true;
+        }
+        if (!trimmed.startsWith("127.")) {
+            return false;
+        }
+        // "127.0.0.1" yes, "127.0.0.1.example.com" no -- a host name may begin with
+        // digits, and one that merely starts with the right four characters is not
+        // an address at all.
+        String[] parts = trimmed.split("\\.");
+        if (parts.length != 4) {
+            return false;
+        }
+        for (int i = 0; i < parts.length; i++) {
+            if (parts[i].length() == 0 || parts[i].length() > 3) {
+                return false;
+            }
+            for (int c = 0; c < parts[i].length(); c++) {
+                if (parts[i].charAt(c) < '0' || parts[i].charAt(c) > '9') {
+                    return false;
+                }
+            }
+            if (Integer.parseInt(parts[i]) > 255) {
+                return false;
+            }
+        }
+        return true;
+    }
+
     private int getDeploymentTargetInt(BuildRequest request) {
         String target = getDeploymentTarget(request);
         if (target.indexOf(".") > 0) {
@@ -1822,7 +1887,6 @@ public class IPhoneBuilder extends Executor {
         }
         return Integer.parseInt(target);
     }
-
 
     /**
      * The Facebook SDK pods, at whatever version the request asked for.
@@ -1864,8 +1928,6 @@ public class IPhoneBuilder extends Executor {
         }
         return hint;
     }
-
-
 
     @Override
     protected String hardeningPlatform(BuildRequest request) {
@@ -1985,7 +2047,6 @@ public class IPhoneBuilder extends Executor {
         return java.util.Collections.singletonList(watchMain);
     }
 
-
     /**
      * Whether an explicit {@code ios.includePush} turns push OFF.
      *
@@ -2046,17 +2107,13 @@ public class IPhoneBuilder extends Executor {
         appAttest = request.getArg("ios.appAttest", "false").equals("true");
         defaultEnvironment.put("LANG", "en_US.UTF-8");
         tmpFile = tmpDir = getBuildDirectory();
-        useMetal = "true".equals(request.getArg("ios.metal", "true"));
 
         // macNative: extend this iOS build to also produce a native Mac slice.
         // All Mac-specific work is delegated to MacNativeBuilder; this builder
-        // only flips a few iOS-side knobs (Metal forced on, minimum deployment
-        // target floor, Ruby xcodeproj gem required) when Mac is enabled.
+        // only flips a few iOS-side knobs (minimum deployment target floor,
+        // Ruby xcodeproj gem required) when Mac is enabled.
         macNativeBuilder.parseHints(request);
         if (macNativeBuilder.isEnabled()) {
-            // The Mac slice cannot link OpenGL ES; force Metal on regardless of
-            // the ios.metal hint. (Already on by default now, but defensive.)
-            useMetal = true;
             // Catalyst requires iOS 13.1+ -> macOS 10.15+.
             addMinDeploymentTarget(macNativeBuilder.getIosMinDeploymentTarget());
             // Mac requires the iPad device family. iphone-only is incompatible.
@@ -2075,13 +2132,10 @@ public class IPhoneBuilder extends Executor {
         }
 
         // tvNative: parse + prep. The tvOS app is a SEPARATE appletvos target
-        // (like the watch target, not a Catalyst-style slice of the iOS app), so
-        // we must NOT touch the iOS app's renderer here -- forcing useMetal=true
-        // would override an explicit ios.metal=false and make the GL screenshot
-        // job actually render with Metal. tvOS itself has no OpenGL ES and runs
-        // on Metal via the project's default ios.metal=true; the tvOS target's
-        // own Xcode settings are written by tvNativeBuilder.applyXcodeSettings.
-        // We only need the xcodeproj gem to add and wire the target.
+        // (like the watch target, not a Catalyst-style slice of the iOS app).
+        // The tvOS target's own Xcode settings are written by
+        // tvNativeBuilder.applyXcodeSettings. We only need the xcodeproj gem to
+        // add and wire the target.
         tvNativeBuilder.parseHints(request);
         if (tvNativeBuilder.isEnabled()) {
             ensureXcodeprojInstalled();
@@ -2093,7 +2147,6 @@ public class IPhoneBuilder extends Executor {
             log(arg+"="+request.getArg(arg, null));
         }
         log("-------------------");
-
 
         buildVersion = request.getVersion();
         if(request.getArg("ios.twoDigitVersion", "false").equals("true")) {
@@ -2149,6 +2202,21 @@ public class IPhoneBuilder extends Executor {
         xcodeVersion = getXcodeVersion(xcodebuild);
         if (xcodeVersion <= 0) {
             xcodeVersion = 10;
+        }
+
+        // The SDK, not the Xcode, is what Apple's launch-screen rule is conditional on -- so ask
+        // for it directly, and only fall back to the Xcode version when xcrun cannot answer. The
+        // fallback is sound in the direction it is used: the two have only matched since the
+        // Xcode 26 renumbering, and every Xcode that predates it reports a version far below the
+        // floor this is compared against, so a wrong answer there can never turn the rule ON for
+        // a build the SDK exempts.
+        iosSdkMajor = iosSdkMajorVersion(activeIosSdkName(request));
+        if (iosSdkMajor < 0) {
+            iosSdkMajor = xcodeVersion;
+        }
+        String removedHintRejection = removedHintRejection(request.getArgs());
+        if (removedHintRejection != null) {
+            throw new BuildException(removedHintRejection);
         }
 
         String facebookAppId = request.getArg("facebook.appId", null);
@@ -2207,13 +2275,35 @@ public class IPhoneBuilder extends Executor {
                     request.getArg("cn1.nativeTheme", null));
             if ("legacy".equalsIgnoreCase(sharedMode)) {
                 iosMode = "ios7";
-            } else if ("modern".equalsIgnoreCase(sharedMode)) {
+            } else if ("modern".equalsIgnoreCase(sharedMode)
+                    || "native".equalsIgnoreCase(sharedMode)) {
+                // "native" is "modern plus the desktop". The desktop half is the
+                // JavaSE port's to resolve; iOS's own answer to "the platform's own
+                // look" is the same theme either way. Without this arm it fell to the
+                // else below and iOS got "auto", which installNativeTheme() resolves
+                // to the FLAT iOS 7 theme -- the exact opposite of what was asked for,
+                // and silently, because an unrecognised mode is not an error here.
                 iosMode = "modern";
             } else {
                 iosMode = "auto";
             }
         }
-        
+
+        // Which generation of the MODERN look. Orthogonal to iosMode above:
+        // that one picks modern vs iOS 7 vs pre-flat, this picks which iOS
+        // design generation the modern theme targets.
+        //
+        // An unrecognised value is a build error rather than a silent fallback.
+        // Falling back would ship the 26 look to someone who asked for 27 and
+        // say nothing, and a theme is exactly the kind of thing nobody notices
+        // is wrong until it is in front of users -- the same failure the
+        // nativeTheme comment above records for iosMode.
+        iosThemeGeneration = request.getArg("ios.themeGeneration", "26").trim();
+        if (!"26".equals(iosThemeGeneration) && !"27".equals(iosThemeGeneration)) {
+            throw new BuildException("ios.themeGeneration must be 26 or 27, got '"
+                    + iosThemeGeneration + "'");
+        }
+
         tmpFile = getBuildDirectory();
         if (tmpFile == null) {
             throw new IllegalStateException("Build directory must be set before running build.");
@@ -2324,9 +2414,7 @@ public class IPhoneBuilder extends Executor {
                     installLocalizedStringsScript.append("xcproj.targets.each{|e| e.add_resources([fileref])}\n");
                 }
 
-
                 child.delete();
-
 
             }
             if (child.getName().endsWith(".framework.zip")) {
@@ -2524,6 +2612,8 @@ public class IPhoneBuilder extends Executor {
                     .merge(scanForDatabaseUsage(buildinRes));
             usesDatabase = databaseUsage.usesDatabase();
             usesDatabaseCipher = databaseUsage.usesDatabaseCipher();
+            usesVault = databaseUsage.usesVault();
+            vaultUnknown = databaseUsage.isVaultUnknown();
         } catch (IOException ex) {
             throw new BuildException("Failed to scan for database usage", ex);
         }
@@ -2928,7 +3018,6 @@ public class IPhoneBuilder extends Executor {
                         sensorWriteThrough = true;
                     }
                 }
-
 
                 @Override
                 public void usesClassMethod(String cls, String method) {
@@ -3346,6 +3435,15 @@ public class IPhoneBuilder extends Executor {
         } catch (IOException ex) {
             throw new BuildException("Failed to extract nativeios.jar",ex);
         }
+        String portSkew;
+        try {
+            portSkew = sceneLifecyclePortSkewRejection(buildinRes);
+        } catch (IOException ex) {
+            throw new BuildException("Failed to read the extracted iOS port natives", ex);
+        }
+        if (portSkew != null) {
+            throw new BuildException(portSkew);
+        }
         stopwatch.split("Extract Libs");
 
         if(request.getArg("noExtraResources", "false").equals("true")) {
@@ -3354,13 +3452,63 @@ public class IPhoneBuilder extends Executor {
             new File(buildinRes, "iOS7Theme.res").delete();
         } 
 
-
         // Flip the crypto build toggles in CN1Crypto.h based on what the
         // user's bytecode references. Apps that don't touch
         // com.codename1.security.* get stub-only versions of the iOS
         // crypto bridge -- no CommonCrypto / Security framework symbols
         // referenced -- which keeps Apple's static-symbol scanner happy.
-        usesCryptoGcm = usesCryptoAPI && "true".equals(request.getArg("ios.crypto.gcm", "false"));
+        // AES-GCM stays OFF unless this application actually uses it, and the reason is in
+        // CN1Crypto.m: CommonCrypto exposes GCM only through <CommonCrypto/CommonCryptorSPI.h>,
+        // which is not in the public iOS SDK. Enabling it makes the binary reference
+        // CCCryptorGCMAddIV, CCCryptorGCMAddAAD and CCCryptorGCMFinal, and an application that
+        // never asked for GCM would then carry private-API symbols into Apple's static scanner.
+        //
+        // Defaulting it on to match macOS -- whose hint documentation claims iOS already did --
+        // was therefore wrong: macOS is not scanned the same way, and the claim described an
+        // intent the iOS side had deliberately not implemented.
+        //
+        // So it is detected instead. usesVault is attributed the same way the database answers
+        // are: the framework classes that merely NAME vault types in their signatures are
+        // excluded by name, because Display, CodenameOneImplementation, SecureStorage and
+        // DatabaseConfig all do -- DatabaseConfig holds a Vault field -- and a plain package
+        // check would answer yes for every application ever built. An application that uses the
+        // vault gets a working one without having to know a hint exists; one that does not keeps
+        // a binary with no GCM symbols in it.
+        //
+        // A scan that was refused partway answers neither yes nor no, and this is the one place
+        // that can resolve it. Guessing yes links the private CommonCrypto SPI into a binary
+        // Apple scans, for an application that may never touch the vault; guessing no ships a
+        // vault that cannot do its crypto. Both are silent, so neither is guessed: the developer
+        // is asked, through the hint that already exists, and the build stops until they answer.
+        // The default is deliberately not "false" here -- an unset hint has to be distinguishable
+        // from one deliberately turned off.
+        String gcmHint = request.getArg("ios.crypto.gcm", "");
+        // Only while the answer is actually open. An unreadable class or a refused archive
+        // can be scanned BEFORE a perfectly readable one that uses Vault, and then both
+        // flags are set -- at which point there is nothing ambiguous left to ask about and
+        // the expression below enables GCM anyway. Stopping the build there would fail a
+        // known vault application over unrelated input it happens to carry.
+        if (vaultUnknown && !usesVault
+                && !"true".equals(gcmHint) && !"false".equals(gcmHint)) {
+            throw new BuildException("Part of this application could not be scanned (see the "
+                    + "scan budget warning above), so the build cannot tell whether it uses "
+                    + "com.codename1.security.vault. Set codename1.arg.ios.crypto.gcm=true if it "
+                    + "does -- the vault needs AES-GCM -- or false if it does not, which keeps "
+                    + "the GCM symbols out of the binary.");
+        }
+        // Vault use IS crypto use, and the two answers came from scans of different trees. The
+        // database scan merges buildinRes, so a submitted LIBRARY that uses Vault is detected
+        // there; the permission scan that sets usesCryptoAPI walks classesDir only, so it saw
+        // nothing and left the flag false. The conjunction below then disabled the base crypto
+        // implementation as well as GCM, and the library reached the iOS stubs with a vault that
+        // could neither encrypt nor unlock. The vault cannot function without the crypto API, so
+        // detecting one is detecting the other.
+        if (usesVault) {
+            usesCryptoAPI = true;
+        }
+        usesCryptoGcm = usesCryptoAPI
+                && (usesVault || "true".equals(gcmHint)
+                    || (vaultUnknown && !"false".equals(gcmHint)));
         try {
             File cn1Crypto = new File(buildinRes, "CN1Crypto.h");
             if (cn1Crypto.exists()) {
@@ -3377,27 +3525,14 @@ public class IPhoneBuilder extends Executor {
         debug("Crypto API "+(usesCryptoAPI?"enabled":"disabled")
               +", AES-GCM "+(usesCryptoGcm?"enabled":"disabled"));
 
-        if (useMetal) {
-            try {
-                File CN1ES2compat = new File(buildinRes, "CN1ES2compat.h");
-                replaceInFile(CN1ES2compat, "//#define CN1_USE_METAL", "#define CN1_USE_METAL");
-                String colorSpaceDefine = resolveMetalColorSpaceDefine(request.getArg("ios.metal.colorSpace", "sRGB"));
-                replaceInFile(CN1ES2compat, "//#define CN1_METAL_COLORSPACE_PLACEHOLDER", colorSpaceDefine);
-                copy(new File(buildinRes, "MainWindowMETAL.xib"), new File(buildinRes, "MainWindow.xib"));
-                copy(new File(buildinRes, "CodenameOne_METALViewController.xib"), new File(buildinRes, "CodenameOne_GLViewController.xib"));
-            } catch (Exception ex) {
-                throw new BuildException("Failed to inject Metal controllers", ex);
-            }
-        } else {
-            new File(buildinRes, "MainWindowMETAL.xib").delete();
-            new File(buildinRes, "CodenameOne_METALViewController.xib").delete();
-            // The .metal shader file isn't guarded by an #ifdef like the
-            // companion .m files, so leaving it in the project forces Xcode
-            // to invoke the Metal toolchain -- which Xcode 26 ships as a
-            // separately-downloaded component that build servers don't have.
-            new File(buildinRes, "CN1MetalShaders.metal").delete();
+        try {
+            File renderBackend = new File(buildinRes, "CN1RenderBackend.h");
+            String colorSpaceDefine = resolveMetalColorSpaceDefine(request.getArg("ios.metal.colorSpace", "sRGB"));
+            replaceInFile(renderBackend, "//#define CN1_METAL_COLORSPACE_PLACEHOLDER", colorSpaceDefine);
+            copy(new File(buildinRes, "CodenameOne_METALViewController.xib"), new File(buildinRes, "CodenameOne_GLViewController.xib"));
+        } catch (Exception ex) {
+            throw new BuildException("Failed to inject Metal controllers", ex);
         }
-
 
         final String moPubAdUnitId = request.getArg("ios.mopubId", null);
         final String moPubTabletAdUnitId = request.getArg("ios.mopubTabletId", moPubAdUnitId);
@@ -3441,7 +3576,6 @@ public class IPhoneBuilder extends Executor {
         }
         
         File glAppDelegate = new File(buildinRes, "CodenameOne_GLAppDelegate.m");
-        boolean useUIScene = "true".equalsIgnoreCase(request.getArg("ios.uiscene", "true"));
         String integrateFacebook = "";
         
 
@@ -3475,7 +3609,6 @@ public class IPhoneBuilder extends Executor {
             } catch (Exception ex) {
                 throw new BuildException("Failed to add facebook api", ex);
             }
-
 
         }
 
@@ -3619,14 +3752,6 @@ public class IPhoneBuilder extends Executor {
                 throw new BuildException("Failure while processing ios.blockScreenshotsOnEnterBackground build hint", ex);
             }
         }
-
-        if (useUIScene) {
-            try {
-                replaceInFile(new File(buildinRes, "CodenameOne_GLAppDelegate.h"), "#ifdef CN1_USE_UI_SCENE", "#define CN1_USE_UI_SCENE\n#ifdef CN1_USE_UI_SCENE");
-            } catch (IOException ex) {
-                throw new BuildException("Failure while processing ios.uiscene build hint", ex);
-            }
-        }
         
         String applicationDidEnterBackground = request.getArg("ios.applicationDidEnterBackground", null);
         if(applicationDidEnterBackground != null) {
@@ -3637,7 +3762,6 @@ public class IPhoneBuilder extends Executor {
             }
         }
         
-
 
         try {
             if (request.getArg("ios.lowMemCamera", "false").equals("true")) {
@@ -3758,6 +3882,12 @@ public class IPhoneBuilder extends Executor {
                     + inviteAppClipGroup + "\"));\n";
         }
         String dbLegacy = databaseLegacyStubProperty(request, usesDatabase);
+        // The desktop title-bar mode, for the macOS target this builder also produces.
+        // IOSImplementation.getConfiguredDesktopTitleBarMode() reads it back out of this exact
+        // Display property and its comment already said the stub surfaced it -- nothing did, so
+        // the hint was inert and the Aqua theme's own constant decided alone. Inert on iPhone
+        // and iPad, where that method returns null before it ever looks: isDesktop() is false.
+        String desktopTitleBar = desktopTitleBarStubProperty(request);
 
         // If the build-time SVG transcoder produced a registry class, weave
         // its installGlobal() call into the Stub right before the first
@@ -3944,6 +4074,7 @@ public class IPhoneBuilder extends Executor {
                     + disableScreenshots
                     + inviteDomainProperty
                     + dbLegacy
+                    + desktopTitleBar
                     + adPadding
                     + integrateFacebook
                     + integrateGoogleConnect
@@ -3998,6 +4129,8 @@ public class IPhoneBuilder extends Executor {
                     + "        " + request.getMainClass() + "Stub stub = new " + request.getMainClass() + "Stub();\n"
                     + "        com.codename1.impl.ios.IOSImplementation.setMainClass(stub.i);\n"
                     + "        com.codename1.impl.ios.IOSImplementation.setIosMode(\"" + iosMode + "\");\n"
+                    + "        com.codename1.impl.ios.IOSImplementation.setIosThemeGeneration(\""
+                        + iosThemeGeneration + "\");\n"
                     + routeDispatcherInstallSource(sourceZip, "        ")
                     + annotationFrameworksInstallSource(sourceZip, "        ")
                     + "        Display.init(stub);\n"
@@ -4135,9 +4268,6 @@ public class IPhoneBuilder extends Executor {
 
         resultDir = new File(tmpFile, "result");
         resultDir.mkdirs();
-
-
-
 
         // BEFORE includePush is read, not after. A VoIP push IS a push, and
         // this copy has no pushV3 -- it reads ios.includePush directly.
@@ -4416,7 +4546,6 @@ public class IPhoneBuilder extends Executor {
                 replaceInFile(glAppDelegate, "//openURLMarkerEntry", openURLInject);
             }
 
-
             String beforeFinishLaunching = request.getArg("ios.beforeFinishLaunching", null);
             if (beforeFinishLaunching != null) {
                 replaceInFile(glAppDelegate, "//beforeDidFinishLaunchingWithOptionsMarkerEntry", beforeFinishLaunching);
@@ -4559,7 +4688,6 @@ public class IPhoneBuilder extends Executor {
                 File CodenameOne_GLViewController_h = new File(buildinRes, "CodenameOne_GLViewController.h");
                 replaceInFile(CodenameOne_GLViewController_h, "//#define CN1_HANDLE_UNIVERSAL_LINKS", "#define CN1_HANDLE_UNIVERSAL_LINKS");
             }
-
 
             if (request.getArg("ios.locationUsageDescription", null) != null) {
                 // Remove location warning message for iOS8...  This is sort of developer documentation
@@ -6599,9 +6727,6 @@ public class IPhoneBuilder extends Executor {
                 throw new BuildException("Failed to extract parparvm-compiler.jar", ex);
             }
 
-
-
-
             try {
                 unzip(getResourceAsStream("/parparvm-java-api.jar"), classesDir, classesDir, classesDir);
             } catch (IOException ex) {
@@ -6629,7 +6754,6 @@ public class IPhoneBuilder extends Executor {
             boolean isReleaseBuild = !request.getArg("ios.buildType", "debug").equals("debug");
             String onDeviceDebug = !isReleaseBuild
                     && Boolean.valueOf(request.getArg("ios.onDeviceDebug", "false")) ? "true" : "false";
-
 
             if (enableGalleryMultiselect && photoLibraryUsage) {
                 addMinDeploymentTarget("8.0");
@@ -6874,7 +6998,6 @@ public class IPhoneBuilder extends Executor {
                     writeCatalystInfoPlist(tmpFile, request.getMainClass());
                 }
 
-
                 if(runPods || !request.getArg("ios.buildType", "debug").equals("debug") || request.getArg("ios.force64", "false").equals("true")) {
                     File pbx = new File(tmpFile, "dist/" + request.getMainClass() + ".xcodeproj/project.pbxproj");
 
@@ -6889,7 +7012,6 @@ public class IPhoneBuilder extends Executor {
                         replaceAllInFile(pbx, "VALID_ARCHS = [^;]+;", "VALID_ARCHS = \"\\$(ARCHS_STANDARD)\";");
                     }
                 }
-
 
                 if(bicodeHandle) {
                     String minTargetVersion = request.getArg("ios.minDeploymentTarget", "6.0");
@@ -6921,10 +7043,8 @@ public class IPhoneBuilder extends Executor {
                     }
                 }
 
-                if (useMetal) {
-                    File pbx = new File(tmpFile, "dist/" + request.getMainClass() + ".xcodeproj/project.pbxproj");
-                    replaceInFile(pbx, "CLANG_ENABLE_MODULES = NO;", "CLANG_ENABLE_MODULES = YES;");
-                }
+                File pbx = new File(tmpFile, "dist/" + request.getMainClass() + ".xcodeproj/project.pbxproj");
+                replaceInFile(pbx, "CLANG_ENABLE_MODULES = NO;", "CLANG_ENABLE_MODULES = YES;");
             } catch (Exception ex) {
                 throw new BuildException("Failed to update infoplist file", ex);
             }
@@ -7095,7 +7215,6 @@ public class IPhoneBuilder extends Executor {
                             if (extEntitlementsFile != null) {
                                 codeSignEntitlements = extensionName + "/" + extEntitlementsFile.getName();
                             }
-
 
                             // The identifier as Xcode will see it: an archive may write
                             // PRODUCT_BUNDLE_IDENTIFIER = $(EXTENSION_ID) with EXTENSION_ID beside
@@ -7316,8 +7435,6 @@ public class IPhoneBuilder extends Executor {
                                 buildSettingsProps.delete();
                             }
 
-
-
                             // The minimum iOS this extension declares, which App Store validation
                             // reads out of the built .appex as MinimumOSVersion. Computed after the
                             // properties are folded in, so an archive that states its own wins.
@@ -7392,8 +7509,6 @@ public class IPhoneBuilder extends Executor {
                             }
                             sb.append("}\n");
                             sb.append("end\n");
-
-
 
                         }
                         if (appExtensions.length > 0) {
@@ -7718,10 +7833,7 @@ public class IPhoneBuilder extends Executor {
                         }
                     }
 
-
-                    if (useMetal) {
-                        buildSettings += "      config.build_settings['CLANG_ENABLE_MODULES'] = \"YES\"\n";
-                    }
+                    buildSettings += "      config.build_settings['CLANG_ENABLE_MODULES'] = \"YES\"\n";
                     if (excludeArm64Simulator) {
                         // Google ML Kit's binary frameworks contain device
                         // arm64 and simulator x86_64 slices. Apply the same
@@ -7730,7 +7842,6 @@ public class IPhoneBuilder extends Executor {
                         // the aggregate xcconfig.
                         buildSettings += "      config.build_settings['EXCLUDED_ARCHS[sdk=iphonesimulator*]'] = \"arm64\"\n";
                     }
-
 
                     podFileContents += "\n\npost_install do |installer|\n" +
                             "  installer.pods_project.targets.each do |target|\n" +
@@ -7920,7 +8031,6 @@ public class IPhoneBuilder extends Executor {
                     // provisioning profile does not carry fails signing, so an unused capability
                     // is not free.
                     macNativeBuilder.writeEntitlements(request, appSrcDir);
-                    macNativeBuilder.writeStubHeaders(appSrcDir);
                     macNativeBuilder.applyXcodeSettings(request, tmpFile, buildVersion);
                     macNativeBuilder.writeExportOptions(request, new File(tmpFile, "dist"));
                 }
@@ -7934,7 +8044,6 @@ public class IPhoneBuilder extends Executor {
                     writeWatchWidgetExtension(request, new File(tmpFile, "dist"), appSrcDir);
                     watchNativeBuilder.writeWatchInfoPlist(request, appSrcDir);
                     watchNativeBuilder.writeWatchEntry(request, appSrcDir);
-                    watchNativeBuilder.writeStubHeaders(appSrcDir);
                     // Empty when the watch shares the phone's translation, which is what tells
                     // applyXcodeSettings to reuse the app target's sources and neutralise the
                     // phone stub's main instead.
@@ -7948,11 +8057,16 @@ public class IPhoneBuilder extends Executor {
                     tvNativeBuilder.applyXcodeSettings(request, tmpFile, buildVersion);
                 }
 
+            } catch (BuildException alreadyDiagnosed) {
+                // A BuildException raised in here is a refusal this builder decided on and
+                // already worded -- "your bundle declares no launch screen, here is how to fix
+                // it". Wrapping it below replaced that with "Failed to inject into plist" and
+                // dropped the cause, so the developer was told a build step failed and nothing
+                // about which one or why.
+                throw alreadyDiagnosed;
             } catch (Exception ex) {
-                throw new BuildException("Failed to inject into plist");
+                throw new BuildException("Failed to inject into plist", ex);
             }
-
-
 
             
         }
@@ -10216,7 +10330,6 @@ public class IPhoneBuilder extends Executor {
         return identifierAsBuilt(declared.trim(), flattenForContext(settings, context));
     }
 
-
     /// The iOS SDK this build archives against.
     ///
     /// A local device build passes no -sdk at all and lets the destination pick the active one,
@@ -10256,6 +10369,277 @@ public class IPhoneBuilder extends Executor {
             // Not a Mac, or no Xcode: the bare platform name still matches every version of it.
         }
         return "iphoneos";
+    }
+
+    /// The major version in an SDK name, or -1 when the name carries no version.
+    ///
+    /// activeIosSdkName answers "iphoneos27.2" when xcrun can be asked and the bare
+    /// "iphoneos" when it cannot, and the bare name deliberately matches every version --
+    /// which is right for an [sdk=...] qualifier and wrong here, where it would have to
+    /// stand for some particular version. -1 says "unknown" instead, and the caller
+    /// resolves that rather than guessing high.
+    ///
+    /// Only the major is returned. Apple's launch rules are stated against the SDK major,
+    /// and API 37 has already shown what gathering the digits of a dotted version does:
+    /// "27.2" read as 272 compares greater than every floor in the file at once.
+    static int iosSdkMajorVersion(String sdkName) {
+        if (sdkName == null) {
+            return -1;
+        }
+        int digit = 0;
+        while (digit < sdkName.length() && !Character.isDigit(sdkName.charAt(digit))) {
+            digit++;
+        }
+        int end = digit;
+        while (end < sdkName.length() && Character.isDigit(sdkName.charAt(end))) {
+            end++;
+        }
+        if (end == digit) {
+            return -1;
+        }
+        try {
+            return Integer.parseInt(sdkName.substring(digit, end));
+        } catch (NumberFormatException tooManyDigits) {
+            return -1;
+        }
+    }
+
+    /// Build hints this builder used to read and no longer does, each with the reason.
+    ///
+    /// A hint nothing reads is accepted, ignored, and silent -- the exact failure the build-hint
+    /// catalog exists to prevent -- and these three are worse than merely inert: every one of
+    /// them asks for a bundle Apple no longer accepts. So they are refused by name rather than
+    /// dropped, and the message says what replaced them.
+    ///
+    /// Read off the request's supplied keys, not through getArg, because getArg is how a hint is
+    /// *read* -- and a removed hint has no reader. That also keeps the catalog honest: these
+    /// names are gone from it, and a getArg site for a name it does not describe is what
+    /// check-build-hint-catalog fails on.
+    private static final String[][] REMOVED_HINTS = {
+        {"ios.uiscene",
+            "ios.uiscene has been removed and the UIScene lifecycle is now the only one this "
+            + "builder generates. Apple requires it of every app linked with the iOS 27 SDK or "
+            + "later -- an app built without it does not launch (iOS & iPadOS 27 release notes, "
+            + "UIKit 141837548) -- so there is nothing left for the hint to select. Delete it "
+            + "from your build hints. Migration guidance for app code is in Apple TN3187, and if "
+            + "your app worked under the legacy UIApplicationDelegate lifecycle and not under "
+            + "scenes, please report it: that is a bug in Codename One and no longer has a way "
+            + "around it."},
+        {"ios.generateSplashScreens",
+            "ios.generateSplashScreens has been removed. It selected the legacy Default*.png "
+            + "splash-image generator, which iOS stopped using long ago and which this builder no "
+            + "longer contains; all the hint still did was suppress the launch screen, and an app "
+            + "linked with the iOS 27 SDK is rejected without one (iOS & iPadOS 27 release notes, "
+            + "UIKit 168247372). Delete it from your build hints. Every build now declares "
+            + "UILaunchScreen and shows Launch.Foreground.png -- drop your own Launch.Foreground.png "
+            + "into the project to replace the image, or declare your own launch key through "
+            + "ios.plistInject."},
+        {"ios.launchStoryboardName",
+            "ios.launchStoryboardName has been removed. It named the storyboard for the "
+            + "UILaunchStoryboardName key, which is only emitted on the legacy lifecycle the "
+            + "ios.uiscene hint used to select: SplashBoard does not render a launch storyboard "
+            + "for a scene-based app, so on every build this builder now produces the key would "
+            + "mean a black launch (issue #5210). Delete it from your build hints. To point the "
+            + "launch at a storyboard of your own anyway, declare UILaunchStoryboardName through "
+            + "ios.plistInject, which overrides the generated UILaunchScreen."},
+    };
+
+    /// Why a build must be refused for asking for a hint that no longer exists, or null.
+    ///
+    /// #### Parameters
+    ///
+    /// - `suppliedHints`: every build-hint name the request carries
+    ///
+    /// #### Returns
+    ///
+    /// the message to fail the build with, or null when none of them was supplied
+    static String removedHintRejection(Set<String> suppliedHints) {
+        if (suppliedHints == null) {
+            return null;
+        }
+        StringBuilder message = new StringBuilder();
+        for (String[] removed : REMOVED_HINTS) {
+            if (suppliedHints.contains(removed[0])) {
+                if (message.length() > 0) {
+                    message.append("\n\n");
+                }
+                message.append(removed[1]);
+            }
+        }
+        return message.length() == 0 ? null : message.toString();
+    }
+
+    /// Why the extracted iOS port cannot service the lifecycle this build declares, or null.
+    ///
+    /// The port's natives and this plugin ship as one unit: `codenameone-ios` is a dependency
+    /// OF the plugin, version-managed to the plugin's own version, and
+    /// `Executor.getResourceAsStream` reads the plugin realm -- so nothing a generated project
+    /// configures, `cn1.version` included, can steer which bundle is unzipped here. A
+    /// hand-written `<dependencies>` override on the plugin declaration can, and Maven honours
+    /// it.
+    ///
+    /// That combination used to be merely odd and is now fatal, silently. The scene delegate is
+    /// what installs the window, and an older bundle either predates it entirely (7.0.214 ships
+    /// no CodenameOne_GLSceneDelegate.m at all) or guards it behind `#ifdef CN1_USE_UI_SCENE`, a
+    /// define this plugin stopped injecting when the legacy lifecycle was deleted. Measured on
+    /// the guarded sources against the iOS 27 SDK: 19432 bytes of object code with the define,
+    /// 1248 without -- no class, no methods. Meanwhile the Info.plist this build writes names
+    /// `CodenameOne_GLSceneDelegate` as the scene delegate, so UIKit looks up a class the binary
+    /// does not contain. Nothing fails at build time; the app fails at launch.
+    ///
+    /// Note the main NIB is NOT the fallback it looks like. An older bundle still carries
+    /// MainWindow.xib -- 7.0.214 does -- but `NSMainNibFile` comes from the translator template,
+    /// which is `codenameone-parparvm` at the PLUGIN's version, so the key that would load it is
+    /// gone whatever the port says.
+    ///
+    /// #### Parameters
+    ///
+    /// - `nativeSources`: the directory nativeios.jar was extracted into
+    ///
+    /// #### Returns
+    ///
+    /// the message to fail the build with, or null when the port matches this plugin
+    static String sceneLifecyclePortSkewRejection(File nativeSources) throws IOException {
+        File sceneDelegate = new File(nativeSources, "CodenameOne_GLSceneDelegate.m");
+        String reason;
+        if (!sceneDelegate.exists()) {
+            reason = "it contains no CodenameOne_GLSceneDelegate.m at all";
+        } else if (new String(readFileBytes(sceneDelegate), StandardCharsets.UTF_8)
+                .contains("CN1_USE_UI_SCENE")) {
+            // Present but compiled out: the define that used to enable it is gone from this
+            // plugin, so the class would vanish from the binary with the build still green.
+            reason = "its CodenameOne_GLSceneDelegate is still behind #ifdef CN1_USE_UI_SCENE, "
+                    + "a define this version no longer sets";
+        } else {
+            return null;
+        }
+        return "The iOS port bundle on this build's classpath is older than the Codename One "
+                + "Maven plugin running it: " + reason + ". The scene delegate is what creates "
+                + "the application window, and the Info.plist this build writes names it, so the "
+                + "result would be an app that builds cleanly and fails to launch. These two "
+                + "artifacts are released together and are not meant to be mixed -- remove the "
+                + "<dependencies> override pinning com.codenameone:codenameone-ios under the "
+                + "codenameone-maven-plugin declaration in your pom, or move the plugin back to "
+                + "the version that matches it. Note cn1.version is not what selects this: the "
+                + "port is a dependency of the plugin, not of your project.";
+    }
+
+    /// The launch-screen keys Apple accepts, in the order its release notes name them.
+    ///
+    /// All four, because an app is entitled to supply whichever one describes its launch
+    /// experience. Everything here that asks about a launch screen asks about the whole set:
+    /// a check that knows only the two this builder can emit would append a second launch
+    /// experience beside a UILaunchStoryboards the developer supplied, and would fail a build
+    /// whose launch screen is perfectly valid.
+    static final String[] ACCEPTED_LAUNCH_KEYS = {
+        "UILaunchStoryboardName", "UILaunchStoryboards", "UILaunchScreen", "UILaunchScreens"
+    };
+
+    /// The same plist without the scene manifest or any launch key of its root dictionary.
+    ///
+    /// The translator template declares a manifest and a UILaunchScreen so that a project it
+    /// produces on its own can launch. This build is about to write its own pair, so the
+    /// template's come out first: a property list takes the LAST of a duplicated key, which
+    /// would make the one UIKit reads depend on where the injection was spliced.
+    ///
+    /// All four launch keys, not only the one the template declares: whichever of them is
+    /// there, it is ours, and leaving a second kind behind is the same duplication by another
+    /// name. Nothing a developer wrote reaches this text -- ios.plistInject is a separate
+    /// fragment, added after this runs.
+    ///
+    /// #### Parameters
+    ///
+    /// - `plist`: the template plist document
+    ///
+    /// #### Returns
+    ///
+    /// the document with those keys removed, or the input when it declared none
+    static String plistStrippedOfGeneratedLaunchMetadata(String plist) {
+        String stripped = plistWithoutRootMembers(plist, "UIApplicationSceneManifest");
+        for (String launchKey : ACCEPTED_LAUNCH_KEYS) {
+            stripped = plistWithoutRootMembers(stripped, launchKey);
+        }
+        return stripped;
+    }
+
+    /// Whether an injected plist fragment names any of Apple's launch-screen keys.
+    ///
+    /// Deliberately `contains`, not a parse. This decides only whether to ADD a key of our
+    /// own, and matching too eagerly there just leaves the developer's fragment alone -- the
+    /// safe direction. The finished document is parsed properly by launchMetadataRejection,
+    /// which is what fails a build, and it is the one that has to tell a real declaration
+    /// from a mention.
+    ///
+    /// #### Parameters
+    ///
+    /// - `inject`: the injected plist fragment
+    ///
+    /// #### Returns
+    ///
+    /// true when the fragment already names a launch key
+    static boolean plistNamesAnyLaunchKey(String inject) {
+        if (inject == null) {
+            return false;
+        }
+        for (String key : ACCEPTED_LAUNCH_KEYS) {
+            if (inject.contains(key)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /// Why a finished Info.plist must be refused, or null when it satisfies Apple's rules.
+    ///
+    /// Asked of the document this builder actually wrote, not of the fragments it assembled.
+    /// The keys can arrive from three places -- the translator's template, the injection
+    /// below, and the developer's own ios.plistInject -- and only the finished file knows
+    /// what survived all three. Reading the generator strings instead is how a bundle with
+    /// no launch key at all was produced by a build whose generator looked correct.
+    ///
+    /// #### Parameters
+    ///
+    /// - `plist`: the complete Info.plist document
+    ///
+    /// - `sdkMajor`: the major version of the SDK being linked against, or -1 if unknown
+    ///
+    /// #### Returns
+    ///
+    /// the message to fail the build with, or null when the document is acceptable
+    static String launchMetadataRejection(String plist, int sdkMajor) {
+        if (sdkMajor < FIRST_SDK_REQUIRING_LAUNCH_METADATA) {
+            return null;
+        }
+        int[] root = plistRootDictBody(plist);
+        if (root == null) {
+            // Not a document this parser can read. Xcode will have its own opinion about that
+            // and will say so; inventing a launch-screen failure for it would be a misdiagnosis.
+            return null;
+        }
+        boolean declared = false;
+        for (String key : ACCEPTED_LAUNCH_KEYS) {
+            if (plistMemberRange(plist, root[0], root[1], key) != null) {
+                declared = true;
+                break;
+            }
+        }
+        if (!declared) {
+            return "The generated Info.plist declares no launch screen. Apps linked with the "
+                    + "iOS " + sdkMajor + " SDK are rejected unless the bundle declares one of "
+                    + "UILaunchStoryboardName, UILaunchStoryboards, UILaunchScreen or "
+                    + "UILaunchScreens (iOS & iPadOS 27 release notes, UIKit 168247372). "
+                    + "UIRequiresFullScreen is not a substitute (TN3192). Remove any "
+                    + "ios.plistInject that strips the generated launch key, or declare your "
+                    + "own launch screen there.";
+        }
+        if (plistMemberRange(plist, root[0], root[1], "UIApplicationSceneManifest") == null) {
+            return "The generated Info.plist declares no UIApplicationSceneManifest. Apps "
+                    + "linked with the iOS " + sdkMajor + " SDK must adopt the UIScene "
+                    + "lifecycle or they fail to launch (iOS & iPadOS 27 release notes, UIKit "
+                    + "141837548). Remove any ios.plistInject that strips the generated scene "
+                    + "manifest, or declare your own there.";
+        }
+        return null;
     }
 
     /// A ruby fragment that raises every app-extension target to the SDK's minimum.
@@ -12393,7 +12777,6 @@ public class IPhoneBuilder extends Executor {
         return "PeerComponent.create(new long[] {" + methodCallString + "})";
     }
 
-
     @Override
     protected String convertPeerComponentToNative(String param) {
         return "((long[])" + param + ".getNativePeer())[0]";
@@ -12542,7 +12925,6 @@ public class IPhoneBuilder extends Executor {
         }
         return value;
     }
-
 
     /**
      * The packet-tunnel Network Extension target.
@@ -15303,16 +15685,17 @@ public class IPhoneBuilder extends Executor {
     /// The Mac slice's version of a finished plist: one that supports multiple scenes
     /// and declares the window role to create them with.
     ///
-    /// The shared plist is left exactly as the iOS slice needs it, which for a default
-    /// Catalyst build means it carries no scene manifest at all -- declaring one
-    /// activates the UIScene lifecycle, and the iPhone/iPad artifact still carries its
-    /// main NIB, which is a window with no scene and a launch FrontBoard terminates.
-    /// So this adds whatever is missing, and only the Mac slice ever reads the result:
+    /// The shared plist is left exactly as the iOS slice needs it, which means
+    /// UIApplicationSupportsMultipleScenes stays false: it is ONE Info.plist, and the same
+    /// build ships the iPhone/iPad slice, which never asked for multiple windows. Only the
+    /// Mac slice reads the result of this, so this is where windows are turned on.
+    ///
+    /// It still handles a manifest it did not generate, because ios.plistInject can supply
+    /// one and then the generator steps aside entirely:
     ///
     /// - no manifest at all: a whole one is added to the root dictionary;
     /// - a manifest without multiple-scene support: the key is set, or added;
-    /// - a manifest whose scene configurations have no window role -- which is what a
-    ///   CarPlay build with ios.uiscene off produces -- the role is added to them.
+    /// - a manifest whose scene configurations have no window role: the role is added.
     ///
     /// That last case is why this cannot simply flip a boolean: a manifest can exist
     /// and still describe no window UIKit could create.
@@ -15331,14 +15714,10 @@ public class IPhoneBuilder extends Executor {
             return null;
         }
         plist = plistWithExpandedDict(plist, 0);
-        // The Mac slice always ends up with a scene manifest, and a scene lifecycle
-        // beside a legacy main NIB is the orphan window FrontBoard terminates -- the
-        // very pairing that keeps the manifest out of the shared plist. The shared
-        // plist only drops NSMainNibFile under ios.uiscene, so for the default Catalyst
-        // build it is still there and has to go here.
-        //
-        // The Mac build settings exclude MainWindow.xib from compilation anyway, so the
-        // key names a NIB that is not in this bundle even before the lifecycle argument.
+        // Nothing this builder generates declares NSMainNibFile any more -- the key left the
+        // translator template with the main NIB it named. What can still put one here is
+        // ios.plistInject, and a scene lifecycle beside a legacy main NIB is an orphan window
+        // FrontBoard terminates at launch, so it goes.
         plist = plistWithoutRootMembers(plist, "NSMainNibFile");
         int[] root = plistRootDictBody(plist);
         if (root == null) {
@@ -16079,12 +16458,31 @@ public class IPhoneBuilder extends Executor {
             replaceAllInFile(infoPlist, "<string>English</string>", "<string>"  + lang + "</string>");
         }
 
-        if ("true".equalsIgnoreCase(request.getArg("ios.uiscene", "true"))) {
-            // MainWindow.xib auto-instantiates a UIWindow with visibleAtLaunch=YES; under
-            // UIScene the window has no scene and FrontBoard kills the launch in iOS 26.
-            // UIApplicationMain(..., @"CodenameOne_GLAppDelegate") still creates the
-            // delegate from the class name, so the NIB is no longer needed.
-            replaceAllInFile(infoPlist, "<key>NSMainNibFile</key>\\s*<string>[^<]*</string>", "");
+        // No NSMainNibFile strip here any more, and none in the template either. MainWindow.xib
+        // auto-instantiated a UIWindow with visibleAtLaunch=YES; under the scene lifecycle that
+        // window has no scene and FrontBoard kills the launch, so the key had to go on every
+        // build this produces -- and the nib it named went with it.
+        // UIApplicationMain(..., @"CodenameOne_GLAppDelegate") creates the delegate from the
+        // class name. A developer who injects the key through ios.plistInject still gets it
+        // stripped from the Mac slice, which is a different concern; see plistForMacSlice.
+
+        // What replaced it lives in the template as well: the scene manifest and UILaunchScreen
+        // are unconditional now, so the translator template declares both and a project produced
+        // by ByteCodeTranslator alone -- without this builder ever running -- has a lifecycle and
+        // a launch screen of its own. The port's natives stopped being able to launch without a
+        // scene manifest the moment the legacy lifecycle was deleted from them, and a native that
+        // depends on a plist key only one of its two producers writes is a key it can lose.
+        //
+        // This build writes its own, because CarPlay adds a second role and ios.plistInject can
+        // replace either outright, so the template's copies come out first: a property list takes
+        // the LAST of a duplicated key, and shipping two of these would make which one UIKit
+        // reads a function of where the injection happened to be spliced.
+        if (infoPlist.exists()) {
+            PlistText template = readPlistText(infoPlist);
+            String withoutGenerated = plistStrippedOfGeneratedLaunchMetadata(template.text);
+            if (!withoutGenerated.equals(template.text)) {
+                writePlistText(infoPlist, template, withoutGenerated);
+            }
         }
 
         // nothing to inject here? move along
@@ -16110,6 +16508,36 @@ public class IPhoneBuilder extends Executor {
                         + "<dict>"
                         + "<key>NSAllowsArbitraryLoads</key><true/>"
                         + "</dict>";
+            }
+            // A PHYSICAL device reaches the proxy across the Wi-Fi it shares with
+            // the developer's machine, and since iOS 14 that is local-network
+            // access: consent-gated, and gated on a purpose string the app has to
+            // declare up front. Without one the app is terminated the moment
+            // cn1_debugger dials out -- before it can connect, so the session fails
+            // with the proxy still waiting and nothing on the device to explain it.
+            //
+            // Only for the LAN case. The native simulator shares the host's
+            // loopback, which is not the local network, and an unnecessary purpose
+            // string puts a prompt in front of a developer who never asked for one
+            // -- the same reason the nearby flags are kept apart from each other.
+            //
+            // Ambiguity resolves TOWARDS declaring it: a proxyHost that is not
+            // recognisably loopback may still be a LAN name rather than an address,
+            // and the costs are not symmetric. A spare purpose string costs one
+            // prompt in a build that is debug-only by construction; a missing one
+            // costs a debugging session that cannot start.
+            //
+            // Through applyCatalogPlistEntry rather than putArgument, for the reason
+            // the Matter block above states: the sweep that copies
+            // ios.NS*UsageDescription hints into privacyUsageDescriptions ran long
+            // before this line, the plist is rendered from that map, and a bare
+            // argument set here would never be read. It fills only a MISSING value,
+            // so a project that declared its own string keeps it.
+            if (!isLoopbackDebugProxyHost(proxyHost)) {
+                applyCatalogPlistEntry(request, new String[] {
+                    "NSLocalNetworkUsageDescription",
+                    "Connects to the Codename One debugging proxy on your computer. "
+                            + "This is a development build."});
             }
         }
 
@@ -16170,11 +16598,7 @@ public class IPhoneBuilder extends Executor {
         }
         
         boolean multitasking = "true".equals(request.getArg("ios.multitasking", "true"));
-        if(request.getArg("ios.generateSplashScreens", "false").equals(
-            "true")) {
-            multitasking = false;
-        }
-        if (multitasking && useMetal && getDeploymentTargetInt(request) < 14) {
+        if (multitasking && getDeploymentTargetInt(request) < 14) {
             // An explicit ios.deployment_target below 14 cannot satisfy the
             // App Store launch screen rule for iPad multitasking apps via the
             // UILaunchScreen key (it only counts when MinimumOSVersion is 14
@@ -16184,7 +16608,6 @@ public class IPhoneBuilder extends Executor {
             multitasking = false;
         }
 
-
         if (!multitasking || xcodeVersion < 9) {
             if (inject.indexOf("UIRequiresFullScreen") < 0) {
                 // Temporary workaround to disable iPad multitasking support.
@@ -16193,67 +16616,45 @@ public class IPhoneBuilder extends Executor {
                 inject += "\n<key>UIRequiresFullScreen</key><true/>\n";
             }
         }
-        if (!"true".equals(request.getArg("ios.generateSplashScreens", "false"))) {
-            if ("true".equalsIgnoreCase(request.getArg("ios.uiscene", "true"))) {
-                // SplashBoard never renders the launch storyboard for scene-based
-                // CN1 apps -- the system animates from a black frame instead
-                // (issue #5210). The iOS 14+ UILaunchScreen generated launch
-                // screen does work under UIScene: system background color
-                // (light/dark aware) with the launch icon centered, matching the
-                // native launch placeholder the app shows until the first EDT
-                // frame. UILaunchStoryboardName must be OMITTED here: when both
-                // keys are present iOS prefers the storyboard, which is exactly
-                // the broken path (verified on the iOS 26 simulator with a cold
-                // SplashBoard cache). The ios.launchStoryboardName hint is
-                // therefore only honored with ios.uiscene=false; injecting
-                // either key via ios.plistInject overrides this default.
-                // UIImageName points at the loose Launch.Foreground.png in the
-                // bundle root (guaranteed by generateLaunchScreen); SplashBoard
-                // resolves it there but fails to render the same image from an
-                // actool compiled imageset, so do NOT move it into
-                // Images.xcassets.
-                if (!inject.contains("UILaunchScreen") && !inject.contains("UILaunchStoryboardName")) {
-                    inject += "\n<key>UILaunchScreen</key>\n"
-                            + "<dict>\n"
-                            + "    <key>UIImageName</key>\n"
-                            + "    <string>Launch.Foreground</string>\n"
-                            + "</dict>";
-                }
-            } else if (!inject.contains("UILaunchStoryboardName")) {
-                inject += "\n<key>UILaunchStoryboardName</key><string>"+request.getArg("ios.launchStoryboardName", "LaunchScreen")+"</string>";
-            }
+        // SplashBoard never renders a launch storyboard for a scene-based CN1 app -- the
+        // system animates from a black frame instead (issue #5210) -- and every build is
+        // scene-based now, so UILaunchStoryboardName is never what this generates.
+        // UILaunchScreen does work under UIScene: system background color (light/dark aware)
+        // with the launch icon centered, matching the native launch placeholder the app shows
+        // until the first EDT frame. When both keys are present iOS prefers the storyboard,
+        // which is exactly the broken path (verified on the iOS 26 simulator with a cold
+        // SplashBoard cache), so this generates one key and only one.
+        //
+        // UIImageName points at the loose Launch.Foreground.png in the bundle root (guaranteed
+        // by generateLaunchScreen); SplashBoard resolves it there but fails to render the same
+        // image from an actool compiled imageset, so do NOT move it into Images.xcassets.
+        //
+        // All four of Apple's launch keys are consulted before adding this one, not just the
+        // two this builder can emit. A project that declares UILaunchStoryboards or
+        // UILaunchScreens through ios.plistInject has supplied a launch experience, and
+        // appending ours next to it produces two -- with iOS picking between them rather than
+        // the developer.
+        if (!plistNamesAnyLaunchKey(inject)) {
+            inject += "\n<key>UILaunchScreen</key>\n"
+                    + "<dict>\n"
+                    + "    <key>UIImageName</key>\n"
+                    + "    <string>Launch.Foreground</string>\n"
+                    + "</dict>";
         }
-        boolean useUISceneManifest = "true".equalsIgnoreCase(request.getArg("ios.uiscene", "true"));
         // com.codename1.ui.Window needs multiple scenes, and a Window only exists on
         // the Mac Catalyst slice, so the key follows macNative.enabled exactly.
         boolean multiWindow = macNativeBuilder.isMultiWindow();
-        // CarPlay requires the UIScene lifecycle and a dedicated
-        // CPTemplateApplicationSceneSessionRoleApplication scene wired to
-        // CodenameOne_CarPlaySceneDelegate. Emit the manifest when either UIScene is on or the app
-        // uses CarPlay; include the phone window role only under UIScene, and the CarPlay role only
-        // when the app references com.codename1.car.
-        // multiWindow is in the condition as well as the value below. A Catalyst build
-        // with ios.uiscene=false and no CarPlay skipped the whole block, so the bundle
-        // got neither UIApplicationSupportsMultipleScenes nor a scene configuration --
-        // and getWindowManager() reads that key back out of the bundle, so windows were
-        // reported unsupported and constructing one threw, in the very build that had
-        // just asked for them.
         if (multiWindow) {
             String rejection = sceneManifestRejection(inject);
             if (rejection != null) {
                 throw new BuildException(rejection);
             }
         }
-        // multiWindow is deliberately NOT in this condition. Declaring
-        // UIApplicationSceneManifest activates the UIScene lifecycle, and the
-        // NSMainNibFile removal above runs only under ios.uiscene -- so putting a
-        // manifest in the shared plist for a Catalyst build would hand the iPhone/iPad
-        // artifact a scene lifecycle while it still carries its main NIB, which is a
-        // window with no scene and a launch FrontBoard terminates on iOS 26. The Mac
-        // slice's copy is where a manifest appears for windows; see
+        // multiWindow is deliberately NOT in this condition -- it decides the VALUE of
+        // UIApplicationSupportsMultipleScenes below, never whether a manifest is written at
+        // all. The Mac slice's copy is where multi-window support appears; see
         // plistForMacSlice.
-        if ((useUISceneManifest || usesCar)
-                && !plistDeclaresKey(inject, "UIApplicationSceneManifest")) {
+        if (!plistDeclaresKey(inject, "UIApplicationSceneManifest")) {
             String carPlayScene = usesCar
                     ? "        <key>CPTemplateApplicationSceneSessionRoleApplication</key>\n"
                     + "        <array>\n"
@@ -16265,7 +16666,6 @@ public class IPhoneBuilder extends Executor {
                     + "            </dict>\n"
                     + "        </array>\n"
                     : "";
-            String windowScene = useUISceneManifest ? WINDOW_SCENE_ROLE : "";
             inject += "\n<key>UIApplicationSceneManifest</key>\n"
                     + "<dict>\n"
                     + "    <key>UIApplicationSupportsMultipleScenes</key>\n"
@@ -16288,7 +16688,10 @@ public class IPhoneBuilder extends Executor {
                     + "    <false/>\n"
                     + "    <key>UISceneConfigurations</key>\n"
                     + "    <dict>\n"
-                    + windowScene
+                    // Unconditional: the app role is what UIKit creates the main window from,
+                    // and a manifest that configures nothing for it describes an app with no
+                    // window. CarPlay is a second, distinct role beside it, never instead of it.
+                    + WINDOW_SCENE_ROLE
                     + carPlayScene
                     + "    </dict>\n"
                     + "</dict>";
@@ -16336,7 +16739,6 @@ public class IPhoneBuilder extends Executor {
                     
 
                 }
-
 
             }
         } else {
@@ -16851,9 +17253,20 @@ public class IPhoneBuilder extends Executor {
             line = infoReader.readLine();
         }
         infoReader.close();
-        
+
         try(FileOutputStream fo = new FileOutputStream(infoPlist)) {
             fo.write(b.toString().getBytes(StandardCharsets.UTF_8));
+        }
+
+        // The last word on Apple's launch rules, and the only one that sees what the developer's
+        // own ios.plistInject did. Every producer above decides whether to ADD a key, and each of
+        // them steps aside when the injection already names it -- so a plistInject that mentions
+        // UILaunchScreen inside a comment, or declares it somewhere other than the root
+        // dictionary, silences the generator without leaving UIKit anything to read. Asking the
+        // finished document is what distinguishes those from a real declaration.
+        String rejection = launchMetadataRejection(b.toString(), iosSdkMajor);
+        if (rejection != null) {
+            throw new BuildException(rejection);
         }
     }
 
@@ -16990,7 +17403,6 @@ public class IPhoneBuilder extends Executor {
         log("Did not find any lines in Xcode version that matched the patterns we were looking for.  Returning version -1");
         return -1;
     }
-
 
     private String resolveMetalColorSpaceDefine(String hint) {
         String value = hint == null ? "sRGB" : hint.trim();
@@ -17450,7 +17862,6 @@ public class IPhoneBuilder extends Executor {
         return trimmed;
     }
 
-
     private void addLocalizedIconsBuildSetting(File pbx) throws IOException {
         if (localizedIcons.isEmpty()) {
             return;
@@ -17584,7 +17995,6 @@ public class IPhoneBuilder extends Executor {
                 || "com/codename1/ai/language/Translator".equals(cls)
                 || "com/codename1/ai/language/SmartReply".equals(cls);
     }
-
 
     /** Locale-independent case-insensitive suffix test. */
     static boolean endsWithIgnoreCase(String value, String suffix) {

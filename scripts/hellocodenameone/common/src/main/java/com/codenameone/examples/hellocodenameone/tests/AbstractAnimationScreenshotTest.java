@@ -1,3 +1,25 @@
+/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
 package com.codenameone.examples.hellocodenameone.tests;
 
 import com.codename1.ui.Form;
@@ -81,7 +103,17 @@ public abstract class AbstractAnimationScreenshotTest extends BaseTest {
             AnimationTime.reset();
         }
         markCaptureStarted();
-        Cn1ssDeviceRunnerHelper.emitImage(grid, getImageName(), this::done);
+        Cn1ssDeviceRunnerHelper.emitImage(grid, getImageName(), new Runnable() {
+            @Override
+            public void run() {
+                if (blankFilmstripMessage != null) {
+                    // fail() calls done(), so this finalises the test exactly once.
+                    fail(blankFilmstripMessage);
+                    return;
+                }
+                done();
+            }
+        });
     }
 
     /// Build the final screenshot Image. The default implementation runs the
@@ -92,6 +124,14 @@ public abstract class AbstractAnimationScreenshotTest extends BaseTest {
     protected Image buildScreenshot(int width, int height) {
         return buildGrid(width, height);
     }
+
+    /// Set when every frame came out a single flat colour. Recorded rather than failed on
+    /// the spot: BaseTest.fail calls done(), and finalising the test from inside the compose
+    /// would end it before the image is emitted -- the runner would then advance and the
+    /// late emit would land on whatever screen came next, which is the exact failure the
+    /// DualAppearance gate was written for. The image is worth having either way; it is the
+    /// evidence.
+    private String blankFilmstripMessage;
 
     private Image buildGrid(int width, int height) {
         int cellW = width / GRID_COLS;
@@ -107,6 +147,7 @@ public abstract class AbstractAnimationScreenshotTest extends BaseTest {
         cg.setColor(0x101010);
         cg.fillRect(0, 0, width, height);
         prepareCapture(frameWidth, frameHeight);
+        int blankFrames = 0;
         try {
             for (int i = 0; i < FRAME_COUNT; i++) {
                 double progress = (double) i / (double) (FRAME_COUNT - 1);
@@ -122,6 +163,9 @@ public abstract class AbstractAnimationScreenshotTest extends BaseTest {
                 } else {
                     scaled = frame.scaled(cellW, cellH);
                 }
+                if (isSingleColour(frame, frameWidth, frameHeight)) {
+                    blankFrames++;
+                }
                 int row = i / GRID_COLS;
                 int col = i % GRID_COLS;
                 cg.drawImage(scaled, col * cellW, row * cellH);
@@ -134,8 +178,59 @@ public abstract class AbstractAnimationScreenshotTest extends BaseTest {
         } finally {
             finishCapture();
         }
+        if (blankFrames == FRAME_COUNT) {
+            // Every frame is one flat colour, so the filmstrip has no content in it at all.
+            //
+            // This is a picture, which is the whole problem: the capture succeeds, the
+            // comparison runs, and the only thing that can tell a blank filmstrip from a
+            // real one is a person looking at it. That is how ten of these emitted six
+            // empty cells in the host Form's background colour -- a layout invalidation
+            // that these captures had been getting by accident stopped happening -- and
+            // the goldens would have recorded the blank as the new truth.
+            //
+            // The condition is deliberately all six rather than any: a single flat frame
+            // can be legitimate at one end of an animation, six cannot.
+            blankFilmstripMessage = getImageName() + " produced " + FRAME_COUNT
+                    + " frames and every one of them is a single flat colour."
+                    + " The animation host painted its background and none of its children;"
+                    + " see BaseTest.layoutOffScreen.";
+            System.out.println("CN1SS:ERR:test=" + getImageName()
+                    + " blank_filmstrip=" + blankFilmstripMessage);
+        }
         drawGridLines(cg, width, height, cellW, cellH);
         return composite;
+    }
+
+    /// True when every pixel of the image is the same colour.
+    ///
+    /// #### Parameters
+    ///
+    /// - `img`: the frame to inspect
+    ///
+    /// - `w`: its width
+    ///
+    /// - `h`: its height
+    ///
+    /// #### Returns
+    ///
+    /// true when the frame carries exactly one colour
+    private static boolean isSingleColour(Image img, int w, int h) {
+        if (w <= 0 || h <= 0) {
+            return true;
+        }
+        // getRGB() rather than the region overload, which is not public outside the
+        // com.codename1.ui package.
+        int[] pixels = img.getRGB();
+        if (pixels == null || pixels.length == 0) {
+            return true;
+        }
+        int first = pixels[0];
+        for (int i = 1; i < pixels.length; i++) {
+            if (pixels[i] != first) {
+                return false;
+            }
+        }
+        return true;
     }
 
     private void drawGridLines(Graphics g, int width, int height, int cellW, int cellH) {

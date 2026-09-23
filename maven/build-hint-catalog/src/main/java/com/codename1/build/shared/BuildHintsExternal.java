@@ -304,14 +304,6 @@ final class BuildHintsExternal {
                         + "documentation]. These are added to the entitlements file with the key "
                         + "`keychain-access-groups`."));
 
-        h.add(new Hint("ios.newPipeline")
-                .group(HintGroup.IOS)
-                .type(HintType.BOOLEAN)
-                .platform("ios")
-                .external()
-                .doc("Boolean true/false defaults to true. Allows toggling the OpenGL ES 2.0 drawing pipeline "
-                        + "off to the older OGL ES 1.0 pipeline."));
-
         h.add(new Hint("ios.release.archs")
                 .group(HintGroup.IOS)
                 .type(HintType.STRING)
@@ -352,14 +344,6 @@ final class BuildHintsExternal {
                 .doc("Boolean true/false defaults to false and works only for pro accounts. Enables the "
                         + "testflight support in the release binaries for easy beta testing. Notice that the IDE "
                         + "plugin has a \"Test Flight\" check box you *should* use under the iOS section."));
-
-        h.add(new Hint("ios.xcode_version")
-                .group(HintGroup.IOS)
-                .type(HintType.STRING)
-                .platform("ios")
-                .external()
-                .doc("The version of Xcode used on the server. Defaults to 4.5; accepts 5.0 as an option and "
-                        + "nothing else."));
 
         h.add(new Hint("javascript.inject.afterHead")
                 .group(HintGroup.JAVASCRIPT)

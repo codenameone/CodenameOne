@@ -2170,6 +2170,25 @@ public class Dialog extends Form implements AbstractDialog {
     /// exactly the expression it always did.
     @Override
     void showDialog(boolean modal, boolean reverse) {
+        if (Display.getInstance().isDesktop()) {
+            // A desktop dialog is a card sized to what it says. The percentages below are the
+            // phone convention -- 20% off the top, 10% off the bottom, 20% each side, so the
+            // dialog is always 70% x 60% of its host no matter what is in it. On a phone that
+            // reads as a sheet; on a desktop window it reads as a confirm box with a title, one
+            // line of text, and a third of the window empty above and below it. Measured on the
+            // committed goldens before this: the same "Delete the document?" dialog came out
+            // 215px tall at 400x300, 280px at 1000x400 and 490px at 900x700 -- tracking the
+            // window, never the content.
+            //
+            // showPacked is the existing content-sized path, already used whenever a dialog
+            // position is set, and it honours the dialogMaxWidthPercentInt / dialogMaxWidthMMInt
+            // theme caps so a long body still wraps into a centred card rather than a full-width
+            // strip. Routed here rather than at the two call sites because Form.showModal and
+            // showModeless both funnel through this method, so this is where hosted and
+            // non-hosted desktop dialogs meet.
+            showPacked(BorderLayout.CENTER, modal);
+            return;
+        }
         if (hostBounds() == null) {
             super.showDialog(modal, reverse);
             return;
@@ -2705,12 +2724,45 @@ public class Dialog extends Form implements AbstractDialog {
         // Vetoed so the dialog owns the teardown. Letting the window dispose itself
         // first would leave the dialog believing it was still showing.
         evt.consume();
+        cancel();
+    }
+
+    /// Every way a user says "not this one" -- the window's close control, the platform back
+    /// gesture, and Escape on a desktop keyboard -- means the same thing, so they resolve it in
+    /// one place: the back command when there is one, and disposal when there isn't.
+    ///
+    /// Written three times before this existed, which is how the three drifted apart: add a
+    /// fourth entry point and the next one is written a fourth time.
+    void cancel() {
         Command back = getBackCommand();
         if (back != null) {
-            dispatchCommand(back, new ActionEvent(back, ActionEvent.Type.Command));
+            // The guard first, exactly as Form.escapePressed does it. dispatchCommand runs the
+            // command and only then reaches actionCommandImpl, where the guard is consulted --
+            // so asking afterwards lets a vetoed cancel navigate away or discard the state the
+            // guard existed to protect. This path is shared by Escape, the native window close
+            // request and the hosted back action, so all three were affected.
+            if (!checkPopGuard(com.codename1.router.PopReason.HARDWARE_BACK)) {
+                return;
+            }
+            ActionEvent ev = new ActionEvent(back, ActionEvent.Type.Command);
+            back.actionPerformed(ev);
+            if (!ev.isConsumed()) {
+                actionCommandImpl(back, ev);
+            }
             return;
         }
         dispose();
+    }
+
+    /// @inheritDoc
+    ///
+    /// Escape closes a dialog, which is what its window's close control already means. An
+    /// anchored popup is included: it is the one surface where Escape is the ONLY way out that
+    /// does not also click something underneath.
+    @Override
+    boolean escapePressed() {
+        cancel();
+        return true;
     }
 
     /// Takes this dialog back out of its window. Idempotent, and marshalled onto the
@@ -3164,12 +3216,7 @@ public class Dialog extends Form implements AbstractDialog {
             return;
         }
         evt.consume();
-        Command back = getBackCommand();
-        if (back != null) {
-            dispatchCommand(back, new ActionEvent(back, ActionEvent.Type.Command));
-            return;
-        }
-        dispose();
+        cancel();
     }
 
     /// Whether this is the last dialog added to its host's shared layer, which is the

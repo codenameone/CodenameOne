@@ -92,7 +92,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 > Francesco Galgani says:
 >
-> I’ve just tested that a Popup Dialog works fine also with an Android skin, thank you! About the Popup Dialog, isn’t the developer guide section "Styling The Arrow Of The Popup Dialog" more valid? Should this part of the developer guide be changed? Link: [https://www.codenameone.com…](</manual/components/#_styling_the_arrow_of_the_popup_dialog>)
+> I’ve just tested that a Popup Dialog works fine also with an Android skin, thank you! About the Popup Dialog, isn’t the developer guide section "Styling The Arrow Of The Popup Dialog" more valid? Should this part of the developer guide be changed? Link: [https://www.codenameone.com…](</developer-guide/the-components-of-codename-one/#_styling_the_arrow_of_the_popup_dialog>)
 >
 
 

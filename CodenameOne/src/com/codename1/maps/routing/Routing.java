@@ -24,6 +24,9 @@ package com.codename1.maps.routing;
 
 import com.codename1.maps.LatLng;
 import com.codename1.maps.MapSurface;
+import com.codename1.maps.MapBounds;
+import com.codename1.maps.MarkerOptions;
+import com.codename1.ui.plaf.UIManager;
 import com.codename1.ui.CN;
 
 import java.util.List;
@@ -225,7 +228,16 @@ public final class Routing {
     /// Draws the best route for `request` on `map`, frames it, and forwards
     /// the outcome to `callback`.
     ///
-    /// The polyline is added and the camera moved *before* `callback` runs, so
+    /// Adds labeled markers at the requested start, intermediate stops and
+    /// destination. Supply place names through [RouteRequest#setOriginLabel],
+    /// [RouteRequest#setDestinationLabel] and [RouteRequest#addWaypoint(LatLng, String)];
+    /// otherwise the labels are "Start", "Stop 1", etc. and "Destination"
+    /// (localized through the UI manager). No reverse geocoding is performed.
+    /// Labels stay visible on vector maps; native providers show the same
+    /// names as marker titles. Disable these markers with
+    /// [RouteRequest#setShowStopLabels]. The request is snapshotted when called.
+    ///
+    /// The polyline and markers are added and the camera moved *before* `callback` runs, so
     /// the callback can read the route's distance and duration to update the
     /// UI. It cannot restyle the line that was drawn -- that polyline is not
     /// exposed, and [Route#toPolyline()] hands back a fresh one every call. To
@@ -242,7 +254,8 @@ public final class Routing {
     /// - `callback`: notified of the outcome, or `null` to just draw the route
     public static void showRoute(final MapSurface map, RouteRequest request,
                                  final RouteCallback callback) {
-        findRoute(request, new RouteCallback() {
+        final RouteRequest submitted = request == null ? null : request.snapshot();
+        findRoute(submitted, new RouteCallback() {
             @Override
             public void routesFound(List routes) {
                 if (routes == null || routes.isEmpty()) {
@@ -261,8 +274,25 @@ public final class Routing {
                 }
                 Route best = (Route) first;
                 map.addPolyline(best.toPolyline());
-                if (best.getBounds() != null) {
-                    map.fitBounds(best.getBounds(), CN.convertToPixels(4));
+                MapBounds bounds = best.getBounds();
+                boolean labels = submitted != null && submitted.isShowStopLabels();
+                if (labels) {
+                    bounds = addStopMarker(map, submitted.getOrigin(),
+                            stopLabel(submitted.getOriginLabel(), "Start"), bounds);
+                    List stops = submitted.getWaypoints();
+                    List names = submitted.getWaypointLabels();
+                    for (int i = 0; i < stops.size(); i++) {
+                        String name = (String) names.get(i);
+                        if (name == null || name.trim().length() == 0) {
+                            name = UIManager.getInstance().localize("Stop", "Stop") + " " + (i + 1);
+                        }
+                        bounds = addStopMarker(map, (LatLng) stops.get(i), name, bounds);
+                    }
+                    bounds = addStopMarker(map, submitted.getDestination(),
+                            stopLabel(submitted.getDestinationLabel(), "Destination"), bounds);
+                }
+                if (bounds != null) {
+                    map.fitBounds(bounds, CN.convertToPixels(labels ? 10 : 4));
                 }
                 if (callback != null) {
                     callback.routesFound(routes);
@@ -277,4 +307,19 @@ public final class Routing {
             }
         });
     }
+
+    private static String stopLabel(String name, String fallback) {
+        return name == null || name.trim().length() == 0
+                ? UIManager.getInstance().localize(fallback, fallback) : name;
+    }
+
+    private static MapBounds addStopMarker(MapSurface map, LatLng position,
+                                          String label, MapBounds bounds) {
+        if (position == null) {
+            return bounds;
+        }
+        map.addMarker(new MarkerOptions(position).title(label).label(label));
+        return bounds == null ? new MapBounds(position, position) : bounds.extend(position);
+    }
+
 }

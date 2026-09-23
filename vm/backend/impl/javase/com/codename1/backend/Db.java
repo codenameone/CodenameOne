@@ -63,18 +63,35 @@ public final class Db {
         // cn1:backend and then fail once translated -- a dev loop that behaves
         // differently from production, which is the one thing it must not do.
         // Database is what speaks to those servers, on both arms.
-        if(path != null && path.startsWith("jdbc:") && !path.startsWith("jdbc:sqlite:")) {
+        // IGNORING CASE, like the translated twin and like DataSource: a URL
+        // scheme is case insensitive, and recognising "jdbc:sqlite:" here while
+        // the other two recognised "JDBC:SQLITE:" made the same string an
+        // in-memory database on one arm and a file named after the URL on the
+        // other.
+        if(path != null && path.regionMatches(true, 0, "jdbc:", 0, 5)
+                && !path.regionMatches(true, 0, "jdbc:sqlite:", 0, 12)) {
             throw new IOException("Db opens SQLite only, and the translated build "
                     + "would hand " + path + " to sqlite3_open. Use Database.open for "
                     + "PostgreSQL or MySQL.");
         }
-        String url = path != null && path.startsWith("jdbc:") ? path : "jdbc:sqlite:" + path;
+        // FORWARDED IN THE SPELLING IT ARRIVED IN, which is safe: measured
+        // against sqlite-jdbc, DriverManager accepts jdbc:sqlite::memory:,
+        // JDBC:SQLITE::memory:, JDBC:SQLite::memory: and Jdbc:Sqlite::memory:
+        // alike -- the driver folds the scheme before comparing it, as a JDBC
+        // driver is expected to. Rewriting it to lower case would only change
+        // the URL the developer sees quoted back in an error.
+        String url = path != null && path.regionMatches(true, 0, "jdbc:", 0, 5)
+                ? path : "jdbc:sqlite:" + path;
         try {
             Connection connection = DriverManager.getConnection(url);
             connection.setAutoCommit(true);
             return new Db(connection);
         } catch (SQLException err) {
-            if(url.startsWith("jdbc:sqlite:")) {
+            if(url.regionMatches(true, 0, "jdbc:sqlite:", 0, 12)) {
+                // IGNORING CASE like the two tests above it. This one was left
+                // exact when they were relaxed, so a mixed-case URL that failed
+                // for the usual reason got the generic message instead of the
+                // one naming the driver.
                 // The usual cause is a dev classpath without the driver, and
                 // "No suitable driver" on its own does not say which one.
                 throw new IOException("Could not open " + url + " -- is sqlite-jdbc on "

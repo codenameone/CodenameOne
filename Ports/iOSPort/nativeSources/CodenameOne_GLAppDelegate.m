@@ -24,13 +24,11 @@
 #if !TARGET_OS_WATCH
 
 #import "CodenameOne_GLAppDelegate.h"
-#ifdef CN1_USE_UI_SCENE
 #import "CodenameOne_GLSceneDelegate.h"
-#endif
 #import "CN1JailbreakDetector.h"
 #include "xmlvm.h"
 #import <objc/message.h>
-#import "EAGLView.h"
+#import "METALView.h"
 #import "CodenameOne_GLViewController.h"
 #ifdef CN1_INCLUDE_CALL
 #import "CN1Call.h"
@@ -189,7 +187,7 @@ static void installSignalHandlers() {
         // to [UIScreen mainScreen].scale; viewDidLoad's updateDisplayMetricsFromView then
         // used the correct scaleValue. Fire awakeFromNib manually, but do NOT force
         // [self.viewController view] first — awakeFromNib reaches self.view through
-        // [self eaglView] internally, which triggers loadView/viewDidLoad after scaleValue
+        // [self renderingView] internally, which triggers loadView/viewDidLoad after scaleValue
         // has already been set. Forcing the view load separately reverses that order and
         // caches wrong density/ppi (scaleValue=1 × NIB 320×460 bounds = DENSITY_MEDIUM).
         [self.viewController awakeFromNib];
@@ -422,11 +420,11 @@ static NSUserActivity *cn1PendingLaunchActivity = nil;
 - (void)cn1ApplicationDidEnterBackground
 {
  #ifdef CN1_BLOCK_SCREENSHOTS_ON_ENTER_BACKGROUND
-    // Hide the view controller's root view rather than just the EAGL/Metal
+    // Hide the view controller's root view rather than just the Metal
     // surface. Once a peer component is added with paintPeersBehindEnabled,
-    // the controller's view is a newRoot containing both eaglView and the
+    // the controller's view is a newRoot containing both renderingView and the
     // peerComponentsLayer (BrowserComponent's WKWebView lives in the latter)
-    // -- hiding only eaglView leaves peers visible in the app-switcher snapshot.
+    // -- hiding only renderingView leaves peers visible in the app-switcher snapshot.
     [CodenameOne_GLViewController instance].view.hidden = YES;
     cn1IsHiddenInBackground = YES;
 #endif
@@ -469,7 +467,7 @@ static NSUserActivity *cn1PendingLaunchActivity = nil;
     CodenameOne_GLViewController* vc = [CodenameOne_GLViewController instance];
     if (vc != nil) {
 #ifdef CN1_USE_METAL
-        id renderingView = [vc eaglView];
+        id renderingView = [vc renderingView];
         if ([renderingView respondsToSelector:@selector(invalidateRetainedFramebuffer)]) {
             [renderingView invalidateRetainedFramebuffer];
         }
@@ -586,9 +584,9 @@ static NSUserActivity *cn1PendingLaunchActivity = nil;
     cn1_debugger_start();
 #endif
     [self cn1EnsureViewController];
-#ifndef CN1_USE_UI_SCENE
-    [self cn1InstallRootViewControllerIntoWindow:self.window];
-#endif
+    // The root view controller is installed by CodenameOne_GLSceneDelegate, not here: under
+    // the scene lifecycle self.window is nil at this point, because UIKit has not connected
+    // a scene yet.
     NSURL *url = (NSURL *)[launchOptions valueForKey:UIApplicationLaunchOptionsURLKey];
     [self cn1StoreAppArgForURL:url];
     if (@available(iOS 8, *)) {
@@ -767,20 +765,18 @@ static NSUserActivity *cn1PendingLaunchActivity = nil;
     return YES;
 }
 
-#ifdef CN1_USE_UI_SCENE
 - (UISceneConfiguration *)application:(UIApplication *)application configurationForConnectingSceneSession:(UISceneSession *)connectingSceneSession options:(UISceneConnectionOptions *)options API_AVAILABLE(ios(13.0))
 {
     UISceneConfiguration *sceneConfiguration = [UISceneConfiguration configurationWithName:@"Default Configuration" sessionRole:connectingSceneSession.role];
     sceneConfiguration.delegateClass = [CodenameOne_GLSceneDelegate class];
     return sceneConfiguration;
 }
-#endif
 
-// Compiled for universal links OR intents OR continuity: without the second and third conditions
-// a Spotlight tap, or a handoff from the user's other device, on a legacy-lifecycle build
-// (ios.uiscene=false) would silently do nothing, since the scene delegate is what routes this on
-// a default build. Continuity was added here for exactly the reason intents was: the branch it
-// needs inside cn1ContinueUserActivity: is compiled, and on a legacy build nothing ever calls it.
+// Compiled for universal links OR intents OR continuity. The scene delegate is what routes this
+// on a live app, so this app-level callback is the path UIKit takes when it hands the activity
+// to the application rather than to a scene -- a Spotlight tap or a handoff from the user's
+// other device. Intents and continuity are in the condition because the branch each needs inside
+// cn1ContinueUserActivity: has to be compiled for that call to do anything.
 #if defined(CN1_HANDLE_UNIVERSAL_LINKS) || defined(CN1_USE_INTENTS) \
         || defined(CN1_USE_CONTINUITY)
 // https://developer.apple.com/documentation/uikit/core_app/allowing_apps_and_websites_to_link_to_your_content?language=objc
@@ -810,7 +806,7 @@ static NSUserActivity *cn1PendingLaunchActivity = nil;
 {
     /*
      Sent when the application is about to move from active to inactive state. This can occur for certain types of temporary interruptions (such as an incoming phone call or SMS message) or when the user quits the application and it begins the transition to the background state.
-     Use this method to pause ongoing tasks, disable timers, and throttle down OpenGL ES frame rates. Games should use this method to pause the game.
+     Use this method to pause ongoing tasks, disable timers, and throttle down rendering frame rates. Games should use this method to pause the game.
      */
     [self cn1ApplicationWillResignActive];
     //[self.viewController stopAnimation];
@@ -1325,7 +1321,7 @@ static NSString *cn1MenuIdentifierForHint(NSString *hint, BOOL *placeAtStart) AP
 @end
 
 #else
-// Compiled out on watchOS: this file is OpenGL ES / Metal / UIKit-only and the watch
+// Compiled out on watchOS: this file is Metal / UIKit-only and the watch
 // slice renders through the Core Graphics backend instead. The typedef keeps the
 // translation unit non-empty, which ISO C requires.
 typedef int cn1_codenameone_glappdelegate_unused_on_watch;

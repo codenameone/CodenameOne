@@ -1383,13 +1383,22 @@ public class ByteCodeTranslator {
                 // dbghelp: lets the last-resort unhandled-exception handler symbolize its
                 // own native backtrace in-process (SymFromAddr against the /Zi .pdb), so a
                 // native crash logs Java/C function names instead of bare RVAs.
-                writer.append("    target_link_libraries(${PROJECT_NAME} d2d1 dwrite dxgi windowscodecs winhttp ws2_32 user32 gdi32 ole32 oleaut32 uuid mf mfplat mfreadwrite mfuuid shell32 comdlg32 crypt32 bcrypt ncrypt winmm runtimeobject dbghelp)\n");
+                // advapi32: RegGetValueW, which cn1_windows_window.cpp calls unconditionally to
+                //   read AppsUseLightTheme for dark mode. It used to be listed only inside the
+                //   optional WebView2 block below, where it backs that loader -- so an
+                //   application built without WEBVIEW2_SDK_DIR, which is every ordinary one,
+                //   failed at the LINK step on a symbol our own port references. Our CI never
+                //   saw it because the cross-compile leg sets WEBVIEW2_SDK_DIR and got the
+                //   library by accident, which is the same way the iOS port once lost
+                //   UniformTypeIdentifiers.
+                writer.append("    target_link_libraries(${PROJECT_NAME} d2d1 dwrite dxgi windowscodecs winhttp ws2_32 user32 gdi32 ole32 oleaut32 uuid mf mfplat mfreadwrite mfuuid shell32 comdlg32 crypt32 bcrypt ncrypt winmm runtimeobject dbghelp advapi32)\n");
                 // BrowserComponent is backed by WebView2 (cn1_windows_browser.cpp),
                 // gated on the SDK being present: when WEBVIEW2_SDK_DIR points at a
                 // Microsoft.Web.WebView2 build/native folder we link the static
                 // loader (arch-specific) and define CN1_HAVE_WEBVIEW2; otherwise the
                 // browser natives compile as stubs and the port reports the browser
-                // as unsupported. version/shell32/advapi32/shlwapi back the loader.
+                // as unsupported. version/shell32/advapi32/shlwapi back the loader; advapi32
+                // is in the unconditional list above as well, because the port itself needs it.
                 writer.append("    if(DEFINED ENV{WEBVIEW2_SDK_DIR} AND EXISTS \"$ENV{WEBVIEW2_SDK_DIR}/include/WebView2.h\")\n");
                 writer.append("        target_include_directories(${PROJECT_NAME} PRIVATE \"$ENV{WEBVIEW2_SDK_DIR}/include\")\n");
                 writer.append("        target_compile_definitions(${PROJECT_NAME} PRIVATE CN1_HAVE_WEBVIEW2=1)\n");

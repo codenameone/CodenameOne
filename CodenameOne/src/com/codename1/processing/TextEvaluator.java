@@ -77,17 +77,33 @@ class TextEvaluator extends AbstractEvaluator {
                                            String lvalue, String rvalue) {
         String[] v = getLeftValue(element, lvalue);
         int vlen = v.length;
+        // Quotes off first, then doubles: the same order and the same
+        // arithmetic the attribute comparisons use, so a predicate means one
+        // thing whether it names an attribute or a child. Integer.parseInt
+        // here threw outright on "[price=2.5]" once isNumeric learned to read
+        // a decimal.
+        rvalue = stripQuotes(rvalue);
         for (int i = 0; i < vlen; i++) {
+            if (v[i] == null) {
+                // A node with no text of its own -- an empty nested array is
+                // one -- has nothing to compare, the same way the attribute
+                // evaluator treats a name it cannot resolve.
+                continue;
+            }
             if (isNumeric(rvalue) && isNumeric(v[i])) {
-                int l = Integer.parseInt(v[i]);
-                int r = Integer.parseInt(rvalue);
-                if (l < r) {
+                if (compareNumbers(v[i], rvalue) < 0) {
                     return element;
                 }
-                return null;
+                // On to the next value rather than out: an element
+                // can carry several children of one name, and the
+                // text branch below has always walked all of them.
+                // Returning here meant <price>1.5</price> hid
+                // <price>2.5</price> from [price=2.5].
+                continue;
             }
-            rvalue = stripQuotes(rvalue);
-            if (v[i].compareTo(rvalue) > 0) {
+            // Backwards: this is the LESS-than method and it answered when the
+            // value sorted AFTER the operand.
+            if (v[i].compareTo(rvalue) < 0) {
                 return element;
             }
         }
@@ -107,17 +123,27 @@ class TextEvaluator extends AbstractEvaluator {
                                               String lvalue, String rvalue) {
         String[] v = getLeftValue(element, lvalue);
         int vlen = v.length;
+        rvalue = stripQuotes(rvalue);
         for (int i = 0; i < vlen; i++) {
+            if (v[i] == null) {
+                // A node with no text of its own -- an empty nested array is
+                // one -- has nothing to compare, the same way the attribute
+                // evaluator treats a name it cannot resolve.
+                continue;
+            }
             if (isNumeric(rvalue) && isNumeric(v[i])) {
-                int l = Integer.parseInt(v[i]);
-                int r = Integer.parseInt(rvalue);
-                if (l > r) {
+                if (compareNumbers(v[i], rvalue) > 0) {
                     return element;
                 }
-                return null;
+                // On to the next value rather than out: an element
+                // can carry several children of one name, and the
+                // text branch below has always walked all of them.
+                // Returning here meant <price>1.5</price> hid
+                // <price>2.5</price> from [price=2.5].
+                continue;
             }
-            rvalue = stripQuotes(rvalue);
-            if (v[i].compareTo(rvalue) < 0) {
+            // Backwards, the same way the less-than method was.
+            if (v[i].compareTo(rvalue) > 0) {
                 return element;
             }
         }
@@ -137,16 +163,25 @@ class TextEvaluator extends AbstractEvaluator {
                                              String lvalue, String rvalue) {
         String[] v = getLeftValue(element, lvalue);
         int vlen = v.length;
+        rvalue = stripQuotes(rvalue);
         for (int i = 0; i < vlen; i++) {
+            if (v[i] == null) {
+                // A node with no text of its own -- an empty nested array is
+                // one -- has nothing to compare, the same way the attribute
+                // evaluator treats a name it cannot resolve.
+                continue;
+            }
             if (isNumeric(rvalue) && isNumeric(v[i])) {
-                int l = Integer.parseInt(v[i]);
-                int r = Integer.parseInt(rvalue);
-                if (l == r) {
+                if (compareNumbers(v[i], rvalue) == 0) {
                     return element;
                 }
-                return null;
+                // On to the next value rather than out: an element
+                // can carry several children of one name, and the
+                // text branch below has always walked all of them.
+                // Returning here meant <price>1.5</price> hid
+                // <price>2.5</price> from [price=2.5].
+                continue;
             }
-            rvalue = stripQuotes(rvalue);
             if (v[i].compareTo(rvalue) == 0) {
                 return element;
             }

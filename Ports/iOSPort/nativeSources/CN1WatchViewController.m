@@ -78,7 +78,7 @@ static CGRect watchFlushRect;
     return [CN1WatchHost sharedHost].renderingView;
 }
 
-- (id)eaglView {
+- (id)renderingView {
     return [CN1WatchHost sharedHost].renderingView;
 }
 

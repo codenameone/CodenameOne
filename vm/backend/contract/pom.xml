@@ -10,7 +10,16 @@
   codenameone_settings.properties.
 
   Build with:
-      mvn -Dcn1.restServer=true process-classes
+      mvn -Dcn1.restServer=true -Dcn1.backendOrm=true process-classes
+
+  BOTH properties, and neither can be moved into this pom: the processors read
+  them with System.getProperty, so a <properties> entry here is not seen. Tried,
+  and the build failed exactly as it does without one.
+
+  cn1.backendOrm says which flavour of dao the @Entity classes get. This module
+  compiles against the core AND the backend at once, so the processor cannot read
+  it off the classpath and refuses to guess rather than silently generating the
+  client half for a server.
 
   The contract compiles against codenameone-core because it names @GET,
   OnComplete and Response. What comes OUT - the server interface, the dispatcher

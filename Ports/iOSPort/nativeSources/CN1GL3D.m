@@ -616,62 +616,10 @@ void com_codename1_impl_ios_IOSNative_gl3dDrawArrays___long_long_long_int_int_in
     [[view activeEncoder] drawPrimitives:CN1GL3DPrimitive(primitive) vertexStart:0 vertexCount:vertexCount];
 }
 
-#else // !CN1_USE_METAL
-
-// Non-Metal builds still need the bridge symbols so ParparVM links. They report
-// 3D as unavailable (context creation returns 0) and every op is a no-op.
-
-JAVA_LONG com_codename1_impl_ios_IOSNative_gl3dCreateContext___R_long(
-        CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) { return 0; }
-JAVA_LONG com_codename1_impl_ios_IOSNative_gl3dGetViewPeer___long_R_long(
-        CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG contextPeer) { return 0; }
-void com_codename1_impl_ios_IOSNative_gl3dDestroyContext___long(
-        CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG contextPeer) {}
-void com_codename1_impl_ios_IOSNative_gl3dSetContinuous___long_boolean(
-        CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG contextPeer, JAVA_BOOLEAN continuous) {}
-void com_codename1_impl_ios_IOSNative_gl3dRequestRender___long(
-        CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG contextPeer) {}
-JAVA_LONG com_codename1_impl_ios_IOSNative_gl3dCreateFloatBuffer___float_1ARRAY_int_R_long(
-        CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT data, JAVA_INT floatCount) { return 0; }
-void com_codename1_impl_ios_IOSNative_gl3dUpdateFloatBuffer___long_float_1ARRAY_int(
-        CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG bufferPeer, JAVA_OBJECT data, JAVA_INT floatCount) {}
-JAVA_LONG com_codename1_impl_ios_IOSNative_gl3dCreateShortBuffer___short_1ARRAY_int_R_long(
-        CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT data, JAVA_INT indexCount) { return 0; }
-void com_codename1_impl_ios_IOSNative_gl3dUpdateShortBuffer___long_short_1ARRAY_int(
-        CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG bufferPeer, JAVA_OBJECT data, JAVA_INT indexCount) {}
-JAVA_LONG com_codename1_impl_ios_IOSNative_gl3dCreateTexture___int_1ARRAY_int_int_R_long(
-        CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT argb, JAVA_INT width, JAVA_INT height) { return 0; }
-void com_codename1_impl_ios_IOSNative_gl3dDisposeBuffer___long(
-        CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG bufferPeer) {}
-void com_codename1_impl_ios_IOSNative_gl3dDisposeTexture___long(
-        CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG texturePeer) {}
-void com_codename1_impl_ios_IOSNative_gl3dDisposePipeline___long(
-        CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG pipelinePeer) {}
-JAVA_LONG com_codename1_impl_ios_IOSNative_gl3dGetOrCreatePipeline___long_java_lang_String_java_lang_String_int_int_int_int_R_long(
-        CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG contextPeer,
-        JAVA_OBJECT key, JAVA_OBJECT mslSource, JAVA_INT blendMode, JAVA_INT cullMode,
-        JAVA_INT depthTest, JAVA_INT depthWrite) { return 0; }
-void com_codename1_impl_ios_IOSNative_gl3dClear___long_int_boolean_boolean(
-        CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG contextPeer,
-        JAVA_INT argbColor, JAVA_BOOLEAN clearColor, JAVA_BOOLEAN clearDepth) {}
-void com_codename1_impl_ios_IOSNative_gl3dSetViewport___long_int_int_int_int(
-        CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG contextPeer,
-        JAVA_INT x, JAVA_INT y, JAVA_INT width, JAVA_INT height) {}
-void com_codename1_impl_ios_IOSNative_gl3dDrawIndexed___long_long_long_int_long_int_int_float_1ARRAY_int_long_int_int(
-        CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG contextPeer,
-        JAVA_LONG pipelinePeer, JAVA_LONG vboPeer, JAVA_INT strideBytes, JAVA_LONG iboPeer,
-        JAVA_INT indexCount, JAVA_INT primitive, JAVA_OBJECT uniforms, JAVA_INT uniformFloats,
-        JAVA_LONG texturePeer, JAVA_INT texFilter, JAVA_INT texWrap) {}
-void com_codename1_impl_ios_IOSNative_gl3dDrawArrays___long_long_long_int_int_int_float_1ARRAY_int_long_int_int(
-        CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG contextPeer,
-        JAVA_LONG pipelinePeer, JAVA_LONG vboPeer, JAVA_INT strideBytes, JAVA_INT vertexCount,
-        JAVA_INT primitive, JAVA_OBJECT uniforms, JAVA_INT uniformFloats,
-        JAVA_LONG texturePeer, JAVA_INT texFilter, JAVA_INT texWrap) {}
-
 #endif /* CN1_USE_METAL */
 
 #else
-// Compiled out on watchOS: this file is OpenGL ES / Metal / UIKit-only and the watch
+// Compiled out on watchOS: this file is Metal / UIKit-only and the watch
 // slice renders through the Core Graphics backend instead. The typedef keeps the
 // translation unit non-empty, which ISO C requires.
 typedef int cn1_cn1gl3d_unused_on_watch;

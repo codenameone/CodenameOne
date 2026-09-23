@@ -1,0 +1,21 @@
+<aside class="cn1-guide-sidebar">
+  <details class="cn1-guide-menu" open>
+    <summary>Chapters and contents</summary>
+    <nav aria-label="Developer Guide chapters">
+      <a class="cn1-guide-home" href="/developer-guide/">Developer Guide</a>
+      <div class="cn1-guide-sidebar-tools">
+        <a href="/developer-guide/" {{ if eq .Layout "guide-index" }}aria-current="page"{{ end }}>Contents</a>
+        <a href="/search/">Search documentation</a>
+      </div>
+      {{ $page := . }}
+      {{ range index site.Data "developer-guide" }}
+      <details class="cn1-guide-part" {{ if or (eq .title $page.Params.guide_group) (and (eq $page.Layout "guide-index") (eq .id "_getting_started")) }}open{{ end }}>
+        <summary>{{ .title }}</summary>
+        <ul>{{ range .chapters }}
+          <li><a href="{{ .url }}" {{ if eq .url $page.RelPermalink }}aria-current="page"{{ end }}>{{ .title }}</a></li>
+        {{ end }}</ul>
+      </details>
+      {{ end }}
+    </nav>
+  </details>
+</aside>

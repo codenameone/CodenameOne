@@ -111,26 +111,106 @@ ios_modern_copies() {
   printf '%s\n' \
     "Ports/iOSPort/nativeSources/iOSModernTheme.res"
 }
+# "${name//-/_}_copies" -- ios-modern-27 resolves here.
+ios_modern_27_copies() {
+  printf '%s\n' \
+    "Ports/iOSPort/nativeSources/iOSModern27Theme.res"
+}
 android_material_copies() {
   # See ios_modern_copies: the fidelity-app copy is build-time, not committed.
   printf '%s\n' \
     "Ports/Android/src/AndroidMaterialTheme.res"
 }
 
+# The desktop themes have NO committed consumer copies. Every desktop consumer
+# (maven/javase, maven/windows, maven/linux, maven/mac) stages straight out of Themes/ at
+# build time, so there is no second binary to drift out of sync -- which is the problem the
+# copies above exist to solve for the ports that do embed one.
+gnome_adwaita_copies() { :; }
+windows_fluent_copies() { :; }
+macos_aqua_copies() { :; }
+
+# Every file a run WRITES, one repo-relative path per line, for callers that have to
+# stage them -- .github/workflows/native-themes-sync.yml above all. That workflow kept a
+# hand-written list of two paths, and it stayed at two when three desktop themes and two
+# committed port mirrors were added: a desktop-only CSS change regenerated three .res
+# files, staged none of them, reported "nothing to commit" and left every downstream
+# build on the previous binary. A list the script produces cannot go stale that way.
+#
+# Off unless the caller asks for it, so a developer running this by hand writes nothing
+# extra.
+record_output() {
+  [ -n "${NATIVE_THEMES_MANIFEST:-}" ] || return 0
+  printf '%s\n' "$1" >> "$NATIVE_THEMES_MANIFEST"
+}
+
+# @import is a SILENT no-op. CSSTheme's importStyle (see
+# maven/css-compiler/.../CSSTheme.java) has an EMPTY body: Flute parses the
+# at-rule, the compiler ignores it, and every rule in the imported file vanishes
+# from the .res with no error and no warning. Composition here is CONCATENATION
+# (see theme_parts), so an @import is always a bug and always a silent one.
+assert_no_import() {
+  local hits
+  hits="$(grep -rn --include='*.css' -E '^[[:space:]]*@import' "$CSS_SRC_ROOT" 2>/dev/null || true)"
+  if [ -n "$hits" ]; then
+    log "FAILED: @import is accepted by the CSS compiler and then ignored, so the"
+    log "        imported rules would be missing from the theme with no diagnostic."
+    log "        List the file in theme_parts() instead."
+    printf '%s\n' "$hits" >&2
+    exit 1
+  fi
+}
+
+# The CSS files a variant is built from, in CASCADE ORDER, repo-relative.
+#
+# A variant is a LOGICAL name, not necessarily a directory: ios-modern and
+# ios-modern-27 share every rule in ios-modern/common.css and differ only by
+# which generation layer is appended. Everything else is still one self-contained
+# theme.css and resolves through the default arm unchanged.
+theme_parts() {
+  case "$1" in
+    ios-modern)    printf '%s\n' ios-modern/common.css ios-modern/gen26.css ;;
+    ios-modern-27) printf '%s\n' ios-modern/common.css ios-modern/gen27.css ;;
+    *)             printf '%s\n' "$1/theme.css" ;;
+  esac
+}
+
 compile_theme() {
   local jar="$1" name="$2" basename="$3"
-  local css="$CSS_SRC_ROOT/$name/theme.css"
   local out="$OUT_DIR/$basename"
-  if [ ! -f "$css" ]; then
-    log "Skipping $name: no source at $css"
-    return
-  fi
-  mkdir -p "$OUT_DIR"
+  local primary build_dir css part missing=0
+  primary="$(theme_parts "$name" | head -n1)"; primary="${primary%%/*}"
+  # The intermediate hangs off the theme's own directory rather than a mktemp,
+  # because CSSTheme.getResourceImage resolves a `res/` image directory THREE
+  # levels up from the input file. Under native-themes/<theme>/target/ that
+  # still lands on native-themes/<theme>/res, exactly where it lands today.
+  build_dir="$CSS_SRC_ROOT/$primary/target"
+  css="$build_dir/$name.css"
+  while IFS= read -r part; do
+    if [ ! -f "$CSS_SRC_ROOT/$part" ]; then
+      log "Skipping $name: no source at $part"
+      missing=1
+    fi
+  done < <(theme_parts "$name")
+  [ "$missing" -eq 0 ] || return
+  mkdir -p "$OUT_DIR" "$build_dir"
+  : > "$css"
+  while IFS= read -r part; do
+    # A provenance banner per part: parse errors report a line number in THIS
+    # concatenated file, so without it an error in gen27.css points at a line of
+    # a file nobody edited. Comments are inert here -- the dark-mode rewriter
+    # uses indexOfOutsideComments and skips them.
+    printf '/* ===== native-themes/%s ===== */\n' "$part" >> "$css"
+    cat "$CSS_SRC_ROOT/$part" >> "$css"
+    printf '\n' >> "$css"
+  done < <(theme_parts "$name")
   log "Compiling $name -> $out"
   java -jar "$jar" -input "$css" -output "$out"
+  record_output "${out#"$REPO_ROOT"/}"
   if [ -d "$JS_ASSETS_DIR" ]; then
     cp "$out" "$JS_ASSETS_DIR/$basename"
     log "Mirrored -> $JS_ASSETS_DIR/$basename"
+    record_output "${JS_ASSETS_DIR#"$REPO_ROOT"/}/$basename"
   fi
   local copy
   while IFS= read -r copy; do
@@ -138,14 +218,23 @@ compile_theme() {
     mkdir -p "$REPO_ROOT/$(dirname "$copy")"
     cp "$out" "$REPO_ROOT/$copy"
     log "Mirrored -> $copy"
+    record_output "$copy"
   done < <("${name//-/_}_copies")
 }
 
 main() {
+  if [ -n "${NATIVE_THEMES_MANIFEST:-}" ]; then
+    : > "$NATIVE_THEMES_MANIFEST"
+  fi
   local jar
+  assert_no_import
   jar="$(ensure_jar)"
   compile_theme "$jar" ios-modern iOSModernTheme.res
+  compile_theme "$jar" ios-modern-27 iOSModern27Theme.res
   compile_theme "$jar" android-material AndroidMaterialTheme.res
+  compile_theme "$jar" gnome-adwaita GnomeAdwaitaTheme.res
+  compile_theme "$jar" windows-fluent WindowsFluentTheme.res
+  compile_theme "$jar" macos-aqua MacOSAquaTheme.res
   log "Native themes written to $OUT_DIR/ and committed consumer copies"
 }
 

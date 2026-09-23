@@ -458,7 +458,7 @@ When implementing this make sure that:
 - You need to pass it as a class literal for example: `MyClassName.class`. Don't use `Class.forName("my.package.MyClassName")`! +
 Class names are problematic since device builds are obfuscated, you should use literals which the obfuscator detects and handles.
 
-The following code demonstrates usage of the GeoFence API:
+The following code demonstrates usage of the `Geofence` API:
 
 [source,java]
 ----
@@ -736,7 +736,7 @@ Pull to refresh is the common UI paradigm that Twitter popularized where the use
 
 Just invoke `addPullToRefresh(Runnable)` on a scrollable container (or form) and the runnable method will be invoked when the refresh operation occurs.
 
-TIP: Pull to refresh is implicitly implements in the `InifiniteContainer`
+TIP: Pull to refresh is implicitly implements in the `InfiniteContainer`
 
 [source,java]
 ----

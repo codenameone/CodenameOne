@@ -92,7 +92,6 @@ import java.sql.Statement;
 import java.util.HashMap;
 import java.util.Map;
 import com.codename1.io.Properties;
-import java.util.StringTokenizer;
 import java.util.Timer;
 import java.util.prefs.Preferences;
 import java.util.zip.ZipEntry;
@@ -230,10 +229,23 @@ public class JavaSEPort extends CodenameOneImplementation {
     private static Set<String> availableFontNamesLowercase;
     private static final String PREF_AUTO_UPDATE_DEFAULT_BUNDLE = "cn1.autoDefaultResourceBundle";
     public final static boolean IS_MAC;
+    /// True when the desktop JVM is running on Linux.
+    ///
+    /// There was no such flag, and getPlatformName() answered "win" for anything that was
+    /// not a Mac -- so a Codename One desktop app on Linux reported itself as Windows. That
+    /// was invisible while no desktop theme existed, and is not once one does: the theme
+    /// resolver, the platform- resource layer and Resources.openLayered all key off that
+    /// name, so a Linux user would have been handed the Fluent theme and any platform-win-
+    /// resource override.
+    public final static boolean IS_LINUX;
     private static boolean isIOS;
     public static boolean blockNativeBrowser;
     private static final boolean isWindows;
     private static String fontFaceSystem;
+    private static boolean fontFacesExplicitlyConfigured;
+    private static boolean desktopNativeFonts;
+    private final java.util.Map<java.awt.Font, Boolean> desktopAliasFonts =
+            new java.util.WeakHashMap<java.awt.Font, Boolean>();
     private Boolean darkMode;
     private AutoLocalizationBundle autoLocalizationBundle;
     private boolean autoUpdateDefaultResourceBundle;
@@ -763,16 +775,15 @@ public class JavaSEPort extends CodenameOneImplementation {
         } else {
             IS_MAC = false;
         }
+        IS_LINUX = n != null && n.startsWith("Linux");
         isWindows = File.separatorChar == '\\';        
         if (System.getProperty("apple.laf.useScreenMenuBar") == null) {
             System.setProperty("apple.laf.useScreenMenuBar", "true");
         }
         
-        if(isWindows) {
-            fontFaceSystem = "ArialUnicodeMS";
-        } else {
-            fontFaceSystem = "Arial";
-        }
+        // New desktop fonts are opt-in with the native desktop theme. Keep legacy
+        // system-font metrics unchanged for applications that only upgrade the framework.
+        fontFaceSystem = isWindows ? "ArialUnicodeMS" : "Arial";
     }
 
     /**
@@ -821,23 +832,15 @@ public class JavaSEPort extends CodenameOneImplementation {
         if (skinNames == null) {
             skinNames = DEFAULT_SKINS;
         }
-        StringBuilder merged = new StringBuilder(skinNames);
-        boolean added = false;
+        String merged = skinNames;
         for (String skin : BUNDLED_WATCH_SKINS) {
             if (JavaSEPort.class.getResource(skin) == null) {
                 continue;
             }
-            if (skinNames.contains(skin + ";") || skinNames.endsWith(skin)) {
-                continue;
-            }
-            if (merged.length() > 0 && merged.charAt(merged.length() - 1) != ';') {
-                merged.append(';');
-            }
-            merged.append(skin).append(';');
-            added = true;
+            merged = SkinPath.append(merged, skin);
         }
-        if (added) {
-            pref.put("skins", merged.toString());
+        if (!merged.equals(skinNames)) {
+            pref.put("skins", merged);
         }
     }
     private static final String DEFAULT_SKINS = DEFAULT_SKIN+";";
@@ -1137,7 +1140,15 @@ public class JavaSEPort extends CodenameOneImplementation {
     private static Resources nativeThemeRes;
     // Desktop window-chrome configuration. Defaults preserve the legacy behavior (CN1 Toolbar,
     // no interactive scrollbars); the generated desktop Stub opts a new app in.
-    private static String desktopTitleBarMode = "toolbar";
+    //
+    // null means "nobody asked", NOT "toolbar". The two have to be distinguishable because a
+    // desktop native theme carries its own desktopTitleBarMode constant, and that constant may
+    // only speak when the project did not. Every reader below coalesces null to "toolbar" for
+    // its own answer, so nothing outside this class sees the sentinel -- except
+    // getConfiguredDesktopTitleBarMode, which exists to report it, and
+    // injectDesktopThemeConstants, which must not inject a mode nobody chose or it would
+    // overwrite the theme's own constant with this default.
+    private static String desktopTitleBarMode;
     private static boolean desktopInteractiveScrollbars = false;
     // Caches the last command-name signature pushed to the native menu bar to avoid rebuilding
     // (and flickering the macOS screen menu) when an unchanged form is re-shown.
@@ -1935,6 +1946,11 @@ public class JavaSEPort extends CodenameOneImplementation {
     }
 
     public static void setFontFaces(String system, String proportional, String monospace) {
+        setFontFaces(system, proportional, monospace, true);
+    }
+
+    private static void setFontFaces(String system, String proportional, String monospace, boolean explicit) {
+        fontFacesExplicitlyConfigured = explicit;
         fontFaceSystem = system;
         fontFaceProportional = proportional;
         fontFaceMonospace = monospace;
@@ -2712,6 +2728,23 @@ public class JavaSEPort extends CodenameOneImplementation {
         }
     }
 
+    /// @inheritDoc
+    ///
+    /// True on the desktop, where setNativeCommands below builds a real Swing JMenuBar
+    /// (which becomes the macOS screen menu). False elsewhere, including the phone-skinned
+    /// simulator, where there is no menu bar to put anything on and the commands belong in
+    /// whatever Codename One draws.
+    @Override
+    public boolean isNativeCommandsSupported() {
+        // The same condition setNativeCommands installs under, not merely "is this a desktop".
+        // They disagreed whenever the project asked for desktop.titleBar=toolbar explicitly:
+        // this returned true, so the core kept commandBehavior Native and MenuBar.updateCommands
+        // stopped drawing the legacy Form.addCommand commands -- while setNativeCommands
+        // returned immediately because the effective mode was not native or custom, installing
+        // no menu. The commands then existed nowhere at all.
+        return isDesktopNativeChromeMode();
+    }
+
     @Override
     public void setNativeCommands(Vector commands) {
         if (!isDesktopNativeChromeMode()) {
@@ -2929,7 +2962,106 @@ public class JavaSEPort extends CodenameOneImplementation {
     }
 
     public static void setNativeTheme(String resFile) {
+        // Existing generated and archetype stubs pass this fallback. Resolve their packaged
+        // hint here too; simulator-only resolution cannot change a shipped application's theme.
+        // An explicitly named custom resource remains an override, even with a theme hint.
+        if ("/NativeTheme.res".equals(resFile)) {
+            Properties theme = new Properties();
+            try (InputStream in = JavaSEPort.class.getResourceAsStream("/codenameone-desktop.properties")) {
+                if (in != null) {
+                    theme.load(in);
+                }
+            } catch (IOException ex) {
+                throw new IllegalStateException("Cannot read packaged desktop theme configuration", ex);
+            }
+            resFile = resolvePackagedDesktopNativeTheme(IS_MAC ? "mac" : (IS_LINUX ? "linux" : "win"), theme);
+        }
         nativeTheme = resFile;
+        configureNativeThemeFonts(resFile);
+    }
+
+    /**
+     * Temporarily configures native font aliases for a directly loaded theme.
+     * Call on the EDT before opening the resource; run the returned callback on
+     * the EDT to restore the prior font configuration without changing the
+     * application's selected native theme resource.
+     *
+     * @param resource theme resource path
+     * @return callback that restores the previous font configuration
+     * @since 8.0
+     */
+    public static Runnable pushNativeThemeFontConfiguration(String resource) {
+        final boolean previousDesktopFonts = desktopNativeFonts;
+        final String previousSystemFace = fontFaceSystem;
+        configureNativeThemeFonts(resource);
+        com.codename1.ui.Font.clearDerivedFontCache();
+        return new Runnable() {
+            @Override
+            public void run() {
+                desktopNativeFonts = previousDesktopFonts;
+                fontFaceSystem = previousSystemFace;
+                com.codename1.ui.Font.clearDerivedFontCache();
+            }
+        };
+    }
+
+    private static void configureNativeThemeFonts(String resFile) {
+        desktopNativeFonts = isDesktopNativeThemeResource(resFile);
+        if (!fontFacesExplicitlyConfigured) {
+            fontFaceSystem = defaultSystemFontForTheme(IS_MAC ? "mac" : (IS_LINUX ? "linux" : "win"), resFile);
+            // Theme selection changes FACE_SYSTEM, not the default font's size. Its
+            // sizing remains owned by setFontSize/setFontFaces; changing it here also
+            // resizes font-relative controls such as Switch and Slider on startup.
+        }
+    }
+
+    private static boolean isDesktopNativeThemeResource(String resource) {
+        return "/WindowsFluentTheme.res".equals(resource) || "/MacOSAquaTheme.res".equals(resource)
+                || "/GnomeAdwaitaTheme.res".equals(resource);
+    }
+
+    static String defaultSystemFontForTheme(String platform, String resource) {
+        if (!isDesktopNativeThemeResource(resource)) {
+            return "win".equals(platform) ? "ArialUnicodeMS" : "Arial";
+        }
+        if (!"win".equals(platform) && !"mac".equals(platform) && !"linux".equals(platform)) {
+            return "Arial";
+        }
+        String[] candidates = "mac".equals(platform)
+                ? new String[]{".AppleSystemUIFont", "SF Pro Text", "Helvetica Neue"}
+                : ("linux".equals(platform) ? new String[]{"Cantarell", "Adwaita Sans", "SansSerif"}
+                : new String[]{"Segoe UI Variable Text", "Segoe UI Variable", "Segoe UI"});
+        String installed = findFirstInstalledFontCandidate(candidates, getAvailableFontNamesLowercase());
+        return installed == null ? "SansSerif" : installed;
+    }
+
+    static String resolvePackagedDesktopNativeTheme(String platformName, Properties theme) {
+        String mode = System.getProperty("codename1.arg.desktop.themeMode");
+        if (mode == null || mode.isEmpty()) {
+            mode = theme.getProperty("desktop.themeMode");
+        }
+        if (mode == null) {
+            // Mobile nativeTheme hints must not opt existing desktop apps into a new theme.
+            mode = buildHint("desktop.themeMode");
+        }
+        return resolveDesktopNativeThemeResource(platformName, mode, "/NativeTheme.res");
+    }
+
+    static void setSimulatorDesktopNativeTheme(String platformName, boolean uwpDesktopSkin) {
+        setNativeTheme(uwpDesktopSkin ? "/winTheme.res"
+                : resolveDesktopNativeThemeResource(platformName, buildHint("desktop.themeMode"), "/iOS7Theme.res"));
+    }
+
+    private static String resolveDesktopNativeThemeResource(String platformName, String mode, String legacyResource) {
+        mode = mode == null ? null : mode.trim();
+        // A null theme basename can mean either custom or legacy. Keep that distinction
+        // at both installation paths so the simulator does not reintroduce a framework base.
+        // Custom means no framework base; legacy still uses the stub's historical resource.
+        if ("custom".equalsIgnoreCase(mode)) {
+            return null;
+        }
+        String resolved = resolveDesktopNativeTheme(platformName, mode);
+        return resolved == null ? legacyResource : "/" + resolved + ".res";
     }
 
     public static void setNativeTheme(Resources resFile) {
@@ -2946,7 +3078,7 @@ public class JavaSEPort extends CodenameOneImplementation {
 
     /// @return the configured desktop title-bar mode (defaults to {@code "toolbar"}).
     public static String getDesktopTitleBarModeSetting() {
-        return desktopTitleBarMode;
+        return desktopTitleBarMode == null ? "toolbar" : desktopTitleBarMode;
     }
 
     /// The desktop title-bar mode core consults to decide whether to suppress the CN1 Toolbar.
@@ -2974,7 +3106,39 @@ public class JavaSEPort extends CodenameOneImplementation {
     /// Resolves the effective desktop title-bar mode, honoring the
     /// {@code codename1.arg.desktop.titleBar} system property fallback.
     private String resolveDesktopTitleBarMode() {
+        String mode = configuredDesktopTitleBarMode();
+        if (mode != null) {
+            return mode;
+        }
+        // The installed theme gets to answer before the default does, because Form already
+        // asks it: Form.getDesktopTitleBarMode consults the theme's desktopTitleBarMode
+        // constant when the project configured nothing. Resolving "toolbar" here regardless
+        // made the two disagree, and the disagreement cost the application its commands --
+        // Form read "native" from the theme and hid the Toolbar, while isDesktopNativeChromeMode
+        // read "toolbar" and returned from setNativeCommands without installing a menu, so the
+        // commands had nowhere left to be.
+        String themed = com.codename1.ui.plaf.UIManager.getInstance()
+                .getThemeConstant("desktopTitleBarMode", null);
+        if (themed != null && themed.length() > 0) {
+            return themed;
+        }
+        return "toolbar";
+    }
+
+    /// The mode the project actually asked for, or null when it asked for nothing. Kept
+    /// separate from {@link #resolveDesktopTitleBarMode()} so the "unset" case survives all the
+    /// way to Form, where a desktop native theme's own constant gets to answer instead.
+    private static String configuredDesktopTitleBarMode() {
         return System.getProperty("codename1.arg.desktop.titleBar", desktopTitleBarMode);
+    }
+
+    /// @inheritDoc
+    @Override
+    public String getConfiguredDesktopTitleBarMode() {
+        if (!isDesktop()) {
+            return null;
+        }
+        return configuredDesktopTitleBarMode();
     }
 
     /// @return true when running on the desktop with a title-bar mode that hides the CN1
@@ -3050,8 +3214,11 @@ public class JavaSEPort extends CodenameOneImplementation {
         if (h == null || !isDesktop()) {
             return;
         }
-        String mode = System.getProperty("codename1.arg.desktop.titleBar", desktopTitleBarMode);
+        String mode = configuredDesktopTitleBarMode();
         if (mode != null && mode.length() > 0) {
+            // Only when the project asked. Injecting the default here would write
+            // "toolbar" over a desktop native theme's own constant and put the in-app
+            // Toolbar back on every screen the theme meant to hand to the window.
             h.put("@desktopTitleBarMode", mode);
         }
         boolean interactive = desktopInteractiveScrollbars
@@ -3072,12 +3239,23 @@ public class JavaSEPort extends CodenameOneImplementation {
      * theme resource basename (without ".res") or {@code null} to fall back
      * to the skin's embedded theme.
      */
+    /// The modern iOS theme for the generation the project asks for.
+    ///
+    /// Mirrors IOSImplementation#modernThemeResourceName so the simulator shows
+    /// the same theme the device would. Reads the hint every time rather than
+    /// caching: the simulator picks up a project's settings without a restart,
+    /// so a cached answer would survive the change that was meant to alter it.
+    private static String modernIosTheme() {
+        return "27".equals(buildHint("ios.themeGeneration"))
+                ? "iOSModern27Theme" : "iOSModernTheme";
+    }
+
     private static String resolveAutoNativeTheme(String platformName) {
         if ("ios".equals(platformName)) {
             String iosMode = buildHint("ios.themeMode");
             if (iosMode != null) {
                 if ("modern".equalsIgnoreCase(iosMode) || "liquid".equalsIgnoreCase(iosMode)) {
-                    return "iOSModernTheme";
+                    return modernIosTheme();
                 }
                 if ("ios7".equalsIgnoreCase(iosMode) || "flat".equalsIgnoreCase(iosMode)) {
                     return "iOS7Theme";
@@ -3094,7 +3272,7 @@ public class JavaSEPort extends CodenameOneImplementation {
                 return null;
             }
             // Default for an iOS skin is the modern theme.
-            return "iOSModernTheme";
+            return modernIosTheme();
         }
         if ("and".equals(platformName)) {
             String andMode = buildHint("and.themeMode");
@@ -3121,6 +3299,68 @@ public class JavaSEPort extends CodenameOneImplementation {
             }
             // Default for an Android skin is Material 3.
             return "AndroidMaterialTheme";
+        }
+        return resolveDesktopNativeTheme(platformName);
+    }
+
+    /// Resolves the desktop native theme for a host platform name.
+    ///
+    /// Returns null when the developer has asked for no framework theme, which leaves the
+    /// existing behaviour exactly as it was. That default is deliberate and matches how the
+    /// modern mobile themes shipped: a desktop application written before these themes
+    /// existed keeps the look it was built and tested against until it opts in, because
+    /// flipping it silently would move every screen of every shipping desktop app.
+    ///
+    /// `auto` and `native` mean "whatever this machine is", which is the only sensible
+    /// reading of a native theme on desktop, where one binary runs on all three. The
+    /// platform names are the ones getPlatformName answers with: "win", "mac", "linux".
+    private static String resolveDesktopNativeTheme(String platformName) {
+        if (platformName == null) {
+            return null;
+        }
+        // Desktop selection is independent of the shared iOS/Android nativeTheme hint.
+        return resolveDesktopNativeTheme(platformName, buildHint("desktop.themeMode"));
+    }
+
+    private static String resolveDesktopNativeTheme(String platformName, String mode) {
+        if (mode == null || mode.trim().isEmpty()) {
+            // The cross-platform nativeTheme hint reaches desktop through exactly one of
+            // its values. "native" says "the platform's own look, everywhere", and desktop
+            // is part of everywhere. "modern" does not, and must not: it predates the
+            // desktop themes by years, so every application that set it for its phone
+            // builds would otherwise have its desktop screens redrawn by a hint it set for
+            // another platform. That is the whole difference between the two constants.
+            if ("native".equalsIgnoreCase(sharedNativeThemeHint())) {
+                mode = "native";
+            }
+        }
+        if (mode == null || "legacy".equalsIgnoreCase(mode)) {
+            // What a desktop app has always had. Not a recommendation, just continuity.
+            return null;
+        }
+        if ("custom".equalsIgnoreCase(mode)) {
+            return null;
+        }
+        if ("fluent".equalsIgnoreCase(mode)) {
+            return "WindowsFluentTheme";
+        }
+        if ("aqua".equalsIgnoreCase(mode)) {
+            return "MacOSAquaTheme";
+        }
+        if ("adwaita".equalsIgnoreCase(mode)) {
+            return "GnomeAdwaitaTheme";
+        }
+        if ("auto".equalsIgnoreCase(mode) || "native".equalsIgnoreCase(mode)
+                || "modern".equalsIgnoreCase(mode)) {
+            if ("mac".equals(platformName)) {
+                return "MacOSAquaTheme";
+            }
+            if ("linux".equals(platformName)) {
+                return "GnomeAdwaitaTheme";
+            }
+            if ("win".equals(platformName)) {
+                return "WindowsFluentTheme";
+            }
         }
         return null;
     }
@@ -4622,6 +4862,20 @@ public class JavaSEPort extends CodenameOneImplementation {
                     com.codename1.ui.TooltipManager.hideTooltip();
                 }
             });
+            // And clear the hover. Motion simply stops when the pointer leaves the canvas,
+            // and Form only re-points its tracked hover when a DIFFERENT component is
+            // reported, so without this the last control stayed lit with the cursor
+            // somewhere else entirely. -1,-1 is the same "nothing is under the pointer"
+            // coordinate the Windows and Linux ports send from their leave events; a real
+            // canvas coordinate is never negative.
+            // Through windowPointerHover, NOT pointerHover: a secondary window's canvas
+            // has windowId > 0 and its hover must reach that window's Desktop entry, the
+            // way mouseMoved above sends it. Routing the leave to the main form instead
+            // left the secondary window's control hovered until another motion event
+            // happened to reach it.
+            if (JavaSEPort.this.isDesktop()) {
+                JavaSEPort.this.windowPointerHover(windowId, -1, -1);
+            }
         }
         public void mouseDragged(MouseEvent e) {
             e.consume();
@@ -5454,6 +5708,7 @@ public class JavaSEPort extends CodenameOneImplementation {
             byte[] nativeThemeData = null;
             nativeThemeRes = null;
             nativeTheme = null;
+            desktopNativeFonts = false;
             while (e != null) {
                 String name = e.getName();
                 if (name.equals("skin.png")) {
@@ -5699,7 +5954,12 @@ public class JavaSEPort extends CodenameOneImplementation {
             isIOS = props.getProperty("systemFontFamily", "Arial").toLowerCase().contains("helvetica");
             setFontFaces(props.getProperty("systemFontFamily", "Arial"),
                     props.getProperty("proportionalFontFamily", "SansSerif"),
-                    props.getProperty("monospaceFontFamily", "Monospaced"));
+                    props.getProperty("monospaceFontFamily", "Monospaced"), false);
+            desktopNativeFonts = isDesktopNativeThemeResource("/" + overrideTheme + ".res");
+            if (desktopNativeFonts) {
+                fontFaceSystem = defaultSystemFontForTheme(IS_MAC ? "mac" : (IS_LINUX ? "linux" : "win"),
+                        "/" + overrideTheme + ".res");
+            }
             int med;
             int sm;
             int la;
@@ -8536,12 +8796,16 @@ public class JavaSEPort extends CodenameOneImplementation {
         m.setDoubleBuffered(true);
         String[][] items = {
             {"auto", "Auto (from build hints)"},
-            {"iOSModernTheme", "iOS Modern (Liquid Glass)"},
+            {"iOSModernTheme", "iOS Modern (Liquid Glass, iOS 26)"},
+            {"iOSModern27Theme", "iOS Modern (iOS 27)"},
             {"iOS7Theme", "iOS 7 (Flat)"},
             {"iPhoneTheme", "iPhone (Pre-Flat)"},
             {"AndroidMaterialTheme", "Android Material"},
             {"android_holo_light", "Android Holo Light"},
             {"androidTheme", "Android Legacy"},
+            {"WindowsFluentTheme", "Windows 11 Fluent"},
+            {"MacOSAquaTheme", "macOS Aqua"},
+            {"GnomeAdwaitaTheme", "GNOME Adwaita"},
             {"embedded", "Use skin's embedded theme"}
         };
         String current = Preferences.userNodeForPackage(JavaSEPort.class)
@@ -8606,7 +8870,7 @@ public class JavaSEPort extends CodenameOneImplementation {
                         // the menu, even if they dismiss the reload
                         // before loadSkinFile finishes its own
                         // addSkinName.
-                        addSkinName(picked.toURI().toString());
+                        addSkinName(SkinPath.toEntry(picked));
                     }
                     String mainClass = System.getProperty("MainClass");
                     if (mainClass != null) {
@@ -8662,14 +8926,16 @@ public class JavaSEPort extends CodenameOneImplementation {
         // never launches the companion can still open a watch skin to check a layout.
         registerBundledWatchSkins(pref);
         String skinNames = pref.get("skins", DEFAULT_SKINS);
-        if (skinNames == null || skinNames.length() < DEFAULT_SKINS.length()) {
+        if (SkinPath.split(skinNames).isEmpty()) {
+            // Empty or unparseable: fall back rather than render a menu with no
+            // skins in it. This used to compare the stored length against the
+            // default's, which also threw away a preference holding exactly one
+            // short entry.
             skinNames = DEFAULT_SKINS;
         }
         final List<String> topLevelSkins = new ArrayList<String>();
         final List<String> otaSkins = new ArrayList<String>();
-        StringTokenizer tkn = new StringTokenizer(skinNames, ";");
-        while (tkn.hasMoreTokens()) {
-            String entry = tkn.nextToken();
+        for (String entry : SkinPath.split(skinNames)) {
             String kind = classifySkin(entry);
             if ("ota".equals(kind)) {
                 otaSkins.add(entry);
@@ -8738,16 +9004,7 @@ public class JavaSEPort extends CodenameOneImplementation {
         if (pathOrURI == null || pathOrURI.isEmpty()) {
             return null;
         }
-        File asFile = null;
-        if (pathOrURI.startsWith("file:") || pathOrURI.contains("://")) {
-            try {
-                asFile = new File(new URL(pathOrURI).getFile());
-            } catch (Exception e) {
-                return null;
-            }
-        } else {
-            asFile = new File(pathOrURI);
-        }
+        File asFile = SkinPath.toFile(pathOrURI);
         if (asFile != null && asFile.exists()) {
             File otaRoot = new File(System.getProperty("user.home"), ".codenameone");
             try {
@@ -8770,20 +9027,7 @@ public class JavaSEPort extends CodenameOneImplementation {
 
     private JRadioButtonMenuItem buildSkinRadioItem(final JFrame frm, final String skinPath,
             final String currentSkin, final boolean desktopSkinActive) {
-        String name;
-        if (skinPath.startsWith("file:") || skinPath.contains("://")) {
-            try {
-                name = new File(new URL(skinPath).getFile()).getName();
-            } catch (Exception e) {
-                name = skinPath;
-            }
-        } else if (skinPath.startsWith("/") && !new File(skinPath).exists()) {
-            // classpath resource - drop the leading slash for display
-            name = skinPath.substring(1);
-        } else {
-            File f = new File(skinPath);
-            name = f.exists() ? f.getName() : skinPath;
-        }
+        String name = SkinPath.displayName(skinPath);
         JRadioButtonMenuItem item = new JRadioButtonMenuItem(name,
                 !desktopSkinActive && skinPath.equals(currentSkin));
         item.addActionListener(new ActionListener() {
@@ -9040,7 +9284,7 @@ public class JavaSEPort extends CodenameOneImplementation {
                                                 try {
                                                     File skin = downloadSkin(skinDir, url, data[1], progress);
                                                     if (skin.exists()) {
-                                                        addSkinName(skin.toURI().toString());
+                                                        addSkinName(SkinPath.toEntry(skin));
                                                     }
                                                 } catch (Exception e) {
                                                 }
@@ -9245,14 +9489,7 @@ public class JavaSEPort extends CodenameOneImplementation {
     private void addSkinName(String f) {
         Preferences pref = Preferences.userNodeForPackage(JavaSEPort.class);
         String skinNames = pref.get("skins", DEFAULT_SKINS);
-        if (skinNames != null) {
-            if (!skinNames.contains(f)) {
-                skinNames += ";" + f;
-            }
-        } else {
-            skinNames = f;
-        }
-        pref.put("skins", skinNames);
+        pref.put("skins", SkinPath.append(skinNames, f));
         try {
             pref.flush();
         } catch(Throwable t) {
@@ -10712,9 +10949,27 @@ public class JavaSEPort extends CodenameOneImplementation {
 
     private void loadSkinFile(String f, JFrame frm) {
         try {
-            File fsFile = new File(f);
-            if (fsFile.exists()) {
-                f = fsFile.toURI().toString();
+            // A local skin is opened as a file rather than through a URL: the entry we
+            // store has to survive a round trip back to this File, and going via the
+            // filesystem is the only reading of it that cannot disagree with
+            // SkinPath.toFile about what a percent-encoded path means.
+            File fsFile = SkinPath.toFile(f);
+            if (fsFile != null && fsFile.exists()) {
+                f = SkinPath.toEntry(fsFile);
+                FileInputStream fsIn = new FileInputStream(fsFile);
+                try {
+                    loadSkinFile(fsIn, frm);
+                } finally {
+                    try {
+                        fsIn.close();
+                    } catch (IOException closeFailed) {
+                        System.err.println("close: " + closeFailed);
+                    }
+                }
+                Preferences fsPref = Preferences.userNodeForPackage(JavaSEPort.class);
+                fsPref.put("skin", f);
+                addSkinName(f);
+                return;
             }
             if (f.contains("://") || f.startsWith("file:")) {
 
@@ -10847,11 +11102,17 @@ public class JavaSEPort extends CodenameOneImplementation {
             frame.setSize(new Dimension(300, 400));
             m = panel;
             window = frame;
-            if (pref.getBoolean("uwpDesktopSkin", false)) {
-                setNativeTheme("/winTheme.res");
-            } else {
-                setNativeTheme("/iOS7Theme.res");
-            }
+            // The desktop pseudo-skin. This used to be a straight choice between the
+            // UWP-era winTheme stub and iOS 7 -- neither of which is what a desktop looks
+            // like on any platform, and the iOS 7 branch is why a Codename One desktop app
+            // has always previewed as a flat iPhone.
+            //
+            // Now it asks the same resolver the generated desktop app does, so the simulator
+            // previews what the app will actually ship with. The uwpDesktopSkin preference
+            // still forces the old stub for anyone relying on it, and a developer who has
+            // opted into nothing still gets iOS 7, unchanged.
+            setSimulatorDesktopNativeTheme(IS_MAC ? "mac" : (IS_LINUX ? "linux" : "win"),
+                    pref.getBoolean("uwpDesktopSkin", false));
         }
         setInvokePointerHover(desktopSkin || invokePointerHover);
         
@@ -13993,11 +14254,44 @@ public class JavaSEPort extends CodenameOneImplementation {
                 && value.regionMatches(true, value.length() - suffix.length(), suffix, 0, suffix.length());
     }
 
+    private java.awt.Font desktopNativeFont(String alias) {
+        String family = fontFaceSystem;
+        // FACE_SYSTEM and native aliases share the installed family resolved at
+        // theme selection. Windows Java may expose "Segoe UI Variable" without
+        // the preferred "Text" suffix; retaining that missing name gives Dialog.
+        String variant = alias.substring("native:".length());
+        boolean italic = variant.startsWith("Italic");
+        if (!italic && !variant.startsWith("Main")) {
+            throw new IllegalArgumentException("Unsupported native font type: " + alias);
+        }
+        String weightName = variant.substring(italic ? 6 : 4);
+        Float weight;
+        if ("Thin".equals(weightName)) weight = TextAttribute.WEIGHT_EXTRA_LIGHT;
+        else if ("Light".equals(weightName)) weight = TextAttribute.WEIGHT_LIGHT;
+        else if ("Regular".equals(weightName)) weight = TextAttribute.WEIGHT_REGULAR;
+        else if ("Bold".equals(weightName)) weight = TextAttribute.WEIGHT_BOLD;
+        else if ("Black".equals(weightName)) weight = TextAttribute.WEIGHT_HEAVY;
+        else throw new IllegalArgumentException("Unsupported native font type: " + alias);
+        java.util.Map<TextAttribute, Object> attributes = new java.util.HashMap<TextAttribute, Object>();
+        attributes.put(TextAttribute.FAMILY, family);
+        attributes.put(TextAttribute.SIZE, Float.valueOf(medianFontSize));
+        attributes.put(TextAttribute.WEIGHT, weight);
+        attributes.put(TextAttribute.POSTURE, italic ? TextAttribute.POSTURE_OBLIQUE : TextAttribute.POSTURE_REGULAR);
+        java.awt.Font out = new java.awt.Font(attributes);
+        desktopAliasFonts.put(out, Boolean.TRUE);
+        return out;
+    }
+
     @Override
     public Object loadTrueTypeFont(String fontName, String fileName) {
         File fontFile = null;
         try {
             if(fontName.startsWith("native:")) {
+                // Desktop CSS uses native: aliases too. Changing FACE_SYSTEM alone
+                // leaves these aliases on the mobile Roboto path.
+                if (desktopNativeFonts) {
+                    return desktopNativeFont(fontName);
+                }
                 if(isIOS) {
                     String nn = nativeFontName(fontName);
                     if (nn != null) {
@@ -14139,11 +14433,24 @@ public class JavaSEPort extends CodenameOneImplementation {
         if ((weight & com.codename1.ui.Font.STYLE_ITALIC) == com.codename1.ui.Font.STYLE_ITALIC) {
             style = style | java.awt.Font.ITALIC;
         }
-        java.awt.Font fff = fnt.deriveFont(style, (float)(size * getFontScale()));
+        java.awt.Font fff;
+        if (desktopAliasFonts.containsKey(fnt)) {
+            // STYLE_PLAIN must retain the alias's light/bold/italic attributes.
+            java.util.Map<TextAttribute, Object> attributes = new java.util.HashMap<TextAttribute, Object>();
+            attributes.put(TextAttribute.SIZE, Float.valueOf((float)(size * getFontScale())));
+            if ((style & java.awt.Font.BOLD) != 0) attributes.put(TextAttribute.WEIGHT, TextAttribute.WEIGHT_BOLD);
+            if ((style & java.awt.Font.ITALIC) != 0) attributes.put(TextAttribute.POSTURE, TextAttribute.POSTURE_OBLIQUE);
+            fff = fnt.deriveFont(attributes);
+            desktopAliasFonts.put(fff, Boolean.TRUE);
+        } else {
+            fff = fnt.deriveFont(style, (float)(size * getFontScale()));
+        }
         
         if(Math.abs(size / 2 - fff.getSize())  < 3) {
             // retina display bug!
-            return fnt.deriveFont(style, (float)(size * 2 * getFontScale()));
+            java.awt.Font retina = fff.deriveFont((float)(size * 2 * getFontScale()));
+            if (desktopAliasFonts.containsKey(fnt)) desktopAliasFonts.put(retina, Boolean.TRUE);
+            return retina;
         }
         return fff;
     }
@@ -16978,6 +17285,9 @@ public class JavaSEPort extends CodenameOneImplementation {
         if(getSkin() == null) {
             if(IS_MAC) {
                 return "mac";
+            }
+            if(IS_LINUX) {
+                return "linux";
             }
             return "win";
         }
@@ -22618,6 +22928,74 @@ public class JavaSEPort extends CodenameOneImplementation {
     @Override
     public byte[] aesDecrypt(String transformation, byte[] key, byte[] iv, byte[] aad, byte[] ciphertext) {
         return javaseAes(transformation, key, iv, aad, ciphertext, javax.crypto.Cipher.DECRYPT_MODE);
+    }
+
+    /// PBKDF2 through the JCE, over the password **bytes** the caller supplied.
+    ///
+    /// Not `SecretKeyFactory` with a `PBEKeySpec`, which takes a `char[]` and encodes it with
+    /// whichever rule the provider happens to use -- and the whole point of this derivation is
+    /// that Android, iOS and a browser produce identical bytes from identical input. The loop
+    /// below is RFC 8018 over `Mac`, which has no latitude in it, so the bytes are the ones the
+    /// portable fallback in `KdfProfile` and the browser's `deriveBits` produce.
+    @Override
+    public byte[] pbkdf2(String hashAlgorithm, byte[] password, byte[] salt, int iterations, int length) {
+        try {
+            String macName = "HmacSHA256";
+            if (hashAlgorithm != null && hashAlgorithm.indexOf("512") >= 0) {
+                macName = "HmacSHA512";
+            }
+            if (password == null || password.length == 0) {
+                // SecretKeySpec throws IllegalArgumentException for a zero-length key, which is
+                // not a GeneralSecurityException and would escape the catch below. Answering
+                // null is this method's own contract for "no native derivation here", so the
+                // caller falls back to the portable implementation, which zero-pads the key the
+                // way RFC 2104 says to.
+                return null;
+            }
+            javax.crypto.Mac mac = javax.crypto.Mac.getInstance(macName);
+            mac.init(new javax.crypto.spec.SecretKeySpec(password, macName));
+            int hashLength = mac.getMacLength();
+            int blocks = (length + hashLength - 1) / hashLength;
+            byte[] out = new byte[blocks * hashLength];
+            byte[] block = new byte[salt.length + 4];
+            System.arraycopy(salt, 0, block, 0, salt.length);
+            for (int index = 1; index <= blocks; index++) {
+                block[salt.length] = (byte) (index >>> 24);
+                block[salt.length + 1] = (byte) (index >>> 16);
+                block[salt.length + 2] = (byte) (index >>> 8);
+                block[salt.length + 3] = (byte) index;
+                byte[] u = mac.doFinal(block);
+                byte[] accumulated = new byte[hashLength];
+                System.arraycopy(u, 0, accumulated, 0, hashLength);
+                for (int round = 1; round < iterations; round++) {
+                    u = mac.doFinal(u);
+                    for (int iter = 0; iter < hashLength; iter++) {
+                        accumulated[iter] ^= u[iter];
+                    }
+                }
+                System.arraycopy(accumulated, 0, out, (index - 1) * hashLength, hashLength);
+                // Wiped as soon as it has been copied out. The portable implementation these
+                // mirror -- KdfProfile.pbkdf2Portable -- has always done this, and these two
+                // copies drifted from it: every one of these arrays holds the derived key, so
+                // SecureEnvelope wiping the array it is GIVEN cleared one copy of three.
+                //
+                // What cannot be wiped is each round's `u`: Mac.doFinal allocates a new array
+                // and the previous one is unreachable before there is anywhere to zero it from.
+                // That is inherent to the JCE shape rather than an omission here, and it is the
+                // same in the portable version.
+                java.util.Arrays.fill(accumulated, (byte) 0);
+                java.util.Arrays.fill(u, (byte) 0);
+            }
+            byte[] exact = new byte[length];
+            System.arraycopy(out, 0, exact, 0, length);
+            java.util.Arrays.fill(out, (byte) 0);
+            java.util.Arrays.fill(block, (byte) 0);
+            return exact;
+        } catch (java.security.GeneralSecurityException e) {
+            // Null, not an exception: the contract is "no native derivation here", and the caller
+            // falls back to the portable loop rather than failing the unlock.
+            return null;
+        }
     }
 
     private static byte[] javaseAes(String transformation, byte[] key, byte[] iv, byte[] aad, byte[] input, int mode) {

@@ -30,7 +30,7 @@
 
 @implementation DrawStringTextureCache
 static int MAX_CACHE_SIZE = 100;
--(id)initWithString:(NSString*)s f:(CN1Font*)f t:(GLuint)t c:(int)c a:(int)a {
+-(id)initWithString:(NSString*)s f:(CN1Font*)f t:(unsigned int)t c:(int)c a:(int)a {
     stringWidth = -1;
     str = s;
     font = f;
@@ -74,11 +74,11 @@ static NSMutableArray* pendingDeleteStrings = nil;
     return stringWidth;
 }
 
--(GLuint)textureName {
+-(unsigned int)textureName {
     return textureName;
 }
 
-+(void)cache:(NSString*)s f:(CN1Font*)f t:(GLuint)t c:(int)c a:(int)a {
++(void)cache:(NSString*)s f:(CN1Font*)f t:(unsigned int)t c:(int)c a:(int)a {
     DrawStringTextureCache* d = [[DrawStringTextureCache alloc] initWithString:s f:f t:t c:c a:a];
     if(cachedStrings == nil) {
         cachedStrings = [[NSMutableArray alloc] init];
@@ -151,26 +151,16 @@ static NSMutableArray* pendingDeleteStrings = nil;
     [str release];
     [font release];
     [lastAccess release];
-#ifndef CN1_USE_METAL
-    if (textureName != 0) {
-        glDeleteTextures(1, &textureName);
-        GLErrorLog;
-    }
-#endif
     [super dealloc];
 }
 #else
 -(void)dealloc {
-#ifndef CN1_USE_METAL
-    glDeleteTextures(1, &textureName);
-    GLErrorLog;
-#endif
 }
 #endif
 @end
 
 #else
-// Compiled out on watchOS: this file is OpenGL ES / Metal / UIKit-only and the watch
+// Compiled out on watchOS: this file is Metal / UIKit-only and the watch
 // slice renders through the Core Graphics backend instead. The typedef keeps the
 // translation unit non-empty, which ISO C requires.
 typedef int cn1_drawstringtexturecache_unused_on_watch;

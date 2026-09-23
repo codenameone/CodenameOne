@@ -32,6 +32,21 @@ import java.util.HashMap;
  */
 public class Thread implements java.lang.Runnable{
     /**
+     * This thread's ThreadLocal values, keyed by the ThreadLocal object itself.
+     *
+     * Keyed WEAKLY by the ThreadLocal object itself, so nothing here keeps one
+     * alive; see the comment on ThreadLocal. Package private and touched only by
+     * that class, which reaches it through Thread.currentThread() -- so every read
+     * and write is by the thread that owns it and no lock is needed. It used to
+     * live the other way round, one shared HashMap per ThreadLocal written by
+     * every thread at once, which corrupted that map's probe sequence and spun.
+     *
+     * Null until the thread actually uses a ThreadLocal, and it dies with the
+     * thread, which is what stops the per-thread entries leaking.
+     */
+    ThreadLocal.Entry[] threadLocalValues;
+
+    /**
      * The maximum priority that a thread can have.
      * See Also:Constant Field Values
      */
@@ -218,6 +233,22 @@ public class Thread implements java.lang.Runnable{
             t.printStackTrace();
         }
         activeThreads--;
+        // DROPPED HERE, because nothing else can ever drop it.
+        //
+        // ThreadLocal sweeps entries whose weak key has been collected, but it
+        // sweeps them on the next access BY THIS THREAD -- and a thread that has
+        // finished never accesses anything again. So an application that keeps a
+        // reference to a completed Thread kept this array, and every value in it,
+        // reachable for as long as it kept the Thread: dropping the ThreadLocal
+        // released nothing, which is the one thing the old per-ThreadLocal map got
+        // right. The values are what matter here; they can be arbitrarily large,
+        // and a thread pool that retains its Thread objects would accumulate one
+        // set per thread for the life of the process.
+        //
+        // Safe at this point by construction: the body has returned, so no code of
+        // this thread's can look one up again, and ThreadLocal creates the table
+        // lazily if anything somehow does.
+        threadLocalValues = null;
         synchronized(this) {
             alive = false;
             notifyAll();

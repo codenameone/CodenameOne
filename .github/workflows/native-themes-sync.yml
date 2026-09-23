@@ -66,6 +66,10 @@ jobs:
           bash $GITHUB_WORKSPACE/scripts/ci/retry.sh mvn -B -pl css-compiler -am install -DskipTests -Dmaven.javadoc.skip=true -Plocal-dev-javase
 
       - name: Rebuild native themes
+        env:
+          # Makes the script record every file it wrote, so the commit step below stages
+          # what this run actually produced instead of a list kept by hand.
+          NATIVE_THEMES_MANIFEST: ${{ runner.temp }}/native-themes-written.txt
         run: ./scripts/build-native-themes.sh
 
       - name: Commit and push regenerated .res files
@@ -80,11 +84,32 @@ jobs:
           git config --global --add safe.directory "$GITHUB_WORKSPACE"
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          # Themes/ holds the single source of truth. Each downstream consumer
-          # (nativeios.jar, the Android port jar, the simulator fat-jar, the
-          # BuildDaemon's sibling cn1 checkout) copies from Themes/ at its own
-          # build time, so this workflow only commits these two files.
-          git add Themes/iOSModernTheme.res Themes/AndroidMaterialTheme.res
+          # Stage what THIS RUN wrote, from the manifest the script emits, rather than
+          # from a list kept here. The list used to be the two mobile themes and stayed
+          # that way when three desktop themes and two committed port mirrors joined the
+          # script: a desktop-only CSS change regenerated three .res files, staged none,
+          # reported "nothing to commit" and left every downstream build on the previous
+          # binary -- silently, because "nothing to commit" is what a no-op run says too.
+          #
+          # Untracked outputs are skipped deliberately. The script also mirrors into the
+          # JavaScript port's asset directory, which does not commit these themes, and
+          # staging blind there would start committing binaries nobody asked for.
+          staged="${RUNNER_TEMP}/native-themes-staged.txt"
+          : > "$staged"
+          while IFS= read -r f; do
+            [ -n "$f" ] || continue
+            if git ls-files --error-unmatch -- "$f" >/dev/null 2>&1; then
+              printf '%s\n' "$f" >> "$staged"
+            else
+              echo "not tracked, not staging: $f"
+            fi
+          done < "${RUNNER_TEMP}/native-themes-written.txt"
+          if [ ! -s "$staged" ]; then
+            echo "The theme build recorded no tracked outputs; refusing to report success." >&2
+            exit 1
+          fi
+          echo "Staging:"; cat "$staged"
+          git add --pathspec-from-file="$staged"
           if git diff --staged --quiet; then
             echo "No .res changes; nothing to commit."
             exit 0

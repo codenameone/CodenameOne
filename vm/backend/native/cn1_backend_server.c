@@ -779,6 +779,51 @@ JAVA_VOID com_codename1_backend_ServerSocket_closeFdImpl___int(CODENAME_ONE_THRE
 #endif
 }
 
+/*
+ * Breaks a connection in both directions without freeing the descriptor number.
+ *
+ * The websocket teardown path needs this: a thread parked in writeImpl below is
+ * inside cn1AwaitWritable waiting for POLLOUT, bounded by SO_SNDTIMEO -- fifteen
+ * seconds by default. A close would hand that number to the next accept while the
+ * parked writer still holds it. shutdown(2) makes POLLOUT ready at once and the
+ * pending send fails with EPIPE, so the writer leaves and the close is safe.
+ *
+ * Return value ignored deliberately: ENOTCONN means the peer already went, which
+ * is the state the caller was asking for.
+ */
+/*
+ * The receive deadline alone, leaving SO_SNDTIMEO untouched.
+ *
+ * setTimeoutImpl above sets both on purpose. A websocket needs them apart: its
+ * read allowance is minutes or unlimited because it is idle by design, while a
+ * send to a peer that stopped reading must still time out or a broadcast thread
+ * blocks for ever.
+ */
+JAVA_INT com_codename1_backend_ServerSocket_setReceiveTimeoutImpl___int_int_R_int(CODENAME_ONE_THREAD_STATE, JAVA_INT fd, JAVA_INT millis) {
+#ifdef _WIN32
+    (void)fd; (void)millis;
+    return -1;
+#else
+    struct timeval tv;
+    if(fd < 0) {
+        return -1;
+    }
+    tv.tv_sec = millis / 1000;
+    tv.tv_usec = (millis % 1000) * 1000;
+    return setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, (const char*)&tv, sizeof(tv)) == 0 ? 0 : -1;
+#endif
+}
+
+JAVA_VOID com_codename1_backend_ServerSocket_shutdownImpl___int(CODENAME_ONE_THREAD_STATE, JAVA_INT fd) {
+#ifndef _WIN32
+    if(fd >= 0) {
+        shutdown(fd, SHUT_RDWR);
+    }
+#else
+    (void)fd;
+#endif
+}
+
 /* ------------------------------------------------------------------ */
 /* Reactor                                                            */
 /* ------------------------------------------------------------------ */
@@ -814,7 +859,45 @@ JAVA_INT com_codename1_backend_Reactor_registerImpl___int_int_int_boolean_R_int(
         // the DEL + ADD that path pays, and it costs no cross-thread wake.
         ev.events |= EPOLLONESHOT;
     }
-    return epoll_ctl(poller, modify ? EPOLL_CTL_MOD : EPOLL_CTL_ADD, fd, &ev) == 0 ? 0 : -1;
+    /*
+     * ADD and MOD both mean "this descriptor should now be watched for these
+     * events", and which one is correct depends on whether the kernel already
+     * holds it -- which the caller tracks in a flag of its own, per host, from
+     * several threads. Getting that wrong is not a wrong flag: epoll answers
+     * EEXIST for an ADD it already has and ENOENT for a MOD it does not, the
+     * caller sees an IOException, and it drops a connection it has already read
+     * a request from WITHOUT writing a response. That is an empty reply to a
+     * valid request, and it is what BackendHttpIntegrationTest kept catching
+     * intermittently on Linux.
+     *
+     * Only on Linux, and that is the tell. The kqueue branch below has always
+     * been idempotent -- EV_ADD on a knote that exists updates it rather than
+     * refusing -- so the same mistaken flag costs nothing on macOS and the
+     * development loop never saw any of this. The asymmetry was the bug: the
+     * caller's flag is an optimisation, saving a syscall on the common path, and
+     * only epoll was treating it as a precondition.
+     *
+     * So each falls back to the other, and both platforms now mean the same
+     * thing by this call. The flag still keeps the fast path fast; it just no
+     * longer decides correctness.
+     */
+    if(epoll_ctl(poller, modify ? EPOLL_CTL_MOD : EPOLL_CTL_ADD, fd, &ev) == 0) {
+        return 0;
+    }
+    if(!modify && errno == EEXIST) {
+        if(epoll_ctl(poller, EPOLL_CTL_MOD, fd, &ev) == 0) {
+            return 0;
+        }
+    } else if(modify && errno == ENOENT) {
+        if(epoll_ctl(poller, EPOLL_CTL_ADD, fd, &ev) == 0) {
+            return 0;
+        }
+    }
+    /* -errno rather than -1: what is left is a real failure, and EBADF (closed
+       under us) and EPERM (not pollable) ask for different answers from a reader
+       of the log. A bare -1 could not tell them apart, and a CI failure saying
+       only "could not watch fd 20" cost a round to classify. */
+    return errno > 0 ? -errno : -1;
 #elif defined(CN1_HAVE_KQUEUE)
     struct kevent ev[2];
     int n = 0;

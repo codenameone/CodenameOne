@@ -182,7 +182,7 @@ include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/g
 ----
 
 .Custom modal Dialog in the south position
-image::img/components-dialog-modal-south.png[Custom Dialog in the south position,scaledwidth=20%]
+image::img/generated/components-dialog-modal-south.png[Custom Dialog in the south position,scaledwidth=20%]
 
 TIP: You can turn the code above to a modless `Dialog` by flipping the boolean `true` argument to `false`.
 
@@ -194,7 +194,7 @@ include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/g
 ----
 
 .Custom Dialog positioned absolutely
-image::img/components-dialog-modal-bottom-half.png[Custom Dialog positioned,scaledwidth=20%]
+image::img/generated/components-dialog-modal-bottom-half.png[Custom Dialog positioned,scaledwidth=20%]
 
 NOTE: `hi` is the name of the parent `Form` in the sample above.
 
@@ -215,7 +215,7 @@ include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/g
 ----
 
 .Dialog with tinted background
-image::img/components-dialog-tint.png[Dialog with tinted background,scaledwidth=20%]
+image::img/generated/components-dialog-tint.png[Dialog with tinted background,scaledwidth=20%]
 
 The tint color can be manipulated on the parent form, you can set it to any AARRGGBB value to set any color using the `setTintColor` method. Notice that this is invoked on the parent form and not on the `Dialog`!
 
@@ -229,7 +229,7 @@ include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/g
 ----
 
 .Dialog with green tinted background
-image::img/components-dialog-green-tint.png[Dialog with green tinted background,scaledwidth=20%]
+image::img/generated/components-dialog-green-tint.png[Dialog with green tinted background,scaledwidth=20%]
 
 You can apply Gaussian blur to the background of a dialog to highlight the foreground further and produce an attractive effect. You can use the `setDefaultBlurBackgroundRadius` to apply this globally, you can use the theme constant `dialogBlurRadiusInt` to do the same or you can do this on a per `Dialog` basis using `setBlurBackgroundRadius`.
 
@@ -241,7 +241,7 @@ include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/g
 ----
 
 .The blur effect coupled with the OS default tint
-image::img/components-dialog-blur.png[The blur effect coupled with the OS default tint,scaledwidth=20%]
+image::img/generated/components-dialog-blur.png[The blur effect coupled with the OS default tint,scaledwidth=20%]
 
 It might be a bit hard to notice the blur effect with the tinting so here is the same code with tinting disabled:
 
@@ -251,7 +251,7 @@ include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/g
 ----
 
 .The blur effect is more pronounced when the tint is disabled
-image::img/components-dialog-blur-no-tint.png[The blur effect is more pronounced when the tint is disabled,scaledwidth=20%]
+image::img/generated/components-dialog-blur-no-tint.png[The blur effect is more pronounced when the tint is disabled,scaledwidth=20%]
 
 
 ==== Popup dialog
@@ -323,11 +323,11 @@ Using the interaction dialog is pretty trivial and like dialog:
 
 [source,java]
 ----
-include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/TheComponentsOfCodenameOneJava015Snippet.java[tag=the-components-of-codename-one-java-015,indent=0]
+include::../demos/common/src/main/java/com/codenameone/developerguide/screenshots/ComponentsInteractionDialogFigure.java[tag=the-components-of-codename-one-java-015,indent=0]
 ----
 
 .Interaction Dialog
-image::img/components-interaction-dialog.png[Interaction Dialog,scaledwidth=20%]
+image::img/generated/components-interaction-dialog.png[Interaction Dialog,scaledwidth=20%]
 
 This will show the dialog on the right-hand side of the screen, which is pretty useful for a floating in place dialog.
 
@@ -395,7 +395,7 @@ Codename One.
 `TextArea` defaults to multi-line input and `TextField` defaults to single line input but both can be used in both cases. The main differences between `TextField` and `TextArea` are:
 
 - Blinking cursor is rendered on `TextField`
-- https://www.codenameone.com/javadoc/com/codename1/ui/events/DataChangedListener.html[DataChangeListener] is available in `TextField`. This is crucial for character by character input event tracking
+- https://www.codenameone.com/javadoc/com/codename1/ui/events/DataChangedListener.html[DataChangedListener] is available in `TextField`. This is crucial for character by character input event tracking
 - https://www.codenameone.com/javadoc/com/codename1/ui/TextField.html#setDoneListener(com.codename1.ui.events.ActionListener)[Done listener] is available in the `TextField`
 - Different `UIID`
 
@@ -417,10 +417,15 @@ The following sample shows off simple text field usage:
 
 [[text-component-sample-code]]
 
-.Simple text component sample
-image::img/components-text-component.png[Simple text component sample,scaledwidth=20%]
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/screenshots/ComponentsTextComponentFigure.java[tag=the-components-of-codename-one-text-component,indent=0]
+----
 
-TIP: The <<Advanced-search-code,Toolbar section>> contains an elaborate `TextField` search sample with `DataChangeListener` and rather unique styling.
+.Simple text component sample
+image::img/generated/components-text-component.png[Simple text component sample,scaledwidth=40%]
+
+TIP: The <<Advanced-search-code,Toolbar section>> contains an elaborate `TextField` search sample with `DataChangedListener` and rather unique styling.
 
 ==== Masking
 
@@ -887,11 +892,11 @@ This sample below continues from the place where the <<text-component-sample-cod
 
 [source,java]
 ----
-include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/TheComponentsOfCodenameOneJava161Snippet.java[tag=the-components-of-codename-one-java-161,indent=0]
+include::../demos/common/src/main/java/com/codenameone/developerguide/screenshots/ComponentsValidationFigure.java[tag=the-components-of-codename-one-java-161,indent=0]
 ----
 
 .Validation & Regular Expressions
-image::img/validation-regex-masking-1.png[Validation and Regular Expressions,scaledwidth=20%]
+image::img/generated/validation-regex-masking-1.png[Validation and Regular Expressions,scaledwidth=20%]
 
 When the form components are bound to a model with `@Bindable`, the
 same constraints can be expressed as field annotations -- `@Required`,
@@ -1122,18 +1127,18 @@ The https://www.codenameone.com/javadoc/com/codename1/ui/list/ListModel.html[Lis
 
 [source,java]
 ----
-include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/TheComponentsOfCodenameOneJava168Snippet.java[tag=the-components-of-codename-one-java-168,indent=0]
+include::../demos/common/src/main/java/com/codenameone/developerguide/screenshots/ComponentsMillionEntriesFigure.java[tag=the-components-of-codename-one-java-168,indent=0]
 ----
 
 You can now replace the existing model by removing all the model related logic and changing the constructor call as such:
 
 [source,java]
 ----
-include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/TheComponentsOfCodenameOneJava169Snippet.java[tag=the-components-of-codename-one-java-169,indent=0]
+include::../demos/common/src/main/java/com/codenameone/developerguide/screenshots/ComponentsMillionEntriesFigure.java[tag=the-components-of-codename-one-java-169,indent=0]
 ----
 
 .It took ages to scroll this far... This goes to a million...
-image::img/components-millionbooks.png[It took ages to scroll this far... This goes to a million...,scaledwidth=20%]
+image::img/generated/components-millionbooks.png[It took ages to scroll this far... This goes to a million...,scaledwidth=20%]
 
 
 ==== List cell renderer
@@ -1233,15 +1238,15 @@ Here is a simple example of a list with checkboxes that gets updated automatical
 
 [source,java]
 ----
-include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/TheComponentsOfCodenameOneJava060Snippet.java[tag=the-components-of-codename-one-java-060,indent=0]
+include::../demos/common/src/main/java/com/codenameone/developerguide/screenshots/ComponentsGenericRendererFigure.java[tag=the-components-of-codename-one-java-060,indent=0]
 ----
 
 .GenericListCellRenderer demo code
-image::img/components-generic-list-cell-renderer.png[GenericListCellRenderer demo code,scaledwidth=20%]
+image::img/generated/components-generic-list-cell-renderer.png[GenericListCellRenderer demo code,scaledwidth=20%]
 
-===== Custom UIID of entry in GenenricListCellRenderer/MultiList
+===== Custom UIID of entry in GenericListCellRenderer/MultiList
 
-With https://www.codenameone.com/javadoc/com/codename1/ui/list/MultiList.html[MultiList]/`GenenricListCellRenderer` one of the common issues is making a UI where a specific component
+With https://www.codenameone.com/javadoc/com/codename1/ui/list/MultiList.html[MultiList]/`GenericListCellRenderer` one of the common issues is making a UI where a specific component
 within the list renderer has a different UIID style based on data. For example: this can be helpful to mark a label within the
 list as red, for instance, for a list of monetary transactions.
 
@@ -1406,7 +1411,7 @@ To line wrap table cells you can override the `createCell` method and return a h
 
 [source,java]
 ----
-include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/TheComponentsOfCodenameOneJava071Snippet.java[tag=the-components-of-codename-one-java-071,indent=0]
+include::../demos/common/src/main/java/com/codenameone/developerguide/screenshots/ComponentsTableMultilineFigure.java[tag=the-components-of-codename-one-java-071,indent=0]
 ----
 
 TIP: Notice that you don't need to do anything else as binding to the `TextArea` is built-in to the `Table`.
@@ -1414,10 +1419,10 @@ TIP: Notice that you don't need to do anything else as binding to the `TextArea`
 IMPORTANT: You must set the column width constraint when you want multi-line to work. Otherwise the preferred size of the column might be too wide and the remaining columns might not have space left.
 
 .Multiline table cell in portrait mode
-image::img/components-table-multiline-portrait.png[Multiline table cell in portrait mode,scaledwidth=20%]
+image::img/generated/components-table-multiline-portrait.png[Multiline table cell in portrait mode,scaledwidth=20%]
 
 .Multiline table cell in landscape mode. Notice the cell row count adapts seamlessly
-image::img/components-table-multiline-landscape.png[Multiline table cell in landscape mode. Notice the cell row count adapts seamlessly,scaledwidth=20%]
+image::img/generated/components-table-multiline-landscape.png[Multiline table cell in landscape mode. Notice the cell row count adapts seamlessly,scaledwidth=20%]
 
 ==== Sorting tables
 
@@ -1440,13 +1445,13 @@ The data of the `Tree` arrives from a model for example: this:
 
 [source,java]
 ----
-include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/TheComponentsOfCodenameOneJava182Snippet.java[tag=the-components-of-codename-one-java-182,indent=0]
+include::../demos/common/src/main/java/com/codenameone/developerguide/screenshots/ComponentsTreeFigure.java[tag=the-components-of-codename-one-java-182,indent=0]
 ----
 
 Will result in this:
 
 .Tree
-image::img/tree.png[Tree,scaledwidth=20%]
+image::img/generated/tree.png[Tree,scaledwidth=40%]
 
 NOTE: Since `Tree` is hierarchy based you can't have a simple model like you've for the `Table` as deep hierarchy is harder to represent with arrays.
 
@@ -1454,19 +1459,19 @@ A more practical "real world" example would be working with XML data. You can us
 
 [source,java]
 ----
-include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/TheComponentsOfCodenameOneJava183Snippet.java[tag=the-components-of-codename-one-java-183,indent=0]
+include::../demos/common/src/main/java/com/codenameone/developerguide/screenshots/ComponentsTreeXmlFigure.java[tag=the-components-of-codename-one-java-183,indent=0]
 ----
 
-NOTE: The `try(Stream)` syntax is a try with resources clogic that implicitly closes the stream.
+NOTE: The `try` with resources syntax closes the `Reader` for you however the block ends.
 
 .XML Tree
-image::img/components-tree-xml.png[XML Tree,scaledwidth=20%]
+image::img/generated/components-tree-xml.png[XML Tree,scaledwidth=40%]
 
 The model for the XML hierarchy is implemented as such:
 
 [source,java]
 ----
-include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/TheComponentsOfCodenameOneJava184Snippet.java[tag=the-components-of-codename-one-java-184,indent=0]
+include::../demos/common/src/main/java/com/codenameone/developerguide/screenshots/ComponentsTreeXmlFigure.java[tag=the-components-of-codename-one-java-184,indent=0]
 ----
 
 [[sharebutton-section]]
@@ -1624,14 +1629,14 @@ A common usage for `Tabs` is the swipe to proceed effect which is common in iOS 
 
 [source,java]
 ----
-include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/TheComponentsOfCodenameOneJava081Snippet.java[tag=the-components-of-codename-one-java-081,indent=0]
+include::../demos/common/src/main/java/com/codenameone/developerguide/screenshots/ComponentsTabsSwipeFigure.java[tag=the-components-of-codename-one-java-081,indent=0]
 ----
 
 .Swipeable Tabs with an iOS carousel effect page 1
-image::img/components-tabs-swipe1.png[Swipeable Tabs with an iOS carousel effect page 1,scaledwidth=20%]
+image::img/generated/components-tabs-swipe1.png[Swipeable Tabs with an iOS carousel effect page 1,scaledwidth=20%]
 
 .Swipeable Tabs with an iOS carousel effect page 2
-image::img/components-tabs-swipe2.png[Swipeable Tabs with an iOS carousel effect page 2,scaledwidth=20%]
+image::img/generated/components-tabs-swipe2.png[Swipeable Tabs with an iOS carousel effect page 2,scaledwidth=20%]
 
 NOTE: Notice that you used `setRadioButtonImages` to explicitly set the radio button images to the look you want for the carousel.
 
@@ -1704,27 +1709,27 @@ You can use the `ImageViewer` as a tool to view a single image which allows you 
 
 [source,java]
 ----
-include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/TheComponentsOfCodenameOneJava187Snippet.java[tag=the-components-of-codename-one-java-187,indent=0]
+include::../demos/common/src/main/java/com/codenameone/developerguide/screenshots/ComponentsImageViewerFigure.java[tag=the-components-of-codename-one-java-187,indent=0]
 ----
 
 TIP: You can simulate pinch to zoom on the simulator by dragging the right button away from the top left corner to zoom in and towards the top left corner to zoom out. On Mac touchpads you can drag two fingers to achieve that.
 
 
 .ImageViewer as the demo loads with the image from the default icon
-image::img/components-imageviewer.png[ImageViewer as the demo loads with the image from the default icon,scaledwidth=20%]
+image::img/generated/components-imageviewer.png[ImageViewer as the demo loads with the image from the default icon,scaledwidth=20%]
 
 .ImageViewer zoomed in
-image::img/components-imageviewer-zoomed-in.png[ImageViewer zoomed in,scaledwidth=20%]
+image::img/generated/components-imageviewer-zoomed-in.png[ImageViewer zoomed in,scaledwidth=20%]
 
 You can work with a list of images to produce a swiping effect for the image viewer where you can swipe from one image to the next and also zoom in/out on a specific image:
 
 [source,java]
 ----
-include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/TheComponentsOfCodenameOneJava085Snippet.java[tag=the-components-of-codename-one-java-085,indent=0]
+include::../demos/common/src/main/java/com/codenameone/developerguide/screenshots/ComponentsImageViewerMultiFigure.java[tag=the-components-of-codename-one-java-085,indent=0]
 ----
 
 .An ImageViewer with many elements is indistinguishable from a single ImageViewer except for swipe
-image::img/components-imageviewer-multi.png[An ImageViewer with many elements is indistinguishable from a single ImageViewer except for swipe,scaledwidth=20%]
+image::img/generated/components-imageviewer-multi.png[An ImageViewer with many elements is indistinguishable from a single ImageViewer except for swipe,scaledwidth=20%]
 
 Notice that you use a https://www.codenameone.com/javadoc/com/codename1/ui/list/ListModel.html[ListModel] to allow swiping between images.
 
@@ -1812,7 +1817,7 @@ image::img/generated/components-toolbar.png[The Toolbar,scaledwidth=25%]
 
 
 .The default sidemenu of the Toolbar
-image::img/components-toolbar-sidemenu.png[The default sidemenu of the Toolbar,scaledwidth=30%]
+image::img/generated/components-toolbar-sidemenu.png[The default sidemenu of the Toolbar,scaledwidth=30%]
 
 .The overflow menu of the Toolbar
 image::img/components-toolbar-overflow-menu.png[The overflow menu of the Toolbar,scaledwidth=25%]
@@ -1828,12 +1833,12 @@ The customization of the title area allows for some pretty powerful UI effects f
 [[Advanced-search-code]]
 [source,java]
 ----
-include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/TheComponentsOfCodenameOneJava090Snippet.java[tag=the-components-of-codename-one-java-090,indent=0]
+include::../demos/common/src/main/java/com/codenameone/developerguide/screenshots/ComponentsToolbarSearchFigure.java[tag=the-components-of-codename-one-java-090,indent=0]
 ----
 
 <1> You use a `TextField` the whole time and style it to make it (and its hint) look like a regular title. An alternative way is to replace the title component dynamically.
 
-<2> You use the `DataChangeListener` to update the search results as you type them.
+<2> You use the `DataChangedListener` to update the search results as you type them.
 
 <3> Hidden & Visible use the opposite flag values to say similar things (for example: when hidden is set to false you would want to set visible to true). +
 Visible indicates whether a component can be seen. It will still occupy the physical space on the screen even when it isn't visible. Hidden will remove the space occupied by the component from the screen, but some code might still try to paint it., visible is redundant but you use it with hidden for good measure.
@@ -1842,10 +1847,10 @@ Visible indicates whether a component can be seen. It will still occupy the phys
 For example, that isn't intuitive to most users so a button is added to start editing.
 
 .Search field within the toolbar
-image::img/components-toolbar-search.png[Search field within the toolbar,scaledwidth=20%]
+image::img/generated/components-toolbar-search.png[Search field within the toolbar,scaledwidth=20%]
 
 .Search field after typing a couple of letters
-image::img/components-toolbar-search-ongoing.png[Search field after typing a couple of letters,scaledwidth=20%]
+image::img/generated/components-toolbar-search-ongoing.png[Search field after typing a couple of letters,scaledwidth=20%]
 
 ==== Search mode
 
@@ -2400,16 +2405,16 @@ You can combine some demos above including the <<slider-stars-demo,Slider stars 
 
 [source,java]
 ----
-include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/TheComponentsOfCodenameOneJava211Snippet.java[tag=the-components-of-codename-one-java-211,indent=0]
+include::../demos/common/src/main/java/com/codenameone/developerguide/screenshots/ComponentsSwipeableContainerFigure.java[tag=the-components-of-codename-one-java-211,indent=0]
 ----
 
 [source,java]
 ----
-include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/TheComponentsOfCodenameOneJava211Snippet.java[tag=the-components-of-codename-one-java-211-helper,indent=0]
+include::../demos/common/src/main/java/com/codenameone/developerguide/screenshots/ComponentsSwipeableContainerFigure.java[tag=the-components-of-codename-one-java-211-helper,indent=0]
 ----
 
-.SwipableContainer showing a common use case of ranking on swipe
-image::img/components-swipablecontainer.png[SwipableContainer showing a common use case of ranking on swipe,scaledwidth=20%]
+.SwipeableContainer showing a common use case of ranking on swipe
+image::img/generated/components-swipablecontainer.png[SwipeableContainer showing a common use case of ranking on swipe,scaledwidth=20%]
 
 
 === EmbeddedContainer

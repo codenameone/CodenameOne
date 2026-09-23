@@ -1,0 +1,202 @@
+/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+import java.io.*;
+import java.nio.file.Files;
+import java.security.KeyStore;
+import java.util.*;
+
+public class AndroidGateHarness {
+    private static final Object PLAIN_KEY_LOCK = new Object();
+    private static final ThreadLocal<String> HELD_GATE = new ThreadLocal<String>();
+    private static final int GATE_SETTLED = 1;
+    private static final int GATE_REMOVED = 2;
+    private static final String ANDROID_KEY_STORE = "unavailable-test-keystore";
+    private static final String PLAIN_KEY_ID = "plain";
+    private final File directory;
+    private final SharedPreferences prefs = new SharedPreferences();
+    private String failWrite;
+    private String failClear;
+    private boolean failAfterClear;
+
+    private AndroidGateHarness() throws Exception {
+        directory = Files.createTempDirectory("android-gate-").toFile();
+    }
+
+    static class Log {
+        static final int WARNING = 1;
+        static void e(Throwable ignored) { }
+        static void p(String ignored, int level) { }
+    }
+
+    static class SharedPreferences {
+        final Map<String, String> values = new LinkedHashMap<String, String>();
+        boolean refuseCommit;
+        boolean throwCommit;
+        Map<String, ?> getAll() { return new LinkedHashMap<String, String>(values); }
+        Editor edit() { return new Editor(); }
+        class Editor {
+            final List<String> removals = new ArrayList<String>();
+            Editor remove(String account) { removals.add(account); return this; }
+            boolean commit() {
+                if (throwCommit) throw new IllegalStateException("injected commit failure");
+                if (refuseCommit) return false;
+                for (String account : removals) values.remove(account);
+                return true;
+            }
+        }
+    }
+
+    private SharedPreferences plainPrefs() { return prefs; }
+    private String get(String account) { return prefs.values.get(account); }
+    private File gateFile(String account) { return new File(directory, account); }
+    private boolean setUnderHeldGate(String account, String value) {
+        prefs.values.put(account, value); return true;
+    }
+    private boolean removeValueUnderHeldGate(String account) {
+        return prefs.edit().remove(account).commit();
+    }
+    private RandomAccessFile openGate(final File file) throws IOException {
+        return new RandomAccessFile(file, "rw") {
+            @Override public void write(int value) throws IOException {
+                super.write(value);
+                if (file.getName().equals(failWrite)) {
+                    failWrite = null;
+                    throw new IOException("injected failure after mark became visible");
+                }
+            }
+            @Override public void setLength(long length) throws IOException {
+                if (file.getName().equals(failClear)) {
+                    failClear = null;
+                    if (failAfterClear) super.setLength(length);
+                    throw new IOException("injected clear failure");
+                }
+                super.setLength(length);
+            }
+        };
+    }
+    private void seed(String account, int mark) throws Exception {
+        if (mark == GATE_SETTLED) prefs.values.put(account, "iv:old-key");
+        try (RandomAccessFile file = new RandomAccessFile(gateFile(account), "rw")) {
+            if (mark != 0) file.write(mark);
+        }
+    }
+    private int mark(String account) throws Exception {
+        try (RandomAccessFile file = new RandomAccessFile(gateFile(account), "r")) {
+            return file.length() == 0 ? 0 : file.read();
+        }
+    }
+    private static void check(boolean condition, String message) {
+        if (!condition) throw new AssertionError(message);
+    }
+    private void clean() {
+        for (File file : directory.listFiles()) file.delete();
+        directory.delete();
+    }
+
+    public static void failedCreation() throws Exception {
+        for (int previous : new int[] {0, GATE_REMOVED}) {
+            AndroidGateHarness h = new AndroidGateHarness();
+            try {
+                h.seed("key", previous);
+                h.failWrite = "key";
+                try (RandomAccessFile file = h.openGate(h.gateFile("key"))) {
+                    try (java.nio.channels.FileLock lock = file.getChannel().lock()) {
+                        check(h.createUnderGate(file, "key", "candidate") == null,
+                                "failed creation must refuse the candidate");
+                        check(!h.prefs.values.containsKey("key"), "candidate must be withdrawn");
+                        check(h.mark("key") == previous, "creation must restore the prior free mark");
+                        check("retry".equals(h.createUnderGate(file, "key", "retry")),
+                                "a subsequent creation must succeed");
+                        check(h.mark("key") == GATE_SETTLED, "retry must settle the gate");
+                    }
+                }
+            } finally { h.clean(); }
+        }
+    }
+
+    public static void failedTombstone() throws Exception {
+        for (int previous : new int[] {GATE_SETTLED, GATE_REMOVED}) {
+            AndroidGateHarness h = new AndroidGateHarness();
+            try {
+                h.seed("key", previous);
+                h.prefs.values.put("key", "iv:old-key");
+                h.failWrite = "key";
+                check(!h.removeUnderGate(h.gateFile("key"), h.prefs, "key"),
+                        "partial tombstone must fail removal");
+                check("iv:old-key".equals(h.prefs.values.get("key")), "old value must survive");
+                check(h.mark("key") == previous, "old mark must survive");
+            } finally { h.clean(); }
+        }
+    }
+
+    public static void failedSet() throws Exception {
+        for (int previous : new int[] {0, GATE_SETTLED, GATE_REMOVED}) {
+            AndroidGateHarness h = new AndroidGateHarness();
+            try {
+                h.seed("key", previous);
+                String old = h.get("key");
+                h.failWrite = "key";
+                check(!h.set("key", "candidate"), "partial mark must fail the write");
+                check(Objects.equals(old, h.get("key")), "failed write must restore the value");
+                check(h.mark("key") == previous, "failed write must restore its prior mark");
+                check(h.set("key", "retry"), "the next write must succeed");
+                check(h.mark("key") == GATE_SETTLED, "retry must settle its gate");
+            } finally { h.clean(); }
+        }
+    }
+
+    public static void failedPreferenceCommit() throws Exception {
+        for (boolean throwing : new boolean[] {false, true}) {
+            AndroidGateHarness h = new AndroidGateHarness();
+            try {
+                h.seed("key", GATE_SETTLED);
+                h.prefs.throwCommit = throwing;
+                h.prefs.refuseCommit = !throwing;
+                check(!h.removeUnderGate(h.gateFile("key"), h.prefs, "key"), "commit must fail");
+                check(h.mark("key") == GATE_SETTLED, "failed commit must restore settled mark");
+                check("iv:old-key".equals(h.prefs.values.get("key")), "old value must survive");
+            } finally { h.clean(); }
+        }
+    }
+
+    public static void failedReset() throws Exception {
+        for (boolean after : new boolean[] {false, true}) {
+            AndroidGateHarness h = new AndroidGateHarness();
+            try {
+                h.seed("broken", GATE_SETTLED);
+                h.seed("healthy", GATE_SETTLED);
+                h.failClear = "broken";
+                h.failAfterClear = after;
+                h.resetPlainKey();
+                check(h.prefs.values.containsKey("broken"), "failed clear must preserve its value");
+                check(!h.prefs.values.containsKey("healthy"), "cleared account must be removed");
+                check(h.mark("healthy") == 0, "healthy gate must be clear");
+                h.resetPlainKey();
+                check(h.prefs.values.isEmpty(), "a later reset must finish the failed account");
+                check(h.mark("broken") == 0, "retry must clear the failed account's gate");
+            } finally { h.clean(); }
+        }
+    }
+
+    /* PRODUCTION_METHODS */
+}

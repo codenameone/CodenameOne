@@ -23,11 +23,9 @@
 #import "CN1AppleUI.h"
 #import "CodenameOne_GLAppDelegate.h"
 
-#ifdef CN1_USE_UI_SCENE
 API_AVAILABLE(ios(13.0))
 @interface CodenameOne_GLSceneDelegate : UIResponder <UIWindowSceneDelegate>
 
 @property (nonatomic, retain) UIWindow *window;
 
 @end
-#endif

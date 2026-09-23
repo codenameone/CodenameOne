@@ -28,5 +28,5 @@ The important product lesson here is that finishing the app does not mean ignori
 ## Further Reading
 
 - [How Do I Create A List Of Items The Easy Way](/how-do-i/how-do-i-create-a-list-of-items-the-easy-way/)
-- [Developer Guide](/developer-guide/)
+- [Developer Guide](/developer-guide/io/)
 - [Communicating with the Server](/courses/course-02-deep-dive-mobile-development-with-codename-one/025-communicating-with-the-server/)

@@ -89,12 +89,12 @@ class CommandLineBuildHintTest {
     @Test
     void hintsNotGivenOnTheCommandLineAreUntouched() throws Exception {
         Properties settings = new Properties();
-        settings.setProperty("codename1.arg.ios.uiscene", "true");
+        settings.setProperty("codename1.arg.ios.multitasking", "true");
         settings.setProperty("codename1.mainName", "MyApp");
 
         overlay(settings, new Properties());
 
-        assertEquals("true", settings.getProperty("codename1.arg.ios.uiscene"));
+        assertEquals("true", settings.getProperty("codename1.arg.ios.multitasking"));
         assertEquals("MyApp", settings.getProperty("codename1.mainName"));
     }
 

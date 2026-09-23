@@ -1,0 +1,165 @@
+/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+import java.util.*;
+
+public class JavascriptStorageHarness {
+    private static final byte STATUS_OK = 0;
+    private static final Map<String, String> gates = new HashMap<String, String>();
+    private static final Storage storage = new Storage();
+    private static boolean refuseLegacyDelete;
+    private static boolean throwLegacyDelete;
+    private static boolean laterWriter;
+    private static boolean refuseMirror;
+    private static boolean unreadableEncrypted;
+    private static boolean refuseMigration;
+    private static int scenarios;
+
+    static class Log {
+        static final int WARNING = 1;
+        static void p(String ignored, int level) { }
+    }
+    static class Storage {
+        final Map<String, Object> values = new HashMap<String, Object>();
+        static Storage getInstance() { return storage; }
+        boolean writeObject(String key, Object value) {
+            if (refuseMirror) return false;
+            values.put(key, value);
+            return true;
+        }
+        void deleteStorageFile(String key) {
+            if (key.startsWith("legacy.")) {
+                check(!"sealed:candidate".equals(values.get("encrypted.account")),
+                        "a reader must not observe a candidate before legacy cleanup can fail");
+                check(!"sealed:candidate".equals(gates.get("encrypted.account")),
+                        "a concurrent creator must not adopt a candidate before cleanup can fail");
+                if (laterWriter) {
+                    values.put("encrypted.account", "sealed:later");
+                    gates.put("encrypted.account", "sealed:later");
+                }
+                if (throwLegacyDelete) throw new IllegalStateException("injected deletion failure");
+                if (refuseLegacyDelete) return;
+            }
+            values.remove(key);
+        }
+    }
+    private static String encryptedKey(String account) { return "encrypted." + account; }
+    private static String legacyKey(String account) { return "legacy." + account; }
+    private static Object readUncached(String key) { return storage.values.get(key); }
+    private static boolean definitelyGone(String key) { return !storage.values.containsKey(key); }
+    private static String reasonOf(RuntimeException failure) { return failure.getMessage(); }
+    private static String seal(String account, String value) { return "sealed:" + value; }
+    private static String open(String account, String value) {
+        if (unreadableEncrypted) throw new IllegalStateException("injected unreadable ciphertext");
+        return value.substring("sealed:".length());
+    }
+    private static String asString(Object value) { return (String) value; }
+    private static byte[] nativeSetIfAbsent(String entry, String value) {
+        if (refuseMigration) return new byte[] {1};
+        if (!gates.containsKey(entry)) gates.put(entry, value);
+        return ("\0" + gates.get(entry)).getBytes(java.nio.charset.StandardCharsets.UTF_8);
+    }
+    private static boolean gateAccepted(byte[] answer) { return answer[0] == 0; }
+    private static byte[] nativeSet(String entry, String value) {
+        gates.put(entry, value); return new byte[] {0};
+    }
+    private static byte[] nativeForgetIf(String entry, String expected) {
+        if (expected.equals(gates.get(entry))) gates.remove(entry);
+        return new byte[] {0};
+    }
+    private static void check(boolean condition, String message) {
+        if (!condition) throw new AssertionError(message);
+    }
+
+    public static void verify() {
+        JavascriptStorageHarness h = new JavascriptStorageHarness();
+        for (boolean encrypted : new boolean[] {false, true}) {
+            for (boolean throwing : new boolean[] {false, true}) {
+                for (boolean concurrent : new boolean[] {false, true}) {
+                    storage.values.clear(); gates.clear();
+                    storage.values.put("legacy.account", "legacy-key");
+                    if (encrypted) {
+                        storage.values.put("encrypted.account", "sealed:old-key");
+                        gates.put("encrypted.account", "sealed:old-key");
+                    }
+                    refuseLegacyDelete = true;
+                    throwLegacyDelete = throwing;
+                    laterWriter = concurrent;
+                    check(!h.set("account", "candidate"), "failed legacy cleanup must fail set");
+                    check("legacy-key".equals(storage.values.get("legacy.account")),
+                            "legacy key must remain recoverable");
+                    String expected = concurrent ? "sealed:later"
+                            : encrypted ? "sealed:old-key" : "sealed:legacy-key";
+                    check(Objects.equals(expected, storage.values.get("encrypted.account")),
+                            "failed replacement must preserve the prior or later mirror");
+                    check(!"sealed:candidate".equals(gates.get("encrypted.account")),
+                            "gate must not retain the failed replacement");
+                    if (concurrent) check("sealed:later".equals(gates.get("encrypted.account")),
+                            "rollback must not remove a later writer's gate");
+                    refuseLegacyDelete = false; throwLegacyDelete = false; laterWriter = false;
+                    check(h.set("account", "retry"), "a retry must succeed");
+                    check("sealed:retry".equals(storage.values.get("encrypted.account")),
+                            "successful retry must install its value");
+                    check(!storage.values.containsKey("legacy.account"), "retry must remove plaintext");
+                    scenarios++;
+                }
+            }
+        }
+        check(scenarios == 8, "all eight failure and concurrency combinations must run");
+        for (boolean encrypted : new boolean[] {false, true}) {
+            storage.values.clear(); gates.clear();
+            storage.values.put("legacy.account", "legacy-key");
+            if (encrypted) {
+                storage.values.put("encrypted.account", "sealed:old-key");
+                gates.put("encrypted.account", "sealed:old-key");
+            }
+            refuseMirror = true;
+            check(!h.set("account", "candidate"), "a refused mirror must fail the write");
+            check(!"sealed:candidate".equals(storage.values.get("encrypted.account")),
+                    "a refused write must not publish the replacement");
+            check(!"sealed:candidate".equals(gates.get("encrypted.account")),
+                    "a refused write must not retain the replacement gate");
+            check(encrypted ? "sealed:old-key".equals(storage.values.get("encrypted.account"))
+                            : "legacy-key".equals(storage.values.get("legacy.account")),
+                    "the old value must survive a refused mirror write");
+            refuseMirror = false;
+        }
+        storage.values.clear(); gates.clear();
+        storage.values.put("legacy.account", "legacy-key");
+        storage.values.put("encrypted.account", "sealed:old-key");
+        unreadableEncrypted = true;
+        check(!h.set("account", "candidate"), "unreadable ciphertext must preserve plaintext fallback");
+        check("legacy-key".equals(storage.values.get("legacy.account")), "fallback must remain");
+        unreadableEncrypted = false;
+        storage.values.remove("encrypted.account");
+        refuseMigration = true;
+        check(!h.set("account", "candidate"), "a refused migration must block replacement");
+        check("legacy-key".equals(storage.values.get("legacy.account")), "unmigrated key must remain");
+        check(!storage.values.containsKey("encrypted.account"), "replacement must stay unpublished");
+        refuseMigration = false;
+        check(h.set("account", "candidate"), "plaintext-only replacement must work after migration recovers");
+        check("sealed:candidate".equals(storage.values.get("encrypted.account")), "replacement must be stored");
+        check(!storage.values.containsKey("legacy.account"), "replacement must leave no plaintext");
+    }
+
+    /* PRODUCTION_METHODS */
+}

@@ -157,4 +157,4 @@ For UI-rendering bugs (a label shows the wrong text, a colour is off, a layout h
 
 For build / compile errors there's no JVM running yet. Use `mvn -pl common compile -e -X` for verbose Maven diagnostics; consult `references/build-and-run.md` for the common build error patterns.
 
-For native-side bugs on iOS / Android the simulator's JVM doesn't apply at all. Use Xcode's debugger (for `ios-source` builds) or Android Studio attached to the running APK.
+For a bug that only reproduces on real hardware, the simulator's JVM doesn't apply at all. You can still attach a **Java** debugger to the build running on the device, and drive it over MCP while you are there — see `references/on-device-debugging.md`. For the native layer below that (Objective-C, NDK C/C++), use Xcode's debugger on an `ios-source` build or Android Studio attached to the running APK; those attaches are independent of the JDWP one and can run beside it.

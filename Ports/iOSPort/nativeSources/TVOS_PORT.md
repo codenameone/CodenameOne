@@ -8,11 +8,9 @@ This document describes how the Codename One iOS port is built for **Apple TV
 
 Unlike watchOS (which has no UIKit / Metal / UIView and therefore needs the
 dedicated Core Graphics backend in `CN1CGGraphics`), **tvOS is very close to
-iOS**: it has UIKit, UIView, `UIApplicationMain` and Metal. The one rendering
-difference is that **OpenGL ES is not used at runtime on tvOS** (the framework
-headers ship in the SDK but the GL pipeline is unavailable), so the tvOS slice
-renders through the existing **Metal backend** (`CN1_USE_METAL`) exactly like the
-Mac Catalyst slice does.
+iOS**: it has UIKit, UIView, `UIApplicationMain` and Metal, and Metal is what
+every slice of this port renders through (`CN1_USE_METAL`), exactly like the
+Mac Catalyst slice.
 
 Consequently the tvOS app:
 
@@ -20,19 +18,16 @@ Consequently the tvOS app:
   `TvNativeBuilder` (it cannot be a variant of the `iphoneos` app target the way
   Mac Catalyst is, because the SDK differs), compiled from the **same**
   ParparVM-generated sources;
-- builds with `CN1_USE_METAL` (the iOS default) and **excludes the OpenGL-only
-  implementation files** (`CN1ES2compat.m`, `CN1ES1compat.m`, `EAGLView.m`) plus
-  the iOS XIBs — identical to the Mac Catalyst `EXCLUDED_SOURCE_FILE_NAMES`;
+- excludes the iOS XIBs — identical to the Mac Catalyst
+  `EXCLUDED_SOURCE_FILE_NAMES`;
 - reuses the shared `UIApplicationMain` entry, the app delegate and the Metal
   view controller (no SwiftUI shell and no duplicate-`main` rename, unlike the
   watch target);
-- weak-links the genuinely-absent frameworks (`WebKit`, and `OpenGLES`/`GLKit`
-  which are present-but-unused) via ParparVM `-Doptional.frameworks`.
+- weak-links the genuinely-absent frameworks (chiefly `WebKit`) via ParparVM
+  `-Doptional.frameworks`.
 
-The tvOS SDK **does** ship the `OpenGLES`, `GLKit` and (a link-stub-only)
-`MessageUI` frameworks, so — unlike the Mac Catalyst slice — **no GLKit/OpenGLES
-stub headers are needed**. `MessageUI` ships only a `.tbd` with no composer
-headers, so the mail/SMS composer is guarded out (as on watchOS).
+`MessageUI` ships only a `.tbd` with no composer headers on tvOS, so the
+mail/SMS composer is guarded out (as on watchOS).
 
 Enable it with `tvNative.enabled=true`, or implicitly by declaring
 `codename1.tvMain` in `codenameone_settings.properties`. `CN.isTV()` returns
@@ -117,9 +112,9 @@ The `ios-source` build bundles the *installed* `codenameone-ios` artifact's
 generated project after the iOS port is rebuilt+installed (use an isolated repo:
 `-Dmaven.repo.local=/path/to/iso -nsu`). For a fast edit loop, sync edited
 sources straight into the generated `<Main>-src/` (but do NOT overwrite the
-generated `CN1ES2compat.h` — the builder uncomments `#define CN1_USE_METAL` there;
-clobbering it drops the slice to the legacy GL text path). Build with arm64
-(Apple-silicon tvOS sim) and a high error limit to see the full wave:
+generated `CN1RenderBackend.h` — the builder substitutes the Metal colour-space
+define there). Build with arm64 (Apple-silicon tvOS sim) and a high error limit
+to see the full wave:
 
 ```
 ./scripts/build-ios-app.sh          # generates the <Main>TV target
@@ -143,7 +138,7 @@ CI run at 3840×2160). The two non-obvious fixes that made rendering work:
    (`cn1_copyMetalScreenTextureImage` + its call site in `cn1_renderViewIntoContext`)
    were both `#if defined(CN1_USE_METAL) && TARGET_OS_MACCATALYST`. tvOS uses the
    same nil-NIB path as Mac Catalyst (its XIBs are excluded from the bundle), so
-   without `loadView` no METALView is created (`EAGLView not found`) and forms
+   without `loadView` no METALView is created (`METALView not found`) and forms
    render to nothing → blank captures; and on a headless simulator
    `-drawViewHierarchyInRect:` snapshots a blank CALayer, so the screenTexture
    readback is required. Both broadened to `(TARGET_OS_MACCATALYST || TARGET_OS_TV)`.
@@ -168,9 +163,8 @@ xcodebuild -project <…>/HelloCodenameOne.xcodeproj -target HelloCodenameOneTV 
 ```
 
 Sync **all** of `Ports/iOSPort/nativeSources/*` into the generated `<Main>-src/`
-(not just the file under edit) and keep `CN1_USE_METAL` defined in the generated
-`CN1ES2compat.h`. For an end-to-end render check, download the tvOS simulator
-runtime (`xcodebuild -downloadPlatform tvOS`), create an "Apple TV 4K" device, and
+(not just the file under edit). For an end-to-end render check, download the
+tvOS simulator runtime (`xcodebuild -downloadPlatform tvOS`), create an "Apple TV 4K" device, and
 run `scripts/run-tv-ui-tests.sh <project>` with `CN1SS_TV_UDID` + `JAVA17_BIN` set.
 
 **Seed goldens from CI, never local:** a local Apple TV sim rendered at 1080×2206

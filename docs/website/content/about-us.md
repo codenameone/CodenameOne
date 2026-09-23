@@ -20,7 +20,7 @@ https://youtu.be/rl6z7DD2-vg
 
 ### How does Codename One work?
 
-To understand how Codename One works, its history etc. check the [developer guide](/manual/) (also available as a [PDF](/files/developer-guide.pdf)). It provide a birds eye view in the first chapter.
+To understand how Codename One works, its history etc. check the [developer guide](/developer-guide/introduction/) (also available as a [PDF](/files/developer-guide.pdf)). It provide a birds eye view in the first chapter.
 
 You can also refer to [this stackoverflow answer](http://stackoverflow.com/questions/10639766/how-codename-one-works/10646336). There is a video that goes into further details [here](https://www.youtube.com/watch?v=MrwbpdMALig) (it's a bit long).
 

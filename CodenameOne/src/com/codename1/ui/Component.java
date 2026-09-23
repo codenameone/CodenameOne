@@ -345,6 +345,9 @@ public class Component implements Animation, StyleListener, Editable {
     private boolean scrollSizeRequestedByUser = false;
     private Style unSelectedStyle;
     private Style pressedStyle;
+    private Style hoverStyle;
+    /// Set only on the desktop; see setHovered.
+    private boolean hovered;
     private Style selectedStyle;
     private Style disabledStyle;
     private Style allStyles;
@@ -756,6 +759,13 @@ public class Component implements Animation, StyleListener, Editable {
     /// hi.add(BorderLayout.CENTER, cmp);
     /// hi.show();
     /// ```
+    ///
+    /// The hover style is deliberately NOT part of this proxy. A component only has one when
+    /// its theme declares hover for that UIID, so including it would either force one into
+    /// existence for every component this is called on -- the blank-default repaint
+    /// {@link #getHoverStyle()} exists to prevent -- or make the proxy cover four states
+    /// sometimes and five others, depending on the theme and on when it was first called.
+    /// Style hover in the theme, which is where the desktop themes do it.
     ///
     /// #### Returns
     ///
@@ -1240,6 +1250,14 @@ public class Component implements Animation, StyleListener, Editable {
             return;
         }
         this.visible = visible;
+        if (!visible) {
+            // Hiding an attached subtree ends its pointer ownership just like removal.
+            // Showing it again must wait for a fresh pointer event, including tooltips.
+            clearHoverForInactiveSubtree();
+        }
+        if (hovered) {
+            checkHoverAnimationHierarchy();
+        }
         accessibilityChanged(AccessibilityManager.CHANGE_STRUCTURE);
     }
 
@@ -1877,6 +1895,7 @@ public class Component implements Animation, StyleListener, Editable {
         selectedStyle = null;
         disabledStyle = null;
         pressedStyle = null;
+        hoverStyle = null;
         allStyles = null;
         if (!sizeRequestedByUser) {
             preferredSize = null;
@@ -1889,6 +1908,7 @@ public class Component implements Animation, StyleListener, Editable {
             selectedStyle = null;
             disabledStyle = null;
             pressedStyle = null;
+            hoverStyle = null;
             allStyles = null;
             if (!sizeRequestedByUser) {
                 preferredSize = null;
@@ -1934,6 +1954,7 @@ public class Component implements Animation, StyleListener, Editable {
             selectedStyle = null;
             disabledStyle = null;
             pressedStyle = null;
+            hoverStyle = null;
             allStyles = null;
             if (!sizeRequestedByUser) {
                 preferredSize = null;
@@ -1970,6 +1991,7 @@ public class Component implements Animation, StyleListener, Editable {
             selectedStyle = null;
             disabledStyle = null;
             pressedStyle = null;
+            hoverStyle = null;
             allStyles = null;
             if (!sizeRequestedByUser) {
                 preferredSize = null;
@@ -2007,6 +2029,7 @@ public class Component implements Animation, StyleListener, Editable {
             selectedStyle = null;
             disabledStyle = null;
             pressedStyle = null;
+            hoverStyle = null;
             allStyles = null;
             if (!sizeRequestedByUser) {
                 preferredSize = null;
@@ -2043,6 +2066,7 @@ public class Component implements Animation, StyleListener, Editable {
             selectedStyle = null;
             disabledStyle = null;
             pressedStyle = null;
+            hoverStyle = null;
             allStyles = null;
             if (!sizeRequestedByUser) {
                 preferredSize = null;
@@ -2079,6 +2103,7 @@ public class Component implements Animation, StyleListener, Editable {
             selectedStyle = null;
             disabledStyle = null;
             pressedStyle = null;
+            hoverStyle = null;
             allStyles = null;
             if (!sizeRequestedByUser) {
                 preferredSize = null;
@@ -4390,6 +4415,9 @@ public class Component implements Animation, StyleListener, Editable {
             return;
         }
         this.focused = focused;
+        if (hovered) {
+            checkHoverAnimationHierarchy();
+        }
         accessibilityChanged(AccessibilityManager.CHANGE_FOCUS);
     }
 
@@ -4659,9 +4687,14 @@ public class Component implements Animation, StyleListener, Editable {
     ///
     /// - `blockLead`: the blockLead to set
     public void setBlockLead(boolean blockLead) {
+        if (this.blockLead == blockLead) {
+            return;
+        }
+        HoverTracker tracker = HoverTracker.prepareLeadChange(this);
         this.blockLead = blockLead;
-        if (blockLead) {
-            hasLead = false;
+        hasLead = !blockLead && getLeadComponent() != null;
+        if (tracker != null) {
+            tracker.finishLeadChange(this);
         }
     }
 
@@ -7169,10 +7202,104 @@ public class Component implements Animation, StyleListener, Editable {
                     return true;
                 }
             }
+            // A listener that did not consume the event has not handled it, so the component's
+            // own commands still get to answer. Resolved in the same walk rather than in a
+            // second one, so the nearest ancestor with EITHER wins -- a row inside a table that
+            // has its own commands must not be overruled by the table's listener declining.
+            if (c.contextMenuCommands != null && c.contextMenuCommands.length > 0) {
+                ContextMenu.show(c, x, y, c.contextMenuCommands);
+                return true;
+            }
             c = c.getParent();
         }
         return false;
     }
+
+    /// Which component's commands a context-menu request at this point would open, or null
+    /// when it would open nothing.
+    ///
+    /// The same walk `#fireContextMenu(int, int)` performs, minus the showing. Split out
+    /// because the showing is a modal popup that parks the caller until the user dismisses
+    /// it: the routing is the part worth asserting, and asserting it through the showing
+    /// means a test with no user to dismiss the menu simply hangs.
+    ///
+    /// #### Returns
+    ///
+    /// the component whose commands would open, or null
+    Component resolveContextMenuOwner() {
+        Component c = this;
+        while (c != null) {
+            if (c.contextMenuCommands != null && c.contextMenuCommands.length > 0) {
+                return c;
+            }
+            c = c.getParent();
+        }
+        return null;
+    }
+
+    /// The commands a right click on this component offers.
+    ///
+    /// #### Returns
+    ///
+    /// the commands, or null when this component has no menu of its own
+    public Command[] getContextMenuCommands() {
+        if (contextMenuCommands == null) {
+            return null;
+        }
+        Command[] copy = new Command[contextMenuCommands.length];
+        System.arraycopy(contextMenuCommands, 0, copy, 0, contextMenuCommands.length);
+        return copy;
+    }
+
+    /// Gives this component a right-click menu.
+    ///
+    /// The menu opens by itself on a secondary mouse button, a stylus barrel button or a
+    /// long press, so nothing else is needed:
+    ///
+    /// ```java
+    /// label.setContextMenuCommands(cut, copy, paste);
+    /// ```
+    ///
+    /// The commands are fixed. When they depend on what was clicked -- which row, which
+    /// cell -- register a `#addContextMenuListener(ActionListener)` instead and call
+    /// `ContextMenu#show(Component, int, int, Command...)` from it.
+    ///
+    /// Passing null or an empty array removes the menu. It does not leave an empty one
+    /// behind: a menu with no items is a rectangle the user has to dismiss to learn it was
+    /// empty.
+    ///
+    /// #### Parameters
+    ///
+    /// - `commands`: the menu items in order, or null for none
+    public void setContextMenuCommands(Command... commands) {
+        if (commands == null || commands.length == 0) {
+            contextMenuCommands = null;
+            return;
+        }
+        // Nulls are dropped HERE rather than at every use, so `length > 0` keeps meaning "has a
+        // menu" wherever it is asked. It did not: an all-null array is nonempty, so the walk in
+        // fireContextMenu treated the component as having a menu, consumed the right click and
+        // opened nothing -- and an ancestor that did have a menu never got to answer.
+        int kept = 0;
+        for (Command cmd : commands) {
+            if (cmd != null) {
+                kept++;
+            }
+        }
+        if (kept == 0) {
+            contextMenuCommands = null;
+            return;
+        }
+        contextMenuCommands = new Command[kept];
+        int at = 0;
+        for (Command cmd : commands) {
+            if (cmd != null) {
+                contextMenuCommands[at++] = cmd;
+            }
+        }
+    }
+
+    private Command[] contextMenuCommands;
 
     /// Dispatches a mouse wheel event to the registered listeners walking up the component
     /// hierarchy until a listener consumes the event. Returns true if a listener consumed it,
@@ -7520,6 +7647,20 @@ public class Component implements Animation, StyleListener, Editable {
                     return getPressedStyle();
                 }
 
+                if (keepTextInputFocusStyle(lead)) {
+                    return getSelectedStyle();
+                }
+
+                // Hover follows the same text-input focus exception as the main path.
+                // The tracker marks the lead component; its parent and siblings paint
+                // the same state through this branch before the main path is reached.
+                if (lead.isHovered()) {
+                    Style hover = getHoverStyle();
+                    if (hover != null) {
+                        return hover;
+                    }
+                }
+
                 if (lead.hasFocus() && Display.getInstance().shouldRenderSelection(this)) {
                     return getSelectedStyle();
                 }
@@ -7536,11 +7677,31 @@ public class Component implements Animation, StyleListener, Editable {
             return getPressedStyle();
         }
 
+        // Text inputs encode the focus ring in their selected style. Keep the complete
+        // style (including its border padding and background) while the pointer remains;
+        // copying only its border onto hover would mix incompatible geometry. Buttons
+        // retain hover feedback while focused, since their selected state is not editing.
+        if (keepTextInputFocusStyle(this)) {
+            return getSelectedStyle();
+        }
+        // An undeclared hover state still falls through for legacy themes.
+        if (hovered) {
+            Style hover = getHoverStyle();
+            if (hover != null) {
+                return hover;
+            }
+        }
+
         if (hasFocus() && Display.getInstance().shouldRenderSelection(this)) {
             return getSelectedStyle();
         }
         isUnselectedStyle = true;
         return unSelectedStyle;
+    }
+
+    private boolean keepTextInputFocusStyle(Component owner) {
+        return owner instanceof TextArea && owner.hasFocus()
+                && Display.getInstance().shouldRenderSelection(this);
     }
 
     boolean isPressedStyle() {
@@ -7573,6 +7734,111 @@ public class Component implements Animation, StyleListener, Editable {
             }
         }
         return pressedStyle;
+    }
+
+    /// Returns the Component Style for the hover state, or `null` when the theme says
+    /// nothing about hovering this UIID.
+    ///
+    /// Hover is the one desktop state the mobile design languages never needed, and it is the
+    /// state a Fluent or Adwaita control is mostly made of. It is deliberately the only
+    /// per-state getter here that can return null, and the null is the whole point: a theme
+    /// authored before hover existed declares no `hover#` entries, and
+    /// {@link com.codename1.ui.plaf.UIManager#getComponentCustomStyle(String, String)} never
+    /// returns null -- asked for a type the theme does not define it hands back a copy of the
+    /// blank default style: white background, black foreground. Building one unconditionally would therefore
+    /// repaint every hovered component in an existing application the moment the pointer
+    /// crossed it. So the theme is asked first, and a theme with no opinion leaves
+    /// {@link #getStyle()} to fall through to the ordinary chain.
+    ///
+    /// #### Returns
+    ///
+    /// the component Style object for the hover state, or null when the theme defines none
+    public Style getHoverStyle() {
+        if (hoverStyle == null) {
+            if (!getUIManager().hasComponentCustomStyle(getUIID(), "hover")) {
+                return null;
+            }
+            hoverStyle = createHoverStyle(getUIManager(), getUIID());
+            if (initialized && hoverStyle.getElevation() > 0) {
+                registerElevatedInternal(this);
+            }
+            if (initialized) {
+                setSurface(hoverStyle.isSurface());
+            }
+            hoverStyle.addStyleListener(this);
+            if (hoverStyle.getBgPainter() == null) {
+                hoverStyle.setBgPainter(new BGPainter());
+            }
+            // UIID and inline-style changes rebuild this lazily while the pointer can
+            // remain stationary. Start the new background once the style is complete.
+            if (initialized && isEffectivelyHovered()) {
+                checkAnimation();
+            }
+        }
+        return hoverStyle;
+    }
+
+    private Style createHoverStyle(UIManager manager, String id) {
+        // Inline-all overlays an already declared hover state. Keep the same resource
+        // prerequisite as the other inline states, without inventing hover for old themes.
+        if (getInlineStylesTheme() != null && inlineAllStyles != null) {
+            return manager.parseComponentCustomStyle(getInlineStylesTheme(), id,
+                    getInlineStylesUIID(id), "hover", inlineAllStyles);
+        }
+        return manager.getComponentCustomStyle(id, "hover");
+    }
+
+    /// Sets the Component Style for the hover state allowing us to manipulate the look of the
+    /// component when the pointer is over it.
+    ///
+    /// #### Parameters
+    ///
+    /// - `style`: the component Style object
+    public void setHoverStyle(Style style) {
+        if (hoverStyle != null) {
+            hoverStyle.removeStyleListener(this);
+        }
+        hoverStyle = style;
+        if (initialized && hoverStyle.getElevation() > 0) {
+            registerElevatedInternal(this);
+        }
+        if (initialized) {
+            setSurface(hoverStyle.isSurface());
+        }
+        hoverStyle.addStyleListener(this);
+        if (hoverStyle.getBgPainter() == null) {
+            hoverStyle.setBgPainter(new BGPainter());
+        }
+        setShouldCalcPreferredSize(true);
+        checkAnimation();
+    }
+
+    /// True while the pointer is over this component. Only ever set on the desktop, by
+    /// {@link Form#pointerHover(int[], int[])}; a touch device has no hover to report.
+    ///
+    /// #### Returns
+    ///
+    /// true when the pointer is currently over this component
+    public boolean isHovered() {
+        return hovered;
+    }
+
+    /// Marks this component as hovered, repainting when the state actually changes AND the
+    /// theme has a hover style to show for it -- otherwise the repaint would be pure cost,
+    /// because nothing about the render depends on the flag.
+    ///
+    /// #### Parameters
+    ///
+    /// - `hovered`: true when the pointer is over this component
+    public void setHovered(boolean hovered) {
+        if (this.hovered == hovered) {
+            return;
+        }
+        this.hovered = hovered;
+        if (getHoverStyle() != null) {
+            repaint();
+        }
+        checkHoverAnimationHierarchy();
     }
 
     /// Sets the Component Style for the pressed state allowing us to manipulate
@@ -7911,12 +8177,31 @@ public class Component implements Animation, StyleListener, Editable {
                     setPressedStyle(mergeStyle(pressedStyle, manager.getComponentCustomStyle(id, "press")));
                 }
             }
+            // Merge local overrides just like the other states. When a theme removes its
+            // hover rule, only application-modified properties survive; the remaining
+            // properties follow the refreshed normal style instead of the removed rule.
+            if (hoverStyle != null) {
+                if (manager.hasComponentCustomStyle(id, "hover")) {
+                    setHoverStyle(mergeStyle(hoverStyle, createHoverStyle(manager, id)));
+                } else if (hoverStyle.isModified()) {
+                    setHoverStyle(mergeStyle(hoverStyle, getUnselectedStyle()));
+                } else {
+                    // The refreshed theme dropped hover for this UIID. Unregister before
+                    // letting go: every other arm in this block goes through a setter that
+                    // removes the listener first, and a Style left holding a listener to a
+                    // component that no longer reads it is both a leak and a source of
+                    // spurious style callbacks.
+                    hoverStyle.removeStyleListener(this);
+                    hoverStyle = null;
+                }
+            }
         } else {
             unSelectedStyle = null;
             getUnselectedStyle();
             selectedStyle = null;
             disabledStyle = null;
             pressedStyle = null;
+            hoverStyle = null;
             allStyles = null;
 
         }
@@ -7967,7 +8252,113 @@ public class Component implements Animation, StyleListener, Editable {
         checkAnimation();
     }
 
+    private Animation hoverBackgroundAnimation;
+    private TopLevelContainer hoverAnimationHost;
+
+    private boolean isEffectivelyHovered() {
+        if (hasLead && !blockLead) {
+            Component lead = getLeadComponent();
+            return lead != null && lead.isHovered();
+        }
+        return hovered;
+    }
+
+    void checkHoverAnimationHierarchy() {
+        checkAnimation();
+        Component leadParent = LeadUtil.leadParentImpl(this);
+        if (leadParent != null && leadParent != this) { // NOPMD CompareObjectsWithEquals
+            leadParent.checkLeadHoverAnimations(this);
+        }
+    }
+
+    private void checkLeadHoverAnimations(Component lead) {
+        // Only the lead owns the pointer flag, but its parent and siblings paint
+        // their own state styles. Each affected background owns its own registration.
+        if (this != lead && initialized && hasLead && !blockLead // NOPMD CompareObjectsWithEquals
+                && getLeadComponent() == lead) { // NOPMD CompareObjectsWithEquals
+            checkAnimation();
+        }
+        if (this instanceof Container) {
+            Container container = (Container) this;
+            for (int i = 0; i < container.getComponentCount(); i++) {
+                container.getComponentAt(i).checkLeadHoverAnimations(lead);
+            }
+        }
+    }
+
+    private boolean hasAnimatedHoverBackground() {
+        if (!isEffectivelyHovered() || !isVisible() || isHidden(true)) {
+            return false;
+        }
+        // Resolve first: an active UIID/inline change may have cleared hoverStyle.
+        Style active = getStyle();
+        if (hoverStyle == null || active != hoverStyle) { // NOPMD CompareObjectsWithEquals
+            return false;
+        }
+        Image image = hoverStyle.getBgImage();
+        Painter painter = hoverStyle.getBgPainter();
+        return (image != null && image.isAnimation())
+                || (painter instanceof Animation && !(painter instanceof BGPainter));
+    }
+
+    private void stopHoverBackgroundAnimation() {
+        if (hoverAnimationHost != null) {
+            hoverAnimationHost.deregisterAnimated(hoverBackgroundAnimation);
+            hoverAnimationHost = null;
+        }
+    }
+
+    private void registerHoverBackgroundAnimation() {
+        TopLevelContainer host = getTopLevelContainer();
+        if (host == null || host == hoverAnimationHost) { // NOPMD CompareObjectsWithEquals
+            return;
+        }
+        stopHoverBackgroundAnimation();
+        if (hoverBackgroundAnimation == null) {
+            // Own a separate registration: removing the Component itself on hover exit
+            // would also cancel an animation explicitly registered by application code.
+            hoverBackgroundAnimation = new Animation() {
+                @Override
+                public boolean animate() {
+                    if (!isInitialized() || !hasAnimatedHoverBackground()) {
+                        stopHoverBackgroundAnimation();
+                        return false;
+                    }
+                    Image image = hoverStyle.getBgImage();
+                    boolean changed = image != null && image.isAnimation() && image.animate();
+                    Painter painter = hoverStyle.getBgPainter();
+                    if (painter instanceof Animation && !(painter instanceof BGPainter)) {
+                        changed = ((Animation) painter).animate() || changed;
+                    }
+                    if (changed) {
+                        repaint();
+                    }
+                    return false;
+                }
+
+                @Override
+                public void paint(Graphics graphics) {
+                    // The component repaints itself when the background changes.
+                }
+            };
+        }
+        hoverAnimationHost = host;
+        host.registerAnimated(hoverBackgroundAnimation);
+    }
+
     void checkAnimation() {
+        if (isEffectivelyHovered() && (!isVisible() || isHidden(true))) {
+            stopHoverBackgroundAnimation();
+            return;
+        }
+        if (hasAnimatedHoverBackground()) {
+            registerHoverBackgroundAnimation();
+            // The hover callback advances only the background. A restored scrollbar
+            // still needs Component.animate() in the independent internal registry.
+            checkScrollbarAnimation();
+            return;
+        }
+        stopHoverBackgroundAnimation();
         Image bgImage = getStyle().getBgImage();
         if (bgImage != null && bgImage.isAnimation()) {
             registerForAnimation();
@@ -7976,13 +8367,16 @@ public class Component implements Animation, StyleListener, Editable {
             if (p != null && p.getClass() != BGPainter.class && p instanceof Animation) {
                 registerForAnimation();
             } else {
-                if (scrollOpacity == 0xff && isScrollable() && getUIManager().getLookAndFeel().isFadeScrollBar()) {
-                    // trigger initial fade process on a fresh view.
-                    Container pf = TopLevelSupport.rootOf(this);
-                    if (pf != null) {
-                        pf.registerAnimatedInternal(this);
-                    }
-                }
+                checkScrollbarAnimation();
+            }
+        }
+    }
+
+    private void checkScrollbarAnimation() {
+        if (scrollOpacity == 0xff && isScrollable() && getUIManager().getLookAndFeel().isFadeScrollBar()) {
+            Container root = TopLevelSupport.rootOf(this);
+            if (root != null) {
+                root.registerAnimatedInternal(this);
             }
         }
     }
@@ -8061,7 +8455,11 @@ public class Component implements Animation, StyleListener, Editable {
             return false;
         }
         Image bgImage = getStyle().getBgImage();
-        boolean animateBackground = bgImage != null && bgImage.isAnimation() && bgImage.animate();
+        // A separately registered hover background advances once even if the app also
+        // registered this Component (or its scrolling/ticker uses the internal list).
+        boolean hoverBackgroundScheduled = hoverAnimationHost != null && getStyle() == hoverStyle; // NOPMD CompareObjectsWithEquals
+        boolean animateBackground = !hoverBackgroundScheduled && bgImage != null
+                && bgImage.isAnimation() && bgImage.animate();
         Motion m = getAnimationMotion();
 
         // perform regular scrolling
@@ -8207,7 +8605,7 @@ public class Component implements Animation, StyleListener, Editable {
 
 
         Painter bgp = getStyle().getBgPainter();
-        boolean animateBackgroundB = bgp != null &&
+        boolean animateBackgroundB = !hoverBackgroundScheduled && bgp != null &&
                 !(bgp instanceof BGPainter) &&
                 bgp instanceof Animation &&
                 ((Animation) bgp).animate();
@@ -8596,6 +8994,7 @@ public class Component implements Animation, StyleListener, Editable {
             if (p instanceof BGPainter) {
                 ((BGPainter) p).radialCache = null;
             }
+            clearHoverForInactiveSubtree();
             if (stateChangeListeners != null) {
                 stateChangeListeners.fireActionEvent(new ComponentStateChangeEvent(this, false));
             }
@@ -8612,6 +9011,26 @@ public class Component implements Animation, StyleListener, Editable {
                     f.removePointerPressedListener(refreshTaskDragListener);
                 }
             }
+        } else {
+            clearHoverForInactiveSubtree();
+        }
+    }
+
+    private void clearHoverForInactiveSubtree() {
+        stopHoverBackgroundAnimation();
+        // Hiding or removal outside a pointer callback must release the owner's target.
+        // Reset directly: setHovered would register the newly active style for
+        // animation while this component is hidden or being torn down.
+        hovered = false;
+        clearInteractiveScrollHover();
+        Container root = TopLevelSupport.rootOf(this);
+        HoverTracker tracker = root == null ? null : root.getHoverTracker();
+        if (tracker != null) {
+            tracker.clearFor(this);
+        }
+        TooltipManager tooltip = TooltipManager.getInstance();
+        if (tooltip != null) {
+            tooltip.clearTooltipFor(this);
         }
     }
 
@@ -8910,6 +9329,9 @@ public class Component implements Animation, StyleListener, Editable {
             return;
         }
         this.enabled = enabled;
+        if (hovered) {
+            checkHoverAnimationHierarchy();
+        }
         accessibilityChanged(AccessibilityManager.CHANGE_STATE);
         repaint();
     }
@@ -9680,6 +10102,10 @@ public class Component implements Animation, StyleListener, Editable {
                 }
                 setPreferredSize(new Dimension());
             }
+            if (isHidden()) {
+                // Collapsing does not change visible, but must release hover/tooltip ownership.
+                clearHoverForInactiveSubtree();
+            }
         } else {
             setPreferredSize(null);
             if (changeMargin) {
@@ -9903,6 +10329,20 @@ public class Component implements Animation, StyleListener, Editable {
             unSelectedStyle = originalStyle;
             g.setAlpha(oAlpha);
         }
+    }
+
+    final boolean isDefaultBackgroundPainter(Style style) {
+        Painter painter = style.getBgPainter();
+        if (painter == null) {
+            return true;
+        }
+        if (painter.getClass() != BGPainter.class) {
+            return false;
+        }
+        BGPainter background = (BGPainter) painter;
+        return background.painter == null && background.wMotion == null && background.hMotion == null
+                && background.previousTint == null
+                && (background.constantStyle == null || background.constantStyle == style); //NOPMD CompareObjectsWithEquals
     }
 
     class BGPainter implements Painter, Animation {

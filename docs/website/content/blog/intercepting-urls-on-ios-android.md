@@ -133,7 +133,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > So, my questions are if this post is still update and if it’s correctly formatted (it’s not clear if the build arguments for Android and iOS are in only one row).
 >
 > I suppose that the build arguments are the ones described in "Sending Arguments To The Build Server", is it right?  
-> [https://www.codenameone.com…](</manual/advanced-topics/#_sending_arguments_to_the_build_server>)
+> [https://www.codenameone.com…](</developer-guide/advanced-topics-under-the-hood/#_sending_arguments_to_the_build_server>)
 >
 > Thank you.
 >
@@ -168,7 +168,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > I don’t recall this at all, it’s been 4 years since I wrote that so no idea…
 >
-> This isn’t mentioned in the developer guide section though: [https://www.codenameone.com…](</manual/advanced-topics/>)
+> This isn’t mentioned in the developer guide section though: [https://www.codenameone.com…](</developer-guide/advanced-topics-under-the-hood/>)
 >
 
 

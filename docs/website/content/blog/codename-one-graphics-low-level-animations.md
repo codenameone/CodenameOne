@@ -17,7 +17,7 @@ In my previous post, I created a static analog clock component. In this post, I 
 
 #### How Animation Works in Codename One
 
-From the [Developer’s Guide:](http://www.codenameone.com/manual/)
+From the [Developer’s Guide:](/developer-guide/animations/)
 
 > The Codename One event dispatch thread has a special animation "pulse" allowing an animation to update its state and draw itself.
 > 
@@ -87,7 +87,7 @@ This tutorial dealt with the low-level animation API since the focus of this ser
   2. Animating components when their layouts are changed.
   3. Animating components when their hierarchy is changed.
 
-See the [Developer’s Guide](http://www.codenameone.com/manual/) for more information about these APIs.
+See the [Developer’s Guide](/developer-guide/animations/) for more information about these APIs.
 
 #### More Advanced Animations
 

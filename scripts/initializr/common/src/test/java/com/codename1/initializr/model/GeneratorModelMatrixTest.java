@@ -170,6 +170,7 @@ public class GeneratorModelMatrixTest extends AbstractTest {
                 ".agent-skills/codename-one/references/snapshot-builds.md",
                 ".agent-skills/codename-one/references/debugging.md",
                 ".agent-skills/codename-one/references/mcp-agent-control.md",
+                ".agent-skills/codename-one/references/on-device-debugging.md",
                 ".agent-skills/codename-one/references/ai-and-speech.md",
                 ".agent-skills/codename-one/tools/README.md",
                 ".agent-skills/codename-one/tools/IsApiSupported.java",
@@ -200,6 +201,10 @@ public class GeneratorModelMatrixTest extends AbstractTest {
         // screenshots, so the pointer to the MCP loop belongs in the root file too.
         assertContains(agentsMd, "references/mcp-agent-control.md",
                 "AGENTS.md should point agents at the MCP control loop");
+        // Same reasoning for the device loops: an agent that never learns the Android/iOS
+        // build is attachable will give up at "cannot reproduce in the simulator".
+        assertContains(agentsMd, "references/on-device-debugging.md",
+                "AGENTS.md should point agents at the on-device debug/MCP loops");
 
         String claudeStub = getText(entries, ".claude/skills/codename-one/SKILL.md");
         assertContains(claudeStub, "name: codename-one", "Claude stub must keep the skill frontmatter");
@@ -551,8 +556,8 @@ public class GeneratorModelMatrixTest extends AbstractTest {
         String pom = getText(entries, "pom.xml");
         assertContains(pom, packageName, "Root pom should include package as groupId");
         assertContains(pom, GeneratorModel.toLowerCaseInvariant(mainClassName), "Root pom should include app artifact/name");
-        assertContains(pom, "<cn1.plugin.version>7.0.271</cn1.plugin.version>", "Root pom should use current CN1 plugin version");
-        assertContains(pom, "<cn1.version>7.0.271</cn1.version>", "Root pom should align CN1 runtime version with plugin version");
+        assertContains(pom, "<cn1.plugin.version>7.0.272</cn1.plugin.version>", "Root pom should use current CN1 plugin version");
+        assertContains(pom, "<cn1.version>7.0.272</cn1.version>", "Root pom should align CN1 runtime version with plugin version");
         assertFalse(pom.indexOf("com.example.myapp") >= 0, "Root pom still contains placeholder package");
         assertFalse(pom.indexOf("myappname") >= 0, "Root pom still contains placeholder app name");
     }

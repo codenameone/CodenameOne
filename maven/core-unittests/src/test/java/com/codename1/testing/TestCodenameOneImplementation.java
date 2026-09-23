@@ -612,10 +612,50 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
         this.desktopTitleBarMode = mode;
     }
 
+    /// Mirrors the real ports' split between "the project asked for this" and "this is what the
+    /// platform answers when nobody asked", which is the distinction a theme constant is allowed
+    /// to fill. Null unless a test sets it, so every existing test keeps reaching
+    /// getDesktopTitleBarMode as before.
+    @Override
+    public String getConfiguredDesktopTitleBarMode() {
+        return configuredDesktopTitleBarMode;
+    }
+
+    public void setConfiguredDesktopTitleBarMode(String mode) {
+        this.configuredDesktopTitleBarMode = mode;
+    }
+
+    private String configuredDesktopTitleBarMode;
+
+    @Override
+    public boolean isShiftKeyDown() {
+        return shiftKeyDown;
+    }
+
+    public void setShiftKeyDown(boolean shiftKeyDown) {
+        this.shiftKeyDown = shiftKeyDown;
+    }
+
+    private boolean shiftKeyDown;
+
     @Override
     public void setNativeCommands(java.util.Vector commands) {
         this.lastNativeCommands = commands;
     }
+
+    /// Defaults TRUE so the existing desktop-chrome tests, which were written when every
+    /// implementation was assumed to have a menu bar, keep asserting what they always did.
+    /// The fallback tests set it false, which is what a port with no native menu reports.
+    @Override
+    public boolean isNativeCommandsSupported() {
+        return nativeCommandsSupported;
+    }
+
+    public void setNativeCommandsSupported(boolean nativeCommandsSupported) {
+        this.nativeCommandsSupported = nativeCommandsSupported;
+    }
+
+    private boolean nativeCommandsSupported = true;
 
     /** @return the commands last pushed via setNativeCommands, for desktop-chrome assertions. */
     public java.util.Vector getLastNativeCommands() {
@@ -1453,6 +1493,9 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
         desktop = false;
         nativeTitle = false;
         desktopTitleBarMode = "toolbar";
+        configuredDesktopTitleBarMode = null;
+        shiftKeyDown = false;
+        nativeCommandsSupported = true;
         lastNativeCommands = null;
         clearFileSystem();
         clearSockets();
@@ -3323,8 +3366,50 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
         return new String[]{single};
     }
 
+    /**
+     * Runs {@code action} once, inside the next storage delete of {@code name}.
+     *
+     * <p>The delete half of {@link #setDuringStorageWrite(String, Runnable)}, for operations
+     * whose storage step removes an entry rather than writing one.</p>
+     *
+     * @param name the storage entry whose delete should be interrupted, or null to cancel
+     * @param action what to do inside it
+     */
+    public void setDuringStorageDelete(String name, Runnable action) {
+        duringStorageDeleteFor = name;
+        duringStorageDelete = action;
+    }
+
+    private String duringStorageDeleteFor;
+    private Runnable duringStorageDelete;
+
+    /**
+     * Makes deletes of {@code name} silently do nothing, the way a real port can.
+     *
+     * <p>{@code deleteStorageFile} returns void on every port, so a failure is invisible to the
+     * caller: JavaSE discards {@code File.delete()}'s boolean and the browser catches and logs
+     * the IndexedDB error. This reproduces that rather than an exception, because an exception
+     * is the case that was never the problem.</p>
+     *
+     * @param name the storage entry whose deletes should be ignored, or null to stop ignoring
+     */
+    public void setStorageDeleteIgnored(String name) {
+        storageDeleteIgnored = name;
+    }
+
+    private String storageDeleteIgnored;
+
     @Override
     public void deleteStorageFile(String name) {
+        if (duringStorageDelete != null && name != null && name.equals(duringStorageDeleteFor)) {
+            Runnable once = duringStorageDelete;
+            duringStorageDelete = null;
+            duringStorageDeleteFor = null;
+            once.run();
+        }
+        if (name != null && name.equals(storageDeleteIgnored)) {
+            return;
+        }
         storageEntries.remove(name);
         // a real port publishes an entry by replacing it, so deleting one abandons
         // any write still open against it rather than being undone by it
@@ -3368,8 +3453,84 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
         }
     }
 
+    /**
+     * Runs {@code action} once, inside the next storage write to {@code name}.
+     *
+     * <p>A test cannot otherwise land anything in the middle of a storage write, and the window
+     * between an operation's last pre-write check and the write returning is where a concurrent
+     * {@code lock()} has to be exercised. Fired once and then cleared, so it cannot leak into a
+     * later write.</p>
+     *
+     * @param name the storage entry whose write should be interrupted, or null to cancel
+     * @param action what to do inside it
+     */
+    public void setDuringStorageWrite(String name, Runnable action) {
+        duringStorageWriteFor = name;
+        duringStorageWrite = action;
+    }
+
+    private String duringStorageWriteFor;
+    private Runnable duringStorageWrite;
+
+    /**
+     * Makes {@link #storageEntryState(String)} answer UNKNOWN for one entry, which is what the
+     * JavaScript port does when IndexedDB refuses the lookup.
+     *
+     * {@code storageFileExists} keeps answering {@code false} for it, because that is precisely
+     * the conflation being reproduced: a port whose existence check fails has only two answers
+     * and reports the entry as absent.
+     *
+     * @param name the entry whose existence cannot be determined, or null to clear
+     */
+    public void setStorageExistenceUnknown(String name) {
+        existenceUnknownFor = name;
+    }
+
+    private String existenceUnknownFor;
+
+    @Override
+    public int storageEntryState(String name) {
+        if (existenceUnknownFor != null && existenceUnknownFor.equals(name)) {
+            return STORAGE_ENTRY_UNKNOWN;
+        }
+        return super.storageEntryState(name);
+    }
+
+    /**
+     * Makes {@link #listStorageEntries()} answer null, which is what JavaSE does: it returns
+     * {@code getStorageDir().list()}, and {@code File.list()} is null for a directory that does
+     * not exist or that cannot be read.
+     *
+     * @param unavailable whether enumeration should report itself unavailable
+     */
+    public void setStorageEnumerationUnavailable(boolean unavailable) {
+        storageEnumerationUnavailable = unavailable;
+    }
+
+    private boolean storageEnumerationUnavailable;
+
+    /**
+     * Makes {@link #listStorageEntries()} answer an EMPTY array, which is what the JavaScript
+     * port does when IndexedDB refuses the enumeration -- it catches the IOException and returns
+     * {@code new String[]{}}. Indistinguishable from a store that holds nothing, which is the
+     * whole difficulty.
+     *
+     * @param empty whether enumeration should report an empty store
+     */
+    public void setStorageEnumerationEmpty(boolean empty) {
+        storageEnumerationEmpty = empty;
+    }
+
+    private boolean storageEnumerationEmpty;
+
     @Override
     public OutputStream createStorageOutputStream(String name) {
+        if (duringStorageWrite != null && name != null && name.equals(duringStorageWriteFor)) {
+            Runnable once = duringStorageWrite;
+            duringStorageWrite = null;
+            duringStorageWriteFor = null;
+            once.run();
+        }
         return new StorageOutput(name);
     }
 
@@ -3395,6 +3556,12 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
 
     @Override
     public String[] listStorageEntries() {
+        if (storageEnumerationUnavailable) {
+            return null;
+        }
+        if (storageEnumerationEmpty) {
+            return new String[0];
+        }
         return storageEntries.keySet().toArray(new String[0]);
     }
 
@@ -4225,19 +4392,53 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
         return testSecureRandom;
     }
 
+    private boolean secureRandomUnavailable;
+
+    public void setSecureRandomUnavailable(boolean unavailable) {
+        secureRandomUnavailable = unavailable;
+    }
+
     @Override
     public void secureRandomBytes(byte[] out) {
+        if (secureRandomUnavailable) {
+            throw new com.codename1.security.CryptoException("secure randomness is unavailable");
+        }
         if (out == null) return;
         testSecureRandom().nextBytes(out);
     }
 
+    /**
+     * Runs {@code action} once, inside the next AES operation.
+     *
+     * <p>The crypto is where a vault operation spends its time between checking that it may
+     * proceed and producing a result, so it is the only place a test can land a concurrent
+     * {@code lock()} deterministically. Fired once and then cleared.</p>
+     *
+     * @param action what to do inside the next AES call, or null to cancel
+     */
+    public void setDuringAes(Runnable action) {
+        duringAes = action;
+    }
+
+    private Runnable duringAes;
+
+    private void fireDuringAes() {
+        if (duringAes != null) {
+            Runnable once = duringAes;
+            duringAes = null;
+            once.run();
+        }
+    }
+
     @Override
     public byte[] aesEncrypt(String transformation, byte[] key, byte[] iv, byte[] aad, byte[] plaintext) {
+        fireDuringAes();
         return testAes(transformation, key, iv, aad, plaintext, javax.crypto.Cipher.ENCRYPT_MODE);
     }
 
     @Override
     public byte[] aesDecrypt(String transformation, byte[] key, byte[] iv, byte[] aad, byte[] ciphertext) {
+        fireDuringAes();
         return testAes(transformation, key, iv, aad, ciphertext, javax.crypto.Cipher.DECRYPT_MODE);
     }
 

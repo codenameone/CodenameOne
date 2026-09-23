@@ -75,6 +75,9 @@ final class InputValidationUITests: XCTestCase {
         // synchronised one right up until a step races -- worth one log line.
         NSLog("CN1IV: gate directory %@", syncDir?.path ?? "<none: running ungated on fixed delays>")
         app.launch()
+        // GestureSuite leaves iOS alive after its final event. Terminate only
+        // after the last XCTest operation, including when the test fails.
+        addTeardownBlock { app.terminate() }
         if syncDir == nil {
             // Local fallback when the shell harness is not coordinating from
             // CN1IV:READY log markers.
@@ -96,8 +99,14 @@ final class InputValidationUITests: XCTestCase {
             Thread.sleep(forTimeInterval: stepDelaySeconds)
         }
 
-        try driveKeyType(app: app, syncDir: syncDir)
+        try driveKeyType(app: app, syncDir: syncDir, step: "browserkeytype")
+        if syncDir == nil {
+            Thread.sleep(forTimeInterval: stepDelaySeconds)
+        }
+        try driveKeyType(app: app, syncDir: syncDir, step: "keytype")
         Thread.sleep(forTimeInterval: max(stepDelaySeconds, 10.0))
+        XCTAssertEqual(app.state, .runningForeground,
+                       "The gesture driver must own app termination after the final event")
     }
 
     private func driveTap(app: XCUIApplication, syncDir: URL?) throws {
@@ -121,8 +130,8 @@ final class InputValidationUITests: XCTestCase {
         target.press(forDuration: 2.25)
     }
 
-    private func driveKeyType(app: XCUIApplication, syncDir: URL?) throws {
-        try waitForGate("keytype", syncDir: syncDir)
+    private func driveKeyType(app: XCUIApplication, syncDir: URL?, step: String) throws {
+        try waitForGate(step, syncDir: syncDir)
         // KeyTypeStep places its TextField in BorderLayout.CENTER with
         // generous padding/margin, matching the layout TapStep and
         // LongPressStep use so a single screen-center tap focuses it on
@@ -148,38 +157,34 @@ final class InputValidationUITests: XCTestCase {
         // the guess. KeyTypeStep asserts the field CONTAINS "cn1", so the
         // repeats a slow start can leave in front of it are harmless.
         //
-        // Stopped by the driver's keytype.stop gate, written as soon as the step
-        // resolves either way. The app exits a second and a half after the suite
-        // finishes, and typing into a process that has left fails the XCUITest run
-        // even though every event landed.
-        //
-        // The GATE is checked before every key, not once per pass. It is the leading
-        // signal -- the driver writes it as soon as the step resolves, about a second
-        // and a half before the app goes -- whereas app.state only flips once the app
-        // is already on its way out, which is too late to stop a keystroke already
-        // being synthesised. Relying on app.state alone, and testing the gate only
-        // once per pass, left up to three keystrokes and a one-second sleep between
-        // the stop being requested and this loop noticing: a CI run typed straight
-        // through the app's exit that way, with every gesture already landed and
-        // CN1IV:SUITE:FINISHED already in the log, and failed anyway.
-        //
-        // The sleep is sliced for the same reason: a whole second of not looking is
-        // most of the margin the gate buys.
-        for _ in 0..<15 {
-            if stopRequested("keytype", syncDir: syncDir) {
+        // The stop gate avoids unnecessary retries once the event is recorded.
+        // Its delivery can be delayed, so it is not an app-lifetime boundary:
+        // GestureSuite keeps iOS alive and testGestureSuite terminates it after
+        // input finishes. An eight-second app-exit timer previously raced a
+        // later typeKey even though every gesture had already passed.
+        // Keep the retry deadline inside the Java step's 30-second input budget.
+        let deadline = Date().addingTimeInterval(25.0)
+        while Date() < deadline {
+            if stopRequested(step, syncDir: syncDir) {
                 return
             }
+            // The browser page and its JS callback load asynchronously. Retry
+            // the focus tap as well as typing in case the first tap preceded load.
+            if step == "browserkeytype" {
+                center.tap()
+            }
             for key in ["c", "n", "1"] {
-                if stopRequested("keytype", syncDir: syncDir) {
+                if stopRequested(step, syncDir: syncDir) {
                     return
                 }
-                guard app.state == .runningForeground else {
+                // Stop if the app unexpectedly leaves the foreground.
+                guard app.state == .runningForeground, Date() < deadline else {
                     return
                 }
                 app.typeKey(key, modifierFlags: [])
             }
             for _ in 0..<10 {
-                if stopRequested("keytype", syncDir: syncDir) {
+                if stopRequested(step, syncDir: syncDir) || Date() >= deadline {
                     return
                 }
                 Thread.sleep(forTimeInterval: 0.1)

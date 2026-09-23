@@ -102,7 +102,19 @@ public class Validator {
     private static boolean validateOnEveryKey = false;
     private final HashMap<Component, Constraint> constraintList = new HashMap<Component, Constraint>();
     private final ArrayList<Component> submitButtons = new ArrayList<Component>();
-    private InteractionDialog message = new InteractionDialog();
+    // Framework chrome, never an operating system window: this bubble is placed against the
+    // field it belongs to, and native window mode documents those margins as ignored. The
+    // field initialiser needs it as much as the reassignment below does -- it is the instance
+    // that is used until a constraint supplies a message of its own, and missing it is what
+    // FrameworkChromeNeverWindowsTest caught by counting constructions against opt-outs.
+    private InteractionDialog message = newChromePopup();
+
+    /// An InteractionDialog that will not become a window whatever the theme default is.
+    private static InteractionDialog newChromePopup() {
+        InteractionDialog d = new InteractionDialog();
+        d.setNativeWindowMode(false);
+        return d;
+    }
     /// Error message UIID defaults to DialogBody. Allows customizing the look of the message
     private String errorMessageUIID = "DialogBody";
     /// Indicates the mode in which validation failures are expressed
@@ -569,6 +581,11 @@ public class Validator {
                             String err = getErrorMessage(cmp);
                             if (err != null && err.length() > 0) {
                                 message = new InteractionDialog(err);
+                                // Framework chrome, never an operating system window: this popup is POSITIONED by the
+                                // framework, and native window mode documents those margins as ignored, so in a window
+                                // it comes out centred and loses the placement that is its whole point. See
+                                // TooltipManager for the full note.
+                                message.setNativeWindowMode(false);
                                 // The emblem path below shows by rectangle, which has
                                 // no anchor component to resolve a host from.
                                 message.setTopLevelHost(p);

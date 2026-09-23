@@ -361,13 +361,16 @@ void cn1WinPushEvent(CN1EventType type, int x, int y, int keyCode) {
  * Note the asymmetry with presses, which stay droppable: a release that arrives with
  * no press behind it finds no recorded target and is discarded harmlessly, so when
  * something has to go it must never be the release. */
-static int cn1WinIsProtectedEvent(CN1EventType type) {
+/* Unlike hover motion, leave has no later motion outside the window to repair
+ * a dropped notification. Protect only the terminal sentinel, not the motion stream. */
+static int cn1WinIsProtectedEvent(CN1EventType type, int x, int y) {
     return type == CN1_EVENT_WINDOW_SHOWN || type == CN1_EVENT_WINDOW_HIDDEN
             || type == CN1_EVENT_WINDOW_CLOSE
             || type == CN1_EVENT_KEY_RELEASED
             || type == CN1_EVENT_POINTER_RELEASED
             || type == CN1_EVENT_WINDOW_FOCUS
-            || type == CN1_EVENT_SIZE_CHANGED;
+            || type == CN1_EVENT_SIZE_CHANGED
+            || (type == CN1_EVENT_POINTER_HOVER && x == -1 && y == -1);
 }
 
 /* Visibility only. A close request is protected from eviction like any other
@@ -433,7 +436,8 @@ static void cn1WinRemoveAtLocked(LONG idx) {
 static int cn1WinEvictInputLocked(void) {
     LONG idx = cn1Win.eventHead;
     while (idx != cn1Win.eventTail) {
-        if (!cn1WinIsProtectedEvent((CN1EventType) cn1Win.events[idx].type)) {
+        if (!cn1WinIsProtectedEvent((CN1EventType) cn1Win.events[idx].type,
+                cn1Win.events[idx].x, cn1Win.events[idx].y)) {
             cn1WinRemoveAtLocked(idx);
             return 1;
         }
@@ -483,7 +487,9 @@ static int cn1WinEvictOldestTerminationLocked(void) {
     while (idx != cn1Win.eventTail) {
         CN1EventType t = (CN1EventType) cn1Win.events[idx].type;
         if (t == CN1_EVENT_KEY_RELEASED || t == CN1_EVENT_POINTER_RELEASED
-                || t == CN1_EVENT_WINDOW_FOCUS) {
+                || t == CN1_EVENT_WINDOW_FOCUS
+                || (t == CN1_EVENT_POINTER_HOVER && cn1Win.events[idx].x == -1
+                        && cn1Win.events[idx].y == -1)) {
             cn1WinRemoveAtLocked(idx);
             return 1;
         }
@@ -495,7 +501,7 @@ static int cn1WinEvictOldestTerminationLocked(void) {
 void cn1WinPushWindowEvent(int windowId, CN1EventType type, int x, int y, int keyCode) {
     EnterCriticalSection(&cn1Win.eventLock);
     LONG next = (cn1Win.eventTail + 1) % CN1_EVENT_QUEUE_CAPACITY;
-    if (next == cn1Win.eventHead && cn1WinIsProtectedEvent(type)) {
+    if (next == cn1Win.eventHead && cn1WinIsProtectedEvent(type, x, y)) {
         /* Full, and this one must not be the casualty. Supersede this window's own
          * queued transition if it has one, otherwise take the room from an input event,
          * and failing that from a transition that a later one already supersedes. Never
@@ -546,6 +552,16 @@ int cn1WinPollEvent(CN1Event* out) {
 
 /* ------------------------------------------------------------- input helpers */
 
+/* The virtual key whose WM_KEYDOWN a menu accelerator consumed, so the matching WM_KEYUP can
+ * be consumed as well. Zero when no such press is outstanding. Touched only from the window
+ * procedure, which is one thread.
+ *
+ * Declared BELOW the input-helpers marker on purpose. scripts/test_native_hover_queue.py
+ * compiles the event queue standalone by slicing this file from cn1WinPushEvent to that
+ * marker, with -Wall -Wextra -Werror; a static declared inside that slice and used only
+ * further down is "defined but not used" there and fails the build. */
+static int cn1AcceleratorKeyDown = 0;
+
 /* Bitmask (CN1_PE_MASK_*) of the mouse buttons currently held. Mouse capture is
  * held while ANY button is down so a drag that starts inside the window keeps
  * delivering WM_MOUSEMOVE after the cursor leaves it, and released only once the
@@ -588,7 +604,10 @@ static int cn1WinMoveMask(WPARAM wParam) {
 int cn1WinTouchFlag(void) {
     LONG_PTR extra = GetMessageExtraInfo();
     if ((extra & 0xFFFFFF00) == 0xFF515700) {
-        return (extra & 0x80) ? CN1_PE_PEN_FLAG : CN1_PE_TOUCH_FLAG;
+        /* Microsoft defines bit 0x80 as TOUCH, not pen. Reversing it makes a
+         * touch-only hover filter admit fingers and discard hovering pens.
+         * https://learn.microsoft.com/en-us/windows/win32/tablet/system-events-and-mouse-messages */
+        return (extra & 0x80) ? CN1_PE_TOUCH_FLAG : CN1_PE_PEN_FLAG;
     }
     return 0;
 }
@@ -711,7 +730,44 @@ LRESULT CALLBACK cn1WinWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam
             if (moveMask != 0) {
                 cn1WinPushEvent(CN1_EVENT_POINTER_DRAGGED, GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam),
                         moveMask | cn1WinTouchFlag());
+            } else {
+                /* No button held: this is hover, and it used to be dropped here.
+                 * Component's hover style is driven by Form.pointerHover, which
+                 * has nothing else to fire it, so every hover rule in a desktop
+                 * theme was inert.
+                 *
+                 * Droppable rather than protected, which is the right side of
+                 * that line: on overflow the ring discards the newest event, and
+                 * a lost hover costs nothing because hover is idempotent -- the
+                 * next motion re-establishes it. A lost RELEASE, by contrast,
+                 * leaves a button held for good, which is why that one is
+                 * protected. */
+                /* A hovering pen is valid hover; only touch-promoted motion is excluded.
+                 * Keep the source flag so Java callbacks receive stylus metadata. */
+                int source = cn1WinTouchFlag();
+                if ((source & CN1_PE_TOUCH_FLAG) == 0) {
+                    cn1WinPushEvent(CN1_EVENT_POINTER_HOVER, GET_X_LPARAM(lParam),
+                            GET_Y_LPARAM(lParam), source);
+                }
+                /* Ask for one WM_MOUSELEAVE. Without it the cursor can move straight off
+                 * the window and the last hovered control stays lit: motion simply stops,
+                 * and Form only clears its tracked hover when a DIFFERENT component is
+                 * reported. TrackMouseEvent is one-shot, so it is re-armed on every hover
+                 * rather than once at creation. */
+                TRACKMOUSEEVENT tme;
+                tme.cbSize = sizeof(tme);
+                tme.dwFlags = TME_LEAVE;
+                tme.hwndTrack = hwnd;
+                tme.dwHoverTime = HOVER_DEFAULT;
+                TrackMouseEvent(&tme);
             }
+            return 0;
+        }
+        case WM_MOUSELEAVE: {
+            /* -1,-1 is the agreed "nothing is under the pointer" coordinate: the Java side
+             * turns it into pointerHover over no component, which clears the hover style.
+             * A real client coordinate is never negative, so the two cannot be confused. */
+            cn1WinPushEvent(CN1_EVENT_POINTER_HOVER, -1, -1, cn1WinTouchFlag());
             return 0;
         }
 #ifdef WM_GESTURE
@@ -737,9 +793,26 @@ LRESULT CALLBACK cn1WinWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam
             return 0;
         }
         case WM_KEYDOWN:
+            /* A menu shortcut first. The menu labels advertise accelerators and there is no
+             * accelerator table in this pump, so without this they were decoration. A match
+             * consumes the keystroke: it belongs to the command, not to the focused
+             * component. Only an exact modifier match can match, so ordinary typing and the
+             * Tab/Escape handling below are untouched. */
+            if (cn1WinMenuHandleAccelerator((int) wParam)) {
+                /* Remember the key so its release can be swallowed too. Consuming only the
+                 * press sent the focused component a release with no press before it, which
+                 * is a second action or a corrupted press/release state depending on what has
+                 * focus -- the same half-a-keystroke problem Escape had on the Java side. */
+                cn1AcceleratorKeyDown = (int) wParam;
+                return 0;
+            }
             cn1WinPushEvent(CN1_EVENT_KEY_PRESSED, 0, 0, (int) wParam);
             return 0;
         case WM_KEYUP:
+            if (cn1AcceleratorKeyDown != 0 && cn1AcceleratorKeyDown == (int) wParam) {
+                cn1AcceleratorKeyDown = 0;
+                return 0;
+            }
             cn1WinPushEvent(CN1_EVENT_KEY_RELEASED, 0, 0, (int) wParam);
             return 0;
         case WM_DISPLAYCHANGE:
@@ -822,6 +895,16 @@ LRESULT CALLBACK cn1WinWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam
             }
             return DefWindowProcW(hwnd, msg, wParam, lParam);
         }
+        case WM_CN1_MENU:
+            /* On the window's own thread, which is the whole reason this is a message:
+             * SetMenu is not legal from the EDT. */
+            cn1WinMenuSetCommands((const char*) lParam);
+            return 0;
+        case WM_COMMAND:
+            if (cn1WinMenuHandleCommand(wParam)) {
+                return 0;
+            }
+            return DefWindowProcW(hwnd, msg, wParam, lParam);
         case WM_CLOSE:
             cn1WinPushEvent(CN1_EVENT_CLOSE, 0, 0, 0);
             DestroyWindow(hwnd);
@@ -900,6 +983,38 @@ JAVA_BOOLEAN com_codename1_impl_windows_WindowsNative_faultSelfTestEnabled___R_b
     char buf[8];
     DWORD n = GetEnvironmentVariableA("CN1_FAULT_SELFTEST", buf, (DWORD) sizeof(buf));
     return (n > 0 && n < sizeof(buf)) ? JAVA_TRUE : JAVA_FALSE;
+}
+
+/*
+ * The main window's title, after initDisplay has already set it once.
+ *
+ * Needed because desktop "native" title-bar mode moves the form title OUT of the CN1 title
+ * area and into the OS window's, and until now this port had nowhere to put it: the title was
+ * a CreateWindowExW argument and WindowsNative.desktopWindowSetTitle addresses the SECONDARY
+ * Window peers by slot, never the main one. Without this, suppressing the CN1 title area would
+ * simply lose the title.
+ *
+ * SetWindowTextW is documented as safe to call from any thread -- it sends WM_SETTEXT to the
+ * window's own thread -- so unlike the GTK counterpart this needs no marshalling. A null HWND
+ * (headless screenshot mode never creates one) makes it a no-op.
+ */
+JAVA_VOID com_codename1_impl_windows_WindowsNative_mainWindowSetTitle___java_lang_String(
+        CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1Arg1) {
+    if (cn1Win.hwnd == NULL) {
+        return;
+    }
+    const char* utf8Title = __cn1Arg1 == JAVA_NULL ? "" : stringToUTF8(threadStateData, __cn1Arg1);
+    int titleLen = MultiByteToWideChar(CP_UTF8, 0, utf8Title, -1, NULL, 0);
+    if (titleLen <= 0) {
+        titleLen = 1;
+    }
+    WCHAR* wTitle = (WCHAR*) malloc((size_t) titleLen * sizeof(WCHAR));
+    if (wTitle == NULL) {
+        return;
+    }
+    MultiByteToWideChar(CP_UTF8, 0, utf8Title, -1, wTitle, titleLen);
+    SetWindowTextW(cn1Win.hwnd, wTitle);
+    free(wTitle);
 }
 
 JAVA_VOID com_codename1_impl_windows_WindowsNative_initDisplay___java_lang_String_int_int(
@@ -1264,3 +1379,51 @@ JAVA_VOID com_codename1_impl_windows_WindowsNative_parkMainThread___int(
 } /* extern "C" */
 
 #endif /* _WIN32 */
+
+/* ---------------------------------------------------------------- dark mode */
+
+/* INSIDE extern "C", and that is not decoration. This file is C++ and wraps its whole
+ * body in an extern "C" block that closes above; a ParparVM native appended after it
+ * gets C++ name mangling, and the generated C calls the unmangled name. It compiles, and
+ * the LINKER fails:
+ *
+ *   lld-link: error: undefined symbol:
+ *     com_codename1_impl_windows_WindowsNative_systemUsesDarkTheme___R_boolean
+ *
+ * Note scripts/check-native-signatures.sh does NOT catch this. It verifies that the
+ * NAME matches the Java signature, which it did; linkage is a different property and the
+ * only thing that reports it is a real device build. */
+extern "C" {
+
+/* True when the user has chosen the dark app theme.
+ *
+ * AppsUseLightTheme under HKCU\...\Themes\Personalize is what the Settings app writes
+ * and what every Windows application reads. The name is the trap: it says "use LIGHT",
+ * so 0 is dark and 1 is light, and a MISSING value is light -- the key does not exist
+ * before Windows 10 1607, and reading a failure as "dark" would put every older system
+ * on a dark theme it cannot render.
+ *
+ * RegGetValueW rather than RegOpenKeyEx + RegQueryValueEx: it opens, queries, type
+ * checks and closes in one call, so there is no key handle to leak on an error path.
+ *
+ * The signature is ParparVM's and is checked by nothing at build time -- a wrong name
+ * compiles, links, and leaves the Java method looking unused to the dead-code pass,
+ * which then removes it. scripts/check-native-signatures.sh is what catches that.
+ */
+JAVA_BOOLEAN com_codename1_impl_windows_WindowsNative_systemUsesDarkTheme___R_boolean(CODENAME_ONE_THREAD_STATE) {
+    DWORD value = 1;
+    DWORD size = sizeof(value);
+    LSTATUS st = RegGetValueW(HKEY_CURRENT_USER,
+            L"Software\\Microsoft\\Windows\\CurrentVersion\\Themes\\Personalize",
+            L"AppsUseLightTheme",
+            RRF_RT_REG_DWORD,
+            NULL,
+            &value,
+            &size);
+    if (st != ERROR_SUCCESS) {
+        return JAVA_FALSE;
+    }
+    return value == 0 ? JAVA_TRUE : JAVA_FALSE;
+}
+
+} /* extern "C" */
