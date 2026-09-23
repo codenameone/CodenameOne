@@ -95,4 +95,44 @@ public class DartRuntimeTest {
         }
         assertEquals("hello\n42\n1.0\n", sb.toString());
     }
+
+    // --- == across int and double ---------------------------------------------
+
+    @Test
+    public void eqComparesBoxedNumbersByValueAcrossIntAndDouble() {
+        assertTrue(DartRuntime.eq(Long.valueOf(1), Double.valueOf(1.0)), "1 == 1.0");
+        assertTrue(DartRuntime.eq(Double.valueOf(1.0), Long.valueOf(1)));
+        assertTrue(DartRuntime.eq(Double.valueOf(0.0), Double.valueOf(-0.0)), "0.0 == -0.0");
+        assertFalse(DartRuntime.eq(Double.valueOf(Double.NaN), Double.valueOf(Double.NaN)), "NaN is never == itself");
+        assertFalse(DartRuntime.eq(Long.valueOf(9007199254740993L), Double.valueOf(9007199254740992.0)),
+                "an int and a double compare exactly, not after rounding the int");
+        assertFalse(DartRuntime.eq(Long.valueOf(Long.MAX_VALUE), Double.valueOf(9.223372036854775807E18)),
+                "2^63 is outside every long; the cast must not saturate into equality");
+        assertFalse(DartRuntime.eq(Long.valueOf(1), Double.valueOf(1.5)));
+        dart.core.DartList<Object> nums = new dart.core.DartList<Object>();
+        nums.add(Long.valueOf(1));
+        assertTrue(nums.contains(Double.valueOf(1.0)), "List<num>.contains(1.0) finds the int 1");
+    }
+
+    // --- toStringAsFixed ------------------------------------------------------
+
+    @Test
+    public void toStringAsFixedUsesTheExactValueAcrossTheWholeRange() {
+        assertEquals("1.00000000000000000000", DartRuntime.toStringAsFixed(1.0, 20),
+                "20 digits no longer overflows a long");
+        assertEquals("0.10000000000000000555", DartRuntime.toStringAsFixed(0.1, 20), "the double's exact digits");
+        assertEquals("1.00", DartRuntime.toStringAsFixed(1.005, 2), "1.005 is really 1.00499...");
+        assertEquals("4321.123", DartRuntime.toStringAsFixed(4321.12345678, 3));
+        assertEquals("4321.12346", DartRuntime.toStringAsFixed(4321.12345678, 5));
+        assertEquals("123456789012345.000", DartRuntime.toStringAsFixed(123456789012345.0, 3));
+        assertEquals("10000000000000000.0000", DartRuntime.toStringAsFixed(1e16, 4));
+        assertEquals("3", DartRuntime.toStringAsFixed(2.5, 0), "an exact tie rounds up");
+        assertEquals("-1.5", DartRuntime.toStringAsFixed(-1.5, 1));
+        assertEquals("-0.00", DartRuntime.toStringAsFixed(-0.001, 2));
+        assertEquals("0.00000000000000000000", DartRuntime.toStringAsFixed(Double.MIN_VALUE, 20));
+        assertEquals("1e+21", DartRuntime.toStringAsFixed(1e21, 2), "1e21 and beyond print as toString");
+        assertEquals("999999999999999868928.00", DartRuntime.toStringAsFixed(999999999999999900000.0, 2));
+        assertThrows(dart.core.RangeError.class, () -> DartRuntime.toStringAsFixed(1.0, 21));
+        assertThrows(dart.core.RangeError.class, () -> DartRuntime.toStringAsFixed(1.0, -1));
+    }
 }

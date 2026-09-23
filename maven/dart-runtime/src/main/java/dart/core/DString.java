@@ -121,6 +121,46 @@ public final class DString {
         return out;
     }
 
+    /**
+     * Dart's {@code String.split(Pattern)} for a RegExp, ported from the Dart
+     * VM's own algorithm so the edge cases agree: an empty input that the
+     * pattern matches splits into no parts at all, an empty match at the
+     * current split point is skipped rather than producing an empty part, and a
+     * match at the very end ends the split. Dart declares split (and the other
+     * Pattern methods below) with a Pattern, so {@code s.split(RegExp(','))} is
+     * ordinary source; with only the String overload it generated a call javac
+     * rejected.
+     */
+    public static DartList<String> split(String s, RegExp pattern) {
+        DartList<String> out = new DartList<>();
+        int length = s.length();
+        java.util.Iterator<RegExpMatch> matches = pattern.allMatches(s).iterator();
+        if (length == 0 && matches.hasNext()) {
+            return out;
+        }
+        int startIndex = 0;
+        int previousIndex = 0;
+        while (true) {
+            if (startIndex == length || !matches.hasNext()) {
+                out.add(s.substring(previousIndex, length));
+                break;
+            }
+            RegExpMatch match = matches.next();
+            if (match.start() == length) {
+                out.add(s.substring(previousIndex, length));
+                break;
+            }
+            int endIndex = (int) match.end();
+            if (startIndex == endIndex && endIndex == previousIndex) {
+                ++startIndex;
+                continue;
+            }
+            out.add(s.substring(previousIndex, (int) match.start()));
+            startIndex = previousIndex = endIndex;
+        }
+        return out;
+    }
+
     public static long indexOf(String s, String other) {
         return s.indexOf(other);
     }
@@ -131,6 +171,62 @@ public final class DString {
 
     public static long lastIndexOf(String s, String other) {
         return s.lastIndexOf(other);
+    }
+
+    /** Dart's {@code indexOf(Pattern)} for a RegExp: where the first match starts. */
+    public static long indexOf(String s, RegExp pattern) {
+        return indexOf(s, pattern, 0);
+    }
+
+    /** Dart's {@code indexOf(Pattern, start)}: the first match found searching from start. */
+    public static long indexOf(String s, RegExp pattern, long start) {
+        RangeError.checkValueInInterval(start, 0, s.length(), "start");
+        RegExpMatch m = pattern.matchFrom(s, (int) start);
+        return m == null ? -1 : m.start();
+    }
+
+    /**
+     * Dart's {@code lastIndexOf(Pattern)} for a RegExp: the greatest position
+     * at which the pattern matches starting exactly there, as Dart defines it.
+     */
+    public static long lastIndexOf(String s, RegExp pattern) {
+        for (int i = s.length(); i >= 0; i--) {
+            RegExpMatch m = pattern.matchFrom(s, i);
+            if (m != null && m.start() == i) {
+                return i;
+            }
+        }
+        return -1;
+    }
+
+    /** Dart's {@code contains(Pattern)} for a RegExp. */
+    public static boolean contains(String s, RegExp pattern) {
+        return pattern.hasMatch(s);
+    }
+
+    /**
+     * Dart's {@code replaceAll(Pattern, String)} for a RegExp. The replacement
+     * is literal -- Dart does not expand group references here; that is
+     * replaceAllMapped's job -- so every match, empty ones included, is swapped
+     * for the same text: {@code 'abc'.replaceAll(RegExp(''), '-')} is -a-b-c-.
+     */
+    public static String replaceAll(String s, RegExp pattern, String to) {
+        StringBuilder sb = new StringBuilder();
+        int last = 0;
+        for (RegExpMatch m : pattern.allMatches(s)) {
+            sb.append(s, last, (int) m.start()).append(to);
+            last = (int) m.end();
+        }
+        return sb.append(s, last, s.length()).toString();
+    }
+
+    /** Dart's {@code replaceFirst(Pattern, String)} for a RegExp; the replacement is literal. */
+    public static String replaceFirst(String s, RegExp pattern, String to) {
+        RegExpMatch m = pattern.firstMatch(s);
+        if (m == null) {
+            return s;
+        }
+        return s.substring(0, (int) m.start()) + to + s.substring((int) m.end());
     }
 
     public static boolean contains(String s, String other) {

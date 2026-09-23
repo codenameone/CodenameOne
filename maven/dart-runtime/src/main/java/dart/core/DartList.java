@@ -291,6 +291,21 @@ public class DartList<E> extends AbstractList<E> implements RandomAccess {
         return -1;
     }
 
+    /**
+     * Dart's List.contains, with Dart's {@code ==} like removeValue and
+     * indexOfDart above. The inherited AbstractList version compares with Java
+     * equals, so a List&lt;num&gt; holding the int 1 answered false for 1.0.
+     */
+    @Override
+    public boolean contains(Object element) {
+        for (int i = 0; i < size(); i++) {
+            if (DartRuntime.eq(get(i), element)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     /** Dart's {@code List.indexWhere(test, [start])}. */
     public long indexWhere(Funcs.Func1<E, Boolean> test, long start) {
         for (int i = (int) Math.max(0, start); i < size(); i++) {

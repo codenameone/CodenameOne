@@ -154,13 +154,67 @@ public class Future<T> {
         return f;
     }
 
-    /** Dart's Future.wait — completes with the values in order. */
+    /**
+     * Dart's Future.wait: a future of every value, in input order, once all
+     * the inputs have completed -- or, if any failed, of the FIRST error,
+     * still only after all of them completed (Dart's default, non-eager
+     * behaviour; the later errors are dropped).
+     *
+     * It returns immediately and settles through listeners. It used to await
+     * each input before returning, which blocked the caller -- and when an
+     * input failed, the error was thrown from the call itself, so
+     * {@code Future.wait(fs).catchError(...)} never got a future to install
+     * its handler on.
+     */
     public static Future<DartList<Object>> wait(Iterable<? extends Future<?>> futures) {
-        DartList<Object> results = new DartList<Object>();
+        final List<Future<?>> inputs = new ArrayList<Future<?>>();
         for (Future<?> f : futures) {
-            results.add(Await.await$(f));
+            inputs.add(f);
         }
-        return Future.value(results);
+        final Future<DartList<Object>> result = new Future<DartList<Object>>();
+        final int count = inputs.size();
+        if (count == 0) {
+            result.complete(new DartList<Object>());
+            return result;
+        }
+        final Object[] values = new Object[count];
+        // Inputs still pending, and the first error. Guarded by `pending`: on
+        // the headless path inputs complete on their own threads.
+        final int[] pending = {count};
+        final Throwable[] firstError = {null};
+        for (int i = 0; i < count; i++) {
+            final int index = i;
+            final Future<?> f = inputs.get(i);
+            f.onComplete(new Runnable() {
+                @Override
+                public void run() {
+                    Throwable error;
+                    synchronized (pending) {
+                        if (f.error != null) {
+                            if (firstError[0] == null) {
+                                firstError[0] = f.error;
+                            }
+                        } else {
+                            values[index] = f.value;
+                        }
+                        if (--pending[0] > 0) {
+                            return;
+                        }
+                        error = firstError[0];
+                    }
+                    if (error != null) {
+                        result.completeError(error);
+                        return;
+                    }
+                    DartList<Object> out = new DartList<Object>();
+                    for (Object v : values) {
+                        out.add(v);
+                    }
+                    result.complete(out);
+                }
+            });
+        }
+        return result;
     }
 
     /** Registers a completion callback (fires immediately if already done). */

@@ -140,10 +140,9 @@ public final class RegExp {
     public DartIterable<RegExpMatch> allMatches(String input) {
         DartList<RegExpMatch> out = new DartList<RegExpMatch>();
         if (input != null) {
-            RE re = engine();
             int from = 0;
-            while (from <= input.length() && re.match(input, from)) {
-                RegExpMatch m = snapshot(re, input);
+            RegExpMatch m;
+            while ((m = matchFrom(input, from)) != null) {
                 out.add(m);
                 int start = (int) m.start();
                 int end = (int) m.end();
@@ -156,6 +155,21 @@ public final class RegExp {
             }
         }
         return out.asIterable();
+    }
+
+    /**
+     * The first match that starts at or after {@code from}, or null. Searching
+     * FROM the offset, not filtering allMatches by it: the two differ where
+     * matches overlap -- RegExp('aa') in "aaa" from 1 matches at 1, while the
+     * matches found from 0 are only the one at 0. String's Pattern methods
+     * (indexOf with a start, lastIndexOf) need the former.
+     */
+    RegExpMatch matchFrom(String input, int from) {
+        if (input == null || from < 0 || from > input.length()) {
+            return null;
+        }
+        RE re = engine();
+        return re.match(input, from) ? snapshot(re, input) : null;
     }
 
     /**

@@ -25,6 +25,7 @@ package dart.async;
 
 import dart.runtime.Funcs;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -202,5 +203,61 @@ public class FutureAdoptionTest {
             }
         });
         assertEquals("recovered", chained.valueOrThrow());
+    }
+
+    // --- Future.wait settles through listeners --------------------------------
+
+    // Bounded: the regression this guards is a wait that BLOCKS, which would
+    // otherwise hang the build instead of failing it -- in a separate thread,
+    // because Await parks through an interrupt.
+    @Test
+    @Timeout(value = 10, threadMode = Timeout.ThreadMode.SEPARATE_THREAD)
+    public void waitReturnsBeforeItsInputsSettle() {
+        Completer<Object> a = new Completer<Object>();
+        Completer<Object> b = new Completer<Object>();
+        java.util.List<Future<?>> inputs = new java.util.ArrayList<Future<?>>();
+        inputs.add(a.future());
+        inputs.add(b.future());
+        Future<dart.core.DartList<Object>> all = Future.wait(inputs);
+        assertFalse(all.isDone(), "wait must hand back a future, not block on its inputs");
+        b.complete("second");
+        assertFalse(all.isDone());
+        a.complete("first");
+        dart.core.DartList<Object> values = all.valueOrThrow();
+        assertEquals(2, values.size());
+        assertEquals("first", values.get(0), "values keep input order, not completion order");
+        assertEquals("second", values.get(1));
+    }
+
+    // Bounded: the regression this guards is a wait that BLOCKS, which would
+    // otherwise hang the build instead of failing it -- in a separate thread,
+    // because Await parks through an interrupt.
+    @Test
+    @Timeout(value = 10, threadMode = Timeout.ThreadMode.SEPARATE_THREAD)
+    public void aFailingInputReachesCatchErrorOnTheReturnedFuture() {
+        Completer<Object> ok = new Completer<Object>();
+        Completer<Object> bad = new Completer<Object>();
+        java.util.List<Future<?>> inputs = new java.util.ArrayList<Future<?>>();
+        inputs.add(ok.future());
+        inputs.add(bad.future());
+        final Object[] caught = {null};
+        Future<Object> handled = Future.wait(inputs).catchError(new Funcs.Func1<Object, Object>() {
+            @Override
+            public Object call(Object e) {
+                caught[0] = e;
+                return "handled";
+            }
+        });
+        final IllegalStateException boom = new IllegalStateException("boom");
+        bad.completeError(boom);
+        assertFalse(handled.isDone(), "Dart's default waits for every input before reporting the error");
+        ok.complete("fine");
+        assertEquals("handled", handled.valueOrThrow());
+        assertSame(boom, caught[0]);
+    }
+
+    @Test
+    public void waitOnNothingCompletesWithAnEmptyList() {
+        assertEquals(0, Future.wait(new java.util.ArrayList<Future<?>>()).valueOrThrow().size());
     }
 }

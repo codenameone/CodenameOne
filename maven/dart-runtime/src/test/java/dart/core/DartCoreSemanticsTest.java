@@ -172,4 +172,32 @@ public class DartCoreSemanticsTest {
         assertFalse(local.equals(utc), "but not equal: the time-zone mode differs");
         assertTrue(local.equals(utc.toLocal()));
     }
+
+    // --- String's Pattern methods accept a RegExp -----------------------------
+
+    @Test
+    public void splitOnARegExpFollowsDart() {
+        assertEquals(java.util.Arrays.asList("a", "b"), DString.split("a,b", new RegExp(",")));
+        assertEquals(java.util.Arrays.asList("a", "b", "c"), DString.split("a1b22c", new RegExp("[0-9]+")));
+        assertEquals(java.util.Arrays.asList("a", "b", "b", "a"), DString.split("abba", new RegExp("")),
+                "empty matches split between characters, with no empty parts at the ends");
+        assertEquals(0, DString.split("", new RegExp("")).size(), "an empty input the pattern matches has no parts");
+        assertEquals(java.util.Arrays.asList(""), DString.split("", new RegExp(",")));
+        assertEquals(java.util.Arrays.asList("a", ""), DString.split("a,", new RegExp(",")));
+    }
+
+    @Test
+    public void theOtherPatternMethodsAcceptARegExp() {
+        assertTrue(DString.contains("abc", new RegExp("b+")));
+        assertFalse(DString.contains("abc", new RegExp("x")));
+        assertEquals(1, DString.indexOf("xab", new RegExp("a")));
+        assertEquals(1, DString.indexOf("aaa", new RegExp("aa"), 1),
+                "searches from the start offset, so an overlapping match is found");
+        assertEquals(3, DString.lastIndexOf("abcab", new RegExp("ab")));
+        assertEquals(-1, DString.lastIndexOf("abc", new RegExp("x")));
+        assertEquals("-a-b-c-", DString.replaceAll("abc", new RegExp(""), "-"));
+        assertEquals("x-y-z", DString.replaceAll("x1y22z", new RegExp("[0-9]+"), "-"));
+        assertEquals("a$1c", DString.replaceAll("abc", new RegExp("(b)"), "$1"), "the replacement is literal");
+        assertEquals("a-b2", DString.replaceFirst("a1b2", new RegExp("[0-9]"), "-"));
+    }
 }
