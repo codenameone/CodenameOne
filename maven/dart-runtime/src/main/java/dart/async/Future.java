@@ -253,13 +253,62 @@ public class Future<T> {
 
     /** {@code catchError(onError, test: ...)} — the optional {@code test} filter is accepted
      *  for API shape (all errors are handled here). Void-handler form. */
-    public Future<T> catchError(final Funcs.VoidFunc1<Object> onError, Object test) {
-        return catchError(onError);
+    public Future<T> catchError(final Funcs.VoidFunc1<Object> onError, final Object test) {
+        final Future<T> next = new Future<T>();
+        onComplete(new Runnable() {
+            @Override
+            public void run() {
+                if (error == null) {
+                    next.complete(value);
+                } else if (!catches(test, error)) {
+                    next.completeError(error);
+                } else {
+                    try {
+                        onError.call(error);
+                        next.complete(null);
+                    } catch (Throwable t) {
+                        next.completeError(t);
+                    }
+                }
+            }
+        });
+        return next;
     }
 
-    /** {@code catchError(onError, test: ...)} — value-handler form. */
-    public Future<Object> catchError(final Funcs.Func1<Object, Object> onError, Object test) {
-        return catchError(onError);
+    /** {@code catchError(onError, test: ...)} -- value-handler form. */
+    public Future<Object> catchError(final Funcs.Func1<Object, Object> onError, final Object test) {
+        final Future<Object> next = new Future<Object>();
+        onComplete(new Runnable() {
+            @Override
+            public void run() {
+                if (error == null) {
+                    next.complete(value);
+                } else if (!catches(test, error)) {
+                    next.completeError(error);
+                } else {
+                    try {
+                        next.complete(onError.call(error));
+                    } catch (Throwable t) {
+                        next.completeError(t);
+                    }
+                }
+            }
+        });
+        return next;
+    }
+
+    /// Dart's catchError `test:`: when the predicate rejects the error, the handler
+    /// is NOT run and the error continues down the chain unchanged. Both overloads
+    /// used to ignore it and recover every failure, so a selective handler --
+    /// `test: (e) => e is TimeoutException` -- swallowed unrelated errors and
+    /// turned a failed operation into a successful one. No test catches all.
+    @SuppressWarnings("unchecked")
+    private static boolean catches(Object test, Object err) {
+        if (test instanceof Funcs.Func1) {
+            Object verdict = ((Funcs.Func1<Object, Object>) test).call(err);
+            return Boolean.TRUE.equals(verdict);
+        }
+        return true;
     }
 
     public Future<T> whenComplete(final Funcs.VoidFunc0 action) {

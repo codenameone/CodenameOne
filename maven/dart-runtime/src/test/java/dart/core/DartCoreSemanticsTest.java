@@ -27,6 +27,7 @@ import dart.math.DartMath;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -153,5 +154,22 @@ public class DartCoreSemanticsTest {
             assertEquals(3, m.start());
         }
         assertEquals(1, count, "the end-of-input match must not be found twice");
+    }
+
+    @Test
+    public void portDefaultsToTheSchemes() {
+        assertEquals(443, DartUri.parse("https://example.com/path").port());
+        assertEquals(80, DartUri.parse("http://example.com/").port());
+        assertEquals(8443, DartUri.parse("https://example.com:8443/").port(), "explicit wins");
+        assertEquals(0, DartUri.parse("ftp://example.com/").port());
+    }
+
+    @Test
+    public void aLocalValueAndItsUtcFormAreNotEqual() {
+        DateTime local = new DateTime(2024, 3, 5, 7, 8, 9, 10, 0);
+        DateTime utc = local.toUtc();
+        assertTrue(local.isAtSameMomentAs(utc), "the same instant");
+        assertFalse(local.equals(utc), "but not equal: the time-zone mode differs");
+        assertTrue(local.equals(utc.toLocal()));
     }
 }

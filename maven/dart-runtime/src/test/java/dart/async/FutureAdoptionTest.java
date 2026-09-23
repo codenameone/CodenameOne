@@ -164,4 +164,43 @@ public class FutureAdoptionTest {
         assertTrue(f.isDone(), "a negative delay must not leave the future pending forever");
         assertEquals("done", f.valueOrThrow());
     }
+
+    @Test
+    public void aRejectingTestLetsTheErrorThrough() {
+        Future<Object> failed = new Future<Object>();
+        failed.completeError(new IllegalStateException("unrelated"));
+        final boolean[] ran = {false};
+        Future<Object> chained = failed.catchError(new Funcs.VoidFunc1<Object>() {
+            @Override
+            public void call(Object e) {
+                ran[0] = true;
+            }
+        }, new Funcs.Func1<Object, Object>() {
+            @Override
+            public Object call(Object e) {
+                return e instanceof IllegalArgumentException;
+            }
+        });
+        assertFalse(ran[0], "the handler must not run for an error its test rejects");
+        RuntimeException thrown = assertThrows(RuntimeException.class, chained::valueOrThrow);
+        assertEquals("unrelated", thrown.getMessage());
+    }
+
+    @Test
+    public void anAcceptingTestRecovers() {
+        Future<Object> failed = new Future<Object>();
+        failed.completeError(new IllegalArgumentException("mine"));
+        Future<Object> chained = failed.catchError(new Funcs.Func1<Object, Object>() {
+            @Override
+            public Object call(Object e) {
+                return "recovered";
+            }
+        }, new Funcs.Func1<Object, Object>() {
+            @Override
+            public Object call(Object e) {
+                return e instanceof IllegalArgumentException;
+            }
+        });
+        assertEquals("recovered", chained.valueOrThrow());
+    }
 }

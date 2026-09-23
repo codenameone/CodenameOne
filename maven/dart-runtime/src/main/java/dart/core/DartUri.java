@@ -38,6 +38,9 @@ public final class DartUri {
     private String scheme = "";
     private String host = "";
     private long port = 0;
+    /// Whether the authority named a port. Without one, port() answers the
+    /// scheme's default, as Dart's Uri.port does.
+    private boolean explicitPort;
     private String path = "";
     private String query = "";
     private String fragment = "";
@@ -92,6 +95,7 @@ public final class DartUri {
             if (close >= 0) {
                 host = authority.substring(1, close);
                 if (pc >= 0) {
+                    explicitPort = true;
                     try {
                         port = Long.parseLong(authority.substring(pc + 1));
                     } catch (NumberFormatException ignored) {
@@ -99,6 +103,7 @@ public final class DartUri {
                     }
                 }
             } else if (pc >= 0) {
+                explicitPort = true;
                 host = authority.substring(0, pc);
                 try {
                     port = Long.parseLong(authority.substring(pc + 1));
@@ -136,8 +141,21 @@ public final class DartUri {
     }
 
     /** Dart's {@code Uri.port}. */
+    /// Dart's Uri.port: the explicit port, or the scheme's default when the URI
+    /// names none -- 80 for http, 443 for https, 0 otherwise. Returning 0 for
+    /// https://example.com/path sent code that splits a URL into host and port
+    /// to port 0 unless every URL spelled out :443.
     public long port() {
-        return port;
+        if (explicitPort) {
+            return port;
+        }
+        if ("http".equals(scheme)) {
+            return 80;
+        }
+        if ("https".equals(scheme)) {
+            return 443;
+        }
+        return 0;
     }
 
     /** Dart's {@code Uri.path}. */

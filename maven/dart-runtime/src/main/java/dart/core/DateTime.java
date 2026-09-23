@@ -177,7 +177,13 @@ public final class DateTime {
 
     @Override
     public boolean equals(Object o) {
-        return o instanceof DateTime && ((DateTime) o).epochMillis == epochMillis;
+        // The instant AND the time-zone mode, as Dart's operator == compares:
+        // a local value and its toUtc() are the same moment but not equal.
+        // isAtSameMomentAs is the instant-only comparison. Comparing instants
+        // alone made them equal here, so a local and a UTC value collapsed into
+        // one map or set key.
+        return o instanceof DateTime && ((DateTime) o).epochMillis == epochMillis
+                && ((DateTime) o).utc == utc;
     }
 
     @Override
