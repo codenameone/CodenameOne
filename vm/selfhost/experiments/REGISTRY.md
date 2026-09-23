@@ -6243,3 +6243,44 @@ the gap.
 Also landed: e055d35b77, a CN1_FAST_NEW miss pops the current page's free list out
 of line before the full slow path. Selfhost -1..-2% wall at a 16MB trigger, neutral
 at adaptive; microbenchmarks neutral.
+
+## Round 41: the ceiling moves to 128MB, and the branch's red tests are green again
+
+**Trigger ceiling 192MB -> 128MB** (c00b8714b7), Shai's call on the Round 40 trade:
+6-9% less peak for ~1% wall at four markers.
+
+**Where the 1-core memory goes** (one marker, hello corpus, vmmap + malloc_history at
+~1.4GB): VM_ALLOCATE 860MB is the BiBOP arena, about half of it free-listed slots on
+partly used pages; malloc holds ~580MB, of which 490MB is ALLOCATED (fragmentation
+only 92MB). By stack: ~165MB of whole generated C files as legacy-heap Strings
+(StringBuilder.toString, String.getBytes -- over the 2KB page-object limit), ~200MB
+of NativeStorage tables and reference blocks, the rest small. The second grace cycle
+is not a lever any more: CN1_GC_AGING_SLACK already defaults to 0.
+
+**SATB per-entry mutex: measured and dropped.** 0.49M lock acquisitions per
+self-hosting run at four markers, 1.57M at one -- ~0.25% and ~0.8% of wall at
+uncontended cost. Thread-local buffers would put entries out of the collector's
+reach until a handshake, in the termination protocol, for that.
+
+**Red tests on this branch, each root-caused:**
+
+- gc-verify self-test5 counted a run where the fault never fired (~1 in 150) as a
+  miss, and did not recognise a run the fault killed (OutOfMemoryError from a
+  clobbered StringBuilder length). 79adb2a0c4.
+- GcOverflowSpiral's non-vacuity witness counted mid-walk worklist drains, which the
+  in-place grace trace made structurally rare; graceTraced (~171k/cycle, 2.6x the
+  65536 worklist the spiral was reported on) is the witness now. GcSteadyState's
+  legacy arrays were 640 bytes, sized for the old 512-byte ceiling; 2560 now.
+  aafd5fd268.
+- LocalReceiverTypesTest asserted try/catch refuses frameless, which 7019abafdc
+  deliberately removed. eb0e60465a.
+- 32 JavaScript-target tests: String's inline-storage natives had no JS binding, and
+  the NativeStorage bindings did not accept the plain-number 0 an unassigned long
+  field defaults to in the JS runtime. c167c57bda. 359/359.
+
+GcSteadyState's "page heap compounding" failure was reproduced only under CPU
+starvation: with every core loaded the registry reaches 8-10k pages against ~2k, in
+the first half of the run, and holds. The failing run had other work started halfway
+through it. Capping the warm page cache at a trigger's worth changed nothing
+measurable and was not kept -- the growth is mutator run-ahead, which the pacing cap
+(free RAM / 8 off a ceiling) permits by design.
