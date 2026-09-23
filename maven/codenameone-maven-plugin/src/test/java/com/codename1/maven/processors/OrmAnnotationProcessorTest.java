@@ -211,6 +211,31 @@ public class OrmAnnotationProcessorTest {
     }
 
     @Test
+    public void generatedStringConvertersAndForeignKeysUsePortableValues() throws Exception {
+        File classes=tmp.newFolder("portablevalues");Map<String,String> sources=new java.util.LinkedHashMap<String,String>();
+        sources.put("portablevalues.Prefix","package portablevalues; public class Prefix implements com.codename1.orm.session.AttributeConverter<String,String> { public String toDatabase(String value) { return value==null?null:\"x:\"+value; } public String fromDatabase(String value) { return value==null?null:value.substring(2); } }");
+        sources.put("portablevalues.Key","package portablevalues; import com.codename1.annotations.*; @Entity(table=\"portable_key\") public class Key { @Id(autoIncrement=false) public String id; }");
+        sources.put("portablevalues.Holder","package portablevalues; import com.codename1.annotations.*; import com.codename1.annotations.db.*; @Entity(table=\"portable_holder\") public class Holder { @Id public long id; @ManyToOne public Key target; @Convert(converter=Prefix.class) public String code; }");
+        JavaSourceCompiler.compile(sources,classes,Arrays.asList(testClassesDir()));
+        ProcessorContext client=runProcessor(classes);assertFalse(client.getErrors().toString(),client.hasErrors());ProcessorContext backend=runProcessor(classes,backendClasspath());assertFalse(backend.getErrors().toString(),backend.hasErrors());
+        try(java.net.URLClassLoader loader=new java.net.URLClassLoader(new URL[]{classes.toURI().toURL()},getClass().getClassLoader())) {
+            Class keyType=loader.loadClass("portablevalues.Key"),holderType=loader.loadClass("portablevalues.Holder");
+            for(String suffix:Arrays.asList("Cn1Model","Cn1BackendModel")) {
+                Map<String,com.codename1.impl.orm.EntityModel<?>> models=new java.util.LinkedHashMap<String,com.codename1.impl.orm.EntityModel<?>>();
+                for(Class type:Arrays.asList(keyType,holderType)) models.put(type.getName(),(com.codename1.impl.orm.EntityModel)loader.loadClass(type.getName()+suffix).newInstance());
+                com.codename1.backend.Database db=com.codename1.backend.Database.open(":memory:");com.codename1.orm.session.Session session=new com.codename1.impl.orm.SessionImpl(new com.codename1.impl.orm.BackendSqlAccess(null,db,db.dialect()),models);
+                try {
+                    session.createTables();session.beginTransaction();Object holder=holderType.newInstance();holderType.getField("code").set(holder,"alpha");session.persist(holder);session.commitTransaction();
+                    org.junit.Assert.assertSame(holder,session.query(holderType).like("code","al%").first());
+                    String overlong=new String(new char[256]).replace('\0','a');db.execute("INSERT INTO portable_key (id) VALUES (?)",new Object[]{overlong});
+                    Object key=keyType.newInstance();keyType.getField("id").set(key,overlong);Object invalid=holderType.newInstance();holderType.getField("target").set(invalid,key);session.beginTransaction();
+                    try { session.persist(invalid);session.flush();fail("Foreign key must have the portable text bound"); } catch(com.codename1.orm.session.PersistenceException expected) { assertTrue(expected.getMessage().contains("255"));session.rollbackTransaction(); }
+                } finally { session.close();db.close(); }
+            }
+        }
+    }
+
+    @Test
     public void convertersAndUniqueIndexesPreserveDomainValues() throws Exception {
         File classes=tmp.newFolder("converted");Map<String,String> sources=new java.util.LinkedHashMap<String,String>();
         sources.put("converted.Code","package converted; public class Code { public String value; public Code(String value) { this.value=value; } }");

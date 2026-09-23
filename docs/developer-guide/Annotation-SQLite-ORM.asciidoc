@@ -243,8 +243,9 @@ Run `session.createTables()` outside application transactions for development
 schemas. It creates missing entity/collection tables, primary and foreign keys,
 one-to-one uniqueness, and relationship indexes. `@Column(unique=true)` and
 `@Entity(indexes=@Index(name="by_name", fields={"name"}))` declare additional
-indexes. MySQL indexed text uses a bounded key type; specify `@Column(type=...)`
-when the schema needs a particular length.
+indexes. Generated text keys, indexed fields, and foreign keys accept at most
+255 characters during managed inserts and updates on every database. Specify
+`@Column(type=...)` to control the SQL type and its value limits yourself.
 
 `session.validateSchema()` checks mapped entity columns, storage-type families,
 whether null values are allowed, primary keys, and required collection columns. It doesn't migrate

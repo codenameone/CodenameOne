@@ -154,7 +154,11 @@ public final class QueryImpl<T> implements com.codename1.orm.session.Query<T> {
         String name = column(field);
         conjunction();
         predicates.append(name).append(session.likeOperator(false));
-        params.add(session.likePattern(pattern, null));
+        Object converted = parameter(field, pattern);
+        if (converted != null && !(converted instanceof String)) {
+            throw new IllegalArgumentException("LIKE requires a text pattern after conversion");
+        }
+        params.add(session.likePattern((String) converted, null));
         return this;
     }
     @Override

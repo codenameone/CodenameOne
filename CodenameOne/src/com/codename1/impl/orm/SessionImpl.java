@@ -885,26 +885,43 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
         if (attr.declaredType != null) {
             return attr.declaredType;
         }
-        boolean key = attr.id;
+        if (!keyColumn(model, index)) {
+            return sql.columnType(attr.kind);
+        }
+        String declaration = sql.assignedKeyColumn(attr.kind);
+        int end = declaration.indexOf(" PRIMARY KEY");
+        return end < 0 ? sql.columnType(attr.kind) : declaration.substring(0, end).replace(" NOT NULL", "");
+    }
+    private boolean keyColumn(EntityModel model, int index) {
+        Attribute attr = model.attributes()[index];
+        if (attr.id) {
+            return true;
+        }
         for (Index definition : model.indexes()) {
             for (String field : definition.fields()) {
                 if (field.equals(attr.field)) {
-                    key = true;
+                    return true;
                 }
             }
         }
         for (Relationship relation : model.relationships()) {
             if (relation.column >= 0 && index >= relation.column &&
                     index < relation.column + model(relation.target).idIndexes().length) {
-                key = true;
+                return true;
             }
         }
-        if (!key) {
-            return sql.columnType(attr.kind);
+        return false;
+    }
+    private void validateTextKey(EntityModel model, int index, Object value) {
+        Attribute attr = model.attributes()[index];
+        if (attr.kind == Attribute.TEXT && attr.declaredType == null && value instanceof String
+                && ((String) value).length() > 255 && keyColumn(model, index)) {
+            throw new PersistenceException("Text key exceeds the portable limit of 255 characters: "
+                    + model.table() + "." + attr.column);
         }
-        String declaration = sql.assignedKeyColumn(attr.kind);
-        int end = declaration.indexOf(" PRIMARY KEY");
-        return end < 0 ? sql.columnType(attr.kind) : declaration.substring(0, end).replace(" NOT NULL", "");
+    }
+    private boolean columnNameMatches(String mapped, String actual) {
+        return "postgresql".equals(sql.dialect()) ? mapped.equals(actual) : mapped.equalsIgnoreCase(actual);
     }
     private String constraintName(String prefix, String table, String[] columns) {
         StringBuilder text = new StringBuilder(table);
@@ -958,7 +975,7 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
                 Attribute attr = attrs[i];
                 Object[] found = null;
                 for (Object[] column : columns) {
-                    if (attr.column.equalsIgnoreCase((String) column[0])) {
+                    if (columnNameMatches(attr.column, (String) column[0])) {
                         found = column;
                         break;
                     }
@@ -984,7 +1001,7 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
                 if (((Number) column[3]).intValue() != 0) {
                     boolean mapped = false;
                     for (Attribute attr : attrs) {
-                        if (attr.id && attr.column.equalsIgnoreCase((String) column[0])) {
+                        if (attr.id && columnNameMatches(attr.column, (String) column[0])) {
                             mapped = true;
                         }
                     }
@@ -1019,7 +1036,7 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
                     for (String name : required) {
                         boolean present = false;
                         for (Object[] column : columns) {
-                            if (name.equalsIgnoreCase((String) column[0])) {
+                            if (columnNameMatches(name, (String) column[0])) {
                                 present = true;
                             }
                         }
@@ -1850,6 +1867,7 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
             cols.append(q(attrs[i].column));
             marks.append('?');
             Object bound = model.get(entry.entity, i);
+            validateTextKey(model, i, bound);
             for (int ri = 0; ri < model.relationships().length; ri++) {
                 if (model.relationships()[ri].column >= 0 && i >= model.relationships()[ri].column &&
                         i < model.relationships()[ri].column +
@@ -1939,6 +1957,7 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
         EntityModel owner = entry.model;
         Attribute[] attributes = owner.attributes();
         for (int i = 0; i < attributes.length; i++) {
+            validateTextKey(owner, i, owner.get(entry.entity, i));
             boolean association = false;
             for (Relationship relation : owner.relationships()) {
                 if (relation.column >= 0 && i >= relation.column

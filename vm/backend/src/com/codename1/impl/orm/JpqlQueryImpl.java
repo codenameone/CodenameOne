@@ -714,6 +714,7 @@ public final class JpqlQueryImpl<T> implements com.codename1.orm.session.JpqlQue
                     } while (take(","));
                 }
                 expect(")");
+                validateFunction(function, args, distinct);
                 StringBuilder sql = new StringBuilder(function).append('(').append(distinct ? "DISTINCT " : "");
                 for (Expr arg : args) {
                     if (sql.charAt(sql.length() - 1) != '(' && !(distinct && sql.toString().endsWith("DISTINCT "))) {
@@ -734,6 +735,7 @@ public final class JpqlQueryImpl<T> implements com.codename1.orm.session.JpqlQue
                     }
                 }
                 int kind = "COUNT".equals(function) || "LENGTH".equals(function) ? Attribute.BIGINT
+                           : "LOWER".equals(function) || "UPPER".equals(function) || "TRIM".equals(function) ? Attribute.TEXT
                            : "AVG".equals(function) ? Attribute.REAL
                            : "COALESCE".equals(function) ? commonKind(args) : args.get(0).kind;
                 Expr result = new Expr(sql.append(')').toString(), kind);
@@ -775,6 +777,42 @@ public final class JpqlQueryImpl<T> implements com.codename1.orm.session.JpqlQue
             result.field = field;
             return result;
         }
+        private void validateFunction(String function, List<Expr> args, boolean distinct) {
+            boolean aggregate = " COUNT SUM AVG MIN MAX ".contains(" " + function + " ");
+            int size = args.size();
+            if ("COALESCE".equals(function) ? size < 2 : size != ("NULLIF".equals(function) ? 2 : 1)) {
+                throw error("Invalid argument count for " + function);
+            }
+            if (distinct && !aggregate) {
+                throw error("DISTINCT requires an aggregate function");
+            }
+            boolean text = " LOWER UPPER LENGTH TRIM ".contains(" " + function + " ");
+            boolean numeric = " SUM AVG ABS ".contains(" " + function + " ");
+            for (Expr arg : args) {
+                if ("*".equals(arg.sql)) {
+                    if (!"COUNT".equals(function) || distinct) {
+                        throw error("Only COUNT(*) accepts a wildcard");
+                    }
+                } else if (arg.entity != null) {
+                    if (!"COUNT".equals(function)) {
+                        throw error("Entity argument requires COUNT");
+                    }
+                } else if (arg.kind >= 0) {
+                    boolean number = arg.kind == Attribute.INTEGER || arg.kind == Attribute.BIGINT
+                            || arg.kind == Attribute.REAL;
+                    if (text && arg.kind != Attribute.TEXT || numeric && !number) {
+                        throw error("Invalid operand type for " + function);
+                    }
+                    if (("MIN".equals(function) || "MAX".equals(function))
+                            && !number && arg.kind != Attribute.TEXT && arg.kind != Attribute.TIMESTAMP) {
+                        throw error("Invalid ordered operand for " + function);
+                    }
+                }
+            }
+            if ("COALESCE".equals(function) || "NULLIF".equals(function)) {
+                commonKind(args);
+            }
+        }
         private Expr literal(String sql, int kind, Object value) {
             Expr result = new Expr(sql, kind);
             result.literal = true;
@@ -799,8 +837,7 @@ public final class JpqlQueryImpl<T> implements com.codename1.orm.session.JpqlQue
                 }
                 if (kind < 0) {
                     kind = arg.kind;
-                }
-                else if (kind != arg.kind) {
+                } else if (kind != arg.kind) {
                     boolean numeric = (kind == Attribute.INTEGER || kind == Attribute.BIGINT || kind == Attribute.REAL)
                             && (arg.kind == Attribute.INTEGER || arg.kind == Attribute.BIGINT || arg.kind == Attribute.REAL);
                     if (!numeric) {

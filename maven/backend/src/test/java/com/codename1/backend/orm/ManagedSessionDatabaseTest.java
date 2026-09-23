@@ -72,7 +72,14 @@ class ManagedSessionDatabaseTest {
         EntityManager manager=EntityManager.open(db);Session session=manager.openSession();
         ExecutorService workers=Executors.newFixedThreadPool(2);
         try {
-            session.createTables();session.validateSchema();session.beginTransaction();
+            session.createTables();session.validateSchema();
+            if(!mysql) {
+                db.execute("ALTER TABLE managed_record RENAME COLUMN name TO \"Name\"",new Object[0]);
+                PersistenceException mismatch=assertThrows(PersistenceException.class,session::validateSchema);
+                assertTrue(mismatch.getMessage().contains("Missing column managed_record.name"));
+                db.execute("ALTER TABLE managed_record RENAME COLUMN \"Name\" TO name",new Object[0]);session.validateSchema();
+            }
+            session.beginTransaction();
             ManagedSessionTest.Record entity=new ManagedSessionTest.Record();entity.name="record";entity.bytes=new byte[]{1,2};session.persist(entity);
             assertTrue(entity.id>0);session.commitTransaction();session.clear();
             assertArrayEquals(new byte[]{1,2},session.find(ManagedSessionTest.Record.class,entity.id).bytes);

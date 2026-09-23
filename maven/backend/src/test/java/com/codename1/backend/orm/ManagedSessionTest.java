@@ -202,6 +202,94 @@ class ManagedSessionTest {
         } finally { em.close(); }
     }
 
+    @Test void schemaColumnNamesFollowDialectCaseRules() throws Exception {
+        for(com.codename1.backend.sql.Dialect dialect:new com.codename1.backend.sql.Dialect[]{com.codename1.backend.sql.Dialect.SQLITE,com.codename1.backend.sql.Dialect.POSTGRES,com.codename1.backend.sql.Dialect.MYSQL}) {
+            for(boolean collection:new boolean[]{false,true}) {
+                Model model=new Model() {
+                    public com.codename1.impl.orm.Relationship[] relationships() { return new com.codename1.impl.orm.Relationship[]{new com.codename1.impl.orm.Relationship("tags",String.class,true,true,-1,"","record_tags","owner_id","value",0,false,false,"","position","",true)}; }
+                };
+                com.codename1.impl.orm.BackendSqlAccess adapter=new com.codename1.impl.orm.BackendSqlAccess(null,null,dialect);
+                com.codename1.impl.orm.SqlAccess access=(com.codename1.impl.orm.SqlAccess)java.lang.reflect.Proxy.newProxyInstance(getClass().getClassLoader(),new Class[]{com.codename1.impl.orm.SqlAccess.class},(proxy,method,args)-> {
+                    if(method.getName().equals("describe")) {
+                        java.util.List<Object[]> rows=new java.util.ArrayList<Object[]>();
+                        if(args[0].equals("record_tags")) { for(String column:new String[]{collection?"Owner_id":"owner_id","value","position"}) rows.add(new Object[]{column,"TEXT",0,0}); }
+                        else { for(Attribute a:model.attributes()) rows.add(new Object[]{!collection && a.id ? "ID" : a.column,dialect.columnType(a.kind),a.nullable?0:1,a.id?1:0}); }
+                        return rows;
+                    }
+                    if(method.getName().equals("close")) return null;
+                    return method.invoke(adapter,args);
+                });
+                java.util.Map<String,EntityModel<?>> models=new java.util.LinkedHashMap<String,EntityModel<?>>();models.put(Record.class.getName(),model);
+                Session session=new com.codename1.impl.orm.SessionImpl(access,models);
+                try {
+                    if(dialect==com.codename1.backend.sql.Dialect.POSTGRES) {
+                        PersistenceException error=assertThrows(PersistenceException.class,session::validateSchema);
+                        assertTrue(error.getMessage().contains(collection?"Missing collection column record_tags.owner_id":"Missing column managed_record.id"));
+                    } else session.validateSchema();
+                } finally { session.close(); }
+            }
+        }
+    }
+
+    @Test void builderLikeConvertsPatternsBeforeDialectNormalization() throws Exception {
+        EntityManager em=manager();
+        try {
+            Models.register(new Model() {
+                public Object get(Record r,int i) { return i==3 ? encode(r.name) : super.get(r,i); }
+                public void set(Record r,int i,Object value) { super.set(r,i,i==3 && value!=null ? ((String)value).substring(2) : value); }
+                public Object parameter(int i,Object value) { return i==3 ? encode((String)value) : super.parameter(i,value); }
+                private String encode(String value) { return value==null ? null : "x:"+value; }
+            });
+            Session session=em.openSession();Record r=seed(session);session.clear();
+            assertEquals(r.id,session.query(Record.class).like("name","fir%").first().id);
+            assertEquals(r.id,session.createQuery("select r from ManagedSessionTest$Record r where r.name like :pattern",Record.class).setParameter("pattern","fir%").first().id);
+            assertTrue(session.query(Record.class).like("name",null).list().isEmpty());session.close();
+        } finally { em.close(); }
+    }
+
+    @Test void jpqlRejectsMalformedFunctionsAtQueryCreation() throws Exception {
+        EntityManager em=manager();
+        try {
+            Session session=em.openSession();seed(session);
+            for(String expression:new String[]{"lower(r.counter)","upper(r.counter)","trim(r.counter)","length(r.counter)","sum(r.name)","avg(r.name)","abs(r.name)","length(r.name,r.name)","lower()","count(r.id,r.name)","coalesce(r.name)","nullif(r.name)","nullif(r.name,r.counter)","abs(*)","count(distinct *)","lower(distinct r.name)","max(r.bytes)"}) {
+                assertThrows(IllegalArgumentException.class,()->session.createQuery("select "+expression+" from ManagedSessionTest$Record r"),expression);
+            }
+            assertEquals("FIRST",session.createQuery("select upper(trim(r.name)) from ManagedSessionTest$Record r",String.class).first());
+            assertEquals(Long.valueOf(5),session.createQuery("select length(r.name) from ManagedSessionTest$Record r",Long.class).first());
+            assertEquals(Long.valueOf(1),session.createQuery("select count(*) from ManagedSessionTest$Record r",Long.class).first());
+            assertEquals(Long.valueOf(0),session.createQuery("select sum(abs(r.counter)) from ManagedSessionTest$Record r",Long.class).first());
+            assertNull(session.createQuery("select nullif(r.name,r.name) from ManagedSessionTest$Record r",String.class).first());session.close();
+        } finally { em.close(); }
+    }
+
+    @Test void managedTextKeysHaveTheSameBoundOnEveryRuntime() throws Exception {
+        String boundary=new String(new char[255]).replace('\0','a'),tooLong=boundary+"b";
+        for(int shape=0;shape<5;shape++) {
+            final int mode=shape;
+            EntityManager em=manager();
+            try {
+                Models.register(new Model() {
+                    public Attribute[] attributes() {
+                        Attribute[] a=super.attributes().clone();
+                        if(mode==0) { a[0]=new Attribute("id","id",Attribute.BIGINT,false,false,false,false);a[3]=new Attribute("name","name",Attribute.TEXT,true,false,false,false); }
+                        if(mode==3) a[3]=new Attribute("name","name",Attribute.TEXT,false,false,true,false,"TEXT");
+                        return a;
+                    }
+                    public com.codename1.impl.orm.Index[] indexes() { return mode==0 || mode==4 ? new com.codename1.impl.orm.Index[0] : new com.codename1.impl.orm.Index[]{new com.codename1.impl.orm.Index("text_name_index",mode==2,"name")}; }
+                });
+                Session session=em.openSession();session.createTables();session.beginTransaction();Record r=new Record();r.name=boundary;session.persist(r);session.commitTransaction();
+                session.beginTransaction();Record longRecord=new Record();longRecord.name=tooLong;
+                if(mode<3) { assertThrows(PersistenceException.class,()->{session.persist(longRecord);session.flush();});session.rollbackTransaction(); }
+                else { session.persist(longRecord);session.commitTransaction(); }
+                if(mode==1 || mode==2) {
+                    session.beginTransaction();Record loaded=session.find(Record.class,r.id);loaded.name=tooLong;assertThrows(PersistenceException.class,session::flush);session.rollbackTransaction();
+                    assertEquals(boundary,session.find(Record.class,r.id).name);
+                }
+                session.close();
+            } finally { em.close(); }
+        }
+    }
+
     @Test void coalesceAndDistinctProjectionValidationArePortable() throws Exception {
         EntityManager em=manager();
         try {
