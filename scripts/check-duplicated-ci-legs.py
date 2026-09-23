@@ -54,6 +54,15 @@ PAIRS = [
         "required_in_copy": [
             "CN1_WARNING_LEG: ios-sim-debug-xcode27",
             "SCREENSHOT_REF_DIR: ${{ github.workspace }}/scripts/ios/screenshots-metal-27",
+            # The simulator this leg captures on. Both lines, because each alone
+            # is a silent fallback: no boot step and the destination names a
+            # device that does not exist; no destination and run-ios-ui-tests.sh
+            # asks for "iPhone 16" by name, finds none on the Xcode 27 image, and
+            # captures on whatever it falls back to -- an iPad, the run that
+            # exposed it. Declaring them as allowed extras only permitted them;
+            # deleting both still read as "the legs match".
+            "boot-ios-simulator.sh 'iOS-27[0-9-]*' 'iPhone 16'",
+            "IOS_SIM_DESTINATION: 'platform=iOS Simulator,id=${{ steps.sim27.outputs.udid }}'",
         ],
         "only_in_copy": [
             "CN1_XCODE_MAJOR: '27'",
@@ -150,8 +159,13 @@ def main():
         # removes exactly the generation-specific lines a requirement is most
         # likely to name, so checking the filtered list would always report them
         # missing.
-        copy_raw = normalise(job_lines(text, pair["copy"], path), set(),
-                             set(pair["only_in_copy_steps"]))
+        #
+        # Declared-extra STEPS are kept here too. A required line may live inside
+        # one -- the iOS 27 leg's simulator boot is exactly that -- and checking
+        # a list those steps were already removed from would report it missing
+        # even when present, or, worse, let a requirement on it be dropped as
+        # "unfindable".
+        copy_raw = normalise(job_lines(text, pair["copy"], path), set(), set())
         if not orig or not copy:
             sys.exit(f"check-duplicated-ci-legs: {pair['copy']} or {pair['original']} "
                      f"parsed empty; the parser is wrong")

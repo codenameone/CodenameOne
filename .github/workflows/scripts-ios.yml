@@ -24,6 +24,9 @@ on:
       - 'scripts/check-ios-sdk-deltas.py'
       - 'scripts/lib/xcode.sh'
       - 'scripts/run-ios-ui-tests.sh'
+      # The iOS legs boot their simulator through this helper and read its
+      # `udid` output, so a change to it alone must exercise them.
+      - 'scripts/ci/boot-ios-simulator.sh'
       - 'scripts/run-watch-ui-tests.sh'
       - 'scripts/run-tv-ui-tests.sh'
       - 'scripts/run-ios-native-tests.sh'
@@ -63,6 +66,9 @@ on:
       - 'scripts/check-ios-sdk-deltas.py'
       - 'scripts/lib/xcode.sh'
       - 'scripts/run-ios-ui-tests.sh'
+      # The iOS legs boot their simulator through this helper and read its
+      # `udid` output, so a change to it alone must exercise them.
+      - 'scripts/ci/boot-ios-simulator.sh'
       - 'scripts/run-watch-ui-tests.sh'
       - 'scripts/run-tv-ui-tests.sh'
       - 'scripts/run-ios-native-tests.sh'
