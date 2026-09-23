@@ -542,6 +542,19 @@ public final class Telemetry {
         ExportRequest(byte[] body) {
             setRequestBody(new ByteBody(body));
         }
+
+        /// Stopped, and nothing sent, once consent is required and no longer
+        /// given. An export waits in the queue behind the app's own requests, and
+        /// a user who withdraws consent in that time has refused these spans too;
+        /// performOperationComplete asks this before it connects.
+        @Override
+        protected boolean shouldStop() {
+            if (super.shouldStop()) {
+                return true;
+            }
+            State s = state;
+            return s != null && !s.permitted();
+        }
     }
 
     /// A request body that is already bytes.

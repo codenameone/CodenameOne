@@ -506,29 +506,40 @@ final class OtlpSchema {
             if(d != Math.floor(d) || Double.isInfinite(d) || Double.isNaN(d)) {
                 throw new IOException(field.name + " must be a whole number");
             }
+            // In range BEFORE the cast: Java saturates, so 1e100 became
+            // Long.MAX_VALUE and a different value than the client sent was
+            // forwarded -- or, as JSON, an out-of-range one a collector rejects.
+            if(!(d >= -9.223372036854775808E18 && d < 9.223372036854775808E18)) {
+                throw new IOException(field.name + " is outside the 64-bit range");
+            }
             return (long)d;
         }
         if(value instanceof String) {
+            // A signed 64-bit decimal, checked digit by digit. Accumulating
+            // without a check wrapped silently past 19 digits, so a value the
+            // client never sent was forwarded. Accumulated NEGATIVELY so the one
+            // value with no positive counterpart, Long.MIN_VALUE, still parses.
             String text = (String)value;
-            if(text.length() == 0 || text.length() > 20) {
-                throw new IOException(field.name + " must be a whole number");
+            boolean negative = text.startsWith("-");
+            String digits = negative ? text.substring(1) : text;
+            if(digits.length() == 0 || digits.length() > 19) {
+                throw new IOException(field.name + " must be a whole number in the 64-bit range");
             }
-            // Unsigned for the fixed64 timestamps, which are uint64 in the proto:
-            // parsed digit by digit with wrap-around, so a value above
-            // Long.MAX_VALUE keeps its bit pattern the way protobuf does.
-            boolean negative = text.charAt(0) == '-';
-            long v = 0;
-            for(int iter = negative ? 1 : 0 ; iter < text.length() ; iter++) {
-                char c = text.charAt(iter);
+            for(int iter = 0 ; iter < digits.length() ; iter++) {
+                char c = digits.charAt(iter);
                 if(c < '0' || c > '9') {
                     throw new IOException(field.name + " must be a whole number");
                 }
-                v = v * 10 + (c - '0');
             }
-            if(negative && text.length() == 1) {
-                throw new IOException(field.name + " must be a whole number");
+            if(digits.length() == 19 && digits.compareTo(
+                    negative ? "9223372036854775808" : "9223372036854775807") > 0) {
+                throw new IOException(field.name + " is outside the 64-bit range");
             }
-            return negative ? -v : v;
+            long v = 0;
+            for(int iter = 0 ; iter < digits.length() ; iter++) {
+                v = v * 10 - (digits.charAt(iter) - '0');
+            }
+            return negative ? v : -v;
         }
         throw new IOException(field.name + " must be a number");
     }
@@ -584,11 +595,31 @@ final class OtlpSchema {
         return -1;
     }
 
+    /**
+     * Base64 as proto3's JSON mapping accepts it: the standard or URL-safe
+     * alphabet, padded or not. Everything is checked before a byte is produced --
+     * no '=' except as final padding, no data after it, and no incomplete quartet
+     * (one lone character carries no whole byte). Stopping at the first '=' let
+     * "AA=garbage" through, and the relay then forwarded something other than
+     * what the client sent.
+     */
     private static byte[] fromBase64(String text) throws IOException {
-        ByteSink out = new ByteSink(text.length());
+        int end = text.length();
+        int padding = 0;
+        while(end > 0 && text.charAt(end - 1) == '=' && padding < 2) {
+            end--;
+            padding++;
+        }
+        if(padding > 0 && text.length() % 4 != 0) {
+            throw new IOException("bytesValue has misplaced padding");
+        }
+        if(end % 4 == 1) {
+            throw new IOException("bytesValue is not whole base64");
+        }
+        ByteSink out = new ByteSink(end);
         int buffer = 0;
         int bits = 0;
-        for(int iter = 0 ; iter < text.length() ; iter++) {
+        for(int iter = 0 ; iter < end ; iter++) {
             char c = text.charAt(iter);
             int v;
             if(c >= 'A' && c <= 'Z') {
@@ -601,8 +632,6 @@ final class OtlpSchema {
                 v = 62;
             } else if(c == '/' || c == '_') {
                 v = 63;
-            } else if(c == '=') {
-                break;
             } else {
                 throw new IOException("bytesValue must be base64");
             }

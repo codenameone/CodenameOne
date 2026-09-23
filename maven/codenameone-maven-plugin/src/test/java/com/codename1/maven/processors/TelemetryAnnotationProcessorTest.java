@@ -151,6 +151,11 @@ public class TelemetryAnnotationProcessorTest {
     @Test
     public void aUrlThatIsNotHttpIsRefused() throws Exception {
         assertRefused("@OpenTelemetry(endpoint = \"collector:4318\")");
+        assertRefused("@OpenTelemetry(endpoint = \"https://\")");
+        assertRefused("@OpenTelemetry(relay = \"https:///path\")");
+        assertRefused("@OpenTelemetry(endpoint = \"https://host:port/\")");
+        assertTrue(TelemetryAnnotationProcessor.isHttpUrl("https://collector.example:4318/otlp"));
+        assertTrue(TelemetryAnnotationProcessor.isHttpUrl("http://[::1]:4318"));
     }
 
     // ------------------------------------------------------------------

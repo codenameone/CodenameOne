@@ -194,6 +194,23 @@ class TelemetryTest extends UITestBase {
     }
 
     @Test
+    void aQueuedExportStopsWhenConsentIsWithdrawn() throws Exception {
+        AnalyticsConsent before = Analytics.getConsent();
+        try {
+            Analytics.setConsent(AnalyticsConsent.granted());
+            Telemetry.install(new TelemetryConfig().direct("http://collector.test")
+                    .requireAnalyticsConsent(true));
+            Telemetry.ExportRequest export = new Telemetry.ExportRequest(new byte[] {1});
+            assertFalse(export.shouldStop(), "with consent the export goes");
+            Analytics.setConsent(AnalyticsConsent.denied());
+            assertTrue(export.shouldStop(),
+                    "an export queued before consent was withdrawn must not be sent");
+        } finally {
+            Analytics.setConsent(before);
+        }
+    }
+
+    @Test
     void withoutTheFlagConsentIsNotConsulted() throws Exception {
         AnalyticsConsent before = Analytics.getConsent();
         try {

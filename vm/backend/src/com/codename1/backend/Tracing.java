@@ -207,9 +207,10 @@ public final class Tracing {
         if(t == null || request == null) {
             return null;
         }
+        Span span = null;
         try {
             String method = request.getMethod();
-            Span span = t.startSpan(method == null ? "HTTP" : method, Span.KIND_SERVER, null,
+            span = t.startSpan(method == null ? "HTTP" : method, Span.KIND_SERVER, null,
                     request.getHeader(TRACEPARENT), request.getHeader(TRACESTATE));
             if(span == null) {
                 return null;
@@ -242,6 +243,7 @@ public final class Tracing {
             return span;
         } catch (RuntimeException err) {
             failed(err);
+            abandon(span);
             return null;
         }
     }
@@ -466,9 +468,10 @@ public final class Tracing {
         if(t == null) {
             return null;
         }
+        Span span = null;
         try {
             String name = System.getenv("AWS_LAMBDA_FUNCTION_NAME");
-            Span span = t.startSpan(name == null ? "invoke" : name, Span.KIND_SERVER, null,
+            span = t.startSpan(name == null ? "invoke" : name, Span.KIND_SERVER, null,
                     fromXRay(traceHeader), null);
             if(span == null) {
                 return null;
@@ -484,6 +487,7 @@ public final class Tracing {
             return span;
         } catch (RuntimeException err) {
             failed(err);
+            abandon(span);
             return null;
         }
     }
@@ -593,6 +597,30 @@ public final class Tracing {
             span.entered = false;
             CURRENT.set(span.previous);
             span.previous = null;
+        }
+        try {
+            span.end();
+        } catch (RuntimeException err) {
+            failed(err);
+        }
+    }
+
+    /**
+     * Finishes a span the tracer handed out before a later call into it failed.
+     * Dropping the reference instead would leave the tracer holding whatever state
+     * it keeps for an open span -- once per request, for as long as the fault lasts.
+     * Discarded, because what it recorded is incomplete; each step guarded, because
+     * the tracer is already known to be failing.
+     */
+    private static void abandon(Span span) {
+        if(span == null) {
+            return;
+        }
+        try {
+            span.discard();
+        } catch (RuntimeException err) {
+            // The tracer is already failing; ending the span below still matters.
+            failed(err);
         }
         try {
             span.end();

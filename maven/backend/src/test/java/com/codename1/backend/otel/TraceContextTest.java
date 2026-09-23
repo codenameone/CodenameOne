@@ -148,6 +148,36 @@ class TraceContextTest {
     }
 
     @Test
+    @DisplayName("relay input: whole base64 only, and integers in their range")
+    void relayValueValidation() throws Exception {
+        assertRelayRefuses("{\"bytesValue\":\"A\"}", "a lone base64 character is no byte");
+        assertRelayRefuses("{\"bytesValue\":\"AA=garbage\"}", "data after padding");
+        assertRelayRefuses("{\"bytesValue\":\"A=AA\"}", "padding in the middle");
+        assertRelayRefuses("{\"intValue\":1e100}", "a number past 64 bits");
+        assertRelayRefuses("{\"intValue\":\"9223372036854775808\"}", "one past Long.MAX_VALUE");
+        relay("{\"bytesValue\":\"AAE=\"}");
+        relay("{\"bytesValue\":\"AAE\"}");
+        relay("{\"bytesValue\":\"-_8\"}");
+        relay("{\"intValue\":\"-9223372036854775808\"}");
+    }
+
+    private static void relay(String anyValue) throws Exception {
+        OtlpSchema.protobuf(OtlpSchema.sanitize(com.codename1.backend.Json.parseObject(
+                "{\"resourceSpans\":[{\"scopeSpans\":[{\"spans\":[{\"traceId\":\""
+                + "4bf92f3577b34da6a3ce929d0e0e4736\",\"spanId\":\"00f067aa0ba902b7\","
+                + "\"attributes\":[{\"key\":\"k\",\"value\":" + anyValue + "}]}]}]}]}")));
+    }
+
+    private static void assertRelayRefuses(String anyValue, String why) {
+        try {
+            relay(anyValue);
+        } catch (Exception expected) {
+            return;
+        }
+        throw new AssertionError("accepted " + anyValue + ": " + why);
+    }
+
+    @Test
     @DisplayName("a partial success is read from either encoding")
     void partialSuccessDecoding() throws Exception {
         long[] rejected = new long[1];

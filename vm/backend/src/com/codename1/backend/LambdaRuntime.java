@@ -127,55 +127,65 @@ public final class LambdaRuntime {
             }
             return true;
         }
-        Tracing.endLambda(span, null);
+        // The span stays open through DELIVERY: a result the Runtime API refuses,
+        // or a POST that fails, is an invocation whose answer was lost, and the
+        // trace has to say so rather than report the handler's success.
+        Throwable delivery = null;
         try {
-            byte[] payload = (result == null ? "null" : result).getBytes("UTF-8");
-            // The status matters: the Runtime API REJECTS a result it will not take
-            // -- 413 for a payload over the response limit is the ordinary case --
-            // and answers rather than throwing. Discarding it meant the handler's
-            // work was dropped and the loop went straight back to polling, with the
-            // caller left waiting for a reply that was never accepted and nothing
-            // anywhere saying why.
-            Http.Response posted = Http.post(host, port,
-                    API_VERSION + "/invocation/" + requestId + "/response", payload);
-            if(posted == null || posted.getStatus() < 200 || posted.getStatus() >= 300) {
-                System.err.println("The Lambda runtime API refused the response for "
-                        + requestId + " with status "
-                        + (posted == null ? "none" : String.valueOf(posted.getStatus()))
-                        + "; the result of " + payload.length + " byte(s) was not "
-                        + "delivered. Reporting it as an error so the invocation "
-                        + "does not simply hang.");
-                // And stop if even THAT could not be delivered. The result is
-                // already gone, so an unreported invocation stays outstanding
-                // until the host times it out while this loop takes the next
-                // one. Third branch with this rule; they are the three ways an
-                // invocation can end without the host being told.
-                if(!reportError(host, port, requestId, new java.io.IOException(
-                        "the runtime API refused the response with status "
-                        + (posted == null ? "none" : String.valueOf(posted.getStatus()))))) {
+            try {
+                byte[] payload = (result == null ? "null" : result).getBytes("UTF-8");
+                // The status matters: the Runtime API REJECTS a result it will not take
+                // -- 413 for a payload over the response limit is the ordinary case --
+                // and answers rather than throwing. Discarding it meant the handler's
+                // work was dropped and the loop went straight back to polling, with the
+                // caller left waiting for a reply that was never accepted and nothing
+                // anywhere saying why.
+                Http.Response posted = Http.post(host, port,
+                        API_VERSION + "/invocation/" + requestId + "/response", payload);
+                if(posted == null || posted.getStatus() < 200 || posted.getStatus() >= 300) {
+                    System.err.println("The Lambda runtime API refused the response for "
+                            + requestId + " with status "
+                            + (posted == null ? "none" : String.valueOf(posted.getStatus()))
+                            + "; the result of " + payload.length + " byte(s) was not "
+                            + "delivered. Reporting it as an error so the invocation "
+                            + "does not simply hang.");
+                    // And stop if even THAT could not be delivered. The result is
+                    // already gone, so an unreported invocation stays outstanding
+                    // until the host times it out while this loop takes the next
+                    // one. Third branch with this rule; they are the three ways an
+                    // invocation can end without the host being told.
+                    java.io.IOException refused = new java.io.IOException(
+                            "the runtime API refused the response with status "
+                            + (posted == null ? "none" : String.valueOf(posted.getStatus())));
+                    delivery = refused;
+                    if(!reportError(host, port, requestId, refused)) {
+                        System.err.println("The runtime API is unreachable, so this runtime is "
+                                + "stopping rather than collecting invocations it cannot answer.");
+                        return false;
+                    }
+                }
+            } catch (Exception err) {
+                delivery = err;
+                // The result is GONE -- it existed only in the request that just
+                // failed -- so this invocation has to be resolved here or it stays
+                // outstanding until the host times it out, while this loop cheerfully
+                // takes the next one. Reporting the failure is what lets the host
+                // fail it now instead.
+                System.err.println("Failed to post the response for " + requestId + ": " + err
+                        + "; reporting it as an error so the invocation is resolved rather "
+                        + "than left outstanding.");
+                if(!reportError(host, port, requestId, err)) {
+                    // Not even the error reached the host, so nothing this process
+                    // says is getting through. Stop polling: collecting further
+                    // invocations only strands them the same way, and an exited
+                    // runtime is something Lambda knows how to recover from.
                     System.err.println("The runtime API is unreachable, so this runtime is "
                             + "stopping rather than collecting invocations it cannot answer.");
                     return false;
                 }
             }
-        } catch (Exception err) {
-            // The result is GONE -- it existed only in the request that just
-            // failed -- so this invocation has to be resolved here or it stays
-            // outstanding until the host times it out, while this loop cheerfully
-            // takes the next one. Reporting the failure is what lets the host
-            // fail it now instead.
-            System.err.println("Failed to post the response for " + requestId + ": " + err
-                    + "; reporting it as an error so the invocation is resolved rather "
-                    + "than left outstanding.");
-            if(!reportError(host, port, requestId, err)) {
-                // Not even the error reached the host, so nothing this process
-                // says is getting through. Stop polling: collecting further
-                // invocations only strands them the same way, and an exited
-                // runtime is something Lambda knows how to recover from.
-                System.err.println("The runtime API is unreachable, so this runtime is "
-                        + "stopping rather than collecting invocations it cannot answer.");
-                return false;
-            }
+        } finally {
+            Tracing.endLambda(span, delivery);
         }
         return true;
     }

@@ -277,9 +277,73 @@ public final class TelemetryAnnotationProcessor extends AbstractAnnotationProces
         return false;
     }
 
-    private static boolean isHttpUrl(String url) {
-        return url.regionMatches(true, 0, "http://", 0, 7)
-                || url.regionMatches(true, 0, "https://", 0, 8);
+    /// An http or https URL WITH A HOST. The scheme alone is not a URL: "https://"
+    /// normalized to "https:/v1/traces", and every export -- fail-silent by design --
+    /// went nowhere while the build reported the setting as checked.
+    static boolean isHttpUrl(String url) {
+        int start;
+        if (url.regionMatches(true, 0, "http://", 0, 7)) {
+            start = 7;
+        } else if (url.regionMatches(true, 0, "https://", 0, 8)) {
+            start = 8;
+        } else {
+            return false;
+        }
+        int end = url.length();
+        for (int i = start; i < url.length(); i++) {
+            char c = url.charAt(i);
+            if (c == '/' || c == '?' || c == '#') {
+                end = i;
+                break;
+            }
+        }
+        String authority = url.substring(start, end);
+        int at = authority.lastIndexOf('@');
+        String hostPort = at >= 0 ? authority.substring(at + 1) : authority;
+        String host = hostPort;
+        if (hostPort.startsWith("[")) {
+            int close = hostPort.indexOf(']');
+            if (close <= 1) {
+                return false;
+            }
+            host = hostPort.substring(1, close);
+            String rest = hostPort.substring(close + 1);
+            if (rest.length() > 0 && !validPort(rest)) {
+                return false;
+            }
+        } else {
+            int colon = hostPort.lastIndexOf(':');
+            if (colon >= 0) {
+                if (!validPort(hostPort.substring(colon))) {
+                    return false;
+                }
+                host = hostPort.substring(0, colon);
+            }
+        }
+        if (host.length() == 0) {
+            return false;
+        }
+        for (int i = 0; i < host.length(); i++) {
+            char c = host.charAt(i);
+            if (c <= ' ' || c == '/' || c == '\\' || c == '@') {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /// ":" then 1-5 digits.
+    private static boolean validPort(String colonPort) {
+        if (!colonPort.startsWith(":") || colonPort.length() < 2 || colonPort.length() > 6) {
+            return false;
+        }
+        for (int i = 1; i < colonPort.length(); i++) {
+            char c = colonPort.charAt(i);
+            if (c < '0' || c > '9') {
+                return false;
+            }
+        }
+        return true;
     }
 
     private static String quote(String value) {
