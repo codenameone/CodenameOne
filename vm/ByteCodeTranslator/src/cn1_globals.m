@@ -132,12 +132,10 @@ int cn1GcFaultRefClear = 0;
 // failed with "LOST held key k1" while the gauntlet and all three self-hosting gates were
 // green.
 int cn1GcFaultHalfBlock = 0;
-// CN1_GC_FAULT=moverange makes a same-block reference move report an EMPTY lost
-// range, i.e. tells the SATB deletion barrier that nothing left the block. That is
-// the fault the GC gates could not see: with the narrowed barrier disabled
-// outright, all six gc-verify self-tests and all 33 gauntlet tortures stayed GREEN.
-// cn1SatbVerifyMove checks the invariant directly and self-test7 requires this to
-// be caught.
+// CN1_GC_FAULT=moverange puts back the narrowed same-block move barrier -- log only the
+// slots whose old value leaves the block -- in cn1RefBlockMove itself. That barrier
+// shipped, lost live objects to a marker scanning the block during the memmove, and no
+// gate saw it; self-test7 requires MoveRace to catch it.
 int cn1GcFaultMoveRange = 0;
 // CN1_GC_FAULT=freelive reclaims a few slots the sweep has just proved LIVE, so a field
 // that is still in use ends up pointing at freed memory. That is the dangling-reference
@@ -233,8 +231,8 @@ static void cn1GcFaultInit(void) {
                 cn1GcFaultDropEvery, CN1_GC_FAULT_MAX_FREES);
     } else if(strcmp(f, "moverange") == 0) {
         cn1GcFaultMoveRange = 1;
-        fprintf(stderr, "[GC-FAULT] same-block move reports an EMPTY lost range "
-                        "(the deletion barrier the gates could not see)\n");
+        fprintf(stderr, "[GC-FAULT] same-block move logs only the slots that leave the "
+                        "block (the narrowed barrier a concurrent scan defeats)\n");
     } else if(strcmp(f, "refnoclear") == 0) {
         cn1GcFaultRefClear = 1;
         fprintf(stderr, "[GC-FAULT] dead referents left in place instead of cleared\n");
@@ -2748,139 +2746,44 @@ void cn1RefBlockSet(CODENAME_ONE_THREAD_STATE, JAVA_LONG block, JAVA_INT index, 
     *slot = value;
 }
 
-#ifdef CN1_GC_VERIFY
-long cn1SatbMoveChecks = 0;
-long cn1SatbMoveViolations = 0;
-
-/* THE DERIVATION IN cn1SatbMoveLostRange, MADE EXECUTABLE AND RUN ON EVERY MOVE.
- *
- * This exists because the gates could not see the barrier it guards. With the
- * same-block deletion barrier removed OUTRIGHT -- a definitely-wrong collector --
- * run-gc-verify.sh's six self-tests and all 33 gauntlet tortures reported GREEN.
- * The narrowing was therefore landed on an argument and an offline proof of the
- * arithmetic, with nothing in the VM able to contradict either. That is the hole
- * this closes, and it was mine: the barrier and those self-tests were written in
- * the same week.
- *
- * The invariant checked is the one the narrowing actually claims:
- *
- *     every overwritten slot whose OLD value survives nowhere in the block
- *     afterwards must lie inside the reported lost range
- *
- * A slot inside the range that did survive is merely conservative and is counted,
- * not reported. A slot OUTSIDE it that did not survive is a reference the snapshot
- * was owed and never got, which is exactly how a live object gets swept.
- *
- * Note what this does NOT depend on: a mark being in progress, a particular thread
- * interleaving, or an object dying at the right moment. It is a property of the
- * move alone, so it is checked on every move rather than only under the bulk
- * handshake, and the self-test that injects a fault against it is deterministic
- * instead of racing the collector. That is the whole reason it can succeed where a
- * torture could not: the previous attempt failed to construct a FAILING workload,
- * because reaching the hazard needs a barrier-free republication path the VM no
- * longer has.
- */
-static void cn1SatbVerifyMove(JAVA_OBJECT* base, JAVA_INT blockCount,
-                              const JAVA_OBJECT* before, JAVA_INT from, JAVA_INT to,
-                              JAVA_INT count, JAVA_INT lostStart, JAVA_INT lostLen) {
-    (void)from;
-    cn1SatbMoveChecks++;
-    for(JAVA_INT j = to ; j < to + count && j < blockCount ; j++) {
-        JAVA_OBJECT old = before[j];
-        if(old == JAVA_NULL || CN1_IS_TAGGED(old)) {
-            continue;
-        }
-        int survives = 0;
-        for(JAVA_INT k = 0 ; k < blockCount ; k++) {
-            if(base[k] == old) { survives = 1; break; }
-        }
-        if(survives) {
-            continue;
-        }
-        if(j >= lostStart && j < lostStart + lostLen) {
-            continue;
-        }
-        cn1SatbMoveViolations++;
-        fprintf(stderr,
-                "[GC-VS] MOVE-RANGE LOST slot %d of [%d,%d) left the block but the "
-                "deletion barrier was only told [%d,%d) (from=%d to=%d count=%d)\n",
-                (int)j, (int)to, (int)(to + count),
-                (int)lostStart, (int)(lostStart + lostLen),
-                (int)from, (int)to, (int)count);
-        fflush(stderr);
-    }
-}
-
-void cn1SatbReportMoveChecks(void) {
-    if(cn1SatbMoveChecks == 0 && cn1SatbMoveViolations == 0) {
-        return;
-    }
-    fprintf(stderr, "[GC-VS] move-range checks=%ld violations=%ld\n",
-            cn1SatbMoveChecks, cn1SatbMoveViolations);
-    fflush(stderr);
-}
-#endif
-
 // BULK MOVE, for the insert/remove shifts ArrayList does with System.arraycopy. The whole
-// source range is logged ONCE under the bulk handshake rather than per element: the
-// per-element barrier takes the SATB mutex per accepted reference, which turns one memmove
-// into an acquisition per element (measured 210x on the grace-pass audit). Overlapping
-// ranges are why this is memmove and not memcpy.
+// range is logged ONCE under the bulk handshake rather than per element: the per-element
+// barrier takes the SATB mutex per accepted reference, which turns one memmove into an
+// acquisition per element (measured 210x on the grace-pass audit). Overlapping ranges are
+// why this is memmove and not memcpy.
+//
+// What is logged is the OLD value of every overwritten slot, [to, to+count), and the
+// reason it is not narrower is in the comment above cn1SatbBulkEnd in cn1_globals.h: a
+// marker scanning this block concurrently with the memmove misses the element the move
+// carries past it, and the bulk handshake does not prevent that -- it holds off mark START
+// and mark TERMINATION, not a marker already inside the mark. Only the deletion half is
+// taken, because every value written here was already in this block.
 void cn1RefBlockMove(CODENAME_ONE_THREAD_STATE, JAVA_LONG block, JAVA_INT from, JAVA_INT to, JAVA_INT count) {
     if(count <= 0 || block == 0) {
         return;
     }
     JAVA_OBJECT* base = (JAVA_OBJECT*)(uintptr_t)block;
-#ifdef CN1_GC_VERIFY
-    /* Snapshot BEFORE the move, and check after it. Unconditional: the invariant
-     * is a property of the move, not of the mark, so checking it only under the
-     * bulk handshake would make the self-test race the collector. */
-    JAVA_INT cn1__vsCount = cn1RefBlockCount(block);
-    JAVA_OBJECT* cn1__vsBefore = 0;
-    if(cn1__vsCount > 0) {
-        cn1__vsBefore = (JAVA_OBJECT*)malloc(sizeof(JAVA_OBJECT) * (size_t)cn1__vsCount);
-        if(cn1__vsBefore != 0) {
-            memcpy(cn1__vsBefore, base, sizeof(JAVA_OBJECT) * (size_t)cn1__vsCount);
-        }
-    }
-#endif
     if(cn1SatbBulkBegin()) {
-        // The DESTINATION range is what is being overwritten, so that is what the
-        // deletion barrier owes the snapshot -- but only the part of it that does
-        // not survive the move. Within one block a shift PERMUTES references, it
-        // does not drop them: min(count, |to-from|) slots actually leave, which is
-        // ONE for ArrayList's insert and remove however long the list is. See
-        // cn1SatbMoveLostRange for the derivation. This was the largest single
-        // mutator cost in the self-hosting profile at 7.8%, nearly all of it
-        // mark-word loads for references that were still in the block afterwards.
-        JAVA_INT lostStart;
-        JAVA_INT lostLen = cn1SatbMoveLostRange(from, to, count, &lostStart);
-        if(lostLen > 0) {
-            cn1SatbEnqueueRangeLocked((JAVA_ARRAY_OBJECT*)(base + lostStart), lostLen);
+        JAVA_INT start = to;
+        JAVA_INT len = count;
+#ifdef CN1_GC_VERIFY
+        if(cn1GcFaultMoveRange) {
+            // The narrowed barrier: [to, to+count) minus [from, from+count).
+            JAVA_INT d = to - from;
+            if(d > 0) {
+                start = (to > from + count) ? to : (from + count);
+                len = (count < d) ? count : d;
+            } else {
+                len = (count < -d) ? count : -d;
+            }
         }
-        // NO INSERTION HALF, and unlike the deletion half it is not narrowed but
-        // dropped: every value this move writes was ALREADY in this same block, so
-        // the move makes nothing newly reachable through this object. The bulk
-        // handshake brackets the memmove, so a concurrent scan sees either the whole
-        // pre-move state (marks a superset of what survives) or the whole post-move
-        // state (and what left went to the deletion barrier above). Neither order
-        // can miss a reference. Across two arrays that argument fails outright --
-        // see java_lang_System_arraycopy, which keeps both halves whenever the
-        // arrays differ.
+#endif
+        if(len > 0) {
+            cn1SatbEnqueueRangeLocked((JAVA_ARRAY_OBJECT*)(base + start), len);
+        }
     }
     memmove(base + to, base + from, (size_t)count * sizeof(JAVA_OBJECT));
     cn1SatbBulkEnd();
-#ifdef CN1_GC_VERIFY
-    if(cn1__vsBefore != 0) {
-        JAVA_INT vsStart;
-        JAVA_INT vsLen = cn1SatbMoveLostRange(from, to, count, &vsStart);
-        /* CN1_GC_FAULT=moverange narrows the range to nothing, which is the exact
-         * shape the GC gates could not detect. The check below must catch it. */
-        if(cn1GcFaultMoveRange) { vsStart = to; vsLen = 0; }
-        cn1SatbVerifyMove(base, cn1__vsCount, cn1__vsBefore, from, to, count, vsStart, vsLen);
-        free(cn1__vsBefore);
-    }
-#endif
 }
 
 // CLEAR, for Arrays.fill(array, a, b, null) -- the range a removal blanks so the dropped
@@ -17026,10 +16929,6 @@ void initConstantPool() {
     // exists to end. Idempotent (cn1GcFaultInit has a done flag), so the GC-path
     // callers are unaffected.
     { extern void cn1GcFaultInitPublic(void); cn1GcFaultInitPublic(); }
-    // Prints "move-range checks=N violations=M". self-test7 reads the check COUNT to
-    // prove the driver actually performed same-block moves: a run that shifted nothing
-    // reports zero violations and is indistinguishable from a clean one.
-    atexit(cn1SatbReportMoveChecks);
 #endif
     atexit(cn1ReportBlockSyscalls);
     atexit(cn1HeapWindowReport);

@@ -4635,6 +4635,13 @@ Profile before touching it.
 
 ## Round 27: the biggest mutator cost was a GC barrier, and no gate could see it
 
+> **RETRACTED by Round 37.** The narrowed barrier below is unsound and has been
+> removed. Its premise -- a reference that stays in the block needs no barrier --
+> ignores a marker scanning the same block while the memmove runs, and that race
+> swept live objects out of the self-hosting translator about one run in twenty.
+> The arithmetic proof and the self-test built on it checked the narrowed range
+> against the narrowed contract, so they could only ever agree with the mistake.
+
 A profile of the mutator (main thread only -- the all-thread view is ~78% idle
 GC workers and says nothing) put one function on top:
 
@@ -6010,3 +6017,68 @@ carries a cache-line split whose note records the same effect measured there --
 adding marker threads that have idle cores to run on". Today's 2-vs-4 marker gap
 (25.3 vs 26.7ms) is the residual of a known, already-attacked problem, which is
 independent support for moving collector-written words off the mutator's lines.
+
+## Round 37: the intermittent self-hosting crash was the Round 27 move barrier
+
+The self-hosted translator failed about one run in twenty on the hello corpus at
+`CN1_GC_TRIGGER_MB=4` -- a SIGSEGV or an uncaught NullPointerException, somewhere
+different each time. It survived master's #5882 class-literal fix (2 failures in 60
+with it cherry-picked), and a bisect over the parallel-grace commits cleared them:
+99b49f66f9 failed 5/80 and 9fd88470ad 1/80, both before the fresh-child skip that
+looked like the obvious suspect.
+
+**What found it was the verifier, not the crash.** A `-DCN1_GC_VERIFY` build of the
+self-hosted translator reported the defect on its first run, and with the same
+signature every time:
+
+    holder = java.util.ArrayList mark=51 (epoch+0)
+    field  -> com.codename1.tools.translator.bytecodes.LineNumber mark=50
+    victim = object AGED OUT by this sweep (page-resident)
+
+A live instruction list held a LineNumber the collector had not marked this cycle.
+The list's elements live in a native reference block, and the translator shifts those
+blocks constantly (`remove(int)`, `add(int, E)`) -- which went through the barrier
+Round 27 narrowed to "only the slot whose value leaves the block".
+
+**The narrowing's premise was wrong.** It holds for a move in isolation and fails
+against a marker scanning the same block while the memmove runs. `remove(0)`'s memmove
+moves upward faster than the marker walks, overtakes it, and carries one element from
+the unscanned side of the scan position to the scanned side, where neither look finds
+it. The bulk handshake does not prevent this: it holds off mark START and mark
+TERMINATION, not a marker already inside the mark. The arithmetic proof and the
+Round 27 self-test both checked the narrowed range against the narrowed contract, so
+they could only ever agree with the mistake.
+
+A/B in one verify binary, with the narrowing switched at runtime, interleaved:
+
+| arm | verify runs with a dangling reference |
+|---|---|
+| narrowed (Round 27) | 4 of 6 (6 violations) |
+| whole destination range | 0 of 6 |
+
+and on the shipping `-O3` build afterwards: **0 failures in 120**, against a rate that
+predicts ~6.
+
+**The fix** logs the old value of every overwritten slot, `[to, to+count)`, in both
+same-block paths (`cn1RefBlockMove` and same-array `System.arraycopy`). That is sound
+for any scan order and any store ordering: a moved value either had its old slot inside
+that range, so it is logged, or it never leaves its old slot during the move, so a scan
+finds it there. No insertion half is needed, for the same reason.
+
+**The gate that can see it.** `MoveRace` rotates a 200,000-element list of old objects
+with `add(remove(0))` while another thread runs collections back to back; self-test7
+re-injects the narrowed barrier into `cn1RefBlockMove` with `CN1_GC_FAULT=moverange`
+and requires the verifier to report dangling references. Measured: 80-100 violations
+in every faulted run, none in any clean one. It replaces `ListShift`,
+`cn1SatbVerifyMove` and `cbench/test_satb_range`, which verified the arithmetic of a
+contract that was itself wrong.
+
+What this gives back is Round 27's win: the per-move barrier is O(count) again during a
+mark (never outside one). The cost is measured separately, on a quiet machine.
+
+Two things worth keeping. **A crash that moves around is a missing mark; point the
+verifier at the real workload before bisecting** -- a bisect at a 5% failure rate needs
+60+ runs per point and still misled here, while one verify run named the class, the
+holder and the epoch. And **"a property of the move alone" was the tell**: a barrier
+exists because of concurrency, so an argument for weakening one that never mentions the
+concurrent reader has not been made.

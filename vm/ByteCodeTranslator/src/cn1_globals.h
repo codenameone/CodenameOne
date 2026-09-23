@@ -1604,47 +1604,24 @@ extern void cn1SatbEnqueue(JAVA_OBJECT old);
 extern volatile int gcSatbTerminating;
 extern JAVA_BOOLEAN cn1SatbBulkBegin(void);
 extern void cn1SatbEnqueueRangeLocked(JAVA_ARRAY_OBJECT* refs, int count);
-#ifdef CN1_GC_VERIFY
-/// Prints the same-block move-range check tally at exit; see cn1SatbVerifyMove.
-extern void cn1SatbReportMoveChecks(void);
-#endif
-
-/// A move WITHIN one reference block drops far less than it touches, and the
-/// deletion barrier only owes the snapshot what is actually dropped.
+/// A MOVE WITHIN ONE REFERENCE BLOCK OWES THE DELETION BARRIER EVERY SLOT IT OVERWRITES.
 ///
-/// Slots [to, to+count-1] are overwritten. The old value at slot j survives the
-/// move exactly when j is in [from, from+count-1], because the move writes it to
-/// j + (to-from). So the set whose old contents genuinely leave the block is
+/// The tempting narrowing is to log only the min(count, |to-from|) slots whose old
+/// value leaves the block, since a shift otherwise only permutes references. It is
+/// wrong, and it shipped for a while: a marker can be scanning this same block WHILE
+/// the memmove runs, and nothing orders the two. For ArrayList.remove(0) the memmove
+/// runs upward faster than the marker does, overtakes it, and the one element that
+/// slides from the unscanned side of the scan position to the scanned side is seen
+/// in neither place. That element is logged by nobody and swept under a live list:
+/// the self-hosting translator lost a LineNumber out of an instruction list this way,
+/// about one run in twenty. MoveRace (run-gc-verify.sh) reproduces it.
 ///
-///     [to, to+count-1] \ [from, from+count-1]
-///
-/// which is contiguous and holds min(count, |to-from|) slots -- ONE for the
-/// insert and remove shifts ArrayList performs, whatever the list's length.
-/// Logging the whole destination range instead costs a mark-word load per moved
-/// element, scattered across the heap, and that was the single largest mutator
-/// cost in the self-hosting profile (7.8%).
-///
-/// Returns the number of lost slots and writes their start to *lostStart.
-/// Conservative in the one direction that is safe: a value that also appears
-/// elsewhere in the block is enqueued anyway, which only over-marks.
-///
-/// THIS IS ONLY VALID WITHIN A SINGLE BLOCK. Across two arrays nothing is
-/// preserved by the move, so every overwritten slot is owed -- see the caller in
-/// java_lang_System_arraycopy, which applies this only when src and dst are the
-/// same array.
-static inline JAVA_INT cn1SatbMoveLostRange(JAVA_INT from, JAVA_INT to, JAVA_INT count, JAVA_INT* lostStart) {
-    JAVA_INT d = to - from;
-    if(d == 0) {
-        *lostStart = to;
-        return 0;
-    }
-    if(d > 0) {
-        *lostStart = (to > from + count) ? to : (from + count);
-        return (count < d) ? count : d;
-    }
-    *lostStart = to;
-    return (count < -d) ? count : -d;
-}
+/// Logging the whole overwritten range [to, to+count) is sound for any scan order and
+/// any store ordering: a moved value either had its old slot inside that range, so its
+/// old value is logged, or it never leaves its old slot during the move (the tail of a
+/// left shift, the head of a right shift), so a scan finds it there whenever it looks.
+/// No insertion half is needed for the same reason -- nothing is written that was not
+/// already in the block.
 extern void cn1SatbBulkEnd(void);
 extern void cn1SatbBulkQuiesce(void);
 #if defined(CN1_DISABLE_SATB)

@@ -350,59 +350,56 @@ if [ "$seOk" -eq 1 ]; then
     fi
 fi
 
-# Seventh self-test, for the SAME-BLOCK SATB DELETION BARRIER -- and it exists because
-# this script could not see that barrier at all.
+# Seventh self-test, for the SAME-BLOCK SATB DELETION BARRIER.
 #
-# The barrier was narrowed from "log the whole destination range" to "log only the
-# min(count, |to-from|) slots that actually leave the block". To check whether these
-# gates covered the claim, the barrier was then removed OUTRIGHT -- a definitely-wrong
-# collector -- and all six self-tests above plus all 33 gauntlet tortures reported
-# GREEN. The narrowing was landed on an argument and an offline proof of the
-# arithmetic, with nothing in the VM able to contradict either.
+# A shift within one reference block (ArrayList.remove / add(int, E)) must log the old
+# value of EVERY slot it overwrites. It was once narrowed to the one slot whose value
+# leaves the block, on the argument that a shift only permutes references -- and that
+# argument forgot the marker scanning the same block while the memmove runs. remove(0)'s
+# memmove overtakes an upward scan and carries one element from the unscanned side to the
+# scanned side, where neither look finds it. The self-hosting translator lost a live
+# LineNumber that way about one run in twenty, while the previous version of this
+# self-test stayed green: it checked the ARITHMETIC of the narrowed range against the
+# narrowed contract, so it could only ever agree with the mistake.
 #
-# What makes this checkable, where an earlier GC torture could not be made to fail, is
-# that the invariant does not involve the collector:
-#
-#     every overwritten slot whose OLD value survives nowhere in the block afterwards
-#     must lie inside the range handed to the deletion barrier
-#
-# cn1SatbVerifyMove checks exactly that on every move, so the fault is deterministic
-# rather than a race against a mark. CN1_GC_FAULT=moverange reports an EMPTY lost
-# range, which is precisely the removal these gates could not detect.
+# This one drives the real race. MoveRace rotates a 200,000-element list of old objects
+# while another thread runs collections back to back; CN1_GC_FAULT=moverange puts the
+# narrowed barrier back into cn1RefBlockMove, and the verifier must then report the
+# swept elements as dangling. Measured: ~95 dangling references in every faulted run,
+# none in any clean one.
 printf '%-16s ' "self-test7"
-rm -f ./target/bin/ListShift-verify
-if ! ./translate-and-build.sh ListShift target/bin/ListShift-verify -DCN1_GC_VERIFY \
-        > target/bin/ListShift-selftest-build.log 2>&1; then
-    echo "BROKEN -- could not build ListShift for the move-range self-test"
-    tail -25 target/bin/ListShift-selftest-build.log
+rm -f ./target/bin/MoveRace-verify
+if ! ./translate-and-build.sh MoveRace target/bin/MoveRace-verify -DCN1_GC_VERIFY \
+        > target/bin/MoveRace-selftest-build.log 2>&1; then
+    echo "BROKEN -- could not build MoveRace for the move-barrier self-test"
+    tail -25 target/bin/MoveRace-selftest-build.log
     fail=1
-elif [ ! -x ./target/bin/ListShift-verify ]; then
-    echo "BROKEN -- could not build ListShift for the move-range self-test"
+elif [ ! -x ./target/bin/MoveRace-verify ]; then
+    echo "BROKEN -- could not build MoveRace for the move-barrier self-test"
     fail=1
 else
-    mrClean="$(./target/bin/ListShift-verify 2>&1)" || true
-    mrFault="$(CN1_GC_FAULT=moverange ./target/bin/ListShift-verify 2>&1)" || true
-    mrCleanHits="$(printf '%s' "$mrClean" | grep -c 'MOVE-RANGE LOST' || true)"
-    mrFaultHits="$(printf '%s' "$mrFault" | grep -c 'MOVE-RANGE LOST' || true)"
-    # "the workload performed moves at all" is a separate claim from "the check
-    # passed": a driver that shifted nothing would report zero on both arms and look
-    # identical to a clean run. That is the vacuity this whole self-test is about.
-    mrChecks="$(printf '%s' "$mrClean" | grep -oE 'move-range checks=[0-9]+' | tail -1 | cut -d= -f2)"
-    [ -z "$mrChecks" ] && mrChecks=0
-    if [ "$mrChecks" -eq 0 ]; then
-        echo "BROKEN -- ListShift performed no same-block moves, so the check proved nothing"
+    mrClean="$(./target/bin/MoveRace-verify 2>&1)" || true
+    mrFault="$(CN1_GC_FAULT=moverange ./target/bin/MoveRace-verify 2>&1)" || true
+    mrCleanHits="$(printf '%s' "$mrClean" | grep -c 'GC-VERIFY. DANGLING' || true)"
+    mrFaultHits="$(printf '%s' "$mrFault" | grep -c 'GC-VERIFY. DANGLING' || true)"
+    # A clean run that never finished a collection verified nothing, and would look
+    # exactly like a correct barrier.
+    mrPasses="$(printf '%s' "$mrClean" | sed -n 's/.*SUMMARY passes=\([0-9]*\).*/\1/p' | tail -1)"
+    [ -z "$mrPasses" ] && mrPasses=0
+    if [ "$mrPasses" -eq 0 ]; then
+        echo "BROKEN -- MoveRace finished no verify pass, so the clean arm proved nothing"
         printf '%s\n' "$mrClean" | tail -5
         fail=1
     elif [ "$mrCleanHits" -ne 0 ]; then
-        echo "BROKEN -- the check reported a lost slot in correctly compiled code"
-        printf '%s\n' "$mrClean" | grep 'MOVE-RANGE LOST' | head -3
+        echo "FAILED -- the same-block move barrier lost a live object"
+        printf '%s\n' "$mrClean" | grep -A 4 'DANGLING' | head -12
         fail=1
     elif [ "$mrFaultHits" -eq 0 ]; then
-        echo "BROKEN -- an EMPTY lost range was reported and NOTHING noticed"
+        echo "BROKEN -- the narrowed move barrier was re-injected and NOTHING noticed"
         printf '%s\n' "$mrFault" | tail -5
         fail=1
     else
-        echo "caught the emptied move range ($mrFaultHits reports, $mrChecks moves checked clean)"
+        echo "caught the narrowed move barrier ($mrFaultHits reports, $mrPasses clean passes)"
     fi
 fi
 

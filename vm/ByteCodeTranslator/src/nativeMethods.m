@@ -1111,18 +1111,14 @@ JAVA_VOID java_lang_System_arraycopy___java_lang_Object_int_java_lang_Object_int
             // reference; this used to be two locked enqueues per element. See
             // cn1SatbEnqueueRangeLocked.
             if(srcArr == dstArr) {
-                // SAME ARRAY -- the overlap-safe shift ArrayList and the ASM tree
-                // classes perform. A move within one array permutes its references
-                // rather than dropping them, so the snapshot is owed only the
-                // min(length, |dstOffset-srcOffset|) slots that actually leave, and
-                // the insertion half is owed nothing at all: every value written was
-                // already in this array. cn1SatbMoveLostRange carries the derivation,
-                // and cn1RefBlockMove the argument for dropping the insertion half.
-                JAVA_INT lostStart;
-                JAVA_INT lostLen = cn1SatbMoveLostRange(srcOffset, dstOffset, length, &lostStart);
-                if(lostLen > 0) {
-                    cn1SatbEnqueueRangeLocked(((JAVA_ARRAY_OBJECT*)CN1_ARRAY_DATA(dstArr)) + lostStart, lostLen);
-                }
+                // SAME ARRAY -- the overlap-safe shift the ASM tree classes and any
+                // array-backed list perform. Every overwritten slot is logged, not just
+                // the ones whose value leaves the array: a marker can be scanning this
+                // array while the memmove runs and miss the element the move carries
+                // past it. The insertion half is still owed nothing, because every value
+                // written was already in this array. See the comment above
+                // cn1SatbBulkEnd in cn1_globals.h.
+                cn1SatbEnqueueRangeLocked(((JAVA_ARRAY_OBJECT*)CN1_ARRAY_DATA(dstArr)) + dstOffset, length);
             } else {
                 // TWO ARRAYS: nothing is preserved by the copy, so every overwritten
                 // slot is owed, and the copy really does publish references into an
