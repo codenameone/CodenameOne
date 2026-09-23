@@ -753,6 +753,40 @@ public class ConnectionRequest implements IOProgressListener {
         }
     }
 
+    /// Adds a header only when the request does not already carry one of that name, in any
+    /// spelling -- the counterpart of [#removeRequestHeaderIfUnchanged(String, String)] for
+    /// a layer that decorates a request it does not own. A tracer adding `traceparent` is
+    /// the case it exists for: when the app set its own, that is a deliberate choice of
+    /// which trace the request belongs to, and replacing it would move the request into
+    /// another one.
+    ///
+    /// #### Parameters
+    ///
+    /// - `key`: the header key, matched without regard to case as HTTP requires
+    ///
+    /// - `value`: the header value
+    ///
+    /// #### Returns
+    ///
+    /// true when the header was added, false when one was already there
+    public boolean addRequestHeaderIfAbsent(String key, String value) {
+        if (key == null || value == null) {
+            return false;
+        }
+        if (userHeaders != null) {
+            Enumeration keys = userHeaders.keys();
+            while (keys.hasMoreElements()) {
+                String existing = (String) keys.nextElement();
+                if (existing != null && existing.length() == key.length()
+                        && equalsIgnoreAsciiCase(existing, key)) {
+                    return false;
+                }
+            }
+        }
+        addRequestHeader(key, value);
+        return true;
+    }
+
     /// ASCII-only case-insensitive comparison, so the result never depends on the device locale --
     /// under the Turkish locale an uppercase `I` does not fold to `i`.
     private static boolean equalsIgnoreAsciiCase(String a, String b) {
@@ -1143,6 +1177,7 @@ public class ConnectionRequest implements IOProgressListener {
             // blocking token fetch would stall every other request.
             requestGuard.beforeRequest(this);
         }
+        tracerResponded = false;
         NetworkTracer tracer = NetworkManager.getNetworkTracer();
         if (tracer != null) {
             // After the guard, so the attempt the tracer times is the one that is
@@ -1151,6 +1186,7 @@ public class ConnectionRequest implements IOProgressListener {
             // that overrides it cannot drop the trace context.
             try {
                 tracerAttempt = tracer.beforeRequest(this, tracerParent);
+                tracerOwner = tracerAttempt == null ? null : tracer;
             } catch (Throwable t) {
                 Log.e(t);
             }
@@ -1283,6 +1319,7 @@ public class ConnectionRequest implements IOProgressListener {
             }
             timeSinceLastUpdate = System.currentTimeMillis();
             responseCode = impl.getResponseCode(connection);
+            tracerResponded = true;
 
             if (isCookiesEnabled()) {
                 String[] cookies = impl.getHeaderFields("Set-Cookie", connection);
@@ -1526,6 +1563,17 @@ public class ConnectionRequest implements IOProgressListener {
     /// The attempt in flight, as the tracer's own state; null when none is being
     /// traced. Set on the network thread and cleared there when the attempt ends.
     Object tracerAttempt;
+
+    /// The tracer that started [#tracerAttempt], which is the one that ends it. The
+    /// slot can be replaced or emptied while the attempt is in flight, and handing
+    /// one tracer's state to another -- or to none -- would leak it and lose the span.
+    NetworkTracer tracerOwner;
+
+    /// Whether this attempt received a status line. Set the moment the status is
+    /// read, because a followed redirect and a 304 revalidation both return before
+    /// the guard's capture runs, and reporting them as "no response" hid the very
+    /// 3xx that explains the attempt.
+    boolean tracerResponded;
 
     private void captureGuardHeaders(Object connection) {
         NetworkGuard guard = NetworkManager.getNetworkGuard();

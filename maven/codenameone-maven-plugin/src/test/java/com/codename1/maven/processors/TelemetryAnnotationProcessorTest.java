@@ -98,6 +98,23 @@ public class TelemetryAnnotationProcessorTest {
     }
 
     @Test
+    public void removingTheAnnotationRemovesTheBootstrapAnEarlierBuildLeft() throws Exception {
+        // Maven keeps target/classes between builds, and the builders install
+        // whatever bootstrap class is there.
+        File classes = compile("");
+        Map<String, String> earlier = new LinkedHashMap<String, String>();
+        earlier.put("cn1app.TelemetryBootstrap",
+                "package cn1app;\npublic final class TelemetryBootstrap {\n}\n");
+        JavaSourceCompiler.compile(earlier, classes, Arrays.asList(testClassesDir()));
+        File stale = new File(classes, "cn1app/TelemetryBootstrap.class");
+        assertTrue("the fixture did not compile", stale.isFile());
+        ProcessorContext ctx = run(classes);
+        assertFalse(ctx.hasErrors());
+        assertFalse("a bootstrap for telemetry nobody asks for any more was left to ship",
+                stale.exists());
+    }
+
+    @Test
     public void nowhereToSendIsRefused() throws Exception {
         assertRefused("@OpenTelemetry(serviceName = \"x\")");
     }

@@ -203,6 +203,116 @@ class TelemetryTest extends UITestBase {
         }
     }
 
+    @Test
+    void aRedirectIsTwoAttemptsEachWithItsOwnStatusAndHeader() throws Exception {
+        // The first attempt answers 302. It returns before the guard's capture
+        // runs, and was reported as "no response"; and the request object is
+        // reused for the second attempt, which must carry ITS span, not the
+        // first attempt's header left behind.
+        TestCodenameOneImplementation impl = TestCodenameOneImplementation.getInstance();
+        TestCodenameOneImplementation.TestConnection hop = impl.createConnection("http://hop.test/a");
+        hop.setResponseCode(302);
+        hop.setHeader("location", API + "?hopped");
+        Telemetry.install(new TelemetryConfig().direct("http://collector.test"));
+        NetworkManager.getInstance().addToQueueAndWait(request("http://hop.test/a"));
+        String second = connection(API + "?hopped").getHeaders().get("traceparent");
+        assertNotNull(second, "the redirected attempt was not traced");
+
+        Telemetry.flush();
+        List<Span> spans = exported(2);
+        Span redirect = null;
+        Span landed = null;
+        for (Span span : spans) {
+            String status = attribute(span.getAttributesList(), "http.response.status_code");
+            if ("302".equals(status)) {
+                redirect = span;
+            } else if ("200".equals(status)) {
+                landed = span;
+            }
+        }
+        assertNotNull(redirect, "the 302 attempt must report its status: " + spans);
+        assertNotNull(landed, "the attempt the redirect reached: " + spans);
+        assertEquals(hex(landed.getSpanId()), second.substring(36, 52),
+                "the second attempt carried its own span, not the first's header");
+        assertFalse(hex(redirect.getSpanId()).equals(hex(landed.getSpanId())));
+    }
+
+    @Test
+    void anAppsOwnTraceparentIsNeverReplacedAndOursDoesNotOutliveTheAttempt() throws Exception {
+        Telemetry.install(new TelemetryConfig().direct("http://collector.test"));
+        String mine = "00-11111111111111111111111111111111-2222222222222222-01";
+        ConnectionRequest own = request(API + "?own");
+        own.addRequestHeader("Traceparent", mine);
+        NetworkManager.getInstance().addToQueueAndWait(own);
+        assertEquals(mine, connection(API + "?own").getHeaders().get("Traceparent"));
+        assertNull(connection(API + "?own").getHeaders().get("traceparent"),
+                "a second spelling of the header was added beside the app's");
+
+        ConnectionRequest ours = request(API + "?ours");
+        NetworkManager.getInstance().addToQueueAndWait(ours);
+        assertNotNull(connection(API + "?ours").getHeaders().get("traceparent"));
+        assertTrue(ours.addRequestHeaderIfAbsent("traceparent", "x"),
+                "the tracer's header must be taken off the request when the attempt ends");
+    }
+
+    @Test
+    void theCurrentSpanBelongsToTheThreadThatStartedIt() throws Exception {
+        Telemetry.install(new TelemetryConfig().direct("http://collector.test"));
+        final TelemetrySpan[] seenElsewhere = new TelemetrySpan[] {Telemetry.startSpan("sentinel")};
+        Telemetry.run("action", new Runnable() {
+            @Override
+            public void run() {
+                Thread other = new Thread(new Runnable() {
+                    @Override
+                    public void run() {
+                        seenElsewhere[0] = Telemetry.getCurrentSpan();
+                    }
+                });
+                other.start();
+                try {
+                    other.join();
+                } catch (InterruptedException err) {
+                    Thread.currentThread().interrupt();
+                }
+                assertNotNull(Telemetry.getCurrentSpan());
+            }
+        });
+        assertNull(seenElsewhere[0], "another thread saw this thread's action as its own");
+    }
+
+    @Test
+    void anAttemptIsEndedByTheTracerThatStartedIt() throws Exception {
+        // The slot can be emptied while an attempt is in flight; the attempt must
+        // still be ended, and by its own tracer.
+        final int[] ended = new int[1];
+        NetworkManager.setNetworkTracer(new com.codename1.io.NetworkTracer() {
+            @Override
+            public Object requestQueued(ConnectionRequest request) {
+                return null;
+            }
+
+            @Override
+            public Object beforeRequest(ConnectionRequest request, Object parent) {
+                NetworkManager.setNetworkTracer(null);
+                return "attempt";
+            }
+
+            @Override
+            public void afterRequest(ConnectionRequest request, Object attempt, int status,
+                                     Throwable error) {
+                if ("attempt".equals(attempt)) {
+                    ended[0]++;
+                }
+            }
+        });
+        try {
+            NetworkManager.getInstance().addToQueueAndWait(request(API + "?swap"));
+        } finally {
+            NetworkManager.setNetworkTracer(null);
+        }
+        assertEquals(1, ended[0]);
+    }
+
     // ------------------------------------------------------------------
 
     private static ConnectionRequest request(String url) {

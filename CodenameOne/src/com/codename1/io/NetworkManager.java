@@ -1211,22 +1211,19 @@ public final class NetworkManager {
                     req.complete = true;
                 }
                 Object attempt = req.tracerAttempt;
-                if (attempt != null) {
+                NetworkTracer owner = req.tracerOwner;
+                if (attempt != null && owner != null) {
                     // Cleared first, so an attempt is ended exactly once however the
-                    // tracer behaves, and a retry starts from nothing.
+                    // tracer behaves, and a retry starts from nothing. Ended by the
+                    // tracer that STARTED it, not whichever is installed now.
                     req.tracerAttempt = null;
-                    NetworkTracer tracer = getNetworkTracer();
-                    if (tracer != null) {
-                        try {
-                            // Only a status THIS attempt received: a reused request
-                            // still holds the last one's, which the guard learned
-                            // to distrust for the same reason.
-                            tracer.afterRequest(req, attempt,
-                                    req.hasGuardResponse() ? req.getResponseCode() : -1, failure);
-                        } catch (Throwable t) {
-                            // Observation must never change a request's outcome.
-                            Log.e(t);
-                        }
+                    req.tracerOwner = null;
+                    try {
+                        owner.afterRequest(req, attempt,
+                                req.tracerResponded ? req.getResponseCode() : -1, failure);
+                    } catch (Throwable t) {
+                        // Observation must never change a request's outcome.
+                        Log.e(t);
                     }
                 }
                 NetworkGuard guard = getNetworkGuard();

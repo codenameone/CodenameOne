@@ -170,9 +170,14 @@ public final class OtlpTracer implements Tracer {
                     + BatchExporter.redact(endpoint) + "'");
         }
 
+        // The signal-specific setting REPLACES the generic one, as the endpoint and
+        // protocol settings do and as the specification says: it is not a list to
+        // append to. Appending sent both, and Web sends every line, so a deployment
+        // that set a traces-only token next to a generic one exported two
+        // Authorization headers and was refused by collectors that reject that.
         List headers = new ArrayList();
-        parseHeaders(config.get(HEADERS), headers);
-        parseHeaders(config.get(TRACES_HEADERS), headers);
+        String tracesHeaders = config.get(TRACES_HEADERS);
+        parseHeaders(tracesHeaders != null ? tracesHeaders : config.get(HEADERS), headers);
 
         Map resourceAttributes = new LinkedHashMap();
         parsePairs(config.get(RESOURCE_ATTRIBUTES), resourceAttributes, RESOURCE_ATTRIBUTES);

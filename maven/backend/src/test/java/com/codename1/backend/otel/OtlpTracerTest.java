@@ -74,6 +74,7 @@ class OtlpTracerTest {
     private final List exports = Collections.synchronizedList(new ArrayList());
     private final List contentTypes = Collections.synchronizedList(new ArrayList());
     private final List authorizations = Collections.synchronizedList(new ArrayList());
+    private final List authorizationCounts = Collections.synchronizedList(new ArrayList());
 
     @BeforeEach
     void startCollector() throws IOException {
@@ -82,6 +83,8 @@ class OtlpTracerTest {
             exports.add(readAll(exchange.getRequestBody()));
             contentTypes.add(exchange.getRequestHeaders().getFirst("Content-Type"));
             authorizations.add(String.valueOf(exchange.getRequestHeaders().getFirst("Authorization")));
+            List all = exchange.getRequestHeaders().get("Authorization");
+            authorizationCounts.add(Integer.valueOf(all == null ? 0 : all.size()));
             exchange.sendResponseHeaders(200, -1);
             exchange.close();
         });
@@ -268,6 +271,33 @@ class OtlpTracerTest {
             backend.stop();
         }
         assertTrue(exports.isEmpty());
+    }
+
+    @Test
+    @DisplayName("the traces-specific headers replace the generic ones rather than adding to them")
+    void signalHeadersReplaceGenericOnes() throws Exception {
+        int port = freePort();
+        Properties settings = settings(port);
+        settings.setProperty(OtlpTracer.TRACES_HEADERS, "Authorization=Api-Token%20traces");
+        Backend backend = Backend.builder(Config.of(settings, "test"))
+                .quiet()
+                .tracing(new OtlpTracer("pets"))
+                .handler(new HttpServer.Handler() {
+                    public HttpServer.Response handle(HttpServer.Request request) throws Exception {
+                        return HttpServer.Response.text(200, "ok");
+                    }
+                })
+                .start();
+        try {
+            HttpURLConnection connection = (HttpURLConnection)new URL(
+                    "http://127.0.0.1:" + port + "/x").openConnection();
+            assertEquals(200, connection.getResponseCode());
+        } finally {
+            backend.stop();
+        }
+        assertEquals("Api-Token traces", authorizations.get(0));
+        assertEquals(Integer.valueOf(1), authorizationCounts.get(0),
+                "two Authorization headers went to the collector");
     }
 
     @Test

@@ -13,10 +13,7 @@ Put `@OpenTelemetry` on the main class:
 
 [source,java]
 ----
-@OpenTelemetry(relay = "https://api.example.com", serviceName = "shop-app")
-public class ShopApp extends Lifecycle {
-    ...
-}
+include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/AppTracingSnippets.java[tag=app-otel-relay,indent=0]
 ----
 
 The build generates a bootstrap that installs `com.codename1.telemetry.Telemetry`
@@ -44,9 +41,7 @@ web build never has to reach a collector on another origin.
 
 [source,java]
 ----
-@OpenTelemetry(endpoint = "https://abc12345.live.dynatrace.com/api/v2/otlp",
-        headers = "Authorization: Api-Token dt0c01.XXXX")
-public class ShopApp extends Lifecycle { ... }
+include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/AppTracingSnippets.java[tag=app-otel-direct,indent=0]
 ----
 
 The header is compiled into the app, and anyone who installs the app can read
@@ -63,7 +58,7 @@ user action causes, run the action inside a span:
 
 [source,java]
 ----
-Telemetry.run("checkout", () -> cart.submit());
+include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/AppTracingSnippets.java[tag=app-otel-run,indent=0]
 ----
 
 Requests queued while `checkout` is running become its children, and so does the
@@ -106,10 +101,7 @@ for example to choose the endpoint at run time:
 
 [source,java]
 ----
-Telemetry.install(new TelemetryConfig()
-        .relay("https://api.example.com")
-        .serviceName("shop-app")
-        .sampleRatio(0.2));
+include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/AppTracingSnippets.java[tag=app-otel-install,indent=0]
 ----
 
 Spans are exported in batches, when 32 have ended or every ten seconds.

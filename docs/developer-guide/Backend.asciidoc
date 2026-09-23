@@ -614,9 +614,7 @@ annotation, on any class in the backend module:
 
 [source,java]
 ----
-@OpenTelemetry(serviceName = "notes")
-@RestController
-public class NotesController { ... }
+include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/TracingSnippets.java[tag=backend-otel-annotation,indent=0]
 ----
 
 or, without touching the source, in `application.properties`:
@@ -683,7 +681,7 @@ the Lambda loop itself -- installs the tracer in one line:
 
 [source,java]
 ----
-Tracing.install(OtlpTracer.open(Config.load(), "notes"));
+include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/TracingSnippets.java[tag=backend-otel-install,indent=0]
 ----
 
 Under Lambda, the invocation continues the trace the host passes in its X-Ray

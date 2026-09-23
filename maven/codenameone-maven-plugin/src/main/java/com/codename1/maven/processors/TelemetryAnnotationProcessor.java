@@ -133,7 +133,22 @@ public final class TelemetryAnnotationProcessor extends AbstractAnnotationProces
 
     @Override
     public void finish(ProcessorContext ctx) throws ProcessingException {
-        if (ctx.hasErrors() || accepted == null) {
+        if (ctx.hasErrors()) {
+            return;
+        }
+        if (accepted == null) {
+            // NOTHING ASKS FOR TELEMETRY NOW, so a bootstrap an earlier build left in
+            // target/classes has to go. The builders install whatever bootstrap class
+            // is present rather than asking whether the annotation still is, and
+            // Maven keeps target/classes across a build without clean -- so removing
+            // @OpenTelemetry, or deleting the class it was on, went on shipping the
+            // old endpoint, token and consent setting until someone ran clean.
+            File stale = new File(ctx.getOutputClassDir(),
+                    BOOTSTRAP_BINARY.replace('.', File.separatorChar) + ".class");
+            if (stale.isFile() && !stale.delete()) {
+                ctx.getLog().warn("cn1: could not remove the stale " + stale + "; a build "
+                        + "without clean may still install telemetry the project no longer asks for");
+            }
             return;
         }
         Map<String, String> sources = new LinkedHashMap<String, String>();

@@ -68,18 +68,22 @@ import java.util.Timer;
 /// by default, which keeps the collector's credentials out of the app (see
 /// [TelemetryConfig]).
 public final class Telemetry {
+    private static final String TRACEPARENT = "traceparent";
     private static State state;
-    /// The span [#run(String, Runnable)] has made current. The EDT's, in practice:
-    /// that is where a user action runs and where most requests are queued.
-    private static TelemetrySpan current;
+    /// The span [#run(String, Runnable)] has made current, per thread. Mostly the
+    /// EDT's, since that is where a user action runs and where requests are queued,
+    /// but `run` is public and a background task may time its own work: one static
+    /// slot let two overlapping tasks adopt and restore each other's spans.
+    private static final ThreadLocal<TelemetrySpan> CURRENT = new ThreadLocal<TelemetrySpan>();
 
     private Telemetry() {
     }
 
     /// Installs telemetry, replacing any earlier installation.
     ///
-    /// Safe to call before `Display.init`: nothing that needs the display is read
-    /// until the first export.
+    /// Safe to call before `Display.init`, which is where the generated bootstrap
+    /// calls it: nothing that needs the platform -- not even the secure random
+    /// source the ids come from -- is touched until the first span.
     ///
     /// #### Parameters
     ///
@@ -91,15 +95,6 @@ public final class Telemetry {
             Log.p("Telemetry: no endpoint configured, so no spans are recorded");
             return;
         }
-        try {
-            // Asked once, up front: a port with no secure random source cannot
-            // make ids, and finding that out per request would fail every one.
-            SecureRandom.bytes(8);
-        } catch (RuntimeException err) {
-            Log.p("Telemetry: this platform has no secure random source, so it cannot make "
-                    + "trace ids; telemetry stays off");
-            return;
-        }
         State installed = new State(config);
         state = installed;
         NetworkManager.setNetworkTracer(installed);
@@ -109,7 +104,7 @@ public final class Telemetry {
     public static void uninstall() {
         State old = state;
         state = null;
-        current = null;
+        CURRENT.remove();
         if (old != null) {
             NetworkManager.setNetworkTracer(null);
             old.stop();
@@ -129,11 +124,10 @@ public final class Telemetry {
     /// - `name`: what the span times
     public static TelemetrySpan startSpan(String name) {
         State s = state;
-        if (s == null || !s.permitted()) {
-            return new TelemetrySpan(null, name, TelemetrySpan.KIND_INTERNAL,
-                    "00000000000000000000000000000000", "0000000000000000", null, false);
-        }
-        return s.start(name, TelemetrySpan.KIND_INTERNAL, current);
+        TelemetrySpan span = s == null || !s.permitted() ? null
+                : s.start(name, TelemetrySpan.KIND_INTERNAL, CURRENT.get());
+        return span != null ? span : new TelemetrySpan(null, name, TelemetrySpan.KIND_INTERNAL,
+                "00000000000000000000000000000000", "0000000000000000", null, false);
     }
 
     /// Runs `work` inside a new span, which is current while it runs: requests
@@ -147,22 +141,22 @@ public final class Telemetry {
     /// - `work`: the work
     public static void run(String name, Runnable work) {
         TelemetrySpan span = startSpan(name);
-        TelemetrySpan previous = current;
-        current = span;
+        TelemetrySpan previous = CURRENT.get();
+        CURRENT.set(span);
         try {
             work.run();
         } catch (RuntimeException err) {
             span.recordException(err);
             throw err;
         } finally {
-            current = previous;
+            CURRENT.set(previous);
             span.end();
         }
     }
 
-    /// The span [#run(String, Runnable)] made current, or null.
+    /// The span [#run(String, Runnable)] made current on this thread, or null.
     public static TelemetrySpan getCurrentSpan() {
-        return current;
+        return CURRENT.get();
     }
 
     /// Exports what is buffered now, rather than at the next interval. Call it
@@ -186,6 +180,8 @@ public final class Telemetry {
         private Timer timer;
         private Map<String, Object> resource;
         private boolean stopped;
+        /// Set once, the first time the platform refuses secure random bytes.
+        private boolean idsUnavailable;
 
         State(TelemetryConfig config) {
             this.config = config;
@@ -193,22 +189,48 @@ public final class Telemetry {
             this.backendHost = config.mode == TelemetryConfig.Mode.RELAY ? host(exportUrl) : null;
         }
 
+        /// A new span, or null when ids cannot be made on this platform.
         TelemetrySpan start(String name, int kind, TelemetrySpan parent) {
             String traceId;
             String parentId = null;
             boolean sampled;
+            byte[] spanBytes = random(8);
+            if (spanBytes == null) {
+                return null;
+            }
             if (parent != null && parent.traceId.length() == 32 && !isZero(parent.spanId)) {
                 traceId = parent.traceId;
                 parentId = parent.spanId;
                 // Follow the parent's decision, so a trace is whole or absent.
                 sampled = parent.sampled;
             } else {
-                byte[] random = SecureRandom.bytes(16);
-                traceId = Hash.toHex(random);
-                sampled = sample(random);
+                byte[] traceBytes = random(16);
+                if (traceBytes == null) {
+                    return null;
+                }
+                traceId = Hash.toHex(traceBytes);
+                sampled = sample(traceBytes);
             }
-            String spanId = Hash.toHex(SecureRandom.bytes(8));
-            return new TelemetrySpan(this, name, kind, traceId, spanId, parentId, sampled);
+            return new TelemetrySpan(this, name, kind, traceId, Hash.toHex(spanBytes), parentId,
+                    sampled);
+        }
+
+        /// Secure random bytes, or null when the platform has none. Asked here,
+        /// at the first span, rather than at install: install runs before
+        /// Display.init, where no platform exists yet to answer, and treating that
+        /// as "no random source" switched telemetry off on every device.
+        private byte[] random(int length) {
+            if (idsUnavailable) {
+                return null;
+            }
+            try {
+                return SecureRandom.bytes(length);
+            } catch (RuntimeException err) {
+                idsUnavailable = true;
+                Log.p("Telemetry: this platform has no secure random source, so it cannot make "
+                        + "trace ids; no spans are recorded");
+                return null;
+            }
         }
 
         /// Whether tracing may run now: always, unless the configuration asked for
@@ -376,7 +398,7 @@ public final class Telemetry {
 
         @Override
         public Object requestQueued(ConnectionRequest request) {
-            return current;
+            return CURRENT.get();
         }
 
         @Override
@@ -393,6 +415,9 @@ public final class Telemetry {
             }
             TelemetrySpan span = start(method, TelemetrySpan.KIND_CLIENT,
                     parent instanceof TelemetrySpan ? (TelemetrySpan) parent : null);
+            if (span == null) {
+                return null;
+            }
             String host = host(url);
             if (span.isRecording()) {
                 span.setAttribute("http.request.method", method);
@@ -404,7 +429,12 @@ public final class Telemetry {
                 }
             }
             if (shouldPropagate(host)) {
-                request.addRequestHeader("traceparent", span.getTraceparent());
+                // Never over a traceparent the APP set: that is a deliberate choice
+                // of which trace the request belongs to. Ours is removed again when
+                // the attempt ends (afterRequest), so a retry or a redirect starts
+                // clean -- the request object is reused, and a header left from an
+                // allowed host would otherwise follow a redirect to one that is not.
+                request.addRequestHeaderIfAbsent(TRACEPARENT, span.getTraceparent());
             }
             return span;
         }
@@ -416,6 +446,9 @@ public final class Telemetry {
                 return;
             }
             TelemetrySpan span = (TelemetrySpan) attempt;
+            // Only if it is still the value this attempt set; an app's own
+            // traceparent, or one it replaced ours with, is left alone.
+            request.removeRequestHeaderIfUnchanged(TRACEPARENT, span.getTraceparent());
             if (responseCode >= 100) {
                 span.setAttribute("http.response.status_code", responseCode);
             }
