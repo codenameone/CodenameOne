@@ -114,6 +114,7 @@ public class DartList<E> extends AbstractList<E> implements RandomAccess {
 
     /** Dart's List.filled(length, fill). */
     public static <E> DartList<E> filled(long length, E fill, boolean growable) {
+        RangeError.checkNotNegative(length, "length");
         ArrayList<E> impl = new ArrayList<>();
         for (long i = 0; i < length; i++) {
             impl.add(fill);
@@ -122,11 +123,13 @@ public class DartList<E> extends AbstractList<E> implements RandomAccess {
     }
 
     public static <E> DartList<E> filled(long length, E fill) {
+        RangeError.checkNotNegative(length, "length");
         return filled(length, fill, false);
     }
 
     /** Dart's List.generate(length, generator). */
     public static <E> DartList<E> generate(long length, Funcs.Func1<Long, E> generator, boolean growable) {
+        RangeError.checkNotNegative(length, "length");
         ArrayList<E> impl = new ArrayList<>();
         for (long i = 0; i < length; i++) {
             impl.add(generator.call(i));
@@ -135,6 +138,7 @@ public class DartList<E> extends AbstractList<E> implements RandomAccess {
     }
 
     public static <E> DartList<E> generate(long length, Funcs.Func1<Long, E> generator) {
+        RangeError.checkNotNegative(length, "length");
         return generate(length, generator, true);
     }
 

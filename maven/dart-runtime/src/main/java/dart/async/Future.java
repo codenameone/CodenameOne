@@ -136,7 +136,7 @@ public class Future<T> {
             }
         };
         if (com.codename1.ui.Display.isInitialized()) {
-            com.codename1.ui.CN.setTimeout((int) ms, complete);
+            Timers.schedule(ms, complete);
         } else {
             final long sleepMs = ms;
             new Thread(new Runnable() {

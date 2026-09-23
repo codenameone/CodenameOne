@@ -33,7 +33,21 @@ public final class ByteData {
     private final byte[] buffer;
 
     public ByteData(long length) {
+        dart.core.RangeError.checkNotNegative(length, "length");
         this.buffer = new byte[(int) length];
+    }
+
+    /**
+     * The offset as an array index, after checking the whole access fits -- on the
+     * long, before narrowing. The cast came first before, so an offset of 2^32 wrapped
+     * to 0: getUint8 read byte zero and setUint8 overwrote it instead of throwing.
+     */
+    private int at(long byteOffset, int width) {
+        if (byteOffset < 0 || byteOffset + width > buffer.length) {
+            throw new dart.core.RangeError("Invalid value: Not in inclusive range 0.."
+                    + (buffer.length - width) + ": " + byteOffset + " (byteOffset)");
+        }
+        return (int) byteOffset;
     }
 
     public long lengthInBytes() {
@@ -41,15 +55,15 @@ public final class ByteData {
     }
 
     public long getUint8(long byteOffset) {
-        return buffer[(int) byteOffset] & 0xFF;
+        return buffer[at(byteOffset, 1)] & 0xFF;
     }
 
     public void setUint8(long byteOffset, long value) {
-        buffer[(int) byteOffset] = (byte) value;
+        buffer[at(byteOffset, 1)] = (byte) value;
     }
 
     public long getInt32(long byteOffset) {
-        int o = (int) byteOffset;
+        int o = at(byteOffset, 4);
         return ((buffer[o] & 0xFF) << 24)
                 | ((buffer[o + 1] & 0xFF) << 16)
                 | ((buffer[o + 2] & 0xFF) << 8)
@@ -57,7 +71,7 @@ public final class ByteData {
     }
 
     public void setInt32(long byteOffset, long value) {
-        int o = (int) byteOffset;
+        int o = at(byteOffset, 4);
         buffer[o] = (byte) (value >> 24);
         buffer[o + 1] = (byte) (value >> 16);
         buffer[o + 2] = (byte) (value >> 8);

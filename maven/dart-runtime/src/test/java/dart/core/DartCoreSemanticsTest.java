@@ -470,4 +470,41 @@ public class DartCoreSemanticsTest {
         DartList<Object> l = DartList.of((Object) 1L, 2L, 1L);
         assertEquals(2, l.indexOfDart(1L, 1));
     }
+
+    // --- round 6 ----------------------------------------------------------------
+
+    @Test
+    public void negativeListLengthsAreRefused() {
+        assertThrows(RangeError.class, () -> DartList.filled(-1, "x"));
+        assertThrows(RangeError.class, () -> DartList.generate(-1, i -> "x"));
+        assertThrows(RangeError.class, () -> DartLongList.filled(-1, 0L));
+        assertThrows(RangeError.class, () -> DartDoubleList.generateDoubles(-1, i -> 0.0));
+        assertEquals(0, DartList.filled(0, "x").size());
+    }
+
+    @Test
+    public void byteDataChecksTheOffsetBeforeNarrowingIt() {
+        dart.typed_data.ByteData b = new dart.typed_data.ByteData(4);
+        b.setUint8(0, 7);
+        assertThrows(RangeError.class, () -> b.getUint8(4294967296L), "2^32 must not wrap to byte 0");
+        assertThrows(RangeError.class, () -> b.setUint8(-1, 1));
+        assertThrows(RangeError.class, () -> b.getInt32(1), "four bytes from 1 run past the end");
+        assertEquals(7, b.getUint8(0));
+    }
+
+    @Test
+    public void malformedUrisAreRejectedAsDartRejectsThem() {
+        // Each expectation recorded from the Dart SDK.
+        assertEquals(null, DartUri.tryParse("http://[::1"));
+        assertEquals(null, DartUri.tryParse("http://host:abc/"));
+        assertEquals(null, DartUri.tryParse("::"));
+        assertEquals(null, DartUri.tryParse("1http://x"));
+        assertThrows(FormatException.class, () -> DartUri.parse("http://[::1"));
+        // ...and what it accepts, it keeps accepting.
+        assertTrue(DartUri.tryParse("http://host:99999/") != null);
+        assertTrue(DartUri.tryParse("a%zzb") != null);
+        assertTrue(DartUri.tryParse("mailto:a@b") != null);
+        assertTrue(DartUri.tryParse("http://[::1]:80/x") != null);
+        assertTrue(DartUri.tryParse("") != null);
+    }
 }

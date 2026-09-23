@@ -56,7 +56,7 @@ public final class Timer {
             }
         };
         if (com.codename1.ui.Display.isInitialized()) {
-            com.codename1.ui.CN.setTimeout((int) ms, r);
+            Timers.schedule(ms, r);
         } else {
             final long delay = ms;
             new Thread(new Runnable() {

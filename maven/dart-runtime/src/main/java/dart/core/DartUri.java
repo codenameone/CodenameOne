@@ -52,12 +52,87 @@ public final class DartUri {
 
     /** Dart's {@code Uri.parse}. */
     public static DartUri parse(String uri) {
-        return new DartUri(uri == null ? "" : uri);
+        String text = uri == null ? "" : uri;
+        String error = malformed(text);
+        if (error != null) {
+            throw new FormatException(error + ": " + text);
+        }
+        return new DartUri(text);
     }
 
-    /** Dart's {@code Uri.tryParse} — never throws (this parser is total). */
+    /** Dart's {@code Uri.tryParse}: null for what {@link #parse} rejects. */
     public static DartUri tryParse(String uri) {
-        return uri == null ? null : new DartUri(uri);
+        return uri == null || malformed(uri) != null ? null : new DartUri(uri);
+    }
+
+    /**
+     * Why {@code text} is not a URI Dart would parse, or null. The parser used to be
+     * total, so tryParse never answered null and parse never threw: an unclosed IPv6
+     * host or a non-numeric port came back as a URI with a mangled host and port, and
+     * validation code accepted it. These are the cases Dart rejects -- recorded from the
+     * Dart SDK; it is lenient about the rest (a stray space or a bad escape is encoded,
+     * an out-of-range port is kept), and so is this.
+     */
+    static String malformed(String text) {
+        int end = text.length();
+        for (int i = 0; i < text.length(); i++) {
+            char c = text.charAt(i);
+            if (c == '/' || c == '?' || c == '#') {
+                end = i;
+                break;
+            }
+        }
+        int colon = text.indexOf(':');
+        int rest = 0;
+        if (colon >= 0 && colon < end) {
+            // A colon before the first '/', '?' or '#' ends a scheme, so what precedes
+            // it has to be one.
+            if (colon == 0 || !isScheme(text.substring(0, colon))) {
+                return "Invalid scheme";
+            }
+            rest = colon + 1;
+        }
+        if (!text.startsWith("//", rest)) {
+            return null;
+        }
+        int authStart = rest + 2;
+        int authEnd = text.length();
+        for (int i = authStart; i < text.length(); i++) {
+            char c = text.charAt(i);
+            if (c == '/' || c == '?' || c == '#') {
+                authEnd = i;
+                break;
+            }
+        }
+        String authority = text.substring(authStart, authEnd);
+        int at = authority.lastIndexOf('@');
+        String hostPort = at >= 0 ? authority.substring(at + 1) : authority;
+        String port = null;
+        if (hostPort.startsWith("[")) {
+            int close = hostPort.indexOf(']');
+            if (close < 0) {
+                return "Missing end `]` to match `[` in host";
+            }
+            if (close + 1 < hostPort.length()) {
+                if (hostPort.charAt(close + 1) != ':') {
+                    return "Invalid end of authority";
+                }
+                port = hostPort.substring(close + 2);
+            }
+        } else {
+            int pc = hostPort.lastIndexOf(':');
+            if (pc >= 0) {
+                port = hostPort.substring(pc + 1);
+            }
+        }
+        if (port != null && port.length() > 0) {
+            try {
+                Long.parseLong(port);
+            } catch (NumberFormatException e) {
+                return "Invalid port";
+            }
+        }
+        return null;
     }
 
     private void parse() {
