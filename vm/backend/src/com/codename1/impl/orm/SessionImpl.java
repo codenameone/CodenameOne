@@ -669,6 +669,10 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
             statement += " AND " + q(model.attributes()[version].column) + " < " +
                          (model.attributes()[version].kind == Attribute.INTEGER ? Integer.MAX_VALUE : Long.MAX_VALUE);
         }
+        String discriminator = discriminatorCondition(model, null);
+        if (discriminator.length() > 0) {
+            statement += " AND " + discriminator;
+        }
         List<Object> arguments = new ArrayList<Object>();
         arguments.add(Long.valueOf(amount));
         Object[] keyValues = model.keyValues(id);
@@ -1297,7 +1301,7 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
     private void attachState(Entry entry, boolean loaded, Object[] values) {
         Relationship[] relations = entry.model.relationships();
         entry.collections = new List[relations.length];
-        if (relations.length == 0) {
+        if (relations.length == 0 && !(entry.entity instanceof ManagedEntity)) {
             return;
         }
         if (!(entry.entity instanceof ManagedEntity)) {

@@ -499,7 +499,16 @@ public final class JpqlQueryImpl<T> implements com.codename1.orm.session.JpqlQue
                     if (peek("SELECT") || peek("FROM")) {
                         values = subquery();
                     } else {
-                        values = expressions();
+                        StringBuilder list = new StringBuilder();
+                        do {
+                            if (list.length() > 0) {
+                                list.append(", ");
+                            }
+                            Expr value = expression();
+                            bindType(left, value);
+                            list.append(value.sql);
+                        } while (take(","));
+                        values = list.toString();
                     }
                 }
                 if (parens) {

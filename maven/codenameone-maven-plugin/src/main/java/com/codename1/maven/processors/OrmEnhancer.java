@@ -55,7 +55,7 @@ final class OrmEnhancer {
     }
     static void enhance(Map<String,OrmAnnotationProcessor.EntityClass> entities,ProcessorContext ctx) throws IOException {
         final Map<String,OrmAnnotationProcessor.EntityClass> owners=new HashMap<String,OrmAnnotationProcessor.EntityClass>();
-        for(OrmAnnotationProcessor.EntityClass entity:entities.values()) if(!entity.relations.isEmpty()) owners.put(entity.binaryName.replace('.','/'),entity);
+        for(OrmAnnotationProcessor.EntityClass entity:entities.values()) if(needsState(entity)) owners.put(entity.binaryName.replace('.','/'),entity);
         // Accessors declared by mapped superclasses must use the same state as their entities.
         for(OrmAnnotationProcessor.EntityClass entity:entities.values()) for(OrmAnnotationProcessor.RelationField relation:entity.relations) {
             String declaring=relation.declaringType.replace('.','/');
@@ -106,6 +106,15 @@ final class OrmEnhancer {
         List<String> records=new ArrayList<String>();
         for(String name:copied) records.add(name+"\t"+digest(Files.readAllBytes(outputPath(ctx.getOutputClassDir(),name))));
         Files.write(manifest,records,java.nio.charset.StandardCharsets.UTF_8);
+    }
+    private static boolean needsState(OrmAnnotationProcessor.EntityClass entity) {
+        // Match generated EntityModel.requiresSession(), including mappings
+        // that have managed values but no association accessors to weave.
+        if(!entity.relations.isEmpty() || !entity.embedded.isEmpty() || !entity.indexes.isEmpty()
+                || entity.generation!=0 || entity.idFields.size()>1 || entity.hierarchyRoot!=null) return true;
+        for(OrmAnnotationProcessor.PersistedField field:entity.fields)
+            if(field.version || field.unique || field.converter!=null) return true;
+        return false;
     }
     private static Path outputPath(File directory,String name) throws IOException {
         // Reject non-portable archive paths even when building on a different OS.

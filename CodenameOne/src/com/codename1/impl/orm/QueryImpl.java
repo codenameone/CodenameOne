@@ -167,7 +167,9 @@ public final class QueryImpl<T> implements com.codename1.orm.session.Query<T> {
     @Override
     public QueryImpl<T> orderBy(String field, boolean ascending) {
         String name = column(field);
-        if (field.indexOf('.') >= 0) {
+        // Embedded paths still resolve to the root alias. A joined column
+        // remains non-root even when its join was created by an earlier clause.
+        if (!name.startsWith(rootAlias + ".")) {
             relationOrdering = true;
         }
         if (order.length() > 0) {

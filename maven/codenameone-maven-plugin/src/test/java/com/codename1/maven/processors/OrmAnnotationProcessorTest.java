@@ -174,7 +174,7 @@ public class OrmAnnotationProcessorTest {
     @Test
     public void polymorphicSingleTableInheritancePreservesIdentityAndSubtypeQueries() throws Exception {
         File classes=tmp.newFolder("inheritance");Map<String,String> sources=new java.util.LinkedHashMap<String,String>();
-        sources.put("hierarchy.Animal","package hierarchy; import com.codename1.annotations.*; import com.codename1.annotations.db.*; @Entity(table=\"hierarchy_animals\") @Inheritance public abstract class Animal { @Id public long id; @Version public long version; public String name; @DbTransient public int callbacks; @PrePersist public void baseCallback() { callbacks++; } }");
+        sources.put("hierarchy.Animal","package hierarchy; import com.codename1.annotations.*; import com.codename1.annotations.db.*; @Entity(table=\"hierarchy_animals\") @Inheritance public abstract class Animal { @Id public long id; @Version public long version; public String name; public long counter; @DbTransient public int callbacks; @PrePersist public void baseCallback() { callbacks++; } }");
         sources.put("hierarchy.Cat","package hierarchy; import com.codename1.annotations.*; import com.codename1.annotations.db.*; @Entity @DiscriminatorValue(\"cat\") public class Cat extends Animal { public int lives; @PrePersist public void catCallback() { callbacks+=10; } }");
         sources.put("hierarchy.Dog","package hierarchy; import com.codename1.annotations.*; import com.codename1.annotations.db.*; @Entity @DiscriminatorValue(\"dog\") public class Dog extends Animal { public String breed; @ManyToOne(fetch=FetchType.LAZY,cascade=CascadeType.PERSIST) public Keeper keeper; }");
         sources.put("hierarchy.Keeper","package hierarchy; import com.codename1.annotations.*; import com.codename1.annotations.db.*; @Entity(table=\"hierarchy_keepers\") public class Keeper { @Id public long id; public String name; }");
@@ -196,6 +196,11 @@ public class OrmAnnotationProcessorTest {
             Object catId=base.getField("id").get(cat),dogId=base.getField("id").get(dog),shelterId=shelterType.getField("id").get(shelter);s.clear();
             Object foundCat=s.find(base,catId);org.junit.Assert.assertEquals(catType,foundCat.getClass());org.junit.Assert.assertSame(foundCat,s.find(catType,catId));
             org.junit.Assert.assertNull(s.find(dogType,catId));org.junit.Assert.assertEquals(2,s.query(base).count());org.junit.Assert.assertEquals(1,s.query(catType).count());
+            s.beginTransaction();assertFalse(s.increment(catType,dogId,"counter",5));s.commitTransaction();
+            Object sibling=s.find(dogType,dogId);org.junit.Assert.assertEquals(0,base.getField("counter").getLong(sibling));org.junit.Assert.assertEquals(0,base.getField("version").getLong(sibling));
+            s.beginTransaction();assertFalse(s.increment(catType,dogId,"counter",5));assertTrue(s.increment(catType,catId,"counter",2));s.commitTransaction();
+            org.junit.Assert.assertEquals(0,base.getField("counter").getLong(sibling));org.junit.Assert.assertEquals(0,base.getField("version").getLong(sibling));org.junit.Assert.assertEquals(2,base.getField("counter").getLong(foundCat));
+            s.beginTransaction();assertTrue(s.increment(base,dogId,"counter",3));s.commitTransaction();org.junit.Assert.assertEquals(3,base.getField("counter").getLong(sibling));
             Object foundDog=s.find(base,dogId);assertFalse(s.isLoaded(foundDog,"keeper"));org.junit.Assert.assertNotNull(reader.getMethod("keeper",dogType).invoke(null,foundDog));
             List loaded=(List)reader.getMethod("animals",shelterType).invoke(null,s.find(shelterType,shelterId));org.junit.Assert.assertEquals(2,loaded.size());
             s.beginTransaction();catType.getField("lives").setInt(foundCat,8);s.commitTransaction();s.clear();org.junit.Assert.assertEquals(8,catType.getField("lives").getInt(s.find(base,catId)));
@@ -224,6 +229,11 @@ public class OrmAnnotationProcessorTest {
             org.junit.Assert.assertEquals("ABC",codeType.getField("value").get(type.getField("code").get(loaded)));
             s.beginTransaction();codeType.getField("value").set(type.getField("code").get(loaded),"DEF");s.commitTransaction();s.clear();
             org.junit.Assert.assertEquals("DEF",codeType.getField("value").get(type.getField("code").get(s.find(type,id))));
+            Object included=codeType.getConstructor(String.class).newInstance("DEF"),excluded=codeType.getConstructor(String.class).newInstance("missing");
+            org.junit.Assert.assertSame(s.find(type,id),s.createQuery("select e from converted.Entry e where e.code in (:first, :second)",type).setParameter("first",excluded).setParameter("second",included).first());
+            org.junit.Assert.assertSame(s.find(type,id),s.createQuery("select e from converted.Entry e where e.code in (:first, :second)",type).setParameter("first",included).setParameter("second",excluded).first());
+            org.junit.Assert.assertNull(s.createQuery("select e from converted.Entry e where e.code not in (:first, :second)",type).setParameter("first",excluded).setParameter("second",included).first());
+            org.junit.Assert.assertSame(s.find(type,id),s.createQuery("select e from converted.Entry e where e.code in ('missing', :second)",type).setParameter("second",included).first());
             Object low=codeType.getConstructor(String.class).newInstance("D"),high=codeType.getConstructor(String.class).newInstance("Z");
             org.junit.Assert.assertSame(s.find(type,id),s.createQuery("select e from converted.Entry e where e.code between :low and :high",type).setParameter("low",low).setParameter("high",high).first());
             org.junit.Assert.assertNull(s.createQuery("select e from converted.Entry e where e.code not between :low and :high",type).setParameter("low",low).setParameter("high",high).first());
@@ -269,6 +279,11 @@ public class OrmAnnotationProcessorTest {
             org.junit.Assert.assertSame(loadedLabel,session.find(labelType,com.codename1.orm.session.Identifier.of("en",3)));
             org.junit.Assert.assertEquals(1,session.query(accountType).join("labels").eq("labels.text","gold").count());
             org.junit.Assert.assertSame(loaded,session.query(accountType).join("items").eq("items.id",itemId).first());
+            org.junit.Assert.assertSame(loaded,session.query(accountType).join("items").orderBy("key.tenant",true).orderBy("key.number",false).first());
+            org.junit.Assert.assertSame(loaded,session.query(accountType).orderBy("key.tenant",true).join("items").first());
+            try { session.query(accountType).join("items").orderBy("items.id",true).list();fail("Ordering a collection join by its target must still fail"); }
+            catch(IllegalArgumentException expected) { assertTrue(expected.getMessage().contains("Collection joins require ordering by a root field")); }
+
             session.beginTransaction();assertTrue(session.increment(accountType,key,"counter",5));session.commitTransaction();
             org.junit.Assert.assertEquals(5,accountType.getField("counter").getLong(loaded));
             session.beginTransaction();session.remove(loaded);session.commitTransaction();
@@ -518,6 +533,48 @@ public class OrmAnnotationProcessorTest {
             sources.put("collision.Owner","package collision; import com.codename1.annotations.*; import com.codename1.annotations.db.*; @Entity(table=\"owners\",indexes=@Index(name=\""+index+"\",fields=\"value\")) public class Owner { @Id @GeneratedValue(strategy=GenerationType.TABLE) public long id; public String value; @ManyToMany @JoinTable(name=\"owner_links\") public java.util.List<Target> links=new java.util.ArrayList<Target>(); }");
             sources.put("collision.Target","package collision; import com.codename1.annotations.*; @Entity(table=\"targets\") public class Target { @Id public long id; }");
             rejectsMappingForBothRuntimes(sources,"Index name conflicts with table");
+        }
+    }
+
+
+    @Test
+    public void explicitIndexNamesCannotDifferOnlyByCase() throws Exception {
+        Map<String,String> sources=new java.util.LinkedHashMap<String,String>();
+        sources.put("caseindexes.Entry","package caseindexes; import com.codename1.annotations.*; import com.codename1.annotations.db.*; @Entity(indexes={@Index(name=\"by_code\",fields=\"code\"),@Index(name=\"BY_CODE\",fields=\"label\")}) public class Entry { @Id public long id; public String code,label; }");
+        rejectsMappingForBothRuntimes(sources,"Invalid or duplicate index name");
+    }
+
+    @Test
+    public void relationshipFreeVersionedEntitiesHaveExclusiveSessionOwnership() throws Exception {
+        File classes=tmp.newFolder();Map<String,String> sources=new java.util.LinkedHashMap<String,String>();
+        sources.put("ownership.Versioned","package ownership; import com.codename1.annotations.*; import com.codename1.annotations.db.*; @Entity(table=\"ownership_versioned\") public class Versioned { @Id public long id; @Version public long version; }");
+        sources.put("ownership.Assigned","package ownership; import com.codename1.annotations.*; import com.codename1.annotations.db.*; @Entity(table=\"ownership_assigned\") public class Assigned { @Id(autoIncrement=false) public String id; @Version public long version; }");
+        JavaSourceCompiler.compile(sources,classes,Arrays.asList(testClassesDir()));
+        ProcessorContext client=runProcessor(classes);assertFalse(client.getErrors().toString(),client.hasErrors());
+        ProcessorContext backend=runProcessor(classes,backendClasspath());assertFalse(backend.getErrors().toString(),backend.hasErrors());
+        // A repeated enhancement must preserve exactly one state getter/setter.
+        backend=runProcessor(classes,backendClasspath());assertFalse(backend.getErrors().toString(),backend.hasErrors());
+        try(java.net.URLClassLoader loader=new java.net.URLClassLoader(new URL[]{classes.toURI().toURL()},getClass().getClassLoader())) {
+            loader.loadClass("cn1app.BackendDaoBootstrap").newInstance();Class versioned=loader.loadClass("ownership.Versioned"),assigned=loader.loadClass("ownership.Assigned");
+            com.codename1.backend.orm.EntityManager first=com.codename1.backend.orm.EntityManager.open(com.codename1.backend.Database.open(":memory:")),second=com.codename1.backend.orm.EntityManager.open(com.codename1.backend.Database.open(":memory:"));
+            com.codename1.orm.session.Session a=first.openSession(),b=second.openSession();
+            try {
+                a.createTables();b.createTables();Object entity=versioned.newInstance();a.beginTransaction();a.persist(entity);b.beginTransaction();
+                try { b.persist(entity);fail("A pending version-only entity must belong to its original session"); }
+                catch(com.codename1.orm.session.PersistenceException expected) { assertTrue(expected.getMessage().contains("already belongs to another session")); }
+                assertTrue(a.contains(entity));assertFalse(b.contains(entity));b.rollbackTransaction();a.commitTransaction();
+                org.junit.Assert.assertEquals(1,a.query(versioned).count());org.junit.Assert.assertEquals(0,b.query(versioned).count());
+                for(int boundary=0;boundary<3;boundary++) {
+                    Object keyed=assigned.newInstance();assigned.getField("id").set(keyed,"key"+boundary);a.beginTransaction();a.persist(keyed);b.beginTransaction();
+                    try { b.persist(keyed);fail("Assigned ID must not bypass ownership"); }
+                    catch(com.codename1.orm.session.PersistenceException expected) { assertTrue(expected.getMessage().contains("already belongs to another session")); }
+                    b.rollbackTransaction();
+                    if(boundary==0) { a.detach(keyed);a.commitTransaction(); }
+                    else if(boundary==1) { a.clear();a.commitTransaction(); }
+                    else a.close();
+                    b.beginTransaction();b.persist(keyed);b.commitTransaction();assertTrue(b.contains(keyed));
+                }
+            } finally { a.close();b.close();first.close();second.close(); }
         }
     }
 

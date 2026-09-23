@@ -641,7 +641,7 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
             }
             for(AnnotationValues index:entity.indexes) {
                 String name=index.getStringOrDefault("name","");
-                if(name.length()>0 && (tooLongForAnEngine(name) || !indexNames.add(name))) ctx.error("Invalid or duplicate index name: "+name);
+                if(name.length()>0 && (tooLongForAnEngine(name) || !indexNames.add(name.toLowerCase(java.util.Locale.ROOT)))) ctx.error("Invalid or duplicate index name: "+name);
                 Object indexed=index.get("fields");
                 if(!(indexed instanceof List) || ((List)indexed).isEmpty()) ctx.error("Index needs mapped fields: "+name);
                 else for(Object field:(List)indexed) if(!fields.contains(field)) ctx.error("Unknown index field: "+field);
