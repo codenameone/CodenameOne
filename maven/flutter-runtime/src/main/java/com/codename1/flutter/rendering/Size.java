@@ -96,7 +96,7 @@ public final class Size {
 
     @Override
     public int hashCode() {
-        long bits = Double.doubleToLongBits(width) * 31 + Double.doubleToLongBits(height);
+        long bits = com.codename1.flutter.ValueHash.bits(width) * 31 + com.codename1.flutter.ValueHash.bits(height);
         return (int) (bits ^ (bits >>> 32));
     }
 

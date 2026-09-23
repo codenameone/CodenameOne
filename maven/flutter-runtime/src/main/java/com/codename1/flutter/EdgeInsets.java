@@ -139,10 +139,10 @@ public class EdgeInsets extends EdgeInsetsGeometry {
 
     @Override
     public int hashCode() {
-        long bits = Double.doubleToLongBits(left);
-        bits = bits * 31 + Double.doubleToLongBits(top);
-        bits = bits * 31 + Double.doubleToLongBits(right);
-        bits = bits * 31 + Double.doubleToLongBits(bottom);
+        long bits = ValueHash.bits(left);
+        bits = bits * 31 + ValueHash.bits(top);
+        bits = bits * 31 + ValueHash.bits(right);
+        bits = bits * 31 + ValueHash.bits(bottom);
         return (int) (bits ^ (bits >>> 32));
     }
 

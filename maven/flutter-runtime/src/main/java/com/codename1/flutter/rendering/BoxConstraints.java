@@ -271,10 +271,10 @@ public final class BoxConstraints {
 
     @Override
     public int hashCode() {
-        long bits = Double.doubleToLongBits(minWidth);
-        bits = bits * 31 + Double.doubleToLongBits(maxWidth);
-        bits = bits * 31 + Double.doubleToLongBits(minHeight);
-        bits = bits * 31 + Double.doubleToLongBits(maxHeight);
+        long bits = com.codename1.flutter.ValueHash.bits(minWidth);
+        bits = bits * 31 + com.codename1.flutter.ValueHash.bits(maxWidth);
+        bits = bits * 31 + com.codename1.flutter.ValueHash.bits(minHeight);
+        bits = bits * 31 + com.codename1.flutter.ValueHash.bits(maxHeight);
         return (int) (bits ^ (bits >>> 32));
     }
 

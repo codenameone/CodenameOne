@@ -111,14 +111,19 @@ public class Matrix4 {
         return r;
     }
 
-    /** The raw column-major entries — vector_math's {@code storage}. */
+    /**
+     * vector_math's {@code storage}: the matrix's own column-major entries, so
+     * {@code matrix.storage[12] = 20} moves the matrix. It used to build a copy on
+     * every call, and writes through it were silently lost.
+     */
     public DartList<Double> storage() {
-        DartList<Double> s = new DartList<Double>();
-        for (int i = 0; i < m.length; i++) {
-            s.add(m[i]);
+        if (storageView == null) {
+            storageView = dart.core.DartDoubleList.view(m);
         }
-        return s;
+        return storageView;
     }
+
+    private DartList<Double> storageView;
 
     /**
      * Component-wise interpolation of two matrices, which is what Flutter's

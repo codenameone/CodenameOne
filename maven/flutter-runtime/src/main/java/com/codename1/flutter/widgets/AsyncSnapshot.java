@@ -73,7 +73,19 @@ public class AsyncSnapshot<T> {
         return error != null;
     }
 
+    /**
+     * Flutter's {@code requireData}: the data, or the stored error rethrown, or a
+     * StateError when there is neither. Returning null let a builder carry on and
+     * fail later at an unrelated dereference, with the original asynchronous error
+     * lost.
+     */
     public T requireData() {
-        return data;
+        if (data != null) {
+            return data;
+        }
+        if (error != null) {
+            throw dart.runtime.DartRuntime.asError(error);
+        }
+        throw new dart.core.StateError("Snapshot has neither data nor error");
     }
 }

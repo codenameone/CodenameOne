@@ -74,7 +74,7 @@ public final class Radius {
 
     @Override
     public int hashCode() {
-        long bits = Double.doubleToLongBits(x) * 31 + Double.doubleToLongBits(y);
+        long bits = ValueHash.bits(x) * 31 + ValueHash.bits(y);
         return (int) (bits ^ (bits >>> 32));
     }
 

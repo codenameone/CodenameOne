@@ -110,7 +110,7 @@ public final class Offset {
 
     @Override
     public int hashCode() {
-        long bits = Double.doubleToLongBits(dx) * 31 + Double.doubleToLongBits(dy);
+        long bits = ValueHash.bits(dx) * 31 + ValueHash.bits(dy);
         return (int) (bits ^ (bits >>> 32));
     }
 
