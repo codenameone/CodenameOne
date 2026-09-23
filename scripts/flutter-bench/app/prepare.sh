@@ -156,10 +156,15 @@ if missing:
 
 io.open(path, "w", encoding="utf-8").write("\n".join(lines) + "\n")
 # Every package the asset paths reference, for the staging check further down.
-io.open(sys.argv[2], "w", encoding="utf-8").write("\n".join(sorted(referenced)) + "\n")
+# newline="\n": Windows Python would otherwise write CRLF, and the shell below
+# would read each name with a trailing carriage return.
+io.open(sys.argv[2], "w", encoding="utf-8", newline="\n").write("\n".join(sorted(referenced)) + "\n")
 PY_INNER
 # The asset packages the gallery references; staging checks each one landed.
-DECLARED_ASSET_PACKAGES="$(tr '\n' ' ' < "$WORK/asset-packages.txt")"
+# CRs stripped as well: on the Windows leg a package name read with a trailing
+# \r named a directory that does not exist, and the staging check below failed
+# for a package that was in the bundle all along.
+DECLARED_ASSET_PACKAGES="$(tr -d '\r' < "$WORK/asset-packages.txt" | tr '\n' ' ')"
 
 # Platform scaffolding is GENERATED rather than committed: `flutter create` on
 # an existing project adds the ios/android/macos/linux/windows/web directories
