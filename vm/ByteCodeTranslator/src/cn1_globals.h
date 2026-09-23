@@ -3712,6 +3712,26 @@ static inline void cn1InitMethodStackInline(CODENAME_ONE_THREAD_STATE, JAVA_OBJE
 // entry to pop.
 #define CN1_FRAMELESS_TRY_RETURN() threadStateData->tryBlockOffset = methodBlockOffset;
 
+// An explicit THROW from a frameless frame. Such a frame pushes no call-stack entry,
+// so a trace filled in by its own throw did not name it at all -- the uncaught report
+// read "java.lang.IllegalStateException" and nothing else, which is the frame a crash
+// report exists to find. So the entry is pushed for the throw alone, with the line the
+// translator knows statically, and taken off again if throwException returns (an app
+// target with no handler). When it longjmps instead, the handler's frame restores
+// callStackOffset to its own entry value, which removes this one with it.
+#define CN1_FRAMELESS_THROW(ex, classNameId, methodNameId, line) do { \
+    JAVA_OBJECT cn1__thrown = (ex); \
+    int cn1__depth = threadStateData->callStackOffset; \
+    if(cn1__depth < CN1_MAX_STACK_CALL_DEPTH) { \
+        threadStateData->callStackClass[cn1__depth] = (classNameId); \
+        threadStateData->callStackMethod[cn1__depth] = (methodNameId); \
+        threadStateData->callStackLine[cn1__depth] = (line); \
+        threadStateData->callStackOffset = cn1__depth + 1; \
+    } \
+    throwException(threadStateData, cn1__thrown); \
+    threadStateData->callStackOffset = cn1__depth; \
+} while(0)
+
 // Headroom (bytes) kept below the end of the native C stack: enough to detect the
 // overflow and still build + throw the StackOverflowError without overrunning.
 #define CN1_FRAMELESS_STACK_GUARD_BAND (256 * 1024)

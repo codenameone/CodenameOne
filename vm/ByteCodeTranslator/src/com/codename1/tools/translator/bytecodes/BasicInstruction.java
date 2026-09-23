@@ -150,6 +150,27 @@ public class BasicInstruction extends Instruction implements AssignableExpressio
     
     
     
+    /// The source line of the nearest LineNumber before this instruction, or -1.
+    private int lineBefore(List<Instruction> instructions) {
+        if (instructions == null) {
+            return -1;
+        }
+        int at = -1;
+        for (int i = 0; i < instructions.size(); i++) {
+            if (instructions.get(i) == this) {
+                at = i;
+                break;
+            }
+        }
+        for (int i = at - 1; i >= 0; i--) {
+            Instruction prev = instructions.get(i);
+            if (prev instanceof LineNumber) {
+                return ((LineNumber) prev).getLine();
+            }
+        }
+        return -1;
+    }
+
     @Override
     public void appendInstruction(StringBuilder b, List<Instruction> instructions) {
         switch(opcode) {
@@ -799,10 +820,21 @@ public class BasicInstruction extends Instruction implements AssignableExpressio
                     "    }\n");
                 break;                
                 
-            case Opcodes.ATHROW:
-                //b.append("    NSLog(@\"Exception thrown %s %d %s %s\\n\", __FILE__, __LINE__, __PRETTY_FUNCTION__, __FUNCTION__);\n");
-                b.append("    throwException(threadStateData, POP_OBJ());\n");
-                break;                
+            case Opcodes.ATHROW: {
+                // A frameless frame names itself in the trace for its own throw; see
+                // CN1_FRAMELESS_THROW. The ids are the ones a framed prologue passes.
+                com.codename1.tools.translator.BytecodeMethod owner = getMethod();
+                if (owner != null && owner.isFrameless()) {
+                    b.append("    CN1_FRAMELESS_THROW(POP_OBJ(), ")
+                     .append(com.codename1.tools.translator.Parser.addToConstantPool(owner.getClsName()))
+                     .append(", ")
+                     .append(com.codename1.tools.translator.Parser.addToConstantPool(owner.getMethodName()))
+                     .append(", ").append(lineBefore(instructions)).append(");\n");
+                } else {
+                    b.append("    throwException(threadStateData, POP_OBJ());\n");
+                }
+                break;
+            }                
                 
             case Opcodes.MONITORENTER:
                 b.append("    monitorEnter(threadStateData, POP_OBJ());\n");
