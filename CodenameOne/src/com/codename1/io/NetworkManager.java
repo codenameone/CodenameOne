@@ -647,12 +647,51 @@ public final class NetworkManager {
         }
     }
 
+    /// Ends the tracer attempt in flight on `req`, if any, with the tracer that
+    /// started it. Cleared first, so an attempt is ended exactly once however the
+    /// tracer behaves.
+    ///
+    /// Only the thread that started the attempt ends it. Once a retry has
+    /// re-queued the request, another worker may already have begun the NEXT
+    /// attempt by the time this one reaches its finally, and that attempt is
+    /// not this thread's to end.
+    static void endTracerAttempt(ConnectionRequest req, Throwable failure) {
+        Object attempt = req.tracerAttempt;
+        NetworkTracer owner = req.tracerOwner;
+        if (attempt == null || owner == null
+                || req.tracerThread != Thread.currentThread()) { //NOPMD CompareObjectsWithEquals
+            return;
+        }
+        req.tracerAttempt = null;
+        req.tracerOwner = null;
+        req.tracerThread = null;
+        try {
+            // Only a status THIS attempt received: a reused request still holds
+            // the last one's.
+            owner.afterRequest(req, attempt,
+                    req.tracerResponded ? req.getResponseCode() : -1, failure);
+        } catch (Throwable t) {
+            // Observation must never change a request's outcome.
+            Log.e(t);
+        }
+    }
+
     /// Adds the given network connection to the queue of execution
     ///
     /// #### Parameters
     ///
     /// - `request`: network request for execution
     void addToQueue(@Async.Schedule ConnectionRequest request, boolean retry) {
+        if (retry) {
+            // A redirect or retry re-queues THIS request object while its current
+            // attempt is still open on the worker that ran it. With more than one
+            // network thread another worker can pick it up before that worker
+            // reaches its finally and overwrite the attempt's state -- losing the
+            // span and leaving its traceparent on the request. So the attempt ends
+            // here, on the thread that ran it, before the request is visible to
+            // anyone else.
+            endTracerAttempt(request, null);
+        }
         // Captured HERE, on the thread that asked for the request, so the span it
         // becomes is a child of what the app was doing at the time. A retry keeps
         // the context of the request it retries. Held in locals and stored only once
@@ -1218,22 +1257,7 @@ public final class NetworkManager {
                 if (requestWasCompleted) {
                     req.complete = true;
                 }
-                Object attempt = req.tracerAttempt;
-                NetworkTracer owner = req.tracerOwner;
-                if (attempt != null && owner != null) {
-                    // Cleared first, so an attempt is ended exactly once however the
-                    // tracer behaves, and a retry starts from nothing. Ended by the
-                    // tracer that STARTED it, not whichever is installed now.
-                    req.tracerAttempt = null;
-                    req.tracerOwner = null;
-                    try {
-                        owner.afterRequest(req, attempt,
-                                req.tracerResponded ? req.getResponseCode() : -1, failure);
-                    } catch (Throwable t) {
-                        // Observation must never change a request's outcome.
-                        Log.e(t);
-                    }
-                }
+                endTracerAttempt(req, failure);
                 NetworkGuard guard = getNetworkGuard();
                 if (guard != null && req.hasGuardResponse()) {
                     try {

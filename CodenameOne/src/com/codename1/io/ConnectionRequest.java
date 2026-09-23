@@ -1214,6 +1214,7 @@ public class ConnectionRequest implements IOProgressListener {
                 tracerAttempt = tracer.beforeRequest(this,
                         tracer == tracerParentOwner ? tracerParent : null);
                 tracerOwner = tracerAttempt == null ? null : tracer;
+                tracerThread = Thread.currentThread();
             } catch (Throwable t) {
                 Log.e(t);
             }
@@ -1607,6 +1608,9 @@ public class ConnectionRequest implements IOProgressListener {
     /// the guard's capture runs, and reporting them as "no response" hid the very
     /// 3xx that explains the attempt.
     boolean tracerResponded;
+
+    /// The network thread running [#tracerAttempt]; only it may end the attempt.
+    Thread tracerThread;
 
     private void captureGuardHeaders(Object connection) {
         NetworkGuard guard = NetworkManager.getNetworkGuard();

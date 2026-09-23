@@ -113,6 +113,54 @@ class NetworkTracerQueueTest extends UITestBase {
     }
 
     @Test
+    void aRetryEndsTheCurrentAttemptBeforeTheRequestIsQueuedAgain() throws Exception {
+        // With several network threads another worker can run the re-queued
+        // request before this one reaches its finally; the attempt must already
+        // be over by then, or the next attempt overwrites it and the span is lost.
+        NetworkManager manager = idleManager();
+        final Object[] ended = new Object[1];
+        NetworkTracer tracer = new NetworkTracer() {
+            @Override
+            public Object requestQueued(ConnectionRequest request) {
+                return null;
+            }
+
+            @Override
+            public Object beforeRequest(ConnectionRequest request, Object parent) {
+                return null;
+            }
+
+            @Override
+            public void afterRequest(ConnectionRequest request, Object attempt, int status,
+                                     Throwable error) {
+                ended[0] = attempt;
+            }
+        };
+        final ConnectionRequest request = new ConnectionRequest();
+        request.setUrl("http://queue.test/redirected");
+        request.tracerAttempt = "first attempt";
+        request.tracerOwner = tracer;
+        request.tracerThread = Thread.currentThread();
+
+        // A thread that did not start the attempt -- the worker running the NEXT
+        // one reaching this attempt's finally late -- must not end it.
+        Thread other = new Thread(new Runnable() {
+            @Override
+            public void run() {
+                NetworkManager.endTracerAttempt(request, null);
+            }
+        });
+        other.start();
+        other.join();
+        assertEquals(null, ended[0], "another thread ended an attempt it did not run");
+
+        manager.addToQueue(request, true);
+        assertEquals("first attempt", ended[0], "the retry left the attempt open");
+        assertEquals(null, request.tracerAttempt);
+        assertEquals(null, request.tracerOwner);
+    }
+
+    @Test
     void addIfAbsentLeavesAnExplicitContentTypeAlone() {
         ConnectionRequest request = new ConnectionRequest();
         request.setContentType("application/json");

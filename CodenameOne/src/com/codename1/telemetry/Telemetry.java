@@ -484,7 +484,7 @@ public final class Telemetry {
                     span.setAttribute("server.address", host);
                 }
             }
-            if (shouldPropagate(host)) {
+            if (shouldPropagate(url, host)) {
                 // The app's own traceparent was ruled out above. Ours is removed
                 // again when the attempt ends (afterRequest), so a retry or a
                 // redirect starts clean -- the request object is reused, and a
@@ -518,8 +518,8 @@ public final class Telemetry {
 
         /// Where the trace context may go. See [TelemetryConfig#propagateTo(String)]
         /// for why the web is different.
-        private boolean shouldPropagate(String host) {
-            if (config.propagateToAll) {
+        private boolean shouldPropagate(String url, String host) {
+            if (config.propagateToAll || isSameOriginRelative(url)) {
                 return true;
             }
             if (host != null) {
@@ -574,6 +574,30 @@ public final class Telemetry {
         public long getSize() {
             return body.length;
         }
+    }
+
+    /// Whether `url` is relative to the page, `/api/orders` or `orders?id=1`, and
+    /// so goes to the origin that served the app. The stock
+    /// `ConnectionRequest.validate()` refuses such a URL, but a request that
+    /// overrides it can send one, and in the browser it reaches the app's own
+    /// backend -- the one destination that never needs a CORS allowance. Refusing
+    /// it, which [#host(String)] returning null did, dropped the context from the
+    /// call it matters most on. A scheme (`data:`, `mailto:`) or a
+    /// protocol-relative `//host/...` names another origin and is not relative.
+    static boolean isSameOriginRelative(String url) {
+        if (url == null || url.length() == 0 || url.startsWith("//")) {
+            return false;
+        }
+        for (int i = 0; i < url.length(); i++) {
+            char c = url.charAt(i);
+            if (c == ':') {
+                return false;
+            }
+            if (c == '/' || c == '?' || c == '#') {
+                return true;
+            }
+        }
+        return true;
     }
 
     /// The host of an absolute URL, without port or userinfo; null when there is

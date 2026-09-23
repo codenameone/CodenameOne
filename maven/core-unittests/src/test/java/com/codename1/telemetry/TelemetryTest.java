@@ -500,6 +500,45 @@ class TelemetryTest extends UITestBase {
     }
 
     @Test
+    void onTheWebARelativeUrlIsSameOriginAndCarriesTheContext() throws Exception {
+        assertTrue(Telemetry.isSameOriginRelative("/api/orders"));
+        assertTrue(Telemetry.isSameOriginRelative("orders?next=http://x.test/"));
+        assertFalse(Telemetry.isSameOriginRelative("//other.test/api"));
+        assertFalse(Telemetry.isSameOriginRelative("http://other.test/api"));
+        assertFalse(Telemetry.isSameOriginRelative("data:text/plain,x"));
+        assertFalse(Telemetry.isSameOriginRelative(""));
+
+        TestCodenameOneImplementation impl = TestCodenameOneImplementation.getInstance();
+        impl.addNetworkMockResponse("/api/orders", 200, "OK", new byte[0]);
+        impl.addNetworkMockResponse("http://other.test/api", 200, "OK", new byte[0]);
+        impl.setPlatformName("HTML5");
+        try {
+            Telemetry.install(new TelemetryConfig().direct("http://collector.test"));
+            // validate() refuses a relative URL; a request that sends one to its
+            // own origin has to relax it.
+            ConnectionRequest relative = new ConnectionRequest() {
+                @Override
+                protected void validate() {
+                }
+
+                @Override
+                protected void readResponse(InputStream input) {
+                }
+            };
+            relative.setUrl("/api/orders");
+            relative.setPost(false);
+            NetworkManager.getInstance().addToQueueAndWait(relative);
+            assertNotNull(connection("/api/orders").getHeaders().get("traceparent"),
+                    "a same-origin request lost its trace context on the web");
+            NetworkManager.getInstance().addToQueueAndWait(request("http://other.test/api"));
+            assertNull(connection("http://other.test/api").getHeaders().get("traceparent"),
+                    "a cross-origin request outside the allowlist got the header");
+        } finally {
+            impl.setPlatformName(null);
+        }
+    }
+
+    @Test
     void anExceptionStatusIsBounded() {
         Telemetry.install(new TelemetryConfig().direct("http://collector.test"));
         TelemetrySpan span = Telemetry.startSpan("big");
