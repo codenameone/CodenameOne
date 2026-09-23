@@ -6750,8 +6750,14 @@ _Atomic int cn1GcCycleState = CN1_GC_CYCLE_IDLE;
 #ifndef CN1_BIBOP_GC_TRIGGER_BYTES
 #define CN1_BIBOP_GC_TRIGGER_BYTES (24*1024*1024)
 #endif
+// 128MB, not 192MB. Re-measured once survival stopped counting the fresh generation
+// as live (the generated mark functions used to stamp their own object): on the
+// self-hosting corpus against JDK 25, four markers, interleaved, 192MB was 0.92x wall
+// / 0.97x peak and 128MB 0.93x / 0.91x -- a 1% wall cost for 6-9% less memory. 96MB
+// was 0.94x / 0.85x. At one marker the ceiling stops mattering below 128MB (the peak
+// there is fragmentation and native storage, not the trigger) and lower is WORSE.
 #ifndef CN1_BIBOP_GC_MAX_TRIGGER_BYTES
-#define CN1_BIBOP_GC_MAX_TRIGGER_BYTES (192*1024*1024)
+#define CN1_BIBOP_GC_MAX_TRIGGER_BYTES (128*1024*1024)
 #endif
 // THE FLOOR IS PROPORTIONAL TO THE LIVE SET, not a constant.
 //
