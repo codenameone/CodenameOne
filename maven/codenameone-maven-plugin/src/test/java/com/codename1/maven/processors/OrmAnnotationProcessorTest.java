@@ -283,6 +283,61 @@ public class OrmAnnotationProcessorTest {
     }
 
     @Test
+    public void partialCompositeForeignKeysAreRejectedForOptionalAndRequiredSubtypeRelations() throws Exception {
+        File classes=tmp.newFolder("partialkeys");Map<String,String> sources=new java.util.LinkedHashMap<String,String>();
+        sources.put("partialkeys.Target","package partialkeys; import com.codename1.annotations.*; @Entity(table=\"partial_targets\") public class Target { @Id(autoIncrement=false) public String first; @Id(autoIncrement=false) public String second; }");
+        sources.put("partialkeys.OptionalOwner","package partialkeys; import com.codename1.annotations.*; import com.codename1.annotations.db.*; @Entity(table=\"partial_optional\") public class OptionalOwner { @Id public long id; @ManyToOne public Target target; }");
+        sources.put("partialkeys.Base","package partialkeys; import com.codename1.annotations.*; import com.codename1.annotations.db.*; @Entity(table=\"partial_hierarchy\") @Inheritance public abstract class Base { @Id public long id; }");
+        sources.put("partialkeys.RequiredOwner","package partialkeys; import com.codename1.annotations.*; import com.codename1.annotations.db.*; @Entity public class RequiredOwner extends Base { @ManyToOne(optional=false) public Target target; }");
+        sources.put("partialkeys.Sibling","package partialkeys; import com.codename1.annotations.*; @Entity public class Sibling extends Base { public String name; }");
+        JavaSourceCompiler.compile(sources,classes,Arrays.asList(testClassesDir()));ProcessorContext client=runProcessor(classes);assertFalse(client.getErrors().toString(),client.hasErrors());ProcessorContext backend=runProcessor(classes,backendClasspath());assertFalse(backend.getErrors().toString(),backend.hasErrors());
+        try(java.net.URLClassLoader loader=new java.net.URLClassLoader(new URL[]{classes.toURI().toURL()},getClass().getClassLoader())) {
+            Class target=loader.loadClass("partialkeys.Target");
+            for(String suffix:Arrays.asList("Cn1Model","Cn1BackendModel")) {
+                Map<String,com.codename1.impl.orm.EntityModel<?>> models=new java.util.LinkedHashMap<String,com.codename1.impl.orm.EntityModel<?>>();
+                for(String name:Arrays.asList("Target","OptionalOwner","Base","RequiredOwner","Sibling")) { Class type=loader.loadClass("partialkeys."+name);models.put(type.getName(),(com.codename1.impl.orm.EntityModel)loader.loadClass(type.getName()+suffix).newInstance()); }
+                com.codename1.backend.Database db=com.codename1.backend.Database.open(":memory:");com.codename1.orm.session.Session session=new com.codename1.impl.orm.SessionImpl(new com.codename1.impl.orm.BackendSqlAccess(null,db,db.dialect()),models);
+                try {
+                    session.createTables();session.validateSchema();Object valid=target.newInstance();target.getField("first").set(valid,"a");target.getField("second").set(valid,"b");session.beginTransaction();session.persist(valid);session.commitTransaction();session.clear();
+                    for(String name:Arrays.asList("OptionalOwner","RequiredOwner")) {
+                        Class ownerType=loader.loadClass("partialkeys."+name);Object owner=ownerType.newInstance();ownerType.getField("target").set(owner,valid);session.beginTransaction();session.persist(owner);session.commitTransaction();Object id=ownerType.getField("id").get(owner);
+                        for(int missing=0;missing<3;missing++) {
+                            Object partial=target.newInstance();if(missing!=0 && missing!=2) target.getField("first").set(partial,"a");if(missing!=1 && missing!=2) target.getField("second").set(partial,"b");
+                            for(boolean update:Arrays.asList(false,true)) {
+                                session.clear();Object changed=update?session.find(ownerType,id):ownerType.newInstance();ownerType.getField("target").set(changed,partial);session.beginTransaction();
+                                try { if(!update) session.persist(changed);session.flush();fail("Partial relationship key must fail before writing"); }
+                                catch(com.codename1.orm.session.PersistenceException expected) { assertTrue(expected.getMessage().contains("Incomplete relationship identifier"));session.rollbackTransaction(); }
+                            }
+                        }
+                        session.clear();org.junit.Assert.assertNotNull(session.find(ownerType,id));
+                    }
+                } finally { session.close();db.close(); }
+            }
+        }
+    }
+
+    @Test
+    public void elementMapKeysHaveAPortableLengthLimit() throws Exception {
+        File classes=tmp.newFolder("mapkeys");Map<String,String> sources=JavaSourceCompiler.singleSource("mapkeys.Owner","package mapkeys; import com.codename1.annotations.*; import com.codename1.annotations.db.*; @Entity(table=\"mapkey_owner\") public class Owner { @Id public long id; @ElementCollection public java.util.Map<String,String> values=new java.util.LinkedHashMap<String,String>(); }");
+        JavaSourceCompiler.compile(sources,classes,Arrays.asList(testClassesDir()));ProcessorContext client=runProcessor(classes);assertFalse(client.getErrors().toString(),client.hasErrors());ProcessorContext backend=runProcessor(classes,backendClasspath());assertFalse(backend.getErrors().toString(),backend.hasErrors());
+        try(java.net.URLClassLoader loader=new java.net.URLClassLoader(new URL[]{classes.toURI().toURL()},getClass().getClassLoader())) {
+            Class type=loader.loadClass("mapkeys.Owner");
+            for(String suffix:Arrays.asList("Cn1Model","Cn1BackendModel")) {
+                Map<String,com.codename1.impl.orm.EntityModel<?>> models=new java.util.LinkedHashMap<String,com.codename1.impl.orm.EntityModel<?>>();models.put(type.getName(),(com.codename1.impl.orm.EntityModel)loader.loadClass(type.getName()+suffix).newInstance());
+                com.codename1.backend.Database db=com.codename1.backend.Database.open(":memory:");com.codename1.orm.session.Session session=new com.codename1.impl.orm.SessionImpl(new com.codename1.impl.orm.BackendSqlAccess(null,db,db.dialect()),models);
+                try {
+                    session.createTables();session.validateSchema();String boundary=new String(new char[255]).replace('\0','a');Object owner=type.newInstance();((Map)type.getField("values").get(owner)).put(boundary,"ok");session.beginTransaction();session.persist(owner);session.commitTransaction();Object id=type.getField("id").get(owner);
+                    for(boolean update:Arrays.asList(false,true)) {
+                        session.clear();Object changed=update?session.find(type,id):type.newInstance();if(update) session.initialize(changed,"values");((Map)type.getField("values").get(changed)).put(boundary+"b","invalid");session.beginTransaction();
+                        try { if(!update) session.persist(changed);session.flush();fail("Overlong map key must be rejected"); } catch(com.codename1.orm.session.PersistenceException expected) { assertTrue(expected.getMessage().contains("255"));session.rollbackTransaction(); }
+                    }
+                    session.clear();Object loaded=session.find(type,id);session.initialize(loaded,"values");org.junit.Assert.assertEquals(java.util.Collections.singletonMap(boundary,"ok"),type.getField("values").get(loaded));
+                } finally { session.close();db.close(); }
+            }
+        }
+    }
+
+    @Test
     public void compositeIdentifiersRoundTripThroughRelationsAndJoinTables() throws Exception {
         File classes=tmp.newFolder("composite");
         Map<String,String> sources=new java.util.LinkedHashMap<String,String>();

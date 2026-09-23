@@ -78,10 +78,24 @@ class ManagedSessionDatabaseTest {
                 PersistenceException mismatch=assertThrows(PersistenceException.class,session::validateSchema);
                 assertTrue(mismatch.getMessage().contains("Missing column managed_record.name"));
                 db.execute("ALTER TABLE managed_record RENAME COLUMN \"Name\" TO name",new Object[0]);session.validateSchema();
+                for(String sqlType:new String[]{"INTERVAL","POINT"}) {
+                    db.execute("ALTER TABLE managed_record ALTER COLUMN counter TYPE "+sqlType+" USING NULL::"+sqlType,new Object[0]);
+                    assertThrows(PersistenceException.class,session::validateSchema);
+                    db.execute("ALTER TABLE managed_record ALTER COLUMN counter TYPE BIGINT USING NULL::BIGINT",new Object[0]);session.validateSchema();
+                }
             }
             session.beginTransaction();
             ManagedSessionTest.Record entity=new ManagedSessionTest.Record();entity.name="record";entity.bytes=new byte[]{1,2};session.persist(entity);
             assertTrue(entity.id>0);session.commitTransaction();session.clear();
+            assertEquals(Long.valueOf(1),session.createQuery("select (r.counter+3)/2 from ManagedSessionTest$Record r",Long.class).first());
+            assertEquals(Long.valueOf(-1),session.createQuery("select (r.counter-3)/2 from ManagedSessionTest$Record r",Long.class).first());
+            assertEquals(Double.valueOf(1.5),session.createQuery("select (r.counter+3)/2.0 from ManagedSessionTest$Record r",Double.class).first());
+            assertNull(session.createQuery("select r.counter/0 from ManagedSessionTest$Record r",Long.class).first());
+            assertEquals(Long.valueOf(-2),session.createQuery("select -:value from ManagedSessionTest$Record r",Long.class).setParameter("value",2L).first());
+            assertEquals(Long.valueOf(2),session.createQuery("select +:value from ManagedSessionTest$Record r",Long.class).setParameter("value",2L).first());
+            assertEquals(Double.valueOf(1.5),session.createQuery("select r.counter+1.5 from ManagedSessionTest$Record r",Double.class).first());
+            assertEquals(Double.valueOf(2.5),session.createQuery("select :value+1.0 from ManagedSessionTest$Record r",Double.class).setParameter("value",1.5).first());
+            assertEquals(1,session.createQuery("select r.name,count(r.id) from ManagedSessionTest$Record r group by r.name having count(r.id)>0").list().size());
             assertArrayEquals(new byte[]{1,2},session.find(ManagedSessionTest.Record.class,entity.id).bytes);
             session.beginTransaction();
             ManagedSessionTest.Record unnamed=new ManagedSessionTest.Record(),upper=new ManagedSessionTest.Record();upper.name="Z";session.persist(unnamed);session.persist(upper);session.commitTransaction();

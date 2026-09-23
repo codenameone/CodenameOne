@@ -169,6 +169,13 @@ or `Long` attribute without a converter, including properties holding those
 numeric types. Other values stored as integers, such as
 booleans and dates, aren't counters.
 
+JPQL arithmetic requires numeric operands. Parameters in integral expressions
+must be integer values; use a real operand such as `1.0` for fractional arithmetic.
+Division of integral operands truncates toward zero on every database. Division
+and remainder by zero return null. Remainder accepts integral operands only.
+Aggregate queries require each non-aggregate field to be covered by `GROUP BY`,
+including fields in `HAVING` and `ORDER BY`.
+
 ==== Values and callbacks
 
 `@MappedSuperclass` contributes public inherited fields to a concrete entity.
@@ -234,6 +241,7 @@ the target key field, update the Java map keys as well.
 List, Set, and Map with String keys. Values may be String, boxed primitive types,
 or `java.util.Date`. Lists preserve order and duplicate values. Map columns can
 be named with `@MapKeyColumn`; `@JoinTable` names the collection table.
+Element-map keys accept at most 255 characters on every database.
 `query.containsElement("tags", "important")` tests membership without loading
 the collection. Changing a mutable Date value is detected during flush.
 
@@ -248,7 +256,8 @@ indexes. Generated text keys, indexed fields, and foreign keys accept at most
 `@Column(type=...)` to control the SQL type and its value limits yourself.
 
 `session.validateSchema()` checks mapped entity columns, storage-type families,
-whether null values are allowed, primary keys, and required collection columns. It doesn't migrate
+whether null values are allowed, and primary-key membership in entity and
+collection tables. It doesn't migrate
 schemas or validate every database-specific constraint. Existing tables are
 left to explicit migrations. In particular, a legacy client DAO's text char
 columns need migration to the managed layer's numeric UTF-16 storage when moving

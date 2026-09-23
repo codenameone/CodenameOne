@@ -80,6 +80,26 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
     String likeExpression(String expression) {
         return sql.likeExpression(expression);
     }
+    String numericOperand(String value, int kind) {
+        if ("postgresql".equals(sql.dialect())) {
+            return "CAST(" + value + " AS " + (kind == Attribute.REAL ? "DOUBLE PRECISION" : "BIGINT") + ")";
+        }
+        if (kind == Attribute.REAL) {
+            return "mysql".equals(sql.dialect()) ? "(1.0 * " + value + ")" : "CAST(" + value + " AS REAL)";
+        }
+        return value;
+    }
+    String arithmetic(String left, String op, String right, int kind) {
+        left = numericOperand(left, kind);
+        right = numericOperand(right, kind);
+        if ("/".equals(op) || "%".equals(op)) {
+            right = "NULLIF(" + right + ", 0)";
+            if ("/".equals(op) && kind != Attribute.REAL && "mysql".equals(sql.dialect())) {
+                op = "DIV";
+            }
+        }
+        return "(" + left + " " + op + " " + right + ")";
+    }
     String nextAlias() {
         return "q" + (aliasSequence++);
     }
@@ -1019,36 +1039,78 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
                         errors.add("Missing collection table " + relation.joinTable);
                         continue;
                     }
-                    List<String> required =
-                            new ArrayList<String>(Arrays.asList(joinColumns(relation.joinColumn, owner)));
+                    List<Attribute> expected = new ArrayList<Attribute>();
+                    collectionKeys(expected, joinColumns(relation.joinColumn, owner), owner, true);
                     if (relation.element) {
-                        required.add(relation.inverseJoinColumn);
-                        required.add(relation.orderColumn);
+                        expected.add(new Attribute("", relation.inverseJoinColumn, Elements.kind(relation.target),
+                                false, false, true, false));
                         if (relation.mapKey.length() > 0) {
-                            required.add(relation.mapKey);
+                            expected.add(new Attribute("", relation.mapKey, Attribute.TEXT, true, false, false, false));
                         }
                     } else {
-                        required.addAll(Arrays.asList(joinColumns(relation.inverseJoinColumn, model(relation.target))));
-                        if (relation.orderColumn.length() > 0) {
-                            required.add(relation.orderColumn);
-                        }
+                        EntityModel target = model(relation.target);
+                        collectionKeys(expected, joinColumns(relation.inverseJoinColumn, target), target,
+                                relation.orderColumn.length() == 0);
                     }
-                    for (String name : required) {
-                        boolean present = false;
-                        for (Object[] column : columns) {
-                            if (columnNameMatches(name, (String) column[0])) {
-                                present = true;
-                            }
-                        }
-                        if (!present) {
-                            errors.add("Missing collection column " + relation.joinTable + "." + name);
-                        }
+                    if (relation.orderColumn.length() > 0) {
+                        expected.add(new Attribute("", relation.orderColumn, Attribute.INTEGER,
+                                !relation.element || relation.mapKey.length() == 0, false, false, false));
                     }
+                    validateCollectionColumns(relation.joinTable, expected, columns, errors);
                 }
             }
         }
         if (!errors.isEmpty()) {
             throw new PersistenceException("Schema validation failed: " + errors);
+        }
+    }
+    private void collectionKeys(List<Attribute> expected, String[] names, EntityModel model, boolean primary) {
+        int[] ids = model.idIndexes();
+        for (int i = 0; i < names.length; i++) {
+            Attribute id = model.attributes()[ids[i]];
+            expected.add(new Attribute("", names[i], id.kind, primary, false, false, false, id.declaredType));
+        }
+    }
+    private void validateCollectionColumns(String table, List<Attribute> expected, List<Object[]> columns,
+            List<String> errors) {
+        for (Attribute attr : expected) {
+            Object[] found = null;
+            for (Object[] column : columns) {
+                if (columnNameMatches(attr.column, (String) column[0])) {
+                    found = column;
+                    break;
+                }
+            }
+            String name = table + "." + attr.column;
+            if (found == null) {
+                errors.add("Missing collection column " + name);
+                continue;
+            }
+            boolean primary = ((Number) found[3]).intValue() != 0;
+            boolean required = ((Number) found[2]).intValue() != 0 || primary;
+            if (attr.id != primary) {
+                errors.add("Primary key mismatch on collection " + name);
+            }
+            if (attr.nullable == required) {
+                errors.add("Nullability mismatch on collection " + name);
+            }
+            String type = attr.declaredType == null ? sql.columnType(attr.kind) : attr.declaredType;
+            if (typeFamily((String) found[1]) != typeFamily(type)) {
+                errors.add("Storage type mismatch on collection " + name);
+            }
+        }
+        for (Object[] column : columns) {
+            if (((Number) column[3]).intValue() != 0) {
+                boolean mapped = false;
+                for (Attribute attr : expected) {
+                    if (attr.id && columnNameMatches(attr.column, (String) column[0])) {
+                        mapped = true;
+                    }
+                }
+                if (!mapped) {
+                    errors.add("Unmapped primary key column " + table + "." + column[0]);
+                }
+            }
         }
     }
     private static String[] split(String text, char separator) {
@@ -1073,7 +1135,9 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
             lower.append(ch >= 'A' && ch <= 'Z' ? (char) (ch + 32) : ch);
         }
         String name = lower.toString();
-        if (name.indexOf("int") >= 0 || name.indexOf("serial") >= 0 || name.indexOf("bool") >= 0) {
+        String[] tokens = split(name.replace('(', ' '), ' ');
+        String token = tokens.length == 0 ? "" : tokens[0];
+        if (" int integer tinyint smallint mediumint bigint int2 int4 int8 serial smallserial bigserial serial2 serial4 serial8 bool boolean ".contains(" " + token + " ")) {
             return 1;
         }
         if (name.indexOf("char") >= 0 || name.indexOf("text") >= 0 || name.indexOf("clob") >= 0) {
@@ -1474,6 +1538,10 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
                 Map.Entry entry = (Map.Entry) item;
                 if (!(entry.getKey() instanceof String)) {
                     throw new PersistenceException("Element maps require non-null String keys");
+                }
+                if (((String) entry.getKey()).length() > 255) {
+                    throw new PersistenceException("Element map key exceeds the portable limit of 255 characters: "
+                            + relation.field);
                 }
                 checkElement(relation, entry.getValue());
                 result.add(new ElementRow(entry.getKey(), entry.getValue()));
@@ -1988,6 +2056,11 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
                 if (targetId == null || (targetModel.attributes()[targetModel.idIndex()].generated &&
                         targetId instanceof Number && ((Number) targetId).longValue() == 0)) {
                     throw new PersistenceException("Transient association without cascade PERSIST: " + relation.field);
+                }
+                try {
+                    targetModel.keyValues(targetId);
+                } catch (IllegalArgumentException error) {
+                    throw new PersistenceException("Incomplete relationship identifier: " + relation.field, error);
                 }
             }
         }

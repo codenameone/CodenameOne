@@ -123,6 +123,99 @@ class ManagedSessionTest {
         } finally { em.close(); }
     }
 
+    @Test void arithmeticValidatesOperandsAndUsesPortableDivision() throws Exception {
+        EntityManager em=manager();
+        try {
+            Session session=em.openSession();Record r=seed(session);session.beginTransaction();r.counter=3;session.commitTransaction();
+            for(String expression:new String[]{"r.name + 1","1 - r.name","r.bytes * 2","-r.name","+r.name","r / 2","r.counter % 1.5"}) {
+                assertThrows(IllegalArgumentException.class,()->session.createQuery("select "+expression+" from ManagedSessionTest$Record r"),expression);
+            }
+            for(String expression:new String[]{":value + r.counter","r.counter / :value","-:value","+:value","coalesce(:value,r.counter)+1"}) {
+                for(Object bad:new Object[]{"2",Boolean.TRUE,new java.util.Date(0),Double.valueOf(1.5)}) {
+                    assertThrows(IllegalArgumentException.class,()->session.createQuery("select "+expression+" from ManagedSessionTest$Record r").setParameter("value",bad).list());
+                }
+            }
+            assertEquals(Long.valueOf(5),session.createQuery("select r.counter + :value from ManagedSessionTest$Record r",Long.class).setParameter("value",2L).first());
+            assertEquals(Double.valueOf(2.5),session.createQuery("select :value + 1.0 from ManagedSessionTest$Record r",Double.class).setParameter("value",1.5).first());
+            assertEquals(Long.valueOf(1),session.createQuery("select r.counter / 2 from ManagedSessionTest$Record r",Long.class).first());
+            assertEquals(Long.valueOf(-1),session.createQuery("select -r.counter / 2 from ManagedSessionTest$Record r",Long.class).first());
+            assertEquals(Double.valueOf(1.5),session.createQuery("select r.counter / 2.0 from ManagedSessionTest$Record r",Double.class).first());
+            assertNull(session.createQuery("select r.counter / 0 from ManagedSessionTest$Record r",Long.class).first());
+            session.beginTransaction();session.createQuery("update ManagedSessionTest$Record r set r.counter = r.counter / 2").executeUpdate();session.commitTransaction();
+            assertEquals(1,session.find(Record.class,r.id).counter);session.close();
+        } finally { em.close(); }
+    }
+
+    @Test void groupedQueriesRejectUncoveredFieldsAndPreserveValidExpressions() throws Exception {
+        EntityManager em=manager();
+        try {
+            Session session=em.openSession();seed(session);
+            for(String query:new String[]{
+                    "select r.name, count(r.id) from ManagedSessionTest$Record r",
+                    "select length(r.name), count(r.id) from ManagedSessionTest$Record r",
+                    "select r.name, count(r.id) from ManagedSessionTest$Record r group by r.counter",
+                    "select r.name from ManagedSessionTest$Record r group by lower(r.name)",
+                    "select count(r.id) from ManagedSessionTest$Record r having r.name is not null",
+                    "select count(r.id) from ManagedSessionTest$Record r having r.name like 'f%'",
+                    "select count(r.id) from ManagedSessionTest$Record r order by r.name",
+                    "select count(r.id) from ManagedSessionTest$Record r where count(r.id) > 0",
+                    "select sum(count(r.id)) from ManagedSessionTest$Record r",
+                    "select r.name from ManagedSessionTest$Record r group by count(r.id)",
+                    "select coalesce(r.name,'x'),count(r.id) from ManagedSessionTest$Record r group by coalesce(r.name,'y')"}) {
+                assertThrows(IllegalArgumentException.class,()->session.createQuery(query),query);
+            }
+            assertEquals(1,session.createQuery("select r.name, count(r.id) from ManagedSessionTest$Record r group by r.name having count(r.id)>0").list().size());
+            assertEquals(1,session.createQuery("select upper(r.name), count(r.id) from ManagedSessionTest$Record r group by r.name order by count(r.id)").list().size());
+            assertEquals(1,session.createQuery("select lower(r.name), count(r.id) from ManagedSessionTest$Record r group by lower(r.name)").list().size());
+            assertEquals(Long.valueOf(2),session.createQuery("select count(r.id)+1 from ManagedSessionTest$Record r",Long.class).first());session.close();
+        } finally { em.close(); }
+    }
+
+    @Test void collectionSchemasValidateTypesNullabilityAndKeyRoles() throws Exception {
+        for(String definition:new String[]{
+                "owner_id BIGINT NOT NULL, position INTEGER NOT NULL, value INTEGER, PRIMARY KEY(owner_id,position)",
+                "owner_id TEXT NOT NULL, position INTEGER NOT NULL, value TEXT, PRIMARY KEY(owner_id,position)",
+                "owner_id BIGINT NOT NULL, position TEXT NOT NULL, value TEXT, PRIMARY KEY(owner_id,position)",
+                "owner_id BIGINT NOT NULL, position INTEGER NOT NULL, value TEXT NOT NULL, PRIMARY KEY(owner_id,position)",
+                "owner_id BIGINT NOT NULL, position INTEGER NOT NULL, value TEXT",
+                "owner_id BIGINT NOT NULL, position INTEGER NOT NULL, value TEXT, extra INTEGER, PRIMARY KEY(owner_id,position,extra)"}) {
+            EntityManager em=manager();
+            try {
+                Models.register(new Model() { public com.codename1.impl.orm.Relationship[] relationships() { return new com.codename1.impl.orm.Relationship[]{new com.codename1.impl.orm.Relationship("tags",String.class,true,true,-1,"","record_tags","owner_id","value",0,false,false,"","position","",true)}; } });
+                Session session=em.openSession();session.createTables();session.validateSchema();
+                em.database().execute("DROP TABLE record_tags",new Object[0]);em.database().execute("CREATE TABLE record_tags ("+definition+")",new Object[0]);
+                assertThrows(PersistenceException.class,session::validateSchema,definition);session.close();
+            } finally { em.close(); }
+        }
+    }
+
+    @Test void orderedJoinAndMapSchemasValidateTheirDistinctKeyRoles() throws Exception {
+        for(int shape=0;shape<3;shape++) {
+            final int mode=shape;EntityManager em=manager();
+            try {
+                Models.register(new Model() { public com.codename1.impl.orm.Relationship[] relationships() { return new com.codename1.impl.orm.Relationship[]{new com.codename1.impl.orm.Relationship("links",mode==2?String.class:Record.class,true,true,-1,"","record_links","owner_id",mode==2?"value":"target_id",0,false,false,mode==2?"map_key":"",mode==0?"":"position","",mode==2)}; } });
+                Session session=em.openSession();session.createTables();session.validateSchema();em.database().execute("DROP TABLE record_links",new Object[0]);
+                String definition=mode==2?"owner_id BIGINT NOT NULL, value TEXT, map_key TEXT NOT NULL, position INTEGER, PRIMARY KEY(owner_id,map_key)"
+                        :"owner_id BIGINT NOT NULL, target_id TEXT NOT NULL"+(mode==1?", position INTEGER NOT NULL":"")+", PRIMARY KEY(owner_id,"+(mode==1?"position":"target_id")+")";
+                em.database().execute("CREATE TABLE record_links ("+definition+")",new Object[0]);
+                PersistenceException error=assertThrows(PersistenceException.class,session::validateSchema);
+                assertTrue(error.getMessage().contains(mode==2?"Nullability mismatch on collection record_links.position":"Storage type mismatch on collection record_links.target_id"));session.close();
+            } finally { em.close(); }
+        }
+    }
+
+    @Test void schemaIntegerFamiliesRejectIntervalAndPoint() throws Exception {
+        for(String type:new String[]{"INTERVAL","POINT","INTEGER","BIGINT","INT8"}) {
+            EntityManager em=manager();
+            try {
+                em.database().execute("CREATE TABLE managed_record (id INTEGER PRIMARY KEY, version BIGINT NOT NULL, counter "+type+" NOT NULL, name TEXT, bytes BLOB)",new Object[0]);
+                Session session=em.openSession();session.createTables();
+                if(type.equals("INTERVAL") || type.equals("POINT")) assertThrows(PersistenceException.class,session::validateSchema);
+                else session.validateSchema();session.close();
+            } finally { em.close(); }
+        }
+    }
+
     @Test void builderLikeConvertsPatternsBeforeDialectNormalization() throws Exception {
         EntityManager em=manager();
         try {
