@@ -2765,6 +2765,22 @@ public final class JavaEmitter {
             restorePromotions(undo, ctx);
             Out b = emitExpr(c.elseExpr, expected, ctx);
             TypeRef t = conditionalType(a.type, b.type, expected);
+            boolean mixedNumeric = a.type != null && b.type != null
+                    && ((a.type.is("int") && b.type.is("double")) || (a.type.is("double") && b.type.is("int")))
+                    && expected != null
+                    && (expected.is("Object") || expected.is("num") || expected.is("dynamic"));
+            if (mixedNumeric) {
+                // An int arm and a double arm STORED as num or Object: Java's ternary
+                // would promote the int to double even when that arm is chosen, so
+                // `Object v = f ? 1 : 1.5` held 1.0 and `v is int` was false. Casting
+                // each arm to Number keeps the selected value's own type -- boxing
+                // alone is not enough, since a Long/Double pair is still promoted.
+                // Only for a reference target: as an arithmetic operand or a double
+                // return, the promotion gives the same number Dart does, and Number
+                // arms would not compile there.
+                return new Out("(" + cond.code + " ? (Number) " + paren(a.code) + " : (Number) "
+                        + paren(b.code) + ")", t);
+            }
             return new Out("(" + cond.code + " ? " + a.code + " : " + b.code + ")", t);
         }
         if (e instanceof NotNullAssert) {
@@ -3995,6 +4011,12 @@ public final class JavaEmitter {
             ctx.importClass("dart.runtime.DartRuntime");
             String fn = baseOp.equals("~/") ? "tdiv" : "mod";
             expr = "DartRuntime." + fn + "(" + readCode + ", " + rhs.code + ")";
+        } else if ((baseOp.equals("<<") || baseOp.equals(">>") || baseOp.equals(">>>"))
+                && !(a.rhs instanceof IntLit && ((IntLit) a.rhs).value >= 0 && ((IntLit) a.rhs).value < 64)) {
+            // `x <<= n` with Dart's shift-count rules, as the binary operator has.
+            ctx.importClass("dart.runtime.DartRuntime");
+            String fn = baseOp.equals("<<") ? "shl" : baseOp.equals(">>") ? "shr" : "ushr";
+            expr = "DartRuntime." + fn + "(" + readCode + ", " + rhs.code + ")";
         } else {
             expr = "(" + readCode + " " + baseOp + " " + rhs.code + ")";
         }
@@ -4247,6 +4269,10 @@ public final class JavaEmitter {
         }
         if (!a.op.equals("=") && isDynamic(lhs.type)) {
             // `x += 1` on a dynamic x: Java's compound operators do not apply to Object.
+            return new Out(lcode + " = " + compoundValue(lcode, lhs.type, a, ctx), lhs.type);
+        }
+        if ((a.op.equals("<<=") || a.op.equals(">>=") || a.op.equals(">>>="))
+                && !(a.rhs instanceof IntLit && ((IntLit) a.rhs).value >= 0 && ((IntLit) a.rhs).value < 64)) {
             return new Out(lcode + " = " + compoundValue(lcode, lhs.type, a, ctx), lhs.type);
         }
         String jop = a.op.equals("~/=") ? null : a.op;
@@ -4519,6 +4545,15 @@ public final class JavaEmitter {
                 String rc = r.type.is("num") ? "((Number) " + paren(r.code) + ").doubleValue()" : r.code;
                 return new Out(paren(lc) + " " + b.op + " " + paren(rc), cmp ? TypeRef.BOOL : TypeRef.DOUBLE);
             }
+        }
+        // Integer shifts with Dart's count rules; a constant count of 0..63 is where
+        // Java's operator already agrees, and keeps it.
+        if ((b.op.equals("<<") || b.op.equals(">>") || b.op.equals(">>>"))
+                && l.type != null && l.type.is("int") && r.type != null && r.type.is("int")
+                && !(b.right instanceof IntLit && ((IntLit) b.right).value >= 0 && ((IntLit) b.right).value < 64)) {
+            ctx.importClass("dart.runtime.DartRuntime");
+            String fn = b.op.equals("<<") ? "shl" : b.op.equals(">>") ? "shr" : "ushr";
+            return new Out("DartRuntime." + fn + "(" + l.code + ", " + r.code + ")", TypeRef.INT);
         }
         // Relational operators on enum operands compare by declaration order (Dart enum
         // semantics). Java enums expose that order as ordinal().
@@ -5322,7 +5357,15 @@ public final class JavaEmitter {
                 return new Out("DString." + n + "(" + target.code + ")", TypeRef.STRING);
             }
             if (n.equals("trim")) {
-                return new Out(target.code + ".trim()", TypeRef.STRING);
+                // Dart's whitespace set, not Java's <= U+0020.
+                return new Out("DString.trim(" + target.code + ")", TypeRef.STRING);
+            }
+            if (n.equals("startsWith") && pos.size() > 1) {
+                // startsWith(pattern, index): the index was dropped, so
+                // 'abc'.startsWith('b', 1) answered false.
+                return new Out("DString.startsWith(" + target.code + ", "
+                        + emitExpr(pos.get(0), null, ctx).code + ", "
+                        + emitExpr(pos.get(1), TypeRef.INT, ctx).code + ")", TypeRef.BOOL);
             }
             if (n.equals("startsWith") || n.equals("endsWith")) {
                 return new Out(target.code + "." + n + "("
@@ -5382,7 +5425,9 @@ public final class JavaEmitter {
                 return new Out("((long) Math.ceil(" + target.code + "))", TypeRef.INT);
             }
             if (n.equals("round")) {
-                return new Out("Math.round(" + target.code + ")", TypeRef.INT);
+                // Half away from zero, as Dart rounds; Math.round rounds -1.5 to -1.
+                ctx.importClass("dart.runtime.DartRuntime");
+                return new Out("DartRuntime.round(" + target.code + ")", TypeRef.INT);
             }
             if (n.equals("floorToDouble")) {
                 return new Out("Math.floor(" + target.code + ")", TypeRef.DOUBLE);
@@ -5391,7 +5436,8 @@ public final class JavaEmitter {
                 return new Out("Math.ceil(" + target.code + ")", TypeRef.DOUBLE);
             }
             if (n.equals("roundToDouble")) {
-                return new Out("((double) Math.round(" + target.code + "))", TypeRef.DOUBLE);
+                ctx.importClass("dart.runtime.DartRuntime");
+                return new Out("DartRuntime.roundToDouble(" + target.code + ")", TypeRef.DOUBLE);
             }
             if (n.equals("abs")) {
                 return new Out("Math.abs(" + target.code + ")", TypeRef.DOUBLE);
@@ -5411,7 +5457,11 @@ public final class JavaEmitter {
                 if (pk != null) {
                     return new Out(target.code + ".add" + pk + "(" + coerce(v, elem, ctx) + ")", TypeRef.VOID);
                 }
-                return new Out(target.code + ".add(" + boxIfPrimitive(v, ctx) + ")", TypeRef.VOID);
+                // Set.add answers whether the element was new, as Dart's does; List.add
+                // is void. Typing both void made `var added = set.add(x)` declare a
+                // void local.
+                return new Out(target.code + ".add(" + boxIfPrimitive(v, ctx) + ")",
+                        tt.is("Set") ? TypeRef.BOOL : TypeRef.VOID);
             }
             if (n.equals("addAll")) {
                 return new Out(target.code + ".addAllIterable(" + emitExpr(pos.get(0), null, ctx).code + ")", TypeRef.VOID);
@@ -5440,15 +5490,15 @@ public final class JavaEmitter {
                 return new Out(target.code + ".join(" + sep + ")", TypeRef.STRING);
             }
             if (n.equals("map")) {
-                Out f = emitExpr(pos.get(0), null, ctx);
+                Out f = emitExpr(pos.get(0), elementLambda(elem, TypeRef.DYNAMIC), ctx);
                 return new Out(target.code + ".map(" + f.code + ")", TypeRef.of("Iterable", TypeRef.DYNAMIC));
             }
             if (n.equals("where")) {
-                Out f = emitExpr(pos.get(0), null, ctx);
+                Out f = emitExpr(pos.get(0), elementLambda(elem, TypeRef.BOOL), ctx);
                 return new Out(target.code + ".where(" + f.code + ")", TypeRef.of("Iterable", elem));
             }
             if (n.equals("forEach")) {
-                Out f = emitExpr(pos.get(0), null, ctx);
+                Out f = emitExpr(pos.get(0), elementLambda(elem, TypeRef.VOID), ctx);
                 return new Out(target.code + ".forEachDart(" + f.code + ")", TypeRef.VOID);
             }
             if (n.equals("toList")) {
@@ -5476,7 +5526,7 @@ public final class JavaEmitter {
                 return new Out(target.code + ".clear()", TypeRef.VOID);
             }
             if (n.equals("any") || n.equals("every")) {
-                Out f = emitExpr(pos.get(0), null, ctx);
+                Out f = emitExpr(pos.get(0), elementLambda(elem, TypeRef.BOOL), ctx);
                 return new Out(target.code + "." + n + "(" + f.code + ")", TypeRef.BOOL);
             }
             if (n.equals("fold")) {
@@ -5491,7 +5541,7 @@ public final class JavaEmitter {
                 return new Out(unboxPrimitiveResult(call, r), r);
             }
             if (n.equals("firstWhere")) {
-                Out test = emitExpr(pos.get(0), null, ctx);
+                Out test = emitExpr(pos.get(0), elementLambda(elem, TypeRef.BOOL), ctx);
                 String orElse = "null";
                 for (NamedArg na : c.args.named) {
                     if (na.name.equals("orElse")) {
@@ -5518,26 +5568,29 @@ public final class JavaEmitter {
                         + paren(cmp) + ")", TypeRef.VOID);
             }
             if (n.equals("indexWhere")) {
-                String args = emitExpr(pos.get(0), null, ctx).code;
+                String args = emitExpr(pos.get(0), elementLambda(elem, TypeRef.BOOL), ctx).code;
                 if (pos.size() > 1) {
                     args += ", " + emitExpr(pos.get(1), TypeRef.INT, ctx).code;
                 }
                 return new Out(target.code + ".indexWhere(" + args + ")", TypeRef.INT);
             }
             if (n.equals("lastIndexWhere")) {
-                return new Out(target.code + ".lastIndexWhere(" + emitExpr(pos.get(0), null, ctx).code + ")",
+                return new Out(target.code + ".lastIndexWhere("
+                        + emitExpr(pos.get(0), elementLambda(elem, TypeRef.BOOL), ctx).code + ")",
                         TypeRef.INT);
             }
             if (n.equals("removeWhere")) {
-                return new Out(target.code + ".removeWhere(" + emitExpr(pos.get(0), null, ctx).code + ")",
+                return new Out(target.code + ".removeWhere("
+                        + emitExpr(pos.get(0), elementLambda(elem, TypeRef.BOOL), ctx).code + ")",
                         TypeRef.VOID);
             }
             if (n.equals("retainWhere")) {
-                return new Out(target.code + ".retainWhere(" + emitExpr(pos.get(0), null, ctx).code + ")",
+                return new Out(target.code + ".retainWhere("
+                        + emitExpr(pos.get(0), elementLambda(elem, TypeRef.BOOL), ctx).code + ")",
                         TypeRef.VOID);
             }
             if (n.equals("lastWhere")) {
-                Out test = emitExpr(pos.get(0), null, ctx);
+                Out test = emitExpr(pos.get(0), elementLambda(elem, TypeRef.BOOL), ctx);
                 String orElse = "null";
                 for (NamedArg na : c.args.named) {
                     if (na.name.equals("orElse")) {
@@ -6703,6 +6756,20 @@ public final class JavaEmitter {
             }
         }
         return null;
+    }
+
+    /**
+     * The expected type of a collection method's per-element lambda -- map, where,
+     * forEach, any/every, the *Where searches -- so an untyped parameter gets the
+     * element type. Passing nothing left `(e) => e.key` with a dynamic `e`: the member
+     * read became a raw field access and the arithmetic a dynamic dispatch. Null (no
+     * expectation) when the element type itself is unknown.
+     */
+    private TypeRef elementLambda(TypeRef elem, TypeRef ret) {
+        if (elem == null || elem.is("dynamic") || elem.is("var")) {
+            return null;
+        }
+        return inlineFuncType(elem, ret);
     }
 
     /** An inline single-parameter function type {@code (param) -> ret}, for typing a lambda arg. */
