@@ -7320,6 +7320,22 @@ static void* cn1BibopRawPage(void) {
 #ifndef CN1_BIBOP_FREE_POOL_KEEP
 #define CN1_BIBOP_FREE_POOL_KEEP 64   /* 64 * 64KB = 4MB kept warm, never released */
 #endif
+// THE WARM CACHE FOLLOWS DEMAND, with CN1_BIBOP_FREE_POOL_KEEP as its floor.
+//
+// "Steady-state churn cycles pages through the warm cache and never calls madvise" held
+// only while one cycle consumed fewer than 64 empty pages. An allocation-heavy mutator
+// consumes far more, so each sweep released most of the pages the mutator was about to
+// take back, and each one came back through MADV_FREE_REUSE -- a syscall on the MUTATOR,
+// made while holding bibopMutex, so every other allocating thread queued behind it.
+// Profiled: madvise was 9.2% of objectAllocation's main thread.
+//
+// So the trim keeps at least as many empty pages as the mutators took in the previous
+// cycle (from the free pool, the released pool or fresh). In a steady state those pages
+// are re-dirtied within the next cycle anyway, so keeping them costs no footprint the
+// process would not reach regardless; when demand falls, the next trim sees the smaller
+// number and releases the rest one cycle later. Under lowMemoryMode the floor alone
+// applies, so memory pressure still releases everything it can.
+static long bibopEmptyPagesTakenThisCycle = 0;   // bibopMutex
 // Bound on the madvise work one sweep may do, so a collapse from a huge pool
 // cannot turn a single cycle into a syscall storm. The remainder is released by
 // the following sweeps.
@@ -7693,10 +7709,16 @@ static void cn1BibopTrimFreePool(void) {
         return;
     }
     pthread_mutex_lock(&bibopMutex);
+    long keep = bibopEmptyPagesTakenThisCycle;
+    bibopEmptyPagesTakenThisCycle = 0;
+    if(keep < CN1_BIBOP_FREE_POOL_KEEP
+       || atomic_load_explicit(&lowMemoryMode, memory_order_relaxed)) {
+        keep = CN1_BIBOP_FREE_POOL_KEEP;
+    }
     CN1BibopPage* keepTail = 0;
     CN1BibopPage* p = bibopFreePool;
     int kept = 0;
-    while(p != 0 && kept < CN1_BIBOP_FREE_POOL_KEEP) {
+    while(p != 0 && kept < keep) {
         keepTail = p;
         p = p->nextPool;
         kept++;
@@ -9010,6 +9032,7 @@ static CN1BibopPage* cn1BibopAcquirePage(CODENAME_ONE_THREAD_STATE, int ci) {
         np = bibopFreePool;
         bibopFreePool = np->nextPool;
         cn1BibopFormatPage(np, ci);
+        bibopEmptyPagesTakenThisCycle++;
     } else if(bibopReleasedPool != 0 || bibopReuseFailedPool != 0) {
         // Warm pages are gone; take one whose slot region was handed back to the
         // OS. The REUSE call must precede the format, which writes into that
@@ -9044,10 +9067,14 @@ static CN1BibopPage* cn1BibopAcquirePage(CODENAME_ONE_THREAD_STATE, int ci) {
             if(cn1BibopReusePageMemory(cand)) {
                 np = cand;
                 cn1BibopFormatPage(np, ci);
+                bibopEmptyPagesTakenThisCycle++;
             } else {
                 cn1BibopParkReuseFailure(cand);
             }
         }
+    }
+    if(np == 0) {
+        bibopEmptyPagesTakenThisCycle++;   // about to take a fresh page: demand too
     }
     pthread_mutex_unlock(&bibopMutex);
     if(np == 0) {

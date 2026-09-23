@@ -1565,13 +1565,27 @@ struct TryBlock {
 // into is a fresh grace object not yet reachable (the residual Property->Double /
 // container->content crash). Pairs with CN1_SATB_DELETE (the deletion half) for a
 // complete snapshot + incremental barrier. Off-mark: one predicted-not-taken flag load.
+// FRESH VALUES ARE FILTERED INLINE. cn1SatbEnqueue discards a fresh (mark == -1)
+// reference anyway -- the sweep's grace rule keeps it -- but only after the call and
+// three acquire loads. In allocation-heavy code nearly every stored reference is a
+// newly allocated object, so that out-of-line call was the cost: 12.6-26.4% of
+// objectAllocation's main thread. The mark word is exactly what the out-of-line
+// filter reads first, so skipping here drops no reference it would have kept.
+// -DCN1_SATB_LOG_FRESH logs fresh references on purpose (it is the negative control
+// GcSteadyStateIntegrationTest rebuilds with), so the filter is off in that arm.
+#ifdef CN1_SATB_LOG_FRESH
+#define CN1_SATB_FRESH_INLINE(o) 0
+#else
+#define CN1_SATB_FRESH_INLINE(o) (__atomic_load_n(&(o)->__codenameOneGcMark, __ATOMIC_RELAXED) == -1)
+#endif
 #if defined(CN1_DISABLE_SATB)
 #define CN1_WRITE_BARRIER(target, value) do { } while(0)
 #else
 #define CN1_WRITE_BARRIER(target, value) \
     do { if(__builtin_expect(gcSatbActive, 0)) { \
              JAVA_OBJECT cn1__nv = (JAVA_OBJECT)(value); \
-             if(cn1__nv != JAVA_NULL && !CN1_IS_TAGGED(cn1__nv)) cn1SatbEnqueue(cn1__nv); } } while(0)
+             if(cn1__nv != JAVA_NULL && !CN1_IS_TAGGED(cn1__nv) && !CN1_SATB_FRESH_INLINE(cn1__nv)) \
+                 cn1SatbEnqueue(cn1__nv); } } while(0)
 #endif
 
 // ---- Snapshot-at-the-beginning (Yuasa) DELETION write barrier ---------------
@@ -1638,7 +1652,8 @@ extern void cn1SatbBulkQuiesce(void);
 #define CN1_SATB_DELETE(fieldAddr) \
     do { if(__builtin_expect(gcSatbActive, 0)) { \
              JAVA_OBJECT cn1__old = *(JAVA_OBJECT volatile*)(fieldAddr); \
-             if(cn1__old != JAVA_NULL && !CN1_IS_TAGGED(cn1__old)) cn1SatbEnqueue(cn1__old); \
+             if(cn1__old != JAVA_NULL && !CN1_IS_TAGGED(cn1__old) && !CN1_SATB_FRESH_INLINE(cn1__old)) \
+                 cn1SatbEnqueue(cn1__old); \
          } } while(0)
 #endif
 
