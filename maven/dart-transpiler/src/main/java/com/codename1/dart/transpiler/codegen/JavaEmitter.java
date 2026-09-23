@@ -366,6 +366,19 @@ public final class JavaEmitter {
         return v.initializer != null && !isSelfContainedLiteral(v.initializer);
     }
 
+    /**
+     * A class's static field initialised lazily, for the same reason as a top-level
+     * one and more: Java initialises every static of a class the first time ANY of them
+     * is touched, while Dart initialises each on its own first read. Reordering the
+     * statics by dependency fixed the null-neighbour half and not this one -- reading
+     * a harmless {@code C.ready} still ran an unrelated
+     * {@code static final expensive = fail()} and threw, or ran side effects Dart would
+     * have deferred until {@code expensive} was read.
+     */
+    private static boolean isLazyStatic(FieldDecl f) {
+        return f.isStatic && isLazyTopLevel(f);
+    }
+
     /** A literal whose value cannot reference any other declaration. */
     private static boolean isSelfContainedLiteral(Expr e) {
         if (e instanceof Ast.IntLit || e instanceof Ast.DoubleLit
@@ -400,8 +413,8 @@ public final class JavaEmitter {
         sb.append("    private static ").append(jt).append(' ').append(v.name)
                 .append("$value;\n");
         sb.append("    private static boolean ").append(v.name).append("$ready;\n\n");
-        sb.append("    /** Dart top-level `").append(v.name)
-                .append("` — initialised on first read, as Dart does. */\n");
+        sb.append("    /** Dart `").append(v.name)
+                .append("` -- initialised on first read, as Dart does. */\n");
         sb.append("    public static ").append(jt).append(" get$").append(v.name)
                 .append("() {\n");
         sb.append("        if (!").append(v.name).append("$ready) {\n");
@@ -415,10 +428,13 @@ public final class JavaEmitter {
         sb.append("        }\n");
         sb.append("        return ").append(v.name).append("$value;\n");
         sb.append("    }\n\n");
-        sb.append("    public static void set$").append(v.name).append('(')
+        // Answers the value stored, as a Dart assignment expression does, so an
+        // accessor write can stand where a value is needed (`x ??= v`, `y = x = v`).
+        sb.append("    public static ").append(jt).append(" set$").append(v.name).append('(')
                 .append(jt).append(" $v) {\n");
         sb.append("        ").append(v.name).append("$ready = true;\n");
         sb.append("        ").append(v.name).append("$value = $v;\n");
+        sb.append("        return $v;\n");
         sb.append("    }\n\n");
         return sb.toString();
     }
@@ -582,6 +598,10 @@ public final class JavaEmitter {
         for (FieldDecl f : orderStaticFieldsByDependency(c)) {
             TypeRef ft = fieldType(f, ctx);
             String jt = javaType(ft, false, ctx);
+            if (isLazyStatic(f)) {
+                body.append(emitLazyTopLevel(f, ft, jt, ctx));
+                continue;
+            }
             // Instance fields are private (accessed via get$/set$ accessors). Static fields
             // are read directly as ClassName.field with no accessor, so a public Dart static
             // (no leading underscore) must be public here; a library-private (_x) static must
@@ -1548,6 +1568,14 @@ public final class JavaEmitter {
             for (CatchClause cc : t.catches) {
                 String exType = cc.onType != null
                         ? javaType(cc.onType, true, ctx) : "RuntimeException";
+                // A dart:core error named only in an `on` clause still needs its
+                // import: `on FormatException` compiled only in a file that happened
+                // to construct one somewhere else.
+                String coreError = cc.onType != null ? CORE_ERRORS.get(cc.onType.name) : null;
+                if (coreError != null && !cc.onType.name.equals("Exception")) {
+                    ctx.importClass(coreError);
+                    exType = coreError.substring(coreError.lastIndexOf('.') + 1);
+                }
                 ctx.pushScope();
                 String var = ctx.declareShadowSafe(cc.exceptionVar != null ? cc.exceptionVar : "$e",
                         cc.onType != null ? cc.onType : TypeRef.DYNAMIC);
@@ -3337,6 +3365,9 @@ public final class JavaEmitter {
                     // interface default methods reach mixin state via accessors
                     return new Out("this.get$" + n + "()", fieldType(f, ctx));
                 }
+                if (isLazyStatic(f)) {
+                    return new Out(javaClassName(cc) + ".get$" + n + "()", fieldType(f, ctx));
+                }
                 return new Out(f.isStatic ? javaClassName(cc) + "." + n : "this." + n, fieldType(f, ctx));
             }
             MethodDecl getter = cc.getter(n);
@@ -3649,7 +3680,8 @@ public final class JavaEmitter {
             if (pc != null) {
                 FieldDecl f = pc.field(name);
                 if (f != null && f.isStatic) {
-                    return new Out(cls + "." + name, fieldType(f, ctx));
+                    return new Out(cls + (isLazyStatic(f) ? ".get$" + name + "()" : "." + name),
+                            fieldType(f, ctx));
                 }
             }
             diags.error(posNode, "E0131", "Cannot resolve static member '" + name + "' on " + cls);
@@ -3984,31 +4016,47 @@ public final class JavaEmitter {
      * replaces produced {@code map.idx(key) = value}, which javac rejects, and evaluated
      * the receiver and index up to three times.</p>
      */
-    private Expr hoistNullAwareTarget(Assign a, Ctx ctx) {
+    private Expr hoistNullAwareTarget(Assign a, Ctx ctx, List<String> inline) {
         if (a.lhs instanceof IndexGet) {
             IndexGet ig = (IndexGet) a.lhs;
             IndexGet copy = new IndexGet().at(a.file, a.line, a.col);
-            copy.target = hoistOnce(ig.target, ctx);
-            copy.index = hoistOnce(ig.index, ctx);
+            copy.target = hoistOnce(ig.target, ctx, inline);
+            copy.index = hoistOnce(ig.index, ctx, inline);
             return copy;
         }
         PropertyGet pg = (PropertyGet) a.lhs;
         PropertyGet copy = new PropertyGet().at(a.file, a.line, a.col);
-        copy.target = hoistOnce(pg.target, ctx);
+        copy.target = hoistOnce(pg.target, ctx, inline);
         copy.name = pg.name;
         copy.nullAware = pg.nullAware;
         return copy;
     }
 
-    /** {@code e} evaluated into a fresh local, unless it is already {@code this} or a local. */
-    private Expr hoistOnce(Expr e, Ctx ctx) {
+    /**
+     * {@code e} evaluated into a fresh local, unless it is already {@code this} or a local.
+     * With {@code inline} null the evaluation is a lifted statement, which is right only
+     * where the enclosing statement runs unconditionally; otherwise only the declaration
+     * is lifted and the assignment is appended to {@code inline}, for the caller to
+     * sequence where the expression really is evaluated.
+     */
+    private Expr hoistOnce(Expr e, Ctx ctx, List<String> inline) {
         if (e instanceof ThisExpr || (e instanceof Ident && ctx.lookup(((Ident) e).name) != null)) {
             return e;
         }
         Out o = emitExpr(e, null, ctx);
+        if (o.type != null && isClassRef(o.type)) {
+            // `Config.label ??= v`: the receiver is a class, which has nothing to
+            // evaluate and cannot be held in a variable.
+            return e;
+        }
         TypeRef t = o.type == null ? TypeRef.DYNAMIC : o.type;
         String tmp = ctx.newTemp();
-        ctx.writer().line(javaType(t, false, ctx) + " " + tmp + " = " + o.code + ";");
+        if (inline == null) {
+            ctx.writer().line(javaType(t, false, ctx) + " " + tmp + " = " + o.code + ";");
+        } else {
+            ctx.writer().line(javaType(t, false, ctx) + " " + tmp + ";");
+            inline.add(tmp + " = " + o.code);
+        }
         ctx.declare(tmp, t);
         Ident id = new Ident().at(e.file, e.line, e.col);
         id.name = tmp;
@@ -4030,7 +4078,9 @@ public final class JavaEmitter {
      * {@code operator []=} included.
      */
     private void emitNullAwareAssignStatement(Assign a, Ctx ctx) {
-        Expr lhs = hoistNullAwareTarget(a, ctx);
+        // A statement runs unconditionally, so lifting its receiver and index ahead of
+        // it evaluates them exactly when Dart would.
+        Expr lhs = hoistNullAwareTarget(a, ctx, null);
         Out read = emitExpr(lhs, null, ctx);
         Ctx.Writer w = ctx.writer();
         w.line("if (" + read.code + " == null) {");
@@ -4050,11 +4100,16 @@ public final class JavaEmitter {
      * or a setter is void in Java and is reported rather than emitted as invalid code.
      */
     private Out emitNullAwareAssignValue(Assign a, Ctx ctx) {
-        Expr lhs = hoistNullAwareTarget(a, ctx);
+        // A value can sit where it is evaluated lazily -- a loop condition, a
+        // short-circuited operand -- so nothing is evaluated ahead of it: the temps are
+        // declared, and assigned in order inside the expression itself.
+        List<String> inline = new ArrayList<String>();
+        Expr lhs = hoistNullAwareTarget(a, ctx, inline);
         Out read = emitExpr(lhs, null, ctx);
         TypeRef rt = read.type == null ? TypeRef.DYNAMIC : read.type;
         String cur = ctx.newTemp();
-        ctx.writer().line(javaType(rt, true, ctx) + " " + cur + " = " + read.code + ";");
+        ctx.writer().line(javaType(rt, true, ctx) + " " + cur + ";");
+        inline.add(cur + " = " + read.code);
         Out write = emitAssign(plainAssign(a, lhs), ctx);
         boolean yieldsValue = write.code.startsWith(read.code + " = ");
         if (lhs instanceof IndexGet) {
@@ -4065,7 +4120,12 @@ public final class JavaEmitter {
             diags.error(a, "E0141", "'??=' on an operator []= or a setter is supported as a statement,"
                     + " not yet as a value. Assign first, then read the target.");
         }
-        return new Out("(" + cur + " != null ? " + cur + " : (" + write.code + "))", rt);
+        ctx.importClass("dart.runtime.DartRuntime");
+        String chain = "true";
+        for (int k = inline.size() - 1; k >= 0; k--) {
+            chain = "DartRuntime.seq(" + inline.get(k) + ", " + chain + ")";
+        }
+        return new Out("(" + chain + " && " + cur + " != null ? " + cur + " : (" + write.code + "))", rt);
     }
 
     private Out emitAssign(Assign a, Ctx ctx) {
@@ -4076,6 +4136,14 @@ public final class JavaEmitter {
         if (a.op.equals("??=")) {
             Out lhs = emitExpr(a.lhs, null, ctx);
             Out rhs = emitExpr(a.rhs, lhs.type, ctx);
+            if (lhs.code.endsWith("()") && lhs.code.contains(".get$")) {
+                // A lazily initialised static or top-level is an accessor pair; its
+                // setter answers the stored value.
+                String base = lhs.code.substring(0, lhs.code.lastIndexOf(".get$"));
+                String prop = lhs.code.substring(lhs.code.lastIndexOf(".get$") + 5, lhs.code.length() - 2);
+                return new Out("(" + lhs.code + " == null ? " + base + ".set$" + prop + "("
+                        + coerce(rhs, lhs.type, ctx) + ") : " + lhs.code + ")", lhs.type);
+            }
             return new Out("(" + lhs.code + " == null ? (" + lhs.code + " = " + rhs.code + ") : " + lhs.code + ")",
                     lhs.type);
         }
@@ -4168,13 +4236,14 @@ public final class JavaEmitter {
         String lcode = lhs.code;
         // setters through accessors: x.get$f() as assignment target -> x.set$f(v)
         if (lcode.endsWith("()") && lcode.contains(".get$")) {
-            if (!a.op.equals("=")) {
-                diags.error(a, "E0134", "Compound assignment through accessors is not supported yet");
-            }
-            Out rhs = emitExpr(a.rhs, lhs.type, ctx);
             String base = lcode.substring(0, lcode.lastIndexOf(".get$"));
             String prop = lcode.substring(lcode.lastIndexOf(".get$") + 5, lcode.length() - 2);
-            return new Out(base + ".set$" + prop + "(" + coerce(rhs, lhs.type, ctx) + ")", lhs.type);
+            // `x op= v` through an accessor pair -- a lazily initialised static or
+            // top-level, or a mixin's field -- is set$x(get$x() op v).
+            String value = a.op.equals("=")
+                    ? coerce(emitExpr(a.rhs, lhs.type, ctx), lhs.type, ctx)
+                    : compoundValue(lcode, lhs.type, a, ctx);
+            return new Out(base + ".set$" + prop + "(" + value + ")", lhs.type);
         }
         if (!a.op.equals("=") && isDynamic(lhs.type)) {
             // `x += 1` on a dynamic x: Java's compound operators do not apply to Object.
@@ -4314,10 +4383,33 @@ public final class JavaEmitter {
                 }
             }
             Out left = emitExpr(b.left, null, ctx);
+            // `a ?? b` must evaluate a once and b only when a is null, WHERE the
+            // expression is -- which may be a loop condition, a short-circuited operand
+            // or a conditional's arm. Lifting `var t = a;` into a statement ran a once
+            // before the enclosing statement instead: `while (next() ?? false)` tested
+            // one stale value forever, and `false && (f() ?? true)` still called f().
+            // Only the temp's declaration is lifted now; the assignment stays inline.
+            Out right;
+            if (b.left instanceof Ident || b.left instanceof ThisExpr) {
+                // A variable read has no effect and nothing to cache.
+                right = emitExpr(b.right, left.type, ctx);
+                return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code + ")",
+                        copyNonNull(left.type));
+            }
+            TypeRef lt = left.type;
+            String jt = lt == null || lt.is("var") || lt.funcParams != null ? null : javaType(lt, true, ctx);
             String tmp = ctx.newTemp();
-            ctx.writer().line("var " + tmp + " = " + left.code + ";");
-            Out right = emitExpr(b.right, left.type, ctx);
-            return new Out("(" + tmp + " != null ? " + tmp + " : " + right.code + ")",
+            if (jt == null) {
+                // A type javac infers but this emitter cannot name: no declaration can
+                // hold it, so it keeps the eager form.
+                ctx.writer().line("var " + tmp + " = " + left.code + ";");
+                right = emitExpr(b.right, left.type, ctx);
+                return new Out("(" + tmp + " != null ? " + tmp + " : " + right.code + ")",
+                        copyNonNull(left.type));
+            }
+            ctx.writer().line(jt + " " + tmp + ";");
+            right = emitExpr(b.right, left.type, ctx);
+            return new Out("((" + tmp + " = " + left.code + ") != null ? " + tmp + " : " + right.code + ")",
                     copyNonNull(left.type));
         }
         if (b.op.equals("&&")) {
@@ -4785,10 +4877,13 @@ public final class JavaEmitter {
 
     /**
      * Static numeric parse factories on {@code int} / {@code double}, whose receiver is a
-     * bare type name rather than a value. Dart's {@code tryParse} returns null on a
-     * malformed input; the Java {@code parse*} it maps to throws instead — acceptable for
-     * the well-formed inputs the gallery feeds, and the result type is kept nullable so a
-     * downstream {@code != null} guard still type-checks. Returns null for any other name.
+     * bare type name rather than a value. Returns null for any other name.
+     *
+     * <p>Both go through the runtime's DString helpers. tryParse used to become the same
+     * Long.parseLong as parse, so malformed input -- exactly what a tryParse guard is
+     * written for -- threw NumberFormatException instead of answering null; and parse
+     * threw Java's exception rather than Dart's FormatException, which an
+     * {@code on FormatException} clause does not catch.</p>
      */
     private Out emitPrimitiveStaticCall(String typeName, Call c, Ctx ctx) {
         boolean isInt = typeName.equals("int");
@@ -4801,14 +4896,11 @@ public final class JavaEmitter {
         }
         String arg = emitExpr(c.args.positional.get(0), TypeRef.STRING, ctx).code;
         boolean nullable = c.name.equals("tryParse");
-        if (isInt) {
-            TypeRef t = new TypeRef("int");
-            t.nullable = nullable;
-            return new Out("Long.parseLong(" + arg + ")", t);
-        }
-        TypeRef t = new TypeRef("double");
+        ctx.importClass("dart.core.DString");
+        TypeRef t = new TypeRef(isInt ? "int" : "double");
         t.nullable = nullable;
-        return new Out("Double.parseDouble(" + arg + ")", t);
+        String fn = (nullable ? "tryParse" : "parse") + (isInt ? "Int" : "Double");
+        return new Out("DString." + fn + "(" + arg + ")", t);
     }
 
     private Out emitBareCall(Call c, Ctx ctx) {
