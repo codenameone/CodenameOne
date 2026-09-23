@@ -3278,7 +3278,20 @@ static inline JAVA_VOID cn1_set_array_element_char(CODENAME_ONE_THREAD_STATE, JA
 #define CN1_SET_ARRAY_ELEMENT_FLOAT_NOCHK(array, index, value) (((JAVA_ARRAY_FLOAT*) CN1_ARRAY_DATA((JAVA_ARRAY)(array)))[(index)] = (value))
 #define CN1_SET_ARRAY_ELEMENT_DOUBLE_NOCHK(array, index, value) (((JAVA_ARRAY_DOUBLE*) CN1_ARRAY_DATA((JAVA_ARRAY)(array)))[(index)] = (value))
 #define CN1_SET_ARRAY_ELEMENT_LONG_NOCHK(array, index, value) (((JAVA_ARRAY_LONG*) CN1_ARRAY_DATA((JAVA_ARRAY)(array)))[(index)] = (value))
-#define CN1_SET_ARRAY_ELEMENT_OBJECT_NOCHK(array, index, value) (((JAVA_ARRAY_OBJECT*) CN1_ARRAY_DATA((JAVA_ARRAY)(array)))[(index)] = (value))
+// NOCHK means the BOUNDS are proven, not that the store is invisible to the collector.
+// This used to be the bare assignment, so every bounds-proven object store -- 1,616 of
+// them in one self-hosting build -- skipped BOTH SATB halves: during a concurrent mark a
+// thread already scanned and released could load an element into a local, overwrite the
+// slot here, and leave that element unmarked if the slot was its only snapshot path. The
+// checked setter (cn1_set_array_element_object) always carried both halves; this now
+// carries exactly the same pair, and outside a mark it costs the one gated load.
+#define CN1_SET_ARRAY_ELEMENT_OBJECT_NOCHK(array, index, value) do { \
+        JAVA_OBJECT cn1__na = (JAVA_OBJECT)(array); \
+        JAVA_OBJECT* cn1__ns = &((JAVA_ARRAY_OBJECT*) CN1_ARRAY_DATA((JAVA_ARRAY)cn1__na))[(index)]; \
+        JAVA_OBJECT cn1__nv2 = (JAVA_OBJECT)(value); \
+        CN1_WRITE_BARRIER(cn1__na, cn1__nv2); \
+        CN1_SATB_DELETE(cn1__ns); \
+        *cn1__ns = cn1__nv2; } while(0)
 #define CN1_SET_ARRAY_ELEMENT_SHORT_NOCHK(array, index, value) (((JAVA_ARRAY_SHORT*) CN1_ARRAY_DATA((JAVA_ARRAY)(array)))[(index)] = (value))
 #define CN1_SET_ARRAY_ELEMENT_CHAR_NOCHK(array, index, value) (((JAVA_ARRAY_CHAR*) CN1_ARRAY_DATA((JAVA_ARRAY)(array)))[(index)] = (value))
 
