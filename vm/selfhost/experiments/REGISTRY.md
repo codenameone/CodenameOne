@@ -6082,3 +6082,55 @@ verifier at the real workload before bisecting** -- a bisect at a 5% failure rat
 holder and the epoch. And **"a property of the move alone" was the tell**: a barrier
 exists because of concurrency, so an argument for weakening one that never mentions the
 concurrent reader has not been made.
+
+## Round 38: the main thread's own costs -- barrier work moved off it, locks off the sweep
+
+Attribution from here on is **main-thread only**. The all-thread view counted the
+markers' work, which runs on otherwise idle cores and costs the wall clock nothing:
+the collector's own marking is 0.1% of the self-hosting main thread. What the main
+thread did pay, inclusive, was file I/O 9.2% (both arms pay it), allocation 5.8%, SATB
+barrier logging 5.4%, `synchronized` 4.8% and pacing parks 0.5%.
+
+Four changes, each A/B'd interleaved against its parent on the self-hosting corpus:
+
+| commit | what | wall | peak |
+|---|---|---|---|
+| 1c3c03ba97 | shifts/addAll queue their block for a collector re-scan instead of logging every reference | 0.988 | 0.895 |
+| 28b760ea22 | monitor side-table reads take no lock (seqlock + type-stable entries) | 0.940 | 1.07 |
+| a057f73c4d | store barriers filter fresh values inline; warm page cache sized by demand | 0.976 | 1.02 |
+
+Matrix against warm AOT JDK 25 after them, 3 rounds, load 7 rising to 20:
+**selfhost wall 0.96x / 0.95x / 0.94x and peak 0.87x / 0.90x / 0.91x at 1 / 2 / 4
+cores** -- ahead on both axes at every core count, where it was 1.02-1.05x behind on
+wall the round before.
+
+The peak rise on the monitor change is unexplained by allocation (none was added); the
+working hypothesis is pacing against a mutator that now runs 6% faster, not yet
+measured.
+
+### objectAllocation: the mutator is not the bottleneck any more
+
+Profiled under sustained load the main thread spends roughly half its time parked in
+`cn1PacingPark`: the collector cannot retire 256MB of young garbage per rep as fast as
+the mutator makes it, because its cost follows ALLOCATION (every fresh object is traced
+by the grace pass and every page is walked slot by slot three sweeps running), not the
+live set, which here is at most 512 nodes. The heap sat at ~630MB. That is why this
+benchmark gets worse against JDK 25 as cores are added: HotSpot's young collection
+scales with cores and costs what is live.
+
+### Trimming the allocation fast path makes it SLOWER -- measured twice, do not retry
+
+Three reasoned-correct trims of `cn1BibopFastAlloc`, layout-robust A/B (4 alignments x
+4 interleaved rounds, controls at 1.00):
+
+- drop the `constantPoolObjects` test (make cn1BibopAlloc refuse pre-init instead) and
+  move the per-object `gcAllocedSinceSweep` store to page install: **+10%**
+  (21.6/29.4/21.6/21.6 -> 28.3/23.6/23.8/28.1ms);
+- the same plus dropping the allocation-site class-init guard for eager classes:
+  **+4%**, mixed per layout (one layout 21.8 -> 28.6ms, another 21.8 -> 20.4ms).
+
+This agrees with the earlier finding recorded at CN1_FAST_NEW, where the guard alone
+measured 11% on every layout. Removing loads and stores from this loop reshapes how the
+core orders the next iteration's bumpIndex load against the previous release store to
+the same word, and on this hardware that costs more than the instructions saved. Not
+understood well enough to engineer; reverted.
