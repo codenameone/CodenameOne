@@ -34,9 +34,13 @@ package com.codename1.flutter;
  * flattens the asset tree into root-level resources and the runtime resolves
  * through the same mangling.</p>
  *
- * <p>The encoding doubles every {@code '_'} and then uses {@code '_'} as the
- * path separator, which makes it unambiguous (and reversible) while emitting
- * only characters that were already legal in the source path — no shell- or
+ * <p>The encoding makes {@code '_'} an escape that is ALWAYS followed by one
+ * character: {@code "__"} for a literal underscore, {@code "_s"} for the path
+ * separator. Every other character is itself. That is prefix-free, so it
+ * decodes one way only and no two paths share a name. The earlier rule --
+ * double every {@code '_'}, then use a single {@code '_'} as the separator --
+ * was not: {@code a_/b} and {@code a/_b} both became {@code a___b}, and the
+ * build silently wrote one asset over the other. No shell- or
  * bundler-hostile punctuation is introduced. The {@code cn1f_} prefix
  * namespaces Flutter assets away from other app resources (and keeps them off
  * the reserved {@code raw} prefix). File extensions survive, so native builders
@@ -44,7 +48,7 @@ package com.codename1.flutter;
  * {@code .png}.</p>
  *
  * <p>Example: {@code packages/gallery_assets/assets/studies/reply_card.png} →
- * {@code /cn1f_packages_gallery__assets_assets_studies_reply__card.png}</p>
+ * {@code /cn1f_packages_sgallery__assets_sassets_sstudies_sreply__card.png}</p>
  *
  * <p><b>Keep in sync</b> with the identical encoder in the build's
  * {@code TranscodeFlutterMojo} — the two halves of this contract are
@@ -63,7 +67,7 @@ public class FlutterAssets {
      * The absolute Codename One resource name for a Flutter asset path.
      *
      * @param assetPath the Flutter asset key, e.g. {@code assets/foo/bar.png}
-     * @return the flat resource name, e.g. {@code /cn1f_assets_foo_bar.png}
+     * @return the flat resource name, e.g. {@code /cn1f_assets_sfoo_sbar.png}
      */
     public static String resourceName(String assetPath) {
         return "/" + flatName(assetPath);
@@ -196,7 +200,7 @@ public class FlutterAssets {
             if (c == '_') {
                 sb.append("__");
             } else if (c == '/') {
-                sb.append('_');
+                sb.append("_s");
             } else {
                 sb.append(c);
             }

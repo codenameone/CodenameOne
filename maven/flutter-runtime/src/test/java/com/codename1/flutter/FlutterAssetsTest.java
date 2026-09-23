@@ -48,13 +48,13 @@ class FlutterAssetsTest {
 
     @Test
     void separatorAndEscape() {
-        assertEquals("/cn1f_assets_studies_reply__card.png",
+        assertEquals("/cn1f_assets_sstudies_sreply__card.png",
                 FlutterAssets.resourceName("assets/studies/reply_card.png"));
     }
 
     @Test
     void packageAssetPath() {
-        assertEquals("/cn1f_packages_gallery__assets_assets_icons_material_material.png",
+        assertEquals("/cn1f_packages_sgallery__assets_sassets_sicons_smaterial_smaterial.png",
                 FlutterAssets.resourceName("packages/gallery_assets/assets/icons/material/material.png"));
     }
 
@@ -78,6 +78,13 @@ class FlutterAssetsTest {
             "a/b/c.png",
             "a_b/c.png",
             "a/b_c.png",
+            // Adjacent underscore and separator: the doubling rule encoded both
+            // of these as "a___b.png", and one asset overwrote the other.
+            "a_/b.png",
+            "a/_b.png",
+            "a__/b.png",
+            "a/__b.png",
+            "a_/_b.png",
         };
         for (String p : paths) {
             assertTrue(seen.add(FlutterAssets.flatName(p)),

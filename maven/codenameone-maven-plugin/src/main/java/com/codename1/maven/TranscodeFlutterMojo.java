@@ -281,10 +281,13 @@ public class TranscodeFlutterMojo extends AbstractCN1Mojo {
     }
 
     /**
-     * The flat resource name for a Flutter asset key. Doubles every {@code '_'}
-     * then uses {@code '_'} as the path separator, so the encoding is
-     * unambiguous while introducing no characters that were not already legal
-     * in the source path (extensions survive for native bundlers).
+     * The flat resource name for a Flutter asset key. {@code '_'} is an escape
+     * always followed by one character -- {@code "__"} for an underscore,
+     * {@code "_s"} for the separator -- which is prefix-free, so no two keys
+     * share a name. Doubling underscores and using a single one as the
+     * separator was not: {@code a_/b} and {@code a/_b} both became
+     * {@code a___b}, and one asset was silently written over the other.
+     * Extensions survive for native bundlers.
      *
      * <p><b>Keep in sync</b> with {@code com.codename1.flutter.FlutterAssets} in
      * the Flutter runtime -- deliberately duplicated rather than shared, because
@@ -301,7 +304,7 @@ public class TranscodeFlutterMojo extends AbstractCN1Mojo {
             if (c == '_') {
                 sb.append("__");
             } else if (c == '/') {
-                sb.append('_');
+                sb.append("_s");
             } else {
                 sb.append(c);
             }

@@ -10,11 +10,12 @@ key into a single flat name, and this script has to produce exactly the same
 name or the asset is simply not found at runtime:
 
     packages/flutter_gallery_assets/places/india.png
-        -> cn1f_packages_flutter__gallery__assets_places_india.png
+        -> cn1f_packages_sflutter__gallery__assets_splaces_sindia.png
 
-The rule is: prefix `cn1f_`, every `/` becomes `_`, and every `_` already in
-the key is DOUBLED so the two cannot be confused. Without the doubling,
-`a_b/c` and `a/b_c` would collide on one file name.
+The rule is: prefix `cn1f_`, then `_` is an escape always followed by one
+character -- `__` for an underscore, `_s` for a `/`. That is prefix-free, so no
+two keys share a name. (Doubling underscores and using a single `_` for `/` was
+not: `a_/b` and `a/_b` both became `a___b`.)
 
 Hard links where the filesystem allows, so the asset pack costs no extra disk;
 a stamp file makes a repeat run a no-op, which matters because this runs on
@@ -36,7 +37,7 @@ def flat_name(key):
         if ch == "_":
             out.append("__")
         elif ch == "/":
-            out.append("_")
+            out.append("_s")
         else:
             out.append(ch)
     return "cn1f_" + "".join(out)

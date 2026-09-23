@@ -35,6 +35,7 @@ import java.lang.reflect.Field;
 import java.nio.file.Files;
 import java.util.HashSet;
 
+import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
@@ -110,6 +111,21 @@ public class TranscodeFlutterAssetsTest {
         mojo.removeStaleAssets(new HashSet<String>());
 
         assertTrue(own.isFile());
+    }
+
+    /**
+     * The same vectors as the runtime's FlutterAssetsTest and the benchmark's
+     * stage_assets.py: the three encoders must agree name for name, or an asset
+     * the build writes is one the runtime never finds.
+     */
+    @Test
+    public void encodingMatchesTheRuntimeAndIsPrefixFree() {
+        assertEquals("cn1f_assets_sstudies_sreply__card.png",
+                TranscodeFlutterMojo.flatAssetName("assets/studies/reply_card.png"));
+        assertEquals("cn1f_a___sb.png", TranscodeFlutterMojo.flatAssetName("a_/b.png"));
+        assertEquals("cn1f_a_s__b.png", TranscodeFlutterMojo.flatAssetName("a/_b.png"));
+        assertFalse(TranscodeFlutterMojo.flatAssetName("a_/b.png")
+                .equals(TranscodeFlutterMojo.flatAssetName("a/_b.png")));
     }
 
     private File asset(String key) throws Exception {

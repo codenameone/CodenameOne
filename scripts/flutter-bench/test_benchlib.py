@@ -298,5 +298,17 @@ class StartupBracket(unittest.TestCase):
         self.assertIn("260", text)
 
 
+class FlatAssetNames(unittest.TestCase):
+    """Must agree with FlutterAssets and TranscodeFlutterMojo, name for name."""
+
+    def test_same_vectors_as_the_runtime_and_the_plugin(self):
+        sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "app"))
+        import stage_assets
+        self.assertEqual("cn1f_assets_sstudies_sreply__card.png",
+                         stage_assets.flat_name("assets/studies/reply_card.png"))
+        self.assertEqual("cn1f_a___sb.png", stage_assets.flat_name("a_/b.png"))
+        self.assertEqual("cn1f_a_s__b.png", stage_assets.flat_name("a/_b.png"))
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)
