@@ -260,17 +260,29 @@ else
     flVerifier=0
     flFired=0
     for flI in $(seq 1 $flAttempts); do
+        flRc=0
         flOut="$(CN1_GC_FAULT=freelive CN1_GC_FAULT_EVERY=3000 CN1_GC_VERIFY_SOFT=1 \
-                 ./target/bin/MapTorture2-verify 2>&1)" || true
+                 ./target/bin/MapTorture2-verify 2>&1)" || flRc=$?
         flV="$(printf '%s' "$flOut" | grep -oE 'violations=[0-9]+' | tail -1 | cut -d= -f2)"
         # "the fault fired" and "the fault was caught" are separate claims; a run where
-        # nothing was freed proves nothing either way and must not count as a pass.
-        if printf '%s' "$flOut" | grep -qE 'slots freed while live: [1-9]'; then
+        # nothing was freed proves nothing either way and must count as NEITHER a pass
+        # nor a miss. It used to count as a miss: about 1 run in 150 ends before any
+        # sweep reaches a 3000th slot, prints the correct checksum with no fault line,
+        # and failed the gate as "freed live slots and NOTHING noticed". The per-slot
+        # "freed slot" line is read as well as the exit summary, because a run the
+        # fault kills never prints the summary.
+        flThis=0
+        if printf '%s' "$flOut" | grep -qE 'slots freed while live: [1-9]|\[GC-FAULT\] +freed slot'; then
             flFired=$((flFired + 1))
+            flThis=1
         fi
         if [ "${flV:-0}" -gt 0 ] 2>/dev/null; then
             flVerifier=$((flVerifier + 1))
-        elif ! printf '%s' "$flOut" | grep -qE 'LOST|CORRUPT'; then
+        elif [ "$flThis" -eq 1 ] && [ "$flRc" -eq 0 ] \
+             && ! printf '%s' "$flOut" | grep -qE 'LOST|CORRUPT'; then
+            # A dangling slot that made the run die -- a crash, or the OutOfMemoryError
+            # a clobbered StringBuilder length produces -- was noticed; only a run that
+            # exits cleanly with nothing reported is a miss.
             flMissed=$((flMissed + 1))
         fi
     done
