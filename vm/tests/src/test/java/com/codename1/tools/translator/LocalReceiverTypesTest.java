@@ -122,7 +122,15 @@ class LocalReceiverTypesTest {
             method.markStackIterators();
             StringBuilder generated = new StringBuilder();
             method.appendMethodC(generated);
-            assertFalse(generated.toString().contains("DEFINE_METHOD_STACK_FRAMELESS"), generated.toString());
+            // A try/catch no longer refuses frameless codegen (7019abafdc): the method is
+            // frameless, and its frame must then carry the two names the exception macros
+            // restore to -- which is what CN1_FRAMELESS_TRY_FRAME supplies. The receiver
+            // is not proven exact (asserted above), so no stack iterator is placed and the
+            // catch path cannot leave one dangling.
+            String c = generated.toString();
+            assertTrue(c.contains("DEFINE_METHOD_STACK_FRAMELESS"), c);
+            assertTrue(c.contains("CN1_FRAMELESS_TRY_FRAME();"), c);
+            assertFalse(c.contains("cn1IterScopeBegin"), c);
         }
         Parser.cleanup();
     }
