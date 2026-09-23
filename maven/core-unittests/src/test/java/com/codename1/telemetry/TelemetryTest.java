@@ -548,6 +548,49 @@ class TelemetryTest extends UITestBase {
     }
 
     @Test
+    void aFailedAttemptThatIsRetriedStillReportsItsFailure() throws Exception {
+        // The retry re-queues the request from inside the exception handler; the
+        // failed attempt must be ended with its exception before that happens.
+        Telemetry.install(new TelemetryConfig().direct("http://collector.test"));
+        final int[] reads = new int[1];
+        ConnectionRequest flaky = new ConnectionRequest() {
+            @Override
+            protected void readResponse(InputStream input) throws java.io.IOException {
+                if (reads[0]++ == 0) {
+                    throw new java.io.IOException("connection reset");
+                }
+            }
+
+            @Override
+            protected void handleIOException(java.io.IOException err) {
+                retry();
+            }
+        };
+        flaky.setUrl(API + "?flaky");
+        flaky.setPost(false);
+        NetworkManager.getInstance().addToQueue(flaky);
+        long deadline = System.currentTimeMillis() + 5000;
+        while (reads[0] < 2 && System.currentTimeMillis() < deadline) {
+            flushSerialCalls();
+            Thread.sleep(20);
+        }
+        assertEquals(2, reads[0], "the request was not retried");
+
+        List<Span> spans = exported(2);
+        Span failed = null;
+        for (Span span : spans) {
+            if (span.getStatus().getCode()
+                    == io.opentelemetry.proto.trace.v1.Status.StatusCode.STATUS_CODE_ERROR) {
+                failed = span;
+            }
+        }
+        assertNotNull(failed, "the failed attempt was exported as neither failed nor answered: "
+                + spans);
+        assertEquals("connection reset", failed.getStatus().getMessage());
+        assertEquals("exception", failed.getEvents(0).getName());
+    }
+
+    @Test
     void anExceptionStatusIsBounded() {
         Telemetry.install(new TelemetryConfig().direct("http://collector.test"));
         TelemetrySpan span = Telemetry.startSpan("big");

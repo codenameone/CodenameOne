@@ -48,6 +48,9 @@ import java.util.Map;
  * <p>The request path only ever takes the lock for an append.
  */
 final class BatchExporter implements Runnable {
+    /** Relayed payloads posted per round before the server's own spans get a turn. */
+    static final int RELAY_PER_ROUND = 8;
+
     private final Object lock = new Object();
     private final String endpoint;
     private final List headers;
@@ -62,8 +65,19 @@ final class BatchExporter implements Runnable {
     /** Each an Object[] {byte[] body, String contentType}: payloads the relay accepted. */
     private ArrayList relayed = new ArrayList();
     private long relayedBytes;
-    private long requested;
-    private long completed;
+    /*
+     * Watermarks for flush(). Items leave each queue in order, so "everything
+     * queued before the flush has gone" is exactly "the drained count has reached
+     * the enqueued count the flush saw" -- which stays true on a busy server whose
+     * queue is never empty, where waiting for an empty queue would not.
+     */
+    private long enqueuedSpans;
+    private long drainedSpans;
+    private long enqueuedRelayed;
+    private long drainedRelayed;
+    /** The furthest watermarks any waiting flush asked for; the thread exports promptly until it reaches them. */
+    private long flushSpans;
+    private long flushRelayed;
     private boolean stopping;
     private boolean stopped;
     private Thread thread;
@@ -112,6 +126,7 @@ final class BatchExporter implements Runnable {
                 return;
             }
             queue.add(span);
+            enqueuedSpans++;
             if(queue.size() >= maxBatch) {
                 lock.notifyAll();
             }
@@ -131,6 +146,7 @@ final class BatchExporter implements Runnable {
             }
             relayed.add(new Object[] {body, contentType});
             relayedBytes += body.length;
+            enqueuedRelayed++;
             lock.notifyAll();
             return true;
         }
@@ -143,9 +159,12 @@ final class BatchExporter implements Runnable {
             if(thread == null || stopped) {
                 return;
             }
-            long target = ++requested;
+            long spans = enqueuedSpans;
+            long payloads = enqueuedRelayed;
+            flushSpans = Math.max(flushSpans, spans);
+            flushRelayed = Math.max(flushRelayed, payloads);
             lock.notifyAll();
-            while(completed < target && !stopped) {
+            while((drainedSpans < spans || drainedRelayed < payloads) && !stopped) {
                 long left = deadline - System.currentTimeMillis();
                 if(left <= 0) {
                     return;
@@ -197,10 +216,9 @@ final class BatchExporter implements Runnable {
         while(true) {
             List batch;
             List payloads;
-            long answering;
             synchronized(lock) {
                 while(!stopping && queue.size() < maxBatch && relayed.isEmpty()
-                        && requested == completed) {
+                        && drainedSpans >= flushSpans && drainedRelayed >= flushRelayed) {
                     long left = nextTick - System.currentTimeMillis();
                     if(left <= 0) {
                         break;
@@ -211,11 +229,16 @@ final class BatchExporter implements Runnable {
                         // Only a shutdown interrupts this thread; carry on to it.
                     }
                 }
-                answering = requested;
                 batch = take(queue, maxBatch);
-                payloads = relayed;
-                relayed = new ArrayList();
-                relayedBytes = 0;
+                // A bounded share of the relay per round, between local batches.
+                // Draining it all at once let clients posting many tiny payloads
+                // to a slow collector hold this thread for as long as that took,
+                // while the server's own spans overflowed their queue and were
+                // dropped.
+                payloads = take(relayed, RELAY_PER_ROUND);
+                for(int iter = 0 ; iter < payloads.size() ; iter++) {
+                    relayedBytes -= ((byte[])((Object[])payloads.get(iter))[0]).length;
+                }
             }
             if(System.currentTimeMillis() >= nextTick) {
                 nextTick = System.currentTimeMillis() + delayMillis;
@@ -235,17 +258,11 @@ final class BatchExporter implements Runnable {
                 }
             }
             synchronized(lock) {
-                // A flush is answered only once everything queued BEFORE it has
-                // gone -- a batch cap smaller than the queue means that can take
-                // several rounds, and answering on the first would let a Lambda
-                // invocation return with spans still waiting.
-                if(queue.isEmpty() && relayed.isEmpty() && completed < answering) {
-                    completed = answering;
-                    lock.notifyAll();
-                }
+                drainedSpans += batch.size();
+                drainedRelayed += payloads.size();
+                lock.notifyAll();
                 if(stopping && queue.isEmpty() && relayed.isEmpty()) {
                     stopped = true;
-                    completed = requested;
                     lock.notifyAll();
                     return;
                 }

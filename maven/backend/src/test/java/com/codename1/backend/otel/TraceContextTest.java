@@ -260,4 +260,32 @@ class TraceContextTest {
         assertNull(convert.invoke(null, "Root=1-5759e988-bd862e3fe1be46a994272793"));
         assertNull(convert.invoke(null, (Object)null));
     }
+
+    @Test
+    @DisplayName("a trace endpoint must name a host, and a valid port if it names one")
+    void endpointAuthority() {
+        assertTrue(OtlpTracer.hasHttpAuthority("https://collector.example/v1/traces"));
+        assertTrue(OtlpTracer.hasHttpAuthority("http://user:pw@127.0.0.1:4318"));
+        assertTrue(OtlpTracer.hasHttpAuthority("http://[::1]:4318/v1/traces"));
+        assertTrue(OtlpTracer.hasHttpAuthority("HTTP://c.example:/v1/traces"));
+        assertFalse(OtlpTracer.hasHttpAuthority("https://"));
+        assertFalse(OtlpTracer.hasHttpAuthority("https:///v1/traces"));
+        assertFalse(OtlpTracer.hasHttpAuthority("http://user@:4318"));
+        assertFalse(OtlpTracer.hasHttpAuthority("http://c.example:70000"));
+        assertFalse(OtlpTracer.hasHttpAuthority("http://c.example:43x8"));
+        assertFalse(OtlpTracer.hasHttpAuthority("http://[::1"));
+        assertFalse(OtlpTracer.hasHttpAuthority("ftp://c.example"));
+    }
+
+    @Test
+    @DisplayName("the relay ceiling counts UTF-8 bytes, not characters")
+    void relayCountsBytes() {
+        assertEquals(3, OtlpRelay.utf8Length("abc", 100));
+        assertEquals(6, OtlpRelay.utf8Length("\u0800\u0800", 100),
+                "a three-byte character counted as one");
+        assertEquals(4, OtlpRelay.utf8Length("\ud83d\ude00", 100), "a surrogate pair is 4 bytes");
+        assertEquals(3, OtlpRelay.utf8Length("\ud83d", 100), "a lone surrogate encodes as U+FFFD");
+        assertEquals(2, OtlpRelay.utf8Length("\u00e9", 100));
+        assertTrue(OtlpRelay.utf8Length("\u0800\u0800\u0800\u0800", 5) > 5);
+    }
 }

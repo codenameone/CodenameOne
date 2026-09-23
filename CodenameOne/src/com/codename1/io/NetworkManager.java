@@ -1231,6 +1231,11 @@ public final class NetworkManager {
                 requestWasCompleted = req.performOperationComplete();
             } catch (IOException e) {
                 failure = e;
+                // Ended HERE, with the failure, before any handler runs: a handler
+                // that retries re-queues the request, and ending the attempt at
+                // that point has no failure to report, so the span came out with
+                // neither a response nor an error.
+                endTracerAttempt(req, e);
                 if (!req.isFailSilently()) {
                     if (!handleException(req, e)) {
                         req.handleIOException(e);
@@ -1241,6 +1246,7 @@ public final class NetworkManager {
                 }
             } catch (RuntimeException er) {
                 failure = er;
+                endTracerAttempt(req, er);
                 if (!req.isFailSilently()) {
                     if (!handleException(req, er)) {
                         req.handleRuntimeException(er);

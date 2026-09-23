@@ -164,10 +164,9 @@ public final class OtlpTracer implements Tracer {
             endpoint = appendTracesPath(base);
         }
         endpoint = endpoint.trim();
-        if(!endpoint.regionMatches(true, 0, "http://", 0, 7)
-                && !endpoint.regionMatches(true, 0, "https://", 0, 8)) {
-            throw new IOException("The trace endpoint must be an http or https URL and is '"
-                    + BatchExporter.redact(endpoint) + "'");
+        if(!hasHttpAuthority(endpoint)) {
+            throw new IOException("The trace endpoint must be an http or https URL naming "
+                    + "a host and is '" + BatchExporter.redact(endpoint) + "'");
         }
 
         // The signal-specific setting REPLACES the generic one, as the endpoint and
@@ -276,6 +275,73 @@ public final class OtlpTracer implements Tracer {
 
     void ended(OtelSpan span) {
         exporter.add(span);
+    }
+
+    /**
+     * Whether {@code url} is http or https with a host, and a valid port if it
+     * names one. A bare {@code https://} passed a scheme check and started an
+     * exporter whose every POST then failed: the server ran, validated, and
+     * produced no traces.
+     */
+    static boolean hasHttpAuthority(String url) {
+        int start;
+        if(url.regionMatches(true, 0, "http://", 0, 7)) {
+            start = 7;
+        } else if(url.regionMatches(true, 0, "https://", 0, 8)) {
+            start = 8;
+        } else {
+            return false;
+        }
+        int end = url.length();
+        for(int iter = start ; iter < url.length() ; iter++) {
+            char c = url.charAt(iter);
+            if(c == '/' || c == '?' || c == '#') {
+                end = iter;
+                break;
+            }
+        }
+        String authority = url.substring(start, end);
+        int at = authority.lastIndexOf('@');
+        String hostPort = at < 0 ? authority : authority.substring(at + 1);
+        String host;
+        String port = null;
+        if(hostPort.startsWith("[")) {
+            int close = hostPort.indexOf(']');
+            if(close < 0) {
+                return false;
+            }
+            host = hostPort.substring(1, close);
+            String rest = hostPort.substring(close + 1);
+            if(rest.length() > 0) {
+                if(rest.charAt(0) != ':') {
+                    return false;
+                }
+                port = rest.substring(1);
+            }
+        } else {
+            int colon = hostPort.lastIndexOf(':');
+            host = colon < 0 ? hostPort : hostPort.substring(0, colon);
+            port = colon < 0 ? null : hostPort.substring(colon + 1);
+        }
+        if(host.length() == 0) {
+            return false;
+        }
+        // An empty port ("host:") is the scheme's default, as RFC 3986 allows.
+        if(port != null && port.length() > 0) {
+            if(port.length() > 5) {
+                return false;
+            }
+            int value = 0;
+            for(int iter = 0 ; iter < port.length() ; iter++) {
+                char c = port.charAt(iter);
+                if(c < '0' || c > '9') {
+                    return false;
+                }
+                value = value * 10 + (c - '0');
+            }
+            return value > 0 && value <= 65535;
+        }
+        return true;
     }
 
     boolean excluded(String key) {

@@ -75,12 +75,21 @@ class OtlpTracerTest {
     private final List contentTypes = Collections.synchronizedList(new ArrayList());
     private final List authorizations = Collections.synchronizedList(new ArrayList());
     private final List authorizationCounts = Collections.synchronizedList(new ArrayList());
+    /** How long the collector takes to answer; a slow one keeps the queue from emptying. */
+    private volatile int collectorDelayMillis;
 
     @BeforeEach
     void startCollector() throws IOException {
         collector = com.sun.net.httpserver.HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
         collector.createContext("/v1/traces", (HttpExchange exchange) -> {
             exports.add(readAll(exchange.getRequestBody()));
+            if(collectorDelayMillis > 0) {
+                try {
+                    Thread.sleep(collectorDelayMillis);
+                } catch (InterruptedException err) {
+                    Thread.currentThread().interrupt();
+                }
+            }
             contentTypes.add(exchange.getRequestHeaders().getFirst("Content-Type"));
             authorizations.add(String.valueOf(exchange.getRequestHeaders().getFirst("Authorization")));
             List all = exchange.getRequestHeaders().get("Authorization");
@@ -325,6 +334,41 @@ class OtlpTracerTest {
         Tracing.install(null);
         assertEquals(1, shutdowns[1], "turning tracing off left the tracer running");
         assertEquals(1, shutdowns[0]);
+    }
+
+    @Test
+    @DisplayName("flush returns once what was queued before it has gone, though the queue never empties")
+    void flushWaitsOnlyForWhatItFound() throws Exception {
+        collectorDelayMillis = 20;
+        Properties settings = settings(freePort());
+        settings.setProperty(OtlpTracer.BATCH_SIZE, "1");
+        settings.setProperty(OtlpTracer.QUEUE_SIZE, "5");
+        final OtlpTracer tracer = new OtlpTracer();
+        assertTrue(tracer.open(Config.of(settings, "test")));
+        final java.util.concurrent.atomic.AtomicBoolean stop =
+                new java.util.concurrent.atomic.AtomicBoolean();
+        Thread busy = new Thread(() -> {
+            // Spans ending far faster than one export per 20ms: the queue is never
+            // empty again for as long as this runs.
+            while(!stop.get()) {
+                tracer.startSpan("busy", com.codename1.backend.Span.KIND_INTERNAL,
+                        null, null, null).end();
+                Thread.yield();
+            }
+        });
+        busy.start();
+        try {
+            Thread.sleep(100);
+            long started = System.currentTimeMillis();
+            tracer.flush(10000);
+            long took = System.currentTimeMillis() - started;
+            assertTrue(took < 5000, "flush waited " + took
+                    + "ms for spans queued after it was called");
+        } finally {
+            stop.set(true);
+            busy.join();
+            tracer.shutdown(0);
+        }
     }
 
     @Test

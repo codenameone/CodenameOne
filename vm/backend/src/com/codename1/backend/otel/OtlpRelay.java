@@ -108,9 +108,9 @@ final class OtlpRelay implements HttpServer.Handler {
         if(body == null || body.length() == 0) {
             return answer(400, "empty export");
         }
-        // Characters, a lower bound on bytes: close enough for a ceiling whose
-        // job is to keep a hostile body from being parsed at all.
-        if(body.length() > maxBytes) {
+        // Measured in UTF-8 bytes, as the setting is. Counting characters let a
+        // body of three-byte characters through at three times the ceiling.
+        if(utf8Length(body, maxBytes) > maxBytes) {
             return answer(413, "export larger than " + maxBytes + " bytes");
         }
         byte[] encoded;
@@ -167,6 +167,36 @@ final class OtlpRelay implements HttpServer.Handler {
             headers.put("Vary", "Origin");
         }
         return headers;
+    }
+
+    /**
+     * The UTF-8 length of {@code value}, counted without encoding it, and given up
+     * on as soon as it passes {@code limit}. An unpaired surrogate counts as the
+     * three bytes of the replacement character an encoder writes for it.
+     */
+    static long utf8Length(String value, long limit) {
+        // Every character is at least one byte, so a long body is refused without
+        // walking it.
+        if(value.length() > limit) {
+            return value.length();
+        }
+        long bytes = 0;
+        int n = value.length();
+        for(int iter = 0 ; iter < n && bytes <= limit ; iter++) {
+            char c = value.charAt(iter);
+            if(c < 0x80) {
+                bytes++;
+            } else if(c < 0x800) {
+                bytes += 2;
+            } else if(Character.isHighSurrogate(c) && iter + 1 < n
+                    && Character.isLowSurrogate(value.charAt(iter + 1))) {
+                bytes += 4;
+                iter++;
+            } else {
+                bytes += 3;
+            }
+        }
+        return bytes;
     }
 
     private static byte[] utf8(String value) throws java.io.IOException {
