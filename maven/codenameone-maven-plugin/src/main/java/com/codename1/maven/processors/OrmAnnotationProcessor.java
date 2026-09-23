@@ -654,10 +654,6 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
             claimSchemaName(schemaTables,entity.tableName,owner,ctx);
             tableGenerators|=entity.generation>1;
             for(PersistedField field:entity.fields) if(backend && tooLongForAnEngine(field.columnName)) ctx.error("Column name exceeds the portable limit: "+field.columnName);
-            for(AnnotationValues index:entity.indexes) {
-                String name=index.getStringOrDefault("name","");
-                if(name.length()>0) claimSchemaName(schemaIndexes,name,owner,ctx);
-            }
         }
         for(EntityClass entity:accepted.values()) for(RelationField relation:entity.relations) if(relation.many && relation.mappedBy.length()==0) {
             String owner=(entity.hierarchyRoot==null?entity.binaryName:entity.hierarchyRoot)+"."+relation.field;
@@ -674,10 +670,29 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
             }
             for(String column:physical) if(column.length()==0 || !columns.add(column.toLowerCase(java.util.Locale.ROOT)) || backend && tooLongForAnEngine(column)) ctx.error("Invalid or duplicate collection column: "+owner+"."+column);
         }
+        // Runtime creates indexes once per physical table, including all three
+        // implicit sources: unique columns, owning to-one FKs and join tables.
+        Set<String> indexedTables=new LinkedHashSet<String>(),indexedCollections=new LinkedHashSet<String>();
+        for(EntityClass entity:accepted.values()) {
+            if(indexedTables.add(entity.tableName.toLowerCase(java.util.Locale.ROOT)))
+                claimEntityIndexes(schemaIndexes,entity,ctx);
+            for(RelationField relation:entity.relations) if(relation.many && !relation.element && relation.mappedBy.length()==0
+                    && indexedCollections.add(relation.table.toLowerCase(java.util.Locale.ROOT))) {
+                EntityClass target=accepted.get(relation.target);
+                if(target!=null) claimIndex(schemaIndexes,"",relation.unique,relation.table,
+                        joinColumnNames(relation.targetColumn,target),ctx);
+            }
+        }
         if(tableGenerators && schemaTables.containsKey("cn1_orm_sequences")) ctx.error("cn1_orm_sequences is reserved for identifier generation");
         for(String name:schemaIndexes.keySet()) {
             if(schemaTables.containsKey(name) || tableGenerators && "cn1_orm_sequences".equals(name))
                 ctx.error("Index name conflicts with table: "+name);
+        }
+        for(EntityClass entity:accepted.values()) if(entity.generation==2) {
+            String name=entity.generator.toLowerCase(java.util.Locale.ROOT);
+            if(tooLongForAnEngine(entity.generator)) ctx.error("Sequence name exceeds the portable limit: "+entity.generator);
+            if(schemaTables.containsKey(name) || schemaIndexes.containsKey(name) || "cn1_orm_sequences".equals(name))
+                ctx.error("Sequence name conflicts with schema object: "+entity.generator);
         }
         if (ctx.hasErrors()) return;
         if (accepted.isEmpty()) {
@@ -764,6 +779,48 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
         if(name.length()==0 || backend && tooLongForAnEngine(name)) { ctx.error("Invalid schema name: "+name);return; }
         String previous=names.put(name.toLowerCase(java.util.Locale.ROOT),owner);
         if(previous!=null && !previous.equals(owner)) ctx.error("Schema name '"+name+"' is shared by "+previous+" and "+owner);
+    }
+
+    private List<String> joinColumnNames(String prefix,EntityClass target) {
+        List<String> columns=new ArrayList<String>();
+        for(PersistedField key:target.idFields) columns.add(prefix+(target.idFields.size()==1?"":"_"+key.columnName));
+        return columns;
+    }
+
+    private void claimEntityIndexes(Map<String,String> names,EntityClass entity,ProcessorContext ctx) {
+        for(RelationField relation:entity.relations) if(relation.column>=0) {
+            EntityClass target=accepted.get(relation.target);
+            if(target!=null) {
+                List<String> columns=new ArrayList<String>();
+                for(int i=0;i<target.idFields.size();i++) columns.add(entity.fields.get(relation.column+i).columnName);
+                claimIndex(names,"",relation.unique,entity.tableName,columns,ctx);
+            }
+        }
+        for(AnnotationValues index:entity.indexes) {
+            Object fields=index.get("fields");
+            if(!(fields instanceof List)) continue;
+            List<String> columns=new ArrayList<String>();
+            for(Object name:(List)fields) {
+                for(PersistedField field:entity.fields) if(field.fieldName.equals(name)) { columns.add(field.columnName);break; }
+            }
+            // Invalid field references have already been reported above.
+            if(columns.isEmpty() || columns.size()!=((List)fields).size()) continue;
+            claimIndex(names,index.getStringOrDefault("name",""),index.getBoolOrDefault("unique",false),entity.tableName,columns,ctx);
+        }
+        for(PersistedField field:entity.fields) if(field.unique)
+            claimIndex(names,"",true,entity.tableName,java.util.Collections.singletonList(field.columnName),ctx);
+    }
+
+    private void claimIndex(Map<String,String> names,String name,boolean unique,String table,List<String> columns,ProcessorContext ctx) {
+        if(name.length()==0) {
+            // Keep identical to SessionImpl.constraintName, using physical SQL
+            // columns (including every composite-key component), not Java paths.
+            StringBuilder key=new StringBuilder(table);
+            for(String column:columns) key.append('/').append(column);
+            name="cn1_"+(unique?"unique":"index")+"_"+Integer.toHexString(key.toString().hashCode());
+        }
+        String previous=names.put(name.toLowerCase(java.util.Locale.ROOT),table);
+        if(tooLongForAnEngine(name) || previous!=null) ctx.error("Invalid or duplicate index name: "+name);
     }
 
     private List<MethodInfo> persistentMethods(AnnotatedClass cls,ProcessorContext ctx) {

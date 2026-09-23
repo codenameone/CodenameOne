@@ -519,7 +519,7 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
         refreshEntry(entity);
         try {
             refresh(entity, new IdentityHashMap<Object, Boolean>());
-        } catch (PersistenceException error) {
+        } catch (RuntimeException error) {
             if (transaction) {
                 rollbackOnly = true;
             }
@@ -602,14 +602,22 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
                 }
             } while (previous != entries.size());
             List<Entry> pending = new ArrayList<Entry>(entries.values());
+            List<Entry> inserted = new ArrayList<Entry>();
             for (Entry e : pending) {
                 if (e.fresh) {
-                    insert(e);
+                    inserted.add(e);
                 }
+            }
+            // Recursive dependency inserts can clear fresh before their turn.
+            for (Entry e : inserted) {
+                insert(e);
+            }
+            for (Entry e : inserted) {
+                completeInsert(e);
             }
             List<Entry> updated = new ArrayList<Entry>();
             for (Entry e : pending) {
-                if (!e.removed && update(e)) {
+                if (!e.removed && !inserted.contains(e) && update(e)) {
                     updated.add(e);
                 }
             }
@@ -1783,8 +1791,15 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
                         i < model.relationships()[ri].column +
                                         model(model.relationships()[ri].target).idIndexes().length) {
                     Entry dependency = entries.get(model.relation(entry.entity, ri));
-                    if (dependency != null && dependency.fresh) {
+                    if (dependency != null && dependency.fresh &&
+                            dependency.model.attributes()[dependency.model.idIndex()].generated) {
+                        // Assigned keys are already known and deferred foreign
+                        // keys can reference them during a cyclic insert.
                         bound = null;
+                        if (entry.deferredForeignKeys == null) {
+                            entry.deferredForeignKeys = new boolean[attrs.length];
+                        }
+                        entry.deferredForeignKeys[i] = true;
                     }
                 }
             }
@@ -1815,6 +1830,46 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
             }
         }
         model.lifecycle(entry.entity, 1);
+    }
+    private void completeInsert(Entry entry) {
+        checkManagedIdentity(entry);
+        checkTransientAssociations(entry);
+        EntityModel model = entry.model;
+        int version = model.versionIndex();
+        if (version >= 0 && !same(model.get(entry.entity, version), entry.snapshot[version])) {
+            throw new PersistenceException("Version is managed by the ORM");
+        }
+        if (entry.deferredForeignKeys == null) {
+            return;
+        }
+        // Finish identity-key cycles after all generated IDs exist. These are
+        // insert writes, with no update callbacks or version increment.
+        List<Object> args = new ArrayList<Object>();
+        StringBuilder columns = new StringBuilder();
+        for (int i = 0; i < entry.deferredForeignKeys.length; i++) {
+            if (!entry.deferredForeignKeys[i]) {
+                continue;
+            }
+            if (columns.length() > 0) {
+                columns.append(", ");
+            }
+            columns.append(q(model.attributes()[i].column)).append(" = ?");
+            Object value = model.get(entry.entity, i);
+            args.add(value);
+        }
+        args.addAll(Arrays.asList(model.keyValues(model.identifier(entry.entity))));
+        if (write("UPDATE " + q(model.table()) + " SET " + columns + " WHERE " + keyCondition(model, null),
+                    args.toArray()) != 1) {
+            throw new OptimisticLockException("Inserted row no longer exists: " + model.table());
+        }
+        int arg = 0;
+        for (int i = 0; i < entry.deferredForeignKeys.length; i++) {
+            if (entry.deferredForeignKeys[i]) {
+                Object value = args.get(arg++);
+                entry.snapshot[i] = value instanceof byte[] ? ((byte[]) value).clone() : value;
+            }
+        }
+        entry.deferredForeignKeys = null;
     }
     private void checkTransientAssociations(Entry entry) {
         EntityModel owner = entry.model;
@@ -2178,6 +2233,7 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
         boolean fresh;
         boolean removed;
         boolean inserting;
+        boolean[] deferredForeignKeys;
         boolean deleting;
         List[] collections;
         Entry(EntityModel model, Object entity, Object[] snapshot) {

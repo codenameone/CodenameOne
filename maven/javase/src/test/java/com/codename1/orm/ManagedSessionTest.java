@@ -212,6 +212,23 @@ class ManagedSessionTest {
         } finally { em.close(); }
     }
 
+    @Test void uncheckedRefreshFailureDetachesContextAndRequiresRollback() throws Exception {
+        for(boolean transactional:new boolean[]{false,true}) {
+            EntityManager em=manager();boolean[] fail={false};RuntimeException failure=new IllegalStateException("post-load failed");
+            Models.register(new Model() { public void lifecycle(Record record,int event) { if(event==6 && fail[0]) throw failure; } });
+            Session s=em.openSession();
+            try {
+                Record saved=seed(s);s.beginTransaction();Record other=new Record();other.name="other";s.persist(other);s.commitTransaction();
+                if(transactional) s.beginTransaction();saved.name="discard";fail[0]=true;
+                assertSame(failure,assertThrows(IllegalStateException.class,()->s.refresh(saved)));
+                assertFalse(s.contains(saved));assertFalse(s.contains(other));
+                if(transactional) { assertTrue(s.isRollbackOnly());assertThrows(PersistenceException.class,s::commitTransaction);s.rollbackTransaction(); }
+                else assertFalse(s.isTransactionActive());
+                fail[0]=false;assertEquals("first",s.find(Record.class,saved.id).name);
+            } finally { s.close();em.close(); }
+        }
+    }
+
     @Test void failedFlushPreservesCallbackExceptionAndRequiresRollback() throws Exception {
         EntityManager em=manager();
         RuntimeException failure=new IllegalStateException("callback failed");

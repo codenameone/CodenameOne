@@ -578,6 +578,72 @@ public class OrmAnnotationProcessorTest {
         }
     }
 
+
+    @Test
+    public void initialCollectionsDoNotTriggerUpdateCallbacksOrVersionIncrements() throws Exception {
+        File classes=tmp.newFolder();Map<String,String> sources=new java.util.LinkedHashMap<String,String>();
+        sources.put("insertstate.Owner","package insertstate; import com.codename1.annotations.*; import com.codename1.annotations.db.*; @Entity(table=\"insertstate_owners\") public class Owner { @Id public long id; @Version public long version; @ElementCollection public java.util.List<String> tags=new java.util.ArrayList<String>(); @ManyToMany(cascade=CascadeType.PERSIST) public java.util.List<Child> children=new java.util.ArrayList<Child>(); @DbTransient public int prePersist,postPersist,preUpdate,postUpdate; @PrePersist public void beforeInsert() { prePersist++; } @PostPersist public void afterInsert() { postPersist++; } @PreUpdate public void beforeUpdate() { preUpdate++; } @PostUpdate public void afterUpdate() { postUpdate++; } }");
+        sources.put("insertstate.Child","package insertstate; import com.codename1.annotations.*; @Entity(table=\"insertstate_children\") public class Child { @Id public long id; }");
+        JavaSourceCompiler.compile(sources,classes,Arrays.asList(testClassesDir()));ProcessorContext ctx=runProcessor(classes,backendClasspath());assertFalse(ctx.getErrors().toString(),ctx.hasErrors());
+        try(java.net.URLClassLoader loader=new java.net.URLClassLoader(new URL[]{classes.toURI().toURL()},getClass().getClassLoader())) {
+            loader.loadClass("cn1app.BackendDaoBootstrap").newInstance();Class type=loader.loadClass("insertstate.Owner"),child=loader.loadClass("insertstate.Child");
+            com.codename1.backend.orm.EntityManager em=com.codename1.backend.orm.EntityManager.open(com.codename1.backend.Database.open(":memory:"));com.codename1.orm.session.Session session=em.openSession();
+            try {
+                session.createTables();session.beginTransaction();Object owner=type.newInstance();((List)type.getField("tags").get(owner)).add("initial");((List)type.getField("children").get(owner)).add(child.newInstance());session.persist(owner);session.flush();
+                org.junit.Assert.assertEquals(0,type.getField("version").getLong(owner));org.junit.Assert.assertEquals(1,type.getField("prePersist").getInt(owner));org.junit.Assert.assertEquals(1,type.getField("postPersist").getInt(owner));
+                org.junit.Assert.assertEquals(0,type.getField("preUpdate").getInt(owner));org.junit.Assert.assertEquals(0,type.getField("postUpdate").getInt(owner));
+                session.flush();org.junit.Assert.assertEquals(0,type.getField("version").getLong(owner));
+                ((List)type.getField("tags").get(owner)).add("updated");session.flush();org.junit.Assert.assertEquals(1,type.getField("version").getLong(owner));org.junit.Assert.assertEquals(1,type.getField("preUpdate").getInt(owner));org.junit.Assert.assertEquals(1,type.getField("postUpdate").getInt(owner));
+                session.commitTransaction();Object id=type.getField("id").get(owner);session.clear();owner=session.find(type,id);org.junit.Assert.assertEquals(2,session.count(owner,"tags"));org.junit.Assert.assertEquals(1,session.count(owner,"children"));
+            } finally { session.close();em.close(); }
+        }
+    }
+
+    @Test
+    public void cyclicAssignedAndGeneratedKeysCompleteWithoutUpdateEvents() throws Exception {
+        for(boolean assigned:new boolean[]{true,false}) {
+            File classes=tmp.newFolder();Map<String,String> sources=new java.util.LinkedHashMap<String,String>();
+            sources.put("insertcycle.Node","package insertcycle; import com.codename1.annotations.*; import com.codename1.annotations.db.*; @Entity(table=\"insertcycle_nodes\") public class Node { "+(assigned?"@Id(autoIncrement=false) public String id;":"@Id public long id;")+" @Version public long version; @ManyToOne(optional="+(!assigned)+",cascade=CascadeType.PERSIST) public Node next; @DbTransient public int inserts,updates; @PostPersist public void inserted() { inserts++; } @PostUpdate public void updated() { updates++; } }");
+            JavaSourceCompiler.compile(sources,classes,Arrays.asList(testClassesDir()));ProcessorContext ctx=runProcessor(classes,backendClasspath());assertFalse(ctx.getErrors().toString(),ctx.hasErrors());
+            try(java.net.URLClassLoader loader=new java.net.URLClassLoader(new URL[]{classes.toURI().toURL()},getClass().getClassLoader())) {
+                loader.loadClass("cn1app.BackendDaoBootstrap").newInstance();Class type=loader.loadClass("insertcycle.Node");
+                com.codename1.backend.orm.EntityManager em=com.codename1.backend.orm.EntityManager.open(com.codename1.backend.Database.open(":memory:"));com.codename1.orm.session.Session session=em.openSession();
+                try {
+                    session.createTables();session.beginTransaction();Object a=type.newInstance(),b=type.newInstance();if(assigned) { type.getField("id").set(a,"a");type.getField("id").set(b,"b"); }type.getField("next").set(a,b);type.getField("next").set(b,a);session.persist(a);session.flush();
+                    for(Object entity:Arrays.asList(a,b)) { org.junit.Assert.assertEquals(0,type.getField("version").getLong(entity));org.junit.Assert.assertEquals(1,type.getField("inserts").getInt(entity));org.junit.Assert.assertEquals(0,type.getField("updates").getInt(entity)); }
+                    session.commitTransaction();Object id=type.getField("id").get(a);session.clear();a=session.find(type,id);session.initialize(a,"next");b=type.getField("next").get(a);org.junit.Assert.assertNotNull(b);session.initialize(b,"next");org.junit.Assert.assertSame(a,type.getField("next").get(b));
+                } finally { session.close();em.close(); }
+            }
+        }
+    }
+
+    @Test
+    public void derivedIndexesCannotDuplicateUniqueColumnsOrRelationshipIndexes() throws Exception {
+        for(String field:Arrays.asList("code","target")) {
+            Map<String,String> sources=new java.util.LinkedHashMap<String,String>();
+            sources.put("derivedclash.Owner","package derivedclash; import com.codename1.annotations.*; import com.codename1.annotations.db.*; @Entity(indexes=@Index(fields=\""+field+"\",unique=true)) public class Owner { @Id public long id; @Column(unique=true) public String code; @OneToOne public Target target; }");
+            sources.put("derivedclash.Target","package derivedclash; import com.codename1.annotations.*; @Entity public class Target { @Id public long id; }");
+            rejectsMappingForBothRuntimes(sources,"Invalid or duplicate index name");
+        }
+        Map<String,String> duplicate=new java.util.LinkedHashMap<String,String>();
+        duplicate.put("derivedclash.Repeated","package derivedclash; import com.codename1.annotations.*; import com.codename1.annotations.db.*; @Entity(indexes={@Index(fields=\"code\"),@Index(fields=\"code\")}) public class Repeated { @Id public long id; public String code; }");
+        rejectsMappingForBothRuntimes(duplicate,"Invalid or duplicate index name");
+        String derived="cn1_index_"+Integer.toHexString("join_links/target_id".hashCode());
+        Map<String,String> join=new java.util.LinkedHashMap<String,String>();
+        join.put("derivedclash.Owner","package derivedclash; import com.codename1.annotations.*; import com.codename1.annotations.db.*; @Entity(indexes=@Index(name=\""+derived+"\",fields=\"id\")) public class Owner { @Id public long id; @ManyToMany @JoinTable(name=\"join_links\") public java.util.Set<Target> targets; }");
+        join.put("derivedclash.Target","package derivedclash; import com.codename1.annotations.*; @Entity public class Target { @Id public long id; }");
+        rejectsMappingForBothRuntimes(join,"Invalid or duplicate index name");
+    }
+
+    @Test
+    public void sequenceNamesCannotCollideWithTablesIndexesOrExceedPortableLength() throws Exception {
+        for(String name:Arrays.asList("SEQ_OWNER","seq_links","by_code","cn1_unique_"+Integer.toHexString("seq_owner/code".hashCode()),"cn1_orm_sequences",String.join("",Collections.nCopies(64,"x")))) {
+            Map<String,String> sources=new java.util.LinkedHashMap<String,String>();
+            sources.put("seqnames.Owner","package seqnames; import com.codename1.annotations.*; import com.codename1.annotations.db.*; @Entity(table=\"seq_owner\",indexes=@Index(name=\"by_code\",fields=\"code\")) public class Owner { @Id @GeneratedValue(strategy=GenerationType.SEQUENCE,generator=\""+name+"\") public long id; @Column(unique=true) public String code; @ElementCollection @JoinTable(name=\"seq_links\") public java.util.List<String> values; }");
+            rejectsMappingForBothRuntimes(sources,name.length()>63?"Sequence name exceeds the portable limit":"Sequence name conflicts with schema object");
+        }
+    }
+
     private java.net.URLClassLoader reviewRelations(String idType) throws Exception {
         File classes=tmp.newFolder();
         Map<String,String> sources=new java.util.LinkedHashMap<String,String>();
