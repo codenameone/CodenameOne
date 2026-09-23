@@ -409,6 +409,15 @@ public abstract class Element implements BuildContext {
      * <p>Unmounted readers are dropped as they are found: a dependency list that only
      * grows would hold a whole popped route alive and keep rebuilding it.</p>
      */
+    /**
+     * Something this element depends on -- an inherited widget or a provided value --
+     * changed. Rebuilds it; a StatefulElement also runs its State's
+     * didChangeDependencies first, as Flutter does.
+     */
+    public void didChangeDependencies() {
+        markNeedsBuild();
+    }
+
     public void rebuildProviderDependents() {
         if (providerDependents == null) {
             return;
@@ -417,7 +426,7 @@ public abstract class Element implements BuildContext {
                 new java.util.ArrayList<Element>(providerDependents);
         for (Element e : snapshot) {
             if (e.mounted) {
-                e.markNeedsBuild();
+                e.didChangeDependencies();
             } else {
                 providerDependents.remove(e);
             }

@@ -106,6 +106,16 @@ public class TextFieldRenderElement extends RenderElement {
             @Override
             public void actionPerformed(ActionEvent evt) {
                 touched = true;
+                // onTap was stored and never called, so a tap-driven field -- a
+                // read-only date field that opens a picker -- focused and did nothing.
+                Funcs.VoidFunc0 tap = textField().getOnTap();
+                if (tap != null) {
+                    try {
+                        tap.call();
+                    } catch (Throwable t) {
+                        com.codename1.flutter.FlutterErrorReport.record(t);
+                    }
+                }
             }
         });
         tf.setDoneListener(new ActionListener<ActionEvent>() {
@@ -149,7 +159,26 @@ public class TextFieldRenderElement extends RenderElement {
         if (suffix != null) {
             // suffixIcon: the trailing glyph INSIDE the decoration -- the demo's
             // password field is a visibility toggle and had none at all.
-            row.add(com.codename1.ui.layouts.BorderLayout.EAST, glyphLabel(suffix));
+            com.codename1.ui.Label glyph = glyphLabel(suffix);
+            // An IconButton suffix keeps its button: a tap on the glyph runs the
+            // CURRENT widget's onPressed, looked up at tap time so a rebuilt
+            // callback is never stale. Drawing only the glyph left the password
+            // visibility toggle showing and doing nothing.
+            glyph.addPointerReleasedListener(new ActionListener<ActionEvent>() {
+                @Override
+                public void actionPerformed(ActionEvent evt) {
+                    IconButton b = suffixButton();
+                    if (b != null && b.getOnPressed() != null) {
+                        evt.consume();
+                        try {
+                            b.getOnPressed().call();
+                        } catch (Throwable t) {
+                            com.codename1.flutter.FlutterErrorReport.record(t);
+                        }
+                    }
+                }
+            });
+            row.add(com.codename1.ui.layouts.BorderLayout.EAST, glyph);
         }
         row.add(com.codename1.ui.layouts.BorderLayout.CENTER, tf);
         if (inside != null) {
@@ -247,6 +276,10 @@ public class TextFieldRenderElement extends RenderElement {
         try {
             TextField w = textField();
             tf.setConstraint(w.isObscureText() ? TextArea.PASSWORD : TextArea.ANY);
+            // maxLength is a limit, not only a counter: Flutter stops the edit.
+            if (w.getMaxLength() != null && w.getMaxLength().longValue() > 0) {
+                tf.setMaxSize((int) Math.min(Integer.MAX_VALUE, w.getMaxLength().longValue()));
+            }
             // maxLines was stored and never read, so the demo's "Life story"
             // field -- which asks for three lines -- came up one line tall and
             // every line the user typed scrolled the one before it out of view.
@@ -714,6 +747,22 @@ public class TextFieldRenderElement extends RenderElement {
      * tests can drive the flow without a component.
      */
     public void userEdited(String newText) {
+        // Enforced here too, not only through the native field's max size: text can
+        // arrive by paste or a platform editor that ignores it, and the value handed
+        // on must never exceed the limit. It used to reach the controller and
+        // onChanged whole, so a 14-character field accepted a 15th.
+        Long max = textField().getMaxLength();
+        if (newText != null && max != null && max.longValue() > 0 && newText.length() > max.longValue()) {
+            newText = newText.substring(0, (int) max.longValue());
+            if (field != null && !applying) {
+                applying = true;
+                try {
+                    field.setText(newText);
+                } finally {
+                    applying = false;
+                }
+            }
+        }
         if (counterLabel != null) {
             counterLabel.setText((newText == null ? 0 : newText.length())
                     + "/" + textField().getMaxLength());
@@ -800,6 +849,22 @@ public class TextFieldRenderElement extends RenderElement {
     }
 
     /** The decoration's trailing glyph, or null. */
+    /** The IconButton the suffix is, or wraps, or null. */
+    private IconButton suffixButton() {
+        InputDecoration d = textField().getDecoration();
+        Widget w = d == null ? null : d.getSuffixIcon();
+        for (int depth = 0; depth < 6 && w != null; depth++) {
+            if (w instanceof IconButton) {
+                return (IconButton) w;
+            }
+            if (w instanceof com.codename1.flutter.widgets.Icon) {
+                return null;
+            }
+            w = com.codename1.flutter.WidgetPreview.step(w, this);
+        }
+        return null;
+    }
+
     private com.codename1.flutter.widgets.Icon suffixIcon() {
         InputDecoration d = textField().getDecoration();
         Widget w = d == null ? null : d.getSuffixIcon();

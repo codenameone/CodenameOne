@@ -91,9 +91,20 @@ public final class Dialogs {
     private static void present(Funcs.Func1<BuildContext, Widget> builder, String position,
             boolean dismissOnOutsideTouch, boolean stretch) {
         DialogWidget rootWidget = new DialogWidget(builder);
-        DialogEntry e = new DialogEntry();
+        final DialogEntry e = new DialogEntry();
         if (Display.isInitialized()) {
-            com.codename1.ui.Dialog d = new com.codename1.ui.Dialog(new BorderLayout());
+            // Codename One disposes a dialog itself when it is touched outside its bounds,
+            // which is how a modal popup is dismissed. That path never reached this stack:
+            // the entry stayed, so the next Navigator.pop consumed it instead of popping
+            // the page, and the dismissed popup's element tree stayed mounted. Every way
+            // the dialog closes now goes through close().
+            com.codename1.ui.Dialog d = new com.codename1.ui.Dialog(new BorderLayout()) {
+                @Override
+                public void dispose() {
+                    super.dispose();
+                    close(e);
+                }
+            };
             d.setDisposeWhenPointerOutOfBounds(dismissOnOutsideTouch);
             Container c = FlutterUI.wrap(rootWidget);
             d.add(BorderLayout.CENTER, c);
@@ -125,14 +136,24 @@ public final class Dialogs {
         if (dialogStack.isEmpty()) {
             return false;
         }
-        DialogEntry e = dialogStack.remove(dialogStack.size() - 1);
-        if (e.root != null) {
-            FlutterUI.unmountTree(e.root);
-        }
+        DialogEntry e = dialogStack.get(dialogStack.size() - 1);
+        close(e);
         if (e.dialog != null) {
             e.dialog.dispose();
         }
         return true;
+    }
+
+    /** Takes a dialog off the stack and unmounts its subtree -- once, however it closed. */
+    private static void close(DialogEntry e) {
+        if (e.closed) {
+            return;
+        }
+        e.closed = true;
+        dialogStack.remove(e);
+        if (e.root != null) {
+            FlutterUI.unmountTree(e.root);
+        }
     }
 
     /**
@@ -152,6 +173,7 @@ public final class Dialogs {
     private static final class DialogEntry {
         com.codename1.ui.Dialog dialog;
         Element root;
+        boolean closed;
     }
 
     /**

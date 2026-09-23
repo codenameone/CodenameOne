@@ -85,6 +85,10 @@ public class TextField extends Widget {
         this.onTap = v;
     }
 
+    public Funcs.VoidFunc0 getOnTap() {
+        return onTap;
+    }
+
     public void maxLines(long v) {
         this.maxLines = v;
     }

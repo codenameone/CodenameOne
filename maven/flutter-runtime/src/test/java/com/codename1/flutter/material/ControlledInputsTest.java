@@ -257,4 +257,18 @@ class ControlledInputsTest {
         state.showSnackBar(timed);
         assertEquals(2000, state.lastDurationMillis());
     }
+
+    @Test
+    void maxLengthLimitsWhatTheControllerAndOnChangedSee() {
+        final List<String> changed = new ArrayList<String>();
+        TextEditingController ctl = new TextEditingController();
+        TextField tf = new TextField();
+        tf.controller(ctl);
+        tf.maxLength(4);
+        tf.onChanged(changed::add);
+        TextFieldRenderElement e = mount(tf);
+        e.userEdited("abcdef");
+        assertEquals("abcd", ctl.text(), "the controller never holds more than maxLength");
+        assertEquals(List.of("abcd"), changed);
+    }
 }

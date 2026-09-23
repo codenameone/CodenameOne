@@ -23,10 +23,7 @@
  */
 package com.codename1.flutter.foundation;
 
-import java.util.ArrayList;
-import java.util.IdentityHashMap;
 import java.util.List;
-import java.util.Map;
 
 import dart.runtime.Funcs;
 
@@ -42,33 +39,26 @@ import dart.runtime.Funcs;
  */
 public interface ChangeNotifier extends Listenable {
 
-    /** Identity-keyed listener lists for every ChangeNotifier instance. */
-    Map<ChangeNotifier, List<Funcs.VoidFunc0>> LISTENERS =
-            new IdentityHashMap<ChangeNotifier, List<Funcs.VoidFunc0>>();
-
-    static List<Funcs.VoidFunc0> listenersOf(ChangeNotifier self) {
-        List<Funcs.VoidFunc0> l = LISTENERS.get(self);
-        if (l == null) {
-            l = new ArrayList<Funcs.VoidFunc0>();
-            LISTENERS.put(self, l);
-        }
-        return l;
-    }
+    /** Listener lists, one per notifier that currently has listeners. */
+    NotifierListeners LISTENERS = new NotifierListeners();
 
     default void addListener(Funcs.VoidFunc0 listener) {
-        listenersOf(this).add(listener);
+        LISTENERS.forAdding(this).add(listener);
     }
 
     default void removeListener(Funcs.VoidFunc0 listener) {
-        listenersOf(this).remove(listener);
+        LISTENERS.remove(this, listener);
     }
 
     default void notifyListeners() {
-        Listeners.notify(listenersOf(this));
+        List<Funcs.VoidFunc0> l = LISTENERS.get(this);
+        if (l != null) {
+            Listeners.notify(l);
+        }
     }
 
     default void dispose() {
-        LISTENERS.remove(this);
+        LISTENERS.clear(this);
     }
 
     default boolean hasListeners() {

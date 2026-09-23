@@ -56,11 +56,18 @@ public class InheritedElement extends StatelessElement {
         super(widget);
     }
 
+    /**
+     * Adds itself to what its subtree can see (see Element.publishAsInherited) BEFORE the
+     * first build mounts that subtree. It used to happen after mount returned, by which
+     * time the initial descendants had already copied the parent's map without this
+     * widget in it. Under a root with no map the lookups fell back to walking ancestors
+     * and found it anyway, which is why a headless test never noticed; under a real app,
+     * whose map is never empty, a nested inherited widget was invisible to its children.
+     */
     @Override
-    public void mount(Element parent, int slot) {
-        super.mount(parent, slot);
-        // Add itself to what its subtree can see; see Element.publishAsInherited.
+    protected void firstBuild() {
         publishAsInherited();
+        super.firstBuild();
     }
 
     /** Registers {@code e} as reading this widget; idempotent, since a rebuild re-reads. */
@@ -156,7 +163,7 @@ public class InheritedElement extends StatelessElement {
                     if (only != null && only.length() > 0 && !matches(e, only)) {
                         continue;
                     }
-                    e.markNeedsBuild();
+                    e.didChangeDependencies();
                 }
             }
         };

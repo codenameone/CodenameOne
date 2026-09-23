@@ -75,8 +75,27 @@ public class StatefulElement extends ComposedElement {
         state.detach();
     }
 
+    /** Set when a dependency changed; State.didChangeDependencies runs before the next build. */
+    private boolean dependenciesChanged;
+
+    /**
+     * Flutter runs State.didChangeDependencies whenever an inherited widget the state read
+     * changes, before rebuilding it. It only ever ran after initState here, so a state that
+     * refreshed locale-derived data or re-created a controller from MediaQuery there kept
+     * stale fields after a Theme, MediaQuery or localization change.
+     */
+    @Override
+    public void didChangeDependencies() {
+        dependenciesChanged = true;
+        super.didChangeDependencies();
+    }
+
     @Override
     protected Widget build() {
+        if (dependenciesChanged) {
+            dependenciesChanged = false;
+            state.didChangeDependencies();
+        }
         return state.build(this);
     }
 }
