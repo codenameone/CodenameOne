@@ -245,6 +245,29 @@ class GateArming(unittest.TestCase):
         self.assertEqual("unarmed", written["gate"]["status"])
         self.assertTrue(candidate_written)
 
+    def test_an_unmeasured_platform_fails_the_gate(self):
+        import run_bench
+
+        class Gone(object):
+            id = "fake"
+            label = "Fake"
+            exercised = True
+
+            def available(self):
+                return False, "no attached device or emulator"
+
+        saved = run_bench.build_adapter
+        run_bench.build_adapter = lambda args: Gone()
+        try:
+            out = os.path.join(tempfile.mkdtemp(), "r.json")
+            self.assertEqual(1, run_bench.main(["--platform", "fake", "--gate", "--json", out]))
+            self.assertEqual(0, run_bench.main(["--platform", "fake", "--json", out]),
+                             "ungated, an unavailable platform is simply reported")
+            with open(out) as handle:
+                self.assertEqual("unavailable", json.load(handle)["status"])
+        finally:
+            run_bench.build_adapter = saved
+
     def test_an_armed_gate_within_tolerance_passes(self):
         baseline = {"codenameone": {"install_bytes": 1000}, "tolerances": {"install_bytes": 0.02}}
         code, written, _ = self._main(baseline)

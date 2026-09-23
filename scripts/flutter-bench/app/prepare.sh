@@ -108,7 +108,7 @@ cp "$FLUTTER_ROOT/pubspec.lock" "$WORK/flutter/pubspec.lock"
 # "Member not found: 'GoogleFonts.robotoCondensed'" in three of the studies:
 # the benchmark would have been comparing against a gallery that does not
 # build, on a dependency nobody chose.
-python3 - "$WORK/flutter/pubspec.yaml" <<'PY_INNER'
+python3 - "$WORK/flutter/pubspec.yaml" "$WORK/asset-packages.txt" <<'PY_INNER'
 import io, re, sys
 path = sys.argv[1]
 lines = [line for line in io.open(path, encoding="utf-8").read().splitlines()
@@ -155,7 +155,11 @@ if missing:
     sys.stderr.write("    declared asset packages: %s\n" % ", ".join(missing))
 
 io.open(path, "w", encoding="utf-8").write("\n".join(lines) + "\n")
+# Every package the asset paths reference, for the staging check further down.
+io.open(sys.argv[2], "w", encoding="utf-8").write("\n".join(sorted(referenced)) + "\n")
 PY_INNER
+# The asset packages the gallery references; staging checks each one landed.
+DECLARED_ASSET_PACKAGES="$(tr '\n' ' ' < "$WORK/asset-packages.txt")"
 
 # Platform scaffolding is GENERATED rather than committed: `flutter create` on
 # an existing project adds the ios/android/macos/linux/windows/web directories
@@ -236,58 +240,32 @@ GENERATED_MAIN="$COMMON/src/main/java/com/example/bench/Bench.java"
   exit 2; }
 cp "$HERE/cn1/Bench.java" "$GENERATED_MAIN"
 
-# Assets. Asked of pub's own answer rather than guessed from a cache path:
-# `flutter pub get` above wrote .dart_tool/package_config.json, which names
-# where every resolved package actually lives, on every platform.
+# Assets: exactly what Flutter's own build bundles, for EVERY asset package.
 #
-# The guess it replaces was "$PUB_CACHE, or ~/.pub-cache" -- the default on
-# Linux and macOS only. Windows puts the cache under LOCALAPPDATA, so find
-# searched a directory that does not exist and exited non-zero; with its stderr
-# sent to /dev/null and pipefail on, the script died on this assignment having
-# printed nothing whatsoever. That is a silent failure twice over, so the path
-# is no longer guessed and no longer silenced.
-ASSETS="$(python3 - "$WORK/flutter/.dart_tool/package_config.json" <<'PY_ASSETS'
-import io, json, os, re, sys
-try:
-    cfg = json.load(io.open(sys.argv[1], encoding="utf-8"))
-except (IOError, OSError, ValueError):
-    sys.exit(0)
-for pkg in cfg.get("packages", []):
-    if pkg.get("name") != "flutter_gallery_assets":
-        continue
-    uri = pkg.get("rootUri", "")
-    if uri.startswith("file:"):
-        # Parsed here rather than through url2pathname, which is a DIFFERENT
-        # function per platform: the POSIX build returns "/C:/Users/..." for a
-        # Windows file URI, leading slash and all, so testing this on a Mac
-        # would have proved nothing about the platform it is for.
-        try:
-            from urllib.parse import urlparse, unquote
-        except ImportError:
-            from urlparse import urlparse
-            from urllib import unquote
-        path = unquote(urlparse(uri).path)
-        if re.match(r"^/[A-Za-z]:", path):
-            path = path[1:]
-    else:
-        # Relative entries are relative to the .dart_tool directory itself.
-        path = os.path.join(os.path.dirname(os.path.abspath(sys.argv[1])), uri)
-    # Forward slashes so the surrounding shell can test the path on Windows too.
-    print(os.path.normpath(path).replace("\\", "/"))
-    break
-PY_ASSETS
-)"
-
-# Fatal, not a warning. A build with no artwork is a SMALLER build, so letting
-# it through would report an installed size flattering to Codename One and not
-# comparable with Flutter's -- the exact class of quietly-unfair number the rest
-# of this harness exists to avoid.
-[ -n "$ASSETS" ] && [ -d "$ASSETS/lib" ] || {
-  echo "flutter_gallery_assets was not resolved (looked in" >&2
-  echo "$WORK/flutter/.dart_tool/package_config.json); the Codename One build" >&2
-  echo "would render without artwork and its size would not be comparable." >&2
+# `flutter build bundle` writes the asset bundle to build/flutter_assets, the
+# same on every platform, and stage_from_flutter_bundle copies what is under
+# its packages/ -- so the Codename One build ships the artwork Flutter ships,
+# 2x and 3x variants included, and installed size compares like with like.
+#
+# This used to stage the flutter_gallery_assets package from the pub cache and
+# nothing else. The gallery also draws from rally_assets and shrine_images, so
+# those screens rendered blank on the Codename One side and the app it measured
+# was smaller than Flutter's by that artwork -- a flattering size comparison of
+# two different applications. It also contradicted the README, which says the
+# assets come from Flutter's bundle.
+( cd "$WORK/flutter" && flutter build bundle --release -t lib/main_bench.dart >/dev/null )
+BUNDLE="$WORK/flutter/build/flutter_assets"
+[ -d "$BUNDLE/packages" ] || {
+  echo "flutter build bundle produced no packages/ under $BUNDLE; the Codename One" >&2
+  echo "build would render without artwork and its size would not be comparable." >&2
   exit 2; }
-python3 "$HERE/stage_assets.py" "$ASSETS/lib" "$COMMON/src/main/resources"
+# Fatal, not a warning, for any package the gallery declares that did not land:
+# a build missing one is a smaller build, and would be measured as a win.
+for pkg in $DECLARED_ASSET_PACKAGES; do
+  [ -d "$BUNDLE/packages/$pkg" ] || {
+    echo "the Flutter bundle is missing the declared asset package $pkg" >&2; exit 2; }
+done
+python3 "$HERE/stage_assets.py" --from-flutter-bundle "$BUNDLE" "$COMMON/src/main/resources"
 
 cat > "$WORK/prepared.json" <<JSON
 {

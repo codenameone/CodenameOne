@@ -162,7 +162,12 @@ def main(argv=None):
         }
         _write(args, report, [report])
         print("%s: not measured -- %s" % (adapter.id, reason))
-        return 0
+        # Under --gate an unmeasured platform FAILS. Returning success let a
+        # platform escape its gate just by not being measured -- the emulator
+        # dropping off adb, Chrome missing -- with the leg green and a regression
+        # riding through unseen. The result is still written above, so the
+        # comment says why.
+        return 1 if args.gate else 0
 
     print("%s: best of %d interleaved runs" % (adapter.label, args.runs))
     sides, notes = measure(adapter, args.runs, args.workdir)
