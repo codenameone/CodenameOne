@@ -375,6 +375,8 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
             throw new IllegalArgumentException("entity is null");
         }
         if (entries.containsKey(entity)) {
+            merging.put(entity, entity);
+            mergeRelations(entries.get(entity).model, entity, entity, merging);
             return entity;
         }
         EntityModel<T> model = model((Class<T>) entity.getClass());
@@ -398,6 +400,11 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
             copy(model, entity, managed);
         }
         merging.put(entity, managed);
+        mergeRelations(model, entity, managed, merging);
+        return managed;
+    }
+    private void mergeRelations(EntityModel model, Object entity, Object managed,
+            IdentityHashMap<Object, Object> merging) {
         Relationship[] relations = model.relationships();
         EntityState sourceState = state(entity);
         for (int i = 0; i < relations.length; i++) {
@@ -405,6 +412,11 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
                 continue;
             }
             Relationship relation = relations[i];
+            // A managed source already owns its values; only MERGE cascades
+            // need traversal. In particular, leave unloaded associations alone.
+            if (sameInstance(entity, managed) && (relation.element || (relation.cascade & Relationship.MERGE) == 0)) {
+                continue;
+            }
             Object value = model.relation(entity, i);
             if (relation.element) {
                 List rows = elementRows(relation, value);
@@ -439,7 +451,6 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
                 targetState.loaded[i] = true;
             }
         }
-        return managed;
     }
     private Object mergeTarget(Relationship relation, Object child, IdentityHashMap<Object, Object> merging) {
         if ((relation.cascade & Relationship.MERGE) != 0) {
@@ -533,8 +544,6 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
             }
             throw new OptimisticLockException("Row no longer exists: " + model.table());
         }
-        EntityState previous = state(entity);
-        boolean[] previouslyLoaded = previous == null ? new boolean[0] : previous.loaded.clone();
         attachState(entry, false, rows.get(0));
         assign(model, entity, rows.get(0));
         entry.snapshot = snapshot(model, entity);
@@ -543,7 +552,7 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
         try {
             for (int i = 0; i < relations.length; i++) {
                 boolean cascade = (relations[i].cascade & Relationship.REFRESH) != 0;
-                if (!relations[i].lazy || (cascade && previouslyLoaded[i])) {
+                if (!relations[i].lazy || cascade) {
                     initialize(entity, i);
                 }
                 if (!cascade || !state(entity).loaded[i]) {
@@ -593,15 +602,21 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
                     insert(e);
                 }
             }
+            List<Entry> updated = new ArrayList<Entry>();
             for (Entry e : pending) {
-                if (!e.removed) {
-                    update(e);
+                if (!e.removed && update(e)) {
+                    updated.add(e);
                 }
             }
             for (Entry e : pending) {
                 if (!e.removed) {
                     syncCollections(e);
                 }
+            }
+            // Relationship writes are part of the update. Fire the post callback
+            // only after they succeed, including for collection-only changes.
+            for (Entry e : updated) {
+                e.model.lifecycle(e.entity, 3);
             }
             prepareDeletes();
             for (Entry e : new ArrayList<Entry>(entries.values())) {
@@ -1811,7 +1826,7 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
             }
         }
     }
-    private void update(Entry entry) {
+    private boolean update(Entry entry) {
         checkTransientAssociations(entry);
         EntityModel model = entry.model;
         Attribute[] attrs = model.attributes();
@@ -1844,7 +1859,7 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
             }
         }
         if (!dirty) {
-            return;
+            return false;
         }
         model.lifecycle(entry.entity, 2);
         checkTransientAssociations(entry);
@@ -1866,7 +1881,7 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
             args.add(now[i]);
         }
         if (args.isEmpty() && version < 0) {
-            return;
+            return true;
         }
         Long next = null;
         if (version >= 0) {
@@ -1890,7 +1905,7 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
             model.set(entry.entity, version, next);
         }
         entry.snapshot = snapshot(model, entry.entity);
-        model.lifecycle(entry.entity, 3);
+        return true;
     }
     private void prepareDeletes() {
         for (Entry entry : new ArrayList<Entry>(entries.values())) {

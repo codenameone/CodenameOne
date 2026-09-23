@@ -641,7 +641,7 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
             }
             for(AnnotationValues index:entity.indexes) {
                 String name=index.getStringOrDefault("name","");
-                if(name.length()==0 || tooLongForAnEngine(name) || !indexNames.add(name)) ctx.error("Invalid or duplicate index name: "+name);
+                if(name.length()>0 && (tooLongForAnEngine(name) || !indexNames.add(name))) ctx.error("Invalid or duplicate index name: "+name);
                 Object indexed=index.get("fields");
                 if(!(indexed instanceof List) || ((List)indexed).isEmpty()) ctx.error("Index needs mapped fields: "+name);
                 else for(Object field:(List)indexed) if(!fields.contains(field)) ctx.error("Unknown index field: "+field);
@@ -654,7 +654,10 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
             claimSchemaName(schemaTables,entity.tableName,owner,ctx);
             tableGenerators|=entity.generation>1;
             for(PersistedField field:entity.fields) if(backend && tooLongForAnEngine(field.columnName)) ctx.error("Column name exceeds the portable limit: "+field.columnName);
-            for(AnnotationValues index:entity.indexes) claimSchemaName(schemaIndexes,index.getStringOrDefault("name",""),owner,ctx);
+            for(AnnotationValues index:entity.indexes) {
+                String name=index.getStringOrDefault("name","");
+                if(name.length()>0) claimSchemaName(schemaIndexes,name,owner,ctx);
+            }
         }
         if(tableGenerators && schemaTables.containsKey("cn1_orm_sequences")) ctx.error("cn1_orm_sequences is reserved for identifier generation");
         for(EntityClass entity:accepted.values()) for(RelationField relation:entity.relations) if(relation.many && relation.mappedBy.length()==0) {

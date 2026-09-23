@@ -27,8 +27,8 @@ import java.lang.annotation.*;
 @Target({})
 public @interface Index {
     /// Names the database index.
-    /// @return index name; an empty name requests a derived name
-    String name();
+    /// @return index name; empty by default to request a derived name
+    String name() default "";
     /// Lists Java attribute names in index order, not SQL column names.
     /// @return indexed fields
     String[] fields();

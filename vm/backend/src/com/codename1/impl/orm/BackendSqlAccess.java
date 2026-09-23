@@ -143,8 +143,14 @@ public final class BackendSqlAccess implements SqlAccess {
     private void unpin() { Database db=transaction; transaction=null; release(db); }
     public void close() throws IOException {
         if(transaction!=null) {
-            try { transaction.rollbackTransaction(); }
-            finally { unpin(); }
+            boolean rolledBack=false;
+            try { transaction.rollbackTransaction();rolledBack=true; }
+            finally {
+                // A failed rollback may leave both a transaction and its thread
+                // reservation active. Close it before the pool can reuse it.
+                try { if(!rolledBack) transaction.close(); }
+                finally { unpin(); }
+            }
         }
     }
 }

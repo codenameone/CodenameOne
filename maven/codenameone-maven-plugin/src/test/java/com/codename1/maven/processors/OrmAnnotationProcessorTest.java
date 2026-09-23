@@ -218,6 +218,12 @@ public class OrmAnnotationProcessorTest {
             org.junit.Assert.assertEquals("ABC",codeType.getField("value").get(type.getField("code").get(loaded)));
             s.beginTransaction();codeType.getField("value").set(type.getField("code").get(loaded),"DEF");s.commitTransaction();s.clear();
             org.junit.Assert.assertEquals("DEF",codeType.getField("value").get(type.getField("code").get(s.find(type,id))));
+            s.beginTransaction();Object replacement=codeType.getConstructor(String.class).newInstance("BULK");
+            org.junit.Assert.assertEquals(1,s.createQuery("update converted.Entry e set e.code = :code where e.id = :id").setParameter("code",replacement).setParameter("id",id).executeUpdate());s.commitTransaction();
+            org.junit.Assert.assertEquals("BULK",codeType.getField("value").get(type.getField("code").get(s.find(type,id))));
+            s.beginTransaction();org.junit.Assert.assertEquals(1,s.createQuery("update converted.Entry e set e.code = :code where e.id = :id").setParameter("code",null).setParameter("id",id).executeUpdate());s.commitTransaction();
+            org.junit.Assert.assertNull(type.getField("code").get(s.find(type,id)));
+            s.beginTransaction();s.createQuery("update converted.Entry e set e.code = :code").setParameter("code",codeType.getConstructor(String.class).newInstance("DEF")).executeUpdate();s.commitTransaction();
             s.beginTransaction();Object duplicate=type.newInstance();type.getField("code").set(duplicate,codeType.getConstructor(String.class).newInstance("DEF"));s.persist(duplicate);
             try { s.commitTransaction();fail("Unique index must reject duplicate domain values"); } catch(com.codename1.orm.session.PersistenceException expected) { s.rollbackTransaction(); }
         } finally { s.close();em.close();loader.close(); }
@@ -334,6 +340,112 @@ public class OrmAnnotationProcessorTest {
                 assertTrue(expected.getCause() instanceof com.codename1.orm.session.LazyInitializationException);
             }
         } finally { session.close();em.close();loader.close(); }
+    }
+
+
+    private java.net.URLClassLoader cascadeReviewFixture() throws Exception {
+        File classes=tmp.newFolder();
+        Map<String,String> sources=new java.util.LinkedHashMap<String,String>();
+        sources.put("cascades.Parent","package cascades; import com.codename1.annotations.*; import com.codename1.annotations.db.*; @Entity(table=\"cascade_parents\") public class Parent { @Id public long id; @ManyToOne(fetch=FetchType.LAZY,cascade={CascadeType.MERGE,CascadeType.REFRESH}) public Child selected; @OneToMany(cascade={CascadeType.MERGE,CascadeType.REFRESH}) public java.util.List<Child> children=new java.util.ArrayList<Child>(); @ElementCollection public java.util.List<String> tags=new java.util.ArrayList<String>(); @DbTransient public int pre,post; @PreUpdate public void before() { pre++; } @PostUpdate public void after() { post++; } }");
+        sources.put("cascades.Child","package cascades; import com.codename1.annotations.*; import com.codename1.annotations.db.*; @Entity(table=\"cascade_children\") public class Child { @Id public long id; public String name; @ManyToOne(fetch=FetchType.LAZY,cascade={CascadeType.MERGE,CascadeType.REFRESH}) public Parent parent; }");
+        JavaSourceCompiler.compile(sources,classes,Arrays.asList(testClassesDir()));
+        ProcessorContext client=runProcessor(classes);assertFalse(client.getErrors().toString(),client.hasErrors());
+        ProcessorContext backend=runProcessor(classes,backendClasspath());assertFalse(backend.getErrors().toString(),backend.hasErrors());
+        java.net.URLClassLoader loader=new java.net.URLClassLoader(new URL[]{classes.toURI().toURL()},getClass().getClassLoader());
+        loader.loadClass("cn1app.BackendDaoBootstrap").newInstance();
+        return loader;
+    }
+
+    @Test
+    public void managedMergeCascadesLoadedToOneAndToManyAndTerminatesCycles() throws Exception {
+        try(java.net.URLClassLoader loader=cascadeReviewFixture()) {
+            Class parentType=loader.loadClass("cascades.Parent"),childType=loader.loadClass("cascades.Child");
+            com.codename1.backend.orm.EntityManager em=com.codename1.backend.orm.EntityManager.open(com.codename1.backend.Database.open(":memory:"));
+            com.codename1.orm.session.Session s=em.openSession();
+            try {
+                s.createTables();s.beginTransaction();Object parent=parentType.newInstance(),a=childType.newInstance(),b=childType.newInstance();
+                childType.getField("name").set(a,"a");childType.getField("name").set(b,"b");s.persist(a);s.persist(b);s.persist(parent);s.commitTransaction();
+                Object parentId=parentType.getField("id").get(parent),aId=childType.getField("id").get(a),bId=childType.getField("id").get(b);
+                s.detach(a);s.detach(b);childType.getField("name").set(a,"merged a");childType.getField("name").set(b,"merged b");
+                childType.getField("parent").set(a,parent);childType.getField("parent").set(b,parent);
+                parentType.getField("selected").set(parent,a);((List)parentType.getField("children").get(parent)).add(b);
+                s.beginTransaction();org.junit.Assert.assertSame(parent,s.merge(parent));
+                Object managedA=parentType.getField("selected").get(parent),managedB=((List)parentType.getField("children").get(parent)).get(0);
+                assertTrue(s.contains(managedA));assertTrue(s.contains(managedB));
+                org.junit.Assert.assertNotSame(a,managedA);org.junit.Assert.assertNotSame(b,managedB);
+                org.junit.Assert.assertSame(parent,childType.getField("parent").get(managedA));
+                s.commitTransaction();s.clear();
+                org.junit.Assert.assertEquals("merged a",childType.getField("name").get(s.find(childType,aId)));
+                org.junit.Assert.assertEquals("merged b",childType.getField("name").get(s.find(childType,bId)));
+                parent=s.find(parentType,parentId);assertFalse(s.isLoaded(parent,"selected"));assertFalse(s.isLoaded(parent,"children"));
+                s.beginTransaction();org.junit.Assert.assertSame(parent,s.merge(parent));
+                assertFalse(s.isLoaded(parent,"selected"));assertFalse(s.isLoaded(parent,"children"));s.commitTransaction();
+            } finally { s.close();em.close(); }
+        }
+    }
+
+    @Test
+    public void refreshCascadesThroughUnloadedToOneAndToManyWithoutFlushingTargets() throws Exception {
+        try(java.net.URLClassLoader loader=cascadeReviewFixture()) {
+            Class parentType=loader.loadClass("cascades.Parent"),childType=loader.loadClass("cascades.Child");
+            com.codename1.backend.orm.EntityManager em=com.codename1.backend.orm.EntityManager.open(com.codename1.backend.Database.open(":memory:"));
+            com.codename1.orm.session.Session s=em.openSession();
+            try {
+                s.createTables();s.beginTransaction();Object parent=parentType.newInstance(),a=childType.newInstance(),b=childType.newInstance();
+                childType.getField("name").set(a,"a");childType.getField("name").set(b,"b");s.persist(a);s.persist(b);
+                parentType.getField("selected").set(parent,a);((List)parentType.getField("children").get(parent)).add(b);s.persist(parent);s.commitTransaction();
+                s.beginTransaction();childType.getField("parent").set(a,parent);childType.getField("parent").set(b,parent);s.commitTransaction();
+                Object parentId=parentType.getField("id").get(parent),aId=childType.getField("id").get(a),bId=childType.getField("id").get(b);s.clear();
+                parent=s.find(parentType,parentId);a=s.find(childType,aId);b=s.find(childType,bId);
+                assertFalse(s.isLoaded(parent,"selected"));assertFalse(s.isLoaded(parent,"children"));
+                s.beginTransaction();childType.getField("name").set(a,"discard a");childType.getField("name").set(b,"discard b");s.refresh(parent);
+                org.junit.Assert.assertEquals("a",childType.getField("name").get(a));org.junit.Assert.assertEquals("b",childType.getField("name").get(b));
+                org.junit.Assert.assertSame(a,parentType.getField("selected").get(parent));org.junit.Assert.assertSame(b,((List)parentType.getField("children").get(parent)).get(0));
+                assertFalse(s.isLoaded(parent,"tags"));s.commitTransaction();s.clear();
+                org.junit.Assert.assertEquals("a",childType.getField("name").get(s.find(childType,aId)));org.junit.Assert.assertEquals("b",childType.getField("name").get(s.find(childType,bId)));
+            } finally { s.close();em.close(); }
+        }
+    }
+
+    @Test
+    public void collectionOnlyUpdatesPairLifecycleCallbacksOncePerFlush() throws Exception {
+        try(java.net.URLClassLoader loader=cascadeReviewFixture()) {
+            Class parentType=loader.loadClass("cascades.Parent"),childType=loader.loadClass("cascades.Child");
+            com.codename1.backend.orm.EntityManager em=com.codename1.backend.orm.EntityManager.open(com.codename1.backend.Database.open(":memory:"));
+            com.codename1.orm.session.Session s=em.openSession();
+            try {
+                s.createTables();s.beginTransaction();Object parent=parentType.newInstance(),child=childType.newInstance();s.persist(child);s.persist(parent);s.commitTransaction();
+                Object id=parentType.getField("id").get(parent);
+                s.beginTransaction();((List)parentType.getField("tags").get(parent)).add("tag");s.flush();
+                org.junit.Assert.assertEquals(1,parentType.getField("pre").getInt(parent));org.junit.Assert.assertEquals(1,parentType.getField("post").getInt(parent));
+                s.flush();org.junit.Assert.assertEquals(1,parentType.getField("post").getInt(parent));
+                ((List)parentType.getField("children").get(parent)).add(child);s.flush();
+                org.junit.Assert.assertEquals(2,parentType.getField("pre").getInt(parent));org.junit.Assert.assertEquals(2,parentType.getField("post").getInt(parent));
+                parentType.getField("selected").set(parent,child);((List)parentType.getField("tags").get(parent)).add("second");s.flush();
+                org.junit.Assert.assertEquals(3,parentType.getField("pre").getInt(parent));org.junit.Assert.assertEquals(3,parentType.getField("post").getInt(parent));
+                s.commitTransaction();s.clear();parent=s.find(parentType,id);org.junit.Assert.assertEquals(2,s.count(parent,"tags"));org.junit.Assert.assertEquals(1,s.count(parent,"children"));
+            } finally { s.close();em.close(); }
+        }
+    }
+
+    @Test
+    public void omittedAndEmptyIndexNamesGenerateWorkingIndexes() throws Exception {
+        File classes=tmp.newFolder();Map<String,String> sources=new java.util.LinkedHashMap<String,String>();
+        sources.put("derived.Entry","package derived; import com.codename1.annotations.*; import com.codename1.annotations.db.*; @Entity(table=\"derived_entries\",indexes={@Index(fields=\"code\",unique=true),@Index(name=\"\",fields=\"label\")}) public class Entry { @Id public long id; public String code; public String label; }");
+        JavaSourceCompiler.compile(sources,classes,Arrays.asList(testClassesDir()));
+        ProcessorContext client=runProcessor(classes);assertFalse(client.getErrors().toString(),client.hasErrors());
+        ProcessorContext backend=runProcessor(classes,backendClasspath());assertFalse(backend.getErrors().toString(),backend.hasErrors());
+        try(java.net.URLClassLoader loader=new java.net.URLClassLoader(new URL[]{classes.toURI().toURL()},getClass().getClassLoader())) {
+            loader.loadClass("cn1app.BackendDaoBootstrap").newInstance();Class type=loader.loadClass("derived.Entry");
+            com.codename1.backend.Database db=com.codename1.backend.Database.open(":memory:");
+            com.codename1.backend.orm.EntityManager em=com.codename1.backend.orm.EntityManager.open(db);com.codename1.orm.session.Session s=em.openSession();
+            try {
+                s.createTables();List<Map<String,Object>> indexes=db.query("PRAGMA index_list(derived_entries)",new Object[0]);org.junit.Assert.assertEquals(2,indexes.size());
+                s.beginTransaction();Object a=type.newInstance();type.getField("code").set(a,"same");s.persist(a);s.commitTransaction();
+                s.beginTransaction();Object b=type.newInstance();type.getField("code").set(b,"same");s.persist(b);
+                try { s.commitTransaction();fail("Derived unique index must reject duplicate values"); } catch(com.codename1.orm.session.PersistenceException expected) { s.rollbackTransaction(); }
+            } finally { s.close();em.close(); }
+        }
     }
 
     private java.net.URLClassLoader reviewRelations(String idType) throws Exception {

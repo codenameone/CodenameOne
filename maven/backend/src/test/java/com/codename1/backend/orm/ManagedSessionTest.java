@@ -206,6 +206,24 @@ class ManagedSessionTest {
             s.beginTransaction();assertThrows(OptimisticLockException.class,()->s.merge(r));s.rollbackTransaction();s.close();
         } finally { em.close(); }
     }
+    @Test void closeDiscardsPooledConnectionWhenRollbackFails() throws Exception {
+        com.codename1.backend.DataSource pool=com.codename1.backend.DataSource.open(":memory:",1);
+        Database damaged=pool.borrow();pool.release(damaged);
+        com.codename1.impl.orm.BackendSqlAccess access=new com.codename1.impl.orm.BackendSqlAccess(pool,null,damaged.dialect());
+        try {
+            access.begin();
+            // End the engine transaction without clearing the facade's owner.
+            // The adapter's subsequent ROLLBACK then fails on a still-open connection.
+            damaged.execute("ROLLBACK",new Object[0]);
+            assertThrows(java.io.IOException.class,access::close);
+            assertFalse(damaged.isOpen());assertFalse(damaged.isInTransaction());
+            Database replacement=pool.borrow();
+            try { assertNotSame(damaged,replacement);assertEquals(1,replacement.query("SELECT 1",new Object[0]).size()); }
+            finally { pool.release(replacement); }
+            access.close();
+        } finally { damaged.close();pool.close(); }
+    }
+
     @Test void suppliedDatabaseSerializesOtherHandlersAcrossSessionTransaction() throws Exception {
         EntityManager em=manager();
         java.util.concurrent.ExecutorService workers=java.util.concurrent.Executors.newFixedThreadPool(2);

@@ -271,7 +271,12 @@ public final class JpqlQueryImpl<T> implements com.codename1.orm.session.JpqlQue
                         throw error("Bulk updates cannot change entity identifiers");
                     }
                     expect("=");
-                    assignments.append(session.q(attribute.column)).append(" = ").append(expression().sql);
+                    Expr value = expression();
+                    Expr target = new Expr(session.q(attribute.column), attribute.kind);
+                    target.query = root;
+                    target.field = field;
+                    bindType(target, value);
+                    assignments.append(target.sql).append(" = ").append(value.sql);
                 } while (take(","));
                 String where = take("WHERE") ? " WHERE " + expression().sql : "";
                 String filter = session.discriminatorCondition(root.model, root.rootAlias);
