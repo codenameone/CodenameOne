@@ -653,15 +653,20 @@ public final class NetworkManager {
     ///
     /// - `request`: network request for execution
     void addToQueue(@Async.Schedule ConnectionRequest request, boolean retry) {
+        // Captured HERE, on the thread that asked for the request, so the span it
+        // becomes is a child of what the app was doing at the time. A retry keeps
+        // the context of the request it retries. Held in locals and stored only once
+        // the enqueue is accepted below: re-adding a request that is already pending
+        // is rejected as a duplicate, and storing first would re-parent the queued
+        // one under whatever the rejected call was doing.
+        NetworkTracer queuedBy = null;
+        Object queuedParent = null;
         if (!retry) {
-            // Captured HERE, on the thread that asked for the request, so the span
-            // it becomes is a child of what the app was doing at the time. A retry
-            // keeps the context of the request it retries.
             NetworkTracer tracer = getNetworkTracer();
             if (tracer != null) {
                 try {
-                    request.tracerParent = tracer.requestQueued(request);
-                    request.tracerParentOwner = tracer;
+                    queuedParent = tracer.requestQueued(request);
+                    queuedBy = tracer;
                 } catch (Throwable t) {
                     Log.e(t);
                 }
@@ -696,6 +701,8 @@ public final class NetworkManager {
                         return;
                     }
                 }
+                request.tracerParent = queuedParent;
+                request.tracerParentOwner = queuedBy;
             } else {
                 i = ConnectionRequest.PRIORITY_HIGH;
             }

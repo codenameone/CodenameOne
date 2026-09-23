@@ -234,11 +234,14 @@ public final class TelemetryConfig {
             return null;
         }
         String base = endpoint.trim();
+        // Trailing slashes first: ".../v1/traces/" is the full URL too, and testing
+        // before stripping appended the path a second time -- a route no collector
+        // serves, and the export fails silently by design.
+        while (base.endsWith("/")) {
+            base = base.substring(0, base.length() - 1);
+        }
         if (base.endsWith("/v1/traces")) {
             return base;
-        }
-        if (base.endsWith("/")) {
-            base = base.substring(0, base.length() - 1);
         }
         return base + (mode == Mode.RELAY ? "/otel/v1/traces" : "/v1/traces");
     }

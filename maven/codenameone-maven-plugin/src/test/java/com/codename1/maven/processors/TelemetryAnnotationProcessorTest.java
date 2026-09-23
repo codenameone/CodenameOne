@@ -137,6 +137,13 @@ public class TelemetryAnnotationProcessorTest {
     }
 
     @Test
+    public void aHeaderThatIsNotValidHttpIsRefused() throws Exception {
+        assertRefused("@OpenTelemetry(endpoint = \"https://a\", headers = \"Bad Name: v\")");
+        assertRefused("@OpenTelemetry(endpoint = \"https://a\", "
+                + "headers = \"X-Token: a\\r\\nInjected: b\")");
+    }
+
+    @Test
     public void aRatioOutOfRangeIsRefused() throws Exception {
         assertRefused("@OpenTelemetry(endpoint = \"https://a\", sampleRatio = 2)");
     }

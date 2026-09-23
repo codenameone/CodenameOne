@@ -73,6 +73,11 @@ final class OtlpSchema {
         Message type;
         /** For HEX_BYTES: the exact length in bytes, or 0 for any. */
         final int bytes;
+        /**
+         * For HEX_BYTES: whether an all-zero value is refused. OTLP requires trace
+         * and span ids to be nonzero; a parent id is simply absent for a root.
+         */
+        boolean nonZero;
 
         Field(String name, int number, int kind, boolean repeated, int bytes) {
             this.name = name;
@@ -106,6 +111,14 @@ final class OtlpSchema {
 
     private static Field hex(String name, int number, int length) {
         return new Field(name, number, HEX_BYTES, false, length);
+    }
+
+    /** A required id: a relay that forwarded a zero one would have answered 200 for a
+     * span the collector then rejects, with the app long past being able to retry. */
+    private static Field id(String name, int number, int length) {
+        Field out = hex(name, number, length);
+        out.nonZero = true;
+        return out;
     }
 
     private static Field rep(String name, int number) {
@@ -164,7 +177,7 @@ final class OtlpSchema {
             f("droppedAttributesCount", 4, VARINT)
         });
         LINK = new Message(new Field[] {
-            hex("traceId", 1, 16), hex("spanId", 2, 8), f("traceState", 3, STRING),
+            id("traceId", 1, 16), id("spanId", 2, 8), f("traceState", 3, STRING),
             attributes(4), f("droppedAttributesCount", 5, VARINT), f("flags", 6, FIXED32)
         });
         Field events = rep("events", 11);
@@ -174,7 +187,7 @@ final class OtlpSchema {
         Field status = f("status", 15, MESSAGE);
         status.type = STATUS;
         SPAN = new Message(new Field[] {
-            hex("traceId", 1, 16), hex("spanId", 2, 8), f("traceState", 3, STRING),
+            id("traceId", 1, 16), id("spanId", 2, 8), f("traceState", 3, STRING),
             hex("parentSpanId", 4, 8), f("flags", 16, FIXED32), f("name", 5, STRING),
             f("kind", 6, VARINT), f("startTimeUnixNano", 7, FIXED64),
             f("endTimeUnixNano", 8, FIXED64), attributes(9),
@@ -278,6 +291,10 @@ final class OtlpSchema {
             Field field = type.fields[iter];
             Object v = value.get(field.name);
             if(v == null) {
+                if(field.nonZero) {
+                    // A span or link with no id at all is as unusable as a zero one.
+                    throw new IOException(field.name + " is required");
+                }
                 continue;
             }
             if(field.kind != MESSAGE) {
@@ -508,6 +525,9 @@ final class OtlpSchema {
         }
         String text = (String)value;
         if(text.length() == 0) {
+            if(field.nonZero) {
+                throw new IOException(field.name + " is required");
+            }
             return new byte[0];
         }
         if(field.bytes > 0 && text.length() != field.bytes * 2) {
@@ -524,6 +544,15 @@ final class OtlpSchema {
                 throw new IOException(field.name + " must be hex digits");
             }
             out[iter] = (byte)((hi << 4) | lo);
+        }
+        if(field.nonZero) {
+            boolean zero = true;
+            for(int iter = 0 ; iter < out.length && zero ; iter++) {
+                zero = out[iter] == 0;
+            }
+            if(zero) {
+                throw new IOException(field.name + " must not be all zeros");
+            }
         }
         return out;
     }

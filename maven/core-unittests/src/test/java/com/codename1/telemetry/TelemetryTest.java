@@ -364,6 +364,18 @@ class TelemetryTest extends UITestBase {
     }
 
     @Test
+    void aTrailingSlashDoesNotDuplicateTheTracesPath() {
+        assertEquals("https://c.test/v1/traces",
+                new TelemetryConfig().direct("https://c.test/v1/traces/").exportUrl());
+        assertEquals("https://c.test/v1/traces",
+                new TelemetryConfig().direct("https://c.test//").exportUrl());
+        assertEquals("https://api.test/otel/v1/traces",
+                new TelemetryConfig().relay("https://api.test/otel/v1/traces/").exportUrl());
+        assertEquals("https://api.test/otel/v1/traces",
+                new TelemetryConfig().relay("https://api.test/").exportUrl());
+    }
+
+    @Test
     void anExceptionStatusIsBounded() {
         Telemetry.install(new TelemetryConfig().direct("http://collector.test"));
         TelemetrySpan span = Telemetry.startSpan("big");

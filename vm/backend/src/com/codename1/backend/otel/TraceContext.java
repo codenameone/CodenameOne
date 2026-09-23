@@ -153,7 +153,13 @@ final class TraceContext {
      *
      * Valid means at most 32 members, each {@code key=value} with the grammar the
      * specification gives (below), no key twice, and no more than 512 characters in
-     * all. Empty members -- ",," -- are allowed and dropped by the grammar itself.
+     * all.
+     *
+     * EMPTY MEMBERS ARE ACCEPTED, NOT REJECTED: the specification says "empty and
+     * whitespace-only list members are allowed" and that vendors MUST accept them,
+     * because several tracestate header lines joined by an intermediary produce
+     * exactly that. It also says a vendor SHOULD avoid sending them, so the list is
+     * passed on rebuilt without them rather than exactly as it arrived.
      */
     static String vetTracestate(String state) {
         if(state == null) {
@@ -164,6 +170,7 @@ final class TraceContext {
             return null;
         }
         java.util.HashSet keys = new java.util.HashSet();
+        StringBuilder rebuilt = new StringBuilder(s.length());
         int members = 0;
         int at = 0;
         while(at <= s.length()) {
@@ -184,8 +191,12 @@ final class TraceContext {
             if(!keys.add(member.substring(0, eq)) || ++members > 32) {
                 return null;
             }
+            if(rebuilt.length() > 0) {
+                rebuilt.append(',');
+            }
+            rebuilt.append(member);
         }
-        return members == 0 ? null : s;
+        return members == 0 ? null : rebuilt.toString();
     }
 
     /**

@@ -113,8 +113,8 @@ class TraceContextTest {
         }
         assertNull(TraceContext.vetTracestate(many.toString()), "33 members");
         assertEquals("tenant@sys=1,k/_-*=v v", TraceContext.vetTracestate("tenant@sys=1,k/_-*=v v"));
-        assertEquals("a=1,,b=2", TraceContext.vetTracestate(" a=1,,b=2 "),
-                "empty members are allowed, and a valid list passes through as it came");
+        assertEquals("a=1,b=2", TraceContext.vetTracestate(" a=1, ,,b=2, "),
+                "empty members are accepted, as the specification requires, and not sent on");
     }
 
     @Test

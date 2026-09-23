@@ -322,6 +322,22 @@ class OtlpTracerTest {
         }
     }
 
+    @Test
+    @DisplayName("a tracer that throws while a route is named does not fail the request")
+    void aBrokenTracerCannotFailARoute() throws Exception {
+        Tracing.install(new ThrowingTracer());
+        try {
+            Object result = Tracing.inSpan("work", span -> {
+                // What every generated router calls on a matched request.
+                Tracing.route("/pets/{id}");
+                return "handled";
+            });
+            assertEquals("handled", result);
+        } finally {
+            Tracing.install(null);
+        }
+    }
+
     /** A tracer whose spans throw from every decoration. */
     private static final class ThrowingTracer implements com.codename1.backend.Tracer {
         public boolean open(Config config) {
@@ -364,7 +380,7 @@ class OtlpTracerTest {
                 }
 
                 public int getKind() {
-                    return KIND_CLIENT;
+                    throw new IllegalStateException("tracer bug");
                 }
 
                 public boolean isRecording() {
@@ -505,6 +521,12 @@ class OtlpTracerTest {
             assertEquals(415, postTyped(port, "/otel/v1/traces", client, "s3cret", "text/plain"));
             assertEquals(400, post(port, "/otel/v1/traces",
                     client.replace(TRACE, "nothex"), "s3cret"));
+            assertEquals(400, post(port, "/otel/v1/traces",
+                    client.replace(TRACE, "00000000000000000000000000000000"), "s3cret"),
+                    "an all-zero trace id is refused before the relay answers 200");
+            assertEquals(400, post(port, "/otel/v1/traces",
+                    client.replace("\"traceId\":\"" + TRACE + "\",", ""), "s3cret"),
+                    "a span without a trace id is refused");
             assertEquals(200, post(port, "/otel/v1/traces", client, "s3cret"));
         } finally {
             backend.stop();

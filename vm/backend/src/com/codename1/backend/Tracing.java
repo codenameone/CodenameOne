@@ -169,10 +169,16 @@ public final class Tracing {
      */
     public static void route(String template) {
         Span span = currentOrNull();
-        if(span == null || span.getKind() != Span.KIND_SERVER || template == null) {
+        if(span == null || template == null) {
             return;
         }
         try {
+            // Inside the guard: the generated routers call this on every matched
+            // request, so a tracer whose getKind throws would otherwise turn a
+            // request that succeeded into a 500.
+            if(span.getKind() != Span.KIND_SERVER) {
+                return;
+            }
             if(span.isRecording()) {
                 span.setAttribute("http.route", template);
             }

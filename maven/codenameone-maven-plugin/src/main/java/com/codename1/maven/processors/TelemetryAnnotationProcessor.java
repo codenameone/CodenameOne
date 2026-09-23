@@ -115,6 +115,23 @@ public final class TelemetryAnnotationProcessor extends AbstractAnnotationProces
                 ctx.error(cls, "@OpenTelemetry header \"" + header + "\" is not \"Name: value\"");
                 return;
             }
+            // The whole field, not just the colon. The export is fail-silent by
+            // design, so a header the platform refuses -- a name that is not an
+            // HTTP token -- loses every span with nothing said, and a control
+            // character in the value is a header injection on a lenient transport.
+            // This is the one place the mistake is visible.
+            String name = header.substring(0, colon).trim();
+            String value = header.substring(colon + 1).trim();
+            if (!isToken(name)) {
+                ctx.error(cls, "@OpenTelemetry header name \"" + name + "\" is not a valid HTTP "
+                        + "header name (letters, digits and !#$%&'*+-.^_`|~ only)");
+                return;
+            }
+            if (value.length() == 0 || hasControl(value)) {
+                ctx.error(cls, "@OpenTelemetry header " + name + " has an empty value or one "
+                        + "containing a control character such as a line break");
+                return;
+            }
         }
         if (relay.length() > 0 && !strings(otel.get("headers")).isEmpty()) {
             ctx.error(cls, "@OpenTelemetry on " + cls.getBinaryName() + " sets headers for a "
@@ -231,6 +248,33 @@ public final class TelemetryAnnotationProcessor extends AbstractAnnotationProces
             out.add((String) value);
         }
         return out;
+    }
+
+    /// RFC 9110 `token`: what a header name may be made of.
+    static boolean isToken(String name) {
+        if (name.length() == 0) {
+            return false;
+        }
+        for (int i = 0; i < name.length(); i++) {
+            char c = name.charAt(i);
+            boolean ok = (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9')
+                    || "!#$%&'*+-.^_`|~".indexOf(c) >= 0;
+            if (!ok) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /// Any control character except horizontal tab, which a field value may carry.
+    static boolean hasControl(String value) {
+        for (int i = 0; i < value.length(); i++) {
+            char c = value.charAt(i);
+            if ((c < 0x20 && c != '\t') || c == 0x7f) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private static boolean isHttpUrl(String url) {
