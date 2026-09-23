@@ -2630,6 +2630,42 @@ static inline JAVA_OBJECT cn1BibopFastAllocNoZero(CODENAME_ONE_THREAD_STATE, int
             return o;
         }
     }
+    // A RECYCLED page: take a slot its last sweep freed. This used to fall through to
+    // __NEW_X and the full slow path for EVERY object once pages came back partial --
+    // which is every allocation in a heap small enough to be reused. Profiled at an 8MB
+    // trigger, that slow path (cn1BibopAlloc, codenameOneGcMalloc, its pthread_once and
+    // the class-initializer call) was ~55% of objectAllocation's main thread, and it is
+    // why small triggers were slow. Sound under the same argument as the bump slot above:
+    // parentCls is 0 until the constructor publishes it, so a conservative scan of the
+    // construction window stops at the guard, and a recycled bump slot already holds a
+    // dead occupant's bytes exactly as this one does (the free-list link is in the word
+    // zeroed here). The slot reads FREE_MARK until the release store of -1.
+    if(__builtin_expect(p != (CN1BibopPage*)0 && p->freeList != (void*)0 &&
+                        constantPoolObjects != (JAVA_OBJECT*)0
+#ifndef CN1_CONSERVATIVE_GC_ROOTS
+                        && !threadStateData->nativeAllocationMode
+#endif
+                        , 1)) {
+        JAVA_OBJECT o = (JAVA_OBJECT)p->freeList;
+        p->freeList = *(void**)o;
+        p->freeCount--;
+        o->__codenameOneParentClsReference = (struct clazz*)0;
+        o->__heapPosition = CN1_BIBOP_HEAP_POS;
+        CN1_ALLOC_CENSUS_COUNT(parent, size);
+#ifdef DEBUG_GC_ALLOCATIONS
+        o->className = threadStateData->callStackClass[threadStateData->callStackOffset - 1];
+        o->line = threadStateData->callStackLine[threadStateData->callStackOffset - 1];
+#endif
+        __atomic_store_n(&o->__codenameOneGcMark, -1, __ATOMIC_RELEASE);
+#ifndef CN1_BIBOP_NO_FASTSWEEP
+        __atomic_store_n(&p->gcAllocedSinceSweep, JAVA_TRUE, __ATOMIC_RELAXED);
+#endif
+        CN1_BIBOP_ACCOUNT_BYTES(threadStateData, CN1_BIBOP_CLASS_SIZE(ci));
+#ifdef CN1_GC_CONFORM
+        cn1RecordAllocation(parent, size);
+#endif
+        return o;
+    }
     return (JAVA_OBJECT)0;
 }
 
