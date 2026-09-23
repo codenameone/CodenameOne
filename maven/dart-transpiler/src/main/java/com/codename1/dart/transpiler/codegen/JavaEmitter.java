@@ -1471,6 +1471,10 @@ public final class JavaEmitter {
                     return;
                 }
             }
+            if (ex instanceof Assign && isNullAwareMemberAssign((Assign) ex)) {
+                emitNullAwareAssignStatement((Assign) ex, ctx);
+                return;
+            }
             Out o = emitExpr(ex, null, ctx);
             String code = statementize(o.code);
             if (!code.isEmpty()) {
@@ -2684,6 +2688,17 @@ public final class JavaEmitter {
         if (e instanceof Unary) {
             Unary u = (Unary) e;
             Out o = emitExpr(u.operand, null, ctx);
+            if (isDynamic(o.type)) {
+                // Java's unary operators do not apply to Object; dispatch on the value.
+                ctx.importClass("dart.runtime.DartRuntime");
+                if (u.op.equals("!")) {
+                    return new Out("!DartRuntime.dynBool(" + o.code + ")", TypeRef.BOOL);
+                }
+                String fn = u.op.equals("-") ? "dynNegate" : u.op.equals("~") ? "dynBitNot" : null;
+                if (fn != null) {
+                    return new Out("DartRuntime." + fn + "(" + o.code + ")", TypeRef.DYNAMIC);
+                }
+            }
             return new Out(u.op + paren(o.code), o.type);
         }
         if (e instanceof IncDec) {
@@ -2694,6 +2709,14 @@ public final class JavaEmitter {
                 String prop = target.code.substring(target.code.lastIndexOf(".get$") + 5, target.code.length() - 2);
                 String delta = id.increment ? " + 1" : " - 1";
                 return new Out(base + ".set$" + prop + "(" + target.code + delta + ")", target.type);
+            }
+            if (isDynamic(target.type)) {
+                // `x++` on a dynamic x: Java's ++ does not apply to Object.
+                ctx.importClass("dart.runtime.DartRuntime");
+                String write = target.code + " = DartRuntime.dynBinary(\"" + (id.increment ? "+" : "-")
+                        + "\", " + target.code + ", 1L)";
+                return new Out(id.prefix ? write
+                        : "DartRuntime.dynPostfix(" + target.code + ", " + write + ")", target.type);
             }
             String op = id.increment ? "++" : "--";
             return new Out(id.prefix ? op + target.code : target.code + op, target.type);
@@ -3923,6 +3946,12 @@ public final class JavaEmitter {
         Out rhs = emitExpr(a.rhs, vt, ctx);
         String baseOp = a.op.substring(0, a.op.length() - 1);
         String expr;
+        if (isDynamic(vt) || isDynamic(rhs.type)) {
+            ctx.importClass("dart.runtime.DartRuntime");
+            // Dart downcasts the result to the slot's type (`int x; x += d`).
+            return coerce(new Out("DartRuntime.dynBinary(\"" + baseOp + "\", " + readCode + ", "
+                    + rhs.code + ")", TypeRef.DYNAMIC), vt, ctx);
+        }
         if (baseOp.equals("~/") || baseOp.equals("%")) {
             ctx.importClass("dart.runtime.DartRuntime");
             String fn = baseOp.equals("~/") ? "tdiv" : "mod";
@@ -3933,8 +3962,110 @@ public final class JavaEmitter {
         return coerce(new Out(expr, vt), vt, ctx);
     }
 
+    /** {@code x[i] ??= v} or {@code o.p ??= v}: a null-aware assignment whose target is not a plain variable. */
+    private static boolean isNullAwareMemberAssign(Assign a) {
+        return a.op.equals("??=") && (a.lhs instanceof IndexGet || a.lhs instanceof PropertyGet);
+    }
+
+    /**
+     * The target of {@code x[i] ??= v} / {@code o.p ??= v} with its receiver and index
+     * evaluated once, into temps, so the read and the write below can both name them.
+     *
+     * <p>Rewriting over temps is what lets the write go through the ordinary {@code =}
+     * lowering -- idxSet, $indexSet, primitive lists, stub and app setters, accessors --
+     * instead of emitting the read as an assignment target. The generic expansion this
+     * replaces produced {@code map.idx(key) = value}, which javac rejects, and evaluated
+     * the receiver and index up to three times.</p>
+     */
+    private Expr hoistNullAwareTarget(Assign a, Ctx ctx) {
+        if (a.lhs instanceof IndexGet) {
+            IndexGet ig = (IndexGet) a.lhs;
+            IndexGet copy = new IndexGet().at(a.file, a.line, a.col);
+            copy.target = hoistOnce(ig.target, ctx);
+            copy.index = hoistOnce(ig.index, ctx);
+            return copy;
+        }
+        PropertyGet pg = (PropertyGet) a.lhs;
+        PropertyGet copy = new PropertyGet().at(a.file, a.line, a.col);
+        copy.target = hoistOnce(pg.target, ctx);
+        copy.name = pg.name;
+        copy.nullAware = pg.nullAware;
+        return copy;
+    }
+
+    /** {@code e} evaluated into a fresh local, unless it is already {@code this} or a local. */
+    private Expr hoistOnce(Expr e, Ctx ctx) {
+        if (e instanceof ThisExpr || (e instanceof Ident && ctx.lookup(((Ident) e).name) != null)) {
+            return e;
+        }
+        Out o = emitExpr(e, null, ctx);
+        TypeRef t = o.type == null ? TypeRef.DYNAMIC : o.type;
+        String tmp = ctx.newTemp();
+        ctx.writer().line(javaType(t, false, ctx) + " " + tmp + " = " + o.code + ";");
+        ctx.declare(tmp, t);
+        Ident id = new Ident().at(e.file, e.line, e.col);
+        id.name = tmp;
+        return id;
+    }
+
+    private static Assign plainAssign(Assign a, Expr lhs) {
+        Assign plain = new Assign().at(a.file, a.line, a.col);
+        plain.lhs = lhs;
+        plain.op = "=";
+        plain.rhs = a.rhs;
+        return plain;
+    }
+
+    /**
+     * {@code x[i] ??= v;} as a statement -- the common shape -- lowers to
+     * {@code if (x[i] == null) { x[i] = v; }}: the value is evaluated only when the slot
+     * is null, and the write is whatever {@code =} would emit, void setters and
+     * {@code operator []=} included.
+     */
+    private void emitNullAwareAssignStatement(Assign a, Ctx ctx) {
+        Expr lhs = hoistNullAwareTarget(a, ctx);
+        Out read = emitExpr(lhs, null, ctx);
+        Ctx.Writer w = ctx.writer();
+        w.line("if (" + read.code + " == null) {");
+        ctx.indent(1);
+        String write = statementize(emitAssign(plainAssign(a, lhs), ctx).code);
+        if (!write.isEmpty()) {
+            ctx.writer().line(write + ";");
+        }
+        ctx.indent(-1);
+        ctx.writer().line("}");
+    }
+
+    /**
+     * {@code x[i] ??= v} used as a value: the current value if non-null, otherwise the
+     * written one. The write has to be a Java expression that yields the value, which
+     * DartList/DartMap's idxSet and a plain field assignment are; an {@code operator []=}
+     * or a setter is void in Java and is reported rather than emitted as invalid code.
+     */
+    private Out emitNullAwareAssignValue(Assign a, Ctx ctx) {
+        Expr lhs = hoistNullAwareTarget(a, ctx);
+        Out read = emitExpr(lhs, null, ctx);
+        TypeRef rt = read.type == null ? TypeRef.DYNAMIC : read.type;
+        String cur = ctx.newTemp();
+        ctx.writer().line(javaType(rt, true, ctx) + " " + cur + " = " + read.code + ";");
+        Out write = emitAssign(plainAssign(a, lhs), ctx);
+        boolean yieldsValue = write.code.startsWith(read.code + " = ");
+        if (lhs instanceof IndexGet) {
+            String receiver = emitExpr(((IndexGet) lhs).target, null, ctx).code;
+            yieldsValue = write.code.startsWith(receiver + ".idxSet(");
+        }
+        if (!yieldsValue) {
+            diags.error(a, "E0141", "'??=' on an operator []= or a setter is supported as a statement,"
+                    + " not yet as a value. Assign first, then read the target.");
+        }
+        return new Out("(" + cur + " != null ? " + cur + " : (" + write.code + "))", rt);
+    }
+
     private Out emitAssign(Assign a, Ctx ctx) {
-        // ??= special
+        if (isNullAwareMemberAssign(a)) {
+            return emitNullAwareAssignValue(a, ctx);
+        }
+        // ??= on a variable: a local or field is a valid Java assignment target.
         if (a.op.equals("??=")) {
             Out lhs = emitExpr(a.lhs, null, ctx);
             Out rhs = emitExpr(a.rhs, lhs.type, ctx);
@@ -4037,6 +4168,10 @@ public final class JavaEmitter {
             String base = lcode.substring(0, lcode.lastIndexOf(".get$"));
             String prop = lcode.substring(lcode.lastIndexOf(".get$") + 5, lcode.length() - 2);
             return new Out(base + ".set$" + prop + "(" + coerce(rhs, lhs.type, ctx) + ")", lhs.type);
+        }
+        if (!a.op.equals("=") && isDynamic(lhs.type)) {
+            // `x += 1` on a dynamic x: Java's compound operators do not apply to Object.
+            return new Out(lcode + " = " + compoundValue(lcode, lhs.type, a, ctx), lhs.type);
         }
         String jop = a.op.equals("~/=") ? null : a.op;
         if (a.op.equals("~/=") || a.op.equals("%=")) {
@@ -4228,6 +4363,19 @@ public final class JavaEmitter {
             ctx.importClass("dart.runtime.DartRuntime");
             String eq = "DartRuntime.eq(" + l.code + ", " + boxIfPrimitive(r, ctx) + ")";
             return new Out(b.op.equals("==") ? eq : "!" + eq, TypeRef.BOOL);
+        }
+        // A dynamic operand: Dart chooses the operator from the run-time value, and none
+        // of the typed lowerings below apply -- the fallback emitted `Object + long`, which
+        // javac rejects. A statically-String `+` keeps its concatenation.
+        if ((isDynamic(l.type) || isDynamic(r.type))
+                && !(b.op.equals("+") && (l.type.is("String") || r.type.is("String")))) {
+            ctx.importClass("dart.runtime.DartRuntime");
+            if (b.op.equals("<") || b.op.equals(">") || b.op.equals("<=") || b.op.equals(">=")) {
+                return new Out("DartRuntime.dynCompare(\"" + b.op + "\", " + l.code + ", " + r.code + ")",
+                        TypeRef.BOOL);
+            }
+            return new Out("DartRuntime.dynBinary(\"" + b.op + "\", " + l.code + ", " + r.code + ")",
+                    TypeRef.DYNAMIC);
         }
         if (b.op.equals("~/")) {
             ctx.importClass("dart.runtime.DartRuntime");
@@ -5880,6 +6028,10 @@ public final class JavaEmitter {
             }
             return sb.toString();
         }
+        String reordered = sourceOrderedArgs(ct, owner, args, ctx);
+        if (reordered != null) {
+            return reordered;
+        }
         int posIdx = 0;
         boolean first = true;
         for (Param p : ct.params) {
@@ -5914,6 +6066,147 @@ public final class JavaEmitter {
                     sb.append(zeroValue(pt));
                 }
             }
+        }
+        reportUnknownNamedArgs(ct, owner, args);
+        return sb.toString();
+    }
+
+    /** An argument whose evaluation can neither have an effect nor observe one. */
+    private static boolean orderFree(Expr e) {
+        if (e instanceof IntLit || e instanceof DoubleLit || e instanceof BoolLit || e instanceof NullLit
+                || e instanceof Lambda) {
+            return true;
+        }
+        if (e instanceof StringLit) {
+            for (Object part : ((StringLit) e).parts) {
+                if (!(part instanceof String)) {
+                    return false;
+                }
+            }
+            return true;
+        }
+        return false;
+    }
+
+    private static boolean sourceBefore(Expr a, Expr b) {
+        return a.line < b.line || (a.line == b.line && a.col < b.col);
+    }
+
+    /**
+     * The argument list of a program-class call whose arguments must be evaluated in a
+     * different order from the parameters they fill, or null when the plain
+     * canonical-order emission already evaluates them in source order.
+     *
+     * <p>Dart evaluates arguments left to right as written, and named arguments may be
+     * written in any order: {@code f(b: log('b'), a: log('a'))} logs b first. Emitting
+     * them in the callee's parameter order ran whichever parameter is declared first.
+     * When that differs and an argument can have or observe an effect, every such
+     * argument is assigned to a temp, in source order, inside the first argument slot
+     * that holds one -- {@code f(DartRuntime.after($t1 = log('b'), DartRuntime.after($t2 =
+     * log('a'), $t2)), $t1)} -- relying on Java's own left-to-right argument
+     * evaluation. Only the temps' DECLARATIONS are lifted into statements; hoisting the
+     * evaluation itself would run an argument even on a branch not taken, as in
+     * {@code x == null ? null : Foo(b: x.bar(), a: 1)}.</p>
+     */
+    private String sourceOrderedArgs(CtorDecl ct, ClassDecl owner, Args args, Ctx ctx) {
+        if (args.named.isEmpty()) {
+            return null;
+        }
+        // Which parameter slot each call-site argument fills.
+        Map<Expr, Integer> slotOf = new java.util.IdentityHashMap<Expr, Integer>();
+        int posIdx = 0;
+        for (int i = 0; i < ct.params.size(); i++) {
+            Param p = ct.params.get(i);
+            if (!p.named) {
+                if (posIdx < args.positional.size()) {
+                    slotOf.put(args.positional.get(posIdx++), Integer.valueOf(i));
+                }
+            } else {
+                for (NamedArg na : args.named) {
+                    if (na.name.equals(p.name)) {
+                        slotOf.put(na.value, Integer.valueOf(i));
+                        break;
+                    }
+                }
+            }
+        }
+        List<Expr> ordered = new ArrayList<Expr>();
+        for (Expr e : slotOf.keySet()) {
+            if (!orderFree(e)) {
+                ordered.add(e);
+            }
+        }
+        java.util.Collections.sort(ordered, new java.util.Comparator<Expr>() {
+            @Override
+            public int compare(Expr a, Expr b) {
+                return sourceBefore(a, b) ? -1 : sourceBefore(b, a) ? 1 : 0;
+            }
+        });
+        boolean inOrder = true;
+        for (int i = 1; i < ordered.size(); i++) {
+            if (slotOf.get(ordered.get(i - 1)).intValue() > slotOf.get(ordered.get(i)).intValue()) {
+                inOrder = false;
+                break;
+            }
+        }
+        if (inOrder) {
+            return null;
+        }
+        String[] slotCode = new String[ct.params.size()];
+        List<String> assigns = new ArrayList<String>();
+        int anchor = -1;
+        for (Expr e : ordered) {
+            int slot = slotOf.get(e).intValue();
+            TypeRef pt = paramType(owner, ct.params.get(slot), ctx);
+            Out o = emitExpr(e, pt, ctx);
+            TypeRef at = o.type;
+            if (at == null || at.is("var")) {
+                // A type javac infers but this emitter cannot name: no temp can hold it.
+                slotCode[slot] = coerce(o, pt, ctx);
+                continue;
+            }
+            String tmp = ctx.newTemp();
+            ctx.writer().line(javaType(at, false, ctx) + " " + tmp + ";");
+            assigns.add("(" + tmp + " = " + o.code + ")");
+            slotCode[slot] = coerce(new Out(tmp, at, o.fromError), pt, ctx);
+            if (anchor < 0 || slot < anchor) {
+                anchor = slot;
+            }
+        }
+        if (anchor < 0) {
+            return null;
+        }
+        ctx.importClass("dart.runtime.DartRuntime");
+        StringBuilder sb = new StringBuilder();
+        posIdx = 0;
+        for (int i = 0; i < ct.params.size(); i++) {
+            Param p = ct.params.get(i);
+            TypeRef pt = paramType(owner, p, ctx);
+            String code = slotCode[i];
+            if (code == null) {
+                Expr supplied = null;
+                for (Map.Entry<Expr, Integer> en : slotOf.entrySet()) {
+                    if (en.getValue().intValue() == i) {
+                        supplied = en.getKey();
+                    }
+                }
+                if (supplied != null) {
+                    code = coerce(emitExpr(supplied, pt, ctx), pt, ctx);
+                } else if (p.defaultValue != null) {
+                    code = coerce(emitExpr(p.defaultValue, pt, ctx), pt, ctx);
+                } else {
+                    code = zeroValue(pt);
+                }
+            }
+            if (i == anchor) {
+                for (int k = assigns.size() - 1; k >= 0; k--) {
+                    code = "DartRuntime.after(" + assigns.get(k) + ", " + code + ")";
+                }
+            }
+            if (i > 0) {
+                sb.append(", ");
+            }
+            sb.append(code);
         }
         reportUnknownNamedArgs(ct, owner, args);
         return sb.toString();
@@ -6610,6 +6903,16 @@ public final class JavaEmitter {
 
     private boolean isClassRef(TypeRef t) {
         return t != null && t.is("$class");
+    }
+
+    /**
+     * Dart's {@code dynamic}: an operand whose operators are chosen at run time. Narrower
+     * than {@link #isDynamicType} on purpose -- a {@code var} local is declared with Java's
+     * {@code var} and keeps its inferred primitive type, so {@code i + 1} on it already
+     * compiles and must stay a Java operator.
+     */
+    private static boolean isDynamic(TypeRef t) {
+        return t != null && t.is("dynamic");
     }
 
     private boolean isNumeric(TypeRef t) {
