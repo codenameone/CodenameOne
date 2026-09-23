@@ -5577,8 +5577,19 @@ void com_codename1_impl_ios_IOSNative_clearRadialGradientPaintMutable__(CN1_THRE
 }
 
 void com_codename1_impl_ios_IOSNative_markImageNoBackingCopy___long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG peer) {
+    // Metal only, like the method it calls: GLUIImage declares and implements
+    // setNoBackingCopy inside CN1_USE_METAL, because only the Metal path keeps a
+    // texture beside a decoded copy. CN1_USE_METAL is defined for every slice
+    // except watchOS (CN1RenderBackend.h), which renders through Core Graphics
+    // and has no texture to spare a copy of. Unguarded, the watch slice failed
+    // to compile on the undeclared selector under -Werror, and without -Werror
+    // would have thrown an unrecognized selector at runtime. The function itself
+    // always exists -- the generated code calls this symbol on every slice -- so
+    // on the watch it is a no-op rather than absent.
+#ifdef CN1_USE_METAL
     GLUIImage* i = (BRIDGE_CAST GLUIImage*)((void *)peer);
     [i setNoBackingCopy:YES];
+#endif
 }
 
 void com_codename1_impl_ios_IOSNative_releasePeer___long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG peer) {
