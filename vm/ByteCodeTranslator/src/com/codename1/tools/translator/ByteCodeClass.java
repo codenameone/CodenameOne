@@ -1588,7 +1588,17 @@ public class ByteCodeClass {
                 b.append(", force);\n");
             }
         }
-        b.append("    __atomic_store_n(&objToMark->__codenameOneGcMark, currentGcMarkValue, __ATOMIC_RELAXED);\n");
+        // NO SELF-STAMP. This function used to end by storing currentGcMarkValue into the
+        // object it traced -- a leftover from when mark functions chained up to Object's
+        // and that store was how an object got marked at all. gcMarkObject now stamps
+        // before it pushes, so for every drain the store was redundant; the one caller it
+        // was not redundant for is the one it broke. The grace pass traces FRESH objects
+        // by calling this directly, deliberately without marking them (the sweep's grace
+        // rule keeps them), and the store stamped every one anyway: they then read at the
+        // sweep as live-this-cycle rather than grace, so measured survival counted the
+        // entire fresh generation. On objectAllocation -- a live set of 512 nodes --
+        // "live" read 75-80% of occupied, the trigger doubled to its ceiling, and the heap
+        // sat at ~600MB.
         b.append("}\n\n");
 
         // initialize object instances
