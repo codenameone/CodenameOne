@@ -186,7 +186,45 @@ public final class DateTime {
     }
 
     @Override
+    /// Dart's own format: {@code 2024-01-15 10:30:00.000}, and for a UTC value the
+    /// same with a trailing {@code Z}. This returned java.util.Date's locale text in
+    /// the host's time zone, so one transpiled value printed differently on each
+    /// device, a UTC value lost its Z, and nothing expecting a Dart date string could
+    /// parse it back. Microseconds are not kept by this class, so they never print;
+    /// Dart omits them when they are zero too.
     public String toString() {
-        return new Date(epochMillis).toString();
+        String text = fourDigits(year()) + "-" + twoDigits(month()) + "-" + twoDigits(day())
+                + " " + twoDigits(hour()) + ":" + twoDigits(minute()) + ":" + twoDigits(second())
+                + "." + threeDigits(millisecond());
+        return utc ? text + "Z" : text;
+    }
+
+    private static String fourDigits(long n) {
+        long abs = Math.abs(n);
+        String sign = n < 0 ? "-" : "";
+        if (abs >= 1000) {
+            return "" + n;
+        }
+        if (abs >= 100) {
+            return sign + "0" + abs;
+        }
+        if (abs >= 10) {
+            return sign + "00" + abs;
+        }
+        return sign + "000" + abs;
+    }
+
+    private static String threeDigits(long n) {
+        if (n >= 100) {
+            return "" + n;
+        }
+        if (n >= 10) {
+            return "0" + n;
+        }
+        return "00" + n;
+    }
+
+    private static String twoDigits(long n) {
+        return n >= 10 ? "" + n : "0" + n;
     }
 }

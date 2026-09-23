@@ -119,4 +119,39 @@ public class DartCoreSemanticsTest {
         assertThrows(RangeError.class, () -> r.nextInt(0));
         assertThrows(RangeError.class, () -> r.nextInt((1L << 32) + 1));
     }
+
+    // --- DateTime.toString is Dart's format ---------------------------------
+
+    @Test
+    public void dateTimePrintsDartsFormat() {
+        assertEquals("2024-03-05 07:08:09.010Z",
+                DateTime.utc(2024, 3, 5, 7, 8, 9, 10, 0).toString());
+        assertEquals("2024-03-05 07:08:09.010",
+                new DateTime(2024, 3, 5, 7, 8, 9, 10, 0).toString(),
+                "local time, no Z");
+    }
+
+    // --- Uri with an IPv6 literal ---------------------------------------------
+
+    @Test
+    public void bracketedIpv6AuthorityKeepsHostAndPort() {
+        DartUri u = DartUri.parse("http://[::1]:8080/path");
+        assertEquals("::1", u.host());
+        assertEquals(8080, u.port());
+        assertEquals("/path", u.path());
+        DartUri noPort = DartUri.parse("http://[2001:db8::7]/x");
+        assertEquals("2001:db8::7", noPort.host());
+    }
+
+    // --- RegExp.allMatches of an empty pattern --------------------------------
+
+    @Test
+    public void anEmptyMatchIsReportedOnce() {
+        int count = 0;
+        for (RegExpMatch m : new RegExp("$").allMatches("abc")) {
+            count++;
+            assertEquals(3, m.start());
+        }
+        assertEquals(1, count, "the end-of-input match must not be found twice");
+    }
 }

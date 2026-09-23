@@ -120,7 +120,11 @@ public class Future<T> {
 
     public static Future<Object> delayed(dart.core.Duration duration, final Funcs.Func0<Object> computation) {
         final Future<Object> f = new Future<Object>();
-        long ms = duration == null ? 0 : duration.inMilliseconds();
+        // Dart treats a negative delay as zero. Passed through, it reached
+        // Thread.sleep -- which throws -- on the headless path, so the worker died
+        // without completing and an await on the result hung forever; Timer
+        // rejects it the same way on the Display path.
+        long ms = duration == null ? 0 : Math.max(0L, duration.inMilliseconds());
         final Runnable complete = new Runnable() {
             @Override
             public void run() {
@@ -200,15 +204,28 @@ public class Future<T> {
      * handler if this future completed with an error, recovering the chain.
      */
     public Future<T> catchError(final Funcs.VoidFunc1<Object> onError) {
+        // A NEW future, as Dart returns one: the handler recovers the chain, so
+        // `await op.catchError((e) { recover(); })` completes with null rather than
+        // rethrowing. Returning this future handed back the original failure, and a
+        // handler that threw escaped into listener dispatch instead of failing the
+        // chain.
+        final Future<T> next = new Future<T>();
         onComplete(new Runnable() {
             @Override
             public void run() {
-                if (error != null) {
+                if (error == null) {
+                    next.complete(value);
+                    return;
+                }
+                try {
                     onError.call(error);
+                    next.complete(null);
+                } catch (Throwable t) {
+                    next.completeError(t);
                 }
             }
         });
-        return this;
+        return next;
     }
 
     /**
@@ -246,13 +263,29 @@ public class Future<T> {
     }
 
     public Future<T> whenComplete(final Funcs.VoidFunc0 action) {
+        // A NEW future carrying this one's outcome -- unless the action throws, in
+        // which case Dart completes it with that error instead. Returning this
+        // future reported the old outcome regardless, and the throw either escaped
+        // synchronously (already completed) or broke listener dispatch on the
+        // completing thread, so later listeners were never told.
+        final Future<T> next = new Future<T>();
         onComplete(new Runnable() {
             @Override
             public void run() {
-                action.call();
+                try {
+                    action.call();
+                } catch (Throwable t) {
+                    next.completeError(t);
+                    return;
+                }
+                if (error != null) {
+                    next.completeError(error);
+                } else {
+                    next.complete(value);
+                }
             }
         });
-        return this;
+        return next;
     }
 
     void onComplete(Runnable r) {

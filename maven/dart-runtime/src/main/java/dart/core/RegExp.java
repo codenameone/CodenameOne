@@ -145,9 +145,14 @@ public final class RegExp {
             while (from <= input.length() && re.match(input, from)) {
                 RegExpMatch m = snapshot(re, input);
                 out.add(m);
+                int start = (int) m.start();
                 int end = (int) m.end();
-                // an empty match must still advance, or this never terminates
-                from = end > from ? end : from + 1;
+                // An empty match must still advance, or this never terminates -- and
+                // it must advance past ITS OWN position, not the previous search
+                // offset. Comparing the end with `from` let an empty match found
+                // later than `from` (RegExp(r'$') on "abc", found at 3 from 0) set
+                // `from` to 3 and be found again there.
+                from = end > start ? end : end + 1;
             }
         }
         return out.asIterable();

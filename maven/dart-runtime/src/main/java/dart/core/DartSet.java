@@ -38,6 +38,23 @@ import java.util.LinkedHashSet;
  */
 public class DartSet<E> extends LinkedHashSet<E> {
 
+    /// Identity, as Dart's own {@code Set} has: {@code [1] == [1]} is false in Dart
+    /// unless a type overrides {@code operator ==}. The inherited Java equality is
+    /// structural, so two separately built collections compared equal and, used as
+    /// keys, collapsed into one entry of a map -- different control flow and lost
+    /// data in a transpiled application. Element-wise comparison is what Dart's
+    /// listEquals, mapEquals and setEquals are for, and they say so explicitly.
+    @Override
+    public boolean equals(Object other) {
+        return this == other;
+    }
+
+    /// Consistent with {@link #equals}: identity.
+    @Override
+    public int hashCode() {
+        return System.identityHashCode(this);
+    }
+
     public DartSet() {
     }
 

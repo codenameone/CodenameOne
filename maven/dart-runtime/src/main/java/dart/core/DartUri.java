@@ -83,8 +83,22 @@ public final class DartUri {
             if (at >= 0) {
                 authority = authority.substring(at + 1);
             }
-            int pc = authority.indexOf(':');
-            if (pc >= 0) {
+            // An IPv6 literal is bracketed, and its colons are not the port
+            // separator: http://[::1]:8080 took the FIRST colon as one, leaving the
+            // host "[" and a port that failed to parse. Dart's host is the address
+            // without its brackets, and the port follows the closing bracket.
+            int close = authority.startsWith("[") ? authority.indexOf(']') : -1;
+            int pc = close >= 0 ? authority.indexOf(':', close) : authority.indexOf(':');
+            if (close >= 0) {
+                host = authority.substring(1, close);
+                if (pc >= 0) {
+                    try {
+                        port = Long.parseLong(authority.substring(pc + 1));
+                    } catch (NumberFormatException ignored) {
+                        port = 0;
+                    }
+                }
+            } else if (pc >= 0) {
                 host = authority.substring(0, pc);
                 try {
                     port = Long.parseLong(authority.substring(pc + 1));

@@ -99,4 +99,69 @@ public class FutureAdoptionTest {
         Future<Object> f = Future.value((Object) "v");
         assertSame("v", f.getNow());
     }
+
+    @Test
+    public void voidCatchErrorRecoversTheChain() {
+        Future<Object> failed = new Future<Object>();
+        failed.completeError(new IllegalStateException("boom"));
+        final boolean[] ran = {false};
+        Future<Object> recovered = failed.catchError(new Funcs.VoidFunc1<Object>() {
+            @Override
+            public void call(Object e) {
+                ran[0] = true;
+            }
+        });
+        assertTrue(ran[0]);
+        assertTrue(recovered.isDone());
+        assertEquals(null, recovered.valueOrThrow(), "recovered with null, not rethrown");
+    }
+
+    @Test
+    public void aThrowingVoidCatchErrorFailsTheChainInstead() {
+        Future<Object> failed = new Future<Object>();
+        failed.completeError(new IllegalStateException("boom"));
+        Future<Object> chained = failed.catchError(new Funcs.VoidFunc1<Object>() {
+            @Override
+            public void call(Object e) {
+                throw new IllegalArgumentException("handler failed");
+            }
+        });
+        RuntimeException thrown = assertThrows(RuntimeException.class, chained::valueOrThrow);
+        assertEquals("handler failed", thrown.getMessage());
+    }
+
+    @Test
+    public void whenCompleteCarriesTheOutcomeUnlessTheActionThrows() {
+        Future<Object> ok = Future.value((Object) "v");
+        assertEquals("v", ok.whenComplete(new Funcs.VoidFunc0() {
+            @Override
+            public void call() {
+            }
+        }).valueOrThrow());
+        Future<Object> cleanupFailed = ok.whenComplete(new Funcs.VoidFunc0() {
+            @Override
+            public void call() {
+                throw new IllegalStateException("cleanup failed");
+            }
+        });
+        RuntimeException thrown = assertThrows(RuntimeException.class, cleanupFailed::valueOrThrow);
+        assertEquals("cleanup failed", thrown.getMessage());
+    }
+
+    @Test
+    public void aNegativeDelayCompletesLikeZero() throws Exception {
+        Future<Object> f = Future.delayed(dart.core.Duration.of(0, 0, 0, 0, -50, 0),
+                new Funcs.Func0<Object>() {
+                    @Override
+                    public Object call() {
+                        return "done";
+                    }
+                });
+        long deadline = System.currentTimeMillis() + 2000;
+        while (!f.isDone() && System.currentTimeMillis() < deadline) {
+            Thread.sleep(5);
+        }
+        assertTrue(f.isDone(), "a negative delay must not leave the future pending forever");
+        assertEquals("done", f.valueOrThrow());
+    }
 }
