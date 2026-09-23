@@ -112,12 +112,15 @@ class VaultTest extends UITestBase {
 
         public AsyncResource<Boolean> ensureKey(String keyId) {
             AsyncResource<Boolean> out = new AsyncResource<Boolean>();
+            // Capture this prompt's gate before waking the test thread, which may
+            // clear releaseEnsure so a replacement operation can create its own key.
+            java.util.concurrent.CountDownLatch release = releaseEnsure;
             if (ensureEntered != null) {
                 ensureEntered.countDown();
             }
-            if (releaseEnsure != null) {
+            if (release != null) {
                 try {
-                    releaseEnsure.await();
+                    release.await();
                 } catch (InterruptedException interrupted) {
                     Thread.currentThread().interrupt();
                 }
@@ -1374,6 +1377,7 @@ class VaultTest extends UITestBase {
             device.releaseEnsure.countDown();
         }
         worker.join(60000);
+        assertFalse(worker.isAlive(), "the device-store operation did not finish after releasing its prompt");
         device.ensureEntered = null;
         device.releaseEnsure = null;
         if (broke.get() != null) {

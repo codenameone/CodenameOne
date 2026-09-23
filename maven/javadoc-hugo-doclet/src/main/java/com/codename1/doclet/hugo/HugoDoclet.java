@@ -910,10 +910,13 @@ public final class HugoDoclet implements Doclet {
             if (documented.name().startsWith("<")) {
                 Map<String, Object> row = new LinkedHashMap<>();
                 row.put("name", documented.name());
+                // Standard Javadoc qualifies method type-parameter anchors with
+                // the declared signature so overloaded methods remain distinct.
+                row.put("anchor", refs.anchors(member).get(0) + "-type-param-"
+                        + documented.name().substring(1, documented.name().length() - 1));
                 // Not Map.of: it rejects a null value and took the whole
                 // generation down with a NullPointerException the moment any
-                // method documented a type parameter. Nothing in the framework
-                // does today, which is the only reason this was not a crash.
+                // method documented a type parameter.
                 Map<String, Object> noType = new LinkedHashMap<>();
                 noType.put("label", "");
                 noType.put("url", null);
