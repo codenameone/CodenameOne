@@ -54,7 +54,10 @@ public class ValueNotifier<T> extends ValueListenable<T> {
     }
 
     public void value(T newValue) {
-        boolean changed = current == null ? newValue != null : !current.equals(newValue);
+        // Dart's ==, not Java equals: 1 and 1.0 are the same value and NaN is never
+        // equal to itself, so a num notifier notified for 1 -> 1.0 and stayed quiet
+        // for NaN -> NaN.
+        boolean changed = !dart.runtime.DartRuntime.eq(current, newValue);
         if (changed) {
             current = newValue;
             notifyListeners();

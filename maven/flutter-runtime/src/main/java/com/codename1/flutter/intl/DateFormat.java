@@ -93,6 +93,13 @@ public final class DateFormat {
         if (date == null) {
             return "";
         }
+        if (date.isUtc()) {
+            // SimpleDateFormat always formats in the device's zone, which shifted a UTC
+            // value's hour by the local offset. The same wall-clock fields as a LOCAL
+            // value format as themselves.
+            date = new DateTime(date.year(), date.month(), date.day(), date.hour(),
+                    date.minute(), date.second(), date.millisecond(), date.microsecond());
+        }
         try {
             return new SimpleDateFormat(pattern).format(date.toJavaDate());
         } catch (Throwable t) {

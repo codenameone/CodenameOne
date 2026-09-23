@@ -322,12 +322,27 @@ public class AnimationController extends Animation<Double> {
     }
 
     public void stop(Boolean canceled) {
-        // A stopped run's future never completes, as in Flutter.
+        // A canceled run's future never completes, as in Flutter -- but
+        // stop(canceled: false) completes it, and ignoring the flag left every
+        // `await controller.forward()` pending for good.
+        dart.async.Completer<Object> c = runCompleter;
         runCompleter = null;
+        settleStoppedRun(c, canceled);
         running = false;
         generation++;
         // Leave the frame clock immediately; it stops itself once nothing is running.
         FrameDriver.remove(this);
+    }
+
+    /**
+     * What stop does with the stopped run's future: completes it for
+     * {@code canceled: false}, and leaves it pending otherwise -- Flutter's default is
+     * canceled, and a canceled TickerFuture never completes.
+     */
+    static void settleStoppedRun(dart.async.Completer<Object> run, Boolean canceled) {
+        if (run != null && canceled != null && !canceled.booleanValue()) {
+            run.complete(null);
+        }
     }
 
     public void reset() {

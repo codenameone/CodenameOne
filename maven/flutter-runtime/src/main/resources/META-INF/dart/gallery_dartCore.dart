@@ -299,9 +299,9 @@ class DateFormat {
 
 @JavaName('com.codename1.flutter.intl.NumberFormat')
 class NumberFormat {
-  external static NumberFormat currency({String locale, String symbol, int decimalDigits, String name});
+  external static NumberFormat currency({String locale, String symbol, int? decimalDigits, String name});
   external static NumberFormat decimalPercentPattern({String locale, int decimalDigits});
-  external static NumberFormat simpleCurrency({String locale, String name, int decimalDigits});
+  external static NumberFormat simpleCurrency({String locale, String name, int? decimalDigits});
   external String format(dynamic number);
 }
 

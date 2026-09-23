@@ -43,13 +43,17 @@ public final class NumberFormat {
         this.percent = percent;
     }
 
-    public static NumberFormat currency(String locale, String symbol, long decimalDigits, String name) {
+    // decimalDigits is boxed so that an omitted argument (null) and an explicit 0
+    // stay distinct: as a primitive both arrived as 0, and 0 was read as "not
+    // given", so a whole-unit currency printed $12.00 for 12.
+
+    public static NumberFormat currency(String locale, String symbol, Long decimalDigits, String name) {
         return new NumberFormat(symbol != null ? symbol : "$", "",
-                decimalDigits > 0 ? (int) decimalDigits : 2, false);
+                decimalDigits != null ? (int) decimalDigits.longValue() : 2, false);
     }
 
-    public static NumberFormat simpleCurrency(String locale, String name, long decimalDigits) {
-        return new NumberFormat("$", "", decimalDigits > 0 ? (int) decimalDigits : 2, false);
+    public static NumberFormat simpleCurrency(String locale, String name, Long decimalDigits) {
+        return new NumberFormat("$", "", decimalDigits != null ? (int) decimalDigits.longValue() : 2, false);
     }
 
     public static NumberFormat decimalPercentPattern(String locale, long decimalDigits) {
