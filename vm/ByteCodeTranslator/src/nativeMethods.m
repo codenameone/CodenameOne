@@ -4310,12 +4310,18 @@ JAVA_INT java_util_ArrayList_addAllNative___int_java_util_Collection_R_int(
     JAVA_OBJECT* data = (JAVA_OBJECT*)(uintptr_t)block;
     JAVA_OBJECT* previous = (JAVA_OBJECT*)(uintptr_t)old;
     JAVA_BOOLEAN marking = cn1SatbBulkBegin();
+    // During a mark the destination block is queued for a collector re-scan instead of
+    // logging every inserted and shifted reference here -- see DEFERRED BLOCK RE-SCAN in
+    // cn1_globals.m. Nothing is lost that a re-scan could miss: the slots an insertion
+    // overwrites lie past the old size, and hold no live reference. Registered for the
+    // whole of the write, which is what the collector waits on before it scans.
+    int deferred = marking ? cn1BlockMoveBegin(block) : 0;
     if(block != old) {
         if(index > 0) memcpy(data, previous, (size_t)index * sizeof(JAVA_OBJECT));
         cn1CollectionCopy(&source, data + index);
         if(size > index) memcpy(data + index + n, previous + index, (size_t)(size - index) * sizeof(JAVA_OBJECT));
     } else {
-        if(marking) cn1SatbEnqueueRangeLocked((JAVA_ARRAY_OBJECT*)(data + index), size - index);
+        if(marking && !deferred) cn1SatbEnqueueRangeLocked((JAVA_ARRAY_OBJECT*)(data + index), size - index);
         memmove(data + index + n, data + index, (size_t)(size - index) * sizeof(JAVA_OBJECT));
         if(source.kind == CN1_COLL_DENSE && source.data == data) {
             // Self insertion: the prefix is still in place; the suffix has moved.
@@ -4323,11 +4329,12 @@ JAVA_INT java_util_ArrayList_addAllNative___int_java_util_Collection_R_int(
             memmove(data + 2 * index, data + index + n, (size_t)(size - index) * sizeof(JAVA_OBJECT));
         } else cn1CollectionCopy(&source, data + index);
     }
-    if(marking) cn1SatbEnqueueRangeLocked((JAVA_ARRAY_OBJECT*)(data + index), n);
+    if(marking && !deferred) cn1SatbEnqueueRangeLocked((JAVA_ARRAY_OBJECT*)(data + index), n);
     if(block != old) list->java_util_ArrayList_cn1Storage = block;
     // No capacity store: the block it was describing already records it.
     list->java_util_ArrayList_size = required;
     list->java_util_AbstractList_modCount++;
+    if(marking) cn1BlockMoveEnd(block);
     cn1SatbBulkEnd();
     if(block != old) cn1RefBlockRetire(old);
     return 1;

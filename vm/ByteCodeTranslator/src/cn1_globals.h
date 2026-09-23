@@ -1622,6 +1622,11 @@ extern void cn1SatbEnqueueRangeLocked(JAVA_ARRAY_OBJECT* refs, int count);
 /// left shift, the head of a right shift), so a scan finds it there whenever it looks.
 /// No insertion half is needed for the same reason -- nothing is written that was not
 /// already in the block.
+///
+/// That is the FALLBACK now, not the common case. On 64-bit targets a move during a mark
+/// queues its block for a collector re-scan and logs only the min(count, |to-from|)
+/// slots that leave -- the narrow form made sound by the re-scan, which finds whatever
+/// the concurrent scan missed. See DEFERRED BLOCK RE-SCAN in cn1_globals.m.
 extern void cn1SatbBulkEnd(void);
 extern void cn1SatbBulkQuiesce(void);
 #if defined(CN1_DISABLE_SATB)
@@ -3871,6 +3876,12 @@ extern void cn1RefBlockSet(CODENAME_ONE_THREAD_STATE, JAVA_LONG block, JAVA_INT 
 extern void cn1RefBlockMove(CODENAME_ONE_THREAD_STATE, JAVA_LONG block, JAVA_INT from, JAVA_INT to, JAVA_INT count);
 extern void cn1RefBlockClear(CODENAME_ONE_THREAD_STATE, JAVA_LONG block, JAVA_INT from, JAVA_INT count);
 extern void cn1GcMarkRefBlock(CODENAME_ONE_THREAD_STATE, JAVA_LONG block, JAVA_BOOLEAN force);
+// Deferred block re-scan, mover side (cn1_globals.m, DEFERRED BLOCK RE-SCAN). Only inside
+// a cn1SatbBulkBegin() bracket that answered TRUE; begin answers whether the collector
+// will re-scan the block after this write (1) or the caller must log every overwritten
+// slot itself (0). Pair every begin with an end after the last write.
+extern int cn1BlockMoveBegin(JAVA_LONG block);
+extern void cn1BlockMoveEnd(JAVA_LONG block);
 // All standalone buffers and table slices begin on a 16-byte boundary.
 // The immutable capacity belongs to the published pointer, not a second field.
 typedef struct __attribute__((aligned(16))) CN1NativeBlock {

@@ -364,9 +364,12 @@ fi
 #
 # This one drives the real race. MoveRace rotates a 200,000-element list of old objects
 # while another thread runs collections back to back; CN1_GC_FAULT=moverange puts the
-# narrowed barrier back into cn1RefBlockMove, and the verifier must then report the
-# swept elements as dangling. Measured: ~95 dangling references in every faulted run,
-# none in any clean one.
+# narrowed barrier back into cn1RefBlockMove -- log only what leaves the block, and do
+# NOT queue the block for the collector's re-scan -- and the verifier must then report
+# the swept elements as dangling. Measured: ~95 dangling references in every faulted
+# run, none in any clean one. The same fault is what shows the deferred re-scan (see
+# DEFERRED BLOCK RE-SCAN in cn1_globals.m) is load-bearing: the clean arm logs exactly
+# as narrowly, and differs only in queueing the block.
 printf '%-16s ' "self-test7"
 rm -f ./target/bin/MoveRace-verify
 if ! ./translate-and-build.sh MoveRace target/bin/MoveRace-verify -DCN1_GC_VERIFY \

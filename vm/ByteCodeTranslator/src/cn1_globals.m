@@ -2746,43 +2746,213 @@ void cn1RefBlockSet(CODENAME_ONE_THREAD_STATE, JAVA_LONG block, JAVA_INT index, 
     *slot = value;
 }
 
-// BULK MOVE, for the insert/remove shifts ArrayList does with System.arraycopy. The whole
-// range is logged ONCE under the bulk handshake rather than per element: the per-element
-// barrier takes the SATB mutex per accepted reference, which turns one memmove into an
-// acquisition per element (measured 210x on the grace-pass audit). Overlapping ranges are
-// why this is memmove and not memcpy.
+// ---- DEFERRED BLOCK RE-SCAN --------------------------------------------------------
+// A same-block shift or an addAll during a mark used to log, ON THE MUTATOR, the old
+// value of every slot it moved: O(count) mark-word loads and a mutex acquisition per 256,
+// on the thread whose wall clock is the benchmark. Measured on the self-hosting corpus:
+// 5.4% of the main thread, almost all of it ArrayList.addAll, arraycopy and shifts.
 //
-// What is logged is the OLD value of every overwritten slot, [to, to+count), and the
-// reason it is not narrower is in the comment above cn1SatbBulkEnd in cn1_globals.h: a
-// marker scanning this block concurrently with the memmove misses the element the move
-// carries past it, and the bulk handshake does not prevent that -- it holds off mark START
-// and mark TERMINATION, not a marker already inside the mark. Only the deletion half is
-// taken, because every value written here was already in this block.
+// Instead the mutator now queues the BLOCK, once per cycle, and the collector re-scans it
+// on its own core before the mark can close. That is sound because a re-scan of the
+// block's final contents finds every reference still in it, and the only references it
+// cannot find -- the ones that LEFT the block -- are still logged individually by the
+// mover (at most min(count, |to-from|) of them for a shift, none for an addAll). What is
+// traded is mutator work for collector work, which is the trade this VM should make: the
+// collector's core is otherwise idle.
+//
+// THE RACE IT HAS TO CLOSE is the one that made the narrowed barrier unsound: a re-scan
+// that runs WHILE the block is being shifted misses the element the shift carries past
+// it. One 32-bit word per block settles who goes first. A mover registers on it (the low
+// bits count movers), then reads SCANNING; the collector sets SCANNING, then waits for
+// the mover count to reach zero before it reads a single slot. Both sides are seq_cst,
+// so either the mover sees SCANNING -- and logs every overwritten slot, the old sound
+// form, which is correct against a concurrent scan -- or the collector sees the mover and
+// waits for its move to finish. QUEUED de-duplicates: it is set by the mover that queues
+// and cleared by the collector BEFORE it scans, so a move after the scan queues again.
+//
+// The queue IS the SATB log: an entry whose low three bits are all set names a block to
+// re-scan (objects are 8-aligned and blocks 16-aligned, so no object pointer looks like
+// one). That puts re-scans under the log's whole termination protocol -- the trial clear,
+// the re-opens, the bulk quiesce, the drop accounting -- with no second protocol to get
+// wrong.
+//
+// Where the word lives: the 4 bytes of padding after `capacity`, i.e. block - 4. It is
+// NOT a header field -- cn1TableAlloc pins the header size, and on 32-bit targets the
+// header has no padding at all, so there the mover keeps logging everything.
+#if UINTPTR_MAX > 0xffffffffu
+#define CN1_BLOCK_RESCAN 1
+_Static_assert(sizeof(CN1NativeBlock) - offsetof(CN1NativeBlock, capacity) == 8,
+               "the re-scan word is the padding after CN1NativeBlock.capacity");
+#endif
+#define CN1_BLOCK_SCAN_MOVERS 0x0000ffff
+#define CN1_BLOCK_SCAN_QUEUED 0x20000000
+#define CN1_BLOCK_SCAN_ACTIVE 0x40000000
+#define CN1_SATB_RESCAN_TAG   7
+
+static inline int* cn1BlockScanWord(JAVA_LONG block) {
+    return (int*)((char*)(uintptr_t)block - 4);
+}
+
+// One raw entry, under the log's mutex. Returns 0 (and counts a drop) when the log
+// cannot grow.
+static int cn1SatbPushRaw(JAVA_OBJECT e) {
+    pthread_mutex_lock(&gcSatbMutex);
+    if(gcSatbTop >= gcSatbCap) {
+        long ncap = gcSatbCap ? gcSatbCap * 2 : 8192;
+        JAVA_OBJECT* n = (JAVA_OBJECT*)realloc(gcSatbStack, (size_t)ncap * sizeof(JAVA_OBJECT));
+        if(n == 0) {
+            atomic_fetch_add_explicit(&cn1SatbDrops, 1, memory_order_relaxed);
+            pthread_mutex_unlock(&gcSatbMutex);
+            return 0;
+        }
+        gcSatbStack = n;
+        gcSatbCap = ncap;
+    }
+    gcSatbStack[gcSatbTop++] = e;
+    pthread_mutex_unlock(&gcSatbMutex);
+    return 1;
+}
+
+// MOVER SIDE. Call only inside a cn1SatbBulkBegin() bracket that answered TRUE, and pair
+// with cn1BlockMoveEnd after the last write to the block. Returns 1 when the collector
+// will re-scan this block after the move (log only what leaves), 0 when the caller must
+// log every slot it overwrites.
+int cn1BlockMoveBegin(JAVA_LONG block) {
+#ifdef CN1_BLOCK_RESCAN
+    int* w = cn1BlockScanWord(block);
+    int prev = __atomic_fetch_add(w, 1, __ATOMIC_SEQ_CST);
+    if(prev & CN1_BLOCK_SCAN_ACTIVE) {
+        return 0;                           // being scanned right now: log in full
+    }
+    // Queue ONLY while the barrier is actually up. The bulk bracket also answers TRUE
+    // while the mark terminates -- after the trial clear lowers gcSatbActive -- and an
+    // entry queued there can outlive the final catch: unlike a logged reference it is
+    // never filtered out as already marked, so it would sit in the log and make the
+    // sweep refuse to run (the undrained-log check). Logging in full costs nothing in
+    // that window, since everything it names is already marked and filtered.
+    //
+    // Read while registered, so a trial clear racing it is safe either way: a mover
+    // that still saw the barrier up is waited out by cn1SatbBulkQuiesce before the
+    // catch, which then takes its entry and re-opens the mark.
+    if(!__atomic_load_n(&gcSatbActive, __ATOMIC_SEQ_CST)) {
+        return 0;
+    }
+    if(prev & CN1_BLOCK_SCAN_QUEUED) {
+        return 1;                           // a re-scan is already pending
+    }
+    prev = __atomic_fetch_or(w, CN1_BLOCK_SCAN_QUEUED, __ATOMIC_SEQ_CST);
+    if(prev & CN1_BLOCK_SCAN_QUEUED) {
+        return 1;                           // another mover queued it first
+    }
+    // A failed push is a DROP, accounted like any other: the reference pass then
+    // declines to clear, as it does for a dropped store.
+    return cn1SatbPushRaw((JAVA_OBJECT)((uintptr_t)block | CN1_SATB_RESCAN_TAG)) ? 1 : 0;
+#else
+    (void)block;
+    return 0;
+#endif
+}
+
+void cn1BlockMoveEnd(JAVA_LONG block) {
+#ifdef CN1_BLOCK_RESCAN
+    __atomic_fetch_sub(cn1BlockScanWord(block), 1, __ATOMIC_SEQ_CST);
+#else
+    (void)block;
+#endif
+}
+
+// COLLECTOR SIDE, for one queued block. The block cannot have been freed: a replaced block
+// is retired, and retirement is deferred to the end of the cycle (cn1RefBlockRetire);
+// the only direct frees are of blocks never published and of a dead owner's block, which
+// its finalizer releases after the sweep, long after this log was drained.
+static void cn1GcMarkReferenceRange(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT* refs,
+                                    JAVA_INT count, JAVA_BOOLEAN force);
+static void cn1GcRescanBlock(CODENAME_ONE_THREAD_STATE, JAVA_LONG block) {
+#ifdef CN1_BLOCK_RESCAN
+    int* w = cn1BlockScanWord(block);
+    __atomic_fetch_or(w, CN1_BLOCK_SCAN_ACTIVE, __ATOMIC_SEQ_CST);
+    __atomic_fetch_and(w, ~CN1_BLOCK_SCAN_QUEUED, __ATOMIC_SEQ_CST);
+    int spins = 0;
+    while((__atomic_load_n(w, __ATOMIC_SEQ_CST) & CN1_BLOCK_SCAN_MOVERS) != 0) {
+        // A registered mover does nothing but copy references between its register and
+        // its release -- no allocation, no safepoint -- so this is bounded by one memmove.
+        if(++spins > 64) {
+            sched_yield();
+        }
+    }
+    cn1GcMarkRefBlock(threadStateData, block, JAVA_FALSE);
+    __atomic_fetch_and(w, ~CN1_BLOCK_SCAN_ACTIVE, __ATOMIC_SEQ_CST);
+#else
+    (void)threadStateData; (void)block;
+#endif
+}
+
+// Every consumer of the SATB log goes through here, so a re-scan entry can never reach
+// gcMarkObject as if it were an object.
+static inline void cn1SatbMarkEntry(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT e) {
+    if(((uintptr_t)e & 7) == CN1_SATB_RESCAN_TAG) {
+        cn1GcRescanBlock(threadStateData, (JAVA_LONG)((uintptr_t)e & ~(uintptr_t)7));
+        return;
+    }
+    gcMarkObject(threadStateData, e, JAVA_FALSE);
+}
+
+// The slots of [to, to+count) whose old value is not rewritten elsewhere by the move --
+// [to, to+count) minus [from, from+count), contiguous and min(count, |to-from|) long.
+// These have LEFT the block, so a re-scan cannot find them and the mover logs them.
+static inline JAVA_INT cn1MoveLeavingRange(JAVA_INT from, JAVA_INT to, JAVA_INT count, JAVA_INT* start) {
+    JAVA_INT d = to - from;
+    if(d == 0) {
+        *start = to;
+        return 0;
+    }
+    if(d > 0) {
+        *start = (to > from + count) ? to : (from + count);
+        return (count < d) ? count : d;
+    }
+    *start = to;
+    return (count < -d) ? count : -d;
+}
+
+// BULK MOVE, for the insert/remove shifts ArrayList does with System.arraycopy. Overlapping
+// ranges are why this is memmove and not memcpy.
+//
+// During a mark the block is queued for a collector re-scan (see DEFERRED BLOCK RE-SCAN
+// above) and only the values that LEAVE the block are logged here. When the block is being
+// scanned at this very moment, or cannot be queued, every overwritten slot is logged
+// instead -- the form that is sound against a concurrent scan on its own. Only the
+// deletion half either way: every value written here was already in this block.
 void cn1RefBlockMove(CODENAME_ONE_THREAD_STATE, JAVA_LONG block, JAVA_INT from, JAVA_INT to, JAVA_INT count) {
     if(count <= 0 || block == 0) {
         return;
     }
     JAVA_OBJECT* base = (JAVA_OBJECT*)(uintptr_t)block;
+    int registered = 0;
     if(cn1SatbBulkBegin()) {
-        JAVA_INT start = to;
-        JAVA_INT len = count;
+        int deferred;
 #ifdef CN1_GC_VERIFY
         if(cn1GcFaultMoveRange) {
-            // The narrowed barrier: [to, to+count) minus [from, from+count).
-            JAVA_INT d = to - from;
-            if(d > 0) {
-                start = (to > from + count) ? to : (from + count);
-                len = (count < d) ? count : d;
-            } else {
-                len = (count < -d) ? count : -d;
-            }
-        }
+            // The shipped-then-reverted barrier: only what leaves, and NO re-scan.
+            deferred = 1;
+        } else
 #endif
+        {
+            registered = 1;
+            deferred = cn1BlockMoveBegin(block);
+        }
+        JAVA_INT start = to;
+        JAVA_INT len = count;
+        if(deferred) {
+            len = cn1MoveLeavingRange(from, to, count, &start);
+        }
         if(len > 0) {
             cn1SatbEnqueueRangeLocked((JAVA_ARRAY_OBJECT*)(base + start), len);
         }
     }
     memmove(base + to, base + from, (size_t)count * sizeof(JAVA_OBJECT));
+    if(registered) {
+        cn1BlockMoveEnd(block);
+    }
     cn1SatbBulkEnd();
 }
 
@@ -5467,12 +5637,13 @@ void codenameOneGCMark() {
             for(long i = 0 ; i < n ; i++) {
 #ifdef CN1_GC_CONFORM
                 if(batch[i] != JAVA_NULL
+                   && ((uintptr_t)batch[i] & 7) != CN1_SATB_RESCAN_TAG
                    && __atomic_load_n(&batch[i]->__codenameOneGcMark, __ATOMIC_RELAXED)
                           == currentGcMarkValue) {
                     cn1GcSatbDrainAlready++;
                 }
 #endif
-                gcMarkObject(d, batch[i], JAVA_FALSE);
+                cn1SatbMarkEntry(d, batch[i]);
             }
             gcMarkDrain(d);
             if(gcMarkNewObjectCount == before) break; // marked nothing new -> closed
@@ -5552,7 +5723,7 @@ void codenameOneGCMark() {
             atomic_fetch_add_explicit(&cn1GcSatbReopens, 1, memory_order_relaxed);
 #endif
             for(long i = 0 ; i < n ; i++) {
-                gcMarkObject(d, batch[i], JAVA_FALSE);
+                cn1SatbMarkEntry(d, batch[i]);
             }
             gcMarkDrain(d);
             if(reopens >= CN1_SATB_MAX_REOPENS) {
@@ -5606,7 +5777,7 @@ void codenameOneGCMark() {
                     JAVA_OBJECT* last;
                     long m = cn1SatbTake(&last);
                     for(long i = 0 ; i < m ; i++) {
-                        gcMarkObject(d, last[i], JAVA_FALSE);
+                        cn1SatbMarkEntry(d, last[i]);
                     }
                     if(m > 0) {
                         gcMarkDrain(d);

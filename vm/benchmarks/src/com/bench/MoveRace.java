@@ -33,10 +33,11 @@ import java.util.ArrayList;
  * <p>{@code remove(0)} moves every element down one slot with a single memmove, and the
  * memmove runs upward faster than a marker walking the same block. When it overtakes
  * the marker, the element it carries from the unscanned side of the scan position to the
- * scanned side is seen in neither place. The SATB deletion barrier on that move therefore
- * has to log every overwritten slot, not just the one slot whose value leaves the block;
- * the narrowed version shipped, and the self-hosting translator lost a LineNumber out of
- * a live instruction list about one run in twenty.</p>
+ * scanned side is seen in neither place. Logging only the one slot whose value leaves the
+ * block is therefore unsound ON ITS OWN -- that version shipped, and the self-hosting
+ * translator lost a LineNumber out of a live instruction list about one run in twenty.
+ * It is sound paired with a re-scan of the block by the collector after the move, which is
+ * what a mark now does (DEFERRED BLOCK RE-SCAN in cn1_globals.m).</p>
  *
  * <p>Everything in the list is allocated before the first collection so it is not
  * protected by the one-cycle grace rule, and the list is the ONLY reference to each item,
