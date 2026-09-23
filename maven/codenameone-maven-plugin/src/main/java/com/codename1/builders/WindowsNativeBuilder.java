@@ -1231,6 +1231,12 @@ public class WindowsNativeBuilder extends Executor {
         src.append("    public static void main(String[] argv) {\n");
         src.append(registerNatives);
         src.append("        final ").append(main).append(" app = new ").append(main).append("();\n");
+        // The generated @Route dispatcher and annotation-framework bootstraps, before
+        // Display.init as the iOS and Android stubs install them. This stub used to
+        // install neither, so @Route, @Mapped, the generated REST/gRPC/GraphQL
+        // clients and @OpenTelemetry all compiled here and did nothing at run time.
+        src.append(routeDispatcherInstallSource(classesDir, "        "));
+        src.append(annotationFrameworksInstallSource(classesDir, "        "));
         src.append("        Display.init(null);\n");
         // The application's identity, which nothing else gives this platform. The stub passes
         // null to Display.init, so the implementation never derives a package from an object, and

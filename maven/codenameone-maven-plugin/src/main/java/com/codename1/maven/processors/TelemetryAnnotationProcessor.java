@@ -1,0 +1,240 @@
+/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.maven.processors;
+
+import com.codename1.maven.annotations.AbstractAnnotationProcessor;
+import com.codename1.maven.annotations.AnnotatedClass;
+import com.codename1.maven.annotations.AnnotationValues;
+import com.codename1.maven.annotations.JavaSourceCompiler;
+import com.codename1.maven.annotations.ProcessingException;
+import com.codename1.maven.annotations.ProcessorContext;
+
+import java.io.File;
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+
+/// Build-time `@OpenTelemetry` processor for the app.
+///
+/// Emits a single `cn1app.TelemetryBootstrap` whose constructor installs
+/// `com.codename1.telemetry.Telemetry` with the annotation's settings. The per-build
+/// application stub instantiates it before `Display.init` (see
+/// `Executor.annotationFrameworksInstallSource`), and the JavaSE port finds it by
+/// name for the simulator. That constructor is the ONLY reference to the telemetry
+/// package, which is how an app that does not enable it ends up without it: the
+/// translator and R8 both keep only what is reachable.
+///
+/// Validated here rather than at run time, because the mistakes are in source the
+/// build can read: no endpoint at all, both a relay and a direct endpoint, a header
+/// that is not `Name: value`, a ratio outside 0..1.
+public final class TelemetryAnnotationProcessor extends AbstractAnnotationProcessor {
+
+    public static final String OPEN_TELEMETRY_DESC = "Lcom/codename1/annotations/OpenTelemetry;";
+
+    static final String BOOTSTRAP_BINARY = "cn1app.TelemetryBootstrap";
+    static final String BOOTSTRAP_SIMPLE = "TelemetryBootstrap";
+
+    /// The one accepted annotation, and the class it was on.
+    private AnnotationValues accepted;
+    private String owner;
+
+    @Override
+    public Set<String> getAnnotationDescriptors() {
+        return Collections.singleton(OPEN_TELEMETRY_DESC);
+    }
+
+    @Override
+    public void start(ProcessorContext ctx) throws ProcessingException {
+        accepted = null;
+        owner = null;
+    }
+
+    @Override
+    public void processClass(AnnotatedClass cls, ProcessorContext ctx) throws ProcessingException {
+        AnnotationValues otel = cls.getClassAnnotation(OPEN_TELEMETRY_DESC);
+        if (otel == null || cls.isSynthetic()) {
+            return;
+        }
+        // A deleted class whose .class is still in target/classes must not keep
+        // telemetry on: the same orphan rule every generator here follows.
+        if (!BuildHintAnnotationProcessor.hasBackingSource(cls, ctx.getCompileSourceRoots(),
+                ctx.getSourceEncoding())) {
+            return;
+        }
+        if (accepted != null) {
+            ctx.error(cls, "@OpenTelemetry is on both " + owner + " and " + cls.getBinaryName()
+                    + ". An app installs telemetry once; keep it on the main class.");
+            return;
+        }
+        String relay = otel.getStringOrDefault("relay", "").trim();
+        String endpoint = otel.getStringOrDefault("endpoint", "").trim();
+        if (relay.length() == 0 && endpoint.length() == 0) {
+            ctx.error(cls, "@OpenTelemetry on " + cls.getBinaryName() + " names neither a relay "
+                    + "nor an endpoint, so there is nowhere to send spans. Set relay to the "
+                    + "app's Codename One backend, or endpoint to an OTLP/HTTP collector.");
+            return;
+        }
+        if (relay.length() > 0 && endpoint.length() > 0) {
+            ctx.error(cls, "@OpenTelemetry on " + cls.getBinaryName() + " sets both relay and "
+                    + "endpoint. Spans go one way: through the backend (relay) or straight "
+                    + "to a collector (endpoint).");
+            return;
+        }
+        if (!isHttpUrl(relay.length() > 0 ? relay : endpoint)) {
+            ctx.error(cls, "@OpenTelemetry on " + cls.getBinaryName() + " must name an http or "
+                    + "https URL");
+            return;
+        }
+        for (String header : strings(otel.get("headers"))) {
+            int colon = header.indexOf(':');
+            if (colon <= 0 || colon == header.length() - 1) {
+                ctx.error(cls, "@OpenTelemetry header \"" + header + "\" is not \"Name: value\"");
+                return;
+            }
+        }
+        if (relay.length() > 0 && !strings(otel.get("headers")).isEmpty()) {
+            ctx.error(cls, "@OpenTelemetry on " + cls.getBinaryName() + " sets headers for a "
+                    + "relay. The relay holds the collector's credentials; the app sends only "
+                    + "relayToken. Move the headers to the backend's cn1.otel.headers.");
+            return;
+        }
+        double ratio = ratio(otel.get("sampleRatio"));
+        if (!(ratio >= 0 && ratio <= 1)) {
+            ctx.error(cls, "@OpenTelemetry sampleRatio must be between 0 and 1, not " + ratio);
+            return;
+        }
+        accepted = otel;
+        owner = cls.getBinaryName();
+    }
+
+    @Override
+    public void finish(ProcessorContext ctx) throws ProcessingException {
+        if (ctx.hasErrors() || accepted == null) {
+            return;
+        }
+        Map<String, String> sources = new LinkedHashMap<String, String>();
+        sources.put(BOOTSTRAP_BINARY, generateBootstrapSource(accepted));
+        try {
+            List<File> cp = new ArrayList<File>();
+            cp.add(ctx.getOutputClassDir());
+            for (String element : ctx.getCompileClasspath()) {
+                cp.add(new File(element));
+            }
+            JavaSourceCompiler.compile(sources, ctx.getOutputClassDir(), cp);
+        } catch (IOException ioe) {
+            throw new ProcessingException("Could not compile the generated telemetry bootstrap: "
+                    + ioe.getMessage(), ioe);
+        }
+        ctx.getLog().info("cn1: generated " + BOOTSTRAP_BINARY + " from @OpenTelemetry on " + owner);
+    }
+
+    /// The bootstrap's source. Package-visible so a test can read it.
+    static String generateBootstrapSource(AnnotationValues otel) {
+        String relay = otel.getStringOrDefault("relay", "").trim();
+        String endpoint = otel.getStringOrDefault("endpoint", "").trim();
+        StringBuilder sb = new StringBuilder(1024);
+        sb.append("package cn1app;\n\n");
+        sb.append("// Auto-generated by cn1:process-annotations from @OpenTelemetry. Do not edit.\n");
+        sb.append("@SuppressWarnings({\"all\"})\n");
+        sb.append("public final class ").append(BOOTSTRAP_SIMPLE).append(" {\n");
+        sb.append("    public ").append(BOOTSTRAP_SIMPLE).append("() {\n");
+        sb.append("        com.codename1.telemetry.Telemetry.install(new com.codename1.telemetry.TelemetryConfig()\n");
+        if (relay.length() > 0) {
+            sb.append("                .relay(").append(quote(relay)).append(")\n");
+        } else {
+            sb.append("                .direct(").append(quote(endpoint)).append(")\n");
+        }
+        String service = otel.getStringOrDefault("serviceName", "").trim();
+        if (service.length() > 0) {
+            sb.append("                .serviceName(").append(quote(service)).append(")\n");
+        }
+        for (String header : strings(otel.get("headers"))) {
+            int colon = header.indexOf(':');
+            sb.append("                .header(").append(quote(header.substring(0, colon).trim()))
+                    .append(", ").append(quote(header.substring(colon + 1).trim())).append(")\n");
+        }
+        String token = otel.getStringOrDefault("relayToken", "");
+        if (token.length() > 0) {
+            sb.append("                .relayToken(").append(quote(token)).append(")\n");
+        }
+        double ratio = ratio(otel.get("sampleRatio"));
+        if (ratio < 1) {
+            sb.append("                .sampleRatio(").append(ratio).append(")\n");
+        }
+        if (!otel.getBoolOrDefault("protobuf", true)) {
+            sb.append("                .protobuf(false)\n");
+        }
+        if (otel.getBoolOrDefault("requireAnalyticsConsent", false)) {
+            sb.append("                .requireAnalyticsConsent(true)\n");
+        }
+        for (String host : strings(otel.get("propagateTo"))) {
+            sb.append("                .propagateTo(").append(quote(host.trim())).append(")\n");
+        }
+        sb.append("        );\n");
+        sb.append("    }\n");
+        sb.append("}\n");
+        return sb.toString();
+    }
+
+    private static double ratio(Object value) {
+        return value instanceof Number ? ((Number) value).doubleValue() : 1.0;
+    }
+
+    private static List<String> strings(Object value) {
+        List<String> out = new ArrayList<String>();
+        if (value instanceof List) {
+            for (Object item : (List<?>) value) {
+                if (item instanceof String) {
+                    out.add((String) item);
+                }
+            }
+        } else if (value instanceof String) {
+            out.add((String) value);
+        }
+        return out;
+    }
+
+    private static boolean isHttpUrl(String url) {
+        return url.regionMatches(true, 0, "http://", 0, 7)
+                || url.regionMatches(true, 0, "https://", 0, 8);
+    }
+
+    private static String quote(String value) {
+        StringBuilder sb = new StringBuilder("\"");
+        for (int i = 0; i < value.length(); i++) {
+            char c = value.charAt(i);
+            if (c == '"' || c == '\\') {
+                sb.append('\\').append(c);
+            } else if (c < 0x20 || c > 0x7e) {
+                sb.append(String.format("\\u%04x", (int) c));
+            } else {
+                sb.append(c);
+            }
+        }
+        return sb.append('"').toString();
+    }
+}

@@ -37,11 +37,11 @@ import java.util.List;
  */
 public final class BuiltinKeepRules {
 
-    /** The seven generated bootstrap classes the builders splice into the app stub. */
+    /** The generated bootstrap classes the builders splice into the app stub. */
     private static final String[] BOOTSTRAPS = {
             "MapperBootstrap", "BinderBootstrap", "DaoBootstrap", "RestClientBootstrap",
             "ProtoBootstrap", "GrpcClientBootstrap", "GraphQLClientBootstrap",
-            "IntentBootstrap"
+            "IntentBootstrap", "TelemetryBootstrap"
     };
 
     private BuiltinKeepRules() {

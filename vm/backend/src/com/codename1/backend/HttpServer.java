@@ -1966,6 +1966,9 @@ public final class HttpServer {
         // enormous, so a leak surfaces hours later as a server that cannot
         // accept sockets, with nothing pointing at the cause.
         out.put("openStaticFiles", new Integer(StaticFiles.openFileCount()));
+        // Only when tracing is on, so a server that does not trace reports
+        // exactly what it always has.
+        Tracing.metrics(out);
         return out;
     }
 
@@ -4846,6 +4849,14 @@ public final class HttpServer {
             // the whole of serveOne: that is the CONNECTION, which outlives this.
             inFlightRequests.incrementAndGet();
             SERVING_FD.set(new Integer(fd));
+            // Null unless a tracer is installed. Started HERE, before the handler,
+            // and read from the request now: the Request is reused by the next
+            // one on this connection. Ended after the write, in the finally below,
+            // so the span covers the response reaching the socket and a write that
+            // fails is recorded as the failure it is.
+            Span span = Tracing.startServer(request, tls != null);
+            int sentStatus = -1;
+            Exception handlerError = null;
             try {
                 try {
                     response = handler.handle(request);
@@ -4854,10 +4865,14 @@ public final class HttpServer {
                     }
                 } catch (Exception err) {
                     System.err.println("handler failed: " + err);
+                    handlerError = err;
                     response = Response.text(500, "internal error");
                 }
+                // Read before the write: writing releases what the Response held.
+                int status = response.status;
                 try {
                     writeResponse(conn, fd, session, response, keepAlive, headOnly);
+                    sentStatus = status;
                     if(conn.stripe >= 0) {
                         servedStripes[conn.stripe]++;      // single writer: this host
                     } else {
@@ -4871,6 +4886,9 @@ public final class HttpServer {
             } finally {
                 inFlightRequests.decrementAndGet();
                 SERVING_FD.set(null);
+                if(span != null) {
+                    Tracing.endServer(span, sentStatus, handlerError);
+                }
             }
             if(!keepAlive) {
                 drop(fd);
@@ -5204,6 +5222,10 @@ public final class HttpServer {
                 inFlightRequests.incrementAndGet();
                 SERVING_FD.set(new Integer(fd));
                 SERVING_H2.set(Boolean.TRUE);
+                // The HTTP/1 path's span, for the same reasons; it ends in the
+                // finally that closes this stream's request.
+                Span span = Tracing.startServer(request, tls != null);
+                Exception handlerError = null;
                 try {
                     response = handler.handle(request);
                     if(response == null) {
@@ -5211,6 +5233,7 @@ public final class HttpServer {
                     }
                 } catch (Exception err) {
                     System.err.println("handler failed: " + err);
+                    handlerError = err;
                     response = Response.text(500, "internal error");
                 }
                 try {
@@ -5395,6 +5418,13 @@ public final class HttpServer {
                     inFlightRequests.decrementAndGet();
                     SERVING_FD.set(null);
                     SERVING_H2.set(null);
+                    if(span != null) {
+                        // The status the handler chose. When the session refused
+                        // the body for lack of room the peer saw a 503 instead;
+                        // that is a server-wide condition, visible in the h2
+                        // counters, and not what this handler answered.
+                        Tracing.endServer(span, response.status, handlerError);
+                    }
                 }
             }
             flushHttp2(fd, session, h2);

@@ -1,0 +1,117 @@
+[[opentelemetry-tracing]]
+== Distributed tracing with OpenTelemetry
+
+OpenTelemetry tracing follows one user action from the app through every service
+it touches. When the user taps "checkout", the trace shows the tap, the requests
+the app made, what the backend did with each one and which database query was
+slow, as one timeline. Codename One produces these traces in the standard OTLP
+format, so any OpenTelemetry collector or tracing backend can display them.
+
+=== Turning it on
+
+Put `@OpenTelemetry` on the main class:
+
+[source,java]
+----
+@OpenTelemetry(relay = "https://api.example.com", serviceName = "shop-app")
+public class ShopApp extends Lifecycle {
+    ...
+}
+----
+
+The build generates a bootstrap that installs `com.codename1.telemetry.Telemetry`
+before the app starts. From then on every `ConnectionRequest` is a span, and so
+is every call through a REST, gRPC-Web or GraphQL client the build generates,
+because they all go through `ConnectionRequest`. Each request also sends the W3C
+`traceparent` header, so a server that understands trace context continues the
+app's trace instead of starting a new one. The Codename One backend understands
+it (see the backend chapter), and so does any service instrumented with
+OpenTelemetry.
+
+An app without the annotation doesn't reference the telemetry classes, so they
+aren't part of its build.
+
+=== Where the spans go
+
+There are two ways to reach a collector, and the annotation takes one of them.
+
+`relay` sends the spans to the app's own Codename One backend, started with
+`cn1.otel.relay=true`. The backend adds the collector's credentials and forwards
+the spans. This is the recommended setup: nothing secret ships in the app, and a
+web build never has to reach a collector on another origin.
+
+`endpoint` sends the spans straight to an OTLP/HTTP collector:
+
+[source,java]
+----
+@OpenTelemetry(endpoint = "https://abc12345.live.dynatrace.com/api/v2/otlp",
+        headers = "Authorization: Api-Token dt0c01.XXXX")
+public class ShopApp extends Lifecycle { ... }
+----
+
+The header is compiled into the app, and anyone who installs the app can read
+it. Use a token that can ingest traces and do nothing else.
+
+Direct exports are binary protobuf by default, which every collector accepts and
+some, Dynatrace among them, require. Set `protobuf = false` for JSON. Exports
+to a relay are always JSON, and the backend re-encodes them for its collector.
+
+=== Timing what the user did
+
+A request made on its own is a trace of its own. To group the requests that one
+user action causes, run the action inside a span:
+
+[source,java]
+----
+Telemetry.run("checkout", () -> cart.submit());
+----
+
+Requests queued while `checkout` is running become its children, and so does the
+backend work they cause. `Telemetry.startSpan` returns a span you end yourself,
+for work that starts in one place and finishes in another.
+
+=== Sampling and privacy
+
+`sampleRatio` records a fraction of new traces, from 0 to 1. A trace the app
+decides not to record still sends `traceparent`, flagged as not sampled, and the
+backend's default sampler follows the app's decision. Each trace is therefore
+recorded completely or not at all.
+
+A span records the request's method, host, path and status. It never records the
+query string, request bodies or response bodies.
+
+Whether trace data needs the user's consent depends on what the app records and
+where it sends it, so the app decides. With `requireAnalyticsConsent = true` on the
+annotation, or `requireAnalyticsConsent(true)` on `TelemetryConfig`, tracing runs
+only while the user has granted analytics consent through the `Analytics` API (see
+<<analytics>>). Without that consent, requests are sent exactly as they would be
+with telemetry off: no span and no `traceparent` header. Spans that were buffered
+before the user withdrew consent are discarded, not exported. Until the user
+makes a choice, the analytics consent mode decides, and the default `OPT_IN` mode
+means no tracing.
+
+=== The web build
+
+`traceparent` isn't one of the request headers a browser sends across origins
+without asking. When a web app adds it to a request for another origin, the
+browser first sends a CORS preflight, and a server that doesn't allow the header
+fails the request. The web build therefore sends trace context only to the relay's
+host and to the hosts listed in `propagateTo`. The other platforms send it to
+every host.
+
+=== Configuring it in code
+
+The annotation is a shortcut for this call, which an app can also make itself,
+for example to choose the endpoint at run time:
+
+[source,java]
+----
+Telemetry.install(new TelemetryConfig()
+        .relay("https://api.example.com")
+        .serviceName("shop-app")
+        .sampleRatio(0.2));
+----
+
+Spans are exported in batches, when 32 have ended or every ten seconds.
+Call `Telemetry.flush()` when the app is paused, because spans still in memory are
+lost if the process is reclaimed.

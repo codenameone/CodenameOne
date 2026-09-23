@@ -239,6 +239,25 @@ public final class NetworkManager {
         return networkGuard;
     }
 
+    /// Read through [#getNetworkTracer()], for the same publication reason as the guard.
+    private static NetworkTracer networkTracer;
+
+    /// Installs the app-wide [NetworkTracer], replacing any earlier one; null removes it.
+    ///
+    /// Unlike the guard this slot does not seal: a tracer only observes, so replacing
+    /// one cannot weaken anything, and telemetry that is switched off at run time has
+    /// to be able to take itself out.
+    public static void setNetworkTracer(NetworkTracer tracer) {
+        synchronized (NetworkManager.class) {
+            networkTracer = tracer;
+        }
+    }
+
+    /// The installed tracer, or null.
+    public static synchronized NetworkTracer getNetworkTracer() {
+        return networkTracer;
+    }
+
     /// Test hook: drops the installed guard and unseals the slot.
     static void resetNetworkGuardForTesting() {
         synchronized (NetworkManager.class) {
@@ -634,6 +653,19 @@ public final class NetworkManager {
     ///
     /// - `request`: network request for execution
     void addToQueue(@Async.Schedule ConnectionRequest request, boolean retry) {
+        if (!retry) {
+            // Captured HERE, on the thread that asked for the request, so the span
+            // it becomes is a child of what the app was doing at the time. A retry
+            // keeps the context of the request it retries.
+            NetworkTracer tracer = getNetworkTracer();
+            if (tracer != null) {
+                try {
+                    request.tracerParent = tracer.requestQueued(request);
+                } catch (Throwable t) {
+                    Log.e(t);
+                }
+            }
+        }
         Util.getImplementation().addConnectionToQueue(request);
         if (!running) {
             start();
@@ -1108,6 +1140,10 @@ public final class NetworkManager {
 
             int frameRate = -1;
             boolean requestWasCompleted = true;
+            // What failed the attempt, for the tracer. Both catches below handle the
+            // failure and do not rethrow, so the finally is the one place that sees
+            // every ending.
+            Throwable failure = null;
             // Default this to true because if, for some reason an exception is thrown
             // before calling performOperationComplete(), then the request
             // won't be retried.
@@ -1147,6 +1183,7 @@ public final class NetworkManager {
 
                 requestWasCompleted = req.performOperationComplete();
             } catch (IOException e) {
+                failure = e;
                 if (!req.isFailSilently()) {
                     if (!handleException(req, e)) {
                         req.handleIOException(e);
@@ -1156,6 +1193,7 @@ public final class NetworkManager {
                     Log.e(e);
                 }
             } catch (RuntimeException er) {
+                failure = er;
                 if (!req.isFailSilently()) {
                     if (!handleException(req, er)) {
                         req.handleRuntimeException(er);
@@ -1171,6 +1209,25 @@ public final class NetworkManager {
                 }
                 if (requestWasCompleted) {
                     req.complete = true;
+                }
+                Object attempt = req.tracerAttempt;
+                if (attempt != null) {
+                    // Cleared first, so an attempt is ended exactly once however the
+                    // tracer behaves, and a retry starts from nothing.
+                    req.tracerAttempt = null;
+                    NetworkTracer tracer = getNetworkTracer();
+                    if (tracer != null) {
+                        try {
+                            // Only a status THIS attempt received: a reused request
+                            // still holds the last one's, which the guard learned
+                            // to distrust for the same reason.
+                            tracer.afterRequest(req, attempt,
+                                    req.hasGuardResponse() ? req.getResponseCode() : -1, failure);
+                        } catch (Throwable t) {
+                            // Observation must never change a request's outcome.
+                            Log.e(t);
+                        }
+                    }
                 }
                 NetworkGuard guard = getNetworkGuard();
                 if (guard != null && req.hasGuardResponse()) {

@@ -539,6 +539,14 @@ public class JavaScriptBuilder extends Executor {
             // runnable at exactly that point; a post-bootstrap stamp would miss startup because
             // bootstrap runs init/start inline. hardeningRuntimeProperties emits
             // Display.getInstance().setProperty(...) lines.
+            // The generated @Route dispatcher and annotation-framework bootstraps
+            // (@Mapped, @Bindable, @Entity, the REST/gRPC/GraphQL clients, intents,
+            // @OpenTelemetry), before Display.init as every other port's stub does.
+            // Without these lines each of those features compiled into the web build
+            // and silently did nothing. Direct references, so the translator keeps
+            // the generated classes.
+            pw.print(routeDispatcherInstallSource(stageClasses, "        "));
+            pw.print(annotationFrameworksInstallSource(stageClasses, "        "));
             pw.println("        ParparVMBootstrap.bootstrap(new " + mainClass + "(), new Runnable() {");
             pw.println("            public void run() {");
             pw.print(hardeningRuntimeProperties(request));

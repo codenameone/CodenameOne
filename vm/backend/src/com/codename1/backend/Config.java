@@ -141,6 +141,24 @@ public final class Config {
     private static final String[] WELL_KNOWN_ENVIRONMENT = {
         SERVER_PORT, "PORT",
         DATASOURCE_URL, "DATABASE_URL",
+        // The OpenTelemetry SDK's own variables, which every collector's
+        // documentation, every operator and every deployment template already
+        // uses. The keys are com.codename1.backend.otel.OtlpTracer's; they are
+        // spelled out here because this table is where the environment is mapped.
+        "cn1.otel.disabled", "OTEL_SDK_DISABLED",
+        "cn1.otel.endpoint", "OTEL_EXPORTER_OTLP_ENDPOINT",
+        "cn1.otel.traces.endpoint", "OTEL_EXPORTER_OTLP_TRACES_ENDPOINT",
+        "cn1.otel.headers", "OTEL_EXPORTER_OTLP_HEADERS",
+        "cn1.otel.traces.headers", "OTEL_EXPORTER_OTLP_TRACES_HEADERS",
+        "cn1.otel.protocol", "OTEL_EXPORTER_OTLP_PROTOCOL",
+        "cn1.otel.traces.protocol", "OTEL_EXPORTER_OTLP_TRACES_PROTOCOL",
+        "cn1.otel.service.name", "OTEL_SERVICE_NAME",
+        "cn1.otel.resource.attributes", "OTEL_RESOURCE_ATTRIBUTES",
+        "cn1.otel.sampler", "OTEL_TRACES_SAMPLER",
+        "cn1.otel.sampler.arg", "OTEL_TRACES_SAMPLER_ARG",
+        "cn1.otel.queue.size", "OTEL_BSP_MAX_QUEUE_SIZE",
+        "cn1.otel.batch.size", "OTEL_BSP_MAX_EXPORT_BATCH_SIZE",
+        "cn1.otel.export.delayMillis", "OTEL_BSP_SCHEDULE_DELAY",
     };
 
     private final Properties profileFile;

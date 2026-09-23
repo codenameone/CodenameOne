@@ -254,6 +254,26 @@ public final class Database {
      */
     public synchronized int execute(String sql, Object[] params) throws IOException {
         awaitTransactionOwner();
+        // A span per statement when a tracer is installed; see Tracing.startDatabase.
+        Span span = Tracing.startDatabase(dialect.getName(), sql);
+        if(span == null) {
+            return executeUntraced(sql, params);
+        }
+        Throwable failure = null;
+        try {
+            return executeUntraced(sql, params);
+        } catch (IOException err) {
+            failure = err;
+            throw err;
+        } catch (RuntimeException err) {
+            failure = err;
+            throw err;
+        } finally {
+            Tracing.endDatabase(span, failure);
+        }
+    }
+
+    private int executeUntraced(String sql, Object[] params) throws IOException {
         params = portableParameters(params);
         String rendered = bind(sql, params);
         if(sqlite != null) {
@@ -268,6 +288,29 @@ public final class Database {
     /** Runs a query and returns every row as a column-name to value map. */
     public synchronized List query(String sql, Object[] params) throws IOException {
         awaitTransactionOwner();
+        Span span = Tracing.startDatabase(dialect.getName(), sql);
+        if(span == null) {
+            return queryUntraced(sql, params);
+        }
+        Throwable failure = null;
+        try {
+            List rows = queryUntraced(sql, params);
+            if(span.isRecording()) {
+                span.setAttribute("db.response.returned_rows", (long)rows.size());
+            }
+            return rows;
+        } catch (IOException err) {
+            failure = err;
+            throw err;
+        } catch (RuntimeException err) {
+            failure = err;
+            throw err;
+        } finally {
+            Tracing.endDatabase(span, failure);
+        }
+    }
+
+    private List queryUntraced(String sql, Object[] params) throws IOException {
         params = portableParameters(params);
         String rendered = bind(sql, params);
         if(sqlite != null) {
@@ -332,6 +375,29 @@ public final class Database {
     public synchronized long insert(String sql, Object[] params, String idColumn)
             throws IOException {
         awaitTransactionOwner();
+        // One span for the insert, whatever it runs to learn its key: the
+        // statements it issues through execute and query find this one current
+        // and add none of their own.
+        Span span = Tracing.startDatabase(dialect.getName(), sql);
+        if(span == null) {
+            return insertUntraced(sql, params, idColumn);
+        }
+        Throwable failure = null;
+        try {
+            return insertUntraced(sql, params, idColumn);
+        } catch (IOException err) {
+            failure = err;
+            throw err;
+        } catch (RuntimeException err) {
+            failure = err;
+            throw err;
+        } finally {
+            Tracing.endDatabase(span, failure);
+        }
+    }
+
+    private long insertUntraced(String sql, Object[] params, String idColumn)
+            throws IOException {
         if(idColumn == null || idColumn.length() == 0) {
             throw new IOException("insert needs the name of the generated key column");
         }

@@ -40,6 +40,8 @@ package com.codename1.backend;
 public final class LambdaRuntime {
     private static final String API_VERSION = "/2018-06-01/runtime";
     private static final String REQUEST_ID_HEADER = "Lambda-Runtime-Aws-Request-Id";
+    /** The invocation's X-Ray trace, which is how the host passes the caller's trace on. */
+    private static final String TRACE_ID_HEADER = "Lambda-Runtime-Trace-Id";
 
     private LambdaRuntime() {
     }
@@ -91,10 +93,27 @@ public final class LambdaRuntime {
             System.err.println("Invocation carried no " + REQUEST_ID_HEADER + "; cannot report a result");
             return false;
         }
+        // The invocation's span when a tracer is installed, parented on the trace
+        // the host hands over. Ended as soon as the handler returns, and FLUSHED
+        // before the next poll: the host freezes this process while it waits for
+        // the next invocation, so a span still queued then is sent late or never.
+        Span span = Tracing.startLambda(next.getHeader(TRACE_ID_HEADER), requestId);
+        try {
+            return answer(handler, host, port, next, requestId, span);
+        } finally {
+            if(span != null) {
+                Tracing.flush(2000);
+            }
+        }
+    }
+
+    private static boolean answer(Handler handler, String host, int port, Http.Response next,
+                                  String requestId, Span span) {
         String result;
         try {
             result = handler.handle(next.getBodyAsString(), requestId);
         } catch (Exception err) {
+            Tracing.endLambda(span, err);
             // The same rule the response path below takes, and for the same
             // reason: an invocation the host was never told about stays
             // outstanding until it times out, and polling for another one while
@@ -108,6 +127,7 @@ public final class LambdaRuntime {
             }
             return true;
         }
+        Tracing.endLambda(span, null);
         try {
             byte[] payload = (result == null ? "null" : result).getBytes("UTF-8");
             // The status matters: the Runtime API REJECTS a result it will not take

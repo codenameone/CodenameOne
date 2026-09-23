@@ -77,14 +77,17 @@ public final class Backend {
     private final EntityManager entities;
     private final Config config;
     private final int shutdownMillis;
+    /** Whether this server installed the tracer, and so owns shutting it down. */
+    private final boolean tracing;
 
     private Backend(HttpServer server, DataSource dataSource, EntityManager entities,
-                    Config config, int shutdownMillis) {
+                    Config config, int shutdownMillis, boolean tracing) {
         this.server = server;
         this.dataSource = dataSource;
         this.entities = entities;
         this.config = config;
         this.shutdownMillis = shutdownMillis;
+        this.tracing = tracing;
     }
 
     /** A builder whose defaults come from the configuration this process sees. */
@@ -133,6 +136,11 @@ public final class Backend {
         server.stop(shutdownMillis);
         if(dataSource != null) {
             dataSource.close();
+        }
+        // LAST, so the spans of the requests the drain let finish are exported
+        // rather than lost with the process.
+        if(tracing) {
+            Tracing.shutdown(shutdownMillis);
         }
     }
 
@@ -221,6 +229,7 @@ public final class Backend {
         private boolean createTablesGiven;
         private boolean handlersNeedADatabase;
         private boolean quiet;
+        private Tracer tracer;
 
         Builder(Config config) {
             this.config = config;
@@ -405,6 +414,17 @@ public final class Backend {
             return this;
         }
 
+        /**
+         * Traces every request with this tracer, once {@link Tracer#open} has read
+         * the configuration and agreed to. The build calls this from the entry
+         * point it generates for a project that enables OpenTelemetry, which is
+         * why nothing else refers to a tracer implementation.
+         */
+        public Builder tracing(Tracer tracer) {
+            this.tracer = tracer;
+            return this;
+        }
+
         /** Suppresses the line this prints when the server comes up. */
         public Builder quiet() {
             this.quiet = true;
@@ -419,9 +439,27 @@ public final class Backend {
             if(config == null) {
                 config = Config.load();
             }
+            // BEFORE the database, so the statements start-up runs -- the ORM's
+            // CREATE TABLE -- are traced like any other, and before anything that
+            // could fail, so a refused configuration is refused up front.
+            boolean tracing = tracer != null && tracer.open(config);
+            if(tracing) {
+                Tracing.install(tracer);
+            }
+            try {
+                return startTraced(tracing);
+            } catch (Exception err) {
+                if(tracing) {
+                    Tracing.shutdown(0);
+                }
+                throw err;
+            }
+        }
+
+        private Backend startTraced(boolean tracing) throws Exception {
             DataSource pool = openDataSource();
             try {
-                return startWith(pool);
+                return startWith(pool, tracing);
             } catch (Exception err) {
                 // EVERY failure after the pool is open, not just the bind. A
                 // controller constructor that rejects its configuration, a
@@ -444,9 +482,16 @@ public final class Backend {
         }
 
         /** {@link #start} once the database, if any, is open. */
-        private Backend startWith(DataSource pool) throws Exception {
+        private Backend startWith(DataSource pool, boolean tracing) throws Exception {
             EntityManager manager = openEntityManager(pool);
-            List routers = new ArrayList(handlers);
+            List routers = new ArrayList();
+            HttpServer.Handler relay = tracing ? tracer.relay() : null;
+            if(relay != null) {
+                // FIRST: it answers one exact path, and a catch-all handler
+                // added before it would otherwise take the app's exports.
+                routers.add(relay);
+            }
+            routers.addAll(handlers);
             if(factory != null) {
                 HttpServer.Handler[] built = factory.create(pool, manager);
                 if(built != null) {
@@ -585,7 +630,7 @@ public final class Backend {
             // The websocket routes went in through start() above, before the
             // listener began accepting -- registering them here instead left a
             // window in which a valid upgrade was answered as ordinary HTTP.
-            Backend backend = new Backend(server, pool, manager, config, drain);
+            Backend backend = new Backend(server, pool, manager, config, drain, tracing);
             if(!quiet) {
                 announce(backend, listenPort, context != null);
             }

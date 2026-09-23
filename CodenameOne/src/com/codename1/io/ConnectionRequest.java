@@ -1143,6 +1143,18 @@ public class ConnectionRequest implements IOProgressListener {
             // blocking token fetch would stall every other request.
             requestGuard.beforeRequest(this);
         }
+        NetworkTracer tracer = NetworkManager.getNetworkTracer();
+        if (tracer != null) {
+            // After the guard, so the attempt the tracer times is the one that is
+            // really made, and in the same place for the same reason: before
+            // initConnection() writes the headers, and outside it so a subclass
+            // that overrides it cannot drop the trace context.
+            try {
+                tracerAttempt = tracer.beforeRequest(this, tracerParent);
+            } catch (Throwable t) {
+                Log.e(t);
+            }
+        }
 
         CodenameOneImplementation impl = Util.getImplementation();
         Object connection = null;
@@ -1506,6 +1518,14 @@ public class ConnectionRequest implements IOProgressListener {
     /// reuse case: without it a retained response code from an earlier attempt is reported
     /// as though it belonged to this one.
     private boolean guardResponseCaptured;
+
+    /// What the [NetworkTracer] returned when this request was queued: the context
+    /// its spans are children of. Kept across retries, which are the same request.
+    Object tracerParent;
+
+    /// The attempt in flight, as the tracer's own state; null when none is being
+    /// traced. Set on the network thread and cleared there when the attempt ends.
+    Object tracerAttempt;
 
     private void captureGuardHeaders(Object connection) {
         NetworkGuard guard = NetworkManager.getNetworkGuard();
