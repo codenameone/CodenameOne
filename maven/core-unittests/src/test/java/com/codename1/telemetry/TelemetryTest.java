@@ -386,6 +386,51 @@ class TelemetryTest extends UITestBase {
                 new TelemetryConfig().relay("https://api.test/otel/v1/traces/").exportUrl());
         assertEquals("https://api.test/otel/v1/traces",
                 new TelemetryConfig().relay("https://api.test/").exportUrl());
+        // A query carries the collector's key: the path goes BEFORE it.
+        assertEquals("https://c.test/otlp/v1/traces?api-key=s3cret",
+                new TelemetryConfig().direct("https://c.test/otlp?api-key=s3cret").exportUrl());
+        assertEquals("https://c.test/v1/traces?api-key=s3cret",
+                new TelemetryConfig().direct("https://c.test/v1/traces/?api-key=s3cret").exportUrl());
+    }
+
+    @Test
+    void whileExportsAreBackedUpNoMoreAreQueuedAndTheBufferIsBounded() throws Exception {
+        // A queue that already holds the maximum of this installation's exports.
+        final Telemetry.State backedUp = new Telemetry.State(
+                new TelemetryConfig().direct("http://collector.test")) {
+            @Override
+            int pendingExports() {
+                return Telemetry.MAX_PENDING_EXPORTS;
+            }
+        };
+        TestCodenameOneImplementation impl = TestCodenameOneImplementation.getInstance();
+        impl.clearQueuedRequests();
+        com.codename1.ui.CN.callSeriallyAndWait(new Runnable() {
+            @Override
+            public void run() {
+                for (int i = 0; i < 1000; i++) {
+                    backedUp.record(backedUp.start("s" + i, TelemetrySpan.KIND_INTERNAL, null));
+                }
+            }
+        });
+        try {
+            for (ConnectionRequest queued : impl.getQueuedRequests()) {
+                assertFalse(queued instanceof Telemetry.ExportRequest,
+                        "an export was queued behind the ones already waiting");
+            }
+            // 32 per batch, so the bound is the 128 floor; the newest spans are kept.
+            assertEquals(128, backedUp.buffer.size(), "the buffer grew past its bound");
+            assertEquals("s999", backedUp.buffer.get(backedUp.buffer.size() - 1).getName());
+        } finally {
+            // Its flush timer started with the first span; it is never installed,
+            // so nothing else would stop it.
+            com.codename1.ui.CN.callSeriallyAndWait(new Runnable() {
+                @Override
+                public void run() {
+                    backedUp.stop();
+                }
+            });
+        }
     }
 
     @Test

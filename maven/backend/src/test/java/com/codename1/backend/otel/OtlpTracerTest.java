@@ -126,6 +126,10 @@ class OtlpTracerTest {
                         }
                         Tracing.route("/work");
                         Tracing.current().setAttribute("pets.checked", 2L);
+                        // The caller's own context: no client span may describe it.
+                        java.util.List own = new java.util.ArrayList();
+                        own.add("traceparent: 00-11111111111111111111111111111111-2222222222222222-01");
+                        Web.request("GET", "http://127.0.0.1:" + port + "/downstream", own, null);
                         db.query("SELECT name FROM pets WHERE id = ?", new Object[] {Long.valueOf(7)});
                         Web.Result down = Web.get("http://127.0.0.1:" + port + "/downstream");
                         return HttpServer.Response.text(200, "ok " + down.getBodyAsString());
@@ -169,7 +173,21 @@ class OtlpTracerTest {
         // By KIND as well as name: the downstream request is "GET" too, since no
         // route names it, and it is a server span.
         Span outbound = find(spans, "GET", Span.SpanKind.SPAN_KIND_CLIENT);
-        Span downstream = find(spans, "GET", Span.SpanKind.SPAN_KIND_SERVER);
+        Span downstream = null;
+        int clientGets = 0;
+        for(Object o : spans) {
+            Span s = (Span)o;
+            if("GET".equals(s.getName()) && s.getKind() == Span.SpanKind.SPAN_KIND_CLIENT) {
+                clientGets++;
+            }
+            if("GET".equals(s.getName()) && s.getKind() == Span.SpanKind.SPAN_KIND_SERVER
+                    && TRACE.equals(hex(s.getTraceId()))) {
+                downstream = s;
+            }
+        }
+        assertEquals(1, clientGets,
+                "a client span was recorded for the call that carried the caller's own traceparent");
+        assertTrue(downstream != null, "the downstream request's span in this trace");
 
         // The server span continues the caller's trace, under the caller's span.
         assertEquals(TRACE, hex(work.getTraceId()));
@@ -557,6 +575,10 @@ class OtlpTracerTest {
             assertEquals(400, post(port, "/otel/v1/traces",
                     client.replace("\"traceId\":\"" + TRACE + "\",", ""), "s3cret"),
                     "a span without a trace id is refused");
+            assertEquals(400, post(port, "/otel/v1/traces",
+                    client.replace("{\"intValue\":\"200\"}",
+                            "{\"intValue\":\"200\",\"stringValue\":\"x\"}"), "s3cret"),
+                    "an AnyValue holding two alternatives of its oneof is refused");
             assertEquals(200, post(port, "/otel/v1/traces", client, "s3cret"));
         } finally {
             backend.stop();

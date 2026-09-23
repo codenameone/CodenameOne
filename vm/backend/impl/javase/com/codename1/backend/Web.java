@@ -229,7 +229,7 @@ public final class Web {
         HeaderLines.requireMethod(method);
         HeaderLines.validate(headers);
         // The translated twin's span, the same way; see Tracing.startHttpClient.
-        Span span = Tracing.startHttpClient(method, url);
+        Span span = Tracing.startHttpClient(method, url, headers);
         int status = -1;
         Throwable failure = null;
         try {

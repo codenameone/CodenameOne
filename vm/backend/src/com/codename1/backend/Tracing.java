@@ -282,9 +282,15 @@ public final class Tracing {
      * is off, suppressed on this thread, or already inside a client span -- one
      * outbound operation is one span, whatever it happens to be built from.
      */
-    static Span startHttpClient(String method, String url) {
+    static Span startHttpClient(String method, String url, List callerHeaders) {
         Tracer t = tracer;
         if(t == null || isSuppressed()) {
+            return null;
+        }
+        if(callerTraceparent(callerHeaders)) {
+            // The caller chose which trace this request belongs to, and the service
+            // it reaches joins that one. A span recorded here would sit in the
+            // CURRENT trace and describe a request whose context it never sent.
             return null;
         }
         String verb = method == null ? "GET" : method;
@@ -320,13 +326,8 @@ public final class Tracing {
         if(span == null) {
             return null;
         }
-        if(callerHeaders != null) {
-            for(int iter = 0 ; iter < callerHeaders.size() ; iter++) {
-                String line = String.valueOf(callerHeaders.get(iter));
-                if(line.regionMatches(true, 0, TRACEPARENT + ":", 0, TRACEPARENT.length() + 1)) {
-                    return null;
-                }
-            }
+        if(callerTraceparent(callerHeaders)) {
+            return null;
         }
         try {
             String parent = span.traceparent();
@@ -421,6 +422,23 @@ public final class Tracing {
         } catch (RuntimeException err) {
             failed(err);
         }
+    }
+
+    /** Whether the caller's own header lines already carry a traceparent. */
+    static boolean callerTraceparent(List callerHeaders) {
+        if(callerHeaders == null) {
+            return false;
+        }
+        for(int iter = 0 ; iter < callerHeaders.size() ; iter++) {
+            String line = String.valueOf(callerHeaders.get(iter)).trim();
+            if(line.regionMatches(true, 0, TRACEPARENT, 0, TRACEPARENT.length())
+                    && line.length() > TRACEPARENT.length()
+                    && (line.charAt(TRACEPARENT.length()) == ':'
+                        || line.charAt(TRACEPARENT.length()) == ' ')) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /** Ends a statement's span. */

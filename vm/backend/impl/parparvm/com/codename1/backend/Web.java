@@ -209,7 +209,7 @@ public final class Web {
         HeaderLines.requireMethod(method);
         HeaderLines.validate(headers);
         // Null unless a tracer is installed; see Tracing.startHttpClient.
-        Span span = Tracing.startHttpClient(method, url);
+        Span span = Tracing.startHttpClient(method, url, headers);
         int status = -1;
         Throwable failure = null;
         try {

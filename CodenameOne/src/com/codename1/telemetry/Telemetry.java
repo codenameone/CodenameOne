@@ -69,6 +69,8 @@ import java.util.Timer;
 /// [TelemetryConfig]).
 public final class Telemetry {
     private static final String TRACEPARENT = "traceparent";
+    /// How many export batches may wait in the network queue at once.
+    static final int MAX_PENDING_EXPORTS = 2;
     private static State state;
     /// The span [#run(String, Runnable)] has made current, per thread. Mostly the
     /// EDT's, since that is where a user action runs and where requests are queued,
@@ -176,12 +178,15 @@ public final class Telemetry {
 
     /// Everything one installation owns. It is the [NetworkTracer] too, so the
     /// network thread reaches the same configuration the app installed.
-    static final class State implements NetworkTracer {
+    /// Not final so a test can stand in for the network queue: whether exports are
+    /// backed up is a property of the shared NetworkManager, which a test cannot hold
+    /// still reliably.
+    static class State implements NetworkTracer {
         private final TelemetryConfig config;
         private final String exportUrl;
         private final String backendHost;
         /// Touched on the EDT only: spans that end elsewhere are marshalled there.
-        private final List<TelemetrySpan> buffer = new ArrayList<TelemetrySpan>();
+        final List<TelemetrySpan> buffer = new ArrayList<TelemetrySpan>();
         private Timer timer;
         private Map<String, Object> resource;
         private boolean stopped;
@@ -294,11 +299,17 @@ public final class Telemetry {
             });
         }
 
-        private void record(TelemetrySpan span) {
+        void record(TelemetrySpan span) {
             if (stopped || !permitted()) {
                 return;
             }
             buffer.add(span);
+            if (buffer.size() > maxBuffered()) {
+                // BOUNDED. While exports cannot keep up -- the collector is slow, or
+                // the app's own traffic keeps outranking them -- the oldest spans
+                // go, rather than the app's memory.
+                buffer.remove(0);
+            }
             if (timer == null) {
                 // Started on the first span, on the EDT, because CN.setInterval
                 // needs the display and install() may run before there is one.
@@ -335,6 +346,13 @@ public final class Telemetry {
                 buffer.clear();
                 return;
             }
+            if (pendingExports() >= MAX_PENDING_EXPORTS) {
+                // Exports are already waiting in the network queue. Queuing another
+                // batch would hold one more byte array per flush for as long as the
+                // app's requests outrank them, with no limit; the spans stay in the
+                // bounded buffer and go out once the queue drains.
+                return;
+            }
             List<TelemetrySpan> batch = new ArrayList<TelemetrySpan>(buffer);
             buffer.clear();
             boolean json = config.mode == TelemetryConfig.Mode.RELAY || !config.protobuf;
@@ -364,6 +382,25 @@ public final class Telemetry {
             request.setReadTimeout(10000);
             request.setPriority(ConnectionRequest.PRIORITY_LOW);
             NetworkManager.getInstance().addToQueue(request);
+        }
+
+        /// Telemetry exports still waiting to be sent. Read from the queue itself
+        /// rather than counted, because a fail-silent export that fails reports
+        /// nothing back to count with. Any installation's exports count: after a
+        /// reinstall the previous one's are still competing for the same network.
+        int pendingExports() {
+            int count = 0;
+            java.util.Enumeration queue = NetworkManager.getInstance().enumurateQueue();
+            while (queue.hasMoreElements()) {
+                if (queue.nextElement() instanceof ExportRequest) {
+                    count++;
+                }
+            }
+            return count;
+        }
+
+        private int maxBuffered() {
+            return Math.max(config.batchSize * 4, 128);
         }
 
         void stop() {

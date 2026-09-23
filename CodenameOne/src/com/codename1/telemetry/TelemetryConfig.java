@@ -233,7 +233,22 @@ public final class TelemetryConfig {
         if (endpoint == null || endpoint.length() == 0) {
             return null;
         }
-        String base = endpoint.trim();
+        String url = endpoint.trim();
+        // The path is what gets the suffix; a query or fragment -- where a
+        // collector's api-key often travels -- is set aside and put back after it.
+        // Appending to the whole string put the path inside the credential and
+        // sent the export to the base path.
+        int cut = url.length();
+        int query = url.indexOf('?');
+        int fragment = url.indexOf('#');
+        if (query >= 0) {
+            cut = query;
+        }
+        if (fragment >= 0 && fragment < cut) {
+            cut = fragment;
+        }
+        String base = url.substring(0, cut);
+        String suffix = url.substring(cut);
         // Trailing slashes first: ".../v1/traces/" is the full URL too, and testing
         // before stripping appended the path a second time -- a route no collector
         // serves, and the export fails silently by design.
@@ -241,8 +256,8 @@ public final class TelemetryConfig {
             base = base.substring(0, base.length() - 1);
         }
         if (base.endsWith("/v1/traces")) {
-            return base;
+            return base + suffix;
         }
-        return base + (mode == Mode.RELAY ? "/otel/v1/traces" : "/v1/traces");
+        return base + (mode == Mode.RELAY ? "/otel/v1/traces" : "/v1/traces") + suffix;
     }
 }

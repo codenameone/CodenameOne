@@ -5230,6 +5230,9 @@ public final class HttpServer {
                 // HTTP/1 path: a respond() that throws is a response the peer never
                 // got, and must not be reported as the status the handler chose.
                 int submittedStatus = -1;
+                // The status the peer is actually sent when the session refuses the
+                // handler's response and a 503 goes in its place; -1 when it did not.
+                int fallbackStatus = -1;
                 try {
                     response = handler.handle(request);
                     if(response == null) {
@@ -5305,6 +5308,7 @@ public final class HttpServer {
                             asciiBytes("too many files in flight"))) {
                         h2.respond(stream.getId(), 503, "text/plain", refusalHeaders(), null);
                     }
+                    fallbackStatus = 503;
                 } else if(response.fileFd >= 0 && !noBody) {
                     // Streamed frame by frame out of the descriptor. Reading the file
                     // in first cost its whole size in the heap plus the same again in
@@ -5324,6 +5328,7 @@ public final class HttpServer {
                         // happens in the same step that takes the descriptor.
                         StaticFiles.closeFile(response.fileFd);
                         h2.respond(stream.getId(), 503, "text/plain", refusalHeaders(), null);
+                        fallbackStatus = 503;
                     }
                 } else {
                     // A HEAD describes the representation it is not sending, and
@@ -5382,11 +5387,15 @@ public final class HttpServer {
                         // is no room for bodies. An explanatory body here is the
                         // one allocation that must not be attempted.
                         h2.respond(stream.getId(), 503, "text/plain", refusalHeaders(), null);
+                        fallbackStatus = 503;
                     } else {
                         queuedBodyBytes += bodyBytes;
                     }
                 }
-                submittedStatus = response.status;
+                // What the peer received: the 503 that replaced a refused response
+                // is what the client saw, and the span must say so -- recording the
+                // handler's 200 hid exactly the overload a trace is read to find.
+                submittedStatus = fallbackStatus > 0 ? fallbackStatus : response.status;
                 requestsServed.incrementAndGet();
                 if(queuedBodyBytes > MAX_QUEUED_H2_BODY_BYTES
                         || Http2.pendingBodyFiles() > MAX_OPEN_H2_FILES
@@ -5424,11 +5433,8 @@ public final class HttpServer {
                     SERVING_FD.set(null);
                     SERVING_H2.set(null);
                     if(span != null) {
-                        // The status the handler chose once it was submitted, or -1
-                        // when submitting threw. When the session refused the body
-                        // for lack of room the peer saw a 503 instead; that is a
-                        // server-wide condition, visible in the h2 counters, and not
-                        // what this handler answered.
+                        // The status that was submitted -- the handler's, or the 503
+                        // that replaced it -- or -1 when submitting threw.
                         Tracing.endServer(span, submittedStatus, handlerError);
                     }
                 }

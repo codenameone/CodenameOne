@@ -286,6 +286,20 @@ final class OtlpSchema {
         if(depth > MAX_DEPTH) {
             throw new IOException("the export nests deeper than " + MAX_DEPTH + " levels");
         }
+        if(type == ANY_VALUE) {
+            // A oneof: exactly one alternative, or none. Keeping two forwarded an
+            // AnyValue a strict collector rejects -- after the relay had answered
+            // 200 -- and in protobuf the later tag silently replaced the earlier.
+            int present = 0;
+            for(int iter = 0 ; iter < type.fields.length ; iter++) {
+                if(value.get(type.fields[iter].name) != null) {
+                    present++;
+                }
+            }
+            if(present > 1) {
+                throw new IOException("an AnyValue holds more than one of its alternatives");
+            }
+        }
         Map out = new java.util.LinkedHashMap();
         for(int iter = 0 ; iter < type.fields.length ; iter++) {
             Field field = type.fields[iter];
