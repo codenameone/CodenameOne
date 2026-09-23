@@ -18,6 +18,7 @@
   <modules>
 <module>common</module>
 <module>backend</module>
+<module>serverframeworks</module>
 </modules>
   <properties>
     <cn1.plugin.version>8.0-SNAPSHOT</cn1.plugin.version>

@@ -207,7 +207,7 @@ and re-serializes is a different byte string.
 
 [source,java]
 ----
-include::../demos/common/src/main/snippets/developer-guide/push-notifications.java[tag=push-notifications-java-spring,indent=0]
+include::../demos/serverframeworks/src/main/java/com/codenameone/developerguide/serverframeworks/PushFeedbackSpring.java[tag=push-notifications-java-spring,indent=0]
 ----
 
 ==== A MicroProfile or Jakarta REST server
@@ -217,7 +217,7 @@ MicroProfile Config:
 
 [source,java]
 ----
-include::../demos/common/src/main/snippets/developer-guide/push-notifications.java[tag=push-notifications-java-microprofile,indent=0]
+include::../demos/serverframeworks/src/main/java/com/codenameone/developerguide/serverframeworks/PushFeedbackMicroProfile.java[tag=push-notifications-java-microprofile,indent=0]
 ----
 
 ==== Any other stack
