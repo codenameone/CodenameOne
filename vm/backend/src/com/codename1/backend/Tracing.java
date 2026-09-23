@@ -544,10 +544,13 @@ public final class Tracing {
             return null;
         }
         Span parent = currentOrNull();
-        if(kind == Span.KIND_CLIENT && parent != null && parent.getKind() == Span.KIND_CLIENT) {
-            return null;
-        }
         try {
+            // Inside the guard, like every other call into the tracer: this runs for
+            // every outbound call and statement, and a span whose getKind throws must
+            // not fail the operation it was only meant to observe.
+            if(kind == Span.KIND_CLIENT && parent != null && parent.getKind() == Span.KIND_CLIENT) {
+                return null;
+            }
             Span span = t.startSpan(name, kind, parent, traceparent, tracestate);
             if(span == null) {
                 return null;

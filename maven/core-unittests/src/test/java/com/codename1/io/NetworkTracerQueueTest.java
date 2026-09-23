@@ -112,6 +112,21 @@ class NetworkTracerQueueTest extends UITestBase {
         assertEquals("action", request.tracerParent);
     }
 
+    @Test
+    void addIfAbsentLeavesAnExplicitContentTypeAlone() {
+        ConnectionRequest request = new ConnectionRequest();
+        request.setContentType("application/json");
+        assertEquals(false, request.addRequestHeaderIfAbsent("Content-Type", "text/plain"));
+        assertEquals("application/json", request.getContentType());
+        assertEquals("application/json", request.getRequestHeader("content-type"));
+
+        ConnectionRequest plain = new ConnectionRequest();
+        assertEquals(null, plain.getRequestHeader("Content-Type"),
+                "the default content type is not a header anyone added");
+        assertEquals(true, plain.addRequestHeaderIfAbsent("X-Trace", "1"));
+        assertEquals("1", plain.getRequestHeader("x-trace"));
+    }
+
     /// A manager that queues and never runs anything: marked running with one
     /// network thread that was never started.
     private static NetworkManager idleManager() throws Exception {

@@ -316,9 +316,37 @@ class OtlpTracerTest {
         try {
             assertEquals(1, db.query("SELECT v FROM t", null).size(),
                     "the rows a query fetched must reach the caller whatever the tracer does");
+            // And inside a span, where starting the statement's span first asks the
+            // parent's kind -- which this tracer's spans throw from.
+            Object nested = Tracing.inSpan("work", span -> db.query("SELECT v FROM t", null).size());
+            assertEquals(Integer.valueOf(1), nested);
         } finally {
             Tracing.install(null);
             db.close();
+        }
+    }
+
+    @Test
+    @DisplayName("a non-ASCII relay token is not satisfied by its ASCII lookalike")
+    void relayTokenComparesEveryCharacter() throws Exception {
+        int port = freePort();
+        Properties settings = settings(port);
+        settings.setProperty(OtlpTracer.RELAY, "true");
+        settings.setProperty(OtlpTracer.RELAY_TOKEN, "s\u00ebcret");
+        Backend backend = Backend.builder(Config.of(settings, "test"))
+                .quiet()
+                .tracing(new OtlpTracer("pets"))
+                .handler(new HttpServer.Handler() {
+                    public HttpServer.Response handle(HttpServer.Request request) throws Exception {
+                        return null;
+                    }
+                })
+                .start();
+        try {
+            // The old comparison folded every non-ASCII character to '?'.
+            assertEquals(401, post(port, "/otel/v1/traces", "{\"resourceSpans\":[]}", "s?cret"));
+        } finally {
+            backend.stop();
         }
     }
 
@@ -518,6 +546,8 @@ class OtlpTracerTest {
                 + "{\"intValue\":\"200\"}}]}]}]}]}";
         try {
             assertEquals(401, post(port, "/otel/v1/traces", client, null));
+            assertEquals(401, post(port, "/otel/v1/traces", client, "s3cre?"),
+                    "a wrong token is refused");
             assertEquals(415, postTyped(port, "/otel/v1/traces", client, "s3cret", "text/plain"));
             assertEquals(400, post(port, "/otel/v1/traces",
                     client.replace(TRACE, "nothex"), "s3cret"));

@@ -161,7 +161,7 @@ public final class OtlpTracer implements Tracer {
         String endpoint = config.get(TRACES_ENDPOINT);
         if(endpoint == null || endpoint.trim().length() == 0) {
             String base = config.get(ENDPOINT, "http://localhost:4318").trim();
-            endpoint = base.endsWith("/") ? base + "v1/traces" : base + "/v1/traces";
+            endpoint = appendTracesPath(base);
         }
         endpoint = endpoint.trim();
         if(!endpoint.regionMatches(true, 0, "http://", 0, 7)
@@ -431,6 +431,29 @@ public final class OtlpTracer implements Tracer {
     // ------------------------------------------------------------------
     // Configuration parsing
     // ------------------------------------------------------------------
+
+    /**
+     * The generic endpoint plus /v1/traces, appended to the PATH. An endpoint can
+     * carry its credential in the query ({@code https://c.example/otlp?api-key=...});
+     * appending to the whole string put the path inside the key's value and sent
+     * the export to the base path with a corrupted credential.
+     */
+    static String appendTracesPath(String base) {
+        int cut = base.length();
+        int query = base.indexOf('?');
+        int fragment = base.indexOf('#');
+        if(query >= 0) {
+            cut = query;
+        }
+        if(fragment >= 0 && fragment < cut) {
+            cut = fragment;
+        }
+        String path = base.substring(0, cut);
+        while(path.endsWith("/")) {
+            path = path.substring(0, path.length() - 1);
+        }
+        return path + "/v1/traces" + base.substring(cut);
+    }
 
     private static int positive(Config config, String key, int fallback) throws IOException {
         int value = config.getInt(key, fallback);

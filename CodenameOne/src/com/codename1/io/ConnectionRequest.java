@@ -773,18 +773,44 @@ public class ConnectionRequest implements IOProgressListener {
         if (key == null || value == null) {
             return false;
         }
+        if (getRequestHeader(key) != null) {
+            return false;
+        }
+        addRequestHeader(key, value);
+        return true;
+    }
+
+    /// The value of a header added to this request, matched without regard to case as
+    /// HTTP requires, or null when there is none. `Content-Type` answers only when it was
+    /// set explicitly: [#addRequestHeader(String, String)] routes that one to a dedicated
+    /// field, and the default it otherwise carries is not something anyone added.
+    ///
+    /// #### Parameters
+    ///
+    /// - `key`: the header name
+    ///
+    /// #### Returns
+    ///
+    /// the value, or null
+    public String getRequestHeader(String key) {
+        if (key == null) {
+            return null;
+        }
+        if ("content-type".equalsIgnoreCase(key)) {
+            return contentTypeSetExplicitly ? contentType : null;
+        }
         if (userHeaders != null) {
             Enumeration keys = userHeaders.keys();
             while (keys.hasMoreElements()) {
                 String existing = (String) keys.nextElement();
                 if (existing != null && existing.length() == key.length()
                         && equalsIgnoreAsciiCase(existing, key)) {
-                    return false;
+                    Object value = userHeaders.get(existing);
+                    return value == null ? null : value.toString();
                 }
             }
         }
-        addRequestHeader(key, value);
-        return true;
+        return null;
     }
 
     /// ASCII-only case-insensitive comparison, so the result never depends on the device locale --

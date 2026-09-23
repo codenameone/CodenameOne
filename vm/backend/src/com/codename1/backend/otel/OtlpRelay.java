@@ -93,7 +93,10 @@ final class OtlpRelay implements HttpServer.Handler {
         }
         if(token != null) {
             String offered = request.getHeader(TOKEN_HEADER);
-            if(offered == null || !Crypto.equalsConstantTime(ascii(offered), ascii(token))) {
+            // UTF-8 on both sides, not the ASCII folding used for fixed replies:
+            // that mapped every non-ASCII character to '?', so distinct tokens
+            // compared equal: "s?cret" opened a relay whose token had an accented e.
+            if(offered == null || !Crypto.equalsConstantTime(utf8(offered), utf8(token))) {
                 return answer(401, "missing or wrong " + TOKEN_HEADER);
             }
         }
@@ -164,6 +167,10 @@ final class OtlpRelay implements HttpServer.Handler {
             headers.put("Vary", "Origin");
         }
         return headers;
+    }
+
+    private static byte[] utf8(String value) throws java.io.IOException {
+        return value.getBytes("UTF-8");
     }
 
     private static byte[] ascii(String value) {

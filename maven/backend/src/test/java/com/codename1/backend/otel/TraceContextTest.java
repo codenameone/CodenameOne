@@ -137,6 +137,17 @@ class TraceContextTest {
     }
 
     @Test
+    @DisplayName("the traces path goes on the endpoint's path, not after its query")
+    void tracesPathBeforeQuery() {
+        assertEquals("https://c.example/otlp/v1/traces?api-key=s3cret",
+                OtlpTracer.appendTracesPath("https://c.example/otlp?api-key=s3cret"));
+        assertEquals("http://localhost:4318/v1/traces",
+                OtlpTracer.appendTracesPath("http://localhost:4318/"));
+        assertEquals("http://localhost:4318/v1/traces",
+                OtlpTracer.appendTracesPath("http://localhost:4318"));
+    }
+
+    @Test
     @DisplayName("a partial success is read from either encoding")
     void partialSuccessDecoding() throws Exception {
         long[] rejected = new long[1];

@@ -244,18 +244,31 @@ class TelemetryTest extends UITestBase {
     void anAppsOwnTraceparentIsNeverReplacedAndOursDoesNotOutliveTheAttempt() throws Exception {
         Telemetry.install(new TelemetryConfig().direct("http://collector.test"));
         String mine = "00-11111111111111111111111111111111-2222222222222222-01";
-        ConnectionRequest own = request(API + "?own");
+        ConnectionRequest own = request(API + "/own");
         own.addRequestHeader("Traceparent", mine);
         NetworkManager.getInstance().addToQueueAndWait(own);
-        assertEquals(mine, connection(API + "?own").getHeaders().get("Traceparent"));
-        assertNull(connection(API + "?own").getHeaders().get("traceparent"),
+        assertEquals(mine, connection(API + "/own").getHeaders().get("Traceparent"));
+        assertNull(connection(API + "/own").getHeaders().get("traceparent"),
                 "a second spelling of the header was added beside the app's");
 
-        ConnectionRequest ours = request(API + "?ours");
+        ConnectionRequest ours = request(API + "/ours");
         NetworkManager.getInstance().addToQueueAndWait(ours);
-        assertNotNull(connection(API + "?ours").getHeaders().get("traceparent"));
+        assertNotNull(connection(API + "/ours").getHeaders().get("traceparent"));
         assertTrue(ours.addRequestHeaderIfAbsent("traceparent", "x"),
                 "the tracer's header must be taken off the request when the attempt ends");
+
+        // The app's request joins the app's trace downstream, so no span of ours
+        // may describe it in another one; ours is recorded as usual.
+        Telemetry.flush();
+        List<Span> spans = exported(1);
+        boolean sawOurs = false;
+        for (Span span : spans) {
+            String url = attribute(span.getAttributesList(), "url.full");
+            assertFalse((API + "/own").equals(url),
+                    "a span was recorded for a request that carries the app's own trace");
+            sawOurs |= (API + "/ours").equals(url);
+        }
+        assertTrue(sawOurs, "the ordinary request's span is missing: " + spans);
     }
 
     @Test
@@ -373,6 +386,55 @@ class TelemetryTest extends UITestBase {
                 new TelemetryConfig().relay("https://api.test/otel/v1/traces/").exportUrl());
         assertEquals("https://api.test/otel/v1/traces",
                 new TelemetryConfig().relay("https://api.test/").exportUrl());
+    }
+
+    @Test
+    void uninstallLeavesAReplacementTracerInPlace() {
+        Telemetry.install(new TelemetryConfig().direct("http://collector.test"));
+        com.codename1.io.NetworkTracer mine = new com.codename1.io.NetworkTracer() {
+            @Override
+            public Object requestQueued(ConnectionRequest request) {
+                return null;
+            }
+
+            @Override
+            public Object beforeRequest(ConnectionRequest request, Object parent) {
+                return null;
+            }
+
+            @Override
+            public void afterRequest(ConnectionRequest request, Object attempt, int status,
+                                     Throwable error) {
+            }
+        };
+        NetworkManager.setNetworkTracer(mine);
+        try {
+            Telemetry.uninstall();
+            assertTrue(NetworkManager.getNetworkTracer() == mine,
+                    "uninstalling telemetry switched off the app's own tracer");
+        } finally {
+            NetworkManager.setNetworkTracer(null);
+        }
+    }
+
+    @Test
+    void anExportIsShortAndBehindTheAppsOwnRequests() throws Exception {
+        TestCodenameOneImplementation impl = TestCodenameOneImplementation.getInstance();
+        impl.clearQueuedRequests();
+        Telemetry.install(new TelemetryConfig().direct("http://collector.test"));
+        NetworkManager.getInstance().addToQueueAndWait(request(API + "/timed"));
+        Telemetry.flush();
+        awaitConnection(COLLECTOR);
+        Telemetry.ExportRequest export = null;
+        for (ConnectionRequest queued : impl.getQueuedRequests()) {
+            if (queued instanceof Telemetry.ExportRequest) {
+                export = (Telemetry.ExportRequest) queued;
+            }
+        }
+        assertNotNull(export, "no export was queued");
+        assertEquals(10000, export.getTimeout());
+        assertEquals(10000, export.getReadTimeout());
+        assertEquals(ConnectionRequest.PRIORITY_LOW, export.getPriority());
     }
 
     @Test

@@ -106,7 +106,12 @@ public final class Telemetry {
         state = null;
         CURRENT.remove();
         if (old != null) {
-            NetworkManager.setNetworkTracer(null);
+            // Only if the slot still holds OURS: an app may have replaced the
+            // generated tracer with its own, and uninstalling telemetry must not
+            // silently switch that one off.
+            if (NetworkManager.getNetworkTracer() == old) { //NOPMD CompareObjectsWithEquals -- identity: is the slot still THIS installation
+                NetworkManager.setNetworkTracer(null);
+            }
             old.stop();
         }
     }
@@ -351,6 +356,13 @@ public final class Telemetry {
             // must not compete with the app's own requests for the network.
             request.setFailSilently(true);
             request.setReadResponseForErrors(false);
+            // SHORT, and behind the app's own requests. By default a request may
+            // take five minutes and the manager has one network thread, so a
+            // collector that accepts the connection and never answers would hold
+            // every request the app makes behind an export nobody is waiting for.
+            request.setTimeout(10000);
+            request.setReadTimeout(10000);
+            request.setPriority(ConnectionRequest.PRIORITY_LOW);
             NetworkManager.getInstance().addToQueue(request);
         }
 
@@ -408,6 +420,13 @@ public final class Telemetry {
                 // and exporting that one another.
                 return null;
             }
+            if (request.getRequestHeader(TRACEPARENT) != null) {
+                // The app chose which trace this request belongs to. The service it
+                // reaches joins THAT trace, so a span recorded here in another one
+                // would describe the same request twice, in two traces that never
+                // meet. The app's own instrumentation owns this request.
+                return null;
+            }
             String url = request.getUrl();
             String method = request.getHttpMethod();
             if (method == null || method.length() == 0) {
@@ -429,11 +448,11 @@ public final class Telemetry {
                 }
             }
             if (shouldPropagate(host)) {
-                // Never over a traceparent the APP set: that is a deliberate choice
-                // of which trace the request belongs to. Ours is removed again when
-                // the attempt ends (afterRequest), so a retry or a redirect starts
-                // clean -- the request object is reused, and a header left from an
-                // allowed host would otherwise follow a redirect to one that is not.
+                // The app's own traceparent was ruled out above. Ours is removed
+                // again when the attempt ends (afterRequest), so a retry or a
+                // redirect starts clean -- the request object is reused, and a
+                // header left from an allowed host would otherwise follow a redirect
+                // to one that is not.
                 request.addRequestHeaderIfAbsent(TRACEPARENT, span.getTraceparent());
             }
             return span;
