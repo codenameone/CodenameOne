@@ -82,6 +82,8 @@ class ManagedSessionDatabaseTest {
             assertEquals(11,session.find(ManagedSessionTest.Record.class,entity.id).version);
             session.beginTransaction();assertEquals(1,session.createQuery("update Record r set r.name=:name where r.id=:id").setParameter("name","updated").setParameter("id",entity.id).executeUpdate());session.commitTransaction();
             assertEquals("updated",session.find(ManagedSessionTest.Record.class,entity.id).name);
+            session.beginTransaction();assertEquals(1,session.createQuery("delete from Record r where r.id=:id").setParameter("id",entity.id).executeUpdate());session.commitTransaction();
+            assertNull(session.find(ManagedSessionTest.Record.class,entity.id));
         } finally {
             workers.shutdownNow();workers.awaitTermination(5,TimeUnit.SECONDS);
             try { session.close();db.execute((mysql?"DROP DATABASE ":"DROP SCHEMA ")+quoted+(mysql?"":" CASCADE"),new Object[0]); }

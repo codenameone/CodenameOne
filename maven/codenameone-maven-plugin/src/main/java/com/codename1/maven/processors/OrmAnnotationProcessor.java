@@ -659,7 +659,6 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
                 if(name.length()>0) claimSchemaName(schemaIndexes,name,owner,ctx);
             }
         }
-        if(tableGenerators && schemaTables.containsKey("cn1_orm_sequences")) ctx.error("cn1_orm_sequences is reserved for identifier generation");
         for(EntityClass entity:accepted.values()) for(RelationField relation:entity.relations) if(relation.many && relation.mappedBy.length()==0) {
             String owner=(entity.hierarchyRoot==null?entity.binaryName:entity.hierarchyRoot)+"."+relation.field;
             claimSchemaName(schemaTables,relation.table,owner,ctx);
@@ -674,6 +673,11 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
                 if(relation.orderColumn.length()>0) physical.add(relation.orderColumn);
             }
             for(String column:physical) if(column.length()==0 || !columns.add(column.toLowerCase(java.util.Locale.ROOT)) || backend && tooLongForAnEngine(column)) ctx.error("Invalid or duplicate collection column: "+owner+"."+column);
+        }
+        if(tableGenerators && schemaTables.containsKey("cn1_orm_sequences")) ctx.error("cn1_orm_sequences is reserved for identifier generation");
+        for(String name:schemaIndexes.keySet()) {
+            if(schemaTables.containsKey(name) || tableGenerators && "cn1_orm_sequences".equals(name))
+                ctx.error("Index name conflicts with table: "+name);
         }
         if (ctx.hasErrors()) return;
         if (accepted.isEmpty()) {
@@ -844,6 +848,11 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
         if(orderColumn!=null && (!"Ljava/util/List;".equals(field.getDescriptor()) || relation.mappedBy.length()>0)) ctx.error("OrderColumn requires an owning List with a join table: "+relation.field);
         if(orderColumn!=null && orderBy!=null) ctx.error("Choose OrderBy or OrderColumn: "+relation.field);
         if(!relation.many && (mapKey!=null || orderColumn!=null || orderBy!=null)) ctx.error("Collection metadata requires a to-many relationship");
+        // Owning lists need an occurrence key even without explicit ordering;
+        // an owner/target primary key cannot store repeated links.
+        if(relation.many && !relation.element && relation.mappedBy.length()==0
+                && "Ljava/util/List;".equals(field.getDescriptor()) && relation.orderColumn.length()==0)
+            relation.orderColumn="list_position";
         relation.orphan=annotation.getBoolOrDefault("orphanRemoval",false);
         if(("ManyToMany".equals(kind) || "ManyToOne".equals(kind)) && relation.orphan)
             ctx.error("orphanRemoval requires OneToOne or OneToMany: "+owner.binaryName+"."+relation.field);
@@ -958,13 +967,26 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
                 member.discriminatorValue=tag==null?member.simpleName:tag.getStringOrDefault("value",member.simpleName);
                 if(!member.discriminatorValue.matches("[A-Za-z0-9_$]{1,63}") || !values.add(member.discriminatorValue)) ctx.error("Invalid or duplicate discriminator: "+member.discriminatorValue);
                 for(PersistedField field:member.fields) {
+                    if(member!=root && (field.isId || field.version)) {
+                        boolean inherited=false;
+                        for(PersistedField rootField:root.fields) {
+                            if(rootField.fieldName.equals(field.fieldName) && rootField.declaringType.equals(field.declaringType)
+                                    && rootField.isId==field.isId && rootField.version==field.version) inherited=true;
+                        }
+                        if(!inherited) ctx.error("Identifier and version fields must be declared on or inherited by the hierarchy root: "+field.declaringType+"."+field.fieldName);
+                    }
                     PersistedField prior=fields.get(field.fieldName);
                     if(prior==null) {
                         if(member!=root && !field.isId && !field.version) field.nullable=true;
                         fields.put(field.fieldName,field);
                     } else if(!prior.declaringType.equals(field.declaringType)) ctx.error("Hidden inherited persistent field: "+member.binaryName+"."+field.fieldName);
                 }
-                for(RelationField relation:member.relations) if(!relations.containsKey(relation.field)) relations.put(relation.field,relation);
+                for(RelationField relation:member.relations) {
+                    RelationField prior=relations.get(relation.field);
+                    if(prior==null) relations.put(relation.field,relation);
+                    else if(!prior.declaringType.equals(relation.declaringType))
+                        ctx.error("Conflicting inherited relationship: "+prior.declaringType+"."+relation.field+" and "+relation.declaringType+"."+relation.field);
+                }
             }
             PersistedField tag=new PersistedField();tag.fieldName="__cn1_discriminator";tag.columnName=discriminator;
             tag.kind=PropertyTypeKind.scalar("java.lang.String");tag.dialectKind=KIND_TEXT;tag.sqlType="TEXT";tag.discriminator=true;

@@ -122,6 +122,26 @@ class ManagedSessionTest {
         } finally { em.close(); }
     }
 
+    @Test void bulkDeleteUsesPortableAliasSyntaxForEachDialect() throws Exception {
+        for(com.codename1.backend.sql.Dialect dialect:new com.codename1.backend.sql.Dialect[]{com.codename1.backend.sql.Dialect.SQLITE,com.codename1.backend.sql.Dialect.POSTGRES,com.codename1.backend.sql.Dialect.MYSQL,com.codename1.backend.sql.Dialect.MARIADB}) {
+            java.util.List<String> statements=new java.util.ArrayList<String>();
+            com.codename1.impl.orm.SqlAccess access=(com.codename1.impl.orm.SqlAccess)java.lang.reflect.Proxy.newProxyInstance(getClass().getClassLoader(),new Class[]{com.codename1.impl.orm.SqlAccess.class},(proxy,method,args)-> {
+                if(method.getName().equals("dialect")) return dialect.getName();
+                if(method.getName().equals("quote")) return dialect.quote((String)args[0]);
+                if(method.getName().equals("execute")) { statements.add((String)args[0]);assertArrayEquals(new Object[]{"delete me"},(Object[])args[1]);return 1; }
+                if(method.getName().equals("begin") || method.getName().equals("commit") || method.getName().equals("close")) return null;
+                throw new AssertionError(method.getName());
+            });
+            java.util.Map<String,EntityModel<?>> models=new java.util.LinkedHashMap<String,EntityModel<?>>();models.put(Record.class.getName(),new Model());
+            Session s=new com.codename1.impl.orm.SessionImpl(access,models);
+            try {
+                s.beginTransaction();assertEquals(1,s.createQuery("delete from Record r where r.name = :name").setParameter("name","delete me").executeUpdate());s.commitTransaction();
+                String prefix="mysql".equals(dialect.getName())?"DELETE q0 FROM ":"DELETE FROM ";
+                assertEquals(prefix+dialect.quote("managed_record")+" AS q0 WHERE (q0."+dialect.quote("name")+" = ?)",statements.get(0));
+            } finally { s.close(); }
+        }
+    }
+
     @Test void counterOverflowAndCrossSessionTransactionReadsAreRejected() throws Exception {
         EntityManager em=manager();
         try {

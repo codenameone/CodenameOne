@@ -297,7 +297,7 @@ public final class JpqlQueryImpl<T> implements com.codename1.orm.session.JpqlQue
                 if (filter.length() > 0) {
                     where = where.length() == 0 ? " WHERE " + filter : where + " AND " + filter;
                 }
-                plan.sql = "DELETE FROM " + session.q(root.model.table()) + " AS " + root.rootAlias + where;
+                plan.sql = session.deleteFrom(root.model.table(), root.rootAlias) + where;
                 refuseImplicitBulkJoins();
                 return plan;
             }
@@ -511,6 +511,8 @@ public final class JpqlQueryImpl<T> implements com.codename1.orm.session.JpqlQue
                 Expr low = add();
                 expect("AND");
                 Expr high = add();
+                bindType(left, low);
+                bindType(left, high);
                 return new Expr(left.sql + (not ? " NOT BETWEEN " : " BETWEEN ") + low.sql + " AND " + high.sql,
                         Attribute.BOOLEAN);
             }

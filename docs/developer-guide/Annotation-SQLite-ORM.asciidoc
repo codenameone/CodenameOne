@@ -204,10 +204,11 @@ discriminator values when class names may change.
 
 ==== Lists, maps, and owned values
 
-`@OrderColumn` on an owning List stores its positions in the join table, so
-reordering survives reload. Many-to-many lists may contain repeated links.
-`@OrderBy("name ASC, id DESC")` instead orders an entity collection by target
-fields at load time. An inverse `mappedBy` collection can use `@OrderBy`.
+Owning Lists store positions in a `list_position` join-table column by default,
+so repeated many-to-many links and reordering survive reload. `@OrderColumn`
+can name that column explicitly. `@OrderBy("name ASC, id DESC")` orders an
+entity collection by target fields at load time; the position column still
+keeps repeated links distinct. An inverse `mappedBy` collection can use `@OrderBy`.
 
 For an entity map, `@MapKey(name="code")` derives keys from a basic field on the
 target entity. Keys must be non-null and unique in that collection. When changing

@@ -145,7 +145,7 @@ public class OrmAnnotationProcessorTest {
     public void orderedListsAndEntityMapsRoundTripWithoutLosingDuplicateLinks() throws Exception {
         File classes=tmp.newFolder("collections");Map<String,String> sources=new java.util.LinkedHashMap<String,String>();
         sources.put("collections.Thing","package collections; import com.codename1.annotations.*; import com.codename1.annotations.db.*; @Entity(table=\"collection_things\") public class Thing { @Id public long id; public String label; }");
-        sources.put("collections.Box","package collections; import com.codename1.annotations.*; import com.codename1.annotations.db.*; @Entity(table=\"collection_boxes\") public class Box { @Id public long id; @Version public long version; @ManyToMany(cascade=CascadeType.PERSIST) @OrderColumn public java.util.List<Thing> sequence=new java.util.ArrayList<Thing>(); @OneToMany(cascade=CascadeType.PERSIST) @MapKey(name=\"label\") public java.util.Map<String,Thing> named=new java.util.LinkedHashMap<String,Thing>(); }");
+        sources.put("collections.Box","package collections; import com.codename1.annotations.*; import com.codename1.annotations.db.*; @Entity(table=\"collection_boxes\") public class Box { @Id public long id; @Version public long version; @ManyToMany(cascade=CascadeType.PERSIST) @OrderColumn public java.util.List<Thing> sequence=new java.util.ArrayList<Thing>(); @ManyToMany(cascade=CascadeType.PERSIST) public java.util.List<Thing> bag=new java.util.ArrayList<Thing>(); @ManyToMany(cascade=CascadeType.PERSIST) @OrderBy(\"label DESC\") public java.util.List<Thing> sorted=new java.util.ArrayList<Thing>(); @OneToMany(cascade=CascadeType.PERSIST) @MapKey(name=\"label\") public java.util.Map<String,Thing> named=new java.util.LinkedHashMap<String,Thing>(); }");
         sources.put("collections.Reader","package collections; public class Reader { public static java.util.List<Thing> sequence(Box b) { return b.sequence; } public static java.util.Map<String,Thing> named(Box b) { return b.named; } }");
         JavaSourceCompiler.compile(sources,classes,Arrays.asList(testClassesDir()));
         ProcessorContext client=runProcessor(classes);assertFalse(client.getErrors().toString(),client.hasErrors());
@@ -156,11 +156,17 @@ public class OrmAnnotationProcessorTest {
         try {
             s.createTables();s.beginTransaction();Object box=boxType.newInstance(),a=thingType.newInstance(),b=thingType.newInstance();thingType.getField("label").set(a,"a");thingType.getField("label").set(b,"b");
             List sequence=(List)boxType.getField("sequence").get(box);sequence.add(a);sequence.add(b);sequence.add(a);Map named=(Map)boxType.getField("named").get(box);named.put("a",a);named.put("b",b);
+            ((List)boxType.getField("bag").get(box)).addAll(Arrays.asList(a,b,a));((List)boxType.getField("sorted").get(box)).addAll(Arrays.asList(a,b,a));
             s.persist(box);s.commitTransaction();Object id=boxType.getField("id").get(box);s.clear();box=s.find(boxType,id);
             assertFalse(s.isLoaded(box,"sequence"));sequence=(List)reader.getMethod("sequence",boxType).invoke(null,box);org.junit.Assert.assertSame(sequence.get(0),sequence.get(2));
             named=(Map)reader.getMethod("named",boxType).invoke(null,box);org.junit.Assert.assertSame(sequence.get(0),named.get("a"));org.junit.Assert.assertSame(sequence.get(1),named.get("b"));
             s.beginTransaction();Object first=sequence.remove(0);sequence.add(first);s.commitTransaction();s.clear();box=s.find(boxType,id);
             sequence=(List)reader.getMethod("sequence",boxType).invoke(null,box);org.junit.Assert.assertEquals("b",thingType.getField("label").get(sequence.get(0)));org.junit.Assert.assertSame(sequence.get(1),sequence.get(2));
+            s.initialize(box,"bag");s.initialize(box,"sorted");List bag=(List)boxType.getField("bag").get(box),sorted=(List)boxType.getField("sorted").get(box);
+            org.junit.Assert.assertEquals(3,bag.size());org.junit.Assert.assertSame(bag.get(0),bag.get(2));
+            org.junit.Assert.assertEquals("b",thingType.getField("label").get(sorted.get(0)));org.junit.Assert.assertSame(sorted.get(1),sorted.get(2));
+            s.beginTransaction();bag.remove(0);bag.add(bag.get(0));bag.add(bag.get(1));s.commitTransaction();s.clear();box=s.find(boxType,id);s.initialize(box,"bag");
+            bag=(List)boxType.getField("bag").get(box);org.junit.Assert.assertEquals(4,bag.size());org.junit.Assert.assertSame(bag.get(0),bag.get(2));org.junit.Assert.assertSame(bag.get(1),bag.get(3));
             org.junit.Assert.assertEquals(3,s.count(box,"sequence"));s.beginTransaction();s.remove(box);s.commitTransaction();org.junit.Assert.assertEquals(2,s.query(thingType).count());
         } finally { s.close();em.close();loader.close(); }
     }
@@ -218,6 +224,10 @@ public class OrmAnnotationProcessorTest {
             org.junit.Assert.assertEquals("ABC",codeType.getField("value").get(type.getField("code").get(loaded)));
             s.beginTransaction();codeType.getField("value").set(type.getField("code").get(loaded),"DEF");s.commitTransaction();s.clear();
             org.junit.Assert.assertEquals("DEF",codeType.getField("value").get(type.getField("code").get(s.find(type,id))));
+            Object low=codeType.getConstructor(String.class).newInstance("D"),high=codeType.getConstructor(String.class).newInstance("Z");
+            org.junit.Assert.assertSame(s.find(type,id),s.createQuery("select e from converted.Entry e where e.code between :low and :high",type).setParameter("low",low).setParameter("high",high).first());
+            org.junit.Assert.assertNull(s.createQuery("select e from converted.Entry e where e.code not between :low and :high",type).setParameter("low",low).setParameter("high",high).first());
+            org.junit.Assert.assertNull(s.createQuery("select e from converted.Entry e where e.code between :low and :high",type).setParameter("low",codeType.getConstructor(String.class).newInstance("X")).setParameter("high",high).first());
             s.beginTransaction();Object replacement=codeType.getConstructor(String.class).newInstance("BULK");
             org.junit.Assert.assertEquals(1,s.createQuery("update converted.Entry e set e.code = :code where e.id = :id").setParameter("code",replacement).setParameter("id",id).executeUpdate());s.commitTransaction();
             org.junit.Assert.assertEquals("BULK",codeType.getField("value").get(type.getField("code").get(s.find(type,id))));
@@ -445,6 +455,69 @@ public class OrmAnnotationProcessorTest {
                 s.beginTransaction();Object b=type.newInstance();type.getField("code").set(b,"same");s.persist(b);
                 try { s.commitTransaction();fail("Derived unique index must reject duplicate values"); } catch(com.codename1.orm.session.PersistenceException expected) { s.rollbackTransaction(); }
             } finally { s.close();em.close(); }
+        }
+    }
+
+
+    private void rejectsMappingForBothRuntimes(Map<String,String> sources,String message) throws Exception {
+        for(boolean backend:new boolean[]{false,true}) {
+            File classes=tmp.newFolder();JavaSourceCompiler.compile(sources,classes,Arrays.asList(testClassesDir()));
+            ProcessorContext ctx=backend?runProcessor(classes,backendClasspath()):runProcessor(classes);
+            assertTrue(ctx.getErrors().toString(),ctx.hasErrors());
+            assertTrue(ctx.getErrors().toString(),ctx.getErrors().toString().contains(message));
+        }
+    }
+
+    @Test
+    public void generatorTableNameIsReservedForJoinAndElementTables() throws Exception {
+        for(String collection:Arrays.asList("@ElementCollection public java.util.List<String> values=new java.util.ArrayList<String>();", "@ManyToMany public java.util.List<Target> values=new java.util.ArrayList<Target>();")) {
+            Map<String,String> sources=new java.util.LinkedHashMap<String,String>();
+            sources.put("reserved.Owner","package reserved; import com.codename1.annotations.*; import com.codename1.annotations.db.*; @Entity public class Owner { @Id @GeneratedValue(strategy=GenerationType.TABLE) public long id; @JoinTable(name=\"CN1_ORM_SEQUENCES\") "+collection+" }");
+            sources.put("reserved.Target","package reserved; import com.codename1.annotations.*; @Entity public class Target { @Id public long id; }");
+            rejectsMappingForBothRuntimes(sources,"cn1_orm_sequences is reserved");
+        }
+    }
+
+    @Test
+    public void siblingRelationshipDeclarationsCannotHideEachOther() throws Exception {
+        Map<String,String> sources=new java.util.LinkedHashMap<String,String>();
+        sources.put("siblings.Root","package siblings; import com.codename1.annotations.*; import com.codename1.annotations.db.*; @Entity @Inheritance public abstract class Root { @Id public long id; }");
+        sources.put("siblings.Target","package siblings; import com.codename1.annotations.*; @Entity public class Target { @Id public long id; }");
+        for(String child:Arrays.asList("First","Second")) sources.put("siblings."+child,"package siblings; import com.codename1.annotations.*; import com.codename1.annotations.db.*; @Entity public class "+child+" extends Root { @ManyToMany public java.util.List<Target> links=new java.util.ArrayList<Target>(); }");
+        rejectsMappingForBothRuntimes(sources,"Conflicting inherited relationship");
+    }
+
+    @Test
+    public void hierarchyIdentifiersAndVersionsMustBeInheritedFromRoot() throws Exception {
+        for(String field:Arrays.asList("@Id(autoIncrement=false) public long extraId;","@Version public long version;")) {
+            Map<String,String> sources=new java.util.LinkedHashMap<String,String>();
+            sources.put("rootkeys.Root","package rootkeys; import com.codename1.annotations.*; import com.codename1.annotations.db.*; @Entity @Inheritance public abstract class Root { @Id(autoIncrement=false) public long id; }");
+            sources.put("rootkeys.First","package rootkeys; import com.codename1.annotations.*; import com.codename1.annotations.db.*; @Entity public class First extends Root { "+field+" }");
+            sources.put("rootkeys.Second","package rootkeys; import com.codename1.annotations.*; @Entity public class Second extends Root { }");
+            rejectsMappingForBothRuntimes(sources,"must be declared on or inherited by the hierarchy root");
+        }
+    }
+
+    @Test
+    public void hierarchyRootMayInheritKeysAndRelationshipsFromMappedSuperclass() throws Exception {
+        Map<String,String> sources=new java.util.LinkedHashMap<String,String>();
+        sources.put("rootbase.Base","package rootbase; import com.codename1.annotations.*; import com.codename1.annotations.db.*; @MappedSuperclass public class Base { @Id public long id; @Version public long version; @ManyToMany public java.util.List<Target> links=new java.util.ArrayList<Target>(); }");
+        sources.put("rootbase.Root","package rootbase; import com.codename1.annotations.*; import com.codename1.annotations.db.*; @Entity @Inheritance public abstract class Root extends Base { }");
+        sources.put("rootbase.Target","package rootbase; import com.codename1.annotations.*; @Entity public class Target { @Id public long id; }");
+        for(String child:Arrays.asList("First","Second")) sources.put("rootbase."+child,"package rootbase; import com.codename1.annotations.*; @Entity public class "+child+" extends Root { }");
+        for(boolean backend:new boolean[]{false,true}) {
+            File classes=tmp.newFolder();JavaSourceCompiler.compile(sources,classes,Arrays.asList(testClassesDir()));
+            ProcessorContext ctx=backend?runProcessor(classes,backendClasspath()):runProcessor(classes);assertFalse(ctx.getErrors().toString(),ctx.hasErrors());
+        }
+    }
+
+    @Test
+    public void explicitIndexesCannotShareEntityCollectionOrGeneratorTableNames() throws Exception {
+        for(String index:Arrays.asList("OWNERS","targets","owner_links","cn1_orm_sequences")) {
+            Map<String,String> sources=new java.util.LinkedHashMap<String,String>();
+            sources.put("collision.Owner","package collision; import com.codename1.annotations.*; import com.codename1.annotations.db.*; @Entity(table=\"owners\",indexes=@Index(name=\""+index+"\",fields=\"value\")) public class Owner { @Id @GeneratedValue(strategy=GenerationType.TABLE) public long id; public String value; @ManyToMany @JoinTable(name=\"owner_links\") public java.util.List<Target> links=new java.util.ArrayList<Target>(); }");
+            sources.put("collision.Target","package collision; import com.codename1.annotations.*; @Entity(table=\"targets\") public class Target { @Id public long id; }");
+            rejectsMappingForBothRuntimes(sources,"Index name conflicts with table");
         }
     }
 

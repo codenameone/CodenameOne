@@ -50,6 +50,11 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
     private int loading;
     private int deferredFetch;
     private int aliasSequence;
+    String deleteFrom(String table, String alias) {
+        // MariaDB before 11.6 needs the target alias before FROM.
+        String prefix = "mysql".equals(sql.dialect()) ? "DELETE " + alias + " FROM " : "DELETE FROM ";
+        return prefix + q(table) + " AS " + alias;
+    }
     String nextAlias() {
         return "q" + (aliasSequence++);
     }
@@ -1267,9 +1272,7 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
                 .append(" l ON ");
         statement.append(joinEquality(keyColumns(target), "t", targetColumns, "l"));
         statement.append(" WHERE ").append(matches(ownerColumns, "l"));
-        if (relation.orderColumn.length() > 0) {
-            statement.append(" ORDER BY l.").append(q(relation.orderColumn));
-        } else if (relation.orderBy.length() > 0) {
+        if (relation.orderBy.length() > 0) {
             statement.append(" ORDER BY ");
             boolean first = true;
             for (String clause : split(relation.orderBy, ',')) {
@@ -1282,6 +1285,8 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
                         .append(q(target.attributes()[target.index(parts[0])].column))
                         .append(parts.length > 1 && "DESC".equalsIgnoreCase(parts[1]) ? " DESC" : " ASC");
             }
+        } else if (relation.orderColumn.length() > 0) {
+            statement.append(" ORDER BY l.").append(q(relation.orderColumn));
         }
         return hydrateAll(
                 target, read(statement.toString(), owner.keyValues(id), kinds(target)), new ArrayList<String>());

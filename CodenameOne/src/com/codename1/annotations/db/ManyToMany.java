@@ -24,6 +24,8 @@ package com.codename1.annotations.db;
 
 import java.lang.annotation.*;
 /// Maps entity collection membership through a join table or an inverse mappedBy field.
+/// Owning Lists store occurrences in a list_position column by default, allowing
+/// repeated links. OrderColumn can override its name; OrderBy controls load order.
 @Retention(RetentionPolicy.CLASS)
 @Target(ElementType.FIELD)
 public @interface ManyToMany {
