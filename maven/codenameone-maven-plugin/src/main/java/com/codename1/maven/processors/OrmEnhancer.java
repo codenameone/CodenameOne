@@ -26,6 +26,8 @@ import com.codename1.maven.annotations.ProcessorContext;
 import org.objectweb.asm.*;
 import java.io.*;
 import java.nio.file.Files;
+import java.nio.file.LinkOption;
+import java.nio.file.Path;
 import java.util.*;
 import java.util.zip.*;
 
@@ -37,19 +39,19 @@ final class OrmEnhancer {
     private static final String MANIFEST="META-INF/cn1/orm-enhanced-dependencies.list";
     private OrmEnhancer() {}
     static Set<String> prepare(ProcessorContext ctx) throws IOException {
-        File manifest=new File(ctx.getOutputClassDir(),MANIFEST);
+        Path manifest=outputPath(ctx.getOutputClassDir(),MANIFEST);
         Set<String> removed=new HashSet<String>();
-        if(!manifest.isFile()) return removed;
-        for(Map.Entry<String,String> entry:readManifest(manifest).entrySet()) {
-            String name=entry.getKey();File output=new File(ctx.getOutputClassDir(),name);
+        if(!Files.isRegularFile(manifest)) return removed;
+        for(Map.Entry<String,String> entry:readManifest(manifest.toFile()).entrySet()) {
+            String name=entry.getKey();Path output=outputPath(ctx.getOutputClassDir(),name);
             // A compiler may have replaced an old dependency overlay with an app class.
             // Only remove the exact bytes this enhancer previously copied.
-            if(output.isFile() && digest(Files.readAllBytes(output.toPath())).equals(entry.getValue())) {
-                Files.delete(output.toPath());
+            if(Files.isRegularFile(output) && digest(Files.readAllBytes(output)).equals(entry.getValue())) {
+                Files.delete(output);
                 removed.add(name.substring(0,name.length()-6).replace('/','.'));
             }
         }
-        Files.delete(manifest.toPath());return removed;
+        Files.delete(manifest);return removed;
     }
     static void enhance(Map<String,OrmAnnotationProcessor.EntityClass> entities,ProcessorContext ctx) throws IOException {
         final Map<String,OrmAnnotationProcessor.EntityClass> owners=new HashMap<String,OrmAnnotationProcessor.EntityClass>();
@@ -68,11 +70,11 @@ final class OrmEnhancer {
             if(!found) owner.relations.add(relation);
         }
         if(owners.isEmpty()) return;
+        Path manifest=outputPath(ctx.getOutputClassDir(),MANIFEST);
         Map<String,byte[]> classes=new LinkedHashMap<String,byte[]>();
         collect(ctx.getOutputClassDir(),ctx.getOutputClassDir(),classes);
         Set<String> own=new HashSet<String>(classes.keySet()),copied=new TreeSet<String>();
-        File manifest=new File(ctx.getOutputClassDir(),MANIFEST);
-        if(manifest.isFile()) copied.addAll(readManifest(manifest).keySet());
+        if(Files.isRegularFile(manifest)) copied.addAll(readManifest(manifest.toFile()).keySet());
         own.removeAll(copied);
         for(String path:ctx.getCompileClasspath()) {
             File file=new File(path);
@@ -95,15 +97,39 @@ final class OrmEnhancer {
             if(!actual.equals(entry.getKey()) || actual.contains("..") || actual.startsWith("/")) throw new IOException("Invalid class entry: "+entry.getKey());
             byte[] result=transform(entry.getValue(),owners);
             if(result!=null) {
-                File output=new File(ctx.getOutputClassDir(),entry.getKey());
-                Files.createDirectories(output.toPath().getParent());Files.write(output.toPath(),result);
+                Path output=outputPath(ctx.getOutputClassDir(),entry.getKey());
+                Files.createDirectories(output.getParent());Files.write(output,result);
                 if(!own.contains(entry.getKey())) copied.add(entry.getKey());
             }
         }
-        Files.createDirectories(manifest.toPath().getParent());
+        Files.createDirectories(manifest.getParent());
         List<String> records=new ArrayList<String>();
-        for(String name:copied) records.add(name+"\t"+digest(Files.readAllBytes(new File(ctx.getOutputClassDir(),name).toPath())));
-        Files.write(manifest.toPath(),records,java.nio.charset.StandardCharsets.UTF_8);
+        for(String name:copied) records.add(name+"\t"+digest(Files.readAllBytes(outputPath(ctx.getOutputClassDir(),name))));
+        Files.write(manifest,records,java.nio.charset.StandardCharsets.UTF_8);
+    }
+    private static Path outputPath(File directory,String name) throws IOException {
+        // Reject non-portable archive paths even when building on a different OS.
+        if(name.length()==0 || name.contains("..") || name.startsWith("/")
+                || name.indexOf('\\')>=0 || name.indexOf(':')>=0) {
+            throw new IOException("Invalid ORM enhancement path: "+name);
+        }
+        // Canonicalization also resolves existing symlinks. Use Path.startsWith,
+        // not a string prefix, so a sibling such as classes-escape is excluded.
+        Path root=realPath(directory.toPath());
+        Path output=realPath(root.resolve(name));
+        if(!output.startsWith(root) || output.equals(root)) {
+            throw new IOException("ORM enhancement path escapes output directory: "+name);
+        }
+        return output;
+    }
+    private static Path realPath(Path path) throws IOException {
+        Path absolute=path.toAbsolutePath().normalize();
+        Path existing=absolute;
+        // Output files and their parent directories may not exist yet. Resolve
+        // the nearest existing ancestor, including any symlinks, then append
+        // the missing suffix. NIO avoids File's stale canonical-path cache.
+        while(!Files.exists(existing,LinkOption.NOFOLLOW_LINKS)) existing=existing.getParent();
+        return existing.toRealPath().resolve(existing.relativize(absolute)).normalize();
     }
     private static Map<String,String> readManifest(File manifest) throws IOException {
         Map<String,String> entries=new LinkedHashMap<String,String>();
