@@ -3931,6 +3931,7 @@ void com_codename1_impl_ios_IOSNative_listFilesInDir___java_lang_String_java_lan
     for(int iter = 0 ; iter < count ; iter++) {
         NSString* currentString = [nsArr objectAtIndex:iter];
         JAVA_OBJECT str = fromNSString(CN1_THREAD_STATE_PASS_ARG currentString);
+        CN1_WRITE_BARRIER(files, str);  // files is the caller's array and may be old
         data[iter] = str;
     }
 #ifndef CN1_USE_ARC
@@ -8388,7 +8389,9 @@ void com_codename1_impl_ios_IOSNative_wifiDisconnect___java_lang_String(CN1_THRE
         JAVA_ARRAY_OBJECT *vArr = (JAVA_ARRAY_OBJECT*) CN1_ARRAY_DATA((JAVA_ARRAY)vals);
         int i = 0;
         for (NSString *k in txt.allKeys) {
-            kArr[i] = fromNSString(CN1_THREAD_GET_STATE_PASS_ARG k);
+            { JAVA_OBJECT cn1__k = fromNSString(CN1_THREAD_GET_STATE_PASS_ARG k);
+              CN1_WRITE_BARRIER(keys, cn1__k);  // each fromNSString is a safepoint
+              kArr[i] = cn1__k; }
             id v = [txt objectForKey:k];
             NSString *s = nil;
             if ([v isKindOfClass:[NSData class]]) {
@@ -8397,7 +8400,9 @@ void com_codename1_impl_ios_IOSNative_wifiDisconnect___java_lang_String(CN1_THRE
             } else if ([v isKindOfClass:[NSString class]]) {
                 s = (NSString*) v;
             }
-            vArr[i] = fromNSString(CN1_THREAD_GET_STATE_PASS_ARG (s == nil ? @"" : s));
+            { JAVA_OBJECT cn1__v = fromNSString(CN1_THREAD_GET_STATE_PASS_ARG (s == nil ? @"" : s));
+              CN1_WRITE_BARRIER(vals, cn1__v);
+              vArr[i] = cn1__v; }
             i++;
         }
     }
@@ -10610,8 +10615,10 @@ void com_codename1_impl_ios_IOSNative_updatePickedContact___int_com_codename1_co
             int pos = 0;
             for (CNLabeledValue<NSString*>* entry in urls) {
                 NSString* url = (NSString*)entry.value;
-                entries[pos++] = fromNSString(CN1_THREAD_STATE_PASS_ARG
+                JAVA_OBJECT cn1__u = fromNSString(CN1_THREAD_STATE_PASS_ARG
                         (url == nil ? @"" : url));
+                CN1_WRITE_BARRIER(array, cn1__u);  // each fromNSString is a safepoint
+                entries[pos++] = cn1__u;
             }
             com_codename1_contacts_Contact_setUrls___java_lang_String_1ARRAY(
                     CN1_THREAD_STATE_PASS_ARG cnt, array);

@@ -1576,16 +1576,48 @@ struct TryBlock {
 #ifdef CN1_SATB_LOG_FRESH
 #define CN1_SATB_FRESH_INLINE(o) 0
 #else
-#define CN1_SATB_FRESH_INLINE(o) (__atomic_load_n(&(o)->__codenameOneGcMark, __ATOMIC_RELAXED) == -1)
+// The filter is only sound while the sweep grants EVERY fresh object a cycle of grace.
+// Single-core mode (see cn1GcSingleCore in cn1_globals.m) reclaims fresh objects that
+// were allocated before the cycle began, so there a fresh reference is logged like any
+// other; cn1GcFreshFilter is set once, at the first collection, and never changes.
+extern JAVA_BOOLEAN cn1GcFreshFilter;
+#define CN1_SATB_FRESH_INLINE(o) (cn1GcFreshFilter && __atomic_load_n(&(o)->__codenameOneGcMark, __ATOMIC_RELAXED) == -1)
 #endif
 #if defined(CN1_DISABLE_SATB)
 #define CN1_WRITE_BARRIER(target, value) do { } while(0)
 #else
+// Two halves share the gate. The SATB half runs only while a mark is in progress. The
+// GENERATIONAL half (single-core mode only, see cn1GcSingleCore) runs always: a young
+// (mark == -1) value stored into an OLD object records that object in the remembered
+// set, which is what lets a minor cycle skip tracing the old generation.
+extern volatile int cn1GcGenBarrier;
+extern void cn1GcRememberSlow(JAVA_OBJECT target);
+// A native reference block (NativeStorage) is remembered itself, not through an object.
+extern void cn1GcRememberBlock(JAVA_LONG block);
+#define CN1_GEN_REMEMBER_BLOCK(block, v) \
+    do { JAVA_OBJECT cn1__bv = (JAVA_OBJECT)(v); \
+         if(__builtin_expect(cn1GcGenBarrier, 0) && cn1__bv != JAVA_NULL && !CN1_IS_TAGGED(cn1__bv) \
+            && __atomic_load_n(&cn1__bv->__codenameOneGcMark, __ATOMIC_RELAXED) == -1) \
+             cn1GcRememberBlock(block); } while(0)
+#define CN1_GEN_REMEMBER(target, v) \
+    do { JAVA_OBJECT cn1__gt = (JAVA_OBJECT)(target); \
+         if(cn1__gt != JAVA_NULL \
+            && __atomic_load_n(&(v)->__codenameOneGcMark, __ATOMIC_RELAXED) == -1 \
+            && __atomic_load_n(&cn1__gt->__codenameOneGcMark, __ATOMIC_RELAXED) > 0) \
+             cn1GcRememberSlow(cn1__gt); } while(0)
+#ifdef CN1_GC_GEN_CHECK2
+extern void cn1GcGenNoteStore(JAVA_OBJECT target, JAVA_OBJECT value);
+#define CN1_GEN_NOTE(t, v) cn1GcGenNoteStore((JAVA_OBJECT)(t), (v))
+#else
+#define CN1_GEN_NOTE(t, v) ((void)0)
+#endif
 #define CN1_WRITE_BARRIER(target, value) \
-    do { if(__builtin_expect(gcSatbActive, 0)) { \
+    do { if(__builtin_expect(gcSatbActive | cn1GcGenBarrier, 0)) { \
              JAVA_OBJECT cn1__nv = (JAVA_OBJECT)(value); \
-             if(cn1__nv != JAVA_NULL && !CN1_IS_TAGGED(cn1__nv) && !CN1_SATB_FRESH_INLINE(cn1__nv)) \
-                 cn1SatbEnqueue(cn1__nv); } } while(0)
+             if(cn1__nv != JAVA_NULL && !CN1_IS_TAGGED(cn1__nv)) { \
+                 if(gcSatbActive && !CN1_SATB_FRESH_INLINE(cn1__nv)) cn1SatbEnqueue(cn1__nv); \
+                 CN1_GEN_NOTE(target, cn1__nv); \
+                 if(cn1GcGenBarrier) CN1_GEN_REMEMBER(target, cn1__nv); } } } while(0)
 #endif
 
 // ---- Snapshot-at-the-beginning (Yuasa) DELETION write barrier ---------------
@@ -2261,6 +2293,17 @@ typedef struct CN1BibopPage {
     void* freeList;                       // intrusive free-list head (slot ptr)
     int freeCount;
     JAVA_BOOLEAN owned;
+    // COLLECTOR-ONLY. Set on a page retired BEFORE the running cycle began, when that
+    // cycle is a single-core stop-the-world one: its fresh slots predate every root
+    // scan, so an unmarked one is garbage and gets no grace. Cleared by the sweep.
+    JAVA_BOOLEAN gcPreCycle;
+    // REMEMBERED SET, single-core generational mode: one bit per 1KB card of this page,
+    // set by the barrier when a young reference is stored into an old object starting in
+    // that card. gcRsetQueued says the page is on the dirty-page array; it is the ONLY
+    // record of membership, so reformatting a page (which clears the cards) cannot drop
+    // other pages' records the way an intrusive link reset did.
+    _Atomic uint64_t gcRsetCards;
+    _Atomic int gcRsetQueued;
     // ---- O(live-pages) sweep bookkeeping (perf-tier1, gated by CN1_BIBOP_NO_FASTSWEEP)
     // These let cn1BibopSweep reclaim an all-dead page or skip an all-live (in-grace)
     // page in O(1) -- without the per-slot walk -- whenever it can PROVE the page is

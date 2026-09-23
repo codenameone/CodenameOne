@@ -1007,7 +1007,9 @@ JAVA_OBJECT com_codename1_impl_windows_WindowsNative_clipboardGetFiles___R_java_
             path[0] = 0;
             /* the HDROP is owned by the clipboard: query only, no DragFinish */
             if (DragQueryFileW(drop, i, path, MAX_PATH) > 0) {
-                elements[i] = cn1WinWideToJavaString(threadStateData, path);
+                JAVA_OBJECT cn1__s = cn1WinWideToJavaString(threadStateData, path);
+                CN1_WRITE_BARRIER(arr, cn1__s);  /* each allocation is a safepoint: arr may be old */
+                elements[i] = cn1__s;
             }
         }
     }

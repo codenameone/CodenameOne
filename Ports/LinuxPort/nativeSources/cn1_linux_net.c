@@ -278,7 +278,9 @@ JAVA_OBJECT com_codename1_impl_linux_LinuxNative_httpHeaderFieldNames___long_R_j
     if (arr != JAVA_NULL) {
         elements = (JAVA_OBJECT*) (*(JAVA_ARRAY) arr).data;
         for (i = 0; i < c->respHeaderCount; i++) {
-            elements[i] = newStringFromCString(threadStateData, c->respHeaders[i].key);
+            JAVA_OBJECT cn1__s = newStringFromCString(threadStateData, c->respHeaders[i].key);
+            CN1_WRITE_BARRIER(arr, cn1__s);  /* each allocation is a safepoint: arr may be old */
+            elements[i] = cn1__s;
         }
     }
     return arr;

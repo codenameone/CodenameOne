@@ -1052,6 +1052,9 @@ JAVA_VOID java_io_NSLogOutputStream_write___byte_1ARRAY_int_int(CODENAME_ONE_THR
 #endif
 }
 
+#ifndef CN1_EXP_SAMEARRAY
+#define CN1_EXP_SAMEARRAY 0
+#endif
 JAVA_VOID java_lang_System_arraycopy___java_lang_Object_int_java_lang_Object_int_int(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT src, JAVA_INT srcOffset, JAVA_OBJECT dst, JAVA_INT dstOffset, JAVA_INT length) {
     __STATIC_INITIALIZER_java_lang_System(threadStateData);
     JAVA_ARRAY srcArr = (JAVA_ARRAY)src;
@@ -1138,6 +1141,13 @@ JAVA_VOID java_lang_System_arraycopy___java_lang_Object_int_java_lang_Object_int
      * heap corruption on the arm64 clean target). memmove is the correct,
      * overlap-safe primitive. */
     memmove( CN1_ARRAY_DATA(dstArr) + (dstOffset * byteSize), CN1_ARRAY_DATA(srcArr)  + (srcOffset * byteSize), length * byteSize);
+    // Generational half: a copy between two arrays can put young references into an
+    // old destination with no per-element store. Remember the destination once, after
+    // the copy, rather than inspecting what was copied. Same-array moves add no edge.
+    if(cn1__satbReg && (CN1_EXP_SAMEARRAY || srcArr != dstArr) && cn1GcGenBarrier
+       && __atomic_load_n(&((JAVA_OBJECT)dstArr)->__codenameOneGcMark, __ATOMIC_RELAXED) > 0) {
+        cn1GcRememberSlow((JAVA_OBJECT)dstArr);
+    }
     if(cn1__satbReg) {
         cn1SatbBulkEnd();
     }
@@ -4346,6 +4356,11 @@ JAVA_INT java_util_ArrayList_addAllNative___int_java_util_Collection_R_int(
     list->java_util_AbstractList_modCount++;
     if(marking) cn1BlockMoveEnd(block);
     cn1SatbBulkEnd();
+    // Generational half: the copy publishes the source's references with no per-element
+    // store. Remembering the OWNER covers whichever block it now holds.
+    if(cn1GcGenBarrier && __atomic_load_n(&owner->__codenameOneGcMark, __ATOMIC_RELAXED) > 0) {
+        cn1GcRememberSlow(owner);
+    }
     if(block != old) cn1RefBlockRetire(old);
     return 1;
 }
@@ -4503,7 +4518,9 @@ JAVA_OBJECT java_util_HashMap_put___java_lang_Object_java_lang_Object_R_java_lan
     JAVA_OBJECT* vals = (JAVA_OBJECT*)(uintptr_t)valsObj;
     if(idx >= 0) {
         JAVA_OBJECT old = vals[idx];
-        CN1_WRITE_BARRIER(valsObj, value);
+        // The OWNER is the barrier target: a block handle is not an object header, and
+        // the generational half remembers the map, whose mark function traces its blocks.
+        CN1_WRITE_BARRIER(__cn1ThisObject, value);
         CN1_SATB_DELETE(&vals[idx]); // preserve the overwritten value for this mark cycle
         vals[idx] = value;
         return old;
@@ -4514,9 +4531,9 @@ JAVA_OBJECT java_util_HashMap_put___java_lang_Object_java_lang_Object_R_java_lan
     JAVA_OBJECT* keys = (JAVA_OBJECT*)(uintptr_t)keysObj;
     JAVA_BOOLEAN wasEmpty = meta[ins] == 0 ? JAVA_TRUE : JAVA_FALSE;
     meta[ins] = marker;
-    CN1_WRITE_BARRIER(keysObj, key);
+    CN1_WRITE_BARRIER(__cn1ThisObject, key);
     keys[ins] = key;
-    CN1_WRITE_BARRIER(valsObj, value);
+    CN1_WRITE_BARRIER(__cn1ThisObject, value);
     vals[ins] = value;
     t->java_util_HashMap_elementCount++;
     if(wasEmpty) {
@@ -5296,6 +5313,9 @@ static JAVA_OBJECT cn1BuilderStringCopy(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT b
     JAVA_OBJECT value = latin1 ? __NEW_ARRAY_JAVA_BYTE(threadStateData, count)
                               : __NEW_ARRAY_JAVA_CHAR(threadStateData, count);
     struct obj__java_lang_String* text = (struct obj__java_lang_String*)result;
+    // Barriered: the array allocation above is a safepoint, so result may already be
+    // old (single-core generational mode) when the young array is stored into it.
+    CN1_WRITE_BARRIER(result, value);
     text->java_lang_String_value = value;
     text->java_lang_String_count = count;
     if(count > 0) {

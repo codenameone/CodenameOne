@@ -46,7 +46,10 @@ static inline JAVA_VOID cn1InlStorageSetInt(CODENAME_ONE_THREAD_STATE, JAVA_LONG
 static inline JAVA_VOID cn1InlStorageSet(CODENAME_ONE_THREAD_STATE, JAVA_LONG block, JAVA_INT i, JAVA_OBJECT value) {
     JAVA_OBJECT* slot = (JAVA_OBJECT*)(uintptr_t)block + i;
     CN1_SATB_DELETE(slot);
-    CN1_WRITE_BARRIER(slot, value);
+    // SATB half only; the BLOCK is what the generational half remembers (see
+    // cn1RefBlockSet) -- a slot address is not an object header.
+    CN1_WRITE_BARRIER(JAVA_NULL, value);
+    CN1_GEN_REMEMBER_BLOCK(block, value);
     *slot = value;
 }
 

@@ -386,7 +386,9 @@ JAVA_OBJECT com_codename1_impl_linux_LinuxNative_clipboardGetFiles___R_java_lang
     if (arr != JAVA_NULL) {
         elements = (JAVA_OBJECT*) (*(JAVA_ARRAY) arr).data;
         for (i = 0; i < n; i++) {
-            elements[i] = newStringFromCString(threadStateData, uris[i]);
+            JAVA_OBJECT cn1__s = newStringFromCString(threadStateData, uris[i]);
+            CN1_WRITE_BARRIER(arr, cn1__s);  /* each allocation is a safepoint: arr may be old */
+            elements[i] = cn1__s;
         }
     }
     g_strfreev(uris);

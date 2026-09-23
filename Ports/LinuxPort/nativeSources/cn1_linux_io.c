@@ -398,7 +398,9 @@ JAVA_OBJECT com_codename1_impl_linux_LinuxNative_fileList___java_lang_String_R_j
     if (arr != JAVA_NULL) {
         elements = (JAVA_OBJECT*) (*(JAVA_ARRAY) arr).data;
         for (i = 0; i < count; i++) {
-            elements[i] = newStringFromCString(threadStateData, names[i]);
+            JAVA_OBJECT cn1__s = newStringFromCString(threadStateData, names[i]);
+            CN1_WRITE_BARRIER(arr, cn1__s);  /* each allocation is a safepoint: arr may be old */
+            elements[i] = cn1__s;
         }
     }
     for (i = 0; i < count; i++) {
@@ -470,7 +472,9 @@ JAVA_OBJECT com_codename1_impl_linux_LinuxNative_executableDir___R_java_lang_Str
 JAVA_OBJECT com_codename1_impl_linux_LinuxNative_fileRoots___R_java_lang_String_1ARRAY(CODENAME_ONE_THREAD_STATE) {
     JAVA_OBJECT arr = allocArray(threadStateData, 1, &class_array1__java_lang_String, sizeof(JAVA_OBJECT), 1);
     if (arr != JAVA_NULL) {
-        ((JAVA_OBJECT*) (*(JAVA_ARRAY) arr).data)[0] = newStringFromCString(threadStateData, "/");
+        JAVA_OBJECT cn1__s = newStringFromCString(threadStateData, "/");
+        CN1_WRITE_BARRIER(arr, cn1__s);  /* the allocation is a safepoint: arr may be old */
+        ((JAVA_OBJECT*) (*(JAVA_ARRAY) arr).data)[0] = cn1__s;
     }
     return arr;
 }

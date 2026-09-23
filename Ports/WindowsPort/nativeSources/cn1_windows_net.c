@@ -459,8 +459,9 @@ JAVA_OBJECT com_codename1_impl_windows_WindowsNative_httpHeaderFieldNames___long
                 name[nameChars] = 0;
                 /* Object-array element store: write the String into the data
                  * slot, again flagged for first-build verification. */
-                ((JAVA_OBJECT*)(*(JAVA_ARRAY)arr).data)[index] =
-                    cn1NetWideToJavaString(threadStateData, name);
+                JAVA_OBJECT cn1__s = cn1NetWideToJavaString(threadStateData, name);
+                CN1_WRITE_BARRIER(arr, cn1__s);  /* each allocation is a safepoint: arr may be old */
+                ((JAVA_OBJECT*)(*(JAVA_ARRAY)arr).data)[index] = cn1__s;
                 free(name);
                 index++;
             }
