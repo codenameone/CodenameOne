@@ -271,6 +271,63 @@ class OtlpTracerTest {
     }
 
     @Test
+    @DisplayName("an excluded exception attribute is recorded neither in the event nor the status")
+    void excludedExceptionAttributes() throws Exception {
+        int port = freePort();
+        Properties settings = settings(port);
+        settings.setProperty(OtlpTracer.ATTRIBUTES_EXCLUDE, "exception.message");
+        Backend backend = Backend.builder(Config.of(settings, "test"))
+                .quiet()
+                .tracing(new OtlpTracer())
+                .handler(new HttpServer.Handler() {
+                    public HttpServer.Response handle(HttpServer.Request request) throws Exception {
+                        throw new IllegalStateException("card 4111 declined");
+                    }
+                })
+                .start();
+        try {
+            HttpURLConnection connection = (HttpURLConnection)new URL(
+                    "http://127.0.0.1:" + port + "/x").openConnection();
+            assertEquals(500, connection.getResponseCode());
+        } finally {
+            backend.stop();
+        }
+        Span span = ExportTraceServiceRequest.parseFrom((byte[])exports.get(0))
+                .getResourceSpans(0).getScopeSpans(0).getSpans(0);
+        assertEquals("exception", span.getEvents(0).getName());
+        assertNull(attribute(span.getEvents(0).getAttributesList(), "exception.message"),
+                "an excluded attribute was exported on the exception event");
+        assertEquals("java.lang.IllegalStateException",
+                attribute(span.getEvents(0).getAttributesList(), "exception.type"));
+        assertEquals("java.lang.IllegalStateException", span.getStatus().getMessage(),
+                "the status description carried the excluded message");
+    }
+
+    @Test
+    @DisplayName("installing a tracer shuts down the one it replaces, and only that one")
+    void replacingATracerShutsDownThePreviousOne() {
+        final int[] shutdowns = new int[2];
+        ThrowingTracer first = new ThrowingTracer() {
+            public void shutdown(int timeoutMillis) {
+                shutdowns[0]++;
+            }
+        };
+        ThrowingTracer second = new ThrowingTracer() {
+            public void shutdown(int timeoutMillis) {
+                shutdowns[1]++;
+            }
+        };
+        Tracing.install(first);
+        Tracing.install(first);
+        assertEquals(0, shutdowns[0], "re-installing the same tracer stopped it");
+        Tracing.install(second);
+        assertEquals(1, shutdowns[0], "the replaced tracer was left running");
+        Tracing.install(null);
+        assertEquals(1, shutdowns[1], "turning tracing off left the tracer running");
+        assertEquals(1, shutdowns[0]);
+    }
+
+    @Test
     @DisplayName("OTEL_SDK_DISABLED leaves the server untraced and the collector untouched")
     void disabledAtRunTime() throws Exception {
         int port = freePort();
@@ -385,7 +442,7 @@ class OtlpTracerTest {
     }
 
     /** A tracer whose spans throw from every decoration. */
-    private static final class ThrowingTracer implements com.codename1.backend.Tracer {
+    private static class ThrowingTracer implements com.codename1.backend.Tracer {
         public boolean open(Config config) {
             return true;
         }

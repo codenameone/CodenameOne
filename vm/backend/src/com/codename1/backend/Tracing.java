@@ -71,14 +71,30 @@ public final class Tracing {
         Object run(Span span) throws Exception;
     }
 
+    /** How long a replaced tracer gets to export what it already holds. */
+    static final int REPLACED_SHUTDOWN_MILLIS = 2000;
+
     /**
      * Installs the tracer every hook reports to, replacing any earlier one. Pass
      * null to turn tracing off. The builder does this itself; a program that
      * starts {@link HttpServer} or {@link LambdaRuntime} directly calls it after
      * {@link Tracer#open}.
+     *
+     * <p>A tracer this replaces is shut down: its spans so far are exported, for
+     * up to {@link #REPLACED_SHUTDOWN_MILLIS}, and its exporter stops. Nothing
+     * else holds it once it is out of this slot, so leaving it running leaked its
+     * export thread and queues on every reconfiguration.
      */
     public static void install(Tracer installed) {
+        Tracer previous = tracer;
         tracer = installed;
+        if(previous != null && previous != installed) {
+            try {
+                previous.shutdown(REPLACED_SHUTDOWN_MILLIS);
+            } catch (RuntimeException err) {
+                failed(err);
+            }
+        }
     }
 
     /** The installed tracer, or null. */

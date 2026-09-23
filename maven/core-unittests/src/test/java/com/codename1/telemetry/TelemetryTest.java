@@ -198,13 +198,22 @@ class TelemetryTest extends UITestBase {
         AnalyticsConsent before = Analytics.getConsent();
         try {
             Analytics.setConsent(AnalyticsConsent.granted());
-            Telemetry.install(new TelemetryConfig().direct("http://collector.test")
-                    .requireAnalyticsConsent(true));
-            Telemetry.ExportRequest export = new Telemetry.ExportRequest(new byte[] {1});
+            Telemetry.State gated = new Telemetry.State(new TelemetryConfig()
+                    .direct("http://collector.test").requireAnalyticsConsent(true));
+            Telemetry.ExportRequest export = new Telemetry.ExportRequest(gated, new byte[] {1});
             assertFalse(export.shouldStop(), "with consent the export goes");
             Analytics.setConsent(AnalyticsConsent.denied());
             assertTrue(export.shouldStop(),
                     "an export queued before consent was withdrawn must not be sent");
+
+            // The export answers to the installation that recorded it, not to
+            // whatever is installed when it runs: neither nothing, nor a
+            // replacement that does not ask for consent.
+            Telemetry.uninstall();
+            assertTrue(export.shouldStop(), "uninstalling released a consent-gated export");
+            Telemetry.install(new TelemetryConfig().direct("http://collector.test"));
+            assertTrue(export.shouldStop(),
+                    "an ungated reinstall released a consent-gated export");
         } finally {
             Analytics.setConsent(before);
         }

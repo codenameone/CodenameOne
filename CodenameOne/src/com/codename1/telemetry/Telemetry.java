@@ -358,7 +358,7 @@ public final class Telemetry {
             boolean json = config.mode == TelemetryConfig.Mode.RELAY || !config.protobuf;
             byte[] body = json ? OtlpEncoding.json(resource(), batch)
                     : OtlpEncoding.protobuf(resource(), batch);
-            ExportRequest request = new ExportRequest(body);
+            ExportRequest request = new ExportRequest(this, body);
             request.setUrl(exportUrl);
             request.setPost(true);
             request.setHttpMethod("POST");
@@ -539,8 +539,28 @@ public final class Telemetry {
     /// The export's own request, a type of its own so the tracer can recognise it,
     /// and a binary body without an intermediate String.
     static final class ExportRequest extends ConnectionRequest {
-        ExportRequest(byte[] body) {
+        /// The installation that recorded these spans. Its consent policy, not
+        /// whichever installation is current when the export finally runs, decides
+        /// whether they may be sent: after an uninstall, or a reinstall without the
+        /// consent flag, the static slot says nothing about THESE spans.
+        private final State origin;
+
+        ExportRequest(State origin, byte[] body) {
+            this.origin = origin;
             setRequestBody(new ByteBody(body));
+        }
+
+        /// Identity. The inherited equality compares URL and arguments, so every
+        /// export to one collector compared equal though each carries its own
+        /// spans; that made no two exports distinguishable to the queue.
+        @Override
+        public boolean equals(Object o) {
+            return o == this; //NOPMD CompareObjectsWithEquals
+        }
+
+        @Override
+        public int hashCode() {
+            return System.identityHashCode(this);
         }
 
         /// Stopped, and nothing sent, once consent is required and no longer
@@ -552,8 +572,7 @@ public final class Telemetry {
             if (super.shouldStop()) {
                 return true;
             }
-            State s = state;
-            return s != null && !s.permitted();
+            return !origin.permitted();
         }
     }
 

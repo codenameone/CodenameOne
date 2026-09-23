@@ -146,19 +146,26 @@ final class OtelSpan extends Span {
         if(!sampled || ended || error == null) {
             return this;
         }
-        String type = error.getClass().getName();
-        String message = error.getMessage();
+        // The exclusion list governs these like any other attribute: it is how a
+        // deployment keeps failure details -- a message quoting user input, say --
+        // out of its traces. That covers the status description too, which would
+        // otherwise carry the excluded message anyway.
+        String type = tracer.excluded("exception.type") ? null : error.getClass().getName();
+        String message = tracer.excluded("exception.message") ? null : error.getMessage();
         statusCode = 2;
         // Bounded like the event attribute below. The export queue is bounded by
         // span COUNT, so an unbounded message per failing request is how that bound
         // stops bounding memory.
-        statusMessage = bound(message == null ? type : message);
+        String description = message == null ? type : message;
+        statusMessage = description == null ? null : bound(description);
         if(events.size() >= MAX_EVENTS) {
             droppedEvents++;
             return this;
         }
         Map attrs = new LinkedHashMap();
-        attrs.put("exception.type", type);
+        if(type != null) {
+            attrs.put("exception.type", type);
+        }
         if(message != null) {
             attrs.put("exception.message", message.length() > MAX_VALUE_LENGTH
                     ? message.substring(0, MAX_VALUE_LENGTH) : message);
