@@ -9684,14 +9684,39 @@ static JAVA_OBJECT cn1BibopAlloc(CODENAME_ONE_THREAD_STATE, int size, struct cla
 // The lazily-attached per-object monitor (CN1ThreadData*) is NULL on virtually every
 // object, so storing it in every header wasted 8 bytes/object. It now lives in an
 // address-keyed chained hash map; only objects that are actually monitorEnter'd ever
-// get an entry. All ops take a single dedicated mutex (monitor ops are rare relative to
-// allocation). Lock discipline: callers NEVER hold this mutex across lockCriticalSection
-// or across a blocking pthread_mutex_lock(data->mutex) -- the data pointer is copied out
-// and the table mutex released first -- so there is no inversion with the GC critical
-// section (which only ever takes the table mutex AFTER it, during reclaim/free).
+// get an entry.
+//
+// READS TAKE NO LOCK. Every monitorEnter and monitorExit looks its monitor up here, and
+// the lookup used to take the table's one mutex -- the same mutex the SWEEP takes to
+// remove the monitor of every dead object on a page that carries monitors. So an
+// uncontended `synchronized` on the main thread queued behind the collector: profiled on
+// the self-hosting corpus, 3.9% of the main thread sat in __psynch_mutexwait, every
+// sample of it under monitorEnter/monitorExitBlock (Hashtable.get, AtomicInteger, the
+// translator's own synchronized methods), with no other Java thread involved.
+//
+// Writers (insert, overwrite, remove) still serialize on the mutex. Readers use a
+// per-bucket sequence count instead: a writer makes it ODD for the duration of an unlink
+// or an overwrite, and a reader that sees it odd, or sees it change across its walk,
+// retries -- after a few tries it takes the mutex like before. An INSERT needs no count:
+// the entry is fully written before a release store publishes it at the head of its
+// bucket, so a reader sees either the old chain or the new one, both valid.
+//
+// What makes a reader racing a removal SAFE rather than merely retried: entries are never
+// returned to malloc. A removed entry goes onto a free list and is reused for a later
+// insert, so a reader still holding it reads a real entry -- whose key is not its object,
+// or whose count has moved -- never freed memory. The walk is bounded, because a recycled
+// entry can lead a stale reader into another bucket's chain.
+//
+// Lock discipline is unchanged: callers NEVER hold the mutex across lockCriticalSection or
+// across a blocking pthread_mutex_lock(data->mutex), so there is no inversion with the GC
+// critical section (which only ever takes the table mutex AFTER it, during reclaim/free).
 struct CN1MonitorEntry { JAVA_OBJECT key; void* data; struct CN1MonitorEntry* next; };
 #define CN1_MON_BUCKETS 4096
+#define CN1_MON_READ_TRIES 4
+#define CN1_MON_MAX_WALK 4096
 static struct CN1MonitorEntry* cn1MonitorBuckets[CN1_MON_BUCKETS];
+static unsigned cn1MonitorSeq[CN1_MON_BUCKETS];
+static struct CN1MonitorEntry* cn1MonitorFreeEntries = 0;   // guarded by the mutex
 static pthread_mutex_t cn1MonitorTableMutex = PTHREAD_MUTEX_INITIALIZER;
 
 static inline unsigned cn1MonHash(JAVA_OBJECT o) {
@@ -9700,9 +9725,16 @@ static inline unsigned cn1MonHash(JAVA_OBJECT o) {
     return (unsigned)((p ^ (p >> 16)) & (CN1_MON_BUCKETS - 1));
 }
 
-// Lookup: returns the attached CN1ThreadData* (or 0). Safe for concurrent callers.
-void* cn1MonitorDataGet(JAVA_OBJECT o) {
-    unsigned h = cn1MonHash(o);
+// Writer brackets for a change a concurrent reader could observe half-done.
+static inline void cn1MonWriteBegin(unsigned h) {
+    __atomic_store_n(&cn1MonitorSeq[h], cn1MonitorSeq[h] + 1, __ATOMIC_RELAXED);
+    __atomic_thread_fence(__ATOMIC_RELEASE);
+}
+static inline void cn1MonWriteEnd(unsigned h) {
+    __atomic_store_n(&cn1MonitorSeq[h], cn1MonitorSeq[h] + 1, __ATOMIC_RELEASE);
+}
+
+static void* cn1MonitorDataGetLocked(JAVA_OBJECT o, unsigned h) {
     pthread_mutex_lock(&cn1MonitorTableMutex);
     struct CN1MonitorEntry* e = cn1MonitorBuckets[h];
     void* r = 0;
@@ -9711,15 +9743,66 @@ void* cn1MonitorDataGet(JAVA_OBJECT o) {
     return r;
 }
 
+// Lookup: returns the attached CN1ThreadData* (or 0). Safe for concurrent callers.
+//
+// Ordering: the head and next pointers are ACQUIRE loads, pairing with the release store
+// that published each entry, so the entry's key and data -- and the fully initialized
+// mutex its data points at, written before cn1MonitorDataSet was called -- are visible to
+// a reader that reached it. That is the guarantee the mutex used to supply.
+void* cn1MonitorDataGet(JAVA_OBJECT o) {
+    unsigned h = cn1MonHash(o);
+    for(int attempt = 0 ; attempt < CN1_MON_READ_TRIES ; attempt++) {
+        unsigned s1 = __atomic_load_n(&cn1MonitorSeq[h], __ATOMIC_ACQUIRE);
+        if(s1 & 1) {
+            continue;                       // a writer is mid-change on this bucket
+        }
+        struct CN1MonitorEntry* e = __atomic_load_n(&cn1MonitorBuckets[h], __ATOMIC_ACQUIRE);
+        void* r = 0;
+        int steps = 0;
+        while(e != 0 && steps < CN1_MON_MAX_WALK) {
+            if(__atomic_load_n(&e->key, __ATOMIC_RELAXED) == o) {
+                r = __atomic_load_n(&e->data, __ATOMIC_RELAXED);
+                break;
+            }
+            e = __atomic_load_n(&e->next, __ATOMIC_ACQUIRE);
+            steps++;
+        }
+        __atomic_thread_fence(__ATOMIC_ACQUIRE);
+        if(steps < CN1_MON_MAX_WALK && __atomic_load_n(&cn1MonitorSeq[h], __ATOMIC_RELAXED) == s1) {
+            return r;
+        }
+    }
+    return cn1MonitorDataGetLocked(o, h);
+}
+
 // Insert or overwrite the monitor for o.
 void cn1MonitorDataSet(JAVA_OBJECT o, void* data) {
     unsigned h = cn1MonHash(o);
     pthread_mutex_lock(&cn1MonitorTableMutex);
     struct CN1MonitorEntry* e = cn1MonitorBuckets[h];
-    while(e) { if(e->key == o) { e->data = data; pthread_mutex_unlock(&cn1MonitorTableMutex); return; } e = e->next; }
-    e = (struct CN1MonitorEntry*)malloc(sizeof(struct CN1MonitorEntry));
-    e->key = o; e->data = data; e->next = cn1MonitorBuckets[h];
-    cn1MonitorBuckets[h] = e;
+    while(e) {
+        if(e->key == o) {
+            cn1MonWriteBegin(h);
+            __atomic_store_n(&e->data, data, __ATOMIC_RELAXED);
+            cn1MonWriteEnd(h);
+            pthread_mutex_unlock(&cn1MonitorTableMutex);
+            return;
+        }
+        e = e->next;
+    }
+    e = cn1MonitorFreeEntries;
+    if(e != 0) {
+        cn1MonitorFreeEntries = e->next;
+    } else {
+        e = (struct CN1MonitorEntry*)malloc(sizeof(struct CN1MonitorEntry));
+    }
+    // A recycled entry can still be under a stale reader from its old bucket; that
+    // bucket's count moved when it was removed, so that reader will retry whatever it
+    // reads here. Written with atomics for the same reason.
+    __atomic_store_n(&e->key, o, __ATOMIC_RELAXED);
+    __atomic_store_n(&e->data, data, __ATOMIC_RELAXED);
+    __atomic_store_n(&e->next, cn1MonitorBuckets[h], __ATOMIC_RELAXED);
+    __atomic_store_n(&cn1MonitorBuckets[h], e, __ATOMIC_RELEASE);
 #ifdef CN1_GC_CONFORM
     atomic_fetch_add_explicit(&cn1MonitorEntries, 1, memory_order_relaxed);
 #endif
@@ -9735,7 +9818,14 @@ void* cn1MonitorDataRemove(JAVA_OBJECT o) {
     while(*pp) {
         if((*pp)->key == o) {
             struct CN1MonitorEntry* d = *pp;
-            r = d->data; *pp = d->next; free(d);
+            r = d->data;
+            cn1MonWriteBegin(h);
+            __atomic_store_n(pp, d->next, __ATOMIC_RELAXED);
+            cn1MonWriteEnd(h);
+            // Kept, not freed: see the note above the table.
+            __atomic_store_n(&d->key, (JAVA_OBJECT)0, __ATOMIC_RELAXED);
+            __atomic_store_n(&d->next, cn1MonitorFreeEntries, __ATOMIC_RELAXED);
+            cn1MonitorFreeEntries = d;
 #ifdef CN1_GC_CONFORM
             atomic_fetch_add_explicit(&cn1MonitorEntries, -1, memory_order_relaxed);
 #endif

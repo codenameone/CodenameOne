@@ -123,7 +123,7 @@ echo "run-gauntlet: modern reference Java $refFeature ($REF_JAVA); legacy refere
 # the try that filled it, and two that are stored into a FIELD and therefore must stay
 # on the heap. A wrong answer here is a C-stack address reaching the heap, which the
 # verifier's escaped-stack-object check (run-gc-verify.sh self-test6) is what catches.
-TORTURES="SbTryCatch BceTryCatch BceHoisted NestThrow MapTorture MapTorture2 IdmTorture HtTorture SbTorture StrCmp FusedTest IbpTest ExcTest ThreadChurn SoeTest TaggedSync BoxEdge ConcatCorrupt ToCharT ForEachT LambdaT FeMin Latin1T SbLatin1T SbCapacityT PureClinitT SetTorture InstanceOfT WriterT StrQueryT LambdaDevirtT TwinProbe NullDeref ThrowingFinalizer"
+TORTURES="SbTryCatch BceTryCatch BceHoisted NestThrow MapTorture MapTorture2 IdmTorture HtTorture SbTorture StrCmp FusedTest IbpTest ExcTest ThreadChurn SoeTest TaggedSync BoxEdge ConcatCorrupt ToCharT ForEachT LambdaT FeMin Latin1T SbLatin1T SbCapacityT PureClinitT MonitorChurnT SetTorture InstanceOfT WriterT StrQueryT LambdaDevirtT TwinProbe NullDeref ThrowingFinalizer"
 mkdir -p target/host-classes target/bin
 # FusedTest uses @com.codename1.annotations.Fused -- supply the annotation
 # source for the host compile (ParparVM's JavaAPI carries its own copy)
