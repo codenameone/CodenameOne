@@ -143,6 +143,15 @@ public final class ContainerTransformTransition extends Transition {
     public void initTransition() {
         Component source = getSource();
         Component destination = getDestination();
+        // Cleared first: a transition object can be reused, and an early return must not
+        // leave the previous run's motion to be replayed.
+        motion = null;
+        // The Transition contract allows no source -- the first Form shown has nothing to
+        // transition from -- and dereferencing it here made that first show throw. With
+        // either side missing there is nothing to transform between, so no animation.
+        if (source == null || destination == null) {
+            return;
+        }
         int w = destination.getWidth();
         int h = destination.getHeight();
         if (w <= 0 || h <= 0) {

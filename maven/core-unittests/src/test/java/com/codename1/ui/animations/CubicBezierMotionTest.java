@@ -120,4 +120,20 @@ class CubicBezierMotionTest extends UITestBase {
         assertEquals(1000, sample(m, 0));
         assertEquals(0, sample(m, 1000));
     }
+
+    @Test
+    void aThreePointMotionWithAFlatSegmentStaysContinuousAtTheJoin() {
+        // Midpoint on the bottom edge: the first segment has no vertical extent. Its Y
+        // cannot be normalized, and substituting linear progress there made the value run
+        // up toward t -- about 499 of 1000 just before the join -- and then drop to 0 at
+        // it. The segment's own cubic is flat at 0 all the way.
+        Motion m = Motion.createThreePointCubicMotion(0, 1000, 1000,
+                0.1f, 0f, 0.4f, 0f,
+                0.5f, 0f,
+                0.6f, 0.3f, 0.9f, 1f);
+        assertEquals(0, sample(m, 499), 20, "the flat first segment stays at its level");
+        assertEquals(0, sample(m, 250), 20);
+        int atJoin = sample(m, 500);
+        assertTrue(Math.abs(atJoin - sample(m, 499)) <= 20, "no jump at the join");
+    }
 }

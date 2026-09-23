@@ -561,8 +561,25 @@ public class Motion {
         float scaleX = first ? midX : 1f - midX;
         float scaleY = first ? midY : 1f - midY;
         float value;
-        if (scaleX <= 0f || scaleY <= 0f) {
-            value = t;
+        if (scaleX <= 0f) {
+            // A segment with no duration is only ever reached at its end.
+            value = first ? midY : 1f;
+        } else if (scaleY <= 0f) {
+            // No vertical extent -- the midpoint lies on the top or bottom edge -- so the
+            // Y axis cannot be normalized. Substituting linear progress here made the
+            // value run toward t and then jump back at the join. X still normalizes, so
+            // solve for the curve parameter as usual and evaluate this segment's Y cubic
+            // from its real endpoints and controls.
+            float scaledT = (t - (first ? 0f : midX)) / scaleX;
+            float x1 = first ? p0 / scaleX : (q0 - midX) / scaleX;
+            float x2 = first ? p2 / scaleX : (q2 - midX) / scaleX;
+            float u = solveBezierForT(scaledT, x1, x2);
+            float y0 = first ? 0f : midY;
+            float y3 = first ? midY : 1f;
+            float c1 = first ? p1 : q1;
+            float c2 = first ? p3 : q3;
+            float inv = 1f - u;
+            value = inv * inv * inv * y0 + 3f * inv * inv * u * c1 + 3f * inv * u * u * c2 + u * u * u * y3;
         } else {
             float scaledT = (t - (first ? 0f : midX)) / scaleX;
             float x1;
