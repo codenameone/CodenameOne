@@ -14136,21 +14136,6 @@ public class IOSImplementation extends CodenameOneImplementation {
     }
 
     public static void applicationWillResignActive() {
-        // PAIRED WITH THE TEXTURE DROP, which happens on this callback too:
-        // cn1ApplicationWillResignActive calls CN1MetalBackupMutableImagesForSuspend,
-        // and that drops the texture of every read-only image. An image created
-        // through createImageNoBackingCopy has released its decoded UIImage, so
-        // once its texture is gone the peer has no pixels at all -- it must be
-        // rebuilt from the encoded bytes, and this is what tells it to.
-        //
-        // Deliberately NOT on didEnterBackground: resigning active happens far
-        // more often than backgrounding and does not imply it -- Control Centre,
-        // the notification shade, an incoming call, the app switcher, a system
-        // alert. Each of those drops the textures and then hands control back
-        // without the app ever entering the background, so a bump wired to
-        // backgrounding would leave those images with no pixels and nothing
-        // telling them to rebuild: they would simply draw blank.
-        //
         minimized = true;
         callInterruptionActive = true;
         if(instance.life != null) {
