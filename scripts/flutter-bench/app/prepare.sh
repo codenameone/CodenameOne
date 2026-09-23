@@ -183,8 +183,12 @@ cp "$HERE/flutter/main_bench.dart" "$WORK/flutter/lib/main_bench.dart"
 echo "==> preparing the Codename One build"
 rm -rf "$WORK/cn1"
 if [ -z "$CN1_VERSION" ]; then
-  CN1_VERSION="$(cd "$REPO/maven" && mvn -q $MVN_REPO_ARG -Dexec.executable=echo \
-      -Dexec.args='${project.version}' --non-recursive exec:exec 2>/dev/null | tail -1)"
+  # help:evaluate prints the value itself. The exec:exec it replaces ran
+  # `echo` as a process, and Windows has no echo executable -- it is a cmd
+  # builtin -- so the Windows leg failed right here, and because stderr was
+  # discarded it said nothing but an exit code. Maven's stderr stays visible.
+  CN1_VERSION="$(cd "$REPO/maven" && mvn -q -B $MVN_REPO_ARG help:evaluate \
+      -Dexpression=project.version -DforceStdout --non-recursive | tr -d '\r' | tail -1)"
 fi
 [ -n "$CN1_VERSION" ] || { echo "could not determine the Codename One version" >&2; exit 2; }
 echo "    archetype version $CN1_VERSION"
