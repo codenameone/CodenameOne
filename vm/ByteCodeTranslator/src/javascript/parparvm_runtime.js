@@ -5717,6 +5717,22 @@ bindNative(["cn1_java_lang_String_charAt_int_R_char"], function(__cn1ThisObject,
   }
   return ns.charCodeAt(index) | 0;
 });
+// String's INLINE-storage natives. The C VM keeps a short string's characters inside
+// the object and leaves value null; String.java then asks these two for the storage.
+// A JS string is native and a String's value can read null here as well, so both are
+// live and answer from the native string itself rather than being stubs.
+bindNative(["cn1_java_lang_String_cn1InlineCharAt_int_R_char"], function(__cn1ThisObject, index) {
+  return jvm.toNativeString(__cn1ThisObject).charCodeAt(index | 0) | 0;
+});
+bindNative(["cn1_java_lang_String_cn1InlineLatin1_R_boolean"], function(__cn1ThisObject) {
+  const ns = jvm.toNativeString(__cn1ThisObject);
+  for (let i = 0; i < ns.length; i++) {
+    if (ns.charCodeAt(i) > 255) {
+      return 0;
+    }
+  }
+  return 1;
+});
 bindNative(["cn1_java_lang_String_equals_java_lang_Object_R_boolean"], function(__cn1ThisObject, obj) {
   return (obj != null && obj.__class === "java_lang_String" && jvm.toNativeString(__cn1ThisObject) === jvm.toNativeString(obj)) ? 1 : 0;
 });
@@ -6004,6 +6020,12 @@ bindNative(["cn1_java_util_HashMap_areEqualKeys_java_lang_Object_java_lang_Objec
 bindNative(["cn1_java_util_ArrayList_addAllNative_int_java_util_Collection_R_int",
             "cn1_java_util_ArrayList_initFromNative_java_util_Collection_R_int"], function() { return -1; });
 let cn1StorageId = 1;
+// "No block" for a NativeStorage handle. A handle is always a long OBJECT carrying its
+// storage, but a long FIELD nobody has assigned yet defaults to the plain number 0 in
+// this runtime -- every long helper coerces that through _Lc, and _LisZero does not, so
+// an ArrayList that had never allocated read .storage off a number and threw. Any
+// number here can only be that default: allocation never returns one.
+function cn1StorageAbsent(b) { return b == null || typeof b === "number" || _LisZero(b); }
 function cn1StorageAllocate(capacity, references) {
   if (capacity === 0) return _L0;
   const handle = _LfromNumber(cn1StorageId++);
@@ -6018,19 +6040,19 @@ bindNative(["cn1_java_util_NativeStorage_allocateTable_int_boolean_R_long"], fun
   return root;
 });
 bindNative(["cn1_java_util_NativeStorage_part_long_int_R_long"], function(root, part) {
-  return _LisZero(root) ? _L0 : root.parts[part];
+  return cn1StorageAbsent(root) ? _L0 : root.parts[part];
 });
 bindNative(["cn1_java_util_NativeStorage_allocateReferences_int_R_long"], function(n) { return cn1StorageAllocate(n, true); });
 bindNative(["cn1_java_util_NativeStorage_allocateIntegers_int_R_long"], function(n) { return cn1StorageAllocate(n, false); });
-bindNative(["cn1_java_util_NativeStorage_capacity_long_R_int"], function(b) { return _LisZero(b) ? 0 : b.storage.length; });
-bindNative(["cn1_java_util_NativeStorage_free_long"], function(b) { if (!_LisZero(b)) b.storage = null; });
+bindNative(["cn1_java_util_NativeStorage_capacity_long_R_int"], function(b) { return cn1StorageAbsent(b) ? 0 : b.storage.length; });
+bindNative(["cn1_java_util_NativeStorage_free_long"], function(b) { if (!cn1StorageAbsent(b)) b.storage = null; });
 bindNative(["cn1_java_util_NativeStorage_retire_long"], function(b) { /* JavaScript owns the handle lifetime. */ });
 bindNative(["cn1_java_util_NativeStorage_get_long_int_R_java_lang_Object"], function(b, i) { return b.storage[i]; });
 bindNative(["cn1_java_util_NativeStorage_set_long_int_java_lang_Object"], function(b, i, v) { b.storage[i] = v; });
 bindNative(["cn1_java_util_NativeStorage_getInt_long_int_R_int"], function(b, i) { return b.storage[i]; });
 bindNative(["cn1_java_util_NativeStorage_setInt_long_int_int"], function(b, i, v) { b.storage[i] = v; });
 bindNative(["cn1_java_util_NativeStorage_nextOccupied_long_int_int_R_int"], function(b, from, cap) {
-  if (_LisZero(b)) return -1;
+  if (cn1StorageAbsent(b)) return -1;
   for (let i = from; i < cap; i++) if (b.storage[i] < 0) return i;
   return -1;
 });
@@ -6047,7 +6069,7 @@ bindNative(["cn1_java_util_NativeStorage_copy_long_int_long_int_int"], function(
   for (let i = 0; i < count; i++) dst.storage[to + i] = src.storage[from + i];
 });
 bindNative(["cn1_java_util_NativeStorage_rehash_long_long_long_long_int_long_long_long_long_long_R_int"], function(keys, values, metadata, links, head, newKeys, newValues, newMetadata, newPrev, newNext) {
-  const ordered = !_LisZero(links), source = metadata.storage, target = newMetadata.storage;
+  const ordered = !cn1StorageAbsent(links), source = metadata.storage, target = newMetadata.storage;
   const mask = target.length - 1;
   let tail = -1;
   for (let i = ordered ? head : 0; i >= 0 && i < source.length; i = ordered ? links.storage[i] : i + 1) {

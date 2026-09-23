@@ -117,6 +117,8 @@ final class JavascriptNativeRegistry {
             "cn1_java_lang_StringToReal_parseDblImpl_java_lang_String_int_R_double",
             "cn1_java_lang_String_bytesToChars_byte_1ARRAY_int_int_java_lang_String_R_char_1ARRAY",
             "cn1_java_lang_String_charAt_int_R_char",
+            "cn1_java_lang_String_cn1InlineCharAt_int_R_char",
+            "cn1_java_lang_String_cn1InlineLatin1_R_boolean",
             "cn1_java_lang_String_charsToBytes_char_1ARRAY_char_1ARRAY_R_byte_1ARRAY",
             "cn1_java_lang_String_compactBytes_java_lang_String_R_byte_1ARRAY",
             "cn1_java_lang_String_cn1SubstringFused_int_int_R_java_lang_String",
