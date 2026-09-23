@@ -198,8 +198,33 @@ public final class DartTranspiler {
         StringBuilder sb = new StringBuilder("-stubs");
         for (File f : stubClasspath) {
             sb.append('|').append(f.getAbsolutePath()).append('@').append(f.lastModified());
+            if (f.isDirectory()) {
+                // A class directory -- a reactor or development build -- keeps its
+                // stubs under META-INF/dart, and editing one of those files does not
+                // touch the directory's own timestamp. The directory alone therefore
+                // hashed the same after a stub change and the transpile was skipped
+                // against the old runtime API.
+                appendStubFiles(new File(f, "META-INF/dart"), sb);
+            }
         }
         return Integer.toHexString(sb.toString().hashCode());
+    }
+
+    /** Every file under {@code dir}, in a stable order: path, size and timestamp. */
+    private static void appendStubFiles(File dir, StringBuilder sb) {
+        File[] children = dir.listFiles();
+        if (children == null) {
+            return;
+        }
+        Arrays.sort(children);
+        for (File c : children) {
+            if (c.isDirectory()) {
+                appendStubFiles(c, sb);
+            } else {
+                sb.append('|').append(c.getName()).append(':').append(c.length())
+                        .append('@').append(c.lastModified());
+            }
+        }
     }
 
     private static String fingerprint;

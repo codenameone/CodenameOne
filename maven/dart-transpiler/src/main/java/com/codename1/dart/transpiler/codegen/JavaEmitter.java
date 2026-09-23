@@ -4900,6 +4900,15 @@ public final class JavaEmitter {
         TypeRef t = new TypeRef(isInt ? "int" : "double");
         t.nullable = nullable;
         String fn = (nullable ? "tryParse" : "parse") + (isInt ? "Int" : "Double");
+        if (isInt) {
+            // `radix:` is the one named argument int.parse takes; it was dropped, so
+            // int.parse('ff', radix: 16) failed as a decimal number.
+            for (NamedArg na : c.args.named) {
+                if (na.name.equals("radix")) {
+                    arg += ", " + emitExpr(na.value, TypeRef.INT, ctx).code;
+                }
+            }
+        }
         return new Out("DString." + fn + "(" + arg + ")", t);
     }
 
@@ -5305,8 +5314,15 @@ public final class JavaEmitter {
                 return new Out("DString.compareTo(" + target.code + ", "
                         + emitExpr(pos.get(0), null, ctx).code + ")", TypeRef.INT);
             }
-            if (n.equals("toUpperCase") || n.equals("toLowerCase") || n.equals("trim")) {
-                return new Out(target.code + "." + n + "()", TypeRef.STRING);
+            if (n.equals("toUpperCase") || n.equals("toLowerCase")) {
+                // Through the runtime, not Java's String methods: those follow the
+                // device's default locale, so under Turkish 'i'.toUpperCase() was a
+                // dotted capital and case-folded identifiers varied by device. Dart's
+                // are locale independent.
+                return new Out("DString." + n + "(" + target.code + ")", TypeRef.STRING);
+            }
+            if (n.equals("trim")) {
+                return new Out(target.code + ".trim()", TypeRef.STRING);
             }
             if (n.equals("startsWith") || n.equals("endsWith")) {
                 return new Out(target.code + "." + n + "("
