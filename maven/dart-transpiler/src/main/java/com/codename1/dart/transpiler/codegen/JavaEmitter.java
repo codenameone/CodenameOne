@@ -5752,16 +5752,46 @@ public final class JavaEmitter {
             ctx.importClass("dart.async.Future");
             if (n.equals("then")) {
                 Out cb = emitExpr(pos.get(0), null, ctx);
-                // A void-bodied callback is applicable to BOTH then overloads (Func1 / VoidFunc1),
-                // which javac reports as ambiguous; pin it to the VoidFunc1 overload.
-                String cbCode = lastLambdaVoid ? "(dart.runtime.Funcs.VoidFunc1) " + paren(cb.code) : cb.code;
+                // A lambda fits BOTH then overloads (Func1 / VoidFunc1) when it is void- or
+                // throw-bodied, which javac reports as ambiguous; pin those to VoidFunc1.
+                String cbCode = pinnedHandler(pos.get(0), cb, false, "dart.runtime.Funcs.Func1",
+                        "dart.runtime.Funcs.VoidFunc1");
+                // then(onValue, onError: handler): the handler was dropped, so a failure
+                // skipped it and the chain stayed failed.
+                for (NamedArg na : c.args.named) {
+                    if (na.name.equals("onError")) {
+                        String handler = pinnedHandler(na.value, emitExpr(na.value, null, ctx), true,
+                                "dart.runtime.Funcs.Func1<Object, Object>", "dart.runtime.Funcs.VoidFunc1<Object>");
+                        return new Out(target.code + ".then(" + cbCode + ", (Object) " + paren(handler) + ")",
+                                TypeRef.of("Future", TypeRef.DYNAMIC));
+                    }
+                }
                 return new Out(target.code + ".then(" + cbCode + ")", TypeRef.of("Future", TypeRef.DYNAMIC));
             }
             if (n.equals("catchError")) {
                 Out cb = emitExpr(pos.get(0), null, ctx);
-                String cbCode = lastLambdaVoid ? "(dart.runtime.Funcs.VoidFunc1) " + paren(cb.code) : cb.code;
-                String test = pos.size() > 1 ? emitExpr(pos.get(1), null, ctx).code : "null";
-                return new Out(target.code + ".catchError(" + cbCode + ", " + test + ")", tt);
+                String cbCode = pinnedHandler(pos.get(0), cb, false, "dart.runtime.Funcs.Func1",
+                        "dart.runtime.Funcs.VoidFunc1");
+                boolean valueHandler = pos.get(0) instanceof Lambda
+                        && (((Lambda) pos.get(0)).exprBody != null ? !lastLambdaVoid : lambdaReturnsValue(pos.get(0)));
+                // `test` is a NAMED parameter in Dart; reading it positionally meant it was
+                // always null, so the handler caught failures its predicate rejected. The
+                // runtime takes it as an Object, so a lambda is given its predicate type.
+                String test = "null";
+                Expr testExpr = pos.size() > 1 ? pos.get(1) : null;
+                for (NamedArg na : c.args.named) {
+                    if (na.name.equals("test")) {
+                        testExpr = na.value;
+                    }
+                }
+                if (testExpr != null) {
+                    test = pinnedHandler(testExpr, emitExpr(testExpr, null, ctx), true,
+                            "dart.runtime.Funcs.Func1<Object, Boolean>", "dart.runtime.Funcs.Func1<Object, Boolean>");
+                }
+                // A handler that returns a value recovers with it, so the runtime answers
+                // a Future<Object>: typed that way, an await of it coerces to the slot.
+                return new Out(target.code + ".catchError(" + cbCode + ", " + test + ")",
+                        valueHandler ? TypeRef.of("Future", TypeRef.DYNAMIC) : tt);
             }
             if (n.equals("whenComplete")) {
                 return new Out(target.code + ".whenComplete(" + emitExpr(pos.get(0), null, ctx).code + ")", tt);
@@ -6824,6 +6854,92 @@ public final class JavaEmitter {
             return null;
         }
         return inlineFuncType(elem, ret);
+    }
+
+    /**
+     * Whether a callback can produce a value: an arrow lambda whose body is not void, or
+     * a block lambda that returns a value somewhere outside a nested function. False
+     * for anything that is not a lambda literal.
+     */
+    private boolean lambdaReturnsValue(Expr e) {
+        if (!(e instanceof Lambda)) {
+            return false;
+        }
+        Lambda l = (Lambda) e;
+        if (l.exprBody != null) {
+            return true;   // decided by the caller from lastLambdaVoid
+        }
+        return returnsValue(l.body);
+    }
+
+    private static boolean returnsValue(Stmt s) {
+        if (s == null) {
+            return false;
+        }
+        if (s instanceof ReturnStmt) {
+            return ((ReturnStmt) s).value != null;
+        }
+        if (s instanceof Block) {
+            for (Stmt x : ((Block) s).statements) {
+                if (returnsValue(x)) {
+                    return true;
+                }
+            }
+            return false;
+        }
+        if (s instanceof IfStmt) {
+            return returnsValue(((IfStmt) s).thenStmt) || returnsValue(((IfStmt) s).elseStmt);
+        }
+        if (s instanceof WhileStmt) {
+            return returnsValue(((WhileStmt) s).body);
+        }
+        if (s instanceof ForStmt) {
+            return returnsValue(((ForStmt) s).body);
+        }
+        if (s instanceof ForInStmt) {
+            return returnsValue(((ForInStmt) s).body);
+        }
+        if (s instanceof TryStmt) {
+            TryStmt t = (TryStmt) s;
+            if (returnsValue(t.tryBlock) || returnsValue(t.finallyBlock)) {
+                return true;
+            }
+            for (CatchClause c : t.catches) {
+                if (returnsValue(c.body)) {
+                    return true;
+                }
+            }
+            return false;
+        }
+        if (s instanceof SwitchStmt) {
+            for (SwitchCase c : ((SwitchStmt) s).cases) {
+                for (Stmt x : c.body) {
+                    if (returnsValue(x)) {
+                        return true;
+                    }
+                }
+            }
+        }
+        return false;   // a nested function's returns are its own
+    }
+
+    /**
+     * A callback lambda cast to the functional type its body fits. A lambda has no type
+     * of its own, so it cannot go where the parameter is Object; and a void- or
+     * throw-bodied one fits both the value and the void overload of then/catchError,
+     * which javac reports as ambiguous. {@code forceCast} casts a value-returning lambda
+     * too (an Object parameter); otherwise only a void one is cast and javac resolves the
+     * rest as it always has. Anything that is not a lambda passes as is.
+     */
+    private String pinnedHandler(Expr src, Out o, boolean forceCast, String asValue, String asVoid) {
+        if (!(src instanceof Lambda)) {
+            return o.code;
+        }
+        boolean value = ((Lambda) src).exprBody != null ? !lastLambdaVoid : lambdaReturnsValue(src);
+        if (value && !forceCast) {
+            return o.code;
+        }
+        return "(" + (value ? asValue : asVoid) + ") " + paren(o.code);
     }
 
     /** An inline single-parameter function type {@code (param) -> ret}, for typing a lambda arg. */
