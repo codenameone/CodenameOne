@@ -642,6 +642,35 @@ class TelemetryTest extends UITestBase {
     }
 
     @Test
+    void aHeaderOrRatioNoExportCouldUseIsRefusedWhenGiven() {
+        String[][] bad = {{"Authorization", "token\nextra"}, {"Bad Name", "x"}, {"", "x"},
+            {"X-Key", "a\u0000b"}, {"X-Key", "a\u007fb"}};
+        for (String[] header : bad) {
+            try {
+                new TelemetryConfig().header(header[0], header[1]);
+                throw new AssertionError("accepted header '" + header[0] + "'");
+            } catch (IllegalArgumentException expected) {
+                assertFalse(expected.getMessage().contains("token\nextra"),
+                        "the refusal quoted the value: " + expected.getMessage());
+            }
+        }
+        new TelemetryConfig().header("Authorization", "Api-Token\tabc");
+        try {
+            new TelemetryConfig().relayToken("r3lay\r\nX-Evil: 1");
+            throw new AssertionError("accepted a relay token with a line break");
+        } catch (IllegalArgumentException expected) {
+            // Sent as a header, so held to the same rules.
+        }
+        try {
+            new TelemetryConfig().sampleRatio(Double.NaN);
+            throw new AssertionError("accepted a NaN ratio");
+        } catch (IllegalArgumentException expected) {
+            // A range clamps; NaN has no nearest value.
+        }
+        assertEquals(1.0, new TelemetryConfig().sampleRatio(7).sampleRatio, 0);
+    }
+
+    @Test
     void aTruncatedValueNeverEndsInHalfACharacter() {
         StringBuilder text = new StringBuilder();
         for (int i = 0; i < TelemetrySpan.MAX_VALUE_LENGTH - 1; i++) {

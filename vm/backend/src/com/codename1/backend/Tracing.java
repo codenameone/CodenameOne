@@ -86,11 +86,47 @@ public final class Tracing {
      * export thread and queues on every reconfiguration.
      */
     public static void install(Tracer installed) {
+        retire(swap(installed), installed);
+    }
+
+    /**
+     * Installs {@code installed} WITHOUT stopping the tracer it replaces, and
+     * returns that one. For a start-up that can still fail: it traces its own
+     * start-up with the new tracer, then {@link #retire}s the old one if it
+     * committed or {@link #rollBack}s if it did not. Shutting the old one down up
+     * front left a failed second server's process with no tracer at all, while
+     * the first server kept running untraced.
+     */
+    static Tracer swap(Tracer installed) {
         Tracer previous = tracer;
         tracer = installed;
+        return previous;
+    }
+
+    /** Stops {@code previous}, replaced by {@code installed}, exporting what it held. */
+    static void retire(Tracer previous, Tracer installed) {
         if(previous != null && previous != installed) {
             try {
                 previous.shutdown(REPLACED_SHUTDOWN_MILLIS);
+            } catch (RuntimeException err) {
+                failed(err);
+            }
+        }
+    }
+
+    /**
+     * Undoes a {@link #swap}: {@code previous} is back in the slot, untouched, and
+     * {@code failed} -- the tracer of a start-up that did not complete -- is
+     * stopped. Only if the slot still holds {@code failed}; anything installed
+     * since then is someone else's.
+     */
+    static void rollBack(Tracer failed, Tracer previous) {
+        if(tracer == failed) {
+            tracer = previous;
+        }
+        if(failed != null && failed != previous) {
+            try {
+                failed.shutdown(0);
             } catch (RuntimeException err) {
                 failed(err);
             }
@@ -639,6 +675,20 @@ public final class Tracing {
         span.previous = currentOrNull();
         span.entered = true;
         CURRENT.set(span);
+    }
+
+    /**
+     * Makes {@code span} stop being this thread's current span WITHOUT ending it.
+     * HTTP/2 serves several streams in one turn and writes their responses after
+     * the last handler, so a span has to leave -- or the next stream's span would
+     * start as its child -- before it can end.
+     */
+    static void leave(Span span) {
+        if(span != null && span.entered) {
+            span.entered = false;
+            CURRENT.set(span.previous);
+            span.previous = null;
+        }
     }
 
     /** Ends a span and restores what was current before it. */

@@ -222,11 +222,42 @@ public final class TelemetryConfig {
     /// #### Returns
     ///
     /// this configuration
+    ///
+    /// #### Throws
+    ///
+    /// - `IllegalArgumentException`: when the name is not an HTTP token or the
+    ///   value holds a control character
     public TelemetryConfig header(String name, String value) {
         if (name != null && value != null) {
+            checkHeader(name, value);
             headers.add(new String[] {name, value});
         }
         return this;
+    }
+
+    /// The rules the annotation processor applies to a header, for one written in
+    /// code, which never meets it. A bad header is refused only when an export
+    /// runs -- after its batch has left the buffer, and silently, by design -- so
+    /// accepting it here lost every batch. The message names the header, never
+    /// the value, which is usually a credential.
+    private static void checkHeader(String name, String value) {
+        if (name.length() == 0) {
+            throw new IllegalArgumentException("A telemetry header needs a name");
+        }
+        for (int i = 0; i < name.length(); i++) {
+            char c = name.charAt(i);
+            if (!((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9')
+                    || "!#$%&'*+-.^_`|~".indexOf(c) >= 0)) {
+                throw new IllegalArgumentException("'" + name + "' is not a valid HTTP header name");
+            }
+        }
+        for (int i = 0; i < value.length(); i++) {
+            char c = value.charAt(i);
+            if ((c < 0x20 && c != '\t') || c == 0x7f) {
+                throw new IllegalArgumentException("The value of telemetry header " + name
+                        + " holds a control character, which no HTTP header may carry");
+            }
+        }
     }
 
     /// The shared secret a backend's relay may require
@@ -236,7 +267,15 @@ public final class TelemetryConfig {
     /// #### Returns
     ///
     /// this configuration
+    ///
+    /// #### Throws
+    ///
+    /// - `IllegalArgumentException`: when the token holds a control character
     public TelemetryConfig relayToken(String token) {
+        if (token != null) {
+            // Sent as a header, so held to the same rules.
+            checkHeader("X-CN1-Telemetry-Token", token);
+        }
         this.relayToken = token;
         return this;
     }
@@ -259,7 +298,19 @@ public final class TelemetryConfig {
     /// #### Returns
     ///
     /// this configuration
+    ///
+    /// #### Throws
+    ///
+    /// - `IllegalArgumentException`: for NaN
     public TelemetryConfig sampleRatio(double ratio) {
+        // NaN fails both comparisons below, so it was stored as it was, and the
+        // sampler then declined every trace while telemetry reported itself on.
+        // A range can be clamped into; NaN has no nearest value, so it is refused
+        // -- as the annotation processor refuses it.
+        if (Double.isNaN(ratio)) {
+            throw new IllegalArgumentException("The telemetry sample ratio is NaN; "
+                    + "give a number from 0 to 1");
+        }
         this.sampleRatio = ratio < 0 ? 0 : ratio > 1 ? 1 : ratio;
         return this;
     }

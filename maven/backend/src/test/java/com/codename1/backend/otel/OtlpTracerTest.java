@@ -501,6 +501,37 @@ class OtlpTracerTest {
     }
 
     @Test
+    @DisplayName("a server that fails to start leaves the tracer it found installed and running")
+    void aFailedStartKeepsTheInstalledTracer() throws Exception {
+        final int[] shutdowns = new int[1];
+        ThrowingTracer existing = new ThrowingTracer() {
+            public void shutdown(int timeoutMillis) {
+                shutdowns[0]++;
+            }
+        };
+        Tracing.install(existing);
+        // The port is taken, so this start-up fails after its tracer went in.
+        java.net.ServerSocket blocker = new java.net.ServerSocket(0);
+        try {
+            int port = blocker.getLocalPort();
+            assertThrows(Exception.class, () -> Backend.builder(Config.of(settings(port), "test"))
+                    .quiet()
+                    .tracing(new OtlpTracer())
+                    .handler(new HttpServer.Handler() {
+                        public HttpServer.Response handle(HttpServer.Request request) {
+                            return null;
+                        }
+                    })
+                    .start());
+        } finally {
+            blocker.close();
+        }
+        assertSame(existing, Tracing.getTracer(),
+                "a failed start-up left the process with no tracer at all");
+        assertEquals(0, shutdowns[0], "a failed start-up shut down a tracer that was working");
+    }
+
+    @Test
     @DisplayName("OTEL_SDK_DISABLED leaves the server untraced and the collector untouched")
     void disabledAtRunTime() throws Exception {
         int port = freePort();

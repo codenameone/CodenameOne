@@ -5066,6 +5066,12 @@ public final class HttpServer {
         // underneath this thread. A turn with no completed request at all, one
         // that only pumped control frames, was never counted by anything.
         http2Turns.incrementAndGet();
+        // Server spans of responses SUBMITTED but not yet written: each an Object[]
+        // {span, submitted status, handler error}. Ended once a flush has put them
+        // on the socket, or with a failed write if it could not -- the HTTP/1 path
+        // keeps its span open through the write for the same reason. Ending them at
+        // submission reported a success for a response a disconnected peer never got.
+        List unwritten = new ArrayList();
         try {
             Object existing = http2Sessions.get(new Integer(fd));
             if(existing == null) {
@@ -5222,8 +5228,11 @@ public final class HttpServer {
                 inFlightRequests.incrementAndGet();
                 SERVING_FD.set(new Integer(fd));
                 SERVING_H2.set(Boolean.TRUE);
-                // The HTTP/1 path's span, for the same reasons; it ends in the
-                // finally that closes this stream's request.
+                // The HTTP/1 path's span, for the same reasons. It stops being this
+                // thread's current span in the finally that closes this stream's
+                // request, and ENDS once the response is written (see unwritten).
+                // server.address is set here as for HTTP/1: :authority was copied
+                // into these headers as "host" above, which is what startServer reads.
                 Span span = Tracing.startServer(request, tls != null);
                 Exception handlerError = null;
                 // -1 until the response has been SUBMITTED to the session, as on the
@@ -5401,6 +5410,7 @@ public final class HttpServer {
                         || Http2.pendingBodyFiles() > MAX_OPEN_H2_FILES
                         || Http2.pendingBodyBytesAll() > MAX_OPEN_H2_BODY_BYTES) {
                     flushHttp2(fd, session, h2);
+                    endH2Spans(unwritten, true);
                     // What the flush could NOT write, not zero. nghttp2 pulls
                     // from a submitted body only as the peer's flow-control
                     // window allows, so a client that simply stops sending
@@ -5434,12 +5444,17 @@ public final class HttpServer {
                     SERVING_H2.set(null);
                     if(span != null) {
                         // The status that was submitted -- the handler's, or the 503
-                        // that replaced it -- or -1 when submitting threw.
-                        Tracing.endServer(span, submittedStatus, handlerError);
+                        // that replaced it -- or -1 when submitting threw. Not current
+                        // any more, so the next stream's span is not its child, but
+                        // ended only when the write is known.
+                        Tracing.leave(span);
+                        unwritten.add(new Object[] {span, new Integer(submittedStatus),
+                                handlerError});
                     }
                 }
             }
             flushHttp2(fd, session, h2);
+            endH2Spans(unwritten, true);
             if(!h2.isAlive()) {
                 drop(fd);
                 return;
@@ -5450,8 +5465,25 @@ public final class HttpServer {
             trace("fd=" + fd + " http/2 failed: " + err);
             drop(fd);
         } finally {
+            // Whatever is still here never reached the socket: a flush threw, or
+            // the turn ended before one ran.
+            endH2Spans(unwritten, false);
             http2Turns.decrementAndGet();
         }
+    }
+
+    /**
+     * Ends the spans of submitted HTTP/2 responses, as sent when {@code written},
+     * otherwise as the failed write HTTP/1 reports: status -1, with the handler's
+     * own error if it had one.
+     */
+    private static void endH2Spans(List unwritten, boolean written) {
+        for(int iter = 0 ; iter < unwritten.size() ; iter++) {
+            Object[] entry = (Object[])unwritten.get(iter);
+            Tracing.endServer((Span)entry[0],
+                    written ? ((Integer)entry[1]).intValue() : -1, (Exception)entry[2]);
+        }
+        unwritten.clear();
     }
 
     /** The HTTP/2 connection preface, sent by a client that opens with h2. */

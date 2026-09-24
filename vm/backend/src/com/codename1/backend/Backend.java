@@ -448,17 +448,23 @@ public final class Backend {
             // CREATE TABLE -- are traced like any other, and before anything that
             // could fail, so a refused configuration is refused up front.
             boolean tracing = tracer != null && tracer.open(config);
-            if(tracing) {
-                Tracing.install(tracer);
-            }
+            // Installed without stopping whatever tracer was there before -- another
+            // server's, or one the program installed -- which is retired only once
+            // this start-up commits, and put back if it does not.
+            Tracer previous = tracing ? Tracing.swap(tracer) : null;
+            Backend started;
             try {
-                return startTraced(tracing);
+                started = startTraced(tracing);
             } catch (Exception err) {
                 if(tracing) {
-                    Tracing.shutdown(tracer, 0);
+                    Tracing.rollBack(tracer, previous);
                 }
                 throw err;
             }
+            if(tracing) {
+                Tracing.retire(previous, tracer);
+            }
+            return started;
         }
 
         private Backend startTraced(boolean tracing) throws Exception {

@@ -68,6 +68,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class BackendOtelTest {
     private static final String TRACE = "4bf92f3577b34da6a3ce929d0e0e4736";
     private static final String CALLER_SPAN = "00f067aa0ba902b7";
+    /** The trace the HTTP/2 request carries, so its span is told from the HTTP/1 ones. */
+    private static final String H2_TRACE = "0af7651916cd43dd8448eb211c80319c";
 
     @Test
     @DisplayName("a translated server exports one connected trace, and an untraced one carries no tracer")
@@ -163,14 +165,40 @@ class BackendOtelTest {
                     + CALLER_SPAN + "\",\"name\":\"tap\",\"kind\":3,\"startTimeUnixNano\":"
                     + "\"1700000000000000000\",\"endTimeUnixNano\":\"1700000000100000000\"}]}]}]}"));
 
-            List spans = awaitSpans(exports, 5, 30000);
+            // Over HTTP/2 as well: its span ends only after the response is
+            // written, and :authority -- HTTP/2's Host -- has to reach
+            // server.address just as Host does.
+            assertTrue(http2Get(port, "/h2probe", "00-" + H2_TRACE + "-" + CALLER_SPAN + "-01"),
+                    "no HTTP/2 response came back:\n" + read(log));
+
+            List spans = awaitSpans(exports, 6, 30000);
             assertEquals("application/x-protobuf", contentTypes.get(0));
             assertEquals("Api-Token t0k", authorizations.get(0));
 
             Span work0 = find(spans, "GET /work", Span.SpanKind.SPAN_KIND_SERVER);
             Span query = find(spans, "SELECT", Span.SpanKind.SPAN_KIND_CLIENT);
             Span outbound = find(spans, "GET", Span.SpanKind.SPAN_KIND_CLIENT);
-            Span failed = find(spans, "GET", Span.SpanKind.SPAN_KIND_SERVER);
+            Span failed = null;
+            Span overH2 = null;
+            for (int iter = 0; iter < spans.size(); iter++) {
+                Span s = (Span) spans.get(iter);
+                if (s.getKind() != Span.SpanKind.SPAN_KIND_SERVER) {
+                    continue;
+                }
+                if (H2_TRACE.equals(hex(s.getTraceId()))) {
+                    overH2 = s;
+                } else if (s.getStatus().getCode() == Status.StatusCode.STATUS_CODE_ERROR) {
+                    failed = s;
+                }
+            }
+            assertTrue(failed != null, "no failed server span in " + spans);
+            assertTrue(overH2 != null, "no span for the HTTP/2 request in " + spans);
+            assertEquals(CALLER_SPAN, hex(overH2.getParentSpanId()));
+            assertEquals("2", attribute(overH2.getAttributesList(), "network.protocol.version"));
+            assertEquals("127.0.0.1", attribute(overH2.getAttributesList(), "server.address"),
+                    "HTTP/2's :authority did not reach server.address");
+            assertEquals("404", attribute(overH2.getAttributesList(), "http.response.status_code"),
+                    "the span of a written HTTP/2 response carries the status sent");
             Span relayed = find(spans, "tap", Span.SpanKind.SPAN_KIND_CLIENT);
 
             assertEquals(TRACE, hex(work0.getTraceId()));
@@ -234,6 +262,88 @@ class BackendOtelTest {
         }
         throw new AssertionError("expected " + wanted + " spans, the collector received "
                 + spans.size() + ": " + spans);
+    }
+
+    /**
+     * One GET over cleartext HTTP/2 by prior knowledge, carrying a traceparent;
+     * whether a response HEADERS frame came back. The frame layout is
+     * BackendHttpIntegrationTest's.
+     */
+    private static boolean http2Get(int port, String path, String traceparent) throws IOException {
+        java.net.Socket socket = new java.net.Socket();
+        socket.connect(new InetSocketAddress("127.0.0.1", port), 5000);
+        socket.setSoTimeout(10000);
+        try {
+            OutputStream out = socket.getOutputStream();
+            out.write("PRI * HTTP/2.0\r\n\r\nSM\r\n\r\n".getBytes("UTF-8"));
+            out.write(h2Frame(4, 0, 0, new byte[0]));
+            ByteArrayOutputStream block = new ByteArrayOutputStream();
+            hpackLiteral(block, ":method", "GET");
+            hpackLiteral(block, ":path", path);
+            hpackLiteral(block, ":scheme", "http");
+            hpackLiteral(block, ":authority", "127.0.0.1");
+            hpackLiteral(block, "traceparent", traceparent);
+            out.write(h2Frame(1, 0x05, 1, block.toByteArray()));
+            out.flush();
+            InputStream in = socket.getInputStream();
+            long deadline = System.currentTimeMillis() + 8000;
+            while (System.currentTimeMillis() < deadline) {
+                byte[] header = readExactly(in, 9);
+                if (header == null) {
+                    return false;
+                }
+                int length = ((header[0] & 0xff) << 16) | ((header[1] & 0xff) << 8) | (header[2] & 0xff);
+                if (length > 0 && readExactly(in, length) == null) {
+                    return false;
+                }
+                if ((header[3] & 0xff) == 1) {
+                    return true;
+                }
+            }
+            return false;
+        } finally {
+            socket.close();
+        }
+    }
+
+    private static byte[] h2Frame(int type, int flags, int streamId, byte[] payload) {
+        byte[] out = new byte[9 + payload.length];
+        out[0] = (byte) ((payload.length >>> 16) & 0xff);
+        out[1] = (byte) ((payload.length >>> 8) & 0xff);
+        out[2] = (byte) (payload.length & 0xff);
+        out[3] = (byte) type;
+        out[4] = (byte) flags;
+        out[5] = (byte) ((streamId >>> 24) & 0x7f);
+        out[6] = (byte) ((streamId >>> 16) & 0xff);
+        out[7] = (byte) ((streamId >>> 8) & 0xff);
+        out[8] = (byte) (streamId & 0xff);
+        System.arraycopy(payload, 0, out, 9, payload.length);
+        return out;
+    }
+
+    /** An uncompressed HPACK literal, the one form every decoder accepts. */
+    private static void hpackLiteral(ByteArrayOutputStream out, String name, String value)
+            throws IOException {
+        byte[] n = name.getBytes("ISO-8859-1");
+        byte[] v = value.getBytes("ISO-8859-1");
+        out.write(0x00);
+        out.write(n.length);
+        out.write(n);
+        out.write(v.length);
+        out.write(v);
+    }
+
+    private static byte[] readExactly(InputStream in, int count) throws IOException {
+        byte[] out = new byte[count];
+        int filled = 0;
+        while (filled < count) {
+            int n = in.read(out, filled, count - filled);
+            if (n < 0) {
+                return null;
+            }
+            filled += n;
+        }
+        return out;
     }
 
     private static Span find(List spans, String name, Span.SpanKind kind) {
