@@ -106,7 +106,17 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
                 op = "DIV";
             }
         }
-        return "(" + left + " " + op + " " + right + ")";
+        return checkedArithmetic("(" + left + " " + op + " " + right + ")", kind);
+    }
+    String checkedArithmetic(String expression, int kind) {
+        if (kind != Attribute.REAL && "sqlite".equals(sql.dialect())) {
+            // SQLite promotes overflowing integer operations to REAL. Force an
+            // execution error before a promoted value can escape or be stored.
+            // CASE is lazy; ABS(MIN_VALUE) is evaluated only on overflow.
+            return "(CASE WHEN typeof(" + expression + ") = 'real' THEN abs(-9223372036854775808) ELSE "
+                    + expression + " END)";
+        }
+        return expression;
     }
     String nextAlias() {
         return "q" + (aliasSequence++);

@@ -690,8 +690,15 @@ public final class Database {
         notifyAll();
     }
 
-    /** Whether a transaction opened through this Database API is active. */
-    public synchronized boolean isInTransaction() { return managedTransaction; }
+    /**
+     * Whether a transaction opened through this Database API is active.
+     * Waits for another thread's exclusive transaction to finish before checking,
+     * like other operations on this connection.
+     */
+    public synchronized boolean isInTransaction() {
+        awaitTransactionOwner();
+        return managedTransaction;
+    }
 
     /** Begins an explicitly bounded transaction, pinning SQLite's write lock. */
     public synchronized void beginTransaction() throws IOException {

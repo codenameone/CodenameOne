@@ -165,6 +165,41 @@ class ManagedSessionTest {
         } finally { em.close(); }
     }
 
+    @Test void scalarProjectionsRequireKnownStorageKinds() throws Exception {
+        EntityManager em=manager();
+        try {
+            Session session=em.openSession();seed(session);
+            for(String expression:new String[]{":value","coalesce(:a,:b)","null","(select :value from ManagedSessionTest$Record i)"}) {
+                assertThrows(IllegalArgumentException.class,()->session.createQuery("select "+expression+" from ManagedSessionTest$Record r"));
+            }
+            assertEquals(Long.valueOf(7),session.createQuery("select coalesce(:value,r.counter) from ManagedSessionTest$Record r",Long.class).setParameter("value",7L).first());
+            session.close();
+        } finally { em.close(); }
+    }
+
+    @Test void integralArithmeticRejectsOverflowBeforeReturningOrStoringValues() throws Exception {
+        EntityManager em=manager();
+        try {
+            Session session=em.openSession();Record record=seed(session);
+            String[] expressions={":value + 1",":value - 1",":value * 2",":value / -1","-:value","(:value + 0) + 1"};
+            long[] values={Long.MAX_VALUE,Long.MIN_VALUE,Long.MAX_VALUE,Long.MIN_VALUE,Long.MIN_VALUE,Long.MAX_VALUE};
+            for(int i=0;i<expressions.length;i++) {
+                String expression=expressions[i];long value=values[i];
+                assertThrows(PersistenceException.class,()->session.createQuery("select "+expression+" from ManagedSessionTest$Record r",Long.class).setParameter("value",value).list());
+                session.beginTransaction();
+                assertThrows(PersistenceException.class,()->session.createQuery("update ManagedSessionTest$Record r set r.counter="+expression).setParameter("value",value).executeUpdate());
+                session.rollbackTransaction();
+                assertEquals(0,session.find(Record.class,record.id).counter);
+            }
+            assertEquals(Long.valueOf(Long.MAX_VALUE),session.createQuery("select :value + 0 from ManagedSessionTest$Record r",Long.class).setParameter("value",Long.MAX_VALUE).first());
+            assertEquals(Long.valueOf(Long.MIN_VALUE),session.createQuery("select :value - 0 from ManagedSessionTest$Record r",Long.class).setParameter("value",Long.MIN_VALUE).first());
+            assertEquals(Long.valueOf(15),session.createQuery("select (:a + :b) * :c from ManagedSessionTest$Record r",Long.class).setParameter("a",2L).setParameter("b",3L).setParameter("c",3L).first());
+            assertEquals(Long.valueOf(1),session.createQuery("select count(*) + 0 from ManagedSessionTest$Record r",Long.class).first());
+            assertEquals(Long.valueOf(1),session.createQuery("select sum(r.counter + 1) from ManagedSessionTest$Record r",Long.class).first());
+            session.close();
+        } finally { em.close(); }
+    }
+
     @Test void arithmeticValidatesOperandsAndUsesPortableDivision() throws Exception {
         EntityManager em=manager();
         try {

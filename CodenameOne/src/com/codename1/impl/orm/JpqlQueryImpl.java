@@ -162,8 +162,18 @@ public final class JpqlQueryImpl<T> implements com.codename1.orm.session.JpqlQue
     }
     private Bound arguments() {
         List<Object> values = new ArrayList<Object>();
-        String statement = plan.sql;
-        for (Object binding : plan.bindings) {
+        // Render each occurrence separately: dialect ordering and checked
+        // arithmetic can repeat expressions containing the same bound value.
+        StringBuilder statement = new StringBuilder();
+        int position = 0;
+        int start;
+        while ((start = plan.sql.indexOf("/*cn1-bind-", position)) >= 0) {
+            statement.append(plan.sql.substring(position, start));
+            int end = plan.sql.indexOf("*/?", start);
+            int index = Integer.parseInt(plan.sql.substring(start + 11, end));
+            Object binding = plan.bindings.get(index);
+            position = end + 3;
+            statement.append("?");
             if (binding instanceof LikeBinding) {
                 LikeBinding like = (LikeBinding) binding;
                 Object pattern = boundValue(like.pattern);
@@ -195,8 +205,8 @@ public final class JpqlQueryImpl<T> implements com.codename1.orm.session.JpqlQue
                         SessionImpl.checkParameterCount(values.size());
                         count++;
                     }
-                    statement = statement.replace(
-                            parameter.marker, count == 0 ? "SELECT NULL WHERE 1=0" : SessionImpl.placeholders(count));
+                    statement.setLength(statement.length() - 1);
+                    statement.append(count == 0 ? "SELECT NULL WHERE 1=0" : SessionImpl.placeholders(count));
                 } else {
                     if (value instanceof Iterable || value instanceof Object[]) {
                         throw new IllegalArgumentException("Collection parameter requires IN: " + parameter.name);
@@ -208,7 +218,8 @@ public final class JpqlQueryImpl<T> implements com.codename1.orm.session.JpqlQue
             }
         }
         SessionImpl.checkParameterCount(values.size());
-        return new Bound(statement, values.toArray());
+        statement.append(plan.sql.substring(position));
+        return new Bound(statement.toString(), values.toArray());
     }
     private Object boundValue(Object binding) {
         if (!(binding instanceof Parameter)) {
@@ -294,6 +305,7 @@ public final class JpqlQueryImpl<T> implements com.codename1.orm.session.JpqlQue
         boolean literal;
         boolean aggregate;
         boolean numericOperands;
+        boolean association;
         boolean predicate;
         QueryImpl projectionQuery;
         String projectionField;
@@ -504,13 +516,6 @@ public final class JpqlQueryImpl<T> implements com.codename1.orm.session.JpqlQue
                         take("ASC");
                     }
                     String rendered = session.orderBy(term.sql, ascending, term.kind);
-                    // Some dialects repeat a term to normalize NULL placement.
-                    // Each repeated expression also needs its own bound values.
-                    int occurrence = rendered.indexOf(term.sql, rendered.indexOf(term.sql) + term.sql.length());
-                    while (occurrence >= 0) {
-                        bindings.addAll(termBindings);
-                        occurrence = rendered.indexOf(term.sql, occurrence + term.sql.length());
-                    }
                     out.append(rendered);
                 } while (take(","));
                 order = " ORDER BY " + out;
@@ -544,7 +549,8 @@ public final class JpqlQueryImpl<T> implements com.codename1.orm.session.JpqlQue
                     }
                 } else {
                     projection.append(" AS cn1_scalar_").append(kinds.size());
-                    kinds.add(Integer.valueOf(expr.kind < 0 ? Attribute.TEXT : expr.kind));
+                    validateProjection(expr);
+                    kinds.add(Integer.valueOf(expr.kind));
                 }
             }
             if (!plan.fetches.isEmpty() && !SessionImpl.sameInstance(plan.entity, root.model)) {
@@ -622,8 +628,7 @@ public final class JpqlQueryImpl<T> implements com.codename1.orm.session.JpqlQue
                     parameter.query = left.query;
                     parameter.field = left.field;
                     parameter.expectedKind = left.kind;
-                    parameter.marker = "/*cn1-list-" + bindings.size() + "*/?";
-                    bindings.add(parameter);
+                    parameter.marker = bind(parameter);
                     values = parameter.marker;
                 } else {
                     if (!parens) {
@@ -680,9 +685,9 @@ public final class JpqlQueryImpl<T> implements com.codename1.orm.session.JpqlQue
                     while (bindings.size() > firstBinding) {
                         bindings.remove(bindings.size() - 1);
                     }
-                    bindings.add(new LikeBinding(pattern.parameter == null ? pattern.literalValue : pattern.parameter,
+                    String marker = bind(new LikeBinding(pattern.parameter == null ? pattern.literalValue : pattern.parameter,
                             !escaped ? null : escape.parameter == null ? escape.literalValue : escape.parameter, escaped));
-                    sql = left.sql + session.likeOperator(escaped);
+                    sql = left.sql + session.likeOperator(escaped).replace("?", marker);
                 } else {
                     if (escaped) {
                         throw error("LIKE with ESCAPE requires literal or parameter patterns and escapes");
@@ -741,7 +746,8 @@ public final class JpqlQueryImpl<T> implements com.codename1.orm.session.JpqlQue
             if (take("-")) {
                 Expr value = primary();
                 requireNumeric(value, value.kind != Attribute.REAL);
-                Expr result = wrap("-" + session.numericOperand(value.sql, value.kind < 0 ? Attribute.BIGINT : value.kind), value);
+                Expr result = wrap(session.checkedArithmetic("-" + session.numericOperand(value.sql,
+                        value.kind < 0 ? Attribute.BIGINT : value.kind), value.kind < 0 ? Attribute.BIGINT : value.kind), value);
                 result.kind = value.kind < 0 ? Attribute.BIGINT : value.kind;
                 result.projectionQuery = null;
                 return result;
@@ -770,15 +776,13 @@ public final class JpqlQueryImpl<T> implements com.codename1.orm.session.JpqlQue
             String token = next();
             if (token.startsWith(":")) {
                 Parameter parameter = new Parameter(token.substring(1));
-                bindings.add(parameter);
-                Expr result = new Expr("?", -1);
+                Expr result = new Expr(bind(parameter), -1);
                 result.parameter = parameter;
                 return result;
             }
             if (token.startsWith("'")) {
                 String value = token.substring(1, token.length() - 1).replace("''", "'");
-                bindings.add(value);
-                return literal("?", Attribute.TEXT, value);
+                return literal(bind(value), Attribute.TEXT, value);
             }
             if ("NULL".equalsIgnoreCase(token)) {
                 return literal("NULL", -1, null);
@@ -790,8 +794,7 @@ public final class JpqlQueryImpl<T> implements com.codename1.orm.session.JpqlQue
                 Object value = token.indexOf('.') >= 0 || token.indexOf('e') >= 0 || token.indexOf('E') >= 0
                                        ? (Object) Double.valueOf(token)
                                        : Long.valueOf(Long.parseLong(token));
-                bindings.add(value);
-                return literal("?", value instanceof Double ? Attribute.REAL : Attribute.BIGINT, value);
+                return literal(bind(value), value instanceof Double ? Attribute.REAL : Attribute.BIGINT, value);
             }
             if (!identifier(token)) {
                 throw error("Expected expression");
@@ -844,6 +847,11 @@ public final class JpqlQueryImpl<T> implements com.codename1.orm.session.JpqlQue
                 result.aggregate = " COUNT SUM AVG MIN MAX ".contains(" " + function + " ");
                 result.numericOperands = " SUM AVG MIN MAX ABS COALESCE NULLIF ".contains(" " + function + " ");
                 result.children.addAll(args);
+                if (" MIN MAX COALESCE NULLIF ".contains(" " + function + " ")) {
+                    for (Expr arg : args) {
+                        result.association |= arg.association;
+                    }
+                }
                 // These functions preserve their operands' domain representation.
                 if (!"COUNT".equals(function) && !"LENGTH".equals(function)) {
                     for (Expr arg : args) {
@@ -884,9 +892,23 @@ public final class JpqlQueryImpl<T> implements com.codename1.orm.session.JpqlQue
             Expr result = new Expr(alias.query.column(field), alias.query.kind(field));
             result.query = alias.query;
             result.field = field;
+            result.association = alias.query.association(field);
             result.projectionQuery = result.query;
             result.projectionField = field;
             return result;
+        }
+        private String bind(Object value) {
+            String marker = "/*cn1-bind-" + bindings.size() + "*/?";
+            bindings.add(value);
+            return marker;
+        }
+        private void validateProjection(Expr value) {
+            if (value.kind < 0) {
+                throw error("Scalar projection requires a known storage kind");
+            }
+            if (value.association) {
+                throw error("Association-valued scalar projections are not supported; select an explicit target field");
+            }
         }
         private void validateFunction(String function, List<Expr> args, boolean distinct) {
             boolean aggregate = " COUNT SUM AVG MIN MAX ".contains(" " + function + " ");
@@ -944,6 +966,7 @@ public final class JpqlQueryImpl<T> implements com.codename1.orm.session.JpqlQue
             result.children.add(value);
             result.numericOperands = true;
             result.predicate = value.predicate;
+            result.association = value.association;
             result.projectionQuery = value.projectionQuery;
             result.projectionField = value.projectionField;
             result.query = value.query;
@@ -1138,8 +1161,18 @@ public final class JpqlQueryImpl<T> implements com.codename1.orm.session.JpqlQue
             }
             return false;
         }
+        private String bindingShape(String sql) {
+            StringBuilder result = new StringBuilder();
+            int position = 0;
+            int start;
+            while ((start = sql.indexOf("/*cn1-bind-", position)) >= 0) {
+                result.append(sql.substring(position, start)).append('?');
+                position = sql.indexOf("*/?", start) + 3;
+            }
+            return result.append(sql.substring(position)).toString();
+        }
         private boolean sameExpression(Expr left, Expr right) {
-            if (!left.sql.equals(right.sql) || left.literal != right.literal
+            if (!bindingShape(left.sql).equals(bindingShape(right.sql)) || left.literal != right.literal
                     || left.children.size() != right.children.size()) {
                 return false;
             }

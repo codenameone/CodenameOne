@@ -314,6 +314,12 @@ public class OrmAnnotationProcessorTest {
                     org.junit.Assert.assertSame(ticket,session.query(ticketType).eq("owner.address.city","Paris").orderBy("owner.address.city",true).first());
                     org.junit.Assert.assertSame(ticket,session.query(ticketType).join("owner").like("owner.address.city","Pa%").first());
                     org.junit.Assert.assertEquals("Paris",session.createQuery("select t.owner.address.city from scalarprojections.Ticket t where t.owner.address.city=:city",String.class).setParameter("city","Paris").first());
+                    for(String query:Arrays.asList("select t.owner from scalarprojections.Ticket t","select (t.owner) from scalarprojections.Ticket t","select coalesce(t.owner,t.owner) from scalarprojections.Ticket t","select o from scalarprojections.Ticket t join t.owner o")) {
+                        org.junit.Assert.assertThrows(IllegalArgumentException.class,()->session.createQuery(query));
+                    }
+                    org.junit.Assert.assertEquals(Long.valueOf(1),session.createQuery("select count(t.owner) from scalarprojections.Ticket t",Long.class).first());
+                    org.junit.Assert.assertEquals(Boolean.TRUE,session.createQuery("select t.owner is not null from scalarprojections.Ticket t",Boolean.class).first());
+                    org.junit.Assert.assertEquals(ownerType.getField("id").get(owner),session.createQuery("select t.owner.id from scalarprojections.Ticket t",Long.class).first());
                     org.junit.Assert.assertEquals("Paris",session.createQuery("select o.address.city from scalarprojections.Ticket t join t.owner o",String.class).first());
                     org.junit.Assert.assertEquals(active,session.createQuery("select (select max(o.status) from scalarprojections.Owner o) from scalarprojections.Ticket t",stateType).first());
                 } finally { session.close();db.close(); }

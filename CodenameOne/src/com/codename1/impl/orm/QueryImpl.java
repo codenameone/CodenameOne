@@ -317,6 +317,16 @@ public final class QueryImpl<T> implements com.codename1.orm.session.Query<T> {
             remaining = path.substring(offset);
         }
     }
+    boolean association(String field) {
+        Field resolved = resolveField(field);
+        String name = resolved.join.model.attributes()[resolved.index].field;
+        for (Relationship relation : resolved.join.model.relationships()) {
+            if (relation.field.equals(name)) {
+                return true;
+            }
+        }
+        return false;
+    }
     Object parameter(String field, Object value) {
         Field resolved = resolveField(field);
         return resolved.join.model.parameter(resolved.index, value);

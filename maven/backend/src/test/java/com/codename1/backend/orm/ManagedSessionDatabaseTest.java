@@ -87,6 +87,18 @@ class ManagedSessionDatabaseTest {
             session.beginTransaction();
             ManagedSessionTest.Record entity=new ManagedSessionTest.Record();entity.name="record";entity.bytes=new byte[]{1,2};session.persist(entity);
             assertTrue(entity.id>0);session.commitTransaction();session.clear();
+            String[] overflowExpressions={":value+1",":value-1",":value*2",":value/-1","-:value"};
+            long[] overflowValues={Long.MAX_VALUE,Long.MIN_VALUE,Long.MAX_VALUE,Long.MIN_VALUE,Long.MIN_VALUE};
+            for(int i=0;i<overflowExpressions.length;i++) {
+                String expression=overflowExpressions[i];long value=overflowValues[i];
+                assertThrows(PersistenceException.class,()->session.createQuery("select "+expression+" from ManagedSessionTest$Record r",Long.class).setParameter("value",value).list());
+                session.beginTransaction();
+                assertThrows(PersistenceException.class,()->session.createQuery("update ManagedSessionTest$Record r set r.counter="+expression).setParameter("value",value).executeUpdate());
+                session.rollbackTransaction();
+                assertEquals(0,session.find(ManagedSessionTest.Record.class,entity.id).counter);
+            }
+            assertEquals(Long.valueOf(Long.MAX_VALUE),session.createQuery("select :value+0 from ManagedSessionTest$Record r",Long.class).setParameter("value",Long.MAX_VALUE).first());
+            assertEquals(Long.valueOf(Long.MIN_VALUE),session.createQuery("select :value-0 from ManagedSessionTest$Record r",Long.class).setParameter("value",Long.MIN_VALUE).first());
             assertEquals(Long.valueOf(9007199254740993L),session.createQuery("select sum(r.counter+9007199254740993) from ManagedSessionTest$Record r",Long.class).first());
             assertEquals("record",session.createQuery("select (select max(i.name) from ManagedSessionTest$Record i) from ManagedSessionTest$Record r",String.class).first());
             assertEquals(1,session.createQuery("select r from ManagedSessionTest$Record r where :flag and NOT false").setParameter("flag",true).list().size());
