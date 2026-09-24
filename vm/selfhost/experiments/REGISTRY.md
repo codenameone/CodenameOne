@@ -6318,3 +6318,51 @@ arms the same way. The generational arm is the only one under JDK on time, and i
 still frees a live young object in ~25% of runs on the Mac (none of these three), so
 it is not a result yet. STW without generations loses 1.75x: the full mark of an
 old heap every cycle is exactly what a single core cannot afford.
+
+## Round 43: the generational use-after-free, and which collector has levers on one core
+
+**The bug.** The single-core generational WIP freed a live young object in ~25% of Mac
+runs and 5/16-11/20 of contended Linux runs. Three instruments misled before one
+answered. The quarantine build (`CN1_GC_GEN_QUAR`) poisons only finalizer-free objects,
+so a wrongly freed collection kept working and hid the fault; `CN1_GC_GEN_CHECK2` does
+not trace through old objects, so its "0 missed edges" covered nothing; and the verifier
+checks only current-epoch holders, which excludes every untraced old parent in a minor.
+What settled it: `CN1_EXP_NOSTOP` (minors trace through old objects) passed 16/16, so it
+was a missing remembered-set entry; then `CN1_GC_GEN_SHADOW` -- after a minor's mark,
+trace through each old object it stopped at and name every young object reached that
+the minor left on a page about to be swept, with that ancestor's remember history.
+All 106 misses: an ancestor remembered by the barrier DURING a major, before its
+remembered-set scan, while the mutator was still running. The major took the set at scan
+time and discarded it, so a young object stored mid-major into an already-traced old
+object, surviving unmarked on a thread-owned page, lost its only record. Fix: a major
+takes (and discards) its set at cycle start; later entries carry into the next minor.
+After: 24/24 contended runs pass, shadow reports 0 misses.
+
+Side finding, committed separately: on Linux the verifier's stack range was "frame +
+1MB", which reached past the stack top into BiBOP pages and reported ~60,000 heap
+references per cycle as escaped stack objects; the overflow guard assumed 8MB of a 16MB
+stack. Both now come from pthread_getattr_np.
+
+**Real single core** (podman, `taskset -c 0`, JVM on SerialGC), interleaved, min wall /
+max RSS, all outputs byte-identical to the JDK reference:
+
+| arm | wall vs JDK | RSS vs JDK |
+|---|---:|---:|
+| concurrent (branch head) | 0.95 | 2.16 |
+| STW, no generations | 1.62-1.69 | 1.14-1.21 |
+| generational, major every 2 minors | 1.04 | 1.28 |
+| generational, every 4 | 0.91 | 1.34 |
+| generational, every 8 (WIP default) | 0.81-0.83 | 1.44-1.53 |
+| generational, every 32 | 0.80 | 2.24 |
+| generational, every 8, 64MB trigger | 0.77 | 1.70 |
+
+Reading it: the concurrent collector has no memory lever on one core. STW sets the
+memory floor any policy can reach here (~1.2x) and costs 1.7x in time because every
+cycle is a full mark. The generational collector is under JDK on time across the whole
+useful range; its major frequency is a direct time-for-memory dial. At the WIP default the
+841MB peak is 467MB of BiBOP pages (400 live, 63 dead), 191MB native side storage, 67MB
+legacy, 116MB unattributed; mark+sweep is 5.2s of 11.5s over 112 cycles at a fixed 24MB
+trigger. So the levers are: majors driven by old-generation growth rather than a count,
+a cheaper full mark, and -- for the last 1.2x -- representation, which no collector
+policy reaches. One STW run took 9m05s (correct output); unexplained, and majors share
+that path.
