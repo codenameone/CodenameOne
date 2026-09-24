@@ -1145,7 +1145,7 @@ JAVA_VOID java_lang_System_arraycopy___java_lang_Object_int_java_lang_Object_int
     // old destination with no per-element store. Remember the destination once, after
     // the copy, rather than inspecting what was copied. Same-array moves add no edge.
     if(cn1__satbReg && (CN1_EXP_SAMEARRAY || srcArr != dstArr) && cn1GcGenBarrier
-       && __atomic_load_n(&((JAVA_OBJECT)dstArr)->__codenameOneGcMark, __ATOMIC_RELAXED) > 0) {
+       && CN1_OBJ_MARK_LOAD(((JAVA_OBJECT)dstArr), __ATOMIC_RELAXED) > 0) {
         cn1GcRememberSlow((JAVA_OBJECT)dstArr);
     }
     if(cn1__satbReg) {
@@ -4424,7 +4424,7 @@ JAVA_INT java_util_ArrayList_addAllNative___int_java_util_Collection_R_int(
     cn1SatbBulkEnd();
     // Generational half: the copy publishes the source's references with no per-element
     // store. Remembering the OWNER covers whichever block it now holds.
-    if(cn1GcGenBarrier && __atomic_load_n(&owner->__codenameOneGcMark, __ATOMIC_RELAXED) > 0) {
+    if(cn1GcGenBarrier && CN1_OBJ_MARK_LOAD(owner, __ATOMIC_RELAXED) > 0) {
         cn1GcRememberSlow(owner);
     }
     if(block != old) cn1RefBlockRetire(old);

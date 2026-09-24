@@ -392,11 +392,56 @@ struct JavaObjectPrototype {
 #define CN1_OBJ_SET_HEAPPOS(o, v)   (((struct JavaObjectPrototype*)(o))->__heapPosition = (v))
 #define CN1_OBJ_HEAPPOS_PTR(o)      (&((struct JavaObjectPrototype*)(o))->__heapPosition)
 #define CN1_OBJ_HEADER_INIT(cls)    .__codenameOneParentClsReference = (cls)
-// The mark word, and the value an object carries from allocation until a mark reaches it.
+// THE MARK WORD STORES AN ENCODED EPOCH.
+//
+// The collector reasons in CYCLES: currentGcMarkValue counts up from 1 and never wraps in
+// practice, and every epoch it keeps outside an object -- page and thread bookkeeping,
+// cn1GcReclaimedBefore, the aging slack arithmetic -- is a cycle number compared with <.
+// An object's mark does not need that range. What is stored is the cycle modulo
+// CN1_GC_EPOCH_WINDOW (plus one, so 0 stays "never marked"), and a read turns it back into
+// a cycle by taking its age relative to the current one. That round trip is exact while
+// no mark that is READ is a full window old, which holds because every live object is
+// re-marked at least once per full cycle (every concurrent cycle, every generational
+// major), and a dead object's mark, which can sit unswept on an owned page or a page the
+// sweep's shortcuts skip, is relabelled CN1_GC_MARK_ANCIENT every quarter window
+// (cn1BibopRelabelStale).
+//
+// Negative values are sentinels and are stored as themselves: -1 fresh, the free and
+// quarantine marks, the debug poison marks, and ANCIENT, which decodes to a cycle older
+// than any the collector compares against, so every rule reads it as long dead.
+//
+// Code outside the collector reads marks only through CN1_OBJ_MARK / CN1_OBJ_MARK_LOAD
+// (decoded) and writes them through CN1_OBJ_SET_MARK / CN1_OBJ_MARK_STORE (encoded). The
+// raw word is compared directly only against an encoded epoch (cn1GcFieldMarkEpoch).
+#ifndef CN1_GC_EPOCH_WINDOW
+#define CN1_GC_EPOCH_WINDOW (1 << 30)
+#endif
 #define CN1_GC_MARK_FRESH           (-1)
-#define CN1_OBJ_MARK(o)             ((int)((const struct JavaObjectPrototype*)(o))->__codenameOneGcMark)
-#define CN1_OBJ_SET_MARK(o, v)      (((struct JavaObjectPrototype*)(o))->__codenameOneGcMark = (v))
+#define CN1_GC_MARK_ANCIENT         (-2)
+#define CN1_GC_ANCIENT_CYCLE        (-(1 << 29))
+extern int currentGcMarkValue;
+static inline __attribute__((always_inline)) int cn1GcMarkEncode(int v) {
+    if(v <= 0) {
+        return v == CN1_GC_ANCIENT_CYCLE ? CN1_GC_MARK_ANCIENT : v;
+    }
+    return 1 + (int)((unsigned)v % (unsigned)CN1_GC_EPOCH_WINDOW);
+}
+static inline __attribute__((always_inline)) int cn1GcMarkDecode(int raw) {
+    if(raw <= 0) {
+        return raw == CN1_GC_MARK_ANCIENT ? CN1_GC_ANCIENT_CYCLE : raw;
+    }
+    int cur = __atomic_load_n(&currentGcMarkValue, __ATOMIC_RELAXED);
+    int age = cn1GcMarkEncode(cur) - raw;
+    if(age < 0) {
+        age += CN1_GC_EPOCH_WINDOW;
+    }
+    return cur - age;
+}
 #define CN1_OBJ_MARK_PTR(o)         (&((struct JavaObjectPrototype*)(o))->__codenameOneGcMark)
+#define CN1_OBJ_MARK(o)             cn1GcMarkDecode(((const struct JavaObjectPrototype*)(o))->__codenameOneGcMark)
+#define CN1_OBJ_SET_MARK(o, v)      (((struct JavaObjectPrototype*)(o))->__codenameOneGcMark = cn1GcMarkEncode(v))
+#define CN1_OBJ_MARK_LOAD(o, ord)   cn1GcMarkDecode(__atomic_load_n(CN1_OBJ_MARK_PTR(o), (ord)))
+#define CN1_OBJ_MARK_STORE(o, v, ord) __atomic_store_n(CN1_OBJ_MARK_PTR(o), cn1GcMarkEncode(v), (ord))
 
 // THE ARRAY HEADER IS 32 BYTES, AND EIGHT OF THOSE WERE PURE PADDING PLUS SLACK.
 //
@@ -1599,7 +1644,7 @@ struct TryBlock {
 // were allocated before the cycle began, so there a fresh reference is logged like any
 // other; cn1GcFreshFilter is set once, at the first collection, and never changes.
 extern JAVA_BOOLEAN cn1GcFreshFilter;
-#define CN1_SATB_FRESH_INLINE(o) (cn1GcFreshFilter && __atomic_load_n(&(o)->__codenameOneGcMark, __ATOMIC_RELAXED) == -1)
+#define CN1_SATB_FRESH_INLINE(o) (cn1GcFreshFilter && CN1_OBJ_MARK_LOAD((o), __ATOMIC_RELAXED) == -1)
 #endif
 #if defined(CN1_DISABLE_SATB)
 #define CN1_WRITE_BARRIER(target, value) do { } while(0)
@@ -1615,13 +1660,13 @@ extern void cn1GcRememberBlock(JAVA_LONG block);
 #define CN1_GEN_REMEMBER_BLOCK(block, v) \
     do { JAVA_OBJECT cn1__bv = (JAVA_OBJECT)(v); \
          if(__builtin_expect(cn1GcGenBarrier, 0) && cn1__bv != JAVA_NULL && !CN1_IS_TAGGED(cn1__bv) \
-            && __atomic_load_n(&cn1__bv->__codenameOneGcMark, __ATOMIC_RELAXED) == -1) \
+            && CN1_OBJ_MARK_LOAD(cn1__bv, __ATOMIC_RELAXED) == -1) \
              cn1GcRememberBlock(block); } while(0)
 #define CN1_GEN_REMEMBER(target, v) \
     do { JAVA_OBJECT cn1__gt = (JAVA_OBJECT)(target); \
          if(cn1__gt != JAVA_NULL \
-            && __atomic_load_n(&(v)->__codenameOneGcMark, __ATOMIC_RELAXED) == -1 \
-            && __atomic_load_n(&cn1__gt->__codenameOneGcMark, __ATOMIC_RELAXED) > 0) \
+            && CN1_OBJ_MARK_LOAD((v), __ATOMIC_RELAXED) == -1 \
+            && CN1_OBJ_MARK_LOAD(cn1__gt, __ATOMIC_RELAXED) > 0) \
              cn1GcRememberSlow(cn1__gt); } while(0)
 #ifdef CN1_GC_GEN_CHECK2
 extern void cn1GcGenNoteStore(JAVA_OBJECT target, JAVA_OBJECT value);
@@ -2611,7 +2656,7 @@ static inline JAVA_OBJECT cn1BibopFastAlloc(CODENAME_ONE_THREAD_STATE, int size,
             o->className = threadStateData->callStackClass[threadStateData->callStackOffset - 1];
             o->line = threadStateData->callStackLine[threadStateData->callStackOffset - 1];
 #endif
-            __atomic_store_n(&o->__codenameOneGcMark, -1, __ATOMIC_RELEASE);
+            CN1_OBJ_MARK_STORE(o, -1, __ATOMIC_RELEASE);
             atomic_store_explicit(&p->bumpIndex, bi + 1, memory_order_release);
 #ifndef CN1_BIBOP_NO_FASTSWEEP
             // Mark the page dirty: the O(1) sweep never treats a page that still has
@@ -2703,7 +2748,7 @@ static inline JAVA_OBJECT cn1BibopFastAllocNoZero(CODENAME_ONE_THREAD_STATE, int
             o->className = threadStateData->callStackClass[threadStateData->callStackOffset - 1];
             o->line = threadStateData->callStackLine[threadStateData->callStackOffset - 1];
 #endif
-            __atomic_store_n(&o->__codenameOneGcMark, -1, __ATOMIC_RELEASE);
+            CN1_OBJ_MARK_STORE(o, -1, __ATOMIC_RELEASE);
             atomic_store_explicit(&p->bumpIndex, bi + 1, memory_order_release);
 #ifndef CN1_BIBOP_NO_FASTSWEEP
             // relaxed: concurrently read by the grace pass (see cn1BibopFastAlloc)
@@ -2743,7 +2788,7 @@ static inline JAVA_OBJECT cn1BibopFastAllocNoZero(CODENAME_ONE_THREAD_STATE, int
         o->className = threadStateData->callStackClass[threadStateData->callStackOffset - 1];
         o->line = threadStateData->callStackLine[threadStateData->callStackOffset - 1];
 #endif
-        __atomic_store_n(&o->__codenameOneGcMark, -1, __ATOMIC_RELEASE);
+        CN1_OBJ_MARK_STORE(o, -1, __ATOMIC_RELEASE);
 #ifndef CN1_BIBOP_NO_FASTSWEEP
         __atomic_store_n(&p->gcAllocedSinceSweep, JAVA_TRUE, __ATOMIC_RELAXED);
 #endif
@@ -3465,7 +3510,7 @@ extern JAVA_OBJECT cn1AllocFused(CODENAME_ONE_THREAD_STATE, int totalSize, struc
 static inline JAVA_OBJECT cn1FusedInstallPrimArray(JAVA_OBJECT owner, int off, struct clazz* acls, int esz, int len) {
     struct JavaArrayPrototype* a = (struct JavaArrayPrototype*)((char*)owner + off);
     CN1_OBJ_SET_CLASS(a, acls);
-    a->__codenameOneGcMark = -1;   // not yet published; see codenameOneGcMalloc
+    CN1_OBJ_SET_MARK(a, -1);   // not yet published; see codenameOneGcMalloc
     CN1_OBJ_SET_HEAPPOS(a, CN1_GC_EMBEDDED_PRIMITIVE);
     a->length = len;
     a->dimensions = 1;
@@ -4035,7 +4080,7 @@ static inline JAVA_OBJECT cn1IterScopeTake(struct ThreadLocalData* threadStateDa
     // treats it as aged, and heapPosition -1 because it was never registered in the heap
     // table and must never be freed. It dies when the frame unwinds.
     CN1_OBJ_SET_CLASS(o, cls);
-    o->__codenameOneGcMark = -1;
+    CN1_OBJ_SET_MARK(o, -1);
     CN1_OBJ_SET_HEAPPOS(o, -1);
     return o;
 }
@@ -4049,7 +4094,8 @@ extern int cn1GcFieldMarkEpoch(JAVA_BOOLEAN force);
 static inline __attribute__((always_inline)) void cn1GcMarkField(
         CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj, JAVA_BOOLEAN force, int epoch) {
     if (obj == JAVA_NULL || CN1_IS_TAGGED(obj)) return;
-    if (epoch != 0 && __atomic_load_n(&obj->__codenameOneGcMark, __ATOMIC_ACQUIRE) == epoch) return;
+    // epoch is ENCODED (cn1GcFieldMarkEpoch): a raw word compare.
+    if (epoch != 0 && __atomic_load_n(CN1_OBJ_MARK_PTR(obj), __ATOMIC_ACQUIRE) == epoch) return;
     gcMarkObject(threadStateData, obj, force);
 }
 
@@ -4305,7 +4351,7 @@ extern _Atomic long cn1RefGets;
 #define CN1_SATB_REF_KEEP(active, refVal) \
     do { CN1_REF_COUNT_GET(); JAVA_OBJECT cn1__r = (refVal); \
          if((active) && cn1__r != JAVA_NULL && !CN1_IS_TAGGED(cn1__r)) { \
-             int cn1__m = __atomic_load_n(&cn1__r->__codenameOneGcMark, __ATOMIC_RELAXED); \
+             int cn1__m = CN1_OBJ_MARK_LOAD(cn1__r, __ATOMIC_RELAXED); \
              int cn1__e = atomic_load_explicit(&bibopGcEpoch, memory_order_relaxed); \
              if(cn1__m != -1 && cn1__m != cn1__e) cn1SatbEnqueue(cn1__r); \
          } } while(0)

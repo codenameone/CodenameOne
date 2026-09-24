@@ -239,7 +239,7 @@ static struct JavaArrayPrototype* cn1BackendEnsureWouldBlockArray(void) {
             return 0;
         }
         CN1_OBJ_SET_CLASS(cn1BackendWouldBlockArray, &class_array1__JAVA_BYTE);
-        cn1BackendWouldBlockArray->__codenameOneGcMark = -1;
+        CN1_OBJ_SET_MARK(cn1BackendWouldBlockArray, -1);
         CN1_OBJ_SET_HEAPPOS(cn1BackendWouldBlockArray, -1);
         cn1BackendWouldBlockArray->dimensions = 1;
         cn1BackendWouldBlockArray->primitiveSize = sizeof(JAVA_ARRAY_BYTE);
@@ -311,7 +311,7 @@ static struct JavaArrayPrototype* cn1BackendEnsureReadArray(JAVA_INT capacity) {
             return 0;
         }
         CN1_OBJ_SET_CLASS(cn1BackendReadArray, &class_array1__JAVA_BYTE);
-        cn1BackendReadArray->__codenameOneGcMark = -1;
+        CN1_OBJ_SET_MARK(cn1BackendReadArray, -1);
         CN1_OBJ_SET_HEAPPOS(cn1BackendReadArray, -1);
         cn1BackendReadArray->dimensions = 1;
         cn1BackendReadArray->primitiveSize = sizeof(JAVA_ARRAY_BYTE);
