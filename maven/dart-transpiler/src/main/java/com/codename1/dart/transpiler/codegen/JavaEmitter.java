@@ -4623,6 +4623,10 @@ public final class JavaEmitter {
             }
         }
         if (b.op.equals("==") || b.op.equals("!=")) {
+            // Java's primitive == on an int and a double widens the int, and that is Dart's
+            // semantics too, not an approximation of them: measured on the Dart 3.9 VM,
+            // 9007199254740993 == 9007199254740992.0 is TRUE and the matching > is false.
+            // Only compareTo compares an int and a double exactly.
             if (numeric || (l.type.is("bool") && r.type.is("bool"))) {
                 return new Out(paren(l.code) + " " + b.op + " " + paren(r.code), TypeRef.BOOL);
             }
@@ -5701,6 +5705,13 @@ public final class JavaEmitter {
                 String start = pos.size() > 1 ? ", " + emitExpr(pos.get(1), TypeRef.INT, ctx).code : "";
                 return new Out(target.code + ".indexOfDart(" + boxIfPrimitive(v, ctx) + start + ")", TypeRef.INT);
             }
+            if (n.equals("lastIndexOf")) {
+                // Was unlowered: it reached Java's lastIndexOf, which compares with the
+                // wrappers' equals (1 never matched 1.0) and has no start at all.
+                Out v = emitExpr(pos.get(0), null, ctx);
+                String start = pos.size() > 1 ? ", " + emitExpr(pos.get(1), TypeRef.INT, ctx).code : "";
+                return new Out(target.code + ".lastIndexOfDart(" + boxIfPrimitive(v, ctx) + start + ")", TypeRef.INT);
+            }
             if (n.equals("join")) {
                 String sep = pos.isEmpty() ? "\"\"" : emitExpr(pos.get(0), null, ctx).code;
                 return new Out(target.code + ".join(" + sep + ")", TypeRef.STRING);
@@ -5811,8 +5822,9 @@ public final class JavaEmitter {
                 return new Out(target.code + ".indexWhere(" + args + ")", TypeRef.INT);
             }
             if (n.equals("lastIndexWhere")) {
+                String start = pos.size() > 1 ? ", " + emitExpr(pos.get(1), TypeRef.INT, ctx).code : "";
                 return new Out(target.code + ".lastIndexWhere("
-                        + emitExpr(pos.get(0), elementLambda(elem, TypeRef.BOOL), ctx).code + ")",
+                        + emitExpr(pos.get(0), elementLambda(elem, TypeRef.BOOL), ctx).code + start + ")",
                         TypeRef.INT);
             }
             if (n.equals("removeWhere")) {

@@ -215,11 +215,13 @@ public final class DartTranspiler {
         }
         for (File f : children) {
             if (f.isDirectory()) {
-                // Only the asset root itself -- src/main/flutter/assets -- is not
-                // source. Skipping every directory NAMED assets silently dropped
-                // real code such as lib/assets/generated.dart from the
-                // whole-program parse, and its importers failed to resolve.
-                if (!(dir.equals(root) && f.getName().equals("assets"))) {
+                // Only the asset roots themselves -- src/main/flutter/assets and
+                // src/main/flutter/packages, both of which TranscodeFlutterMojo bundles
+                // as assets -- are not source. Skipping every directory NAMED assets
+                // silently dropped real code such as lib/assets/generated.dart from the
+                // whole-program parse; not skipping packages/ parsed a .dart file bundled
+                // there as data, and its declarations could break the build.
+                if (!(dir.equals(root) && (f.getName().equals("assets") || f.getName().equals("packages")))) {
                     collectDartFiles(root, f, out);
                 }
             } else if (f.getName().endsWith(".dart")) {

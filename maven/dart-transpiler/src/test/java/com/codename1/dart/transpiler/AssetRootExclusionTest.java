@@ -51,6 +51,10 @@ public class AssetRootExclusionTest {
                 "import 'lib/assets/generated.dart';\n\nint twice() => generated() * 2;\n");
         // The real asset root: not Dart, and never parsed as such.
         TestSupport.write(new File(src, "assets/notes.dart"), "this is an asset, not a program\n");
+        // The package asset root is bundled the same way, so its .dart is data too.
+        TestSupport.write(new File(src, "packages/lib_x/snippet.dart"), "also data, not a program\n");
+        // ...while a packages directory below the root is ordinary source.
+        TestSupport.write(new File(src, "lib/packages/helper.dart"), "int helper() => 1;\n");
 
         TranspileResult r = new DartTranspiler().transpile(new TranspileRequest()
                 .sourceRoot(src).outputDir(new File(tmp, "out"))
@@ -62,5 +66,10 @@ public class AssetRootExclusionTest {
             found |= f.content.contains("generated()");
         }
         assertTrue(found, "lib/assets/generated.dart was transpiled");
+        boolean helper = false;
+        for (GeneratedFile f : r.getGeneratedFiles()) {
+            helper |= f.content.contains("helper()");
+        }
+        assertTrue(helper, "lib/packages/helper.dart was transpiled");
     }
 }
