@@ -1676,42 +1676,8 @@ public final class JavaEmitter {
             emitStatements(t.tryBlock, ctx);
             ctx.popScope();
             ctx.indent(-1);
-            for (CatchClause cc : t.catches) {
-                String exType = cc.onType != null
-                        ? javaType(cc.onType, true, ctx) : "RuntimeException";
-                // A dart:core error named only in an `on` clause still needs its
-                // import: `on FormatException` compiled only in a file that happened
-                // to construct one somewhere else.
-                String coreError = cc.onType != null ? CORE_ERRORS.get(cc.onType.name) : null;
-                if (coreError != null && !cc.onType.name.equals("Exception")) {
-                    ctx.importClass(coreError);
-                    exType = coreError.substring(coreError.lastIndexOf('.') + 1);
-                }
-                // `on Error`: Java's Error is not where this runtime's Dart errors live -- they
-                // are RuntimeExceptions -- so catch everything and pass on what is not one.
-                boolean dartError = cc.onType != null && cc.onType.is("Error") && cc.onType.args.isEmpty();
-                if (dartError) {
-                    exType = "Throwable";
-                    ctx.importClass("dart.runtime.DartRuntime");
-                }
-                ctx.pushScope();
-                String var = ctx.declareShadowSafe(cc.exceptionVar != null ? cc.exceptionVar : "$e",
-                        cc.onType != null ? cc.onType : TypeRef.DYNAMIC);
-                w.line("} catch (" + exType + " " + var + ") {");
-                ctx.indent(1);
-                if (dartError) {
-                    w.line("if (!DartRuntime.isDartError(" + var + ")) {");
-                    w.line("    throw DartRuntime.rethrow(" + var + ");");
-                    w.line("}");
-                }
-                if (cc.stackVar != null) {
-                    // stack traces are not modeled; bind the name for compilation
-                    String stackJn = ctx.declareShadowSafe(cc.stackVar, TypeRef.DYNAMIC);
-                    w.line("Object " + stackJn + " = null;");
-                }
-                emitStatements(cc.body, ctx);
-                ctx.popScope();
-                ctx.indent(-1);
+            if (!t.catches.isEmpty()) {
+                emitCatchChain(t.catches, ctx);
             }
             if (t.finallyBlock != null) {
                 w.line("} finally {");
@@ -2796,7 +2762,7 @@ public final class JavaEmitter {
                 // routed to the primitive Dart*List when E is a non-nullable int/double.
                 if (cc.type.name.equals("List")
                         && (cc.ctorName.equals("generate") || cc.ctorName.equals("filled")
-                            || cc.ctorName.equals("from"))) {
+                            || cc.ctorName.equals("from") || cc.ctorName.equals("unmodifiable"))) {
                     return emitListFactory(cc, ctx);
                 }
                 // Map/Set/Iterable named factory constructors — dart:core intrinsics
@@ -4341,10 +4307,13 @@ public final class JavaEmitter {
             }
             // Primitive long->long map: m[k] = v -> putLong(k, v), no boxing.
             if (isPrimitiveLongMap(target.type)) {
+                // The key is coerced like the value: a dynamic one (an untyped forEach
+                // parameter, say) did not compile against putLong(long, long).
+                String key = coerce(idx, TypeRef.INT, ctx);
                 String rhsCode = compound
-                        ? compoundValue(target.code + ".idxLong(" + idx.code + ")", vt, a, ctx)
+                        ? compoundValue(target.code + ".idxLong(" + key + ")", vt, a, ctx)
                         : coerce(emitExpr(a.rhs, vt, ctx), vt, ctx);
-                return new Out(target.code + ".putLong(" + idx.code + ", " + rhsCode + ")", vt);
+                return new Out(target.code + ".putLong(" + key + ", " + rhsCode + ")", vt);
             }
             String key = target.type.is("Map") ? boxIfPrimitive(idx, ctx) : idx.code;
             String rhsCode = compound
@@ -4738,6 +4707,130 @@ public final class JavaEmitter {
             t = l.type;
         }
         return new Out(paren(l.code) + " " + b.op + " " + paren(r.code), t);
+    }
+
+    /**
+     * The catch clauses of one try, as ONE {@code catch (Throwable)} whose body tests the
+     * Dart clauses in order and rethrows what none of them takes. Separate Java catch
+     * clauses cannot express Dart's rules: `on Error` and `on Exception` are tests, not
+     * Java types (this runtime's Dart errors are RuntimeExceptions), a thrown value that is
+     * not an exception -- `throw 'boom'`, `throw token` -- arrives carried in a DartThrown
+     * and must be matched by ITS type and bound as itself, and a filtered clause that
+     * rethrew from its own Java catch skipped every clause after it.
+     */
+    private void emitCatchChain(List<CatchClause> catches, Ctx ctx) {
+        Ctx.Writer w = ctx.writer();
+        ctx.importClass("dart.runtime.DartRuntime");
+        String caught = ctx.newTemp();
+        w.line("} catch (Throwable " + caught + ") {");
+        ctx.indent(1);
+        boolean first = true;
+        boolean catchAll = false;
+        for (CatchClause cc : catches) {
+            TypeRef on = cc.onType;
+            String test;
+            String bindType;
+            String bindValue;
+            TypeRef varType;
+            if (on == null || on.is("Object") || on.is("dynamic")) {
+                test = null;
+                bindType = "Object";
+                bindValue = "DartRuntime.caught(" + caught + ")";
+                varType = TypeRef.DYNAMIC;
+            } else if (on.is("Error") && on.args.isEmpty()) {
+                test = "DartRuntime.isDartError(" + caught + ")";
+                bindType = "Object";
+                bindValue = caught;
+                varType = TypeRef.DYNAMIC;
+            } else if (on.is("Exception") && on.args.isEmpty()) {
+                test = "DartRuntime.isDartException(" + caught + ")";
+                bindType = "Object";
+                bindValue = caught;
+                varType = TypeRef.DYNAMIC;
+            } else if (isThrowableType(on)) {
+                String jt;
+                String coreError = CORE_ERRORS.get(on.name);
+                if (coreError != null) {
+                    ctx.importClass(coreError);
+                    jt = coreError.substring(coreError.lastIndexOf('.') + 1);
+                } else {
+                    jt = javaType(on, true, ctx);
+                }
+                test = caught + " instanceof " + jt;
+                bindType = jt;
+                bindValue = "(" + jt + ") " + caught;
+                varType = on;
+                if (on.is("ConcurrentModificationError")) {
+                    // Maps and sets iterate with Java's iterators, which report a change
+                    // during iteration as java.util.ConcurrentModificationException; it is
+                    // the same Dart error, so the clause takes both.
+                    test = "(" + test + " || " + caught + " instanceof java.util.ConcurrentModificationException)";
+                    bindType = "Object";
+                    bindValue = caught;
+                    varType = TypeRef.DYNAMIC;
+                }
+            } else {
+                // A thrown value that is not an exception: matched by its own type.
+                ctx.importClass("dart.core.DartThrown");
+                String jt = javaType(on, true, ctx);
+                String value = "((DartThrown) " + caught + ").value()";
+                test = caught + " instanceof DartThrown && " + value + " instanceof " + jt;
+                bindType = jt;
+                bindValue = "(" + jt + ") " + value;
+                varType = on;
+            }
+            if (test == null) {
+                w.line(first ? "{" : "} else {");
+                catchAll = true;
+            } else {
+                w.line((first ? "if (" : "} else if (") + test + ") {");
+            }
+            first = false;
+            ctx.indent(1);
+            ctx.pushScope();
+            String var = ctx.declareShadowSafe(cc.exceptionVar != null ? cc.exceptionVar : "$e", varType);
+            w.line(bindType + " " + var + " = " + bindValue + ";");
+            if (cc.stackVar != null) {
+                // stack traces are not modeled; bind the name for compilation
+                String stackJn = ctx.declareShadowSafe(cc.stackVar, TypeRef.DYNAMIC);
+                w.line("Object " + stackJn + " = null;");
+            }
+            emitStatements(cc.body, ctx);
+            ctx.popScope();
+            ctx.indent(-1);
+            if (catchAll) {
+                break;   // a catch-all takes everything; later clauses are unreachable
+            }
+        }
+        if (!catchAll) {
+            w.line("} else {");
+            w.line("    throw DartRuntime.rethrow(" + caught + ");");
+        }
+        w.line("}");
+        ctx.indent(-1);
+    }
+
+    /**
+     * Whether values of {@code t} are Java throwables here: the dart:core errors, the
+     * framework's own error types, and application classes whose superclass chain reaches
+     * one. Anything else a Dart program throws travels in a DartThrown.
+     */
+    private boolean isThrowableType(TypeRef t) {
+        java.util.Set<String> seen = new java.util.HashSet<String>();
+        String n = t.name;
+        while (n != null && seen.add(n)) {
+            if (CORE_ERRORS.containsKey(n) || n.equals("Error") || n.equals("Exception")
+                    || n.endsWith("Error") && stubs.isStubClass(n)
+                    || n.endsWith("Exception") && stubs.isStubClass(n)) {
+                return true;
+            }
+            ClassDecl c = program.classes.get(n);
+            if (c == null || c.superclass == null) {
+                return false;
+            }
+            n = c.superclass.name;
+        }
+        return false;
     }
 
     /** dart:core error constructors -> dart-runtime classes. */
@@ -5239,6 +5332,14 @@ public final class JavaEmitter {
             String jn = n.equals("main") ? "main$" : n;
             return new Out(cls + "." + jn + "(" + methodArgs(fn.params, c.args, ctx) + ")",
                     fn.returnType == null || fn.returnType.is("var") ? TypeRef.DYNAMIC : fn.returnType);
+        }
+        // dart:core identical(a, b): unresolved before, so any use failed the build.
+        if (n.equals("identical") && c.args.positional.size() == 2 && !program.functions.containsKey(n)) {
+            ctx.importClass("dart.runtime.DartRuntime");
+            Out a = emitExpr(c.args.positional.get(0), null, ctx);
+            Out b = emitExpr(c.args.positional.get(1), null, ctx);
+            // Object parameters: a primitive long/double/bool argument autoboxes.
+            return new Out("DartRuntime.identical(" + a.code + ", " + b.code + ")", TypeRef.BOOL);
         }
         // stub top-level function (e.g. runApp)
         Ast.FunctionDecl sf = stubs.functions.get(n);
@@ -6095,6 +6196,12 @@ public final class JavaEmitter {
             if (na.name.equals("growable")) {
                 growable = emitExpr(na.value, TypeRef.BOOL, ctx).code;
             }
+        }
+        if (cc.ctorName.equals("unmodifiable")) {
+            // A read-only copy; unresolved before, so any use failed the build.
+            String src = emitExpr(pos.get(0), null, ctx).code;
+            return new Out(cls + witness + (pk == null ? "unmodifiable" : "unmodifiable" + sfx) + "(" + src + ")",
+                    listType);
         }
         if (cc.ctorName.equals("from")) {
             String src = emitExpr(pos.get(0), null, ctx).code;
