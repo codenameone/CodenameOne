@@ -66,6 +66,31 @@ public final class TelemetryConfig {
     boolean propagateToAll;
     boolean requireAnalyticsConsent;
 
+    /// A copy the caller cannot reach, taken when telemetry is installed. The
+    /// installation read the caller's object live, while caching what it derives
+    /// from it (the export URL, the relay's origin) -- so reusing the config after
+    /// install, say `direct(...)` on one installed as a relay, sent direct-mode
+    /// protobuf to the old relay, which dropped every batch. EVERY field goes
+    /// here; a new one that is not copied is read live again.
+    TelemetryConfig copy() {
+        TelemetryConfig out = new TelemetryConfig();
+        out.mode = mode;
+        out.endpoint = endpoint;
+        out.serviceName = serviceName;
+        out.relayToken = relayToken;
+        out.protobuf = protobuf;
+        out.sampleRatio = sampleRatio;
+        out.batchSize = batchSize;
+        out.flushIntervalMillis = flushIntervalMillis;
+        for (String[] header : headers) {
+            out.headers.add(new String[] {header[0], header[1]});
+        }
+        out.propagateTo.addAll(propagateTo);
+        out.propagateToAll = propagateToAll;
+        out.requireAnalyticsConsent = requireAnalyticsConsent;
+        return out;
+    }
+
     /// Sends spans through a Codename One backend's relay.
     ///
     /// #### Parameters

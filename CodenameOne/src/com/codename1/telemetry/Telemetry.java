@@ -207,7 +207,8 @@ public final class Telemetry {
         private boolean idsUnavailable;
 
         State(TelemetryConfig config) {
-            this.config = config;
+            // A snapshot: see TelemetryConfig.copy.
+            this.config = config.copy();
             this.exportUrl = config.exportUrl();
             this.backendOrigin = config.mode == TelemetryConfig.Mode.RELAY ? origin(exportUrl) : null;
         }

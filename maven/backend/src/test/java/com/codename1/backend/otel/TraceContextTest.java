@@ -134,6 +134,30 @@ class TraceContextTest {
                 BatchExporter.redact("https://user:secret@collector.example/v1/traces?token=t"));
         assertEquals("http://collector.example:4318/v1/traces",
                 BatchExporter.redact("http://collector.example:4318/v1/traces"));
+        // A fragment carries a token as readily as a query does.
+        assertEquals("https://collector.example/v1/traces#<redacted>",
+                BatchExporter.redact("https://collector.example/v1/traces#access_token=secret"));
+        assertEquals("https://c.example/v1#<redacted>",
+                BatchExporter.redact("https://c.example/v1#frag?token=secret"));
+    }
+
+    @Test
+    @DisplayName("once shutdown begins the exporter takes nothing more")
+    void aStoppingExporterRefusesLateWork() throws Exception {
+        BatchExporter exporter = new BatchExporter("http://127.0.0.1:9/v1/traces",
+                new java.util.ArrayList(), true, new java.util.LinkedHashMap(), 16, 4, 60000, 1024);
+        exporter.start();
+        exporter.shutdown(0);
+        // A span from a request still in flight when its tracer was replaced, and
+        // a relayed payload arriving just as late: both are dropped and counted,
+        // never handed to a worker that is supposed to be finishing.
+        exporter.add(null);
+        assertFalse(exporter.addRelayed(new byte[] {1}, "application/json"),
+                "a stopping exporter accepted a relayed payload");
+        java.util.Map metrics = new java.util.LinkedHashMap();
+        exporter.metrics(metrics);
+        assertEquals(Long.valueOf(1), metrics.get("spansDropped"));
+        assertEquals(Integer.valueOf(0), metrics.get("spansQueued"));
     }
 
     @Test

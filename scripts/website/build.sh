@@ -100,8 +100,24 @@ fi
 # `wget -O` leaves an EMPTY jar behind that every later mvnw call trusts -- so one
 # refused TLS handshake with Maven Central ("Unable to establish SSL connection")
 # ended the website build as "Could not find or load main class
-# org.apache.maven.wrapper.MavenWrapperMain". A jar that is not a zip is fetched
-# again; a good one is left alone, so this costs nothing once it is there.
+# org.apache.maven.wrapper.MavenWrapperMain". A jar that is not a complete zip is
+# fetched again; a good one is left alone, so this costs nothing once it is there.
+# Whether $1 is a COMPLETE zip archive. The first two bytes are not enough: a
+# transfer cut off mid-body still starts with "PK", and that truncated jar was
+# accepted as downloaded. unzip -t reads every entry and its CRC; python's
+# zipfile does the same where unzip is missing.
+is_complete_jar() {
+  [ -s "$1" ] || return 1
+  if command -v unzip >/dev/null 2>&1; then
+    unzip -tq "$1" >/dev/null 2>&1
+  elif command -v python3 >/dev/null 2>&1; then
+    python3 -m zipfile -t "$1" >/dev/null 2>&1
+  else
+    echo "Neither unzip nor python3 is available to verify ${1}" >&2
+    return 1
+  fi
+}
+
 ensure_maven_wrapper_jar() {
   local dir="$1" props jar url delay
   props="${dir}/.mvn/wrapper/maven-wrapper.properties"
@@ -111,7 +127,7 @@ ensure_maven_wrapper_jar() {
   # A wrapper with no wrapperUrl (the script-only kind) needs no jar.
   [ -n "${url}" ] || return 0
   for delay in 0 15 60 180; do
-    if [ -s "${jar}" ] && [ "$(head -c 2 "${jar}")" = "PK" ]; then
+    if is_complete_jar "${jar}"; then
       return 0
     fi
     if [ "${delay}" -gt 0 ]; then
@@ -121,7 +137,7 @@ ensure_maven_wrapper_jar() {
     rm -f "${jar}"
     curl -fsSL --retry 3 --retry-delay 5 --retry-all-errors -o "${jar}" "${url}" || true
   done
-  if [ -s "${jar}" ] && [ "$(head -c 2 "${jar}")" = "PK" ]; then
+  if is_complete_jar "${jar}"; then
     return 0
   fi
   rm -f "${jar}"

@@ -328,6 +328,31 @@ public class RestControllerAnnotationProcessorTest {
                 "com/codename1/backend/otel/OtlpTracer"));
     }
 
+    @Test
+    public void thePropertyInTheStandardResourcesPlaceTracesTheBuild() throws Exception {
+        // src/main/resources/application.properties, which process-resources has
+        // copied into the classes directory before this goal runs. Looking only
+        // beside the module missed it, so the documented layout never traced.
+        File classes = compile(CONTROLLER_SOURCE);
+        File root = sourceRootWith("Notes.java", CONTROLLER_SOURCE);
+        writeUtf8(new File(classes, "application.properties"), "cn1.otel.enabled=true\n");
+        ProcessorContext ctx = run(classes, Collections.singletonList(root.getAbsolutePath()),
+                tmp.newFolder());
+        assertFalse(String.valueOf(ctx.getErrors()), ctx.hasErrors());
+        assertTrue("cn1.otel.enabled in the resources copy did not trace the build",
+                references(new File(classes, "com/example/BackendApplication.class"),
+                        "com/codename1/backend/otel/OtlpTracer"));
+
+        // And straight from the source tree, for a build that skipped resources.
+        File untouched = compile(CONTROLLER_SOURCE);
+        File project = tmp.newFolder();
+        writeUtf8(new File(project, "src/main/resources/application.properties"),
+                "cn1.otel.enabled=true\n");
+        run(untouched, Collections.singletonList(root.getAbsolutePath()), project);
+        assertTrue(references(new File(untouched, "com/example/BackendApplication.class"),
+                "com/codename1/backend/otel/OtlpTracer"));
+    }
+
     private File sourceRootWith(String file, String source) throws Exception {
         File root = tmp.newFolder();
         File pkg = new File(root, "com/example");
@@ -433,6 +458,7 @@ public class RestControllerAnnotationProcessorTest {
     }
 
     private static void writeUtf8(File f, String text) throws Exception {
+        f.getParentFile().mkdirs();
         java.io.OutputStream out = new java.io.FileOutputStream(f);
         try {
             out.write(text.getBytes("UTF-8"));

@@ -121,7 +121,11 @@ final class BatchExporter implements Runnable {
     /** From the request path, as a span ends. */
     void add(OtelSpan span) {
         synchronized(lock) {
-            if(stopped || queue.size() >= maxQueue) {
+            // STOPPING counts as closed, not just stopped: shutdown() has already
+            // dropped the queue, and a span that ends after it -- a request still
+            // in flight when its tracer was replaced -- would otherwise be taken
+            // and exported by a worker that is meant to be finishing.
+            if(stopped || stopping || queue.size() >= maxQueue) {
                 droppedSpans++;
                 return;
             }
@@ -140,7 +144,7 @@ final class BatchExporter implements Runnable {
      */
     boolean addRelayed(byte[] body, String contentType) {
         synchronized(lock) {
-            if(stopped || relayedBytes + body.length > maxRelayBytes) {
+            if(stopped || stopping || relayedBytes + body.length > maxRelayBytes) {
                 droppedRelayed++;
                 return false;
             }
@@ -435,14 +439,24 @@ final class BatchExporter implements Runnable {
     }
 
     /**
-     * The endpoint as it may be logged: no query, where a token would travel, and
+     * The endpoint as it may be logged: no query or fragment, where a token would travel, and
      * no userinfo, where a password would. Both are how collectors are commonly
      * authenticated, and this string goes into every failure line and every
      * refused-configuration message.
      */
     static String redact(String url) {
+        // The query AND the fragment, whichever comes first: an OAuth token rides
+        // in a fragment as readily as in a query, and cutting only at '?' logged it.
+        int cut = url.length();
         int query = url.indexOf('?');
-        String out = query < 0 ? url : url.substring(0, query);
+        int fragment = url.indexOf('#');
+        if(query >= 0) {
+            cut = query;
+        }
+        if(fragment >= 0 && fragment < cut) {
+            cut = fragment;
+        }
+        String out = url.substring(0, cut);
         int scheme = out.indexOf("://");
         if(scheme >= 0) {
             int at = out.indexOf('@', scheme + 3);
@@ -451,6 +465,7 @@ final class BatchExporter implements Runnable {
                 out = out.substring(0, scheme + 3) + "<redacted>@" + out.substring(at + 1);
             }
         }
-        return query < 0 ? out : out + "?<redacted>";
+        // Says something was there, and which part, without saying what.
+        return cut < url.length() ? out + url.charAt(cut) + "<redacted>" : out;
     }
 }

@@ -2676,18 +2676,31 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
     /// in a multi-module application is `common`. The packaging goal does pass the
     /// module itself, which is the fallback.
     private static File applicationProperties(ProcessorContext ctx) {
+        // Where a project keeps it, in the order Maven would see it. The copy in
+        // the classes directory FIRST: the documented layout is
+        // src/main/resources/application.properties, which process-resources has
+        // already copied there by the time this runs -- and looking only beside
+        // the module missed it, so cn1.otel.enabled=true in the standard place
+        // never linked the tracer. The source copy covers a build that skipped
+        // the resources phase; the module and project directories, the other
+        // places Config reads it from at run time.
+        List<File> candidates = new ArrayList<File>();
         File classes = ctx.getOutputClassDir();
-        if (classes != null && classes.getParentFile() != null
-                && "target".equals(classes.getParentFile().getName())) {
-            File module = classes.getParentFile().getParentFile();
-            File file = new File(module, "application.properties");
-            if (file.isFile()) {
-                return file;
+        if (classes != null) {
+            candidates.add(new File(classes, "application.properties"));
+            if (classes.getParentFile() != null
+                    && "target".equals(classes.getParentFile().getName())) {
+                File module = classes.getParentFile().getParentFile();
+                candidates.add(new File(module, "src/main/resources/application.properties"));
+                candidates.add(new File(module, "application.properties"));
             }
         }
         File dir = ctx.getProjectDir();
         if (dir != null) {
-            File file = new File(dir, "application.properties");
+            candidates.add(new File(dir, "src/main/resources/application.properties"));
+            candidates.add(new File(dir, "application.properties"));
+        }
+        for (File file : candidates) {
             if (file.isFile()) {
                 return file;
             }

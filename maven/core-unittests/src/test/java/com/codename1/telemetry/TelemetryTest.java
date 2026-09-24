@@ -709,6 +709,47 @@ class TelemetryTest extends UITestBase {
     }
 
     @Test
+    void theInstalledConfigurationIsASnapshot() throws Exception {
+        // Every field, by reflection, so a field added later without being copied
+        // -- or without being set here -- fails this test instead of being read
+        // live from the caller's object again.
+        TelemetryConfig original = new TelemetryConfig().direct("https://c.test")
+                .serviceName("svc").relayToken("tok").protobuf(false).sampleRatio(0.5)
+                .batchSize(7).flushIntervalMillis(1234).header("X-A", "1")
+                .propagateTo("h.test").propagateToAllHosts().requireAnalyticsConsent(true);
+        TelemetryConfig copy = original.copy();
+        TelemetryConfig defaults = new TelemetryConfig();
+        for (java.lang.reflect.Field field : TelemetryConfig.class.getDeclaredFields()) {
+            if (java.lang.reflect.Modifier.isStatic(field.getModifiers()) || field.isSynthetic()) {
+                continue;
+            }
+            field.setAccessible(true);
+            Object set = field.get(original);
+            Object copied = field.get(copy);
+            Object unset = field.get(defaults);
+            if (set instanceof List) {
+                assertFalse(set == copied, field.getName() + " is shared, not copied");
+                assertEquals(((List<?>) set).size(), ((List<?>) copied).size(), field.getName());
+                assertFalse(((List<?>) set).isEmpty(), field.getName() + " was not set by this test");
+                continue;
+            }
+            assertEquals(set, copied, field.getName() + " was not copied");
+            assertFalse(set == null ? unset == null : set.equals(unset),
+                    field.getName() + " was not set by this test, so its copy is unchecked");
+        }
+
+        // And in use: installed as direct protobuf, then the caller's object is
+        // turned into a JSON relay. The installation must not notice.
+        TelemetryConfig live = new TelemetryConfig().direct("http://collector.test");
+        Telemetry.install(live);
+        live.relay("http://backend.test").protobuf(false);
+        NetworkManager.getInstance().addToQueueAndWait(request(API + "?snapshot"));
+        Telemetry.flush();
+        assertFalse(exported(1).isEmpty(),
+                "the export was not the protobuf the installed configuration asked for");
+    }
+
+    @Test
     void aTruncatedValueNeverEndsInHalfACharacter() {
         StringBuilder text = new StringBuilder();
         for (int i = 0; i < TelemetrySpan.MAX_VALUE_LENGTH - 1; i++) {

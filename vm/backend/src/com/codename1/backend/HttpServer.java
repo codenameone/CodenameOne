@@ -5274,6 +5274,9 @@ public final class HttpServer {
                 // The status the peer is actually sent when the session refuses the
                 // handler's response and a 503 goes in its place; -1 when it did not.
                 int fallbackStatus = -1;
+                // Whether the span has been handed to tracedStreams, which then
+                // owns ending it.
+                boolean spanRegistered = false;
                 try {
                     response = handler.handle(request);
                     if(response == null) {
@@ -5438,6 +5441,17 @@ public final class HttpServer {
                 // handler's 200 hid exactly the overload a trace is read to find.
                 submittedStatus = fallbackStatus > 0 ? fallbackStatus : response.status;
                 requestsServed.incrementAndGet();
+                if(span != null) {
+                    // Registered NOW, before the flush just below can run: that
+                    // flush may close this very stream, and settling consumes its
+                    // one close notification. Registered after it -- in the finally
+                    // -- the span missed that notification and stayed open until
+                    // the whole connection went.
+                    Tracing.leave(span);
+                    tracedStreams(fd).put(new Integer(stream.getId()),
+                            new Object[] {span, new Integer(submittedStatus), handlerError});
+                    spanRegistered = true;
+                }
                 if(queuedBodyBytes > MAX_QUEUED_H2_BODY_BYTES
                         || Http2.pendingBodyFiles() > MAX_OPEN_H2_FILES
                         || Http2.pendingBodyBytesAll() > MAX_OPEN_H2_BODY_BYTES) {
@@ -5474,11 +5488,10 @@ public final class HttpServer {
                     inFlightRequests.decrementAndGet();
                     SERVING_FD.set(null);
                     SERVING_H2.set(null);
-                    if(span != null) {
-                        // The status that was submitted -- the handler's, or the 503
-                        // that replaced it -- or -1 when submitting threw. Not current
-                        // any more, so the next stream's span is not its child, but
-                        // ended only when the write is known.
+                    if(span != null && !spanRegistered) {
+                        // Submitting threw before the span was registered above. Not
+                        // current any more, so the next stream's span is not its
+                        // child.
                         Tracing.leave(span);
                         if(submittedStatus < 0) {
                             // Nothing was submitted, so no stream close will ever
