@@ -3138,7 +3138,8 @@ public class Component implements Animation, StyleListener, Editable {
                 }
                 g.glassRegion(getX(), getY(), getWidth(), getHeight(), backdropBlur, cornerRadius,
                         recipe.getSaturation(), recipe.getScale(), recipe.getOffset(),
-                        recipe.getRefraction(), recipe.getSpecular());
+                        recipe.getRefraction(), recipe.getSpecular(),
+                        recipe.getCurve(), recipe.getCurveMid(), recipe.getOutline());
             } else {
                 g.blurRegion(getX(), getY(), getWidth(), getHeight(), backdropBlur);
             }

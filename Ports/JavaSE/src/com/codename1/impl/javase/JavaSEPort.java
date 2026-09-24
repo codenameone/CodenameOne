@@ -20867,6 +20867,14 @@ public class JavaSEPort extends CodenameOneImplementation {
     @Override
     public boolean glassRegion(Object graphics, int x, int y, int width, int height, float radius,
             float cornerRadius, float sat, float scaleParam, float offset, float refract, float specular) {
+        return glassRegion(graphics, x, y, width, height, radius, cornerRadius, sat, scaleParam, offset,
+                refract, specular, 0f, 0f, 0f);
+    }
+
+    @Override
+    public boolean glassRegion(Object graphics, int x, int y, int width, int height, float radius,
+            float cornerRadius, float sat, float scaleParam, float offset, float refract, float specular,
+            float curve, float curveMid, float outline) {
         if (radius <= 0f || width <= 0 || height <= 0) {
             return true;
         }
@@ -20923,13 +20931,22 @@ public class JavaSEPort extends CodenameOneImplementation {
                     prgb[brow + bx] = avail[arow + ax];
                 }
             }
-            glassMaterialInPlace(prgb, sat, scaleParam, offset);
+            int[] raw = null;
+            if (outline > 0f) {
+                // The outline darkens the BACKDROP under the edge, so keep the raw
+                // pixels under the component before the material transforms them.
+                raw = new int[rw * rh];
+                for (int yy = 0; yy < rh; yy++) {
+                    System.arraycopy(prgb, (yy + pad) * bw + pad, raw, yy * rw, rw);
+                }
+            }
+            glassMaterialInPlace(prgb, sat, scaleParam, offset, curve, curveMid);
             BufferedImage padded = new BufferedImage(bw, bh, BufferedImage.TYPE_INT_ARGB);
             padded.setRGB(0, 0, bw, bh, prgb, 0, bw);
             BufferedImage blurredPadded = new GaussianFilter(scaledRadius).filter(padded, null);
             int[] pbargb = blurredPadded.getRGB(0, 0, bw, bh, null, 0, bw);
             int[] out = new int[rw * rh];
-            applyGlassOptics(pbargb, bw, bh, pad, out, rw, rh, scaledCorner, refract, specular);
+            applyGlassOptics(pbargb, bw, bh, pad, out, rw, rh, scaledCorner, refract, specular, outline, raw);
             BufferedImage patch = new BufferedImage(rw, rh, BufferedImage.TYPE_INT_ARGB);
             patch.setRGB(0, 0, rw, rh, out, 0, rw);
             Graphics2D dg = dest.createGraphics();
@@ -20943,8 +20960,12 @@ public class JavaSEPort extends CodenameOneImplementation {
 
     /// The reverse-engineered iOS Liquid Glass colour material; mirrors
     /// IOSImplementation.glassMaterialInPlace (validated &lt;1 LSB against a real
-    /// UIVisualEffectView): c' = clamp((lum + (c - lum) * sat) * scale + offset).
-    private static void glassMaterialInPlace(int[] argb, float sat, float scale, float offset) {
+    /// UIVisualEffectView): c' = clamp((lum + (c - lum) * sat) * scale + offset
+    /// + curve * 255 * (lum / 255 - curveMid)^2). The curve term is zero for every
+    /// recipe except iOS 27 dark, whose material is not affine.
+    private static void glassMaterialInPlace(int[] argb, float sat, float scale, float offset,
+            float curve, float curveMid) {
+        boolean curved = curve != 0f;
         for (int i = 0; i < argb.length; i++) {
             int p = argb[i];
             int a = p & 0xff000000;
@@ -20953,6 +20974,13 @@ public class JavaSEPort extends CodenameOneImplementation {
             r = (lum + (r - lum) * sat) * scale + offset;
             g = (lum + (g - lum) * sat) * scale + offset;
             b = (lum + (b - lum) * sat) * scale + offset;
+            if (curved) {
+                float d = lum / 255f - curveMid;
+                float k = curve * 255f * d * d;
+                r += k;
+                g += k;
+                b += k;
+            }
             int ri = r < 0 ? 0 : (r > 255 ? 255 : (int) r);
             int gi = g < 0 ? 0 : (g > 255 ? 255 : (int) g);
             int bi = b < 0 ? 0 : (b > 255 ? 255 : (int) b);
@@ -20965,7 +20993,8 @@ public class JavaSEPort extends CodenameOneImplementation {
     /// refraction (quarter-circle displacement toward the centre), a specular rim
     /// glint (brightest at the top) and the anti-aliased shape mask.
     private static void applyGlassOptics(int[] src, int bw, int bh, int pad, int[] out,
-            int rw, int rh, float cornerRadius, float refract, float specular) {
+            int rw, int rh, float cornerRadius, float refract, float specular,
+            float outline, int[] raw) {
         float hw = rw / 2f, hh = rh / 2f;
         float r = cornerRadius < 0f ? Math.min(hw, hh) : Math.min(cornerRadius, Math.min(hw, hh));
         if (r < 0f) r = 0f;
@@ -21001,10 +21030,47 @@ public class JavaSEPort extends CodenameOneImplementation {
                     gg = gg + add > 255 ? 255 : gg + add;
                     bb = bb + add > 255 ? 255 : bb + add;
                 }
+                // iOS 27 edge outline (GlassRecipe.getOutline): on the outermost
+                // pixel, composite the glass over the raw backdrop and darken it,
+                // weighted by the horizontal component of the edge normal -- full on
+                // the sides, fading round the corners, none along top and bottom.
+                if (outline > 0f && depth < 1f) {
+                    float wx;
+                    if (dx > 0 && dy > 0) {
+                        wx = outside > 0f ? ax / outside : 0f;
+                    } else {
+                        wx = dx >= dy ? 1f : 0f;
+                    }
+                    float ow = outline * wx;
+                    if (ow > 0f) {
+                        int bk = raw[y * rw + x];
+                        rr = glassOutlineChannel(rr, (bk >> 16) & 0xff, alpha, ow);
+                        gg = glassOutlineChannel(gg, (bk >> 8) & 0xff, alpha, ow);
+                        bb = glassOutlineChannel(bb, bk & 0xff, alpha, ow);
+                        out[y * rw + x] = 0xff000000 | (rr << 16) | (gg << 8) | bb;
+                        continue;
+                    }
+                }
                 int a = (int) (alpha * 255f);
                 out[y * rw + x] = (a << 24) | (rr << 16) | (gg << 8) | bb;
             }
         }
+    }
+
+    /// One channel of the iOS 27 edge outline: glass `c` at coverage `alpha`
+    /// composited over backdrop `b`, then darkened by min(76 * w, 0.78 * w * b).
+    /// At full strength that is max(b - 76, 0.22 * b), the measured native line.
+    private static int glassOutlineChannel(int c, int b, float alpha, float w) {
+        float v = c * alpha;
+        float under = b * (1f - alpha);
+        v = v + under;
+        float dark = 76f * w;
+        float alt = 0.78f * w * b;
+        if (alt < dark) {
+            dark = alt;
+        }
+        v = v - dark;
+        return v <= 0f ? 0 : (v >= 255f ? 255 : (int) (v + 0.5f));
     }
 
     /// Bilinear ARGB sample with edge clamping; mirrors IOSImplementation.sampleBilinear.

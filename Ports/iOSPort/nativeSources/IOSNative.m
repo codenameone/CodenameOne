@@ -2386,11 +2386,11 @@ void com_codename1_impl_ios_IOSNative_nativeBlurScreenRegion___int_int_int_int_f
     POOL_END();
 }
 
-extern void Java_com_codename1_impl_ios_IOSImplementation_nativeGlassScreenRegionImpl(int x, int y, int width, int height, float radius, float cornerRadius, float sat, float scale, float offset, float refract, float specular);
-void com_codename1_impl_ios_IOSNative_nativeGlassScreenRegion___int_int_int_int_float_float_float_float_float_float_float(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT n1, JAVA_INT n2, JAVA_INT n3, JAVA_INT n4, JAVA_FLOAT n5, JAVA_FLOAT n6, JAVA_FLOAT n7, JAVA_FLOAT n8, JAVA_FLOAT n9, JAVA_FLOAT n10, JAVA_FLOAT n11)
+extern void Java_com_codename1_impl_ios_IOSImplementation_nativeGlassScreenRegionImpl(int x, int y, int width, int height, float radius, float cornerRadius, float sat, float scale, float offset, float refract, float specular, float curve, float curveMid, float outline);
+void com_codename1_impl_ios_IOSNative_nativeGlassScreenRegion___int_int_int_int_float_float_float_float_float_float_float_float_float_float(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT n1, JAVA_INT n2, JAVA_INT n3, JAVA_INT n4, JAVA_FLOAT n5, JAVA_FLOAT n6, JAVA_FLOAT n7, JAVA_FLOAT n8, JAVA_FLOAT n9, JAVA_FLOAT n10, JAVA_FLOAT n11, JAVA_FLOAT n12, JAVA_FLOAT n13, JAVA_FLOAT n14)
 {
     POOL_BEGIN();
-    Java_com_codename1_impl_ios_IOSImplementation_nativeGlassScreenRegionImpl(n1, n2, n3, n4, n5, n6, n7, n8, n9, n10, n11);
+    Java_com_codename1_impl_ios_IOSImplementation_nativeGlassScreenRegionImpl(n1, n2, n3, n4, n5, n6, n7, n8, n9, n10, n11, n12, n13, n14);
     POOL_END();
 }
 

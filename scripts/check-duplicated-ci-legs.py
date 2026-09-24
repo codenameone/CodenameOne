@@ -95,9 +95,6 @@ PAIRS = [
         "only_in_copy": [
             "CN1SS_FIDELITY_GOLDEN_SET: 'ios-27-metal'",
             "CN1_XCODE_MAJOR: '27'",
-            # Non-gating until the ios-27-metal baseline can be recorded; the job
-            # header says what blocks that and what lifts it.
-            "continue-on-error: true",
         ],
         "only_in_original_steps": [],
         "only_in_copy_steps": [],
