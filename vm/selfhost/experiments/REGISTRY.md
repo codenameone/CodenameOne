@@ -6448,3 +6448,51 @@ Not kept: ArrayList default 10 -> 4 (-9MB for +7% wall); 16-byte size classes to
 
 Single core, default generational build after all of the above: 0.78x JDK 25 wall,
 ~1.30x RSS (722-742MB against 551-569MB).
+
+## Round 46: representation, and a correction to Round 43
+
+**Correction first.** Round 43's "24/24 contended runs pass" and every single-core number
+since were built with `-DCN1_EXP_LEGNOGRACE=0`, a bisect switch from that hunt whose
+committed default was 1: skip the legacy grace pass in single-core mode and free every
+unmarked fresh legacy object. At the default, `CN1_GC_VERIFY` caught a large array freed
+while an `org.objectweb.asm.Context` still held it in 2 of 3 contended runs, and the plain
+build failed 4-6 of 8. The default was the one configuration nothing exercised. The switch
+is gone and the pass always runs (WIP 5dcf3b6d30); the numbers above describe that.
+
+**Representation**, each change validated by 16 contended single-core and 3-4 concurrent
+runs byte-identical to the JDK, measured with the allocation census (deterministic live
+bytes) rather than wall clock:
+
+| change | what moved |
+|---|---|
+| hash tables: no per-part 16-byte prefix | native blocks 117.9 -> 109.9MB |
+| maps keep one table field; parts derived from the root | HashMap 96 -> 80 bytes (221k maps, 20.2 -> 16.9MB) |
+| BiBOP size classes step by 8 up to 128 (23 -> 32 classes) | live BiBOP 347.4 -> 324.6MB; Mac 1.9% fewer instructions |
+| HashMap/HashSet grow BEFORE the insert that passes the threshold; default 2 slots | native blocks held 115.7 -> 108.1MB |
+| HashSet: elements and markers in one allocation | native blocks 645k -> 523k, held 108.1 -> 100.2MB; HashSet 48 -> 40 bytes |
+
+Two things the table does not show. The growth rule was the JDK's in name only: growth ran
+after an insert once the threshold was reached, so a 4-slot map held 2 entries where the
+JDK's holds 3, and a 2-slot table could not hold one -- which is why the default had been 4.
+And the size-class change is the one where live bytes did NOT become resident ones: peak
+reserved pages stayed at ~400MB because the saved bytes turned into slack. A per-class
+census (`[JCLASS]`, census builds) shows the slack is ~62MB of free-listed holes inside
+otherwise full pages, not empty pages or tails; holes in old pages come back only at a
+major, and majors run every 8 minors. That makes the major policy, not representation,
+the lever on the remaining gap between live and resident.
+
+**Ratio table** (container, interleaved, 3 rounds; `head` is the unchanged branch-head
+binary, so wip/head is the noise-free trend):
+
+| | r1 (before) | r4 (after) |
+|---|---|---|
+| 1 core, wip vs JDK | 0.77x time, 1.27x RSS | 0.74x time, 1.21x RSS |
+| 1 core, wip vs head | 0.80 / 0.57 | 0.74 / 0.54 |
+| 2 cores, wip vs head | 1.03 / 0.97 | 1.00 / 0.90 |
+| 4 cores, wip vs head | 1.01 / 0.88 | 1.02 / 0.90 |
+
+2- and 4-core RSS ratios against the JDK move 20-30% between runs with G1's own peak (914
+vs 1138MB in two runs of the same JDK), so only the head-relative column is read there.
+One harness trap worth recording: the translated translator copies `cn1_collections.h`
+from `CN1_RESOURCE_PATH`, not from its own classes, so a runtime-header change shows as
+a one-file output diff until the mount points at the changed tree.
