@@ -40,7 +40,37 @@ sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)),
 
 import publish_port_status  # noqa: E402
 
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+
+import benchlib  # noqa: E402
+
 TARGET = "benchmarks/flutter.json"
+
+
+def refusal(report):
+    """Why `report` must not replace the published one, or None if it may.
+
+    Publishing REPLACES benchmarks/flutter.json, so the document has to be a
+    complete run. At least one platform must have been MEASURED: unmeasured
+    platforms are recorded in the document too, so "has platforms" is not
+    enough, and a night where every leg failed would otherwise publish "not
+    measured" everywhere over the last good numbers. And every platform must be
+    PRESENT: a matrix leg that dies before writing its result leaves no file,
+    the upload only warns about that, and port_status.py builds the document
+    from the files that exist -- so the failed platform would simply vanish
+    from the public table instead of keeping its last numbers.
+    """
+    if report.get("schema_version") != 1:
+        return "unsupported schema_version %r" % report.get("schema_version")
+    present = report.get("platforms") or {}
+    missing = [p for p in benchlib.PLATFORM_IDS if p not in present]
+    if missing:
+        return "no result for %s; publishing would drop it from the page" % ", ".join(missing)
+    measured = [p for p in present.values()
+                if isinstance(p, dict) and p.get("status") == "measured"]
+    if not measured:
+        return "no measured platforms"
+    return None
 
 
 def main(argv):
@@ -49,14 +79,9 @@ def main(argv):
         return 2
     with open(argv[1], encoding="utf-8") as handle:
         report = json.load(handle)
-    # At least one platform must have been MEASURED. Unmeasured platforms are
-    # recorded in the document too, so "has platforms" is not enough: a night
-    # where every leg failed would otherwise publish "not measured" everywhere
-    # over the last good numbers.
-    measured = [p for p in (report.get("platforms") or {}).values()
-                if isinstance(p, dict) and p.get("status") == "measured"]
-    if report.get("schema_version") != 1 or not measured:
-        print("Not publishing %s: no measured platforms." % argv[1], file=sys.stderr)
+    reason = refusal(report)
+    if reason:
+        print("Not publishing %s: %s." % (argv[1], reason), file=sys.stderr)
         return 1
     try:
         publish_port_status.publish(report, argv[2], target=TARGET,

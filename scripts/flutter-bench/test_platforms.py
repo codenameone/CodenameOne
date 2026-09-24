@@ -64,6 +64,19 @@ class TimeStreamDeadlines(unittest.TestCase):
         self.assertLess(elapsed, 2.5)
         self.assertGreaterEqual(elapsed, 0.9, "the idle period is still waited for")
 
+    def test_the_idle_period_is_counted_from_the_marker_not_the_launch(self):
+        # A side that reaches its marker late still gets the full SETTLE_S
+        # before memory is sampled; a deadline from launch cut it to nothing.
+        # The marker also lands close to LAUNCH_TIMEOUT_S, which bounds only
+        # the wait FOR the marker.
+        (upper, _), elapsed = self._time(
+            "codenameone", "import time; time.sleep(1.5); print('BENCH:FIRSTFRAME');"
+                           "time.sleep(60)")
+        self.assertIsNotNone(upper)
+        self.assertGreaterEqual(elapsed, upper / 1000.0 + 0.9,
+                                "the settle must start at the marker")
+        self.assertLess(elapsed, 4.0)
+
     def test_the_flutter_bracket_is_still_read(self):
         (upper, lower), _ = self._time(
             "flutter", "import time; print('BENCH:FIRSTCONTENT'); time.sleep(0.2);"

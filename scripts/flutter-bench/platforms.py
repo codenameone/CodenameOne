@@ -139,22 +139,29 @@ class Adapter(object):
         `reader` is a _LineReader, whose get() gives up after a timeout, so a
         launch that hangs before its marker is abandoned at LAUNCH_TIMEOUT_S,
         and an application that goes quiet after its last marker -- which is
-        what a healthy one does -- is let go at SETTLE_S. With a blocking
-        readline both waited for one more line that might never come, and the
-        job sat until the workflow's own two-hour timeout.
+        what a healthy one does -- is let go SETTLE_S after its marker. With a
+        blocking readline both waited for one more line that might never come,
+        and the job sat until the workflow's own two-hour timeout.
+
+        The idle period is counted from the MARKER, not from the launch: the
+        caller samples memory as soon as this returns, so a deadline measured
+        from launch gave a side that started in 10 s only 2 s to settle and one
+        that started in 13 s none at all -- the two sides were sampled at
+        different points in their lifecycle. The Android adapter sleeps SETTLE_S
+        after its launch returns for the same reason. LAUNCH_TIMEOUT_S bounds
+        only the wait for the marker, so it cannot cut a settle short either.
         """
         marker = MARKERS[side]
         lower_marker = LOWER_BOUND_MARKERS.get(side)
         upper = None
         lower = None
         deadline = started + LAUNCH_TIMEOUT_S
+        settle_until = None
         while True:
             now = time.time()
-            if now >= deadline:
+            limit = deadline if settle_until is None else settle_until
+            if now >= limit:
                 break
-            if upper is not None and now - started >= SETTLE_S:
-                break
-            limit = deadline if upper is None else min(deadline, started + SETTLE_S)
             line = reader.get(max(0.0, limit - now))
             if line is _LineReader.EOF:
                 break
@@ -163,7 +170,9 @@ class Adapter(object):
             if lower is None and lower_marker and lower_marker.search(line):
                 lower = (time.time() - started) * 1000.0
             if upper is None and marker.search(line):
-                upper = (time.time() - started) * 1000.0
+                seen = time.time()
+                upper = (seen - started) * 1000.0
+                settle_until = seen + SETTLE_S
         return upper, lower
 
 

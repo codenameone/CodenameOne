@@ -29,6 +29,49 @@ def _report(cn1, flutter):
         runs=3)
 
 
+
+class PlatformIdsMatchTheWorkflow(unittest.TestCase):
+    """The plan job's matrix and benchlib.PLATFORM_IDS name the same platforms."""
+
+    def test_the_workflow_measures_exactly_the_known_platforms(self):
+        import re
+        workflow = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                                "..", "..", ".github", "workflows", "flutter-bench.yml")
+        with open(workflow) as handle:
+            text = handle.read()
+        ids = re.findall(r'\{"platform": "([a-z]+)", "runner"', text)
+        self.assertTrue(ids, "the plan job's ALL list was not found")
+        self.assertEqual(list(benchlib.PLATFORM_IDS), ids)
+
+
+class PublishRefusalTest(unittest.TestCase):
+    """Publishing replaces the public document, so only a complete run may."""
+
+    def _report(self, statuses):
+        return {"schema_version": 1,
+                "platforms": dict((p, {"status": s}) for p, s in statuses.items())}
+
+    def setUp(self):
+        sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                                        "..", "hellocodenameone", "conformance"))
+        import publish_benchmark
+        self.refusal = publish_benchmark.refusal
+
+    def test_a_complete_run_publishes(self):
+        statuses = dict((p, "measured") for p in benchlib.PLATFORM_IDS)
+        statuses["javascript"] = "not measured"
+        self.assertIsNone(self.refusal(self._report(statuses)))
+
+    def test_a_platform_whose_leg_left_no_result_blocks_publication(self):
+        statuses = dict((p, "measured") for p in benchlib.PLATFORM_IDS if p != "windows")
+        reason = self.refusal(self._report(statuses))
+        self.assertIsNotNone(reason)
+        self.assertIn("windows", reason)
+
+    def test_every_platform_unmeasured_blocks_publication(self):
+        statuses = dict((p, "not measured") for p in benchlib.PLATFORM_IDS)
+        self.assertIn("no measured platforms", self.refusal(self._report(statuses)))
+
 class VerdictTest(unittest.TestCase):
 
     def test_lower_is_better_so_a_ratio_above_one_is_our_win(self):
@@ -85,6 +128,11 @@ class StatisticsTest(unittest.TestCase):
 class RegressionGateTest(unittest.TestCase):
 
     BASELINE = {
+        "codenameone": {"install_bytes": 1000},
+        "tolerances": {"install_bytes": 0.02},
+    }
+
+    STARTUP_BASELINE = {
         "codenameone": {"install_bytes": 1000, "cold_start_ms": 200},
         "tolerances": {"install_bytes": 0.02, "cold_start_ms": 0.25},
     }
@@ -155,6 +203,22 @@ class RegressionGateTest(unittest.TestCase):
         report = _report({"cold_start_runs": [300]}, {"cold_start_runs": [1400]})
         candidate = benchlib.baseline_candidate(report)
         self.assertEqual(candidate["flutter_reference"], {"cold_start_ms": 1400})
+
+    def test_a_gated_metric_the_run_did_not_produce_fails_the_gate(self):
+        # Sizes come from the build output, so they fill in even when the app
+        # never reached its first frame; the start-up row is simply absent.
+        report = _report({"install_bytes": 1000}, {"install_bytes": 5000})
+        found = benchlib.check_regressions(report, self.STARTUP_BASELINE)
+        self.assertEqual([f["metric"] for f in found], ["cold_start_ms"])
+        self.assertTrue(found[0]["missing"])
+        line = benchlib.render_regressions("linux", found)[0]
+        self.assertIn("was not measured", line)
+
+    def test_an_ungated_metric_the_run_did_not_produce_is_not_a_failure(self):
+        baseline = {"codenameone": {"install_bytes": 1000, "cold_start_ms": 200},
+                    "tolerances": {"install_bytes": 0.02}}
+        report = _report({"install_bytes": 1000}, {"install_bytes": 5000})
+        self.assertEqual(benchlib.check_regressions(report, baseline), [])
 
     def test_a_metric_with_no_tolerance_is_not_gated(self):
         baseline = {"codenameone": {"install_bytes": 1000}, "tolerances": {}}

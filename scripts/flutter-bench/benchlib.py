@@ -37,6 +37,12 @@ import zipfile
 
 # Lower is better for every metric here; that is what makes "wins" well
 # defined and lets the regression gate use a single comparison.
+
+# Every platform the benchmark measures, in the order the report lists them.
+# The workflow's plan job carries its own copy (it runs before any checkout);
+# test_benchlib.PlatformIdsMatchTheWorkflow holds the two together.
+PLATFORM_IDS = ("macos", "ios", "android", "linux", "windows", "javascript")
+
 METRICS = [
     ("install_bytes", "Installed size", "bytes"),
     ("code_bytes", "Executable code", "bytes"),
@@ -506,11 +512,27 @@ def check_regressions(report, baseline):
     values = baseline.get("codenameone", {})
     for key, label, _unit in METRICS:
         expected = values.get(key)
-        actual = report["codenameone"].get(key)
-        if expected is None or actual is None:
-            continue
         tolerance = tolerances.get(key)
-        if tolerance is None:
+        if expected is None or tolerance is None:
+            continue
+        actual = report["codenameone"].get(key)
+        if actual is None:
+            # A gated metric that this run did not produce is a FAILURE, never
+            # a skip. The adapter being available is what made this report
+            # "measured", and sizes are read from the build output whether or
+            # not the app ever ran -- so a desktop build that launches and
+            # never prints its first-frame marker loses every start-up and
+            # memory sample while the size rows still fill in. Skipping the
+            # absent rows then printed "within tolerance" for a run whose
+            # start-up was completely broken.
+            findings.append({
+                "metric": key,
+                "label": label,
+                "baseline": expected,
+                "actual": None,
+                "tolerance": tolerance,
+                "missing": True,
+            })
             continue
         judged = actual * runner_slowdown_discount(report, baseline, key)
         limit = expected * (1.0 + tolerance)
@@ -607,6 +629,11 @@ def render_gate(report):
 def render_regressions(platform_id, findings):
     lines = []
     for item in findings:
+        if item.get("missing"):
+            lines.append("%s: %s was not measured, but the baseline gates it at %s"
+                         % (platform_id, item["label"],
+                            format_value(item["metric"], item["baseline"])))
+            continue
         lines.append(
             "%s: %s is %s%s against a baseline of %s (+%.1f%%, tolerance +%.0f%%)"
             % (platform_id, item["label"],
