@@ -48,6 +48,7 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
     private final Map<Key, Object> identities = new LinkedHashMap<Key, Object>();
     private final IdentityHashMap<Object, Entry> entries = new IdentityHashMap<Object, Entry>();
     private int loading;
+    private int mergeDepth;
     private int deferredFetch;
     private int aliasSequence;
     String deleteFrom(String table, String alias) {
@@ -486,6 +487,8 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
     }
     @Override
     public <T> T merge(T entity) {
+        // Relationship lookups must not flush a partially copied merge graph.
+        mergeDepth++;
         try {
             return merge(entity, new IdentityHashMap<Object, Object>());
         } catch (RuntimeException error) {
@@ -493,6 +496,8 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
                 rollbackOnly = true;
             }
             throw error;
+        } finally {
+            mergeDepth--;
         }
     }
     private <T> T merge(T entity, IdentityHashMap<Object, Object> merging) {
@@ -831,7 +836,10 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
         if (a.id || a.version || !model.counter(index)) {
             throw new IllegalArgumentException("Counter must be a non-key integral field: " + field);
         }
-        String statement = "UPDATE " + q(model.table()) + " SET " + q(a.column) + " = " + q(a.column) + " + ?";
+        // PostgreSQL otherwise infers INTEGER parameters, narrowing valid long deltas.
+        String counter = numericOperand(q(a.column), Attribute.BIGINT);
+        String operand = numericOperand("?", Attribute.BIGINT);
+        String statement = "UPDATE " + q(model.table()) + " SET " + q(a.column) + " = " + counter + " + " + operand;
         if (version >= 0) {
             String v = q(model.attributes()[version].column);
             statement += ", " + v + " = " + v + " + 1";
@@ -843,8 +851,8 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
         if (lower > upper) {
             return false;
         }
-        statement +=
-                " WHERE " + keyCondition(model, null) + " AND " + q(a.column) + " >= ? AND " + q(a.column) + " <= ?";
+        statement += " WHERE " + keyCondition(model, null) + " AND " + counter + " >= " + operand +
+                     " AND " + counter + " <= " + operand;
         if (version >= 0) {
             statement += " AND " + q(model.attributes()[version].column) + " < " +
                          (model.attributes()[version].kind == Attribute.INTEGER ? Integer.MAX_VALUE : Long.MAX_VALUE);
@@ -1926,7 +1934,7 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
     }
     void autoFlush() {
         check();
-        if (transaction && !flushing && loading == 0) {
+        if (transaction && !flushing && loading == 0 && mergeDepth == 0) {
             flush();
         }
     }

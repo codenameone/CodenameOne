@@ -1551,6 +1551,38 @@ public class OrmAnnotationProcessorTest {
     }
 
     @Test
+    public void mergeCompletesRequiredRelationshipsBeforeAutoFlush() throws Exception {
+        File classes=tmp.newFolder();Map<String,String> sources=new java.util.LinkedHashMap<String,String>();
+        sources.put("mergegraph.Child","package mergegraph; import com.codename1.annotations.*; import com.codename1.annotations.db.*; @Entity(table=\"merge_graph_child\") public class Child { @Id public long id; @Version public long version; public String name; }");
+        for(String name:Arrays.asList("PlainOwner","CascadeOwner")) {
+            String cascade=name.equals("CascadeOwner")?",cascade=CascadeType.MERGE":"";
+            sources.put("mergegraph."+name,"package mergegraph; import com.codename1.annotations.*; import com.codename1.annotations.db.*; @Entity(table=\"merge_graph_"+name+"\") public class "+name+" { @Id public long id; @ManyToOne(optional=false"+cascade+") public Child first; @ManyToOne(optional=false"+cascade+") public Child second; }");
+        }
+        JavaSourceCompiler.compile(sources,classes,Arrays.asList(testClassesDir()));ProcessorContext client=runProcessor(classes);assertFalse(client.getErrors().toString(),client.hasErrors());ProcessorContext backend=runProcessor(classes,backendClasspath());assertFalse(backend.getErrors().toString(),backend.hasErrors());
+        try(java.net.URLClassLoader loader=new java.net.URLClassLoader(new URL[]{classes.toURI().toURL()},getClass().getClassLoader())) {
+            Class childType=loader.loadClass("mergegraph.Child");
+            for(String suffix:Arrays.asList("Cn1Model","Cn1BackendModel")) for(String ownerName:Arrays.asList("PlainOwner","CascadeOwner")) {
+                Class ownerType=loader.loadClass("mergegraph."+ownerName);Map<String,com.codename1.impl.orm.EntityModel<?>> models=new java.util.LinkedHashMap<String,com.codename1.impl.orm.EntityModel<?>>();
+                for(String name:Arrays.asList("Child",ownerName)) models.put("mergegraph."+name,(com.codename1.impl.orm.EntityModel<?>)loader.loadClass("mergegraph."+name+suffix).newInstance());
+                for(com.codename1.impl.orm.EntityModel<?> model:models.values()) com.codename1.impl.orm.Models.register(model);
+                com.codename1.backend.Database db=com.codename1.backend.Database.open(":memory:");com.codename1.orm.session.Session session=new com.codename1.impl.orm.SessionImpl(new com.codename1.impl.orm.BackendSqlAccess(null,db,db.dialect()),models);
+                try {
+                    session.createTables();session.beginTransaction();Object first=childType.newInstance(),second=childType.newInstance();childType.getField("name").set(first,"first");childType.getField("name").set(second,"second");session.persist(first);session.persist(second);session.commitTransaction();session.clear();
+                    Object source=ownerType.newInstance();ownerType.getField("first").set(source,first);ownerType.getField("second").set(source,second);childType.getField("name").set(first,"changed");
+                    session.beginTransaction();Object managed=session.merge(source);assertFalse(session.isRollbackOnly());org.junit.Assert.assertNotSame(source,managed);
+                    // This query must resume normal auto-flush after the entire merge graph is ready.
+                    org.junit.Assert.assertEquals(1,session.query(ownerType).count());Object ownerId=ownerType.getField("id").get(managed);assertTrue(((Number)ownerId).longValue()>0);session.commitTransaction();session.clear();
+                    Object saved=session.find(ownerType,ownerId);Object savedFirst=ownerType.getField("first").get(saved),savedSecond=ownerType.getField("second").get(saved);
+                    org.junit.Assert.assertEquals(childType.getField("id").get(first),childType.getField("id").get(savedFirst));org.junit.Assert.assertEquals(childType.getField("id").get(second),childType.getField("id").get(savedSecond));
+                    org.junit.Assert.assertEquals(ownerName.equals("CascadeOwner")?"changed":"first",childType.getField("name").get(savedFirst));
+                    session.beginTransaction();try { session.merge(null);fail("Null merge must fail"); } catch(IllegalArgumentException expected) { }assertTrue(session.isRollbackOnly());session.rollbackTransaction();
+                    session.beginTransaction();Object pending=childType.newInstance();childType.getField("name").set(pending,"after failure");session.persist(pending);org.junit.Assert.assertEquals(3,session.query(childType).count());assertTrue(((Number)childType.getField("id").get(pending)).longValue()>0);session.commitTransaction();
+                } finally { session.close();db.close(); }
+            }
+        }
+    }
+
+    @Test
     public void requiredIdentityCyclesAreRejectedBeforeSchemaCreation() throws Exception {
         for(String required:Arrays.asList("@ManyToOne(optional=false)","@ManyToOne @JoinColumn(nullable=false)","@OneToOne(optional=false)")) {
             for(int length:new int[]{1,2,3}) {

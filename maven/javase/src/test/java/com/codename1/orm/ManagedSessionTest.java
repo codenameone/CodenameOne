@@ -247,6 +247,17 @@ class ManagedSessionTest {
         for(long boundary:new long[]{Integer.MIN_VALUE,Integer.MAX_VALUE,0}) {
             session.beginTransaction();assertEquals(1,session.createQuery("update ManagedSessionTest$Record r set r.counter=:value").setParameter("value",boundary).executeUpdate());session.commitTransaction();assertEquals(boundary,session.find(Record.class,id).counter);
         }
+        for(long[] change:new long[][]{{Integer.MIN_VALUE,2147483648L,0},{Integer.MIN_VALUE,4294967295L,Integer.MAX_VALUE},{Integer.MAX_VALUE,-4294967295L,Integer.MIN_VALUE},{Integer.MAX_VALUE,-2147483649L,-2}}) {
+            session.beginTransaction();session.createQuery("update ManagedSessionTest$Record r set r.counter=:value").setParameter("value",change[0]).executeUpdate();session.commitTransaction();
+            Record current=session.find(Record.class,id);long version=current.version;
+            session.beginTransaction();assertTrue(session.increment(Record.class,id,"counter",change[1]));assertEquals(change[2],current.counter);assertEquals(version+1,current.version);session.commitTransaction();
+            session.clear();assertEquals(change[2],session.find(Record.class,id).counter);
+        }
+        for(long amount:new long[]{Long.MIN_VALUE,Long.MAX_VALUE,-4294967296L,4294967296L,-2147483648L,2147483650L}) {
+            Record current=session.find(Record.class,id);long value=current.counter,version=current.version;
+            session.beginTransaction();assertFalse(session.increment(Record.class,id,"counter",amount));assertFalse(session.isRollbackOnly());session.commitTransaction();
+            assertEquals(value,current.counter);assertEquals(version,current.version);
+        }
     }
     @Test void integerKeysAndBulkAssignmentsRespectTheirRange() throws Exception {
         EntityManager em=manager();Models.register(integerModel());
