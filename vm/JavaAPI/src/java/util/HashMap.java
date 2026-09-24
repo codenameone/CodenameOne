@@ -39,7 +39,12 @@ public class HashMap<K, V> extends AbstractMap<K, V> implements Map<K, V> {
 
     private static final long serialVersionUID = 362498820763181265L;
 
-    private static final int DEFAULT_SIZE = 16;
+    // 4, not the JDK's 16. The table is ours, not an array of Node references: a slot is
+    // a key, a value and a hash (20 bytes), so a 16-slot table is ~330 bytes on the first
+    // put. Measured on the self-hosting corpus, 221k HashMaps are live at the peak and
+    // most hold a handful of entries. Growth doubles, so a map that does fill up pays two
+    // extra rehashes on the way to 16.
+    private static final int DEFAULT_SIZE = 4;
 
     /** slot metadata: empty slot. */
     static final int META_EMPTY = 0;
@@ -112,7 +117,7 @@ public class HashMap<K, V> extends AbstractMap<K, V> implements Map<K, V> {
             return 1 << 30;
         }
         if (x == 0) {
-            return 16;
+            return DEFAULT_SIZE;
         }
         x = x - 1;
         x |= x >> 1;

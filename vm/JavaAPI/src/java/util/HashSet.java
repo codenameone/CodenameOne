@@ -55,7 +55,10 @@ public class HashSet<E> extends AbstractSet<E> implements Set<E> {
     transient int cn1Occupied;
     transient int cn1ModCount;
 
-    private static final int DEFAULT_CAPACITY = 16;
+    // The smallest table, and the default. 4 rather than 16 for the reason given at
+    // HashMap.DEFAULT_SIZE: 145k HashSets are live at the self-hosting peak. The threshold
+    // cap - (cap >> 2) still leaves an empty slot at 4 (3 of 4), which probing requires.
+    private static final int DEFAULT_CAPACITY = 4;
 
     private native boolean cn1AddNative(Object element);
     private native boolean cn1ContainsNative(Object element);
@@ -80,8 +83,8 @@ public class HashSet<E> extends AbstractSet<E> implements Set<E> {
          * cap - (cap >> 2). Deriving it costs a shift and a subtract where the field
          * cost 4 bytes on every set, which is what took java.util.HashSet from the
          * 48-byte BiBOP slot class into the 64-byte one. The clamp it used to apply
-         * for a table with no empty slot cannot trigger: cap >= 16 always, so
-         * cap - (cap >> 2) <= cap - 4. See cn1HsThreshold in nativeMethods.m. */
+         * for a table with no empty slot cannot trigger: cap >= 4 always, so
+         * cap - (cap >> 2) <= cap - 1. See cn1HsThreshold in nativeMethods.m. */
         cn1Cap = cap;
     }
 
