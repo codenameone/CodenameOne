@@ -81,4 +81,31 @@ public class IncrementalCacheKeyTest {
                 "the old package's sources must not stay on the compile root beside the new ones");
         assertTrue(new File(out, "com/example/two").listFiles().length > 0);
     }
+
+    @Test
+    public void aFailedWriteLeavesNoStateToSkipTheNextBuild() throws Exception {
+        File src = new File(tmp, "src3");
+        src.mkdirs();
+        File dart = new File(src, "a.dart");
+        TestSupport.write(dart, "int answer() => 42;\n");
+        File out = new File(tmp, "out3");
+        File state = new File(tmp, "state3.txt");
+        run(src, out, state, "com.example.three");
+        assertTrue(state.isFile(), "a successful run records its inputs");
+
+        // Every generated file's path becomes a directory, so writing it fails.
+        File pkg = new File(out, "com/example/three");
+        for (File f : pkg.listFiles()) {
+            assertTrue(f.delete() && f.mkdir(), "could not block " + f);
+        }
+        TestSupport.write(dart, "int answer() => 43;\n");
+        TranspileResult failed = run(src, out, state, "com.example.three");
+        assertTrue(failed.hasErrors(), "the blocked writes are reported");
+        assertFalse(state.exists(), "the digest of inputs whose output was not written is not recorded");
+
+        // Back to the inputs of the earlier, successful build: its state is gone, so
+        // this build writes again instead of trusting output that no longer matches.
+        TestSupport.write(dart, "int answer() => 42;\n");
+        assertFalse(run(src, out, state, "com.example.three").isUpToDate());
+    }
 }

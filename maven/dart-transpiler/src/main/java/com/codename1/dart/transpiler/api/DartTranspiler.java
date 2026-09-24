@@ -115,7 +115,16 @@ public final class DartTranspiler {
 
         if (!diags.hasErrors() && req.outputDir != null) {
             writeOutput(req, files, diags);
-            if (req.stateFile != null) {
+            if (req.stateFile != null && diags.hasErrors()) {
+                // A file failed to write, so the output does not match these inputs.
+                // Recording the digest anyway sent the next unchanged build down the
+                // up-to-date path with a missing or stale generated file and no error;
+                // removing the state (it may name an earlier, matching build) forces
+                // the next build to write everything again.
+                if (req.stateFile.exists() && !req.stateFile.delete()) {
+                    diags.warn(null, "W0001", "Could not remove stale transpiler state file: " + req.stateFile);
+                }
+            } else if (req.stateFile != null) {
                 try {
                     req.stateFile.getParentFile().mkdirs();
                     Files.write(req.stateFile.toPath(), digest.getBytes(StandardCharsets.UTF_8));

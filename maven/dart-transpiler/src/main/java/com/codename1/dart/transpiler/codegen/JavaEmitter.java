@@ -5754,6 +5754,12 @@ public final class JavaEmitter {
                 Out v = emitExpr(pos.get(0), null, ctx);
                 return new Out(target.code + ".containsKey(" + boxIfPrimitive(v, ctx) + ")", TypeRef.BOOL);
             }
+            if (n.equals("containsValue")) {
+                // Boxed through Object so a primitive argument picks containsValue(Object),
+                // which compares with Dart's ==; unresolved before.
+                Out v = emitExpr(pos.get(0), null, ctx);
+                return new Out(target.code + ".containsValue((Object) " + paren(v.code) + ")", TypeRef.BOOL);
+            }
             if (n.equals("remove")) {
                 Out v = emitExpr(pos.get(0), null, ctx);
                 return new Out(target.code + ".removeDart(" + boxIfPrimitive(v, ctx) + ")", boxType(tt.arg(1)));
