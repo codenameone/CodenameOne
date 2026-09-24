@@ -588,6 +588,33 @@ class OtlpTracerTest {
     }
 
     @Test
+    @DisplayName("relay payloads that were never posted keep their own retry")
+    void unsentRelayPayloadsKeepTheirRetry() throws Exception {
+        // One round of two: A's first POST fails, and A and the unsent B go back.
+        // B's own first POST then fails too, and must still get its retry.
+        answers.add(Integer.valueOf(503));   // A
+        answers.add(Integer.valueOf(200));   // A, retried
+        answers.add(Integer.valueOf(503));   // B, first real attempt
+        answers.add(Integer.valueOf(200));   // B, retried
+        BatchExporter exporter = new BatchExporter(
+                "http://127.0.0.1:" + collector.getAddress().getPort() + "/v1/traces",
+                new ArrayList(), false, new java.util.LinkedHashMap(), 16, 4, 100, 1 << 20);
+        assertTrue(exporter.addRelayed("{\"a\":1}".getBytes("UTF-8"), "application/json"));
+        assertTrue(exporter.addRelayed("{\"b\":1}".getBytes("UTF-8"), "application/json"));
+        exporter.start();
+        try {
+            exporter.flush(10000);
+            java.util.Map metrics = new java.util.LinkedHashMap();
+            exporter.metrics(metrics);
+            assertEquals(Long.valueOf(2), metrics.get("clientExportsRelayed"),
+                    "a payload that was never sent was dropped on its first failure");
+            assertEquals(Long.valueOf(0), metrics.get("clientExportsDropped"));
+        } finally {
+            exporter.shutdown(0);
+        }
+    }
+
+    @Test
     @DisplayName("OTEL_SDK_DISABLED leaves the server untraced and the collector untouched")
     void disabledAtRunTime() throws Exception {
         int port = freePort();

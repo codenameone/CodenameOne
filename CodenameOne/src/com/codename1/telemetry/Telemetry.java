@@ -393,6 +393,13 @@ public final class Telemetry {
             // must not compete with the app's own requests for the network.
             request.setFailSilently(true);
             request.setReadResponseForErrors(false);
+            // Never followed. A redirect re-queues this same request with its
+            // headers intact, so a collector that redirected elsewhere -- another
+            // origin included -- would be handed the Authorization or API-key
+            // header meant for it, and 301/302/303 turn the POST into a bodiless
+            // GET anyway. An export that is redirected fails, and is dropped like
+            // any other failed export; point the endpoint at the real collector.
+            request.setFollowRedirects(false);
             // SHORT, and behind the app's own requests. By default a request may
             // take five minutes and the manager has one network thread, so a
             // collector that accepts the connection and never answers would hold

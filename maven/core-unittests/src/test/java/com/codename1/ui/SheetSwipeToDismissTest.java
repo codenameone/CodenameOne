@@ -340,7 +340,15 @@ class SheetSwipeToDismissTest extends UITestBase {
         // the next tick: when it flips false, the next updateAnimations
         // call is the one that runs the completion runnable.
         while (am.isAnimating() && System.currentTimeMillis() < deadline) {
-            clearPaintQueue();
+            // Cleared only while the sheet is still up. Once the dismiss has run,
+            // the repaint it scheduled is the thing under test -- and another
+            // animation still finishing on the form (the overlay's fade, which on
+            // a slow runner can outlast the slide) kept this loop going and
+            // cleared that repaint away, so the assertion below found an empty
+            // queue on a JDK 21 CI run with the fix in place.
+            if (Sheet.getCurrentSheet() != null) {
+                clearPaintQueue();
+            }
             am.updateAnimations();
             flushSerialCalls();
             sleepQuietly(10);

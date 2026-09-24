@@ -135,13 +135,44 @@ class LambdaTracingTest {
         Recorder failing = new Recorder();
         Recorder other = new Recorder();
         Tracing.install(x);
-        // Start-up A swaps X out, start-up B swaps A out, then A fails.
-        Tracer previous = Tracing.swap(failing);
-        Tracing.retire(Tracing.swap(other), other);
-        Tracing.rollBack(failing, previous);
+        // Start-up A swaps X out, start-up B swaps A out and completes, then A fails.
+        Tracing.Swap a = Tracing.swap(failing);
+        Tracing.commit(Tracing.swap(other));
+        Tracing.rollBack(a);
         assertTrue(Tracing.getTracer() == other, "the later install was undone");
         assertEquals(1, x.shutdowns, "the tracer the failed start-up displaced leaked");
-        assertEquals(1, failing.shutdowns);
+        assertEquals(1, failing.shutdowns, "retired once, by the start-up that replaced it");
+    }
+
+    @Test
+    @DisplayName("overlapping failed start-ups restore the original tracer and stop both of theirs")
+    void nestedRollBacksRestoreTheOriginal() {
+        Recorder x = new Recorder();
+        Recorder f = new Recorder();
+        Recorder g = new Recorder();
+        Tracing.install(x);
+        // A swaps X for F, B swaps F for G; A fails first, then B.
+        Tracing.Swap a = Tracing.swap(f);
+        Tracing.Swap b = Tracing.swap(g);
+        Tracing.rollBack(a);
+        assertTrue(Tracing.getTracer() == g, "B is still starting; its tracer stays");
+        assertEquals(0, x.shutdowns, "A retired the original while B could still restore it");
+        Tracing.rollBack(b);
+        assertTrue(Tracing.getTracer() == x, "the original was not restored");
+        assertEquals(0, x.shutdowns);
+        assertEquals(1, f.shutdowns, "A's failed tracer");
+        assertEquals(1, g.shutdowns, "B's failed tracer");
+
+        // And the other order: B fails first, then A.
+        Tracing.Swap a2 = Tracing.swap(f = new Recorder());
+        Tracing.Swap b2 = Tracing.swap(g = new Recorder());
+        Tracing.rollBack(b2);
+        assertTrue(Tracing.getTracer() == f);
+        Tracing.rollBack(a2);
+        assertTrue(Tracing.getTracer() == x);
+        assertEquals(0, x.shutdowns);
+        assertEquals(1, f.shutdowns);
+        assertEquals(1, g.shutdowns);
     }
 
     @Test

@@ -393,8 +393,8 @@ final class BatchExporter implements Runnable {
     }
 
     /**
-     * Puts payloads[from..] back at the head of the relay queue, marked as retried,
-     * and starts the backoff; false, having changed nothing, when the relay's byte
+     * Puts payloads[from..] back at the head of the relay queue -- payloads[from],
+     * the one whose POST failed, marked as retried -- and starts the backoff; false, having changed nothing, when the relay's byte
      * budget has no room for them. Called holding the lock.
      */
     private boolean requeueRelayed(List payloads, int from) {
@@ -411,7 +411,11 @@ final class BatchExporter implements Runnable {
         List again = new ArrayList();
         for(int iter = from ; iter < payloads.size() ; iter++) {
             Object[] payload = (Object[])payloads.get(iter);
-            again.add(new Object[] {payload[0], payload[1], Boolean.TRUE});
+            // Only the one that was POSTED has used its retry. The rest of the
+            // round were never sent, and marking them too dropped each of them on
+            // its first real failure.
+            again.add(iter == from ? new Object[] {payload[0], payload[1], Boolean.TRUE}
+                    : payload);
         }
         relayed.addAll(0, again);
         relayedBytes += bytes;

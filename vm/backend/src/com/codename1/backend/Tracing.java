@@ -86,34 +86,68 @@ public final class Tracing {
      * export thread and queues on every reconfiguration.
      */
     public static void install(Tracer installed) {
-        retire(swap(installed), installed);
+        commit(swap(installed));
     }
 
     /**
-     * Installs {@code installed} WITHOUT stopping the tracer it replaces, and
-     * returns that one. For a start-up that can still fail: it traces its own
-     * start-up with the new tracer, then {@link #retire}s the old one if it
-     * committed or {@link #rollBack}s if it did not. Shutting the old one down up
-     * front left a failed second server's process with no tracer at all, while
-     * the first server kept running untraced.
+     * A start-up's claim on the slot, from {@link #swap} until {@link #commit} or
+     * {@link #rollBack}: what it installed, and what that displaced.
+     *
+     * <p>{@code previous} can CHANGE while the claim is open. Two start-ups that
+     * overlap chain: A swaps X out for F, B swaps F out for G. If A then fails, F
+     * is gone but X is not coming back yet -- B is still starting over it -- so
+     * A's rollback hands X to B's claim. B's rollback then restores X and its
+     * commit retires X, and each failed tracer is stopped exactly once. Without
+     * the chain, A retired X and B's rollback restored A's failed F.
      */
-    static Tracer swap(Tracer installed) {
+    static final class Swap {
+        final Tracer installed;
+        Tracer previous;
+
+        Swap(Tracer installed, Tracer previous) {
+            this.installed = installed;
+            this.previous = previous;
+        }
+    }
+
+    /** Claims made by swap() and not yet committed or rolled back. Under LIFECYCLE. */
+    private static final List PENDING = new ArrayList();
+
+    /**
+     * Installs {@code installed} WITHOUT stopping the tracer it replaces. For a
+     * start-up that can still fail: it traces its own start-up with the new
+     * tracer, then {@link #commit}s if it completed or {@link #rollBack}s if it
+     * did not. Shutting the old one down up front left a failed second server's
+     * process with no tracer at all, while the first server kept running untraced.
+     */
+    static Swap swap(Tracer installed) {
         synchronized(LIFECYCLE) {
-            Tracer previous = tracer;
+            Swap claim = new Swap(installed, tracer);
             tracer = installed;
-            return previous;
+            PENDING.add(claim);
+            return claim;
         }
     }
 
     /**
-     * Guards every read-and-replace of the slot. Two servers starting at once each
-     * read the same previous tracer before either write landed, so each retired
-     * that one, and the tracer the FIRST installed -- overwritten by the second --
-     * was never shut down: its export thread and queues leaked. The server is
-     * multi-threaded here; the lock is held for the swap only, never across a
-     * shutdown, which can block for seconds.
+     * Guards every read-and-replace of the slot, and the chain of open claims.
+     * Two servers starting at once each read the same previous tracer before
+     * either write landed, so each retired that one, and the tracer the FIRST
+     * installed -- overwritten by the second -- was never shut down. The server
+     * is multi-threaded here; the lock is never held across a shutdown, which
+     * can block for seconds.
      */
     private static final Object LIFECYCLE = new Object();
+
+    /** A start-up completed: what its tracer displaced is stopped. */
+    static void commit(Swap claim) {
+        Tracer displaced;
+        synchronized(LIFECYCLE) {
+            PENDING.remove(claim);
+            displaced = claim.previous;
+        }
+        retire(displaced, claim.installed);
+    }
 
     /** Stops {@code previous}, replaced by {@code installed}, exporting what it held. */
     static void retire(Tracer previous, Tracer installed) {
@@ -127,33 +161,52 @@ public final class Tracing {
     }
 
     /**
-     * Undoes a {@link #swap}: {@code previous} is back in the slot, untouched, and
-     * {@code failed} -- the tracer of a start-up that did not complete -- is
-     * stopped. Only if the slot still holds {@code failed}; anything installed
-     * since then is someone else's.
+     * Undoes a {@link #swap}. Three cases, decided under the lock:
+     * <ul>
+     *   <li>its tracer is still installed: what it displaced goes back, and the
+     *       failed tracer stops;</li>
+     *   <li>a start-up that is still open swapped over it: that claim inherits
+     *       what this one displaced (see {@link Swap}), and the failed tracer
+     *       stops;</li>
+     *   <li>an install or a commit replaced it, and retired it doing so: what it
+     *       displaced is not coming back, and is retired here, since nothing else
+     *       holds it.</li>
+     * </ul>
      */
-    static void rollBack(Tracer failed, Tracer previous) {
-        boolean restored;
+    static void rollBack(Swap claim) {
+        Tracer stopFailed = null;
+        Tracer orphan = null;
         synchronized(LIFECYCLE) {
-            restored = tracer == failed;
-            if(restored) {
-                tracer = previous;
+            PENDING.remove(claim);
+            if(tracer == claim.installed) {
+                tracer = claim.previous;
+                stopFailed = claim.installed;
+            } else {
+                Swap later = null;
+                for(int iter = 0 ; iter < PENDING.size() ; iter++) {
+                    Swap open = (Swap)PENDING.get(iter);
+                    if(open.previous == claim.installed) {
+                        later = open;
+                        break;
+                    }
+                }
+                if(later != null) {
+                    later.previous = claim.previous;
+                    stopFailed = claim.installed;
+                } else {
+                    orphan = claim.previous;
+                }
             }
         }
-        if(!restored) {
-            // Another install replaced the failed tracer meanwhile, so previous is
-            // not coming back -- and the failed start-up was the only one holding
-            // it. Retired here, or nothing ever would. The failed tracer itself was
-            // retired by that install, which found it in the slot.
-            retire(previous, failed);
-            return;
-        }
-        if(failed != null && failed != previous) {
+        if(stopFailed != null && stopFailed != claim.previous) {
             try {
-                failed.shutdown(0);
+                stopFailed.shutdown(0);
             } catch (RuntimeException err) {
                 failed(err);
             }
+        }
+        if(orphan != null) {
+            retire(orphan, claim.installed);
         }
     }
 

@@ -776,6 +776,34 @@ class TelemetryTest extends UITestBase {
     }
 
     @Test
+    void anExportIsNeverRedirectedWithItsCredential() throws Exception {
+        TestCodenameOneImplementation impl = TestCodenameOneImplementation.getInstance();
+        TestCodenameOneImplementation.TestConnection redirecting =
+                impl.createConnection("http://redirecting.test/v1/traces");
+        redirecting.setResponseCode(302);
+        redirecting.setHeader("location", "http://elsewhere.test/v1/traces");
+        impl.addNetworkMockResponse("http://elsewhere.test/v1/traces", 200, "OK", new byte[0]);
+        Telemetry.install(new TelemetryConfig().direct("http://redirecting.test")
+                .header("Authorization", "Api-Token s3cret"));
+        NetworkManager.getInstance().addToQueueAndWait(request(API + "?redirected"));
+        Telemetry.flush();
+        long deadline = System.currentTimeMillis() + 3000;
+        TestCodenameOneImplementation.TestConnection sent = null;
+        while (System.currentTimeMillis() < deadline) {
+            flushSerialCalls();
+            sent = impl.getConnection("http://redirecting.test/v1/traces");
+            if (sent != null && sent.getOutputData().length > 0) {
+                break;
+            }
+            Thread.sleep(20);
+        }
+        assertTrue(sent != null && sent.getOutputData().length > 0,
+                "the export never reached the collector");
+        assertNull(impl.getConnection("http://elsewhere.test/v1/traces"),
+                "the export followed a redirect, credential and all");
+    }
+
+    @Test
     void aTruncatedValueNeverEndsInHalfACharacter() {
         StringBuilder text = new StringBuilder();
         for (int i = 0; i < TelemetrySpan.MAX_VALUE_LENGTH - 1; i++) {

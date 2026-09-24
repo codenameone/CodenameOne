@@ -451,18 +451,18 @@ public final class Backend {
             // Installed without stopping whatever tracer was there before -- another
             // server's, or one the program installed -- which is retired only once
             // this start-up commits, and put back if it does not.
-            Tracer previous = tracing ? Tracing.swap(tracer) : null;
+            Tracing.Swap claim = tracing ? Tracing.swap(tracer) : null;
             Backend started;
             try {
                 started = startTraced(tracing);
             } catch (Exception err) {
                 if(tracing) {
-                    Tracing.rollBack(tracer, previous);
+                    Tracing.rollBack(claim);
                 }
                 throw err;
             }
             if(tracing) {
-                Tracing.retire(previous, tracer);
+                Tracing.commit(claim);
             }
             return started;
         }
