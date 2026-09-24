@@ -88,6 +88,9 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
     String integralSum(String expression) {
         return "CAST(" + expression + " AS " + ("mysql".equals(sql.dialect()) ? "SIGNED" : "BIGINT") + ")";
     }
+    String functionName(String function) {
+        return "LENGTH".equals(function) && "mysql".equals(sql.dialect()) ? "CHAR_LENGTH" : function;
+    }
     String numericOperand(String value, int kind) {
         if ("postgresql".equals(sql.dialect())) {
             return "CAST(" + value + " AS " + (kind == Attribute.REAL ? "DOUBLE PRECISION" : "BIGINT") + ")";
@@ -796,6 +799,7 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
         if (transaction) {
             throw new PersistenceException("Create schemas outside application transactions");
         }
+        validateKeyWidths();
         List<String> created = new ArrayList<String>();
         List<ForeignKey> foreignKeys = new ArrayList<ForeignKey>();
         for (EntityModel<?> model : models.values()) {
@@ -916,6 +920,44 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
             return sql.describe(table);
         } catch (IOException error) {
             throw failure(error);
+        }
+    }
+    private void validateKeyWidths() {
+        for (EntityModel model : models.values()) {
+            int primary = keyWidth(model, model.idIndexes());
+            checkKeyWidth(model.table(), primary);
+            for (Index index : model.indexes()) {
+                int width = 0;
+                for (String field : index.fields()) {
+                    width += keyWidth(model, new int[] {model.index(field)});
+                }
+                checkKeyWidth(model.table(), width);
+            }
+            for (Relationship relation : model.relationships()) {
+                if (relation.many && relation.mappedBy.length() == 0) {
+                    int suffix = relation.element ? (relation.mapKey.length() > 0 ? 1020 : 4)
+                            : relation.orderColumn.length() > 0 ? 4
+                            : keyWidth(model(relation.target), model(relation.target).idIndexes());
+                    checkKeyWidth(relation.joinTable, primary + suffix);
+                }
+            }
+        }
+    }
+    private int keyWidth(EntityModel model, int[] indexes) {
+        int width = 0;
+        for (int index : indexes) {
+            Attribute attribute = model.attributes()[index];
+            // Explicit declarations remain the application's schema contract.
+            if (attribute.declaredType == null) {
+                width += attribute.kind == Attribute.TEXT ? 255 * 4
+                        : attribute.kind == Attribute.INTEGER ? 4 : attribute.kind == Attribute.BOOLEAN ? 2 : 8;
+            }
+        }
+        return width;
+    }
+    private void checkKeyWidth(String table, int width) {
+        if (width > 3072) {
+            throw new PersistenceException("Generated key exceeds the portable limit of 3072 bytes: " + table);
         }
     }
     private String columnType(EntityModel model, int index) {
@@ -1146,7 +1188,7 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
         }
         return parts.toArray(new String[parts.size()]);
     }
-    private static int typeFamily(String type) {
+    private int typeFamily(String type) {
         StringBuilder lower = new StringBuilder();
         for (int i = 0; i < type.length(); i++) {
             char ch = type.charAt(i);
@@ -1155,6 +1197,9 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
         String name = lower.toString();
         String[] tokens = split(name.replace('(', ' '), ' ');
         String token = tokens.length == 0 ? "" : tokens[0];
+        if ("postgresql".equals(sql.dialect()) && ("bool".equals(token) || "boolean".equals(token))) {
+            return 6;
+        }
         if (" int integer tinyint smallint mediumint bigint int2 int4 int8 serial smallserial bigserial serial2 serial4 serial8 bool boolean ".contains(" " + token + " ")) {
             return 1;
         }

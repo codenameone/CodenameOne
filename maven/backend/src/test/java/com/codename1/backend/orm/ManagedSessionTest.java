@@ -147,6 +147,21 @@ class ManagedSessionTest {
         }
     }
 
+    @Test void lengthUsesCharacterSemanticsForEachDialect() throws Exception {
+        for(com.codename1.backend.sql.Dialect dialect:new com.codename1.backend.sql.Dialect[]{com.codename1.backend.sql.Dialect.SQLITE,com.codename1.backend.sql.Dialect.POSTGRES,com.codename1.backend.sql.Dialect.MYSQL,com.codename1.backend.sql.Dialect.MARIADB}) {
+            com.codename1.impl.orm.BackendSqlAccess adapter=new com.codename1.impl.orm.BackendSqlAccess(null,null,dialect);
+            com.codename1.impl.orm.SqlAccess access=(com.codename1.impl.orm.SqlAccess)java.lang.reflect.Proxy.newProxyInstance(getClass().getClassLoader(),new Class[]{com.codename1.impl.orm.SqlAccess.class},(proxy,method,args)-> {
+                if(method.getName().equals("query")) {
+                    assertTrue(((String)args[0]).contains("mysql".equals(dialect.getName())?"CHAR_LENGTH(":"LENGTH("));return java.util.Collections.singletonList(new Object[]{1L});
+                }
+                return method.invoke(adapter,args);
+            });
+            java.util.Map<String,EntityModel<?>> models=new java.util.LinkedHashMap<String,EntityModel<?>>();models.put(Record.class.getName(),new Model());
+            Session session=new com.codename1.impl.orm.SessionImpl(access,models);
+            assertEquals(Long.valueOf(1),session.createQuery("select length(r.name) from ManagedSessionTest$Record r",Long.class).first());session.close();
+        }
+    }
+
     @Test void managedOrderingUsesDialectForTextNumericAndExpressionTerms() throws Exception {
         for(com.codename1.backend.sql.Dialect dialect:new com.codename1.backend.sql.Dialect[]{com.codename1.backend.sql.Dialect.SQLITE,com.codename1.backend.sql.Dialect.POSTGRES,com.codename1.backend.sql.Dialect.MYSQL,com.codename1.backend.sql.Dialect.MARIADB}) {
             java.util.List<String> statements=new java.util.ArrayList<String>();
@@ -276,6 +291,42 @@ class ManagedSessionTest {
             assertThrows(IllegalArgumentException.class,()->session.createQuery("select r from ManagedSessionTest$Record r where r.id in :ids").setParameter("ids",tooMany).list());
             assertThrows(IllegalArgumentException.class,()->session.createQuery("select r from ManagedSessionTest$Record r where r.id in :a and r.id in :b").setParameter("a",half).setParameter("b",half).list());
             assertThrows(IllegalArgumentException.class,()->session.createQuery("select r from ManagedSessionTest$Record r where r.id in :ids and r.name=:name").setParameter("ids",allowed).setParameter("name","first").list());session.close();
+        } finally { em.close(); }
+    }
+
+    @Test void functionsValidateUnknownOperandsAgainstKnownKinds() throws Exception {
+        EntityManager em=manager();
+        try {
+            Session session=em.openSession();seed(session);
+            for(String expression:new String[]{"coalesce(:value,r.counter)","coalesce(r.counter,:value)","nullif(:value,r.counter)","nullif(r.counter,:value)","coalesce(coalesce(:value,:other),r.counter)"}) {
+                com.codename1.orm.session.JpqlQuery<?> query=session.createQuery("select "+expression+" from ManagedSessionTest$Record r").setParameter("value","oops");
+                if(expression.contains(":other")) query.setParameter("other",null);
+                assertThrows(IllegalArgumentException.class,query::list,expression);
+            }
+            assertThrows(IllegalArgumentException.class,()->session.createQuery("select coalesce(:value,r.name) from ManagedSessionTest$Record r").setParameter("value",1L).list());
+            assertThrows(IllegalArgumentException.class,()->session.createQuery("select coalesce(:value,r.bytes) from ManagedSessionTest$Record r").setParameter("value","oops").list());
+            assertEquals(Long.valueOf(7),session.createQuery("select coalesce(:value,r.counter) from ManagedSessionTest$Record r",Long.class).setParameter("value",7L).first());
+            assertEquals(Long.valueOf(7),session.createQuery("select nullif(:value,r.counter) from ManagedSessionTest$Record r",Long.class).setParameter("value",7L).first());
+            assertEquals(Long.valueOf(1),session.createQuery("select length('é') from ManagedSessionTest$Record r",Long.class).first());
+            session.close();
+        } finally { em.close(); }
+    }
+
+    @Test void groupingTracksCorrelatedSubqueryFields() throws Exception {
+        EntityManager em=manager();
+        try {
+            Session session=em.openSession();seed(session);
+            String correlated="(select max(i.name) from ManagedSessionTest$Record i where i.id=r.id)";
+            assertThrows(IllegalArgumentException.class,()->session.createQuery("select "+correlated+",count(r.id) from ManagedSessionTest$Record r"));
+            assertThrows(IllegalArgumentException.class,()->session.createQuery("select count(r.id) from ManagedSessionTest$Record r having "+correlated+"='first'"));
+            assertThrows(IllegalArgumentException.class,()->session.createQuery("select count(r.id) from ManagedSessionTest$Record r order by "+correlated));
+            assertThrows(IllegalArgumentException.class,()->session.createQuery("select count(r.id) from ManagedSessionTest$Record r having exists (select i.id from ManagedSessionTest$Record i where i.id=r.id)"));
+            String nested="(select max(i.name) from ManagedSessionTest$Record i where i.id=(select max(j.id) from ManagedSessionTest$Record j where j.id=r.id))";
+            assertThrows(IllegalArgumentException.class,()->session.createQuery("select "+nested+",count(r.id) from ManagedSessionTest$Record r"));
+            assertEquals("first",((Object[])session.createQuery("select "+correlated+",count(r.id) from ManagedSessionTest$Record r group by r.id").first())[0]);
+            assertEquals("first",((Object[])session.createQuery("select "+nested+",count(r.id) from ManagedSessionTest$Record r group by r.id").first())[0]);
+            assertEquals(1,session.createQuery("select (select max(i.name) from ManagedSessionTest$Record i),count(r.id) from ManagedSessionTest$Record r").list().size());
+            session.close();
         } finally { em.close(); }
     }
 

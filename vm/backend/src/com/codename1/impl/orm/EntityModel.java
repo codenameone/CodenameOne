@@ -72,6 +72,10 @@ public abstract class EntityModel<T> {
     public boolean required(T entity, int index) {
         return !attributes()[index].nullable;
     }
+    /// Whether the unconverted Java field is primitive and cannot hold null.
+    public boolean primitive(int index) {
+        return false;
+    }
     /// Returns whether any mapped subtype requires this column to contain a value.
     public boolean required(int index) {
         return !attributes()[index].nullable;

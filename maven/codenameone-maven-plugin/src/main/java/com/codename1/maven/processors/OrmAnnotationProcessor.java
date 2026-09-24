@@ -387,6 +387,8 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
                 if(fieldPath.prefix.length()>0) { ctx.error(cls,"Relationships inside embeddables are not supported: "+fieldPath.path);continue; }
                 relationship.declaringType=fieldPath.declaringType;relationship.index=ec.relations.size(); ec.relations.add(relationship); continue; }
             PersistedField pf = new PersistedField();
+            pf.primitive = f.getDescriptor().length()==1;
+            pf.javaType = org.objectweb.asm.Type.getType(f.getDescriptor()).getClassName();
             pf.fieldName = fieldPath.path;pf.declaringType=fieldPath.declaringType;
             pf.embeddedParent = fieldPath.prefix;
             pf.version = f.getAnnotation("Lcom/codename1/annotations/db/Version;") != null;
@@ -943,7 +945,7 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
             int end=start<0?-1:signature.indexOf(';',start);
             if(start<0 || end<0) ctx.error("Relationship needs a concrete collection element type: "+owner.binaryName+"."+relation.field);
             else {
-                if(map) { start=end;end=signature.indexOf(';',start+2); }
+                if(map) { relation.mapKeyType=signature.substring(start+2,end).replace('/','.');start=end;end=signature.indexOf(';',start+2); }
                 if(end<0) ctx.error("Map requires a concrete entity value type: "+relation.field);
                 else relation.target=signature.substring(start+2,end).replace('/','.');
             }
@@ -973,13 +975,24 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
         return relation;
     }
 
+    private String boxedDomainType(String type) {
+        String[] primitive={"boolean","byte","short","int","long","float","double","char"};
+        String[] boxed={"Boolean","Byte","Short","Integer","Long","Float","Double","Character"};
+        for(int i=0;i<primitive.length;i++) if(primitive[i].equals(type)) return "java.lang."+boxed[i];
+        return type;
+    }
+
     private void resolveRelations(ProcessorContext ctx) {
         for(EntityClass owner:accepted.values()) for(RelationField relation:owner.relations) {
             if(relation.element) continue;
             EntityClass target=accepted.get(relation.target);
             if(target==null) { ctx.error("Relationship target is not an available @Entity: "+relation.target);continue; }
             if(relation.mapKey.length()>0) {
-                boolean found=false;for(PersistedField field:target.fields) if(field.fieldName.equals(relation.mapKey) && field.relation==null) found=true;
+                boolean found=false;for(PersistedField field:target.fields) if(field.fieldName.equals(relation.mapKey) && field.relation==null) {
+                    found=true;
+                    String domain=field.kind.kind==PropertyTypeKind.Kind.PROPERTY?field.kind.elementBinaryName:field.javaType;
+                    if(!relation.mapKeyType.equals(boxedDomainType(domain))) ctx.error("MapKey generic must match target domain type: "+relation.field);
+                }
                 if(!found) ctx.error("MapKey must name a target basic field: "+relation.mapKey);
             }
             if(relation.orderBy.length()>0) for(String clause:relation.orderBy.split(",")) {
@@ -1333,6 +1346,9 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
         }
         sb.append("public boolean required(int index) { switch(index) {");
         for(int i=0;i<ec.fields.size();i++) if(ec.fields.get(i).declaredRequired) sb.append("case ").append(i).append(": return true;");
+        sb.append("default:return false;} }\n");
+        sb.append("public boolean primitive(int index) { switch(index) {");
+        for(int i=0;i<ec.fields.size();i++) if(ec.fields.get(i).primitive) sb.append("case ").append(i).append(": return true;");
         sb.append("default:return false;} }\n");
         sb.append("public boolean counter(int index) { switch(index) {");
         for(int i=0;i<ec.fields.size();i++) {
@@ -2527,7 +2543,7 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
 
     static final class RelationField {
         String field, descriptor, target, mappedBy, columnName, table, ownerColumn, targetColumn,kind,declaringType;
-        String mapKey="",orderColumn="",orderBy="";
+        String mapKey="",orderColumn="",orderBy="",mapKeyType="";
         boolean many,lazy,orphan,nullable,unique,element;
         int cascade,index,column=-1;
     }
@@ -2558,7 +2574,8 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
         String fieldName;
         String embeddedParent;
         String converter,domainType,declaringType;
-        boolean discriminator;
+        boolean discriminator,primitive;
+        String javaType;
         String columnName;
         String sqlType;
         boolean nullable;

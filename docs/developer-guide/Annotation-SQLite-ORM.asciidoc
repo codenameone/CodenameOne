@@ -156,7 +156,8 @@ Bulk mutations use `executeUpdate()` inside a transaction. They flush pending
 managed changes, bypass per-entity callbacks and cascades, and clear the context
 so later reads can't reuse stale entities. Bulk assignments to required subtype
 fields need a non-null literal or named parameter. Other assignment expressions
-are rejected for those fields.
+are rejected for those fields. Literal and bound null assignments to primitive
+Java fields are rejected on both runtimes.
 
 An `int` or `long` field annotated `@Version` is maintained by the session.
 Updates and deletes compare its previous value and throw
@@ -178,6 +179,10 @@ projections are also rejected; select an explicit field such as `order.customer.
 or select the relationship target as a root entity.
 Queries accept at most 999 bound parameters in total, including expanded `IN`
 lists. Larger lists are rejected before query execution.
+Generated key columns also have a combined limit of 3,072 bytes per key, counting
+up to four bytes per text character. This applies to primary keys, indexes, and
+collection keys, and is checked before schema creation. Explicit column type
+declarations remain the application's schema contract.
 
 JPQL arithmetic requires numeric operands. Parameters in integral expressions
 must be integer values; use a real operand such as `1.0` for fractional arithmetic.
@@ -186,7 +191,8 @@ and remainder by zero return null. Remainder accepts integral operands only.
 Integral addition, subtraction, multiplication, division, and negation fail if the
 result exceeds the signed 64-bit range, including in bulk assignments.
 Aggregate queries require each non-aggregate field to be covered by `GROUP BY`,
-including fields in `HAVING` and `ORDER BY`.
+including fields in `HAVING` and `ORDER BY` and outer fields referenced inside
+correlated nested queries. `LENGTH` counts characters on every backend.
 
 ==== Values and callbacks
 
@@ -246,7 +252,9 @@ entity collection by target fields at load time; the position column still
 keeps repeated links distinct. An inverse `mappedBy` collection can use `@OrderBy`.
 
 For an entity map, `@MapKey(name="code")` derives keys from a basic field on the
-target entity. Keys must be non-null and unique in that collection. When changing
+target entity. The map key type must match that field's Java type before
+conversion, using the boxed type for a primitive field. Keys must be non-null
+and unique in that collection. When changing
 the target key field, update the Java map keys as well.
 
 `@ElementCollection` stores owned scalar values in a separate table. It supports

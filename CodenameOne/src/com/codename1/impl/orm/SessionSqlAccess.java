@@ -123,8 +123,22 @@ public final class SessionSqlAccess implements SqlAccess {
     public String limit(int limit, int offset) {
         return limit < 0 && offset == 0 ? "" : " LIMIT " + limit + " OFFSET " + offset;
     }
+    private void validateParameters(Object[] args) throws IOException {
+        for (Object value : args) {
+            if (value instanceof Double && (Double.isNaN(((Double) value).doubleValue())
+                    || Double.isInfinite(((Double) value).doubleValue()))
+                    || value instanceof Float && (Float.isNaN(((Float) value).floatValue())
+                    || Float.isInfinite(((Float) value).floatValue()))) {
+                throw new IOException("Non-finite numeric parameters are not portable");
+            }
+            if (value instanceof String && ((String) value).indexOf(0) >= 0) {
+                throw new IOException("NUL in text parameters is not portable; use a byte array");
+            }
+        }
+    }
     @Override
     public List<Object[]> query(String sql, Object[] args, int[] kinds) throws IOException {
+        validateParameters(args);
         synchronized (db) {
             checkOwner();
             Cursor cursor = db.executeQuery(sql, args);
@@ -167,6 +181,7 @@ public final class SessionSqlAccess implements SqlAccess {
     }
     @Override
     public int execute(String sql, Object[] args) throws IOException {
+        validateParameters(args);
         synchronized (db) {
             checkOwner();
             db.execute(sql, args);
@@ -183,6 +198,7 @@ public final class SessionSqlAccess implements SqlAccess {
     }
     @Override
     public long insert(String sql, Object[] args, String keyColumn) throws IOException {
+        validateParameters(args);
         synchronized (db) {
             checkOwner();
             db.execute(sql, args);

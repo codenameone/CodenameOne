@@ -37,6 +37,7 @@ class ManagedSessionTest {
         long id,version,counter;
         String name;
         byte[] bytes;
+        double floating;
     }
     static class Model extends EntityModel<Record> {
         private final Attribute[] attrs={
@@ -162,6 +163,73 @@ class ManagedSessionTest {
             assertThrows(IllegalArgumentException.class,()->session.createQuery("select r from ManagedSessionTest$Record r where r.id in :ids").setParameter("ids",tooMany).list());
             assertThrows(IllegalArgumentException.class,()->session.createQuery("select r from ManagedSessionTest$Record r where r.id in :a and r.id in :b").setParameter("a",half).setParameter("b",half).list());
             assertThrows(IllegalArgumentException.class,()->session.createQuery("select r from ManagedSessionTest$Record r where r.id in :ids and r.name=:name").setParameter("ids",allowed).setParameter("name","first").list());session.close();
+        } finally { em.close(); }
+    }
+
+    @Test void generatedIdInsertRejectsNaNBeforeStoringARow() throws Exception {
+        EntityManager em=manager();
+        try {
+            Model model=new Model() {
+                public Attribute[] attributes() { Attribute[] result=super.attributes().clone();result[2]=new Attribute("floating","counter",Attribute.REAL,false,false,true,false);return result; }
+                public Object get(Record record,int index) { return index==2?Double.valueOf(record.floating):super.get(record,index); }
+            };
+            java.util.Map<String,EntityModel<?>> models=new java.util.LinkedHashMap<String,EntityModel<?>>();models.put(Record.class.getName(),model);
+            Session session=new com.codename1.impl.orm.SessionImpl(new com.codename1.impl.orm.SessionSqlAccess(em.database()),models);session.createTables();
+            session.beginTransaction();Record record=new Record();record.floating=Double.NaN;
+            assertThrows(PersistenceException.class,()->{session.persist(record);session.flush();});session.rollbackTransaction();
+            assertEquals(0,session.query(Record.class).count());session.close();
+        } finally { em.close(); }
+    }
+
+    @Test void clientAdapterRejectsNonportableValuesBeforeBinding() throws Exception {
+        EntityManager em=manager();
+        try {
+            com.codename1.impl.orm.SessionSqlAccess access=new com.codename1.impl.orm.SessionSqlAccess(em.database());
+            access.execute("CREATE TABLE portable_values (id INTEGER PRIMARY KEY AUTOINCREMENT, value REAL)",new Object[0]);
+            for(Object value:new Object[]{Double.NaN,Double.POSITIVE_INFINITY,Double.NEGATIVE_INFINITY,Float.NaN,Float.POSITIVE_INFINITY,Float.NEGATIVE_INFINITY,"bad\0text"}) {
+                assertThrows(java.io.IOException.class,()->access.query("SELECT ?",new Object[]{value},new int[]{Attribute.REAL}));
+                assertThrows(java.io.IOException.class,()->access.execute("INSERT INTO portable_values(value) VALUES (?)",new Object[]{value}));
+                assertThrows(java.io.IOException.class,()->access.insert("INSERT INTO portable_values(value) VALUES (?)",new Object[]{value},"id"));
+            }
+            assertEquals(Long.valueOf(0),access.query("SELECT COUNT(*) FROM portable_values",new Object[0],new int[]{Attribute.BIGINT}).get(0)[0]);
+            assertEquals(1,access.insert("INSERT INTO portable_values(value) VALUES (?)",new Object[]{1.5},"id"));
+            assertEquals(Double.valueOf(1.5),access.query("SELECT value FROM portable_values",new Object[0],new int[]{Attribute.REAL}).get(0)[0]);
+        } finally { em.close(); }
+    }
+
+    @Test void functionsValidateUnknownOperandsAgainstKnownKinds() throws Exception {
+        EntityManager em=manager();
+        try {
+            Session session=em.openSession();seed(session);
+            for(String expression:new String[]{"coalesce(:value,r.counter)","coalesce(r.counter,:value)","nullif(:value,r.counter)","nullif(r.counter,:value)","coalesce(coalesce(:value,:other),r.counter)"}) {
+                com.codename1.orm.session.JpqlQuery<?> query=session.createQuery("select "+expression+" from ManagedSessionTest$Record r").setParameter("value","oops");
+                if(expression.contains(":other")) query.setParameter("other",null);
+                assertThrows(IllegalArgumentException.class,query::list,expression);
+            }
+            assertThrows(IllegalArgumentException.class,()->session.createQuery("select coalesce(:value,r.name) from ManagedSessionTest$Record r").setParameter("value",1L).list());
+            assertThrows(IllegalArgumentException.class,()->session.createQuery("select coalesce(:value,r.bytes) from ManagedSessionTest$Record r").setParameter("value","oops").list());
+            assertEquals(Long.valueOf(7),session.createQuery("select coalesce(:value,r.counter) from ManagedSessionTest$Record r",Long.class).setParameter("value",7L).first());
+            assertEquals(Long.valueOf(7),session.createQuery("select nullif(:value,r.counter) from ManagedSessionTest$Record r",Long.class).setParameter("value",7L).first());
+            assertEquals(Long.valueOf(1),session.createQuery("select length('é') from ManagedSessionTest$Record r",Long.class).first());
+            session.close();
+        } finally { em.close(); }
+    }
+
+    @Test void groupingTracksCorrelatedSubqueryFields() throws Exception {
+        EntityManager em=manager();
+        try {
+            Session session=em.openSession();seed(session);
+            String correlated="(select max(i.name) from ManagedSessionTest$Record i where i.id=r.id)";
+            assertThrows(IllegalArgumentException.class,()->session.createQuery("select "+correlated+",count(r.id) from ManagedSessionTest$Record r"));
+            assertThrows(IllegalArgumentException.class,()->session.createQuery("select count(r.id) from ManagedSessionTest$Record r having "+correlated+"='first'"));
+            assertThrows(IllegalArgumentException.class,()->session.createQuery("select count(r.id) from ManagedSessionTest$Record r order by "+correlated));
+            assertThrows(IllegalArgumentException.class,()->session.createQuery("select count(r.id) from ManagedSessionTest$Record r having exists (select i.id from ManagedSessionTest$Record i where i.id=r.id)"));
+            String nested="(select max(i.name) from ManagedSessionTest$Record i where i.id=(select max(j.id) from ManagedSessionTest$Record j where j.id=r.id))";
+            assertThrows(IllegalArgumentException.class,()->session.createQuery("select "+nested+",count(r.id) from ManagedSessionTest$Record r"));
+            assertEquals("first",((Object[])session.createQuery("select "+correlated+",count(r.id) from ManagedSessionTest$Record r group by r.id").first())[0]);
+            assertEquals("first",((Object[])session.createQuery("select "+nested+",count(r.id) from ManagedSessionTest$Record r group by r.id").first())[0]);
+            assertEquals(1,session.createQuery("select (select max(i.name) from ManagedSessionTest$Record i),count(r.id) from ManagedSessionTest$Record r").list().size());
+            session.close();
         } finally { em.close(); }
     }
 

@@ -375,6 +375,67 @@ public class OrmAnnotationProcessorTest {
     }
 
     @Test
+    public void primitiveBulkNullsAreRejectedForBothGeneratedModels() throws Exception {
+        File classes=tmp.newFolder("primitivebulk");
+        JavaSourceCompiler.compile(JavaSourceCompiler.singleSource("primitivebulk.Entry","package primitivebulk; import com.codename1.annotations.*; @Entity(table=\"primitive_bulk\") public class Entry { @Id public long id; public long counter; public int number; public boolean flag; public Double optional; }"),classes,Arrays.asList(testClassesDir()));
+        ProcessorContext client=runProcessor(classes);assertFalse(client.getErrors().toString(),client.hasErrors());ProcessorContext backend=runProcessor(classes,backendClasspath());assertFalse(backend.getErrors().toString(),backend.hasErrors());
+        try(java.net.URLClassLoader loader=new java.net.URLClassLoader(new URL[]{classes.toURI().toURL()},getClass().getClassLoader())) {
+            Class type=loader.loadClass("primitivebulk.Entry");
+            for(String suffix:Arrays.asList("Cn1Model","Cn1BackendModel")) {
+                Map<String,com.codename1.impl.orm.EntityModel<?>> models=new java.util.LinkedHashMap<String,com.codename1.impl.orm.EntityModel<?>>();models.put(type.getName(),(com.codename1.impl.orm.EntityModel)loader.loadClass(type.getName()+suffix).newInstance());
+                com.codename1.backend.Database db=com.codename1.backend.Database.open(":memory:");com.codename1.orm.session.Session session=new com.codename1.impl.orm.SessionImpl(new com.codename1.impl.orm.BackendSqlAccess(null,db,db.dialect()),models);
+                try {
+                    session.createTables();session.beginTransaction();Object entity=type.newInstance();session.persist(entity);session.commitTransaction();
+                    for(String field:Arrays.asList("counter","number","flag")) {
+                        org.junit.Assert.assertThrows(IllegalArgumentException.class,()->session.createQuery("update primitivebulk.Entry e set e."+field+"=NULL"));
+                        session.beginTransaction();org.junit.Assert.assertThrows(IllegalArgumentException.class,()->session.createQuery("update primitivebulk.Entry e set e."+field+"=:value").setParameter("value",null).executeUpdate());session.rollbackTransaction();
+                    }
+                    session.beginTransaction();org.junit.Assert.assertEquals(1,session.createQuery("update primitivebulk.Entry e set e.counter=e.counter+1,e.optional=NULL").executeUpdate());session.commitTransaction();
+                    org.junit.Assert.assertEquals(Long.valueOf(1),session.createQuery("select e.counter from primitivebulk.Entry e",Long.class).first());
+                } finally { session.close();db.close(); }
+            }
+        }
+    }
+
+    @Test
+    public void entityMapKeysMatchUnconvertedDomainTypes() throws Exception {
+        for(String[] types:new String[][]{{"String","int"},{"Integer","long"},{"String","java.util.Date"}}) {
+            Map<String,String> sources=new java.util.LinkedHashMap<String,String>();
+            sources.put("badmap.Child","package badmap; import com.codename1.annotations.*; @Entity public class Child { @Id public long id; public "+types[1]+" code; }");
+            sources.put("badmap.Owner","package badmap; import com.codename1.annotations.*; import com.codename1.annotations.db.*; @Entity public class Owner { @Id public long id; @OneToMany @MapKey(name=\"code\") public java.util.Map<"+types[0]+",Child> values; }");
+            rejectsMappingForBothRuntimes(sources,"MapKey generic must match target domain type");
+        }
+        File classes=tmp.newFolder("goodmap");Map<String,String> sources=new java.util.LinkedHashMap<String,String>();
+        sources.put("goodmap.Code","package goodmap; public class Code { }");
+        sources.put("goodmap.Converter","package goodmap; public class Converter implements com.codename1.orm.session.AttributeConverter<Code,String> { public String toDatabase(Code value) { return null; } public Code fromDatabase(String value) { return null; } }");
+        sources.put("goodmap.Child","package goodmap; import com.codename1.annotations.*; import com.codename1.annotations.db.*; @Entity public class Child { @Id public long id; public int number; @Convert(converter=Converter.class) public Code code; }");
+        sources.put("goodmap.Owner","package goodmap; import com.codename1.annotations.*; import com.codename1.annotations.db.*; @Entity public class Owner { @Id public long id; @OneToMany @MapKey(name=\"number\") public java.util.Map<Integer,Child> numbers; @OneToMany @MapKey(name=\"code\") public java.util.Map<Code,Child> codes; }");
+        JavaSourceCompiler.compile(sources,classes,Arrays.asList(testClassesDir()));ProcessorContext client=runProcessor(classes);assertFalse(client.getErrors().toString(),client.hasErrors());ProcessorContext backend=runProcessor(classes,backendClasspath());assertFalse(backend.getErrors().toString(),backend.hasErrors());
+    }
+
+    @Test
+    public void generatedCompositeKeysRespectAggregatePortableWidth() throws Exception {
+        File classes=tmp.newFolder("keywidth");Map<String,String> sources=new java.util.LinkedHashMap<String,String>();
+        String imports="package keywidth; import com.codename1.annotations.*; import com.codename1.annotations.db.*; ";
+        sources.put("keywidth.Wide",imports+"@Entity public class Wide { @Id(autoIncrement=false) public String a,b,c,d; }");
+        sources.put("keywidth.Indexed",imports+"@Entity(indexes=@Index(fields={\"a\",\"b\",\"c\",\"d\"})) public class Indexed { @Id public long id; public String a,b,c,d; }");
+        sources.put("keywidth.Joined",imports+"@Entity public class Joined { @Id(autoIncrement=false) public String a,b; @ManyToMany public java.util.Set<Joined> targets; }");
+        sources.put("keywidth.Mapped",imports+"@Entity public class Mapped { @Id(autoIncrement=false) public String a,b,c; @ElementCollection public java.util.Map<String,String> values; }");
+        sources.put("keywidth.Boundary",imports+"@Entity public class Boundary { @Id(autoIncrement=false) public String a,b,c; @Id(autoIncrement=false) public long number; }");
+        JavaSourceCompiler.compile(sources,classes,Arrays.asList(testClassesDir()));ProcessorContext client=runProcessor(classes);assertFalse(client.getErrors().toString(),client.hasErrors());ProcessorContext backend=runProcessor(classes,backendClasspath());assertFalse(backend.getErrors().toString(),backend.hasErrors());
+        try(java.net.URLClassLoader loader=new java.net.URLClassLoader(new URL[]{classes.toURI().toURL()},getClass().getClassLoader())) {
+            for(String suffix:Arrays.asList("Cn1Model","Cn1BackendModel")) for(String name:Arrays.asList("Wide","Indexed","Joined","Mapped","Boundary")) {
+                Class type=loader.loadClass("keywidth."+name);Map<String,com.codename1.impl.orm.EntityModel<?>> models=new java.util.LinkedHashMap<String,com.codename1.impl.orm.EntityModel<?>>();models.put(type.getName(),(com.codename1.impl.orm.EntityModel)loader.loadClass(type.getName()+suffix).newInstance());
+                com.codename1.backend.Database db=com.codename1.backend.Database.open(":memory:");com.codename1.orm.session.Session session=new com.codename1.impl.orm.SessionImpl(new com.codename1.impl.orm.BackendSqlAccess(null,db,db.dialect()),models);
+                try {
+                    if(name.equals("Boundary")) { session.createTables();session.validateSchema(); }
+                    else { com.codename1.orm.session.PersistenceException error=org.junit.Assert.assertThrows(com.codename1.orm.session.PersistenceException.class,session::createTables);assertTrue(error.getMessage(),error.getMessage().contains("3072"));org.junit.Assert.assertEquals(0,db.query("SELECT name FROM sqlite_master WHERE type='table'",new Object[0]).size()); }
+                } finally { session.close();db.close(); }
+            }
+        }
+    }
+
+    @Test
     public void elementMapKeysHaveAPortableLengthLimit() throws Exception {
         File classes=tmp.newFolder("mapkeys");Map<String,String> sources=JavaSourceCompiler.singleSource("mapkeys.Owner","package mapkeys; import com.codename1.annotations.*; import com.codename1.annotations.db.*; @Entity(table=\"mapkey_owner\") public class Owner { @Id public long id; @ElementCollection public java.util.Map<String,String> values=new java.util.LinkedHashMap<String,String>(); }");
         JavaSourceCompiler.compile(sources,classes,Arrays.asList(testClassesDir()));ProcessorContext client=runProcessor(classes);assertFalse(client.getErrors().toString(),client.hasErrors());ProcessorContext backend=runProcessor(classes,backendClasspath());assertFalse(backend.getErrors().toString(),backend.hasErrors());

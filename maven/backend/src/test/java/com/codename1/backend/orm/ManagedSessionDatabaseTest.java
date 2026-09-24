@@ -78,7 +78,7 @@ class ManagedSessionDatabaseTest {
                 PersistenceException mismatch=assertThrows(PersistenceException.class,session::validateSchema);
                 assertTrue(mismatch.getMessage().contains("Missing column managed_record.name"));
                 db.execute("ALTER TABLE managed_record RENAME COLUMN \"Name\" TO name",new Object[0]);session.validateSchema();
-                for(String sqlType:new String[]{"INTERVAL","POINT"}) {
+                for(String sqlType:new String[]{"INTERVAL","POINT","BOOLEAN"}) {
                     db.execute("ALTER TABLE managed_record ALTER COLUMN counter TYPE "+sqlType+" USING NULL::"+sqlType,new Object[0]);
                     assertThrows(PersistenceException.class,session::validateSchema);
                     db.execute("ALTER TABLE managed_record ALTER COLUMN counter TYPE BIGINT USING NULL::BIGINT",new Object[0]);session.validateSchema();
@@ -98,6 +98,11 @@ class ManagedSessionDatabaseTest {
             session.beginTransaction();
             assertThrows(IllegalArgumentException.class,()->session.createQuery("update ManagedSessionTest$Record r set r.counter=:value").setParameter("value","oops").executeUpdate());
             assertEquals(1,session.createQuery("update ManagedSessionTest$Record r set r.counter=:value").setParameter("value",0L).executeUpdate());session.commitTransaction();
+            assertThrows(IllegalArgumentException.class,()->session.createQuery("select coalesce(:value,r.counter) from ManagedSessionTest$Record r").setParameter("value","oops").list());
+            assertEquals(Long.valueOf(7),session.createQuery("select nullif(:value,r.counter) from ManagedSessionTest$Record r",Long.class).setParameter("value",7L).first());
+            assertEquals(Long.valueOf(1),session.createQuery("select length('é') from ManagedSessionTest$Record r",Long.class).first());
+            assertThrows(IllegalArgumentException.class,()->session.createQuery("select (select max(i.name) from ManagedSessionTest$Record i where i.id=r.id),count(r.id) from ManagedSessionTest$Record r"));
+            assertEquals("record",((Object[])session.createQuery("select (select max(i.name) from ManagedSessionTest$Record i where i.id=r.id),count(r.id) from ManagedSessionTest$Record r group by r.id").first())[0]);
             String[] overflowExpressions={":value+1",":value-1",":value*2",":value/-1","-:value"};
             long[] overflowValues={Long.MAX_VALUE,Long.MIN_VALUE,Long.MAX_VALUE,Long.MIN_VALUE,Long.MIN_VALUE};
             for(int i=0;i<overflowExpressions.length;i++) {

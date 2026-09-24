@@ -276,7 +276,7 @@ public final class JpqlQueryImpl<T> implements com.codename1.orm.session.JpqlQue
                 }
             }
             if (nonNull && converted == null) {
-                throw new IllegalArgumentException("Null parameter for a required subtype attribute: " + name);
+                throw new IllegalArgumentException("Null parameter for a required subtype or primitive attribute: " + name);
             }
             return converted;
         }
@@ -319,14 +319,16 @@ public final class JpqlQueryImpl<T> implements com.codename1.orm.session.JpqlQue
     }
     private static final class Plan {
         List<Expr> projections = new ArrayList<Expr>();
+        final List<Expr> correlations;
         String sql;
         int[] kinds = new int[0];
         EntityModel entity;
         boolean mutation;
         final List<Object> bindings;
         final List<String> fetches = new ArrayList<String>();
-        Plan(List<Object> bindings) {
+        Plan(List<Object> bindings, List<Expr> correlations) {
             this.bindings = bindings;
+            this.correlations = correlations;
         }
     }
     private static final class Parser {
@@ -336,6 +338,7 @@ public final class JpqlQueryImpl<T> implements com.codename1.orm.session.JpqlQue
         final Map<String, Alias> aliases;
         int position;
         QueryImpl root;
+        final List<Expr> correlations = new ArrayList<Expr>();
         String rootName;
         Parser(SessionImpl session, List<String> tokens, List<Object> bindings, Map<String, Alias> outer) {
             this.session = session;
@@ -344,7 +347,7 @@ public final class JpqlQueryImpl<T> implements com.codename1.orm.session.JpqlQue
             this.aliases = new LinkedHashMap<String, Alias>(outer);
         }
         Plan parse() {
-            Plan plan = new Plan(bindings);
+            Plan plan = new Plan(bindings, correlations);
             if (take("UPDATE")) {
                 plan.mutation = true;
                 root(true);
@@ -370,6 +373,13 @@ public final class JpqlQueryImpl<T> implements com.codename1.orm.session.JpqlQue
                     target.field = field;
                     compatible(target, value);
                     bindType(target, value);
+                    if (root.model.primitive(root.model.index(field))) {
+                        if (value.parameter != null) {
+                            value.parameter.nonNull = true;
+                        } else if (value.literal && value.literalValue == null) {
+                            throw error("Null bulk assignment to a primitive attribute");
+                        }
+                    }
                     if (attribute.nullable && root.model.required(root.model.index(field))) {
                         requireNonNull(value);
                     }
@@ -605,9 +615,10 @@ public final class JpqlQueryImpl<T> implements com.codename1.orm.session.JpqlQue
             }
             if (take("EXISTS")) {
                 expect("(");
-                String sql = subquery().sql;
+                Plan nested = subquery();
                 expect(")");
-                return node("EXISTS (" + sql + ")", Attribute.BOOLEAN);
+                return node("EXISTS (" + nested.sql + ")", Attribute.BOOLEAN,
+                        nested.correlations.toArray(new Expr[nested.correlations.size()]));
             }
             Expr left = add();
             if (take("IS")) {
@@ -637,6 +648,7 @@ public final class JpqlQueryImpl<T> implements com.codename1.orm.session.JpqlQue
                         Plan nested = subquery();
                         compatible(left, nested.projections.get(0));
                         values = nested.sql;
+                        operands.addAll(nested.correlations);
                     } else {
                         StringBuilder list = new StringBuilder();
                         do {
@@ -764,6 +776,7 @@ public final class JpqlQueryImpl<T> implements com.codename1.orm.session.JpqlQue
                     Plan nested = subquery();
                     expect(")");
                     Expr result = new Expr("(" + nested.sql + ")", nested.kinds[0]);
+                    result.children.addAll(nested.correlations);
                     result.projectionQuery = nested.projections.get(0).projectionQuery;
                     result.projectionField = nested.projections.get(0).projectionField;
                     return result;
@@ -816,7 +829,7 @@ public final class JpqlQueryImpl<T> implements com.codename1.orm.session.JpqlQue
                 }
                 expect(")");
                 validateFunction(function, args, distinct);
-                StringBuilder sql = new StringBuilder(function).append('(').append(distinct ? "DISTINCT " : "");
+                StringBuilder sql = new StringBuilder(session.functionName(function)).append('(').append(distinct ? "DISTINCT " : "");
                 for (Expr arg : args) {
                     if (sql.charAt(sql.length() - 1) != '(' && !(distinct && sql.toString().endsWith("DISTINCT "))) {
                         sql.append(", ");
@@ -839,7 +852,8 @@ public final class JpqlQueryImpl<T> implements com.codename1.orm.session.JpqlQue
                            : "LOWER".equals(function) || "UPPER".equals(function) || "TRIM".equals(function) ? Attribute.TEXT
                            : "SUM".equals(function) && args.get(0).kind != Attribute.REAL ? Attribute.BIGINT
                            : "AVG".equals(function) ? Attribute.REAL
-                           : "COALESCE".equals(function) ? commonKind(args) : args.get(0).kind;
+                           : "COALESCE".equals(function) || "NULLIF".equals(function) && args.get(0).kind < 0
+                                   ? commonKind(args) : args.get(0).kind;
                 Expr result = new Expr(sql.append(')').toString(), kind);
                 if ("SUM".equals(function) && kind == Attribute.BIGINT) {
                     result.sql = session.integralSum(result.sql);
@@ -895,6 +909,9 @@ public final class JpqlQueryImpl<T> implements com.codename1.orm.session.JpqlQue
             result.association = alias.query.association(field);
             result.projectionQuery = result.query;
             result.projectionField = field;
+            if (!SessionImpl.sameInstance(alias.query, root)) {
+                correlations.add(result);
+            }
             return result;
         }
         private String bind(Object value) {
@@ -952,7 +969,14 @@ public final class JpqlQueryImpl<T> implements com.codename1.orm.session.JpqlQue
                 }
             }
             if ("COALESCE".equals(function) || "NULLIF".equals(function)) {
-                commonKind(args);
+                int kind = commonKind(args);
+                if (kind >= 0) {
+                    for (Expr arg : args) {
+                        if (arg.kind < 0) {
+                            requireKind(arg, kind);
+                        }
+                    }
+                }
             }
         }
         private Expr literal(String sql, int kind, Object value) {
@@ -1047,6 +1071,11 @@ public final class JpqlQueryImpl<T> implements com.codename1.orm.session.JpqlQue
             Parser nested =
                     new Parser(session, new ArrayList<String>(tokens.subList(start, position)), bindings, aliases);
             Plan plan = nested.parse();
+            for (Expr dependency : plan.correlations) {
+                if (!SessionImpl.sameInstance(dependency.query, root)) {
+                    correlations.add(dependency);
+                }
+            }
             nested.end();
             if (plan.mutation || plan.entity != null || plan.kinds.length != 1) {
                 throw error("Subquery requires a single scalar projection");
@@ -1198,7 +1227,7 @@ public final class JpqlQueryImpl<T> implements com.codename1.orm.session.JpqlQue
             return true;
         }
         private void validateGrouped(Expr value, List<Expr> groups) {
-            if (value.aggregate) {
+            if (value.aggregate || value.query != null && !SessionImpl.sameInstance(value.query, root)) {
                 return;
             }
             for (Expr group : groups) {
