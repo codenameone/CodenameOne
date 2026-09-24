@@ -25,10 +25,14 @@ package com.demo;
 import java.util.Map;
 
 import com.codename1.backend.Backend;
+import com.codename1.backend.DataSource;
 import com.codename1.backend.Database;
 import com.codename1.backend.HttpServer;
 import com.codename1.backend.Tracing;
 import com.codename1.backend.Web;
+import com.codename1.backend.WebSocket;
+import com.codename1.backend.WebSocketSession;
+import com.codename1.backend.orm.EntityManager;
 import com.codename1.backend.otel.OtlpTracer;
 
 /**
@@ -44,6 +48,9 @@ import com.codename1.backend.otel.OtlpTracer;
  * this server calling itself: on the packaged runtime an outbound call blocks the
  * host thread it runs on, and the request it makes can be queued behind it on
  * that same host.
+ *
+ * <p>/ws is a websocket whose onOpen runs a statement, so the test can see that a
+ * handshake is a span and that onOpen's work is its child.
  */
 public class OtelServer {
     public static void main(String[] args) throws Exception {
@@ -53,6 +60,24 @@ public class OtelServer {
         db.execute("INSERT INTO pets (id, name) VALUES (7, 'Rex')", null);
         Backend.builder()
                 .tracing(new OtlpTracer("oteltest"))
+                .webSockets(new Backend.WebSocketEndpoints() {
+                    public void register(HttpServer.WebSocketRegistry registry,
+                                         DataSource dataSource, EntityManager entities) {
+                        registry.route("/ws", new WebSocket() {
+                            public void onOpen(WebSocketSession session) throws Exception {
+                                db.queryOne("SELECT name FROM pets WHERE id = ?",
+                                        new Object[] {Long.valueOf(7)});
+                            }
+
+                            public void onText(WebSocketSession session, String message) {
+                            }
+
+                            public void onBinary(WebSocketSession session, byte[] message,
+                                                 int offset, int length) {
+                            }
+                        });
+                    }
+                })
                 .handler(new HttpServer.Handler() {
                     public HttpServer.Response handle(HttpServer.Request request)
                             throws Exception {

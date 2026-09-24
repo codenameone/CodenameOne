@@ -3374,7 +3374,7 @@ public final class HttpServer {
      * means the request was refused with a status and the connection is still an
      * ordinary HTTP one.
      */
-    private boolean tryUpgrade(Conn conn, int fd, long session, Request request) {
+    private boolean tryUpgrade(Conn conn, int fd, long session, Request request, Span span) {
         // THE CANONICAL PATH, which is what pathIs compares for every HTTP route.
         // Taking the raw target substring instead meant `/ch%61t` missed the
         // websocket route for `/chat` and fell through to the catch-all router or
@@ -3487,6 +3487,9 @@ public final class HttpServer {
             writeHandshakeResponse(conn, WebSocketHandshake.accept(key), subprotocol);
         } catch (IOException err) {
             trace("fd=" + fd + " handshake write failed: " + err);
+            // Handled here, not by the caller: this path reports the connection
+            // as taken, so the caller will not end the handshake's span.
+            Tracing.endServer(span, -1, null);
             drop(fd);
             return true;
         }
@@ -3498,6 +3501,7 @@ public final class HttpServer {
         armWebSocketDeadline(fd);
         applyWebSocketReadTimeout(fd);
 
+        Exception onOpenError = null;
         try {
             endpoint.onOpen(socket);
         } catch (Exception err) {
@@ -3509,7 +3513,13 @@ public final class HttpServer {
             // is the same failure and gets the same answer.
             reportWebSocketError(socket, err);
             socket.failOnOpen();
+            onOpenError = err;
         }
+        // The handshake's span ends HERE, with the 101 that was sent: it covered
+        // routing, the subprotocol choice and onOpen -- so work onOpen starts is
+        // its child -- and not the session, which can last for hours. Messages
+        // after this are not spans of their own.
+        Tracing.endServer(span, 101, onOpenError);
         runWebSocket(fd, socket);
         return true;
     }
@@ -3916,6 +3926,7 @@ public final class HttpServer {
             conn.put("Content-Length: 0\r\n");
             conn.put("Connection: close\r\n\r\n");
             writeTo(conn.fd, conn.session, conn.out, 0, conn.outLength);
+            conn.writtenStatus = 426;
         } catch (IOException ignored) {
             // The peer is already gone; there is nothing better to do here.
         }
@@ -3988,6 +3999,12 @@ public final class HttpServer {
      * it is what pipelining is, and what a proxy does when it coalesces.
      */
     private final class Conn {
+        /**
+         * The status of the last refusal or handshake written on this connection,
+         * -1 when none was. A websocket handshake's span reads it: tryUpgrade
+         * answers through several writers, and each records what it sent.
+         */
+        int writtenStatus = -1;
         final int fd;
         final long session;
         byte[] buffer = new byte[0];
@@ -4836,9 +4853,25 @@ public final class HttpServer {
             // it was never told carried a websocket. After wantsKeepAlive, so
             // nothing in the ordinary flow above moves.
             if(isUpgradeRequest(request)) {
-                if(tryUpgrade(conn, fd, session, request)) {
+                // The handshake is a request like any other and gets a span like
+                // any other. Started before tryUpgrade, so the websocket router,
+                // getSubprotocols and onOpen run inside it; tryUpgrade ends it once
+                // the upgrade is done, and a refusal ends here with the status it
+                // wrote. Returning before this point left every handshake, and
+                // everything onOpen called out to, untraced.
+                Span handshake = Tracing.startServer(request, tls != null);
+                conn.writtenStatus = -1;
+                boolean upgraded;
+                try {
+                    upgraded = tryUpgrade(conn, fd, session, request, handshake);
+                } catch (RuntimeException err) {
+                    Tracing.endServer(handshake, -1, err);
+                    throw err;
+                }
+                if(upgraded) {
                     return;             // this connection is no longer HTTP
                 }
+                Tracing.endServer(handshake, conn.writtenStatus, null);
                 // REFUSED, AND THE REFUSAL SAID `Connection: close`. Carrying on
                 // to parse whatever the client pipelined behind the handshake
                 // would execute a second request the server has already promised
@@ -6220,6 +6253,7 @@ public final class HttpServer {
             head.append("Connection: close\r\n\r\n");
             conn.write(head.toString().getBytes("UTF-8"));
             conn.write(body);
+            conn.writtenStatus = status;
         } catch (IOException err) {
             // The peer is already gone; there is nowhere to report this.
         }

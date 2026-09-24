@@ -70,6 +70,9 @@ class BackendOtelTest {
     private static final String CALLER_SPAN = "00f067aa0ba902b7";
     /** The trace the HTTP/2 request carries, so its span is told from the HTTP/1 ones. */
     private static final String H2_TRACE = "0af7651916cd43dd8448eb211c80319c";
+    /** The traces the websocket handshakes carry: one accepted, one refused. */
+    private static final String WS_TRACE = "5b8aa5a2d2c872e8321cf37308d69df2";
+    private static final String WS_REFUSED_TRACE = "7d0a1e4bb7c9a2f35e61d8c04f2b9a13";
 
     @Test
     @DisplayName("a translated server exports one connected trace, and an untraced one carries no tracer")
@@ -171,12 +174,24 @@ class BackendOtelTest {
             assertTrue(http2Get(port, "/h2probe", "00-" + H2_TRACE + "-" + CALLER_SPAN + "-01"),
                     "no HTTP/2 response came back:\n" + read(log));
 
-            List spans = awaitSpans(exports, 6, 30000);
+            // A websocket handshake is a request with a span of its own, and what
+            // onOpen does is its child; a refused one is a span with the refusal.
+            assertEquals("101", handshake(port, "/ws", WS_TRACE), read(log));
+            assertEquals("404", handshake(port, "/nows", WS_REFUSED_TRACE), read(log));
+
+            List spans = awaitSpans(exports, 9, 30000);
             assertEquals("application/x-protobuf", contentTypes.get(0));
             assertEquals("Api-Token t0k", authorizations.get(0));
 
             Span work0 = find(spans, "GET /work", Span.SpanKind.SPAN_KIND_SERVER);
-            Span query = find(spans, "SELECT", Span.SpanKind.SPAN_KIND_CLIENT);
+            Span query = null;
+            for (int iter = 0; iter < spans.size(); iter++) {
+                Span s = (Span) spans.get(iter);
+                if ("SELECT".equals(s.getName()) && hex(s.getParentSpanId()).equals(hex(work0.getSpanId()))) {
+                    query = s;
+                }
+            }
+            assertTrue(query != null, "no statement under GET /work in " + spans);
             Span outbound = find(spans, "GET", Span.SpanKind.SPAN_KIND_CLIENT);
             Span failed = null;
             Span overH2 = null;
@@ -191,6 +206,28 @@ class BackendOtelTest {
                     failed = s;
                 }
             }
+            Span accepted = null;
+            Span refused = null;
+            Span onOpenQuery = null;
+            for (int iter = 0; iter < spans.size(); iter++) {
+                Span s = (Span) spans.get(iter);
+                String trace = hex(s.getTraceId());
+                if (WS_TRACE.equals(trace) && s.getKind() == Span.SpanKind.SPAN_KIND_SERVER) {
+                    accepted = s;
+                } else if (WS_TRACE.equals(trace)) {
+                    onOpenQuery = s;
+                } else if (WS_REFUSED_TRACE.equals(trace)) {
+                    refused = s;
+                }
+            }
+            assertTrue(accepted != null, "the accepted handshake has no span: " + spans);
+            assertEquals("101", attribute(accepted.getAttributesList(), "http.response.status_code"));
+            assertEquals("/ws", attribute(accepted.getAttributesList(), "url.path"));
+            assertTrue(onOpenQuery != null, "onOpen's statement is not in the handshake's trace");
+            assertEquals(hex(accepted.getSpanId()), hex(onOpenQuery.getParentSpanId()),
+                    "onOpen's work is a child of the handshake");
+            assertTrue(refused != null, "the refused handshake has no span: " + spans);
+            assertEquals("404", attribute(refused.getAttributesList(), "http.response.status_code"));
             assertTrue(failed != null, "no failed server span in " + spans);
             assertTrue(overH2 != null, "no span for the HTTP/2 request in " + spans);
             assertEquals(CALLER_SPAN, hex(overH2.getParentSpanId()));
@@ -262,6 +299,39 @@ class BackendOtelTest {
         }
         throw new AssertionError("expected " + wanted + " spans, the collector received "
                 + spans.size() + ": " + spans);
+    }
+
+    /**
+     * A websocket handshake carrying a traceparent; the status code the server
+     * answered, as text. The connection is closed as soon as the status line is in.
+     */
+    private static String handshake(int port, String path, String trace) throws IOException {
+        java.net.Socket socket = new java.net.Socket();
+        socket.connect(new InetSocketAddress("127.0.0.1", port), 5000);
+        socket.setSoTimeout(10000);
+        try {
+            OutputStream out = socket.getOutputStream();
+            out.write(("GET " + path + " HTTP/1.1\r\n"
+                    + "Host: 127.0.0.1\r\n"
+                    + "Upgrade: websocket\r\n"
+                    + "Connection: Upgrade\r\n"
+                    + "Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\r\n"
+                    + "Sec-WebSocket-Version: 13\r\n"
+                    + "traceparent: 00-" + trace + "-" + CALLER_SPAN + "-01\r\n"
+                    + "\r\n").getBytes("UTF-8"));
+            out.flush();
+            InputStream in = socket.getInputStream();
+            StringBuilder line = new StringBuilder();
+            int c;
+            while ((c = in.read()) >= 0 && c != '\n') {
+                line.append((char) c);
+            }
+            String status = line.toString().trim();
+            int space = status.indexOf(' ');
+            return space < 0 ? status : status.substring(space + 1, Math.min(status.length(), space + 4));
+        } finally {
+            socket.close();
+        }
     }
 
     /**
