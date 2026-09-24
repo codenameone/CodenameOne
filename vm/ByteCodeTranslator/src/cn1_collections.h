@@ -175,7 +175,7 @@ static inline int cn1CollectionOpen(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT colle
         struct obj__java_util_HashSet* set = (struct obj__java_util_HashSet*)collection;
         out->owner = collection;
         out->data = (JAVA_OBJECT*)(uintptr_t)set->java_util_HashSet_cn1KeysBlock;
-        out->metadata = (JAVA_INT*)(uintptr_t)set->java_util_HashSet_cn1MetaBlock;
+        out->metadata = (JAVA_INT*)(uintptr_t)cn1SetTableMeta(set->java_util_HashSet_cn1KeysBlock);
         out->capacity = set->java_util_HashSet_cn1Cap;
         out->count = set->java_util_HashSet_cn1Size;
         out->kind = CN1_COLL_HASH;

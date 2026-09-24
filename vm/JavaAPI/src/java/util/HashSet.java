@@ -46,10 +46,10 @@ public class HashSet<E> extends AbstractSet<E> implements Set<E> {
     // that is null in every plain HashSet ever made. LinkedHashSet overrides those
     // six instead, which is both smaller and faster here and no slower there.
 
-    // volatile to match HashMap's blocks: the concurrent marker reads these while the
-    // mutator may be swapping them during a rebuild.
+    // volatile to match HashMap's table: the concurrent marker reads it while the
+    // mutator may be swapping it during a rebuild. The slot markers follow the elements
+    // in the same allocation (cn1SetTableAlloc), so this is the set's only table field.
     transient volatile long cn1KeysBlock;
-    transient volatile long cn1MetaBlock;
     transient int cn1Cap;
     transient int cn1Size;
     transient int cn1Occupied;

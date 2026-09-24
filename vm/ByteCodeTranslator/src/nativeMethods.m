@@ -4099,8 +4099,7 @@ void cn1CollectionCensusNote(JAVA_OBJECT o) {
     if(c == &class__java_util_HashSet) {
         struct obj__java_util_HashSet* hs = (struct obj__java_util_HashSet*)o;
         kind = 2; n = hs->java_util_HashSet_cn1Size;
-        bytes = cn1CensusBlockBytes(hs->java_util_HashSet_cn1KeysBlock)
-              + cn1CensusBlockBytes(hs->java_util_HashSet_cn1MetaBlock);
+        bytes = cn1CensusBlockBytes(hs->java_util_HashSet_cn1KeysBlock);   // keys + markers
     }
 #endif
     if(kind < 0) return;
@@ -4151,10 +4150,12 @@ void cn1CollectionCensusDump(const char* label) {
 // ============================================================================
 
 #define CN1_HS(o) ((struct obj__java_util_HashSet*)(o))
+// The markers live in the same allocation as the elements (cn1SetTableAlloc).
+#define CN1_HS_META(s) cn1SetTableMeta((s)->java_util_HashSet_cn1KeysBlock)
 
 static JAVA_INT cn1HsFindSlot(CODENAME_ONE_THREAD_STATE, struct obj__java_util_HashSet* s,
         JAVA_OBJECT key, JAVA_INT marker) {
-    JAVA_INT* meta = (JAVA_INT*)(uintptr_t)s->java_util_HashSet_cn1MetaBlock;
+    JAVA_INT* meta = (JAVA_INT*)(uintptr_t)CN1_HS_META(s);
     JAVA_OBJECT* keys = (JAVA_OBJECT*)(uintptr_t)s->java_util_HashSet_cn1KeysBlock;
     int mask = s->java_util_HashSet_cn1Cap - 1;
     int i = marker & mask;
@@ -4176,9 +4177,9 @@ static JAVA_INT cn1HsFindSlot(CODENAME_ONE_THREAD_STATE, struct obj__java_util_H
             // A user equals() can re-enter and rearrange this table; no pointer cached
             // before the callback may be used after it. A String equals cannot re-enter.
             if(!stringKey && (expected != s->java_util_HashSet_cn1ModCount ||
-                    meta != (JAVA_INT*)(uintptr_t)s->java_util_HashSet_cn1MetaBlock)) CN1_THROW_CME();
+                    meta != (JAVA_INT*)(uintptr_t)CN1_HS_META(s))) CN1_THROW_CME();
             if(matches) return i;
-            meta = (JAVA_INT*)(uintptr_t)s->java_util_HashSet_cn1MetaBlock;
+            meta = (JAVA_INT*)(uintptr_t)CN1_HS_META(s);
             keys = (JAVA_OBJECT*)(uintptr_t)s->java_util_HashSet_cn1KeysBlock;
         } else if(m == 1 && firstTomb < 0) { // META_TOMB
             firstTomb = i;
@@ -4210,16 +4211,15 @@ static void cn1HsGrow(CODENAME_ONE_THREAD_STATE, struct obj__java_util_HashSet* 
         if(cap <= 0) { CN1_THROW_OOM(); return; }
     }
     JAVA_LONG oldKeys = s->java_util_HashSet_cn1KeysBlock;
-    JAVA_LONG oldMeta = s->java_util_HashSet_cn1MetaBlock;
-    // These can collect. The OLD table is still published throughout, so every live
-    // element remains traced; the fresh blocks are empty and hold nothing to lose.
-    JAVA_LONG keys = cn1RefBlockAlloc(cap);
-    JAVA_LONG meta = cn1IntBlockAlloc(cap);
-    if(keys == 0 || meta == 0) {
-        cn1RefBlockFree(keys); cn1RefBlockFree(meta);
+    JAVA_LONG oldMeta = cn1SetTableMeta(oldKeys);
+    // This can collect. The OLD table is still published throughout, so every live
+    // element remains traced; the fresh table is empty and holds nothing to lose.
+    JAVA_LONG keys = cn1SetTableAlloc(cap);
+    if(keys == 0) {
         CN1_THROW_OOM();
         return;
     }
+    JAVA_LONG meta = cn1SetTableMeta(keys);
     JAVA_INT* src = (JAVA_INT*)(uintptr_t)oldMeta;
     JAVA_INT* dst = (JAVA_INT*)(uintptr_t)meta;
     JAVA_OBJECT* srcKeys = (JAVA_OBJECT*)(uintptr_t)oldKeys;
@@ -4242,10 +4242,8 @@ static void cn1HsGrow(CODENAME_ONE_THREAD_STATE, struct obj__java_util_HashSet* 
     }
     s->java_util_HashSet_cn1Cap = cap;
     s->java_util_HashSet_cn1KeysBlock = keys;
-    s->java_util_HashSet_cn1MetaBlock = meta;
     s->java_util_HashSet_cn1Occupied = occupied;
     cn1RefBlockRetire(oldKeys);
-    cn1RefBlockRetire(oldMeta);
 }
 
 JAVA_BOOLEAN java_util_HashSet_cn1AddNative___java_lang_Object_R_boolean(
@@ -4254,30 +4252,27 @@ JAVA_BOOLEAN java_util_HashSet_cn1AddNative___java_lang_Object_R_boolean(
     CN1_KEEP_NATIVE_OWNER(elementOwner, __cn1Arg1);
     struct obj__java_util_HashSet* s = CN1_HS(__cn1ThisObject);
     JAVA_INT marker = cn1HmMarker(threadStateData, __cn1Arg1);
-    if(s->java_util_HashSet_cn1MetaBlock == 0) {
-        JAVA_LONG keys = cn1RefBlockAlloc(s->java_util_HashSet_cn1Cap);
-        JAVA_LONG meta = cn1IntBlockAlloc(s->java_util_HashSet_cn1Cap);
-        if(keys == 0 || meta == 0) {
-            cn1RefBlockFree(keys); cn1RefBlockFree(meta);
+    if(s->java_util_HashSet_cn1KeysBlock == 0) {
+        JAVA_LONG keys = cn1SetTableAlloc(s->java_util_HashSet_cn1Cap);
+        if(keys == 0) {
             CN1_THROW_OOM();
             return JAVA_FALSE;
         }
         s->java_util_HashSet_cn1KeysBlock = keys;
-        s->java_util_HashSet_cn1MetaBlock = meta;
         s->java_util_HashSet_cn1Size = 0;
         s->java_util_HashSet_cn1Occupied = 0;
         }
     JAVA_INT idx = cn1HsFindSlot(threadStateData, s, __cn1Arg1, marker);
     if(idx >= 0) return JAVA_FALSE;
     JAVA_INT ins = -idx - 1;
-    JAVA_INT* meta = (JAVA_INT*)(uintptr_t)s->java_util_HashSet_cn1MetaBlock;
+    JAVA_INT* meta = (JAVA_INT*)(uintptr_t)CN1_HS_META(s);
     int wasEmpty = meta[ins] == 0;
     if(wasEmpty && s->java_util_HashSet_cn1Occupied >= cn1HsThreshold(s)) {
         // One slot past the threshold: rebuild BEFORE inserting (see HashMap.cn1PutSlot),
         // then take the first empty slot on this element's probe path -- the rebuilt
         // table holds no tombstones and not this element.
         cn1HsGrow(threadStateData, s);
-        meta = (JAVA_INT*)(uintptr_t)s->java_util_HashSet_cn1MetaBlock;
+        meta = (JAVA_INT*)(uintptr_t)CN1_HS_META(s);
         JAVA_INT mask = s->java_util_HashSet_cn1Cap - 1;
         uint32_t perturb = (uint32_t)marker;
         ins = marker & mask;
@@ -4299,7 +4294,7 @@ JAVA_BOOLEAN java_util_HashSet_cn1ContainsNative___java_lang_Object_R_boolean(
     CN1_KEEP_NATIVE_OWNER(setOwner, __cn1ThisObject);
     CN1_KEEP_NATIVE_OWNER(elementOwner, __cn1Arg1);
     struct obj__java_util_HashSet* s = CN1_HS(__cn1ThisObject);
-    if(s->java_util_HashSet_cn1MetaBlock == 0) return JAVA_FALSE;
+    if(s->java_util_HashSet_cn1KeysBlock == 0) return JAVA_FALSE;
     return cn1HsFindSlot(threadStateData, s, __cn1Arg1,
             cn1HmMarker(threadStateData, __cn1Arg1)) >= 0 ? JAVA_TRUE : JAVA_FALSE;
 }
@@ -4309,13 +4304,13 @@ JAVA_BOOLEAN java_util_HashSet_cn1RemoveNative___java_lang_Object_R_boolean(
     CN1_KEEP_NATIVE_OWNER(setOwner, __cn1ThisObject);
     CN1_KEEP_NATIVE_OWNER(elementOwner, __cn1Arg1);
     struct obj__java_util_HashSet* s = CN1_HS(__cn1ThisObject);
-    if(s->java_util_HashSet_cn1MetaBlock == 0) return JAVA_FALSE;
+    if(s->java_util_HashSet_cn1KeysBlock == 0) return JAVA_FALSE;
     JAVA_INT idx = cn1HsFindSlot(threadStateData, s, __cn1Arg1,
             cn1HmMarker(threadStateData, __cn1Arg1));
     if(idx < 0) return JAVA_FALSE;
     // A TOMBSTONE, not an empty slot: emptying it would terminate the probe path early
     // and hide every element that collided past this point.
-    ((JAVA_INT*)(uintptr_t)s->java_util_HashSet_cn1MetaBlock)[idx] = 1;
+    ((JAVA_INT*)(uintptr_t)CN1_HS_META(s))[idx] = 1;
     cn1RefBlockSet(threadStateData, s->java_util_HashSet_cn1KeysBlock, idx, JAVA_NULL);
     s->java_util_HashSet_cn1Size--;
     s->java_util_HashSet_cn1ModCount++;
@@ -4325,9 +4320,9 @@ JAVA_BOOLEAN java_util_HashSet_cn1RemoveNative___java_lang_Object_R_boolean(
 JAVA_VOID java_util_HashSet_cn1ClearNative__(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject) {
     CN1_KEEP_NATIVE_OWNER(setOwner, __cn1ThisObject);
     struct obj__java_util_HashSet* s = CN1_HS(__cn1ThisObject);
-    if(s->java_util_HashSet_cn1MetaBlock != 0) {
+    if(s->java_util_HashSet_cn1KeysBlock != 0) {
         JAVA_INT cap = s->java_util_HashSet_cn1Cap;
-        memset((void*)(uintptr_t)s->java_util_HashSet_cn1MetaBlock, 0, (size_t)cap * sizeof(JAVA_INT));
+        memset((void*)(uintptr_t)CN1_HS_META(s), 0, (size_t)cap * sizeof(JAVA_INT));
         for(JAVA_INT i = 0 ; i < cap ; i++) {
             cn1RefBlockSet(threadStateData, s->java_util_HashSet_cn1KeysBlock, i, JAVA_NULL);
         }
@@ -4341,7 +4336,7 @@ JAVA_VOID java_util_HashSet_cn1ClearNative__(CODENAME_ONE_THREAD_STATE, JAVA_OBJ
 JAVA_INT java_util_HashSet_cn1NextOccupied___int_R_int(
         CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject, JAVA_INT __cn1Arg1) {
     struct obj__java_util_HashSet* s = CN1_HS(__cn1ThisObject);
-    JAVA_LONG metaBlock = s->java_util_HashSet_cn1MetaBlock;
+    JAVA_LONG metaBlock = CN1_HS_META(s);
     if(metaBlock == 0) return -1;
     JAVA_INT* meta = (JAVA_INT*)(uintptr_t)metaBlock;
     JAVA_INT cap = s->java_util_HashSet_cn1Cap;
@@ -4362,7 +4357,7 @@ JAVA_VOID java_util_HashSet_cn1RemoveSlot___int(
         CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject, JAVA_INT __cn1Arg1) {
     CN1_KEEP_NATIVE_OWNER(setOwner, __cn1ThisObject);
     struct obj__java_util_HashSet* s = CN1_HS(__cn1ThisObject);
-    ((JAVA_INT*)(uintptr_t)s->java_util_HashSet_cn1MetaBlock)[__cn1Arg1] = 1;
+    ((JAVA_INT*)(uintptr_t)CN1_HS_META(s))[__cn1Arg1] = 1;
     cn1RefBlockSet(threadStateData, s->java_util_HashSet_cn1KeysBlock, __cn1Arg1, JAVA_NULL);
     s->java_util_HashSet_cn1Size--;
     s->java_util_HashSet_cn1ModCount++;

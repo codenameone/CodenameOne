@@ -139,10 +139,9 @@ public class ByteCodeClass {
         new NativeBlock("java_util_Hashtable", "cn1Keys", true, false, "cn1Keys", 1),
         new NativeBlock("java_util_ArrayList", "cn1Storage", true),
         new NativeBlock("java_util_Vector", "cn1Storage", true),
-        // A plain HashSet owns its table: one reference block for elements, one int
-        // block for slot markers, and no values array. Independent allocations.
+        // A plain HashSet owns its table: element references and then int slot markers
+        // in ONE allocation (cn1SetTableAlloc), and no values array.
         new NativeBlock("java_util_HashSet", "cn1KeysBlock", true),
-        new NativeBlock("java_util_HashSet", "cn1MetaBlock", false),
         new NativeBlock("java_util_HashMap", "cn1KeysBlock", true),
         new NativeBlock("java_util_HashMap", "cn1KeysBlock", true, false, "cn1KeysBlock", 1),
     };

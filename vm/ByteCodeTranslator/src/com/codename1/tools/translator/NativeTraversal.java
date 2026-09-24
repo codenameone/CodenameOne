@@ -128,6 +128,10 @@ final class NativeTraversal {
     /* The table fields for a layout. Identical names on both classes, different owner:
      * HASH_SET reads the HashSet's own table, everything else reads a map's. */
     private String table(Layout layout, String field) {
+        if (layout == Layout.HASH_SET && field.equals("cn1MetaBlock")) {
+            // A set's markers follow its elements in the same allocation.
+            return "cn1SetTableMeta(" + field("java_util_HashSet", "cn1KeysBlock", root) + ")";
+        }
         return layout == Layout.HASH_SET ? field("java_util_HashSet", field, root) : map(field);
     }
     private String modification(Layout layout) {

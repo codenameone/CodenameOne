@@ -2861,6 +2861,16 @@ JAVA_LONG cn1TableAlloc(JAVA_INT capacity, JAVA_BOOLEAN ordered) {
     return table;
 }
 
+JAVA_LONG cn1SetTableAlloc(JAVA_INT capacity) {
+    if(capacity <= 0 || (size_t)capacity > (SIZE_MAX - sizeof(CN1NativeBlock) - 15)
+            / (sizeof(JAVA_OBJECT) + sizeof(JAVA_INT))) return 0;
+    JAVA_LONG table = cn1BlockAlloc(1, (size_t)capacity * (sizeof(JAVA_OBJECT) + sizeof(JAVA_INT)));
+    if(table == 0) return 0;
+    cn1BlockHeader(table)->capacity = capacity;
+    CN1_BLOCK_NOTE_REFS(table, (size_t)capacity * sizeof(JAVA_OBJECT));
+    return table;
+}
+
 JAVA_LONG cn1RefBlockAlloc(JAVA_INT capacity) {
     JAVA_LONG b = cn1BlockAlloc(capacity, sizeof(JAVA_OBJECT));
     CN1_BLOCK_NOTE_REFS(b, (size_t)capacity * sizeof(JAVA_OBJECT));

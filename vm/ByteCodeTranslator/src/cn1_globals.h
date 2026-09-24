@@ -4109,6 +4109,14 @@ typedef struct __attribute__((aligned(16))) CN1NativeBlock {
 // back with no header between them, so a part is arithmetic on the root's capacity and
 // the owners keep no field for it. Everything that walks or writes a part derives it from
 // the root it read ONCE; see cn1TableAlloc.
+// A HashSet's table: `capacity` element references, then `capacity` int markers, in
+// one allocation. The header's capacity is the element count, so the ordinary
+// reference-block walk traces exactly the elements; the markers are found from it.
+extern JAVA_LONG cn1SetTableAlloc(JAVA_INT capacity);
+static inline JAVA_LONG cn1SetTableMeta(JAVA_LONG table) {
+    if(table == 0) return 0;
+    return table + (JAVA_LONG)((size_t)((const CN1NativeBlock*)(uintptr_t)table - 1)->capacity * sizeof(JAVA_OBJECT));
+}
 static inline JAVA_LONG cn1TablePart(JAVA_LONG table, JAVA_INT part) {
     if(table == 0) return 0;
     size_t cap = (size_t)((const CN1NativeBlock*)(uintptr_t)table - 1)->capacity;
