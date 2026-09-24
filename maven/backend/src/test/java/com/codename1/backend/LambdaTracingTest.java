@@ -36,6 +36,7 @@ import java.util.List;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /** The Lambda loop's span, and the span a failing tracer leaves behind. */
@@ -84,6 +85,47 @@ class LambdaTracingTest {
         assertTrue(span.ended, "the invocation span was never ended");
         assertTrue(span.error != null && span.error.indexOf("413") >= 0,
                 "the lost result must be on the span, not the handler's success: " + span.error);
+    }
+
+    @Test
+    @DisplayName("a failed invocation's span stays open through the error report, and says it was lost")
+    void anUndeliveredErrorReportIsRecorded() throws Exception {
+        final Recorder recorder = new Recorder();
+        final boolean[] endedBeforeReport = new boolean[1];
+        HttpServer api = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+        api.createContext("/2018-06-01/runtime/invocation/next", (HttpExchange ex) -> {
+            byte[] body = "{}".getBytes("UTF-8");
+            ex.getResponseHeaders().add("Lambda-Runtime-Aws-Request-Id", "req-2");
+            ex.sendResponseHeaders(200, body.length);
+            ex.getResponseBody().write(body);
+            ex.close();
+        });
+        api.createContext("/2018-06-01/runtime/invocation/req-2/error", (HttpExchange ex) -> {
+            drain(ex);
+            endedBeforeReport[0] = ((RecordedSpan)recorder.spans.get(0)).ended;
+            ex.sendResponseHeaders(500, -1);
+            ex.close();
+        });
+        api.start();
+        Tracing.install(recorder);
+        boolean keepPolling;
+        try {
+            keepPolling = LambdaRuntime.pumpOnce(new Handler() {
+                public String handle(String event, String requestId) {
+                    throw new IllegalStateException("handler failed");
+                }
+            }, "127.0.0.1", api.getAddress().getPort());
+        } finally {
+            api.stop(0);
+        }
+        assertFalse(keepPolling, "an unreported invocation must stop the loop");
+        RecordedSpan span = (RecordedSpan)recorder.spans.get(0);
+        assertFalse(endedBeforeReport[0], "the span ended before the error report was sent");
+        assertTrue(span.ended);
+        assertEquals(2, span.errors.size(), String.valueOf(span.errors));
+        assertEquals("handler failed", span.errors.get(0));
+        assertTrue(String.valueOf(span.errors.get(1)).contains("did not accept the error report"),
+                String.valueOf(span.errors));
     }
 
     @Test
@@ -140,6 +182,7 @@ class LambdaTracingTest {
         boolean ended;
         boolean discarded;
         String error;
+        final List errors = new ArrayList();
 
         RecordedSpan(boolean throwOnAttributes) {
             this.throwOnAttributes = throwOnAttributes;
@@ -170,6 +213,7 @@ class LambdaTracingTest {
 
         public Span recordException(Throwable err) {
             error = String.valueOf(err.getMessage());
+            errors.add(error);
             return this;
         }
 

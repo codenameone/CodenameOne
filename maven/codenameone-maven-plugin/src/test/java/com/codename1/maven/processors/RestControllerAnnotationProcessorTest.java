@@ -266,16 +266,20 @@ public class RestControllerAnnotationProcessorTest {
     }
 
     @Test
-    public void anUntracedBuildDoesNotMentionTracingAnywhere() throws Exception {
-        // The same controller without the annotation: nothing it emits refers to
-        // tracing, so an untraced server is exactly what it was.
+    public void anUntracedBuildNamesRoutesButNeverLinksTheTracer() throws Exception {
+        // The same controller without the annotation. The OTLP tracer is not
+        // linked -- that is what the build switch buys -- but the router still
+        // names its routes, for a tracer the program installs itself.
         File classes = compile(CONTROLLER_SOURCE);
         File root = sourceRootWith("Notes.java", CONTROLLER_SOURCE);
         ProcessorContext ctx = run(classes, Collections.singletonList(root.getAbsolutePath()),
                 tmp.newFolder());
         assertFalse(String.valueOf(ctx.getErrors()), ctx.hasErrors());
+        assertTrue("a manually installed tracer would see every route merged under its method",
+                references(new File(classes, "com/example/NotesRouter.class"),
+                        "com/codename1/backend/Tracing"));
         assertFalse(references(new File(classes, "com/example/NotesRouter.class"),
-                "com/codename1/backend/Tracing"));
+                "com/codename1/backend/otel/OtlpTracer"));
         assertFalse(references(new File(classes, "com/example/BackendApplication.class"),
                 "com/codename1/backend/otel/OtlpTracer"));
     }

@@ -78,6 +78,12 @@ final class OtlpSchema {
          * and span ids to be nonzero; a parent id is simply absent for a root.
          */
         boolean nonZero;
+        /**
+         * For HEX_BYTES: an all-zero value is refused, but absent or empty is fine
+         * -- a parent id, which a root span leaves empty and no span may give as
+         * zeros. A zero one was forwarded after the relay answered 200.
+         */
+        boolean nonZeroIfPresent;
 
         Field(String name, int number, int kind, boolean repeated, int bytes) {
             this.name = name;
@@ -118,6 +124,13 @@ final class OtlpSchema {
     private static Field id(String name, int number, int length) {
         Field out = hex(name, number, length);
         out.nonZero = true;
+        return out;
+    }
+
+    /** An optional id: empty for none, never zeros when given. */
+    private static Field optionalId(String name, int number, int length) {
+        Field out = hex(name, number, length);
+        out.nonZeroIfPresent = true;
         return out;
     }
 
@@ -188,7 +201,7 @@ final class OtlpSchema {
         status.type = STATUS;
         SPAN = new Message(new Field[] {
             id("traceId", 1, 16), id("spanId", 2, 8), f("traceState", 3, STRING),
-            hex("parentSpanId", 4, 8), f("flags", 16, FIXED32), f("name", 5, STRING),
+            optionalId("parentSpanId", 4, 8), f("flags", 16, FIXED32), f("name", 5, STRING),
             f("kind", 6, VARINT), f("startTimeUnixNano", 7, FIXED64),
             f("endTimeUnixNano", 8, FIXED64), attributes(9),
             f("droppedAttributesCount", 10, VARINT), events,
@@ -578,7 +591,7 @@ final class OtlpSchema {
             }
             out[iter] = (byte)((hi << 4) | lo);
         }
-        if(field.nonZero) {
+        if(field.nonZero || field.nonZeroIfPresent) {
             boolean zero = true;
             for(int iter = 0 ; iter < out.length && zero ; iter++) {
                 zero = out[iter] == 0;

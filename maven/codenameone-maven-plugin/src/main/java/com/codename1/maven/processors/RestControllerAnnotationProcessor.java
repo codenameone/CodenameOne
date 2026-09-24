@@ -1299,7 +1299,7 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
                         + "rename the controller.");
                 return;
             }
-            sources.put(router, generateRouter(c, telemetry));
+            sources.put(router, generateRouter(c));
         }
         // WHERE THE ENTRY POINT GOES. The first controller's package, as before --
         // but a module may now have websocket endpoints and no controller at all,
@@ -1358,7 +1358,7 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
      * pays for a prefix compare first, so an unrelated request leaves without
      * allocating anything.
      */
-    private static String generateRouter(Controller c, boolean traced) {
+    private static String generateRouter(Controller c) {
         StringBuilder sb = new StringBuilder();
         if (c.packageName.length() > 0) {
             sb.append("package ").append(c.packageName).append(";\n\n");
@@ -1455,7 +1455,7 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
                 current = route.httpMethod;
                 open = true;
             }
-            emitRoute(sb, route, i, c, traced);
+            emitRoute(sb, route, i, c);
         }
         if (open) {
             sb.append("        }\n");
@@ -1468,8 +1468,7 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
         return sb.toString();
     }
 
-    private static void emitRoute(StringBuilder sb, Route route, int index, Controller c,
-                                  boolean traced) {
+    private static void emitRoute(StringBuilder sb, Route route, int index, Controller c) {
         String pad = "                ";
         if (route.after.isEmpty()) {
             sb.append("            if (request.pathIs(P").append(index).append(")) {\n");
@@ -1480,14 +1479,16 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
             sb.append(pad).append("if (bound != null) {\n");
             pad = "                    ";
         }
-        if (traced) {
-            // The TEMPLATE names the span, never the path: /pets/7 and /pets/8
-            // are one operation, and a trace backend grouping by path would give
-            // every id its own. Emitted only for a traced build, so a router in a
-            // project that does not trace is exactly what it was.
-            sb.append(pad).append("com.codename1.backend.Tracing.route(")
-              .append(quote(route.pattern)).append(");\n");
-        }
+        // The TEMPLATE names the span, never the path: /pets/7 and /pets/8 are
+        // one operation, and a trace backend grouping by path would give every id
+        // its own. Emitted in EVERY build, not only a traced one: a program can
+        // install a tracer itself (Tracing.install(OtlpTracer.open(...))), and a
+        // router that never named its routes merged them all under "GET". It
+        // costs one static read with no tracer -- Tracing is linked by HttpServer
+        // regardless -- and it is the OTLP tracer, not this hook, that a build
+        // without @OpenTelemetry leaves out.
+        sb.append(pad).append("com.codename1.backend.Tracing.route(")
+          .append(quote(route.pattern)).append(");\n");
 
         emitRequiredGuards(sb, route, pad);
         emitScalarGuards(sb, route, pad);

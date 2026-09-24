@@ -113,14 +113,23 @@ public final class LambdaRuntime {
         try {
             result = handler.handle(next.getBodyAsString(), requestId);
         } catch (Exception err) {
-            Tracing.endLambda(span, err);
+            // The span stays open through the error report too, as it does through
+            // the result's delivery below: the report's latency is part of the
+            // invocation, and a report the host refuses or never receives leaves
+            // the invocation unresolved -- which the trace must say.
+            boolean reported = false;
+            try {
+                reported = reportError(host, port, requestId, err);
+            } finally {
+                Tracing.endLambda(span, err, reported ? null : unreported());
+            }
             // The same rule the response path below takes, and for the same
             // reason: an invocation the host was never told about stays
             // outstanding until it times out, and polling for another one while
             // that is true just strands them one after the next. If the failure
             // could not even be reported, nothing this process says is reaching
             // the host, so it stops rather than collecting more.
-            if(!reportError(host, port, requestId, err)) {
+            if(!reported) {
                 System.err.println("The runtime API is unreachable, so this runtime is "
                         + "stopping rather than collecting invocations it cannot answer.");
                 return false;
@@ -131,6 +140,7 @@ public final class LambdaRuntime {
         // or a POST that fails, is an invocation whose answer was lost, and the
         // trace has to say so rather than report the handler's success.
         Throwable delivery = null;
+        Throwable reporting = null;
         try {
             try {
                 byte[] payload = (result == null ? "null" : result).getBytes("UTF-8");
@@ -159,6 +169,7 @@ public final class LambdaRuntime {
                             + (posted == null ? "none" : String.valueOf(posted.getStatus())));
                     delivery = refused;
                     if(!reportError(host, port, requestId, refused)) {
+                        reporting = unreported();
                         System.err.println("The runtime API is unreachable, so this runtime is "
                                 + "stopping rather than collecting invocations it cannot answer.");
                         return false;
@@ -175,6 +186,7 @@ public final class LambdaRuntime {
                         + "; reporting it as an error so the invocation is resolved rather "
                         + "than left outstanding.");
                 if(!reportError(host, port, requestId, err)) {
+                    reporting = unreported();
                     // Not even the error reached the host, so nothing this process
                     // says is getting through. Stop polling: collecting further
                     // invocations only strands them the same way, and an exited
@@ -185,9 +197,18 @@ public final class LambdaRuntime {
                 }
             }
         } finally {
-            Tracing.endLambda(span, delivery);
+            Tracing.endLambda(span, delivery, reporting);
         }
         return true;
+    }
+
+    /**
+     * Recorded on an invocation span when not even the error report reached the
+     * host: the invocation is left unresolved, which is why the runtime stops.
+     */
+    private static java.io.IOException unreported() {
+        return new java.io.IOException(
+                "the runtime API did not accept the error report; the invocation is unresolved");
     }
 
     /** @return whether the host accepted the report, so a caller can stop. */

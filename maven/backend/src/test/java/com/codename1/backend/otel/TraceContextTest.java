@@ -275,6 +275,16 @@ class TraceContextTest {
         assertFalse(OtlpTracer.hasHttpAuthority("http://c.example:43x8"));
         assertFalse(OtlpTracer.hasHttpAuthority("http://[::1"));
         assertFalse(OtlpTracer.hasHttpAuthority("ftp://c.example"));
+        // A host no resolver or libcurl can use, though it is not empty.
+        assertFalse(OtlpTracer.hasHttpAuthority("https://collector example/v1/traces"));
+        assertFalse(OtlpTracer.hasHttpAuthority("https://collector\\example"));
+        assertFalse(OtlpTracer.hasHttpAuthority("https://collector\texample"));
+        assertFalse(OtlpTracer.hasHttpAuthority("https://[not-an-address]:4318"));
+        assertFalse(OtlpTracer.hasHttpAuthority("https://[1234]"));
+        assertFalse(OtlpTracer.hasHttpAuthority("https://host]:4318"));
+        assertTrue(OtlpTracer.hasHttpAuthority("https://10.0.0.7:4318"));
+        assertTrue(OtlpTracer.hasHttpAuthority("https://[::ffff:10.0.0.7]:4318"));
+        assertTrue(OtlpTracer.hasHttpAuthority("https://otel-collector.svc_1.local"));
     }
 
     @Test
@@ -306,5 +316,28 @@ class TraceContextTest {
         assertNull(OtlpTracer.canonicalPath("/otel%zz"));
         assertNull(OtlpTracer.canonicalPath("otel"));
         assertNull(OtlpTracer.canonicalPath(""));
+    }
+
+    @Test
+    @DisplayName("a supplementary character survives percent-decoding beside an escape")
+    void percentDecodingKeepsSurrogatePairs() throws Exception {
+        java.util.Map out = new java.util.LinkedHashMap();
+        OtlpTracer.parsePairs("label=\ud83d\ude00%20ok", out, "test");
+        assertEquals("\ud83d\ude00 ok", out.get("label"));
+    }
+
+    @Test
+    @DisplayName("a parent span id may be empty for a root, never all zeros")
+    void zeroParentIsRefused() throws Exception {
+        String span = "{\"resourceSpans\":[{\"scopeSpans\":[{\"spans\":[{\"traceId\":"
+                + "\"4bf92f3577b34da6a3ce929d0e0e4736\",\"spanId\":\"00f067aa0ba902b7\","
+                + "\"parentSpanId\":\"PARENT\",\"name\":\"x\"}]}]}]}";
+        OtlpSchema.sanitize((java.util.Map)com.codename1.backend.Json.parse(span.replace("PARENT", "")));
+        OtlpSchema.sanitize((java.util.Map)com.codename1.backend.Json.parse(
+                span.replace("PARENT", "b7ad6b7169203331")));
+        java.io.IOException refused = org.junit.jupiter.api.Assertions.assertThrows(
+                java.io.IOException.class, () -> OtlpSchema.sanitize((java.util.Map)
+                        com.codename1.backend.Json.parse(span.replace("PARENT", "0000000000000000"))));
+        assertTrue(refused.getMessage().contains("parentSpanId"), refused.getMessage());
     }
 }

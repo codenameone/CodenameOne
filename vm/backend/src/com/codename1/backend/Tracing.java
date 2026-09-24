@@ -198,6 +198,11 @@ public final class Tracing {
      * path alone would make every pet id its own operation.
      */
     public static void route(String template) {
+        // Every generated router calls this on every matched request, traced or
+        // not; with no tracer that is this one read and nothing else.
+        if(tracer == null) {
+            return;
+        }
         Span span = currentOrNull();
         if(span == null || template == null) {
             return;
@@ -528,11 +533,22 @@ public final class Tracing {
      * collector.
      */
     static void endLambda(Span span, Throwable error) {
+        endLambda(span, error, null);
+    }
+
+    /**
+     * Ends an invocation span with what went wrong, in order: the invocation's own
+     * failure, then a failure to tell the host about it. Either may be null.
+     */
+    static void endLambda(Span span, Throwable error, Throwable reporting) {
         if(span == null) {
             return;
         }
         if(error != null) {
             guardedException(span, error);
+        }
+        if(reporting != null) {
+            guardedException(span, reporting);
         }
         finish(span);
     }

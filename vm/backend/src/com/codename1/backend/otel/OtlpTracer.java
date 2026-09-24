@@ -384,6 +384,11 @@ public final class OtlpTracer implements Tracer {
                 return false;
             }
             host = hostPort.substring(1, close);
+            // An IPv6 literal: hex digits and colons, with dots for an embedded
+            // IPv4 tail. Anything else is not an address any stack will parse.
+            if(host.indexOf(':') < 0 || !onlyChars(host, "0123456789abcdefABCDEF:.")) {
+                return false;
+            }
             String rest = hostPort.substring(close + 1);
             if(rest.length() > 0) {
                 if(rest.charAt(0) != ':') {
@@ -395,6 +400,13 @@ public final class OtlpTracer implements Tracer {
             int colon = hostPort.lastIndexOf(':');
             host = colon < 0 ? hostPort : hostPort.substring(0, colon);
             port = colon < 0 ? null : hostPort.substring(colon + 1);
+            // A DNS name or an IPv4 address: letters, digits, '-', '.', and the
+            // other unreserved characters. A space, a control, a backslash or a
+            // stray bracket passed the emptiness check and started an exporter no
+            // resolver or libcurl could connect with, so every span was lost.
+            if(!onlyChars(host, "-._~")) {
+                return false;
+            }
         }
         if(host.length() == 0) {
             return false;
@@ -413,6 +425,18 @@ public final class OtlpTracer implements Tracer {
                 value = value * 10 + (c - '0');
             }
             return value > 0 && value <= 65535;
+        }
+        return true;
+    }
+
+    /** Whether every character of {@code value} is an ASCII letter, a digit, or one of {@code extra}. */
+    private static boolean onlyChars(String value, String extra) {
+        for(int iter = 0 ; iter < value.length() ; iter++) {
+            char c = value.charAt(iter);
+            if(!((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9')
+                    || extra.indexOf(c) >= 0)) {
+                return false;
+            }
         }
         return true;
     }
@@ -701,6 +725,16 @@ public final class OtlpTracer implements Tracer {
         for(int iter = 0 ; iter < value.length() ; iter++) {
             char c = value.charAt(iter);
             if(c != '%') {
+                // By CODE POINT: a supplementary character is two chars here, and
+                // encoding each half on its own wrote invalid UTF-8 that the String
+                // constructor below replaced -- corrupting a resource value, or a
+                // credential so that every export was refused.
+                if(Character.isHighSurrogate(c) && iter + 1 < value.length()
+                        && Character.isLowSurrogate(value.charAt(iter + 1))) {
+                    bytes.putCodePoint(Character.toCodePoint(c, value.charAt(iter + 1)));
+                    iter++;
+                    continue;
+                }
                 bytes.putCodePoint(c);
                 continue;
             }
