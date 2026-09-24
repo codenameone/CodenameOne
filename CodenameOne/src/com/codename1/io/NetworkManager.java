@@ -1324,8 +1324,12 @@ public final class NetworkManager {
                     req.complete = true;
                 }
                 endTracerAttempt(req, failure);
+                // Any tracer field, the owners included: a request queued outside an
+                // action holds only tracerParentOwner, and that alone pins the whole
+                // telemetry installation.
                 if (req.tracerRequeues == requeuesBefore
-                        && (req.tracerParent != null || req.tracerLastAttempt != null)) {
+                        && (req.tracerParent != null || req.tracerLastAttempt != null
+                        || req.tracerParentOwner != null || req.tracerLastOwner != null)) {
                     // Nothing queued this request again YET. Its tracer state has
                     // to go once it is done -- the parent and the last attempt are
                     // the tracer's own objects, a span and through it the whole

@@ -86,7 +86,9 @@ public final class TelemetrySpan {
     TelemetrySpan(Telemetry.State owner, String name, int kind, String traceId, String spanId,
                   String parentSpanId, boolean sampled, TelemetrySpan localParent) {
         this.owner = owner;
-        this.name = name == null ? "" : name;
+        // Bounded like every other string a span keeps: a caller-derived name
+        // could otherwise be any size, and the buffer is bounded by span COUNT.
+        this.name = name == null ? "" : bound(name);
         this.kind = kind;
         this.traceId = traceId;
         this.spanId = spanId;
@@ -210,7 +212,7 @@ public final class TelemetrySpan {
     /// this span
     public TelemetrySpan updateName(String newName) {
         if (!ended && newName != null) {
-            name = newName;
+            name = bound(newName);
         }
         return this;
     }

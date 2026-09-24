@@ -347,8 +347,27 @@ public final class Telemetry {
                 return;
             }
             buffer.add(span);
-            flush(true);
+            if (buffer.size() > maxBuffered()) {
+                buffer.remove(0);
+            }
+            // ONE final flush for the burst, not one per span: every other late
+            // handoff already queued on the EDT runs before this, so they share a
+            // single export. A flush per span put an uncapped export -- and its
+            // encoded body -- in the network queue for each of them.
+            if (!lateFlushScheduled) {
+                lateFlushScheduled = true;
+                CN.callSerially(new Runnable() {
+                    @Override
+                    public void run() {
+                        lateFlushScheduled = false;
+                        flush(true);
+                    }
+                });
+            }
         }
+
+        /// Whether a final flush for late handoffs is already queued on the EDT.
+        private boolean lateFlushScheduled;
 
         void record(TelemetrySpan span) {
             if (stopped || !permitted()) {
@@ -689,8 +708,19 @@ public final class Telemetry {
     /// it, which [#host(String)] returning null did, dropped the context from the
     /// call it matters most on. A scheme (`data:`, `mailto:`) or a
     /// protocol-relative `//host/...` names another origin and is not relative.
+    private static boolean isSlash(char c) {
+        return c == '/' || c == '\\';
+    }
+
     static boolean isSameOriginRelative(String url) {
-        if (url == null || url.length() == 0 || url.startsWith("//")) {
+        if (url == null || url.length() == 0) {
+            return false;
+        }
+        // A network-path reference names another origin, and a browser's URL
+        // parser reads '\' as '/' for http(s): "\\host/x" and "/\\host" are
+        // "//host/x" to it. Refused in any mix of the two, or the trace header
+        // went cross-origin without a propagateTo allowance.
+        if (url.length() >= 2 && isSlash(url.charAt(0)) && isSlash(url.charAt(1))) {
             return false;
         }
         for (int i = 0; i < url.length(); i++) {

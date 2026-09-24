@@ -402,6 +402,28 @@ class TraceContextTest {
     }
 
     @Test
+    @DisplayName("a span's name is bounded like its attributes")
+    void spanNamesAreBounded() throws Exception {
+        java.util.Properties settings = new java.util.Properties();
+        settings.setProperty(OtlpTracer.ENDPOINT, "http://127.0.0.1:9");
+        OtlpTracer tracer = new OtlpTracer();
+        assertTrue(tracer.open(com.codename1.backend.Config.of(settings, "test")));
+        try {
+            StringBuilder huge = new StringBuilder();
+            while(huge.length() < 50000) {
+                huge.append("name ");
+            }
+            com.codename1.backend.Span span = tracer.startSpan(huge.toString(),
+                    com.codename1.backend.Span.KIND_INTERNAL, null, null, null);
+            assertTrue(span.getName().length() <= OtelSpan.MAX_VALUE_LENGTH);
+            span.updateName(huge.toString());
+            assertTrue(span.getName().length() <= OtelSpan.MAX_VALUE_LENGTH);
+        } finally {
+            tracer.shutdown(0);
+        }
+    }
+
+    @Test
     @DisplayName("a truncated value never ends in half a character")
     void truncationKeepsPairsWhole() {
         StringBuilder text = new StringBuilder();

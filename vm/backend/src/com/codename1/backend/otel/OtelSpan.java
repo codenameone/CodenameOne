@@ -80,7 +80,9 @@ final class OtelSpan extends Span {
              long parentId, boolean parentRemote, boolean sampled, String tracestate,
              OtelSpan localParent) {
         this.tracer = tracer;
-        this.name = name == null ? "" : name;
+        // Bounded like every other string a span keeps: a caller-derived name
+        // could otherwise be any size, and the queue is bounded by span COUNT.
+        this.name = name == null ? "" : bound(name);
         this.kind = kind;
         this.traceHi = traceHi;
         this.traceLo = traceLo;
@@ -192,7 +194,7 @@ final class OtelSpan extends Span {
 
     public Span updateName(String newName) {
         if(!ended && newName != null) {
-            name = newName;
+            name = bound(newName);
         }
         return this;
     }

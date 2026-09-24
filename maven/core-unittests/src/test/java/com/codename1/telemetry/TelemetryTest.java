@@ -525,6 +525,11 @@ class TelemetryTest extends UITestBase {
         assertTrue(Telemetry.isSameOriginRelative("/api/orders"));
         assertTrue(Telemetry.isSameOriginRelative("orders?next=http://x.test/"));
         assertFalse(Telemetry.isSameOriginRelative("//other.test/api"));
+        // A browser reads '\\' as '/', so these are network paths too.
+        assertFalse(Telemetry.isSameOriginRelative("\\\\other.test/api"));
+        assertFalse(Telemetry.isSameOriginRelative("/\\other.test/api"));
+        assertFalse(Telemetry.isSameOriginRelative("\\/other.test/api"));
+        assertTrue(Telemetry.isSameOriginRelative("\\api\\orders"));
         assertFalse(Telemetry.isSameOriginRelative("http://other.test/api"));
         assertFalse(Telemetry.isSameOriginRelative("data:text/plain,x"));
         assertFalse(Telemetry.isSameOriginRelative(""));
@@ -957,11 +962,16 @@ class TelemetryTest extends UITestBase {
         com.codename1.ui.CN.callSeriallyAndWait(new Runnable() {
             @Override
             public void run() {
-                final TelemetrySpan span = state.start("late", TelemetrySpan.KIND_CLIENT, null);
+                final TelemetrySpan[] spans = new TelemetrySpan[5];
+                for (int i = 0; i < spans.length; i++) {
+                    spans[i] = state.start("late" + i, TelemetrySpan.KIND_CLIENT, null);
+                }
                 Thread ender = new Thread(new Runnable() {
                     @Override
                     public void run() {
-                        span.end();
+                        for (TelemetrySpan span : spans) {
+                            span.end();
+                        }
                     }
                 });
                 ender.start();
@@ -974,11 +984,28 @@ class TelemetryTest extends UITestBase {
             }
         });
         flushSerialCalls();
-        boolean exported = false;
+        int exports = 0;
         for (ConnectionRequest queued : impl.getQueuedRequests()) {
-            exported |= queued instanceof Telemetry.ExportRequest;
+            if (queued instanceof Telemetry.ExportRequest) {
+                exports++;
+            }
         }
-        assertTrue(exported, "a span that ended before the stop was discarded after it");
+        assertTrue(exports > 0, "spans that ended before the stop were discarded after it");
+        assertEquals(1, exports, "a burst of late spans went out as one export per span");
+    }
+
+    @Test
+    void aSpanNameIsBounded() {
+        Telemetry.install(new TelemetryConfig().direct("http://collector.test"));
+        StringBuilder huge = new StringBuilder();
+        while (huge.length() < 50000) {
+            huge.append("name ");
+        }
+        TelemetrySpan span = Telemetry.startSpan(huge.toString());
+        assertTrue(span.getName().length() <= TelemetrySpan.MAX_VALUE_LENGTH, "" + span.getName().length());
+        span.updateName(huge.toString());
+        assertTrue(span.getName().length() <= TelemetrySpan.MAX_VALUE_LENGTH);
+        span.end();
     }
 
     @Test

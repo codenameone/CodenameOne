@@ -195,6 +195,24 @@ class NetworkTracerQueueTest extends UITestBase {
         assertEquals(null, request.tracerParentOwner);
         assertEquals(null, request.tracerLastAttempt);
         assertEquals(null, request.tracerLastOwner);
+
+        // Owner-only state: nothing captured, no attempt made -- the owner alone
+        // pins the installation and must go too.
+        NetworkManager.setNetworkTracer(new NetworkTracer() {
+            public Object requestQueued(ConnectionRequest r) { return null; }
+            public Object beforeRequest(ConnectionRequest r, Object p) { return null; }
+            public void afterRequest(ConnectionRequest r, Object at, int s, Throwable e) { }
+        });
+        ConnectionRequest untraced = new ConnectionRequest() {
+            @Override
+            protected void readResponse(java.io.InputStream input) {
+            }
+        };
+        untraced.setUrl("http://queue.test/done");
+        untraced.setPost(false);
+        NetworkManager.getInstance().addToQueueAndWait(untraced);
+        flushSerialCalls();
+        assertEquals(null, untraced.tracerParentOwner, "the tracer owner outlived the request");
     }
 
     @Test
