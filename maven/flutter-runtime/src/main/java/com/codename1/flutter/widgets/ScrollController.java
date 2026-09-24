@@ -79,16 +79,81 @@ public class ScrollController {
         return attached;
     }
 
-    public Future<Object> animateTo(double offset, Duration duration, Curve curve) {
-        scrollPosition.jumpTo(offset);
+    /** The animateTo in progress, or null. */
+    private com.codename1.flutter.animation.AnimationController motion;
+    private dart.async.Completer<Object> motionDone;
+
+    /**
+     * Scrolls the attached list to {@code offset} over {@code duration}, following
+     * {@code curve}, and completes when it arrives -- or when the motion is interrupted
+     * by a jump, another animateTo or dispose, as Flutter's does. It used to assign the
+     * target at once and return a completed future, so the list jumped and a caller
+     * awaiting the scroll resumed before any motion could have run.
+     */
+    public Future<Object> animateTo(final double offset, Duration duration, final Curve curve) {
+        interruptMotion();
+        if (client == null || duration == null || duration.inMilliseconds() <= 0) {
+            moveTo(offset);
+            return Future.value(null);
+        }
+        final double from = scrollPosition.pixels();
+        final com.codename1.flutter.animation.AnimationController run =
+                new com.codename1.flutter.animation.AnimationController();
+        run.duration(duration);
+        run.addListener(new Funcs.VoidFunc0() {
+            @Override
+            public void call() {
+                if (motion != run) {
+                    return;
+                }
+                double v = run.value();
+                double t = curve == null ? v : curve.transform(v);
+                moveTo(from + (offset - from) * t);
+            }
+        });
+        final dart.async.Completer<Object> done = new dart.async.Completer<Object>();
+        motion = run;
+        motionDone = done;
+        run.forward().then(new Funcs.Func1<Object, Object>() {
+            @Override
+            public Object call(Object ignored) {
+                if (motion == run) {
+                    moveTo(offset);
+                    motion = null;
+                    motionDone = null;
+                    run.dispose();
+                    done.complete(null);
+                }
+                return null;
+            }
+        });
+        return done.future();
+    }
+
+    /** Stops an animateTo in progress where it is, completing its future. */
+    private void interruptMotion() {
+        com.codename1.flutter.animation.AnimationController run = motion;
+        dart.async.Completer<Object> done = motionDone;
+        motion = null;
+        motionDone = null;
+        if (run != null) {
+            run.dispose();
+        }
+        if (done != null) {
+            done.complete(null);
+        }
+    }
+
+    private void moveTo(double px) {
+        scrollPosition.jumpTo(px);
         if (client != null) {
-            client.scrollToOffset(offset);
+            client.scrollToOffset(px);
         }
         notifyListeners();
-        return Future.value(null);
     }
 
     public void jumpTo(double value) {
+        interruptMotion();
         scrollPosition.jumpTo(value);
         if (client != null) {
             client.scrollToOffset(value);
@@ -107,6 +172,7 @@ public class ScrollController {
     }
 
     public void dispose() {
+        interruptMotion();
         listeners.clear();
         attached = false;
     }

@@ -144,6 +144,17 @@ class Timer {
   external bool get isActive;
 }
 
+// dart.async.Completer existed in the runtime with nothing declaring it, so Dart code
+// that built a future by hand could not be transpiled.
+@JavaName('dart.async.Completer')
+class Completer<T> {
+  external Completer();
+  external Future<T> get future;
+  external void complete([T? value]);
+  external void completeError(Object error);
+  external bool get isCompleted;
+}
+
 // The eventual-value type — dart:async's `Future<T>`. `await`, the named
 // constructors (Future.value / Future.delayed) and `.then` / `.whenComplete`
 // are handled directly by the transpiler; `.catchError` (chained after `.then`
