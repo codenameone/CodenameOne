@@ -6405,3 +6405,46 @@ re-trace of large maps (IdentityHashMap alone 324ms: one young insert re-traces 
 map). Roughly half of each minor's young survives and is promoted on first survival,
 and most of that dies as old garbage for majors to collect -- the case a tenuring age
 exists for.
+
+## Round 45: survivor aging and compressed references, measured before being built out
+
+**Survivor aging -- implemented, measured, reverted.** A young object surviving one minor
+was kept young (mark -2, per-page 16-byte survivor bitmap, a survivor pass promoting or
+freeing it next minor; remembered-set rules to keep old->survivor edges recorded). The
+whole-run counters decide it: of 7.63M first-time survivors, 82% survived the second minor
+too and only 18% died. On this workload whatever lives through one minor is long-lived, so
+aging can cut promotion by at most ~18%, while keeping old parents remembered across cycles
+raised remembered-set traffic ~6x (6.1M traced objects against ~1M). The old garbage majors
+collect is objects that die AFTER being old for a while, which a one-cycle age cannot catch.
+The attempt still had 320 missed edges when it was measured; it was not pursued. Patch kept
+out of tree.
+
+**Compressed references -- sized from the live census, not built.** Each live class's
+struct was laid out again with 4-byte references (C alignment, then BiBOP size class):
+
+| option | live BiBOP saving |
+|---|---:|
+| all references + 12-byte header | 80MB (22%), plus 43MB of collection storage |
+| typed fields only, 16-byte header | 41MB (12%) |
+| typed fields + 12-byte header | 49MB (14%) |
+
+The first row is not reachable: tagged immediates put up to 61 bits of payload in a
+reference word, so every slot that can hold a boxed value -- Object-typed fields,
+Object[], all collection storage -- must stay 64 bits. The heavy classes' fields are
+almost all concretely typed (String, Label, char[], List), so typed compression gets
+nearly all of the per-object share, ~6-7% of peak RSS. Its cost: every generated struct
+and accessor, runtime natives, every port native that reads a field, the debugger's field
+tables, and every heap object (legacy included) inside one reserved address region.
+
+**What was cheaper and was kept** (both on `parparvm-single-core-gen-wip`):
+
+| change | effect |
+|---|---|
+| HashMap/HashSet default table 16 -> 4 slots | peak RSS 790MB -> 737MB, wall unchanged |
+| translator lays out a class's own fields largest first | live BiBOP 366.2 -> 356.0MB, peak occupancy 382.6 -> 366.7MB |
+
+Not kept: ArrayList default 10 -> 4 (-9MB for +7% wall); 16-byte size classes to 256
+(no measurable change -- tighter rounding offset by more partially filled pages).
+
+Single core, default generational build after all of the above: 0.78x JDK 25 wall,
+~1.30x RSS (722-742MB against 551-569MB).
