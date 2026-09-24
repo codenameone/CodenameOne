@@ -1485,6 +1485,15 @@ public class BytecodeMethod implements SignatureSet {
         snapshotDebugVarScopes();
     }
 
+    /**
+     * Re-snapshots the raw plans after a pass that runs on the raw list edited it
+     * (DeadFieldElimination). Every analysis above resets its own state first.
+     */
+    public void recomputeRawMethodPlans() {
+        rawPlansComputed = false;
+        computeRawMethodPlans();
+    }
+
     public com.codename1.tools.translator.bytecodes.InlinableConstructor getInlinableConstructorPlan() {
         return inlinableCtorPlan;
     }

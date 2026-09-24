@@ -1403,6 +1403,15 @@ public class Parser extends ClassVisitor {
             // On the raw bytecode, before any fusion pass below rewrites instructions:
             // see ByteCodeClass.isEagerInitEligible.
             ByteCodeClass.computePureClinits(classes);
+            // Also on the raw bytecode, where every field access is still a plain
+            // GETFIELD/PUTFIELD: see DeadFieldElimination. Not for the JavaScript target
+            // (its own field model), and not under on-device debugging, whose sidecar
+            // shows every field the source declares.
+            if (BytecodeMethod.optimizerOn
+                    && ByteCodeTranslator.output != ByteCodeTranslator.OutputType.OUTPUT_TYPE_JAVASCRIPT
+                    && !"true".equalsIgnoreCase(Util.getProperty("cn1.onDeviceDebug", "false"))) {
+                DeadFieldElimination.run(classes, nativeSources);
+            }
 
             // Fuse all-String StringBuilder concat chains into String.cn1ConcatN
             // BEFORE the cull, not during code generation.
