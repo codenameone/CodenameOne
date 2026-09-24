@@ -43,7 +43,22 @@ public class TextEditingController {
 
     private String value = "";
     private final List<Funcs.VoidFunc0> listeners = new ArrayList<Funcs.VoidFunc0>();
-    private TextFieldRenderElement bound;
+    /**
+     * Every mounted field this controller drives. It was one reference, replaced by each
+     * bind, so with a controller shared between fields a programmatic setText reached
+     * only the last one, and when that one unmounted the controller forgot the others.
+     */
+    private final List<TextFieldRenderElement> bound = new ArrayList<TextFieldRenderElement>();
+
+    /** The most recently bound field that is still mounted, or null. */
+    private TextFieldRenderElement liveField() {
+        for (int i = bound.size() - 1; i >= 0; i--) {
+            if (bound.get(i).isMounted()) {
+                return bound.get(i);
+            }
+        }
+        return null;
+    }
 
     public TextEditingController() {
     }
@@ -61,8 +76,9 @@ public class TextEditingController {
      * component's live text.
      */
     public String text() {
-        if (bound != null && bound.isMounted()) {
-            String s = bound.componentText();
+        TextFieldRenderElement live = liveField();
+        if (live != null) {
+            String s = live.componentText();
             if (s != null) {
                 value = s;
             }
@@ -90,9 +106,7 @@ public class TextEditingController {
      */
     public void setText(String v) {
         this.value = v == null ? "" : v;
-        if (bound != null && bound.isMounted()) {
-            bound.applyControllerText(this.value);
-        }
+        pushToFields(null);
         notifyListeners();
     }
 
@@ -118,7 +132,16 @@ public class TextEditingController {
      */
     public void dispose() {
         listeners.clear();
-        this.bound = null;
+        bound.clear();
+    }
+
+    /** Shows the current value in every mounted field except {@code source}. */
+    private void pushToFields(TextFieldRenderElement source) {
+        for (TextFieldRenderElement e : new ArrayList<TextFieldRenderElement>(bound)) {
+            if (e != source && e.isMounted()) {
+                e.applyControllerText(this.value);
+            }
+        }
     }
 
     // ------------------------------------------------------------------
@@ -126,13 +149,13 @@ public class TextEditingController {
     // ------------------------------------------------------------------
 
     void bind(TextFieldRenderElement e) {
-        this.bound = e;
+        if (e != null && !bound.contains(e)) {
+            bound.add(e);
+        }
     }
 
     void unbind(TextFieldRenderElement e) {
-        if (this.bound == e) {
-            this.bound = null;
-        }
+        bound.remove(e);
     }
 
     /**
@@ -140,7 +163,13 @@ public class TextEditingController {
      * notify listeners.
      */
     void valueFromComponent(String s) {
+        valueFromComponent(s, null);
+    }
+
+    /** A user edit in {@code source}: absorb it and show it in the other bound fields. */
+    void valueFromComponent(String s, TextFieldRenderElement source) {
         this.value = s == null ? "" : s;
+        pushToFields(source);
         notifyListeners();
     }
 

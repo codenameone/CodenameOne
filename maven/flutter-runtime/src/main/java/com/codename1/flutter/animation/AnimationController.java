@@ -106,7 +106,9 @@ public class AnimationController extends Animation<Double> {
      * any running animation, clamps to the bounds, and notifies listeners.
      */
     public void value(double v) {
-        stop(false);
+        // Canceled, as Flutter's value setter, reset and dispose are: the interrupted run's
+        // future stays pending rather than resolving as if its target had been reached.
+        stop(Boolean.TRUE);
         requestedValue = v;
         double clamped = clamp(v);
         this.currentValue = clamped;
@@ -346,7 +348,9 @@ public class AnimationController extends Animation<Double> {
     }
 
     public void reset() {
-        stop(false);
+        // Canceled, as Flutter's value setter, reset and dispose are: the interrupted run's
+        // future stays pending rather than resolving as if its target had been reached.
+        stop(Boolean.TRUE);
         currentValue = lowerBound;
         AnimationStatus newStatus = statusForValue(currentValue);
         boolean changed = newStatus != status;
@@ -358,7 +362,9 @@ public class AnimationController extends Animation<Double> {
     }
 
     public void dispose() {
-        stop(false);
+        // Canceled, as Flutter's value setter, reset and dispose are: the interrupted run's
+        // future stays pending rather than resolving as if its target had been reached.
+        stop(Boolean.TRUE);
     }
 
     // ------------------------------------------------------------------

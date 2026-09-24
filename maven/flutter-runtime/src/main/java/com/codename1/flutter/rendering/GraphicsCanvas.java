@@ -83,9 +83,16 @@ public class GraphicsCanvas extends Canvas {
     // Transform stack
     // ------------------------------------------------------------------
 
+    /**
+     * Saves the transform AND the clip. Only the transform used to be saved, while
+     * clipRect/clipRRect/clipPath narrow the Graphics clip itself, so a clip set between
+     * save() and restore() stayed in force after the restore and cropped every later
+     * drawing command of the painter.
+     */
     @Override
     public void save() {
         stack.add(new double[] {a, b, c, d, e, f});
+        g.pushClip();
     }
 
     @Override
@@ -102,6 +109,7 @@ public class GraphicsCanvas extends Canvas {
         }
         double[] m = stack.remove(stack.size() - 1);
         a = m[0]; b = m[1]; c = m[2]; d = m[3]; e = m[4]; f = m[5];
+        g.popClip();
     }
 
     @Override

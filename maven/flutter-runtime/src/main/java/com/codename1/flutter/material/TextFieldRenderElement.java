@@ -769,7 +769,7 @@ public class TextFieldRenderElement extends RenderElement {
         }
         rebindController();
         if (boundController != null) {
-            boundController.valueFromComponent(newText);
+            boundController.valueFromComponent(newText, this);
         }
         Funcs.VoidFunc1<String> f = textField().getOnChanged();
         if (f != null) {

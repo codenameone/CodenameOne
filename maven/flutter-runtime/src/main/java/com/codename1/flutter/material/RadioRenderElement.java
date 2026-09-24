@@ -97,6 +97,9 @@ public class RadioRenderElement extends RenderElement {
         applying = true;
         try {
             rb.setSelected(selected());
+            // A null onChanged is Flutter's disabled radio, as the checkbox, switch and
+            // slider renderers already mirror; the radio stayed enabled and focusable.
+            rb.setEnabled(radio().getOnChanged() != null);
         } finally {
             applying = false;
         }

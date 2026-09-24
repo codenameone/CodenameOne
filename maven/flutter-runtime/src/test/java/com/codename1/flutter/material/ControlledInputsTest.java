@@ -271,4 +271,20 @@ class ControlledInputsTest {
         assertEquals("abcd", ctl.text(), "the controller never holds more than maxLength");
         assertEquals(List.of("abcd"), changed);
     }
+
+    @Test
+    void oneControllerDrivesEveryFieldItIsGivenTo() {
+        TextEditingController ctl = new TextEditingController();
+        TextField first = new TextField();
+        first.controller(ctl);
+        TextField second = new TextField();
+        second.controller(ctl);
+        TextFieldRenderElement a = mount(first);
+        TextFieldRenderElement b = mount(second);
+        a.userEdited("typed");
+        assertEquals("typed", ctl.text());
+        com.codename1.flutter.FlutterUI.unmountTree(b);
+        ctl.setText("set");
+        assertEquals("set", ctl.text(), "unmounting the second field must not orphan the first");
+    }
 }
