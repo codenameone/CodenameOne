@@ -115,6 +115,47 @@ class RegressionGateTest(unittest.TestCase):
         self.assertEqual(
             benchlib.check_regressions(report, self.BASELINE), [])
 
+    SLOW_RUNNER_BASELINE = {
+        "codenameone": {"cold_start_ms": 418},
+        "tolerances": {"cold_start_ms": 0.25},
+        "flutter_reference": {"cold_start_ms": 1505},
+    }
+
+    def test_a_slow_runner_is_discounted_by_flutters_own_slowdown(self):
+        """The run that motivated it: the emulator was slow for everyone.
+
+        Flutter (pinned) came in at 2244 ms against its 1505 ms reference, and
+        Codename One at 754 ms against a 418 ms baseline; discounted by the same
+        ratio it is 505 ms, inside the 25% band. Linux and Windows showed the code
+        had not moved.
+        """
+        report = _report({"cold_start_runs": [754]}, {"cold_start_runs": [2244]})
+        self.assertEqual(
+            benchlib.check_regressions(report, self.SLOW_RUNNER_BASELINE), [])
+
+    def test_a_normal_runner_gets_no_discount(self):
+        """A slow Flutter cannot hide our regression on a runner that is not slow."""
+        report = _report({"cold_start_runs": [754]}, {"cold_start_runs": [1200]})
+        found = benchlib.check_regressions(report, self.SLOW_RUNNER_BASELINE)
+        self.assertEqual(len(found), 1)
+        self.assertNotIn("judged", found[0])
+
+    def test_a_regression_beyond_the_slowdown_still_fails(self):
+        report = _report({"cold_start_runs": [1500]}, {"cold_start_runs": [2244]})
+        found = benchlib.check_regressions(report, self.SLOW_RUNNER_BASELINE)
+        self.assertEqual(len(found), 1)
+        self.assertAlmostEqual(found[0]["judged"], 1500 * 1505 / 2244.0, places=0)
+
+    def test_without_a_reference_nothing_is_discounted(self):
+        report = _report({"cold_start_runs": [754]}, {"cold_start_runs": [2244]})
+        baseline = {"codenameone": {"cold_start_ms": 418}, "tolerances": {"cold_start_ms": 0.25}}
+        self.assertEqual(len(benchlib.check_regressions(report, baseline)), 1)
+
+    def test_the_candidate_records_the_flutter_reference(self):
+        report = _report({"cold_start_runs": [300]}, {"cold_start_runs": [1400]})
+        candidate = benchlib.baseline_candidate(report)
+        self.assertEqual(candidate["flutter_reference"], {"cold_start_ms": 1400})
+
     def test_a_metric_with_no_tolerance_is_not_gated(self):
         baseline = {"codenameone": {"install_bytes": 1000}, "tolerances": {}}
         report = _report({"install_bytes": 99999}, {"install_bytes": 5000})

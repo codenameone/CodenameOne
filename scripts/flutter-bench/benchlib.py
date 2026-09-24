@@ -512,23 +512,58 @@ def check_regressions(report, baseline):
         tolerance = tolerances.get(key)
         if tolerance is None:
             continue
+        judged = actual * runner_slowdown_discount(report, baseline, key)
         limit = expected * (1.0 + tolerance)
-        if actual > limit:
-            findings.append({
+        if judged > limit:
+            finding = {
                 "metric": key,
                 "label": label,
                 "baseline": expected,
                 "actual": actual,
                 "tolerance": tolerance,
-                "over_by": round((actual / float(expected) - 1.0) * 100.0, 1),
-            })
+                "over_by": round((judged / float(expected) - 1.0) * 100.0, 1),
+            }
+            if judged != actual:
+                finding["judged"] = round(judged, 1)
+            findings.append(finding)
     return findings
+
+
+# Wall-clock metrics whose runner speed Flutter's own number measures.
+LOAD_NORMALISED = ("cold_start_ms",)
+
+
+def runner_slowdown_discount(report, baseline, key):
+    """How much of this run's time is the runner being slow, as a factor <= 1.
+
+    The emulator's speed swings by up to 2x between runs: in one run the Android
+    emulator booted in 75s instead of ~57s and Flutter's own cold start came in at
+    2244 ms against 1031-1505 ms in the runs before, and Codename One's rose with it
+    -- the gate failed a change that Linux and Windows, running the same code, showed
+    had not moved at all. Flutter is PINNED (FLUTTER_REF) and measured interleaved on
+    the same emulator, so when it is slower than its recorded reference the runner is
+    slower, by that much.
+
+    One-sided on purpose: a runner no slower than the reference is judged exactly as
+    before, so this only ever discounts load; it never makes the gate stricter, and a
+    slow Flutter cannot hide a regression on a normal runner. Metrics outside
+    LOAD_NORMALISED, and baselines without a flutter_reference, are not adjusted.
+    """
+    if key not in LOAD_NORMALISED:
+        return 1.0
+    reference = (baseline.get("flutter_reference") or {}).get(key)
+    theirs = (report.get("flutter") or {}).get(key)
+    if not reference or not theirs or theirs <= reference:
+        return 1.0
+    return reference / float(theirs)
 
 
 def baseline_candidate(report):
     """A baseline recorded from this run, ready to commit as-is.
 
-    Only Codename One's figures, for the same reason only they are gated.
+    Only Codename One's figures are gated, and are the values here; Flutter's
+    appear only as flutter_reference, the yardstick for runner speed that
+    runner_slowdown_discount reads.
     Written by every gated run, so re-baselining after a deliberate change --
     a Flutter SDK bump moves every number -- is copying one file, not
     re-deriving it by hand.
@@ -538,13 +573,21 @@ def baseline_candidate(report):
         value = report.get("codenameone", {}).get(key)
         if value is not None:
             values[key] = value
-    return {
+    reference = {}
+    for key in LOAD_NORMALISED:
+        value = report.get("flutter", {}).get(key)
+        if value is not None:
+            reference[key] = value
+    candidate = {
         "schema_version": 1,
         "platform": report.get("platform"),
         "generated_at": report.get("generated_at"),
         "tolerances": dict((k, DEFAULT_TOLERANCES[k]) for k in values if k in DEFAULT_TOLERANCES),
         "codenameone": values,
     }
+    if reference:
+        candidate["flutter_reference"] = reference
+    return candidate
 
 
 def render_gate(report):
@@ -565,9 +608,11 @@ def render_regressions(platform_id, findings):
     lines = []
     for item in findings:
         lines.append(
-            "%s: %s is %s against a baseline of %s (+%.1f%%, tolerance +%.0f%%)"
+            "%s: %s is %s%s against a baseline of %s (+%.1f%%, tolerance +%.0f%%)"
             % (platform_id, item["label"],
                format_value(item["metric"], item["actual"]),
+               (" (%s after discounting a slow runner)" % format_value(item["metric"], item["judged"])
+                if "judged" in item else ""),
                format_value(item["metric"], item["baseline"]),
                item["over_by"], item["tolerance"] * 100.0))
     return lines
