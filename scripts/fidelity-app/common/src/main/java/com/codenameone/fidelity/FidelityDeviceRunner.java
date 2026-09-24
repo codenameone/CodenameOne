@@ -295,7 +295,7 @@ public class FidelityDeviceRunner {
         // it passed while the running app showed no glass -- a false green. Capturing the live
         // screen makes the suite tell the truth: glass widgets go red until the live-screen
         // glass actually works. (emitTiles, the old offscreen path, is kept for reference.)
-        cropAndEmit(captureScreen(), wrappers, names, w, h);
+        cropAndEmit(captureStableScreen(), wrappers, names, w, h);
     }
 
     // ---- animation-frame render ----
@@ -373,7 +373,7 @@ public class FidelityDeviceRunner {
                 }
             });
             settle();
-            cropAndEmit(captureScreen(), wrappers, names, w, h);
+            cropAndEmit(captureStableScreen(), wrappers, names, w, h);
         }
     }
 
@@ -559,6 +559,59 @@ public class FidelityDeviceRunner {
             Image tileImage = screen.subImage(ax, ay, cw, ch, true);
             Cn1ssDeviceRunnerHelper.emitImage(tileImage, name, null);
         }
+    }
+
+    /// How many extra captures to wait for the screen to stop changing, and how far apart.
+    private static final int STABLE_ATTEMPTS = 6;
+    private static final long STABLE_GAP_MS = 200;
+
+    /// A screenshot of a screen that has stopped changing: captures are repeated until
+    /// two consecutive ones are identical.
+    ///
+    /// A single capture after a fixed settle raced the device. The crop rectangles are
+    /// read from the laid-out tiles AFTER the capture, so a frame the screen had not yet
+    /// caught up with -- a slow emulator still presenting the previous layout -- was cut
+    /// with the final geometry and its content landed shifted: Android's disabled dark
+    /// text field was once captured 50px right of where it sits (81% against a 96%
+    /// baseline), and the next run on the same code measured exactly the baseline.
+    /// Content that never settles (a blinking caret) falls back to the last capture,
+    /// which is what a single capture gave before.
+    private Image captureStableScreen() {
+        Image last = captureScreen();
+        for (int attempt = 0; attempt < STABLE_ATTEMPTS && last != null; attempt++) {
+            try {
+                Thread.sleep(STABLE_GAP_MS);
+            } catch (InterruptedException ignored) {
+            }
+            Image next = captureScreen();
+            if (next == null) {
+                return last;
+            }
+            if (samePixels(last, next)) {
+                return next;
+            }
+            last = next;
+        }
+        println("CN1SS:INFO:fidelity screen still changing after " + STABLE_ATTEMPTS
+                + " extra captures; using the last");
+        return last;
+    }
+
+    private static boolean samePixels(Image a, Image b) {
+        if (a.getWidth() != b.getWidth() || a.getHeight() != b.getHeight()) {
+            return false;
+        }
+        int[] pa = a.getRGB();
+        int[] pb = b.getRGB();
+        if (pa.length != pb.length) {
+            return false;
+        }
+        for (int i = 0; i < pa.length; i++) {
+            if (pa[i] != pb[i]) {
+                return false;
+            }
+        }
+        return true;
     }
 
     private Image captureScreen() {
