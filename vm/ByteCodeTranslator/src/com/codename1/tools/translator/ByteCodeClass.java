@@ -39,6 +39,8 @@ import com.codename1.tools.translator.bytecodes.VarOp;
 import com.codename1.tools.translator.bytecodes.BasicInstruction;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -2369,11 +2371,33 @@ public class ByteCodeClass {
         return null;
     }
 
+    // Largest first, so a class's own fields leave no alignment holes between them.
+    // Declaration order interleaved 2-byte shorts with 8-byte references and padded each
+    // gap: measured on the self-hosting corpus, ASM's Label was 104 bytes (a 112-byte
+    // BiBOP slot) where the same fields pack into 96. Only a class's OWN fields move --
+    // the inherited prefix stays in the parent's order, which is what lets a pointer to
+    // this struct be read as a pointer to its parent's. Every access is by field name
+    // (and the offset table is taken with offsetof), so nothing depends on the order.
+    // Stable, so fields of one size keep their declaration order.
+    private static int fieldStorageBytes(ByteCodeField bf) {
+        String d = bf.getCDefinition();
+        if(d.endsWith("JAVA_BOOLEAN") || d.endsWith("JAVA_BYTE")) return 1;
+        if(d.endsWith("JAVA_SHORT") || d.endsWith("JAVA_CHAR")) return 2;
+        if(d.endsWith("JAVA_INT") || d.endsWith("JAVA_FLOAT")) return 4;
+        return 8;
+    }
+
     private void addFields(StringBuilder b) {
         if(baseClassObject != null) {
             baseClassObject.addFields(b);
         }
-        for(ByteCodeField bf : fields) {
+        List<ByteCodeField> ordered = new ArrayList<ByteCodeField>(fields);
+        Collections.sort(ordered, new Comparator<ByteCodeField>() {
+            public int compare(ByteCodeField a, ByteCodeField c) {
+                return fieldStorageBytes(c) - fieldStorageBytes(a);
+            }
+        });
+        for(ByteCodeField bf : ordered) {
             if(!bf.isStaticField()) {
                 String guard = targetGuardFor(clsName, bf.getFieldName());
                 if(guard != null) {
