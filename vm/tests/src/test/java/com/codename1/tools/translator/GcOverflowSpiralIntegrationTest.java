@@ -285,6 +285,17 @@ class GcOverflowSpiralIntegrationTest {
         assertEquals(javaResult, extractLine(output, "RESULT="),
                 "JavaSE and ParparVM should agree\n--- ParparVM ---\n" + output);
 
+        // EVERY CYCLE MUST BE ALLOWED TO SWEEP. A cycle whose root capture was incomplete
+        // keeps everything, and nothing else here notices: the search still finishes,
+        // RESULT= still agrees, and the heap just never shrinks. On glibc that was every
+        // cycle of every app -- getThreadLocalData() read pthread key 0 as "no key yet",
+        // orphaned the main thread's first state, and the collector could never stop it
+        // (see cn1ThreadIdKeyOnce in nativeMethods.m). Darwin never hands out key 0, so a
+        // Mac run cannot fail this; the Linux leg is the one that can.
+        assertTrue(!output.contains("incomplete native root capture"),
+                "A cycle skipped its sweep because a thread's roots could not be captured."
+                        + " Output: " + output);
+
         long overflowCycles = parseTrace(output, "overflowCycles=");
         long graceDrains = parseTrace(output, "graceDrains=");
         long cycles = parseTrace(output, "cycles=");

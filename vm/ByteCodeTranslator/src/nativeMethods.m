@@ -2257,6 +2257,21 @@ struct ThreadLocalData** allThreads = 0;
 int nThreadsToKill = 0;         // the number of threads we expect to be finalized, eventually
 
 pthread_key_t   threadIdKey = 0;
+/* Created through pthread_once, never by testing threadIdKey against 0. Zero is a
+   VALID key: Darwin reserves its low keys for libSystem so an app never sees one,
+   but glibc hands the first pthread_key_create in the process key 0. The old
+   `if(threadIdKey == 0) pthread_key_create(...)` therefore created a second key on
+   the next call, and the state already bound to the first was orphaned -- still in
+   allThreads, still naming the main pthread, never lightweight. The collector then
+   signal-stopped it every cycle, the handler answered for the thread's REAL state
+   (found through the new key), the orphan never reported stopped, and every sweep
+   was skipped as "incomplete native root capture": no Linux build of an app ever
+   reclaimed memory. The once also closes the unsynchronised first-call race the
+   iOS debugger's listener thread documents in cn1_debugger.m. */
+static pthread_once_t cn1ThreadIdKeyOnce = PTHREAD_ONCE_INIT;
+static void cn1ThreadIdKeyCreate(void) {
+    pthread_key_create(&threadIdKey, NULL);
+}
 JAVA_LONG threadKeyCounter = 1;
 /**
  * Build a fresh VM thread state.
@@ -2434,6 +2449,7 @@ struct ThreadLocalData* cn1CreateThreadLocalData(JAVA_BOOLEAN bindToCallingOsThr
     }
 #endif
     if(bindToCallingOsThread) {
+        pthread_once(&cn1ThreadIdKeyOnce, cn1ThreadIdKeyCreate);
         pthread_setspecific(threadIdKey, i);
     }
     
@@ -2628,9 +2644,7 @@ struct ThreadLocalData* getThreadLocalData() {
             }
         }
     }
-    if(threadIdKey == 0) {
-        pthread_key_create(&threadIdKey, NULL);
-    }
+    pthread_once(&cn1ThreadIdKeyOnce, cn1ThreadIdKeyCreate);
     struct ThreadLocalData* i = pthread_getspecific(threadIdKey);
     if(i == NULL) {
         i = cn1CreateThreadLocalData(JAVA_TRUE);
