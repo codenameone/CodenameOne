@@ -116,6 +116,14 @@ public class Slider extends Widget {
         return onChanged;
     }
 
+    public Funcs.VoidFunc1<Double> getOnChangeStart() {
+        return onChangeStart;
+    }
+
+    public Funcs.VoidFunc1<Double> getOnChangeEnd() {
+        return onChangeEnd;
+    }
+
     @Override
     public Element createElement() {
         return new SliderRenderElement(this);

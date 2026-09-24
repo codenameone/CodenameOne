@@ -277,7 +277,7 @@ class CupertinoModalPopupRoute<T> extends Route<T> {
 }
 
 @JavaName('com.codename1.flutter.cupertino.CupertinoDialogs.showCupertinoDialog')
-external void showCupertinoDialog({BuildContext context, WidgetBuilder builder, bool? barrierDismissible, Color? barrierColor, String? barrierLabel, bool? useRootNavigator, Object? routeSettings});
+external Future<dynamic> showCupertinoDialog({BuildContext context, WidgetBuilder builder, bool? barrierDismissible, Color? barrierColor, String? barrierLabel, bool? useRootNavigator, Object? routeSettings});
 
 @JavaName('com.codename1.flutter.cupertino.CupertinoDialogs.showCupertinoModalPopup')
-external void showCupertinoModalPopup({BuildContext context, WidgetBuilder builder, Color? barrierColor, bool? barrierDismissible, bool? useRootNavigator, Object? semanticsDismissible, Object? routeSettings});
+external Future<dynamic> showCupertinoModalPopup({BuildContext context, WidgetBuilder builder, Color? barrierColor, bool? barrierDismissible, bool? useRootNavigator, Object? semanticsDismissible, Object? routeSettings});

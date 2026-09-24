@@ -55,8 +55,8 @@ public final class Animations {
                                    Funcs.Func1<BuildContext, Widget> builder,
                                    Object filter) {
         if (builder != null) {
-            Dialogs.showDialog(context, builder);
+            return Dialogs.showDialog(context, builder);
         }
-        return null;
+        return dart.async.Future.value(null);
     }
 }

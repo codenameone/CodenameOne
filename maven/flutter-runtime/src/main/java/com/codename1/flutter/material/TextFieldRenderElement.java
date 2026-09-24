@@ -296,7 +296,10 @@ public class TextFieldRenderElement extends RenderElement {
             tf.setConstraint(w.isObscureText() ? TextArea.PASSWORD : TextArea.ANY);
             // maxLength is a limit, not only a counter: Flutter stops the edit.
             if (w.getMaxLength() != null && w.getMaxLength().longValue() > 0) {
-                tf.setMaxSize((int) Math.min(Integer.MAX_VALUE, w.getMaxLength().longValue()));
+                // The native cap counts UTF-16 units, and maxLength counts characters: a
+                // single emoji can be eleven units. It is therefore only a generous upper
+                // bound; userEdited enforces the real limit on character boundaries.
+                tf.setMaxSize((int) Math.min(Integer.MAX_VALUE, w.getMaxLength().longValue() * 16));
             }
             // maxLines was stored and never read, so the demo's "Life story"
             // field -- which asks for three lines -- came up one line tall and
@@ -770,9 +773,12 @@ public class TextFieldRenderElement extends RenderElement {
         // arrive by paste or a platform editor that ignores it, and the value handed
         // on must never exceed the limit. It used to reach the controller and
         // onChanged whole, so a 14-character field accepted a 15th.
+        // Counted in user-perceived characters, as Flutter's maxLength is: cutting UTF-16
+        // units split an emoji at the limit and handed half a surrogate pair on.
         Long max = textField().getMaxLength();
-        if (newText != null && max != null && max.longValue() > 0 && newText.length() > max.longValue()) {
-            newText = newText.substring(0, (int) max.longValue());
+        if (newText != null && max != null && max.longValue() > 0
+                && com.codename1.flutter.foundation.Characters.count(newText) > max.longValue()) {
+            newText = com.codename1.flutter.foundation.Characters.take(newText, max.longValue());
             if (field != null && !applying) {
                 applying = true;
                 try {
@@ -783,7 +789,7 @@ public class TextFieldRenderElement extends RenderElement {
             }
         }
         if (counterLabel != null) {
-            counterLabel.setText((newText == null ? 0 : newText.length())
+            counterLabel.setText(com.codename1.flutter.foundation.Characters.count(newText)
                     + "/" + textField().getMaxLength());
         }
         rebindController();
@@ -1052,7 +1058,7 @@ public class TextFieldRenderElement extends RenderElement {
             return "";
         }
         String t = componentText();
-        return (t == null ? 0 : t.length()) + "/" + max.longValue();
+        return com.codename1.flutter.foundation.Characters.count(t) + "/" + max.longValue();
     }
 
     private com.codename1.ui.Container supportLine;

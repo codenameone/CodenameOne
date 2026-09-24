@@ -197,7 +197,10 @@ public class AnimationController extends Animation<Double> {
 
     public dart.async.Future<Object> forward(Double from) {
         if (from != null) {
-            currentValue = clamp(from);
+            // Through the value setter, as Flutter's forward(from:) does: it stops the
+            // previous run and notifies value and status listeners now. Assigning the
+            // field left dependants showing the old value until the next frame.
+            value(from.doubleValue());
         }
         repeating = false;
         dart.async.Future<Object> done = newRun();
@@ -217,7 +220,7 @@ public class AnimationController extends Animation<Double> {
 
     public dart.async.Future<Object> reverse(Double from) {
         if (from != null) {
-            currentValue = clamp(from);
+            value(from.doubleValue());   // the setter, as forward(from:) -- see there
         }
         repeating = false;
         long d = reverseDurationMs >= 0 ? reverseDurationMs : durationMs;

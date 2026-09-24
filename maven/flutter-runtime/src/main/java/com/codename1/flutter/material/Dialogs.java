@@ -63,8 +63,14 @@ public final class Dialogs {
     private Dialogs() {
     }
 
-    public static void showDialog(BuildContext context, Funcs.Func1<BuildContext, Widget> builder) {
-        present(builder, BorderLayout.CENTER, false);
+    /**
+     * Shows the dialog and returns a future that completes when it closes, with the
+     * value handed to {@code Navigator.pop} -- null when it closed any other way. It
+     * returned nothing, so {@code final ok = await showDialog(...)} could not be written
+     * and code after an awaited dialog ran while it was still open.
+     */
+    public static dart.async.Future<Object> showDialog(BuildContext context, Funcs.Func1<BuildContext, Widget> builder) {
+        return present(builder, BorderLayout.CENTER, false);
     }
 
     /**
@@ -78,17 +84,17 @@ public final class Dialogs {
      *
      * <p>Dismissible by touching outside it, as the reference is by default.</p>
      */
-    public static void showModalPopup(BuildContext context,
+    public static dart.async.Future<Object> showModalPopup(BuildContext context,
             Funcs.Func1<BuildContext, Widget> builder) {
-        present(builder, BorderLayout.SOUTH, true, true);
+        return present(builder, BorderLayout.SOUTH, true, true);
     }
 
-    private static void present(Funcs.Func1<BuildContext, Widget> builder, String position,
+    private static dart.async.Future<Object> present(Funcs.Func1<BuildContext, Widget> builder, String position,
             boolean dismissOnOutsideTouch) {
-        present(builder, position, dismissOnOutsideTouch, false);
+        return present(builder, position, dismissOnOutsideTouch, false);
     }
 
-    private static void present(Funcs.Func1<BuildContext, Widget> builder, String position,
+    private static dart.async.Future<Object> present(Funcs.Func1<BuildContext, Widget> builder, String position,
             boolean dismissOnOutsideTouch, boolean stretch) {
         DialogWidget rootWidget = new DialogWidget(builder);
         final DialogEntry e = new DialogEntry();
@@ -126,6 +132,7 @@ public final class Dialogs {
             e.root = FlutterUI.mount(rootWidget, host, new BuildOwner());
             dialogStack.add(e);
         }
+        return e.result.future();
     }
 
     /**
@@ -133,10 +140,16 @@ public final class Dialogs {
      * the caller (Navigator.pop) then pops a route instead.
      */
     public static boolean popTopDialog() {
+        return popTopDialog(null);
+    }
+
+    /** {@link #popTopDialog()} completing the dialog's future with {@code result}. */
+    public static boolean popTopDialog(Object result) {
         if (dialogStack.isEmpty()) {
             return false;
         }
         DialogEntry e = dialogStack.get(dialogStack.size() - 1);
+        e.popResult = result;
         close(e);
         if (e.dialog != null) {
             e.dialog.dispose();
@@ -154,6 +167,7 @@ public final class Dialogs {
         if (e.root != null) {
             FlutterUI.unmountTree(e.root);
         }
+        e.result.complete(e.popResult);
     }
 
     /**
@@ -174,6 +188,9 @@ public final class Dialogs {
         com.codename1.ui.Dialog dialog;
         Element root;
         boolean closed;
+        /** What Navigator.pop handed back; null when the dialog closed another way. */
+        Object popResult;
+        final dart.async.Completer<Object> result = new dart.async.Completer<Object>();
     }
 
     /**

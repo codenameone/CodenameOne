@@ -103,11 +103,23 @@ public class PageController implements Listenable {
         return view != null;
     }
 
+    /**
+     * Animates to {@code page} over {@code duration} following {@code curve}, and returns a
+     * future that completes when the page is reached (or the motion is interrupted).
+     */
     public Object animateToPage(long page, Object duration, Object curve) {
-        if (view != null) {
-            view.scrollToPage(page, true);
+        dart.async.Completer<Object> done = new dart.async.Completer<Object>();
+        if (view == null) {
+            done.complete(null);
+            return done.future();
         }
-        return null;
+        int ms = duration instanceof dart.core.Duration
+                ? (int) Math.max(0L, Math.min(Integer.MAX_VALUE, ((dart.core.Duration) duration).inMilliseconds()))
+                : 0;
+        com.codename1.flutter.animation.Curve c = curve instanceof com.codename1.flutter.animation.Curve
+                ? (com.codename1.flutter.animation.Curve) curve : null;
+        view.animateToPage(page, ms, c, done);
+        return done.future();
     }
 
     public void jumpToPage(long page) {

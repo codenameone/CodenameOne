@@ -219,7 +219,7 @@ public class Navigator extends StatelessWidget {
      * does and completes the popped route's future with {@code result}.
      */
     public static void pop(BuildContext context, Object result) {
-        if (Dialogs.popTopDialog()) {
+        if (Dialogs.popTopDialog(result)) {
             return;
         }
         if (stack.isEmpty()) {

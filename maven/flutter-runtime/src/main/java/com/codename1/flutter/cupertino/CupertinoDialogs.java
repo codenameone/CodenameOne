@@ -42,19 +42,19 @@ public final class CupertinoDialogs {
     private CupertinoDialogs() {
     }
 
-    public static void showCupertinoDialog(BuildContext context,
+    public static dart.async.Future<Object> showCupertinoDialog(BuildContext context,
                                            Funcs.Func1<BuildContext, Widget> builder,
                                            Boolean barrierDismissible, Color barrierColor,
                                            String barrierLabel, Boolean useRootNavigator,
                                            Object routeSettings) {
-        Dialogs.showDialog(context, builder);
+        return Dialogs.showDialog(context, builder);
     }
 
-    public static void showCupertinoModalPopup(BuildContext context,
+    public static dart.async.Future<Object> showCupertinoModalPopup(BuildContext context,
                                                Funcs.Func1<BuildContext, Widget> builder,
                                                Color barrierColor, Boolean barrierDismissible,
                                                Boolean useRootNavigator, Object semanticsDismissible,
                                                Object routeSettings) {
-        Dialogs.showModalPopup(context, builder);
+        return Dialogs.showModalPopup(context, builder);
     }
 }

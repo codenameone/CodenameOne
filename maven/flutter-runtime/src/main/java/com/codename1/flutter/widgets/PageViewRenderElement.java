@@ -209,6 +209,23 @@ public class PageViewRenderElement extends ScrollRenderElement {
         ((SnappingPane) pane).moveTo(target, animate);
     }
 
+    /**
+     * Animates to {@code page} over {@code durationMs} following {@code curve} (null for
+     * linear), completing {@code done} when it arrives or is superseded. The duration and
+     * curve an app passed to animateToPage used to be dropped for the fixed 240ms settle
+     * spring, so a one-second linear page turn ran fast and eased.
+     */
+    void animateToPage(long page, int durationMs, com.codename1.flutter.animation.Curve curve,
+                       dart.async.Completer<Object> done) {
+        com.codename1.ui.Container pane = pane();
+        if (!(pane instanceof SnappingPane)) {
+            done.complete(null);
+            return;
+        }
+        int target = (int) Math.round(Math.max(0, Math.min(maxScroll(), page * pageExtent())));
+        ((SnappingPane) pane).animateTo(target, durationMs, curve, done);
+    }
+
     /** The fraction of the viewport one page occupies (Flutter's default is 1). */
     private double viewportFraction() {
         PageController c = pageView().getController();
@@ -309,6 +326,13 @@ public class PageViewRenderElement extends ScrollRenderElement {
         /** Stops any settle in flight, leaving the scroll exactly where it got to. */
         private void cancelSettle() {
             settling = false;
+            if (pendingDone != null) {
+                // Arrived, or superseded by another settle or a finger: either way the
+                // animateToPage future completes, as Flutter's does.
+                dart.async.Completer<Object> d = pendingDone;
+                pendingDone = null;
+                d.complete(null);
+            }
             if (settleAnim == null) {
                 return;
             }
@@ -367,6 +391,50 @@ public class PageViewRenderElement extends ScrollRenderElement {
                 return;
             }
             animateScroll(from, target);
+        }
+
+        /** The pending completion of a curved animateTo; completed however the motion ends. */
+        private dart.async.Completer<Object> pendingDone;
+
+        /** Programmatic paging with the caller's own duration and curve. */
+        void animateTo(final int target, int durationMs, final com.codename1.flutter.animation.Curve curve,
+                       final dart.async.Completer<Object> done) {
+            int from = horizontal() ? getScrollX() : getScrollY();
+            final com.codename1.ui.Form form = getComponentForm();
+            if (from == target || durationMs <= 0 || form == null) {
+                cancelSettle();
+                setScroll(target);
+                done.complete(null);
+                return;
+            }
+            cancelSettle();
+            settling = true;
+            pendingDone = done;
+            final int start = from;
+            final com.codename1.ui.animations.Motion progress =
+                    com.codename1.ui.animations.Motion.createLinearMotion(0, 10000, durationMs);
+            progress.start();
+            settleAnim = new com.codename1.ui.animations.Animation() {
+                @Override
+                public boolean animate() {
+                    if (settleAnim != this) {
+                        return false;
+                    }
+                    double t = progress.getValue() / 10000.0;
+                    double eased = curve == null ? t : curve.transform(t);
+                    setScroll((int) Math.round(start + (target - start) * eased));
+                    if (progress.isFinished()) {
+                        setScroll(target);
+                        cancelSettle();
+                    }
+                    return false;   // see animateScroll: setScroll repaints the pane itself
+                }
+
+                @Override
+                public void paint(com.codename1.ui.Graphics g) {
+                }
+            };
+            form.registerAnimated(settleAnim);
         }
 
         /** Programmatic paging from the controller. */

@@ -122,6 +122,21 @@ public class SliderRenderElement extends RenderElement {
                 userDragged(index);
             }
         });
+        // The interaction's bounds. onChangeStart and onChangeEnd were stored and never
+        // called, so code that pauses work as a drag begins, or commits the value on
+        // release, never ran.
+        s.addPointerPressedListener(new com.codename1.ui.events.ActionListener<com.codename1.ui.events.ActionEvent>() {
+            @Override
+            public void actionPerformed(com.codename1.ui.events.ActionEvent evt) {
+                userDragStarted();
+            }
+        });
+        s.addPointerReleasedListener(new com.codename1.ui.events.ActionListener<com.codename1.ui.events.ActionEvent>() {
+            @Override
+            public void actionPerformed(com.codename1.ui.events.ActionEvent evt) {
+                userDragEnded();
+            }
+        });
         apply(s);
         return s;
     }
@@ -192,12 +207,49 @@ public class SliderRenderElement extends RenderElement {
         Slider w = slider();
         Funcs.VoidFunc1<Double> f = w.getOnChanged();
         if (f != null) {
-            f.call(valueFor(progress, w.getMin(), w.getMax(), steps()));
+            double v = valueFor(progress, w.getMin(), w.getMax(), steps());
+            lastDragValue = Double.valueOf(v);
+            f.call(v);
         }
         Component c = component();
         if (c != null) {
             apply((com.codename1.ui.Slider) c);
         }
+    }
+
+    /** The last value handed to onChanged during the current interaction, or null. */
+    private Double lastDragValue;
+    private boolean interacting;
+
+    /**
+     * An interaction began: onChangeStart with the value the slider shows now, once.
+     * Only for an enabled slider (one with onChanged), as in Flutter.
+     */
+    public void userDragStarted() {
+        Slider w = slider();
+        if (interacting || w.getOnChanged() == null) {
+            return;
+        }
+        interacting = true;
+        lastDragValue = null;
+        Funcs.VoidFunc1<Double> start = w.getOnChangeStart();
+        if (start != null) {
+            start.call(w.getValue());
+        }
+    }
+
+    /** The interaction ended: onChangeEnd with the last value onChanged was given, once. */
+    public void userDragEnded() {
+        if (!interacting) {
+            return;
+        }
+        interacting = false;
+        Slider w = slider();
+        Funcs.VoidFunc1<Double> end = w.getOnChangeEnd();
+        if (end != null) {
+            end.call(lastDragValue != null ? lastDragValue.doubleValue() : w.getValue());
+        }
+        lastDragValue = null;
     }
 
     @Override

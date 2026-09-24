@@ -77,11 +77,82 @@ public class Selector<A, S> extends StatelessWidget {
         this.child = v;
     }
 
+    /** The last selection and what was built for it; per widget instance, see build. */
+    private boolean built;
+    private S lastSelected;
+    private Widget lastBuilt;
+
+    /**
+     * Rebuilds only when the selection changed. This recomputed the selection and called
+     * the builder on every notification of the model, so Selector did nothing a Consumer
+     * does not -- an unrelated field changing rebuilt the whole slice, and a builder with
+     * side effects ran again.
+     *
+     * <p>The cache lives on the widget: a notification rebuilds the element with the SAME
+     * widget instance, which is when an unchanged selection must not rebuild; a parent
+     * rebuild brings a new instance, and Flutter's Selector rebuilds then too. Handing
+     * back the previous child instance lets reconciliation skip the subtree.</p>
+     */
     @Override
-    @SuppressWarnings("unchecked")
+    @SuppressWarnings({"unchecked", "rawtypes"})
     public Widget build(BuildContext context) {
         A value = (A) context.providerValueOfType(providedType);
         S selected = selector == null ? (S) value : selector.call(context, value);
-        return builder == null ? child : builder.call(context, selected, child);
+        if (built) {
+            boolean rebuild;
+            if (shouldRebuild instanceof Funcs.Func2) {
+                rebuild = Boolean.TRUE.equals(((Funcs.Func2) shouldRebuild).call(lastSelected, selected));
+            } else {
+                rebuild = !deepEquals(lastSelected, selected);
+            }
+            if (!rebuild) {
+                return lastBuilt;
+            }
+        }
+        Widget out = builder == null ? child : builder.call(context, selected, child);
+        built = true;
+        lastSelected = selected;
+        lastBuilt = out;
+        return out;
+    }
+
+    /** provider's default test: DeepCollectionEquality, over lists, sets and maps. */
+    @SuppressWarnings("rawtypes")
+    static boolean deepEquals(Object a, Object b) {
+        if (a == b) {
+            return true;
+        }
+        if (a instanceof java.util.List && b instanceof java.util.List) {
+            java.util.List la = (java.util.List) a;
+            java.util.List lb = (java.util.List) b;
+            if (la.size() != lb.size()) {
+                return false;
+            }
+            for (int i = 0; i < la.size(); i++) {
+                if (!deepEquals(la.get(i), lb.get(i))) {
+                    return false;
+                }
+            }
+            return true;
+        }
+        if (a instanceof java.util.Map && b instanceof java.util.Map) {
+            java.util.Map ma = (java.util.Map) a;
+            java.util.Map mb = (java.util.Map) b;
+            if (ma.size() != mb.size()) {
+                return false;
+            }
+            for (Object k : ma.keySet()) {
+                if (!mb.containsKey(k) || !deepEquals(ma.get(k), mb.get(k))) {
+                    return false;
+                }
+            }
+            return true;
+        }
+        if (a instanceof java.util.Set && b instanceof java.util.Set) {
+            java.util.Set sa = (java.util.Set) a;
+            java.util.Set sb = (java.util.Set) b;
+            return sa.size() == sb.size() && sa.containsAll(sb);
+        }
+        return dart.runtime.DartRuntime.eq(a, b);
     }
 }

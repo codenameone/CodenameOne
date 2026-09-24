@@ -697,7 +697,7 @@ class Navigator extends Widget {
 }
 
 @JavaName('com.codename1.flutter.material.Dialogs.showDialog')
-external void showDialog({BuildContext context, WidgetBuilder builder});
+external Future<dynamic> showDialog({BuildContext context, WidgetBuilder builder});
 
 @JavaName('com.codename1.flutter.material.AlertDialog')
 class AlertDialog extends Widget {
