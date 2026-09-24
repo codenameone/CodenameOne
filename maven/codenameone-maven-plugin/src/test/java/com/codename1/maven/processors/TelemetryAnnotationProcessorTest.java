@@ -168,6 +168,17 @@ public class TelemetryAnnotationProcessorTest {
         assertFalse(TelemetryAnnotationProcessor.isHttpUrl("https://u%zz@collector.example"));
         assertTrue(TelemetryAnnotationProcessor.isHttpUrl("https://user:p%40ss@collector.example"));
         assertFalse(TelemetryAnnotationProcessor.isHttpUrl("https://collector.example/bad path"));
+        assertFalse(TelemetryAnnotationProcessor.isHttpUrl("https://[:::]:4318"));
+        assertFalse(TelemetryAnnotationProcessor.isHttpUrl("https://[1::2::3]:4318"));
+        assertFalse(TelemetryAnnotationProcessor.isHttpUrl("https://[1:2:3:4:5:6:7:8:9]:4318"));
+        assertFalse(TelemetryAnnotationProcessor.isHttpUrl("https://[::ffff:300.0.0.1]:4318"));
+        assertFalse(TelemetryAnnotationProcessor.isHttpUrl("https://[1:2:3:4:5:6:7]:4318"));
+        assertFalse(TelemetryAnnotationProcessor.isHttpUrl("https://[12345::1]:4318"));
+        assertTrue(TelemetryAnnotationProcessor.isHttpUrl("https://[::1]:4318"));
+        assertTrue(TelemetryAnnotationProcessor.isHttpUrl("https://[::ffff:10.0.0.7]:4318"));
+        assertTrue(TelemetryAnnotationProcessor.isHttpUrl("https://[2001:db8::1]:4318"));
+        assertTrue(TelemetryAnnotationProcessor.isHttpUrl("https://[1:2:3:4:5:6:7:8]:4318"));
+        assertTrue(TelemetryAnnotationProcessor.isHttpUrl("https://[::]:4318"));
     }
 
     @Test

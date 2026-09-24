@@ -357,20 +357,110 @@ public final class TelemetryAnnotationProcessor extends AbstractAnnotationProces
         // platform that does not guard it -- a crash at start-up for a mistake the
         // build is there to catch. A DNS name or IPv4 address, or a bracketed IPv6
         // literal.
-        String allowed = hostPort.startsWith("[") ? "0123456789abcdefABCDEF:." : null;
-        if (allowed != null && host.indexOf(':') < 0) {
-            return false;
+        if (hostPort.startsWith("[")) {
+            return isIpv6(host);
         }
         for (int i = 0; i < host.length(); i++) {
             char c = host.charAt(i);
-            boolean ok = allowed != null ? allowed.indexOf(c) >= 0
-                    : (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9')
-                            || "-._~".indexOf(c) >= 0;
-            if (!ok) {
+            if (!((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9')
+                    || "-._~".indexOf(c) >= 0)) {
                 return false;
             }
         }
         return true;
+    }
+
+    /// An IPv6 address by its STRUCTURE (RFC 4291 2.2), not its characters: groups
+    /// of one to four hex digits, at most one "::", eight groups without it and at
+    /// most seven with it, and optionally a dotted IPv4 tail counting as two. A
+    /// character check let "[:::]" through, and the transport refused every export.
+    static boolean isIpv6(String s) {
+        int n = s.length();
+        if (n == 0) {
+            return false;
+        }
+        int groups = 0;
+        boolean compressed = false;
+        int i = 0;
+        if (s.startsWith("::")) {
+            compressed = true;
+            i = 2;
+            if (i == n) {
+                return true;
+            }
+        } else if (s.charAt(0) == ':') {
+            return false;
+        }
+        while (i < n) {
+            int j = i;
+            while (j < n && s.charAt(j) != ':') {
+                j++;
+            }
+            String part = s.substring(i, j);
+            if (part.indexOf('.') >= 0) {
+                if (j != n || !isIpv4(part)) {
+                    return false;
+                }
+                groups += 2;
+            } else {
+                if (part.length() < 1 || part.length() > 4) {
+                    return false;
+                }
+                for (int k = 0; k < part.length(); k++) {
+                    char c = part.charAt(k);
+                    if (!((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F'))) {
+                        return false;
+                    }
+                }
+                groups++;
+            }
+            if (j == n) {
+                break;
+            }
+            if (j + 1 < n && s.charAt(j + 1) == ':') {
+                if (compressed) {
+                    return false;
+                }
+                compressed = true;
+                i = j + 2;
+            } else {
+                i = j + 1;
+                if (i == n) {
+                    return false;
+                }
+            }
+        }
+        return compressed ? groups <= 7 : groups == 8;
+    }
+
+    /// Four decimal parts, each 0 to 255.
+    static boolean isIpv4(String s) {
+        int parts = 0;
+        int i = 0;
+        while (i <= s.length()) {
+            int j = s.indexOf('.', i);
+            if (j < 0) {
+                j = s.length();
+            }
+            String part = s.substring(i, j);
+            if (part.length() < 1 || part.length() > 3) {
+                return false;
+            }
+            int value = 0;
+            for (int k = 0; k < part.length(); k++) {
+                char c = part.charAt(k);
+                if (c < '0' || c > '9') {
+                    return false;
+                }
+                value = value * 10 + (c - '0');
+            }
+            if (value > 255) {
+                return false;
+            }
+            parts++;
+            i = j + 1;
+        }
+        return parts == 4;
     }
 
     /// RFC 3986 userinfo: unreserved characters, sub-delims, ':' and complete

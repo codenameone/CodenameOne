@@ -647,6 +647,17 @@ class TelemetryTest extends UITestBase {
                 new TelemetryConfig().direct("https://[::1]:4318").exportUrl());
         assertNotNull(new TelemetryConfig().direct("https://user:p%40ss@collector.test").exportUrl(),
                 "valid userinfo, a percent escape included, is accepted");
+        assertFalse(TelemetryConfig.isHttpUrl("https://[:::]:4318"));
+        assertFalse(TelemetryConfig.isHttpUrl("https://[1::2::3]:4318"));
+        assertFalse(TelemetryConfig.isHttpUrl("https://[1:2:3:4:5:6:7:8:9]:4318"));
+        assertFalse(TelemetryConfig.isHttpUrl("https://[::ffff:300.0.0.1]:4318"));
+        assertFalse(TelemetryConfig.isHttpUrl("https://[1:2:3:4:5:6:7]:4318"));
+        assertFalse(TelemetryConfig.isHttpUrl("https://[12345::1]:4318"));
+        assertTrue(TelemetryConfig.isHttpUrl("https://[::1]:4318"));
+        assertTrue(TelemetryConfig.isHttpUrl("https://[::ffff:10.0.0.7]:4318"));
+        assertTrue(TelemetryConfig.isHttpUrl("https://[2001:db8::1]:4318"));
+        assertTrue(TelemetryConfig.isHttpUrl("https://[1:2:3:4:5:6:7:8]:4318"));
+        assertTrue(TelemetryConfig.isHttpUrl("https://[::]:4318"));
     }
 
     @Test
@@ -791,7 +802,10 @@ class TelemetryTest extends UITestBase {
                 .header("Authorization", "Api-Token s3cret"));
         NetworkManager.getInstance().addToQueueAndWait(request(API + "?redirected"));
         Telemetry.flush();
-        long deadline = System.currentTimeMillis() + 3000;
+        // An upper bound, not a delay: the loop leaves as soon as the export lands.
+        // Exports queue at low priority behind whatever else the shared network
+        // manager holds, and 3s was too short on a loaded CI runner.
+        long deadline = System.currentTimeMillis() + 15000;
         TestCodenameOneImplementation.TestConnection sent = null;
         while (System.currentTimeMillis() < deadline) {
             flushSerialCalls();
@@ -877,6 +891,34 @@ class TelemetryTest extends UITestBase {
                 "service.name");
         assertNotNull(service);
         assertFalse(service.trim().length() == 0, "a blank service.name was exported");
+    }
+
+    @Test
+    void stoppingBehindAFullExportQueueStillSendsTheBuffer() throws Exception {
+        // Uninstall while exports are already waiting: the final flush goes out
+        // anyway, or the buffered spans die with the installation.
+        final Telemetry.State backedUp = new Telemetry.State(
+                new TelemetryConfig().direct("http://collector.test")) {
+            @Override
+            int pendingExports() {
+                return Telemetry.MAX_PENDING_EXPORTS;
+            }
+        };
+        TestCodenameOneImplementation impl = TestCodenameOneImplementation.getInstance();
+        impl.clearQueuedRequests();
+        com.codename1.ui.CN.callSeriallyAndWait(new Runnable() {
+            @Override
+            public void run() {
+                backedUp.record(backedUp.start("last words", TelemetrySpan.KIND_INTERNAL, null));
+                backedUp.stop();
+            }
+        });
+        boolean exported = false;
+        for (ConnectionRequest queued : impl.getQueuedRequests()) {
+            exported |= queued instanceof Telemetry.ExportRequest;
+        }
+        assertTrue(exported, "the buffer was dropped on stop because the export queue was full");
+        assertTrue(backedUp.buffer.isEmpty());
     }
 
     @Test

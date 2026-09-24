@@ -314,6 +314,18 @@ class TraceContextTest {
         assertFalse(OtlpTracer.hasHttpAuthority("https://u%zz@collector.example"));
         assertFalse(OtlpTracer.hasHttpAuthority("https://a@b@collector.example"));
         assertTrue(OtlpTracer.hasHttpAuthority("https://user:p%40ss@collector.example"));
+        // IPv6 by structure, not by its characters.
+        assertFalse(OtlpTracer.hasHttpAuthority("https://[:::]:4318"));
+        assertFalse(OtlpTracer.hasHttpAuthority("https://[1::2::3]:4318"));
+        assertFalse(OtlpTracer.hasHttpAuthority("https://[1:2:3:4:5:6:7:8:9]:4318"));
+        assertFalse(OtlpTracer.hasHttpAuthority("https://[::ffff:300.0.0.1]:4318"));
+        assertFalse(OtlpTracer.hasHttpAuthority("https://[1:2:3:4:5:6:7]:4318"));
+        assertFalse(OtlpTracer.hasHttpAuthority("https://[12345::1]:4318"));
+        assertTrue(OtlpTracer.hasHttpAuthority("https://[::1]:4318"));
+        assertTrue(OtlpTracer.hasHttpAuthority("https://[::ffff:10.0.0.7]:4318"));
+        assertTrue(OtlpTracer.hasHttpAuthority("https://[2001:db8::1]:4318"));
+        assertTrue(OtlpTracer.hasHttpAuthority("https://[1:2:3:4:5:6:7:8]:4318"));
+        assertTrue(OtlpTracer.hasHttpAuthority("https://[::]:4318"));
         // The whole URL, not only its authority.
         assertFalse(OtlpTracer.hasHttpAuthority("https://collector.example/bad value"));
         assertFalse(OtlpTracer.hasHttpAuthority("https://collector.example/v1?q=a\tb"));

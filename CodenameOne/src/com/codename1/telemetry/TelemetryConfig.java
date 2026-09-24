@@ -194,7 +194,7 @@ public final class TelemetryConfig {
                 return false;
             }
             host = hostPort.substring(1, close);
-            if (host.indexOf(':') < 0 || !onlyChars(host, "0123456789abcdefABCDEF:.")) {
+            if (!isIpv6(host)) {
                 return false;
             }
             String rest = hostPort.substring(close + 1);
@@ -256,6 +256,99 @@ public final class TelemetryConfig {
 
     private static boolean isHex(char c) {
         return (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F');
+    }
+
+    /// An IPv6 address by its STRUCTURE (RFC 4291 2.2), not its characters: groups
+    /// of one to four hex digits, at most one "::", eight groups without it and at
+    /// most seven with it, and optionally a dotted IPv4 tail counting as two. A
+    /// character check let "[:::]" through, and the transport refused every export.
+    static boolean isIpv6(String s) {
+        int n = s.length();
+        if (n == 0) {
+            return false;
+        }
+        int groups = 0;
+        boolean compressed = false;
+        int i = 0;
+        if (s.startsWith("::")) {
+            compressed = true;
+            i = 2;
+            if (i == n) {
+                return true;
+            }
+        } else if (s.charAt(0) == ':') {
+            return false;
+        }
+        while (i < n) {
+            int j = i;
+            while (j < n && s.charAt(j) != ':') {
+                j++;
+            }
+            String part = s.substring(i, j);
+            if (part.indexOf('.') >= 0) {
+                if (j != n || !isIpv4(part)) {
+                    return false;
+                }
+                groups += 2;
+            } else {
+                if (part.length() < 1 || part.length() > 4) {
+                    return false;
+                }
+                for (int k = 0; k < part.length(); k++) {
+                    char c = part.charAt(k);
+                    if (!((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F'))) {
+                        return false;
+                    }
+                }
+                groups++;
+            }
+            if (j == n) {
+                break;
+            }
+            if (j + 1 < n && s.charAt(j + 1) == ':') {
+                if (compressed) {
+                    return false;
+                }
+                compressed = true;
+                i = j + 2;
+            } else {
+                i = j + 1;
+                if (i == n) {
+                    return false;
+                }
+            }
+        }
+        return compressed ? groups <= 7 : groups == 8;
+    }
+
+    /// Four decimal parts, each 0 to 255.
+    static boolean isIpv4(String s) {
+        int parts = 0;
+        int i = 0;
+        while (i <= s.length()) {
+            int j = s.indexOf('.', i);
+            if (j < 0) {
+                j = s.length();
+            }
+            String part = s.substring(i, j);
+            if (part.length() < 1 || part.length() > 3) {
+                return false;
+            }
+            int value = 0;
+            for (int k = 0; k < part.length(); k++) {
+                char c = part.charAt(k);
+                if (c < '0' || c > '9') {
+                    return false;
+                }
+                value = value * 10 + (c - '0');
+            }
+            if (value > 255) {
+                return false;
+            }
+            parts++;
+            i = j + 1;
+        }
+        return parts == 4;
     }
 
     /// The headers the exporter owns: its body's type and framing, and the

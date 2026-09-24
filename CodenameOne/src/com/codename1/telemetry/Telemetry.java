@@ -359,12 +359,21 @@ public final class Telemetry {
         }
 
         void flush() {
+            flush(false);
+        }
+
+        /// `last` is the installation's final flush, from [#stop()]: it sends the
+        /// buffer even when exports are already waiting. Otherwise an uninstall or a
+        /// reinstall behind a full export queue left the buffer behind for good --
+        /// the state stops, its timer is cancelled, and nothing would ever flush it
+        /// again. One extra batch, and the buffer it comes from is bounded.
+        void flush(final boolean last) {
             if (!CN.isEdt()) {
                 if (Display.isInitialized()) {
                     CN.callSerially(new Runnable() {
                         @Override
                         public void run() {
-                            flush();
+                            flush(last);
                         }
                     });
                 }
@@ -379,7 +388,7 @@ public final class Telemetry {
                 buffer.clear();
                 return;
             }
-            if (pendingExports() >= MAX_PENDING_EXPORTS) {
+            if (!last && pendingExports() >= MAX_PENDING_EXPORTS) {
                 // Exports are already waiting in the network queue. Queuing another
                 // batch would hold one more byte array per flush for as long as the
                 // app's requests outrank them, with no limit; the spans stay in the
@@ -446,7 +455,7 @@ public final class Telemetry {
         }
 
         void stop() {
-            flush();
+            flush(true);
             stopped = true;
             if (timer != null) {
                 timer.cancel();

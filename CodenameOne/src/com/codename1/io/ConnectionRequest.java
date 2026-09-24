@@ -1586,6 +1586,13 @@ public class ConnectionRequest implements IOProgressListener {
 
     /// What the [NetworkTracer] returned when this request was queued: the context
     /// its spans are children of. Kept across retries, which are the same request.
+    ///
+    /// The tracer fields are per REQUEST OBJECT, like every other field of one
+    /// execution here -- the URL, the response code, the streams, the guard's
+    /// capture. The same instance queued to run twice at once (duplicates are
+    /// allowed by default) already has its two runs overwrite each other's response
+    /// state; tracing is no more per-execution than the request it observes, and
+    /// is not the place to make it so. Queue separate instances to run in parallel.
     Object tracerParent;
 
     /// The tracer that produced [#tracerParent]. The context is that tracer's own
