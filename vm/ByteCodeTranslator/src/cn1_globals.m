@@ -10582,6 +10582,7 @@ void cn1LiveCensus(const char* label) {
             }
 #endif
             int bucket = cn1LiveBucket(m);
+            { extern void cn1CollectionCensusNote(JAVA_OBJECT o); cn1CollectionCensusNote(o); }
             cn1LiveTally(o->__codenameOneParentClsReference, (long long)p->slotSize, bucket);
             bibopBytes += (long long)p->slotSize;
             bibopObjs++;
@@ -10616,6 +10617,7 @@ void cn1LiveCensus(const char* label) {
     // occupying a slot, and they call for different fixes: traced means the program
     // really is holding it, fresh and aging mean the collector is holding it under
     // the grace and aging rules, and dead means this sweep is about to return it.
+    { extern void cn1CollectionCensusDump(const char* label); cn1CollectionCensusDump(label); }
     long occupied = bibopObjs + legacyObjs;
     // NATIVE BLOCKS ON THIS LINE, BECAUSE THE PER-CLASS TABLE BELOW CANNOT SEE THEM
     // AND THE RANKING WAS BEING READ OFF IT. cn1BlockAlloc bumps

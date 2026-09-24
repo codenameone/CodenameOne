@@ -4059,6 +4059,58 @@ static JAVA_INT cn1HmFindSlotSlow(CODENAME_ONE_THREAD_STATE, struct obj__java_ut
 }
 
 #include "cn1_collections.h"
+
+#ifdef CN1_ALLOC_CENSUS
+// QA (CN1_ALLOC_CENSUS): live collections by element count, and the native bytes they
+// hold, to size inline small storage. Called by cn1LiveCensus for every live slot.
+static long cn1CcCount[3][7];
+static long long cn1CcBytes[3][7];
+static int cn1CcBucket(int n) {
+    return n <= 0 ? 0 : n == 1 ? 1 : n == 2 ? 2 : n <= 4 ? 3 : n <= 8 ? 4 : n <= 16 ? 5 : 6;
+}
+void cn1CollectionCensusNote(JAVA_OBJECT o) {
+    struct clazz* c = o->__codenameOneParentClsReference;
+    int kind = -1, n = 0;
+    long long bytes = 0;
+#ifdef CN1_COLL_ARRAYLIST
+    if(c == &class__java_util_ArrayList) {
+        struct obj__java_util_ArrayList* l = (struct obj__java_util_ArrayList*)o;
+        kind = 0; n = l->java_util_ArrayList_size;
+        if(l->java_util_ArrayList_cn1Storage != 0) bytes = (long long)cn1RefBlockCount(l->java_util_ArrayList_cn1Storage) * 8 + 48;
+    }
+#endif
+#ifdef CN1_COLL_HASHMAP
+    if(c == &class__java_util_HashMap) {
+        struct obj__java_util_HashMap* m = (struct obj__java_util_HashMap*)o;
+        kind = 1; n = m->java_util_HashMap_elementCount;
+        if(m->java_util_HashMap_cn1KeysBlock != 0) bytes = (long long)m->java_util_HashMap_cn1Cap * 20 + 80;
+    }
+#endif
+#ifdef CN1_COLL_SET
+    if(c == &class__java_util_HashSet) {
+        struct obj__java_util_HashSet* hs = (struct obj__java_util_HashSet*)o;
+        kind = 2; n = hs->java_util_HashSet_cn1Size;
+        if(hs->java_util_HashSet_cn1KeysBlock != 0) bytes = (long long)hs->java_util_HashSet_cn1Cap * 12 + 96;
+    }
+#endif
+    if(kind < 0) return;
+    int b = cn1CcBucket(n);
+    cn1CcCount[kind][b]++;
+    cn1CcBytes[kind][b] += bytes;
+}
+void cn1CollectionCensusDump(const char* label) {
+    static const char* names[3] = { "ArrayList", "HashMap", "HashSet" };
+    static const char* buckets[7] = { "0", "1", "2", "3-4", "5-8", "9-16", "17+" };
+    for(int k = 0 ; k < 3 ; k++) {
+        fprintf(stderr, "[COLL:%s] %-9s", label, names[k]);
+        for(int b = 0 ; b < 7 ; b++) {
+            fprintf(stderr, " %s:%ld/%.1fMB", buckets[b], cn1CcCount[k][b], cn1CcBytes[k][b] / 1048576.0);
+            cn1CcCount[k][b] = 0; cn1CcBytes[k][b] = 0;
+        }
+        fprintf(stderr, "\n");
+    }
+}
+#endif
 #ifdef CN1_COLL_SET
 // ============================================================================
 // HashSet, ENTIRELY IN C.
