@@ -93,15 +93,15 @@ public final class DateFormat {
         if (date == null) {
             return "";
         }
-        if (date.isUtc()) {
-            // SimpleDateFormat always formats in the device's zone, which shifted a UTC
-            // value's hour by the local offset. The same wall-clock fields as a LOCAL
-            // value format as themselves.
-            date = new DateTime(date.year(), date.month(), date.day(), date.hour(),
-                    date.minute(), date.second(), date.millisecond(), date.microsecond());
-        }
         try {
-            return new SimpleDateFormat(pattern).format(date.toJavaDate());
+            SimpleDateFormat f = new SimpleDateFormat(pattern);
+            if (date.isUtc()) {
+                // The instant itself, formatted in UTC. Moving its fields onto a LOCAL
+                // value first broke inside the device's daylight-saving gap, where that
+                // local time does not exist: 02:30 UTC printed as 03:30 in New York.
+                f.setTimeZone(java.util.TimeZone.getTimeZone("UTC"));
+            }
+            return f.format(date.toJavaDate());
         } catch (Throwable t) {
             return date.toJavaDate().toString();
         }

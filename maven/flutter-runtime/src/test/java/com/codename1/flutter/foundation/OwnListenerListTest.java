@@ -21,25 +21,29 @@
  * Please contact Codename One through http://www.codenameone.com/ if you
  * need additional information or have any questions.
  */
-package com.codename1.flutter.scopedmodel;
+package com.codename1.flutter.foundation;
 
-import com.codename1.flutter.foundation.ChangeNotifier;
+import com.codename1.flutter.scopedmodel.Model;
 
-/**
- * scoped_model's {@code Model}: the base class application models extend
- * ({@code class AppStateModel extends Model}). It is a {@link ChangeNotifier},
- * so {@code notifyListeners()} / {@code addListener} / {@code removeListener}
- * come from the notifier's default methods.
- */
-public class Model implements ChangeNotifier {
+import org.junit.jupiter.api.Test;
 
-    /** Held here, not in the shared map, so this goes when the object does (see ChangeNotifier). */
-    private final java.util.List<dart.runtime.Funcs.VoidFunc0> changeNotifierListeners =
-            new java.util.ArrayList<dart.runtime.Funcs.VoidFunc0>();
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 
-    @Override
-    public java.util.List<dart.runtime.Funcs.VoidFunc0> changeNotifierListeners$() {
-        return changeNotifierListeners;
+/// A notifier with its own listener list leaves nothing in the shared map: a listener
+/// that closes over the notifier would otherwise keep it alive through the map's value.
+class OwnListenerListTest {
+
+    @Test
+    void aNotifierThatClosesOverItselfLeavesNoSharedEntry() {
+        final Model model = new Model();
+        final int[] heard = {0};
+        model.addListener(() -> heard[0] += model.hashCode() == 0 ? 0 : 1);   // closes over the model
+        assertNull(ChangeNotifier.LISTENERS.get(model), "no shared-map entry leading back to the model");
+        model.notifyListeners();
+        assertEquals(1, heard[0]);
+        model.dispose();
+        model.notifyListeners();
+        assertEquals(1, heard[0], "disposed: nothing is told any more");
     }
-
 }

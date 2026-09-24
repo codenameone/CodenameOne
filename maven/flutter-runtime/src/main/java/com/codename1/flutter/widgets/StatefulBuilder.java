@@ -56,6 +56,15 @@ public class StatefulBuilder extends StatelessWidget {
                 if (fn != null) {
                     fn.call();
                 }
+                // Then rebuild this builder, as State.setState does. The mutation ran and
+                // nothing was marked dirty, so the subtree showed the old value until an
+                // unrelated ancestor rebuilt -- a StatefulBuilder in a dialog never updated.
+                if (context instanceof com.codename1.flutter.Element) {
+                    com.codename1.flutter.Element e = (com.codename1.flutter.Element) context;
+                    if (e.isMounted()) {
+                        e.markNeedsBuild();
+                    }
+                }
             }
         };
         return builder.call(context, setState);

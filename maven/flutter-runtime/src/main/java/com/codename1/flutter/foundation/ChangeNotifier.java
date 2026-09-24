@@ -42,27 +42,58 @@ public interface ChangeNotifier extends Listenable {
     /** Listener lists, one per notifier that currently has listeners. */
     NotifierListeners LISTENERS = new NotifierListeners();
 
+    /**
+     * The implementing object's own listener list, or null to use {@link #LISTENERS}.
+     *
+     * <p>A class should provide one. The shared map holds its notifier only weakly, but a
+     * listener that closes over the notifier -- a bound method, a closure reading the
+     * model -- is held strongly by the map's value and leads back to the key, so such a
+     * notifier could never be collected until someone called dispose. A list held by the
+     * notifier itself goes when the notifier does. The transpiler adds one to every class
+     * that mixes this in; the map remains for any implementation that does not.</p>
+     */
+    default List<Funcs.VoidFunc0> changeNotifierListeners$() {
+        return null;
+    }
+
     default void addListener(Funcs.VoidFunc0 listener) {
+        List<Funcs.VoidFunc0> own = changeNotifierListeners$();
+        if (own != null) {
+            own.add(listener);
+            return;
+        }
         LISTENERS.forAdding(this).add(listener);
     }
 
     default void removeListener(Funcs.VoidFunc0 listener) {
+        List<Funcs.VoidFunc0> own = changeNotifierListeners$();
+        if (own != null) {
+            own.remove(listener);
+            return;
+        }
         LISTENERS.remove(this, listener);
     }
 
     default void notifyListeners() {
-        List<Funcs.VoidFunc0> l = LISTENERS.get(this);
+        List<Funcs.VoidFunc0> own = changeNotifierListeners$();
+        List<Funcs.VoidFunc0> l = own != null ? own : LISTENERS.get(this);
         if (l != null) {
             Listeners.notify(l);
         }
     }
 
     default void dispose() {
+        List<Funcs.VoidFunc0> own = changeNotifierListeners$();
+        if (own != null) {
+            own.clear();   // emptied, so a notification already running stops (see Listeners)
+            return;
+        }
         LISTENERS.clear(this);
     }
 
     default boolean hasListeners() {
-        List<Funcs.VoidFunc0> l = LISTENERS.get(this);
+        List<Funcs.VoidFunc0> own = changeNotifierListeners$();
+        List<Funcs.VoidFunc0> l = own != null ? own : LISTENERS.get(this);
         return l != null && !l.isEmpty();
     }
 }

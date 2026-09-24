@@ -34,6 +34,16 @@ import com.codename1.flutter.foundation.ChangeNotifier;
  */
 public abstract class DataTableSource implements ChangeNotifier {
 
+    /** Held here, not in the shared map, so this goes when the object does (see ChangeNotifier). */
+    private final java.util.List<dart.runtime.Funcs.VoidFunc0> changeNotifierListeners =
+            new java.util.ArrayList<dart.runtime.Funcs.VoidFunc0>();
+
+    @Override
+    public java.util.List<dart.runtime.Funcs.VoidFunc0> changeNotifierListeners$() {
+        return changeNotifierListeners;
+    }
+
+
     public abstract DataRow getRow(long index);
 
     public abstract long rowCount();

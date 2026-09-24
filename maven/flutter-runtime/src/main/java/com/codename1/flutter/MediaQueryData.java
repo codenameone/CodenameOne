@@ -103,11 +103,13 @@ public class MediaQueryData {
 
     /**
      * The parts of the display obscured by system UI regardless of whether the
-     * app can draw under them (e.g. a hardware notch). This pass does not track
-     * system insets, so it reports none.
+     * app can draw under them (e.g. a hardware notch, the home indicator). With no
+     * keyboard inset -- this runtime tracks none, so viewInsets is zero -- Flutter's
+     * viewPadding equals padding, which holds the safe-area insets fromDisplay read.
+     * It reported zero, so a bar sized from viewPadding ran under the notch.
      */
     public EdgeInsets viewPadding() {
-        return EdgeInsets.all(0);
+        return padding;
     }
 
     /**
