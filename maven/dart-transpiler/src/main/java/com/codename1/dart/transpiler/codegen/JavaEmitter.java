@@ -6743,13 +6743,19 @@ public final class JavaEmitter {
 
     /**
      * Whether evaluating {@code e} can have an effect another argument could observe:
-     * an assignment, an increment, an await, a cascade, or a call to a function or to
-     * a method of this object -- {@code log('b')}, {@code _next()}. Calls on a value or
-     * a class ({@code color.withOpacity(.5)}, {@code EdgeInsets.all(8)},
-     * {@code Theme.of(context)}) and constructor calls are taken to have none. That is
-     * the line Flutter code sits on: every widget constructor has named arguments in
-     * whatever order the author wrote them, and treating all of them as effects would
-     * sequence nearly every call in a build method for no observable difference.
+     * an assignment, an increment, an await, a cascade, any call -- a function, a
+     * method on this object or on a value ({@code counter.next()}), a static method, a
+     * constructor that is not {@code const} -- a getter on a value, and an index
+     * operator. Any of those runs code a user class can give effects, and nothing here
+     * knows which ones are pure: {@code Pair(b: counter.next(), a: counter.next())}
+     * gave a and b each other's values when calls on a value were assumed pure.
+     *
+     * <p>A {@code const} constructor, a read through a class name
+     * ({@code ReplyColors.white50}, {@code Axis.vertical}), literals and operators
+     * over them are free. Treating every call as an effect costs little: sequencing
+     * only happens for a program class's constructor or method whose order-sensitive
+     * arguments are written out of parameter order, and then costs one temp per
+     * argument -- a fraction of a percent of the gallery's compiled classes.</p>
      */
     private static boolean hasEffect(Expr e) {
         if (e == null || e instanceof IntLit || e instanceof DoubleLit || e instanceof BoolLit
@@ -6769,10 +6775,15 @@ public final class JavaEmitter {
             return false;
         }
         if (e instanceof PropertyGet) {
-            return hasEffect(((PropertyGet) e).target);
+            Expr target = ((PropertyGet) e).target;
+            if (isClassReference(target)) {
+                return false;
+            }
+            return true;
         }
         if (e instanceof IndexGet) {
-            return hasEffect(((IndexGet) e).target) || hasEffect(((IndexGet) e).index);
+            // operator [] is a method call, and a user class can give it effects.
+            return true;
         }
         if (e instanceof ParenExpr) {
             return hasEffect(((ParenExpr) e).inner);
@@ -6791,17 +6802,11 @@ public final class JavaEmitter {
             return hasEffect(c.condition) || hasEffect(c.thenExpr) || hasEffect(c.elseExpr);
         }
         if (e instanceof CtorCall) {
-            return argsHaveEffect(((CtorCall) e).args);
+            CtorCall cc = (CtorCall) e;
+            return !cc.isConst || argsHaveEffect(cc.args);
         }
         if (e instanceof Call) {
-            Call c = (Call) e;
-            boolean ownOrFunction = c.target == null || c.target instanceof ThisExpr;
-            boolean onAClass = c.target == null && c.name != null && !c.name.isEmpty()
-                    && Character.isUpperCase(c.name.charAt(0));
-            if (ownOrFunction && !onAClass) {
-                return true;
-            }
-            return hasEffect(c.target) || argsHaveEffect(c.args);
+            return true;
         }
         if (e instanceof ListLit) {
             for (Expr x : ((ListLit) e).elements) {
@@ -6814,6 +6819,15 @@ public final class JavaEmitter {
         // Anything else is assumed to be able to: sequencing an argument that did
         // not need it costs a temp, while skipping one that did reorders effects.
         return true;
+    }
+
+    /** A bare class name used as a receiver: {@code ReplyColors.white50}, {@code Axis.vertical}. */
+    private static boolean isClassReference(Expr e) {
+        if (!(e instanceof Ident)) {
+            return false;
+        }
+        String n = ((Ident) e).name;
+        return n != null && !n.isEmpty() && Character.isUpperCase(n.charAt(0));
     }
 
     private static boolean argsHaveEffect(Args args) {
@@ -6832,12 +6846,74 @@ public final class JavaEmitter {
 
     /**
      * An argument whose position relative to an effect matters: one that has an
-     * effect, or a bare variable read, which an effect can change --
+     * effect, or one that reads a variable, which an effect can change --
      * {@code f(b: x, a: log())} must read x before log() runs. Constants, reads through
-     * a class ({@code ReplyColors.white50}) and constructor calls are left in place.
+     * a class ({@code ReplyColors.white50}) and closures are left in place.
      */
     private static boolean orderSensitive(Expr e) {
-        return e instanceof Ident || hasEffect(e);
+        return hasEffect(e) || readsVariable(e);
+    }
+
+    /**
+     * Whether {@code e} reads a variable anywhere in it, so that an effect evaluated
+     * before it could change its value: {@code f(b: n + 1, a: bump())} must read n
+     * before bump() runs, exactly as {@code f(b: n, a: bump())} must. A class name
+     * used as a receiver is not a variable, and a closure reads nothing until it runs.
+     */
+    private static boolean readsVariable(Expr e) {
+        if (e == null || e instanceof Lambda) {
+            return false;
+        }
+        if (e instanceof Ident) {
+            return !isClassReference(e);
+        }
+        if (e instanceof StringLit) {
+            for (Object part : ((StringLit) e).parts) {
+                if (part instanceof Expr && readsVariable((Expr) part)) {
+                    return true;
+                }
+            }
+            return false;
+        }
+        if (e instanceof ParenExpr) {
+            return readsVariable(((ParenExpr) e).inner);
+        }
+        if (e instanceof NotNullAssert) {
+            return readsVariable(((NotNullAssert) e).operand);
+        }
+        if (e instanceof Unary) {
+            return readsVariable(((Unary) e).operand);
+        }
+        if (e instanceof Binary) {
+            return readsVariable(((Binary) e).left) || readsVariable(((Binary) e).right);
+        }
+        if (e instanceof Conditional) {
+            Conditional c = (Conditional) e;
+            return readsVariable(c.condition) || readsVariable(c.thenExpr) || readsVariable(c.elseExpr);
+        }
+        if (e instanceof ListLit) {
+            for (Expr x : ((ListLit) e).elements) {
+                if (readsVariable(x)) {
+                    return true;
+                }
+            }
+            return false;
+        }
+        if (e instanceof CtorCall) {
+            Args args = ((CtorCall) e).args;
+            for (Expr x : args.positional) {
+                if (readsVariable(x)) {
+                    return true;
+                }
+            }
+            for (NamedArg na : args.named) {
+                if (readsVariable(na.value)) {
+                    return true;
+                }
+            }
+            return false;
+        }
+        return false;
     }
 
     private static boolean sourceBefore(Expr a, Expr b) {
