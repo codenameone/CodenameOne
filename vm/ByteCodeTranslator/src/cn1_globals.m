@@ -7397,8 +7397,9 @@ _Atomic int cn1GcCycleState = CN1_GC_CYCLE_IDLE;
 #define CN1_BIBOP_HEAP_POS   (-3)
 #endif
 
-// Size classes (slot sizes, 16-aligned). size <= CN1_BIBOP_MAX_OBJECT maps to
-// the smallest class >= size; everything else takes the legacy path.
+// Size classes (slot sizes; see CN1_BIBOP_CIDX for why the small ones step by 8).
+// size <= CN1_BIBOP_MAX_OBJECT maps to the smallest class >= size; everything else
+// takes the legacy path.
 // CN1_BIBOP_NUM_CLASSES is fixed in cn1_globals.h (must equal this array length).
 /* The table carries classes past the default ceiling so the ceiling itself can be
  * an A/B flag: CN1_BIBOP_NUM_CLASSES selects how many are in use and
@@ -7406,7 +7407,7 @@ _Atomic int cn1GcCycleState = CN1_GC_CYCLE_IDLE;
  * would take the legacy calloc path into managed pages instead -- which is where
  * the 1.3-1.7KB byte[] that dominate this corpus' live set sit. */
 static const int cn1BibopClassSize[] = {
-    32, 48, 64, 80, 96, 112, 128, 160, 192, 224, 256, 320, 384, 448, 512,
+    24, 32, 40, 48, 56, 64, 72, 80, 88, 96, 104, 112, 120, 128, 144, 160, 176, 192, 224, 256, 320, 384, 448, 512,
     640, 768, 896, 1024, 1280, 1536, 1792, 2048
 };
 _Static_assert(sizeof(cn1BibopClassSize)/sizeof(int) >= CN1_BIBOP_NUM_CLASSES,
@@ -7628,8 +7629,8 @@ static void cn1BibopExitReport(void) {
 
 static void cn1BibopFormatPage(CN1BibopPage* p, int ci) {
     int slotSize = cn1BibopClassSize[ci];
-    // slot 0 starts after the page header, rounded up to 16-byte alignment so
-    // every slot is at least 16-aligned (matches/exceeds calloc's guarantee).
+    // slot 0 starts after the page header, rounded up to 16 bytes, so a slot is
+    // aligned to the largest power of two dividing its class size (at least 8).
     int hdr = (int)((sizeof(CN1BibopPage) + 15) & ~((size_t)15));
     p->classIndex = ci;
     p->slotSize = slotSize;

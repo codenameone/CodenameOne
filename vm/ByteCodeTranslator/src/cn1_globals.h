@@ -1736,7 +1736,7 @@ static inline void cn1NativeOwnerFence(JAVA_OBJECT* owner) {
 
 // Shared by ThreadLocalData's adaptive state and the page allocator below.
 #ifndef CN1_BIBOP_NUM_CLASSES
-#define CN1_BIBOP_NUM_CLASSES 23
+#define CN1_BIBOP_NUM_CLASSES 32
 #endif
 
 // handles the stack used for print stack trace and GC
@@ -2175,7 +2175,14 @@ const int currentCodenameOneCallStackOffset = threadStateData->callStackOffset;
 #ifndef CN1_BIBOP_ADOPTED
 #define CN1_BIBOP_ADOPTED (-4)
 #endif
-// Slot sizes (16-aligned); a size maps to the smallest class >= size.
+// Slot sizes; a size maps to the smallest class >= size. EIGHT-byte steps up to 128:
+// an object struct is a multiple of 8, and with only 16-byte steps every one whose size
+// is an odd multiple of 8 paid 8 bytes of padding -- measured on the self-hosting corpus,
+// 19MB of the ~350MB live set (VarOp 40 -> 48, Label 104 -> 112, ArrayList 40 -> 48,
+// HashMap 72 -> 80, ...). Slots are 8-aligned, which is all a Java object needs (tagged
+// references use the low 3 bits). A type that asks for more -- StringBuilder's inline
+// storage is aligned(16) -- has a size that is a multiple of its alignment, so it lands
+// in a class that is also a multiple of 16 and its slots stay 16-aligned.
 // Compile-time size -> class-index. With a constant `sz` (sizeof(...)) clang
 // folds the whole chain to an int literal (or -1 for oversized => fast path
 // dead-code-eliminated, slow path only).
@@ -2192,12 +2199,12 @@ const int currentCodenameOneCallStackOffset = threadStateData->callStackOffset;
  * raise as working. The static assertion below is the part that matters -- it
  * makes the two definitions unable to drift again. */
 #define CN1_BIBOP_CIDX(sz) ( \
-  (sz)<=32?0:(sz)<=48?1:(sz)<=64?2:(sz)<=80?3:(sz)<=96?4:(sz)<=112?5: \
-  (sz)<=128?6:(sz)<=160?7:(sz)<=192?8:(sz)<=224?9:(sz)<=256?10: \
-  (sz)<=320?11:(sz)<=384?12:(sz)<=448?13:(sz)<=512?14: \
-  (CN1_BIBOP_NUM_CLASSES<=15)?-1: \
-  (sz)<=640?15:(sz)<=768?16:(sz)<=896?17:(sz)<=1024?18: \
-  (sz)<=1280?19:(sz)<=1536?20:(sz)<=1792?21:(sz)<=2048?22:-1)
+  (sz)<=24?0: (sz)<=32?1: (sz)<=40?2: (sz)<=48?3: (sz)<=56?4: (sz)<=64?5: (sz)<=72?6: \
+  (sz)<=80?7: (sz)<=88?8: (sz)<=96?9: (sz)<=104?10: (sz)<=112?11: (sz)<=120?12: \
+  (sz)<=128?13: (sz)<=144?14: (sz)<=160?15: (sz)<=176?16: (sz)<=192?17: (sz)<=224?18: \
+  (sz)<=256?19: (sz)<=320?20: (sz)<=384?21: (sz)<=448?22: (sz)<=512?23: \
+  (CN1_BIBOP_NUM_CLASSES<=24)?-1: (sz)<=640?24: (sz)<=768?25: (sz)<=896?26: \
+  (sz)<=1024?27: (sz)<=1280?28: (sz)<=1536?29: (sz)<=1792?30: (sz)<=2048?31: -1)
 
 /* THE PAGE GEOMETRY IS A COMPILE-TIME CONSTANT, so stop loading it.
  *
@@ -2222,11 +2229,12 @@ const int currentCodenameOneCallStackOffset = threadStateData->callStackOffset;
  * cn1BibopFormatPage uses, and the assertions in cn1_globals.m check them against
  * the runtime table rather than trusting that they stay in step. */
 #define CN1_BIBOP_CLASS_SIZE(ci) ( \
-  (ci)==0?32:(ci)==1?48:(ci)==2?64:(ci)==3?80:(ci)==4?96:(ci)==5?112: \
-  (ci)==6?128:(ci)==7?160:(ci)==8?192:(ci)==9?224:(ci)==10?256: \
-  (ci)==11?320:(ci)==12?384:(ci)==13?448:(ci)==14?512: \
-  (ci)==15?640:(ci)==16?768:(ci)==17?896:(ci)==18?1024: \
-  (ci)==19?1280:(ci)==20?1536:(ci)==21?1792:(ci)==22?2048:0)
+  (ci)==0?24: (ci)==1?32: (ci)==2?40: (ci)==3?48: (ci)==4?56: (ci)==5?64: (ci)==6?72: \
+  (ci)==7?80: (ci)==8?88: (ci)==9?96: (ci)==10?104: (ci)==11?112: (ci)==12?120: \
+  (ci)==13?128: (ci)==14?144: (ci)==15?160: (ci)==16?176: (ci)==17?192: (ci)==18?224: \
+  (ci)==19?256: (ci)==20?320: (ci)==21?384: (ci)==22?448: (ci)==23?512: (ci)==24?640: \
+  (ci)==25?768: (ci)==26?896: (ci)==27?1024: (ci)==28?1280: (ci)==29?1536: \
+  (ci)==30?1792: (ci)==31?2048: 0)
 #define CN1_BIBOP_HDR_BYTES ((int)((sizeof(CN1BibopPage) + 15) & ~((size_t)15)))
 #define CN1_BIBOP_SLOT_COUNT(ci) \
     ((CN1_BIBOP_PAGE_SIZE - CN1_BIBOP_HDR_BYTES) / CN1_BIBOP_CLASS_SIZE(ci))
