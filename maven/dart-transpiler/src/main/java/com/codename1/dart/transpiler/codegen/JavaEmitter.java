@@ -375,6 +375,52 @@ public final class JavaEmitter {
      * {@code static final expensive = fail()} and threw, or ran side effects Dart would
      * have deferred until {@code expensive} was read.
      */
+    /**
+     * A {@code late} field with no initializer, which Dart checks: reading it before it is
+     * assigned throws LateInitializationError, and so does assigning a {@code late final}
+     * one twice. Emitted as a plain field it read as 0, false or null and could be
+     * reassigned at will. Such a field is reached only through the get$/set$ pair
+     * {@link #emitLateAccessors} writes, so every write form -- `=`, `op=`, `??=`, `++` --
+     * goes through the existing accessor-pair lowering. Mixin fields already live behind
+     * accessors of their own and are left as they are.
+     */
+    private static boolean isLateChecked(FieldDecl f, ClassDecl owner) {
+        return f.isLate && f.initializer == null && !f.isConst && owner != null && !owner.isMixin;
+    }
+
+    private static String emitLateAccessors(FieldDecl f, String jt) {
+        String st = f.isStatic ? "static " : "";
+        String vis = f.name.startsWith("_") ? "    " : "    public ";
+        String flag = f.name + "$late";
+        String self = f.isStatic ? "" : "this.";
+        StringBuilder b = new StringBuilder();
+        b.append("    private ").append(st).append("boolean ").append(flag).append(";\n");
+        b.append(vis).append(st).append(jt).append(" get$").append(f.name).append("() {\n")
+                .append("        if (!").append(flag).append(") {\n")
+                .append("            throw dart.core.LateInitializationError.notInitialized(\"")
+                .append(f.name).append("\");\n        }\n")
+                .append("        return ").append(self).append(f.name).append(";\n    }\n");
+        b.append(vis).append(st).append(jt).append(" set$").append(f.name).append("(").append(jt).append(" v) {\n");
+        if (f.isFinal) {
+            b.append("        if (").append(flag).append(") {\n")
+                    .append("            throw dart.core.LateInitializationError.alreadyInitialized(\"")
+                    .append(f.name).append("\");\n        }\n");
+        }
+        b.append("        ").append(flag).append(" = true;\n")
+                .append("        ").append(self).append(f.name).append(" = v;\n")
+                .append("        return v;\n    }\n");
+        return b.toString();
+    }
+
+    /** A constructor's store into its own field: through set$ for a checked late field. */
+    private static String fieldStore(ClassDecl c, String field, String value) {
+        FieldDecl f = c.field(field);
+        if (f != null && isLateChecked(f, c)) {
+            return "this.set$" + field + "(" + value + ");";
+        }
+        return "this." + field + " = " + value + ";";
+    }
+
     private static boolean isLazyStatic(FieldDecl f) {
         return f.isStatic && isLazyTopLevel(f);
     }
@@ -632,6 +678,11 @@ public final class JavaEmitter {
                 }
             } else {
                 body.append(";\n");
+            }
+            if (isLateChecked(f, c)) {
+                body.append(emitLateAccessors(f, jt));
+                body.append('\n');
+                continue;
             }
             // Accessors for instance fields. A Dart library-private (`_x`) field is still
             // reachable from sibling classes in the same library, so emit its accessor
@@ -930,13 +981,13 @@ public final class JavaEmitter {
         // this.x params
         for (Param p : params) {
             if (p.isThis) {
-                w.line("this." + p.name + " = " + javaIdent(p.name) + ";");
+                w.line(fieldStore(c, p.name, javaIdent(p.name)));
             }
         }
         // initializer list entries
         for (FieldInit fi : ct.fieldInits) {
             Out v = emitExpr(fi.value, typeOfField(c, fi.field, ctx), ctx);
-            w.line("this." + fi.field + " = " + v.code + ";");
+            w.line(fieldStore(c, fi.field, v.code));
         }
         if (ct.body != null) {
             emitStatements(ct.body, ctx);
@@ -1003,7 +1054,7 @@ public final class JavaEmitter {
         Ctx.Writer w = ctx.writer();
         for (Param p : ct.params) {
             if (p.isThis) {
-                w.line("this." + p.name + " = " + javaIdent(p.name) + ";");
+                w.line(fieldStore(c, p.name, javaIdent(p.name)));
             }
             if (p.isSuper) {
                 diags.error(p, "E0206", "super parameters are not supported on named constructors yet");
@@ -1011,7 +1062,7 @@ public final class JavaEmitter {
         }
         for (FieldInit fi : ct.fieldInits) {
             Out v = emitExpr(fi.value, typeOfField(c, fi.field, ctx), ctx);
-            w.line("this." + fi.field + " = " + v.code + ";");
+            w.line(fieldStore(c, fi.field, v.code));
         }
         if (ct.body != null) {
             emitStatements(ct.body, ctx);
@@ -1274,13 +1325,20 @@ public final class JavaEmitter {
         }
         String rjt = m.isSetter ? "void" : (forceIntReturn ? "int" : javaType(rt, false, ctx));
         sb.append(rjt).append(' ').append(m.name).append('(');
+        // The Java parameter list and names, kept for a sync* body's helper method.
+        StringBuilder paramDecls = new StringBuilder();
+        StringBuilder paramNames = new StringBuilder();
         for (int i = 0; i < m.params.size(); i++) {
             Param p = m.params.get(i);
             TypeRef pt = p.type == null || p.type.is("var") ? TypeRef.DYNAMIC : p.type;
             if (i > 0) {
                 sb.append(", ");
             }
-            sb.append(javaType(pt, false, ctx)).append(' ').append(ctx.declareShadowSafe(p.name, pt));
+            String jn = ctx.declareShadowSafe(p.name, pt);
+            String decl = javaType(pt, false, ctx) + ' ' + jn;
+            sb.append(decl);
+            paramDecls.append(", ").append(decl);
+            paramNames.append(", ").append(jn);
         }
         sb.append(')');
         if (m.isAbstract) {
@@ -1295,9 +1353,62 @@ public final class JavaEmitter {
         ctx.boxedLocals.clear();
         ctx.boxedLocals.addAll(m.body != null
                 ? CaptureScan.boxedLocals(m.body) : CaptureScan.boxedLocals(m.exprBody));
+        if (m.isSyncStar && !rt.is("List") && !m.isSetter) {
+            // sync* generator. The body moves into a private helper that yields into the list
+            // it is given (`yield x` -> out.add(x), `yield* xs` -> out.addAllIterable(xs), and a
+            // bare `return;` simply ends it); the method returns DartIterable.syncStar over it,
+            // which runs the body when an iteration BEGINS and again for every iteration, as
+            // Dart runs a generator. Running it at the call -- as this did -- performed its side
+            // effects before anyone iterated and made a second iteration replay the first.
+            // (Suspension at each yield is not modelled; see DartIterable.syncStar.)
+            ctx.importClass("dart.core.DartList");
+            ctx.importClass("dart.core.DartIterable");
+            TypeRef elem = rt.is("Iterable") && !rt.args.isEmpty() ? rt.arg(0) : TypeRef.DYNAMIC;
+            String ej = javaType(elem, true, ctx);
+            String out = ctx.newTemp();
+            String helper = m.name + "$sync";
+            ctx.writer().line("return DartIterable.syncStar((DartList<" + ej + "> " + out + ") -> "
+                    + helper + "(" + out + paramNames + "));");
+            sb.append(ctx.popWriter());
+            sb.append("    }\n\n");
+            StringBuilder hb = new StringBuilder("    private ");
+            if (m.isStatic) {
+                hb.append("static ");
+            }
+            if (m.typeParams != null && !m.typeParams.isEmpty()) {
+                hb.append('<');
+                for (int i = 0; i < m.typeParams.size(); i++) {
+                    if (i > 0) {
+                        hb.append(", ");
+                    }
+                    hb.append(m.typeParams.get(i));
+                }
+                hb.append("> ");
+            }
+            hb.append("void ").append(helper).append("(DartList<").append(ej).append("> ").append(out)
+                    .append(paramDecls).append(") {\n");
+            ctx.pushWriter(2);
+            ctx.methodReturnType = TypeRef.VOID;
+            String savedList = ctx.syncStarList;
+            TypeRef savedElem = ctx.syncStarElem;
+            ctx.syncStarList = out;
+            ctx.syncStarElem = elem;
+            if (m.body != null) {
+                emitStatements(m.body, ctx);
+            }
+            ctx.syncStarList = savedList;
+            ctx.syncStarElem = savedElem;
+            hb.append(ctx.popWriter());
+            hb.append("    }\n\n");
+            sb.append(hb);
+            ctx.popScope();
+            ctx.methodReturnType = null;
+            ctx.inAsyncBody = false;
+            return sb.toString();
+        }
         if (m.isSyncStar) {
-            // sync* generator: collect yielded values into a DartList and return it (DartList is an
-            // Iterable). `yield x` -> list.add(x); `yield* xs` -> list.addAllIterable(xs).
+            // sync* declared as a List (not valid Dart, kept as before): collect yielded values
+            // into a DartList and return it.
             ctx.importClass("dart.core.DartList");
             TypeRef elem = (rt.is("Iterable") || rt.is("List") || rt.is("Set")) && !rt.args.isEmpty()
                     ? rt.arg(0) : TypeRef.DYNAMIC;
@@ -1576,11 +1687,23 @@ public final class JavaEmitter {
                     ctx.importClass(coreError);
                     exType = coreError.substring(coreError.lastIndexOf('.') + 1);
                 }
+                // `on Error`: Java's Error is not where this runtime's Dart errors live -- they
+                // are RuntimeExceptions -- so catch everything and pass on what is not one.
+                boolean dartError = cc.onType != null && cc.onType.is("Error") && cc.onType.args.isEmpty();
+                if (dartError) {
+                    exType = "Throwable";
+                    ctx.importClass("dart.runtime.DartRuntime");
+                }
                 ctx.pushScope();
                 String var = ctx.declareShadowSafe(cc.exceptionVar != null ? cc.exceptionVar : "$e",
                         cc.onType != null ? cc.onType : TypeRef.DYNAMIC);
                 w.line("} catch (" + exType + " " + var + ") {");
                 ctx.indent(1);
+                if (dartError) {
+                    w.line("if (!DartRuntime.isDartError(" + var + ")) {");
+                    w.line("    throw DartRuntime.rethrow(" + var + ");");
+                    w.line("}");
+                }
                 if (cc.stackVar != null) {
                     // stack traces are not modeled; bind the name for compilation
                     String stackJn = ctx.declareShadowSafe(cc.stackVar, TypeRef.DYNAMIC);
@@ -3388,8 +3511,8 @@ public final class JavaEmitter {
                     // interface default methods reach mixin state via accessors
                     return new Out("this.get$" + n + "()", fieldType(f, ctx));
                 }
-                if (isLazyStatic(f)) {
-                    return new Out(javaClassName(cc) + ".get$" + n + "()", fieldType(f, ctx));
+                if (isLazyStatic(f) || isLateChecked(f, cc)) {
+                    return new Out((f.isStatic ? javaClassName(cc) : "this") + ".get$" + n + "()", fieldType(f, ctx));
                 }
                 return new Out(f.isStatic ? javaClassName(cc) + "." + n : "this." + n, fieldType(f, ctx));
             }
@@ -3703,7 +3826,7 @@ public final class JavaEmitter {
             if (pc != null) {
                 FieldDecl f = pc.field(name);
                 if (f != null && f.isStatic) {
-                    return new Out(cls + (isLazyStatic(f) ? ".get$" + name + "()" : "." + name),
+                    return new Out(cls + (isLazyStatic(f) || isLateChecked(f, pc) ? ".get$" + name + "()" : "." + name),
                             fieldType(f, ctx));
                 }
             }
@@ -3794,7 +3917,7 @@ public final class JavaEmitter {
         if (pc != null) {
             FieldDecl f = pc.field(name);
             if (f != null) {
-                if (target.code.equals("this")) {
+                if (target.code.equals("this") && !isLateChecked(f, pc)) {
                     return new Out("this." + name, fieldType(f, ctx));
                 }
                 return new Out(target.code + ".get$" + name + "()", fieldType(f, ctx));
@@ -4624,6 +4747,8 @@ public final class JavaEmitter {
         CORE_ERRORS.put("UnsupportedError", "dart.core.UnsupportedError");
         CORE_ERRORS.put("UnimplementedError", "dart.core.UnimplementedError");
         CORE_ERRORS.put("RangeError", "dart.core.RangeError");
+        CORE_ERRORS.put("ConcurrentModificationError", "dart.core.ConcurrentModificationError");
+        CORE_ERRORS.put("TypeError", "dart.core.TypeError");
     }
 
     /**
@@ -5151,7 +5276,12 @@ public final class JavaEmitter {
         if (isClassRef(tt)) {
             String cls = tt.arg(0).name;
             // Dart's `Object.hash(a, b, ...)` -> java.util.Objects.hash(Object...).
-            if (cls.equals("Object") && (n.equals("hash") || n.equals("hashAll"))) {
+            if (cls.equals("Object") && n.equals("hashAll") && c.args.positional.size() == 1) {
+                ctx.importClass("dart.runtime.DartRuntime");
+                return new Out("DartRuntime.hashAll(" + emitExpr(c.args.positional.get(0), null, ctx).code + ")",
+                        TypeRef.INT);
+            }
+            if (cls.equals("Object") && n.equals("hash")) {
                 StringBuilder sb = new StringBuilder();
                 for (int i = 0; i < c.args.positional.size(); i++) {
                     if (i > 0) {
@@ -5185,7 +5315,22 @@ public final class JavaEmitter {
                 }
                 if (n.equals("wait")) {
                     Out l = emitExpr(c.args.positional.get(0), null, ctx);
-                    return new Out("Future.wait(" + l.code + ")",
+                    // eagerError: and cleanUp: were dropped, so an eager wait still waited
+                    // for every input and a cleanUp callback never ran.
+                    String eager = null;
+                    String cleanUp = null;
+                    for (NamedArg na : c.args.named) {
+                        if (na.name.equals("eagerError")) {
+                            eager = emitExpr(na.value, TypeRef.BOOL, ctx).code;
+                        } else if (na.name.equals("cleanUp")) {
+                            cleanUp = pinnedHandler(na.value, emitExpr(na.value, null, ctx), true,
+                                    "dart.runtime.Funcs.VoidFunc1<Object>", "dart.runtime.Funcs.VoidFunc1<Object>");
+                        }
+                    }
+                    String args = eager == null && cleanUp == null ? l.code
+                            : l.code + ", " + (eager == null ? "false" : eager) + ", "
+                                    + (cleanUp == null ? "(dart.runtime.Funcs.VoidFunc1<Object>) null" : cleanUp);
+                    return new Out("Future.wait(" + args + ")",
                             TypeRef.of("Future", TypeRef.of("List", TypeRef.DYNAMIC)));
                 }
                 diags.error(c, "E0304", "Unsupported Future member: " + n);
@@ -5367,8 +5512,11 @@ public final class JavaEmitter {
                 return new Out("DString.substring(" + args + ")", TypeRef.STRING);
             }
             if (n.equals("contains")) {
+                // contains(pattern, startIndex): the start was dropped, so the search
+                // always began at 0.
+                String start = pos.size() > 1 ? ", " + emitExpr(pos.get(1), TypeRef.INT, ctx).code : "";
                 return new Out("DString.contains(" + target.code + ", "
-                        + emitExpr(pos.get(0), null, ctx).code + ")", TypeRef.BOOL);
+                        + emitExpr(pos.get(0), null, ctx).code + start + ")", TypeRef.BOOL);
             }
             if (n.equals("split")) {
                 return new Out("DString.split(" + target.code + ", "

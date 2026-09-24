@@ -1298,6 +1298,26 @@ public final class AstBuilder {
     private Stmt buildLocalVar(Dart2Parser.LocalVariableDeclarationContext ctx) {
         Dart2Parser.InitializedVariableDeclarationContext iv = ctx.initializedVariableDeclaration();
         Dart2Parser.DeclaredIdentifierContext di = iv.declaredIdentifier();
+        // `await x;` on a bare variable is ambiguous in the grammar with a declaration
+        // of a variable x of type `await`, and the parser takes the declaration. Dart
+        // does not: await is reserved in an async body, and no type can be named it.
+        // Read as a declaration it was emitted as `await x = null;`, which does not
+        // compile, so an `await someFuture;` statement broke the whole build.
+        Dart2Parser.FinalConstVarOrTypeContext fct = di.finalConstVarOrType();
+        if (iv.expr() == null && iv.initializedIdentifier().isEmpty()
+                && fct.FINAL_() == null && fct.CONST_() == null && fct.LATE_() == null
+                && "await".equals(fct.getText())) {
+            Ident operand = new Ident();
+            pos(operand, di.identifier());
+            operand.name = di.identifier().getText();
+            AwaitExpr aw = new AwaitExpr();
+            pos(aw, ctx);
+            aw.operand = operand;
+            ExprStmt es = new ExprStmt();
+            pos(es, ctx);
+            es.expr = aw;
+            return es;
+        }
         VarDeclStmt v = new VarDeclStmt();
         pos(v, ctx);
         v.name = di.identifier().getText();
