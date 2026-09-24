@@ -23,6 +23,8 @@
  */
 package com.codename1.flutter;
 
+import dart.runtime.DartRuntime;
+
 /**
  * A key that uses value equality of the wrapped value, mirroring Flutter's
  * {@code ValueKey<T>}. Two ValueKeys are equal when they have the same
@@ -48,11 +50,24 @@ public class ValueKey<T> extends Key {
             return false;
         }
         ValueKey<?> other = (ValueKey<?>) o;
-        return value == other.value || (value != null && value.equals(other.value));
+        // Dart's ==, not Java's equals: ValueKey<num>(1) and ValueKey<num>(1.0) are
+        // the same key, and two NaN keys are not. Java's equals said the opposite
+        // on both, so a rebuild discarded and recreated a subtree it should keep.
+        return DartRuntime.eq(value, other.value);
     }
 
     @Override
     public int hashCode() {
+        if (value instanceof Double || value instanceof Float) {
+            // A double equal to an int hashes as that int, so equal keys agree.
+            double d = ((Number) value).doubleValue();
+            if (d >= -9.223372036854775808E18 && d < 9.223372036854775808E18 && (double) (long) d == d) {
+                return Long.valueOf((long) d).hashCode();
+            }
+        }
+        if (value instanceof Integer || value instanceof Short || value instanceof Byte) {
+            return Long.valueOf(((Number) value).longValue()).hashCode();
+        }
         return value == null ? 0 : value.hashCode();
     }
 

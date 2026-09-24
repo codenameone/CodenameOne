@@ -25,7 +25,8 @@ package com.codename1.flutter.widgets;
 
 /**
  * A node in the focus tree that establishes a focus scope — Flutter's
- * {@code FocusScopeNode}. API-shape only for this milestone.
+ * {@code FocusScopeNode}. There is one scope, the whole app, so it forwards to
+ * the node holding the primary focus.
  */
 public class FocusScopeNode {
 
@@ -38,19 +39,32 @@ public class FocusScopeNode {
         this.debugLabel = v;
     }
 
+    /**
+     * Whether a node holds the focus. The whole app is one scope here, so that is
+     * whether any node does; these methods were no-ops, so the common
+     * {@code FocusScope.of(context).unfocus()} left the keyboard up.
+     */
     public boolean hasFocus() {
-        return false;
+        return com.codename1.flutter.FocusNode.primaryFocus() != null;
     }
 
     public void requestFocus() {
     }
 
     public void requestFocus(Object node) {
+        if (node instanceof com.codename1.flutter.FocusNode) {
+            ((com.codename1.flutter.FocusNode) node).requestFocus();
+        }
     }
 
     public void unfocus() {
+        com.codename1.flutter.FocusNode f = com.codename1.flutter.FocusNode.primaryFocus();
+        if (f != null) {
+            f.unfocus();
+        }
     }
 
     public void unfocus(Object disposition) {
+        unfocus();
     }
 }

@@ -72,6 +72,22 @@ public class Checkbox extends Widget {
         return onChanged != null;
     }
 
+    /**
+     * The value a tap asks for, in Flutter's order: false to true, true to null
+     * when tristate (to false otherwise), and null back to false. Treating null
+     * as "go to checked" and true as "go to unchecked" meant a user could never
+     * reach the indeterminate state of a tristate box.
+     */
+    public Boolean nextValue() {
+        if (value == null) {
+            return Boolean.FALSE;
+        }
+        if (!value.booleanValue()) {
+            return Boolean.TRUE;
+        }
+        return tristate ? null : Boolean.FALSE;
+    }
+
     public boolean getValue() {
         return value != null && value.booleanValue();
     }

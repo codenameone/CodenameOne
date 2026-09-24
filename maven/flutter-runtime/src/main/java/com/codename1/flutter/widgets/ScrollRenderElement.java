@@ -296,12 +296,41 @@ public abstract class ScrollRenderElement extends RenderElement {
             return isDragActivated();
         }
 
-        /** Moves the scroll position -- what a ScrollController's jumpTo drives. */
+        /** A position asked for before the pane had a size, applied at its first layout. */
+        private int pendingPx = -1;
+        private boolean pendingHorizontal;
+
+        /**
+         * Moves the scroll position -- what a ScrollController's jumpTo drives. Before
+         * the pane has been laid out there is nothing to scroll (and the position may
+         * be clamped to zero), so it is kept and applied once layout gives the pane a
+         * size: a controller's initialScrollOffset reaches the list that way.
+         */
         public void scrollToPosition(int px, boolean horizontal) {
+            if ((horizontal ? getWidth() : getHeight()) <= 0) {
+                pendingPx = px;
+                pendingHorizontal = horizontal;
+                return;
+            }
+            pendingPx = -1;
             if (horizontal) {
                 setScrollX(px);
             } else {
                 setScrollY(px);
+            }
+        }
+
+        @Override
+        public void layoutContainer() {
+            super.layoutContainer();
+            if (pendingPx >= 0 && (pendingHorizontal ? getWidth() : getHeight()) > 0) {
+                int px = pendingPx;
+                pendingPx = -1;
+                if (pendingHorizontal) {
+                    setScrollX(px);
+                } else {
+                    setScrollY(px);
+                }
             }
         }
     }

@@ -94,8 +94,7 @@ public class CheckboxRenderElement extends RenderElement {
                 if (applying || !checkbox().isEnabled()) {
                     return;
                 }
-                // Material advances indeterminate -> checked; otherwise it flips.
-                userToggled(checkbox().isIndeterminate() || !configuredValue());
+                userToggled(checkbox().nextValue());
             }
         });
         apply(box);
@@ -161,7 +160,7 @@ public class CheckboxRenderElement extends RenderElement {
      * fires onChanged with the attempted value, then re-applies the widget's
      * configured value to the component.
      */
-    public void userToggled(boolean attemptedValue) {
+    public void userToggled(Boolean attemptedValue) {
         Funcs.VoidFunc1<Boolean> f = checkbox().getOnChanged();
         if (f != null) {
             f.call(attemptedValue);

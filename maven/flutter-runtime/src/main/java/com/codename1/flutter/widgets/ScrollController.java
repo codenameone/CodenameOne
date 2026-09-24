@@ -137,6 +137,12 @@ public class ScrollController {
     void attach(Client c) {
         this.client = c;
         this.attached = true;
+        // The position this controller already holds -- its initialScrollOffset, or
+        // where an earlier list left it -- is where the newly attached one starts.
+        // Recording it only here left the list at zero while offset reported it.
+        if (c != null && scrollPosition.pixels() != 0) {
+            c.scrollToOffset(scrollPosition.pixels());
+        }
     }
 
     void detach() {

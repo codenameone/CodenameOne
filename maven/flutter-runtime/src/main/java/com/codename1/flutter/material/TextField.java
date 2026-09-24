@@ -138,6 +138,10 @@ public class TextField extends Widget {
         this.focusNode = v;
     }
 
+    public FocusNode getFocusNode() {
+        return focusNode;
+    }
+
     public TextStyle getStyle() {
         return style;
     }

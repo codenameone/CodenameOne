@@ -127,6 +127,23 @@ public class TextFieldRenderElement extends RenderElement {
                 }
             }
         });
+        tf.addFocusListener(new com.codename1.ui.events.FocusListener() {
+            @Override
+            public void focusGained(Component cmp) {
+                // The focus Codename One hands a field on arrival is not a Flutter
+                // focus (releaseUnrequestedFocus hands it back), so it is not reported.
+                if (boundFocus != null && (focusReleased || touched)) {
+                    boundFocus.hostFocusChanged(true);
+                }
+            }
+
+            @Override
+            public void focusLost(Component cmp) {
+                if (boundFocus != null) {
+                    boundFocus.hostFocusChanged(false);
+                }
+            }
+        });
         field = tf;
         Component out = decorated(tf);
         apply(tf);
@@ -265,6 +282,7 @@ public class TextFieldRenderElement extends RenderElement {
     @Override
     public void unmount() {
         super.unmount();
+        bindFocus(null);
         if (boundController != null) {
             boundController.unbind(this);
             boundController = null;
@@ -305,6 +323,7 @@ public class TextFieldRenderElement extends RenderElement {
                 applyDecoration(decoratedRow != null ? (Component) decoratedRow : (Component) tf, d);
             }
             releaseUnrequestedFocus(tf);
+            bindFocus(w.getFocusNode());
             if (counterLabel != null) {
                 counterLabel.setText(counterText());
             }
@@ -817,6 +836,76 @@ public class TextFieldRenderElement extends RenderElement {
         double w = constraints.hasBoundedWidth() ? constraints.maxWidth() : prefW;
         double h = Math.max(prefH, Dp.px(MIN_HEIGHT_LP));
         return constraints.constrain(new Size(w, h));
+    }
+
+    /** The FocusNode the widget gave this field, bridged to the editor through focusHost. */
+    private com.codename1.flutter.FocusNode boundFocus;
+
+    /**
+     * Moves the real focus when the app moves its FocusNode. The node used to keep
+     * a private flag only, so requestFocus neither placed the caret nor opened the
+     * keyboard while hasFocus reported true.
+     */
+    private final com.codename1.flutter.FocusNode.Host focusHost = new com.codename1.flutter.FocusNode.Host() {
+        @Override
+        public void focusHost() {
+            // An asked-for focus is not the arrival focus: never hand it back.
+            focusReleased = true;
+            focusField(2);
+        }
+
+        @Override
+        public void blurHost() {
+            com.codename1.ui.TextField tf = field;
+            if (tf == null) {
+                return;
+            }
+            if (tf.isEditing()) {
+                tf.stopEditing();
+            }
+            com.codename1.ui.Form f = tf.getComponentForm();
+            if (f != null && f.getFocused() == tf) {
+                f.setFocused(null);
+            }
+        }
+    };
+
+    private void bindFocus(com.codename1.flutter.FocusNode node) {
+        if (node == boundFocus) {
+            return;
+        }
+        if (boundFocus != null) {
+            boundFocus.detachHost(focusHost);
+        }
+        boundFocus = node;
+        if (node != null) {
+            node.attachHost(focusHost);
+        }
+    }
+
+    /**
+     * Focuses the editor and starts editing it. A field that is not on a form yet
+     * -- focus requested in initState, before the page is shown -- cannot take the
+     * focus, so it tries again after the current event, a bounded number of times.
+     */
+    private void focusField(final int retries) {
+        com.codename1.ui.TextField tf = field;
+        if (tf == null || !Display.isInitialized()) {
+            return;
+        }
+        if (tf.getComponentForm() == null) {
+            if (retries > 0) {
+                Display.getInstance().callSerially(new Runnable() {
+                    @Override
+                    public void run() {
+                        focusField(retries - 1);
+                    }
+                });
+            }
+            return;
+        }
+        tf.requestFocus();
+        tf.startEditingAsync();
     }
 
     /** True once the user has actually pressed on this field. */
