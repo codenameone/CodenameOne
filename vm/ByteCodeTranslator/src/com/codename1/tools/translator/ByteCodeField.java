@@ -124,6 +124,25 @@ public class ByteCodeField {
         }
         return getCDefinition();
     }
+
+    /**
+     * The C type an INSTANCE field is stored as. JAVA_BOOLEAN, JAVA_BYTE, JAVA_SHORT and
+     * JAVA_CHAR are all `int`, the width the operand stack works in, so storing a field
+     * with them gave every boolean, byte, short and char field four bytes: Invoke's eight
+     * booleans cost 32 bytes where they need 8. The array element types are the real
+     * widths. Reads widen and stores truncate exactly as getfield and putfield do (char is
+     * unsigned, byte and short signed), so only the struct layout changes; a native that
+     * takes a field's ADDRESS must use the same narrow type. Static fields keep the int
+     * types -- there is one of each, and natives take their addresses.
+     */
+    public String getCInstanceStorageDefinition() {
+        String t = getCDefinition();
+        if (t.equals("JAVA_BOOLEAN")) t = "JAVA_ARRAY_BOOLEAN";
+        else if (t.equals("JAVA_BYTE")) t = "JAVA_ARRAY_BYTE";
+        else if (t.equals("JAVA_SHORT")) t = "JAVA_ARRAY_SHORT";
+        else if (t.equals("JAVA_CHAR")) t = "JAVA_ARRAY_CHAR";
+        return volatileField ? "_Atomic " + t : t;
+    }
     
     public List<String> getDependentClasses() {
         return dependentClasses;

@@ -415,10 +415,12 @@ static int field_read_into(JAVA_OBJECT obj, const cn1_field_entry* fe,
     char* base = (char*)obj + fe->offset;
     *outType = fe->type;
     switch (fe->type) {
-        case 'Z': *outValue = (uint64_t)(*(JAVA_BOOLEAN*)base & 1); return 1;
-        case 'B': *outValue = (uint64_t)(uint8_t)(*(JAVA_BYTE*)base); return 1;
-        case 'S': *outValue = (uint64_t)(uint16_t)(*(JAVA_SHORT*)base); return 1;
-        case 'C': *outValue = (uint64_t)(uint16_t)(*(JAVA_CHAR*)base); return 1;
+        // Instance fields of these types are stored at their real width (the translator's
+        // getCInstanceStorageDefinition), not as the int JAVA_BOOLEAN & co. name.
+        case 'Z': *outValue = (uint64_t)(*(JAVA_ARRAY_BOOLEAN*)base & 1); return 1;
+        case 'B': *outValue = (uint64_t)(uint8_t)(*(JAVA_ARRAY_BYTE*)base); return 1;
+        case 'S': *outValue = (uint64_t)(uint16_t)(*(JAVA_ARRAY_SHORT*)base); return 1;
+        case 'C': *outValue = (uint64_t)(uint16_t)(*(JAVA_ARRAY_CHAR*)base); return 1;
         case 'I': *outValue = (uint64_t)(uint32_t)(*(JAVA_INT*)base); return 1;
         case 'F': {
             JAVA_FLOAT f = *(JAVA_FLOAT*)base;
@@ -1572,12 +1574,14 @@ static int handleCommand(uint8_t cmd, const uint8_t* payload, uint32_t len) {
             for (int i = 0; i < count; i++) {
                 int idx = firstIdx + i;
                 switch (tag) {
-                    case 'Z': p[0] = ((JAVA_BOOLEAN*)CN1_ARRAY_DATA(arr))[idx] & 1; p += 1; break;
-                    case 'B': p[0] = (uint8_t)((JAVA_BYTE*)CN1_ARRAY_DATA(arr))[idx]; p += 1; break;
-                    case 'S': { JAVA_SHORT s = ((JAVA_SHORT*)CN1_ARRAY_DATA(arr))[idx];
+                    // Array elements are the narrow types too; indexing with the int
+                    // JAVA_BOOLEAN/JAVA_BYTE/... read element idx*4, not idx.
+                    case 'Z': p[0] = ((JAVA_ARRAY_BOOLEAN*)CN1_ARRAY_DATA(arr))[idx] & 1; p += 1; break;
+                    case 'B': p[0] = (uint8_t)((JAVA_ARRAY_BYTE*)CN1_ARRAY_DATA(arr))[idx]; p += 1; break;
+                    case 'S': { JAVA_SHORT s = ((JAVA_ARRAY_SHORT*)CN1_ARRAY_DATA(arr))[idx];
                                 p[0] = (uint8_t)((s >> 8) & 0xff); p[1] = (uint8_t)(s & 0xff); }
                               p += 2; break;
-                    case 'C': { JAVA_CHAR c = ((JAVA_CHAR*)CN1_ARRAY_DATA(arr))[idx];
+                    case 'C': { JAVA_CHAR c = ((JAVA_ARRAY_CHAR*)CN1_ARRAY_DATA(arr))[idx];
                                 p[0] = (uint8_t)((c >> 8) & 0xff); p[1] = (uint8_t)(c & 0xff); }
                               p += 2; break;
                     case 'I': writeBE32(p, (uint32_t)((JAVA_INT*)CN1_ARRAY_DATA(arr))[idx]); p += 4; break;

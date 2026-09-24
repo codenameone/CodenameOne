@@ -2416,7 +2416,7 @@ public class ByteCodeClass {
                     b.append("#if ").append(guard).append("\n");
                 }
                 b.append("    ");
-                b.append(bf.getCStorageDefinition());
+                b.append(bf.getCInstanceStorageDefinition());
                 b.append(" ");
                 b.append(clsName);
                 b.append("_");
