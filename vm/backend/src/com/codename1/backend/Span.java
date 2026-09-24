@@ -52,6 +52,12 @@ public abstract class Span {
     Span previous;
     /** Whether {@link Tracing} made this span current and must restore on end. */
     boolean entered;
+    /**
+     * A tracer to shut down once this server span has ended, set when the
+     * request it describes stopped the server; see Tracing.shutdownAfterServing.
+     */
+    Tracer shutdownOnEnd;
+    int shutdownOnEndMillis;
 
     /** For tracer implementations. */
     protected Span() {

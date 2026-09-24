@@ -212,6 +212,32 @@ class NetworkTracerQueueTest extends UITestBase {
     }
 
     @Test
+    void aRetryChainsPastAParentAnotherTracerCaptured() throws Exception {
+        // Queued under tracer A, run under tracer B: B's attempts must still
+        // chain, not each start a new root because A's parent is in the way.
+        NetworkManager manager = idleManager();
+        NetworkTracer a = new NetworkTracer() {
+            public Object requestQueued(ConnectionRequest r) { return null; }
+            public Object beforeRequest(ConnectionRequest r, Object p) { return null; }
+            public void afterRequest(ConnectionRequest r, Object at, int s, Throwable e) { }
+        };
+        NetworkTracer b = new NetworkTracer() {
+            public Object requestQueued(ConnectionRequest r) { return null; }
+            public Object beforeRequest(ConnectionRequest r, Object p) { return null; }
+            public void afterRequest(ConnectionRequest r, Object at, int s, Throwable e) { }
+        };
+        ConnectionRequest request = new ConnectionRequest();
+        request.setUrl("http://queue.test/foreign");
+        request.tracerParent = "A's context";
+        request.tracerParentOwner = a;
+        request.tracerLastAttempt = "B's first attempt";
+        request.tracerLastOwner = b;
+        manager.addToQueue(request, true);
+        assertEquals("B's first attempt", request.tracerParent);
+        assertSame(b, request.tracerParentOwner);
+    }
+
+    @Test
     void addIfAbsentLeavesAnExplicitContentTypeAlone() {
         ConnectionRequest request = new ConnectionRequest();
         request.setContentType("application/json");

@@ -428,6 +428,48 @@ public final class Tracing {
             failed(err);
         }
         finish(span);
+        // The request that stopped the server has now ended, and its span with it:
+        // only now can the tracer go without taking that span down unexported.
+        Tracer after = span.shutdownOnEnd;
+        if(after != null) {
+            span.shutdownOnEnd = null;
+            shutdown(after, span.shutdownOnEndMillis);
+        }
+    }
+
+    /**
+     * Stops {@code owned} -- now, or, when this thread is serving a request, once
+     * that request's span has ended. A handler that calls Backend.stop() is exempt
+     * from the drain precisely so its response can still be written, and its span
+     * ends after that write; shutting the tracer down first made the exporter
+     * refuse that span, so every shutdown requested over HTTP lost its own trace.
+     */
+    static void shutdownAfterServing(Tracer owned, int timeoutMillis) {
+        Span serving = servingSpan();
+        if(serving != null) {
+            serving.shutdownOnEnd = owned;
+            serving.shutdownOnEndMillis = timeoutMillis;
+            return;
+        }
+        shutdown(owned, timeoutMillis);
+    }
+
+    /** The server span of the request this thread is serving, or null. */
+    private static Span servingSpan() {
+        Span span = currentOrNull();
+        int depth = 0;
+        while(span != null && depth++ < 64) {
+            try {
+                if(span.getKind() == Span.KIND_SERVER) {
+                    return span;
+                }
+            } catch (RuntimeException err) {
+                failed(err);
+                return null;
+            }
+            span = span.previous;
+        }
+        return null;
     }
 
     /**

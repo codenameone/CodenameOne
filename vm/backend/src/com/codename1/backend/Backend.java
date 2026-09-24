@@ -143,9 +143,10 @@ public final class Backend {
             dataSource.close();
         }
         // LAST, so the spans of the requests the drain let finish are exported
-        // rather than lost with the process.
+        // rather than lost with the process -- and, when a request handler is the
+        // caller, after THAT request's span has ended, which is after this returns.
         if(ownTracer != null) {
-            Tracing.shutdown(ownTracer, shutdownMillis);
+            Tracing.shutdownAfterServing(ownTracer, shutdownMillis);
         }
     }
 

@@ -947,6 +947,41 @@ class TelemetryTest extends UITestBase {
     }
 
     @Test
+    void aSpanThatEndedJustBeforeStopIsStillExported() throws Exception {
+        // It ends on another thread, so it is handed to the EDT -- and the stop
+        // runs on the EDT first. It finished while telemetry ran, and is sent.
+        final Telemetry.State state = new Telemetry.State(
+                new TelemetryConfig().direct("http://collector.test"));
+        TestCodenameOneImplementation impl = TestCodenameOneImplementation.getInstance();
+        impl.clearQueuedRequests();
+        com.codename1.ui.CN.callSeriallyAndWait(new Runnable() {
+            @Override
+            public void run() {
+                final TelemetrySpan span = state.start("late", TelemetrySpan.KIND_CLIENT, null);
+                Thread ender = new Thread(new Runnable() {
+                    @Override
+                    public void run() {
+                        span.end();
+                    }
+                });
+                ender.start();
+                try {
+                    ender.join();
+                } catch (InterruptedException err) {
+                    Thread.currentThread().interrupt();
+                }
+                state.stop();   // before the handed-off span reaches the EDT
+            }
+        });
+        flushSerialCalls();
+        boolean exported = false;
+        for (ConnectionRequest queued : impl.getQueuedRequests()) {
+            exported |= queued instanceof Telemetry.ExportRequest;
+        }
+        assertTrue(exported, "a span that ended before the stop was discarded after it");
+    }
+
+    @Test
     void aTruncatedValueNeverEndsInHalfACharacter() {
         StringBuilder text = new StringBuilder();
         for (int i = 0; i < TelemetrySpan.MAX_VALUE_LENGTH - 1; i++) {

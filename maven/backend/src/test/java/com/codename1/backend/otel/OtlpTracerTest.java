@@ -644,6 +644,49 @@ class OtlpTracerTest {
     }
 
     @Test
+    @DisplayName("a request that stops the server still exports its own span")
+    void theStoppingRequestKeepsItsSpan() throws Exception {
+        int port = freePort();
+        final java.util.concurrent.atomic.AtomicReference server =
+                new java.util.concurrent.atomic.AtomicReference();
+        Backend backend = Backend.builder(Config.of(settings(port), "test"))
+                .quiet()
+                .tracing(new OtlpTracer())
+                .handler(new HttpServer.Handler() {
+                    public HttpServer.Response handle(HttpServer.Request request) {
+                        if(request.getTarget().startsWith("/shutdown")) {
+                            ((Backend)server.get()).stop();
+                            return HttpServer.Response.text(200, "stopping");
+                        }
+                        return null;
+                    }
+                })
+                .start();
+        server.set(backend);
+        HttpURLConnection connection = (HttpURLConnection)new URL(
+                "http://127.0.0.1:" + port + "/shutdown").openConnection();
+        assertEquals(200, connection.getResponseCode());
+        long deadline = System.currentTimeMillis() + 10000;
+        boolean found = false;
+        while(!found && System.currentTimeMillis() < deadline) {
+            for(int iter = 0 ; iter < exports.size() && !found ; iter++) {
+                ExportTraceServiceRequest sent = ExportTraceServiceRequest.parseFrom((byte[])exports.get(iter));
+                for(ResourceSpans rs : sent.getResourceSpansList()) {
+                    for(io.opentelemetry.proto.trace.v1.ScopeSpans ss : rs.getScopeSpansList()) {
+                        for(Span span : ss.getSpansList()) {
+                            found |= "/shutdown".equals(attribute(span.getAttributesList(), "url.path"));
+                        }
+                    }
+                }
+            }
+            if(!found) {
+                Thread.sleep(50);
+            }
+        }
+        assertTrue(found, "the request that stopped the server lost its span");
+    }
+
+    @Test
     @DisplayName("OTEL_SDK_DISABLED leaves the server untraced and the collector untouched")
     void disabledAtRunTime() throws Exception {
         int port = freePort();

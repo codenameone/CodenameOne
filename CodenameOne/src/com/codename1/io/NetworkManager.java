@@ -729,7 +729,11 @@ public final class NetworkManager {
             // attempt that just ended becomes the next one's parent: one trace,
             // one decision, each attempt still its own span. A request that WAS
             // queued inside an action keeps that action as every attempt's parent.
-            if ((request.tracerParent == null || request.tracerParentChained)
+            // A parent some OTHER tracer captured is as good as none: the tracer
+            // that ran this attempt will not use it (it only takes its own), and
+            // keeping it blocked the chain, so every retry started a new root.
+            if ((request.tracerParent == null || request.tracerParentChained
+                    || request.tracerParentOwner != request.tracerLastOwner) //NOPMD CompareObjectsWithEquals
                     && request.tracerLastAttempt != null) {
                 request.tracerParent = request.tracerLastAttempt;
                 request.tracerParentOwner = request.tracerLastOwner;

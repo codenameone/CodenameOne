@@ -327,9 +327,27 @@ public final class Telemetry {
             CN.callSerially(new Runnable() {
                 @Override
                 public void run() {
-                    record(span);
+                    recordHandedOff(span);
                 }
             });
+        }
+
+        /// A span that ended on another thread and reaches the EDT only now. It
+        /// passed the stopped check where it ended, so it finished while this
+        /// installation was running; if an uninstall or a reinstall ran on the EDT
+        /// in between, it is exported on its own rather than discarded -- which
+        /// lost the request spans that were completing just as telemetry was
+        /// reconfigured.
+        void recordHandedOff(TelemetrySpan span) {
+            if (!stopped) {
+                record(span);
+                return;
+            }
+            if (!permitted()) {
+                return;
+            }
+            buffer.add(span);
+            flush(true);
         }
 
         void record(TelemetrySpan span) {
