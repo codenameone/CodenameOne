@@ -46,12 +46,27 @@ public final class Uint8List {
         this.bytes = bytes;
     }
 
+    /** {@code Uint8List.fromList(source)} with a source typed only dynamic. */
+    public static Uint8List fromList(Object source) {
+        if (!(source instanceof List)) {
+            throw new dart.core.TypeError("type '" + (source == null ? "Null" : source.getClass().getName())
+                    + "' is not a subtype of type 'List<int>'");
+        }
+        return fromList((List<?>) source);
+    }
+
     /** {@code Uint8List.fromList(<int>[...])}. */
     public static Uint8List fromList(List<?> elements) {
         byte[] b = new byte[elements.size()];
         for (int i = 0; i < b.length; i++) {
             Object o = elements.get(i);
-            b[i] = o instanceof Number ? ((Number) o).byteValue() : 0;
+            // The List<int> contract is checked per element, as Dart does: a string
+            // became byte zero and a double was narrowed, where Dart throws TypeError.
+            if (!(o instanceof Long || o instanceof Integer || o instanceof Short || o instanceof Byte)) {
+                throw new dart.core.TypeError("type '" + (o == null ? "Null" : o instanceof Number ? "double"
+                        : o.getClass().getSimpleName()) + "' is not a subtype of type 'int'");
+            }
+            b[i] = ((Number) o).byteValue();
         }
         return new Uint8List(b);
     }

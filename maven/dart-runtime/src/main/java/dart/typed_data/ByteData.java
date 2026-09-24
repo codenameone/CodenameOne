@@ -46,7 +46,10 @@ public final class ByteData {
      * to 0: getUint8 read byte zero and setUint8 overwrote it instead of throwing.
      */
     private int at(long byteOffset, int width) {
-        if (byteOffset < 0 || byteOffset + width > buffer.length) {
+        // Against length - width, never offset + width: near Long.MAX_VALUE the sum
+        // overflowed negative, passed, and the narrowed index threw Java's
+        // ArrayIndexOutOfBoundsException instead of Dart's RangeError.
+        if (byteOffset < 0 || byteOffset > buffer.length - width) {
             throw new dart.core.RangeError("Invalid value: Not in inclusive range 0.."
                     + (buffer.length - width) + ": " + byteOffset + " (byteOffset)");
         }

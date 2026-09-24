@@ -342,7 +342,9 @@ public final class DString {
         if (s == null) {
             return null;
         }
-        String t = s.trim();
+        // Dart's whitespace, not Java's: String.trim leaves U+00A0, U+2003, U+3000 and
+        // the rest in place, and 123 between two U+00A0 failed to parse.
+        String t = trim(s);
         boolean negative = false;
         if (t.startsWith("-") || t.startsWith("+")) {
             negative = t.charAt(0) == '-';

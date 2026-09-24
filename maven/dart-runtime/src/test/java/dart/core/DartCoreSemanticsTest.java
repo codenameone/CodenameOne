@@ -848,4 +848,39 @@ public class DartCoreSemanticsTest {
         assertFalse(dart.runtime.DartRuntime.identical(Double.valueOf(0.0), Double.valueOf(-0.0)));
         assertFalse(dart.runtime.DartRuntime.identical(new StringBuilder("a").toString(), "a"));
     }
+
+    @Test
+    public void hashesAgreeWithDartEqualityAcrossIntAndDouble() {
+        assertEquals(dart.runtime.DartRuntime.hashOf(Long.valueOf(1)), dart.runtime.DartRuntime.hashOf(Double.valueOf(1.0)));
+        assertEquals(dart.runtime.DartRuntime.hashOf(Double.valueOf(0.0)), dart.runtime.DartRuntime.hashOf(Double.valueOf(-0.0)));
+        assertEquals(dart.runtime.DartRuntime.hash(Long.valueOf(2), "x"), dart.runtime.DartRuntime.hash(Double.valueOf(2.0), "x"));
+    }
+
+    @Test
+    public void typedCopiesCheckTheirElements() {
+        java.util.List<Object> mixed = new java.util.ArrayList<Object>();
+        mixed.add(Long.valueOf(1));
+        assertThrows(TypeError.class, () -> DartList.fromChecked(mixed, String.class, false, true));
+        java.util.List<Object> strings = new java.util.ArrayList<Object>();
+        strings.add("a");
+        strings.add(null);
+        assertThrows(TypeError.class, () -> DartList.fromChecked(strings, String.class, false, true),
+                "null is not a String");
+        assertEquals(2, DartList.fromChecked(strings, String.class, true, true).size());
+        java.util.List<Object> notInts = new java.util.ArrayList<Object>();
+        notInts.add("x");
+        assertThrows(TypeError.class, () -> dart.typed_data.Uint8List.fromList(notInts));
+    }
+
+    @Test
+    public void byteDataOffsetsNearTheLimitAreRangeErrors() {
+        dart.typed_data.ByteData bd = new dart.typed_data.ByteData(8);
+        assertThrows(RangeError.class, () -> bd.getInt32(Long.MAX_VALUE));
+        assertThrows(RangeError.class, () -> bd.getInt32(5));
+    }
+
+    @Test
+    public void intParsingTrimsDartWhitespace() {
+        assertEquals(Long.valueOf(123), DString.tryParseInt("\u00A0123\u00A0"));
+    }
 }

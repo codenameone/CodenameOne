@@ -126,6 +126,32 @@ public class DartList<E> extends AbstractList<E> implements RandomAccess {
         return new DartList<E>(impl, growable);
     }
 
+    /**
+     * {@code List<E>.from(elements)} with Dart's per-element type check: {@code type} is
+     * E's class. Java erases E, so the plain copy accepted anything --
+     * {@code List<String>.from(<dynamic>[1])} stored a Long that failed only when a later
+     * typed read cast it. Dart throws TypeError from the constructor.
+     */
+    @SuppressWarnings("unchecked")
+    public static <E> DartList<E> fromChecked(Object source, Class<?> type, boolean nullable,
+                                              boolean growable) {
+        // Object, not Iterable: a dynamic source arrives untyped, as Dart allows.
+        if (!(source instanceof Iterable)) {
+            throw new TypeError("type '" + (source == null ? "Null" : source.getClass().getName())
+                    + "' is not a subtype of type 'Iterable'");
+        }
+        ArrayList<E> impl = new ArrayList<E>();
+        for (Object e : (Iterable<?>) source) {
+            if (e == null ? !nullable : !type.isInstance(e)) {
+                String n = type.getName();
+                throw new TypeError("type '" + (e == null ? "Null" : e.getClass().getName())
+                        + "' is not a subtype of type '" + n.substring(n.lastIndexOf('.') + 1) + "'");
+            }
+            impl.add((E) e);
+        }
+        return new DartList<E>(impl, growable);
+    }
+
     public static <E> DartList<E> from(Iterable<E> elements) {
         DartList<E> l = new DartList<>();
         for (E e : elements) {

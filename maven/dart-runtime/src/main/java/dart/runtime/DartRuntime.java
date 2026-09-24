@@ -106,10 +106,44 @@ public final class DartRuntime {
         int h = 1;
         if (objects != null) {
             for (Object o : objects) {
-                h = 31 * h + (o == null ? 0 : o.hashCode());
+                h = 31 * h + hashOf(o);
             }
         }
         return h;
+    }
+
+    /** Dart's {@code Object.hash(a, b, ...)}: {@link #hashAll} over the arguments. */
+    public static long hash(Object... objects) {
+        int h = 1;
+        if (objects != null) {
+            for (Object o : objects) {
+                h = 31 * h + hashOf(o);
+            }
+        }
+        return h;
+    }
+
+    /**
+     * A hash consistent with {@link #eq}: Dart's {@code 1 == 1.0}, so 1.0 (and any double
+     * equal to an int) hashes as that int, and 0.0 as -0.0. Java's wrappers hash a Long
+     * and the equal Double differently, so a value class hashing a num field gave equal
+     * instances different hashes and they missed each other in maps and sets.
+     */
+    public static int hashOf(Object o) {
+        if (o == null) {
+            return 0;
+        }
+        if (o instanceof Double || o instanceof Float) {
+            double d = ((Number) o).doubleValue();
+            if (d >= -9.223372036854775808E18 && d < 9.223372036854775808E18 && (double) (long) d == d) {
+                return Long.valueOf((long) d).hashCode();
+            }
+            return o.hashCode();
+        }
+        if (o instanceof Integer || o instanceof Short || o instanceof Byte) {
+            return Long.valueOf(((Number) o).longValue()).hashCode();
+        }
+        return o.hashCode();
     }
 
     /**
@@ -188,6 +222,14 @@ public final class DartRuntime {
             return ((Boolean) a).booleanValue() == ((Boolean) b).booleanValue();
         }
         return false;
+    }
+
+    /** {@code t} as Dart's ConcurrentModificationError, converting Java's exception. */
+    public static dart.core.ConcurrentModificationError asConcurrentModificationError(Throwable t) {
+        if (t instanceof dart.core.ConcurrentModificationError) {
+            return (dart.core.ConcurrentModificationError) t;
+        }
+        return new dart.core.ConcurrentModificationError(t.getMessage() == null ? "collection modified" : t.getMessage());
     }
 
     public static boolean eq(Object a, Object b) {
