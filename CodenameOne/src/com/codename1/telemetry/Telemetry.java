@@ -531,6 +531,11 @@ public final class Telemetry {
                 span.recordException(error);
             } else if (responseCode >= 400) {
                 span.setError(String.valueOf(responseCode));
+            } else if (responseCode < 100) {
+                // Neither a response nor an exception: the request was killed or
+                // stopped after it had started. Ended without a status, it read as
+                // a success in every trace backend.
+                span.setError("cancelled before a response");
             }
             span.end();
         }

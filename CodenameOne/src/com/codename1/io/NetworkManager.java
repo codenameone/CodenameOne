@@ -679,6 +679,15 @@ public final class NetworkManager {
         }
     }
 
+    /// Forgets every tracer object a finished request holds.
+    static void clearTracerState(ConnectionRequest req) {
+        req.tracerParent = null;
+        req.tracerParentOwner = null;
+        req.tracerParentChained = false;
+        req.tracerLastAttempt = null;
+        req.tracerLastOwner = null;
+    }
+
     /// Adds the given network connection to the queue of execution
     ///
     /// #### Parameters
@@ -694,6 +703,7 @@ public final class NetworkManager {
             // here, on the thread that ran it, before the request is visible to
             // anyone else.
             endTracerAttempt(request, null);
+            request.tracerRequeues++;
             // A request queued with no context -- the usual case for a generated
             // client used outside Telemetry.run -- would start a NEW trace on every
             // attempt: a 302 and the 200 it led to, or a failure and the retry that
@@ -1212,6 +1222,9 @@ public final class NetworkManager {
             // failure and do not rethrow, so the finally is the one place that sees
             // every ending.
             Throwable failure = null;
+            // How many times the request had been re-queued when this attempt
+            // began; compared in the finally to learn whether it was the last.
+            int requeuesBefore = req.tracerRequeues;
             // Default this to true because if, for some reason an exception is thrown
             // before calling performOperationComplete(), then the request
             // won't be retried.
@@ -1285,6 +1298,15 @@ public final class NetworkManager {
                     req.complete = true;
                 }
                 endTracerAttempt(req, failure);
+                if (req.tracerRequeues == requeuesBefore) {
+                    // Nothing queued this request again, so that was its last
+                    // attempt. Its tracer state goes with it: the parent and the
+                    // last attempt are the tracer's own objects -- a span and,
+                    // through it, the whole installation -- and a request an app
+                    // keeps for reuse held them for as long as it lived, an
+                    // uninstalled telemetry included.
+                    clearTracerState(req);
+                }
                 NetworkGuard guard = getNetworkGuard();
                 if (guard != null && req.hasGuardResponse()) {
                     try {

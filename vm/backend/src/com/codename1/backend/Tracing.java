@@ -98,10 +98,22 @@ public final class Tracing {
      * the first server kept running untraced.
      */
     static Tracer swap(Tracer installed) {
-        Tracer previous = tracer;
-        tracer = installed;
-        return previous;
+        synchronized(LIFECYCLE) {
+            Tracer previous = tracer;
+            tracer = installed;
+            return previous;
+        }
     }
+
+    /**
+     * Guards every read-and-replace of the slot. Two servers starting at once each
+     * read the same previous tracer before either write landed, so each retired
+     * that one, and the tracer the FIRST installed -- overwritten by the second --
+     * was never shut down: its export thread and queues leaked. The server is
+     * multi-threaded here; the lock is held for the swap only, never across a
+     * shutdown, which can block for seconds.
+     */
+    private static final Object LIFECYCLE = new Object();
 
     /** Stops {@code previous}, replaced by {@code installed}, exporting what it held. */
     static void retire(Tracer previous, Tracer installed) {
@@ -121,8 +133,20 @@ public final class Tracing {
      * since then is someone else's.
      */
     static void rollBack(Tracer failed, Tracer previous) {
-        if(tracer == failed) {
-            tracer = previous;
+        boolean restored;
+        synchronized(LIFECYCLE) {
+            restored = tracer == failed;
+            if(restored) {
+                tracer = previous;
+            }
+        }
+        if(!restored) {
+            // Another install replaced the failed tracer meanwhile, so previous is
+            // not coming back -- and the failed start-up was the only one holding
+            // it. Retired here, or nothing ever would. The failed tracer itself was
+            // retired by that install, which found it in the slot.
+            retire(previous, failed);
+            return;
         }
         if(failed != null && failed != previous) {
             try {
@@ -608,11 +632,14 @@ public final class Tracing {
      * {@link #install}, and whatever replaced it belongs to someone else.
      */
     static void shutdown(Tracer owned, int timeoutMillis) {
-        Tracer t = tracer;
-        if(t == null || t != owned) {
-            return;
+        Tracer t;
+        synchronized(LIFECYCLE) {
+            t = tracer;
+            if(t == null || t != owned) {
+                return;
+            }
+            tracer = null;
         }
-        tracer = null;
         try {
             t.shutdown(timeoutMillis);
         } catch (RuntimeException err) {

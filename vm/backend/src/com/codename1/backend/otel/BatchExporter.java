@@ -80,6 +80,12 @@ final class BatchExporter implements Runnable {
     private long flushRelayed;
     private boolean stopping;
     private boolean stopped;
+    /**
+     * Nothing is posted before this time: set after a retryable failure (429, a
+     * 5xx gateway answer, no connection) so the retry waits out a backoff. Waited
+     * for on the lock, never slept through -- shutdown's notifyAll ends it at once.
+     */
+    private long retryAt;
     private Thread thread;
 
     // Counters for the metrics snapshot. Written under the lock.
@@ -148,7 +154,8 @@ final class BatchExporter implements Runnable {
                 droppedRelayed++;
                 return false;
             }
-            relayed.add(new Object[] {body, contentType});
+            // The third slot marks a payload that has had its one retry.
+            relayed.add(new Object[] {body, contentType, null});
             relayedBytes += body.length;
             enqueuedRelayed++;
             lock.notifyAll();
@@ -238,14 +245,23 @@ final class BatchExporter implements Runnable {
             List batch;
             List payloads;
             synchronized(lock) {
-                while(!stopping && queue.size() < maxBatch && relayed.isEmpty()
-                        && drainedSpans >= flushSpans && drainedRelayed >= flushRelayed) {
-                    long left = nextTick - System.currentTimeMillis();
-                    if(left <= 0) {
+                while(!stopping) {
+                    long now = System.currentTimeMillis();
+                    long until;
+                    if(now < retryAt) {
+                        // Backing off: nothing goes before retryAt, a pending
+                        // flush included, or a flush would hammer the collector
+                        // that just asked for less.
+                        until = retryAt;
+                    } else if(queue.size() >= maxBatch || !relayed.isEmpty()
+                            || drainedSpans < flushSpans || drainedRelayed < flushRelayed
+                            || now >= nextTick) {
                         break;
+                    } else {
+                        until = nextTick;
                     }
                     try {
-                        lock.wait(left);
+                        lock.wait(Math.max(1, until - now));
                     } catch (InterruptedException err) {
                         // Only a shutdown interrupts this thread; carry on to it.
                     }
@@ -264,9 +280,8 @@ final class BatchExporter implements Runnable {
             if(System.currentTimeMillis() >= nextTick) {
                 nextTick = System.currentTimeMillis() + delayMillis;
             }
-            if(!batch.isEmpty()) {
-                exportSpans(batch);
-            }
+            int requeuedSpans = batch.isEmpty() ? 0 : exportSpans(batch);
+            int requeuedPayloads = 0;
             for(int iter = 0 ; iter < payloads.size() ; iter++) {
                 if(isStopping()) {
                     // The rest of this round goes the way shutdown() sends the
@@ -277,18 +292,26 @@ final class BatchExporter implements Runnable {
                     break;
                 }
                 Object[] payload = (Object[])payloads.get(iter);
-                boolean sent = post((byte[])payload[0], (String)payload[1]);
+                int result = post((byte[])payload[0], (String)payload[1]);
                 synchronized(lock) {
-                    if(sent) {
+                    if(result == SENT) {
                         relayedPayloads++;
+                    } else if(result == RETRY && payload[2] == null
+                            && requeueRelayed(payloads, iter)) {
+                        // This one and the rest of the round go back to the head of
+                        // the relay queue, and wait out the backoff with it.
+                        requeuedPayloads = payloads.size() - iter;
+                        break;
                     } else {
                         droppedRelayed++;
                     }
                 }
             }
             synchronized(lock) {
-                drainedSpans += batch.size();
-                drainedRelayed += payloads.size();
+                // A requeued span is not drained: flush() is waiting for it to be
+                // exported or dropped, which happens on its retry.
+                drainedSpans += batch.size() - requeuedSpans;
+                drainedRelayed += payloads.size() - requeuedPayloads;
                 lock.notifyAll();
                 if(stopping && queue.isEmpty() && relayed.isEmpty()) {
                     stopped = true;
@@ -311,7 +334,14 @@ final class BatchExporter implements Runnable {
         return out;
     }
 
-    private void exportSpans(List batch) {
+    /**
+     * Posts one batch. A retryable failure puts the spans that have not been
+     * retried yet back at the head of the queue for one more try after the
+     * backoff; the rest are dropped.
+     *
+     * @return how many spans went back on the queue
+     */
+    private int exportSpans(List batch) {
         byte[] body;
         try {
             Map request = OtlpTracer.exportRequest(resource, batch);
@@ -324,64 +354,108 @@ final class BatchExporter implements Runnable {
                 droppedSpans += batch.size();
                 lastError = "encode: " + err.getMessage();
             }
-            return;
+            return 0;
         }
-        boolean sent = post(body, protobuf ? "application/x-protobuf" : "application/json");
+        int result = post(body, protobuf ? "application/x-protobuf" : "application/json");
         synchronized(lock) {
-            if(sent) {
+            if(result == SENT) {
                 // A 200 can still carry a partial success: the collector names how
                 // many spans it dropped, and those were not exported.
                 long rejected = Math.min(lastRejected, batch.size());
                 exportedSpans += batch.size() - rejected;
                 rejectedSpans += rejected;
-            } else {
-                droppedSpans += batch.size();
+                return 0;
             }
+            if(result != RETRY || stopping) {
+                droppedSpans += batch.size();
+                return 0;
+            }
+            // Once per span, never more: an overloaded collector is not helped by
+            // this server hammering it, and what is queued behind these keeps
+            // arriving. Room permitting -- a full queue is the bound that holds.
+            List again = new ArrayList();
+            for(int iter = 0 ; iter < batch.size() ; iter++) {
+                OtelSpan span = (OtelSpan)batch.get(iter);
+                if(!span.exportRetried) {
+                    span.exportRetried = true;
+                    again.add(span);
+                }
+            }
+            if(again.isEmpty() || queue.size() + again.size() > maxQueue) {
+                droppedSpans += batch.size();
+                return 0;
+            }
+            droppedSpans += batch.size() - again.size();
+            queue.addAll(0, again);
+            retryAt = System.currentTimeMillis() + delayMillis;
+            return again.size();
         }
     }
 
     /**
-     * One POST, retried once for the answers OTLP/HTTP defines as retryable. Never
-     * more than once: a collector that is overloaded is not helped by this server
-     * hammering it, and the next batch is already queued behind this one.
+     * Puts payloads[from..] back at the head of the relay queue, marked as retried,
+     * and starts the backoff; false, having changed nothing, when the relay's byte
+     * budget has no room for them. Called holding the lock.
      */
-    private boolean post(byte[] body, String contentType) {
-        lastRejected = 0;
-        for(int attempt = 0 ; attempt < 2 ; attempt++) {
-            List lines = new ArrayList(headers.size() + 1);
-            lines.add("Content-Type: " + contentType);
-            lines.addAll(headers);
-            int status;
-            try {
-                Web.Result result = Web.request("POST", endpoint, lines, body);
-                status = result.getStatus();
-                if(status >= 200 && status < 300) {
-                    lastRejected = partialSuccess(result, contentType);
-                }
-            } catch (Exception err) {
-                recordFailure("could not reach the collector: " + err.getMessage());
-                status = -1;
-            }
-            if(status >= 200 && status < 300) {
-                return true;
-            }
-            if(status > 0) {
-                recordFailure("the collector answered " + status);
-            }
-            boolean retryable = status < 0 || status == 429 || status == 502 || status == 503
-                    || status == 504;
-            // No retry once stopping: the wait and the second request are exactly
-            // what a bounded shutdown cannot afford.
-            if(!retryable || attempt == 1 || isStopping()) {
-                return false;
-            }
-            try {
-                Thread.sleep(1000);
-            } catch (InterruptedException err) {
-                return false;
-            }
+    private boolean requeueRelayed(List payloads, int from) {
+        if(stopping) {
+            return false;
         }
-        return false;
+        long bytes = 0;
+        for(int iter = from ; iter < payloads.size() ; iter++) {
+            bytes += ((byte[])((Object[])payloads.get(iter))[0]).length;
+        }
+        if(relayedBytes + bytes > maxRelayBytes) {
+            return false;
+        }
+        List again = new ArrayList();
+        for(int iter = from ; iter < payloads.size() ; iter++) {
+            Object[] payload = (Object[])payloads.get(iter);
+            again.add(new Object[] {payload[0], payload[1], Boolean.TRUE});
+        }
+        relayed.addAll(0, again);
+        relayedBytes += bytes;
+        retryAt = System.currentTimeMillis() + delayMillis;
+        return true;
+    }
+
+    private static final int SENT = 0;
+    /** A failure OTLP/HTTP defines as retryable: 429, 502-504, or no connection. */
+    private static final int RETRY = 1;
+    private static final int FAILED = 2;
+
+    /**
+     * One POST, and only one. There used to be a second, after a one-second
+     * Thread.sleep in here: a thread parked doing nothing, and a window in which
+     * a shutdown that had already given up waiting watched it post again with the
+     * old credentials. The retry now goes back on the queue instead -- see
+     * exportSpans -- and waits out its backoff on the lock, which shutdown wakes.
+     */
+    private int post(byte[] body, String contentType) {
+        lastRejected = 0;
+        List lines = new ArrayList(headers.size() + 1);
+        lines.add("Content-Type: " + contentType);
+        lines.addAll(headers);
+        int status;
+        try {
+            Web.Result result = Web.request("POST", endpoint, lines, body);
+            status = result.getStatus();
+            if(status >= 200 && status < 300) {
+                lastRejected = partialSuccess(result, contentType);
+            }
+        } catch (Exception err) {
+            recordFailure("could not reach the collector: " + err.getMessage());
+            status = -1;
+        }
+        if(status >= 200 && status < 300) {
+            return SENT;
+        }
+        if(status > 0) {
+            recordFailure("the collector answered " + status);
+        }
+        boolean retryable = status < 0 || status == 429 || status == 502 || status == 503
+                || status == 504;
+        return retryable ? RETRY : FAILED;
     }
 
     /**

@@ -129,6 +129,22 @@ class LambdaTracingTest {
     }
 
     @Test
+    @DisplayName("a failed start-up whose tracer was replaced meanwhile retires the one it displaced")
+    void aRollBackAfterAnotherInstallRetiresWhatItDisplaced() {
+        Recorder x = new Recorder();
+        Recorder failing = new Recorder();
+        Recorder other = new Recorder();
+        Tracing.install(x);
+        // Start-up A swaps X out, start-up B swaps A out, then A fails.
+        Tracer previous = Tracing.swap(failing);
+        Tracing.retire(Tracing.swap(other), other);
+        Tracing.rollBack(failing, previous);
+        assertTrue(Tracing.getTracer() == other, "the later install was undone");
+        assertEquals(1, x.shutdowns, "the tracer the failed start-up displaced leaked");
+        assertEquals(1, failing.shutdowns);
+    }
+
+    @Test
     @DisplayName("a span whose decoration throws is still ended")
     void abandonedSpansAreEnded() throws Exception {
         Recorder recorder = new Recorder();
@@ -166,7 +182,10 @@ class LambdaTracingTest {
         public void flush(int timeoutMillis) {
         }
 
+        int shutdowns;
+
         public void shutdown(int timeoutMillis) {
+            shutdowns++;
         }
 
         public com.codename1.backend.HttpServer.Handler relay() {

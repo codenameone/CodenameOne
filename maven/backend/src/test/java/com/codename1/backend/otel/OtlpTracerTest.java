@@ -77,6 +77,9 @@ class OtlpTracerTest {
     private final List contentTypes = Collections.synchronizedList(new ArrayList());
     private final List authorizations = Collections.synchronizedList(new ArrayList());
     private final List authorizationCounts = Collections.synchronizedList(new ArrayList());
+    /** Statuses the collector answers with, in order; 200 once they run out. */
+    private final java.util.concurrent.ConcurrentLinkedQueue answers =
+            new java.util.concurrent.ConcurrentLinkedQueue();
     /** How long the collector takes to answer; a slow one keeps the queue from emptying. */
     private volatile int collectorDelayMillis;
 
@@ -96,7 +99,8 @@ class OtlpTracerTest {
             authorizations.add(String.valueOf(exchange.getRequestHeaders().getFirst("Authorization")));
             List all = exchange.getRequestHeaders().get("Authorization");
             authorizationCounts.add(Integer.valueOf(all == null ? 0 : all.size()));
-            exchange.sendResponseHeaders(200, -1);
+            Object answer = answers.poll();
+            exchange.sendResponseHeaders(answer == null ? 200 : ((Integer)answer).intValue(), -1);
             exchange.close();
         });
         collector.start();
@@ -550,6 +554,37 @@ class OtlpTracerTest {
         Thread.sleep(5000);
         assertTrue(exports.size() <= 2,
                 "the stopped exporter kept posting to the collector: " + exports.size() + " posts");
+    }
+
+    @Test
+    @DisplayName("a retryable failure is retried once, after a backoff, without sleeping")
+    void aRetryableFailureIsRetriedOnceFromTheQueue() throws Exception {
+        Properties settings = settings(freePort());
+        settings.setProperty(OtlpTracer.EXPORT_DELAY, "200");
+        answers.add(Integer.valueOf(503));
+        OtlpTracer tracer = new OtlpTracer();
+        assertTrue(tracer.open(Config.of(settings, "test")));
+        try {
+            tracer.startSpan("once", com.codename1.backend.Span.KIND_INTERNAL, null, null, null).end();
+            tracer.flush(5000);
+            java.util.Map metrics = new java.util.LinkedHashMap();
+            tracer.metrics(metrics);
+            assertEquals(2, exports.size(), "the 503 and the retry that succeeded");
+            assertEquals(Long.valueOf(1), metrics.get("spansExported"));
+
+            // Refused again on its retry: dropped, never tried a third time.
+            answers.add(Integer.valueOf(503));
+            answers.add(Integer.valueOf(503));
+            tracer.startSpan("twice", com.codename1.backend.Span.KIND_INTERNAL, null, null, null).end();
+            // flush returns once the span is exported OR dropped: here, dropped.
+            tracer.flush(5000);
+            metrics.clear();
+            tracer.metrics(metrics);
+            assertEquals(4, exports.size(), "a span was retried more than once");
+            assertEquals(Long.valueOf(1), metrics.get("spansDropped"));
+        } finally {
+            tracer.shutdown(0);
+        }
     }
 
     @Test

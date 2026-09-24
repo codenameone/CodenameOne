@@ -161,6 +161,43 @@ class NetworkTracerQueueTest extends UITestBase {
     }
 
     @Test
+    void aFinishedRequestLetsGoOfItsTracerState() throws Exception {
+        // The parent and the last attempt are the tracer's objects -- through them,
+        // a whole telemetry installation. A request kept for reuse must not hold
+        // them once its last attempt is over.
+        com.codename1.testing.TestCodenameOneImplementation.getInstance()
+                .addNetworkMockResponse("http://queue.test/done", 200, "OK", new byte[0]);
+        NetworkManager.setNetworkTracer(new NetworkTracer() {
+            @Override
+            public Object requestQueued(ConnectionRequest request) {
+                return "the action";
+            }
+
+            @Override
+            public Object beforeRequest(ConnectionRequest request, Object parent) {
+                return "the attempt";
+            }
+
+            @Override
+            public void afterRequest(ConnectionRequest request, Object attempt, int status,
+                                     Throwable error) {
+            }
+        });
+        ConnectionRequest request = new ConnectionRequest() {
+            @Override
+            protected void readResponse(java.io.InputStream input) {
+            }
+        };
+        request.setUrl("http://queue.test/done");
+        request.setPost(false);
+        NetworkManager.getInstance().addToQueueAndWait(request);
+        assertEquals(null, request.tracerParent);
+        assertEquals(null, request.tracerParentOwner);
+        assertEquals(null, request.tracerLastAttempt);
+        assertEquals(null, request.tracerLastOwner);
+    }
+
+    @Test
     void addIfAbsentLeavesAnExplicitContentTypeAlone() {
         ConnectionRequest request = new ConnectionRequest();
         request.setContentType("application/json");

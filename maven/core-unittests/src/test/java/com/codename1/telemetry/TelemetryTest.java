@@ -750,6 +750,32 @@ class TelemetryTest extends UITestBase {
     }
 
     @Test
+    void anAttemptCancelledAfterItStartedIsAnError() throws Exception {
+        Telemetry.install(new TelemetryConfig().direct("http://collector.test"));
+        final int[] checks = new int[1];
+        ConnectionRequest cancelled = new ConnectionRequest() {
+            @Override
+            protected boolean shouldStop() {
+                // Running at the first check, stopped at the next: the span has
+                // started and no response ever arrives.
+                return checks[0]++ > 0;
+            }
+
+            @Override
+            protected void readResponse(InputStream input) {
+            }
+        };
+        cancelled.setUrl(API + "?cancelled");
+        cancelled.setPost(false);
+        NetworkManager.getInstance().addToQueueAndWait(cancelled);
+        Telemetry.flush();
+        Span span = find(exported(1), "GET");
+        assertEquals(io.opentelemetry.proto.trace.v1.Status.StatusCode.STATUS_CODE_ERROR,
+                span.getStatus().getCode(), "a cancelled attempt read as a success");
+        assertEquals("cancelled before a response", span.getStatus().getMessage());
+    }
+
+    @Test
     void aTruncatedValueNeverEndsInHalfACharacter() {
         StringBuilder text = new StringBuilder();
         for (int i = 0; i < TelemetrySpan.MAX_VALUE_LENGTH - 1; i++) {

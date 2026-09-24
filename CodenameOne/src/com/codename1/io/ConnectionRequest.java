@@ -1621,6 +1621,10 @@ public class ConnectionRequest implements IOProgressListener {
     /// the request was queued under; a later retry then moves it to the newest one.
     boolean tracerParentChained;
 
+    /// How many times this request has been queued again as a retry or redirect.
+    /// An attempt that ends with it unchanged was the request's last.
+    int tracerRequeues;
+
     private void captureGuardHeaders(Object connection) {
         NetworkGuard guard = NetworkManager.getNetworkGuard();
         guardHeaders = null;

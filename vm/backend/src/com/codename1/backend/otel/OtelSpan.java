@@ -37,6 +37,8 @@ import java.util.Map;
  * here needs a lock of its own.
  */
 final class OtelSpan extends Span {
+    /** Whether an export of this span has already been retried once; see BatchExporter. */
+    boolean exportRetried;
     /** OpenTelemetry's default attribute and event limits. */
     static final int MAX_ATTRIBUTES = 128;
     static final int MAX_EVENTS = 128;
