@@ -310,6 +310,27 @@ class ManagedSessionTest {
         } finally { em.close(); }
     }
 
+    @Test void identifierStorageKindsAreValidatedBeforeCacheOrSql() throws Exception {
+        EntityManager em=manager();
+        try {
+            Session session=em.openSession();Record record=seed(session);
+            for(boolean clear:new boolean[]{false,true}) {
+                if(clear) session.clear();
+                for(Object bad:new Object[]{"abc",String.valueOf(record.id),Double.valueOf(record.id),new byte[]{1}}) {
+                    assertThrows(IllegalArgumentException.class,()->session.find(Record.class,bad));
+                }
+                assertEquals(record.id,session.find(Record.class,Integer.valueOf((int)record.id)).id);
+            }
+            Model composite=new Model() { public Attribute[] attributes() { return new Attribute[]{new Attribute("name","name",Attribute.TEXT,true,false,false,false),new Attribute("counter","counter",Attribute.BIGINT,true,false,false,false)}; } };
+            assertArrayEquals(new Object[]{"key",2L},composite.keyValues(new Object[]{"key",Integer.valueOf(2)}));
+            for(Object[] bad:new Object[][]{{1L,2L},{"key","abc"},{"key",2.5},{"key",null}}) {
+                assertThrows(IllegalArgumentException.class,()->composite.keyValues(bad));
+                assertThrows(IllegalArgumentException.class,()->composite.keyValues(com.codename1.orm.session.Identifier.of(bad)));
+            }
+            session.close();
+        } finally { em.close(); }
+    }
+
     @Test void bulkIntegralAssignmentsRejectRealValuesBeforeWriting() throws Exception {
         EntityManager em=manager();
         try {

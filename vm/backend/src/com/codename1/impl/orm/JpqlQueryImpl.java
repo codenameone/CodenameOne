@@ -178,7 +178,12 @@ public final class JpqlQueryImpl<T> implements com.codename1.orm.session.JpqlQue
             Object binding = plan.bindings.get(index);
             position = end + 3;
             statement.append("?");
-            if (binding instanceof LikeBinding) {
+            if (binding instanceof LiteralBinding && ((LiteralBinding) binding).value == null
+                    && ((LiteralBinding) binding).query == null) {
+                // Keep untyped, unmapped NULL valid in COUNT(NULL) and similar SQL.
+                statement.setLength(statement.length() - 1);
+                statement.append("NULL");
+            } else if (binding instanceof LikeBinding) {
                 LikeBinding like = (LikeBinding) binding;
                 Object pattern = boundValue(like.pattern);
                 Object escape = like.escaped ? boundValue(like.escape) : null;
@@ -1027,7 +1032,7 @@ public final class JpqlQueryImpl<T> implements com.codename1.orm.session.JpqlQue
         }
         private Expr literal(int kind, Object value) {
             LiteralBinding binding = new LiteralBinding(value);
-            String sql = value == null ? "NULL" : bind(binding);
+            String sql = bind(binding);
             if (numericKind(kind) || kind == Attribute.BOOLEAN) {
                 sql = session.numericOperand(sql, kind == Attribute.BOOLEAN ? Attribute.BIGINT : kind);
             }

@@ -211,10 +211,13 @@ correlated nested queries. `LENGTH` counts characters on every backend.
 `@MappedSuperclass` contributes public inherited fields to a concrete entity.
 `@Embedded` flattens a public `@Embeddable` value into columns prefixed with the
 embedding field name. An all-null embedded value reads as null. Embedded fields
-can be used in query paths. Enums are stored by name.
+can be used in query paths. Enums are stored by name. Boolean values use numeric
+storage; native `BOOL` and `BOOLEAN` column declarations are rejected.
 
 Public no-argument void methods can receive `@PrePersist`, `@PostPersist`,
 `@PreUpdate`, `@PostUpdate`, `@PreRemove`, `@PostRemove`, and `@PostLoad` callbacks.
+Relationships added by `@PrePersist` follow `PERSIST` cascades in the current
+flush, including newly created collections.
 
 Inherited callbacks run before subclass callbacks; overriding a callback method
 replaces the inherited declaration. Client scalar `Property` fields participate
@@ -224,7 +227,8 @@ backend runtime doesn't contain the client properties package.
 `@Convert(converter=CodeConverter.class, storageType=String.class)` maps a
 custom basic value to a SQL scalar. The converter implements
 `com.codename1.orm.session.AttributeConverter<Code,String>` and has a public
-no-argument constructor. It receives null values too. Query-builder predicates
+no-argument constructor. It receives null values too, including mapped JPQL
+`NULL` literals. Query-builder predicates
 and JPQL comparison parameters and literals apply the field's converter. Values
 must match the converter's input type; use a named parameter for custom objects. Identifiers and
 versions can't use converters. This includes every component of an embedded identifier.
@@ -242,6 +246,9 @@ required key. SQLite and PostgreSQL support required cycles with keys assigned
 before insertion because their foreign keys are deferred until commit.
 MySQL and MariaDB enforce foreign keys immediately, so sessions reject required
 cycles before creating tables or writing data, even when the keys are known.
+
+Identifier components are normalized and checked against their storage types
+before a cache lookup or SQL query. Incompatible values raise `IllegalArgumentException`.
 
 For composite IDs, use several `@Id(autoIncrement=false)` fields or one
 `@EmbeddedId` whose type is `@Embeddable`. Lookup accepts

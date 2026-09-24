@@ -101,6 +101,9 @@ class ManagedSessionDatabaseTest {
             session.beginTransaction();
             assertThrows(IllegalArgumentException.class,()->session.createQuery("update ManagedSessionTest$Record r set r.counter=:value").setParameter("value",1.5).executeUpdate());
             session.rollbackTransaction();
+            assertThrows(IllegalArgumentException.class,()->session.find(ManagedSessionTest.Record.class,"abc"));
+            assertThrows(IllegalArgumentException.class,()->session.find(ManagedSessionTest.Record.class,1.5));
+            assertEquals(Long.valueOf(0),session.createQuery("select count(NULL) from ManagedSessionTest$Record r",Long.class).first());
             assertThrows(IllegalArgumentException.class,()->session.query(ManagedSessionTest.Record.class).eq("counter","abc"));
             assertThrows(IllegalArgumentException.class,()->session.createQuery("update ManagedSessionTest$Record r set r.counter='oops'"));
             session.beginTransaction();

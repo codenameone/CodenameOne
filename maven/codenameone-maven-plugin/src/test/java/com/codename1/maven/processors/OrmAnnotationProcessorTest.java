@@ -215,6 +215,63 @@ public class OrmAnnotationProcessorTest {
     }
 
     @Test
+    public void mappedNullLiteralsUseConverterSentinels() throws Exception {
+        File classes=tmp.newFolder("nullsentinel");Map<String,String> sources=new java.util.LinkedHashMap<String,String>();String imports="package nullsentinel; import com.codename1.annotations.*; import com.codename1.annotations.db.*; ";
+        sources.put("nullsentinel.Sentinel","package nullsentinel; public class Sentinel implements com.codename1.orm.session.AttributeConverter<String,String> { public String toDatabase(String value) { return value==null?\"<null>\":\"db:\"+value; } public String fromDatabase(String value) { return value==null || value.equals(\"<null>\")?null:value.substring(3); } }");
+        sources.put("nullsentinel.Entry",imports+"@Entity(table=\"null_sentinel\") public class Entry { @Id public long id; @Convert(converter=Sentinel.class) public String code; }");
+        JavaSourceCompiler.compile(sources,classes,Arrays.asList(testClassesDir()));ProcessorContext client=runProcessor(classes);assertFalse(client.getErrors().toString(),client.hasErrors());ProcessorContext backend=runProcessor(classes,backendClasspath());assertFalse(backend.getErrors().toString(),backend.hasErrors());
+        try(java.net.URLClassLoader loader=new java.net.URLClassLoader(new URL[]{classes.toURI().toURL()},getClass().getClassLoader())) {
+            Class type=loader.loadClass("nullsentinel.Entry");
+            for(String suffix:Arrays.asList("Cn1Model","Cn1BackendModel")) {
+                Map<String,com.codename1.impl.orm.EntityModel<?>> models=new java.util.LinkedHashMap<String,com.codename1.impl.orm.EntityModel<?>>();models.put(type.getName(),(com.codename1.impl.orm.EntityModel)loader.loadClass(type.getName()+suffix).newInstance());
+                com.codename1.backend.Database db=com.codename1.backend.Database.open(":memory:");com.codename1.orm.session.Session session=new com.codename1.impl.orm.SessionImpl(new com.codename1.impl.orm.BackendSqlAccess(null,db,db.dialect()),models);
+                try {
+                    session.createTables();session.beginTransaction();Object entity=type.newInstance();session.persist(entity);session.commitTransaction();
+                    for(String assignment:Arrays.asList("NULL","(NULL)",":value")) {
+                        session.beginTransaction();session.createQuery("update Entry e set e.code='Paris'").executeUpdate();com.codename1.orm.session.JpqlQuery query=session.createQuery("update Entry e set e.code="+assignment);if(assignment.equals(":value")) query.setParameter("value",null);org.junit.Assert.assertEquals(1,query.executeUpdate());session.commitTransaction();
+                        org.junit.Assert.assertEquals("<null>",((java.util.Map)db.query("select code from null_sentinel",new Object[0]).get(0)).get("code"));
+                        org.junit.Assert.assertEquals(1,session.createQuery("select e from Entry e where e.code=NULL").list().size());org.junit.Assert.assertEquals(1,session.createQuery("select e from Entry e where e.code=:value").setParameter("value",null).list().size());
+                        org.junit.Assert.assertNull(session.createQuery("select e.code from Entry e",String.class).first());
+                    }
+                    org.junit.Assert.assertEquals(Long.valueOf(0),session.createQuery("select count(NULL) from Entry e",Long.class).first());
+                } finally { session.close();db.close(); }
+            }
+        }
+    }
+
+    @Test
+    public void prePersistCascadesJoinTheCurrentFlush() throws Exception {
+        for(boolean generated:Arrays.asList(false,true)) {
+            File classes=tmp.newFolder();Map<String,String> sources=new java.util.LinkedHashMap<String,String>();String imports="package callbackcascade; import com.codename1.annotations.*; import com.codename1.annotations.db.*; ";
+            sources.put("callbackcascade.Child",imports+"@Entity public class Child { @Id(autoIncrement="+generated+") public long id"+(generated?";":"=++sequence; public static long sequence=100;")+" @Version public long version; @ManyToOne(cascade=CascadeType.PERSIST) public Child next; @ElementCollection public java.util.List<String> tags=new java.util.ArrayList<String>(); @DbTransient public int depth,pre,post,updates; @PrePersist public void before() { pre++; tags.add(\"created\"); if(depth==0) { next=new Child();next.depth=1;next.next=this; } } @PostPersist public void after() { post++; } @PreUpdate public void update() { updates++; } }");
+            sources.put("callbackcascade.Owner",imports+"@Entity public class Owner { @Id public long id; @ManyToOne(cascade=CascadeType.PERSIST) public Child child; @OneToMany(cascade=CascadeType.PERSIST) public java.util.List<Child> children=new java.util.ArrayList<Child>(); @DbTransient public int pre; @PrePersist public void before() { pre++;child=new Child();children.add(new Child()); } }");
+            JavaSourceCompiler.compile(sources,classes,Arrays.asList(testClassesDir()));ProcessorContext client=runProcessor(classes);assertFalse(client.getErrors().toString(),client.hasErrors());ProcessorContext backend=runProcessor(classes,backendClasspath());assertFalse(backend.getErrors().toString(),backend.hasErrors());
+            try(java.net.URLClassLoader loader=new java.net.URLClassLoader(new URL[]{classes.toURI().toURL()},getClass().getClassLoader())) {
+                Class ownerType=loader.loadClass("callbackcascade.Owner"),childType=loader.loadClass("callbackcascade.Child");
+                for(String suffix:Arrays.asList("Cn1Model","Cn1BackendModel")) {
+                    Map<String,com.codename1.impl.orm.EntityModel<?>> models=new java.util.LinkedHashMap<String,com.codename1.impl.orm.EntityModel<?>>();for(Class type:Arrays.asList(ownerType,childType)) models.put(type.getName(),(com.codename1.impl.orm.EntityModel)loader.loadClass(type.getName()+suffix).newInstance());
+                    com.codename1.backend.Database db=com.codename1.backend.Database.open(":memory:");com.codename1.orm.session.Session session=new com.codename1.impl.orm.SessionImpl(new com.codename1.impl.orm.BackendSqlAccess(null,db,db.dialect()),models);
+                    try {
+                        session.createTables();session.beginTransaction();Object owner=ownerType.newInstance();session.persist(owner);session.flush();org.junit.Assert.assertEquals(1,ownerType.getField("pre").getInt(owner));
+                        org.junit.Assert.assertEquals(4,session.query(childType).count());for(Object child:session.query(childType).list()) { org.junit.Assert.assertEquals(1,childType.getField("pre").getInt(child));org.junit.Assert.assertEquals(1,childType.getField("post").getInt(child));org.junit.Assert.assertEquals(0,childType.getField("updates").getInt(child)); }
+                        session.commitTransaction();Object id=ownerType.getField("id").get(owner);session.clear();owner=session.find(ownerType,id);session.initialize(owner,"children");org.junit.Assert.assertEquals(1,((java.util.List)ownerType.getField("children").get(owner)).size());
+                        for(Object child:session.query(childType).list()) { Object next=childType.getField("next").get(child);org.junit.Assert.assertSame(child,childType.getField("next").get(next));session.initialize(child,"tags");org.junit.Assert.assertEquals(Arrays.asList("created"),childType.getField("tags").get(child)); }
+                    } finally { session.close();db.close(); }
+                }
+            }
+        }
+    }
+
+    @Test
+    public void booleanMappingsRejectNativeBooleanDeclarations() throws Exception {
+        for(boolean backend:Arrays.asList(false,true)) for(String declaration:Arrays.asList("BOOLEAN","bool"," Boolean NOT NULL ")) {
+            File classes=tmp.newFolder();Map<String,String> sources=new java.util.LinkedHashMap<String,String>();String imports="package nativebool; import com.codename1.annotations.*; ";
+            sources.put("nativebool.Entry",imports+"@Entity public class Entry { @Id public long id; @Column(type=\""+declaration+"\") public boolean flag; @Column(type=\""+declaration+"\") public Boolean optional; }");JavaSourceCompiler.compile(sources,classes,Arrays.asList(testClassesDir()));ProcessorContext ctx=runProcessor(classes,backend?backendClasspath():Collections.<String>emptyList());assertTrue(ctx.hasErrors());assertTrue(ctx.getErrors().toString(),ctx.getErrors().toString().contains("Boolean mappings use numeric storage"));
+        }
+        File classes=tmp.newFolder();Map<String,String> sources=new java.util.LinkedHashMap<String,String>();sources.put("numericbool.Entry","package numericbool; import com.codename1.annotations.*; @Entity public class Entry { @Id public long id; @Column(type=\"SMALLINT\") public boolean flag; public Boolean optional; }");JavaSourceCompiler.compile(sources,classes,Arrays.asList(testClassesDir()));ProcessorContext client=runProcessor(classes);assertFalse(client.getErrors().toString(),client.hasErrors());ProcessorContext backend=runProcessor(classes,backendClasspath());assertFalse(backend.getErrors().toString(),backend.hasErrors());
+    }
+
+    @Test
     public void jpqlLiteralsUseMappedConvertersLikeNamedParameters() throws Exception {
         File classes=tmp.newFolder("mappedliterals");Map<String,String> sources=new java.util.LinkedHashMap<String,String>();String imports="package mappedliterals; import com.codename1.annotations.*; import com.codename1.annotations.db.*; ";
         sources.put("mappedliterals.Prefix","package mappedliterals; public class Prefix implements com.codename1.orm.session.AttributeConverter<String,String> { public String toDatabase(String value) { return value==null?null:\"db:\"+value; } public String fromDatabase(String value) { return value==null?null:value.substring(3); } }");

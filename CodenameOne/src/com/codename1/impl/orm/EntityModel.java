@@ -213,13 +213,20 @@ public abstract class EntityModel<T> {
         Object[] values = key instanceof Identifier ? ((Identifier) key).values()
                           : key instanceof Object[] ? ((Object[]) key).clone()
                                                     : new Object[] {key};
-        if (values.length != idIndexes().length) {
+        int[] ids = idIndexes();
+        if (values.length != ids.length) {
             throw new IllegalArgumentException("Wrong identifier width for " + type().getName());
         }
         for (int i = 0; i < values.length; i++) {
             values[i] = Values.storage(values[i]);
             if (values[i] == null) {
                 throw new IllegalArgumentException("Null identifier component for " + type().getName());
+            }
+            int kind = attributes()[ids[i]].kind;
+            Values.requireStorageKind(values[i], kind);
+            if ((kind == Attribute.INTEGER || kind == Attribute.BIGINT || kind == Attribute.BOOLEAN
+                    || kind == Attribute.TIMESTAMP) && !(values[i] instanceof Long)) {
+                throw new IllegalArgumentException("Identifier component requires integral storage");
             }
         }
         return values;

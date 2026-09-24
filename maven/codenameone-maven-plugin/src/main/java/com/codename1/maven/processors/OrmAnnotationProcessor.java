@@ -451,6 +451,10 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
             pf.nullable = nullable;
 
             pf.dialectKind = dialectKind(pf.kind);
+            if (pf.dialectKind == KIND_BOOLEAN && colType != null
+                    && colType.trim().matches("(?i)BOOL(?:EAN)?(?:\\s.*|\\(.*)?")) {
+                ctx.error(cls,"Boolean mappings use numeric storage; native BOOL/BOOLEAN declarations are not supported: "+pf.fieldName);
+            }
             pf.boxed = isBoxed(pf.kind);
             if (pf.version) {
                 if (pf.kind.kind != PropertyTypeKind.Kind.INT && pf.kind.kind != PropertyTypeKind.Kind.LONG) {

@@ -705,20 +705,18 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
                     }
                 }
             } while (previous != entries.size());
-            List<Entry> pending = new ArrayList<Entry>(entries.values());
             List<Entry> inserted = new ArrayList<Entry>();
-            for (Entry e : pending) {
-                if (e.fresh) {
-                    inserted.add(e);
+            do {
+                previous = inserted.size();
+                for (Entry entry : new ArrayList<Entry>(entries.values())) {
+                    insert(entry, inserted);
                 }
-            }
-            // Recursive dependency inserts can clear fresh before their turn.
-            for (Entry e : inserted) {
-                insert(e);
-            }
+            } while (previous != inserted.size());
             for (Entry e : inserted) {
                 completeInsert(e);
             }
+            // PrePersist callbacks may have introduced new cascaded entities.
+            List<Entry> pending = new ArrayList<Entry>(entries.values());
             List<Entry> updated = new ArrayList<Entry>();
             for (Entry e : pending) {
                 if (!e.removed && !inserted.contains(e) && update(e)) {
@@ -1991,14 +1989,16 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
         model.lifecycle(entity, 6);
         return entity;
     }
-    private void insert(Entry entry) {
-        if (!entry.fresh || entry.inserting) {
+    private void insert(Entry entry, List<Entry> inserted) {
+        if (!entry.fresh || entry.inserting || entry.removed) {
             return;
         }
         entry.inserting = true;
+        inserted.add(entry);
         EntityModel model = entry.model;
         Attribute[] attrs = model.attributes();
         model.lifecycle(entry.entity, 0);
+        cascadePersist(entry);
         checkTransientAssociations(entry);
         if (!attrs[model.idIndex()].generated && !same(entry.initialId, model.identifier(entry.entity))) {
             throw new PersistenceException("Managed primary key cannot change");
@@ -2011,7 +2011,7 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
             Object target = model.relation(entry.entity, i);
             Entry dependency = entries.get(target);
             if (dependency != null && dependency.fresh) {
-                insert(dependency);
+                insert(dependency, inserted);
             }
         }
         StringBuilder cols = new StringBuilder();
