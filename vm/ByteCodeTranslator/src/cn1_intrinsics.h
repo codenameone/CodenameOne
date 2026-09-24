@@ -53,6 +53,15 @@ static inline JAVA_VOID cn1InlStorageSet(CODENAME_ONE_THREAD_STATE, JAVA_LONG bl
     *slot = value;
 }
 
+// A store into a block that `owner` traces. Barrier-wise it is a field store into the
+// owner: the SATB halves as for any slot, and the generational half remembers the owner
+// (only if it is old), whose mark function then traces whichever block it holds now.
+static inline JAVA_VOID cn1InlStorageSetOwned(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT owner, JAVA_LONG block, JAVA_INT i, JAVA_OBJECT value) {
+    JAVA_OBJECT* slot = (JAVA_OBJECT*)(uintptr_t)block + i;
+    CN1_SATB_DELETE(slot);
+    CN1_WRITE_BARRIER(owner, value);
+    *slot = value;
+}
 static inline JAVA_INT cn1InlStorageCapacity(CODENAME_ONE_THREAD_STATE, JAVA_LONG block) {
     return cn1RefBlockCount(block);
 }

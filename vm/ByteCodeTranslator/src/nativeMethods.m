@@ -4418,6 +4418,15 @@ JAVA_VOID java_util_NativeStorage_set___long_int_java_lang_Object(CODENAME_ONE_T
     cn1RefBlockSet(threadStateData, b, i, v);
 }
 
+// Out-of-line twin of cn1InlStorageSetOwned (cn1_intrinsics.h), for a call the
+// translator did not devirtualize into the intrinsic.
+JAVA_VOID java_util_NativeStorage_setOwned___java_lang_Object_long_int_java_lang_Object(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT owner, JAVA_LONG b, JAVA_INT i, JAVA_OBJECT v) {
+    JAVA_OBJECT* slot = &((JAVA_OBJECT*)(uintptr_t)b)[i];
+    CN1_SATB_DELETE(slot);
+    CN1_WRITE_BARRIER(owner, v);
+    *slot = v;
+}
+
 JAVA_INT java_util_NativeStorage_getInt___long_int_R_int(CODENAME_ONE_THREAD_STATE, JAVA_LONG b, JAVA_INT i) {
     return cn1IntBlockGet(b, i);
 }

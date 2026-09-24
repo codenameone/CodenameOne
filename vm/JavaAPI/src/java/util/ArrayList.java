@@ -112,7 +112,7 @@ public class ArrayList<E> extends AbstractList<E> implements List<E>, RandomAcce
     public E set(int index, E value) {
         checkIndex(index);
         E old = (E) NativeStorage.get(cn1Storage, index);
-        NativeStorage.set(cn1Storage, index, value);
+        NativeStorage.setOwned(this, cn1Storage, index, value);
         return old;
     }
 
@@ -197,7 +197,7 @@ public class ArrayList<E> extends AbstractList<E> implements List<E>, RandomAcce
     public boolean add(E value) {
         int s = size;
         if (s < capacity()) {
-            NativeStorage.set(cn1Storage, s, value);
+            NativeStorage.setOwned(this, cn1Storage, s, value);
             size = s + 1;
             modCount++;
             return true;
@@ -209,7 +209,7 @@ public class ArrayList<E> extends AbstractList<E> implements List<E>, RandomAcce
      * exists so add() above can stay small. */
     private boolean addGrow(E value) {
         reserveSlow(size + 1);
-        NativeStorage.set(cn1Storage, size++, value);
+        NativeStorage.setOwned(this, cn1Storage, size++, value);
         modCount++;
         return true;
     }
@@ -218,7 +218,7 @@ public class ArrayList<E> extends AbstractList<E> implements List<E>, RandomAcce
         checkPosition(index);
         reserve(size + 1);
         NativeStorage.move(cn1Storage, index, index + 1, size - index);
-        NativeStorage.set(cn1Storage, index, value);
+        NativeStorage.setOwned(this, cn1Storage, index, value);
         size++;
         modCount++;
     }
@@ -241,7 +241,7 @@ public class ArrayList<E> extends AbstractList<E> implements List<E>, RandomAcce
         if (values.length == 0) return false;
         reserve(size + values.length);
         NativeStorage.move(cn1Storage, index, index + values.length, size - index);
-        for (int i = 0; i < values.length; i++) NativeStorage.set(cn1Storage, index + i, values[i]);
+        for (int i = 0; i < values.length; i++) NativeStorage.setOwned(this, cn1Storage, index + i, values[i]);
         size += values.length;
         modCount++;
         return true;

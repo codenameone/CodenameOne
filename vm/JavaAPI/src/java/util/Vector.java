@@ -64,7 +64,7 @@ public class Vector<E> extends AbstractList<E> implements List<E>,
     final void cn1Set(int index, Object value) {
         if (!cn1Native) { elementData[index] = value; return; }
         if (index < 0 || index >= cn1Capacity()) throw new ArrayIndexOutOfBoundsException(index);
-        NativeStorage.set(cn1Storage, index, value);
+        NativeStorage.setOwned(this, cn1Storage, index, value);
     }
 
     private void cn1Move(int from, int to, int count) {

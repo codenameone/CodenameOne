@@ -108,7 +108,7 @@ public class Hashtable<K, V> extends Dictionary<K, V> implements Map<K, V> {
             }
             V result = value;
             value = object;
-            NativeStorage.set(table.cn1Vals, index, object);
+            NativeStorage.setOwned(table, table.cn1Vals, index, object);
             return result;
         }
 
@@ -209,15 +209,15 @@ public class Hashtable<K, V> extends Dictionary<K, V> implements Map<K, V> {
             i = cn1NextSlot(i, perturb, mask);
         }
         NativeStorage.setInt(meta, i, marker);
-        NativeStorage.set(cn1Keys, i, key);
-        NativeStorage.set(cn1Vals, i, value);
+        NativeStorage.setOwned(this, cn1Keys, i, key);
+        NativeStorage.setOwned(this, cn1Vals, i, value);
     }
 
     /** Tombstone a found slot. The single mutation point for removals. */
     final void cn1RemoveAtIndex(int idx) {
         NativeStorage.setInt(cn1Meta, idx, META_TOMB);
-        NativeStorage.set(cn1Keys, idx, null);
-        NativeStorage.set(cn1Vals, idx, null);
+        NativeStorage.setOwned(this, cn1Keys, idx, null);
+        NativeStorage.setOwned(this, cn1Vals, idx, null);
         elementCount--;
         modCount++;
     }
@@ -753,14 +753,14 @@ public class Hashtable<K, V> extends Dictionary<K, V> implements Map<K, V> {
             if (idx >= 0) {
                 @SuppressWarnings("unchecked")
                 V result = (V) NativeStorage.get(cn1Vals, idx);
-                NativeStorage.set(cn1Vals, idx, value);
+                NativeStorage.setOwned(this, cn1Vals, idx, value);
                 return result;
             }
             int ins = -idx - 1;
             boolean wasEmpty = NativeStorage.getInt(cn1Meta, ins) == META_EMPTY;
             NativeStorage.setInt(cn1Meta, ins, marker);
-            NativeStorage.set(cn1Keys, ins, key);
-            NativeStorage.set(cn1Vals, ins, value);
+            NativeStorage.setOwned(this, cn1Keys, ins, key);
+            NativeStorage.setOwned(this, cn1Vals, ins, value);
             elementCount++;
             if (wasEmpty) {
                 cn1Occupied++;

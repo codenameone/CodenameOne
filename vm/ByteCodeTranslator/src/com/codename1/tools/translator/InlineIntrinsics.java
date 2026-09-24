@@ -23,6 +23,7 @@ public final class InlineIntrinsics {
         RENAMES.put("java_util_NativeStorage_getInt___long_int_R_int", "cn1InlStorageGetInt");
         RENAMES.put("java_util_NativeStorage_setInt___long_int_int", "cn1InlStorageSetInt");
         RENAMES.put("java_util_NativeStorage_set___long_int_java_lang_Object", "cn1InlStorageSet");
+        RENAMES.put("java_util_NativeStorage_setOwned___java_lang_Object_long_int_java_lang_Object", "cn1InlStorageSetOwned");
         RENAMES.put("java_util_NativeStorage_move___long_int_int_int", "cn1RefBlockMove");
         RENAMES.put("java_util_NativeStorage_clear___long_int_int", "cn1RefBlockClear");
         RENAMES.put("java_lang_StringBuilder_append___char_R_java_lang_StringBuilder", "cn1InlSbAppendChar");

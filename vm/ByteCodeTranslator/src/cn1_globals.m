@@ -7574,7 +7574,11 @@ static void cn1BibopFormatPage(CN1BibopPage* p, int ci) {
     p->gcPreCycle = JAVA_FALSE;
     // Cards only. gcRsetQueued is left alone: a page can be reformatted while it is
     // still on the dirty-page array, and the scan must find it there consistently.
-    atomic_store_explicit(&p->gcRsetCards, 0, memory_order_relaxed);
+    for(int __w = 0 ; __w < (int)(sizeof(p->gcRsetCards) / sizeof(p->gcRsetCards[0])) ; __w++) {
+        atomic_store_explicit(&p->gcRsetCards[__w], 0, memory_order_relaxed);
+    }
+    p->gcSweptBump = 0;
+    memset(p->gcYoungChunks, 0, sizeof(p->gcYoungChunks));
     atomic_store_explicit(&p->gcGraceMarked, 0, memory_order_relaxed);
     // Page-release state. Both MUST be initialized here: a page from
     // cn1BibopRawPage is indeterminate memory, and cn1BibopTrimFreePool READS
@@ -7716,7 +7720,7 @@ static void cn1GenPoisonCrash(int sig, siginfo_t* si, void* uc) {
         fprintf(stderr, "[GEN-POISON] %s-freed object %p class=%s slotSize=%d page queued=%d cards=%llx\n",
                 o->__codenameOneGcMark == -8 ? "MAJOR" : "minor",
                 (void*)o, c && c->clsName ? c->clsName : "?", pg->slotSize,
-                atomic_load(&pg->gcRsetQueued), (unsigned long long)atomic_load(&pg->gcRsetCards));
+                atomic_load(&pg->gcRsetQueued), (unsigned long long)atomic_load(&pg->gcRsetCards[0]));
         break;
     }
     backtrace_symbols_fd(bt, n, 2);
@@ -7750,7 +7754,13 @@ static void cn1GcGenDecide(void) {
     }
 }
 
+#ifdef CN1_GC_INSTRUMENT
+static void cn1RsProfDump(void);
+#endif
 static void cn1GcGenEndCycle(void) {
+#ifdef CN1_GC_INSTRUMENT
+    if(!cn1GcMinor) cn1RsProfDump();
+#endif
 #ifdef CN1_GC_GEN_CHECK2
     if(cn1GcMinor) fprintf(stderr, "[GEN-MISS] epoch=%d missedTotal=%ld\n", currentGcMarkValue, cn1GcGenMissed);
     // The store log covers the period since the previous cycle only: a miss at this
@@ -7857,7 +7867,7 @@ static void cn1GcShadowReport(JAVA_OBJECT young) {
     int card = 0, queued = -1;
     if(a && (a->__heapPosition == CN1_BIBOP_HEAP_POS || a->__heapPosition == CN1_BIBOP_ADOPTED)) {
         CN1BibopPage* pg = (CN1BibopPage*)((uintptr_t)a & ~((uintptr_t)CN1_BIBOP_PAGE_SIZE - 1));
-        card = (atomic_load(&pg->gcRsetCards) >> ((((uintptr_t)a - (uintptr_t)pg) >> 10) & 63)) & 1;
+        { uintptr_t __c = ((uintptr_t)a - (uintptr_t)pg) >> 6; card = (atomic_load(&pg->gcRsetCards[__c >> 6]) >> (__c & 63)) & 1; }
         queued = atomic_load(&pg->gcRsetQueued);
     }
     {
@@ -7914,17 +7924,19 @@ void cn1GcRememberSlow(JAVA_OBJECT t) {
     int hp = t->__heapPosition;
     if(hp == CN1_BIBOP_HEAP_POS || hp == CN1_BIBOP_ADOPTED) {
         CN1BibopPage* pg = (CN1BibopPage*)((uintptr_t)t & ~((uintptr_t)CN1_BIBOP_PAGE_SIZE - 1));
-        uint64_t bit = (uint64_t)1 << ((((uintptr_t)t - (uintptr_t)pg) >> 10) & 63);
+        uintptr_t chunk = ((uintptr_t)t - (uintptr_t)pg) >> 6;
+        _Atomic uint64_t* cw = &pg->gcRsetCards[chunk >> 6];
+        uint64_t bit = (uint64_t)1 << (chunk & 63);
 #ifdef CN1_GC_GEN_SHADOW
         cn1RhNote(t, (cn1RhSweeping ? CN1_RH_PROMO : CN1_RH_BARRIER)
-                     | ((atomic_load_explicit(&pg->gcRsetCards, memory_order_relaxed) & bit) ? CN1_RH_CARDSET : 0)
+                     | ((atomic_load_explicit(cw, memory_order_relaxed) & bit) ? CN1_RH_CARDSET : 0)
                      | (atomic_load(&pg->gcRsetQueued) ? CN1_RH_WASQUEUED : 0) | (cn1RhPhase << 8));
         if(cn1RhPhase != 0) cn1RhRemembersInCycle++;
 #endif
-        if(atomic_load_explicit(&pg->gcRsetCards, memory_order_relaxed) & bit) {
+        if(atomic_load_explicit(cw, memory_order_relaxed) & bit) {
             return;
         }
-        atomic_fetch_or_explicit(&pg->gcRsetCards, bit, memory_order_acq_rel);
+        atomic_fetch_or_explicit(cw, bit, memory_order_acq_rel);
         int expect = 0;
         if(atomic_load_explicit(&pg->gcRsetQueued, memory_order_relaxed) == 0
            && atomic_compare_exchange_strong_explicit(&pg->gcRsetQueued, &expect, 1,
@@ -7969,6 +7981,19 @@ void cn1GcRememberSlow(JAVA_OBJECT t) {
 static JAVA_OBJECT cn1GcGenTraced[1 << 18];
 static int cn1GcGenTracedN = 0;
 #endif
+#ifdef CN1_GC_INSTRUMENT
+static struct clazz* cn1RsProfCls[256]; static long cn1RsProfN[256]; static double cn1RsProfMs[256];
+static void cn1RsProfDump(void) {
+    for(int k = 0 ; k < 12 ; k++) {
+        int best = -1; double bm = 0;
+        for(int j = 0 ; j < 256 ; j++) if(cn1RsProfCls[j] && cn1RsProfMs[j] > bm) { bm = cn1RsProfMs[j]; best = j; }
+        if(best < 0) break;
+        fprintf(stderr, "[RSET-PROF] %s n=%ld ms=%.1f\n", cn1RsProfCls[best]->clsName, cn1RsProfN[best], cn1RsProfMs[best]);
+        cn1RsProfMs[best] = -cn1RsProfMs[best] - 1;
+    }
+    for(int j = 0 ; j < 256 ; j++) if(cn1RsProfMs[j] < 0) cn1RsProfMs[j] = -cn1RsProfMs[j] - 1;
+}
+#endif
 static void cn1GcRsetTraceObject(struct ThreadLocalData* d, JAVA_OBJECT o) {
 #ifdef CN1_GC_GEN_CHECK
     if(cn1GcGenTracedN < (1 << 18)) cn1GcGenTraced[cn1GcGenTracedN++] = o;
@@ -7997,7 +8022,15 @@ static void cn1GcRsetTraceObject(struct ThreadLocalData* d, JAVA_OBJECT o) {
 #ifdef CN1_GC_GEN_SHADOW
     cn1ShadowSetAdd(&cn1GcShadowRs, o);
 #endif
+#ifdef CN1_GC_INSTRUMENT
+    struct timespec __p0, __p1; clock_gettime(CLOCK_MONOTONIC, &__p0);
+#endif
     ((gcMarkFunctionPointer)c->markFunction)(d, o, JAVA_FALSE);
+#ifdef CN1_GC_INSTRUMENT
+    clock_gettime(CLOCK_MONOTONIC, &__p1);
+    { unsigned h = (unsigned)(((uintptr_t)c >> 4) & 255); while(cn1RsProfCls[h] && cn1RsProfCls[h] != c) h = (h + 1) & 255;
+      cn1RsProfCls[h] = c; cn1RsProfN[h]++; cn1RsProfMs[h] += (__p1.tv_sec - __p0.tv_sec) * 1e3 + (__p1.tv_nsec - __p0.tv_nsec) / 1e6; }
+#endif
     CN1_GC_TRACE_DONE(o);
     cn1GcPreciseTrace = savedPrecise;
 #ifdef CN1_GC_INSTRUMENT
@@ -8005,21 +8038,25 @@ static void cn1GcRsetTraceObject(struct ThreadLocalData* d, JAVA_OBJECT o) {
 #endif
 }
 
-static void cn1GcRsetTracePage(struct ThreadLocalData* d, CN1BibopPage* p, uint64_t cards) {
+#define CN1_RSET_WORDS (CN1_BIBOP_PAGE_SIZE / 64 / 64)
+// Trace every object STARTING in a dirty 64-byte chunk. Each slot starts in exactly one
+// chunk, so no slot is visited twice.
+static void cn1GcRsetTracePage(struct ThreadLocalData* d, CN1BibopPage* p, const uint64_t* chunks) {
     int n = atomic_load_explicit(&p->bumpIndex, memory_order_acquire);
     int size = p->slotSize, first = p->firstSlotOffset;
     if(size <= 0 || n <= 0) {
         return;
     }
-    int last = -1;   // a slot straddling two dirty cards is traced once
-    for(int c = 0 ; c < 64 ; c++) {
-        if(!(cards & ((uint64_t)1 << c))) continue;
-        int lo = c * 1024, hi = lo + 1024;
-        int i = lo <= first ? 0 : (lo - first + size - 1) / size;
-        if(i <= last) i = last + 1;
-        for(; i < n && first + i * size < hi ; i++) {
-            cn1GcRsetTraceObject(d, cn1BibopSlot(p, i));
-            last = i;
+    for(int w = 0 ; w < CN1_RSET_WORDS ; w++) {
+        uint64_t bits = chunks[w];
+        while(bits != 0) {
+            int b = __builtin_ctzll(bits);
+            bits &= bits - 1;
+            int lo = (w * 64 + b) * 64, hi = lo + 64;
+            int i = lo <= first ? 0 : (lo - first + size - 1) / size;
+            for(; i < n && first + i * size < hi ; i++) {
+                cn1GcRsetTraceObject(d, cn1BibopSlot(p, i));
+            }
         }
     }
 }
@@ -8030,6 +8067,12 @@ static void cn1GcRsetScan(struct ThreadLocalData* d, JAVA_BOOLEAN trace) {
     if(!cn1GcGenBarrier) {
         return;
     }
+#ifdef CN1_GC_INSTRUMENT
+    struct timespec __rt0, __rt1, __rt2, __rt3;
+    long __objs0 = cn1GcGenRsetObjs, __blk0 = cn1GcGenRsetBlocks;
+    clock_gettime(CLOCK_MONOTONIC, &__rt0);
+    long __cards = 0;
+#endif
 #ifdef CN1_GC_GEN_CHECK
     cn1GcGenTracedN = 0;
 #endif
@@ -8049,19 +8092,32 @@ static void cn1GcRsetScan(struct ThreadLocalData* d, JAVA_BOOLEAN trace) {
         // Dequeue BEFORE taking the cards: a barrier racing this either finds the page
         // still queued (and its bit is taken below) or re-queues it for next cycle.
         atomic_store_explicit(&p->gcRsetQueued, 0, memory_order_release);
-        uint64_t cards = atomic_exchange_explicit(&p->gcRsetCards, 0, memory_order_acq_rel);
+        uint64_t chunks[CN1_RSET_WORDS];
+        uint64_t any = 0;
+        for(int w = 0 ; w < CN1_RSET_WORDS ; w++) {
+            chunks[w] = atomic_exchange_explicit(&p->gcRsetCards[w], 0, memory_order_acq_rel);
+            any |= chunks[w];
+        }
 #ifdef CN1_GC_GEN_SHADOW
-        if(cn1RhScanN < (1 << 16)) { cn1RhScanPages[cn1RhScanN] = p; cn1RhScanCards[cn1RhScanN] = cards; cn1RhScanN++; }
+        if(cn1RhScanN < (1 << 16)) { cn1RhScanPages[cn1RhScanN] = p; cn1RhScanCards[cn1RhScanN] = any; cn1RhScanN++; }
 #endif
-        if(trace && cards != 0) {
+        if(trace && any != 0) {
 #ifdef CN1_GC_INSTRUMENT
             cn1GcGenRsetPages++;
+            for(int w = 0 ; w < CN1_RSET_WORDS ; w++) __cards += __builtin_popcountll(chunks[w]);
 #endif
-            cn1GcRsetTracePage(d, p, cards);
+            cn1GcRsetTracePage(d, p, chunks);
         }
     }
     free(pages);
+#ifdef CN1_GC_INSTRUMENT
+    clock_gettime(CLOCK_MONOTONIC, &__rt1);
+    long __objsCards = cn1GcGenRsetObjs - __objs0;
+#endif
     cn1GcBlockRsetScan(d, trace);
+#ifdef CN1_GC_INSTRUMENT
+    clock_gettime(CLOCK_MONOTONIC, &__rt2);
+#endif
     pthread_mutex_lock(&cn1GcRsetLegacyMutex);
     JAVA_OBJECT* set = cn1GcRsetLegacy;
     long cap = cn1GcRsetLegacyCap;
@@ -8079,6 +8135,15 @@ static void cn1GcRsetScan(struct ThreadLocalData* d, JAVA_BOOLEAN trace) {
         }
         free(set);
     }
+#ifdef CN1_GC_INSTRUMENT
+    clock_gettime(CLOCK_MONOTONIC, &__rt3);
+#define __MS(a,b) (((b).tv_sec - (a).tv_sec) * 1e3 + ((b).tv_nsec - (a).tv_nsec) / 1e6)
+    if(trace) fprintf(stderr, "[RSET-T] epoch=%d pages=%ld cards=%ld cardObjs=%ld cardMs=%.1f blocks=%ld blockMs=%.1f legacyObjs=%ld legacyMs=%.1f\n",
+            currentGcMarkValue, np, __cards, __objsCards, __MS(__rt0, __rt1),
+            cn1GcGenRsetBlocks - __blk0, __MS(__rt1, __rt2),
+            cn1GcGenRsetObjs - __objs0 - __objsCards, __MS(__rt2, __rt3));
+#undef __MS
+#endif
 }
 
 #ifdef CN1_GC_GEN_CHECK
@@ -8115,7 +8180,7 @@ static void cn1GcGenCheckChild(JAVA_OBJECT c) {
         for(int k = 0 ; k < cn1GcGenTracedN ; k++) if(cn1GcGenTraced[k] == h) { traced = 1; break; }
         CN1BibopPage* hp = (CN1BibopPage*)((uintptr_t)h & ~((uintptr_t)CN1_BIBOP_PAGE_SIZE - 1));
         fprintf(stderr, "[GEN-CHECK] epoch=%d traced=%d holderPage owned=%d pre=%d cards=%llx | ", currentGcMarkValue, traced,
-                (int)hp->owned, (int)hp->gcPreCycle, (unsigned long long)atomic_load(&hp->gcRsetCards));
+                (int)hp->owned, (int)hp->gcPreCycle, (unsigned long long)atomic_load(&hp->gcRsetCards[0]));
         fprintf(stderr, "old %p %s (mark=%d heapPos=%d) -> young unmarked %p %s\n",
                 (void*)h, hc && hc->clsName ? hc->clsName : "?",
                 h ? h->__codenameOneGcMark : 0, h ? h->__heapPosition : 0, (void*)c,
@@ -10741,6 +10806,7 @@ JAVA_OBJECT cn1BibopAllocRecycled(CODENAME_ONE_THREAD_STATE, int size, struct cl
     JAVA_OBJECT o = (JAVA_OBJECT)p->freeList;
     p->freeList = *(void**)o;
     p->freeCount--;
+    CN1_BIBOP_NOTE_RECYCLED(p, o);
     cn1BibopInitSlot(threadStateData, o, size, parent);
 #ifndef CN1_BIBOP_NO_FASTSWEEP
     __atomic_store_n(&p->gcAllocedSinceSweep, JAVA_TRUE, __ATOMIC_RELAXED);
@@ -10767,6 +10833,7 @@ static JAVA_OBJECT cn1BibopAlloc(CODENAME_ONE_THREAD_STATE, int size, struct cla
                 o = (JAVA_OBJECT)p->freeList;
                 p->freeList = *(void**)o;
                 p->freeCount--;
+                CN1_BIBOP_NOTE_RECYCLED(p, o);
                 break;
             }
             int bi = atomic_load_explicit(&p->bumpIndex, memory_order_relaxed);
@@ -11244,6 +11311,13 @@ static void cn1BibopSweep(CODENAME_ONE_THREAD_STATE) {
         int major = atomic_load_explicit(&lowMemoryMode, memory_order_relaxed)
                 || quiet
                 || bibopCyclesSinceMajorSweep >= CN1_BIBOP_MAJOR_SWEEP_CYCLES;
+        // Single-core generational mode knows exactly when the deep walk pays: a minor
+        // frees nothing on a page nobody allocated into, and a major is the only cycle
+        // that frees old garbage -- which, on a partial page, it cannot reach without
+        // this. So a major always takes the partial pools and a minor never does.
+        if(cn1GcStwCycle) {
+            major = !cn1GcMinor || atomic_load_explicit(&lowMemoryMode, memory_order_relaxed);
+        }
         if(major) {
             bibopCyclesSinceMajorSweep = 0;
             int spliced = 0;
@@ -11271,6 +11345,10 @@ static void cn1BibopSweep(CODENAME_ONE_THREAD_STATE) {
     }
 #endif
     int V = currentGcMarkValue;  // stable during the sweep (mark done, not yet incremented)
+#ifdef CN1_GC_INSTRUMENT
+    long __swPages = 0, __swWalked = 0, __swSlots = 0;
+    struct timespec __swT0; clock_gettime(CLOCK_MONOTONIC, &__swT0);
+#endif
     long occupiedBytes = 0;
     long liveBytes = 0;
     long reclaimedBytes = 0;
@@ -11285,6 +11363,9 @@ static void cn1BibopSweep(CODENAME_ONE_THREAD_STATE) {
     while(list != 0) {
         CN1BibopPage* page = list;
         list = page->nextPool;
+#ifdef CN1_GC_INSTRUMENT
+        __swPages++;
+#endif
         atomic_store_explicit(&page->gcAdoptedDied, 0, memory_order_relaxed);
         // A page the major sweep pulled out of a PARTIAL pool is a one-off deep
         // sample: mostly-dead slots that the ordinary sweep would never have
@@ -11320,7 +11401,112 @@ static void cn1BibopSweep(CODENAME_ONE_THREAD_STATE) {
         // this is the complete count for the window since this page was last swept.
         int graceMarked = atomic_exchange_explicit(&page->gcGraceMarked, 0,
                                                    memory_order_relaxed);
+#if !defined(CN1_GC_VERIFY) && !defined(CN1_GC_GEN_QUAR)
+        // MINOR: walk only the YOUNG slots. A minor frees nothing with an epoch, so the
+        // only slots whose fate it decides are the ones allocated since this page's last
+        // sweep: the bump range [gcSweptBump, bumpIndex) and the recycled slots whose
+        // chunk bits the allocator set. Measured before this: a minor walked 1,770 pages
+        // and 1.83M slots -- the whole heap, because majors leave free slots scattered
+        // over old pages and 24MB of young allocation touches thousands of them -- which
+        // was 1.3s of an 11s single-core run. The page keeps its existing free list
+        // (a FREE slot met here is already on it) and takes the minor's frees on top;
+        // its live count is not recomputed, so it always returns to the partial pool,
+        // and the next major's full walk is what returns an emptied page.
+        if(cn1GcStwCycle && cn1GcMinor && !page->gcHasAdopted) {
+            int size = page->slotSize, first = page->firstSlotOffset;
+            int oldFree = page->freeCount;
+            void* fl = page->freeList;
+            int freed = 0, marked = 0;
+            JAVA_BOOLEAN needsReclaim = page->gcNeedsReclaim;
+            int sb = page->gcSweptBump;
+            if(sb > n) sb = n;
+            // Words of chunk bits first (recycled slots, all below sb), then one extra
+            // pass, w == words, for the bump range.
+            for(int w = 0 ; w < (int)(sizeof(page->gcYoungChunks) / sizeof(page->gcYoungChunks[0])) + 1 ; w++) {
+                int iStart, iEnd, hiByte;
+                uint64_t bits = 0;
+                if(w < (int)(sizeof(page->gcYoungChunks) / sizeof(page->gcYoungChunks[0]))) {
+                    bits = page->gcYoungChunks[w];
+                    if(bits == 0) continue;
+                }
+                do {
+                    if(w < (int)(sizeof(page->gcYoungChunks) / sizeof(page->gcYoungChunks[0]))) {
+                        int b = __builtin_ctzll(bits);
+                        bits &= bits - 1;
+                        int lo = (w * 64 + b) * 64;
+                        hiByte = lo + 64;
+                        iStart = lo <= first ? 0 : (lo - first + size - 1) / size;
+                        iEnd = sb;
+                    } else {
+                        iStart = sb;
+                        iEnd = n;
+                        hiByte = 0x7fffffff;
+                    }
+                    for(int i = iStart ; i < iEnd && first + i * size < hiByte ; i++) {
+                        JAVA_OBJECT o = cn1BibopSlot(page, i);
+                        int m = o->__codenameOneGcMark;
+                        if(m == V) {
+                            marked++;
+                        } else if(m == -1) {
+                            if(preCycle && o->__codenameOneParentClsReference != 0) {
+                                cn1BibopReclaimSlot(threadStateData, o);
+                                __atomic_store_n(&o->__codenameOneGcMark, CN1_BIBOP_FREE_MARK, __ATOMIC_RELAXED);
+                                *(void**)o = fl; fl = o; freed++;
+                            } else {
+                                // Kept by grace, exactly as the full walk keeps it: promoted,
+                                // and remembered because no barrier saw its fields.
+                                __atomic_store_n(&o->__codenameOneGcMark, V, __ATOMIC_RELAXED);
+                                if(cn1GcGenBarrier) cn1GcRememberSlow(o);
+                                if(o->__codenameOneParentClsReference != 0 &&
+                                   o->__codenameOneParentClsReference->finalizerFunction != 0) needsReclaim = JAVA_TRUE;
+                            }
+                        }
+                        // anything else is old, or already free and on the list: untouched
+                    }
+                } while(bits != 0);
+            }
+            page->freeList = fl;
+            page->freeCount = oldFree + freed;
+            page->gcSweptBump = n;
+            memset(page->gcYoungChunks, 0, sizeof(page->gcYoungChunks));
 #ifndef CN1_BIBOP_NO_FASTSWEEP
+            if(page->gcHasMonitors) needsReclaim = JAVA_TRUE;
+            page->gcAllocedSinceSweep = JAVA_FALSE;
+            page->gcNeedsReclaim = needsReclaim;
+            page->gcGraceEpoch = V;
+#endif
+            if(!statsExcluded) {
+                int survivors = marked - graceMarked;
+                if(survivors < 0) survivors = 0;
+                occupiedBytes += (long)(n - oldFree) * size;
+                liveBytes += (long)survivors * size;
+                reclaimedBytes += (long)freed * size;
+            }
+            pthread_mutex_lock(&bibopMutex);
+            page->nextPool = bibopPartialPool[page->classIndex];
+            bibopPartialPool[page->classIndex] = page;
+            pthread_mutex_unlock(&bibopMutex);
+            continue;
+        }
+#endif
+#ifndef CN1_BIBOP_NO_FASTSWEEP
+        // MINOR: a page nothing has allocated into since its last sweep holds no young
+        // object -- that sweep freed or promoted every one, which is the same fact the
+        // O(1) decision below rests on -- and a minor frees nothing else, so walking it
+        // can only confirm that every slot stays. Measured: the walk was 1.48s of an
+        // 11s single-core run, 99 minors at ~15ms each, over pages of old objects.
+        // Route it exactly as the walk would (every occupant live -> partial pool) and
+        // count it occupied, not live, as the walk counted its old slots.
+        if(cn1GcMinor && page->gcAllocedSinceSweep == JAVA_FALSE && !page->gcHasAdopted) {
+            pthread_mutex_lock(&bibopMutex);
+            page->nextPool = bibopPartialPool[page->classIndex];
+            bibopPartialPool[page->classIndex] = page;
+            pthread_mutex_unlock(&bibopMutex);
+            if(!statsExcluded) {
+                occupiedBytes += (long)(n - page->freeCount) * page->slotSize;
+            }
+            continue;
+        }
         // ---- O(1) page decision (no per-slot walk). -------------------------------
         // A page is HOMOGENEOUS when every occupied slot is a dead-or-graced object
         // sitting at a single (upper-bounded) epoch. That holds iff:
@@ -11450,6 +11636,9 @@ static void cn1BibopSweep(CODENAME_ONE_THREAD_STATE) {
         // preceded that release are visible to this walk. Relaxed could observe a
         // freshly-bumped slot with a garbage header.
         int oldFreeCount = page->freeCount;
+#ifdef CN1_GC_INSTRUMENT
+        __swWalked++; __swSlots += n;
+#endif
         void* fl = 0;
         int freeCount = 0;
         int liveCount = 0;
@@ -11590,6 +11779,8 @@ static void cn1BibopSweep(CODENAME_ONE_THREAD_STATE) {
         }
         page->freeList = fl;
         page->freeCount = freeCount;
+        page->gcSweptBump = n;
+        memset(page->gcYoungChunks, 0, sizeof(page->gcYoungChunks));
         int sampledSlots = n - oldFreeCount;
         // Survivors the policy may act on: slots at the current epoch MINUS the ones a
         // grace pass put there. A grace mark says only "allocated since the last cycle
@@ -11633,6 +11824,14 @@ static void cn1BibopSweep(CODENAME_ONE_THREAD_STATE) {
         }
         pthread_mutex_unlock(&bibopMutex);
     }
+#ifdef CN1_GC_INSTRUMENT
+    {
+        struct timespec __t1; clock_gettime(CLOCK_MONOTONIC, &__t1);
+        fprintf(stderr, "[SWEEP-T] epoch=%d kind=%s pages=%ld walked=%ld slots=%ld loopMs=%.1f\n",
+                V, cn1GcMinor ? "minor" : "major", __swPages, __swWalked, __swSlots,
+                (__t1.tv_sec - __swT0.tv_sec) * 1e3 + (__t1.tv_nsec - __swT0.tv_nsec) / 1e6);
+    }
+#endif
     cn1BibopAdaptAfterSweep(occupiedBytes, liveBytes, reclaimedBytes);
     // Free the native reference blocks retired by growth since the last sweep. HERE and
     // not at retire time: a marker that loaded the old block pointer before the swap may
@@ -15162,10 +15361,11 @@ void gcMarkObject(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj, JAVA_BOOLEAN force
                         found ? "yes" : "NEVER", nm, ne);
                 {
                     CN1BibopPage* pp = (CN1BibopPage*)((uintptr_t)P & ~((uintptr_t)CN1_BIBOP_PAGE_SIZE - 1));
-                    uint64_t bit = (uint64_t)1 << ((((uintptr_t)P - (uintptr_t)pp) >> 10) & 63);
+                    uintptr_t __pc = ((uintptr_t)P - (uintptr_t)pp) >> 6;
+                    uint64_t bit = (uint64_t)1 << (__pc & 63);
                     fprintf(stderr, "[GEN-MISS]   parent page queued=%d cards=%llx parentBit=%d promoRemembered=%d\n",
-                            atomic_load(&pp->gcRsetQueued), (unsigned long long)atomic_load(&pp->gcRsetCards),
-                            (atomic_load(&pp->gcRsetCards) & bit) ? 1 : 0,
+                            atomic_load(&pp->gcRsetQueued), (unsigned long long)atomic_load(&pp->gcRsetCards[__pc >> 6]),
+                            (atomic_load(&pp->gcRsetCards[__pc >> 6]) & bit) ? 1 : 0,
                             cn1GcGenSetHas(cn1GcGenPromoSet, cn1GcGenPromoCap, P));
                 }
                 fprintf(stderr, "[GEN-MISS] epoch=%d reachable old %s %p (mark=%d page pre=%d owned=%d) -> young %s %p\n",

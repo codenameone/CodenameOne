@@ -181,6 +181,7 @@ final class JavascriptNativeRegistry {
             "cn1_java_util_NativeStorage_retire_long",
             "cn1_java_util_NativeStorage_get_long_int_R_java_lang_Object",
             "cn1_java_util_NativeStorage_set_long_int_java_lang_Object",
+            "cn1_java_util_NativeStorage_setOwned_java_lang_Object_long_int_java_lang_Object",
             "cn1_java_util_NativeStorage_getInt_long_int_R_int",
             "cn1_java_util_NativeStorage_setInt_long_int_int",
             "cn1_java_util_NativeStorage_nextOccupied_long_int_int_R_int",

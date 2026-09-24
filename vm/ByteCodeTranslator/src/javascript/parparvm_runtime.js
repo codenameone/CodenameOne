@@ -6049,6 +6049,7 @@ bindNative(["cn1_java_util_NativeStorage_free_long"], function(b) { if (!cn1Stor
 bindNative(["cn1_java_util_NativeStorage_retire_long"], function(b) { /* JavaScript owns the handle lifetime. */ });
 bindNative(["cn1_java_util_NativeStorage_get_long_int_R_java_lang_Object"], function(b, i) { return b.storage[i]; });
 bindNative(["cn1_java_util_NativeStorage_set_long_int_java_lang_Object"], function(b, i, v) { b.storage[i] = v; });
+bindNative(["cn1_java_util_NativeStorage_setOwned_java_lang_Object_long_int_java_lang_Object"], function(owner, b, i, v) { b.storage[i] = v; });
 bindNative(["cn1_java_util_NativeStorage_getInt_long_int_R_int"], function(b, i) { return b.storage[i]; });
 bindNative(["cn1_java_util_NativeStorage_setInt_long_int_int"], function(b, i, v) { b.storage[i] = v; });
 bindNative(["cn1_java_util_NativeStorage_nextOccupied_long_int_int_R_int"], function(b, from, cap) {

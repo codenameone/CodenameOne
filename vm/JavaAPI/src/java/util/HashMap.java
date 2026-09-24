@@ -278,7 +278,7 @@ public class HashMap<K, V> extends AbstractMap<K, V> implements Map<K, V> {
         if (idx >= 0) {
             @SuppressWarnings("unchecked")
             V old = (V) NativeStorage.get(cn1ValsBlock, idx);
-            NativeStorage.set(cn1ValsBlock, idx, value);
+            NativeStorage.setOwned(this, cn1ValsBlock, idx, value);
             cn1LastPut = idx;
             cn1LastInserted = false;
             return old;
@@ -286,8 +286,8 @@ public class HashMap<K, V> extends AbstractMap<K, V> implements Map<K, V> {
         int ins = -idx - 1;
         boolean wasEmpty = NativeStorage.getInt(cn1MetaBlock, ins) == META_EMPTY;
         NativeStorage.setInt(cn1MetaBlock, ins, marker);
-        NativeStorage.set(cn1KeysBlock, ins, key);
-        NativeStorage.set(cn1ValsBlock, ins, value);
+        NativeStorage.setOwned(this, cn1KeysBlock, ins, key);
+        NativeStorage.setOwned(this, cn1ValsBlock, ins, value);
         elementCount++;
         if (wasEmpty) {
             cn1Occupied++;
@@ -368,8 +368,8 @@ public class HashMap<K, V> extends AbstractMap<K, V> implements Map<K, V> {
             i = cn1NextSlot(i, perturb, mask);
         }
         NativeStorage.setInt(meta, i, marker);
-        NativeStorage.set(cn1KeysBlock, i, key);
-        NativeStorage.set(cn1ValsBlock, i, value);
+        NativeStorage.setOwned(this, cn1KeysBlock, i, key);
+        NativeStorage.setOwned(this, cn1ValsBlock, i, value);
         return i;
     }
 
@@ -379,8 +379,8 @@ public class HashMap<K, V> extends AbstractMap<K, V> implements Map<K, V> {
      */
     void cn1RemoveAtIndex(int idx) {
         NativeStorage.setInt(cn1MetaBlock, idx, META_TOMB);
-        NativeStorage.set(cn1KeysBlock, idx, null);
-        NativeStorage.set(cn1ValsBlock, idx, null);
+        NativeStorage.setOwned(this, cn1KeysBlock, idx, null);
+        NativeStorage.setOwned(this, cn1ValsBlock, idx, null);
         elementCount--;
         modCount++;
     }
@@ -760,7 +760,7 @@ public class HashMap<K, V> extends AbstractMap<K, V> implements Map<K, V> {
 
         public V setValue(V object) {
             V result = getValue();
-            NativeStorage.set(map.cn1ValsBlock, index, object);
+            NativeStorage.setOwned(map, map.cn1ValsBlock, index, object);
             return result;
         }
 

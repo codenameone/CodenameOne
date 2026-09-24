@@ -2302,8 +2302,19 @@ typedef struct CN1BibopPage {
     // that card. gcRsetQueued says the page is on the dirty-page array; it is the ONLY
     // record of membership, so reformatting a page (which clears the cards) cannot drop
     // other pages' records the way an intrusive link reset did.
-    _Atomic uint64_t gcRsetCards;
+    // One bit per 64-byte chunk in which a remembered object STARTS. It was one bit per
+    // 1KB card, and the scan traced every object starting on a dirty card: measured,
+    // 1.79M objects traced for the ~0.2M actually remembered once owners (rather than
+    // blocks) were remembered, since a collection's card also holds its neighbours.
+    _Atomic uint64_t gcRsetCards[CN1_BIBOP_PAGE_SIZE / 64 / 64];
     _Atomic int gcRsetQueued;
+    // YOUNG-SLOT MAP, so a minor sweep walks what was allocated since the last sweep
+    // instead of the whole page. Bump allocation is the range [gcSweptBump, bumpIndex);
+    // a slot recycled from the free list sets the bit of the 64-byte chunk it starts in
+    // (one shift, no division, on the allocating thread, which owns the page). Cleared
+    // by every walk and by format.
+    int gcSweptBump;
+    uint64_t gcYoungChunks[CN1_BIBOP_PAGE_SIZE / 64 / 64];
     // ---- O(live-pages) sweep bookkeeping (perf-tier1, gated by CN1_BIBOP_NO_FASTSWEEP)
     // These let cn1BibopSweep reclaim an all-dead page or skip an all-live (in-grace)
     // page in O(1) -- without the per-slot walk -- whenever it can PROVE the page is
@@ -2389,6 +2400,9 @@ typedef struct CN1BibopPage {
                                           //  FREE pool
 #endif
 } CN1BibopPage;
+#define CN1_BIBOP_NOTE_RECYCLED(p, o) do { \
+        uintptr_t cn1__c = ((uintptr_t)(o) - (uintptr_t)(p)) >> 6; \
+        (p)->gcYoungChunks[cn1__c >> 6] |= (uint64_t)1 << (cn1__c & 63); } while(0)
 
 // Per-thread current page per size class; defined in cn1_globals.m. Touched only
 // by the owning thread (alloc) and by that same thread on death.
@@ -2695,6 +2709,7 @@ static inline JAVA_OBJECT cn1BibopFastAllocNoZero(CODENAME_ONE_THREAD_STATE, int
         JAVA_OBJECT o = (JAVA_OBJECT)p->freeList;
         p->freeList = *(void**)o;
         p->freeCount--;
+        CN1_BIBOP_NOTE_RECYCLED(p, o);
         o->__codenameOneParentClsReference = (struct clazz*)0;
         o->__heapPosition = CN1_BIBOP_HEAP_POS;
         CN1_ALLOC_CENSUS_COUNT(parent, size);

@@ -35,6 +35,12 @@ final class NativeStorage {
     static native void retire(long block);
     static native <T> T get(long block, int index);
     static native void set(long block, int index, Object value);
+    // The store every collection makes. `owner` is the object whose mark function traces
+    // `block`: the barrier treats the store as a field store into the owner, so the
+    // generational collector remembers the OWNER, and only when it is old. The
+    // owner-less set() above has to remember the block itself, whatever its owner's age,
+    // which made every young collection a remembered-set root of the next minor.
+    static native void setOwned(Object owner, long block, int index, Object value);
     static native int getInt(long block, int index);
     static native void setInt(long block, int index, int value);
     // Rebuild fresh hash buffers, optionally following and rebuilding an ordering chain.

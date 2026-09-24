@@ -598,13 +598,13 @@ public class IdentityHashMap<K, V> extends AbstractMap<K, V> implements
             }
 
             // insert the key and assign the value to null initially
-            NativeStorage.set(elementData, index, _key);
-            NativeStorage.set(elementData, index + 1, null);
+            NativeStorage.setOwned(this, elementData, index, _key);
+            NativeStorage.setOwned(this, elementData, index + 1, null);
         }
 
         // insert value to where it needs to go, return the old value
         Object result = NativeStorage.get(elementData, index + 1);
-        NativeStorage.set(elementData, index + 1, _value);
+        NativeStorage.setOwned(this, elementData, index + 1, _value);
 
         return massageValue(result);
     }
@@ -648,8 +648,8 @@ public class IdentityHashMap<K, V> extends AbstractMap<K, V> implements
             if (key != null) {
                 // if not empty
                 int index = findIndex(key, newData, newlength);
-                NativeStorage.set(newData, index, key);
-                NativeStorage.set(newData, index + 1, NativeStorage.get(oldData, i + 1));
+                NativeStorage.setOwned(this, newData, index, key);
+                NativeStorage.setOwned(this, newData, index + 1, NativeStorage.get(oldData, i + 1));
             }
         }
         elementData = newData;
@@ -708,8 +708,8 @@ public class IdentityHashMap<K, V> extends AbstractMap<K, V> implements
                 hashedOk = hashedOk && (hash <= next);
             }
             if (!hashedOk) {
-                NativeStorage.set(elementData, index, object);
-                NativeStorage.set(elementData, index + 1,
+                NativeStorage.setOwned(this, elementData, index, object);
+                NativeStorage.setOwned(this, elementData, index + 1,
                         NativeStorage.get(elementData, next + 1));
                 index = next;
             }
@@ -719,8 +719,8 @@ public class IdentityHashMap<K, V> extends AbstractMap<K, V> implements
         modCount++;
 
         // clear both the key and the value
-        NativeStorage.set(elementData, index, null);
-        NativeStorage.set(elementData, index + 1, null);
+        NativeStorage.setOwned(this, elementData, index, null);
+        NativeStorage.setOwned(this, elementData, index + 1, null);
 
         return massageValue(result);
     }

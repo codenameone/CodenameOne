@@ -175,7 +175,7 @@ public class ArrayDeque<E> extends AbstractCollection<E> implements Deque<E> {
         checkNull(e);
         checkAndExpand();
         front = circularSmallerPos(front);
-        NativeStorage.set(elements, front, e);
+        NativeStorage.setOwned(this, elements, front, e);
         resetStatus(true);
         modCount++;
         return true;
@@ -454,7 +454,7 @@ public class ArrayDeque<E> extends AbstractCollection<E> implements Deque<E> {
     private  boolean addLastImpl(E e) {
         checkNull(e);
         checkAndExpand();
-        NativeStorage.set(elements, rear, e);
+        NativeStorage.setOwned(this, elements, rear, e);
         rear = circularBiggerPos(rear);
         resetStatus(true);
         modCount++;
@@ -463,7 +463,7 @@ public class ArrayDeque<E> extends AbstractCollection<E> implements Deque<E> {
 
     private E removePollFirstImpl() {
         E element = NativeStorage.get(elements, front);
-        NativeStorage.set(elements, front, null);
+        NativeStorage.setOwned(this, elements, front, null);
         front = circularBiggerPos(front);
         resetStatus(false);
         modCount++;
@@ -473,7 +473,7 @@ public class ArrayDeque<E> extends AbstractCollection<E> implements Deque<E> {
     private E removeLastImpl() {
         int last = circularSmallerPos(rear);
         E element = NativeStorage.get(elements, last);
-        NativeStorage.set(elements, last, null);
+        NativeStorage.setOwned(this, elements, last, null);
         rear = last;
         resetStatus(false);
         modCount++;
@@ -553,19 +553,19 @@ public class ArrayDeque<E> extends AbstractCollection<E> implements Deque<E> {
         if (frontShift) {
             while (cursor != front) {
                 int previous = circularSmallerPos(cursor);
-                NativeStorage.set(elements, cursor, NativeStorage.get(elements, previous));
+                NativeStorage.setOwned(this, elements, cursor, NativeStorage.get(elements, previous));
                 cursor = previous;
             }
-            NativeStorage.set(elements, front, null);
+            NativeStorage.setOwned(this, elements, front, null);
             front = circularBiggerPos(front);
         } else {
             int last = circularSmallerPos(rear);
             while (cursor != last) {
                 int next = circularBiggerPos(cursor);
-                NativeStorage.set(elements, cursor, NativeStorage.get(elements, next));
+                NativeStorage.setOwned(this, elements, cursor, NativeStorage.get(elements, next));
                 cursor = next;
             }
-            NativeStorage.set(elements, last, null);
+            NativeStorage.setOwned(this, elements, last, null);
             rear = last;
         }
         resetStatus(false);
@@ -631,7 +631,7 @@ public class ArrayDeque<E> extends AbstractCollection<E> implements Deque<E> {
         if (status != DequeStatus.Empty) {
             int cursor = front;
             do {
-                NativeStorage.set(elements, cursor, null);
+                NativeStorage.setOwned(this, elements, cursor, null);
                 cursor = circularBiggerPos(cursor);
             } while (cursor != rear);
             status = DequeStatus.Empty;
