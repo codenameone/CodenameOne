@@ -88,7 +88,8 @@ class GcMarkCompletenessTest {
         Path app = src.resolve("GcMarkApp.java");
         Files.write(app, ("import java.util.*;\n" +
                 "class MarkList extends ArrayList<Object> {}\n" +
-                "class MarkBase { Object baseRef; private Object privateRef = new Object(); int basePrim; }\n" +
+                "class MarkBase { Object baseRef; private Object privateRef = new Object(); int basePrim;\n" +
+                "    int reads() { return (baseRef != null ? 1 : 0) + (privateRef != null ? 1 : 0) + basePrim; } }\n" +
                 "class MarkMid extends MarkBase { String midRef; }\n" +
                 "class MarkLeaf extends MarkMid {\n" +
                 "    final ArrayList<Runnable> pending = new ArrayList<Runnable>();\n" +
@@ -106,7 +107,12 @@ class GcMarkCompletenessTest {
                 "        keep.mapRef = new HashMap<String,String>();\n" +
                 "        keep.baseRef = new Object();\n" +
                 "        keep.midRef = \"x\";\n" +
-                "        System.out.println(keep.pending.size());\n" +
+                // Every field is READ as well as written: the translator removes an
+                // instance field nothing reads (DeadFieldElimination), and a removed
+                // field has no mark-function entry for this test to find.
+                "        System.out.println(keep.pending.size() + keep.reads() + (keep.midRef != null ? 1 : 0)\n" +
+                "            + (keep.mixedOne != null ? 1 : 0) + (keep.arrayRef != null ? 1 : 0) + keep.a + keep.c + (int) keep.b\n" +
+                "            + (keep.iface != null ? 1 : 0) + (keep.mapRef != null ? 1 : 0));\n" +
                 "    }\n" +
                 "}\n").getBytes(StandardCharsets.UTF_8));
 
