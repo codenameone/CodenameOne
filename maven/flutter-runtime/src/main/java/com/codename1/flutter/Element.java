@@ -526,7 +526,7 @@ public abstract class Element implements BuildContext {
     /// access failed with the target visibly on screen. Done here, the one path
     /// every element mounts through, rather than per widget type.
     @SuppressWarnings({"unchecked", "rawtypes"})
-    private void registerGlobalKey() {
+    protected final void registerGlobalKey() {
         Key k = widget == null ? null : widget.getKey();
         if (k instanceof GlobalKey) {
             ((GlobalKey) k).attach(globalKeyState(), this, widget);

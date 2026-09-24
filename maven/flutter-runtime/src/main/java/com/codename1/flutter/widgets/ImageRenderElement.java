@@ -106,7 +106,15 @@ public class ImageRenderElement extends RenderElement {
                     Log.p("Flutter runtime: asset image not found: " + image().getAssetName()
                             + " (resource " + FlutterAssets.resourceName(image().getAssetName()) + ")");
                 } else {
-                    img = downsample(encodedWithKnownSize(res.stream()));
+                    // Closed here: FlutterAssets.open closes the candidates it rejects
+                    // and hands over the chosen one, and on a port whose resources are
+                    // files or native handles an unclosed stream per image leaks until
+                    // no further resource can be opened.
+                    try {
+                        img = downsample(encodedWithKnownSize(res.stream()));
+                    } finally {
+                        com.codename1.io.Util.cleanup(res.stream());
+                    }
                     assetRatio = res.ratio();
                 }
             } else if (image().getMemoryBytes() != null) {

@@ -74,8 +74,8 @@ public class FlutterAssets {
     }
 
     /**
-     * The device-pixel-ratio variants Flutter recognises, ascending. A variant
-     * of {@code dir/name.ext} lives at {@code dir/<ratio>x/name.ext}.
+     * The ratios probed when no manifest lists the asset, ascending. A variant of
+     * {@code dir/name.ext} lives at {@code dir/<ratio>x/name.ext}.
      */
     private static final double[] VARIANTS = {1.5, 2.0, 3.0, 4.0};
 
@@ -86,6 +86,21 @@ public class FlutterAssets {
      * instead, and {@link #chooseVariant} picks among the ones present.
      */
     public static String[] variantCandidates(String assetPath, double dpr) {
+        return variantCandidates(assetPath, dpr, manifest());
+    }
+
+    /**
+     * As {@link #variantCandidates(String, double)}, from {@code manifest} (main asset
+     * key to every bundled key that is it or a variant of it). An asset the manifest
+     * lists is probed at exactly the variants it lists, whatever their scale; one it
+     * does not -- or no manifest at all, from an older build or resources placed by
+     * hand -- falls back to the fixed ratios below.
+     */
+    static String[] variantCandidates(String assetPath, double dpr, java.util.Map<String, java.util.List<String>> manifest) {
+        java.util.List<String> listed = manifest == null ? null : manifest.get(stripSlash(assetPath));
+        if (listed != null) {
+            return listed.toArray(new String[listed.size()]);
+        }
         int slash = assetPath.lastIndexOf('/');
         String dir = slash < 0 ? "" : assetPath.substring(0, slash + 1);
         String file = slash < 0 ? assetPath : assetPath.substring(slash + 1);
@@ -229,17 +244,107 @@ public class FlutterAssets {
 
     /** The density a resolved candidate was authored for. */
     static double ratioOf(String candidate, String assetPath) {
-        if (candidate.equals(assetPath)) {
+        if (stripSlash(candidate).equals(stripSlash(assetPath))) {
             return 1;
         }
         int end = candidate.lastIndexOf('/');
         int start = candidate.lastIndexOf('/', end - 1);
-        String dir = candidate.substring(start + 1, end);
-        try {
-            return Double.parseDouble(dir.substring(0, dir.length() - 1));
-        } catch (NumberFormatException e) {
-            return 1;
+        String dir = end < 0 ? "" : candidate.substring(start + 1, end);
+        return isRatioDir(dir) ? Double.parseDouble(dir.substring(0, dir.length() - 1)) : 1;
+    }
+
+    /** The bundled manifest's resource name; the build writes it (TranscodeFlutterMojo). */
+    static final String MANIFEST = "cn1f_AssetManifest.txt";
+
+    private static java.util.Map<String, java.util.List<String>> manifest;
+    private static boolean manifestRead;
+
+    /** The bundled manifest, read once, or null when the build wrote none. */
+    private static java.util.Map<String, java.util.List<String>> manifest() {
+        if (!manifestRead) {
+            manifestRead = true;
+            try {
+                if (com.codename1.ui.Display.isInitialized()) {
+                    java.io.InputStream in = com.codename1.ui.Display.getInstance()
+                            .getResourceAsStream(FlutterAssets.class, "/" + MANIFEST);
+                    if (in != null) {
+                        try {
+                            manifest = parseManifest(new String(com.codename1.io.Util.readInputStream(in), "UTF-8"));
+                        } finally {
+                            com.codename1.io.Util.cleanup(in);
+                        }
+                    }
+                }
+            } catch (Exception unreadable) {
+                manifest = null;   // probe the fixed ratios, as without one
+            }
         }
+        return manifest;
+    }
+
+    /**
+     * Groups the manifest's asset keys by the asset they are variants of. A key
+     * {@code dir/<N>x/name} is the N-ratio variant of {@code dir/name} when N is a
+     * positive decimal number, as Flutter's own rule has it; every other key is a
+     * main asset.
+     */
+    static java.util.Map<String, java.util.List<String>> parseManifest(String text) {
+        java.util.Map<String, java.util.List<String>> out = new java.util.HashMap<String, java.util.List<String>>();
+        int pos = 0;
+        while (pos < text.length()) {
+            int nl = text.indexOf('\n', pos);
+            if (nl < 0) {
+                nl = text.length();
+            }
+            String key = stripSlash(text.substring(pos, nl).trim());
+            pos = nl + 1;
+            if (key.length() == 0) {
+                continue;
+            }
+            String main = key;
+            int end = key.lastIndexOf('/');
+            if (end > 0) {
+                int start = key.lastIndexOf('/', end - 1);
+                if (isRatioDir(key.substring(start + 1, end))) {
+                    main = key.substring(0, start + 1) + key.substring(end + 1);
+                }
+            }
+            java.util.List<String> variants = out.get(main);
+            if (variants == null) {
+                variants = new java.util.ArrayList<String>();
+                out.put(main, variants);
+            }
+            variants.add(key);
+        }
+        return out;
+    }
+
+    /** Whether {@code dir} names a resolution variant: a positive decimal and an 'x'. */
+    static boolean isRatioDir(String dir) {
+        int n = dir.length();
+        if (n < 2 || dir.charAt(n - 1) != 'x') {
+            return false;
+        }
+        boolean dot = false;
+        boolean digit = false;
+        for (int i = 0; i < n - 1; i++) {
+            char c = dir.charAt(i);
+            if (c >= '0' && c <= '9') {
+                digit = true;
+            } else if (c == '.' && !dot && i > 0 && i < n - 2) {
+                dot = true;
+            } else {
+                return false;
+            }
+        }
+        return digit && Double.parseDouble(dir.substring(0, n - 1)) > 0;
+    }
+
+    private static String stripSlash(String p) {
+        while (p.startsWith("/")) {
+            p = p.substring(1);
+        }
+        return p;
     }
 
     /**

@@ -40,7 +40,11 @@ import java.util.Collection;
  * controller -- a failing analytics listener froze the visual animation.</p>
  *
  * <p>The list is copied first, so a listener may add or remove listeners
- * during dispatch.</p>
+ * during dispatch -- one added is not called until the next notification, as in
+ * Flutter. One REMOVED is not called either: each is checked against the live
+ * collection before it runs. Calling the copy blindly ran a listener after an
+ * earlier one had disposed its owner, and its state or controller code ran on
+ * a disposed object.</p>
  */
 public final class Listeners {
 
@@ -50,6 +54,9 @@ public final class Listeners {
     /** Calls every listener in {@code listeners}, reporting any that throws. */
     public static void notify(Collection<Funcs.VoidFunc0> listeners) {
         for (Funcs.VoidFunc0 l : new ArrayList<Funcs.VoidFunc0>(listeners)) {
+            if (!listeners.contains(l)) {
+                continue;
+            }
             try {
                 l.call();
             } catch (Throwable t) {
@@ -61,6 +68,9 @@ public final class Listeners {
     /** Calls every listener in {@code listeners} with {@code value}, reporting any that throws. */
     public static <T> void notify(Collection<Funcs.VoidFunc1<T>> listeners, T value) {
         for (Funcs.VoidFunc1<T> l : new ArrayList<Funcs.VoidFunc1<T>>(listeners)) {
+            if (!listeners.contains(l)) {
+                continue;
+            }
             try {
                 l.call(value);
             } catch (Throwable t) {

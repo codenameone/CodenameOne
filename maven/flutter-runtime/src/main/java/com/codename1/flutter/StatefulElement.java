@@ -62,6 +62,11 @@ public class StatefulElement extends ComposedElement {
     public void update(Widget newWidget) {
         StatefulWidget oldWidget = (StatefulWidget) widget;
         widget = newWidget;
+        // What Element.update does, which this override cannot call through
+        // ComposedElement (that would rebuild before didUpdateWidget): a GlobalKey's
+        // currentWidget follows the new configuration. Skipping it left
+        // key.currentWidget() on the first configuration for the element's life.
+        registerGlobalKey();
         state.updateWidget((StatefulWidget) newWidget);
         state.invokeDidUpdateWidget(oldWidget);
         dirty = true;

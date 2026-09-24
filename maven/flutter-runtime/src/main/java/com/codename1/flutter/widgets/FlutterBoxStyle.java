@@ -217,7 +217,11 @@ final class FlutterBoxStyle {
                 com.codename1.io.Log.p("Flutter runtime: decoration image not found: " + name);
                 return null;
             }
-            return com.codename1.ui.EncodedImage.create(res.stream());
+            try {
+                return com.codename1.ui.EncodedImage.create(res.stream());
+            } finally {
+                com.codename1.io.Util.cleanup(res.stream());   // the chosen stream is ours to close
+            }
         } catch (Exception cannotDecode) {
             com.codename1.io.Log.p("Flutter runtime: could not decode decoration image " + name);
             return null;

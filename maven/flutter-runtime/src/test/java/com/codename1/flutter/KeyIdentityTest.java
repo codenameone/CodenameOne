@@ -91,6 +91,23 @@ public class KeyIdentityTest {
     }
 
     @Test
+    public void aGlobalKeyFollowsTheNewConfigurationOfItsStatefulElement() {
+        GlobalKey<ProbeState> key = new GlobalKey<ProbeState>();
+        Probe first = new Probe();
+        first.key(key);
+        Element root = FlutterUI.mount(first, new RenderHost(), new BuildOwner());
+        Object state = key.currentState();
+
+        Probe second = new Probe();
+        second.key(key);
+        root.update(second);
+
+        assertSame(second, key.currentWidget(), "currentWidget follows the update");
+        assertSame(state, key.currentState(), "the State is kept");
+        FlutterUI.unmountTree(root);
+    }
+
+    @Test
     public void localesCompareByValue() {
         assertEquals(new Locale("en", "US"), new Locale("en", "US"));
         assertEquals(new Locale("en", "US").hashCode(), new Locale("en", "US").hashCode());

@@ -365,6 +365,9 @@ public class AnimationController extends Animation<Double> {
         // Canceled, as Flutter's value setter, reset and dispose are: the interrupted run's
         // future stays pending rather than resolving as if its target had been reached.
         stop(Boolean.TRUE);
+        // Flutter's dispose clears both listener lists, so a listener an earlier one
+        // disposed this controller from is not called in the same notification.
+        clearListeners();
     }
 
     // ------------------------------------------------------------------

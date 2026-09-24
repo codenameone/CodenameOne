@@ -109,7 +109,13 @@ public final class NotifierListeners {
     }
 
     void clear(Object notifier) {
-        lists.remove(new Key(notifier));
+        // Emptied as well as dropped: a notification already running holds this list
+        // and checks each listener against it before calling, so a notifier disposed
+        // by one of its own listeners must stop there.
+        List<Funcs.VoidFunc0> l = lists.remove(new Key(notifier));
+        if (l != null) {
+            l.clear();
+        }
     }
 
     /** How many notifiers currently have an entry; for tests. */

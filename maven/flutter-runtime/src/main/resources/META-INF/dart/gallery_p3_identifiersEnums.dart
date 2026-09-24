@@ -73,6 +73,15 @@ enum FloatingActionButtonLocation {
 @JavaName('dart.core.DartUri')
 class Uri {
   external static Uri parse(String uri);
+  external static Uri? tryParse(String uri);
+  external String get scheme;
+  external String get host;
+  external int get port;
+  external String get path;
+  external String get query;
+  external String get fragment;
+  external List<String> get pathSegments;
+  external Map<String, String> get queryParameters;
   external String toString();
 }
 

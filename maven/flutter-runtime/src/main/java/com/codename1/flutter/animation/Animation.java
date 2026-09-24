@@ -101,6 +101,12 @@ public abstract class Animation<T> implements Listenable {
         com.codename1.flutter.foundation.Listeners.notify(statusListeners, s);
     }
 
+    /** Removes every value and status listener, as Flutter's dispose does. */
+    protected void clearListeners() {
+        listeners.clear();
+        statusListeners.clear();
+    }
+
     /**
      * Drives {@code child} from this animation (which must produce doubles):
      * {@code controller.drive(tween)} == {@code tween.animate(controller)}.
