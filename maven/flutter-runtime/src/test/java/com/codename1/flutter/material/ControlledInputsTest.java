@@ -273,6 +273,24 @@ class ControlledInputsTest {
     }
 
     @Test
+    void aMaxLengthOfZeroAcceptsNothing() {
+        final List<String> changed = new ArrayList<String>();
+        TextField tf = new TextField();
+        tf.maxLength(0);
+        tf.onChanged(changed::add);
+        TextFieldRenderElement e = mount(tf);
+        e.userEdited("abc");
+        assertEquals(List.of(""), changed, "zero is a limit, not 'no limit'");
+        TextField unlimited = new TextField();
+        unlimited.maxLength(-1);   // Flutter's noMaxLength
+        final List<String> free = new ArrayList<String>();
+        unlimited.onChanged(free::add);
+        TextFieldRenderElement u = mount(unlimited);
+        u.userEdited("abc");
+        assertEquals(List.of("abc"), free);
+    }
+
+    @Test
     void oneControllerDrivesEveryFieldItIsGivenTo() {
         TextEditingController ctl = new TextEditingController();
         TextField first = new TextField();

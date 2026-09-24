@@ -132,6 +132,7 @@ public class ImageRenderElement extends RenderElement {
                 // element read the placeholder's size as the image's own, so BoxFit
                 // contain/cover could never recover the real aspect ratio. Until the
                 // bytes arrive there is simply no image, as in Flutter.
+                assetRatio = image().getMemoryScale();   // NetworkImage's scale
                 fetchNetworkImage(l, source, image().getUrl(), image().getHeaders());
             }
         } catch (Exception err) {

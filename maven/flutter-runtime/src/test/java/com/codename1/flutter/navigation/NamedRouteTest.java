@@ -154,6 +154,18 @@ class NamedRouteTest {
     }
 
     @Test
+    void aReplacementThatCannotBeBuiltLeavesTheCurrentRoute() {
+        // Only "/known" resolves; anything else has no route.
+        Navigator.installRouteTable(null, settings -> "/unknown".equals(settings.name()) ? null : route(), null);
+        NavigatorState state = Navigator.of(null, null);
+        state.pushNamed("/a", null);
+        state.pushNamed("/b", null);
+        state.pushReplacementNamed("/unknown", null, null);
+        assertEquals(2, Navigator.stackSize(),
+                "the page stays: popping first sent the user back when the replacement failed");
+    }
+
+    @Test
     void popUntilUnwindsToTheAcceptedRoute() {
         Navigator.installRouteTable(null, settings -> route(), null);
         NavigatorState state = Navigator.of(null, null);

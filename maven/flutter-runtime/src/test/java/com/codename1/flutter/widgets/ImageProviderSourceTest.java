@@ -110,4 +110,22 @@ public class ImageProviderSourceTest {
         img.image(p);
         return img;
     }
+
+    @Test
+    public void networkImageKeepsItsScaleAndKeysItsHeadersByContent() {
+        com.codename1.flutter.NetworkImage provider = new com.codename1.flutter.NetworkImage("https://x/a.png");
+        provider.scale(2.0);
+        java.util.Map<String, String> headers = new dart.core.DartMap<String, String>();
+        headers.put("Authorization", "Bearer one");
+        provider.headers(headers);
+        Image img = new Image();
+        img.image(provider);
+        assertEquals(2.0, img.getMemoryScale(), 0.0, "NetworkImage's scale is kept");
+        String before = img.sourceKey();
+        headers.put("Authorization", "Bearer two");   // mutated in place, as a Dart map is
+        Image again = new Image();
+        again.image(provider);
+        org.junit.jupiter.api.Assertions.assertNotEquals(before, again.sourceKey(),
+                "new credentials are a new source, even in the same map object");
+    }
 }

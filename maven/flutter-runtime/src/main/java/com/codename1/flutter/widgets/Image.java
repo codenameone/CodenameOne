@@ -117,6 +117,11 @@ public class Image extends Widget {
                     Object h = ((com.codename1.flutter.NetworkImage) inner).getHeaders();
                     this.headers = h instanceof java.util.Map && !((java.util.Map<?, ?>) h).isEmpty()
                             ? (java.util.Map<?, ?>) h : null;
+                    // NetworkImage(url, scale: 2.0) says two encoded pixels make one
+                    // logical one, as MemoryImage's scale does below. It was dropped, so
+                    // such an image came out twice the size it asked for.
+                    double scale = ((com.codename1.flutter.NetworkImage) inner).getScale();
+                    this.memoryScale = scale > 0 ? scale : 1;
                 }
             } else if (inner instanceof com.codename1.flutter.MemoryImage) {
                 // The bytes are already here, so there is nothing to resolve: the
@@ -241,7 +246,10 @@ public class Image extends Widget {
         }
         // The headers are part of what was asked for: a refreshed token must
         // fetch again rather than be answered by the load made with the old one.
-        return headers == null ? "url:" + url : "url:" + url + "#h" + headers.hashCode();
+        // Content-derived, the same SHA-256 the storage cache keys by: the header map's
+        // hashCode is identity-based for a Dart map and 32 bits for any other, so a
+        // mutated map or a collision kept the key and the old credentials' bytes.
+        return headers == null ? "url:" + url : "url:" + url + "#" + ImageRenderElement.storageKey(url, headers);
     }
 
     /// Request headers for a network image, or null.
@@ -254,7 +262,8 @@ public class Image extends Widget {
         return memoryBytes;
     }
 
-    /// Encoded pixels per logical pixel for a memory image (1 unless given).
+    /// Encoded pixels per logical pixel for a memory or network image -- the provider's
+    /// {@code scale} (1 unless given).
     public double getMemoryScale() {
         return memoryScale;
     }

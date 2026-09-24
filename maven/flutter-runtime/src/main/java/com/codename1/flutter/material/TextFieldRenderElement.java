@@ -295,7 +295,9 @@ public class TextFieldRenderElement extends RenderElement {
             TextField w = textField();
             tf.setConstraint(w.isObscureText() ? TextArea.PASSWORD : TextArea.ANY);
             // maxLength is a limit, not only a counter: Flutter stops the edit.
-            if (w.getMaxLength() != null && w.getMaxLength().longValue() > 0) {
+            // Zero is a real limit (no characters at all); only null and Flutter's
+            // negative noMaxLength mean "unlimited".
+            if (w.getMaxLength() != null && w.getMaxLength().longValue() >= 0) {
                 // The native cap counts UTF-16 units, and maxLength counts characters: a
                 // single emoji can be eleven units. It is therefore only a generous upper
                 // bound; userEdited enforces the real limit on character boundaries.
@@ -776,7 +778,7 @@ public class TextFieldRenderElement extends RenderElement {
         // Counted in user-perceived characters, as Flutter's maxLength is: cutting UTF-16
         // units split an emoji at the limit and handed half a surrogate pair on.
         Long max = textField().getMaxLength();
-        if (newText != null && max != null && max.longValue() > 0
+        if (newText != null && max != null && max.longValue() >= 0
                 && com.codename1.flutter.foundation.Characters.count(newText) > max.longValue()) {
             newText = com.codename1.flutter.foundation.Characters.take(newText, max.longValue());
             if (field != null && !applying) {

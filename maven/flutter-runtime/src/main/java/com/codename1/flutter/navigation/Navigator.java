@@ -455,6 +455,26 @@ public class Navigator extends StatelessWidget {
     }
 
     /**
+     * pushReplacementNamed: the route is resolved FIRST, and the current one is popped
+     * (completing with {@code result}, as Flutter's is) only when there is a replacement
+     * to show. Popping first sent the user back a page whenever the name was unknown or
+     * resolved to an unsupported route -- the replacement failed and the page it was to
+     * replace was gone.
+     */
+    static dart.async.Future<Object> replaceNamed(BuildContext context, String name, Object arguments,
+                                                  Object result) {
+        Route route = resolveRoute(context, name, arguments);
+        if (!(route instanceof MaterialPageRoute)) {
+            com.codename1.flutter.FlutterErrorReport.noRoute(name, route == null ? null
+                    : "(unsupported route type " + route.getClass().getName() + ")");
+            return nothingPushed();
+        }
+        pop(context, result);
+        com.codename1.flutter.FlutterErrorReport.route(name);
+        return push(context, (MaterialPageRoute) route);
+    }
+
+    /**
      * What a push answers when nothing could be pushed. An already-completed null: a
      * caller awaiting it must not hang on a page that never opened, and the failure has
      * been reported where it happened.
@@ -510,9 +530,7 @@ public class Navigator extends StatelessWidget {
 
         @Override
         public dart.async.Future<Object> pushReplacementNamed(String routeName, Object arguments, Object result) {
-            // The replaced route completes with `result`, as Flutter's does.
-            Navigator.pop(null, result);
-            return orNothing(pushNamedForResult(null, routeName, arguments));
+            return replaceNamed(null, routeName, arguments, result);
         }
 
         @Override
@@ -699,9 +717,7 @@ public class Navigator extends StatelessWidget {
 
         @Override
         public dart.async.Future<Object> pushReplacementNamed(String routeName, Object arguments, Object result) {
-            // The replaced route completes with `result`, as Flutter's does.
-            Navigator.pop(context, result);
-            return orNothing(pushNamedForResult(context, routeName, arguments));
+            return replaceNamed(context, routeName, arguments, result);
         }
 
         @Override
