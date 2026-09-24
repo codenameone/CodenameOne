@@ -213,8 +213,15 @@ public class GcOverflowSpiralApp {
             }
             int v = search(child, depth - 1, seed + b);
             head.score = v;
-            if (v > best) {
-                best = v;
+            // Read back every field of the chain. The translator removes an instance
+            // field nothing reads (DeadFieldElimination), and a Move whose board and next
+            // were write-only would stop carrying references -- the one property this
+            // workload exists for. The checks cannot fail and do not change RESULT.
+            if (head.board != child || (head.next != null && head.next.board != child)) {
+                throw new IllegalStateException();
+            }
+            if (head.score > best) {
+                best = head.score;
             }
         }
         return best;
