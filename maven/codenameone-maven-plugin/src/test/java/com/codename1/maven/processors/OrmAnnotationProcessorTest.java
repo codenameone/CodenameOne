@@ -259,6 +259,9 @@ public class OrmAnnotationProcessorTest {
             s.beginTransaction();codeType.getField("value").set(type.getField("code").get(loaded),"DEF");s.commitTransaction();s.clear();
             org.junit.Assert.assertEquals("DEF",codeType.getField("value").get(type.getField("code").get(s.find(type,id))));
             Object included=codeType.getConstructor(String.class).newInstance("DEF"),excluded=codeType.getConstructor(String.class).newInstance("missing");
+            org.junit.Assert.assertSame(s.find(type,id),s.query(type).in("code",excluded,included).first());
+            org.junit.Assert.assertSame(s.find(type,id),s.query(type).ge("code",included).first());
+            s.beginTransaction();org.junit.Assert.assertEquals(1,s.createQuery("update converted.Entry e set e.code=:code").setParameter("code",included).executeUpdate());s.commitTransaction();
             Object projected=s.createQuery("select e.code from converted.Entry e",codeType).first();org.junit.Assert.assertEquals("DEF",codeType.getField("value").get(projected));
             org.junit.Assert.assertSame(s.find(type,id),s.createQuery("select e from converted.Entry e where e.code in (:first, :second)",type).setParameter("first",excluded).setParameter("second",included).first());
             org.junit.Assert.assertSame(s.find(type,id),s.createQuery("select e from converted.Entry e where e.code in (:first, :second)",type).setParameter("first",included).setParameter("second",excluded).first());

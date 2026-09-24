@@ -279,6 +279,65 @@ class ManagedSessionTest {
         } finally { em.close(); }
     }
 
+    @Test void builderOperandsMatchStorageKindsAndRejectedClausesLeaveQueryUsable() throws Exception {
+        EntityManager em=manager();
+        try {
+            Session session=em.openSession();Record record=seed(session);
+            for(String field:new String[]{"counter","name","bytes"}) {
+                Object bad=field.equals("counter")?"abc":Long.valueOf(1);
+                com.codename1.orm.session.Query<Record> query=session.query(Record.class);
+                assertThrows(IllegalArgumentException.class,()->query.eq(field,bad));
+                assertThrows(IllegalArgumentException.class,()->query.ne(field,bad));
+                assertThrows(IllegalArgumentException.class,()->query.gt(field,bad));
+                assertThrows(IllegalArgumentException.class,()->query.ge(field,bad));
+                assertThrows(IllegalArgumentException.class,()->query.lt(field,bad));
+                assertThrows(IllegalArgumentException.class,()->query.le(field,bad));
+                assertThrows(IllegalArgumentException.class,()->query.in(field,null,bad));
+                assertSame(record,query.eq("counter",0L).first());
+            }
+            assertSame(record,session.query(Record.class).in("counter",null,0).first());
+            assertSame(record,session.query(Record.class).eq("bytes",new byte[]{1}).first());
+            assertNull(session.query(Record.class).eq("bytes",null).first());
+            session.close();
+        } finally { em.close(); }
+    }
+
+    @Test void bulkAssignmentsRejectIncompatibleStorageBeforeWriting() throws Exception {
+        EntityManager em=manager();
+        try {
+            Session session=em.openSession();Record record=seed(session);
+            for(String assignment:new String[]{"r.counter='oops'","r.counter=r.name","r.name=1","r.bytes='oops'","r.counter=coalesce(:a,'oops')"}) {
+                assertThrows(IllegalArgumentException.class,()->session.createQuery("update ManagedSessionTest$Record r set "+assignment));
+            }
+            session.beginTransaction();
+            for(String assignment:new String[]{"r.counter=:value","r.counter=(:value)","r.counter=coalesce(:value,:other)"}) {
+                com.codename1.orm.session.JpqlQuery<?> query=session.createQuery("update ManagedSessionTest$Record r set "+assignment).setParameter("value","oops");
+                if(assignment.contains(":other")) query.setParameter("other",0L);
+                assertThrows(IllegalArgumentException.class,query::executeUpdate);
+            }
+            assertThrows(IllegalArgumentException.class,()->session.createQuery("update ManagedSessionTest$Record r set r.name=:value").setParameter("value",7L).executeUpdate());
+            assertThrows(IllegalArgumentException.class,()->session.createQuery("update ManagedSessionTest$Record r set r.bytes=:value").setParameter("value","oops").executeUpdate());
+            assertEquals(1,session.createQuery("update ManagedSessionTest$Record r set r.counter=:value,r.name=:name,r.bytes=:bytes").setParameter("value",7L).setParameter("name",null).setParameter("bytes",new byte[]{1,2}).executeUpdate());
+            session.commitTransaction();Record loaded=session.find(Record.class,record.id);
+            assertEquals(7,loaded.counter);assertNull(loaded.name);assertArrayEquals(new byte[]{1,2},loaded.bytes);
+            session.close();
+        } finally { em.close(); }
+    }
+
+    @Test void numericConstantProjectionsKeepTheirPlannedTypes() throws Exception {
+        EntityManager em=manager();
+        try {
+            Session session=em.openSession();seed(session);
+            for(String expression:new String[]{"1","abs(1)","coalesce(1,2)","nullif(1,2)","min(1)","max(1)","(select 1 from ManagedSessionTest$Record i)"}) {
+                assertEquals(Long.valueOf(1),session.createQuery("select "+expression+" from ManagedSessionTest$Record r",Long.class).first(),expression);
+            }
+            for(String expression:new String[]{"1.5","abs(1.5)","coalesce(1.5,2.5)","avg(1.5)"}) {
+                assertEquals(Double.valueOf(1.5),session.createQuery("select "+expression+" from ManagedSessionTest$Record r",Double.class).first(),expression);
+            }
+            session.close();
+        } finally { em.close(); }
+    }
+
     @Test void scalarProjectionsRequireKnownStorageKinds() throws Exception {
         EntityManager em=manager();
         try {

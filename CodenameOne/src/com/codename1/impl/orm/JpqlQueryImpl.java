@@ -161,16 +161,20 @@ public final class JpqlQueryImpl<T> implements com.codename1.orm.session.JpqlQue
         }
     }
     private Bound arguments() {
+        String template = plan.sql;
+        if (template == null) {
+            throw new IllegalStateException("Query has no SQL plan");
+        }
         List<Object> values = new ArrayList<Object>();
         // Render each occurrence separately: dialect ordering and checked
         // arithmetic can repeat expressions containing the same bound value.
         StringBuilder statement = new StringBuilder();
         int position = 0;
         int start;
-        while ((start = plan.sql.indexOf("/*cn1-bind-", position)) >= 0) {
-            statement.append(plan.sql.substring(position, start));
-            int end = plan.sql.indexOf("*/?", start);
-            int index = Integer.parseInt(plan.sql.substring(start + 11, end));
+        while ((start = template.indexOf("/*cn1-bind-", position)) >= 0) {
+            statement.append(template.substring(position, start));
+            int end = template.indexOf("*/?", start);
+            int index = Integer.parseInt(template.substring(start + 11, end));
             Object binding = plan.bindings.get(index);
             position = end + 3;
             statement.append("?");
@@ -218,7 +222,7 @@ public final class JpqlQueryImpl<T> implements com.codename1.orm.session.JpqlQue
             }
         }
         SessionImpl.checkParameterCount(values.size());
-        statement.append(plan.sql.substring(position));
+        statement.append(template.substring(position));
         return new Bound(statement.toString(), values.toArray());
     }
     private Object boundValue(Object binding) {
@@ -263,13 +267,7 @@ public final class JpqlQueryImpl<T> implements com.codename1.orm.session.JpqlQue
             if (converted != null && logical && !(value instanceof Boolean)) {
                 throw new IllegalArgumentException("Logical parameter requires a Boolean: " + name);
             }
-            if (converted != null && expectedKind >= 0) {
-                boolean valid = expectedKind == Attribute.TEXT ? converted instanceof String
-                        : expectedKind == Attribute.BLOB ? converted instanceof byte[] : converted instanceof Number;
-                if (!valid) {
-                    throw new IllegalArgumentException("Incompatible parameter storage type: " + name);
-                }
-            }
+            Values.requireStorageKind(converted, expectedKind);
             if (converted != null && numeric) {
                 if (!(value instanceof Number) || !(converted instanceof Number) || integral && !(converted instanceof Byte
                         || converted instanceof Short || converted instanceof Integer || converted instanceof Long)) {
@@ -370,6 +368,7 @@ public final class JpqlQueryImpl<T> implements com.codename1.orm.session.JpqlQue
                     Expr target = new Expr(session.q(attribute.column), attribute.kind);
                     target.query = root;
                     target.field = field;
+                    compatible(target, value);
                     bindType(target, value);
                     if (attribute.nullable && root.model.required(root.model.index(field))) {
                         requireNonNull(value);
@@ -794,7 +793,8 @@ public final class JpqlQueryImpl<T> implements com.codename1.orm.session.JpqlQue
                 Object value = token.indexOf('.') >= 0 || token.indexOf('e') >= 0 || token.indexOf('E') >= 0
                                        ? (Object) Double.valueOf(token)
                                        : Long.valueOf(Long.parseLong(token));
-                return literal(bind(value), value instanceof Double ? Attribute.REAL : Attribute.BIGINT, value);
+                int kind = value instanceof Double ? Attribute.REAL : Attribute.BIGINT;
+                return literal(session.numericOperand(bind(value), kind), kind, value);
             }
             if (!identifier(token)) {
                 throw error("Expected expression");
@@ -1103,6 +1103,10 @@ public final class JpqlQueryImpl<T> implements com.codename1.orm.session.JpqlQue
             }
             if (value.parameter != null) {
                 value.parameter.expectedKind = kind;
+            } else if (value.kind < 0) {
+                for (Expr child : value.children) {
+                    requireKind(child, kind);
+                }
             }
         }
         private void compatible(Expr left, Expr right) {

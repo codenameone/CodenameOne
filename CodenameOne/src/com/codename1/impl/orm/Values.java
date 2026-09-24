@@ -68,6 +68,17 @@ public final class Values {
         return value;
     }
 
+    static void requireStorageKind(Object value, int kind) {
+        if (value == null || kind < 0) {
+            return;
+        }
+        boolean valid = kind == Attribute.TEXT ? value instanceof String
+                : kind == Attribute.BLOB ? value instanceof byte[] : value instanceof Number;
+        if (!valid) {
+            throw new IllegalArgumentException("Incompatible parameter storage type");
+        }
+    }
+
     private Values() {
     }
 

@@ -87,6 +87,17 @@ class ManagedSessionDatabaseTest {
             session.beginTransaction();
             ManagedSessionTest.Record entity=new ManagedSessionTest.Record();entity.name="record";entity.bytes=new byte[]{1,2};session.persist(entity);
             assertTrue(entity.id>0);session.commitTransaction();session.clear();
+            for(String expression:new String[]{"1","abs(1)","coalesce(1,2)","nullif(1,2)","min(1)","max(1)","(select 1 from ManagedSessionTest$Record i)"}) {
+                assertEquals(Long.valueOf(1),session.createQuery("select "+expression+" from ManagedSessionTest$Record r",Long.class).first(),expression);
+            }
+            for(String expression:new String[]{"1.5","abs(1.5)","coalesce(1.5,2.5)","avg(1.5)"}) {
+                assertEquals(Double.valueOf(1.5),session.createQuery("select "+expression+" from ManagedSessionTest$Record r",Double.class).first(),expression);
+            }
+            assertThrows(IllegalArgumentException.class,()->session.query(ManagedSessionTest.Record.class).eq("counter","abc"));
+            assertThrows(IllegalArgumentException.class,()->session.createQuery("update ManagedSessionTest$Record r set r.counter='oops'"));
+            session.beginTransaction();
+            assertThrows(IllegalArgumentException.class,()->session.createQuery("update ManagedSessionTest$Record r set r.counter=:value").setParameter("value","oops").executeUpdate());
+            assertEquals(1,session.createQuery("update ManagedSessionTest$Record r set r.counter=:value").setParameter("value",0L).executeUpdate());session.commitTransaction();
             String[] overflowExpressions={":value+1",":value-1",":value*2",":value/-1","-:value"};
             long[] overflowValues={Long.MAX_VALUE,Long.MIN_VALUE,Long.MAX_VALUE,Long.MIN_VALUE,Long.MIN_VALUE};
             for(int i=0;i<overflowExpressions.length;i++) {

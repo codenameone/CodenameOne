@@ -155,13 +155,14 @@ public final class QueryImpl<T> implements com.codename1.orm.session.Query<T> {
             throw new IllegalArgumentException("LIKE requires text storage: " + field);
         }
         String name = column(field);
-        conjunction();
-        predicates.append(name).append(session.likeOperator(false));
-        Object converted = parameter(field, pattern);
+        Object converted = builderParameter(field, pattern);
         if (converted != null && !(converted instanceof String)) {
             throw new IllegalArgumentException("LIKE requires a text pattern after conversion");
         }
-        params.add(session.likePattern((String) converted, null));
+        String normalized = session.likePattern((String) converted, null);
+        conjunction();
+        predicates.append(name).append(session.likeOperator(false));
+        params.add(normalized);
         return this;
     }
     @Override
@@ -177,6 +178,10 @@ public final class QueryImpl<T> implements com.codename1.orm.session.Query<T> {
         SessionImpl.checkParameterCount(params.size() + values.length);
 
         String name = column(field);
+        Object[] converted = new Object[values.length];
+        for (int i = 0; i < values.length; i++) {
+            converted[i] = builderParameter(field, values[i]);
+        }
         conjunction();
         if (values.length == 0) {
             predicates.append("1 = 0");
@@ -188,7 +193,7 @@ public final class QueryImpl<T> implements com.codename1.orm.session.Query<T> {
                 predicates.append(", ");
             }
             predicates.append('?');
-            params.add(parameter(field, values[i]));
+            params.add(converted[i]);
         }
         predicates.append(')');
         return this;
@@ -280,11 +285,12 @@ public final class QueryImpl<T> implements com.codename1.orm.session.Query<T> {
         if (!unary && value == null) {
             throw new IllegalArgumentException("Null comparison requires isNull/isNotNull");
         }
+        Object converted = unary ? null : builderParameter(field, value);
         conjunction();
         predicates.append(name).append(' ').append(op);
         if (!unary) {
             predicates.append(" ?");
-            params.add(parameter(field, value));
+            params.add(converted);
         }
         return this;
     }
@@ -326,6 +332,11 @@ public final class QueryImpl<T> implements com.codename1.orm.session.Query<T> {
             }
         }
         return false;
+    }
+    private Object builderParameter(String field, Object value) {
+        Object converted = parameter(field, value);
+        Values.requireStorageKind(converted, kind(field));
+        return converted;
     }
     Object parameter(String field, Object value) {
         Field resolved = resolveField(field);
