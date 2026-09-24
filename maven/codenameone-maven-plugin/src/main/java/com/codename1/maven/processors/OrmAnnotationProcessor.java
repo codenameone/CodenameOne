@@ -1334,9 +1334,13 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
             }
             sb.append("default:return super.").append(method).append("(index);}}\n");
         }
-        boolean converters=false;for(PersistedField field:ec.fields) if(field.converter!=null) converters=true;
-        if(converters) {
-            if(ec.embedded.isEmpty()) sb.append("public boolean requiresSession() { return true; }\n");
+        boolean converters=false,enumParameters=false;
+        for(PersistedField field:ec.fields) {
+            if(field.converter!=null) converters=true;
+            if(field.kind.kind==PropertyTypeKind.Kind.ENUM) enumParameters=true;
+        }
+        if(converters || enumParameters) {
+            if(converters && ec.embedded.isEmpty()) sb.append("public boolean requiresSession() { return true; }\n");
             sb.append("public Object parameter(int index,Object value) { switch(index) {\n");
             for(int i=0;i<ec.fields.size();i++) {
                 PersistedField field=ec.fields.get(i);
@@ -1344,6 +1348,10 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
                     .append(boxedDomainType(field.domainType)).append(".class.isInstance(value)) throw new IllegalArgumentException(\"Converter input requires ")
                     .append(escape(field.domainType)).append("\"); return ").append(pkg).append("Values.storage(new ").append(field.converter)
                     .append("().toDatabase((").append(field.domainType).append(")value));\n");
+                else if(field.kind.kind==PropertyTypeKind.Kind.ENUM) sb.append("case ").append(i)
+                    .append(": if(value instanceof String) value=").append(field.kind.binaryName).append(".valueOf((String)value); if(value!=null && !")
+                    .append(field.kind.binaryName).append(".class.isInstance(value)) throw new IllegalArgumentException(\"Enum input requires ")
+                    .append(escape(field.kind.binaryName)).append(" or a valid constant name\"); return ").append(pkg).append("Values.storage(value);\n");
             }
             sb.append("default:return super.parameter(index,value);}}\n");
         }

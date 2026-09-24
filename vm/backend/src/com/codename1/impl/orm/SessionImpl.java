@@ -726,23 +726,17 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
                 }
             } while (previous != entries.size());
             List<Entry> inserted = new ArrayList<Entry>();
-            do {
-                previous = inserted.size();
-                for (Entry entry : new ArrayList<Entry>(entries.values())) {
-                    insert(entry, inserted);
-                }
-            } while (previous != inserted.size());
-            for (Entry e : inserted) {
-                completeInsert(e);
-            }
+            insertPending(inserted);
             // PrePersist callbacks may have introduced new cascaded entities.
             List<Entry> pending = new ArrayList<Entry>(entries.values());
             List<Entry> updated = new ArrayList<Entry>();
             for (Entry e : pending) {
-                if (!e.removed && !inserted.contains(e) && update(e)) {
+                if (!e.removed && !inserted.contains(e) && update(e, inserted)) {
                     updated.add(e);
                 }
             }
+            // PreUpdate callbacks may have introduced entities with collections too.
+            pending = new ArrayList<Entry>(entries.values());
             // Release all old collection links before inserting moved children.
             for (Entry e : pending) {
                 if (!e.removed) {
@@ -2182,7 +2176,20 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
             }
         }
     }
-    private boolean update(Entry entry) {
+    private void insertPending(List<Entry> inserted) {
+        int first = inserted.size();
+        int previous;
+        do {
+            previous = inserted.size();
+            for (Entry entry : new ArrayList<Entry>(entries.values())) {
+                insert(entry, inserted);
+            }
+        } while (previous != inserted.size());
+        for (int i = first; i < inserted.size(); i++) {
+            completeInsert(inserted.get(i));
+        }
+    }
+    private boolean update(Entry entry, List<Entry> inserted) {
         checkTransientAssociations(entry);
         EntityModel model = entry.model;
         Attribute[] attrs = model.attributes();
@@ -2218,6 +2225,8 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
             return false;
         }
         model.lifecycle(entry.entity, 2);
+        cascadePersist(entry);
+        insertPending(inserted);
         checkTransientAssociations(entry);
         now = snapshot(model, entry.entity);
         if (!same(model.identifierFromRow(now), model.identifierFromRow(entry.snapshot)) ||

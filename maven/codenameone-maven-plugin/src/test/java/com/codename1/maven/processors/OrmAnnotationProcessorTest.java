@@ -314,10 +314,19 @@ public class OrmAnnotationProcessorTest {
 
     @Test
     public void prePersistCascadesJoinTheCurrentFlush() throws Exception {
+        callbackCascadesJoinTheCurrentFlush(false);
+    }
+
+    @Test
+    public void preUpdateCascadesJoinTheCurrentFlush() throws Exception {
+        callbackCascadesJoinTheCurrentFlush(true);
+    }
+
+    private void callbackCascadesJoinTheCurrentFlush(boolean updating) throws Exception {
         for(boolean generated:Arrays.asList(false,true)) {
             File classes=tmp.newFolder();Map<String,String> sources=new java.util.LinkedHashMap<String,String>();String imports="package callbackcascade; import com.codename1.annotations.*; import com.codename1.annotations.db.*; ";
             sources.put("callbackcascade.Child",imports+"@Entity public class Child { @Id(autoIncrement="+generated+") public long id"+(generated?";":"=++sequence; public static long sequence=100;")+" @Version public long version; @ManyToOne(cascade=CascadeType.PERSIST) public Child next; @ElementCollection public java.util.List<String> tags=new java.util.ArrayList<String>(); @DbTransient public int depth,pre,post,updates; @PrePersist public void before() { pre++; tags.add(\"created\"); if(depth==0) { next=new Child();next.depth=1;next.next=this; } } @PostPersist public void after() { post++; } @PreUpdate public void update() { updates++; } }");
-            sources.put("callbackcascade.Owner",imports+"@Entity public class Owner { @Id public long id; @ManyToOne(cascade=CascadeType.PERSIST) public Child child; @OneToMany(cascade=CascadeType.PERSIST) public java.util.List<Child> children=new java.util.ArrayList<Child>(); @DbTransient public int pre; @PrePersist public void before() { pre++;child=new Child();children.add(new Child()); } }");
+            sources.put("callbackcascade.Owner",imports+"@Entity public class Owner { @Id public long id; @Version public long version; public String name; @ManyToOne(cascade=CascadeType.PERSIST) public Child child; @OneToMany(cascade=CascadeType.PERSIST) public java.util.List<Child> children=new java.util.ArrayList<Child>(); @DbTransient public int pre,post; @"+(updating?"PreUpdate":"PrePersist")+" public void before() { pre++;child=new Child();children.add(new Child()); } @"+(updating?"PostUpdate":"PostPersist")+" public void after() { post++; } }");
             JavaSourceCompiler.compile(sources,classes,Arrays.asList(testClassesDir()));ProcessorContext client=runProcessor(classes);assertFalse(client.getErrors().toString(),client.hasErrors());ProcessorContext backend=runProcessor(classes,backendClasspath());assertFalse(backend.getErrors().toString(),backend.hasErrors());
             try(java.net.URLClassLoader loader=new java.net.URLClassLoader(new URL[]{classes.toURI().toURL()},getClass().getClassLoader())) {
                 Class ownerType=loader.loadClass("callbackcascade.Owner"),childType=loader.loadClass("callbackcascade.Child");
@@ -325,12 +334,59 @@ public class OrmAnnotationProcessorTest {
                     Map<String,com.codename1.impl.orm.EntityModel<?>> models=new java.util.LinkedHashMap<String,com.codename1.impl.orm.EntityModel<?>>();for(Class type:Arrays.asList(ownerType,childType)) models.put(type.getName(),(com.codename1.impl.orm.EntityModel)loader.loadClass(type.getName()+suffix).newInstance());
                     com.codename1.backend.Database db=com.codename1.backend.Database.open(":memory:");com.codename1.orm.session.Session session=new com.codename1.impl.orm.SessionImpl(new com.codename1.impl.orm.BackendSqlAccess(null,db,db.dialect()),models);
                     try {
-                        session.createTables();session.beginTransaction();Object owner=ownerType.newInstance();session.persist(owner);session.flush();org.junit.Assert.assertEquals(1,ownerType.getField("pre").getInt(owner));
+                        session.createTables();session.beginTransaction();Object owner=ownerType.newInstance();session.persist(owner);
+                        if(updating) { session.commitTransaction();session.beginTransaction();ownerType.getField("name").set(owner,"changed"); }
+                        session.flush();session.flush();org.junit.Assert.assertEquals(1,ownerType.getField("pre").getInt(owner));org.junit.Assert.assertEquals(1,ownerType.getField("post").getInt(owner));org.junit.Assert.assertEquals(updating?1:0,ownerType.getField("version").getLong(owner));
                         org.junit.Assert.assertEquals(4,session.query(childType).count());for(Object child:session.query(childType).list()) { org.junit.Assert.assertEquals(1,childType.getField("pre").getInt(child));org.junit.Assert.assertEquals(1,childType.getField("post").getInt(child));org.junit.Assert.assertEquals(0,childType.getField("updates").getInt(child)); }
+                        Object childId=childType.getField("id").get(ownerType.getField("child").get(owner));
                         session.commitTransaction();Object id=ownerType.getField("id").get(owner);session.clear();owner=session.find(ownerType,id);session.initialize(owner,"children");org.junit.Assert.assertEquals(1,((java.util.List)ownerType.getField("children").get(owner)).size());
+                        org.junit.Assert.assertEquals(childId,childType.getField("id").get(ownerType.getField("child").get(owner)));org.junit.Assert.assertEquals(updating?1:0,ownerType.getField("version").getLong(owner));
                         for(Object child:session.query(childType).list()) { Object next=childType.getField("next").get(child);org.junit.Assert.assertSame(child,childType.getField("next").get(next));session.initialize(child,"tags");org.junit.Assert.assertEquals(Arrays.asList("created"),childType.getField("tags").get(child)); }
                     } finally { session.close();db.close(); }
                 }
+            }
+        }
+    }
+
+    @Test
+    public void enumAssignmentsValidateDomainValuesBeforeWriting() throws Exception {
+        File classes=tmp.newFolder("enumparameters");
+        Map<String,String> sources=new java.util.LinkedHashMap<String,String>();
+        sources.put("enumparameters.State","package enumparameters; public enum State { OPEN, CLOSED }");
+        sources.put("enumparameters.Other","package enumparameters; public enum Other { OPEN, UNKNOWN }");
+        sources.put("enumparameters.Entry","package enumparameters; import com.codename1.annotations.*; @Entity public class Entry { @Id public long id; public State state=State.OPEN; public String name=\"original\"; }");
+        JavaSourceCompiler.compile(sources,classes,Arrays.asList(testClassesDir()));
+        ProcessorContext client=runProcessor(classes);assertFalse(client.getErrors().toString(),client.hasErrors());
+        ProcessorContext backend=runProcessor(classes,backendClasspath());assertFalse(backend.getErrors().toString(),backend.hasErrors());
+        try(java.net.URLClassLoader loader=new java.net.URLClassLoader(new URL[]{classes.toURI().toURL()},getClass().getClassLoader())) {
+            Class type=loader.loadClass("enumparameters.Entry"),stateType=loader.loadClass("enumparameters.State"),otherType=loader.loadClass("enumparameters.Other");
+            Object open=Enum.valueOf(stateType,"OPEN"),closed=Enum.valueOf(stateType,"CLOSED");
+            for(String suffix:Arrays.asList("Cn1Model","Cn1BackendModel")) {
+                com.codename1.impl.orm.EntityModel model=(com.codename1.impl.orm.EntityModel)loader.loadClass(type.getName()+suffix).newInstance();
+                assertFalse("Enums alone must not disable legacy DAOs",model.requiresSession());
+                Map<String,com.codename1.impl.orm.EntityModel<?>> models=new java.util.LinkedHashMap<String,com.codename1.impl.orm.EntityModel<?>>();models.put(type.getName(),model);
+                com.codename1.backend.Database db=com.codename1.backend.Database.open(":memory:");
+                com.codename1.orm.session.Session session=new com.codename1.impl.orm.SessionImpl(new com.codename1.impl.orm.BackendSqlAccess(null,db,db.dialect()),models);
+                try {
+                    session.createTables();session.beginTransaction();Object entity=type.newInstance();session.persist(entity);session.commitTransaction();Object id=type.getField("id").get(entity);
+                    session.beginTransaction();
+                    for(Object invalid:Arrays.asList("INVALID",Enum.valueOf(otherType,"UNKNOWN"),Enum.valueOf(otherType,"OPEN"),Integer.valueOf(1))) {
+                        try { session.createQuery("update Entry e set e.name='changed',e.state=:state").setParameter("state",invalid).executeUpdate();fail("Accepted invalid enum: "+invalid); }
+                        catch(IllegalArgumentException expected) { /* Reject before executing the update. */ }
+                        org.junit.Assert.assertEquals("original",session.createQuery("select e.name from Entry e",String.class).first());
+                        org.junit.Assert.assertEquals(open,session.createQuery("select e.state from Entry e",stateType).first());
+                    }
+                    try { session.createQuery("update Entry e set e.state='INVALID'").executeUpdate();fail("Accepted invalid enum literal"); }
+                    catch(IllegalArgumentException expected) { /* Literals follow the same validation. */ }
+                    for(Object valid:Arrays.asList(closed,"OPEN",null)) {
+                        org.junit.Assert.assertEquals(1,session.createQuery("update Entry e set e.state=:state").setParameter("state",valid).executeUpdate());
+                        org.junit.Assert.assertEquals(valid==closed?closed:valid==null?null:open,session.createQuery("select e.state from Entry e",stateType).first());
+                    }
+                    org.junit.Assert.assertEquals(1,session.createQuery("update Entry e set e.state='CLOSED'").executeUpdate());
+                    org.junit.Assert.assertEquals(1,session.createQuery("select e from Entry e where e.state=:state").setParameter("state",closed).list().size());
+                    org.junit.Assert.assertEquals(1,session.createQuery("select e from Entry e where e.state='CLOSED'").list().size());
+                    session.commitTransaction();session.clear();org.junit.Assert.assertEquals(closed,type.getField("state").get(session.find(type,id)));
+                } finally { session.close();db.close(); }
             }
         }
     }

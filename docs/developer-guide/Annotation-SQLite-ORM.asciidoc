@@ -217,12 +217,15 @@ correlated nested queries. `LENGTH` counts characters on every backend.
 `@MappedSuperclass` contributes public inherited fields to a concrete entity.
 `@Embedded` flattens a public `@Embeddable` value into columns prefixed with the
 embedding field name. An all-null embedded value reads as null. Embedded fields
-can be used in query paths. Enums are stored by name. Boolean values use numeric
+can be used in query paths. Enums are stored by name. Mapped query parameters and
+literals accept the declared enum type, a valid constant name, or null. Invalid
+names and constants from other enum types are rejected before execution.
+Boolean values use numeric
 storage; native `BOOL` and `BOOLEAN` column declarations are rejected.
 
 Public no-argument void methods can receive `@PrePersist`, `@PostPersist`,
 `@PreUpdate`, `@PostUpdate`, `@PreRemove`, `@PostRemove`, and `@PostLoad` callbacks.
-Relationships added by `@PrePersist` follow `PERSIST` cascades in the current
+Relationships added by `@PrePersist` or `@PreUpdate` follow `PERSIST` cascades in the current
 flush, including newly created collections.
 
 Inherited callbacks run before subclass callbacks; overriding a callback method
