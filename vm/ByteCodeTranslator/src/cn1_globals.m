@@ -866,6 +866,45 @@ static int cn1GcAgingSlack(void) {
 // young (mark == -1) garbage; every object with a real epoch survives it. See
 // cn1GcGenDecide.
 static JAVA_BOOLEAN cn1GcMinor = JAVA_FALSE;
+#ifdef CN1_GC_GEN_SHADOW
+// QA: per-object remember history -- epoch of the last remember and how it happened.
+#define CN1_RH_PROMO 1
+#define CN1_RH_BARRIER 2
+#define CN1_RH_CARDSET 4
+#define CN1_RH_BLOCKOWNER 8
+#define CN1_RH_WASQUEUED 16
+#define CN1_RH_WEQUEUED 32
+// pages the rset scan processed this cycle, with the cards it took
+static volatile int cn1RhPhase = 0;   // 0 outside a cycle, 1 mark before rset scan, 2 after it, 3 sweep
+static volatile long cn1RhRemembersInCycle = 0;
+static void* cn1RhScanPages[1 << 16]; static uint64_t cn1RhScanCards[1 << 16]; static int cn1RhScanN = 0;
+static JAVA_OBJECT* cn1RhKeys = 0; static int* cn1RhEpoch = 0; static int* cn1RhFlags = 0;
+static long cn1RhCap = 1L << 23;
+static pthread_mutex_t cn1RhMutex = PTHREAD_MUTEX_INITIALIZER;
+static void cn1RhNote(JAVA_OBJECT o, int flags) {
+    pthread_mutex_lock(&cn1RhMutex);
+    if(cn1RhKeys == 0) {
+        cn1RhKeys = (JAVA_OBJECT*)calloc((size_t)cn1RhCap, sizeof(JAVA_OBJECT));
+        cn1RhEpoch = (int*)calloc((size_t)cn1RhCap, sizeof(int));
+        cn1RhFlags = (int*)calloc((size_t)cn1RhCap, sizeof(int));
+    }
+    long h = (long)(((uintptr_t)o >> 4) & (cn1RhCap - 1));
+    long probes = 0;
+    while(cn1RhKeys[h] != 0 && cn1RhKeys[h] != o && probes < 64) { h = (h + 1) & (cn1RhCap - 1); probes++; }
+    if(cn1RhKeys[h] != o) { cn1RhKeys[h] = o; cn1RhFlags[h] = 0; }
+    cn1RhEpoch[h] = currentGcMarkValue;
+    cn1RhFlags[h] = flags;
+    pthread_mutex_unlock(&cn1RhMutex);
+}
+static int cn1RhFind(JAVA_OBJECT o, int* epoch) {
+    if(cn1RhKeys == 0) return -1;
+    long h = (long)(((uintptr_t)o >> 4) & (cn1RhCap - 1));
+    long probes = 0;
+    while(cn1RhKeys[h] != 0 && probes < 64) { if(cn1RhKeys[h] == o) { *epoch = cn1RhEpoch[h]; return cn1RhFlags[h]; } h = (h + 1) & (cn1RhCap - 1); probes++; }
+    return -1;
+}
+static int cn1RhSweeping = 0;
+#endif
 #ifdef CN1_GC_GEN_CHECK2
 // QA ONLY: minors run in trace-everything mode (which is correct) and report every edge a
 // real minor would have missed -- a TRACED (so reachable) parent that was already old,
@@ -5010,6 +5049,21 @@ void codenameOneGCMark() {
 #ifndef CN1_DISABLE_BIBOP
         cn1BibopDetachPreCycle();
         cn1GcGenDecide();
+        // A MAJOR discards the remembered set -- its full trace covers every old->young
+        // edge that existed when the cycle began -- and it must discard exactly THAT set,
+        // taken here. A remember made after this point is a store made during the cycle,
+        // by a thread not yet stopped, into an old object the trace may already have
+        // passed; the young value it stored can survive the major unmarked (a page its
+        // thread still owns is never swept), and the only record of the edge is this
+        // entry. Taking the set later, at the scan, threw those entries away with the
+        // rest, and the next minor freed the child under a live old parent: measured as
+        // every missed edge on the self-hosting corpus, each remembered mid-major.
+        if(!cn1GcMinor) {
+            cn1GcRsetScan(getThreadLocalData(), JAVA_FALSE);
+        }
+#ifdef CN1_GC_GEN_SHADOW
+        cn1RhPhase = 1;
+#endif
 #endif
     }
     // Drop the previous cycle's reference list and recompute the soft-retention budget
@@ -5065,7 +5119,7 @@ void codenameOneGCMark() {
 #if defined(CN1_GC_GEN_CHECK2) && !defined(CN1_GC_GEN_QUAR) && !defined(CN1_DISABLE_BIBOP)
     // Diagnostic order: the remembered set first, so a child it covers is marked before
     // any root-reached old parent is traced and cannot be misreported as missed.
-    if(cn1GcStwCycle) cn1GcRsetScan(getThreadLocalData(), cn1GcMinor);
+    if(cn1GcStwCycle && cn1GcMinor) cn1GcRsetScan(getThreadLocalData(), JAVA_TRUE);
 #endif
     init_gc_thresholds();
     hasAgressiveAllocator = JAVA_FALSE;
@@ -5804,7 +5858,11 @@ void codenameOneGCMark() {
     // major one (a full trace makes it redundant); either way it is taken here, once
     // every cooperatively stopped thread has been scanned and held.
 #if !defined(CN1_GC_GEN_CHECK2) || defined(CN1_GC_GEN_QUAR)
-    cn1GcRsetScan(d, cn1GcMinor);
+    // A minor takes it here, after every cooperatively stopped thread is scanned, so a
+    // store racing the stop is traced now; a major already took its set at cycle start.
+    if(cn1GcMinor) {
+        cn1GcRsetScan(d, JAVA_TRUE);
+    }
 #endif
 #endif
     // Drain the worklist that the calls above populated. gcMarkObject no longer recurses
@@ -6374,8 +6432,16 @@ static void cn1GcReportStaleIndexSkip(void) {
     }
 }
 
+#ifdef CN1_GC_GEN_SHADOW
+void cn1GcShadowRun(CODENAME_ONE_THREAD_STATE);
+#endif
 void codenameOneGCSweep() {
     struct ThreadLocalData* threadStateData = getThreadLocalData();
+#ifdef CN1_GC_GEN_SHADOW
+    if(cn1GcMinor) {
+        cn1GcShadowRun(threadStateData);
+    }
+#endif
 #ifdef CN1_GC_GEN_CHECK
     if(cn1GcMinor) {
         cn1GcGenCheck(threadStateData);
@@ -6557,7 +6623,15 @@ void codenameOneGCSweep() {
     // them in the page sweep of THIS cycle. Marking is complete and the pool lock
     // excludes mutator-owned pages; finalization still happens exactly once in
     // cn1BibopReclaimSlot. Sweeping pages first would defer native-buffer release.
+#ifdef CN1_GC_GEN_SHADOW
+    cn1RhSweeping = 1;
+    cn1RhPhase = 3;
+#endif
     cn1BibopSweep(threadStateData);
+#ifdef CN1_GC_GEN_SHADOW
+    cn1RhSweeping = 0;
+    cn1RhPhase = 0;
+#endif
 #endif
     // A minor cycle freed nothing with an epoch, so the floor below which a mark means
     // "already reclaimed" must not move -- every old object sits below the current epoch.
@@ -7625,14 +7699,22 @@ static void cn1GenPoisonCrash(int sig, siginfo_t* si, void* uc) {
     int n = backtrace(bt, 64);
     uintptr_t a = (uintptr_t)si->si_addr & 0x0000FFFFFFFFFFFFULL;
     fprintf(stderr, "[GEN-POISON] signal %d at %p -- a freed (quarantined) object was used:\n", sig, si->si_addr);
+    // Backtrace FIRST: the object search below reads page headers, and for an address
+    // that is not in the heap at all (a plain NULL dereference) it faults inside this
+    // handler, which kills the process before anything useful is printed.
+    backtrace_symbols_fd(bt, n, 2);
+    if(a < 65536) {
+        _exit(98);   // a NULL dereference, not a poisoned word
+    }
     for(uintptr_t off = 0 ; off < 2048 ; off += 8) {
         JAVA_OBJECT o = (JAVA_OBJECT)(a - off);
         CN1BibopPage* pg = (CN1BibopPage*)((uintptr_t)o & ~((uintptr_t)CN1_BIBOP_PAGE_SIZE - 1));
         if(((uintptr_t)o - (uintptr_t)pg) < (uintptr_t)pg->firstSlotOffset) continue;
         if(((uintptr_t)o - (uintptr_t)pg - pg->firstSlotOffset) % pg->slotSize != 0) continue;
-        if(o->__codenameOneGcMark != -9) continue;
+        if(o->__codenameOneGcMark != -9 && o->__codenameOneGcMark != -8) continue;
         struct clazz* c = o->__codenameOneParentClsReference;
-        fprintf(stderr, "[GEN-POISON] freed object %p class=%s slotSize=%d page queued=%d cards=%llx\n",
+        fprintf(stderr, "[GEN-POISON] %s-freed object %p class=%s slotSize=%d page queued=%d cards=%llx\n",
+                o->__codenameOneGcMark == -8 ? "MAJOR" : "minor",
                 (void*)o, c && c->clsName ? c->clsName : "?", pg->slotSize,
                 atomic_load(&pg->gcRsetQueued), (unsigned long long)atomic_load(&pg->gcRsetCards));
         break;
@@ -7720,11 +7802,125 @@ static void cn1GcRsetLegacyInsertLocked(JAVA_OBJECT t) {
     cn1GcRsetLegacyCount++;
 }
 
+#ifdef CN1_GC_GEN_SHADOW
+// QA ONLY. After a minor's mark, trace THROUGH every old object the mark stopped at, and
+// report each young object on a pre-cycle page that this reaches and the minor did not:
+// exactly the objects the minor's sweep would free while they are reachable. Everything
+// reached is marked, so the run behaves like CN1_EXP_NOSTOP and completes.
+static int cn1GcShadowPhase = 0;
+static JAVA_OBJECT cn1GcShadowParent = 0, cn1GcShadowAncestor = 0;
+static JAVA_OBJECT* cn1GcShadowList = 0; static long cn1GcShadowN = 0, cn1GcShadowCap = 0;
+static long cn1GcShadowMisses = 0, cn1GcShadowOld = 0;
+typedef struct { JAVA_OBJECT* t; long cap, n; } CN1ShadowSet;
+static CN1ShadowSet cn1GcShadowSeen, cn1GcShadowRs;
+static int cn1ShadowSetAdd(CN1ShadowSet* st, JAVA_OBJECT o) {
+    if((st->n + 1) * 2 > st->cap) {
+        long nc = st->cap ? st->cap * 2 : (1 << 16);
+        JAVA_OBJECT* nt = (JAVA_OBJECT*)calloc((size_t)nc, sizeof(JAVA_OBJECT));
+        for(long i = 0 ; i < st->cap ; i++) if(st->t[i]) { long h = (long)(((uintptr_t)st->t[i] >> 4) & (nc - 1)); while(nt[h]) h = (h + 1) & (nc - 1); nt[h] = st->t[i]; }
+        free(st->t); st->t = nt; st->cap = nc;
+    }
+    long h = (long)(((uintptr_t)o >> 4) & (st->cap - 1));
+    while(st->t[h]) { if(st->t[h] == o) return 0; h = (h + 1) & (st->cap - 1); }
+    st->t[h] = o; st->n++;
+    return 1;
+}
+static int cn1ShadowSetHas(CN1ShadowSet* st, JAVA_OBJECT o) {
+    if(!st->t) return 0;
+    long h = (long)(((uintptr_t)o >> 4) & (st->cap - 1));
+    while(st->t[h]) { if(st->t[h] == o) return 1; h = (h + 1) & (st->cap - 1); }
+    return 0;
+}
+static void cn1ShadowSetClear(CN1ShadowSet* st) { if(st->t) memset(st->t, 0, (size_t)st->cap * sizeof(JAVA_OBJECT)); st->n = 0; }
+static void cn1GcShadowPush(JAVA_OBJECT o) {
+    if(cn1GcShadowN == cn1GcShadowCap) {
+        long nc = cn1GcShadowCap ? cn1GcShadowCap * 2 : 65536;
+        cn1GcShadowList = (JAVA_OBJECT*)realloc(cn1GcShadowList, (size_t)nc * sizeof(JAVA_OBJECT));
+        cn1GcShadowCap = nc;
+    }
+    cn1GcShadowList[cn1GcShadowN++] = o;
+}
+static int cn1GcShadowLegacyHas(JAVA_OBJECT t) {
+    if(cn1GcRsetLegacyCap == 0) return 0;
+    long h = (long)(((uintptr_t)t >> 4) & (uintptr_t)(cn1GcRsetLegacyCap - 1));
+    while(cn1GcRsetLegacy[h] != 0) { if(cn1GcRsetLegacy[h] == t) return 1; h = (h + 1) & (cn1GcRsetLegacyCap - 1); }
+    return 0;
+}
+static const char* cn1ShadowCls(JAVA_OBJECT o) {
+    return (o && o->__codenameOneParentClsReference && o->__codenameOneParentClsReference->clsName)
+        ? o->__codenameOneParentClsReference->clsName : "?";
+}
+static void cn1GcShadowReport(JAVA_OBJECT young) {
+    cn1GcShadowMisses++;
+    if(cn1GcShadowMisses > 40) return;
+    JAVA_OBJECT p = cn1GcShadowParent, a = cn1GcShadowAncestor;
+    int card = 0, queued = -1;
+    if(a && (a->__heapPosition == CN1_BIBOP_HEAP_POS || a->__heapPosition == CN1_BIBOP_ADOPTED)) {
+        CN1BibopPage* pg = (CN1BibopPage*)((uintptr_t)a & ~((uintptr_t)CN1_BIBOP_PAGE_SIZE - 1));
+        card = (atomic_load(&pg->gcRsetCards) >> ((((uintptr_t)a - (uintptr_t)pg) >> 10) & 63)) & 1;
+        queued = atomic_load(&pg->gcRsetQueued);
+    }
+    {
+        int re = 0, rf = a ? cn1RhFind(a, &re) : -1;
+        CN1BibopPage* apg = a ? (CN1BibopPage*)((uintptr_t)a & ~((uintptr_t)CN1_BIBOP_PAGE_SIZE - 1)) : 0;
+        CN1BibopPage* ypg = (CN1BibopPage*)((uintptr_t)young & ~((uintptr_t)CN1_BIBOP_PAGE_SIZE - 1));
+        int scanned = -1; uint64_t scards = 0;
+        for(int k = 0 ; k < cn1RhScanN ; k++) if(cn1RhScanPages[k] == (void*)apg) { scanned = k; scards = cn1RhScanCards[k]; }
+        int abit = apg ? (int)((((uintptr_t)a - (uintptr_t)apg) >> 10) & 63) : -1;
+        fprintf(stderr, "[GEN-SHADOW]   scan: pagesScanned=%d oldPageScanned=%d cardsTaken=%llx oldCard=%d takenHasOldCard=%d wasQueuedAtRemember=%d slotSize=%d first=%d\n",
+                cn1RhScanN, scanned, (unsigned long long)scards, abit, scanned >= 0 ? (int)((scards >> abit) & 1) : -1,
+                rf > 0 && (rf & CN1_RH_WASQUEUED) ? 1 : 0, apg ? apg->slotSize : -1, apg ? apg->firstSlotOffset : -1);
+        fprintf(stderr, "[GEN-SHADOW]   phaseAtRemember=%d rememberedInCycleTotal=%ld\n", rf > 0 ? (rf >> 8) : -1, cn1RhRemembersInCycle);
+        fprintf(stderr, "[GEN-SHADOW]   history: OLD remembered=%s epoch=%d promo=%d barrier=%d cardWasSet=%d | OLD page owned=%d pre=%d bump=%d | young page owned=%d pre=%d\n",
+                rf < 0 ? "never" : "yes", re, rf > 0 && (rf & CN1_RH_PROMO), rf > 0 && (rf & CN1_RH_BARRIER) ? 1 : 0, rf > 0 && (rf & CN1_RH_CARDSET) ? 1 : 0,
+                apg ? (int)apg->owned : -1, apg ? (int)apg->gcPreCycle : -1, apg ? atomic_load(&apg->bumpIndex) : -1,
+                (int)ypg->owned, (int)ypg->gcPreCycle);
+    }
+    fprintf(stderr, "[GEN-SHADOW] epoch=%d miss: young %s %p <- parent %s %p (mark=%d hp=%d) <- OLD %s %p (mark=%d hp=%d rsetTraced=%d legacyRset=%d cardNow=%d queuedNow=%d)\n",
+            currentGcMarkValue, cn1ShadowCls(young), (void*)young,
+            cn1ShadowCls(p), (void*)p, p ? p->__codenameOneGcMark : 0, p ? p->__heapPosition : 0,
+            cn1ShadowCls(a), (void*)a, a ? a->__codenameOneGcMark : 0, a ? a->__heapPosition : 0,
+            a ? cn1ShadowSetHas(&cn1GcShadowRs, a) : 0, a ? cn1GcShadowLegacyHas(a) : 0, card, queued);
+}
+static void gcMarkDrainWorklist(CODENAME_ONE_THREAD_STATE);
+void cn1GcShadowRun(CODENAME_ONE_THREAD_STATE) {
+    long misses0 = cn1GcShadowMisses;
+    cn1GcShadowPhase = 1;
+    while(cn1GcShadowN > 0) {
+        JAVA_OBJECT o = cn1GcShadowList[--cn1GcShadowN];
+        if(!cn1ShadowSetAdd(&cn1GcShadowSeen, o)) continue;
+        cn1GcShadowOld++;
+        struct clazz* c = o->__codenameOneParentClsReference;
+        if(c == 0 || c->markFunction == 0) continue;
+        cn1GcShadowAncestor = o;
+        cn1GcShadowParent = o;
+        int savedPrecise = cn1GcPreciseTrace;
+        cn1GcPreciseTrace = 0;
+        ((gcMarkFunctionPointer)c->markFunction)(threadStateData, o, JAVA_FALSE);
+        cn1GcPreciseTrace = savedPrecise;
+        cn1GcTraceIncomplete = 0;
+        gcMarkDrainWorklist(threadStateData);
+    }
+    cn1GcShadowPhase = 0;
+    fprintf(stderr, "[GEN-SHADOW] epoch=%d minor: oldTraced=%ld misses=%ld (total %ld)\n",
+            currentGcMarkValue, cn1GcShadowOld, cn1GcShadowMisses - misses0, cn1GcShadowMisses);
+    cn1GcShadowOld = 0;
+    cn1ShadowSetClear(&cn1GcShadowSeen);
+    cn1ShadowSetClear(&cn1GcShadowRs);
+}
+#endif
+
 void cn1GcRememberSlow(JAVA_OBJECT t) {
     int hp = t->__heapPosition;
     if(hp == CN1_BIBOP_HEAP_POS || hp == CN1_BIBOP_ADOPTED) {
         CN1BibopPage* pg = (CN1BibopPage*)((uintptr_t)t & ~((uintptr_t)CN1_BIBOP_PAGE_SIZE - 1));
         uint64_t bit = (uint64_t)1 << ((((uintptr_t)t - (uintptr_t)pg) >> 10) & 63);
+#ifdef CN1_GC_GEN_SHADOW
+        cn1RhNote(t, (cn1RhSweeping ? CN1_RH_PROMO : CN1_RH_BARRIER)
+                     | ((atomic_load_explicit(&pg->gcRsetCards, memory_order_relaxed) & bit) ? CN1_RH_CARDSET : 0)
+                     | (atomic_load(&pg->gcRsetQueued) ? CN1_RH_WASQUEUED : 0) | (cn1RhPhase << 8));
+        if(cn1RhPhase != 0) cn1RhRemembersInCycle++;
+#endif
         if(atomic_load_explicit(&pg->gcRsetCards, memory_order_relaxed) & bit) {
             return;
         }
@@ -7754,6 +7950,17 @@ void cn1GcRememberSlow(JAVA_OBJECT t) {
         cn1GcRsetLegacyInsertLocked(t);
         pthread_mutex_unlock(&cn1GcRsetLegacyMutex);
     }
+#ifdef CN1_GC_GEN_SHADOW
+    else {
+        static long dropped = 0;
+        if(++dropped <= 25 || (dropped & (dropped - 1)) == 0) {
+            fprintf(stderr, "[GEN-DROP] #%ld remember of old %s %p ignored: heapPosition=%d mark=%d epoch=%d\n",
+                    dropped, t->__codenameOneParentClsReference && t->__codenameOneParentClsReference->clsName
+                        ? t->__codenameOneParentClsReference->clsName : "?",
+                    (void*)t, hp, t->__codenameOneGcMark, currentGcMarkValue);
+        }
+    }
+#endif
     // heapPosition -1 (stack / scalar-replaced / iterator scope) and anything else: a
     // root every cycle, never recorded.
 }
@@ -7786,6 +7993,9 @@ static void cn1GcRsetTraceObject(struct ThreadLocalData* d, JAVA_OBJECT o) {
 #else
     cn1GcGenCurParent = 0;   // children of an rset object are covered by definition
 #endif
+#endif
+#ifdef CN1_GC_GEN_SHADOW
+    cn1ShadowSetAdd(&cn1GcShadowRs, o);
 #endif
     ((gcMarkFunctionPointer)c->markFunction)(d, o, JAVA_FALSE);
     CN1_GC_TRACE_DONE(o);
@@ -7823,6 +8033,10 @@ static void cn1GcRsetScan(struct ThreadLocalData* d, JAVA_BOOLEAN trace) {
 #ifdef CN1_GC_GEN_CHECK
     cn1GcGenTracedN = 0;
 #endif
+#ifdef CN1_GC_GEN_SHADOW
+    cn1RhScanN = 0;
+    cn1RhPhase = 2;
+#endif
     pthread_mutex_lock(&cn1GcRsetPagesMutex);
     CN1BibopPage** pages = cn1GcRsetPages;
     long np = cn1GcRsetPagesN;
@@ -7836,6 +8050,9 @@ static void cn1GcRsetScan(struct ThreadLocalData* d, JAVA_BOOLEAN trace) {
         // still queued (and its bit is taken below) or re-queues it for next cycle.
         atomic_store_explicit(&p->gcRsetQueued, 0, memory_order_release);
         uint64_t cards = atomic_exchange_explicit(&p->gcRsetCards, 0, memory_order_acq_rel);
+#ifdef CN1_GC_GEN_SHADOW
+        if(cn1RhScanN < (1 << 16)) { cn1RhScanPages[cn1RhScanN] = p; cn1RhScanCards[cn1RhScanN] = cards; cn1RhScanN++; }
+#endif
         if(trace && cards != 0) {
 #ifdef CN1_GC_INSTRUMENT
             cn1GcGenRsetPages++;
@@ -11254,6 +11471,12 @@ static void cn1BibopSweep(CODENAME_ONE_THREAD_STATE) {
             }
             if(m == CN1_BIBOP_FREE_MARK) {
                 *(void**)o = fl; fl = o; freeCount++;
+#ifdef CN1_GC_GEN_QUAR_MAJOR
+            } else if(m == -8) {
+                // QA: quarantined by an earlier MAJOR; release it now.
+                __atomic_store_n(&o->__codenameOneGcMark, CN1_BIBOP_FREE_MARK, __ATOMIC_RELAXED);
+                *(void**)o = fl; fl = o; freeCount++;
+#endif
 #ifdef CN1_GC_VERIFY
             } else if(m == CN1_BIBOP_QUAR_MARK) {
                 // Quarantined by the PREVIOUS sweep: its cycle has passed, so release it
@@ -11311,6 +11534,21 @@ static void cn1BibopSweep(CODENAME_ONE_THREAD_STATE) {
                 }
 #endif
                 liveCount++;
+#endif
+#ifdef CN1_GC_GEN_QUAR_MAJOR
+            } else if(!cn1GcMinor && (m == -1 || cn1GcSweepReclaims(m))
+                      && o->__codenameOneParentClsReference != 0
+                      && o->__codenameOneParentClsReference->finalizerFunction == 0) {
+                // QA: a MAJOR's free is quarantined and poisoned exactly like a minor's
+                // (-9), so a mutator that still holds it faults on the poison and names
+                // it. Released by the next sweep of this page.
+                __atomic_store_n(&o->__codenameOneGcMark, -8, __ATOMIC_RELAXED);
+                {
+                    uintptr_t* w = (uintptr_t*)((char*)o + sizeof(struct JavaObjectPrototype));
+                    uintptr_t* e = (uintptr_t*)((char*)o + page->slotSize);
+                    for(; w < e ; w++) *w = (uintptr_t)o | (uintptr_t)0x00AB000000000000ULL;
+                }
+                liveCount++;   // keeps the page out of the free pool while quarantined
 #endif
             } else if(m == -1 || cn1GcSweepReclaims(m) || CN1_GC_FAULT_FREE_LIVE(o, m)) {
                 cn1BibopReclaimSlot(threadStateData, o);
@@ -14899,7 +15137,12 @@ void gcMarkObject(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj, JAVA_BOOLEAN force
     // MINOR CYCLE: an old object is live by definition and is not traced -- the young
     // objects it references are reached through the remembered set instead.
 #ifndef CN1_EXP_NOSTOP
-    if(cn1GcMinor && cn1GcIsOld(obj, markSnapshot)) return;
+    if(cn1GcMinor && cn1GcIsOld(obj, markSnapshot)) {
+#ifdef CN1_GC_GEN_SHADOW
+        cn1GcShadowPush(obj);
+#endif
+        return;
+    }
 #endif
 #ifdef CN1_GC_GEN_CHECK2
     if(cn1GcMinor) {
@@ -15155,6 +15398,12 @@ void gcMarkObject(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj, JAVA_BOOLEAN force
         }
     }
 #endif
+#ifdef CN1_GC_GEN_SHADOW
+    if(cn1GcShadowPhase && markSnapshot == -1 && obj->__heapPosition == CN1_BIBOP_HEAP_POS
+       && ((CN1BibopPage*)((uintptr_t)obj & ~((uintptr_t)CN1_BIBOP_PAGE_SIZE - 1)))->gcPreCycle) {
+        cn1GcShadowReport(obj);
+    }
+#endif
     __atomic_store_n(&obj->__codenameOneGcMark, markVal, __ATOMIC_RELAXED);
     CN1_BIBOP_STAMP_MARKED_GRACE(obj, markVal, markSnapshot);
     gcMarkFoundUnmarkedChildInPass = JAVA_TRUE;
@@ -15350,6 +15599,9 @@ static void gcMarkDrainWorklist(CODENAME_ONE_THREAD_STATE) {
             cn1GcTraceIncomplete = 0;
 #ifdef CN1_GC_GEN_CHECK2
             cn1GcGenCurParent = obj;
+#endif
+#ifdef CN1_GC_GEN_SHADOW
+            cn1GcShadowParent = obj;
 #endif
             fp(threadStateData, obj, force);
             CN1_GC_TRACE_DONE(obj);
