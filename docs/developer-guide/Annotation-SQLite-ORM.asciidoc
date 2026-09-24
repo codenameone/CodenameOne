@@ -136,7 +136,7 @@ include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/M
 foreign-key collection fetches with single-column keys are batched. Ordered,
 map, composite-key, and join-table collections currently use individual loaders. Root pagination happens before
 loading fetched collections. `query.count()` counts matching entities without
-loading them and ignores pagination. `session.count(entity, "relationship")`
+loading them and ignores pagination, ordering, and joins needed only by ordering. `session.count(entity, "relationship")`
 counts a relationship without materializing it.
 
 `createQuery` accepts an explicit JPQL subset: entity or scalar selects,
@@ -161,7 +161,10 @@ escape character.
 include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/ManagedOrmSnippets.java[tag=managed-orm-jpql-query,indent=0]
 ----
 
-Bulk mutations use `executeUpdate()` inside a transaction. They flush pending
+Bulk mutations use `executeUpdate()` inside a transaction. Aggregate functions
+are allowed inside scalar nested queries, but not directly in assignments or bulk
+predicates. On MySQL and MariaDB, nested queries that read the bulk mutation target
+table are rejected during query creation. They flush pending
 managed changes, bypass per-entity callbacks and cascades, and clear the context
 so later reads can't reuse stale entities. Bulk assignments to required subtype
 fields need a non-null literal or named parameter. Other assignment expressions
@@ -187,7 +190,8 @@ Scalar field projections return the mapped Java values, including enums, dates,
 booleans, property values, and converter-backed objects. Integral `SUM` results
 use `Long` on every database, and `AVG` returns `Double`. Joined paths may end in embedded fields.
 `COALESCE` field operands must share an enum type or converter mapping so the
-result can be decoded consistently. Scalar projections need a known storage type when the query is created. Bare
+result can be decoded consistently. Field-to-field comparisons also require
+matching enum types and converter mappings. Scalar projections need a known storage type when the query is created. Bare
 parameters and expressions such as `coalesce(:a,:b)` are rejected. Association
 projections are also rejected; select an explicit field such as `order.customer.id`
 or select the relationship target as a root entity.

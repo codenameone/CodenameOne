@@ -105,6 +105,8 @@ class ManagedSessionDatabaseTest {
             session.beginTransaction();
             assertThrows(IllegalArgumentException.class,()->session.createQuery("update ManagedSessionTest$Record r set r.counter=:value").setParameter("value",1.5).executeUpdate());
             session.rollbackTransaction();
+            for(String mutation:new String[]{"update ManagedSessionTest$Record r set r.counter=sum(r.counter)","update ManagedSessionTest$Record r set r.counter=1 where count(r.id)>0","delete from ManagedSessionTest$Record r where count(r.id)>0"}) assertThrows(IllegalArgumentException.class,()->session.createQuery(mutation));
+            if(!mysql) { session.beginTransaction();assertEquals(1,session.createQuery("update ManagedSessionTest$Record r set r.counter=(select max(i.counter) from ManagedSessionTest$Record i)").executeUpdate());assertEquals(0,session.createQuery("delete from ManagedSessionTest$Record r where r.id in (select i.id from ManagedSessionTest$Record i where i.id<0)").executeUpdate());session.commitTransaction(); }
             assertThrows(IllegalArgumentException.class,()->session.find(ManagedSessionTest.Record.class,"abc"));
             assertThrows(IllegalArgumentException.class,()->session.find(ManagedSessionTest.Record.class,1.5));
             assertEquals(Long.valueOf(0),session.createQuery("select count(NULL) from ManagedSessionTest$Record r",Long.class).first());

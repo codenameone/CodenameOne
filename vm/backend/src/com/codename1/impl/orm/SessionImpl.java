@@ -138,6 +138,9 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
         return "(CASE WHEN " + value + " < " + min + " OR " + value + " > " + max
                 + " THEN " + overflow + " ELSE " + value + " END)";
     }
+    String sqlDialect() {
+        return sql.dialect();
+    }
     String nextAlias() {
         return "q" + (aliasSequence++);
     }

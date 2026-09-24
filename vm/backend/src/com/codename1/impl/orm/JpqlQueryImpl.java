@@ -366,6 +366,7 @@ public final class JpqlQueryImpl<T> implements com.codename1.orm.session.JpqlQue
         QueryImpl root;
         final List<Expr> correlations = new ArrayList<Expr>();
         String rootName;
+        String mutationTable;
         Parser(SessionImpl session, List<String> tokens, List<Object> bindings, Map<String, Alias> outer) {
             this.session = session;
             this.tokens = tokens;
@@ -377,6 +378,7 @@ public final class JpqlQueryImpl<T> implements com.codename1.orm.session.JpqlQue
             if (take("UPDATE")) {
                 plan.mutation = true;
                 root(true);
+                mutationTable = root.model.table();
                 expect("SET");
                 StringBuilder assignments = new StringBuilder();
                 do {
@@ -393,10 +395,12 @@ public final class JpqlQueryImpl<T> implements com.codename1.orm.session.JpqlQue
                         throw error("Bulk updates cannot change entity identifiers");
                     }
                     expect("=");
-                    Expr value = expression();
+                    Expr value = rowExpression();
                     Expr target = new Expr(session.q(attribute.column), attribute.kind);
                     target.query = root;
                     target.field = field;
+                    target.projectionQuery = root;
+                    target.projectionField = field;
                     compatible(target, value);
                     if (attribute.kind == Attribute.INTEGER || attribute.kind == Attribute.BIGINT) {
                         requireIntegralAssignment(value);
@@ -420,7 +424,7 @@ public final class JpqlQueryImpl<T> implements com.codename1.orm.session.JpqlQue
                     }
                     assignments.append(target.sql).append(" = ").append(value.sql);
                 } while (take(","));
-                String where = take("WHERE") ? " WHERE " + condition(expression()) : "";
+                String where = take("WHERE") ? " WHERE " + condition(rowExpression()) : "";
                 String filter = session.discriminatorCondition(root.model, root.rootAlias);
                 if (filter.length() > 0) {
                     where = where.length() == 0 ? " WHERE " + filter : where + " AND " + filter;
@@ -434,7 +438,8 @@ public final class JpqlQueryImpl<T> implements com.codename1.orm.session.JpqlQue
                 plan.mutation = true;
                 expect("FROM");
                 root(true);
-                String where = take("WHERE") ? " WHERE " + condition(expression()) : "";
+                mutationTable = root.model.table();
+                String where = take("WHERE") ? " WHERE " + condition(rowExpression()) : "";
                 String filter = session.discriminatorCondition(root.model, root.rootAlias);
                 if (filter.length() > 0) {
                     where = where.length() == 0 ? " WHERE " + filter : where + " AND " + filter;
@@ -605,6 +610,9 @@ public final class JpqlQueryImpl<T> implements com.codename1.orm.session.JpqlQue
                     plan.singleRow |= hasRowAggregate(expression);
                 }
             }
+            if (mutationTable != null && "mysql".equals(session.sqlDialect()) && root.readsTable(mutationTable)) {
+                throw error("MySQL bulk subqueries cannot read the mutation target table");
+            }
             plan.projections = selections;
             SessionImpl.checkParameterCount(bindings.size());
             plan.kinds = new int[kinds.size()];
@@ -733,6 +741,7 @@ public final class JpqlQueryImpl<T> implements com.codename1.orm.session.JpqlQue
                 Expr pattern = add();
                 requireKind(left, Attribute.TEXT);
                 requireKind(pattern, Attribute.TEXT);
+                compatibleMappings(left, pattern);
                 bindType(left, pattern);
                 boolean escaped = take("ESCAPE");
                 Expr escape = escaped ? add() : null;
@@ -896,6 +905,9 @@ public final class JpqlQueryImpl<T> implements com.codename1.orm.session.JpqlQue
                     } else {
                         sql.append(arg.sql);
                     }
+                }
+                if ("NULLIF".equals(function)) {
+                    compatibleMappings(args.get(0), args.get(1));
                 }
                 int kind = "COUNT".equals(function) || "LENGTH".equals(function) ? Attribute.BIGINT
                            : "LOWER".equals(function) || "UPPER".equals(function) || "TRIM".equals(function) ? Attribute.TEXT
@@ -1190,6 +1202,7 @@ public final class JpqlQueryImpl<T> implements com.codename1.orm.session.JpqlQue
             }
             Parser nested =
                     new Parser(session, new ArrayList<String>(tokens.subList(start, position)), bindings, aliases);
+            nested.mutationTable = mutationTable;
             Plan plan = nested.parse();
             for (Expr dependency : plan.correlations) {
                 if (!SessionImpl.sameInstance(dependency.query, root)) {
@@ -1258,7 +1271,40 @@ public final class JpqlQueryImpl<T> implements com.codename1.orm.session.JpqlQue
                 }
             }
         }
+        private Expr rowExpression() {
+            Expr value = expression();
+            if (hasAggregate(value)) {
+                throw error("Aggregate expressions are not allowed directly in bulk clauses");
+            }
+            return value;
+        }
+        private boolean flexibleMapping(Expr value) {
+            if (value.literal || value.parameter != null) {
+                return true;
+            }
+            if (value.projectionQuery != null || value.query != null || !value.numericOperands
+                    || value.children.isEmpty()) {
+                return false;
+            }
+            for (Expr child : value.children) {
+                if (!flexibleMapping(child)) {
+                    return false;
+                }
+            }
+            return true;
+        }
+        private void compatibleMappings(Expr left, Expr right) {
+            if (flexibleMapping(left) || flexibleMapping(right)) {
+                return;
+            }
+            String first = left.projectionQuery == null ? "" : left.projectionQuery.mapping(left.projectionField);
+            String second = right.projectionQuery == null ? "" : right.projectionQuery.mapping(right.projectionField);
+            if (!first.equals(second)) {
+                throw error("Comparison requires matching domain and converter mappings");
+            }
+        }
         private void compatible(Expr left, Expr right) {
+            compatibleMappings(left, right);
             if (left.kind < 0 && right.kind < 0) {
                 throw error("Comparison requires at least one known storage kind");
             }

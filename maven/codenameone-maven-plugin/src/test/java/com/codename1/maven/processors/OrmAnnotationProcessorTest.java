@@ -216,6 +216,32 @@ public class OrmAnnotationProcessorTest {
     }
 
     @Test
+    public void countOmitsOnlyOrderingJoins() throws Exception {
+        File classes=tmp.newFolder("countjoins");Map<String,String> sources=new java.util.LinkedHashMap<String,String>();String imports="package countjoins; import com.codename1.annotations.*; import com.codename1.annotations.db.*; ";
+        sources.put("countjoins.Child",imports+"@Entity public class Child { @Id public long id; public String name=\"child\"; @ManyToOne(cascade=CascadeType.PERSIST) public Child next; }");
+        sources.put("countjoins.Parent",imports+"@Entity public class Parent { @Id public long id; @ManyToOne(cascade=CascadeType.PERSIST) public Child child; @OneToMany(cascade=CascadeType.PERSIST) public java.util.List<Child> children=new java.util.ArrayList<Child>(); }");JavaSourceCompiler.compile(sources,classes,Arrays.asList(testClassesDir()));ProcessorContext client=runProcessor(classes);assertFalse(client.getErrors().toString(),client.hasErrors());ProcessorContext backend=runProcessor(classes,backendClasspath());assertFalse(backend.getErrors().toString(),backend.hasErrors());
+        try(java.net.URLClassLoader loader=new java.net.URLClassLoader(new URL[]{classes.toURI().toURL()},getClass().getClassLoader())) {
+            Class parent=loader.loadClass("countjoins.Parent"),child=loader.loadClass("countjoins.Child");
+            for(String suffix:Arrays.asList("Cn1Model","Cn1BackendModel")) {
+                Map<String,com.codename1.impl.orm.EntityModel<?>> models=new java.util.LinkedHashMap<String,com.codename1.impl.orm.EntityModel<?>>();for(Class type:Arrays.asList(parent,child)) models.put(type.getName(),(com.codename1.impl.orm.EntityModel)loader.loadClass(type.getName()+suffix).newInstance());com.codename1.backend.Database db=com.codename1.backend.Database.open(":memory:");com.codename1.orm.session.Session session=new com.codename1.impl.orm.SessionImpl(new com.codename1.impl.orm.BackendSqlAccess(null,db,db.dialect()),models);
+                try { session.createTables();session.beginTransaction();Object empty=parent.newInstance(),full=parent.newInstance(),one=child.newInstance(),two=child.newInstance();child.getField("next").set(one,two);parent.getField("child").set(full,one);((java.util.List)parent.getField("children").get(full)).addAll(Arrays.asList(one,two));session.persist(empty);session.persist(full);session.commitTransaction();
+                    for(String field:Arrays.asList("child.name","child.next.name","children.name")) org.junit.Assert.assertEquals(field,2,session.query(parent).orderBy(field,true).limit(1).offset(1).count());
+                    org.junit.Assert.assertEquals(1,session.query(parent).orderBy("child.name",true).list().size());
+                    org.junit.Assert.assertEquals(1,session.query(parent).orderBy("child.next.name",true).eq("child.next.name","child").count());
+                    org.junit.Assert.assertEquals(1,session.query(parent).eq("child.name","child").orderBy("child.next.name",true).count());
+                    org.junit.Assert.assertEquals(1,session.query(parent).orderBy("child.next.name",true).join("child.next").count());
+                    org.junit.Assert.assertEquals(1,session.query(parent).join("child").orderBy("child.name",true).count());
+                    org.junit.Assert.assertEquals(2,session.query(parent).leftJoin("child").orderBy("child.name",true).count());
+                    org.junit.Assert.assertEquals(1,session.query(parent).orderBy("children.name",true).eq("children.name","child").count());
+                    org.junit.Assert.assertEquals(1,session.query(parent).join("children").orderBy("child.next.name",true).count());
+                    session.beginTransaction();Object partial=parent.newInstance();parent.getField("child").set(partial,child.newInstance());session.persist(partial);session.commitTransaction();org.junit.Assert.assertEquals(2,session.query(parent).orderBy("child.next.name",true).eq("child.name","child").count());org.junit.Assert.assertEquals(1,session.query(parent).orderBy("child.next.name",true).join("child.next").count());
+
+                } finally { session.close();db.close(); }
+            }
+        }
+    }
+
+    @Test
     public void coalesceRequiresCompatibleResultMappings() throws Exception {
         File classes=tmp.newFolder("coalescemappings");Map<String,String> sources=new java.util.LinkedHashMap<String,String>();String imports="package coalescemappings; import com.codename1.annotations.*; import com.codename1.annotations.db.*; ";
         sources.put("coalescemappings.State","package coalescemappings; public enum State { ACTIVE, INACTIVE }");sources.put("coalescemappings.Color","package coalescemappings; public enum Color { RED, BLUE }");
@@ -230,6 +256,10 @@ public class OrmAnnotationProcessorTest {
                     org.junit.Assert.assertEquals("fallback",session.createQuery("select coalesce(e.code,e.backup) from Entry e",String.class).first());org.junit.Assert.assertEquals("ACTIVE",session.createQuery("select coalesce(e.state,e.backupState) from Entry e").first().toString());
                     org.junit.Assert.assertEquals("literal",session.createQuery("select coalesce(e.code,'literal') from Entry e",String.class).first());org.junit.Assert.assertEquals("parameter",session.createQuery("select coalesce(e.code,:value) from Entry e",String.class).setParameter("value","parameter").first());
                     org.junit.Assert.assertEquals("raw",session.createQuery("select coalesce(lower(e.name),'fallback') from Entry e",String.class).first());
+                    for(String predicate:Arrays.asList("e.code=e.other","e.other<>e.code","e.code=e.name","e.name=e.code","e.code>e.other","e.code between e.other and e.backup","e.code in (e.other)","e.code in (select i.name from Entry i)","e.code like e.other","nullif(e.code,e.other) is null","e.state=e.color","e.code=lower(e.backup)")) { try { session.createQuery("select e from Entry e where "+predicate);fail(predicate); } catch(IllegalArgumentException expected) { assertTrue(expected.getMessage().contains("mapping")); } }
+                    session.beginTransaction();session.createQuery("update Entry e set e.code=e.backup").executeUpdate();session.commitTransaction();
+                    for(String predicate:Arrays.asList("e.code=e.backup","e.code in (select i.backup from Entry i)","nullif(e.code,e.backup) is null","e.backupState=e.backupState","e.name=lower(e.name)")) org.junit.Assert.assertEquals(predicate,1,session.createQuery("select e from Entry e where "+predicate).list().size());
+
                 } finally { session.close();db.close(); }
             }
         }

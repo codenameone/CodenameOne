@@ -45,10 +45,13 @@ public final class QueryImpl<T> implements com.codename1.orm.session.Query<T> {
     private final Map<String, Join> joins = new LinkedHashMap<String, Join>();
     private boolean pluralJoin;
     private boolean relationOrdering;
+    private boolean resolvingOrder;
     private static final class Join {
         final EntityModel model;
         final String alias;
         final String sql;
+        boolean requiredForCount = true;
+        boolean plural;
         Join(EntityModel model, String alias, String sql) {
             this.model = model;
             this.alias = alias;
@@ -76,7 +79,9 @@ public final class QueryImpl<T> implements com.codename1.orm.session.Query<T> {
             String sql = (left ? " LEFT JOIN " : " INNER JOIN ") + session.q(relation.joinTable) + " " + alias
                     + " ON " + session.joinEquality(session.joinColumns(relation.joinColumn, model), alias,
                             session.keyColumns(model), rootAlias);
-            joins.put(field, new Join(model, alias, sql));
+            Join join = new Join(model, alias, sql);
+            join.plural = true;
+            joins.put(field, join);
             pluralJoin = true;
         }
     }
@@ -201,6 +206,14 @@ public final class QueryImpl<T> implements com.codename1.orm.session.Query<T> {
     }
     @Override
     public QueryImpl<T> orderBy(String field, boolean ascending) {
+        resolvingOrder = true;
+        try {
+            return appendOrder(field, ascending);
+        } finally {
+            resolvingOrder = false;
+        }
+    }
+    private QueryImpl<T> appendOrder(String field, boolean ascending) {
         String name = column(field);
         // Embedded paths still resolve to the root alias. A joined column
         // remains non-root even when its join was created by an earlier clause.
@@ -263,8 +276,12 @@ public final class QueryImpl<T> implements com.codename1.orm.session.Query<T> {
     @Override
     public long count() {
         session.autoFlush();
-        String statement = "SELECT COUNT(*)" + from() + where();
-        if (pluralJoin) {
+        String statement = "SELECT COUNT(*)" + from(true) + where();
+        boolean distinct = false;
+        for (Join join : joins.values()) {
+            distinct |= join.requiredForCount && join.plural;
+        }
+        if (distinct) {
             StringBuilder keys = new StringBuilder();
             for (String column : session.keyColumns(model)) {
                 if (keys.length() > 0) {
@@ -272,7 +289,7 @@ public final class QueryImpl<T> implements com.codename1.orm.session.Query<T> {
                 }
                 keys.append(rootAlias).append('.').append(session.q(column));
             }
-            statement = "SELECT COUNT(*) FROM (SELECT DISTINCT " + keys + from() + where() + ") cn1_count";
+            statement = "SELECT COUNT(*) FROM (SELECT DISTINCT " + keys + from(true) + where() + ") cn1_count";
         }
         List<Object[]> rows = session.read(statement, params.toArray(), new int[] {Attribute.BIGINT});
         return ((Number) rows.get(0)[0]).longValue();
@@ -363,6 +380,13 @@ public final class QueryImpl<T> implements com.codename1.orm.session.Query<T> {
     private Join ensureJoin(String path, boolean left) {
         Join existing = joins.get(path);
         if (existing != null) {
+            if (!resolvingOrder) {
+                existing.requiredForCount = true;
+                int parent = path.lastIndexOf('.');
+                if (parent >= 0) {
+                    ensureJoin(path.substring(0, parent), left);
+                }
+            }
             return existing;
         }
         int dot = path.lastIndexOf('.');
@@ -404,14 +428,32 @@ public final class QueryImpl<T> implements com.codename1.orm.session.Query<T> {
             }
         }
         Join created = new Join(target, alias, join);
+        created.requiredForCount = !resolvingOrder;
+        created.plural = relation.many;
         joins.put(path, created);
         return created;
     }
+    boolean readsTable(String table) {
+        if (model.table().equalsIgnoreCase(table)) {
+            return true;
+        }
+        for (Join join : joins.values()) {
+            if (join.model.table().equalsIgnoreCase(table)) {
+                return true;
+            }
+        }
+        return false;
+    }
     String from() {
+        return from(false);
+    }
+    private String from(boolean counting) {
         StringBuilder result =
                 new StringBuilder(" FROM ").append(session.tableSource(model)).append(' ').append(rootAlias);
         for (Join join : joins.values()) {
-            result.append(join.sql);
+            if (!counting || join.requiredForCount) {
+                result.append(join.sql);
+            }
         }
         return result.toString();
     }

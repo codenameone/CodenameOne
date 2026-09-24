@@ -215,6 +215,18 @@ class ManagedSessionTest {
         } finally { em.close(); }
     }
 
+    @Test void bulkClausesRejectUnscopedAggregates() throws Exception {
+        EntityManager em=manager();
+        try {
+            Session session=em.openSession();Record record=seed(session);
+            for(String query:new String[]{"update ManagedSessionTest$Record r set r.counter=sum(r.counter)","update ManagedSessionTest$Record r set r.counter=coalesce(max(r.counter),0)","update ManagedSessionTest$Record r set r.counter=1 where count(r.id)>0","delete from ManagedSessionTest$Record r where count(r.id)>0","delete from ManagedSessionTest$Record r where coalesce(sum(r.counter),0)>=0"}) {
+                assertThrows(IllegalArgumentException.class,()->session.createQuery(query),query);
+            }
+            session.beginTransaction();assertEquals(1,session.createQuery("update ManagedSessionTest$Record r set r.counter=(select max(i.counter)+1 from ManagedSessionTest$Record i)").executeUpdate());session.commitTransaction();assertEquals(1,session.find(Record.class,record.id).counter);
+            session.beginTransaction();assertEquals(1,session.createQuery("delete from ManagedSessionTest$Record r where r.id in (select i.id from ManagedSessionTest$Record i where i.counter=1)").executeUpdate());session.commitTransaction();assertEquals(0,session.query(Record.class).count());session.close();
+        } finally { em.close(); }
+    }
+
     static Model integerModel() {
         return new Model() {
             public String table() { return "integer_record"; }

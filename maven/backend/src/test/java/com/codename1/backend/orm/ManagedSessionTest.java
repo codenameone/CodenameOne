@@ -163,6 +163,22 @@ class ManagedSessionTest {
         }
     }
 
+    static class Other extends Record { }
+    @Test void mysqlBulkSubqueriesCannotReadTheirMutationTarget() throws Exception {
+        for(com.codename1.backend.sql.Dialect dialect:new com.codename1.backend.sql.Dialect[]{com.codename1.backend.sql.Dialect.SQLITE,com.codename1.backend.sql.Dialect.POSTGRES,com.codename1.backend.sql.Dialect.MYSQL,com.codename1.backend.sql.Dialect.MARIADB}) {
+            java.util.Map<String,EntityModel<?>> models=new java.util.LinkedHashMap<String,EntityModel<?>>();models.put(Record.class.getName(),new Model());models.put(Other.class.getName(),new Model() { public Class<Record> type() { return (Class)Other.class; } public String table() { return "other_record"; } });
+            Session session=new com.codename1.impl.orm.SessionImpl(new com.codename1.impl.orm.BackendSqlAccess(null,null,dialect),models);
+            try {
+                for(String query:new String[]{"update ManagedSessionTest$Record r set r.counter=1 where r.id in (select i.id from ManagedSessionTest$Record i)","delete from ManagedSessionTest$Record r where exists (select i.id from ManagedSessionTest$Record i)","update ManagedSessionTest$Record r set r.counter=(select max(i.counter) from ManagedSessionTest$Record i)","delete from ManagedSessionTest$Record r where r.id in (select o.id from ManagedSessionTest$Other o where exists (select i.id from ManagedSessionTest$Record i))"}) {
+                    if("mysql".equals(dialect.getName())) assertThrows(IllegalArgumentException.class,()->session.createQuery(query),query);else assertNotNull(session.createQuery(query));
+                }
+                assertNotNull(session.createQuery("update ManagedSessionTest$Record r set r.counter=(select max(o.counter) from ManagedSessionTest$Other o where o.id=r.id)"));
+                assertNotNull(session.createQuery("delete from ManagedSessionTest$Record r where r.id in (select o.id from ManagedSessionTest$Other o)"));
+                assertNotNull(session.createQuery("select r from ManagedSessionTest$Record r where r.id in (select i.id from ManagedSessionTest$Record i)"));
+            } finally { session.close(); }
+        }
+    }
+
     @Test void integerAssignmentsRenderCheckedRangesForEveryDialect() throws Exception {
         for(com.codename1.backend.sql.Dialect dialect:new com.codename1.backend.sql.Dialect[]{com.codename1.backend.sql.Dialect.SQLITE,com.codename1.backend.sql.Dialect.POSTGRES,com.codename1.backend.sql.Dialect.MYSQL,com.codename1.backend.sql.Dialect.MARIADB}) {
             com.codename1.impl.orm.BackendSqlAccess adapter=new com.codename1.impl.orm.BackendSqlAccess(null,null,dialect);
@@ -325,6 +341,18 @@ class ManagedSessionTest {
             assertThrows(IllegalArgumentException.class,()->session.createQuery("select r from ManagedSessionTest$Record r where r.id in :ids").setParameter("ids",tooMany).list());
             assertThrows(IllegalArgumentException.class,()->session.createQuery("select r from ManagedSessionTest$Record r where r.id in :a and r.id in :b").setParameter("a",half).setParameter("b",half).list());
             assertThrows(IllegalArgumentException.class,()->session.createQuery("select r from ManagedSessionTest$Record r where r.id in :ids and r.name=:name").setParameter("ids",allowed).setParameter("name","first").list());session.close();
+        } finally { em.close(); }
+    }
+
+    @Test void bulkClausesRejectUnscopedAggregates() throws Exception {
+        EntityManager em=manager();
+        try {
+            Session session=em.openSession();Record record=seed(session);
+            for(String query:new String[]{"update ManagedSessionTest$Record r set r.counter=sum(r.counter)","update ManagedSessionTest$Record r set r.counter=coalesce(max(r.counter),0)","update ManagedSessionTest$Record r set r.counter=1 where count(r.id)>0","delete from ManagedSessionTest$Record r where count(r.id)>0","delete from ManagedSessionTest$Record r where coalesce(sum(r.counter),0)>=0"}) {
+                assertThrows(IllegalArgumentException.class,()->session.createQuery(query),query);
+            }
+            session.beginTransaction();assertEquals(1,session.createQuery("update ManagedSessionTest$Record r set r.counter=(select max(i.counter)+1 from ManagedSessionTest$Record i)").executeUpdate());session.commitTransaction();assertEquals(1,session.find(Record.class,record.id).counter);
+            session.beginTransaction();assertEquals(1,session.createQuery("delete from ManagedSessionTest$Record r where r.id in (select i.id from ManagedSessionTest$Record i where i.counter=1)").executeUpdate());session.commitTransaction();assertEquals(0,session.query(Record.class).count());session.close();
         } finally { em.close(); }
     }
 
