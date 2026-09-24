@@ -2792,7 +2792,14 @@ public final class JavaEmitter {
         if (e instanceof IsTest) {
             IsTest t = (IsTest) e;
             Out o = emitExpr(t.operand, null, ctx);
-            String check = o.code + " instanceof " + javaType(t.type, true, ctx);
+            String subject = o.code;
+            if (o.type != null && !o.type.nullable
+                    && (o.type.is("int") || o.type.is("double") || o.type.is("bool"))) {
+                // A primitive operand cannot be tested with instanceof; the cast boxes it,
+                // so `min(1, 2) is int` tests the Long it is.
+                subject = "((Object) " + paren(o.code) + ")";
+            }
+            String check = subject + " instanceof " + javaType(t.type, true, ctx);
             return new Out(t.negated ? "!(" + check + ")" : "(" + check + ")", TypeRef.BOOL);
         }
         if (e instanceof AsCast) {
@@ -5110,6 +5117,10 @@ public final class JavaEmitter {
             int dot = sf.javaName.lastIndexOf('.');
             String cls = sf.javaName.substring(0, dot);
             String method = sf.javaName.substring(dot + 1);
+            Out numeric = mathNumCall(cls, method, c, ctx);
+            if (numeric != null) {
+                return numeric;
+            }
             ctx.importClass(cls);
             String simple = cls.substring(cls.lastIndexOf('.') + 1);
             return new Out(simple + "." + method + "(" + methodArgs(sf.params, c.args, ctx) + ")",
@@ -5183,6 +5194,11 @@ public final class JavaEmitter {
             if (stubs.isStubClass(cls)) {
                 Ast.MethodDecl m = stubs.findMethod(cls, n, false);
                 if (m != null && m.isStatic) {
+                    Ast.ClassDecl sc = stubs.classes.get(cls);
+                    Out numeric = sc == null ? null : mathNumCall(sc.javaName, n, c, ctx);
+                    if (numeric != null) {
+                        return numeric;
+                    }
                     return stubCallOut(m, c, stubSimpleName(cls, ctx) + "." + n, ctx);
                 }
             }
@@ -5411,6 +5427,14 @@ public final class JavaEmitter {
                 return new Out(target.code, TypeRef.STRING);
             }
         }
+        if ((tt.is("int") || tt.is("double") || tt.is("num")) && n.equals("compareTo") && pos.size() == 1) {
+            // num.compareTo across representations: an int against a double compares
+            // exactly, -0.0 orders below 0, NaN above everything. Unresolved before.
+            ctx.importClass("dart.core.DartComparable");
+            Out other = emitExpr(pos.get(0), null, ctx);
+            return new Out("DartComparable.compare(" + boxNumber(new Out(target.code, tt)) + ", "
+                    + boxNumber(other) + ")", TypeRef.INT);
+        }
         if (tt.is("int")) {
             if (n.equals("toString")) {
                 return new Out("Long.toString(" + target.code + ")", TypeRef.STRING);
@@ -5421,8 +5445,9 @@ public final class JavaEmitter {
                         + emitExpr(pos.get(0), TypeRef.INT, ctx).code + ")", TypeRef.STRING);
             }
             if (n.equals("toRadixString")) {
-                return new Out("Long.toString(" + target.code + ", (int) ("
-                        + emitExpr(pos.get(0), TypeRef.INT, ctx).code + "))", TypeRef.STRING);
+                ctx.importClass("dart.runtime.DartRuntime");
+                return new Out("DartRuntime.toRadixString(" + target.code + ", "
+                        + emitExpr(pos.get(0), TypeRef.INT, ctx).code + ")", TypeRef.STRING);
             }
             if (n.equals("toDouble")) {
                 return new Out("((double) " + paren(target.code) + ")", TypeRef.DOUBLE);
@@ -5814,7 +5839,29 @@ public final class JavaEmitter {
                         valueHandler ? TypeRef.of("Future", TypeRef.DYNAMIC) : tt);
             }
             if (n.equals("whenComplete")) {
-                return new Out(target.code + ".whenComplete(" + emitExpr(pos.get(0), null, ctx).code + ")", tt);
+                // A cleanup that can produce a value -- `() => asyncCleanup()`, or a tear-off
+                // of a function returning one -- goes to whenCompleteFuture, which waits for
+                // a returned Future and surfaces its failure. The void form discarded it.
+                Expr action = pos.get(0);
+                Out cb = emitExpr(action, null, ctx);
+                boolean value;
+                if (action instanceof Lambda) {
+                    value = ((Lambda) action).exprBody != null ? !lastLambdaVoid : lambdaReturnsValue(action);
+                } else {
+                    // A tear-off is typed a bare Function, so its declared return is read
+                    // from the method or function it names; unresolved stays on the void form.
+                    TypeRef ret = cb.type != null ? cb.type.funcReturn : null;
+                    if (ret == null) {
+                        ret = tearOffReturn(action, ctx);
+                    }
+                    value = ret != null && !ret.is("void");
+                }
+                if (value) {
+                    String fn = action instanceof Lambda
+                            ? "(dart.runtime.Funcs.Func0<Object>) " + paren(cb.code) : cb.code;
+                    return new Out(target.code + ".whenCompleteFuture(" + fn + ")", tt);
+                }
+                return new Out(target.code + ".whenComplete(" + cb.code + ")", tt);
             }
         }
         return null;
@@ -6665,6 +6712,64 @@ public final class JavaEmitter {
      * </ul>
      * Methods that return a concrete type are emitted unchanged.
      */
+    /**
+     * dart:math's {@code min}, {@code max} and {@code pow} take and return {@code num}:
+     * two ints give an int, and pow of an int by a non-negative int is an int. The stubs
+     * declare them over double, which turned {@code min(1, 2)} into 1.0 and failed
+     * {@code is int}. Two ints use the runtime's long overloads (pow by a non-negative
+     * literal uses powInt); a double against anything but an int keeps the double form;
+     * an int against a double, or two values typed only num or dynamic, go through the
+     * Number versions, which answer one of the arguments unconverted. Null when the
+     * call is not one of these.
+     */
+    private Out mathNumCall(String javaClass, String method, Call c, Ctx ctx) {
+        if (!"dart.math.DartMath".equals(javaClass) || c.args.positional.size() != 2
+                || !c.args.named.isEmpty()
+                || !(method.equals("min") || method.equals("max") || method.equals("pow"))) {
+            return null;
+        }
+        ctx.importClass("dart.math.DartMath");
+        Expr ex = c.args.positional.get(0);
+        Expr ey = c.args.positional.get(1);
+        Out x = emitExpr(ex, null, ctx);
+        Out y = emitExpr(ey, null, ctx);
+        boolean xi = x.type != null && x.type.is("int") && !x.type.nullable;
+        boolean yi = y.type != null && y.type.is("int") && !y.type.nullable;
+        boolean xd = x.type != null && x.type.is("double") && !x.type.nullable;
+        boolean yd = y.type != null && y.type.is("double") && !y.type.nullable;
+        if (xi && yi) {
+            if (!method.equals("pow")) {
+                return new Out("DartMath." + method + "(" + x.code + ", " + y.code + ")", TypeRef.INT);
+            }
+            if (ey instanceof IntLit && ((IntLit) ey).value >= 0) {
+                return new Out("DartMath.powInt(" + x.code + ", " + y.code + ")", TypeRef.INT);
+            }
+        }
+        // pow with a double on either side is always a double in Dart; min and max
+        // answer one of their arguments, so an int beside a double can come back.
+        if ((xd && !yi) || (yd && !xi) || (method.equals("pow") && (xd || yd))) {
+            // A double against another double -- or against a value this emitter only
+            // types as num or dynamic, which in the gallery is a double whose type was
+            // lost in arithmetic -- keeps the double form the stubs declare, so it still
+            // fits the double slots it flows into.
+            return new Out("DartMath." + method + "(" + coerce(x, TypeRef.DOUBLE, ctx) + ", "
+                    + coerce(y, TypeRef.DOUBLE, ctx) + ")", TypeRef.DOUBLE);
+        }
+        // Boxed explicitly: a primitive long reaches a Number parameter only through boxing.
+        return new Out("DartMath." + method + "Num(" + boxNumber(x) + ", " + boxNumber(y) + ")",
+                TypeRef.of("num"));
+    }
+
+    private String boxNumber(Out o) {
+        if (o.type != null && o.type.is("int") && !o.type.nullable) {
+            return "Long.valueOf(" + o.code + ")";
+        }
+        if (o.type != null && o.type.is("double") && !o.type.nullable) {
+            return "Double.valueOf(" + o.code + ")";
+        }
+        return "(Number) " + paren(o.code);
+    }
+
     private Out stubCallOut(Ast.MethodDecl m, Call c, String callee, Ctx ctx) {
         return stubCallOut(m, c, callee, ctx, null);
     }
@@ -6881,6 +6986,33 @@ public final class JavaEmitter {
      * a block lambda that returns a value somewhere outside a nested function. False
      * for anything that is not a lambda literal.
      */
+    /**
+     * The declared return type of a bare-name tear-off -- an own or inherited method,
+     * or a top-level function -- or null when the expression is not one of those.
+     */
+    private TypeRef tearOffReturn(Expr e, Ctx ctx) {
+        if (!(e instanceof Ident)) {
+            return null;
+        }
+        String n = ((Ident) e).name;
+        if (ctx.lookup(n) != null) {
+            return null;   // a local shadows any method or function of that name
+        }
+        if (ctx.currentClass != null) {
+            MethodDecl md = findMethodInHierarchy(ctx.currentClass, n);
+            if (md != null) {
+                return declaredReturn(md.returnType);
+            }
+        }
+        FunctionDecl fn = program.functions.get(n);
+        return fn != null && !fn.isGetter ? declaredReturn(fn.returnType) : null;
+    }
+
+    /** An omitted or inferred return type is emitted as Object, so it produces a value. */
+    private static TypeRef declaredReturn(TypeRef t) {
+        return t == null || t.is("var") ? TypeRef.DYNAMIC : t;
+    }
+
     private boolean lambdaReturnsValue(Expr e) {
         if (!(e instanceof Lambda)) {
             return false;
