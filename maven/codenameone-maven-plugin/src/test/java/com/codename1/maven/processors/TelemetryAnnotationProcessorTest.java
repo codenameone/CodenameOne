@@ -164,6 +164,9 @@ public class TelemetryAnnotationProcessorTest {
         assertFalse(TelemetryAnnotationProcessor.isHttpUrl("https://collector!x.example"));
         assertFalse(TelemetryAnnotationProcessor.isHttpUrl("https://[not-ipv6]:4318"));
         assertFalse(TelemetryAnnotationProcessor.isHttpUrl("https://[1234]"));
+        assertFalse(TelemetryAnnotationProcessor.isHttpUrl("https://bad value@collector.example"));
+        assertFalse(TelemetryAnnotationProcessor.isHttpUrl("https://u%zz@collector.example"));
+        assertTrue(TelemetryAnnotationProcessor.isHttpUrl("https://user:p%40ss@collector.example"));
     }
 
     @Test

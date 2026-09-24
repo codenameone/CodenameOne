@@ -624,7 +624,8 @@ class TelemetryTest extends UITestBase {
     void anEndpointNoExportCouldReachIsRefusedWhenGiven() {
         String[] bad = {"https://", "https:///v1/traces", "ftp://collector.test",
             "collector.test:4318", "https://collector example", "https://c.test:99999",
-            "https://[nope]:4318"};
+            "https://[nope]:4318", "https://bad value@collector.test", "https://u%zz@collector.test",
+            "https://u%2@collector.test"};
         for (String url : bad) {
             try {
                 new TelemetryConfig().direct(url);
@@ -644,6 +645,8 @@ class TelemetryTest extends UITestBase {
         assertNull(new TelemetryConfig().relay("").exportUrl());
         assertEquals("https://[::1]:4318/v1/traces",
                 new TelemetryConfig().direct("https://[::1]:4318").exportUrl());
+        assertNotNull(new TelemetryConfig().direct("https://user:p%40ss@collector.test").exportUrl(),
+                "valid userinfo, a percent escape included, is accepted");
     }
 
     @Test

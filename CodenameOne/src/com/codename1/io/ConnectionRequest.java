@@ -1621,8 +1621,9 @@ public class ConnectionRequest implements IOProgressListener {
     /// the request was queued under; a later retry then moves it to the newest one.
     boolean tracerParentChained;
 
-    /// How many times this request has been queued again as a retry or redirect.
-    /// An attempt that ends with it unchanged was the request's last.
+    /// A generation, advanced by every accepted enqueue -- a retry, a redirect or a
+    /// fresh reuse. An attempt that ends with it unchanged was the request's last,
+    /// and a cleanup queued for one generation never touches the next.
     int tracerRequeues;
 
     private void captureGuardHeaders(Object connection) {

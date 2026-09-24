@@ -307,6 +307,9 @@ public final class TelemetryAnnotationProcessor extends AbstractAnnotationProces
         }
         String authority = url.substring(start, end);
         int at = authority.lastIndexOf('@');
+        if (at >= 0 && !validUserinfo(authority.substring(0, at))) {
+            return false;
+        }
         String hostPort = at >= 0 ? authority.substring(at + 1) : authority;
         String host = hostPort;
         if (hostPort.startsWith("[")) {
@@ -351,6 +354,32 @@ public final class TelemetryAnnotationProcessor extends AbstractAnnotationProces
             }
         }
         return true;
+    }
+
+    /// RFC 3986 userinfo: unreserved characters, sub-delims, ':' and complete
+    /// percent escapes. Skipped over, a space, a control or a stray '%' in it passed
+    /// validation and failed only at transport, where the export fails silently.
+    static boolean validUserinfo(String userinfo) {
+        for (int i = 0; i < userinfo.length(); i++) {
+            char c = userinfo.charAt(i);
+            if (c == '%') {
+                if (i + 2 >= userinfo.length() || !isHex(userinfo.charAt(i + 1))
+                        || !isHex(userinfo.charAt(i + 2))) {
+                    return false;
+                }
+                i += 2;
+                continue;
+            }
+            if (!((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9')
+                    || "-._~!$&'()*+,;=:".indexOf(c) >= 0)) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private static boolean isHex(char c) {
+        return (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F');
     }
 
     /// ":" then a TCP port, 1 through 65535. Five digits alone let 99999 through,

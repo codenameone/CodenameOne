@@ -309,6 +309,11 @@ class TraceContextTest {
         assertTrue(OtlpTracer.hasHttpAuthority("https://10.0.0.7:4318"));
         assertTrue(OtlpTracer.hasHttpAuthority("https://[::ffff:10.0.0.7]:4318"));
         assertTrue(OtlpTracer.hasHttpAuthority("https://otel-collector.svc_1.local"));
+        // Userinfo is checked too, not skipped.
+        assertFalse(OtlpTracer.hasHttpAuthority("https://bad value@collector.example"));
+        assertFalse(OtlpTracer.hasHttpAuthority("https://u%zz@collector.example"));
+        assertFalse(OtlpTracer.hasHttpAuthority("https://a@b@collector.example"));
+        assertTrue(OtlpTracer.hasHttpAuthority("https://user:p%40ss@collector.example"));
     }
 
     @Test
@@ -406,5 +411,17 @@ class TraceContextTest {
         java.util.Properties settings = new java.util.Properties();
         settings.setProperty(OtlpTracer.RELAY_CORS_ORIGIN, value);
         return OtlpTracer.corsOrigin(com.codename1.backend.Config.of(settings, "test"));
+    }
+
+    @Test
+    @DisplayName("a collector's error text is bounded before it is kept or logged")
+    void diagnosticsAreBounded() {
+        StringBuilder huge = new StringBuilder();
+        while(huge.length() < 100000) {
+            huge.append("rejected ");
+        }
+        String kept = BatchExporter.bounded(huge.toString());
+        assertTrue(kept.length() < BatchExporter.MAX_ERROR_CHARS + 32, "kept " + kept.length());
+        assertEquals("short", BatchExporter.bounded("short"));
     }
 }

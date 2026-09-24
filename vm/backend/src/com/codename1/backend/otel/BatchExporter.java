@@ -362,7 +362,7 @@ final class BatchExporter implements Runnable {
             synchronized(lock) {
                 failedExports++;
                 droppedSpans += batch.size();
-                lastError = "encode: " + err.getMessage();
+                lastError = bounded("encode: " + err.getMessage());
             }
             return 0;
         }
@@ -519,7 +519,28 @@ final class BatchExporter implements Runnable {
      * a developer laptop, a misconfigured deployment -- and a line per batch would
      * bury everything else the server logs.
      */
+    /** The longest diagnostic kept or logged. */
+    static final int MAX_ERROR_CHARS = 512;
+
+    /**
+     * {@code message} cut to {@link #MAX_ERROR_CHARS}. Much of it is the
+     * collector's own text -- a partial-success errorMessage, an exception naming
+     * what it read -- and a response may be megabytes, which lastError then held
+     * for the exporter's lifetime and the log printed as one line.
+     */
+    static String bounded(String message) {
+        if(message == null || message.length() <= MAX_ERROR_CHARS) {
+            return message;
+        }
+        int end = MAX_ERROR_CHARS;
+        if(Character.isHighSurrogate(message.charAt(end - 1))) {
+            end--;
+        }
+        return message.substring(0, end) + "... (" + message.length() + " chars)";
+    }
+
     private void recordFailure(String message) {
+        message = bounded(message);
         long count;
         synchronized(lock) {
             failedExports++;

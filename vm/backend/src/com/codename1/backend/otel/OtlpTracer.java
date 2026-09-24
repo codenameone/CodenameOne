@@ -443,6 +443,9 @@ public final class OtlpTracer implements Tracer {
         }
         String authority = url.substring(start, end);
         int at = authority.lastIndexOf('@');
+        if(at >= 0 && !validUserinfo(authority.substring(0, at))) {
+            return false;
+        }
         String hostPort = at < 0 ? authority : authority.substring(at + 1);
         String host;
         String port = null;
@@ -504,6 +507,29 @@ public final class OtlpTracer implements Tracer {
         }
         String trimmed = value.trim();
         return trimmed.length() == 0 ? null : trimmed;
+    }
+
+    /**
+     * RFC 3986 userinfo: unreserved characters, sub-delims, ':' and complete
+     * percent escapes. Skipped over, a space, a control or a stray '%' in it
+     * passed validation and failed only at transport, where exports fail silently.
+     */
+    static boolean validUserinfo(String userinfo) {
+        for(int iter = 0 ; iter < userinfo.length() ; iter++) {
+            char c = userinfo.charAt(iter);
+            if(c == '%') {
+                if(iter + 2 >= userinfo.length() || OtlpSchema.hexDigit(userinfo.charAt(iter + 1)) < 0
+                        || OtlpSchema.hexDigit(userinfo.charAt(iter + 2)) < 0) {
+                    return false;
+                }
+                iter += 2;
+                continue;
+            }
+            if(!onlyChars(String.valueOf(c), "-._~!$&'()*+,;=:")) {
+                return false;
+            }
+        }
+        return true;
     }
 
     /** Whether every character of {@code value} is an ASCII letter, a digit, or one of {@code extra}. */

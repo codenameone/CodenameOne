@@ -198,6 +198,20 @@ class NetworkTracerQueueTest extends UITestBase {
     }
 
     @Test
+    void everyAcceptedEnqueueAdvancesTheGeneration() throws Exception {
+        // A fresh reuse as well as a retry: a cleanup the previous run queued on
+        // the EDT compares against this, and must not clear the new run's parent.
+        NetworkManager manager = idleManager();
+        ConnectionRequest request = new ConnectionRequest();
+        request.setUrl("http://queue.test/generation");
+        int before = request.tracerRequeues;
+        manager.addToQueue(request, false);
+        assertEquals(before + 1, request.tracerRequeues, "a fresh enqueue left the generation");
+        manager.addToQueue(request, true);
+        assertEquals(before + 2, request.tracerRequeues);
+    }
+
+    @Test
     void addIfAbsentLeavesAnExplicitContentTypeAlone() {
         ConnectionRequest request = new ConnectionRequest();
         request.setContentType("application/json");

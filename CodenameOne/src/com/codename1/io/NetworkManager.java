@@ -787,6 +787,11 @@ public final class NetworkManager {
                 request.tracerParent = queuedParent;
                 request.tracerParentOwner = queuedBy;
                 // A fresh enqueue is a new logical request, not a retry of the last.
+                // It advances the generation too: a cleanup the previous run queued
+                // on the EDT would otherwise still match, and clear the parent this
+                // enqueue just captured -- a listener can reuse a finished request
+                // with addToQueue before that cleanup runs.
+                request.tracerRequeues++;
                 request.tracerParentChained = false;
                 request.tracerLastAttempt = null;
                 request.tracerLastOwner = null;
