@@ -582,4 +582,46 @@ public class DartCoreSemanticsTest {
         assertEquals(Double.valueOf(Double.NEGATIVE_INFINITY), DString.tryParseDouble("-Infinity"));
         assertThrows(FormatException.class, () -> DString.parseDouble("1f"));
     }
+
+    @Test
+    public void anIntAndADoubleCompareExactly() {
+        // 2^53 + 1 widens onto 2^53; Dart's compareTo still orders them.
+        assertEquals(1L, DartComparable.compare(Long.valueOf(9007199254740993L), Double.valueOf(9007199254740992.0)));
+        assertEquals(-1L, DartComparable.compare(Double.valueOf(9007199254740992.0), Long.valueOf(9007199254740993L)));
+        assertEquals(0L, DartComparable.compare(Long.valueOf(1), Double.valueOf(1.0)));
+        assertEquals(1L, DartComparable.compare(Long.valueOf(0), Double.valueOf(-0.0)));
+        assertEquals(-1L, DartComparable.compare(Long.valueOf(1), Double.valueOf(Double.NaN)));
+        assertEquals(-1L, DartComparable.compare(Long.valueOf(1), Double.valueOf(1.5)));
+        assertEquals(1L, DartComparable.compare(Long.valueOf(Long.MAX_VALUE), Double.valueOf(9.2e18)));
+        assertEquals(-1L, DartComparable.compare(Long.valueOf(Long.MAX_VALUE), Double.valueOf(9.3e18)));
+        assertEquals(1L, DartComparable.compare(Long.valueOf(-3), Double.valueOf(Double.NEGATIVE_INFINITY)));
+    }
+
+    @Test
+    public void dotAllLetsTheDotMatchANewline() {
+        RegExp all = new RegExp("a.b");
+        all.dotAll(true);
+        assertTrue(all.hasMatch("a\nb"));
+        assertFalse(new RegExp("a.b").hasMatch("a\nb"));
+    }
+
+    @Test
+    public void toRadixStringRefusesARadixOutsideTwoToThirtySix() {
+        assertEquals("ff", dart.runtime.DartRuntime.toRadixString(255, 16));
+        assertThrows(RangeError.class, () -> dart.runtime.DartRuntime.toRadixString(255, 1));
+        assertThrows(RangeError.class, () -> dart.runtime.DartRuntime.toRadixString(255, 37));
+        assertThrows(RangeError.class, () -> dart.runtime.DartRuntime.toRadixString(255, 4294967312L),
+                "a radix that would wrap into range as a Java int");
+    }
+
+    @Test
+    public void minMaxAndPowKeepIntsInts() {
+        assertEquals(Long.valueOf(1), DartMath.minNum(Long.valueOf(1), Double.valueOf(2.5)));
+        assertEquals(Double.valueOf(2.5), DartMath.maxNum(Long.valueOf(1), Double.valueOf(2.5)));
+        assertEquals(Long.valueOf(8), DartMath.powNum(Long.valueOf(2), Long.valueOf(3)));
+        assertEquals(Double.valueOf(0.5), DartMath.powNum(Long.valueOf(2), Long.valueOf(-1)));
+        assertEquals(Double.valueOf(-0.0), DartMath.minNum(Double.valueOf(0.0), Double.valueOf(-0.0)));
+        assertEquals(Double.valueOf(0.0), DartMath.maxNum(Double.valueOf(-0.0), Double.valueOf(0.0)));
+        assertTrue(Double.isNaN(DartMath.minNum(Long.valueOf(1), Double.valueOf(Double.NaN)).doubleValue()));
+    }
 }

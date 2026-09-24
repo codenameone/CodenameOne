@@ -53,17 +53,60 @@ public final class DartComparable {
      * Dart's {@code num.compareTo} across int and double. Java's wrappers only
      * compare within their own class, so a List&lt;num&gt; holding 2 and 1.5
      * threw ClassCastException from Long.compareTo(Double) instead of sorting.
-     * Double.compare gives Dart's order for doubles too: -0.0 before 0.0, NaN
-     * after everything.
+     * Double.compare gives Dart's order between two doubles: -0.0 before 0.0,
+     * NaN after everything. An int against a double is compared exactly, as
+     * the Dart VM does: widening the int first rounds 2^53 + 1 onto the double
+     * 2^53 and reported them equal.
      */
     private static long compareNumbers(Number a, Number b) {
-        boolean ai = a instanceof Long || a instanceof Integer || a instanceof Short || a instanceof Byte;
-        boolean bi = b instanceof Long || b instanceof Integer || b instanceof Short || b instanceof Byte;
+        boolean ai = isIntegral(a);
+        boolean bi = isIntegral(b);
         if (ai && bi) {
             long x = a.longValue();
             long y = b.longValue();
             return x < y ? -1 : x > y ? 1 : 0;
         }
-        return Double.compare(a.doubleValue(), b.doubleValue());
+        if (!ai && !bi) {
+            return Double.compare(a.doubleValue(), b.doubleValue());
+        }
+        long l = ai ? a.longValue() : b.longValue();
+        double d = ai ? b.doubleValue() : a.doubleValue();
+        int c;
+        if (d != d) {
+            c = -1;                             // every int orders before NaN
+        } else {
+            c = compareIntDouble(l, d);
+            if (c == 0 && l == 0 && 1 / d < 0) {
+                c = 1;                          // 0.compareTo(-0.0) is 1
+            }
+        }
+        return ai ? c : -c;
+    }
+
+    /**
+     * The numeric order of an int and a non-NaN double, without widening the
+     * int: -1, 0 or 1 as {@code l} is below, equal to or above {@code d}. Zero
+     * and negative zero are the same value here; callers that order them
+     * (compareTo, but not the relational operators) do that themselves.
+     */
+    public static int compareIntDouble(long l, double d) {
+        // [-2^63, 2^63) is the range of doubles a long can hold; outside it the
+        // (long) cast below would saturate and compare wrongly.
+        if (d >= 9.223372036854775808E18) {
+            return -1;
+        }
+        if (d < -9.223372036854775808E18) {
+            return 1;
+        }
+        double f = Math.floor(d);
+        long fl = (long) f;
+        if (l != fl) {
+            return l < fl ? -1 : 1;
+        }
+        return d > f ? -1 : 0;                  // l == floor(d): below d iff d has a fraction
+    }
+
+    private static boolean isIntegral(Number n) {
+        return n instanceof Long || n instanceof Integer || n instanceof Short || n instanceof Byte;
     }
 }

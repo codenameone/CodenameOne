@@ -96,6 +96,9 @@ public final class RegExp {
             if (!caseSensitive) {
                 flags |= RE.MATCH_CASEINDEPENDENT;
             }
+            if (dotAll) {
+                flags |= RE.MATCH_SINGLELINE;   // '.' also matches line terminators
+            }
             try {
                 compiled = new RE(source, flags);
             } catch (RESyntaxException e) {

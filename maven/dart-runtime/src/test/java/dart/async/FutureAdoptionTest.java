@@ -318,4 +318,33 @@ public class FutureAdoptionTest {
         });
         assertSame(fromOnValue, assertThrows(IllegalArgumentException.class, escaped::valueOrThrow));
     }
+
+    @Test
+    public void whenCompleteWaitsForTheCleanupFutureThenForwardsTheOutcome() {
+        final Completer<Object> cleanup = new Completer<Object>();
+        Future<Object> done = Future.value((Object) "result").whenCompleteFuture(new Funcs.Func0<Object>() {
+            @Override
+            public Object call() {
+                return cleanup.future();
+            }
+        });
+        assertFalse(done.isDone(), "the outcome waits for the cleanup");
+        cleanup.complete(null);
+        assertTrue(done.isDone());
+        assertEquals("result", done.valueOrThrow());
+    }
+
+    @Test
+    public void aFailingCleanupFutureReplacesTheOutcome() {
+        final Completer<Object> cleanup = new Completer<Object>();
+        Future<Object> done = Future.value((Object) "result").whenCompleteFuture(new Funcs.Func0<Object>() {
+            @Override
+            public Object call() {
+                return cleanup.future();
+            }
+        });
+        cleanup.completeError(new IllegalStateException("cleanup failed"));
+        RuntimeException thrown = assertThrows(RuntimeException.class, done::valueOrThrow);
+        assertEquals("cleanup failed", thrown.getMessage());
+    }
 }

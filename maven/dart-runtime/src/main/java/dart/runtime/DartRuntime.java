@@ -587,6 +587,17 @@ public final class DartRuntime {
     }
 
     /**
+     * Dart's {@code int.toRadixString}: a radix outside 2..36 is a RangeError.
+     * Java's Long.toString(v, radix) silently falls back to base 10 there, so
+     * 255.toRadixString(1) printed "255"; and the radix is checked as the Dart
+     * int it is, before the narrowing to a Java int could wrap it into range.
+     */
+    public static String toRadixString(long v, long radix) {
+        dart.core.RangeError.checkValueInInterval(radix, 2, 36, "radix");
+        return Long.toString(v, (int) radix);
+    }
+
+    /**
      * Dart's {@code num.toStringAsFixed(fractionDigits)}: exactly
      * {@code fractionDigits} digits after the point, for 0 through 20. The
      * digits are those of the double's EXACT binary value rounded half up, as

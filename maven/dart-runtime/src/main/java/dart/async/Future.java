@@ -455,6 +455,55 @@ public class Future<T> {
         return next;
     }
 
+    /**
+     * {@code whenComplete} whose action may return a value: when that value is a
+     * Future, Dart waits for it before forwarding this future's outcome, and a
+     * cleanup that fails replaces the outcome with its error. The void overload
+     * above discarded it, so {@code whenComplete(() => asyncCleanup())}
+     * completed while the cleanup was still running and lost its failure. A
+     * separate name rather than an overload, because a lambda that fits both a
+     * Func0 and a VoidFunc0 is ambiguous to javac.
+     */
+    public Future<T> whenCompleteFuture(final Funcs.Func0<?> action) {
+        final Future<T> next = new Future<T>();
+        onComplete(new Runnable() {
+            @Override
+            public void run() {
+                Object r;
+                try {
+                    r = action.call();
+                } catch (Throwable t) {
+                    next.completeError(t);
+                    return;
+                }
+                if (r instanceof Future) {
+                    final Future<?> cleanup = (Future<?>) r;
+                    cleanup.onComplete(new Runnable() {
+                        @Override
+                        public void run() {
+                            if (cleanup.error != null) {
+                                next.completeError(cleanup.error);
+                            } else {
+                                forwardTo(next);
+                            }
+                        }
+                    });
+                    return;
+                }
+                forwardTo(next);
+            }
+        });
+        return next;
+    }
+
+    private void forwardTo(Future<T> next) {
+        if (error != null) {
+            next.completeError(error);
+        } else {
+            next.complete(value);
+        }
+    }
+
     void onComplete(Runnable r) {
         boolean immediate;
         synchronized (lock) {

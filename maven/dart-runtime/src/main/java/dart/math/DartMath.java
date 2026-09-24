@@ -72,6 +72,65 @@ public final class DartMath {
         return result;
     }
 
+    /**
+     * Dart's {@code min} over two nums whose static types are not both int or
+     * both double. The result is one of the arguments, unconverted, so
+     * {@code min(1, 2.5)} is the int 1 -- converting both to double printed
+     * "1.0" and failed an {@code is int} test. As in Dart, NaN wins and -0.0 is
+     * below 0.0.
+     */
+    public static Number minNum(Number a, Number b) {
+        if (isIntegral(a) && isIntegral(b)) {
+            return Long.valueOf(Math.min(a.longValue(), b.longValue()));
+        }
+        double x = a.doubleValue();
+        double y = b.doubleValue();
+        if (x != x) {
+            return a;
+        }
+        if (y != y) {
+            return b;
+        }
+        if (x != y) {
+            return x < y ? a : b;
+        }
+        return x == 0 && 1 / y < 0 ? b : a;
+    }
+
+    /** Dart's {@code max} over two nums; see {@link #minNum}. 0.0 is above -0.0. */
+    public static Number maxNum(Number a, Number b) {
+        if (isIntegral(a) && isIntegral(b)) {
+            return Long.valueOf(Math.max(a.longValue(), b.longValue()));
+        }
+        double x = a.doubleValue();
+        double y = b.doubleValue();
+        if (x != x) {
+            return a;
+        }
+        if (y != y) {
+            return b;
+        }
+        if (x != y) {
+            return x > y ? a : b;
+        }
+        return x == 0 && 1 / x < 0 ? b : a;
+    }
+
+    /**
+     * Dart's {@code pow} over nums: an int raised to a non-negative int stays an
+     * int ({@code pow(2, 3)} is 8, not 8.0); anything else is a double.
+     */
+    public static Number powNum(Number x, Number exponent) {
+        if (isIntegral(x) && isIntegral(exponent) && exponent.longValue() >= 0) {
+            return Long.valueOf(powInt(x.longValue(), exponent.longValue()));
+        }
+        return Double.valueOf(Math.pow(x.doubleValue(), exponent.doubleValue()));
+    }
+
+    private static boolean isIntegral(Number n) {
+        return n instanceof Long || n instanceof Integer || n instanceof Short || n instanceof Byte;
+    }
+
     public static double sqrt(double x) {
         return Math.sqrt(x);
     }
