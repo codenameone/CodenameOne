@@ -169,7 +169,8 @@ are rejected for those fields. Literal and bound null assignments to primitive
 Java fields are rejected on both runtimes. Field-to-field assignments require
 matching enum types and converter mappings, including fields inside expressions.
 Integral attributes reject real-valued assignment expressions and floating-point
-parameter values.
+parameter values. Assignments also check the mapped integer range, including
+computed results and the narrower ranges of `byte`, `short`, and `char` fields.
 
 An `int` or `long` field annotated `@Version` is maintained by the session.
 Updates and deletes compare its previous value and throw
@@ -185,7 +186,8 @@ booleans and dates, aren't counters.
 Scalar field projections return the mapped Java values, including enums, dates,
 booleans, property values, and converter-backed objects. Integral `SUM` results
 use `Long` on every database, and `AVG` returns `Double`. Joined paths may end in embedded fields.
-Scalar projections need a known storage type when the query is created. Bare
+`COALESCE` field operands must share an enum type or converter mapping so the
+result can be decoded consistently. Scalar projections need a known storage type when the query is created. Bare
 parameters and expressions such as `coalesce(:a,:b)` are rejected. Association
 projections are also rejected; select an explicit field such as `order.customer.id`
 or select the relationship target as a root entity.
@@ -229,7 +231,8 @@ custom basic value to a SQL scalar. The converter implements
 `com.codename1.orm.session.AttributeConverter<Code,String>` and has a public
 no-argument constructor. It receives null values too, including mapped JPQL
 `NULL` literals. Query-builder predicates
-and JPQL comparison parameters and literals apply the field's converter. Values
+and JPQL comparison parameters and literals apply the field's converter.
+The builder converts values before choosing equality or SQL null predicates. Values
 must match the converter's input type; use a named parameter for custom objects. Identifiers and
 versions can't use converters. This includes every component of an embedded identifier.
 
@@ -248,7 +251,8 @@ MySQL and MariaDB enforce foreign keys immediately, so sessions reject required
 cycles before creating tables or writing data, even when the keys are known.
 
 Identifier components are normalized and checked against their storage types
-before a cache lookup or SQL query. Incompatible values raise `IllegalArgumentException`.
+before a cache lookup or SQL query, including the mapped integer range.
+Incompatible values raise `IllegalArgumentException`.
 
 For composite IDs, use several `@Id(autoIncrement=false)` fields or one
 `@EmbeddedId` whose type is `@Embeddable`. Lookup accepts

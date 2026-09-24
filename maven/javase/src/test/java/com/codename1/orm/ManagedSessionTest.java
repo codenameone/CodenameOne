@@ -215,6 +215,32 @@ class ManagedSessionTest {
         } finally { em.close(); }
     }
 
+    static Model integerModel() {
+        return new Model() {
+            public String table() { return "integer_record"; }
+            public Attribute[] attributes() { Attribute[] attrs=super.attributes().clone();attrs[0]=new Attribute("id","id",Attribute.INTEGER,true,true,false,false);attrs[2]=new Attribute("counter","counter",Attribute.INTEGER,false,false,false,false);return attrs; }
+        };
+    }
+    static void assertIntegerRanges(Session session) {
+        session.createTables();session.beginTransaction();Record record=new Record();record.name="integer";session.persist(record);session.commitTransaction();long id=record.id;
+        for(boolean clear:new boolean[]{false,true}) {
+            if(clear) session.clear();
+            for(long bad:new long[]{2147483648L,-2147483649L,Long.MAX_VALUE,Long.MIN_VALUE}) assertThrows(IllegalArgumentException.class,()->session.find(Record.class,bad));
+            assertEquals(id,session.find(Record.class,Long.valueOf(id)).id);
+        }
+        for(String expression:new String[]{"2147483648","-2147483649","r.counter+2147483648","r.counter-2147483649",":value","coalesce(:value,r.counter)","(select max(i.counter)+2147483648 from ManagedSessionTest$Record i)"}) {
+            session.beginTransaction();com.codename1.orm.session.JpqlQuery query=session.createQuery("update ManagedSessionTest$Record r set r.counter="+expression);if(expression.contains(":value")) query.setParameter("value",2147483648L);
+            assertThrows(PersistenceException.class,query::executeUpdate,expression);session.rollbackTransaction();assertEquals(0L,session.find(Record.class,id).counter);
+        }
+        for(long boundary:new long[]{Integer.MIN_VALUE,Integer.MAX_VALUE,0}) {
+            session.beginTransaction();assertEquals(1,session.createQuery("update ManagedSessionTest$Record r set r.counter=:value").setParameter("value",boundary).executeUpdate());session.commitTransaction();assertEquals(boundary,session.find(Record.class,id).counter);
+        }
+    }
+    @Test void integerKeysAndBulkAssignmentsRespectTheirRange() throws Exception {
+        EntityManager em=manager();Models.register(integerModel());
+        try { Session session=em.openSession();try { assertIntegerRanges(session); } finally { session.close(); } } finally { em.close(); }
+    }
+
     @Test void identifierStorageKindsAreValidatedBeforeCacheOrSql() throws Exception {
         EntityManager em=manager();
         try {

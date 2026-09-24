@@ -73,6 +73,10 @@ class ManagedSessionDatabaseTest {
         ExecutorService workers=Executors.newFixedThreadPool(2);
         try {
             session.createTables();session.validateSchema();
+            java.util.Map<String,com.codename1.impl.orm.EntityModel<?>> integerModels=new java.util.LinkedHashMap<String,com.codename1.impl.orm.EntityModel<?>>();integerModels.put(ManagedSessionTest.Record.class.getName(),ManagedSessionTest.integerModel());
+            Session integerSession=new com.codename1.impl.orm.SessionImpl(new com.codename1.impl.orm.BackendSqlAccess(null,db,db.dialect()),integerModels);
+            try { ManagedSessionTest.assertIntegerRanges(integerSession); } finally { integerSession.close(); }
+
             if(!mysql) {
                 db.execute("ALTER TABLE managed_record RENAME COLUMN name TO \"Name\"",new Object[0]);
                 PersistenceException mismatch=assertThrows(PersistenceException.class,session::validateSchema);

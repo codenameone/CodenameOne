@@ -80,6 +80,14 @@ public abstract class EntityModel<T> {
     public boolean required(int index) {
         return !attributes()[index].nullable;
     }
+    /// Smallest stored integral value the mapped attribute can hold.
+    public long minimumIntegralValue(int index) {
+        return attributes()[index].kind == Attribute.INTEGER ? Integer.MIN_VALUE : Long.MIN_VALUE;
+    }
+    /// Largest stored integral value the mapped attribute can hold.
+    public long maximumIntegralValue(int index) {
+        return attributes()[index].kind == Attribute.INTEGER ? Integer.MAX_VALUE : Long.MAX_VALUE;
+    }
     /// True only for unconverted int/Integer or long/Long values, including numeric properties.
     public boolean counter(int index) {
         return false;
@@ -227,6 +235,10 @@ public abstract class EntityModel<T> {
             if ((kind == Attribute.INTEGER || kind == Attribute.BIGINT || kind == Attribute.BOOLEAN
                     || kind == Attribute.TIMESTAMP) && !(values[i] instanceof Long)) {
                 throw new IllegalArgumentException("Identifier component requires integral storage");
+            }
+            if (values[i] instanceof Long && (((Long) values[i]).longValue() < minimumIntegralValue(ids[i])
+                    || ((Long) values[i]).longValue() > maximumIntegralValue(ids[i]))) {
+                throw new IllegalArgumentException("Identifier component is outside the mapped integral range");
             }
         }
         return values;

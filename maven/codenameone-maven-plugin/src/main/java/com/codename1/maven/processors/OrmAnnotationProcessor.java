@@ -1322,6 +1322,18 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
             if(mapping!=null) sb.append("case ").append(i).append(": return \"").append(escape(mapping)).append("\";\n");
         }
         sb.append("default:return super.mapping(index);}}\n");
+        for(boolean minimum:new boolean[]{true,false}) {
+            String method=minimum?"minimumIntegralValue":"maximumIntegralValue";
+            sb.append("public long ").append(method).append("(int index) { switch(index) {\n");
+            for(int i=0;i<ec.fields.size();i++) {
+                PersistedField field=ec.fields.get(i);
+                String type=field.kind.kind==PropertyTypeKind.Kind.PROPERTY?field.kind.elementBinaryName:field.kind.binaryName;
+                String boxed=boxedDomainType(type);
+                String range="java.lang.Byte".equals(boxed)?"Byte":"java.lang.Short".equals(boxed)?"Short":"java.lang.Character".equals(boxed)?"Character":null;
+                if(range!=null) sb.append("case ").append(i).append(": return ").append(range).append(minimum?".MIN_VALUE;\n":".MAX_VALUE;\n");
+            }
+            sb.append("default:return super.").append(method).append("(index);}}\n");
+        }
         boolean converters=false;for(PersistedField field:ec.fields) if(field.converter!=null) converters=true;
         if(converters) {
             if(ec.embedded.isEmpty()) sb.append("public boolean requiresSession() { return true; }\n");

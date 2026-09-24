@@ -103,6 +103,10 @@ public final class QueryImpl<T> implements com.codename1.orm.session.Query<T> {
         if (!relation.element) {
             throw new IllegalArgumentException("Not an element collection: " + field);
         }
+        if (value != null && !relation.target.isInstance(value)) {
+            throw new IllegalArgumentException("Wrong element type");
+        }
+        Object converted = Values.storage(value);
         String alias = session.nextAlias();
         conjunction();
         predicates.append("EXISTS (SELECT 1 FROM ")
@@ -116,22 +120,19 @@ public final class QueryImpl<T> implements com.codename1.orm.session.Query<T> {
                 .append(alias)
                 .append('.')
                 .append(session.q(relation.inverseJoinColumn))
-                .append(value == null ? " IS NULL)" : " = ?)");
-        if (value != null) {
-            if (!relation.target.isInstance(value)) {
-                throw new IllegalArgumentException("Wrong element type");
-            }
-            params.add(Values.storage(value));
+                .append(converted == null ? " IS NULL)" : " = ?)");
+        if (converted != null) {
+            params.add(converted);
         }
         return this;
     }
     @Override
     public QueryImpl<T> eq(String field, Object value) {
-        return compare(field, value == null ? "IS NULL" : "=", value);
+        return compare(field, "=", value);
     }
     @Override
     public QueryImpl<T> ne(String field, Object value) {
-        return compare(field, value == null ? "IS NOT NULL" : "<>", value);
+        return compare(field, "<>", value);
     }
     @Override
     public QueryImpl<T> gt(String field, Object value) {
@@ -282,10 +283,15 @@ public final class QueryImpl<T> implements com.codename1.orm.session.Query<T> {
             name = session.orderValue(name, kind(field));
         }
         boolean unary = op.startsWith("IS ");
-        if (!unary && value == null) {
-            throw new IllegalArgumentException("Null comparison requires isNull/isNotNull");
-        }
         Object converted = unary ? null : builderParameter(field, value);
+        if (!unary && converted == null) {
+            if ("=".equals(op) || "<>".equals(op)) {
+                op = "=".equals(op) ? "IS NULL" : "IS NOT NULL";
+                unary = true;
+            } else {
+                throw new IllegalArgumentException("Null comparison requires isNull/isNotNull");
+            }
+        }
         conjunction();
         predicates.append(name).append(' ').append(op);
         if (!unary) {

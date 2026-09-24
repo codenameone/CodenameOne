@@ -136,6 +136,7 @@ public class OrmAnnotationProcessorTest {
         try {
             s.createTables();s.beginTransaction();Object profile=type.newInstance();((List)type.getField("tags").get(profile)).addAll(Arrays.asList("a","b","a",null));((Set)type.getField("flags").get(profile)).add(7);((Map)type.getField("dates").get(profile)).put("start",new java.util.Date(1000));s.persist(profile);s.commitTransaction();Object id=type.getField("id").get(profile);s.clear();
             profile=s.find(type,id);assertFalse(s.isLoaded(profile,"tags"));org.junit.Assert.assertEquals(4,s.count(profile,"tags"));assertFalse(s.isLoaded(profile,"tags"));
+            com.codename1.orm.session.Query reusable=s.query(type).eq("id",id);try { reusable.containsElement("tags",42);fail("Wrong element type"); } catch(IllegalArgumentException expected) { assertTrue(expected.getMessage().contains("element")); }org.junit.Assert.assertSame(profile,reusable.first());org.junit.Assert.assertEquals(1,reusable.containsElement("tags","a").count());
             org.junit.Assert.assertSame(profile,s.query(type).containsElement("tags","a").first());org.junit.Assert.assertEquals(1,s.query(type).containsElement("tags",null).count());
             org.junit.Assert.assertEquals(Arrays.asList("a","b","a",null),reader.getMethod("tags",type).invoke(null,profile));org.junit.Assert.assertEquals(java.util.Collections.singleton(7),reader.getMethod("flags",type).invoke(null,profile));
             Map dates=(Map)reader.getMethod("dates",type).invoke(null,profile);s.beginTransaction();((java.util.Date)dates.get("start")).setTime(2000);((List)reader.getMethod("tags",type).invoke(null,profile)).remove(0);s.commitTransaction();s.clear();
@@ -215,6 +216,46 @@ public class OrmAnnotationProcessorTest {
     }
 
     @Test
+    public void coalesceRequiresCompatibleResultMappings() throws Exception {
+        File classes=tmp.newFolder("coalescemappings");Map<String,String> sources=new java.util.LinkedHashMap<String,String>();String imports="package coalescemappings; import com.codename1.annotations.*; import com.codename1.annotations.db.*; ";
+        sources.put("coalescemappings.State","package coalescemappings; public enum State { ACTIVE, INACTIVE }");sources.put("coalescemappings.Color","package coalescemappings; public enum Color { RED, BLUE }");
+        for(String name:Arrays.asList("First","Second")) sources.put("coalescemappings."+name,"package coalescemappings; public class "+name+" implements com.codename1.orm.session.AttributeConverter<String,String> { public String toDatabase(String v) { return v==null?null:\""+name+":\"+v; } public String fromDatabase(String v) { return v==null?null:v.substring("+(name.length()+1)+"); } }");
+        sources.put("coalescemappings.Entry",imports+"@Entity public class Entry { @Id public long id; @Convert(converter=First.class) public String code,backup=\"fallback\"; @Convert(converter=Second.class) public String other=\"other\"; public String name=\"raw\"; public State state,backupState=State.ACTIVE; public Color color=Color.RED; }");JavaSourceCompiler.compile(sources,classes,Arrays.asList(testClassesDir()));ProcessorContext client=runProcessor(classes);assertFalse(client.getErrors().toString(),client.hasErrors());ProcessorContext backend=runProcessor(classes,backendClasspath());assertFalse(backend.getErrors().toString(),backend.hasErrors());
+        try(java.net.URLClassLoader loader=new java.net.URLClassLoader(new URL[]{classes.toURI().toURL()},getClass().getClassLoader())) {
+            Class type=loader.loadClass("coalescemappings.Entry");
+            for(String suffix:Arrays.asList("Cn1Model","Cn1BackendModel")) {
+                Map<String,com.codename1.impl.orm.EntityModel<?>> models=new java.util.LinkedHashMap<String,com.codename1.impl.orm.EntityModel<?>>();models.put(type.getName(),(com.codename1.impl.orm.EntityModel)loader.loadClass(type.getName()+suffix).newInstance());com.codename1.backend.Database db=com.codename1.backend.Database.open(":memory:");com.codename1.orm.session.Session session=new com.codename1.impl.orm.SessionImpl(new com.codename1.impl.orm.BackendSqlAccess(null,db,db.dialect()),models);
+                try { session.createTables();session.beginTransaction();session.persist(type.newInstance());session.commitTransaction();
+                    for(String expression:Arrays.asList("coalesce(e.code,e.name)","coalesce(e.name,e.code)","coalesce(e.code,e.other)","coalesce(e.state,e.color)","coalesce(e.code,lower(e.backup))","coalesce(lower(e.backup),e.code)","coalesce(e.code,(select max(i.name) from Entry i))","coalesce(e.name,coalesce(e.code,e.backup))")) { try { session.createQuery("select "+expression+" from Entry e");fail(expression); } catch(IllegalArgumentException expected) { assertTrue(expected.getMessage().contains("mapping")); } }
+                    org.junit.Assert.assertEquals("fallback",session.createQuery("select coalesce(e.code,e.backup) from Entry e",String.class).first());org.junit.Assert.assertEquals("ACTIVE",session.createQuery("select coalesce(e.state,e.backupState) from Entry e").first().toString());
+                    org.junit.Assert.assertEquals("literal",session.createQuery("select coalesce(e.code,'literal') from Entry e",String.class).first());org.junit.Assert.assertEquals("parameter",session.createQuery("select coalesce(e.code,:value) from Entry e",String.class).setParameter("value","parameter").first());
+                    org.junit.Assert.assertEquals("raw",session.createQuery("select coalesce(lower(e.name),'fallback') from Entry e",String.class).first());
+                } finally { session.close();db.close(); }
+            }
+        }
+    }
+
+    @Test
+    public void generatedIntegralMappingsEnforceJavaRanges() throws Exception {
+        File classes=tmp.newFolder("bounded");Map<String,String> sources=new java.util.LinkedHashMap<String,String>();sources.put("bounded.Entry","package bounded; import com.codename1.annotations.*; @Entity public class Entry { @Id(autoIncrement=false) public int id=1; public int amount; public Integer boxed; public byte narrow; public short small; public char letter; }");JavaSourceCompiler.compile(sources,classes,Arrays.asList(testClassesDir()));ProcessorContext client=runProcessor(classes);assertFalse(client.getErrors().toString(),client.hasErrors());ProcessorContext backend=runProcessor(classes,backendClasspath());assertFalse(backend.getErrors().toString(),backend.hasErrors());
+        try(java.net.URLClassLoader loader=new java.net.URLClassLoader(new URL[]{classes.toURI().toURL()},getClass().getClassLoader())) {
+            Class type=loader.loadClass("bounded.Entry");
+            for(String suffix:Arrays.asList("Cn1Model","Cn1BackendModel")) {
+                Map<String,com.codename1.impl.orm.EntityModel<?>> models=new java.util.LinkedHashMap<String,com.codename1.impl.orm.EntityModel<?>>();models.put(type.getName(),(com.codename1.impl.orm.EntityModel)loader.loadClass(type.getName()+suffix).newInstance());com.codename1.backend.Database db=com.codename1.backend.Database.open(":memory:");com.codename1.orm.session.Session session=new com.codename1.impl.orm.SessionImpl(new com.codename1.impl.orm.BackendSqlAccess(null,db,db.dialect()),models);
+                try { session.createTables();session.beginTransaction();session.persist(type.newInstance());session.commitTransaction();
+                    String[] fields={"amount","boxed","narrow","small","letter"};long[] lows={Integer.MIN_VALUE,Integer.MIN_VALUE,Byte.MIN_VALUE,Short.MIN_VALUE,Character.MIN_VALUE},highs={Integer.MAX_VALUE,Integer.MAX_VALUE,Byte.MAX_VALUE,Short.MAX_VALUE,Character.MAX_VALUE};
+                    for(int i=0;i<fields.length;i++) {
+                        for(long invalid:new long[]{lows[i]-1,highs[i]+1}) { session.beginTransaction();try { session.createQuery("update Entry e set e."+fields[i]+"=:value").setParameter("value",invalid).executeUpdate();fail("Stored out-of-range "+fields[i]); } catch(com.codename1.orm.session.PersistenceException expected) { session.rollbackTransaction(); } }
+                        for(long valid:new long[]{lows[i],highs[i]}) { session.beginTransaction();org.junit.Assert.assertEquals(1,session.createQuery("update Entry e set e."+fields[i]+"=:value").setParameter("value",valid).executeUpdate());session.commitTransaction();Object stored=type.getField(fields[i]).get(session.find(type,1));org.junit.Assert.assertEquals(valid,stored instanceof Character?((Character)stored).charValue():((Number)stored).longValue()); }
+                    }
+                    session.beginTransaction();org.junit.Assert.assertEquals(1,session.createQuery("update Entry e set e.boxed=NULL").executeUpdate());session.commitTransaction();org.junit.Assert.assertNull(type.getField("boxed").get(session.find(type,1)));
+                    try { session.find(type,2147483648L);fail("Out-of-range identifier"); } catch(IllegalArgumentException expected) { assertTrue(expected.getMessage().contains("range")); }
+                } finally { session.close();db.close(); }
+            }
+        }
+    }
+
+    @Test
     public void mappedNullLiteralsUseConverterSentinels() throws Exception {
         File classes=tmp.newFolder("nullsentinel");Map<String,String> sources=new java.util.LinkedHashMap<String,String>();String imports="package nullsentinel; import com.codename1.annotations.*; import com.codename1.annotations.db.*; ";
         sources.put("nullsentinel.Sentinel","package nullsentinel; public class Sentinel implements com.codename1.orm.session.AttributeConverter<String,String> { public String toDatabase(String value) { return value==null?\"<null>\":\"db:\"+value; } public String fromDatabase(String value) { return value==null || value.equals(\"<null>\")?null:value.substring(3); } }");
@@ -233,6 +274,8 @@ public class OrmAnnotationProcessorTest {
                         org.junit.Assert.assertEquals(1,session.createQuery("select e from Entry e where e.code=NULL").list().size());org.junit.Assert.assertEquals(1,session.createQuery("select e from Entry e where e.code=:value").setParameter("value",null).list().size());
                         org.junit.Assert.assertNull(session.createQuery("select e.code from Entry e",String.class).first());
                     }
+                    org.junit.Assert.assertEquals(1,session.query(type).eq("code",null).count());org.junit.Assert.assertEquals(0,session.query(type).ne("code",null).count());org.junit.Assert.assertEquals(1,session.query(type).in("code",new Object[]{null}).count());
+                    session.beginTransaction();session.createQuery("update Entry e set e.code='Paris'").executeUpdate();session.commitTransaction();org.junit.Assert.assertEquals(0,session.query(type).eq("code",null).count());org.junit.Assert.assertEquals(1,session.query(type).ne("code",null).count());
                     org.junit.Assert.assertEquals(Long.valueOf(0),session.createQuery("select count(NULL) from Entry e",Long.class).first());
                 } finally { session.close();db.close(); }
             }

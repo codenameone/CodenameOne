@@ -413,6 +413,11 @@ public final class JpqlQueryImpl<T> implements com.codename1.orm.session.JpqlQue
                     if (attribute.nullable && root.model.required(root.model.queryIndex(field))) {
                         requireNonNull(value);
                     }
+                    if (attribute.kind == Attribute.INTEGER) {
+                        int index = root.model.queryIndex(field);
+                        value.sql = session.checkedIntegralAssignment(value.sql,
+                                root.model.minimumIntegralValue(index), root.model.maximumIntegralValue(index));
+                    }
                     assignments.append(target.sql).append(" = ").append(value.sql);
                 } while (take(","));
                 String where = take("WHERE") ? " WHERE " + condition(expression()) : "";
@@ -913,7 +918,16 @@ public final class JpqlQueryImpl<T> implements com.codename1.orm.session.JpqlQue
                     }
                 }
                 // These functions preserve their operands' domain representation.
-                if (!"COUNT".equals(function) && !"LENGTH".equals(function)) {
+                if ("COALESCE".equals(function)) {
+                    Expr mapping = coalesceMapping(args);
+                    if (mapping != null && mapping.projectionQuery != null) {
+                        result.query = mapping.projectionQuery;
+                        result.field = mapping.projectionField;
+                        for (Expr arg : args) {
+                            bindType(result, arg);
+                        }
+                    }
+                } else if (!"COUNT".equals(function) && !"LENGTH".equals(function)) {
                     for (Expr arg : args) {
                         if (arg.query != null) {
                             for (Expr other : args) {
@@ -1099,6 +1113,25 @@ public final class JpqlQueryImpl<T> implements com.codename1.orm.session.JpqlQue
                 }
             }
             return false;
+        }
+        private Expr coalesceMapping(List<Expr> args) {
+            Expr selected = null;
+            String mapping = null;
+            for (Expr arg : args) {
+                if (arg.literal || arg.parameter != null) {
+                    continue;
+                }
+                String current = arg.projectionQuery == null ? ""
+                        : arg.projectionQuery.mapping(arg.projectionField);
+                if (mapping != null && !mapping.equals(current)) {
+                    throw error("COALESCE operands require matching domain and converter mappings");
+                }
+                if (selected == null) {
+                    selected = arg;
+                    mapping = current;
+                }
+            }
+            return selected;
         }
         private void requireIntegralAssignment(Expr value) {
             if (value.kind == Attribute.REAL) {

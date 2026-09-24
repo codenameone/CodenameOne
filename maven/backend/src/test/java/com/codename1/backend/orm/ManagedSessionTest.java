@@ -163,6 +163,24 @@ class ManagedSessionTest {
         }
     }
 
+    @Test void integerAssignmentsRenderCheckedRangesForEveryDialect() throws Exception {
+        for(com.codename1.backend.sql.Dialect dialect:new com.codename1.backend.sql.Dialect[]{com.codename1.backend.sql.Dialect.SQLITE,com.codename1.backend.sql.Dialect.POSTGRES,com.codename1.backend.sql.Dialect.MYSQL,com.codename1.backend.sql.Dialect.MARIADB}) {
+            com.codename1.impl.orm.BackendSqlAccess adapter=new com.codename1.impl.orm.BackendSqlAccess(null,null,dialect);
+            com.codename1.impl.orm.SqlAccess access=(com.codename1.impl.orm.SqlAccess)java.lang.reflect.Proxy.newProxyInstance(getClass().getClassLoader(),new Class[]{com.codename1.impl.orm.SqlAccess.class},(proxy,method,args)-> {
+                if(method.getName().equals("execute")) {
+                    String sql=(String)args[0];assertTrue(sql.contains("CASE WHEN"),sql);assertTrue(sql.contains("< -2147483648") && sql.contains("> 2147483647"),sql);
+                    if("sqlite".equals(dialect.getName())) assertTrue(sql.contains("abs(-9223372036854775808)"),sql);
+                    else { assertTrue(sql.contains("+ CASE WHEN"),sql);assertTrue(sql.contains("mysql".equals(dialect.getName())?"AS SIGNED":"AS BIGINT"),sql); }
+                    for(Object value:(Object[])args[1]) assertEquals(Long.valueOf(2147483648L),value);return 1;
+                }
+                if(method.getName().equals("begin") || method.getName().equals("commit") || method.getName().equals("close")) return null;
+                return method.invoke(adapter,args);
+            });
+            java.util.Map<String,EntityModel<?>> models=new java.util.LinkedHashMap<String,EntityModel<?>>();models.put(Record.class.getName(),integerModel());Session session=new com.codename1.impl.orm.SessionImpl(access,models);
+            try { session.beginTransaction();assertEquals(1,session.createQuery("update ManagedSessionTest$Record r set r.counter=:value").setParameter("value",2147483648L).executeUpdate());session.commitTransaction(); } finally { session.close(); }
+        }
+    }
+
     @Test void lengthUsesCharacterSemanticsForEachDialect() throws Exception {
         for(com.codename1.backend.sql.Dialect dialect:new com.codename1.backend.sql.Dialect[]{com.codename1.backend.sql.Dialect.SQLITE,com.codename1.backend.sql.Dialect.POSTGRES,com.codename1.backend.sql.Dialect.MYSQL,com.codename1.backend.sql.Dialect.MARIADB}) {
             com.codename1.impl.orm.BackendSqlAccess adapter=new com.codename1.impl.orm.BackendSqlAccess(null,null,dialect);
@@ -308,6 +326,32 @@ class ManagedSessionTest {
             assertThrows(IllegalArgumentException.class,()->session.createQuery("select r from ManagedSessionTest$Record r where r.id in :a and r.id in :b").setParameter("a",half).setParameter("b",half).list());
             assertThrows(IllegalArgumentException.class,()->session.createQuery("select r from ManagedSessionTest$Record r where r.id in :ids and r.name=:name").setParameter("ids",allowed).setParameter("name","first").list());session.close();
         } finally { em.close(); }
+    }
+
+    static Model integerModel() {
+        return new Model() {
+            public String table() { return "integer_record"; }
+            public Attribute[] attributes() { Attribute[] attrs=super.attributes().clone();attrs[0]=new Attribute("id","id",Attribute.INTEGER,true,true,false,false);attrs[2]=new Attribute("counter","counter",Attribute.INTEGER,false,false,false,false);return attrs; }
+        };
+    }
+    static void assertIntegerRanges(Session session) {
+        session.createTables();session.beginTransaction();Record record=new Record();record.name="integer";session.persist(record);session.commitTransaction();long id=record.id;
+        for(boolean clear:new boolean[]{false,true}) {
+            if(clear) session.clear();
+            for(long bad:new long[]{2147483648L,-2147483649L,Long.MAX_VALUE,Long.MIN_VALUE}) assertThrows(IllegalArgumentException.class,()->session.find(Record.class,bad));
+            assertEquals(id,session.find(Record.class,Long.valueOf(id)).id);
+        }
+        for(String expression:new String[]{"2147483648","-2147483649","r.counter+2147483648","r.counter-2147483649",":value","coalesce(:value,r.counter)","(select max(i.counter)+2147483648 from ManagedSessionTest$Record i)"}) {
+            session.beginTransaction();com.codename1.orm.session.JpqlQuery query=session.createQuery("update ManagedSessionTest$Record r set r.counter="+expression);if(expression.contains(":value")) query.setParameter("value",2147483648L);
+            assertThrows(PersistenceException.class,query::executeUpdate,expression);session.rollbackTransaction();assertEquals(0L,session.find(Record.class,id).counter);
+        }
+        for(long boundary:new long[]{Integer.MIN_VALUE,Integer.MAX_VALUE,0}) {
+            session.beginTransaction();assertEquals(1,session.createQuery("update ManagedSessionTest$Record r set r.counter=:value").setParameter("value",boundary).executeUpdate());session.commitTransaction();assertEquals(boundary,session.find(Record.class,id).counter);
+        }
+    }
+    @Test void integerKeysAndBulkAssignmentsRespectTheirRange() throws Exception {
+        EntityManager em=manager();Models.register(integerModel());
+        try { Session session=em.openSession();try { assertIntegerRanges(session); } finally { session.close(); } } finally { em.close(); }
     }
 
     @Test void identifierStorageKindsAreValidatedBeforeCacheOrSql() throws Exception {

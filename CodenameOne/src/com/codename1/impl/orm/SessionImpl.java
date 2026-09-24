@@ -121,6 +121,23 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
         }
         return expression;
     }
+    String checkedIntegralAssignment(String expression, long min, long max) {
+        String value = numericOperand(expression, Attribute.BIGINT);
+        String overflow;
+        if ("sqlite".equals(sql.dialect())) {
+            overflow = "abs(-9223372036854775808)";
+        } else {
+            // Keep overflow dependent on the row value so constant folding
+            // cannot reject a valid CASE branch. Signed arithmetic also fails
+            // on MySQL when column assignment clipping is enabled.
+            String type = "mysql".equals(sql.dialect()) ? "SIGNED" : "BIGINT";
+            String signed = "CAST(" + value + " AS " + type + ")";
+            overflow = "(" + signed + " + CASE WHEN " + signed + " < 0 THEN CAST('-9223372036854775808' AS "
+                    + type + ") ELSE CAST('9223372036854775807' AS " + type + ") END)";
+        }
+        return "(CASE WHEN " + value + " < " + min + " OR " + value + " > " + max
+                + " THEN " + overflow + " ELSE " + value + " END)";
+    }
     String nextAlias() {
         return "q" + (aliasSequence++);
     }
