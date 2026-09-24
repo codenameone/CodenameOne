@@ -373,6 +373,7 @@ public final class JpqlQueryImpl<T> implements com.codename1.orm.session.JpqlQue
                     target.query = root;
                     target.field = field;
                     compatible(target, value);
+                    validateAssignment(root.mapping(field), value);
                     bindType(target, value);
                     if (root.model.primitive(root.model.queryIndex(field))) {
                         if (value.parameter != null) {
@@ -628,6 +629,9 @@ public final class JpqlQueryImpl<T> implements com.codename1.orm.session.JpqlQue
             }
             Expr left = add();
             if (take("IS")) {
+                if (left.kind < 0) {
+                    throw error("IS NULL requires a known operand storage kind");
+                }
                 boolean not = take("NOT");
                 expect("NULL");
                 return node(left.sql + (not ? " IS NOT NULL" : " IS NULL"), Attribute.BOOLEAN, left);
@@ -1060,6 +1064,18 @@ public final class JpqlQueryImpl<T> implements com.codename1.orm.session.JpqlQue
                 }
             }
             return false;
+        }
+        private void validateAssignment(String mapping, Expr value) {
+            if (value.query != null && value.field != null && !mapping.equals(value.query.mapping(value.field))) {
+                throw error("Bulk assignment requires matching domain and converter mappings");
+            }
+            if (value.projectionQuery != null
+                    && !mapping.equals(value.projectionQuery.mapping(value.projectionField))) {
+                throw error("Bulk assignment requires matching domain and converter mappings");
+            }
+            for (Expr child : value.children) {
+                validateAssignment(mapping, child);
+            }
         }
         private void bindType(Expr attribute, Expr value) {
             if (attribute.query == null) {

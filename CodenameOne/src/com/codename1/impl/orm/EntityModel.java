@@ -97,6 +97,10 @@ public abstract class EntityModel<T> {
             throw new PersistenceException("Invalid scalar projection", error);
         }
     }
+    /// Identifies enum or converter encoding; empty for ordinary storage values.
+    public String mapping(int index) {
+        return "";
+    }
     public Object parameter(int index, Object value) {
         return Values.storage(value);
     }

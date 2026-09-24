@@ -405,7 +405,7 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
     @Override
     public <T> void persist(T entity) {
         try {
-            persistInternal(entity);
+            persistInternal(entity, new IdentityHashMap<Object, Boolean>());
         } catch (RuntimeException error) {
             if (transaction) {
                 rollbackOnly = true;
@@ -413,13 +413,18 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
             throw error;
         }
     }
-    private <T> void persistInternal(T entity) {
+    private <T> void persistInternal(T entity, IdentityHashMap<Object, Boolean> visited) {
         requireTransaction();
         if (entity == null) {
             throw new IllegalArgumentException("entity is null");
         }
+        if (visited.put(entity, Boolean.TRUE) != null) {
+            return;
+        }
         if (entries.containsKey(entity)) {
-            entries.get(entity).removed = false;
+            Entry entry = entries.get(entity);
+            entry.removed = false;
+            cascadePersist(entry, visited);
             return;
         }
         EntityState previous = state(entity);
@@ -457,7 +462,7 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
         }
         entries.put(entity, e);
         attachState(e, true, null);
-        cascadePersist(e);
+        cascadePersist(e, visited);
     }
     @Override
     public <T> T merge(T entity) {
@@ -720,9 +725,15 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
                     updated.add(e);
                 }
             }
+            // Release all old collection links before inserting moved children.
             for (Entry e : pending) {
                 if (!e.removed) {
-                    syncCollections(e);
+                    syncCollections(e, true);
+                }
+            }
+            for (Entry e : pending) {
+                if (!e.removed) {
+                    syncCollections(e, false);
                 }
             }
             // Relationship writes are part of the update. Fire the post callback
@@ -1559,6 +1570,11 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
         }
     }
     private void cascadePersist(Entry entry) {
+        IdentityHashMap<Object, Boolean> visited = new IdentityHashMap<Object, Boolean>();
+        visited.put(entry.entity, Boolean.TRUE);
+        cascadePersist(entry, visited);
+    }
+    private void cascadePersist(Entry entry, IdentityHashMap<Object, Boolean> visited) {
         Relationship[] relations = entry.model.relationships();
         for (int i = 0; i < relations.length; i++) {
             if ((relations[i].cascade & Relationship.PERSIST) == 0) {
@@ -1574,10 +1590,10 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
             }
             if (relations[i].many) {
                 for (Object child : relatedValues(value)) {
-                    persist(child);
+                    persistInternal(child, visited);
                 }
             } else {
-                persist(value);
+                persistInternal(value, visited);
             }
         }
     }
@@ -1745,12 +1761,15 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
         }
         return result;
     }
-    private void syncCollections(Entry entry) {
+    private void syncCollections(Entry entry, boolean removals) {
         Relationship[] relations = entry.model.relationships();
         EntityState state = state(entry.entity);
         for (int i = 0; i < relations.length; i++) {
             Relationship relation = relations[i];
             if (state == null || !state.loaded[i]) {
+                continue;
+            }
+            if (removals && (relation.element || !relation.many || relation.mappedBy.length() > 0)) {
                 continue;
             }
             Object value = entry.model.relation(entry.entity, i);
@@ -1771,8 +1790,11 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
                 Object[] ownerKey = entry.model.keyValues(owner);
                 if (relation.orderColumn.length() > 0) {
                     if (!keys.equals(old)) {
-                        write("DELETE FROM " + q(relation.joinTable) + " WHERE " + matches(ownerColumns, null),
-                                ownerKey);
+                        if (removals) {
+                            write("DELETE FROM " + q(relation.joinTable) + " WHERE " + matches(ownerColumns, null),
+                                    ownerKey);
+                            continue;
+                        }
                         for (int position = 0; position < keys.size(); position++) {
                             Object[] args = concat(concat(ownerKey, target.keyValues(keys.get(position))),
                                     new Object[] {Integer.valueOf(position)});
@@ -1784,14 +1806,14 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
                     }
                 } else {
                     for (Object id : old) {
-                        if (!keys.contains(id)) {
+                        if (removals && !keys.contains(id)) {
                             write("DELETE FROM " + q(relation.joinTable) + " WHERE " + matches(ownerColumns, null) +
                                             " AND " + matches(targetColumns, null),
                                     concat(ownerKey, target.keyValues(id)));
                         }
                     }
                     for (Object id : keys) {
-                        if (!old.contains(id)) {
+                        if (!removals && !old.contains(id)) {
                             Object[] args = concat(ownerKey, target.keyValues(id));
                             write("INSERT INTO " + q(relation.joinTable) + " (" + quoted(ownerColumns) + ", " +
                                             quoted(targetColumns) + ") VALUES (" + placeholders(args.length) + ")",
@@ -1799,6 +1821,9 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
                         }
                     }
                 }
+            }
+            if (removals) {
+                continue;
             }
             if (relation.orphanRemoval) {
                 for (Object id : old) {

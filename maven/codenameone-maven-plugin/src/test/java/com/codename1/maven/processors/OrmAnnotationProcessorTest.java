@@ -215,6 +215,94 @@ public class OrmAnnotationProcessorTest {
     }
 
     @Test
+    public void bulkAssignmentsRequireMatchingDomainEncodings() throws Exception {
+        File classes=tmp.newFolder("assignmentdomains");Map<String,String> sources=new java.util.LinkedHashMap<String,String>();
+        String imports="package assignmentdomains; import com.codename1.annotations.*; import com.codename1.annotations.db.*; ";
+        sources.put("assignmentdomains.State","package assignmentdomains; public enum State { OPEN, CLOSED }");
+        sources.put("assignmentdomains.Color","package assignmentdomains; public enum Color { RED, BLUE }");
+        for(String converter:Arrays.asList("First","Second")) sources.put("assignmentdomains."+converter,"package assignmentdomains; public class "+converter+" implements com.codename1.orm.session.AttributeConverter<String,String> { public String toDatabase(String value) { return value==null?null:\""+converter+":\"+value; } public String fromDatabase(String value) { return value==null?null:value.substring("+(converter.length()+1)+"); } }");
+        sources.put("assignmentdomains.Entry",imports+"@Entity public class Entry { @Id public long id; public State state=State.OPEN,otherState=State.CLOSED; public Color color=Color.RED; public String text=\"raw\"; @Convert(converter=First.class) public String first=\"a\",same=\"b\"; @Convert(converter=Second.class) public String second=\"c\"; }");
+        JavaSourceCompiler.compile(sources,classes,Arrays.asList(testClassesDir()));
+        ProcessorContext client=runProcessor(classes);assertFalse(client.getErrors().toString(),client.hasErrors());ProcessorContext backend=runProcessor(classes,backendClasspath());assertFalse(backend.getErrors().toString(),backend.hasErrors());
+        try(java.net.URLClassLoader loader=new java.net.URLClassLoader(new URL[]{classes.toURI().toURL()},getClass().getClassLoader())) {
+            Class type=loader.loadClass("assignmentdomains.Entry");
+            for(String suffix:Arrays.asList("Cn1Model","Cn1BackendModel")) {
+                Map<String,com.codename1.impl.orm.EntityModel<?>> models=new java.util.LinkedHashMap<String,com.codename1.impl.orm.EntityModel<?>>();models.put(type.getName(),(com.codename1.impl.orm.EntityModel)loader.loadClass(type.getName()+suffix).newInstance());
+                com.codename1.backend.Database db=com.codename1.backend.Database.open(":memory:");com.codename1.orm.session.Session session=new com.codename1.impl.orm.SessionImpl(new com.codename1.impl.orm.BackendSqlAccess(null,db,db.dialect()),models);
+                try {
+                    session.createTables();session.beginTransaction();Object entity=type.newInstance();session.persist(entity);session.commitTransaction();Object id=type.getField("id").get(entity);session.beginTransaction();
+                    for(String assignment:Arrays.asList("state=e.color","state=e.text","text=e.state","first=e.second","first=e.text","text=e.first","first=coalesce(e.same,e.second)","state=(select max(i.color) from Entry i)")) {
+                        try { session.createQuery("update Entry e set e."+assignment);fail("Accepted incompatible assignment: "+assignment); } catch(IllegalArgumentException expected) { assertTrue(expected.getMessage().contains("mapping")); }
+                    }
+                    org.junit.Assert.assertEquals(1,session.createQuery("update Entry e set e.state=e.otherState,e.first=coalesce(e.same,e.first)").executeUpdate());session.commitTransaction();session.clear();
+                    Object loaded=session.find(type,id);org.junit.Assert.assertEquals("CLOSED",type.getField("state").get(loaded).toString());org.junit.Assert.assertEquals("b",type.getField("first").get(loaded));org.junit.Assert.assertEquals("c",type.getField("second").get(loaded));
+                } finally { session.close();db.close(); }
+            }
+        }
+    }
+
+    @Test
+    public void embeddedIdentifiersRejectConvertersAtAnyDepth() throws Exception {
+        for(boolean nested:Arrays.asList(false,true)) for(boolean backend:Arrays.asList(false,true)) {
+            File classes=tmp.newFolder();Map<String,String> sources=new java.util.LinkedHashMap<String,String>();
+            String imports="package convertedid; import com.codename1.annotations.*; import com.codename1.annotations.db.*; ";
+            sources.put("convertedid.Prefix","package convertedid; public class Prefix implements com.codename1.orm.session.AttributeConverter<String,String> { public String toDatabase(String value) { return value; } public String fromDatabase(String value) { return value; } }");
+            sources.put("convertedid.Part",imports+"@Embeddable public class Part { @Convert(converter=Prefix.class) public String value; }");
+            sources.put("convertedid.Key",imports+"@Embeddable public class Key { "+(nested?"@Embedded public Part part;":"@Convert(converter=Prefix.class) public String value;")+" }");
+            sources.put("convertedid.Entry",imports+"@Entity public class Entry { @EmbeddedId public Key key; }");
+            JavaSourceCompiler.compile(sources,classes,Arrays.asList(testClassesDir()));ProcessorContext ctx=runProcessor(classes,backend?backendClasspath():Collections.<String>emptyList());
+            assertTrue(ctx.hasErrors());assertTrue(ctx.getErrors().toString(),ctx.getErrors().toString().contains("Identifier and version fields cannot declare converters"));
+        }
+    }
+
+    @Test
+    public void owningCollectionsCanSwapAndMoveChildrenInOneFlush() throws Exception {
+        for(boolean ordered:Arrays.asList(false,true)) {
+            File classes=tmp.newFolder();Map<String,String> sources=new java.util.LinkedHashMap<String,String>();String imports="package movedlinks; import com.codename1.annotations.*; import com.codename1.annotations.db.*; ";
+            sources.put("movedlinks.Child",imports+"@Entity public class Child { @Id public long id; }");
+            sources.put("movedlinks.Owner",imports+"@Entity public class Owner { @Id public long id; @OneToMany(cascade=CascadeType.PERSIST) "+(ordered?"@OrderColumn(name=\"position\") ":"")+"public java.util.List<Child> children=new java.util.ArrayList<Child>(); }");
+            JavaSourceCompiler.compile(sources,classes,Arrays.asList(testClassesDir()));ProcessorContext client=runProcessor(classes);assertFalse(client.getErrors().toString(),client.hasErrors());ProcessorContext backend=runProcessor(classes,backendClasspath());assertFalse(backend.getErrors().toString(),backend.hasErrors());
+            try(java.net.URLClassLoader loader=new java.net.URLClassLoader(new URL[]{classes.toURI().toURL()},getClass().getClassLoader())) {
+                Class ownerType=loader.loadClass("movedlinks.Owner"),childType=loader.loadClass("movedlinks.Child");
+                for(String suffix:Arrays.asList("Cn1Model","Cn1BackendModel")) {
+                    Map<String,com.codename1.impl.orm.EntityModel<?>> models=new java.util.LinkedHashMap<String,com.codename1.impl.orm.EntityModel<?>>();for(Class type:Arrays.asList(ownerType,childType)) models.put(type.getName(),(com.codename1.impl.orm.EntityModel)loader.loadClass(type.getName()+suffix).newInstance());
+                    com.codename1.backend.Database db=com.codename1.backend.Database.open(":memory:");com.codename1.orm.session.Session session=new com.codename1.impl.orm.SessionImpl(new com.codename1.impl.orm.BackendSqlAccess(null,db,db.dialect()),models);
+                    try {
+                        session.createTables();session.beginTransaction();Object a=ownerType.newInstance(),b=ownerType.newInstance(),x=childType.newInstance(),y=childType.newInstance();
+                        java.util.List left=(java.util.List)ownerType.getField("children").get(a),right=(java.util.List)ownerType.getField("children").get(b);left.add(x);right.add(y);session.persist(a);session.persist(b);session.commitTransaction();
+                        Object aId=ownerType.getField("id").get(a),bId=ownerType.getField("id").get(b),xId=childType.getField("id").get(x),yId=childType.getField("id").get(y);
+                        session.beginTransaction();left.clear();right.clear();left.add(y);right.add(x);session.commitTransaction();session.clear();
+                        a=session.find(ownerType,aId);b=session.find(ownerType,bId);session.initialize(a,"children");session.initialize(b,"children");left=(java.util.List)ownerType.getField("children").get(a);right=(java.util.List)ownerType.getField("children").get(b);
+                        org.junit.Assert.assertEquals(yId,childType.getField("id").get(left.get(0)));org.junit.Assert.assertEquals(xId,childType.getField("id").get(right.get(0)));
+                        session.beginTransaction();left.addAll(right);right.clear();session.commitTransaction();session.clear();a=session.find(ownerType,aId);b=session.find(ownerType,bId);session.initialize(a,"children");session.initialize(b,"children");left=(java.util.List)ownerType.getField("children").get(a);right=(java.util.List)ownerType.getField("children").get(b);org.junit.Assert.assertEquals(2,left.size());assertTrue(right.isEmpty());org.junit.Assert.assertEquals(2,session.query(childType).count());
+                        if(ordered) { org.junit.Assert.assertEquals(yId,childType.getField("id").get(left.get(0)));org.junit.Assert.assertEquals(xId,childType.getField("id").get(left.get(1))); }
+                    } finally { session.close();db.close(); }
+                }
+            }
+        }
+    }
+
+    @Test
+    public void persistRevivesEntireRemovedAggregateIncludingCycles() throws Exception {
+        File classes=tmp.newFolder("revived");Map<String,String> sources=new java.util.LinkedHashMap<String,String>();String imports="package revived; import com.codename1.annotations.*; import com.codename1.annotations.db.*; ";
+        sources.put("revived.Node",imports+"@Entity public class Node { @Id public long id; @OneToMany(cascade=CascadeType.ALL) public java.util.List<Node> children=new java.util.ArrayList<Node>(); }");
+        JavaSourceCompiler.compile(sources,classes,Arrays.asList(testClassesDir()));ProcessorContext client=runProcessor(classes);assertFalse(client.getErrors().toString(),client.hasErrors());ProcessorContext backend=runProcessor(classes,backendClasspath());assertFalse(backend.getErrors().toString(),backend.hasErrors());
+        try(java.net.URLClassLoader loader=new java.net.URLClassLoader(new URL[]{classes.toURI().toURL()},getClass().getClassLoader())) {
+            Class type=loader.loadClass("revived.Node");
+            for(String suffix:Arrays.asList("Cn1Model","Cn1BackendModel")) {
+                Map<String,com.codename1.impl.orm.EntityModel<?>> models=new java.util.LinkedHashMap<String,com.codename1.impl.orm.EntityModel<?>>();models.put(type.getName(),(com.codename1.impl.orm.EntityModel)loader.loadClass(type.getName()+suffix).newInstance());
+                com.codename1.backend.Database db=com.codename1.backend.Database.open(":memory:");com.codename1.orm.session.Session session=new com.codename1.impl.orm.SessionImpl(new com.codename1.impl.orm.BackendSqlAccess(null,db,db.dialect()),models);
+                try {
+                    session.createTables();session.beginTransaction();java.util.List<Object> nodes=new java.util.ArrayList<Object>();for(int i=0;i<5;i++) nodes.add(type.newInstance());
+                    for(int i=0;i<nodes.size();i++) ((java.util.List)type.getField("children").get(nodes.get(i))).add(nodes.get((i+1)%nodes.size()));session.persist(nodes.get(0));session.commitTransaction();
+                    for(int round=0;round<3;round++) { session.beginTransaction();session.remove(nodes.get(0));session.persist(nodes.get(0));session.flush();session.commitTransaction();org.junit.Assert.assertEquals(5,session.query(type).count()); }
+                    Object rootId=type.getField("id").get(nodes.get(0));session.clear();Object root=session.find(type,rootId),next=root;for(int i=0;i<5;i++) { session.initialize(next,"children");java.util.List children=(java.util.List)type.getField("children").get(next);org.junit.Assert.assertEquals(1,children.size());next=children.get(0); }org.junit.Assert.assertSame(root,next);
+                } finally { session.close();db.close(); }
+            }
+        }
+    }
+
+    @Test
     public void generatedStringConvertersAndForeignKeysUsePortableValues() throws Exception {
         File classes=tmp.newFolder("portablevalues");Map<String,String> sources=new java.util.LinkedHashMap<String,String>();
         sources.put("portablevalues.Prefix","package portablevalues; public class Prefix implements com.codename1.orm.session.AttributeConverter<String,String> { public String toDatabase(String value) { return value==null?null:\"x:\"+value; } public String fromDatabase(String value) { return value==null?null:value.substring(2); } }");

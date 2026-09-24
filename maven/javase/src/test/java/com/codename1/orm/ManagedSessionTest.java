@@ -219,11 +219,11 @@ class ManagedSessionTest {
         EntityManager em=manager();
         try {
             Session session=em.openSession();seed(session);
-            for(String predicate:new String[]{":left=:right","(:left)<>:right",":left>:right",":left in (:right)",":left between :low and :high","coalesce(:a,:b)=nullif(:c,:d)"}) {
+            for(String predicate:new String[]{":left=:right","(:left)<>:right",":left>:right",":left in (:right)",":left between :low and :high","coalesce(:a,:b)=nullif(:c,:d)",":value is null",":value is not null","(:value) is null","coalesce(:a,:b) is null"}) {
                 assertThrows(IllegalArgumentException.class,()->session.createQuery("select r from ManagedSessionTest$Record r where "+predicate),predicate);
             }
             assertEquals(1,session.createQuery("select r from ManagedSessionTest$Record r where :value=1").setParameter("value",1L).list().size());
-            assertEquals(1,session.createQuery("select r from ManagedSessionTest$Record r where :value is null").setParameter("value",null).list().size());session.close();
+            assertEquals(1,session.createQuery("select r from ManagedSessionTest$Record r where coalesce(:value,r.name) is not null").setParameter("value",null).list().size());session.close();
         } finally { em.close(); }
     }
 

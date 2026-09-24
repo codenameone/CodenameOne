@@ -147,7 +147,8 @@ parameters. `IN :values` and `IN (:values)` accept an `Iterable` or object array
 including an empty collection. Unsupported syntax is rejected. Multiple scalar
 projections return `Object[]`.
 Comparisons require at least one operand with a known storage type; two untyped
-parameters can't be compared directly. A scalar nested query requires an
+parameters can't be compared directly. `IS NULL` and `IS NOT NULL` also require a
+known operand type; a standalone untyped parameter is rejected. A scalar nested query requires an
 aggregate without `GROUP BY`, so it returns at most one row. `IN` and `EXISTS`
 may use queries that return multiple rows.
 A `DISTINCT` query can order only by selected expressions. Text range comparisons
@@ -165,7 +166,8 @@ managed changes, bypass per-entity callbacks and cascades, and clear the context
 so later reads can't reuse stale entities. Bulk assignments to required subtype
 fields need a non-null literal or named parameter. Other assignment expressions
 are rejected for those fields. Literal and bound null assignments to primitive
-Java fields are rejected on both runtimes.
+Java fields are rejected on both runtimes. Field-to-field assignments require
+matching enum types and converter mappings, including fields inside expressions.
 
 An `int` or `long` field annotated `@Version` is maintained by the session.
 Updates and deletes compare its previous value and throw
@@ -222,7 +224,7 @@ custom basic value to a SQL scalar. The converter implements
 `com.codename1.orm.session.AttributeConverter<Code,String>` and has a public
 no-argument constructor. It receives null values too. Query-builder predicates
 and JPQL comparison parameters apply the field's converter. Identifiers and
-versions can't use converters.
+versions can't use converters. This includes every component of an embedded identifier.
 
 ==== Identity and inheritance
 

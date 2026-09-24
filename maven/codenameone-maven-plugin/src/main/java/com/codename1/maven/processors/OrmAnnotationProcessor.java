@@ -402,7 +402,7 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
                 pf.kind=PropertyTypeKind.scalar(storage instanceof org.objectweb.asm.Type?((org.objectweb.asm.Type)storage).getClassName():"java.lang.String");
                 AnnotatedClass converterClass=findType(pf.converter,ctx);
                 if(converterClass==null || !hasPublicNoArgConstructor(converterClass)) ctx.error(cls,"Converter requires a public no-arg constructor: "+pf.converter);
-                if(f.getAnnotation(ID_DESC)!=null || pf.version) ctx.error(cls,"Identifier and version fields cannot declare converters");
+                if(f.getAnnotation(ID_DESC)!=null || pf.version || ec.embeddedId!=null && pf.fieldName.startsWith(ec.embeddedId+".")) ctx.error(cls,"Identifier and version fields cannot declare converters");
             }
             AnnotatedClass enumClass = pf.kind.kind == PropertyTypeKind.Kind.REFERENCE ? findType(pf.kind.binaryName,ctx) : null;
             if (pf.kind.kind == PropertyTypeKind.Kind.REFERENCE && enumClass != null && enumClass.isEnum())
@@ -1310,6 +1310,14 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
         for(PersistedField field:ec.fields) if(field.unique)
             sb.append("new ").append(pkg).append("Index(\"\",true,\"").append(escape(field.fieldName)).append("\"),");
         sb.append("};}\n");
+        sb.append("public String mapping(int index) { switch(index) {\n");
+        for(int i=0;i<ec.fields.size();i++) {
+            PersistedField field=ec.fields.get(i);
+            String mapping=field.converter!=null?"converter:"+field.converter+":"+field.domainType
+                :field.kind.kind==PropertyTypeKind.Kind.ENUM?"enum:"+field.kind.binaryName:null;
+            if(mapping!=null) sb.append("case ").append(i).append(": return \"").append(escape(mapping)).append("\";\n");
+        }
+        sb.append("default:return super.mapping(index);}}\n");
         boolean converters=false;for(PersistedField field:ec.fields) if(field.converter!=null) converters=true;
         if(converters) {
             if(ec.embedded.isEmpty()) sb.append("public boolean requiresSession() { return true; }\n");

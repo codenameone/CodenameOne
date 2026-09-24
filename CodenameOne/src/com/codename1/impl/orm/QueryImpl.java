@@ -342,6 +342,10 @@ public final class QueryImpl<T> implements com.codename1.orm.session.Query<T> {
         Field resolved = resolveField(field);
         return resolved.join.model.parameter(resolved.index, value);
     }
+    String mapping(String field) {
+        Field resolved = resolveField(field);
+        return resolved.join.model.mapping(resolved.index);
+    }
     Object project(String field, Object value) {
         Field resolved = resolveField(field);
         return resolved.join.model.project(resolved.index, value);
