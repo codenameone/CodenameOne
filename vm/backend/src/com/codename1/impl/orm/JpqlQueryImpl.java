@@ -286,10 +286,14 @@ public final class JpqlQueryImpl<T> implements com.codename1.orm.session.JpqlQue
             Object converted = query == null ? Values.storage(value) : query.parameter(field, value);
             boolean mappedBoolean = query != null && query.mapping(field).startsWith("converter:")
                     && (Long.valueOf(0).equals(converted) || Long.valueOf(1).equals(converted));
-            if (converted != null && logical && !(value instanceof Boolean) && !mappedBoolean) {
+            if (converted != null && (logical || expectedKind == Attribute.BOOLEAN)
+                    && !(value instanceof Boolean) && !mappedBoolean) {
                 throw new IllegalArgumentException("Logical parameter requires a Boolean: " + name);
             }
             Values.requireStorageKind(converted, expectedKind);
+            if (query != null && !numeric && !integralAssignment) {
+                query.requireIntegralRange(field, converted);
+            }
             if (converted != null && integralAssignment && !(converted instanceof Byte
                     || converted instanceof Short || converted instanceof Integer || converted instanceof Long)) {
                 throw new IllegalArgumentException("Integral assignment requires an integral stored value: " + name);
@@ -833,6 +837,12 @@ public final class JpqlQueryImpl<T> implements com.codename1.orm.session.JpqlQue
         }
         private Expr primary() {
             if (take("-")) {
+                String magnitude = peek();
+                if (magnitude.length() > 0 && Character.isDigit(magnitude.charAt(0))
+                        && magnitude.indexOf('.') < 0 && magnitude.indexOf('e') < 0 && magnitude.indexOf('E') < 0) {
+                    // Parse the sign with the magnitude so Long.MIN_VALUE remains representable.
+                    return literal(Attribute.BIGINT, Long.valueOf(Long.parseLong("-" + next())));
+                }
                 Expr value = primary();
                 requireNumeric(value, value.kind != Attribute.REAL);
                 Expr result = wrap(session.checkedArithmetic("-" + session.numericOperand(value.sql,
@@ -968,7 +978,7 @@ public final class JpqlQueryImpl<T> implements com.codename1.orm.session.JpqlQue
                             bindType(result, arg);
                         }
                     }
-                } else if (!"COUNT".equals(function) && !"LENGTH".equals(function)) {
+                } else if (" MIN MAX NULLIF ".contains(" " + function + " ")) {
                     for (Expr arg : args) {
                         if (arg.query != null) {
                             for (Expr other : args) {
@@ -1176,7 +1186,7 @@ public final class JpqlQueryImpl<T> implements com.codename1.orm.session.JpqlQue
         private void requireNonNull(Expr value) {
             if (value.parameter != null) {
                 value.parameter.nonNull = true;
-            } else if (!value.literal || value.literalValue == null) {
+            } else if (!value.literal || value.literalBinding.convert() == null) {
                 throw error("Bulk assignment to a required subtype attribute needs a non-null literal or parameter");
             }
         }

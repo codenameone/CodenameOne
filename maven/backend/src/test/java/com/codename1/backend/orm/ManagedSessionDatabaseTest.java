@@ -77,6 +77,8 @@ class ManagedSessionDatabaseTest {
             Session integerSession=new com.codename1.impl.orm.SessionImpl(new com.codename1.impl.orm.BackendSqlAccess(null,db,db.dialect()),integerModels);
             try { ManagedSessionTest.assertIntegerRanges(integerSession); } finally { integerSession.close(); }
 
+            ManagedSessionTest.assertMinimumLongLiteral(session);
+
             if(!mysql) {
                 db.execute("ALTER TABLE managed_record RENAME COLUMN name TO \"Name\"",new Object[0]);
                 PersistenceException mismatch=assertThrows(PersistenceException.class,session::validateSchema);

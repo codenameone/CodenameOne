@@ -196,6 +196,10 @@ booleans and dates, aren't counters.
 Scalar field projections return the mapped Java values, including enums, dates,
 booleans, property values, and converter-backed objects. Integral `SUM` results
 use `Long` on every database, and `AVG` returns `Double`. Joined paths may end in embedded fields.
+`LOWER`, `UPPER`, `TRIM`, and `ABS` transform stored values. Their results and
+comparison operands use SQL storage values. These results can't be assigned
+directly to a field with a converter. `MIN`, `MAX`, `COALESCE`, and `NULLIF`
+preserve compatible converter mappings.
 `COALESCE` field operands must share an enum type or converter mapping so the
 result can be decoded consistently. Field-to-field comparisons also require
 matching enum types and converter mappings. Scalar projections need a known storage type when the query is created. Bare

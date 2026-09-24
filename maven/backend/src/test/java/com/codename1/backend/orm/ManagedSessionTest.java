@@ -369,6 +369,16 @@ class ManagedSessionTest {
             for(long bad:new long[]{2147483648L,-2147483649L,Long.MAX_VALUE,Long.MIN_VALUE}) assertThrows(IllegalArgumentException.class,()->session.find(Record.class,bad));
             assertEquals(id,session.find(Record.class,Long.valueOf(id)).id);
         }
+        for(String predicate:new String[]{"r.counter=:value",":value=r.counter","r.counter>:value","r.counter in (:value)","r.counter in (:value,0)","r.counter between :value and :value"}) {
+            boolean collection=predicate.equals("r.counter in (:value)");
+            com.codename1.orm.session.JpqlQuery query=session.createQuery("select r from ManagedSessionTest$Record r where "+predicate);
+            for(long invalid:new long[]{2147483648L,-2147483649L,Long.MIN_VALUE,Long.MAX_VALUE}) {
+                session.beginTransaction();query.setParameter("value",collection?new Object[]{invalid}:invalid);assertThrows(IllegalArgumentException.class,query::list,predicate);assertFalse(session.isRollbackOnly());query.setParameter("value",collection?new Object[]{0L}:0L).list();session.commitTransaction();
+            }
+            for(long boundary:new long[]{Integer.MIN_VALUE,Integer.MAX_VALUE}) query.setParameter("value",collection?new Object[]{boundary}:boundary).list();
+        }
+        // Arithmetic widens the expression and must still accept a long operand.
+        assertEquals(1,session.createQuery("select r from ManagedSessionTest$Record r where r.counter+:delta=:expected").setParameter("delta",2147483648L).setParameter("expected",2147483648L).list().size());
         for(String expression:new String[]{"2147483648","-2147483649","r.counter+2147483648","r.counter-2147483649",":value","coalesce(:value,r.counter)","(select max(i.counter)+2147483648 from ManagedSessionTest$Record i)"}) {
             session.beginTransaction();com.codename1.orm.session.JpqlQuery query=session.createQuery("update ManagedSessionTest$Record r set r.counter="+expression);if(expression.contains(":value")) query.setParameter("value",2147483648L);
             assertThrows(PersistenceException.class,query::executeUpdate,expression);session.rollbackTransaction();assertEquals(0L,session.find(Record.class,id).counter);
@@ -388,6 +398,19 @@ class ManagedSessionTest {
             assertEquals(value,current.counter);assertEquals(version,current.version);
         }
     }
+    static void assertMinimumLongLiteral(Session session) {
+        session.createTables();session.beginTransaction();Record record=new Record();record.name="minimum";session.persist(record);session.commitTransaction();
+        session.beginTransaction();assertEquals(1,session.createQuery("update ManagedSessionTest$Record r set r.counter=-9223372036854775808").executeUpdate());session.commitTransaction();
+        assertEquals(Long.MIN_VALUE,session.find(Record.class,record.id).counter);
+        assertEquals(1,session.createQuery("select r from ManagedSessionTest$Record r where r.counter=(-9223372036854775808)").list().size());
+        assertEquals(Long.valueOf(Long.MIN_VALUE),session.createQuery("select -9223372036854775808 from ManagedSessionTest$Record r",Long.class).first());
+        for(String invalid:new String[]{"9223372036854775808","+9223372036854775808","-9223372036854775809"}) assertThrows(IllegalArgumentException.class,()->session.createQuery("select r from ManagedSessionTest$Record r where r.counter="+invalid));
+        session.beginTransaction();session.remove(session.find(Record.class,record.id));session.commitTransaction();
+    }
+    @Test void minimumLongLiteralSupportsPredicatesAndAssignments() throws Exception {
+        EntityManager em=manager();try { Session session=em.openSession();try { assertMinimumLongLiteral(session); } finally { session.close(); } } finally { em.close(); }
+    }
+
     @Test void integerKeysAndBulkAssignmentsRespectTheirRange() throws Exception {
         EntityManager em=manager();Models.register(integerModel());
         try { Session session=em.openSession();try { assertIntegerRanges(session); } finally { session.close(); } } finally { em.close(); }

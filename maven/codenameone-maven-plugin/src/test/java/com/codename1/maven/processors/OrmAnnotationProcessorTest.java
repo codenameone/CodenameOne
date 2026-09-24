@@ -234,6 +234,11 @@ public class OrmAnnotationProcessorTest {
                     org.junit.Assert.assertEquals(0,session.createQuery("select e from Entry e where e.flag=:flag").setParameter("flag",missing).list().size());
                     for(Object invalid:Arrays.asList("YES",Boolean.TRUE,1L)) org.junit.Assert.assertThrows(IllegalArgumentException.class,()->session.createQuery("select e from Entry e where e.flag=:flag").setParameter("flag",invalid).list());
                     org.junit.Assert.assertThrows(IllegalArgumentException.class,()->session.createQuery("select e from Entry e where e.plain=:flag").setParameter("flag",1L).list());
+                    for(Object invalid:Arrays.asList(0L,1L,2L,1.0,"true")) {
+                        for(String predicate:Arrays.asList("e.plain=:flag","e.plain in (:flag)","coalesce(e.plain,false)=:flag")) org.junit.Assert.assertThrows(IllegalArgumentException.class,()->session.createQuery("select e from Entry e where "+predicate).setParameter("flag",predicate.contains(" in ")?new Object[]{invalid}:invalid).list());
+                        session.beginTransaction();org.junit.Assert.assertThrows(IllegalArgumentException.class,()->session.createQuery("update Entry e set e.plain=:flag").setParameter("flag",invalid).executeUpdate());assertFalse(session.isRollbackOnly());session.commitTransaction();
+                    }
+                    for(boolean value:new boolean[]{false,true}) { session.beginTransaction();org.junit.Assert.assertEquals(1,session.createQuery("update Entry e set e.plain=:flag").setParameter("flag",value).executeUpdate());session.commitTransaction();org.junit.Assert.assertEquals(1,session.createQuery("select e from Entry e where e.plain="+value).list().size()); }
                     session.beginTransaction();org.junit.Assert.assertEquals(1,session.createQuery("update Entry e set e.flag=:flag").setParameter("flag",no).executeUpdate());session.commitTransaction();org.junit.Assert.assertEquals(no,session.createQuery("select e.flag from Entry e",flag).first());
                 } finally { session.close();db.close(); }
             }
@@ -468,11 +473,62 @@ public class OrmAnnotationProcessorTest {
                 try { session.createTables();session.beginTransaction();session.persist(type.newInstance());session.commitTransaction();
                     String[] fields={"amount","boxed","narrow","small","letter"};long[] lows={Integer.MIN_VALUE,Integer.MIN_VALUE,Byte.MIN_VALUE,Short.MIN_VALUE,Character.MIN_VALUE},highs={Integer.MAX_VALUE,Integer.MAX_VALUE,Byte.MAX_VALUE,Short.MAX_VALUE,Character.MAX_VALUE};
                     for(int i=0;i<fields.length;i++) {
-                        for(long invalid:new long[]{lows[i]-1,highs[i]+1}) { session.beginTransaction();try { session.createQuery("update Entry e set e."+fields[i]+"=:value").setParameter("value",invalid).executeUpdate();fail("Stored out-of-range "+fields[i]); } catch(com.codename1.orm.session.PersistenceException expected) { session.rollbackTransaction(); } }
+                        for(long invalid:new long[]{lows[i]-1,highs[i]+1}) { final String predicateField=fields[i];org.junit.Assert.assertThrows(IllegalArgumentException.class,()->session.createQuery("select e from Entry e where e."+predicateField+"=:value").setParameter("value",invalid).list());session.beginTransaction();try { session.createQuery("update Entry e set e."+fields[i]+"=:value").setParameter("value",invalid).executeUpdate();fail("Stored out-of-range "+fields[i]); } catch(com.codename1.orm.session.PersistenceException expected) { session.rollbackTransaction(); } }
                         for(long valid:new long[]{lows[i],highs[i]}) { session.beginTransaction();org.junit.Assert.assertEquals(1,session.createQuery("update Entry e set e."+fields[i]+"=:value").setParameter("value",valid).executeUpdate());session.commitTransaction();Object stored=type.getField(fields[i]).get(session.find(type,1));org.junit.Assert.assertEquals(valid,stored instanceof Character?((Character)stored).charValue():((Number)stored).longValue()); }
                     }
                     session.beginTransaction();org.junit.Assert.assertEquals(1,session.createQuery("update Entry e set e.boxed=NULL").executeUpdate());session.commitTransaction();org.junit.Assert.assertNull(type.getField("boxed").get(session.find(type,1)));
                     try { session.find(type,2147483648L);fail("Out-of-range identifier"); } catch(IllegalArgumentException expected) { assertTrue(expected.getMessage().contains("range")); }
+                } finally { session.close();db.close(); }
+            }
+        }
+    }
+
+    @Test
+    public void requiredSubtypeLiteralsValidateConvertedStorage() throws Exception {
+        File classes=tmp.newFolder();Map<String,String> sources=new java.util.LinkedHashMap<String,String>();String imports="package requiredliteral; import com.codename1.annotations.*; import com.codename1.annotations.db.*; ";
+        sources.put("requiredliteral.Converter","package requiredliteral; public class Converter implements com.codename1.orm.session.AttributeConverter<String,String> { public String toDatabase(String value) { return value==null?\"sentinel\":value.equals(\"missing\")?null:value; } public String fromDatabase(String value) { return \"sentinel\".equals(value)?null:value; } }");
+        sources.put("requiredliteral.Base",imports+"@Entity(table=\"required_literal\") @Inheritance public abstract class Base { @Id public long id; }");
+        sources.put("requiredliteral.Child",imports+"@Entity public class Child extends Base { @Column(nullable=false) @Convert(converter=Converter.class) public String code=\"valid\"; }");
+        sources.put("requiredliteral.Sibling",imports+"@Entity public class Sibling extends Base { }");
+        JavaSourceCompiler.compile(sources,classes,Arrays.asList(testClassesDir()));ProcessorContext client=runProcessor(classes);assertFalse(client.getErrors().toString(),client.hasErrors());ProcessorContext backend=runProcessor(classes,backendClasspath());assertFalse(backend.getErrors().toString(),backend.hasErrors());
+        try(java.net.URLClassLoader loader=new java.net.URLClassLoader(new URL[]{classes.toURI().toURL()},getClass().getClassLoader())) {
+            Class child=loader.loadClass("requiredliteral.Child"),sibling=loader.loadClass("requiredliteral.Sibling");
+            for(String suffix:Arrays.asList("Cn1Model","Cn1BackendModel")) {
+                Map<String,com.codename1.impl.orm.EntityModel<?>> models=new java.util.LinkedHashMap<String,com.codename1.impl.orm.EntityModel<?>>();for(String name:Arrays.asList("Base","Child","Sibling")) models.put("requiredliteral."+name,(com.codename1.impl.orm.EntityModel)loader.loadClass("requiredliteral."+name+suffix).newInstance());
+                com.codename1.backend.Database db=com.codename1.backend.Database.open(":memory:");com.codename1.orm.session.Session session=new com.codename1.impl.orm.SessionImpl(new com.codename1.impl.orm.BackendSqlAccess(null,db,db.dialect()),models);
+                try {
+                    session.createTables();session.beginTransaction();session.persist(child.newInstance());session.persist(sibling.newInstance());session.commitTransaction();
+                    for(String literal:Arrays.asList("'missing'","('missing')")) org.junit.Assert.assertThrows(IllegalArgumentException.class,()->session.createQuery("update Child c set c.code="+literal));
+                    session.beginTransaction();org.junit.Assert.assertThrows(IllegalArgumentException.class,()->session.createQuery("update Child c set c.code=:value").setParameter("value","missing").executeUpdate());session.commitTransaction();
+                    for(String assignment:Arrays.asList("NULL","(NULL)",":value")) { session.beginTransaction();com.codename1.orm.session.JpqlQuery query=session.createQuery("update Child c set c.code="+assignment);if(assignment.equals(":value")) query.setParameter("value",null);org.junit.Assert.assertEquals(1,query.executeUpdate());session.commitTransaction();org.junit.Assert.assertNull(session.createQuery("select c.code from Child c",String.class).first()); }
+                    org.junit.Assert.assertEquals(1,session.query(sibling).count());
+                } finally { session.close();db.close(); }
+            }
+        }
+    }
+
+    @Test
+    public void transformingFunctionsUseStoredValuesWithoutConverters() throws Exception {
+        File classes=tmp.newFolder();Map<String,String> sources=new java.util.LinkedHashMap<String,String>();String imports="package transformmapping; import com.codename1.annotations.*; import com.codename1.annotations.db.*; ";
+        sources.put("transformmapping.Prefix","package transformmapping; public class Prefix implements com.codename1.orm.session.AttributeConverter<String,String> { public String toDatabase(String value) { return value==null?null:\"P:\"+value; } public String fromDatabase(String value) { if(value==null)return null;if(!value.startsWith(\"P:\"))throw new IllegalArgumentException(\"Corrupt prefix\");return value.substring(2); } }");
+        sources.put("transformmapping.Negative","package transformmapping; public class Negative implements com.codename1.orm.session.AttributeConverter<Long,Long> { public Long toDatabase(Long value) { return value==null?null:-value; } public Long fromDatabase(Long value) { return value==null?null:-value; } }");
+        sources.put("transformmapping.Entry",imports+"@Entity(table=\"transform_mapping\") public class Entry { @Id public long id; @Convert(converter=Prefix.class) public String code=\"AbC\"; @Convert(converter=Negative.class,storageType=Long.class) public Long amount=5L; }");
+        JavaSourceCompiler.compile(sources,classes,Arrays.asList(testClassesDir()));ProcessorContext client=runProcessor(classes);assertFalse(client.getErrors().toString(),client.hasErrors());ProcessorContext backend=runProcessor(classes,backendClasspath());assertFalse(backend.getErrors().toString(),backend.hasErrors());
+        try(java.net.URLClassLoader loader=new java.net.URLClassLoader(new URL[]{classes.toURI().toURL()},getClass().getClassLoader())) {
+            Class type=loader.loadClass("transformmapping.Entry");
+            for(String suffix:Arrays.asList("Cn1Model","Cn1BackendModel")) {
+                Map<String,com.codename1.impl.orm.EntityModel<?>> models=new java.util.LinkedHashMap<String,com.codename1.impl.orm.EntityModel<?>>();models.put(type.getName(),(com.codename1.impl.orm.EntityModel)loader.loadClass(type.getName()+suffix).newInstance());
+                com.codename1.backend.Database db=com.codename1.backend.Database.open(":memory:");com.codename1.orm.session.Session session=new com.codename1.impl.orm.SessionImpl(new com.codename1.impl.orm.BackendSqlAccess(null,db,db.dialect()),models);
+                try {
+                    session.createTables();session.beginTransaction();session.persist(type.newInstance());session.commitTransaction();
+                    String[] functions={"lower(e.code)","upper(e.code)","trim(e.code)","abs(e.amount)"};Object[] stored={"p:abc","P:ABC","P:AbC",5L};
+                    for(int i=0;i<functions.length;i++) {
+                        String expression=functions[i];org.junit.Assert.assertEquals(stored[i],session.createQuery("select "+expression+" from Entry e").first());
+                        org.junit.Assert.assertEquals(1,session.createQuery("select e from Entry e where "+expression+"=:value").setParameter("value",stored[i]).list().size());
+                        org.junit.Assert.assertEquals(1,session.createQuery("select e from Entry e where "+expression+"="+(stored[i] instanceof String?"'"+stored[i]+"'":stored[i])).list().size());
+                        String field=i==3?"amount":"code";org.junit.Assert.assertThrows(IllegalArgumentException.class,()->session.createQuery("update Entry e set e."+field+"="+expression));
+                    }
+                    org.junit.Assert.assertEquals("AbC",session.createQuery("select min(e.code) from Entry e",String.class).first());org.junit.Assert.assertEquals(1,session.createQuery("select e from Entry e where coalesce(e.code,e.code)=:value").setParameter("value","AbC").list().size());
                 } finally { session.close();db.close(); }
             }
         }

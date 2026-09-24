@@ -402,6 +402,18 @@ public final class QueryImpl<T> implements com.codename1.orm.session.Query<T> {
         Field resolved = validatePath(field, true);
         return resolved.join.model.parameter(resolved.index, value);
     }
+    void requireIntegralRange(String field, Object value) {
+        Field resolved = validatePath(field, true);
+        EntityModel target = resolved.join.model;
+        if (target.attributes()[resolved.index].kind == Attribute.INTEGER && value instanceof Number) {
+            long minimum = target.minimumIntegralValue(resolved.index);
+            long maximum = target.maximumIntegralValue(resolved.index);
+            double number = ((Number) value).doubleValue();
+            if (!(number >= minimum && number <= maximum)) {
+                throw new IllegalArgumentException("Parameter is outside the mapped integral range: " + field);
+            }
+        }
+    }
     boolean nonNull(String field) {
         Field resolved = resolveField(field);
         return !resolved.join.left && resolved.join.model.nonNullQueryValue(resolved.index);
