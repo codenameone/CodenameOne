@@ -4081,10 +4081,17 @@ extern int cn1BlockMoveBegin(JAVA_LONG block);
 extern void cn1BlockMoveEnd(JAVA_LONG block);
 // All standalone buffers and table slices begin on a 16-byte boundary.
 // The immutable capacity belongs to the published pointer, not a second field.
+// 16 BYTES, not 32. A collection's storage is a block, and at the self-hosting peak
+// 606k blocks are live, 89% of them 256 bytes or less; a 32-byte header was 19MB of the
+// 127MB they held. The size fits 32 bits (a block's element count is an int and nothing
+// here is that big), the allocation is the header less a small alignment offset (0
+// wherever malloc aligns to 16), and the retirement link lives outside the block (see
+// cn1RefBlockRetire). What the rest of the runtime reads stays where it was: the
+// capacity 8 bytes before the data and the re-scan word 4 bytes before it.
 typedef struct __attribute__((aligned(16))) CN1NativeBlock {
-    struct CN1NativeBlock* next;
-    void* allocation;
-    size_t bytes;
+    uint32_t bytes;          // size of the whole allocation, header included
+    uint8_t allocOffset;     // header - allocation
+    uint8_t reserved[3];
     JAVA_INT capacity;
 } CN1NativeBlock;
 // Fixed-width copies compile to unaligned word loads without aliasing UB. Both

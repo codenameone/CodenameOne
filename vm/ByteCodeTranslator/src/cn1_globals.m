@@ -28,6 +28,15 @@
 #endif
 #include "cn1_globals.h"
 #include "cn1_virtual_thread.h"
+#ifdef CN1_ALLOC_CENSUS
+#if defined(__APPLE__)
+#include <malloc/malloc.h>
+#define CN1_USABLE_SIZE(p) malloc_size(p)
+#else
+#include <malloc.h>
+#define CN1_USABLE_SIZE(p) malloc_usable_size(p)
+#endif
+#endif
 #include <assert.h>
 #include <time.h>   // clock_gettime: paces the low-memory allocation throttle
 #ifndef _WIN32
@@ -2640,16 +2649,30 @@ JAVA_BOOLEAN cn1SatbBulkBegin(void) {
 // can read between any two stores. Keeping the count inside the block makes the pair
 // atomic by construction: whichever pointer the marker loads, the count it reads belongs
 // to that block.
-/* The immutable header travels with each allocation. Retirement is intrusive: it
- * cannot allocate, fail, or lose a block when the process is short of memory. */
+/* The immutable header travels with each allocation. Retired blocks wait in an array
+ * rather than on a link through their headers, which no longer have room for one. The
+ * array can fail to grow only when the process is out of memory, and then the block is
+ * LEAKED and counted, never freed early: a marker may still be walking it. */
 static pthread_mutex_t cn1RetiredMutex = PTHREAD_MUTEX_INITIALIZER;
-static CN1NativeBlock* cn1RetiredBlocks = NULL;
+static JAVA_LONG* cn1RetiredBlocks = NULL;
+static long cn1RetiredCount = 0, cn1RetiredCap = 0;
+static _Atomic long cn1RetiredLeaked = 0;
 static int cn1NativeBlockCycleActive = 0;
 static _Atomic size_t cn1NativeBlockLiveBytes = 0;
 #ifdef CN1_ALLOC_CENSUS
 // CUMULATIVE reference-slot bytes handed out in native blocks; see
 // cn1BlockNoteRefBytes for why this is not a live figure.
 static _Atomic size_t cn1NativeBlockRefLiveBytes = 0;
+#ifdef CN1_ALLOC_CENSUS
+// Live native blocks, what they asked for, and what the allocator really holds for them
+// (malloc_usable_size / the mapping), to size a small-block allocator. Census only.
+static _Atomic long cn1CensusBlocks = 0;
+static _Atomic long long cn1CensusBlockAsked = 0, cn1CensusBlockHeld = 0;
+static _Atomic long cn1CensusBlockHist[8];   // live blocks by total bytes: <=64,128,256,512,1K,4K,64K,more
+static int cn1CensusBlockBucket(size_t b) {
+    return b <= 64 ? 0 : b <= 128 ? 1 : b <= 256 ? 2 : b <= 512 ? 3 : b <= 1024 ? 4 : b <= 4096 ? 5 : b <= 65536 ? 6 : 7;
+}
+#endif
 static _Atomic size_t cn1NativeBlockAllBytesEver = 0;
 // CAPACITY HISTOGRAM FOR COLLECTION STORAGE. "Collections cost 304MB of native
 // blocks" does not say whether that is a few big collections or millions of tiny
@@ -2677,6 +2700,9 @@ static void cn1NoteNativeAllocation(size_t bytes);
 
 static CN1NativeBlock* cn1BlockHeader(JAVA_LONG block) {
     return ((CN1NativeBlock*)(uintptr_t)block) - 1;
+}
+static void* cn1BlockAllocation(CN1NativeBlock* header) {
+    return (char*)header - header->allocOffset;
 }
 
 static size_t cn1BlockPadding(void) {
@@ -2746,17 +2772,27 @@ static JAVA_LONG cn1BlockAlloc(JAVA_INT capacity, size_t width) {
         return 0;
     }
     size_t bytes = sizeof(CN1NativeBlock) + (size_t)capacity * width + padding;
+    if(bytes > UINT32_MAX) return 0;
     void* allocation = bytes >= CN1_BLOCK_MMAP_THRESHOLD ? cn1BlockOsAlloc(bytes)
                                                          : calloc(1, bytes);
     if(allocation == NULL) return 0;
     // Also align on 32-bit allocators whose natural alignment can be only 8.
     CN1NativeBlock* block = (CN1NativeBlock*)(((uintptr_t)allocation + 15) & ~(uintptr_t)15);
-    block->allocation = allocation;
+    block->allocOffset = (uint8_t)((char*)block - (char*)allocation);
     block->capacity = capacity;
-    block->bytes = bytes;
+    block->bytes = (uint32_t)bytes;
     atomic_fetch_add_explicit(&cn1NativeBlockLiveBytes, bytes, memory_order_relaxed);
 #ifdef CN1_ALLOC_CENSUS
     atomic_fetch_add_explicit(&cn1NativeBlockAllBytesEver, bytes, memory_order_relaxed);
+#endif
+#ifdef CN1_ALLOC_CENSUS
+    {
+        size_t held = bytes >= CN1_BLOCK_MMAP_THRESHOLD ? bytes : CN1_USABLE_SIZE(allocation);
+        atomic_fetch_add_explicit(&cn1CensusBlocks, 1, memory_order_relaxed);
+        atomic_fetch_add_explicit(&cn1CensusBlockAsked, (long long)bytes, memory_order_relaxed);
+        atomic_fetch_add_explicit(&cn1CensusBlockHeld, (long long)held, memory_order_relaxed);
+        atomic_fetch_add_explicit(&cn1CensusBlockHist[cn1CensusBlockBucket(bytes)], 1, memory_order_relaxed);
+    }
 #endif
     cn1NoteNativeAllocation(bytes);
     return (JAVA_LONG)(uintptr_t)(block + 1);
@@ -2865,14 +2901,23 @@ void cn1RefBlockFree(JAVA_LONG block) {
 static void cn1RefBlockFreeNow(JAVA_LONG block) {
     if(block != 0) {
         CN1NativeBlock* header = cn1BlockHeader(block);
+#ifdef CN1_ALLOC_CENSUS
+        {
+            size_t held = header->bytes >= CN1_BLOCK_MMAP_THRESHOLD ? header->bytes : CN1_USABLE_SIZE(cn1BlockAllocation(header));
+            atomic_fetch_sub_explicit(&cn1CensusBlocks, 1, memory_order_relaxed);
+            atomic_fetch_sub_explicit(&cn1CensusBlockAsked, (long long)header->bytes, memory_order_relaxed);
+            atomic_fetch_sub_explicit(&cn1CensusBlockHeld, (long long)held, memory_order_relaxed);
+            atomic_fetch_sub_explicit(&cn1CensusBlockHist[cn1CensusBlockBucket(header->bytes)], 1, memory_order_relaxed);
+        }
+#endif
         atomic_fetch_sub_explicit(&cn1NativeBlockLiveBytes, header->bytes, memory_order_relaxed);
         atomic_fetch_add_explicit(&cn1NativeBlockReleasedBytes, header->bytes, memory_order_relaxed);
         // Same test the allocator used; see CN1_BLOCK_MMAP_THRESHOLD for why the
         // path is inferred from the size rather than recorded in the header.
         if(header->bytes >= CN1_BLOCK_MMAP_THRESHOLD) {
-            cn1BlockOsFree(header->allocation, header->bytes);
+            cn1BlockOsFree(cn1BlockAllocation(header), header->bytes);
         } else {
-            free(header->allocation);
+            free(cn1BlockAllocation(header));
         }
     }
 }
@@ -2916,10 +2961,20 @@ JAVA_LONG cn1PrimitiveBlockResize(JAVA_LONG block, JAVA_INT bytes) {
     }
     size_t oldBytes = old->bytes;
     size_t newBytes = newBytesPlanned;
-    CN1NativeBlock* fresh = (CN1NativeBlock*)realloc(old->allocation, newBytes);
+#ifdef CN1_ALLOC_CENSUS
+    size_t heldBefore = CN1_USABLE_SIZE(cn1BlockAllocation(old));
+#endif
+    if(newBytes > UINT32_MAX) return 0;
+    CN1NativeBlock* fresh = (CN1NativeBlock*)realloc(cn1BlockAllocation(old), newBytes);
     if(fresh == NULL) return 0;
-    fresh->allocation = fresh;
-    fresh->bytes = newBytes;
+#ifdef CN1_ALLOC_CENSUS
+    atomic_fetch_add_explicit(&cn1CensusBlockAsked, (long long)newBytes - (long long)oldBytes, memory_order_relaxed);
+    atomic_fetch_add_explicit(&cn1CensusBlockHeld, (long long)CN1_USABLE_SIZE(fresh) - (long long)heldBefore, memory_order_relaxed);
+    atomic_fetch_sub_explicit(&cn1CensusBlockHist[cn1CensusBlockBucket(oldBytes)], 1, memory_order_relaxed);
+    atomic_fetch_add_explicit(&cn1CensusBlockHist[cn1CensusBlockBucket(newBytes)], 1, memory_order_relaxed);
+#endif
+    fresh->allocOffset = 0;   // this path runs only where malloc aligns to 16 (padding 0)
+    fresh->bytes = (uint32_t)newBytes;
     fresh->capacity = bytes;
     if(newBytes > oldBytes) {
         atomic_fetch_add_explicit(&cn1NativeBlockLiveBytes, newBytes - oldBytes, memory_order_relaxed);
@@ -2945,10 +3000,19 @@ void cn1RefBlockRetire(JAVA_LONG block) {
     if(block == 0) return;
     pthread_mutex_lock(&cn1RetiredMutex);
     if(cn1NativeBlockCycleActive) {
-        CN1NativeBlock* header = cn1BlockHeader(block);
-        header->next = cn1RetiredBlocks;
-        cn1RetiredBlocks = header;
-        atomic_fetch_add_explicit(&cn1NativeBlockRetiredBytes, header->bytes, memory_order_relaxed);
+        if(cn1RetiredCount == cn1RetiredCap) {
+            long nc = cn1RetiredCap ? cn1RetiredCap * 2 : 1024;
+            JAVA_LONG* na = (JAVA_LONG*)realloc(cn1RetiredBlocks, (size_t)nc * sizeof(JAVA_LONG));
+            if(na == NULL) {
+                atomic_fetch_add_explicit(&cn1RetiredLeaked, 1, memory_order_relaxed);
+                pthread_mutex_unlock(&cn1RetiredMutex);
+                return;
+            }
+            cn1RetiredBlocks = na;
+            cn1RetiredCap = nc;
+        }
+        cn1RetiredBlocks[cn1RetiredCount++] = block;
+        atomic_fetch_add_explicit(&cn1NativeBlockRetiredBytes, cn1BlockHeader(block)->bytes, memory_order_relaxed);
     } else {
         cn1RefBlockFree(block);
     }
@@ -2956,12 +3020,12 @@ void cn1RefBlockRetire(JAVA_LONG block) {
 }
 
 static void cn1RefBlockDrainLocked(void) {
-    while(cn1RetiredBlocks != NULL) {
-        CN1NativeBlock* header = cn1RetiredBlocks;
-        cn1RetiredBlocks = header->next;
-        atomic_fetch_sub_explicit(&cn1NativeBlockRetiredBytes, header->bytes, memory_order_relaxed);
-        cn1RefBlockFree((JAVA_LONG)(uintptr_t)(header + 1));
+    for(long i = 0 ; i < cn1RetiredCount ; i++) {
+        JAVA_LONG block = cn1RetiredBlocks[i];
+        atomic_fetch_sub_explicit(&cn1NativeBlockRetiredBytes, cn1BlockHeader(block)->bytes, memory_order_relaxed);
+        cn1RefBlockFree(block);
     }
+    cn1RetiredCount = 0;
 }
 
 void cn1RefBlockDrainRetired(void) {
@@ -10618,6 +10682,12 @@ void cn1LiveCensus(const char* label) {
     // really is holding it, fresh and aging mean the collector is holding it under
     // the grace and aging rules, and dead means this sweep is about to return it.
     { extern void cn1CollectionCensusDump(const char* label); cn1CollectionCensusDump(label); }
+    fprintf(stderr, "[BLOCKS:%s] live %ld asked %.1fMB held %.1fMB | by size <=64:%ld <=128:%ld <=256:%ld <=512:%ld <=1K:%ld <=4K:%ld <=64K:%ld more:%ld\n",
+            label, atomic_load(&cn1CensusBlocks), atomic_load(&cn1CensusBlockAsked) / 1048576.0,
+            atomic_load(&cn1CensusBlockHeld) / 1048576.0,
+            atomic_load(&cn1CensusBlockHist[0]), atomic_load(&cn1CensusBlockHist[1]), atomic_load(&cn1CensusBlockHist[2]),
+            atomic_load(&cn1CensusBlockHist[3]), atomic_load(&cn1CensusBlockHist[4]), atomic_load(&cn1CensusBlockHist[5]),
+            atomic_load(&cn1CensusBlockHist[6]), atomic_load(&cn1CensusBlockHist[7]));
     long occupied = bibopObjs + legacyObjs;
     // NATIVE BLOCKS ON THIS LINE, BECAUSE THE PER-CLASS TABLE BELOW CANNOT SEE THEM
     // AND THE RANKING WAS BEING READ OFF IT. cn1BlockAlloc bumps
