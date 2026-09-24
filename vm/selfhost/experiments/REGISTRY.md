@@ -6496,3 +6496,34 @@ vs 1138MB in two runs of the same JDK), so only the head-relative column is read
 One harness trap worth recording: the translated translator copies `cn1_collections.h`
 from `CN1_RESOURCE_PATH`, not from its own classes, so a runtime-header change shows as
 a one-file output diff until the mount points at the changed tree.
+
+## Round 47: instance fields at their real width, and the gates on the WIP
+
+`JAVA_BOOLEAN`, `JAVA_BYTE`, `JAVA_SHORT` and `JAVA_CHAR` are all `int` (the operand stack's
+width), and instance fields were declared with them: every boolean, byte, short and char
+field took four bytes. asm's `Label` (six shorts) was 104 bytes instead of 88, the
+translator's `Invoke` (eight booleans) 152 instead of 128. Instance structs now use the
+array element types; reads widen and stores truncate the way getfield/putfield do, so
+only the layout changes. Statics keep the int types. Census: live BiBOP after the sweep
+325.3 -> 299.5MB, peak live 338.5 -> 312.4MB (-7.7%). No native in the tree takes a
+field's address; the on-device debugger read fields through the int types (correct only
+because little-endian puts the value in the low bytes) and read boolean/byte/short/char
+ARRAY elements at idx*4 -- both fixed with it.
+
+RSS did not follow the live set: 1-core 1.21x -> 1.19x JDK. As in Round 46, the saved bytes
+become holes in old pages until a major; the major policy is the lever on that gap.
+
+**Gates on the WIP branch** (`vm` suite, 648 tests): three failures came from dead field
+elimination, not from the collector -- fixtures that wrote fields and never read them
+(GcMarkCompletenessTest; GcOverflowSpiralApp and GcSteadyStateApp, whose Move chains
+stopped carrying references, so both gates reported themselves vacuous). Bisected to the
+DFE commit; fixed by reading the fields. The one remaining failure, BackendJavaSeRuntimeTest
+(demo sources missing generated API classes), fails identically on this branch's head.
+
+**Ratio table r5** (interleaved, 3 rounds; wip/head is the noise-free trend):
+
+| | vs JDK time | vs JDK RSS | wip/head time | wip/head RSS |
+|---|---:|---:|---:|---:|
+| 1 core | 0.75 | 1.19 | 0.74 | 0.53 |
+| 2 cores | 0.97 | 0.87 | 0.94 | 0.80 |
+| 4 cores | 1.06 | 0.67 | 1.00 | 0.84 |
