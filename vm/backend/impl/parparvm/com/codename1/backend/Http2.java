@@ -251,6 +251,17 @@ public final class Http2 {
         return drainImpl(session);
     }
 
+    /**
+     * The streams that have closed since the last call, as (stream id, HTTP/2
+     * error code) pairs; null when none have. Code 0 is a stream whose response
+     * was sent in full; anything else is one reset before it was. The server ends
+     * a request's span here, since a body the peer's flow-control window holds
+     * back is sent turns after it was submitted.
+     */
+    public int[] closedStreams() {
+        return session == 0 ? null : closedStreamsImpl(session);
+    }
+
     /** False once the session is finished and the connection can be closed. */
     public boolean isAlive() {
         return wantsMoreImpl(session);
@@ -324,6 +335,7 @@ public final class Http2 {
     private static native int pumpImpl(long session);
     private static native int pendingOutputImpl(long session);
     private static native byte[] drainImpl(long session);
+    private static native int[] closedStreamsImpl(long session);
     private static native int nextRequestImpl(long session);
     private static native String methodImpl(long session);
     private static native String pathImpl(long session);

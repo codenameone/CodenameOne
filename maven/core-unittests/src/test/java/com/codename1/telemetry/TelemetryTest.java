@@ -271,6 +271,11 @@ class TelemetryTest extends UITestBase {
         assertEquals(hex(landed.getSpanId()), second.substring(36, 52),
                 "the second attempt carried its own span, not the first's header");
         assertFalse(hex(redirect.getSpanId()).equals(hex(landed.getSpanId())));
+        // Queued outside any action, yet one logical request: the second attempt
+        // continues the first attempt's trace, as its child, rather than a new one.
+        assertEquals(hex(redirect.getTraceId()), hex(landed.getTraceId()),
+                "a redirect split the request across two traces");
+        assertEquals(hex(redirect.getSpanId()), hex(landed.getParentSpanId()));
     }
 
     @Test
@@ -668,6 +673,39 @@ class TelemetryTest extends UITestBase {
             // A range clamps; NaN has no nearest value.
         }
         assertEquals(1.0, new TelemetryConfig().sampleRatio(7).sampleRatio, 0);
+    }
+
+    @Test
+    void theRelayIsMatchedByOriginNotHost() {
+        assertEquals("https://api.example.com:443", Telemetry.origin("https://API.example.com/x"));
+        assertEquals("https://api.example.com:8443",
+                Telemetry.origin("https://u:p@api.example.com:8443/otel?q=1"));
+        assertEquals("http://api.example.com:80", Telemetry.origin("http://api.example.com"));
+        assertEquals("http://[::1]:4318", Telemetry.origin("http://[::1]:4318/v1"));
+        assertNull(Telemetry.origin("/relative"));
+
+        TestCodenameOneImplementation impl = TestCodenameOneImplementation.getInstance();
+        String same = "https://api.example.com:8443/pets";
+        String otherPort = "https://api.example.com:9443/pets";
+        String otherScheme = "http://api.example.com/pets";
+        impl.addNetworkMockResponse(same, 200, "OK", new byte[0]);
+        impl.addNetworkMockResponse(otherPort, 200, "OK", new byte[0]);
+        impl.addNetworkMockResponse(otherScheme, 200, "OK", new byte[0]);
+        impl.setPlatformName("HTML5");
+        try {
+            Telemetry.install(new TelemetryConfig().relay("https://api.example.com:8443"));
+            NetworkManager.getInstance().addToQueueAndWait(request(same));
+            NetworkManager.getInstance().addToQueueAndWait(request(otherPort));
+            NetworkManager.getInstance().addToQueueAndWait(request(otherScheme));
+            assertNotNull(connection(same).getHeaders().get("traceparent"),
+                    "the relay's own origin carries the context");
+            assertNull(connection(otherPort).getHeaders().get("traceparent"),
+                    "another port on the relay's host is another origin");
+            assertNull(connection(otherScheme).getHeaders().get("traceparent"),
+                    "another scheme on the relay's host is another origin");
+        } finally {
+            impl.setPlatformName(null);
+        }
     }
 
     @Test

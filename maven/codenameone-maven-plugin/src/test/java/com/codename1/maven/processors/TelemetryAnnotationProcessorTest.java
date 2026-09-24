@@ -160,6 +160,17 @@ public class TelemetryAnnotationProcessorTest {
         assertFalse(TelemetryAnnotationProcessor.isHttpUrl("https://collector.example:99999"));
         assertFalse(TelemetryAnnotationProcessor.isHttpUrl("https://collector.example:0"));
         assertTrue(TelemetryAnnotationProcessor.isHttpUrl("https://collector.example:65535"));
+        // The runtime's host rule, so nothing the build accepts throws at start-up.
+        assertFalse(TelemetryAnnotationProcessor.isHttpUrl("https://collector!x.example"));
+        assertFalse(TelemetryAnnotationProcessor.isHttpUrl("https://[not-ipv6]:4318"));
+        assertFalse(TelemetryAnnotationProcessor.isHttpUrl("https://[1234]"));
+    }
+
+    @Test
+    public void aRelayTokenNoHeaderMayCarryIsRefused() throws Exception {
+        // TelemetryConfig would throw on it inside the bootstrap, before
+        // Display.init; the build says so instead.
+        assertRefused("@OpenTelemetry(relay = \"https://api.example\", relayToken = \"bad\\nvalue\")");
     }
 
     // ------------------------------------------------------------------

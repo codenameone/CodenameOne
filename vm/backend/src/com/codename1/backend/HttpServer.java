@@ -2209,9 +2209,13 @@ public final class HttpServer {
         synchronized(http2Sessions) {
             java.util.Iterator it = new java.util.ArrayList(http2Sessions.keySet()).iterator();
             while(it.hasNext()) {
-                Object h2 = http2Sessions.remove(it.next());
+                Object key = it.next();
+                Object h2 = http2Sessions.remove(key);
                 if(h2 != null) {
                     ((Http2)h2).close();
+                }
+                if(key instanceof Integer) {
+                    abandonHttp2Spans(((Integer)key).intValue());
                 }
             }
         }
@@ -3321,6 +3325,7 @@ public final class HttpServer {
         if(h2 != null) {
             ((Http2)h2).close();
         }
+        abandonHttp2Spans(fd);
         Object session = sessions.remove(new Integer(fd));
         if(session != null) {
             Tls.closeSession(((Long)session).longValue());
@@ -5066,12 +5071,6 @@ public final class HttpServer {
         // underneath this thread. A turn with no completed request at all, one
         // that only pumped control frames, was never counted by anything.
         http2Turns.incrementAndGet();
-        // Server spans of responses SUBMITTED but not yet written: each an Object[]
-        // {span, submitted status, handler error}. Ended once a flush has put them
-        // on the socket, or with a failed write if it could not -- the HTTP/1 path
-        // keeps its span open through the write for the same reason. Ending them at
-        // submission reported a success for a response a disconnected peer never got.
-        List unwritten = new ArrayList();
         try {
             Object existing = http2Sessions.get(new Integer(fd));
             if(existing == null) {
@@ -5230,7 +5229,7 @@ public final class HttpServer {
                 SERVING_H2.set(Boolean.TRUE);
                 // The HTTP/1 path's span, for the same reasons. It stops being this
                 // thread's current span in the finally that closes this stream's
-                // request, and ENDS once the response is written (see unwritten).
+                // request, and ENDS when its stream closes (see http2Spans).
                 // server.address is set here as for HTTP/1: :authority was copied
                 // into these headers as "host" above, which is what startServer reads.
                 Span span = Tracing.startServer(request, tls != null);
@@ -5410,7 +5409,7 @@ public final class HttpServer {
                         || Http2.pendingBodyFiles() > MAX_OPEN_H2_FILES
                         || Http2.pendingBodyBytesAll() > MAX_OPEN_H2_BODY_BYTES) {
                     flushHttp2(fd, session, h2);
-                    endH2Spans(unwritten, true);
+                    settleHttp2Spans(fd, h2);
                     // What the flush could NOT write, not zero. nghttp2 pulls
                     // from a submitted body only as the peer's flow-control
                     // window allows, so a client that simply stops sending
@@ -5448,13 +5447,20 @@ public final class HttpServer {
                         // any more, so the next stream's span is not its child, but
                         // ended only when the write is known.
                         Tracing.leave(span);
-                        unwritten.add(new Object[] {span, new Integer(submittedStatus),
-                                handlerError});
+                        if(submittedStatus < 0) {
+                            // Nothing was submitted, so no stream close will ever
+                            // report on it: it failed here.
+                            Tracing.endServer(span, -1, handlerError);
+                        } else {
+                            tracedStreams(fd).put(new Integer(stream.getId()),
+                                    new Object[] {span, new Integer(submittedStatus),
+                                            handlerError});
+                        }
                     }
                 }
             }
             flushHttp2(fd, session, h2);
-            endH2Spans(unwritten, true);
+            settleHttp2Spans(fd, h2);
             if(!h2.isAlive()) {
                 drop(fd);
                 return;
@@ -5465,25 +5471,81 @@ public final class HttpServer {
             trace("fd=" + fd + " http/2 failed: " + err);
             drop(fd);
         } finally {
-            // Whatever is still here never reached the socket: a flush threw, or
-            // the turn ended before one ran.
-            endH2Spans(unwritten, false);
             http2Turns.decrementAndGet();
         }
     }
 
     /**
-     * Ends the spans of submitted HTTP/2 responses, as sent when {@code written},
-     * otherwise as the failed write HTTP/1 reports: status -1, with the handler's
-     * own error if it had one.
+     * Server spans of HTTP/2 responses submitted but not yet fully sent, per
+     * connection and then per stream id: each an Object[] {span, submitted status,
+     * handler error}. A response is sent in full only when its stream CLOSES --
+     * nghttp2 pulls a body only as the peer's flow-control window allows, so a
+     * large one finishes turns after it was submitted -- and a stream the peer
+     * resets never is. Ending the span at submission, or at the first flush,
+     * reported a success for a response the peer never got. The HTTP/1 path keeps
+     * its span open through the write for the same reason.
      */
-    private static void endH2Spans(List unwritten, boolean written) {
-        for(int iter = 0 ; iter < unwritten.size() ; iter++) {
-            Object[] entry = (Object[])unwritten.get(iter);
-            Tracing.endServer((Span)entry[0],
-                    written ? ((Integer)entry[1]).intValue() : -1, (Exception)entry[2]);
+    private final Map http2Spans = java.util.Collections.synchronizedMap(new java.util.HashMap());
+
+    private Map tracedStreams(int fd) {
+        Integer key = new Integer(fd);
+        synchronized(http2Spans) {
+            Map streams = (Map)http2Spans.get(key);
+            if(streams == null) {
+                streams = java.util.Collections.synchronizedMap(new java.util.HashMap());
+                http2Spans.put(key, streams);
+            }
+            return streams;
         }
-        unwritten.clear();
+    }
+
+    /**
+     * Ends the spans of the streams that closed, after a flush put their final
+     * frames on the socket: with the status sent when the stream closed cleanly,
+     * as the failed write HTTP/1 reports (-1) when it was reset.
+     */
+    private void settleHttp2Spans(int fd, Http2 h2) {
+        int[] closed = h2.closedStreams();
+        if(closed == null) {
+            return;
+        }
+        Map streams = (Map)http2Spans.get(new Integer(fd));
+        if(streams == null) {
+            return;
+        }
+        for(int iter = 0 ; iter + 1 < closed.length ; iter += 2) {
+            Object entry = streams.remove(new Integer(closed[iter]));
+            if(entry instanceof Object[]) {
+                endHttp2Span((Object[])entry, closed[iter + 1] == 0);
+            }
+        }
+    }
+
+    /** Every span still open on a connection that is going away: none was sent in full. */
+    private void abandonHttp2Spans(int fd) {
+        Object streams = http2Spans.remove(new Integer(fd));
+        if(!(streams instanceof Map)) {
+            return;
+        }
+        synchronized(streams) {
+            java.util.Iterator it = ((Map)streams).values().iterator();
+            while(it.hasNext()) {
+                Object entry = it.next();
+                if(entry instanceof Object[]) {
+                    endHttp2Span((Object[])entry, false);
+                }
+            }
+            ((Map)streams).clear();
+        }
+    }
+
+    private static void endHttp2Span(Object[] entry, boolean sent) {
+        if(!(entry[0] instanceof Span)) {
+            return;
+        }
+        int status = sent && entry[1] instanceof Integer ? ((Integer)entry[1]).intValue() : -1;
+        Tracing.endServer((Span)entry[0], status,
+                entry[2] instanceof Exception ? (Exception)entry[2] : null);
     }
 
     /** The HTTP/2 connection preface, sent by a client that opens with h2. */

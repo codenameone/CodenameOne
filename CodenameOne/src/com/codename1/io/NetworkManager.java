@@ -665,6 +665,9 @@ public final class NetworkManager {
         req.tracerAttempt = null;
         req.tracerOwner = null;
         req.tracerThread = null;
+        // Kept for a retry of a request queued with no parent: see addToQueue.
+        req.tracerLastAttempt = attempt;
+        req.tracerLastOwner = owner;
         try {
             // Only a status THIS attempt received: a reused request still holds
             // the last one's.
@@ -691,6 +694,20 @@ public final class NetworkManager {
             // here, on the thread that ran it, before the request is visible to
             // anyone else.
             endTracerAttempt(request, null);
+            // A request queued with no context -- the usual case for a generated
+            // client used outside Telemetry.run -- would start a NEW trace on every
+            // attempt: a 302 and the 200 it led to, or a failure and the retry that
+            // succeeded, came out as unrelated traces with separate sampling
+            // decisions, and the logical request could not be followed. So the
+            // attempt that just ended becomes the next one's parent: one trace,
+            // one decision, each attempt still its own span. A request that WAS
+            // queued inside an action keeps that action as every attempt's parent.
+            if ((request.tracerParent == null || request.tracerParentChained)
+                    && request.tracerLastAttempt != null) {
+                request.tracerParent = request.tracerLastAttempt;
+                request.tracerParentOwner = request.tracerLastOwner;
+                request.tracerParentChained = true;
+            }
         }
         // Captured HERE, on the thread that asked for the request, so the span it
         // becomes is a child of what the app was doing at the time. A retry keeps
@@ -742,6 +759,10 @@ public final class NetworkManager {
                 }
                 request.tracerParent = queuedParent;
                 request.tracerParentOwner = queuedBy;
+                // A fresh enqueue is a new logical request, not a retry of the last.
+                request.tracerParentChained = false;
+                request.tracerLastAttempt = null;
+                request.tracerLastOwner = null;
             } else {
                 i = ConnectionRequest.PRIORITY_HIGH;
             }

@@ -179,12 +179,29 @@ final class BatchExporter implements Runnable {
         }
     }
 
-    /** Flushes, then stops the thread. */
+    /**
+     * Flushes for at most {@code timeoutMillis}, then stops the thread. What the
+     * flush could not export in that time is DROPPED and counted, not drained:
+     * waiting for an empty queue kept a replaced tracer posting every remaining
+     * batch -- retries included -- with its old credentials for as long as a slow
+     * or absent collector took, while its caller had been promised a bounded stop.
+     */
     void shutdown(int timeoutMillis) {
         flush(timeoutMillis);
         synchronized(lock) {
             stopping = true;
+            droppedSpans += queue.size();
+            queue.clear();
+            droppedRelayed += relayed.size();
+            relayed.clear();
+            relayedBytes = 0;
             lock.notifyAll();
+        }
+    }
+
+    private boolean isStopping() {
+        synchronized(lock) {
+            return stopping;
         }
     }
 
@@ -247,6 +264,14 @@ final class BatchExporter implements Runnable {
                 exportSpans(batch);
             }
             for(int iter = 0 ; iter < payloads.size() ; iter++) {
+                if(isStopping()) {
+                    // The rest of this round goes the way shutdown() sends the
+                    // queue: dropped, so the stop stays bounded.
+                    synchronized(lock) {
+                        droppedRelayed += payloads.size() - iter;
+                    }
+                    break;
+                }
                 Object[] payload = (Object[])payloads.get(iter);
                 boolean sent = post((byte[])payload[0], (String)payload[1]);
                 synchronized(lock) {
@@ -341,7 +366,9 @@ final class BatchExporter implements Runnable {
             }
             boolean retryable = status < 0 || status == 429 || status == 502 || status == 503
                     || status == 504;
-            if(!retryable || attempt == 1) {
+            // No retry once stopping: the wait and the second request are exactly
+            // what a bounded shutdown cannot afford.
+            if(!retryable || attempt == 1 || isStopping()) {
                 return false;
             }
             try {

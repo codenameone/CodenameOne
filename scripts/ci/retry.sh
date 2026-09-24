@@ -66,18 +66,39 @@ fi
 # never a downloaded artifact, so the worst case is that Maven asks Central a
 # question it already knows the answer to.
 purge_maven_negative_cache() {
-  repo=""
-  for arg in "$@"; do
+  # EVERY place the local repository can be, not just $HOME/.m2. In a GitHub
+  # container job $HOME is /github/home, but Maven takes its repository from
+  # Java's user.home, which JDK 8 reads from the passwd entry: /root. Measured
+  # with eclipse-temurin:8 as root and HOME=/github/home -- user.home = /root.
+  # Looking only under $HOME found nothing, said nothing, and a purchase-e2e run
+  # replayed one cached miss through all five attempts.
+  repos=""
+  for arg in "$@" ${MAVEN_OPTS:-}; do
     case "$arg" in
-      -Dmaven.repo.local=*) repo="${arg#-Dmaven.repo.local=}" ;;
+      -Dmaven.repo.local=*) repos="$repos ${arg#-Dmaven.repo.local=}" ;;
     esac
   done
-  [ -n "$repo" ] || repo="${MAVEN_REPO_LOCAL:-$HOME/.m2/repository}"
-  [ -d "$repo" ] || return 0
-  n="$(find "$repo" -name '*.lastUpdated' -type f 2>/dev/null | wc -l | tr -d ' ')"
-  if [ "${n:-0}" -gt 0 ]; then
-    find "$repo" -name '*.lastUpdated' -type f -delete 2>/dev/null || :
-    echo "retry.sh: cleared ${n} cached resolution failure(s) from ${repo}" >&2
+  [ -n "${MAVEN_REPO_LOCAL:-}" ] && repos="$repos ${MAVEN_REPO_LOCAL}"
+  repos="$repos ${HOME:-}/.m2/repository"
+  java_cmd="java"
+  [ -n "${JAVA_HOME:-}" ] && [ -x "${JAVA_HOME}/bin/java" ] && java_cmd="${JAVA_HOME}/bin/java"
+  user_home="$("$java_cmd" -XshowSettings:properties -version 2>&1 \
+    | sed -n 's/^ *user\.home = //p' | head -n 1)"
+  [ -n "$user_home" ] && repos="$repos ${user_home}/.m2/repository"
+  total=0
+  for repo in $repos; do
+    [ -d "$repo" ] || continue
+    n="$(find "$repo" -name '*.lastUpdated' -type f 2>/dev/null | wc -l | tr -d ' ')"
+    if [ "${n:-0}" -gt 0 ]; then
+      find "$repo" -name '*.lastUpdated' -type f -delete 2>/dev/null || :
+      echo "retry.sh: cleared ${n} cached resolution failure(s) from ${repo}" >&2
+      total=$((total + n))
+    fi
+  done
+  # Said out loud either way: a purge that silently looked in the wrong place is
+  # how the case above went unnoticed.
+  if [ "$total" -eq 0 ]; then
+    echo "retry.sh: no cached resolution failures found under:${repos}" >&2
   fi
 }
 

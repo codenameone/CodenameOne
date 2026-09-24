@@ -193,7 +193,11 @@ public final class Telemetry {
     static class State implements NetworkTracer {
         private final TelemetryConfig config;
         private final String exportUrl;
-        private final String backendHost;
+        /// The relay's ORIGIN -- scheme, host and effective port -- which is what
+        /// the browser keys CORS on. The host alone let a request to another port
+        /// or scheme on the same host through, and a traceparent can turn a request
+        /// the browser would have sent as-is into a preflight that fails.
+        private final String backendOrigin;
         /// Touched on the EDT only: spans that end elsewhere are marshalled there.
         final List<TelemetrySpan> buffer = new ArrayList<TelemetrySpan>();
         private Timer timer;
@@ -205,7 +209,7 @@ public final class Telemetry {
         State(TelemetryConfig config) {
             this.config = config;
             this.exportUrl = config.exportUrl();
-            this.backendHost = config.mode == TelemetryConfig.Mode.RELAY ? host(exportUrl) : null;
+            this.backendOrigin = config.mode == TelemetryConfig.Mode.RELAY ? origin(exportUrl) : null;
         }
 
         /// A new span, or null when ids cannot be made on this platform.
@@ -536,10 +540,11 @@ public final class Telemetry {
             if (config.propagateToAll || isSameOriginRelative(url)) {
                 return true;
             }
+            if (backendOrigin != null && backendOrigin.equals(origin(url))) {
+                return true;
+            }
             if (host != null) {
-                if (host.equalsIgnoreCase(backendHost)) {
-                    return true;
-                }
+                // Hosts the app named itself, as it named them.
                 for (String allowed : config.propagateTo) {
                     if (host.equalsIgnoreCase(allowed)) {
                         return true;
@@ -631,6 +636,64 @@ public final class Telemetry {
             }
         }
         return true;
+    }
+
+    /// `scheme://host:port` of an http or https URL, lower case, with the
+    /// scheme's default port filled in, so two spellings of one origin compare
+    /// equal; null for anything else.
+    static String origin(String url) {
+        String host = host(url);
+        if (host == null) {
+            return null;
+        }
+        String scheme;
+        int defaultPort;
+        if (url.regionMatches(true, 0, "https://", 0, 8)) {
+            scheme = "https";
+            defaultPort = 443;
+        } else if (url.regionMatches(true, 0, "http://", 0, 7)) {
+            scheme = "http";
+            defaultPort = 80;
+        } else {
+            return null;
+        }
+        int start = scheme.length() + 3;
+        int end = url.length();
+        for (int i = start; i < url.length(); i++) {
+            char c = url.charAt(i);
+            if (c == '/' || c == '?' || c == '#') {
+                end = i;
+                break;
+            }
+        }
+        String authority = url.substring(start, end);
+        authority = authority.substring(authority.lastIndexOf('@') + 1);
+        int close = authority.lastIndexOf(']');
+        int colon = authority.lastIndexOf(':');
+        int port = defaultPort;
+        if (colon > close && colon + 1 < authority.length()) {
+            try {
+                port = Integer.parseInt(authority.substring(colon + 1));
+            } catch (NumberFormatException err) {
+                return null;
+            }
+        }
+        // host() drops an IPv6 literal's brackets; an origin keeps them, or the
+        // port could not be told from the address.
+        String name = asciiLower(host);
+        if (name.indexOf(':') >= 0) {
+            name = "[" + name + "]";
+        }
+        return scheme + "://" + name + ":" + port;
+    }
+
+    private static String asciiLower(String value) {
+        StringBuilder out = new StringBuilder(value.length());
+        for (int i = 0; i < value.length(); i++) {
+            char c = value.charAt(i);
+            out.append(c >= 'A' && c <= 'Z' ? (char) (c + 32) : c);
+        }
+        return out.toString();
     }
 
     /// The host of an absolute URL, without port or userinfo; null when there is

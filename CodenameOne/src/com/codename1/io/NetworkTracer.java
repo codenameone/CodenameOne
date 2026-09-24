@@ -57,7 +57,9 @@ public interface NetworkTracer {
     ///
     /// - `request`: the request
     ///
-    /// - `parent`: what [#requestQueued] returned for it
+    /// - `parent`: what [#requestQueued] returned for it -- or, for a retry or
+    ///   redirect of a request queued with no parent, the attempt before it (what
+    ///   this method returned then), so that the attempts share one trace
     ///
     /// #### Returns
     ///

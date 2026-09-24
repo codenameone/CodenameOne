@@ -139,6 +139,14 @@ public final class TelemetryAnnotationProcessor extends AbstractAnnotationProces
                     + "relayToken. Move the headers to the backend's cn1.otel.headers.");
             return;
         }
+        // TelemetryConfig.relayToken refuses a control character at run time, where
+        // the generated bootstrap would throw before Display.init; refused here
+        // instead, where the build can say so.
+        if (hasControl(otel.getStringOrDefault("relayToken", ""))) {
+            ctx.error(cls, "@OpenTelemetry relayToken contains a control character such as a "
+                    + "line break; it is sent as a header and no header may carry one");
+            return;
+        }
         double ratio = ratio(otel.get("sampleRatio"));
         if (!(ratio >= 0 && ratio <= 1)) {
             ctx.error(cls, "@OpenTelemetry sampleRatio must be between 0 and 1, not " + ratio);
@@ -323,9 +331,22 @@ public final class TelemetryAnnotationProcessor extends AbstractAnnotationProces
         if (host.length() == 0) {
             return false;
         }
+        // The same host rule TelemetryConfig applies at run time, and it has to be
+        // the same: a URL this accepted and that refused would pass the build and
+        // then throw from the generated bootstrap, before Display.init, on every
+        // platform that does not guard it -- a crash at start-up for a mistake the
+        // build is there to catch. A DNS name or IPv4 address, or a bracketed IPv6
+        // literal.
+        String allowed = hostPort.startsWith("[") ? "0123456789abcdefABCDEF:." : null;
+        if (allowed != null && host.indexOf(':') < 0) {
+            return false;
+        }
         for (int i = 0; i < host.length(); i++) {
             char c = host.charAt(i);
-            if (c <= ' ' || c == '/' || c == '\\' || c == '@') {
+            boolean ok = allowed != null ? allowed.indexOf(c) >= 0
+                    : (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9')
+                            || "-._~".indexOf(c) >= 0;
+            if (!ok) {
                 return false;
             }
         }

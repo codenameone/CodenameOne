@@ -532,6 +532,27 @@ class OtlpTracerTest {
     }
 
     @Test
+    @DisplayName("shutdown stops within its window instead of draining a slow collector's queue")
+    void shutdownIsBoundedBySlowCollectors() throws Exception {
+        collectorDelayMillis = 1500;
+        Properties settings = settings(freePort());
+        settings.setProperty(OtlpTracer.BATCH_SIZE, "1");
+        OtlpTracer tracer = new OtlpTracer();
+        assertTrue(tracer.open(Config.of(settings, "test")));
+        for(int i = 0 ; i < 10 ; i++) {
+            tracer.startSpan("s" + i, com.codename1.backend.Span.KIND_INTERNAL, null, null, null).end();
+        }
+        long started = System.currentTimeMillis();
+        tracer.shutdown(200);
+        assertTrue(System.currentTimeMillis() - started < 3000, "shutdown overran its window");
+        // Draining would post all ten, one every 1.5s; bounded, the post already in
+        // flight is the last.
+        Thread.sleep(5000);
+        assertTrue(exports.size() <= 2,
+                "the stopped exporter kept posting to the collector: " + exports.size() + " posts");
+    }
+
+    @Test
     @DisplayName("OTEL_SDK_DISABLED leaves the server untraced and the collector untouched")
     void disabledAtRunTime() throws Exception {
         int port = freePort();

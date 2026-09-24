@@ -1612,6 +1612,15 @@ public class ConnectionRequest implements IOProgressListener {
     /// The network thread running [#tracerAttempt]; only it may end the attempt.
     Thread tracerThread;
 
+    /// The last attempt that ended, and its tracer: the parent a retry of a request
+    /// queued with no context continues from, so the attempts share one trace.
+    Object tracerLastAttempt;
+    NetworkTracer tracerLastOwner;
+
+    /// Whether [#tracerParent] is such an earlier attempt rather than the context
+    /// the request was queued under; a later retry then moves it to the newest one.
+    boolean tracerParentChained;
+
     private void captureGuardHeaders(Object connection) {
         NetworkGuard guard = NetworkManager.getNetworkGuard();
         guardHeaders = null;
