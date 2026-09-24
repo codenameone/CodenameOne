@@ -616,6 +616,45 @@ class TelemetryTest extends UITestBase {
     }
 
     @Test
+    void anEndpointNoExportCouldReachIsRefusedWhenGiven() {
+        String[] bad = {"https://", "https:///v1/traces", "ftp://collector.test",
+            "collector.test:4318", "https://collector example", "https://c.test:99999",
+            "https://[nope]:4318"};
+        for (String url : bad) {
+            try {
+                new TelemetryConfig().direct(url);
+                throw new AssertionError("accepted " + url);
+            } catch (IllegalArgumentException expected) {
+                // Refused at the call, not lost at the first export.
+            }
+        }
+        try {
+            new TelemetryConfig().relay("https://user:s3cret@bad host/");
+            throw new AssertionError("accepted a host with a space");
+        } catch (IllegalArgumentException expected) {
+            assertFalse(expected.getMessage().contains("s3cret"),
+                    "the refusal quoted a credential: " + expected.getMessage());
+        }
+        assertNull(new TelemetryConfig().direct(null).exportUrl(), "no endpoint is still allowed");
+        assertNull(new TelemetryConfig().relay("").exportUrl());
+        assertEquals("https://[::1]:4318/v1/traces",
+                new TelemetryConfig().direct("https://[::1]:4318").exportUrl());
+    }
+
+    @Test
+    void aTruncatedValueNeverEndsInHalfACharacter() {
+        StringBuilder text = new StringBuilder();
+        for (int i = 0; i < TelemetrySpan.MAX_VALUE_LENGTH - 1; i++) {
+            text.append('a');
+        }
+        text.append("\ud83d\ude00tail");
+        String bounded = TelemetrySpan.bound(text.toString());
+        assertEquals(TelemetrySpan.MAX_VALUE_LENGTH - 1, bounded.length(),
+                "the pair straddling the limit must go whole");
+        assertFalse(Character.isHighSurrogate(bounded.charAt(bounded.length() - 1)));
+    }
+
+    @Test
     void anExceptionStatusIsBounded() {
         Telemetry.install(new TelemetryConfig().direct("http://collector.test"));
         TelemetrySpan span = Telemetry.startSpan("big");

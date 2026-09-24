@@ -481,6 +481,26 @@ class OtlpTracerTest {
     }
 
     @Test
+    @DisplayName("a blank service name falls back to unknown_service")
+    void aBlankServiceNameIsUnknownService() throws Exception {
+        Properties settings = settings(freePort());
+        settings.setProperty(OtlpTracer.SERVICE_NAME, "   ");
+        OtlpTracer tracer = new OtlpTracer("  ");
+        assertTrue(tracer.open(Config.of(settings, "test")));
+        try {
+            tracer.startSpan("x", com.codename1.backend.Span.KIND_INTERNAL, null, null, null).end();
+            tracer.flush(5000);
+        } finally {
+            tracer.shutdown(0);
+        }
+        ExportTraceServiceRequest request = ExportTraceServiceRequest.parseFrom(
+                (byte[])exports.get(0));
+        assertEquals("unknown_service",
+                attribute(request.getResourceSpans(0).getResource().getAttributesList(),
+                        "service.name"));
+    }
+
+    @Test
     @DisplayName("OTEL_SDK_DISABLED leaves the server untraced and the collector untouched")
     void disabledAtRunTime() throws Exception {
         int port = freePort();

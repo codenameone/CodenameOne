@@ -111,7 +111,7 @@ public final class TelemetrySpan {
     /// this span
     public TelemetrySpan setAttribute(String key, String value) {
         if (value != null && value.length() > MAX_VALUE_LENGTH) {
-            return put(key, value.substring(0, MAX_VALUE_LENGTH));
+            return put(key, bound(value));
         }
         return put(key, value);
     }
@@ -183,7 +183,7 @@ public final class TelemetrySpan {
         attrs.put("exception.type", type);
         if (message != null) {
             attrs.put("exception.message", message.length() > MAX_VALUE_LENGTH
-                    ? message.substring(0, MAX_VALUE_LENGTH) : message);
+                    ? bound(message) : message);
         }
         Object[] event = {Long.valueOf(now()), "exception", attrs};
         events.add(event);
@@ -281,7 +281,17 @@ public final class TelemetrySpan {
         return anchorEpochNanos + (elapsed < 0 ? 0 : elapsed);
     }
 
-    private static String bound(String value) {
-        return value.length() > MAX_VALUE_LENGTH ? value.substring(0, MAX_VALUE_LENGTH) : value;
+    /// At most MAX_VALUE_LENGTH chars, cut on a code point boundary. A cut through
+    /// a surrogate pair kept a lone high surrogate, which UTF-8 encoding then
+    /// replaced, so the exported value was not the one the app recorded.
+    static String bound(String value) {
+        if (value.length() <= MAX_VALUE_LENGTH) {
+            return value;
+        }
+        int end = MAX_VALUE_LENGTH;
+        if (Character.isHighSurrogate(value.charAt(end - 1))) {
+            end--;
+        }
+        return value.substring(0, end);
     }
 }

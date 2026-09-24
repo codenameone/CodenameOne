@@ -2611,7 +2611,9 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
                     ctx.getSourceEncoding())) {
                 continue;
             }
-            String name = otel.getStringOrDefault("serviceName", "");
+            // Trimmed: " " is no name at all, and kept raw it reached the entry
+            // point and became an empty service.name instead of unknown_service.
+            String name = otel.getStringOrDefault("serviceName", "").trim();
             if (telemetry && name.length() > 0 && telemetryServiceName != null
                     && telemetryServiceName.length() > 0 && !name.equals(telemetryServiceName)) {
                 ctx.error(cls, "@OpenTelemetry names the service \"" + name + "\" here and \""

@@ -181,14 +181,18 @@ public final class OtlpTracer implements Tracer {
 
         Map resourceAttributes = new LinkedHashMap();
         parsePairs(config.get(RESOURCE_ATTRIBUTES), resourceAttributes, RESOURCE_ATTRIBUTES);
-        String service = config.get(SERVICE_NAME);
-        if(service == null || service.trim().length() == 0) {
-            Object fromResource = resourceAttributes.get("service.name");
-            service = fromResource != null ? String.valueOf(fromResource)
-                    : defaultServiceName != null && defaultServiceName.length() > 0
-                            ? defaultServiceName : "unknown_service";
+        // Each source in turn, a blank one counting as absent: tested raw, a name
+        // of " " was chosen and then trimmed to an empty service.name, where the
+        // specification wants unknown_service.
+        Object fromResource = resourceAttributes.get("service.name");
+        String service = nonBlank(config.get(SERVICE_NAME));
+        if(service == null) {
+            service = nonBlank(fromResource == null ? null : String.valueOf(fromResource));
         }
-        resourceAttributes.put("service.name", service.trim());
+        if(service == null) {
+            service = nonBlank(defaultServiceName);
+        }
+        resourceAttributes.put("service.name", service == null ? "unknown_service" : service);
         resourceAttributes.put("telemetry.sdk.name", "codenameone");
         resourceAttributes.put("telemetry.sdk.language", "java");
         Map resource = new LinkedHashMap();
@@ -427,6 +431,15 @@ public final class OtlpTracer implements Tracer {
             return value > 0 && value <= 65535;
         }
         return true;
+    }
+
+    /** {@code value} trimmed, or null when that leaves nothing. */
+    private static String nonBlank(String value) {
+        if(value == null) {
+            return null;
+        }
+        String trimmed = value.trim();
+        return trimmed.length() == 0 ? null : trimmed;
     }
 
     /** Whether every character of {@code value} is an ASCII letter, a digit, or one of {@code extra}. */

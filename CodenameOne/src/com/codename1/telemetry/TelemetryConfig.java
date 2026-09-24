@@ -77,9 +77,14 @@ public final class TelemetryConfig {
     /// #### Returns
     ///
     /// this configuration
+    ///
+    /// #### Throws
+    ///
+    /// - `IllegalArgumentException`: when the URL is not http or https with a
+    ///   host and a valid port
     public TelemetryConfig relay(String backendUrl) {
         this.mode = Mode.RELAY;
-        this.endpoint = backendUrl;
+        this.endpoint = checkedEndpoint(backendUrl);
         return this;
     }
 
@@ -94,10 +99,110 @@ public final class TelemetryConfig {
     /// #### Returns
     ///
     /// this configuration
+    ///
+    /// #### Throws
+    ///
+    /// - `IllegalArgumentException`: when the URL is not http or https with a
+    ///   host and a valid port
     public TelemetryConfig direct(String collectorUrl) {
         this.mode = Mode.DIRECT;
-        this.endpoint = collectorUrl;
+        this.endpoint = checkedEndpoint(collectorUrl);
         return this;
+    }
+
+    /// Refuses an endpoint no export could reach, when it is given. The build
+    /// checks an annotation's URL, but a configuration written in code never meets
+    /// that check: `direct("https://")` became `https:/v1/traces`, telemetry
+    /// reported itself installed, and every export -- which fails silently by
+    /// design -- was lost. Null or empty still means "no endpoint".
+    private static String checkedEndpoint(String url) {
+        if (url == null || url.trim().length() == 0) {
+            return url;
+        }
+        if (!isHttpUrl(url.trim())) {
+            throw new IllegalArgumentException("A telemetry endpoint must be an http or https "
+                    + "URL with a host, such as https://collector.example:4318; it is '"
+                    + Telemetry.redact(url.trim()) + "'");
+        }
+        return url;
+    }
+
+    /// Whether `url` is http or https with a host (a DNS name, an IPv4 address or
+    /// a bracketed IPv6 literal) and, if it names one, a port from 1 to 65535.
+    static boolean isHttpUrl(String url) {
+        int start;
+        if (url.regionMatches(true, 0, "http://", 0, 7)) {
+            start = 7;
+        } else if (url.regionMatches(true, 0, "https://", 0, 8)) {
+            start = 8;
+        } else {
+            return false;
+        }
+        int end = url.length();
+        for (int i = start; i < url.length(); i++) {
+            char c = url.charAt(i);
+            if (c == '/' || c == '?' || c == '#') {
+                end = i;
+                break;
+            }
+        }
+        String authority = url.substring(start, end);
+        String hostPort = authority.substring(authority.lastIndexOf('@') + 1);
+        String host;
+        String port = null;
+        if (hostPort.startsWith("[")) {
+            int close = hostPort.indexOf(']');
+            if (close < 0) {
+                return false;
+            }
+            host = hostPort.substring(1, close);
+            if (host.indexOf(':') < 0 || !onlyChars(host, "0123456789abcdefABCDEF:.")) {
+                return false;
+            }
+            String rest = hostPort.substring(close + 1);
+            if (rest.length() > 0) {
+                if (rest.charAt(0) != ':') {
+                    return false;
+                }
+                port = rest.substring(1);
+            }
+        } else {
+            int colon = hostPort.lastIndexOf(':');
+            host = colon < 0 ? hostPort : hostPort.substring(0, colon);
+            port = colon < 0 ? null : hostPort.substring(colon + 1);
+            if (!onlyChars(host, "-._~")) {
+                return false;
+            }
+        }
+        if (host.length() == 0) {
+            return false;
+        }
+        if (port == null || port.length() == 0) {
+            return true;
+        }
+        if (port.length() > 5) {
+            return false;
+        }
+        int value = 0;
+        for (int i = 0; i < port.length(); i++) {
+            char c = port.charAt(i);
+            if (c < '0' || c > '9') {
+                return false;
+            }
+            value = value * 10 + (c - '0');
+        }
+        return value >= 1 && value <= 65535;
+    }
+
+    private static boolean onlyChars(String value, String extra) {
+        for (int i = 0; i < value.length(); i++) {
+            char c = value.charAt(i);
+            if (!((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9')
+                    || extra.indexOf(c) >= 0)) {
+                return false;
+            }
+        }
+        return true;
     }
 
     /// The `service.name` the app's spans are reported under. Defaults to the

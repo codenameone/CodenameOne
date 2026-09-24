@@ -108,7 +108,7 @@ final class OtelSpan extends Span {
 
     public Span setAttribute(String key, String value) {
         if(value != null && value.length() > MAX_VALUE_LENGTH) {
-            value = value.substring(0, MAX_VALUE_LENGTH);
+            value = bound(value);
         }
         return put(key, value);
     }
@@ -173,7 +173,7 @@ final class OtelSpan extends Span {
         }
         if(message != null) {
             attrs.put("exception.message", message.length() > MAX_VALUE_LENGTH
-                    ? message.substring(0, MAX_VALUE_LENGTH) : message);
+                    ? bound(message) : message);
         }
         events.add(new Object[] {Long.valueOf(nowEpochNanos()), "exception", attrs});
         return this;
@@ -230,8 +230,20 @@ final class OtelSpan extends Span {
         }
     }
 
-    private static String bound(String value) {
-        return value.length() > MAX_VALUE_LENGTH ? value.substring(0, MAX_VALUE_LENGTH) : value;
+    /**
+     * At most MAX_VALUE_LENGTH chars, cut on a code point boundary. A cut through a
+     * surrogate pair kept a lone high surrogate, which UTF-8 encoding then
+     * replaced, so the exported value was not the one the server recorded.
+     */
+    static String bound(String value) {
+        if(value.length() <= MAX_VALUE_LENGTH) {
+            return value;
+        }
+        int end = MAX_VALUE_LENGTH;
+        if(Character.isHighSurrogate(value.charAt(end - 1))) {
+            end--;
+        }
+        return value.substring(0, end);
     }
 
     private long nowEpochNanos() {

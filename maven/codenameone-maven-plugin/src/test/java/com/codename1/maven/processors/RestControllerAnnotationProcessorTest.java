@@ -266,6 +266,29 @@ public class RestControllerAnnotationProcessorTest {
     }
 
     @Test
+    public void aBlankServiceNameIsNoServiceName() throws Exception {
+        // " " is not a name. Kept raw it reached the entry point, and the server
+        // reported an empty service.name instead of unknown_service.
+        String source = CONTROLLER_SOURCE.replace("@RestController\n",
+                "@RestController\n@OpenTelemetry(serviceName = \"  \")\n");
+        File classes = compile(source);
+        File root = sourceRootWith("Notes.java", source);
+        Map<String, AnnotatedClass> index = ClassScanner.scan(classes);
+        ProcessorContext ctx = new ProcessorContext(classes, tmp.newFolder(), index,
+                new SystemStreamLog(), tmp.newFolder(), new Properties(), null,
+                Collections.singletonList(root.getAbsolutePath()), "UTF-8",
+                Collections.<String>emptyList());
+        RestControllerAnnotationProcessor proc = new RestControllerAnnotationProcessor();
+        proc.resolveTelemetry(ctx);
+        assertFalse(String.valueOf(ctx.getErrors()), ctx.hasErrors());
+        assertTrue("the annotation still turns tracing on", proc.telemetry);
+        assertTrue("a blank name was kept: '" + proc.telemetryServiceName + "'",
+                proc.telemetryServiceName == null || proc.telemetryServiceName.length() == 0);
+        assertTrue(proc.generateBootstrap("com.example")
+                .indexOf(".tracing(new com.codename1.backend.otel.OtlpTracer(null))") >= 0);
+    }
+
+    @Test
     public void anUntracedBuildNamesRoutesButNeverLinksTheTracer() throws Exception {
         // The same controller without the annotation. The OTLP tracer is not
         // linked -- that is what the build switch buys -- but the router still

@@ -71,6 +71,15 @@ public final class Telemetry {
     private static final String TRACEPARENT = "traceparent";
     /// How many export batches may wait in the network queue at once.
     static final int MAX_PENDING_EXPORTS = 2;
+    /// The installation. A plain field, deliberately, like the tracer and guard
+    /// slots in NetworkManager it fills: install and uninstall are lifecycle
+    /// calls -- the generated bootstrap's, before Display.init, or the app's, on
+    /// the EDT -- and Codename One core does not synchronize framework state
+    /// (PMD's AvoidUsingVolatile gate says the same). A network thread or a task
+    /// started after the install sees it through Thread.start's happens-before
+    /// edge. Reinstalling telemetry while background tasks are mid-flight is not
+    /// a supported pattern, and locking every span start to serve it would tax
+    /// every request of every app that never does it.
     private static State state;
     /// The span [#run(String, Runnable)] has made current, per thread. Mostly the
     /// EDT's, since that is where a user action runs and where requests are queued,

@@ -340,4 +340,17 @@ class TraceContextTest {
                         com.codename1.backend.Json.parse(span.replace("PARENT", "0000000000000000"))));
         assertTrue(refused.getMessage().contains("parentSpanId"), refused.getMessage());
     }
+
+    @Test
+    @DisplayName("a truncated value never ends in half a character")
+    void truncationKeepsPairsWhole() {
+        StringBuilder text = new StringBuilder();
+        for(int i = 0 ; i < OtelSpan.MAX_VALUE_LENGTH - 1 ; i++) {
+            text.append('a');
+        }
+        text.append("\ud83d\ude00tail");
+        String bounded = OtelSpan.bound(text.toString());
+        assertEquals(OtelSpan.MAX_VALUE_LENGTH - 1, bounded.length());
+        assertFalse(Character.isHighSurrogate(bounded.charAt(bounded.length() - 1)));
+    }
 }
