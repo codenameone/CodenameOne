@@ -77,6 +77,8 @@ class OtlpTracerTest {
     private final List contentTypes = Collections.synchronizedList(new ArrayList());
     private final List authorizations = Collections.synchronizedList(new ArrayList());
     private final List authorizationCounts = Collections.synchronizedList(new ArrayList());
+    /** When each POST reached the collector, in arrival order. */
+    private final List postTimes = Collections.synchronizedList(new ArrayList());
     /** Statuses the collector answers with, in order; 200 once they run out. */
     private final java.util.concurrent.ConcurrentLinkedQueue answers =
             new java.util.concurrent.ConcurrentLinkedQueue();
@@ -99,6 +101,7 @@ class OtlpTracerTest {
             authorizations.add(String.valueOf(exchange.getRequestHeaders().getFirst("Authorization")));
             List all = exchange.getRequestHeaders().get("Authorization");
             authorizationCounts.add(Integer.valueOf(all == null ? 0 : all.size()));
+            postTimes.add(Long.valueOf(System.currentTimeMillis()));
             Object answer = answers.poll();
             exchange.sendResponseHeaders(answer == null ? 200 : ((Integer)answer).intValue(), -1);
             exchange.close();
@@ -582,6 +585,29 @@ class OtlpTracerTest {
             tracer.metrics(metrics);
             assertEquals(4, exports.size(), "a span was retried more than once");
             assertEquals(Long.valueOf(1), metrics.get("spansDropped"));
+        } finally {
+            tracer.shutdown(0);
+        }
+    }
+
+    @Test
+    @DisplayName("the backoff holds even after a batch that used its retry is dropped")
+    void backoffHoldsAfterADroppedBatch() throws Exception {
+        Properties settings = settings(freePort());
+        settings.setProperty(OtlpTracer.EXPORT_DELAY, "500");
+        answers.add(Integer.valueOf(429));
+        answers.add(Integer.valueOf(429));
+        OtlpTracer tracer = new OtlpTracer();
+        assertTrue(tracer.open(Config.of(settings, "test")));
+        try {
+            tracer.startSpan("first", com.codename1.backend.Span.KIND_INTERNAL, null, null, null).end();
+            tracer.flush(5000);   // posted, retried, dropped
+            tracer.startSpan("second", com.codename1.backend.Span.KIND_INTERNAL, null, null, null).end();
+            tracer.flush(5000);
+            assertEquals(3, postTimes.size(), String.valueOf(postTimes));
+            long afterDrop = ((Long)postTimes.get(2)).longValue() - ((Long)postTimes.get(1)).longValue();
+            assertTrue(afterDrop >= 400, "the next batch went out " + afterDrop
+                    + "ms after a 429, not after the backoff");
         } finally {
             tracer.shutdown(0);
         }

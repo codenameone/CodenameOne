@@ -296,11 +296,21 @@ final class BatchExporter implements Runnable {
                 synchronized(lock) {
                     if(result == SENT) {
                         relayedPayloads++;
-                    } else if(result == RETRY && payload[2] == null
-                            && requeueRelayed(payloads, iter)) {
-                        // This one and the rest of the round go back to the head of
-                        // the relay queue, and wait out the backoff with it.
-                        requeuedPayloads = payloads.size() - iter;
+                    } else if(result == RETRY) {
+                        // The collector asked for less: the backoff starts whatever
+                        // becomes of this payload, and the rest of the round waits
+                        // it out rather than being posted into the same trouble.
+                        retryAt = System.currentTimeMillis() + delayMillis;
+                        boolean retryThis = payload[2] == null;
+                        if(!retryThis) {
+                            droppedRelayed++;       // its one retry is spent
+                        }
+                        int rest = retryThis ? iter : iter + 1;
+                        if(requeueRelayed(payloads, rest, retryThis)) {
+                            requeuedPayloads = payloads.size() - rest;
+                        } else {
+                            droppedRelayed += payloads.size() - rest;
+                        }
                         break;
                     } else {
                         droppedRelayed++;
@@ -366,6 +376,12 @@ final class BatchExporter implements Runnable {
                 rejectedSpans += rejected;
                 return 0;
             }
+            if(result == RETRY) {
+                // On EVERY retryable answer, whether or not these spans can go
+                // back: dropping a batch without it let the next one go straight
+                // out into the same 429, unthrottled.
+                retryAt = System.currentTimeMillis() + delayMillis;
+            }
             if(result != RETRY || stopping) {
                 droppedSpans += batch.size();
                 return 0;
@@ -387,17 +403,18 @@ final class BatchExporter implements Runnable {
             }
             droppedSpans += batch.size() - again.size();
             queue.addAll(0, again);
-            retryAt = System.currentTimeMillis() + delayMillis;
             return again.size();
         }
     }
 
     /**
-     * Puts payloads[from..] back at the head of the relay queue -- payloads[from],
-     * the one whose POST failed, marked as retried -- and starts the backoff; false, having changed nothing, when the relay's byte
-     * budget has no room for them. Called holding the lock.
+     * Puts payloads[from..] back at the head of the relay queue -- payloads[from]
+     * marked as retried when {@code markFirst}, since its POST was the one that
+     * failed -- or answers false, having changed nothing, when the relay's byte
+     * budget has no room for them. The caller starts the backoff. Called holding
+     * the lock.
      */
-    private boolean requeueRelayed(List payloads, int from) {
+    private boolean requeueRelayed(List payloads, int from, boolean markFirst) {
         if(stopping) {
             return false;
         }
@@ -414,12 +431,11 @@ final class BatchExporter implements Runnable {
             // Only the one that was POSTED has used its retry. The rest of the
             // round were never sent, and marking them too dropped each of them on
             // its first real failure.
-            again.add(iter == from ? new Object[] {payload[0], payload[1], Boolean.TRUE}
-                    : payload);
+            again.add(markFirst && iter == from
+                    ? new Object[] {payload[0], payload[1], Boolean.TRUE} : payload);
         }
         relayed.addAll(0, again);
         relayedBytes += bytes;
-        retryAt = System.currentTimeMillis() + delayMillis;
         return true;
     }
 

@@ -680,21 +680,41 @@ public final class Tracing {
     }
 
     /**
-     * Flushes, stops and uninstalls {@code owned} -- if it is still the installed
-     * tracer. One that has been replaced was already shut down by
-     * {@link #install}, and whatever replaced it belongs to someone else.
+     * Flushes, stops and uninstalls {@code owned}, the tracer of a server that is
+     * stopping. Three places it can be:
+     * <ul>
+     *   <li>installed: taken out of the slot and stopped;</li>
+     *   <li>displaced by a start-up still in progress, which holds it as the
+     *       tracer to restore if it fails: taken out of that claim -- so a failed
+     *       start-up cannot put back the tracer of a server that has stopped -- and
+     *       stopped, since nothing is running it any more;</li>
+     *   <li>neither: replaced by an install or a commit, which already stopped it,
+     *       and whatever replaced it belongs to someone else.</li>
+     * </ul>
      */
     static void shutdown(Tracer owned, int timeoutMillis) {
-        Tracer t;
+        if(owned == null) {
+            return;
+        }
+        boolean stop = false;
         synchronized(LIFECYCLE) {
-            t = tracer;
-            if(t == null || t != owned) {
-                return;
+            if(tracer == owned) {
+                tracer = null;
+                stop = true;
             }
-            tracer = null;
+            for(int iter = 0 ; iter < PENDING.size() ; iter++) {
+                Swap open = (Swap)PENDING.get(iter);
+                if(open.previous == owned) {
+                    open.previous = null;
+                    stop = true;
+                }
+            }
+        }
+        if(!stop) {
+            return;
         }
         try {
-            t.shutdown(timeoutMillis);
+            owned.shutdown(timeoutMillis);
         } catch (RuntimeException err) {
             failed(err);
         }

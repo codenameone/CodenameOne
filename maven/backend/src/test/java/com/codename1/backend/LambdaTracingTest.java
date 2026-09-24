@@ -176,6 +176,23 @@ class LambdaTracingTest {
     }
 
     @Test
+    @DisplayName("a server that stops while another is starting cannot have its tracer restored")
+    void aStoppedServersTracerIsNotRestoredByARollBack() {
+        Recorder a = new Recorder();
+        Recorder b = new Recorder();
+        Tracing.install(a);
+        // B starts over A's tracer; A stops; then B fails.
+        Tracing.Swap claim = Tracing.swap(b);
+        Tracing.shutdown(a, 0);
+        assertEquals(1, a.shutdowns, "the stopped server's tracer kept running");
+        Tracing.rollBack(claim);
+        assertTrue(Tracing.getTracer() == null,
+                "a failed start-up put back the tracer of a server that had stopped");
+        assertEquals(1, a.shutdowns);
+        assertEquals(1, b.shutdowns);
+    }
+
+    @Test
     @DisplayName("a span whose decoration throws is still ended")
     void abandonedSpansAreEnded() throws Exception {
         Recorder recorder = new Recorder();

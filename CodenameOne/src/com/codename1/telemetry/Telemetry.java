@@ -252,6 +252,13 @@ public final class Telemetry {
             if (idsUnavailable) {
                 return null;
             }
+            if (!Display.isInitialized()) {
+                // Too early to ask, not a platform without a source: before
+                // Display.init there is no implementation behind SecureRandom. Not
+                // cached, or a span a program started during start-up switched
+                // telemetry off for good once the display did exist.
+                return null;
+            }
             try {
                 return SecureRandom.bytes(length);
             } catch (RuntimeException err) {
