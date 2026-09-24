@@ -106,6 +106,8 @@ class TelemetryTest extends UITestBase {
                 "the header names the request's own span as the server's parent");
         assertEquals(Span.SpanKind.SPAN_KIND_CLIENT, get.getKind());
         assertEquals(Span.SpanKind.SPAN_KIND_INTERNAL, checkout.getKind());
+        assertEquals(0x101, get.getFlags(), "sampled, with a parent known to be local");
+        assertEquals(1, checkout.getFlags(), "a root claims nothing about a parent it lacks");
         assertEquals(API, attribute(get.getAttributesList(), "url.full"),
                 "the query string is never recorded");
         // One clock per trace: the request sits inside the action that caused it.

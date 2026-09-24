@@ -243,6 +243,17 @@ jobs:
           # time and cannot turn a failing test green.
           $ok = $false
           foreach ($delay in 0, 30, 90, 180, 300) {
+            # Maven records a download that failed as a *.lastUpdated marker and then
+            # answers later resolutions from it instead of the network -- the "(absent)"
+            # in "Could not transfer artifact ... (absent)". Left in place, every retry
+            # below replays the first 403 offline and cannot succeed: one Central refusal
+            # of org.junit:junit-bom took all five attempts and the job. And because
+            # setup-java's cache: 'maven' restores ~/.m2 between runs, a marker can also
+            # arrive from an earlier run, so this clears them before EVERY attempt, not
+            # just the retries. A marker records only a failure, never an artifact, so
+            # deleting one costs at most a repeated question to Central.
+            Get-ChildItem -Path "$env:USERPROFILE\.m2\repository" -Recurse -File -Filter '*.lastUpdated' -ErrorAction SilentlyContinue |
+              Remove-Item -Force -ErrorAction SilentlyContinue
             if ($delay -gt 0) {
               Write-Host "mvn failed; retrying in $delay s..."
               Start-Sleep -Seconds $delay
@@ -258,6 +269,9 @@ jobs:
           $resolutionFailure = 'status: (403|429|50[0-9])|Could not transfer artifact|Failed to read artifact descriptor|Unresolveable build extension|Non-resolvable import POM|Could not resolve dependencies'
           $ok = $false
           foreach ($delay in 0, 30, 90, 180, 300) {
+            # Clear Maven's cached resolution failures first; see the first retry loop above.
+            Get-ChildItem -Path "$env:USERPROFILE\.m2\repository" -Recurse -File -Filter '*.lastUpdated' -ErrorAction SilentlyContinue |
+              Remove-Item -Force -ErrorAction SilentlyContinue
             if ($delay -gt 0) {
               Write-Host "mvn failed on a dependency-resolution error; retrying in $delay s..."
               Start-Sleep -Seconds $delay
@@ -371,6 +385,9 @@ jobs:
         run: |
           $ok = $false
           foreach ($delay in 0, 30, 90, 180, 300) {
+            # Clear Maven's cached resolution failures first; see the first retry loop above.
+            Get-ChildItem -Path "$env:USERPROFILE\.m2\repository" -Recurse -File -Filter '*.lastUpdated' -ErrorAction SilentlyContinue |
+              Remove-Item -Force -ErrorAction SilentlyContinue
             if ($delay -gt 0) {
               Write-Host "mvn failed; retrying in $delay s..."
               Start-Sleep -Seconds $delay
@@ -404,6 +421,9 @@ jobs:
           # Same retry as the port build above: this reaches Maven Central too.
           $ok = $false
           foreach ($delay in 0, 30, 90, 180, 300) {
+            # Clear Maven's cached resolution failures first; see the first retry loop above.
+            Get-ChildItem -Path "$env:USERPROFILE\.m2\repository" -Recurse -File -Filter '*.lastUpdated' -ErrorAction SilentlyContinue |
+              Remove-Item -Force -ErrorAction SilentlyContinue
             if ($delay -gt 0) {
               Write-Host "mvn failed; retrying in $delay s..."
               Start-Sleep -Seconds $delay
@@ -481,6 +501,9 @@ jobs:
           # blocking gate green.
           $ok = $false
           foreach ($delay in 0, 30, 90, 180, 300) {
+            # Clear Maven's cached resolution failures first; see the first retry loop above.
+            Get-ChildItem -Path "$env:USERPROFILE\.m2\repository" -Recurse -File -Filter '*.lastUpdated' -ErrorAction SilentlyContinue |
+              Remove-Item -Force -ErrorAction SilentlyContinue
             if ($delay -gt 0) {
               Write-Host "mvn failed; retrying in $delay s..."
               Start-Sleep -Seconds $delay
@@ -492,6 +515,9 @@ jobs:
           $resolutionFailure = 'status: (403|429|50[0-9])|Could not transfer artifact|Unresolveable build extension|Non-resolvable import POM|Could not resolve dependencies'
           $ok = $false
           foreach ($delay in 0, 30, 90, 180, 300) {
+            # Clear Maven's cached resolution failures first; see the first retry loop above.
+            Get-ChildItem -Path "$env:USERPROFILE\.m2\repository" -Recurse -File -Filter '*.lastUpdated' -ErrorAction SilentlyContinue |
+              Remove-Item -Force -ErrorAction SilentlyContinue
             if ($delay -gt 0) {
               Write-Host "mvn failed on a dependency-resolution error; retrying in $delay s..."
               Start-Sleep -Seconds $delay
@@ -649,6 +675,9 @@ jobs:
           # blocking gate green.
           $ok = $false
           foreach ($delay in 0, 30, 90, 180, 300) {
+            # Clear Maven's cached resolution failures first; see the first retry loop above.
+            Get-ChildItem -Path "$env:USERPROFILE\.m2\repository" -Recurse -File -Filter '*.lastUpdated' -ErrorAction SilentlyContinue |
+              Remove-Item -Force -ErrorAction SilentlyContinue
             if ($delay -gt 0) {
               Write-Host "mvn failed; retrying in $delay s..."
               Start-Sleep -Seconds $delay
@@ -660,6 +689,9 @@ jobs:
           $resolutionFailure = 'status: (403|429|50[0-9])|Could not transfer artifact|Unresolveable build extension|Non-resolvable import POM|Could not resolve dependencies'
           $ok = $false
           foreach ($delay in 0, 30, 90, 180, 300) {
+            # Clear Maven's cached resolution failures first; see the first retry loop above.
+            Get-ChildItem -Path "$env:USERPROFILE\.m2\repository" -Recurse -File -Filter '*.lastUpdated' -ErrorAction SilentlyContinue |
+              Remove-Item -Force -ErrorAction SilentlyContinue
             if ($delay -gt 0) {
               Write-Host "mvn failed on a dependency-resolution error; retrying in $delay s..."
               Start-Sleep -Seconds $delay

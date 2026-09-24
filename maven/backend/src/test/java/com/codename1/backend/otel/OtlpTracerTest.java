@@ -278,6 +278,8 @@ class OtlpTracerTest {
         assertEquals("java.lang.IllegalStateException",
                 attribute(span.getEvents(0).getAttributesList(), "exception.type"));
         assertEquals(0, span.getParentSpanId().size(), "a root span has no parent");
+        assertEquals(1, span.getFlags(),
+                "a root has no parent context, so its remoteness is not claimed either way");
         assertEquals(32, hex(span.getTraceId()).length());
     }
 
@@ -426,6 +428,56 @@ class OtlpTracerTest {
         assertSame(replacement, Tracing.getTracer(),
                 "stopping the server uninstalled a tracer it never installed");
         assertEquals(0, shutdowns[0], "stopping the server shut down another tracer");
+    }
+
+    @Test
+    @DisplayName("a span from a replaced tracer is never adopted as a parent")
+    void aReplacedTracersSpanIsNotAParent() throws Exception {
+        OtlpTracer before = new OtlpTracer();
+        OtlpTracer after = new OtlpTracer();
+        assertTrue(before.open(Config.of(settings(freePort()), "test")));
+        assertTrue(after.open(Config.of(settings(freePort()), "test")));
+        try {
+            OtelSpan old = (OtelSpan)before.startSpan("request", com.codename1.backend.Span.KIND_SERVER,
+                    null, null, null);
+            OtelSpan child = (OtelSpan)after.startSpan("query", com.codename1.backend.Span.KIND_CLIENT,
+                    old, null, null);
+            assertFalse(old.traceHi == child.traceHi && old.traceLo == child.traceLo,
+                    "the new tracer's span joined the replaced tracer's trace");
+            assertEquals(0, child.parentId);
+            OtelSpan grandchild = (OtelSpan)after.startSpan("row", com.codename1.backend.Span.KIND_INTERNAL,
+                    child, null, null);
+            assertEquals(child.spanId, grandchild.parentId, "its own spans still nest");
+        } finally {
+            before.shutdown(0);
+            after.shutdown(0);
+        }
+    }
+
+    @Test
+    @DisplayName("a relay path is matched as the server normalizes request paths")
+    void relayPathIsNormalized() throws Exception {
+        int port = freePort();
+        Properties settings = settings(port);
+        settings.setProperty(OtlpTracer.RELAY, "true");
+        settings.setProperty(OtlpTracer.RELAY_PATH, "/otel/%74races");
+        Backend backend = Backend.builder(Config.of(settings, "test"))
+                .quiet()
+                .tracing(new OtlpTracer("pets"))
+                .handler(new HttpServer.Handler() {
+                    public HttpServer.Response handle(HttpServer.Request request) {
+                        return HttpServer.Response.text(404, "not the relay");
+                    }
+                })
+                .start();
+        try {
+            assertEquals(200, post(port, "/otel/traces", "{\"resourceSpans\":[]}", null),
+                    "the relay configured as /otel/%74races never answered /otel/traces");
+            assertEquals(200, post(port, "/otel/%74races", "{\"resourceSpans\":[]}", null),
+                    "nor the spelling that was configured");
+        } finally {
+            backend.stop();
+        }
     }
 
     @Test

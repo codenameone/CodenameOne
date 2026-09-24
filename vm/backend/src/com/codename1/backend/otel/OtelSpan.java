@@ -142,6 +142,11 @@ final class OtelSpan extends Span {
         return this;
     }
 
+    /** Whether {@code owner} made this span. */
+    boolean isFrom(OtlpTracer owner) {
+        return tracer == owner;
+    }
+
     public Span recordException(Throwable error) {
         if(!sampled || ended || error == null) {
             return this;

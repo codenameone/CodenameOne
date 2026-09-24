@@ -290,15 +290,21 @@ class TraceContextTest {
     }
 
     @Test
-    @DisplayName("the relay path is an origin-form path the relay can match byte for byte")
+    @DisplayName("the relay path is refused unless matchable, and normalized as requests are")
     void relayPath() {
-        assertTrue(OtlpTracer.isOriginFormPath("/otel/v1/traces"));
-        assertTrue(OtlpTracer.isOriginFormPath("/t%C3%A9l%C3%A9metry"));
-        assertFalse(OtlpTracer.isOriginFormPath("/t\u00e9l\u00e9metry"), "non-ASCII");
-        assertFalse(OtlpTracer.isOriginFormPath("/otel?x=1"), "a query never matches");
-        assertFalse(OtlpTracer.isOriginFormPath("/otel#f"));
-        assertFalse(OtlpTracer.isOriginFormPath("/otel traces"));
-        assertFalse(OtlpTracer.isOriginFormPath("otel"));
-        assertFalse(OtlpTracer.isOriginFormPath(""));
+        assertEquals("/otel/v1/traces", OtlpTracer.canonicalPath("/otel/v1/traces"));
+        assertEquals("/t%C3%A9l%C3%A9metry", OtlpTracer.canonicalPath("/t%c3%a9l%c3%a9metry"),
+                "a kept escape gets upper-case hex, as the server spells it");
+        assertEquals("/otel/traces", OtlpTracer.canonicalPath("/otel/%74races"),
+                "an escaped unreserved character is decoded, as the server decodes it");
+        assertEquals("/a%2Fb", OtlpTracer.canonicalPath("/a%2fb"));
+        assertNull(OtlpTracer.canonicalPath("/t\u00e9l\u00e9metry"), "non-ASCII");
+        assertNull(OtlpTracer.canonicalPath("/otel?x=1"), "a query never matches");
+        assertNull(OtlpTracer.canonicalPath("/otel#f"));
+        assertNull(OtlpTracer.canonicalPath("/otel traces"));
+        assertNull(OtlpTracer.canonicalPath("/otel%2"), "a truncated escape");
+        assertNull(OtlpTracer.canonicalPath("/otel%zz"));
+        assertNull(OtlpTracer.canonicalPath("otel"));
+        assertNull(OtlpTracer.canonicalPath(""));
     }
 }

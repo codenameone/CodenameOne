@@ -264,10 +264,16 @@ final class OtlpEncoding {
         }
     }
 
-    /// Trace flags in the low byte, then HAS_IS_REMOTE: every span the app makes
-    /// has a local parent or none.
+    /// Trace flags in the low byte, then HAS_IS_REMOTE when there is a parent:
+    /// every parent the app has is local. A root has no parent context to
+    /// describe, so the bits stay clear ("unknown" in trace.proto) rather than
+    /// claiming a local parent it does not have.
     private static int flags(TelemetrySpan span) {
-        return (span.sampled ? 1 : 0) | 0x100;
+        int flags = span.sampled ? 1 : 0;
+        if (span.parentSpanId != null) {
+            flags |= 0x100;
+        }
+        return flags;
     }
 
     private static Map<String, Object> asMap(Object value) {

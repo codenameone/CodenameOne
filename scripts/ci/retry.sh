@@ -53,6 +53,34 @@ if [ "$only_matching" = "transient" ]; then
   only_matching="$TRANSIENT_RESOLUTION_FAILURE"
 fi
 
+# Maven records a download that failed as a `*.lastUpdated` marker beside the
+# artifact, and then answers later resolutions from that marker instead of the
+# network: "was not found ... during a previous attempt. This failure was
+# cached in the local repository". A retry that leaves the marker in place is
+# therefore guaranteed to fail the same way -- which is how a single Central
+# hiccup took four attempts and the job with it, and, because `cache: maven`
+# stores the local repository between runs, went on failing runs that Central
+# would have answered fine.
+#
+# Clearing them before each retry is safe: the marker records only a FAILURE,
+# never a downloaded artifact, so the worst case is that Maven asks Central a
+# question it already knows the answer to.
+purge_maven_negative_cache() {
+  repo=""
+  for arg in "$@"; do
+    case "$arg" in
+      -Dmaven.repo.local=*) repo="${arg#-Dmaven.repo.local=}" ;;
+    esac
+  done
+  [ -n "$repo" ] || repo="${MAVEN_REPO_LOCAL:-$HOME/.m2/repository}"
+  [ -d "$repo" ] || return 0
+  n="$(find "$repo" -name '*.lastUpdated' -type f 2>/dev/null | wc -l | tr -d ' ')"
+  if [ "${n:-0}" -gt 0 ]; then
+    find "$repo" -name '*.lastUpdated' -type f -delete 2>/dev/null || :
+    echo "retry.sh: cleared ${n} cached resolution failure(s) from ${repo}" >&2
+  fi
+}
+
 if [ "$#" -eq 0 ]; then
   echo "retry.sh: no command given" >&2
   exit 2
@@ -106,6 +134,7 @@ while [ "$attempt" -le "$attempts" ]; do
   if [ "$attempt" -lt "$attempts" ]; then
     echo "retry.sh: attempt ${attempt}/${attempts} failed with status ${status};" \
       "retrying in ${wait_seconds}s (possible transient Maven Central 403/429/5xx)" >&2
+    purge_maven_negative_cache "$@"
     sleep "$wait_seconds"
     wait_seconds=$((wait_seconds * 4))
     if [ "$wait_seconds" -gt "$max_delay" ]; then

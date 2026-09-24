@@ -203,8 +203,8 @@ public final class OtlpTracer implements Tracer {
         exporter = new BatchExporter(endpoint, headers, protobuf, resource, queue, batch,
                 delay, relayBytes * 4L);
         if(config.getBoolean(RELAY, false)) {
-            String path = config.get(RELAY_PATH, "/otel/v1/traces").trim();
-            if(!isOriginFormPath(path)) {
+            String path = canonicalPath(config.get(RELAY_PATH, "/otel/v1/traces").trim());
+            if(path == null) {
                 throw new IOException(RELAY_PATH + " must be a path such as /otel/v1/traces: "
                         + "it starts with /, has no query or fragment, and uses only the "
                         + "ASCII characters a URL path allows (percent-encode anything "
@@ -227,8 +227,14 @@ public final class OtlpTracer implements Tracer {
         boolean parentSampled = false;
         boolean remote = false;
         String state = null;
-        if(parent instanceof OtelSpan) {
-            OtelSpan local = (OtelSpan)parent;
+        // Only a parent THIS tracer made. After Tracing.install() replaces the
+        // tracer, a request still in flight holds the old one's span as current,
+        // and adopting it filed the new tracer's children under the old trace, its
+        // sampling decision and its clock -- exported, possibly, to another
+        // collector than their parent's. Such a child starts a trace of its own.
+        OtelSpan local = parent instanceof OtelSpan && ((OtelSpan)parent).isFrom(this)
+                ? (OtelSpan)parent : null;
+        if(local != null) {
             hi = local.traceHi;
             lo = local.traceLo;
             parentId = local.spanId;
@@ -252,7 +258,7 @@ public final class OtlpTracer implements Tracer {
         }
         boolean sampled = sampler.sample(hasParent, parentSampled, lo);
         return new OtelSpan(this, name, kind, hi, lo, nextId(), parentId, remote, sampled, state,
-                parent instanceof OtelSpan ? (OtelSpan)parent : null);
+                local);
     }
 
     public void flush(int timeoutMillis) {
@@ -282,25 +288,66 @@ public final class OtlpTracer implements Tracer {
     }
 
     /**
-     * Whether {@code path} is an origin-form path the relay can match byte for
-     * byte: RFC 3986 pchar and "/", nothing else. The relay compares the raw
-     * request path, so a non-ASCII character used to be folded to '?' and the
-     * relay listened somewhere nobody configured, and a query or fragment could
-     * never match at all, since only the path is compared.
+     * {@code path} as the server will compare it, or null when it is not an
+     * origin-form path the relay could ever match.
+     *
+     * <p>Only RFC 3986 pchar and "/": a non-ASCII character used to be folded to
+     * '?', so the relay listened somewhere nobody configured, and a query or
+     * fragment could never match, since only the path is compared.
+     *
+     * <p>Then normalized as the server normalizes every request path before
+     * {@code Request.pathIs} compares it (RFC 3986 6.2.2): an escaped unreserved
+     * character is decoded and a kept escape gets upper-case hex digits. Compared
+     * as configured, {@code /otel/%74races} or {@code /otel/%2f} could never
+     * match any request. A '%' not followed by two hex digits is refused.
      */
-    static boolean isOriginFormPath(String path) {
+    static String canonicalPath(String path) {
         if(path.length() == 0 || path.charAt(0) != '/') {
-            return false;
+            return null;
         }
+        StringBuilder out = new StringBuilder(path.length());
         for(int iter = 0 ; iter < path.length() ; iter++) {
             char c = path.charAt(iter);
-            boolean allowed = (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z')
-                    || (c >= '0' && c <= '9') || "-._~!$&'()*+,;=:@/%".indexOf(c) >= 0;
-            if(!allowed) {
-                return false;
+            if(c == '%') {
+                int hi = iter + 2 < path.length() ? hexValue(path.charAt(iter + 1)) : -1;
+                int lo = hi < 0 ? -1 : hexValue(path.charAt(iter + 2));
+                if(lo < 0) {
+                    return null;
+                }
+                char decoded = (char)((hi << 4) | lo);
+                if(isUnreserved(decoded)) {
+                    out.append(decoded);
+                } else {
+                    out.append('%').append(Character.toUpperCase(path.charAt(iter + 1)))
+                            .append(Character.toUpperCase(path.charAt(iter + 2)));
+                }
+                iter += 2;
+                continue;
             }
+            if(!isUnreserved(c) && "!$&'()*+,;=:@/".indexOf(c) < 0) {
+                return null;
+            }
+            out.append(c);
         }
-        return true;
+        return out.toString();
+    }
+
+    private static boolean isUnreserved(char c) {
+        return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9')
+                || c == '-' || c == '.' || c == '_' || c == '~';
+    }
+
+    private static int hexValue(char c) {
+        if(c >= '0' && c <= '9') {
+            return c - '0';
+        }
+        if(c >= 'a' && c <= 'f') {
+            return c - 'a' + 10;
+        }
+        if(c >= 'A' && c <= 'F') {
+            return c - 'A' + 10;
+        }
+        return -1;
     }
 
     /**
@@ -455,8 +502,13 @@ public final class OtlpTracer implements Tracer {
         }
         // Trace flags in the low byte, then HAS_IS_REMOTE and IS_REMOTE: whether
         // the parent was in another process, which a backend uses to draw the
-        // service boundary.
-        long flags = (span.sampled ? 1 : 0) | 0x100 | (span.parentRemote ? 0x200 : 0);
+        // service boundary. Only when there IS a parent: the bits describe the
+        // parent's context (trace.proto: "unknown, is not remote, is remote"), and
+        // setting HAS_IS_REMOTE on a root claimed a local parent it does not have.
+        long flags = span.sampled ? 1 : 0;
+        if(span.parentId != 0) {
+            flags |= 0x100 | (span.parentRemote ? 0x200 : 0);
+        }
         out.put("flags", Long.valueOf(flags));
         out.put("name", span.name);
         out.put("kind", Integer.valueOf(span.kind));
