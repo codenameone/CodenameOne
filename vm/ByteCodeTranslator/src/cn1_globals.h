@@ -4070,9 +4070,11 @@ extern void cn1RefBlockBeginCycle(void);
 extern void cn1RefBlockEndCycle(void);
 extern void cn1NativeBlockAccounting(size_t* live, size_t* retired, size_t* released);
 extern void cn1RefBlockSet(CODENAME_ONE_THREAD_STATE, JAVA_LONG block, JAVA_INT index, JAVA_OBJECT value);
+extern void cn1TableRefSet(CODENAME_ONE_THREAD_STATE, JAVA_LONG table, JAVA_INT part, JAVA_INT index, JAVA_OBJECT value);
 extern void cn1RefBlockMove(CODENAME_ONE_THREAD_STATE, JAVA_LONG block, JAVA_INT from, JAVA_INT to, JAVA_INT count);
 extern void cn1RefBlockClear(CODENAME_ONE_THREAD_STATE, JAVA_LONG block, JAVA_INT from, JAVA_INT count);
 extern void cn1GcMarkRefBlock(CODENAME_ONE_THREAD_STATE, JAVA_LONG block, JAVA_BOOLEAN force);
+extern void cn1GcMarkTablePart(CODENAME_ONE_THREAD_STATE, JAVA_LONG table, JAVA_INT part, JAVA_BOOLEAN force);
 // Deferred block re-scan, mover side (cn1_globals.m, DEFERRED BLOCK RE-SCAN). Only inside
 // a cn1SatbBulkBegin() bracket that answered TRUE; begin answers whether the collector
 // will re-scan the block after this write (1) or the caller must log every overwritten

@@ -2822,22 +2822,23 @@ static void cn1BlockNoteRefBytes(JAVA_LONG block, size_t refBytes) {
 static void cn1GcGenTagTable(JAVA_LONG table, int parts);
 static void cn1GcForceMajor(void);
 static int cn1GcGenBlockDeferFree(JAVA_LONG block);
+void cn1GcMarkTablePart(CODENAME_ONE_THREAD_STATE, JAVA_LONG table, JAVA_INT part, JAVA_BOOLEAN force);
 static void cn1RefBlockFreeNow(JAVA_LONG block);
-/* A hash table owns one allocation. The remaining parts are borrowed slices,
- * each with only a 16-byte capacity prefix; allocation/retirement metadata is
- * stored once, on the root. The shared reference/primitive kernels apply.
+/* A hash table owns one allocation: keys, values, then int metadata (and, ordered,
+ * the two link arrays), packed back to back with NO per-part prefix. The parts are
+ * interior pointers found from the root's capacity; nothing reads a capacity or a
+ * re-scan word through a part. That holds because every reference store into a
+ * table goes through its OWNER (NativeStorage.setOwned and the owner-targeted
+ * natives), the collector walks a values part from the root (cn1GcMarkTablePart),
+ * and every capacity question is asked of the root. Measured: a 16-byte prefix per
+ * extra part, plus the padding to reach it, was ~64 of the ~176 bytes of a 4-slot
+ * HashMap table, on 216k live tables at the self-hosting peak.
  * Only part zero may be freed or retired. */
-static size_t cn1TableIntStride(JAVA_INT capacity) {
-    size_t bytes = 16 + (size_t)capacity * sizeof(JAVA_INT);
-    return (bytes + 15) & ~(size_t)15;
-}
-
 JAVA_LONG cn1TablePart(JAVA_LONG table, JAVA_INT part) {
     if(table == 0) return 0;
-    CN1NativeBlock* root = cn1BlockHeader(table);
-    size_t referenceStride = (16 + (size_t)root->capacity * sizeof(JAVA_OBJECT) + 15) & ~(size_t)15;
-    size_t offset = part < 2 ? (size_t)part * referenceStride
-        : 2 * referenceStride + (size_t)(part - 2) * cn1TableIntStride(root->capacity);
+    size_t cap = (size_t)cn1BlockHeader(table)->capacity;
+    size_t offset = part < 2 ? (size_t)part * cap * sizeof(JAVA_OBJECT)
+        : 2 * cap * sizeof(JAVA_OBJECT) + (size_t)(part - 2) * cap * sizeof(JAVA_INT);
     return table + (JAVA_LONG)offset;
 }
 
@@ -2846,9 +2847,9 @@ JAVA_LONG cn1TableAlloc(JAVA_INT capacity, JAVA_BOOLEAN ordered) {
             (SIZE_MAX - 5 * sizeof(CN1NativeBlock) - 5 * 15) /
             (2 * sizeof(JAVA_OBJECT) + 3 * sizeof(JAVA_INT))) return 0;
     int parts = ordered ? 5 : 3;
-    size_t bytes = sizeof(CN1NativeBlock) - 16
-        + 2 * ((16 + (size_t)capacity * sizeof(JAVA_OBJECT) + 15) & ~(size_t)15)
-        + (size_t)(parts - 2) * cn1TableIntStride(capacity);
+    size_t bytes = sizeof(CN1NativeBlock)
+        + 2 * (size_t)capacity * sizeof(JAVA_OBJECT)
+        + (size_t)(parts - 2) * (size_t)capacity * sizeof(JAVA_INT);
     JAVA_LONG table = cn1BlockAlloc(1, bytes - sizeof(CN1NativeBlock));
     if(table == 0) return 0;
     cn1BlockHeader(table)->capacity = capacity;
@@ -2863,10 +2864,6 @@ JAVA_LONG cn1TableAlloc(JAVA_INT capacity, JAVA_BOOLEAN ordered) {
                 (long)(bytes), memory_order_relaxed);
     }
 #endif
-    for(int part = 1; part < parts; part++) {
-        char* data = (char*)(uintptr_t)cn1TablePart(table, part);
-        *(JAVA_INT*)(data - (sizeof(CN1NativeBlock) - offsetof(CN1NativeBlock, capacity))) = capacity;
-    }
     cn1GcGenTagTable(table, parts);
     return table;
 }
@@ -3068,6 +3065,17 @@ void cn1RefBlockSet(CODENAME_ONE_THREAD_STATE, JAVA_LONG block, JAVA_INT index, 
     *slot = value;
 }
 
+// STORE into reference part `part` of the table whose root is `table`. The same barriers
+// as cn1RefBlockSet, except that the ROOT is remembered: a part has no header, so its
+// "scan word" would be the last key slot of the part before it.
+void cn1TableRefSet(CODENAME_ONE_THREAD_STATE, JAVA_LONG table, JAVA_INT part, JAVA_INT index, JAVA_OBJECT value) {
+    JAVA_OBJECT* slot = &((JAVA_OBJECT*)(uintptr_t)cn1TablePart(table, part))[index];
+    CN1_SATB_DELETE(slot);
+    CN1_WRITE_BARRIER(JAVA_NULL, value);
+    CN1_GEN_REMEMBER_BLOCK(table, value);
+    *slot = value;
+}
+
 // ---- DEFERRED BLOCK RE-SCAN --------------------------------------------------------
 // A same-block shift or an addAll during a mark used to log, ON THE MUTATOR, the old
 // value of every slot it moved: O(count) mark-word loads and a mutex acquisition per 256,
@@ -3119,9 +3127,9 @@ static inline int* cn1BlockScanWord(JAVA_LONG block) {
 // A block is not an object, so it cannot go on a page card. It is remembered itself: a
 // bit in the same spare word the re-scan protocol uses (whose own bits are all masked),
 // and the first set pushes it onto a list the next cycle's scan consumes. A hash-table
-// PART is a slice of its root's allocation with no header of its own, so it is tagged at
-// allocation (CN1_BLOCK_GEN_PART) and carries its root pointer in the 8 unused bytes of
-// its prefix; the ROOT is what is remembered, and the scan traces its reference parts.
+// PART is an interior slice of its root's allocation with no header at all; every store
+// into a table is made through its owner with the ROOT, so the root is what is
+// remembered (CN1_BLOCK_GEN_TABLE), and the scan traces its reference parts from it.
 //
 // FREED WHILE REMEMBERED is the case that decides soundness. The owner can drop a block
 // -- growth copies it into a fresh one and retires the old -- while the young objects it
@@ -3130,7 +3138,6 @@ static inline int* cn1BlockScanWord(JAVA_LONG block) {
 // mutex orders the free check against the scan; it is only ever taken in this mode.
 #define CN1_BLOCK_GEN_REMEMBERED  0x10000000
 #define CN1_BLOCK_GEN_FREEPENDING 0x08000000
-#define CN1_BLOCK_GEN_PART        0x04000000
 #define CN1_BLOCK_GEN_TABLE       0x02000000
 static pthread_mutex_t cn1GcBlockRsetMutex = PTHREAD_MUTEX_INITIALIZER;
 static JAVA_LONG* cn1GcBlockRset = 0;
@@ -3139,11 +3146,7 @@ static long cn1GcBlockRsetN = 0, cn1GcBlockRsetCap = 0;
 static void cn1GcGenTagTable(JAVA_LONG table, int parts) {
 #ifdef CN1_BLOCK_RESCAN
     __atomic_fetch_or(cn1BlockScanWord(table), CN1_BLOCK_GEN_TABLE, __ATOMIC_RELAXED);
-    for(int part = 1 ; part < parts ; part++) {
-        JAVA_LONG pp = cn1TablePart(table, part);
-        *(JAVA_LONG*)((char*)(uintptr_t)pp - 16) = table;
-        __atomic_fetch_or(cn1BlockScanWord(pp), CN1_BLOCK_GEN_PART, __ATOMIC_RELAXED);
-    }
+    (void)parts;   // parts have no prefix to tag; see cn1TablePart
 #else
     (void)table; (void)parts;
 #endif
@@ -3151,9 +3154,8 @@ static void cn1GcGenTagTable(JAVA_LONG table, int parts) {
 
 void cn1GcRememberBlock(JAVA_LONG b) {
 #ifdef CN1_BLOCK_RESCAN
-    if(__atomic_load_n(cn1BlockScanWord(b), __ATOMIC_RELAXED) & CN1_BLOCK_GEN_PART) {
-        b = *(JAVA_LONG*)((char*)(uintptr_t)b - 16);
-    }
+    // A table PART is never passed here: it has no header, and every store into a table
+    // goes through its owner (see cn1TablePart).
     int* w = cn1BlockScanWord(b);
     if(__atomic_load_n(w, __ATOMIC_RELAXED) & CN1_BLOCK_GEN_REMEMBERED) {
         return;
@@ -3228,7 +3230,7 @@ static void cn1GcBlockRsetScan(struct ThreadLocalData* d, JAVA_BOOLEAN trace) {
 #endif
             cn1GcMarkRefBlock(d, b, JAVA_FALSE);
             if(prev & CN1_BLOCK_GEN_TABLE) {
-                cn1GcMarkRefBlock(d, cn1TablePart(b, 1), JAVA_FALSE);
+                cn1GcMarkTablePart(d, b, 1, JAVA_FALSE);
             }
             incomplete = cn1GcTraceIncomplete;
             cn1GcTraceIncomplete = 0;
@@ -3475,6 +3477,20 @@ static void cn1GcMarkReferenceRange(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT* refs
             }
         }
     }
+}
+
+// Trace reference part `part` of the table whose root is `table`. The part and its
+// count both come from the root the caller read ONCE, so a marker racing a rehash can
+// never pair a new part with an old capacity. Called from generated __GC_MARK_.
+void cn1GcMarkTablePart(CODENAME_ONE_THREAD_STATE, JAVA_LONG table, JAVA_INT part, JAVA_BOOLEAN force) {
+    if(table == 0) {
+        return;
+    }
+    JAVA_INT count = cn1RefBlockCount(table);
+    if(count <= 0) {
+        return;
+    }
+    cn1GcMarkReferenceRange(threadStateData, (JAVA_OBJECT*)(uintptr_t)cn1TablePart(table, part), count, force);
 }
 
 // Trace `count` elements. Called from the owner's generated __GC_MARK_.

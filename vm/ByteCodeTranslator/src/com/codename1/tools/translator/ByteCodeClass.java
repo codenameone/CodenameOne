@@ -109,14 +109,24 @@ public class ByteCodeClass {
     private static final class NativeBlock {
         final String owner, field;
         final boolean references, owns;
+        // For a reference PART of a table: the field holding the table's root, and the
+        // part index. A part has no header of its own (see cn1TablePart in
+        // cn1_globals.m), so it is walked through the root.
+        final String rootField;
+        final int part;
         NativeBlock(String owner, String field, boolean references) {
             this(owner, field, references, true);
         }
         NativeBlock(String owner, String field, boolean references, boolean owns) {
+            this(owner, field, references, owns, null, 0);
+        }
+        NativeBlock(String owner, String field, boolean references, boolean owns, String rootField, int part) {
             this.owner = owner;
             this.field = field;
             this.references = references;
             this.owns = owns;
+            this.rootField = rootField;
+            this.part = part;
         }
     }
 
@@ -127,7 +137,7 @@ public class ByteCodeClass {
         new NativeBlock("java_util_LinkedHashMap", "cn1Prev", false, false),
         new NativeBlock("java_util_LinkedHashMap", "cn1Next", false, false),
         new NativeBlock("java_util_Hashtable", "cn1Keys", true),
-        new NativeBlock("java_util_Hashtable", "cn1Vals", true, false),
+        new NativeBlock("java_util_Hashtable", "cn1Vals", true, false, "cn1Keys", 1),
         new NativeBlock("java_util_Hashtable", "cn1Meta", false, false),
         new NativeBlock("java_util_ArrayList", "cn1Storage", true),
         new NativeBlock("java_util_Vector", "cn1Storage", true),
@@ -136,7 +146,7 @@ public class ByteCodeClass {
         new NativeBlock("java_util_HashSet", "cn1KeysBlock", true),
         new NativeBlock("java_util_HashSet", "cn1MetaBlock", false),
         new NativeBlock("java_util_HashMap", "cn1KeysBlock", true),
-        new NativeBlock("java_util_HashMap", "cn1ValsBlock", true, false),
+        new NativeBlock("java_util_HashMap", "cn1ValsBlock", true, false, "cn1KeysBlock", 1),
         new NativeBlock("java_util_HashMap", "cn1MetaBlock", false, false),
     };
 
@@ -1585,9 +1595,15 @@ public class ByteCodeClass {
                 // No count argument: the block carries its own length one slot below the
                 // pointer. Passing a separate capacity field would let a marker pair a new
                 // block with a stale capacity -- see cn1RefBlockAlloc.
-                b.append("    cn1GcMarkRefBlock(threadStateData, ((struct obj__");
-                b.append(clsName).append("*)objToMark)->").append(block.owner).append("_").append(block.field);
-                b.append(", force);\n");
+                if (block.rootField != null) {
+                    b.append("    cn1GcMarkTablePart(threadStateData, ((struct obj__");
+                    b.append(clsName).append("*)objToMark)->").append(block.owner).append("_").append(block.rootField);
+                    b.append(", ").append(block.part).append(", force);\n");
+                } else {
+                    b.append("    cn1GcMarkRefBlock(threadStateData, ((struct obj__");
+                    b.append(clsName).append("*)objToMark)->").append(block.owner).append("_").append(block.field);
+                    b.append(", force);\n");
+                }
             }
         }
         // NO SELF-STAMP. This function used to end by storing currentGcMarkValue into the

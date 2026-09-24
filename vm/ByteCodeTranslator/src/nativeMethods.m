@@ -4068,6 +4068,11 @@ static long long cn1CcBytes[3][7];
 static int cn1CcBucket(int n) {
     return n <= 0 ? 0 : n == 1 ? 1 : n == 2 ? 2 : n <= 4 ? 3 : n <= 8 ? 4 : n <= 16 ? 5 : 6;
 }
+// Bytes the block's allocation asked for, header included: read from the header, so the
+// census follows the layout instead of restating it.
+static long long cn1CensusBlockBytes(JAVA_LONG block) {
+    return block == 0 ? 0 : (long long)((const CN1NativeBlock*)(uintptr_t)block - 1)->bytes;
+}
 void cn1CollectionCensusNote(JAVA_OBJECT o) {
     struct clazz* c = o->__codenameOneParentClsReference;
     int kind = -1, n = 0;
@@ -4076,21 +4081,22 @@ void cn1CollectionCensusNote(JAVA_OBJECT o) {
     if(c == &class__java_util_ArrayList) {
         struct obj__java_util_ArrayList* l = (struct obj__java_util_ArrayList*)o;
         kind = 0; n = l->java_util_ArrayList_size;
-        if(l->java_util_ArrayList_cn1Storage != 0) bytes = (long long)cn1RefBlockCount(l->java_util_ArrayList_cn1Storage) * 8 + 48;
+        bytes = cn1CensusBlockBytes(l->java_util_ArrayList_cn1Storage);
     }
 #endif
 #ifdef CN1_COLL_HASHMAP
     if(c == &class__java_util_HashMap) {
         struct obj__java_util_HashMap* m = (struct obj__java_util_HashMap*)o;
         kind = 1; n = m->java_util_HashMap_elementCount;
-        if(m->java_util_HashMap_cn1KeysBlock != 0) bytes = (long long)m->java_util_HashMap_cn1Cap * 20 + 80;
+        bytes = cn1CensusBlockBytes(m->java_util_HashMap_cn1KeysBlock);   // the whole table
     }
 #endif
 #ifdef CN1_COLL_SET
     if(c == &class__java_util_HashSet) {
         struct obj__java_util_HashSet* hs = (struct obj__java_util_HashSet*)o;
         kind = 2; n = hs->java_util_HashSet_cn1Size;
-        if(hs->java_util_HashSet_cn1KeysBlock != 0) bytes = (long long)hs->java_util_HashSet_cn1Cap * 12 + 96;
+        bytes = cn1CensusBlockBytes(hs->java_util_HashSet_cn1KeysBlock)
+              + cn1CensusBlockBytes(hs->java_util_HashSet_cn1MetaBlock);
     }
 #endif
     if(kind < 0) return;
@@ -4496,7 +4502,8 @@ JAVA_INT java_util_NativeStorage_rehash___long_long_long_long_int_long_long_long
         JAVA_LONG newMetadata, JAVA_LONG newPrev, JAVA_LONG newNext) {
     JAVA_INT* source = (JAVA_INT*)(uintptr_t)metadata;
     JAVA_INT* target = (JAVA_INT*)(uintptr_t)newMetadata;
-    JAVA_INT capacity = cn1RefBlockCount(metadata), mask = cn1RefBlockCount(newMetadata) - 1;
+    // Capacities from the ROOTS (keys): a table part has no header (see cn1TablePart).
+    JAVA_INT capacity = cn1RefBlockCount(keys), mask = cn1RefBlockCount(newKeys) - 1;
     JAVA_INT tail = -1;
     for(JAVA_INT i = links ? head : 0; i >= 0 && i < capacity;
             i = links ? cn1IntBlockGet(links, i) : i + 1) {
@@ -4510,7 +4517,8 @@ JAVA_INT java_util_NativeStorage_rehash___long_long_long_long_int_long_long_long
         }
         target[slot] = marker;
         cn1RefBlockSet(threadStateData, newKeys, slot, cn1RefBlockGet(keys, i));
-        cn1RefBlockSet(threadStateData, newValues, slot, cn1RefBlockGet(values, i));
+        // Values are a PART of the new table: the barrier must remember its root.
+        cn1TableRefSet(threadStateData, newKeys, 1, slot, cn1RefBlockGet(values, i));
         if(links) {
             cn1IntBlockSet(newPrev, slot, tail);
             cn1IntBlockSet(newNext, slot, -1);
