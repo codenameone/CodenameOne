@@ -4094,6 +4094,14 @@ public abstract class CodenameOneImplementation {
         return blurRegion(graphics, x, y, width, height, radius);
     }
 
+    /// The glass material with a luminance curve term and an edge outline (see
+    /// `Graphics.glassRegion(int, int, int, int, float, float, float, float, float, float, float, float, float, float)`).
+    /// Defaults to the affine overload, dropping both, so a port that has not
+    /// implemented them renders exactly as it did before they existed.
+    public boolean glassRegion(Object graphics, int x, int y, int width, int height, float radius, float cornerRadius, float sat, float scale, float offset, float refract, float specular, float curve, float curveMid, float outline) {
+        return glassRegion(graphics, x, y, width, height, radius, cornerRadius, sat, scale, offset, refract, specular);
+    }
+
     /// In-place iOS 26 selection-drop LENS (magnify + chromatic aberration +
     /// dark-&gt;accent tint over the painted content). Default unsupported; the iOS
     /// port overrides it. Returns false so callers can fall back (e.g. to a tint).

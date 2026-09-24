@@ -46,8 +46,9 @@ package com.codename1.ui.plaf;
 /// on top of the content rather than a flat hole.
 /// - `chrome27`, `pill27`, `panel27` -- the same three materials as
 /// iOS 27 retuned them. Light is measured as unchanged in chrome and pill;
-/// dark moved in all three. See {@link #liquidPanel27(boolean)} for how the
-/// constants were measured and why dark is approximate.
+/// dark moved in all three, and dark chrome and pill are the only materials
+/// that are not affine: they carry a luminance curve (see {@link #getCurve()}).
+/// See {@link #liquidPanel27(boolean)} for how the constants were measured.
 ///
 /// A theme assigns a recipe per UIID with the theme constant
 /// `<UIID>GlassRecipe` (for example `ToolbarGlassRecipe: chrome`),
@@ -81,15 +82,31 @@ public final class GlassRecipe {
     private final float offset;
     private final float refraction;
     private final float specular;
+    private final float curve;
+    private final float curveMid;
+    private final float outline;
 
     private GlassRecipe(Kind kind, float saturation, float scale, float offset,
             float refraction, float specular) {
+        this(kind, saturation, scale, offset, refraction, specular, 0f, 0f);
+    }
+
+    private GlassRecipe(Kind kind, float saturation, float scale, float offset,
+            float refraction, float specular, float curve, float curveMid) {
+        this(kind, saturation, scale, offset, refraction, specular, curve, curveMid, 0f);
+    }
+
+    private GlassRecipe(Kind kind, float saturation, float scale, float offset,
+            float refraction, float specular, float curve, float curveMid, float outline) {
         this.kind = kind;
         this.saturation = saturation;
         this.scale = scale;
         this.offset = offset;
         this.refraction = refraction;
         this.specular = specular;
+        this.curve = curve;
+        this.curveMid = curveMid;
+        this.outline = outline;
     }
 
     /// Plain backdrop blur with no material transform.
@@ -145,14 +162,22 @@ public final class GlassRecipe {
     /// so the iOS 26 numbers are reused verbatim rather than replaced by a
     /// near-identical duplicate that would read as a real difference.
     ///
-    /// DARK is the best affine fit (rms 14.6/255) and is KNOWN NOT TO BE EXACT.
-    /// See {@link #liquidPanel27(boolean)} for why dark cannot be fitted properly.
+    /// DARK carries the luminance curve. The best affine fit left rms 14.6/255
+    /// with a systematic bend in the residual; the curved material halves that,
+    /// to 8.0/255. Chrome bends hardest of the three (curve 1.65) because the
+    /// bar sits over the full range of content luma. See
+    /// {@link #liquidPanel27(boolean)} for the method.
+    ///
+    /// Unlike the pill, this one is fitted but NOT verified on device: the
+    /// fidelity suite's Toolbar tile paints a Toolbar-styled container rather
+    /// than a form toolbar, so no glass material reaches it and its score does
+    /// not move with these constants (it was byte-identical across the change).
     ///
     /// @param dark true for the dark appearance
     /// @return the iOS 27 chrome-bar recipe
     public static GlassRecipe liquidChrome27(boolean dark) {
         return dark
-                ? new GlassRecipe(Kind.LIQUID_CHROME, 1.98f, 0.764f, 51.3f, 0f, 0f)
+                ? new GlassRecipe(Kind.LIQUID_CHROME, 4.5f, 0.349f, 96.6f, 0f, 0f, 1.65f, 0.45f)
                 : new GlassRecipe(Kind.LIQUID_CHROME, 1.1f, 0.85f, 20f, 0f, 0f);
     }
 
@@ -160,14 +185,19 @@ public final class GlassRecipe {
     ///
     /// LIGHT is again measured as unchanged -- the fit returned 1.86 / 0.984 /
     /// 111.4 against iOS 26's 1.80 / 1.000 / 108.0 -- so the iOS 26 values are
-    /// reused. DARK is the best affine fit and, like chrome, is approximate.
+    /// reused as the MATERIAL. DARK carries the luminance curve, which takes the
+    /// fit from rms 11.4/255 to 4.4/255.
+    ///
+    /// Both appearances carry the iOS 27 edge outline (see {@link #getOutline()}),
+    /// softer on the pill than on the panel: a 127 backdrop falls to about 85 on
+    /// the capsule's boundary pixel in both light and dark, hence 0.55.
     ///
     /// @param dark true for the dark appearance
     /// @return the iOS 27 floating-pill recipe
     public static GlassRecipe liquidPill27(boolean dark) {
         return dark
-                ? new GlassRecipe(Kind.LIQUID_PILL, 3.04f, 0.244f, 45.5f, 0f, 0.2f)
-                : new GlassRecipe(Kind.LIQUID_PILL, 1.8f, 1.0f, 108f, 0f, 0.2f);
+                ? new GlassRecipe(Kind.LIQUID_PILL, 5.9f, 0.129f, 77.1f, 0f, 0.2f, 0.065f, 0.85f, 0.55f)
+                : new GlassRecipe(Kind.LIQUID_PILL, 1.8f, 1.0f, 108f, 0f, 0.2f, 0f, 0f, 0.55f);
     }
 
     /// The iOS 27 glass-panel material, and the recipe that carries the method
@@ -188,45 +218,55 @@ public final class GlassRecipe {
     /// The method self-checks: run against the iOS 26 set it recovers the iOS 26
     /// chrome constants it was never told, to within 1.3%.
     ///
-    /// WHY DARK IS APPROXIMATE, IN ALL THREE RECIPES. After the best affine fit,
+    /// WHY DARK CHROME AND PILL HAVE A CURVE. After the best affine fit,
     /// the light residual is flat across the whole backdrop-luma range (within
     /// +/-0.9/255). The dark residual is not: on the chrome bar it runs +8.9 at
     /// low luma, -9.3 through the middle and +10.3 at high luma -- a systematic
-    /// curve, not noise. iOS 27's dark glass therefore applies a NON-LINEAR
-    /// luminance response, and no choice of sat/scale/offset can express it,
-    /// because this transform is affine by construction. Matching dark properly
-    /// needs a curve term in the material model and in every port's shader, which
-    /// is a larger change than new constants; these values are the closest an
-    /// affine material gets until then.
+    /// parabola, not noise. iOS 27's dark glass applies a NON-LINEAR luminance
+    /// response that no choice of sat/scale/offset can express, so the dark
+    /// chrome and pill recipes add `curve * 255 * (lum / 255 - curveMid)^2` to
+    /// every channel (see {@link #getCurve()}). The fit is the same inversion as
+    /// above, with the vertex gridded and the rest solved by least squares: rms
+    /// 14.6 to 8.0 on chrome, 11.4 to 4.4 on the pill. On device the pill tiles
+    /// moved with it -- Tabs dark 68.75% to 73.53%, TabsGeom dark 87.73% to
+    /// 90.81%.
     ///
-    /// DARK'S OFFSET IS THE FIT'S OPTIMUM, 79.8, AND A NUDGE WAS TRIED AND
-    /// REVERTED. At a flat mid-grey backdrop it produces 128 * 0.378 + 79.8 =
-    /// 128.18, and the renderer emits integers, so the panel lands on 128 -- the
-    /// backdrop exactly, with no silhouette. The native capture is not flat
-    /// there: it averages 128.7 over that region across 101 distinct values,
-    /// where our render has 17.
+    /// THIS PANEL STAYS AFFINE, ON MEASUREMENT. Its residual bends far less, and
+    /// the curve only took the fit from rms 3.59 to 3.18. On device that did not
+    /// survive: GlassPanelGrey, GlassText and GlassIcon in dark each lost about
+    /// 0.3 points and none gained, so the affine constants stand.
     ///
-    /// 80.3 was tried, because it puts the arithmetic at 128.68 against the
-    /// native's 128.7 and costs only 0.026/255 of global fit error. Measured on
-    /// device, it changed nothing: 128.68 still quantises to 128. The only other
-    /// reachable value is 129, which overshoots the native by 0.3 instead of
-    /// undershooting by 0.7, and reaching it means choosing an offset for what
-    /// the quantiser does with it rather than for what the platform draws. So
-    /// the fitted value stands.
+    /// Saturation and scale trade off along a flat valley once the curve is
+    /// free: with the vertex and the linear terms re-solved at each saturation,
+    /// chrome fits at rms 8.03 at sat 3.0, 8.02 at 4.5 and 8.02 at 8.5. The
+    /// captures therefore barely constrain saturation, and it is the constant
+    /// most likely to be wrong on a strongly coloured backdrop the fidelity
+    /// tiles do not cover.
     ///
-    /// The consequence is recorded rather than hidden: GlassPanelGrey and
-    /// GlassPanelRed in dark render with no silhouette at all where the native
-    /// has a faint one, ProcessScreenshots reports cn1_empty for them, and
-    /// FidelityGate refuses to baseline a one-sided empty. Closing that needs the
-    /// material model to carry sub-level detail (see the non-affine note below),
-    /// not a different constant.
+    /// THE OUTLINE, AND WHY IT IS WHAT MAKES THE DARK PANEL VISIBLE. Over a flat
+    /// mid-grey the dark material gives 128.18, which the renderer emits as 128
+    /// -- the backdrop exactly -- so the material alone draws no silhouette, and
+    /// no offset changes that (80.3 was tried). The native silhouette is not
+    /// made by the material at all. iOS 27 draws a thin dark line around the
+    /// sides of the glass, in both appearances and over every backdrop, which
+    /// iOS 26 does not: on its boundary pixel each channel of the backdrop `b`
+    /// becomes `max(b - 76, 0.22 * b)` to within a few levels -- grey 126 to 54,
+    /// red 251/58/47 to 179/17/12, the blue gradient 35/148/165 to 7/71/85 --
+    /// and it fades out toward the top and bottom edges. `getOutline()` carries
+    /// that line; this panel's is 0.95, the strength that reproduces the grey
+    /// boundary pixel.
+    ///
+    /// Raising the specular rim instead was tried first, and rejected on
+    /// measurement: a rim bright enough to show over grey (1.2) overshot the
+    /// native rim over the red, photo and gradient backdrops by about two to one
+    /// and cost every other dark panel tile 0.1 to 0.9 points.
     ///
     /// @param dark true for the dark appearance
     /// @return the iOS 27 glass-panel recipe
     public static GlassRecipe liquidPanel27(boolean dark) {
         return dark
-                ? new GlassRecipe(Kind.LIQUID_PANEL, 2.84f, 0.378f, 79.8f, 0.4f, 0.5f)
-                : new GlassRecipe(Kind.LIQUID_PANEL, 2.08f, 0.457f, 137.4f, 0.4f, 0.5f);
+                ? new GlassRecipe(Kind.LIQUID_PANEL, 2.84f, 0.378f, 79.8f, 0.4f, 0.5f, 0f, 0f, 0.95f)
+                : new GlassRecipe(Kind.LIQUID_PANEL, 2.08f, 0.457f, 137.4f, 0.4f, 0.5f, 0f, 0f, 0.95f);
     }
 
     /// Looks up a recipe by its theme name: `blur`, `chrome`,
@@ -318,5 +358,55 @@ public final class GlassRecipe {
     /// @return the specular strength, 0 = none
     public float getSpecular() {
         return specular;
+    }
+
+    /// The strength of the material's luminance CURVE, in levels per unit of
+    /// squared normalised luma distance from `getCurveMid()`. Zero for every
+    /// recipe whose platform material is affine, which is all of them except the
+    /// iOS 27 dark variants.
+    ///
+    /// The full per-pixel material is
+    /// `c' = clamp((lum + (c - lum) * sat) * scale + offset + curve * 255 * (lum / 255 - curveMid)^2)`,
+    /// with `lum` the Rec. 709 luma of the backdrop pixel before the transform. A
+    /// port that does not implement the term reproduces the affine material
+    /// exactly, because the term vanishes when `curve` is zero.
+    ///
+    /// #### Returns
+    ///
+    /// the curve strength; 0 for an affine material
+    public float getCurve() {
+        return curve;
+    }
+
+    /// The strength (0..1) of the thin dark outline iOS 27 draws around the sides
+    /// of its glass; 0 for none, which is every recipe but the iOS 27 panel and
+    /// pill.
+    ///
+    /// On the outermost pixel of the glass, each channel of the backdrop `b`
+    /// under it is darkened by `min(76 * w, 0.78 * w * b)` after the glass is
+    /// composited over it, where `w` is this strength times the horizontal
+    /// component of the edge normal: full on the vertical sides, fading around
+    /// the corners, none along the top and bottom. At full strength that is the
+    /// `max(b - 76, 0.22 * b)` measured on the native boundary pixel.
+    ///
+    /// UIKit draws the line just OUTSIDE the view's bounds. A component cannot
+    /// paint outside its own bounds on every port, so it lands on the outermost
+    /// pixel inside instead -- one pixel inward of the native line.
+    ///
+    /// #### Returns
+    ///
+    /// the outline strength; 0 for none
+    public float getOutline() {
+        return outline;
+    }
+
+    /// The normalised luma (0..1) at which the curve term is zero -- the vertex of
+    /// the parabola. Meaningless when `getCurve()` is zero.
+    ///
+    /// #### Returns
+    ///
+    /// the curve's vertex, as a fraction of full-scale luma
+    public float getCurveMid() {
+        return curveMid;
     }
 }

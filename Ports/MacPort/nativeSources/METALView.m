@@ -2827,8 +2827,25 @@ static uint32_t glassSampleBilinear(uint32_t *buf, int w, int h, float fx, float
 // ARGB patch (rw x rh) with transparent corners. s = contentScaleFactor (logical
 // lengths -- cornerRadius, rim width -- scale to physical px). cornerRadius < 0
 // means capsule.
+// One channel of the iOS 27 edge outline: glass c at coverage alpha composited
+// over backdrop b, then darkened by min(76 * w, 0.78 * w * b) -- at full strength
+// the max(b - 76, 0.22 * b) measured on the native boundary pixel. Mirrors
+// IOSImplementation.glassOutlineChannel; separate statements keep the compiler
+// from contracting the blend into an fma the Java side does not do.
+static int glassOutlineChannel(int c, int b, float alpha, float w) {
+    float v = c * alpha;
+    float under = b * (1.0f - alpha);
+    v = v + under;
+    float dark = 76.0f * w;
+    float alt = 0.78f * w * b;
+    if (alt < dark) { dark = alt; }
+    v = v - dark;
+    return v <= 0.0f ? 0 : (v >= 255.0f ? 255 : (int)(v + 0.5f));
+}
+
 static void glassApplyOptics(uint32_t *src, int bw, int bh, int pad, uint32_t *out,
-        int rw, int rh, float cornerRadius, float refract, float specular, float s) {
+        int rw, int rh, float cornerRadius, float refract, float specular, float s,
+        float outline, const uint32_t *raw) {
     float hw = rw / 2.0f, hh = rh / 2.0f;
     float minhh = hw < hh ? hw : hh;
     float r;
@@ -2881,6 +2898,23 @@ static void glassApplyOptics(uint32_t *src, int bw, int bh, int pad, uint32_t *o
                 rr = rr + add > 255 ? 255 : rr + add;
                 gg = gg + add > 255 ? 255 : gg + add;
                 bb = bb + add > 255 ? 255 : bb + add;
+            }
+            // iOS 27 edge outline (GlassRecipe.getOutline) on the outermost pixel,
+            // weighted by the horizontal component of the edge normal. Emitted
+            // opaque: it is already composited over the backdrop it darkens.
+            if (outline > 0.0f && depth < 1.0f && raw != NULL) {
+                float wx;
+                if (dx > 0 && dy > 0) { wx = outside > 0.0f ? axx / outside : 0.0f; }
+                else { wx = dx >= dy ? 1.0f : 0.0f; }
+                float ow = outline * wx;
+                if (ow > 0.0f) {
+                    uint32_t bk = raw[(size_t)y * rw + x];
+                    rr = glassOutlineChannel(rr, (int)((bk >> 16) & 0xff), alpha, ow);
+                    gg = glassOutlineChannel(gg, (int)((bk >> 8) & 0xff), alpha, ow);
+                    bb = glassOutlineChannel(bb, (int)(bk & 0xff), alpha, ow);
+                    out[(size_t)y * rw + x] = 0xff000000u | ((uint32_t)rr << 16) | ((uint32_t)gg << 8) | (uint32_t)bb;
+                    continue;
+                }
             }
             int a = (int)(alpha * 255.0f);
             int pr = rr * a / 255, pg = gg * a / 255, pb = bb * a / 255;
@@ -3050,7 +3084,10 @@ static void glassApplyOptics(uint32_t *src, int bw, int bh, int pad, uint32_t *o
 typedef struct {
     int valid;
     int fx, fy, fw, fh;
-    float rad, cornerRadius, sat, scale, offset, refract, specular;
+    // curve/curveMid are part of the KEY, not decoration: without them a curved
+    // (iOS 27 dark) recipe and an affine one with the same other constants would
+    // share a slot, and the second paint would be served the first one's patch.
+    float rad, cornerRadius, sat, scale, offset, refract, specular, curve, curveMid, outline;
     uint64_t backdropHash;
     uint32_t *patch;       // composed premultiplied glass patch (fw*fh), malloc'd
 } CN1GlassPatchCacheEntry;
@@ -3073,7 +3110,8 @@ static uint64_t cn1GlassBackdropHash(const uint8_t *bytes, size_t len) {
 // during the drain like blurScreenRegionX; one GPU sync per glass paint.
 - (void)glassScreenRegionX:(int)x y:(int)y w:(int)w h:(int)h radius:(float)radius
               cornerRadius:(float)cornerRadius sat:(float)sat scale:(float)scale
-                    offset:(float)offset refract:(float)refract specular:(float)specular {
+                    offset:(float)offset refract:(float)refract specular:(float)specular
+                     curve:(float)curve curveMid:(float)curveMid outline:(float)outline {
     if (self.screenTexture == nil || w <= 0 || h <= 0 || radius <= 0.0f) {
         return;
     }
@@ -3147,7 +3185,8 @@ static uint64_t cn1GlassBackdropHash(const uint8_t *bytes, size_t len) {
         if (e->valid && e->fx == fx && e->fy == fy && e->fw == fw && e->fh == fh
                 && e->rad == rad && e->cornerRadius == cornerRadius && e->sat == sat
                 && e->scale == scale && e->offset == offset && e->refract == refract
-                && e->specular == specular) {
+                && e->specular == specular && e->curve == curve && e->curveMid == curveMid
+                && e->outline == outline) {
             cacheSlot = ci;
             if (e->backdropHash == backdropHash && e->patch != NULL) {
                 free(avail);
@@ -3177,10 +3216,34 @@ static uint64_t cn1GlassBackdropHash(const uint8_t *bytes, size_t len) {
             float rr = (lum + (rch - lum) * sat) * scale + offset;
             float gg = (lum + (gch - lum) * sat) * scale + offset;
             float bb = (lum + (bch - lum) * sat) * scale + offset;
+            if (curve != 0.0f) {
+                // Luminance curve, identical to IOSImplementation.glassMaterialInPlace:
+                // iOS 27's dark glass bends, and no affine constants express that.
+                float d = lum / 255.0f - curveMid;
+                float k = curve * 255.0f * d * d;
+                rr += k; gg += k; bb += k;
+            }
             int ri = rr < 0 ? 0 : (rr > 255 ? 255 : (int)rr);
             int gi = gg < 0 ? 0 : (gg > 255 ? 255 : (int)gg);
             int bi = bb < 0 ? 0 : (bb > 255 ? 255 : (int)bb);
             prgb[(size_t)by * bw + bx] = 0xff000000u | ((uint32_t)ri << 16) | ((uint32_t)gi << 8) | (uint32_t)bi;
+        }
+    }
+    // The iOS 27 edge outline darkens the BACKDROP under the edge, so keep the
+    // raw pixels under the component (0xffRRGGBB) before avail goes. A failed
+    // allocation only loses the outline, never the glass.
+    uint32_t *raw = NULL;
+    if (outline > 0.0f) {
+        raw = (uint32_t *)malloc((size_t)fw * (size_t)fh * 4);
+        if (raw != NULL) {
+            for (int ry = 0; ry < fh; ry++) {
+                uint8_t *row = avail + (size_t)(fy + ry - ay0) * availRow + (size_t)(fx - ax0) * 4;
+                for (int rx = 0; rx < fw; rx++) {
+                    uint8_t *p = row + (size_t)rx * 4;
+                    raw[(size_t)ry * fw + rx] = 0xff000000u | ((uint32_t)p[2] << 16)
+                            | ((uint32_t)p[1] << 8) | (uint32_t)p[0];
+                }
+            }
         }
     }
     free(avail);
@@ -3189,8 +3252,10 @@ static uint64_t cn1GlassBackdropHash(const uint8_t *bytes, size_t len) {
     glassGaussianBlur(prgb, bw, bh, rad);
     uint32_t *out = (uint32_t *)malloc((size_t)fw * (size_t)fh * 4);
     if (out == NULL) { free(prgb); [self setFramebuffer]; CN1_SCRATCH_RELEASE return; }
-    glassApplyOptics(prgb, bw, bh, pad, out, fw, fh, cornerRadius, refract, specular, (float)s);
+    glassApplyOptics(prgb, bw, bh, pad, out, fw, fh, cornerRadius, refract, specular, (float)s,
+            outline, raw);
     free(prgb);
+    if (raw != NULL) { free(raw); }
 
     // 4b) Store the composed patch in the cache (the cache owns the buffer).
     if (cacheSlot < 0) {
@@ -3205,7 +3270,7 @@ static uint64_t cn1GlassBackdropHash(const uint8_t *bytes, size_t len) {
     entry->fx = fx; entry->fy = fy; entry->fw = fw; entry->fh = fh;
     entry->rad = rad; entry->cornerRadius = cornerRadius; entry->sat = sat;
     entry->scale = scale; entry->offset = offset; entry->refract = refract;
-    entry->specular = specular;
+    entry->specular = specular; entry->curve = curve; entry->curveMid = curveMid; entry->outline = outline;
     entry->backdropHash = backdropHash;
     entry->patch = out;
 

@@ -1570,6 +1570,20 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
         nativeTitle = false;
         softkeyCount = 2;
         thirdSoftButton = false;
+        // Every flag a test can set has to come back here, or it leaks into every
+        // test after it in the JVM. touchDevice did: DialogInWindowTest left it
+        // false, and CodenameOneImplementation.setCommandBehavior then turned a
+        // later test's COMMAND_BEHAVIOR_BUTTON_BAR into SOFTKEY, so
+        // MenuBarDialogSideMenuTest found no command button -- but only when the
+        // filesystem happened to order the two classes that way, which made it
+        // look intermittent. These six were the setter-backed fields reset()
+        // missed; the values are their declared defaults.
+        touchDevice = true;
+        portrait = true;
+        tablet = false;
+        trueTypeSupported = true;
+        autoProcessConnections = true;
+        locationButtonReady = true;
         nativeFontSchemeSupported = true;
         nativeImageCacheSupported = false;
         resetTextSelectionTracking();
