@@ -27,6 +27,7 @@ import com.codename1.backend.Crypto;
 import com.codename1.backend.HttpServer;
 import com.codename1.backend.Span;
 import com.codename1.backend.Tracer;
+import com.codename1.backend.Tracing;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -203,8 +204,11 @@ public final class OtlpTracer implements Tracer {
                 delay, relayBytes * 4L);
         if(config.getBoolean(RELAY, false)) {
             String path = config.get(RELAY_PATH, "/otel/v1/traces").trim();
-            if(!path.startsWith("/")) {
-                throw new IOException(RELAY_PATH + " must start with / and is '" + path + "'");
+            if(!isOriginFormPath(path)) {
+                throw new IOException(RELAY_PATH + " must be a path such as /otel/v1/traces: "
+                        + "it starts with /, has no query or fragment, and uses only the "
+                        + "ASCII characters a URL path allows (percent-encode anything "
+                        + "else); it is '" + path + "'");
             }
             relay = new OtlpRelay(path, config.get(RELAY_TOKEN), relayBytes,
                     positive(config, RELAY_MAX_SPANS, 1000), config.get(RELAY_CORS_ORIGIN),
@@ -275,6 +279,28 @@ public final class OtlpTracer implements Tracer {
 
     void ended(OtelSpan span) {
         exporter.add(span);
+    }
+
+    /**
+     * Whether {@code path} is an origin-form path the relay can match byte for
+     * byte: RFC 3986 pchar and "/", nothing else. The relay compares the raw
+     * request path, so a non-ASCII character used to be folded to '?' and the
+     * relay listened somewhere nobody configured, and a query or fragment could
+     * never match at all, since only the path is compared.
+     */
+    static boolean isOriginFormPath(String path) {
+        if(path.length() == 0 || path.charAt(0) != '/') {
+            return false;
+        }
+        for(int iter = 0 ; iter < path.length() ; iter++) {
+            char c = path.charAt(iter);
+            boolean allowed = (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z')
+                    || (c >= '0' && c <= '9') || "-._~!$&'()*+,;=:@/%".indexOf(c) >= 0;
+            if(!allowed) {
+                return false;
+            }
+        }
+        return true;
     }
 
     /**
@@ -557,6 +583,9 @@ public final class OtlpTracer implements Tracer {
         while(it.hasNext()) {
             Map.Entry entry = (Map.Entry)it.next();
             String name = String.valueOf(entry.getKey());
+            if(name.length() == 0) {
+                throw new IOException(HEADERS + " has an entry with no header name");
+            }
             for(int iter = 0 ; iter < name.length() ; iter++) {
                 char c = name.charAt(iter);
                 boolean token = (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z')
@@ -567,6 +596,18 @@ public final class OtlpTracer implements Tracer {
                 }
             }
             out.add(name + ": " + entry.getValue());
+        }
+        // A value is percent-decoded, so %0A becomes a real newline here. Checked
+        // now, by the rules Web applies when it sends: accepting it started a
+        // server that then failed every export on that check and dropped every
+        // span. The message names the header, never the value -- it is usually a
+        // credential.
+        try {
+            Tracing.checkHeaderLines(out);
+        } catch (IOException err) {
+            IOException refused = new IOException(HEADERS + ": " + err.getMessage());
+            refused.initCause(err);
+            throw refused;
         }
     }
 

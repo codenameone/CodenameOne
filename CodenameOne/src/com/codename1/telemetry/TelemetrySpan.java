@@ -239,8 +239,27 @@ public final class TelemetrySpan {
     /// This span as a W3C `traceparent` header value, for a transport the
     /// framework does not instrument itself -- a WebSocket message, a push token
     /// registration.
+    ///
+    /// Null for the span [Telemetry#startSpan(String)] hands out when there is
+    /// no trace to join: telemetry is not installed, consent is required and not
+    /// given, or the platform cannot make ids. Its ids are all zeros, which W3C
+    /// Trace Context defines as invalid, so a header built from them would be
+    /// refused or misread downstream. An unsampled span is different: it is a real
+    /// trace whose decision must travel, and it answers with its `-00` flags.
+    ///
+    /// #### Returns
+    ///
+    /// the header value, or null when there is no trace
     public String getTraceparent() {
+        if (owner == null) {
+            return null;
+        }
         return "00-" + traceId + "-" + spanId + (sampled ? "-01" : "-00");
+    }
+
+    /// Whether `state` recorded this span.
+    boolean isOwnedBy(Telemetry.State state) {
+        return owner == state; //NOPMD CompareObjectsWithEquals
     }
 
     /// Ends the span. Only the first call counts.

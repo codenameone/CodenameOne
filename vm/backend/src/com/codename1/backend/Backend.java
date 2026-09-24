@@ -77,17 +77,22 @@ public final class Backend {
     private final EntityManager entities;
     private final Config config;
     private final int shutdownMillis;
-    /** Whether this server installed the tracer, and so owns shutting it down. */
-    private final boolean tracing;
+    /**
+     * The tracer this server installed, or null. The INSTANCE, not a flag: the
+     * global slot may hold another tracer by the time this server stops -- a
+     * second server in the same process, or one the application installed -- and
+     * stopping this one must not shut that down.
+     */
+    private final Tracer ownTracer;
 
     private Backend(HttpServer server, DataSource dataSource, EntityManager entities,
-                    Config config, int shutdownMillis, boolean tracing) {
+                    Config config, int shutdownMillis, Tracer ownTracer) {
         this.server = server;
         this.dataSource = dataSource;
         this.entities = entities;
         this.config = config;
         this.shutdownMillis = shutdownMillis;
-        this.tracing = tracing;
+        this.ownTracer = ownTracer;
     }
 
     /** A builder whose defaults come from the configuration this process sees. */
@@ -139,8 +144,8 @@ public final class Backend {
         }
         // LAST, so the spans of the requests the drain let finish are exported
         // rather than lost with the process.
-        if(tracing) {
-            Tracing.shutdown(shutdownMillis);
+        if(ownTracer != null) {
+            Tracing.shutdown(ownTracer, shutdownMillis);
         }
     }
 
@@ -450,7 +455,7 @@ public final class Backend {
                 return startTraced(tracing);
             } catch (Exception err) {
                 if(tracing) {
-                    Tracing.shutdown(0);
+                    Tracing.shutdown(tracer, 0);
                 }
                 throw err;
             }
@@ -630,7 +635,8 @@ public final class Backend {
             // The websocket routes went in through start() above, before the
             // listener began accepting -- registering them here instead left a
             // window in which a valid upgrade was answered as ordinary HTTP.
-            Backend backend = new Backend(server, pool, manager, config, drain, tracing);
+            Backend backend = new Backend(server, pool, manager, config, drain,
+                    tracing ? tracer : null);
             if(!quiet) {
                 announce(backend, listenPort, context != null);
             }

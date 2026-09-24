@@ -208,7 +208,12 @@ public final class Telemetry {
             if (spanBytes == null) {
                 return null;
             }
-            if (parent != null && parent.traceId.length() == 32 && !isZero(parent.spanId)) {
+            // Only a parent THIS installation recorded. A thread still inside
+            // run() across an uninstall and reinstall holds the old one's span, and
+            // inheriting it would file the new installation's spans under the old
+            // trace, with the old sampling decision, possibly at another collector.
+            if (parent != null && parent.isOwnedBy(this) && parent.traceId.length() == 32
+                    && !isZero(parent.spanId)) {
                 traceId = parent.traceId;
                 parentId = parent.spanId;
                 // Follow the parent's decision, so a trace is whole or absent.

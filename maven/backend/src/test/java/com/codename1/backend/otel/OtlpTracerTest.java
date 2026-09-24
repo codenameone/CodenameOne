@@ -58,6 +58,8 @@ import java.util.Properties;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -369,6 +371,61 @@ class OtlpTracerTest {
             busy.join();
             tracer.shutdown(0);
         }
+    }
+
+    @Test
+    @DisplayName("a header value that cannot be sent is refused when the tracer opens")
+    void anUnsendableHeaderIsRefusedAtStartup() throws Exception {
+        Properties settings = settings(freePort());
+        settings.setProperty(OtlpTracer.HEADERS, "Authorization=token%0Aextra");
+        IOException refused = assertThrows(IOException.class,
+                () -> new OtlpTracer().open(Config.of(settings, "test")));
+        assertTrue(refused.getMessage().contains("Authorization"), refused.getMessage());
+        assertFalse(refused.getMessage().contains("token"),
+                "the refusal quoted the credential: " + refused.getMessage());
+        settings.setProperty(OtlpTracer.HEADERS, "Host=collector.example");
+        assertThrows(IOException.class, () -> new OtlpTracer().open(Config.of(settings, "test")));
+    }
+
+    @Test
+    @DisplayName("the relay refuses a negative timestamp instead of forwarding it")
+    void aNegativeTimestampIsRefused() throws Exception {
+        java.util.Map request = (java.util.Map)com.codename1.backend.Json.parse(
+                "{\"resourceSpans\":[{\"scopeSpans\":[{\"spans\":[{\"traceId\":\""
+                + TRACE + "\",\"spanId\":\"" + CALLER_SPAN + "\",\"name\":\"x\","
+                + "\"startTimeUnixNano\":\"-1\"}]}]}]}");
+        IOException refused = assertThrows(IOException.class,
+                () -> OtlpSchema.sanitize(request));
+        assertTrue(refused.getMessage().contains("startTimeUnixNano"), refused.getMessage());
+    }
+
+    @Test
+    @DisplayName("stopping a server leaves a tracer it did not install running")
+    void stoppingAServerLeavesAnotherTracerAlone() throws Exception {
+        int port = freePort();
+        Backend backend = Backend.builder(Config.of(settings(port), "test"))
+                .quiet()
+                .tracing(new OtlpTracer())
+                .handler(new HttpServer.Handler() {
+                    public HttpServer.Response handle(HttpServer.Request request) {
+                        return null;
+                    }
+                })
+                .start();
+        final int[] shutdowns = new int[1];
+        ThrowingTracer replacement = new ThrowingTracer() {
+            public void shutdown(int timeoutMillis) {
+                shutdowns[0]++;
+            }
+        };
+        try {
+            Tracing.install(replacement);
+        } finally {
+            backend.stop();
+        }
+        assertSame(replacement, Tracing.getTracer(),
+                "stopping the server uninstalled a tracer it never installed");
+        assertEquals(0, shutdowns[0], "stopping the server shut down another tracer");
     }
 
     @Test

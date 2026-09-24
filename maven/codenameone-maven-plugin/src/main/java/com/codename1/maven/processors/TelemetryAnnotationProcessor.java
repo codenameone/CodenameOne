@@ -332,18 +332,21 @@ public final class TelemetryAnnotationProcessor extends AbstractAnnotationProces
         return true;
     }
 
-    /// ":" then 1-5 digits.
+    /// ":" then a TCP port, 1 through 65535. Five digits alone let 99999 through,
+    /// and the generated exporter, which fails silently, then lost every span.
     private static boolean validPort(String colonPort) {
         if (!colonPort.startsWith(":") || colonPort.length() < 2 || colonPort.length() > 6) {
             return false;
         }
+        int port = 0;
         for (int i = 1; i < colonPort.length(); i++) {
             char c = colonPort.charAt(i);
             if (c < '0' || c > '9') {
                 return false;
             }
+            port = port * 10 + (c - '0');
         }
-        return true;
+        return port >= 1 && port <= 65535;
     }
 
     private static String quote(String value) {

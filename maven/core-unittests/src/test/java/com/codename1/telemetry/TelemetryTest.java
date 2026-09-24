@@ -156,6 +156,8 @@ class TelemetryTest extends UITestBase {
         assertNull(connection(API).getHeaders().get("traceparent"));
         TelemetrySpan span = Telemetry.startSpan("noop");
         assertFalse(span.isRecording());
+        assertNull(span.getTraceparent(),
+                "a span with no trace must not hand out an all-zero traceparent");
         span.end();
     }
 
@@ -167,6 +169,9 @@ class TelemetryTest extends UITestBase {
         assertNotNull(traceparent);
         assertTrue(traceparent.endsWith("-00"),
                 "the backend must be told not to record either: " + traceparent);
+        TelemetrySpan unsampled = Telemetry.startSpan("unsampled");
+        assertNotNull(unsampled.getTraceparent(), "an unsampled trace still propagates");
+        unsampled.end();
     }
 
     @Test
@@ -588,6 +593,24 @@ class TelemetryTest extends UITestBase {
                 + spans);
         assertEquals("connection reset", failed.getStatus().getMessage());
         assertEquals("exception", failed.getEvents(0).getName());
+    }
+
+    @Test
+    void aSpanFromAnotherInstallationIsNeverAParent() {
+        Telemetry.State before = new Telemetry.State(
+                new TelemetryConfig().direct("http://collector.test"));
+        Telemetry.State after = new Telemetry.State(
+                new TelemetryConfig().direct("http://collector.test"));
+        TelemetrySpan old = before.start("old action", TelemetrySpan.KIND_INTERNAL, null);
+        TelemetrySpan mine = after.start("request", TelemetrySpan.KIND_CLIENT, old);
+        TelemetrySpan child = after.start("child", TelemetrySpan.KIND_CLIENT, mine);
+        assertNotNull(old);
+        assertNotNull(mine);
+        assertFalse(old.getTraceId().equals(mine.getTraceId()),
+                "a new installation joined the previous one's trace");
+        assertNull(mine.parentSpanId);
+        assertEquals(mine.getTraceId(), child.getTraceId(), "its own spans still nest");
+        assertEquals(mine.getSpanId(), child.parentSpanId);
     }
 
     @Test

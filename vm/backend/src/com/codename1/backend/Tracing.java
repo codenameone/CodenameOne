@@ -173,6 +173,20 @@ public final class Tracing {
         SUPPRESSED.set(suppressed ? Boolean.TRUE : null);
     }
 
+    /**
+     * Applies the rules {@link Web} enforces on request header lines to lines an
+     * exporter will send, so a tracer can refuse a bad configuration when it is
+     * opened. Otherwise the server starts, and every export then fails on the
+     * same check. One rule set, not a copy of it.
+     *
+     * @param lines {@code "Name: value"} strings
+     * @throws java.io.IOException naming the first line that could not be sent;
+     *         the message never quotes a value, since values carry credentials
+     */
+    public static void checkHeaderLines(List lines) throws java.io.IOException {
+        HeaderLines.validate(lines);
+    }
+
     /** Whether {@link #setSuppressed} is in force on this thread. */
     public static boolean isSuppressed() {
         return SUPPRESSED.get() != null;
@@ -536,10 +550,14 @@ public final class Tracing {
         }
     }
 
-    /** Flushes and stops the installed tracer, and uninstalls it. */
-    static void shutdown(int timeoutMillis) {
+    /**
+     * Flushes, stops and uninstalls {@code owned} -- if it is still the installed
+     * tracer. One that has been replaced was already shut down by
+     * {@link #install}, and whatever replaced it belongs to someone else.
+     */
+    static void shutdown(Tracer owned, int timeoutMillis) {
         Tracer t = tracer;
-        if(t == null) {
+        if(t == null || t != owned) {
             return;
         }
         tracer = null;

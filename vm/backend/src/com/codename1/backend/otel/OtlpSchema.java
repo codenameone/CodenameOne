@@ -430,6 +430,14 @@ final class OtlpSchema {
             }
             case FIXED64: {
                 long v = number(field, value);
+                // Every fixed64 in the trace schema is an unsigned nanosecond
+                // timestamp. A negative one was accepted, forwarded as an invalid
+                // value in JSON after the relay had answered 200, and in protobuf
+                // reinterpreted as a time in the far future. (The signed parse also
+                // stops at 2^63 ns, the year 2262, which no real span reaches.)
+                if(v < 0) {
+                    throw new IOException(field.name + " must not be negative");
+                }
                 tag(out, field.number, 1);
                 fixed64(out, v);
                 return;

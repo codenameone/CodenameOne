@@ -288,4 +288,17 @@ class TraceContextTest {
         assertEquals(2, OtlpRelay.utf8Length("\u00e9", 100));
         assertTrue(OtlpRelay.utf8Length("\u0800\u0800\u0800\u0800", 5) > 5);
     }
+
+    @Test
+    @DisplayName("the relay path is an origin-form path the relay can match byte for byte")
+    void relayPath() {
+        assertTrue(OtlpTracer.isOriginFormPath("/otel/v1/traces"));
+        assertTrue(OtlpTracer.isOriginFormPath("/t%C3%A9l%C3%A9metry"));
+        assertFalse(OtlpTracer.isOriginFormPath("/t\u00e9l\u00e9metry"), "non-ASCII");
+        assertFalse(OtlpTracer.isOriginFormPath("/otel?x=1"), "a query never matches");
+        assertFalse(OtlpTracer.isOriginFormPath("/otel#f"));
+        assertFalse(OtlpTracer.isOriginFormPath("/otel traces"));
+        assertFalse(OtlpTracer.isOriginFormPath("otel"));
+        assertFalse(OtlpTracer.isOriginFormPath(""));
+    }
 }

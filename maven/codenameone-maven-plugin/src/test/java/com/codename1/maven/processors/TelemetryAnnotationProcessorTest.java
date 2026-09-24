@@ -156,6 +156,10 @@ public class TelemetryAnnotationProcessorTest {
         assertRefused("@OpenTelemetry(endpoint = \"https://host:port/\")");
         assertTrue(TelemetryAnnotationProcessor.isHttpUrl("https://collector.example:4318/otlp"));
         assertTrue(TelemetryAnnotationProcessor.isHttpUrl("http://[::1]:4318"));
+        // A port outside TCP's range is five digits too.
+        assertFalse(TelemetryAnnotationProcessor.isHttpUrl("https://collector.example:99999"));
+        assertFalse(TelemetryAnnotationProcessor.isHttpUrl("https://collector.example:0"));
+        assertTrue(TelemetryAnnotationProcessor.isHttpUrl("https://collector.example:65535"));
     }
 
     // ------------------------------------------------------------------
