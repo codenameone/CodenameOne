@@ -122,10 +122,14 @@ final class NativeDebuggerHarness {
           + "struct clazz class__java_lang_Character = { .classId = 4 };\n"
           + "struct clazz class__java_lang_Short = { .classId = 5 };\n"
           // The header holds a class INDEX (classId + 1) into this table.
+          // Three spare descriptors a driver can shape into test classes. Each names its
+          // own header index, so an object can carry one whatever classId it claims.
+          + "struct clazz cn1TestClazz[3] = { [0] = { .cn1HeaderIndex = 7 },\n"
+          + "    [1] = { .cn1HeaderIndex = 8 }, [2] = { .cn1HeaderIndex = 9 } };\n"
           + "struct clazz* const cn1ClazzById[] = { 0, &class__java_lang_Integer, &class__java_lang_Long,\n"
           + "    &class__java_lang_Double, &class__java_lang_Float, &class__java_lang_Character,\n"
-          + "    &class__java_lang_Short };\n"
-          + "const int cn1ClazzByIdCount = 7;\n"
+          + "    &class__java_lang_Short, &cn1TestClazz[0], &cn1TestClazz[1], &cn1TestClazz[2] };\n"
+          + "const int cn1ClazzByIdCount = 10;\n"
           // The collector's mark entry point. Records whether a nominated
           // reference was reached, rather than buffering every mark -- the
           // table can hold thousands, so a fixed buffer would answer "was it

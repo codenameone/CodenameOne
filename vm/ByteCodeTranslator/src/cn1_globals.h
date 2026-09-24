@@ -221,9 +221,14 @@
 //   * the heap position keeps its 32 bits (a legacy object's index into
 //     allObjectsInHeap). The spare byte is an unnamed bit-field, so the positional
 //     initializers of static headers still list three values.
+// ALIGNED(8), which the old class POINTER gave for free: every object must be 8-aligned
+// because a reference's low three bits are the tagged-immediate code. Without it an
+// object struct holding only int-sized fields (a boxed Integer, say) is 4-aligned, and a
+// static or stack-allocated one at a 4-mod-8 address reads as a tagged value -- measured:
+// GcHeapRemovalTest's static test object was classified "tagged" and never removed.
 #define CN1_OBJ_HEADER_FIELDS \
     DEBUG_GC_VARIABLES \
-    uint16_t __cn1ClassId; \
+    uint16_t __cn1ClassId __attribute__((aligned(8))); \
     signed char __codenameOneGcMark; \
     unsigned char : 8; \
     int __heapPosition;
@@ -550,6 +555,8 @@ _Static_assert(sizeof(struct JavaArrayPrototype) == 16,
 _Static_assert(sizeof(struct JavaArrayPrototype) % 8 == 0,
                "array payload offset must stay 8-aligned for long[] and double[]");
 _Static_assert(sizeof(struct JavaObjectPrototype) == 8, "object header must stay 8 bytes");
+_Static_assert(_Alignof(struct JavaObjectPrototype) == 8,
+               "objects must be 8-aligned: a reference's low 3 bits are the tag code");
 #endif
 _Static_assert(offsetof(struct JavaArrayPrototype, __cn1ClassId)
                == offsetof(struct JavaObjectPrototype, __cn1ClassId),

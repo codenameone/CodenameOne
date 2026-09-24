@@ -485,9 +485,12 @@ class DebuggerObjectValidationTest {
             "#include <string.h>\n" +
             "#include <stdlib.h>\n" +
             "\n" +
-            "static struct clazz registeredClass;\n" +
-            "static struct clazz arrayClass;\n" +
-            "static struct clazz unregisteredClass;\n" +
+            /* The object header holds a class INDEX, so a test class must be in the
+               harness's cn1ClazzById: these are its three spare descriptors. */
+            "extern struct clazz cn1TestClazz[3];\n" +
+            "#define registeredClass (cn1TestClazz[0])\n" +
+            "#define arrayClass (cn1TestClazz[1])\n" +
+            "#define unregisteredClass (cn1TestClazz[2])\n" +
             "\n" +
             "int main(int argc, char** argv) {\n" +
             "    if (argc < 2) { fprintf(stderr, \"usage: validate <candidate>\\n\"); return 2; }\n" +

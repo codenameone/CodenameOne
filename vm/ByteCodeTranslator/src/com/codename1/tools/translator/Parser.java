@@ -1250,6 +1250,7 @@ public class Parser extends ClassVisitor {
                 }
             }
         }
+        bldM.append("extern struct clazz ClazzClazz;\n");
         bldM.append("\n\nstruct clazz* const cn1ClazzById[] = {\n    [0] = 0");
         for (ByteCodeClass bc : classes) {
             String n = bc.getClsName().replace('/', '_').replace('$', '_');
@@ -1267,6 +1268,9 @@ public class Parser extends ClassVisitor {
                         .append(" + 1] = &class_array").append(dim).append("__").append(p);
             }
         }
+        // The runtime's descriptor for class objects (nativeMethods.m), classId
+        // cn1_array_start_offset -- an id no array takes.
+        bldM.append(",\n    [cn1_array_start_offset + 1] = &ClazzClazz");
         bldM.append(",\n    [cn1_header_index_java_lang_String_i8] = &class__java_lang_String_i8");
         bldM.append(",\n    [cn1_header_index_java_lang_String_i16] = &class__java_lang_String_i16");
         bldM.append("};\nconst int cn1ClazzByIdCount = (int)(sizeof(cn1ClazzById) / sizeof(cn1ClazzById[0]));\n");
