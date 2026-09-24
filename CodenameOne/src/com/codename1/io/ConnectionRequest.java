@@ -849,6 +849,19 @@ public class ConnectionRequest implements IOProgressListener {
         }
     }
 
+    /// Whether the headers added with [NetworkManager#addDefaultHeader(String, String)]
+    /// are sent with this request. They are meant for the app's own services -- an
+    /// `Authorization` for its backend is the usual one -- so a request that goes
+    /// somewhere else, a third-party collector for instance, overrides this to
+    /// keep them from being disclosed there.
+    ///
+    /// #### Returns
+    ///
+    /// true, the default: every request carries the default headers
+    protected boolean shouldApplyDefaultHeaders() {
+        return true;
+    }
+
     void prepare() {
         complete = false;
         timeSinceLastUpdate = System.currentTimeMillis();

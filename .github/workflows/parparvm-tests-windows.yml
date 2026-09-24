@@ -266,7 +266,7 @@ jobs:
           # exists for. A blanket loop lets an intermittent product regression pass on
           # attempt two and turns a blocking gate green -- which is the opposite of what
           # a gate is for, and worse than the flake it was hiding.
-          $resolutionFailure = 'status: (403|429|50[0-9])|Could not transfer artifact|Failed to read artifact descriptor|Unresolveable build extension|Non-resolvable import POM|Could not resolve dependencies'
+          $resolutionFailure = 'status: (403|429|50[0-9])|Could not transfer artifact|Failed to read artifact descriptor|Unresolveable build extension|Non-resolvable import POM|Could not resolve dependencies|UnknownHostException|Could not resolve host|Temporary failure in name resolution'
           $ok = $false
           foreach ($delay in 0, 30, 90, 180, 300) {
             # Clear Maven's cached resolution failures first; see the first retry loop above.
@@ -512,7 +512,7 @@ jobs:
             if ($LASTEXITCODE -eq 0) { $ok = $true; break }
           }
           if (-not $ok) { throw "mvn clean package failed after all retries" }
-          $resolutionFailure = 'status: (403|429|50[0-9])|Could not transfer artifact|Unresolveable build extension|Non-resolvable import POM|Could not resolve dependencies'
+          $resolutionFailure = 'status: (403|429|50[0-9])|Could not transfer artifact|Unresolveable build extension|Non-resolvable import POM|Could not resolve dependencies|UnknownHostException|Could not resolve host|Temporary failure in name resolution'
           $ok = $false
           foreach ($delay in 0, 30, 90, 180, 300) {
             # Clear Maven's cached resolution failures first; see the first retry loop above.
@@ -686,7 +686,7 @@ jobs:
             if ($LASTEXITCODE -eq 0) { $ok = $true; break }
           }
           if (-not $ok) { throw "mvn clean package failed after all retries" }
-          $resolutionFailure = 'status: (403|429|50[0-9])|Could not transfer artifact|Unresolveable build extension|Non-resolvable import POM|Could not resolve dependencies'
+          $resolutionFailure = 'status: (403|429|50[0-9])|Could not transfer artifact|Unresolveable build extension|Non-resolvable import POM|Could not resolve dependencies|UnknownHostException|Could not resolve host|Temporary failure in name resolution'
           $ok = $false
           foreach ($delay in 0, 30, 90, 180, 300) {
             # Clear Maven's cached resolution failures first; see the first retry loop above.

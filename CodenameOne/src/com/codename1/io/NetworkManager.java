@@ -1393,7 +1393,7 @@ public final class NetworkManager {
                             nextConnectionId = 1;
                         }
                     }
-                    if (userHeaders != null) {
+                    if (userHeaders != null && currentRequest.shouldApplyDefaultHeaders()) {
                         Enumeration e = userHeaders.keys();
                         while (e.hasMoreElements()) {
                             String key = (String) e.nextElement();

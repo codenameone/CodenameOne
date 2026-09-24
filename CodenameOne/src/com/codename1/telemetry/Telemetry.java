@@ -609,6 +609,15 @@ public final class Telemetry {
             setRequestBody(new ByteBody(body));
         }
 
+        /// None of the app's default headers. They are the app's credentials for
+        /// its own services; copied onto an export they reached a third-party
+        /// collector, and a default Content-Type relabelled the body. An export
+        /// carries only what the telemetry configuration names.
+        @Override
+        protected boolean shouldApplyDefaultHeaders() {
+            return false;
+        }
+
         /// Identity. The inherited equality compares URL and arguments, so every
         /// export to one collector compared equal though each carries its own
         /// spans; that made no two exports distinguishable to the queue.

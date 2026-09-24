@@ -196,6 +196,15 @@ final class BatchExporter implements Runnable {
      * waiting for an empty queue kept a replaced tracer posting every remaining
      * batch -- retries included -- with its old credentials for as long as a slow
      * or absent collector took, while its caller had been promised a bounded stop.
+     *
+     * <p>What is bounded is THIS exporter's work: after the window nothing new is
+     * posted, nothing is retried, and every later span or payload is refused. A
+     * POST already in flight is not cancelled; it ends on Web's own timeouts --
+     * connect, and a low-speed or per-read limit -- which a collector trickling
+     * bytes can stretch. That is a property of Web, which offers no cancellation
+     * and no total deadline on either transport, and it belongs there rather than
+     * worked around from one caller: the worker is a daemon thread, the request
+     * it is in was the last it will make, and it exits when that returns.
      */
     void shutdown(int timeoutMillis) {
         flush(timeoutMillis);

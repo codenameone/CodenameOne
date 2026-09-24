@@ -35,7 +35,11 @@ set -uo pipefail
 # "or one of its dependencies could not be resolved" -- a plain Central hiccup that
 # two other workflows already knew to retry and that one had never been taught. One
 # definition, so the next failure mode is added once.
-TRANSIENT_RESOLUTION_FAILURE='status: (403|429|50[0-9])|Could not transfer artifact|Could not resolve dependencies|Failed to read artifact descriptor|Unresolveable build extension|Non-resolvable import POM|or one of its dependencies could not be resolved|authorization failed for https://repo\.maven\.apache\.org|Connection reset|Premature end of Content-Length'
+# UnknownHostException and the curl/glibc spellings of the same thing: a DNS
+# failure on the runner is as transient as a Central 5xx. A windows cross-build
+# died on "UnknownHostException: raw.githubusercontent.com" from an Ant <get>,
+# whose own retries all land inside the same second.
+TRANSIENT_RESOLUTION_FAILURE='status: (403|429|50[0-9])|Could not transfer artifact|Could not resolve dependencies|Failed to read artifact descriptor|Unresolveable build extension|Non-resolvable import POM|or one of its dependencies could not be resolved|authorization failed for https://repo\.maven\.apache\.org|Connection reset|Premature end of Content-Length|UnknownHostException|Could not resolve host|Temporary failure in name resolution'
 
 # Four, not three. With the growing wait below that is 30s, 2m and 5m of
 # coverage -- the same 30/120/300 the Windows cross-compile workflow settled on.

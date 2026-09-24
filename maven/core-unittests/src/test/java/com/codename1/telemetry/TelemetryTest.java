@@ -922,6 +922,31 @@ class TelemetryTest extends UITestBase {
     }
 
     @Test
+    void anExportNeverCarriesTheAppsDefaultHeaders() throws Exception {
+        // A default header is the app's credential for its own services; it must
+        // not reach a third-party collector, nor relabel the export's body.
+        NetworkManager.getInstance().addDefaultHeader("Authorization", "app-secret");
+        NetworkManager.getInstance().addDefaultHeader("Content-Type", "text/plain");
+        try {
+            Telemetry.install(new TelemetryConfig().direct("http://collector.test"));
+            NetworkManager.getInstance().addToQueueAndWait(request(API + "?defaults"));
+            assertEquals("app-secret", connection(API + "?defaults").getHeaders().get("Authorization"),
+                    "the app's own request still gets its default header");
+            Telemetry.flush();
+            exported(1);
+            TestCodenameOneImplementation.TestConnection export = connection(COLLECTOR);
+            assertNull(export.getHeaders().get("Authorization"),
+                    "the app's credential was sent to the collector");
+            assertFalse("text/plain".equals(export.getHeaders().get("Content-Type")),
+                    "a default Content-Type relabelled the export");
+        } finally {
+            java.lang.reflect.Field headers = NetworkManager.class.getDeclaredField("userHeaders");
+            headers.setAccessible(true);
+            headers.set(NetworkManager.getInstance(), null);
+        }
+    }
+
+    @Test
     void aTruncatedValueNeverEndsInHalfACharacter() {
         StringBuilder text = new StringBuilder();
         for (int i = 0; i < TelemetrySpan.MAX_VALUE_LENGTH - 1; i++) {
