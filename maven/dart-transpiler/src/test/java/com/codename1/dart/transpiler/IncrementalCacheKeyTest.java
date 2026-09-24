@@ -64,4 +64,21 @@ public class IncrementalCacheKeyTest {
         assertFalse(run(src, out, state, "com.example.two").isUpToDate(),
                 "a changed output package must regenerate");
     }
+
+    @Test
+    public void changingThePackageRemovesThePreviousPackagesSources() throws Exception {
+        File src = new File(tmp, "src2");
+        src.mkdirs();
+        TestSupport.write(new File(src, "a.dart"), "int answer() => 42;\n");
+        File out = new File(tmp, "out2");
+        File state = new File(tmp, "state2.txt");
+        run(src, out, state, "com.example.one");
+        File oldDir = new File(out, "com/example/one");
+        assertTrue(oldDir.listFiles() != null && oldDir.listFiles().length > 0, "the first run generated sources");
+        run(src, out, state, "com.example.two");
+        File[] left = oldDir.listFiles();
+        assertTrue(left == null || left.length == 0,
+                "the old package's sources must not stay on the compile root beside the new ones");
+        assertTrue(new File(out, "com/example/two").listFiles().length > 0);
+    }
 }

@@ -129,6 +129,7 @@ public final class DartTranspiler {
 
     private void writeOutput(TranspileRequest req, List<GeneratedFile> files, Diagnostics diags) {
         File pkgDir = new File(req.outputDir, req.packageName.replace('.', File.separatorChar));
+        removePreviousPackage(req, pkgDir);
         pkgDir.mkdirs();
         Set<String> expected = new HashSet<String>();
         for (GeneratedFile gf : files) {
@@ -153,6 +154,48 @@ public final class DartTranspiler {
                     f.delete();
                 }
             }
+        }
+    }
+
+    /**
+     * When the output package changed since the last run, deletes what that run generated
+     * into the OLD package's directory. The stale-file sweep below only looks in the new
+     * package's directory, so every source of the previous package stayed on the compile
+     * root and was compiled and packaged beside its replacement -- a second, obsolete copy
+     * of the whole generated tree. Only the generated .java files directly in that
+     * directory go, so an old package that is a parent of the new one keeps the new files.
+     */
+    private void removePreviousPackage(TranspileRequest req, File pkgDir) {
+        if (req.stateFile == null || !req.stateFile.exists()) {
+            return;
+        }
+        String prev;
+        try {
+            prev = new String(Files.readAllBytes(req.stateFile.toPath()), StandardCharsets.UTF_8).trim();
+        } catch (IOException e) {
+            return;
+        }
+        int at = prev.lastIndexOf("-pkg:");
+        if (at < 0) {
+            return;
+        }
+        String prevPkg = prev.substring(at + 5);
+        if (prevPkg.isEmpty() || prevPkg.equals(req.packageName)) {
+            return;
+        }
+        File old = new File(req.outputDir, prevPkg.replace('.', File.separatorChar));
+        File[] children = old.listFiles();
+        if (children == null || old.equals(pkgDir)) {
+            return;
+        }
+        for (File f : children) {
+            if (f.isFile() && f.getName().endsWith(".java")) {
+                f.delete();
+            }
+        }
+        String[] left = old.list();
+        if (left != null && left.length == 0) {
+            old.delete();
         }
     }
 

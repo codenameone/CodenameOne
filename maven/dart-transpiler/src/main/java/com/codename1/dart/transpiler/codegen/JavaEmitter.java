@@ -4504,7 +4504,7 @@ public final class JavaEmitter {
         // of the typed lowerings below apply -- the fallback emitted `Object + long`, which
         // javac rejects. A statically-String `+` keeps its concatenation.
         if ((isDynamic(l.type) || isDynamic(r.type))
-                && !(b.op.equals("+") && (l.type.is("String") || r.type.is("String")))) {
+                && !(b.op.equals("+") && l.type.is("String") && r.type.is("String"))) {
             ctx.importClass("dart.runtime.DartRuntime");
             if (b.op.equals("<") || b.op.equals(">") || b.op.equals("<=") || b.op.equals(">=")) {
                 return new Out("DartRuntime.dynCompare(\"" + b.op + "\", " + l.code + ", " + r.code + ")",
@@ -5434,9 +5434,11 @@ public final class JavaEmitter {
                 return new Out("Math.abs(" + target.code + ")", TypeRef.INT);
             }
             if (n.equals("clamp")) {
+                // ArgumentError for lower > upper, as Dart; nested min/max answered a value.
+                ctx.importClass("dart.runtime.DartRuntime");
                 String lo = emitExpr(pos.get(0), TypeRef.INT, ctx).code;
                 String hi = emitExpr(pos.get(1), TypeRef.INT, ctx).code;
-                return new Out("Math.min(Math.max(" + target.code + ", " + lo + "), " + hi + ")", TypeRef.INT);
+                return new Out("DartRuntime.clamp(" + target.code + ", " + lo + ", " + hi + ")", TypeRef.INT);
             }
         }
         if (tt.is("double")) {
@@ -5448,17 +5450,19 @@ public final class JavaEmitter {
                 return new Out("DartRuntime.toStringAsFixed(" + paren(target.code) + ", "
                         + emitExpr(pos.get(0), TypeRef.INT, ctx).code + ")", TypeRef.STRING);
             }
-            if (n.equals("toInt")) {
-                return new Out("((long) " + paren(target.code) + ")", TypeRef.INT);
+            // toInt, floor and ceil refuse NaN and the infinities with UnsupportedError,
+            // as Dart does; a Java cast made NaN 0 and saturated the infinities.
+            if (n.equals("toInt") || n.equals("truncate")) {
+                return new Out("DartRuntime.toInt(" + target.code + ")", TypeRef.INT);
             }
             if (n.equals("toDouble")) {
                 return new Out("((double) " + paren(target.code) + ")", TypeRef.DOUBLE);
             }
             if (n.equals("floor")) {
-                return new Out("((long) Math.floor(" + target.code + "))", TypeRef.INT);
+                return new Out("DartRuntime.floor(" + target.code + ")", TypeRef.INT);
             }
             if (n.equals("ceil")) {
-                return new Out("((long) Math.ceil(" + target.code + "))", TypeRef.INT);
+                return new Out("DartRuntime.ceil(" + target.code + ")", TypeRef.INT);
             }
             if (n.equals("round")) {
                 // Half away from zero, as Dart rounds; Math.round rounds -1.5 to -1.
@@ -5481,7 +5485,7 @@ public final class JavaEmitter {
             if (n.equals("clamp")) {
                 String lo = emitExpr(pos.get(0), TypeRef.DOUBLE, ctx).code;
                 String hi = emitExpr(pos.get(1), TypeRef.DOUBLE, ctx).code;
-                return new Out("Math.min(Math.max(((double) " + paren(target.code) + "), " + lo + "), "
+                return new Out("DartRuntime.clamp(((double) " + paren(target.code) + "), " + lo + ", "
                         + hi + ")", TypeRef.DOUBLE);
             }
         }
@@ -5542,16 +5546,23 @@ public final class JavaEmitter {
             }
             if (n.equals("toList")) {
                 TypeRef listType = TypeRef.of("List", elem);
+                // toList(growable: false) used to ignore the flag and hand back a growable list.
+                String growable = null;
+                for (NamedArg na : c.args.named) {
+                    if (na.name.equals("growable")) {
+                        growable = emitExpr(na.value, TypeRef.BOOL, ctx).code;
+                    }
+                }
                 // A Dart List<int>/List<double> variable has Java type Dart{Long,Double}List, but
                 // the runtime toList() returns a boxed DartList<E>. Re-wrap into the primitive
                 // list so the value matches its declared/target type.
                 String pk = primitiveListKind(listType);
                 if (pk != null) {
                     ctx.importClass("dart.core.Dart" + pk + "List");
-                    return new Out("Dart" + pk + "List.from" + pk + "s(" + target.code + ".toList())",
-                            listType);
+                    return new Out("Dart" + pk + "List.from" + pk + "s(" + target.code + ".toList()"
+                            + (growable != null ? ", " + growable : "") + ")", listType);
                 }
-                return new Out(target.code + ".toList()", listType);
+                return new Out(target.code + ".toList(" + (growable != null ? growable : "") + ")", listType);
             }
             if (n.equals("sublist")) {
                 String args = "";
@@ -5685,7 +5696,16 @@ public final class JavaEmitter {
                 return new Out(target.code + ".getRange(" + args + ")", TypeRef.of("Iterable", elem));
             }
             if (n.equals("asMap")) {
-                return new Out(target.code + ".asMap()", TypeRef.of("Map", TypeRef.INT, elem));
+                // The runtime answers a boxed live view (DartMap<Long, E>), never the
+                // primitive DartLongMap, so a List<int>'s view is typed Map<int, int?>:
+                // the nullable value keeps isPrimitiveLongMap from claiming it, and
+                // matches what the view's [] returns in Dart anyway.
+                TypeRef viewValue = elem;
+                if (elem != null && elem.is("int") && !elem.nullable) {
+                    viewValue = TypeRef.of("int");
+                    viewValue.nullable = true;
+                }
+                return new Out(target.code + ".asMap()", TypeRef.of("Map", TypeRef.INT, viewValue));
             }
             if (n.equals("toSet")) {
                 return new Out(target.code + ".toSet()", TypeRef.of("Set", elem));
