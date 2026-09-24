@@ -6366,3 +6366,42 @@ trigger. So the levers are: majors driven by old-generation growth rather than a
 a cheaper full mark, and -- for the last 1.2x -- representation, which no collector
 policy reaches. One STW run took 9m05s (correct output); unexplained, and majors share
 that path.
+
+## Round 44: pushing the single-core generational collector toward its floor
+
+Work on `parparvm-single-core-gen-wip` (a4fb5cacd4), measured in the one-CPU container.
+Each change was preceded by a measurement that named the cost:
+
+| cost (whole run) | before | after | change |
+|---|---:|---:|---|
+| minor sweep | 1.48s | 0.87s | walk only young slots: bump range since last sweep + a 64-byte chunk bit per recycled slot |
+| remembered native blocks | 574ms, 1.09M blocks | 142ms | `NativeStorage.setOwned(owner, ...)`: a block store remembers its owner, only when old |
+| remembered cards | 826ms, 1.79M objects | 511ms, 183k | 64-byte remembered chunks instead of 1KB cards |
+
+Curve after (JDK 25 SerialGC = 1.00; min wall, max RSS):
+
+| young trigger / majors every | wall | RSS |
+|---|---:|---:|
+| 24MB / 8 minors (default) | 0.77 | 1.38 |
+| 24MB / 4 | 0.84 | 1.27 |
+| 48MB / 2 | 0.91 | 1.23 |
+| 24MB / 2 | 0.99 | 1.24 |
+
+Tried and dropped: majors driven by promoted bytes or by footprint growth (worse on memory
+at every threshold -- RSS ratchets on Linux, so a footprint trigger cannot see what a major
+frees); glibc malloc_trim / mmap / trim / arena tunables (no RSS change); mark prefetching
+(majors 1,702 / 1,696 / 1,703ms at distance 0 / 4 / 8); larger young triggers (same curve).
+
+**Where the memory floor is.** JDK 25 on this workload runs 117 young collections, 0.89s
+of pause in total, and NO full collection: its old generation keeps everything ever
+promoted, garbage included, and still peaks at 374MB used of 409MB committed. Ours holds
+~386MB of live BiBOP slots plus ~186MB of native collection storage plus legacy arrays.
+The remaining memory gap is object representation (8-byte references and 16-byte headers
+against compressed 4-byte references and 12-byte headers), not collection policy.
+
+**Where the time is.** Our minors cost ~21ms against the JDK's ~7.6ms young
+collections; the rest of the GC time is majors (13 x ~130ms) and the remembered-set
+re-trace of large maps (IdentityHashMap alone 324ms: one young insert re-traces the whole
+map). Roughly half of each minor's young survives and is promoted on first survival,
+and most of that dies as old garbage for majors to collect -- the case a tenuring age
+exists for.
