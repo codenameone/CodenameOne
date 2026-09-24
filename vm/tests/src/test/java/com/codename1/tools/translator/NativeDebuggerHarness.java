@@ -135,12 +135,12 @@ final class NativeDebuggerHarness {
           + "}\n"
           + "#if CN1_TAGGED_ACTIVE\n"
           + "struct JavaObjectPrototype cn1TaggedProxy[CN1_TAG_COUNT] = {\n"
-          + "    [CN1_TAG_INTEGER]   = { .__codenameOneParentClsReference = &class__java_lang_Integer },\n"
-          + "    [CN1_TAG_LONG]      = { .__codenameOneParentClsReference = &class__java_lang_Long },\n"
-          + "    [CN1_TAG_DOUBLE]    = { .__codenameOneParentClsReference = &class__java_lang_Double },\n"
-          + "    [CN1_TAG_FLOAT]     = { .__codenameOneParentClsReference = &class__java_lang_Float },\n"
-          + "    [CN1_TAG_CHARACTER] = { .__codenameOneParentClsReference = &class__java_lang_Character },\n"
-          + "    [CN1_TAG_SHORT]     = { .__codenameOneParentClsReference = &class__java_lang_Short }\n"
+          + "    [CN1_TAG_INTEGER]   = { CN1_OBJ_HEADER_INIT(&class__java_lang_Integer) },\n"
+          + "    [CN1_TAG_LONG]      = { CN1_OBJ_HEADER_INIT(&class__java_lang_Long) },\n"
+          + "    [CN1_TAG_DOUBLE]    = { CN1_OBJ_HEADER_INIT(&class__java_lang_Double) },\n"
+          + "    [CN1_TAG_FLOAT]     = { CN1_OBJ_HEADER_INIT(&class__java_lang_Float) },\n"
+          + "    [CN1_TAG_CHARACTER] = { CN1_OBJ_HEADER_INIT(&class__java_lang_Character) },\n"
+          + "    [CN1_TAG_SHORT]     = { CN1_OBJ_HEADER_INIT(&class__java_lang_Short) }\n"
           + "};\n"
           + "#endif\n";
 

@@ -166,7 +166,7 @@ final class NativeTraversal {
         else {
             code.append(mode).append(" = 0;\nJAVA_OBJECT __original = __c;\n");
             if (unwrapSet) {
-                code.append("if((*__c).__codenameOneParentClsReference == &class__java_util_Collections_SetFromMap) __c = get_field_java_util_Collections_SetFromMap_backingSet(__c);\nif(__c == JAVA_NULL) { cn1ThrowNullPointerHere(threadStateData); }\n");
+                code.append("if(CN1_OBJ_CLASS(__c) == &class__java_util_Collections_SetFromMap) __c = get_field_java_util_Collections_SetFromMap_backingSet(__c);\nif(__c == JAVA_NULL) { cn1ThrowNullPointerHere(threadStateData); }\n");
             }
             for (Layout layout : layouts) {
                 if (layout == Layout.IDENTITY || Parser.getClassObject(layout.type) == null) continue;
@@ -175,7 +175,7 @@ final class NativeTraversal {
                 // a real iterator. LinkedHashSet keeps its fast path (it does delegate to
                 // a LinkedHashMap), as do keySet()/values() views via viewSetup().
                 if (layout == Layout.SET) continue;
-                code.append("if((*__c).__codenameOneParentClsReference == &class__").append(layout.type)
+                code.append("if(CN1_OBJ_CLASS(__c) == &class__").append(layout.type)
                         .append(") {\n").append(mode).append(" = ").append(layout.id).append(";\n")
                         .append(start(layout)).append("}\n");
             }
@@ -191,7 +191,7 @@ final class NativeTraversal {
         return code.append("locals[").append(slot).append("].type = CN1_TYPE_OBJECT; }\n").toString();
     }
     private String viewSetup(String viewClass, boolean values) {
-        StringBuilder code = new StringBuilder("if((*__c).__codenameOneParentClsReference == &class__");
+        StringBuilder code = new StringBuilder("if(CN1_OBJ_CLASS(__c) == &class__");
         code.append(viewClass).append(") {\n").append(root).append(" = ")
                 .append(field(viewClass, "map", "__c")).append(";\n");
         for (Layout layout : layouts) {
@@ -203,7 +203,7 @@ final class NativeTraversal {
                     || viewClass.startsWith("java_util_IdentityHashMap") != (layout == Layout.IDENTITY)) continue;
             String mapClass = layout == Layout.IDENTITY ? "java_util_IdentityHashMap"
                     : layout == Layout.SET ? "java_util_HashMap" : "java_util_LinkedHashMap";
-            code.append("if((*").append(root).append(").__codenameOneParentClsReference == &class__")
+            code.append("if(CN1_OBJ_CLASS(").append(root).append(") == &class__")
                     .append(mapClass).append(") {\n").append(mode).append(" = ").append(layout.id + (values ? 8 : 0)).append(";\n")
                     .append(index).append(" = ").append(layout == Layout.IDENTITY ? "0" : layout == Layout.SET
                             ? "cn1InlTableNext(" + map("cn1MetaBlock") + ", 0, " + map("cn1Cap") + ")"

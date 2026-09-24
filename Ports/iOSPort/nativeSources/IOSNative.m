@@ -12252,37 +12252,37 @@ void com_codename1_impl_ios_IOSNative_cleanupAudioRecord___long(CN1_THREAD_STATE
 JAVA_BOOLEAN com_codename1_impl_ios_IOSImplementation_instanceofObjArrayI___java_lang_Object_R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT n1)
 {
     // second part of the expression check that this isn't a primitive array
-    return n1->__codenameOneParentClsReference->isArray && cn1_array_start_offset + 100 < n1->__codenameOneParentClsReference->classId;
+    return CN1_OBJ_CLASS(n1)->isArray && cn1_array_start_offset + 100 < CN1_OBJ_CLASS(n1)->classId;
 }
 
 JAVA_BOOLEAN com_codename1_impl_ios_IOSImplementation_instanceofByteArrayI___java_lang_Object_R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT n1)
 {
-    return n1->__codenameOneParentClsReference->classId == cn1_array_1_id_JAVA_BYTE;
+    return CN1_OBJ_CLASS(n1)->classId == cn1_array_1_id_JAVA_BYTE;
 }
 
 JAVA_BOOLEAN com_codename1_impl_ios_IOSImplementation_instanceofShortArrayI___java_lang_Object_R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT n1)
 {
-    return n1->__codenameOneParentClsReference->classId == cn1_array_1_id_JAVA_SHORT;
+    return CN1_OBJ_CLASS(n1)->classId == cn1_array_1_id_JAVA_SHORT;
 }
 
 JAVA_BOOLEAN com_codename1_impl_ios_IOSImplementation_instanceofLongArrayI___java_lang_Object_R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT n1)
 {
-    return n1->__codenameOneParentClsReference->classId == cn1_array_1_id_JAVA_LONG;
+    return CN1_OBJ_CLASS(n1)->classId == cn1_array_1_id_JAVA_LONG;
 }
 
 JAVA_BOOLEAN com_codename1_impl_ios_IOSImplementation_instanceofIntArrayI___java_lang_Object_R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT n1)
 {
-    return n1->__codenameOneParentClsReference->classId == cn1_array_1_id_JAVA_INT;
+    return CN1_OBJ_CLASS(n1)->classId == cn1_array_1_id_JAVA_INT;
 }
 
 JAVA_BOOLEAN com_codename1_impl_ios_IOSImplementation_instanceofFloatArrayI___java_lang_Object_R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT n1)
 {
-    return n1->__codenameOneParentClsReference->classId == cn1_array_1_id_JAVA_FLOAT;
+    return CN1_OBJ_CLASS(n1)->classId == cn1_array_1_id_JAVA_FLOAT;
 }
 
 JAVA_BOOLEAN com_codename1_impl_ios_IOSImplementation_instanceofDoubleArrayI___java_lang_Object_R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT n1)
 {
-    return n1->__codenameOneParentClsReference->classId == cn1_array_1_id_JAVA_DOUBLE;
+    return CN1_OBJ_CLASS(n1)->classId == cn1_array_1_id_JAVA_DOUBLE;
 }
 #else // NEW_CODENAME_ONE_VM
 JAVA_BOOLEAN com_codename1_impl_ios_IOSImplementation_instanceofObjArrayI___java_lang_Object(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT n1)

@@ -226,7 +226,7 @@ static LONG WINAPI cn1WinUnhandled(EXCEPTION_POINTERS* info) {
 static int cn1WinDeliverViaContext(CONTEXT* ctx, struct ThreadLocalData* t, JAVA_OBJECT exc) {
     java_lang_Throwable_fillInStack__(t, exc);
     t->exception = exc;
-    int excClassId = exc->__codenameOneParentClsReference->classId;
+    int excClassId = CN1_OBJ_CLASS(exc)->classId;
     t->tryBlockOffset--;
     while (t->tryBlockOffset >= 0) {
         struct TryBlock* blk = &t->blocks[t->tryBlockOffset];

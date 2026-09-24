@@ -320,17 +320,17 @@ public class TypeInstruction extends Instruction {
                     b.append(stackAllocId);
                     b.append(", 0, sizeof(struct obj__");
                     b.append(type);
-                    b.append(")); __cn1stk_");
+                    b.append(")); CN1_OBJ_SET_CLASS(&__cn1stk_");
                     b.append(stackAllocId);
-                    b.append(".__codenameOneParentClsReference = &class__");
+                    b.append(", &class__");
                     b.append(type);
-                    b.append("; __cn1stk_");
+                    b.append("); CN1_OBJ_SET_MARK(&__cn1stk_");
                     b.append(stackAllocId);
-                    b.append(".__codenameOneGcMark = -1; __cn1stk_");
+                    b.append(", CN1_GC_MARK_FRESH); CN1_OBJ_SET_HEAPPOS(&__cn1stk_");
                     b.append(stackAllocId);
-                    b.append(".__heapPosition = -1; ");
+                    b.append(", -1); ");
                     if(stackBuilderBytes > 0) {
-                        b.append("__cn1stk_").append(stackAllocId).append(".__heapPosition = CN1_GC_STACK_BUILDER; ");
+                        b.append("CN1_OBJ_SET_HEAPPOS(&__cn1stk_").append(stackAllocId).append(", CN1_GC_STACK_BUILDER); ");
                         b.append("*(struct CN1StackBuffer**)__cn1stk_").append(stackAllocId)
                                 .append(".__cn1InlineStorage = &__cn1sbscope_").append(stackAllocId).append("; ");
                         b.append("__cn1stk_").append(stackAllocId)
@@ -411,11 +411,11 @@ public class TypeInstruction extends Instruction {
                     b.append(actualType);
                     b.append(", sizeof(JAVA_OBJECT), ");
                     b.append(dim);
-                    b.append("));\n    SP[-1].data.o->__codenameOneParentClsReference = &class_array");
+                    b.append("));\n    CN1_OBJ_SET_CLASS(SP[-1].data.o, &class_array");
                     b.append(dim);
                     b.append("__");
                     b.append(actualType);
-                    b.append("; /* ANEWARRAY multi */\n");
+                    b.append("); /* ANEWARRAY multi */\n");
                     break;
                 }
                 b.append("SP--;\n    PUSH_POINTER(__NEW_ARRAY_");

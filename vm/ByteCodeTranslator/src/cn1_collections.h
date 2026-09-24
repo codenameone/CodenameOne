@@ -70,9 +70,9 @@ static inline int cn1CollectionMap(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT owner,
     // what a caller should do with one.
     if(owner == JAVA_NULL) return 0;
 #ifdef CN1_COLL_HASHMAP
-    if(owner->__codenameOneParentClsReference == &class__java_util_HashMap
+    if(CN1_OBJ_CLASS(owner) == &class__java_util_HashMap
 #ifdef CN1_COLL_LINKED
-       || owner->__codenameOneParentClsReference == &class__java_util_LinkedHashMap
+       || CN1_OBJ_CLASS(owner) == &class__java_util_LinkedHashMap
 #endif
     ) {
         struct obj__java_util_HashMap* map = (struct obj__java_util_HashMap*)owner;
@@ -84,7 +84,7 @@ static inline int cn1CollectionMap(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT owner,
         out->count = map->java_util_HashMap_elementCount;
         out->kind = CN1_COLL_HASH;
 #ifdef CN1_COLL_LINKED
-        if(owner->__codenameOneParentClsReference == &class__java_util_LinkedHashMap) {
+        if(CN1_OBJ_CLASS(owner) == &class__java_util_LinkedHashMap) {
             struct obj__java_util_LinkedHashMap* ordered = (struct obj__java_util_LinkedHashMap*)owner;
             out->kind = CN1_COLL_ORDERED;
             out->first = ordered->java_util_LinkedHashMap_cn1Head;
@@ -95,7 +95,7 @@ static inline int cn1CollectionMap(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT owner,
     }
 #endif
 #ifdef CN1_COLL_IDENTITY
-    if(owner->__codenameOneParentClsReference == &class__java_util_IdentityHashMap) {
+    if(CN1_OBJ_CLASS(owner) == &class__java_util_IdentityHashMap) {
         struct obj__java_util_IdentityHashMap* map = (struct obj__java_util_IdentityHashMap*)owner;
         JAVA_LONG block = map->java_util_IdentityHashMap_elementData;
         out->owner = owner;
@@ -117,12 +117,12 @@ static inline int cn1CollectionOpen(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT colle
                                     CN1CollectionView* out) {
     if(collection == JAVA_NULL) return 0;
 #ifdef CN1_COLL_SET_FROM_MAP
-    if(collection->__codenameOneParentClsReference == &class__java_util_Collections_SetFromMap)
+    if(CN1_OBJ_CLASS(collection) == &class__java_util_Collections_SetFromMap)
         collection = ((struct obj__java_util_Collections_SetFromMap*)collection)->java_util_Collections_SetFromMap_backingSet;
 #endif
     if(collection == JAVA_NULL) return 0;
 #ifdef CN1_COLL_ARRAYLIST
-    if(collection->__codenameOneParentClsReference == &class__java_util_ArrayList) {
+    if(CN1_OBJ_CLASS(collection) == &class__java_util_ArrayList) {
         struct obj__java_util_ArrayList* list = (struct obj__java_util_ArrayList*)collection;
         out->owner = collection;
         out->kind = CN1_COLL_DENSE;
@@ -132,7 +132,7 @@ static inline int cn1CollectionOpen(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT colle
     }
 #endif
 #ifdef CN1_COLL_ARRAY_VIEW
-    if(collection->__codenameOneParentClsReference == &class__java_util_Arrays_ArrayList) {
+    if(CN1_OBJ_CLASS(collection) == &class__java_util_Arrays_ArrayList) {
         JAVA_ARRAY array = (JAVA_ARRAY)((struct obj__java_util_Arrays_ArrayList*)collection)->java_util_Arrays_ArrayList_a;
         out->owner = collection;
         out->kind = CN1_COLL_DENSE;
@@ -142,23 +142,23 @@ static inline int cn1CollectionOpen(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT colle
     }
 #endif
 #ifdef CN1_COLL_KEYS
-    if(collection->__codenameOneParentClsReference == &class__java_util_HashMap_KeySet)
+    if(CN1_OBJ_CLASS(collection) == &class__java_util_HashMap_KeySet)
         return cn1CollectionMap(threadStateData, ((struct obj__java_util_HashMap_KeySet*)collection)->java_util_HashMap_KeySet_map, 0, out);
 #endif
 #ifdef CN1_COLL_VALUES
-    if(collection->__codenameOneParentClsReference == &class__java_util_HashMap_Values)
+    if(CN1_OBJ_CLASS(collection) == &class__java_util_HashMap_Values)
         return cn1CollectionMap(threadStateData, ((struct obj__java_util_HashMap_Values*)collection)->java_util_HashMap_Values_map, 1, out);
 #endif
 #ifdef CN1_COLL_IDENTITY_KEYS
-    if(collection->__codenameOneParentClsReference == &class__java_util_IdentityHashMap_KeySet)
+    if(CN1_OBJ_CLASS(collection) == &class__java_util_IdentityHashMap_KeySet)
         return cn1CollectionMap(threadStateData, ((struct obj__java_util_IdentityHashMap_KeySet*)collection)->java_util_IdentityHashMap_KeySet_map, 0, out);
 #endif
 #ifdef CN1_COLL_IDENTITY_VALUES
-    if(collection->__codenameOneParentClsReference == &class__java_util_IdentityHashMap_Values)
+    if(CN1_OBJ_CLASS(collection) == &class__java_util_IdentityHashMap_Values)
         return cn1CollectionMap(threadStateData, ((struct obj__java_util_IdentityHashMap_Values*)collection)->java_util_IdentityHashMap_Values_map, 1, out);
 #endif
 #ifdef CN1_COLL_SET
-    if(collection->__codenameOneParentClsReference == &class__java_util_HashSet) {
+    if(CN1_OBJ_CLASS(collection) == &class__java_util_HashSet) {
         // A plain HashSet owns a keys+meta table of its own -- it stopped renting a
         // HashMap -- and that table is the SAME shape cn1CollectionMap describes for a
         // map: an occupied slot is one whose marker has the sign bit set, which is the
@@ -187,7 +187,7 @@ static inline int cn1CollectionOpen(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT colle
     }
 #endif
 #ifdef CN1_COLL_ORDERED_SET
-    if(collection->__codenameOneParentClsReference == &class__java_util_LinkedHashSet) {
+    if(CN1_OBJ_CLASS(collection) == &class__java_util_LinkedHashSet) {
         JAVA_OBJECT backing = ((struct obj__java_util_LinkedHashSet*)collection)->java_util_LinkedHashSet_backingMap;
         if(backing == JAVA_NULL) return 0;
         return cn1CollectionMap(threadStateData, backing, 0, out);

@@ -226,7 +226,7 @@ static inline JAVA_BOOLEAN cn1InlSbResize(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT
             && t->java_lang_StringBuilder_cn1Storage == 0
             && capacity >= 0
             && capacity <= (JAVA_INT)sizeof(t->__cn1InlineStorage)
-            && t->__heapPosition != CN1_GC_STACK_BUILDER, 1)) {
+            && CN1_OBJ_HEAPPOS(t) != CN1_GC_STACK_BUILDER, 1)) {
         t->java_lang_StringBuilder_cn1Storage = (JAVA_LONG)(uintptr_t)t->__cn1InlineStorage;
         t->java_lang_StringBuilder_capacity = capacity;
         return JAVA_TRUE;
@@ -239,7 +239,7 @@ static inline JAVA_BOOLEAN cn1InlSbResize(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT
      * construction, which the profile put at ~375 of ~3200 stringBuilding samples. */
     if(__builtin_expect(!wide
             && capacity >= 0
-            && t->__heapPosition == CN1_GC_STACK_BUILDER, 1)) {
+            && CN1_OBJ_HEAPPOS(t) == CN1_GC_STACK_BUILDER, 1)) {
         struct CN1StackBuffer* scope;
         memcpy(&scope, t->__cn1InlineStorage, sizeof(scope));
         if(t->java_lang_StringBuilder_cn1Storage == (JAVA_LONG)(uintptr_t)scope->initialData
@@ -263,7 +263,7 @@ static inline JAVA_OBJECT cn1InlSbAppendStr(CODENAME_ONE_THREAD_STATE, JAVA_OBJE
          * and the twin class word IS the coder -- see cn1StrIsLatin1. Testing
          * both at once keeps this to a single class-pointer comparison. */
         if(__builtin_expect(s->java_lang_String_value == JAVA_NULL
-                && str->__codenameOneParentClsReference == &class__java_lang_String_i8
+                && CN1_OBJ_CLASS(str) == &class__java_lang_String_i8
                 && !t->java_lang_StringBuilder_wide, 1)) {
             JAVA_INT len = s->java_lang_String_count;
             JAVA_INT count = t->java_lang_StringBuilder_count;
@@ -306,7 +306,7 @@ static inline JAVA_OBJECT cn1InlSbToString(CODENAME_ONE_THREAD_STATE, JAVA_OBJEC
                 string->java_lang_String_count = count;
                 string->java_lang_String_hashCode = 0;
                 CN1_STRING_CLEAR_PEER(string);
-                result->__codenameOneParentClsReference = &class__java_lang_String_i8;
+                CN1_OBJ_SET_CLASS(result, &class__java_lang_String_i8);
                 return result;
             }
         }
@@ -355,7 +355,7 @@ static inline __attribute__((always_inline)) JAVA_BOOLEAN cn1InlStrEquals(
 #endif
     if(self == other) return JAVA_TRUE;
     if(other == JAVA_NULL || CN1_IS_TAGGED(other)
-            || !cn1IsStringClass(other->__codenameOneParentClsReference)) return JAVA_FALSE;
+            || !cn1IsStringClass(CN1_OBJ_CLASS(other))) return JAVA_FALSE;
     struct obj__java_lang_String* a = (struct obj__java_lang_String*)self;
     struct obj__java_lang_String* b = (struct obj__java_lang_String*)other;
     int count = a->java_lang_String_count;

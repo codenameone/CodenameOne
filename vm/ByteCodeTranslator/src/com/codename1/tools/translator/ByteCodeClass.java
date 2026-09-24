@@ -1663,9 +1663,9 @@ public class ByteCodeClass {
             b.append("(CODENAME_ONE_THREAD_STATE, JAVA_INT size) {\n");
             b.append("    JAVA_OBJECT o = allocArray(threadStateData, size, &class_array1__");
             b.append(clsName);
-            b.append(", sizeof(JAVA_OBJECT), 1);\n    (*o).__codenameOneParentClsReference = &class_array1__");
+            b.append(", sizeof(JAVA_OBJECT), 1);\n    CN1_OBJ_SET_CLASS(o, &class_array1__");
             b.append(clsName);
-            b.append(";\n    return o;\n}\n\n");
+            b.append(");\n    return o;\n}\n\n");
         }
 
         /*b.append("JAVA_OBJECT __NEW_MULTI_ARRAY_");
@@ -2651,9 +2651,7 @@ public class ByteCodeClass {
         b.append(" {\n");
         // reference to the class, reference counter for the arc portion of the GC
         // and a mutex for synchronization code
-        b.append("    DEBUG_GC_VARIABLES\n    struct clazz *__codenameOneParentClsReference;\n");
-        b.append("    int __codenameOneGcMark;\n");
-        b.append("    int __heapPosition;\n");
+        b.append("    CN1_OBJ_HEADER_FIELDS\n");
 
         
         addFields(b);

@@ -240,7 +240,7 @@ public final class InlinableConstructor {
         // guards on parentCls==0). Set it only now, with every field written: from
         // this store on the object is safely traceable. (The __NEW_X slow-path
         // fallback already set it -- rewriting the same value is harmless.)
-        b.append("    __ibp->__codenameOneParentClsReference = &class__").append(cType).append(";\n");
+        b.append("    CN1_OBJ_SET_CLASS(__ibp, &class__").append(cType).append(");\n");
         // publish: the object becomes a GC root only now, fully constructed.
         b.append("    SP[-").append(survivorSlot).append("].data.o = __ibp;\n");
         if(deadGuardId >= 0) {

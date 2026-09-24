@@ -206,6 +206,16 @@
 #define DEBUG_GC_INIT 
 #endif
 
+// THE OBJECT HEADER, in one place: every object struct, every array and every class
+// descriptor (a java.lang.Class instance) starts with exactly these members, because
+// each is cast to JavaObjectPrototype. Read and write them only through the CN1_OBJ_*
+// accessors defined after JavaObjectPrototype.
+#define CN1_OBJ_HEADER_FIELDS \
+    DEBUG_GC_VARIABLES \
+    struct clazz *__codenameOneParentClsReference; \
+    int __codenameOneGcMark; \
+    int __heapPosition;
+
 /**
  * header file containing global CN1 constants and structs
  */
@@ -281,11 +291,8 @@ struct CN1ThreadData {
 };
 
 struct clazz {
-    DEBUG_GC_VARIABLES
-    // these first  fields aren't really used but they allow us to treat a clazz as an object
-    struct clazz *__codenameOneParentClsReference;
-    int __codenameOneGcMark;
-    int __heapPosition;
+    // A class descriptor is a java.lang.Class instance, so it starts with an object header.
+    CN1_OBJ_HEADER_FIELDS
 
     void* finalizerFunction;
     void* releaseFieldsFunction;
@@ -371,11 +378,25 @@ extern void cn1GcRegisterClazz(struct clazz* c);
 #define EMPTY_INTERFACES ((const struct clazz**)0)
 
 struct JavaObjectPrototype {
-    DEBUG_GC_VARIABLES
-    struct clazz *__codenameOneParentClsReference;
-    int __codenameOneGcMark;
-    int __heapPosition;
+    CN1_OBJ_HEADER_FIELDS
 };
+
+// OBJECT HEADER ACCESS. Every read and write of an object's class and heap position goes
+// through these, never through the members, so the header's layout is decided in one
+// place. A read is an rvalue (the cast), so it cannot be assigned through by accident;
+// writes use the SET forms. Static objects initialize their header with
+// CN1_OBJ_HEADER_INIT. `o` is any object or array pointer.
+#define CN1_OBJ_CLASS(o)            ((struct clazz*)((const struct JavaObjectPrototype*)(o))->__codenameOneParentClsReference)
+#define CN1_OBJ_SET_CLASS(o, c)     (((struct JavaObjectPrototype*)(o))->__codenameOneParentClsReference = (c))
+#define CN1_OBJ_HEAPPOS(o)          ((int)((const struct JavaObjectPrototype*)(o))->__heapPosition)
+#define CN1_OBJ_SET_HEAPPOS(o, v)   (((struct JavaObjectPrototype*)(o))->__heapPosition = (v))
+#define CN1_OBJ_HEAPPOS_PTR(o)      (&((struct JavaObjectPrototype*)(o))->__heapPosition)
+#define CN1_OBJ_HEADER_INIT(cls)    .__codenameOneParentClsReference = (cls)
+// The mark word, and the value an object carries from allocation until a mark reaches it.
+#define CN1_GC_MARK_FRESH           (-1)
+#define CN1_OBJ_MARK(o)             ((int)((const struct JavaObjectPrototype*)(o))->__codenameOneGcMark)
+#define CN1_OBJ_SET_MARK(o, v)      (((struct JavaObjectPrototype*)(o))->__codenameOneGcMark = (v))
+#define CN1_OBJ_MARK_PTR(o)         (&((struct JavaObjectPrototype*)(o))->__codenameOneGcMark)
 
 // THE ARRAY HEADER IS 32 BYTES, AND EIGHT OF THOSE WERE PURE PADDING PLUS SLACK.
 //
@@ -404,10 +425,7 @@ struct JavaObjectPrototype {
 // all of it is silent when wrong -- a mis-set primitiveSize is a wrong element stride,
 // which reads and writes past the end of the payload with nothing thrown.
 struct JavaArrayPrototype {
-    DEBUG_GC_VARIABLES
-    struct clazz *__codenameOneParentClsReference;
-    int __codenameOneGcMark;
-    int __heapPosition;
+    CN1_OBJ_HEADER_FIELDS
     int length;
     unsigned char dimensions;
     unsigned char primitiveSize;
@@ -1213,7 +1231,7 @@ static inline struct clazz* cn1ClassOf(JAVA_OBJECT o) {
     uintptr_t cn1__code = ((uintptr_t)o) & CN1_TAG_MASK;
     struct JavaObjectPrototype* cn1__p = cn1__code ? &cn1TaggedProxy[cn1__code]
                                                    : (struct JavaObjectPrototype*)o;
-    return cn1__p->__codenameOneParentClsReference;
+    return CN1_OBJ_CLASS(cn1__p);
 }
 #define CN1_TAG_INT(v) ((JAVA_OBJECT)((((uintptr_t)(intptr_t)(JAVA_INT)(v)) << CN1_TAG_SHIFT) | CN1_TAG_INTEGER))
 #define CN1_UNTAG_INT(o) ((JAVA_INT)(((intptr_t)(o)) >> CN1_TAG_SHIFT))
@@ -1255,7 +1273,7 @@ static inline struct clazz* cn1ClassOf(JAVA_OBJECT o) {
 #else
 #define CN1_TAG_CODE(o) (0)
 #define CN1_IS_TAGGED(o) (0)
-#define CN1_CLASS_OF(o) ((o)->__codenameOneParentClsReference)
+#define CN1_CLASS_OF(o) (CN1_OBJ_CLASS((o)))
 #endif
 
 /* The class word, read DIRECTLY, for a receiver that cannot be a tagged immediate.
@@ -1267,7 +1285,7 @@ static inline struct clazz* cn1ClassOf(JAVA_OBJECT o) {
  * decides that from the hierarchy (Parser.canReceiveTagged); using this where a
  * tagged value CAN arrive dereferences a small integer.
  */
-#define CN1_CLASS_OF_UNTAGGED(o) ((o)->__codenameOneParentClsReference)
+#define CN1_CLASS_OF_UNTAGGED(o) (CN1_OBJ_CLASS((o)))
 
 #define GET_CLASS_ID(JavaObj) ((CN1_CLASS_OF(JavaObj))->classId)
 
@@ -1375,14 +1393,14 @@ extern JAVA_CHAR cn1StrCharAtRaw(JAVA_OBJECT s, JAVA_INT i);
         JAVA_OBJECT cn1__io = SP[-1].data.o; \
         SP[-1].type = CN1_TYPE_INT; \
         SP[-1].data.i = (cn1__io != JAVA_NULL && !CN1_IS_TAGGED(cn1__io) \
-                && cn1IsStringClass(cn1__io->__codenameOneParentClsReference)) ? 1 : 0; \
+                && cn1IsStringClass(CN1_OBJ_CLASS(cn1__io))) ? 1 : 0; \
     }
 
 #define BC_INSTANCEOF_LEAF(clsSymbol) { \
         JAVA_OBJECT cn1__io = SP[-1].data.o; \
         SP[-1].type = CN1_TYPE_INT; \
         SP[-1].data.i = (cn1__io != JAVA_NULL && !CN1_IS_TAGGED(cn1__io) \
-                && cn1__io->__codenameOneParentClsReference == &(clsSymbol)) ? 1 : 0; \
+                && CN1_OBJ_CLASS(cn1__io) == &(clsSymbol)) ? 1 : 0; \
     }
 
 #define BC_INSTANCEOF_FAST(typeTestIdx, typeOfInstanceOf) { \
@@ -2584,10 +2602,10 @@ static inline JAVA_OBJECT cn1BibopFastAlloc(CODENAME_ONE_THREAD_STATE, int size,
                 // floating garbage. The body zero is load-bearing, not overhead.
                 memset((char*)o + hdr, 0, size - hdr);
             }
-            o->__codenameOneParentClsReference = parent;
+            CN1_OBJ_SET_CLASS(o, parent);
             // __codenameOneReferenceCount + __codenameOneThreadData relocated out of the
             // header (force-visited / monitor side tables); no per-object stores.
-            o->__heapPosition = CN1_BIBOP_HEAP_POS;
+            CN1_OBJ_SET_HEAPPOS(o, CN1_BIBOP_HEAP_POS);
             CN1_ALLOC_CENSUS_COUNT(parent, size);
 #ifdef DEBUG_GC_ALLOCATIONS
             o->className = threadStateData->callStackClass[threadStateData->callStackOffset - 1];
@@ -2678,8 +2696,8 @@ static inline JAVA_OBJECT cn1BibopFastAllocNoZero(CODENAME_ONE_THREAD_STATE, int
             // The explicit 0 store matters: a bump slot recycled by the O(1)
             // homogeneous page reclaim still holds the DEAD previous occupant's
             // class pointer.
-            o->__codenameOneParentClsReference = (struct clazz*)0;
-            o->__heapPosition = CN1_BIBOP_HEAP_POS;
+            CN1_OBJ_SET_CLASS(o, (struct clazz*)0);
+            CN1_OBJ_SET_HEAPPOS(o, CN1_BIBOP_HEAP_POS);
             CN1_ALLOC_CENSUS_COUNT(parent, size);
 #ifdef DEBUG_GC_ALLOCATIONS
             o->className = threadStateData->callStackClass[threadStateData->callStackOffset - 1];
@@ -2718,8 +2736,8 @@ static inline JAVA_OBJECT cn1BibopFastAllocNoZero(CODENAME_ONE_THREAD_STATE, int
         p->freeList = *(void**)o;
         p->freeCount--;
         CN1_BIBOP_NOTE_RECYCLED(p, o);
-        o->__codenameOneParentClsReference = (struct clazz*)0;
-        o->__heapPosition = CN1_BIBOP_HEAP_POS;
+        CN1_OBJ_SET_CLASS(o, (struct clazz*)0);
+        CN1_OBJ_SET_HEAPPOS(o, CN1_BIBOP_HEAP_POS);
         CN1_ALLOC_CENSUS_COUNT(parent, size);
 #ifdef DEBUG_GC_ALLOCATIONS
         o->className = threadStateData->callStackClass[threadStateData->callStackOffset - 1];
@@ -3446,9 +3464,9 @@ extern JAVA_OBJECT cn1AllocFused(CODENAME_ONE_THREAD_STATE, int totalSize, struc
 // this storage to precise tracing. Element placement mirrors allocArray.
 static inline JAVA_OBJECT cn1FusedInstallPrimArray(JAVA_OBJECT owner, int off, struct clazz* acls, int esz, int len) {
     struct JavaArrayPrototype* a = (struct JavaArrayPrototype*)((char*)owner + off);
-    a->__codenameOneParentClsReference = acls;
+    CN1_OBJ_SET_CLASS(a, acls);
     a->__codenameOneGcMark = -1;   // not yet published; see codenameOneGcMalloc
-    a->__heapPosition = CN1_GC_EMBEDDED_PRIMITIVE;
+    CN1_OBJ_SET_HEAPPOS(a, CN1_GC_EMBEDDED_PRIMITIVE);
     a->length = len;
     a->dimensions = 1;
     a->primitiveSize = esz;
@@ -4016,9 +4034,9 @@ static inline JAVA_OBJECT cn1IterScopeTake(struct ThreadLocalData* threadStateDa
     // walk its fields when it finds the pointer on the C stack, mark -1 so no sweep
     // treats it as aged, and heapPosition -1 because it was never registered in the heap
     // table and must never be freed. It dies when the frame unwinds.
-    o->__codenameOneParentClsReference = cls;
+    CN1_OBJ_SET_CLASS(o, cls);
     o->__codenameOneGcMark = -1;
-    o->__heapPosition = -1;
+    CN1_OBJ_SET_HEAPPOS(o, -1);
     return o;
 }
 void codenameOneGcFree(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj);

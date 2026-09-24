@@ -510,13 +510,13 @@ class DebuggerObjectValidationTest {
             "    JAVA_OBJECT candidate = JAVA_NULL;\n" +
             "\n" +
             "    if (strcmp(which, \"REGISTERED\") == 0) {\n" +
-            "        object.__codenameOneParentClsReference = &registeredClass;\n" +
+            "        CN1_OBJ_SET_CLASS(&object, &registeredClass);\n" +
             "        candidate = &object;\n" +
             "    } else if (strcmp(which, \"ARRAY\") == 0) {\n" +
-            "        object.__codenameOneParentClsReference = &arrayClass;\n" +
+            "        CN1_OBJ_SET_CLASS(&object, &arrayClass);\n" +
             "        candidate = &object;\n" +
             "    } else if (strcmp(which, \"IMPOSTOR\") == 0) {\n" +
-            "        object.__codenameOneParentClsReference = &unregisteredClass;\n" +
+            "        CN1_OBJ_SET_CLASS(&object, &unregisteredClass);\n" +
             "        candidate = &object;\n" +
             "    } else if (strcmp(which, \"NO_CLASS_WORD\") == 0) {\n" +
             "        candidate = &object;\n" +
@@ -730,20 +730,20 @@ class DebuggerObjectValidationTest {
             "        printf(\"all-resolvable\\n\");\n" +
             "        return 0;\n" +
             "    } else if (strcmp(which, \"WIRE_ID_ISSUED\") == 0) {\n" +
-            "        object.__codenameOneParentClsReference = &registeredClass;\n" +
+            "        CN1_OBJ_SET_CLASS(&object, &registeredClass);\n" +
             "        cn1_debugger_note_issued(&object);\n" +
             "        printf(\"%s\\n\", cn1_debugger_class_of_wire_id(&object)\n" +
             "                ? \"accepted\" : \"rejected\");\n" +
             "        return 0;\n" +
             "    } else if (strcmp(which, \"WIRE_ID_AFTER_RESUME\") == 0) {\n" +
-            "        object.__codenameOneParentClsReference = &registeredClass;\n" +
+            "        CN1_OBJ_SET_CLASS(&object, &registeredClass);\n" +
             "        cn1_debugger_note_issued(&object);\n" +
             "        cn1_debugger_forget_issued();   /* the app ran on */\n" +
             "        printf(\"%s\\n\", cn1_debugger_class_of_wire_id(&object)\n" +
             "                ? \"accepted\" : \"rejected\");\n" +
             "        return 0;\n" +
             "    } else if (strcmp(which, \"WIRE_ID_NEVER_ISSUED\") == 0) {\n" +
-            "        object.__codenameOneParentClsReference = &registeredClass;\n" +
+            "        CN1_OBJ_SET_CLASS(&object, &registeredClass);\n" +
             "        printf(\"%s\\n\", cn1_debugger_class_of_wire_id(&object)\n" +
             "                ? \"accepted\" : \"rejected\");\n" +
             "        return 0;\n" +

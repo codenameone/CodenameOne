@@ -999,7 +999,7 @@ static inline int cn1GcIsOld(JAVA_OBJECT o, int m) {
     if(m <= 0) {
         return 0;
     }
-    int hp = o->__heapPosition;
+    int hp = CN1_OBJ_HEAPPOS(o);
     return hp == CN1_BIBOP_HEAP_POS || hp == CN1_BIBOP_ADOPTED || hp >= 0;
 }
 
@@ -1064,8 +1064,8 @@ static inline int cn1GcSweepReclaimsObj(JAVA_OBJECT o, int mark) {
         return cn1GcSweepReclaims(mark);
     }
 #ifndef CN1_DISABLE_BIBOP
-    if(cn1GcStwCycle && o->__heapPosition == CN1_BIBOP_HEAP_POS
-       && o->__codenameOneParentClsReference != 0) {
+    if(cn1GcStwCycle && CN1_OBJ_HEAPPOS(o) == CN1_BIBOP_HEAP_POS
+       && CN1_OBJ_CLASS(o) != 0) {
         CN1BibopPage* pg = (CN1BibopPage*)((uintptr_t)o & ~((uintptr_t)CN1_BIBOP_PAGE_SIZE - 1));
         return pg->gcPreCycle;
     }
@@ -1110,7 +1110,7 @@ void cn1MarkDeadNow(JAVA_OBJECT o) {
     if(cn1GcSingleCore()) { return; }
     if(o == JAVA_NULL || CN1_IS_TAGGED(o)) { return; }
     /* Page-resident only: the legacy heap reclaims on a different path. */
-    if(o->__heapPosition != CN1_BIBOP_HEAP_POS) { return; }
+    if(CN1_OBJ_HEAPPOS(o) != CN1_BIBOP_HEAP_POS) { return; }
     /* Never race a running mark. The collector may already hold this object in a
      * worklist, and the whole point is to save work, not to win a race for one
      * object. Off-mark this is a single predicted-not-taken load. */
@@ -1732,7 +1732,7 @@ void flushReleaseQueue() {
 // BiBOP pages) only on pages flagged by cn1BibopNoteNativePeer at cache time.
 #if defined(__APPLE__) && defined(__OBJC__)
 static inline void cn1ReleaseStringPeer(JAVA_OBJECT o) {
-    if(cn1IsStringClass(o->__codenameOneParentClsReference)) {
+    if(cn1IsStringClass(CN1_OBJ_CLASS(o))) {
         struct obj__java_lang_String* s = (struct obj__java_lang_String*)o;
         if(s->java_lang_String_nsString != 0) {
             void* v = (void*)s->java_lang_String_nsString;
@@ -1779,7 +1779,7 @@ void cn1InvokeFinalizer(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj, void (*ptr)(
 void freeAndFinalize(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj) {
     // Generated cleanup functions catch Java finalize() exceptions themselves.
     // Primitive/reference-buffer cleanup needs no second setjmp frame.
-    finalizerFunctionPointer ptr = (finalizerFunctionPointer)obj->__codenameOneParentClsReference->finalizerFunction;
+    finalizerFunctionPointer ptr = (finalizerFunctionPointer)CN1_OBJ_CLASS(obj)->finalizerFunction;
     if(ptr != 0) ptr(threadStateData, obj);
     cn1ReleaseStringPeer(obj);
     codenameOneGcFree(threadStateData, obj);
@@ -1962,7 +1962,7 @@ int findPointerPosInHeap(JAVA_OBJECT obj) {
     if(obj == 0 || CN1_IS_TAGGED(obj)) {
         return -1;
     }
-    return obj->__heapPosition;
+    return CN1_OBJ_HEAPPOS(obj);
 }
 
 // this is an optimization allowing us to continue searching for available space in RAM from the previous position
@@ -1975,7 +1975,7 @@ void placeObjectInHeapCollection(JAVA_OBJECT obj) {
     }
     if(currentSizeOfAllObjectsInHeap < sizeOfAllObjectsInHeap) {
         allObjectsInHeap[currentSizeOfAllObjectsInHeap] = obj;
-        obj->__heapPosition = currentSizeOfAllObjectsInHeap;
+        CN1_OBJ_SET_HEAPPOS(obj, currentSizeOfAllObjectsInHeap);
         currentSizeOfAllObjectsInHeap++;
     } else {
         int pos = -1;
@@ -2022,7 +2022,7 @@ void placeObjectInHeapCollection(JAVA_OBJECT obj) {
         } else {
             allObjectsInHeap[pos] = obj;
         }
-        obj->__heapPosition = pos;
+        CN1_OBJ_SET_HEAPPOS(obj, pos);
     }
 }
 
@@ -2096,7 +2096,7 @@ static void cn1MatureObject(JAVA_OBJECT obj) {
         return;
     }
     int expected = CN1_BIBOP_HEAP_POS;
-    if(!__atomic_compare_exchange_n(&obj->__heapPosition, &expected, CN1_BIBOP_ADOPTED,
+    if(!__atomic_compare_exchange_n(CN1_OBJ_HEAPPOS_PTR(obj), &expected, CN1_BIBOP_ADOPTED,
                                     0, __ATOMIC_RELAXED, __ATOMIC_RELAXED)) {
         return;
     }
@@ -2154,7 +2154,7 @@ static void cn1DrainAdoptBuffer() {
     for(long i = 0 ; i < gcAdoptTop ; i++) {
         JAVA_OBJECT o = gcAdoptStack[i];
         placeObjectInHeapCollection(o);      // sets heapPosition to the array index...
-        o->__heapPosition = CN1_BIBOP_ADOPTED; // ...restore the -4 sentinel (found by walk-index)
+        CN1_OBJ_SET_HEAPPOS(o, CN1_BIBOP_ADOPTED); // ...restore the -4 sentinel (found by walk-index)
     }
     gcAdoptTop = 0;
     unlockCriticalSection();
@@ -5026,8 +5026,8 @@ static void gcMarkGraceWalkPages(CODENAME_ONE_THREAD_STATE) {
                 for(; gi < gn && __nf < CN1_GRACE_TRACE_CHUNK ; gi++) {
                     JAVA_OBJECT go = cn1BibopSlot(gp, gi);
                     if(__atomic_load_n(&go->__codenameOneGcMark, __ATOMIC_ACQUIRE) == -1
-                       && go->__codenameOneParentClsReference != 0
-                       && go->__codenameOneParentClsReference->markFunction != 0) {
+                       && CN1_OBJ_CLASS(go) != 0
+                       && CN1_OBJ_CLASS(go)->markFunction != 0) {
 #ifdef CN1_GC_CONFORM
                         __marked++;
 #endif
@@ -5046,7 +5046,7 @@ static void gcMarkGraceWalkPages(CODENAME_ONE_THREAD_STATE) {
                 cn1GcGraceTraceFresh = 1;
                 for(int __i = 0 ; __i < __nf ; __i++) {
                     JAVA_OBJECT go = __gbuf[__i];
-                    struct clazz* __gc = go->__codenameOneParentClsReference;
+                    struct clazz* __gc = CN1_OBJ_CLASS(go);
                     if(__gc != 0 && __gc->markFunction != 0) {
                         gcMarkFunctionPointer __fp = __gc->markFunction;
                         cn1GcTraceIncomplete = 0;
@@ -6097,8 +6097,8 @@ void codenameOneGCMark() {
             // without the preceding parentClsReference store.
             if(go != JAVA_NULL
                && __atomic_load_n(&go->__codenameOneGcMark, __ATOMIC_ACQUIRE) == -1
-               && go->__codenameOneParentClsReference != 0
-               && go->__codenameOneParentClsReference->markFunction != 0) {
+               && CN1_OBJ_CLASS(go) != 0
+               && CN1_OBJ_CLASS(go)->markFunction != 0) {
                 gcMarkObject(d, go, JAVA_FALSE);
                 // Same interleaved drain as the page walk above, and for the same
                 // reason: the number of fresh entries here is set by the allocation
@@ -6432,11 +6432,11 @@ static void cn1HeapHistogram(void) {
     int t = currentSizeOfAllObjectsInHeap;
     for(int iter = 0 ; iter < t ; iter++) {
         JAVA_OBJECT o = allObjectsInHeap[iter];
-        if(o == JAVA_NULL || o->__codenameOneParentClsReference == 0) {
+        if(o == JAVA_NULL || CN1_OBJ_CLASS(o) == 0) {
             continue;
         }
         total++;
-        const char* n = o->__codenameOneParentClsReference->clsName;
+        const char* n = CN1_OBJ_CLASS(o)->clsName;
         if(n == 0) {
             n = "?";
         }
@@ -6617,11 +6617,11 @@ void codenameOneGCSweep() {
                     // finalizer a SECOND time (cn1BibopReclaimSlot runs it too), which
                     // double-frees a native-resource finalizer's buffer -- the deterministic
                     // mid-suite "corrupted unsorted chunks" heap abort.
-                    if(o->__heapPosition == CN1_BIBOP_ADOPTED) {
+                    if(CN1_OBJ_HEAPPOS(o) == CN1_BIBOP_ADOPTED) {
 #ifdef CN1_GC_CONFORM
                         atomic_fetch_add_explicit(&cn1GcMaturedDied, 1, memory_order_relaxed);
 #endif
-                        o->__heapPosition = CN1_BIBOP_HEAP_POS;
+                        CN1_OBJ_SET_HEAPPOS(o, CN1_BIBOP_HEAP_POS);
                         cn1BibopNoteAdoptedDeath(o);
                         continue;
                     }
@@ -6642,9 +6642,9 @@ void codenameOneGCSweep() {
                         whereIs = @"unknown";
                     }
                     
-                    if(o->__codenameOneParentClsReference->isArray) {
+                    if(CN1_OBJ_CLASS(o)->isArray) {
                         JAVA_ARRAY arr = (JAVA_ARRAY)o;
-                        if(arr->__codenameOneParentClsReference == &class_array1__JAVA_CHAR) {
+                        if(CN1_OBJ_CLASS(arr) == &class_array1__JAVA_CHAR) {
                             JAVA_ARRAY_CHAR* ch = (JAVA_ARRAY_CHAR*)CN1_ARRAY_DATA(arr);
                             char data[arr->length + 1];
                             for(int iter = 0 ; iter < arr->length ; iter++) {
@@ -6652,11 +6652,11 @@ void codenameOneGCSweep() {
                             }
                             data[arr->length] = 0;
                             #if defined(__OBJC__)
-                            NSLog(@"Sweeping: %X, Mark: %i, Allocated: %@ %i type: %@, which is: '%@'", (int)o, o->__codenameOneGcMark, whereIs, o->line, [NSString stringWithUTF8String:o->__codenameOneParentClsReference->clsName], [NSString stringWithUTF8String:data]);
+                            NSLog(@"Sweeping: %X, Mark: %i, Allocated: %@ %i type: %@, which is: '%@'", (int)o, o->__codenameOneGcMark, whereIs, o->line, [NSString stringWithUTF8String:CN1_OBJ_CLASS(o)->clsName], [NSString stringWithUTF8String:data]);
                             #endif
                         } else {
                             #if defined(__OBJC__)
-                            NSLog(@"Sweeping: %X, Mark: %i, Allocated: %@ %i , type: %@", (int)o, o->__codenameOneGcMark, whereIs, o->line, [NSString stringWithUTF8String:o->__codenameOneParentClsReference->clsName]);
+                            NSLog(@"Sweeping: %X, Mark: %i, Allocated: %@ %i , type: %@", (int)o, o->__codenameOneGcMark, whereIs, o->line, [NSString stringWithUTF8String:CN1_OBJ_CLASS(o)->clsName]);
                             #endif
                         }
                     } else {
@@ -6666,7 +6666,7 @@ void codenameOneGCSweep() {
                             ns = @"[NULL]";
                         }
                         #if defined(__OBJC__)
-                        NSLog(@"Sweeping: %X, Mark: %i, Allocated: %@ %i , type: %@, toString: '%@'", (int)o, o->__codenameOneGcMark, whereIs, o->line, [NSString stringWithUTF8String:o->__codenameOneParentClsReference->clsName], ns);
+                        NSLog(@"Sweeping: %X, Mark: %i, Allocated: %@ %i , type: %@, toString: '%@'", (int)o, o->__codenameOneGcMark, whereIs, o->line, [NSString stringWithUTF8String:CN1_OBJ_CLASS(o)->clsName], ns);
                         #endif
                     }
 #endif
@@ -6774,7 +6774,7 @@ JAVA_BOOLEAN removeObjectFromHeapCollection(CODENAME_ONE_THREAD_STATE, JAVA_OBJE
        || o == (JAVA_OBJECT)&ClazzClazz) {
         return JAVA_TRUE;
     }
-    struct clazz* parent = o->__codenameOneParentClsReference;
+    struct clazz* parent = CN1_OBJ_CLASS(o);
     if(parent == 0 || parent == &class__java_lang_Class || parent == &ClazzClazz) {
         return JAVA_TRUE;
     }
@@ -6801,7 +6801,7 @@ JAVA_BOOLEAN removeObjectFromHeapCollection(CODENAME_ONE_THREAD_STATE, JAVA_OBJE
     // immortal root while freeAndFinalize frees it corrupts the heap. -4 falls through to
     // findPointerPosInHeap removal, which is correct for both the sweep and the (never
     // observed in practice) make-immortal-of-an-already-matured-object case.
-    if(o != JAVA_NULL && !CN1_IS_TAGGED(o) && o->__heapPosition == CN1_BIBOP_HEAP_POS) {
+    if(o != JAVA_NULL && !CN1_IS_TAGGED(o) && CN1_OBJ_HEAPPOS(o) == CN1_BIBOP_HEAP_POS) {
         cn1AddImmortalRoot(o);
         return JAVA_TRUE;
     }
@@ -6825,7 +6825,7 @@ JAVA_BOOLEAN removeObjectFromHeapCollection(CODENAME_ONE_THREAD_STATE, JAVA_OBJE
         }
         return JAVA_FALSE;
     }
-    o->__heapPosition = -1;
+    CN1_OBJ_SET_HEAPPOS(o, -1);
 
     allObjectsInHeap[pos] = JAVA_NULL;
 
@@ -7683,8 +7683,8 @@ static void cn1BibopFormatPage(CN1BibopPage* p, int ci) {
         int __n = (CN1_BIBOP_PAGE_SIZE - __hdr) / slotSize;
         for(int __i = 0 ; __i < __n ; __i++) {
             JAVA_OBJECT __o = (JAVA_OBJECT)(__s + (long)__i * slotSize);
-            __o->__codenameOneParentClsReference = 0;
-            __o->__heapPosition = CN1_BIBOP_HEAP_POS;
+            CN1_OBJ_SET_CLASS(__o, 0);
+            CN1_OBJ_SET_HEAPPOS(__o, CN1_BIBOP_HEAP_POS);
             cn1GcVerifyPoisonSlot(__o, slotSize);
             __atomic_store_n(&__o->__codenameOneGcMark, CN1_BIBOP_FREE_MARK, __ATOMIC_RELEASE);
         }
@@ -7795,7 +7795,7 @@ static void cn1GenPoisonCrash(int sig, siginfo_t* si, void* uc) {
         if(((uintptr_t)o - (uintptr_t)pg) < (uintptr_t)pg->firstSlotOffset) continue;
         if(((uintptr_t)o - (uintptr_t)pg - pg->firstSlotOffset) % pg->slotSize != 0) continue;
         if(o->__codenameOneGcMark != -9 && o->__codenameOneGcMark != -8) continue;
-        struct clazz* c = o->__codenameOneParentClsReference;
+        struct clazz* c = CN1_OBJ_CLASS(o);
         fprintf(stderr, "[GEN-POISON] %s-freed object %p class=%s slotSize=%d page queued=%d cards=%llx\n",
                 o->__codenameOneGcMark == -8 ? "MAJOR" : "minor",
                 (void*)o, c && c->clsName ? c->clsName : "?", pg->slotSize,
@@ -7936,15 +7936,15 @@ static int cn1GcShadowLegacyHas(JAVA_OBJECT t) {
     return 0;
 }
 static const char* cn1ShadowCls(JAVA_OBJECT o) {
-    return (o && o->__codenameOneParentClsReference && o->__codenameOneParentClsReference->clsName)
-        ? o->__codenameOneParentClsReference->clsName : "?";
+    return (o && CN1_OBJ_CLASS(o) && CN1_OBJ_CLASS(o)->clsName)
+        ? CN1_OBJ_CLASS(o)->clsName : "?";
 }
 static void cn1GcShadowReport(JAVA_OBJECT young) {
     cn1GcShadowMisses++;
     if(cn1GcShadowMisses > 40) return;
     JAVA_OBJECT p = cn1GcShadowParent, a = cn1GcShadowAncestor;
     int card = 0, queued = -1;
-    if(a && (a->__heapPosition == CN1_BIBOP_HEAP_POS || a->__heapPosition == CN1_BIBOP_ADOPTED)) {
+    if(a && (CN1_OBJ_HEAPPOS(a) == CN1_BIBOP_HEAP_POS || CN1_OBJ_HEAPPOS(a) == CN1_BIBOP_ADOPTED)) {
         CN1BibopPage* pg = (CN1BibopPage*)((uintptr_t)a & ~((uintptr_t)CN1_BIBOP_PAGE_SIZE - 1));
         { uintptr_t __c = ((uintptr_t)a - (uintptr_t)pg) >> 6; card = (atomic_load(&pg->gcRsetCards[__c >> 6]) >> (__c & 63)) & 1; }
         queued = atomic_load(&pg->gcRsetQueued);
@@ -7967,8 +7967,8 @@ static void cn1GcShadowReport(JAVA_OBJECT young) {
     }
     fprintf(stderr, "[GEN-SHADOW] epoch=%d miss: young %s %p <- parent %s %p (mark=%d hp=%d) <- OLD %s %p (mark=%d hp=%d rsetTraced=%d legacyRset=%d cardNow=%d queuedNow=%d)\n",
             currentGcMarkValue, cn1ShadowCls(young), (void*)young,
-            cn1ShadowCls(p), (void*)p, p ? p->__codenameOneGcMark : 0, p ? p->__heapPosition : 0,
-            cn1ShadowCls(a), (void*)a, a ? a->__codenameOneGcMark : 0, a ? a->__heapPosition : 0,
+            cn1ShadowCls(p), (void*)p, p ? p->__codenameOneGcMark : 0, p ? CN1_OBJ_HEAPPOS(p) : 0,
+            cn1ShadowCls(a), (void*)a, a ? a->__codenameOneGcMark : 0, a ? CN1_OBJ_HEAPPOS(a) : 0,
             a ? cn1ShadowSetHas(&cn1GcShadowRs, a) : 0, a ? cn1GcShadowLegacyHas(a) : 0, card, queued);
 }
 static void gcMarkDrainWorklist(CODENAME_ONE_THREAD_STATE);
@@ -7979,7 +7979,7 @@ void cn1GcShadowRun(CODENAME_ONE_THREAD_STATE) {
         JAVA_OBJECT o = cn1GcShadowList[--cn1GcShadowN];
         if(!cn1ShadowSetAdd(&cn1GcShadowSeen, o)) continue;
         cn1GcShadowOld++;
-        struct clazz* c = o->__codenameOneParentClsReference;
+        struct clazz* c = CN1_OBJ_CLASS(o);
         if(c == 0 || c->markFunction == 0) continue;
         cn1GcShadowAncestor = o;
         cn1GcShadowParent = o;
@@ -8000,7 +8000,7 @@ void cn1GcShadowRun(CODENAME_ONE_THREAD_STATE) {
 #endif
 
 void cn1GcRememberSlow(JAVA_OBJECT t) {
-    int hp = t->__heapPosition;
+    int hp = CN1_OBJ_HEAPPOS(t);
     if(hp == CN1_BIBOP_HEAP_POS || hp == CN1_BIBOP_ADOPTED) {
         CN1BibopPage* pg = (CN1BibopPage*)((uintptr_t)t & ~((uintptr_t)CN1_BIBOP_PAGE_SIZE - 1));
         uintptr_t chunk = ((uintptr_t)t - (uintptr_t)pg) >> 6;
@@ -8046,8 +8046,8 @@ void cn1GcRememberSlow(JAVA_OBJECT t) {
         static long dropped = 0;
         if(++dropped <= 25 || (dropped & (dropped - 1)) == 0) {
             fprintf(stderr, "[GEN-DROP] #%ld remember of old %s %p ignored: heapPosition=%d mark=%d epoch=%d\n",
-                    dropped, t->__codenameOneParentClsReference && t->__codenameOneParentClsReference->clsName
-                        ? t->__codenameOneParentClsReference->clsName : "?",
+                    dropped, CN1_OBJ_CLASS(t) && CN1_OBJ_CLASS(t)->clsName
+                        ? CN1_OBJ_CLASS(t)->clsName : "?",
                     (void*)t, hp, t->__codenameOneGcMark, currentGcMarkValue);
         }
     }
@@ -8081,7 +8081,7 @@ static void cn1GcRsetTraceObject(struct ThreadLocalData* d, JAVA_OBJECT o) {
     if(!cn1GcIsOld(o, m)) {
         return;   // freed, or young again: nothing a young object holds needs this path
     }
-    struct clazz* c = o->__codenameOneParentClsReference;
+    struct clazz* c = CN1_OBJ_CLASS(o);
     if(c == 0 || c->markFunction == 0) {
         return;
     }
@@ -8237,9 +8237,9 @@ static JAVA_OBJECT cn1GcGenCheckHolder = 0;
 static long cn1GcGenCheckFindings = 0;
 static long cn1GcGenCheckLive = 0;
 static void cn1GcGenCheckChild(JAVA_OBJECT c) {
-    if(c->__heapPosition != CN1_BIBOP_HEAP_POS
+    if(CN1_OBJ_HEAPPOS(c) != CN1_BIBOP_HEAP_POS
        || __atomic_load_n(&c->__codenameOneGcMark, __ATOMIC_ACQUIRE) != -1
-       || c->__codenameOneParentClsReference == 0) {
+       || CN1_OBJ_CLASS(c) == 0) {
         return;
     }
     CN1BibopPage* pg = (CN1BibopPage*)((uintptr_t)c & ~((uintptr_t)CN1_BIBOP_PAGE_SIZE - 1));
@@ -8254,7 +8254,7 @@ static void cn1GcGenCheckChild(JAVA_OBJECT c) {
     if(__live) cn1GcGenCheckLive++;
     if(__live && cn1GcGenCheckLive <= 20) {
         JAVA_OBJECT h = cn1GcGenCheckHolder;
-        struct clazz* hc = h ? h->__codenameOneParentClsReference : 0;
+        struct clazz* hc = h ? CN1_OBJ_CLASS(h) : 0;
         int traced = 0;
         for(int k = 0 ; k < cn1GcGenTracedN ; k++) if(cn1GcGenTraced[k] == h) { traced = 1; break; }
         CN1BibopPage* hp = (CN1BibopPage*)((uintptr_t)h & ~((uintptr_t)CN1_BIBOP_PAGE_SIZE - 1));
@@ -8262,14 +8262,14 @@ static void cn1GcGenCheckChild(JAVA_OBJECT c) {
                 (int)hp->owned, (int)hp->gcPreCycle, (unsigned long long)atomic_load(&hp->gcRsetCards[0]));
         fprintf(stderr, "old %p %s (mark=%d heapPos=%d) -> young unmarked %p %s\n",
                 (void*)h, hc && hc->clsName ? hc->clsName : "?",
-                h ? h->__codenameOneGcMark : 0, h ? h->__heapPosition : 0, (void*)c,
-                c->__codenameOneParentClsReference->clsName ? c->__codenameOneParentClsReference->clsName : "?");
+                h ? h->__codenameOneGcMark : 0, h ? CN1_OBJ_HEAPPOS(h) : 0, (void*)c,
+                CN1_OBJ_CLASS(c)->clsName ? CN1_OBJ_CLASS(c)->clsName : "?");
     }
 }
 static void cn1GcGenCheckTrace(struct ThreadLocalData* d, JAVA_OBJECT o) {
     int m = __atomic_load_n(&o->__codenameOneGcMark, __ATOMIC_ACQUIRE);
     if(!cn1GcIsOld(o, m)) return;
-    struct clazz* c = o->__codenameOneParentClsReference;
+    struct clazz* c = CN1_OBJ_CLASS(o);
     if(c == 0 || c->markFunction == 0) return;
     cn1GcGenCheckHolder = o;
     ((gcMarkFunctionPointer)c->markFunction)(d, o, JAVA_FALSE);
@@ -10184,11 +10184,11 @@ long cn1BibopValidateHeap(void) {
             }
             slots++;
             JAVA_OBJECT o = cn1BibopSlot(p, i);
-            struct clazz* oc = o->__codenameOneParentClsReference;
+            struct clazz* oc = CN1_OBJ_CLASS(o);
             // R4: a page-resident object is -3, or -4 once matured. An embedded
             // primitive (-5) has no slot of its own and must never appear AT a
             // slot boundary.
-            int hp = o->__heapPosition;
+            int hp = CN1_OBJ_HEAPPOS(o);
             if(hp != CN1_BIBOP_HEAP_POS && hp != CN1_BIBOP_ADOPTED) {
                 fprintf(stderr, "[BIBOP-R4] page=%p slot=%d heapPosition=%d\n",
                         (void*)p, i, hp);
@@ -10305,10 +10305,10 @@ static inline void cn1BibopInitSlot(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT o, in
     if(size > hdr) {
         memset((char*)o + hdr, 0, size - hdr);
     }
-    o->__codenameOneParentClsReference = parent;
+    CN1_OBJ_SET_CLASS(o, parent);
     // __codenameOneReferenceCount + __codenameOneThreadData relocated out of the header
     // (force-visited / monitor side tables); no per-object stores.
-    o->__heapPosition = CN1_BIBOP_HEAP_POS;
+    CN1_OBJ_SET_HEAPPOS(o, CN1_BIBOP_HEAP_POS);
 #ifdef DEBUG_GC_ALLOCATIONS
     o->className = threadStateData->callStackClass[threadStateData->callStackOffset - 1];
     o->line = threadStateData->callStackLine[threadStateData->callStackOffset - 1];
@@ -10485,7 +10485,7 @@ void cn1HeapAccounting(const char* label) {
         }
         // Adopted objects still occupy page slots counted above; their address
         // is not an individual malloc allocation.
-        if(o->__heapPosition == CN1_BIBOP_ADOPTED) continue;
+        if(CN1_OBJ_HEAPPOS(o) == CN1_BIBOP_ADOPTED) continue;
         legacyLive++;
 #if defined(__APPLE__)
         legacyBytes += (long long)malloc_size((void*)o);
@@ -10688,7 +10688,7 @@ void cn1LiveCensus(const char* label) {
 #endif
             int bucket = cn1LiveBucket(m);
             { extern void cn1CollectionCensusNote(JAVA_OBJECT o); cn1CollectionCensusNote(o); }
-            cn1LiveTally(o->__codenameOneParentClsReference, (long long)p->slotSize, bucket);
+            cn1LiveTally(CN1_OBJ_CLASS(o), (long long)p->slotSize, bucket);
             bibopBytes += (long long)p->slotSize;
             bibopObjs++;
             totals[bucket]++;
@@ -10704,7 +10704,7 @@ void cn1LiveCensus(const char* label) {
         }
         // An adopted object lives in a BiBOP slot and was already charged by the
         // page walk; malloc_size on it would read a block header that is not there.
-        if(o->__heapPosition == CN1_BIBOP_ADOPTED) {
+        if(CN1_OBJ_HEAPPOS(o) == CN1_BIBOP_ADOPTED) {
             continue;
         }
         long long sz = 0;
@@ -10712,7 +10712,7 @@ void cn1LiveCensus(const char* label) {
         sz = (long long)malloc_size((void*)o);
 #endif
         int lbucket = cn1LiveBucket(o->__codenameOneGcMark);
-        cn1LiveTally(o->__codenameOneParentClsReference, sz, lbucket);
+        cn1LiveTally(CN1_OBJ_CLASS(o), sz, lbucket);
         legacyBytes += sz;
         legacyObjs++;
         totals[lbucket]++;
@@ -11152,10 +11152,10 @@ static void cn1BibopReclaimSlot(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT o) {
     // a garbage peer. It holds no finalizer/peer/monitor by construction, so there is
     // nothing to release: skip. (Fixed at the source too -- see cn1InlSbToString -- so
     // this is defense in depth for any future memset-elided allocator.)
-    if(o->__codenameOneParentClsReference == 0) {
+    if(CN1_OBJ_CLASS(o) == 0) {
         return;
     }
-    finalizerFunctionPointer ptr = (finalizerFunctionPointer)o->__codenameOneParentClsReference->finalizerFunction;
+    finalizerFunctionPointer ptr = (finalizerFunctionPointer)CN1_OBJ_CLASS(o)->finalizerFunction;
     if(ptr != 0) {
         ptr(threadStateData, o);
     }
@@ -11172,7 +11172,7 @@ static void cn1BibopReclaimSlot(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT o) {
 // cn1BibopReclaimSlot (which releases the peer) instead of the O(1) all-dead
 // page reclaim. Same sticky-flag visibility argument as monitors.
 void cn1BibopNoteNativePeer(JAVA_OBJECT obj) {
-    if(obj != JAVA_NULL && (obj->__heapPosition == CN1_BIBOP_HEAP_POS || obj->__heapPosition == CN1_BIBOP_ADOPTED)) {
+    if(obj != JAVA_NULL && (CN1_OBJ_HEAPPOS(obj) == CN1_BIBOP_HEAP_POS || CN1_OBJ_HEAPPOS(obj) == CN1_BIBOP_ADOPTED)) {
         CN1BibopPage* p = (CN1BibopPage*)((uintptr_t)obj & ~((uintptr_t)(CN1_BIBOP_PAGE_SIZE - 1)));
         p->gcHasMonitors = JAVA_TRUE;
     }
@@ -11185,7 +11185,7 @@ void cn1BibopNoteMonitorAttached(JAVA_OBJECT obj) {
     if(CN1_IS_TAGGED(obj)) {
         return;
     }
-    if(obj != JAVA_NULL && (obj->__heapPosition == CN1_BIBOP_HEAP_POS || obj->__heapPosition == CN1_BIBOP_ADOPTED)) {
+    if(obj != JAVA_NULL && (CN1_OBJ_HEAPPOS(obj) == CN1_BIBOP_HEAP_POS || CN1_OBJ_HEAPPOS(obj) == CN1_BIBOP_ADOPTED)) {
         // STICKY per-page flag (plain store): visible to any sweep that could
         // legitimately take the all-dead shortcut for this page, because that
         // requires a full mark completed AFTER this (live) object died, and the
@@ -11561,7 +11561,7 @@ static void cn1BibopSweep(CODENAME_ONE_THREAD_STATE) {
                         if(m == V) {
                             marked++;
                         } else if(m == -1) {
-                            if(preCycle && o->__codenameOneParentClsReference != 0) {
+                            if(preCycle && CN1_OBJ_CLASS(o) != 0) {
                                 cn1BibopReclaimSlot(threadStateData, o);
                                 __atomic_store_n(&o->__codenameOneGcMark, CN1_BIBOP_FREE_MARK, __ATOMIC_RELAXED);
                                 *(void**)o = fl; fl = o; freed++;
@@ -11570,8 +11570,8 @@ static void cn1BibopSweep(CODENAME_ONE_THREAD_STATE) {
                                 // and remembered because no barrier saw its fields.
                                 __atomic_store_n(&o->__codenameOneGcMark, V, __ATOMIC_RELAXED);
                                 if(cn1GcGenBarrier) cn1GcRememberSlow(o);
-                                if(o->__codenameOneParentClsReference != 0 &&
-                                   o->__codenameOneParentClsReference->finalizerFunction != 0) needsReclaim = JAVA_TRUE;
+                                if(CN1_OBJ_CLASS(o) != 0 &&
+                                   CN1_OBJ_CLASS(o)->finalizerFunction != 0) needsReclaim = JAVA_TRUE;
                             }
                         }
                         // anything else is old, or already free and on the list: untouched
@@ -11711,10 +11711,10 @@ static void cn1BibopSweep(CODENAME_ONE_THREAD_STATE) {
                                         "slotMark=%d heapPos=%d cls=%s alloced=%d adopted=%d\n",
                                         V, page->gcGraceEpoch,
                                         atomic_load_explicit(&page->gcLastMarkedEpoch, memory_order_relaxed),
-                                        __o->__codenameOneGcMark, __o->__heapPosition,
-                                        (__o->__codenameOneParentClsReference &&
-                                         __o->__codenameOneParentClsReference->clsName)
-                                            ? __o->__codenameOneParentClsReference->clsName : "?",
+                                        __o->__codenameOneGcMark, CN1_OBJ_HEAPPOS(__o),
+                                        (CN1_OBJ_CLASS(__o) &&
+                                         CN1_OBJ_CLASS(__o)->clsName)
+                                            ? CN1_OBJ_CLASS(__o)->clsName : "?",
                                         (int)page->gcAllocedSinceSweep, (int)page->gcHasAdopted);
                                 fflush(stderr);
                             }
@@ -11766,7 +11766,7 @@ static void cn1BibopSweep(CODENAME_ONE_THREAD_STATE) {
             // Skip it entirely (no double-clearing) -- BiBOP counts it as occupied/live so
             // the page isn't reclaimed. The legacy sweep flips it back to -3 on death, and a
             // LATER BiBOP sweep of this page then reclaims it as a normal dead slot.
-            if(o->__heapPosition == CN1_BIBOP_ADOPTED) {
+            if(CN1_OBJ_HEAPPOS(o) == CN1_BIBOP_ADOPTED) {
                 liveCount++;
                 if(m == V) policyLiveCount++;
                 continue;
@@ -11787,7 +11787,7 @@ static void cn1BibopSweep(CODENAME_ONE_THREAD_STATE) {
                 __atomic_store_n(&o->__codenameOneGcMark, CN1_BIBOP_FREE_MARK, __ATOMIC_RELAXED);
                 *(void**)o = fl; fl = o; freeCount++;
 #endif
-            } else if(m == -1 && !(preCycle && o->__codenameOneParentClsReference != 0
+            } else if(m == -1 && !(preCycle && CN1_OBJ_CLASS(o) != 0
 #ifdef CN1_EXP_MINORGRACE
                                    && !cn1GcMinor
 #endif
@@ -11816,8 +11816,8 @@ static void cn1BibopSweep(CODENAME_ONE_THREAD_STATE) {
                 // from the elision if they declare a finalizer, so skipping the
                 // finalizer probe here is exact, and dereferencing would be a NULL
                 // crash (this sweep runs concurrently with the constructing thread).
-                if(o->__codenameOneParentClsReference != 0 &&
-                   o->__codenameOneParentClsReference->finalizerFunction != 0) needsReclaim = JAVA_TRUE;
+                if(CN1_OBJ_CLASS(o) != 0 &&
+                   CN1_OBJ_CLASS(o)->finalizerFunction != 0) needsReclaim = JAVA_TRUE;
 #endif
 #ifdef CN1_GC_GEN_QUAR
             } else if(m == -1 && cn1GcMinor) {
@@ -11827,7 +11827,7 @@ static void cn1BibopSweep(CODENAME_ONE_THREAD_STATE) {
 #ifdef CN1_GC_GEN_POISON
                 // Body only: the header stays readable so a use reaches a FIELD, whose
                 // non-canonical poison faults at the using Java method.
-                if(o->__codenameOneParentClsReference->finalizerFunction == 0) {
+                if(CN1_OBJ_CLASS(o)->finalizerFunction == 0) {
                     // Each word = this object's address beyond the 48-bit VA: the fault
                     // address then names the freed object (see cn1GenPoisonCrash).
                     uintptr_t* w = (uintptr_t*)((char*)o + sizeof(struct JavaObjectPrototype));
@@ -11839,8 +11839,8 @@ static void cn1BibopSweep(CODENAME_ONE_THREAD_STATE) {
 #endif
 #ifdef CN1_GC_GEN_QUAR_MAJOR
             } else if(!cn1GcMinor && (m == -1 || cn1GcSweepReclaims(m))
-                      && o->__codenameOneParentClsReference != 0
-                      && o->__codenameOneParentClsReference->finalizerFunction == 0) {
+                      && CN1_OBJ_CLASS(o) != 0
+                      && CN1_OBJ_CLASS(o)->finalizerFunction == 0) {
                 // QA: a MAJOR's free is quarantined and poisoned exactly like a minor's
                 // (-9), so a mutator that still holds it faults on the poison and names
                 // it. Released by the next sweep of this page.
@@ -11885,8 +11885,8 @@ static void cn1BibopSweep(CODENAME_ONE_THREAD_STATE) {
                 // written, and an abandoned NoZero slot (never published) can reach
                 // here after grace-aging -- dereferencing NULL->finalizerFunction
                 // would crash at offset 0x10.
-                if(o->__codenameOneParentClsReference != 0 &&
-                   o->__codenameOneParentClsReference->finalizerFunction != 0) needsReclaim = JAVA_TRUE;
+                if(CN1_OBJ_CLASS(o) != 0 &&
+                   CN1_OBJ_CLASS(o)->finalizerFunction != 0) needsReclaim = JAVA_TRUE;
 #endif
             }
         }
@@ -12010,8 +12010,8 @@ static void cn1GraceAuditPreSweep(CODENAME_ONE_THREAD_STATE) {
         for(int gi = 0 ; gi < gn ; gi++) {
             JAVA_OBJECT go = cn1BibopSlot(gp, gi);
             if(__atomic_load_n(&go->__codenameOneGcMark, __ATOMIC_ACQUIRE) == -1
-               && go->__codenameOneParentClsReference != 0
-               && go->__codenameOneParentClsReference->markFunction != 0) {
+               && CN1_OBJ_CLASS(go) != 0
+               && CN1_OBJ_CLASS(go)->markFunction != 0) {
                 missedFresh++;
                 gcMarkObject(threadStateData, go, JAVA_FALSE);
             }
@@ -12048,8 +12048,8 @@ static void cn1GraceAuditLegacy(CODENAME_ONE_THREAD_STATE) {
     for(int iter = 0 ; iter < t ; iter++) {
         JAVA_OBJECT o = allObjectsInHeap[iter];
         if(o != JAVA_NULL && o->__codenameOneGcMark == -1
-           && o->__codenameOneParentClsReference != 0
-           && o->__codenameOneParentClsReference->markFunction != 0) {
+           && CN1_OBJ_CLASS(o) != 0
+           && CN1_OBJ_CLASS(o)->markFunction != 0) {
             missedFresh++;
             gcMarkObject(threadStateData, o, JAVA_FALSE);
         }
@@ -12449,7 +12449,7 @@ static int cn1GcSignalStopMode = -1;  // -1 = uninit; 0 = cooperative+signal-for
 static void cn1ConsExtAdd(JAVA_OBJECT o) {
     if(o == JAVA_NULL) return;
 #ifndef CN1_DISABLE_BIBOP
-    if(o->__heapPosition == CN1_BIBOP_ADOPTED) {
+    if(CN1_OBJ_HEAPPOS(o) == CN1_BIBOP_ADOPTED) {
         char* page = (char*)((uintptr_t)o & ~((uintptr_t)CN1_BIBOP_PAGE_SIZE - 1));
         // A published page index already resolves every slot, including adopted
         // objects. The index only grows and replacement is all-or-nothing. If a
@@ -12457,7 +12457,7 @@ static void cn1ConsExtAdd(JAVA_OBJECT o) {
         if(cn1ConsPgFind(page) != 0) return;
     }
 #endif
-    struct clazz* cls = o->__codenameOneParentClsReference;
+    struct clazz* cls = CN1_OBJ_CLASS(o);
     if(cls == 0) return;
     char* base = (char*)o;
     char* hi;
@@ -12724,7 +12724,7 @@ void cn1GcBuildRootSnapshots(void) {
         int pn = th->heapAllocationSize;
         for(int j = 0 ; j < pn ; j++) {
             JAVA_OBJECT o = (JAVA_OBJECT)th->pendingHeapAllocations[j];
-            if(o != JAVA_NULL && o->__heapPosition == -1) cn1ConsExtAdd(o);
+            if(o != JAVA_NULL && CN1_OBJ_HEAPPOS(o) == -1) cn1ConsExtAdd(o);
         }
     }
     unlockThreadHeapMutex();
@@ -12851,9 +12851,9 @@ static const char* cn1ResolveDiagSampleCls[4] = {0,0,0,0};
 void cn1ResolveDiagNote(int reason, JAVA_OBJECT o) {
     if(reason < 1 || reason > 3) return;
     cn1ResolveDiagCounts[reason]++;
-    if(cn1ResolveDiagSampleCls[reason] == 0 && o->__codenameOneParentClsReference
-       && o->__codenameOneParentClsReference->clsName) {
-        cn1ResolveDiagSampleCls[reason] = o->__codenameOneParentClsReference->clsName;
+    if(cn1ResolveDiagSampleCls[reason] == 0 && CN1_OBJ_CLASS(o)
+       && CN1_OBJ_CLASS(o)->clsName) {
+        cn1ResolveDiagSampleCls[reason] = CN1_OBJ_CLASS(o)->clsName;
     }
 }
 void cn1ResolveDiagReport(void) {
@@ -12894,13 +12894,13 @@ JAVA_OBJECT cn1ConservativeResolve(void* w) {
                 // at all" (referenced from an untraced field elsewhere).
                 if(idx >= 0 && idx < pg->slotCount) {
                     JAVA_OBJECT __o = (JAVA_OBJECT)(cand + pg->firstSlotOffset + (long)idx * pg->slotSize);
-                    struct clazz* __pc = __o->__codenameOneParentClsReference;
+                    struct clazz* __pc = CN1_OBJ_CLASS(__o);
                     extern void cn1ResolveDiagNote(int reason, JAVA_OBJECT o);
                     if(__pc != 0 && (((uintptr_t)__pc & 7) == 0)) {
                         int __m = __o->__codenameOneGcMark;
                         if(idx >= pg->bumpIndex) cn1ResolveDiagNote(1, __o);         // idx >= snapshot bump
                         else if(__m == CN1_BIBOP_FREE_MARK) cn1ResolveDiagNote(2, __o); // FREE_MARK
-                        else if(__o->__heapPosition != CN1_BIBOP_HEAP_POS && __o->__heapPosition != CN1_BIBOP_ADOPTED) cn1ResolveDiagNote(3, __o); // heapPos
+                        else if(CN1_OBJ_HEAPPOS(__o) != CN1_BIBOP_HEAP_POS && CN1_OBJ_HEAPPOS(__o) != CN1_BIBOP_ADOPTED) cn1ResolveDiagNote(3, __o); // heapPos
                     }
                 }
 #endif
@@ -12921,7 +12921,7 @@ JAVA_OBJECT cn1ConservativeResolve(void* w) {
                 // Accept both a normal BiBOP slot and a MATURED (adopted) slot -- a
                 // matured object's memory is still in this page, so a conservative stack
                 // word must still resolve to it or it would be missed as a root and swept.
-                if(o->__heapPosition != CN1_BIBOP_HEAP_POS && o->__heapPosition != CN1_BIBOP_ADOPTED) return JAVA_NULL;
+                if(CN1_OBJ_HEAPPOS(o) != CN1_BIBOP_HEAP_POS && CN1_OBJ_HEAPPOS(o) != CN1_BIBOP_ADOPTED) return JAVA_NULL;
                 return o;                                        // interior -> slot base
         }
     }
@@ -13236,7 +13236,7 @@ void cn1GcVerifyPoisonSlot(JAVA_OBJECT o, int slotSize) {
     if((long)slotSize > hdr) {
         memset((char*)o + hdr, CN1_GC_POISON_BYTE, (size_t)((long)slotSize - hdr));
     }
-    o->__heapPosition = CN1_BIBOP_HEAP_POS;
+    CN1_OBJ_SET_HEAPPOS(o, CN1_BIBOP_HEAP_POS);
 }
 
 // Replaces free() for legacy blocks. Stamps the poison header, poisons the
@@ -13274,7 +13274,7 @@ JAVA_BOOLEAN cn1GcVerifyQuarantineFree(JAVA_OBJECT obj) {
     cn1GcVerifyFreedLegacy++;
     cn1GcPoisonBody(obj, sz);
     __atomic_store_n(&obj->__codenameOneGcMark, CN1_GC_POISON_MARK, __ATOMIC_RELAXED);
-    obj->__heapPosition = CN1_GC_POISON_POS;
+    CN1_OBJ_SET_HEAPPOS(obj, CN1_GC_POISON_POS);
     JAVA_OBJECT evicted = cn1GcQRing[cn1GcQRingPos];
     cn1GcQRing[cn1GcQRingPos] = obj;
     cn1GcQSetAdd(obj);
@@ -13354,7 +13354,7 @@ static int cn1GcVerifyClassify(JAVA_OBJECT o, CN1BibopPage** outPage, int* outId
 
 static const char* cn1GcVerifyClsName(JAVA_OBJECT o) {
     if(o == JAVA_NULL) return "(null)";
-    struct clazz* c = o->__codenameOneParentClsReference;
+    struct clazz* c = CN1_OBJ_CLASS(o);
     if(c == 0) return "(unpublished)";
 #ifdef CN1_CONSERVATIVE_GC_ROOTS
     if(!cn1ClazzRegistryContains((uintptr_t)c)) return "(unregistered)";
@@ -13369,7 +13369,7 @@ static const char* cn1GcVerifyClsName(JAVA_OBJECT o) {
 // conservative stack scan), and a driver in that state is testing nothing.
 static void cn1GcVerifyCensus(JAVA_OBJECT o, int m) {
     if(cn1GcVerifyCensusCls == 0) return;
-    struct clazz* c = o->__codenameOneParentClsReference;
+    struct clazz* c = CN1_OBJ_CLASS(o);
     if(c == 0 || c->clsName == 0 || m == CN1_BIBOP_FREE_MARK || m == CN1_BIBOP_QUAR_MARK || m == CN1_GC_POISON_MARK) return;
     if(strstr(c->clsName, cn1GcVerifyCensusCls) == 0) return;
     int age = m == -1 ? 0 : currentGcMarkValue - m;
@@ -13414,7 +13414,7 @@ void cn1GcResurrectAudit(CODENAME_ONE_THREAD_STATE) {
     cn1GcVerifyActive = 1;
     for(int i = 0 ; i < cn1GcResCount ; i++) {
         JAVA_OBJECT o = cn1GcResRing[i];
-        struct clazz* c = o->__codenameOneParentClsReference;
+        struct clazz* c = CN1_OBJ_CLASS(o);
         if(c == 0 || c->markFunction == 0) continue;
         if(!cn1ClazzRegistryContains((uintptr_t)c)) continue;
         cn1GcVerifyHolder = o;
@@ -13501,7 +13501,7 @@ void cn1GcVerifyChild(JAVA_OBJECT child, void* markSite) {
         // values -- whose marks are not maintained).
         int cm = __atomic_load_n(&child->__codenameOneGcMark, __ATOMIC_ACQUIRE);
         if(cn1GcSweepReclaims(cm)
-           && child->__codenameOneParentClsReference != (&class__java_lang_Class)
+           && CN1_OBJ_CLASS(child) != (&class__java_lang_Class)
            && !cn1GcImmortalObjContains(child)) {
             st = CN1_GC_VS_DEAD_AGE;
         }
@@ -13523,7 +13523,7 @@ void cn1GcVerifyChild(JAVA_OBJECT child, void* markSite) {
                     cn1GcVerifyHolder->__codenameOneGcMark - currentGcMarkValue,
                     cn1GcVerifyClsName(child), child->__codenameOneGcMark,
                     child->__codenameOneGcMark - currentGcMarkValue,
-                    child->__heapPosition, st);
+                    CN1_OBJ_HEAPPOS(child), st);
         }
     }
     if(st == CN1_GC_VS_OK) {
@@ -13539,8 +13539,8 @@ void cn1GcVerifyChild(JAVA_OBJECT child, void* markSite) {
     // offset is small and positive -- which is also what makes the address
     // usable: add it to the mark function's symbol to reach the exact field.
     void* holderFn = (cn1GcVerifyHolder != JAVA_NULL
-                      && cn1GcVerifyHolder->__codenameOneParentClsReference != 0)
-        ? (void*)cn1GcVerifyHolder->__codenameOneParentClsReference->markFunction : (void*)0;
+                      && CN1_OBJ_CLASS(cn1GcVerifyHolder) != 0)
+        ? (void*)CN1_OBJ_CLASS(cn1GcVerifyHolder)->markFunction : (void*)0;
     const char* what = st == CN1_GC_VS_FREE_SLOT ? "FREED BiBOP slot"
                      : st == CN1_GC_VS_STALE_SLOT ? "RECYCLED page slot (above bump cursor)"
                      : st == CN1_GC_VS_DEAD_AGE ? "object AGED OUT by this sweep (mark below the free threshold)"
@@ -13556,9 +13556,9 @@ void cn1GcVerifyChild(JAVA_OBJECT child, void* markSite) {
         cn1GcVerifyHolder != JAVA_NULL ? cn1GcVerifyHolder->__codenameOneGcMark : 0,
         cn1GcVerifyHolder != JAVA_NULL
             ? cn1GcVerifyHolder->__codenameOneGcMark - currentGcMarkValue : 0,
-        cn1GcVerifyHolder != JAVA_NULL ? cn1GcVerifyHolder->__heapPosition : 0,
+        cn1GcVerifyHolder != JAVA_NULL ? CN1_OBJ_HEAPPOS(cn1GcVerifyHolder) : 0,
         (void*)child, cn1GcVerifyClsName(child),
-        child->__codenameOneGcMark, child->__heapPosition,
+        child->__codenameOneGcMark, CN1_OBJ_HEAPPOS(child),
         what,
         pg != 0 ? " (page-resident)" : "",
         markSite, holderFn != 0 ? "markFn" : "?",
@@ -13657,7 +13657,7 @@ void cn1GcVerifyHeap(CODENAME_ONE_THREAD_STATE) {
                 // mark==-1 is excluded: allocated after the sweep began, its body
                 // can still be under construction; it is verified next cycle.
                 if(!cn1GcVerifyHolderKept(m)) continue;
-                struct clazz* c = o->__codenameOneParentClsReference;
+                struct clazz* c = CN1_OBJ_CLASS(o);
                 if(c == 0 || c->markFunction == 0) continue;
 #ifdef CN1_CONSERVATIVE_GC_ROOTS
                 if(!cn1ClazzRegistryContains((uintptr_t)c)) continue;
@@ -13675,10 +13675,10 @@ void cn1GcVerifyHeap(CODENAME_ONE_THREAD_STATE) {
         for(int iter = 0 ; iter < t ; iter++) {
             JAVA_OBJECT o = allObjectsInHeap[iter];
             if(o == JAVA_NULL) continue;
-            if(o->__heapPosition != CN1_BIBOP_ADOPTED) {
+            if(CN1_OBJ_HEAPPOS(o) != CN1_BIBOP_ADOPTED) {
                 cn1GcVerifyCensus(o, o->__codenameOneGcMark);   // else counted by the page walk
             }
-            struct clazz* c = o->__codenameOneParentClsReference;
+            struct clazz* c = CN1_OBJ_CLASS(o);
             if(c == 0 || c->markFunction == 0) continue;
             int lm = o->__codenameOneGcMark;
             if(!cn1GcVerifyHolderKept(lm)) continue;
@@ -14343,8 +14343,8 @@ static void cn1GcSelfCheckThreadStack(struct ThreadLocalData* t, int stackSize) 
         if(e->type != CN1_TYPE_OBJECT) continue;
         JAVA_OBJECT o = e->data.o;
         if(o == JAVA_NULL || CN1_IS_TAGGED(o)) continue;
-        if(o->__codenameOneParentClsReference == 0 ||
-           o->__codenameOneParentClsReference == (&class__java_lang_Class)) continue;
+        if(CN1_OBJ_CLASS(o) == 0 ||
+           CN1_OBJ_CLASS(o) == (&class__java_lang_Class)) continue;
         cn1SelfChecked++;
         JAVA_OBJECT r = cn1ConservativeResolve((void*)o);
         if(r == JAVA_NULL) { cn1SelfUnmanaged++; continue; } // static/VM singleton, out of scope
@@ -14352,7 +14352,7 @@ static void cn1GcSelfCheckThreadStack(struct ThreadLocalData* t, int stackSize) 
             cn1SelfMiss++;
             fprintf(stderr, "[CONS-GC][SELFCHECK][MISS] precise root %p resolved to %p (class=%s)\n",
                 (void*)o, (void*)r,
-                (o->__codenameOneParentClsReference ? o->__codenameOneParentClsReference->clsName : "?"));
+                (CN1_OBJ_CLASS(o) ? CN1_OBJ_CLASS(o)->clsName : "?"));
         }
     }
     fprintf(stderr, "[CONS-GC][SELFCHECK] checked=%lld unmanaged=%lld MISS=%lld\n",
@@ -14596,13 +14596,13 @@ cn1GcMallocRetry:
     if(needsZeroing) {
         memset(o, 0, size);
     }
-    o->__codenameOneParentClsReference = parent;
+    CN1_OBJ_SET_CLASS(o, parent);
     // PLAIN, unlike the collector-side writes below: this is header initialisation of an
     // object no other thread can reach yet. The SATB barrier only ever reads the mark of
     // an object the mutator holds a reference to, i.e. one already published, and the
     // publishing store is what orders this write against any reader.
     o->__codenameOneGcMark = -1;
-    o->__heapPosition = -1;
+    CN1_OBJ_SET_HEAPPOS(o, -1);
 #ifdef DEBUG_GC_ALLOCATIONS
     o->className = threadStateData->callStackClass[threadStateData->callStackOffset - 1];
     o->line = threadStateData->callStackLine[threadStateData->callStackOffset - 1];
@@ -14847,11 +14847,11 @@ void codenameOneGcFree(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj) {
     // path should reach here with a page slot (they are not in allObjectsInHeap).
     // A MATURED (-4) object's memory is also a page slot -- never free() it either;
     // the legacy sweep flips it back to -3 (below) and the BiBOP sweep reclaims it.
-    if(obj->__heapPosition == CN1_BIBOP_HEAP_POS || obj->__heapPosition == CN1_BIBOP_ADOPTED) {
-        if(obj->__heapPosition == CN1_BIBOP_ADOPTED) {
+    if(CN1_OBJ_HEAPPOS(obj) == CN1_BIBOP_HEAP_POS || CN1_OBJ_HEAPPOS(obj) == CN1_BIBOP_ADOPTED) {
+        if(CN1_OBJ_HEAPPOS(obj) == CN1_BIBOP_ADOPTED) {
             // Hand the slot back to BiBOP: revert to a normal dead BiBOP slot so the next
             // sweep of its (retired) page reclaims it to the page free-list.
-            obj->__heapPosition = CN1_BIBOP_HEAP_POS;
+            CN1_OBJ_SET_HEAPPOS(obj, CN1_BIBOP_HEAP_POS);
             cn1BibopNoteAdoptedDeath(obj);
         }
         return;
@@ -15192,12 +15192,12 @@ static inline void gcMarkWorklistPush(JAVA_OBJECT obj, JAVA_BOOLEAN force) {
 // the object itself), and the slots for codes with no tagged type yet stay zero, which is
 // unreachable for the same reason: nothing produces those codes.
 struct JavaObjectPrototype cn1TaggedProxy[CN1_TAG_COUNT] = {
-    [CN1_TAG_INTEGER]   = { .__codenameOneParentClsReference = &class__java_lang_Integer },
-    [CN1_TAG_LONG]      = { .__codenameOneParentClsReference = &class__java_lang_Long },
-    [CN1_TAG_DOUBLE]    = { .__codenameOneParentClsReference = &class__java_lang_Double },
-    [CN1_TAG_FLOAT]     = { .__codenameOneParentClsReference = &class__java_lang_Float },
-    [CN1_TAG_CHARACTER] = { .__codenameOneParentClsReference = &class__java_lang_Character },
-    [CN1_TAG_SHORT]     = { .__codenameOneParentClsReference = &class__java_lang_Short }
+    [CN1_TAG_INTEGER]   = { CN1_OBJ_HEADER_INIT(&class__java_lang_Integer) },
+    [CN1_TAG_LONG]      = { CN1_OBJ_HEADER_INIT(&class__java_lang_Long) },
+    [CN1_TAG_DOUBLE]    = { CN1_OBJ_HEADER_INIT(&class__java_lang_Double) },
+    [CN1_TAG_FLOAT]     = { CN1_OBJ_HEADER_INIT(&class__java_lang_Float) },
+    [CN1_TAG_CHARACTER] = { CN1_OBJ_HEADER_INIT(&class__java_lang_Character) },
+    [CN1_TAG_SHORT]     = { CN1_OBJ_HEADER_INIT(&class__java_lang_Short) }
 };
 #endif
 
@@ -15209,7 +15209,7 @@ struct JavaObjectPrototype cn1TaggedProxy[CN1_TAG_COUNT] = {
 static inline void cn1BibopStampMarked(JAVA_OBJECT obj, int markVal, int graceOnly) {
     // Stamp for a normal BiBOP slot AND a MATURED (-4) slot: a live matured object's
     // memory is still in this page, so its page must not be O(1) all-dead reclaimed.
-    if(obj->__heapPosition == CN1_BIBOP_HEAP_POS || obj->__heapPosition == CN1_BIBOP_ADOPTED) {
+    if(CN1_OBJ_HEAPPOS(obj) == CN1_BIBOP_HEAP_POS || CN1_OBJ_HEAPPOS(obj) == CN1_BIBOP_ADOPTED) {
         CN1BibopPage* pg = (CN1BibopPage*)(((uintptr_t)obj) & ~((uintptr_t)CN1_BIBOP_PAGE_SIZE - 1));
         // Every marker publishes the same epoch. Avoid invalidating this shared
         // cache line for every object on a page already stamped by another worker.
@@ -15284,8 +15284,8 @@ static int cn1GcStringIsFusedLeaf(JAVA_OBJECT obj) {
     // An inline String carries its characters in its own block and holds no
     // reference at all, so there is nothing to trace and no embedded child header
     // to inspect. This is the cheap case and it comes first.
-    if (cn1IsInlineStringClass(obj->__codenameOneParentClsReference)) return 1;
-    int position = obj->__heapPosition;
+    if (cn1IsInlineStringClass(CN1_OBJ_CLASS(obj))) return 1;
+    int position = CN1_OBJ_HEAPPOS(obj);
     if (position != CN1_BIBOP_HEAP_POS && position != CN1_BIBOP_ADOPTED) return 0;
     size_t offset = (sizeof(struct obj__java_lang_String) + 7) & ~(size_t)7;
     JAVA_OBJECT child = ((struct obj__java_lang_String*)obj)->java_lang_String_value;
@@ -15295,7 +15295,7 @@ static int cn1GcStringIsFusedLeaf(JAVA_OBJECT obj) {
     // extent BEFORE reading the purported embedded child's header.
     CN1BibopPage* page = (CN1BibopPage*)((uintptr_t)obj & ~((uintptr_t)CN1_BIBOP_PAGE_SIZE - 1));
     if ((size_t)page->slotSize < offset + sizeof(struct JavaArrayPrototype)) return 0;
-    return child->__heapPosition == CN1_GC_EMBEDDED_PRIMITIVE;
+    return CN1_OBJ_HEAPPOS(child) == CN1_GC_EMBEDDED_PRIMITIVE;
 #else
     return 0;
 #endif
@@ -15313,12 +15313,12 @@ void gcMarkObject(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj, JAVA_BOOLEAN force
 #endif
 #ifdef CN1_GC_GEN_QUAR
     if(__atomic_load_n(&obj->__codenameOneGcMark, __ATOMIC_RELAXED) == -9
-       && obj->__heapPosition == CN1_BIBOP_HEAP_POS) {
+       && CN1_OBJ_HEAPPOS(obj) == CN1_BIBOP_HEAP_POS) {
         static long cn1QuarHits = 0;
         JAVA_OBJECT P = cn1GcGenCurParent;
         if(P == (JAVA_OBJECT)(uintptr_t)1) {
             if(++cn1QuarHits <= 40) fprintf(stderr, "[GEN-QUAR] epoch=%d reached a minor-freed %s %p from the BLOCK rset scan\n",
-                currentGcMarkValue, obj->__codenameOneParentClsReference ? obj->__codenameOneParentClsReference->clsName : "?", (void*)obj);
+                currentGcMarkValue, CN1_OBJ_CLASS(obj) ? CN1_OBJ_CLASS(obj)->clsName : "?", (void*)obj);
             __atomic_store_n(&obj->__codenameOneGcMark, -1, __ATOMIC_RELAXED);
             P = 0;
         } else if(++cn1QuarHits <= 40) {
@@ -15332,9 +15332,9 @@ void gcMarkObject(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj, JAVA_BOOLEAN force
             }
             fprintf(stderr, "[GEN-QUAR] epoch=%d %s cycle reached a minor-freed %s %p via parent %s %p (mark=%d heapPos=%d)\n",
                     currentGcMarkValue, cn1GcMinor ? "minor" : "major",
-                    obj->__codenameOneParentClsReference ? obj->__codenameOneParentClsReference->clsName : "?", (void*)obj,
-                    P && P->__codenameOneParentClsReference ? P->__codenameOneParentClsReference->clsName : "(root/none)", (void*)P,
-                    P ? P->__codenameOneGcMark : 0, P ? P->__heapPosition : 0);
+                    CN1_OBJ_CLASS(obj) ? CN1_OBJ_CLASS(obj)->clsName : "?", (void*)obj,
+                    P && CN1_OBJ_CLASS(P) ? CN1_OBJ_CLASS(P)->clsName : "(root/none)", (void*)P,
+                    P ? P->__codenameOneGcMark : 0, P ? CN1_OBJ_HEAPPOS(P) : 0);
         }
 #ifdef CN1_GC_GEN_POISON
         return;   // poisoned: never trace it; only a MUTATOR use should fault
@@ -15460,7 +15460,7 @@ void gcMarkObject(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj, JAVA_BOOLEAN force
     if(cn1GcMinor) {
         if(cn1GcIsOld(obj, markSnapshot) && markSnapshot != currentGcMarkValue) {
             cn1GcGenSetAdd(&cn1GcGenOldSet, &cn1GcGenOldCap, &cn1GcGenOldN, obj);
-        } else if(markSnapshot == -1 && obj->__heapPosition == CN1_BIBOP_HEAP_POS
+        } else if(markSnapshot == -1 && CN1_OBJ_HEAPPOS(obj) == CN1_BIBOP_HEAP_POS
                   && ((CN1BibopPage*)((uintptr_t)obj & ~((uintptr_t)CN1_BIBOP_PAGE_SIZE - 1)))->gcPreCycle
                   && cn1GcGenCurParent != 0
                   && cn1GcGenSetHas(cn1GcGenOldSet, cn1GcGenOldCap, cn1GcGenCurParent)
@@ -15482,11 +15482,11 @@ void gcMarkObject(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj, JAVA_BOOLEAN force
                             cn1GcGenSetHas(cn1GcGenPromoSet, cn1GcGenPromoCap, P));
                 }
                 fprintf(stderr, "[GEN-MISS] epoch=%d reachable old %s %p (mark=%d page pre=%d owned=%d) -> young %s %p\n",
-                    currentGcMarkValue, P->__codenameOneParentClsReference->clsName, (void*)P,
+                    currentGcMarkValue, CN1_OBJ_CLASS(P)->clsName, (void*)P,
                     P->__codenameOneGcMark,
                     (int)((CN1BibopPage*)((uintptr_t)P & ~((uintptr_t)CN1_BIBOP_PAGE_SIZE - 1)))->gcPreCycle,
                     (int)((CN1BibopPage*)((uintptr_t)P & ~((uintptr_t)CN1_BIBOP_PAGE_SIZE - 1)))->owned,
-                    obj->__codenameOneParentClsReference ? obj->__codenameOneParentClsReference->clsName : "?", (void*)obj);
+                    CN1_OBJ_CLASS(obj) ? CN1_OBJ_CLASS(obj)->clsName : "?", (void*)obj);
             }
         }
     }
@@ -15494,7 +15494,7 @@ void gcMarkObject(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj, JAVA_BOOLEAN force
     // Its owner is the allocation and the only sweepable object. Never age the
     // embedded header independently (it may be reached through both precise and
     // conservative graphs in different cycles).
-    if(obj->__heapPosition == CN1_GC_EMBEDDED_PRIMITIVE) return;
+    if(CN1_OBJ_HEAPPOS(obj) == CN1_GC_EMBEDDED_PRIMITIVE) return;
     // GRACE FRESH-CHILD SKIP. While the grace walk is tracing a fresh object, an edge
     // to another FRESH page-resident object needs neither a mark nor a worklist entry:
     //   * the sweep's grace rule keeps mark == -1 regardless (it promotes such a slot
@@ -15513,7 +15513,7 @@ void gcMarkObject(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj, JAVA_BOOLEAN force
     // "kept and traced on its own account anyway" -- is false there, and skipping left a
     // kept object pointing at a freed child. The verifier caught it on the first cycle.
     if(cn1GcGraceTraceFresh && !force && markSnapshot == -1
-       && obj->__heapPosition == CN1_BIBOP_HEAP_POS
+       && CN1_OBJ_HEAPPOS(obj) == CN1_BIBOP_HEAP_POS
        && !(cn1GcStwCycle && ((CN1BibopPage*)((uintptr_t)obj
                 & ~((uintptr_t)CN1_BIBOP_PAGE_SIZE - 1)))->gcPreCycle)) {
 #ifdef CN1_GC_CONFORM
@@ -15525,7 +15525,7 @@ void gcMarkObject(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj, JAVA_BOOLEAN force
     // conservatively-reached object can be freed/reused WHILE this function runs; loading
     // once and validating that one value removes the read-validate-reread window (the
     // original crash note: "obj readable at acquire-load but header freed/reused mid-mark").
-    struct clazz* __cls = obj->__codenameOneParentClsReference;
+    struct clazz* __cls = CN1_OBJ_CLASS(obj);
 #ifdef CN1_CONSERVATIVE_GC_ROOTS
     // Conservative-scan safety guard. The native-stack scan can legitimately false-positive-
     // mark a DEAD object (a stale native-stack word happens to resolve to it -- unavoidable
@@ -15630,13 +15630,13 @@ void gcMarkObject(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj, JAVA_BOOLEAN force
     // markFunction lies in the app text (never a libc/heap address); anything else is
     // a freed/reused slot or a dangling reference.
     {
-        gcMarkFunctionPointer __cfp = obj->__codenameOneParentClsReference
-            ? obj->__codenameOneParentClsReference->markFunction : (gcMarkFunctionPointer)0;
+        gcMarkFunctionPointer __cfp = CN1_OBJ_CLASS(obj)
+            ? CN1_OBJ_CLASS(obj)->markFunction : (gcMarkFunctionPointer)0;
         uintptr_t __anchor = (uintptr_t)(void*)&gcMarkObject;
         uintptr_t __fpv = (uintptr_t)(void*)__cfp;
         int __fpBad = (__cfp != 0) &&
             ((__fpv > __anchor ? __fpv - __anchor : __anchor - __fpv) > (256ULL << 20));
-        int __hp = obj->__heapPosition;
+        int __hp = CN1_OBJ_HEAPPOS(obj);
         // CN1_BIBOP_ADOPTED (-4) is a live MATURED slot (owned by the legacy sweep), not
         // corruption -- accept it exactly like a normal BiBOP slot.
         if((__hp != CN1_BIBOP_HEAP_POS && __hp != CN1_BIBOP_ADOPTED && __hp < -1) || __fpBad) {
@@ -15647,10 +15647,10 @@ void gcMarkObject(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj, JAVA_BOOLEAN force
             // function -> addr2line / the gdb bt maps it to the exact field being marked.
             const char* __pcls = "?";
             if(__p != JAVA_NULL
-               && (__p->__heapPosition == CN1_BIBOP_HEAP_POS || __p->__heapPosition == CN1_BIBOP_ADOPTED)
-               && __p->__codenameOneParentClsReference != 0
-               && __p->__codenameOneParentClsReference->clsName != 0) {
-                __pcls = __p->__codenameOneParentClsReference->clsName;
+               && (CN1_OBJ_HEAPPOS(__p) == CN1_BIBOP_HEAP_POS || CN1_OBJ_HEAPPOS(__p) == CN1_BIBOP_ADOPTED)
+               && CN1_OBJ_CLASS(__p) != 0
+               && CN1_OBJ_CLASS(__p)->clsName != 0) {
+                __pcls = CN1_OBJ_CLASS(__p)->clsName;
             }
             void* __callSite = __builtin_return_address(0);
             fprintf(stderr, "CN1BIBOP MARKOBJ CORRUPT CHILD: parentClass=%s markCallSite=%p :: "
@@ -15658,13 +15658,13 @@ void gcMarkObject(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj, JAVA_BOOLEAN force
                     "childHeapPos=%d childGcMark=%d curMark=%d FREE_MARK=%d :: drainParent=%p "
                     "parentCls=%p parentMarkFn=%p parentHeapPos=%d parentGcMark=%d\n",
                     __pcls, __callSite,
-                    (void*)obj, (void*)obj->__codenameOneParentClsReference, (void*)__cfp,
+                    (void*)obj, (void*)CN1_OBJ_CLASS(obj), (void*)__cfp,
                     __hp, obj->__codenameOneGcMark, currentGcMarkValue, CN1_BIBOP_FREE_MARK,
                     (void*)__p,
-                    __p ? (void*)__p->__codenameOneParentClsReference : (void*)0,
-                    (__p && __p->__codenameOneParentClsReference)
-                        ? (void*)__p->__codenameOneParentClsReference->markFunction : (void*)0,
-                    __p ? __p->__heapPosition : -999,
+                    __p ? (void*)CN1_OBJ_CLASS(__p) : (void*)0,
+                    (__p && CN1_OBJ_CLASS(__p))
+                        ? (void*)CN1_OBJ_CLASS(__p)->markFunction : (void*)0,
+                    __p ? CN1_OBJ_HEAPPOS(__p) : -999,
                     __p ? __p->__codenameOneGcMark : -999);
             fflush(stderr);
             abort();
@@ -15697,9 +15697,9 @@ void gcMarkObject(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj, JAVA_BOOLEAN force
                 __tmCount++;
 #ifdef CN1_BIBOP_VALIDATE
                 JAVA_OBJECT __p = gcMarkCurrentDrainObj;
-                const char* __pn = (__p != JAVA_NULL && __p->__codenameOneParentClsReference != 0
-                                    && __p->__codenameOneParentClsReference->clsName != 0)
-                        ? __p->__codenameOneParentClsReference->clsName : "(root/none)";
+                const char* __pn = (__p != JAVA_NULL && CN1_OBJ_CLASS(__p) != 0
+                                    && CN1_OBJ_CLASS(__p)->clsName != 0)
+                        ? CN1_OBJ_CLASS(__p)->clsName : "(root/none)";
 #else
                 const char* __pn = "(build with -DCN1_BIBOP_VALIDATE for the drain parent)";
 #endif
@@ -15712,7 +15712,7 @@ void gcMarkObject(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj, JAVA_BOOLEAN force
     }
 #endif
 #ifdef CN1_GC_GEN_SHADOW
-    if(cn1GcShadowPhase && markSnapshot == -1 && obj->__heapPosition == CN1_BIBOP_HEAP_POS
+    if(cn1GcShadowPhase && markSnapshot == -1 && CN1_OBJ_HEAPPOS(obj) == CN1_BIBOP_HEAP_POS
        && ((CN1BibopPage*)((uintptr_t)obj & ~((uintptr_t)CN1_BIBOP_PAGE_SIZE - 1)))->gcPreCycle) {
         cn1GcShadowReport(obj);
     }
@@ -15727,11 +15727,11 @@ void gcMarkObject(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj, JAVA_BOOLEAN force
     // its drain parent's class (throttled) to identify the drain-incompleteness pattern.
     if(gcBeltDiagActive && gcBeltDiagCount < 60) {
         JAVA_OBJECT __p = gcMarkCurrentDrainObj;
-        const char* __cc = (obj->__codenameOneParentClsReference && obj->__codenameOneParentClsReference->clsName)
-            ? obj->__codenameOneParentClsReference->clsName : "?";
-        const char* __pc = (__p && __p->__heapPosition == CN1_BIBOP_HEAP_POS
-            && __p->__codenameOneParentClsReference && __p->__codenameOneParentClsReference->clsName)
-            ? __p->__codenameOneParentClsReference->clsName : "?";
+        const char* __cc = (CN1_OBJ_CLASS(obj) && CN1_OBJ_CLASS(obj)->clsName)
+            ? CN1_OBJ_CLASS(obj)->clsName : "?";
+        const char* __pc = (__p && CN1_OBJ_HEAPPOS(__p) == CN1_BIBOP_HEAP_POS
+            && CN1_OBJ_CLASS(__p) && CN1_OBJ_CLASS(__p)->clsName)
+            ? CN1_OBJ_CLASS(__p)->clsName : "?";
         fprintf(stderr, "CN1BIBOP BELT RECOVERED: child=%s <- drainParent=%s\n", __cc, __pc);
         fflush(stderr);
         gcBeltDiagCount++;
@@ -15750,7 +15750,7 @@ void gcMarkObject(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj, JAVA_BOOLEAN force
     // tracking, which suits the concurrent collector; there, every major re-marks the
     // whole old generation, so it adopted all of it -- 3.19M entries on the self-hosting
     // corpus -- and every cycle's legacy sweep, grace pass and root snapshot walked them.
-    if(__markFn != 0 && obj->__heapPosition == CN1_BIBOP_HEAP_POS && !cn1GcStwCycle
+    if(__markFn != 0 && CN1_OBJ_HEAPPOS(obj) == CN1_BIBOP_HEAP_POS && !cn1GcStwCycle
 #if CN1_ADOPT_POLICY == 1
        && (markSnapshot > 0 || gcCurrentlyMaturing)
 #endif
@@ -15805,7 +15805,7 @@ static JAVA_BOOLEAN cn1BibopRescanStep() {
             JAVA_OBJECT o = cn1BibopSlot(p, bibopRescanSlot);
             bibopRescanSlot++;
             int m = __atomic_load_n(&o->__codenameOneGcMark, __ATOMIC_ACQUIRE);
-            if(m == currentGcMarkValue && o->__heapPosition == CN1_BIBOP_ADOPTED) {
+            if(m == currentGcMarkValue && CN1_OBJ_HEAPPOS(o) == CN1_BIBOP_ADOPTED) {
                 // Overflow setup drains the adoption buffer into allObjectsInHeap;
                 // the legacy half of this same rescan owns this object now.
 #ifdef CN1_GC_INSTRUMENT
@@ -15814,7 +15814,7 @@ static JAVA_BOOLEAN cn1BibopRescanStep() {
 #endif
                 continue;
             }
-            if(m == currentGcMarkValue && o->__codenameOneParentClsReference->markFunction != 0) {
+            if(m == currentGcMarkValue && CN1_OBJ_CLASS(o)->markFunction != 0) {
                 gcMarkWorklistPush(o, JAVA_FALSE);
             }
         }
@@ -15868,10 +15868,10 @@ static void gcMarkDrainWorklist(CODENAME_ONE_THREAD_STATE) {
         // corrupted-parentCls object.
         {
             gcMarkFunctionPointer __vfp = (obj != JAVA_NULL && !CN1_IS_TAGGED(obj)
-                && obj->__codenameOneParentClsReference != 0)
-                ? obj->__codenameOneParentClsReference->markFunction : (gcMarkFunctionPointer)0;
+                && CN1_OBJ_CLASS(obj) != 0)
+                ? CN1_OBJ_CLASS(obj)->markFunction : (gcMarkFunctionPointer)0;
             int __vmark = (obj != JAVA_NULL && !CN1_IS_TAGGED(obj)) ? obj->__codenameOneGcMark : -999;
-            int __vhp = (obj != JAVA_NULL && !CN1_IS_TAGGED(obj)) ? obj->__heapPosition : -999;
+            int __vhp = (obj != JAVA_NULL && !CN1_IS_TAGGED(obj)) ? CN1_OBJ_HEAPPOS(obj) : -999;
             // A real markFunction lives in the app text segment; anchor off a
             // known app function (&gcMarkObject) and flag any fp more than 256MB
             // away (the observed garbage fp was a libc-range address).
@@ -15880,14 +15880,14 @@ static void gcMarkDrainWorklist(CODENAME_ONE_THREAD_STATE) {
             int __fpBad = (__vfp != 0) &&
                 ((__fpv > __anchor ? __fpv - __anchor : __anchor - __fpv) > (256ULL << 20));
             if(obj == JAVA_NULL || CN1_IS_TAGGED(obj) ||
-               obj->__codenameOneParentClsReference == 0 ||
+               CN1_OBJ_CLASS(obj) == 0 ||
                (__vhp != CN1_BIBOP_HEAP_POS && __vhp != CN1_BIBOP_ADOPTED && __vhp < -1) ||
                (__vmark != currentGcMarkValue && __vmark != -1) ||
                __fpBad) {
                 fprintf(stderr, "CN1BIBOP MARKDRAIN CORRUPT: obj=%p tagged=%d parentCls=%p "
                         "markFn=%p heapPosition=%d gcMark=%d curMark=%d FREE_MARK=%d force=%d\n",
                         (void*)obj, (int)CN1_IS_TAGGED(obj),
-                        (obj && !CN1_IS_TAGGED(obj)) ? (void*)obj->__codenameOneParentClsReference : (void*)0,
+                        (obj && !CN1_IS_TAGGED(obj)) ? (void*)CN1_OBJ_CLASS(obj) : (void*)0,
                         (void*)__vfp, __vhp, __vmark, currentGcMarkValue,
                         CN1_BIBOP_FREE_MARK, (int)force);
                 fflush(stderr);
@@ -15895,7 +15895,7 @@ static void gcMarkDrainWorklist(CODENAME_ONE_THREAD_STATE) {
             }
         }
 #endif
-        gcMarkFunctionPointer fp = obj->__codenameOneParentClsReference->markFunction;
+        gcMarkFunctionPointer fp = CN1_OBJ_CLASS(obj)->markFunction;
         if(fp != 0) {
 #ifdef CN1_BIBOP_VALIDATE
             gcMarkCurrentDrainObj = obj;
@@ -15905,7 +15905,7 @@ static void gcMarkDrainWorklist(CODENAME_ONE_THREAD_STATE) {
             // function is about to mark, so the whole reachable subtree graduates
             // together (never half a tree). Restored after the call.
             JAVA_BOOLEAN __savedMaturing = gcCurrentlyMaturing;
-            gcCurrentlyMaturing = (obj->__heapPosition == CN1_BIBOP_ADOPTED) ? JAVA_TRUE : __savedMaturing;
+            gcCurrentlyMaturing = (CN1_OBJ_HEAPPOS(obj) == CN1_BIBOP_ADOPTED) ? JAVA_TRUE : __savedMaturing;
 #endif
             int savedPrecise = cn1GcPreciseTrace;
             cn1GcPreciseTrace = precise;
@@ -16029,7 +16029,7 @@ static void gcMarkDrain(CODENAME_ONE_THREAD_STATE) {
             __slots0++;
 #endif
             if(o != JAVA_NULL && o->__codenameOneGcMark == currentGcMarkValue) {
-                if(o->__codenameOneParentClsReference->markFunction != 0) {
+                if(CN1_OBJ_CLASS(o)->markFunction != 0) {
                     gcMarkWorklistPush(o, JAVA_FALSE);
 #ifdef CN1_GC_CONFORM
                     __pushes0++;
@@ -16184,7 +16184,7 @@ static int gcMarkResolveThreadCount() {
 static void gcMarkRunBatch(struct ThreadLocalData* d, struct gcMarkWorklistEntry* batch, int n) {
     for(int i = 0 ; i < n ; i++) {
         JAVA_OBJECT obj = batch[i].obj;
-        gcMarkFunctionPointer fp = obj->__codenameOneParentClsReference->markFunction;
+        gcMarkFunctionPointer fp = CN1_OBJ_CLASS(obj)->markFunction;
         if(fp != 0) {
             int savedPrecise = cn1GcPreciseTrace;
             cn1GcPreciseTrace = batch[i].precise;
@@ -16194,7 +16194,7 @@ static void gcMarkRunBatch(struct ThreadLocalData* d, struct gcMarkWorklistEntry
             // race. (Registration is deferred + locked, so this is only about which
             // objects get flagged -- always safe.)
             JAVA_BOOLEAN __savedMaturing = gcCurrentlyMaturing;
-            gcCurrentlyMaturing = (obj->__heapPosition == CN1_BIBOP_ADOPTED) ? JAVA_TRUE : __savedMaturing;
+            gcCurrentlyMaturing = (CN1_OBJ_HEAPPOS(obj) == CN1_BIBOP_ADOPTED) ? JAVA_TRUE : __savedMaturing;
             cn1GcTraceIncomplete = 0;
 #ifdef CN1_GC_GEN_CHECK2
             cn1GcGenCurParent = obj;
@@ -16359,13 +16359,13 @@ static int cn1GcMutatorAssist(CODENAME_ONE_THREAD_STATE) {
     gcMarkLocalBuf = &localBuf;
     for(i = 0 ; i < n ; i++) {
         JAVA_OBJECT obj = batch[i].obj;
-        gcMarkFunctionPointer fp = obj->__codenameOneParentClsReference->markFunction;
+        gcMarkFunctionPointer fp = CN1_OBJ_CLASS(obj)->markFunction;
         if(fp != 0) {
             int savedPrecise = cn1GcPreciseTrace;
             cn1GcPreciseTrace = batch[i].precise;
 #if CN1_ADOPT_POLICY != 0 && !defined(CN1_DISABLE_BIBOP)
             JAVA_BOOLEAN __savedMaturing = gcCurrentlyMaturing;
-            gcCurrentlyMaturing = (obj->__heapPosition == CN1_BIBOP_ADOPTED)
+            gcCurrentlyMaturing = (CN1_OBJ_HEAPPOS(obj) == CN1_BIBOP_ADOPTED)
                     ? JAVA_TRUE : __savedMaturing;
             cn1GcTraceIncomplete = 0;
 #ifdef CN1_GC_GEN_CHECK2
@@ -17683,7 +17683,7 @@ void cn1GcProbeCycle(double markMs, double sweepMs, int threw) {
             continue;
         }
         legUsed++;
-        if(o->__heapPosition >= 0) {
+        if(CN1_OBJ_HEAPPOS(o) >= 0) {
             legBlockBytes += CN1_CONFORM_BLOCK_SIZE(o);
         } else {
             legAdopted++;
@@ -18342,7 +18342,7 @@ void cn1SlotHistLiveSample(void) {
                 continue;   // R2: only a live slot has a readable header
             }
             JAVA_OBJECT o = cn1BibopSlot(p, i);
-            struct clazz* c = o->__codenameOneParentClsReference;
+            struct clazz* c = CN1_OBJ_CLASS(o);
             if(c == 0) {
                 continue;
             }
@@ -19025,49 +19025,49 @@ NSString* toNSString(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT o) {
 
 JAVA_OBJECT __NEW_ARRAY_JAVA_BOOLEAN(CODENAME_ONE_THREAD_STATE, JAVA_INT size) {
     JAVA_OBJECT o = allocArray(threadStateData, size, &class_array1__JAVA_BOOLEAN, sizeof(JAVA_ARRAY_BOOLEAN), 1);
-    (*o).__codenameOneParentClsReference = &class_array1__JAVA_BOOLEAN;
+    CN1_OBJ_SET_CLASS(&((*o)), &class_array1__JAVA_BOOLEAN);
     return o;
 }
 
 JAVA_OBJECT __NEW_ARRAY_JAVA_CHAR(CODENAME_ONE_THREAD_STATE, JAVA_INT size) {
     JAVA_OBJECT o = allocArray(threadStateData, size, &class_array1__JAVA_CHAR, sizeof(JAVA_ARRAY_CHAR), 1);
-    (*o).__codenameOneParentClsReference = &class_array1__JAVA_CHAR;
+    CN1_OBJ_SET_CLASS(&((*o)), &class_array1__JAVA_CHAR);
     return o;
 }
 
 JAVA_OBJECT __NEW_ARRAY_JAVA_BYTE(CODENAME_ONE_THREAD_STATE, JAVA_INT size) {
     JAVA_OBJECT o = allocArray(threadStateData, size, &class_array1__JAVA_BYTE, sizeof(JAVA_ARRAY_BYTE), 1);
-    (*o).__codenameOneParentClsReference = &class_array1__JAVA_BYTE;
+    CN1_OBJ_SET_CLASS(&((*o)), &class_array1__JAVA_BYTE);
     return o;
 }
 
 JAVA_OBJECT __NEW_ARRAY_JAVA_SHORT(CODENAME_ONE_THREAD_STATE, JAVA_INT size) {
     JAVA_OBJECT o = allocArray(threadStateData, size, &class_array1__JAVA_SHORT, sizeof(JAVA_ARRAY_SHORT), 1);
-    (*o).__codenameOneParentClsReference = &class_array1__JAVA_SHORT;
+    CN1_OBJ_SET_CLASS(&((*o)), &class_array1__JAVA_SHORT);
     return o;
 }
 
 JAVA_OBJECT __NEW_ARRAY_JAVA_INT(CODENAME_ONE_THREAD_STATE, JAVA_INT size) {
     JAVA_OBJECT o = allocArray(threadStateData, size, &class_array1__JAVA_INT, sizeof(JAVA_ARRAY_INT), 1);
-    (*o).__codenameOneParentClsReference = &class_array1__JAVA_INT;
+    CN1_OBJ_SET_CLASS(&((*o)), &class_array1__JAVA_INT);
     return o;
 }
 
 JAVA_OBJECT __NEW_ARRAY_JAVA_LONG(CODENAME_ONE_THREAD_STATE, JAVA_INT size) {
     JAVA_OBJECT o = allocArray(threadStateData, size, &class_array1__JAVA_LONG, sizeof(JAVA_ARRAY_LONG), 1);
-    (*o).__codenameOneParentClsReference = &class_array1__JAVA_LONG;
+    CN1_OBJ_SET_CLASS(&((*o)), &class_array1__JAVA_LONG);
     return o;
 }
 
 JAVA_OBJECT __NEW_ARRAY_JAVA_FLOAT(CODENAME_ONE_THREAD_STATE, JAVA_INT size) {
     JAVA_OBJECT o = allocArray(threadStateData, size, &class_array1__JAVA_FLOAT, sizeof(JAVA_ARRAY_FLOAT), 1);
-    (*o).__codenameOneParentClsReference = &class_array1__JAVA_FLOAT;
+    CN1_OBJ_SET_CLASS(&((*o)), &class_array1__JAVA_FLOAT);
     return o;
 }
 
 JAVA_OBJECT __NEW_ARRAY_JAVA_DOUBLE(CODENAME_ONE_THREAD_STATE, JAVA_INT size) {
     JAVA_OBJECT o = allocArray(threadStateData, size, &class_array1__JAVA_DOUBLE, sizeof(JAVA_ARRAY_DOUBLE), 1);
-    (*o).__codenameOneParentClsReference = &class_array1__JAVA_DOUBLE;
+    CN1_OBJ_SET_CLASS(&((*o)), &class_array1__JAVA_DOUBLE);
     return o;
 }
 
@@ -19103,9 +19103,9 @@ static void cn1ReportUncaughtException(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT ex
      * Every handler has been unwound by now, so the honest depth is zero. */
     threadStateData->tryBlockOffset = 0;
     fprintf(stderr, "Uncaught exception");
-    if(exceptionArg != JAVA_NULL && exceptionArg->__codenameOneParentClsReference != NULL
-            && exceptionArg->__codenameOneParentClsReference->clsName != NULL) {
-        fprintf(stderr, " %s", exceptionArg->__codenameOneParentClsReference->clsName);
+    if(exceptionArg != JAVA_NULL && CN1_OBJ_CLASS(exceptionArg) != NULL
+            && CN1_OBJ_CLASS(exceptionArg)->clsName != NULL) {
+        fprintf(stderr, " %s", CN1_OBJ_CLASS(exceptionArg)->clsName);
     }
     if(exceptionArg != JAVA_NULL) {
         /* The message, which the pre-rendered stack string does not carry -- and
@@ -19152,7 +19152,7 @@ void throwException(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT exceptionArg) {
             monitorExitBlock(threadStateData, threadStateData->blocks[threadStateData->tryBlockOffset].monitor);
             // Continue to search for a matching exception ...
             continue;
-        } else if(threadStateData->blocks[threadStateData->tryBlockOffset].exceptionClass <= 0 || instanceofFunction(threadStateData->blocks[threadStateData->tryBlockOffset].exceptionClass, exceptionArg->__codenameOneParentClsReference->classId)) {
+        } else if(threadStateData->blocks[threadStateData->tryBlockOffset].exceptionClass <= 0 || instanceofFunction(threadStateData->blocks[threadStateData->tryBlockOffset].exceptionClass, CN1_OBJ_CLASS(exceptionArg)->classId)) {
             int off = threadStateData->tryBlockOffset;
             cn1StackBufferUnwind(threadStateData, threadStateData->blocks[off].nativeBuffers);
             CN1_TRY_LONGJMP(threadStateData->blocks[off].destination, 1);
@@ -19422,7 +19422,7 @@ int byteSizeForArray(struct clazz* cls) {
 JAVA_OBJECT cloneArray(JAVA_OBJECT array) {
     JAVA_ARRAY src = (JAVA_ARRAY)array;
 
-    struct clazz* cls = array->__codenameOneParentClsReference;
+    struct clazz* cls = CN1_OBJ_CLASS(array);
     int byteSize = byteSizeForArray(cls);
 
 #ifdef CN1_ALLOC_CENSUS

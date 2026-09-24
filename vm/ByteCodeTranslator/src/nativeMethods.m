@@ -125,9 +125,9 @@ int cn1StrIsLatin1(JAVA_OBJECT s) {
     if(v == JAVA_NULL) {
         // The twin IS the coder -- that is the whole point of carrying it in the
         // class word instead of a header around the payload.
-        return s->__codenameOneParentClsReference == &class__java_lang_String_i8;
+        return CN1_OBJ_CLASS(s) == &class__java_lang_String_i8;
     }
-    return ((JAVA_ARRAY)v)->__codenameOneParentClsReference == &class_array1__JAVA_BYTE;
+    return CN1_OBJ_CLASS(((JAVA_ARRAY)v)) == &class_array1__JAVA_BYTE;
 }
 
 // Compact-string: logical char at index i of String s, decoding Latin-1 or UTF-16.
@@ -428,7 +428,7 @@ static inline __attribute__((always_inline)) JAVA_BOOLEAN cn1StringEquals(CODENA
         THROW_NULL_POINTER_EXCEPTION();
     }
 #endif
-    if(__cn1Arg1 == JAVA_NULL || CN1_CLASS_OF(__cn1Arg1)->classId != __cn1ThisObject->__codenameOneParentClsReference->classId) {
+    if(__cn1Arg1 == JAVA_NULL || CN1_CLASS_OF(__cn1Arg1)->classId != CN1_OBJ_CLASS(__cn1ThisObject)->classId) {
         return JAVA_FALSE;
     }
     struct obj__java_lang_String* t = (struct obj__java_lang_String*)__cn1ThisObject;
@@ -549,7 +549,7 @@ JAVA_BOOLEAN java_lang_String_equalsIgnoreCase___java_lang_String_R_boolean(CODE
         THROW_NULL_POINTER_EXCEPTION();
     }
 #endif
-    if(__cn1Arg1 == JAVA_NULL || CN1_CLASS_OF(__cn1Arg1)->classId != __cn1ThisObject->__codenameOneParentClsReference->classId) {
+    if(__cn1Arg1 == JAVA_NULL || CN1_CLASS_OF(__cn1Arg1)->classId != CN1_OBJ_CLASS(__cn1ThisObject)->classId) {
         return JAVA_FALSE;
     }
     struct obj__java_lang_String* t = (struct obj__java_lang_String*)__cn1ThisObject;
@@ -1067,7 +1067,7 @@ JAVA_VOID java_lang_System_arraycopy___java_lang_Object_int_java_lang_Object_int
         THROW_ARRAY_INDEX_EXCEPTION(-1);
         return;
     }
-    struct clazz* cls = (*srcArr).__codenameOneParentClsReference;
+    struct clazz* cls = CN1_OBJ_CLASS(&((*srcArr)));
     int byteSize = byteSizeForArray(cls);
     // SATB barrier, BOTH halves: an object arraycopy replaces dst[dstOffset..+length)
     // with a bulk memmove that bypasses the per-element setter, so neither half fires on
@@ -2200,7 +2200,7 @@ JAVA_OBJECT java_lang_Object_toString___R_java_lang_String(CODENAME_ONE_THREAD_S
     if (obj == JAVA_NULL) {
         return newStringFromCString(threadStateData, "null");
     } else {
-        struct clazz* cls = obj->__codenameOneParentClsReference;
+        struct clazz* cls = CN1_OBJ_CLASS(obj);
         const char* className = cls->clsName;
         char s[strlen(className) + 32];
         sprintf(s, "%s@%llX", className, ((JAVA_LONG)obj));
@@ -2234,11 +2234,11 @@ JAVA_OBJECT java_lang_Object_getClassImpl___R_java_lang_Class(CODENAME_ONE_THREA
     // build precisely because it read the header directly.
     if(CN1_IS_TAGGED(obj)) {
         struct clazz* cn1__tagCls = CN1_CLASS_OF(obj);
-        cn1__tagCls->__codenameOneParentClsReference = &ClazzClazz;
+        CN1_OBJ_SET_CLASS(cn1__tagCls, &ClazzClazz);
         return (JAVA_OBJECT)cn1__tagCls;
     }
 #endif
-    struct clazz* cn1__cls = obj->__codenameOneParentClsReference;
+    struct clazz* cn1__cls = CN1_OBJ_CLASS(obj);
     if(!cn1__cls) {
         return (JAVA_OBJECT)(&ClazzClazz);
     }
@@ -2251,7 +2251,7 @@ JAVA_OBJECT java_lang_Object_getClassImpl___R_java_lang_Class(CODENAME_ONE_THREA
     if(cn1IsInlineStringClass(cn1__cls)) {
         cn1__cls = &class__java_lang_String;
     }
-    cn1__cls->__codenameOneParentClsReference = &ClazzClazz;
+    CN1_OBJ_SET_CLASS(cn1__cls, &ClazzClazz);
     return (JAVA_OBJECT)cn1__cls;
 }
 
@@ -4078,7 +4078,7 @@ static long long cn1CensusBlockBytes(JAVA_LONG block) {
     return block == 0 ? 0 : (long long)((const CN1NativeBlock*)(uintptr_t)block - 1)->bytes;
 }
 void cn1CollectionCensusNote(JAVA_OBJECT o) {
-    struct clazz* c = o->__codenameOneParentClsReference;
+    struct clazz* c = CN1_OBJ_CLASS(o);
     int kind = -1, n = 0;
     long long bytes = 0;
 #ifdef CN1_COLL_ARRAYLIST
@@ -4433,7 +4433,7 @@ JAVA_INT java_util_ArrayList_addAllNative___int_java_util_Collection_R_int(
 JAVA_INT java_util_ArrayList_initFromNative___java_util_Collection_R_int(
         CODENAME_ONE_THREAD_STATE, JAVA_OBJECT owner, JAVA_OBJECT collection) {
     // A subclass constructor can observe its overridden addAll being invoked.
-    if(owner->__codenameOneParentClsReference != &class__java_util_ArrayList) return -1;
+    if(CN1_OBJ_CLASS(owner) != &class__java_util_ArrayList) return -1;
     return java_util_ArrayList_addAllNative___int_java_util_Collection_R_int(threadStateData, owner, 0, collection);
 }
 
@@ -5152,7 +5152,7 @@ JAVA_BOOLEAN java_lang_StringBuilder_resizeBufferImpl___int_boolean_R_boolean(
     JAVA_LONG inlineStorage = (JAVA_LONG)(uintptr_t)target->__cn1InlineStorage;
     int inlineBytes = sizeof(target->__cn1InlineStorage);
     struct CN1StackBuffer* scope = NULL;
-    if(target->__heapPosition == CN1_GC_STACK_BUILDER) {
+    if(CN1_OBJ_HEAPPOS(target) == CN1_GC_STACK_BUILDER) {
         memcpy(&scope, target->__cn1InlineStorage, sizeof(scope));
         inlineStorage = (JAVA_LONG)(uintptr_t)scope->initialData;
         inlineBytes = scope->initialBytes;
@@ -5196,7 +5196,7 @@ static JAVA_VOID cn1SbEnsure(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT builder, JAV
         long long bytes = (long long)grown * (t->java_lang_StringBuilder_wide ? 2 : 1);
         JAVA_LONG storage = t->java_lang_StringBuilder_cn1Storage;
         long long avail = -1;
-        if(t->__heapPosition == CN1_GC_STACK_BUILDER) {
+        if(CN1_OBJ_HEAPPOS(t) == CN1_GC_STACK_BUILDER) {
             struct CN1StackBuffer* scope;
             memcpy(&scope, t->__cn1InlineStorage, sizeof(scope));
             if(storage == (JAVA_LONG)(uintptr_t)scope->initialData) {
@@ -5310,8 +5310,8 @@ JAVA_OBJECT java_lang_StringBuilder_append___java_lang_String_R_java_lang_String
 // charAt semantics in the caller. Re-read storage after growth for self-append.
 JAVA_BOOLEAN java_lang_StringBuilder_tryAppendRange___java_lang_CharSequence_int_int_R_boolean(
         CODENAME_ONE_THREAD_STATE, JAVA_OBJECT builder, JAVA_OBJECT text, JAVA_INT start, JAVA_INT end) {
-    int sourceBuilder = text->__codenameOneParentClsReference == &class__java_lang_StringBuilder;
-    if(!sourceBuilder && !cn1IsStringClass(text->__codenameOneParentClsReference)) return JAVA_FALSE;
+    int sourceBuilder = CN1_OBJ_CLASS(text) == &class__java_lang_StringBuilder;
+    if(!sourceBuilder && !cn1IsStringClass(CN1_OBJ_CLASS(text))) return JAVA_FALSE;
     JAVA_INT length = end - start;
     if(length == 0) return JAVA_TRUE;
     CN1_KEEP_NATIVE_OWNER(bufferOwner, builder);
@@ -5571,7 +5571,7 @@ JAVA_OBJECT java_lang_StringBuilder_toString___R_java_lang_String(CODENAME_ONE_T
         cn1CharCopy((JAVA_ARRAY_CHAR*)CN1_ARRAY_DATA((JAVA_ARRAY)arr), src, count);
     }
     if(!published) {
-        so->__codenameOneParentClsReference = &class__java_lang_String; // PUBLISH
+        CN1_OBJ_SET_CLASS(so, &class__java_lang_String); // PUBLISH
     }
     finishedNativeAllocations();
     return so;

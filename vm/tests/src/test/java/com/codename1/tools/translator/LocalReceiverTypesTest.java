@@ -102,7 +102,7 @@ class LocalReceiverTypesTest {
             assertTrue(code.contains("locals["));
             assertFalse(code.contains("virtual_java_util_Iterator"));
             assertFalse(code.contains("cn1IterScopeBegin"));
-            assertFalse(code.contains("__codenameOneParentClsReference"));
+            assertFalse(code.contains("CN1_OBJ_CLASS("));
         }
         for (BytecodeMethod method : cls.getMethods()) if (method.getMethodName().equals("walkMap")) {
             method.intrinsifyForEach();
@@ -116,7 +116,7 @@ class LocalReceiverTypesTest {
             assertTrue(code.contains("cn1TablePart(get_field_java_util_HashMap_cn1KeysBlock(") && code.contains(", 1)"));
             assertFalse(code.contains("_values___"));
             assertFalse(code.contains("virtual_java_util_Iterator"));
-            assertFalse(code.contains("__codenameOneParentClsReference"));
+            assertFalse(code.contains("CN1_OBJ_CLASS("));
         }
         for (BytecodeMethod method : cls.getMethods()) if (method.getMethodName().equals("caught")) {
             method.freezeFramelessEligibility();
@@ -180,7 +180,7 @@ class LocalReceiverTypesTest {
             assertTrue(generated.toString().contains("cn1RefBlockGet"));
             assertTrue(generated.toString().contains("CN1_KEEP_NATIVE_OWNER"));
             assertFalse(generated.toString().contains("virtual_java_util_Iterator"));
-            assertFalse(generated.toString().contains("__codenameOneParentClsReference"));
+            assertFalse(generated.toString().contains("CN1_OBJ_CLASS("));
         }
         Parser.cleanup();
         Parser.parse(directory.resolve("Fields.class").toFile());

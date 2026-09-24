@@ -179,9 +179,9 @@ final class StreamFusion {
                     Type[] captures = Type.getArgumentTypes(stage.factory.getDesc());
                     out.append("__STATIC_INITIALIZER_").append(cls).append("(threadStateData);\n");
                     out.append("struct obj__").append(cls).append(" __sfLambda").append(i).append(" = {0};\n")
-                            .append("__sfLambda").append(i).append(".__codenameOneParentClsReference = &class__").append(cls).append(";\n")
-                            .append("__sfLambda").append(i).append(".__codenameOneGcMark = -1;\n")
-                            .append("__sfLambda").append(i).append(".__heapPosition = -1;\n");
+                            .append("CN1_OBJ_SET_CLASS(&__sfLambda").append(i).append(", &class__").append(cls).append(");\n")
+                            .append("CN1_OBJ_SET_MARK(&__sfLambda").append(i).append(", CN1_GC_MARK_FRESH);\n")
+                            .append("CN1_OBJ_SET_HEAPPOS(&__sfLambda").append(i).append(", -1);\n");
                     for (int c = 0; c < captures.length; c++) {
                         char type = kind(captures[c]);
                         String value = "SP[-" + (captures.length - c) + "].data." + type;
