@@ -2736,8 +2736,19 @@ public final class JavaEmitter {
                 return new Out(o.code, TypeRef.VOID);
             }
             ctx.importClass("dart.async.Await");
-            TypeRef inner = o.type.is("Future") ? o.type.arg(0) : TypeRef.DYNAMIC;
-            return new Out("Await.await$(" + o.code + ")", boxType(inner));
+            if (o.type != null && o.type.is("Future")) {
+                return new Out("Await.await$(" + o.code + ")", boxType(o.type.arg(0)));
+            }
+            if (o.type == null || isDynamicType(o.type) || o.type.is("FutureOr")) {
+                // Might be a Future, might be a value: decided at run time.
+                TypeRef inner = o.type != null && o.type.is("FutureOr") && !o.type.args.isEmpty()
+                        ? o.type.arg(0) : TypeRef.DYNAMIC;
+                String v = "Await.awaitAny(" + o.code + ")";
+                return new Out(isDynamicType(inner) ? v : "((" + javaType(boxType(inner), true, ctx) + ") " + v + ")",
+                        boxType(inner));
+            }
+            // A statically non-Future value: `await 42` is 42.
+            return new Out(o.code, o.type);
         }
         if (e instanceof ParenExpr) {
             Out inner = emitExpr(((ParenExpr) e).inner, expected, ctx);
@@ -4554,7 +4565,7 @@ public final class JavaEmitter {
             List<Object[]> undo = applyGuardPromotions(b.left, ctx);
             Out r = emitExpr(b.right, null, ctx);
             restorePromotions(undo, ctx);
-            return new Out(paren(l.code) + " && " + paren(r.code), TypeRef.BOOL);
+            return new Out(logicalOperand(l, ctx) + " && " + logicalOperand(r, ctx), TypeRef.BOOL);
         }
         if (b.op.equals("||")) {
             // `x is! T || x.member`: reaching the right operand means the left was false,
@@ -4564,7 +4575,7 @@ public final class JavaEmitter {
             collectNegativePromotions(b.left, ctx, undo);
             Out r = emitExpr(b.right, null, ctx);
             restorePromotions(undo, ctx);
-            return new Out(paren(l.code) + " || " + paren(r.code), TypeRef.BOOL);
+            return new Out(logicalOperand(l, ctx) + " || " + logicalOperand(r, ctx), TypeRef.BOOL);
         }
         Out l = emitExpr(b.left, null, ctx);
         Out r = emitExpr(b.right, null, ctx);
@@ -4831,6 +4842,19 @@ public final class JavaEmitter {
             n = c.superclass.name;
         }
         return false;
+    }
+
+    /**
+     * An operand of && or ||: a dynamic one is checked to be a bool at run time, as Dart
+     * does. Emitted as is it was `Object && boolean`, which javac rejects. Java's && and
+     * || still short-circuit, so the right operand is evaluated only when Dart would.
+     */
+    private String logicalOperand(Out o, Ctx ctx) {
+        if (o.type == null || isDynamicType(o.type) || (o.type.is("bool") && o.type.nullable)) {
+            ctx.importClass("dart.runtime.DartRuntime");
+            return "DartRuntime.dynBool(" + o.code + ")";
+        }
+        return paren(o.code);
     }
 
     /** dart:core error constructors -> dart-runtime classes. */
@@ -5647,6 +5671,13 @@ public final class JavaEmitter {
                     args += ", " + emitExpr(e, null, ctx).code;
                 }
                 return new Out("DString.indexOf(" + args + ")", TypeRef.INT);
+            }
+            if (n.equals("replaceFirst")) {
+                // Unresolved before: DString's overloads were never reached.
+                String start = pos.size() > 2 ? ", " + emitExpr(pos.get(2), TypeRef.INT, ctx).code : "";
+                return new Out("DString.replaceFirst(" + target.code + ", "
+                        + emitExpr(pos.get(0), null, ctx).code + ", "
+                        + emitExpr(pos.get(1), null, ctx).code + start + ")", TypeRef.STRING);
             }
             if (n.equals("replaceAll")) {
                 return new Out("DString.replaceAll(" + target.code + ", "
