@@ -180,6 +180,7 @@ public class TranscodeFlutterMojo extends AbstractCN1Mojo {
     void copyAssets() throws MojoExecutionException {
         File outDir = new File(project.getBuild().getOutputDirectory());
         Set<String> written = new HashSet<String>();
+        List<String> keys = new ArrayList<String>();
         int count = 0;
         try {
             // Both roots a pubspec asset key can start with. "assets/" is an app's own
@@ -194,9 +195,10 @@ public class TranscodeFlutterMojo extends AbstractCN1Mojo {
                 }
                 Files.createDirectories(outDir.toPath());
                 // the root stays in the Flutter asset key, matching pubspec paths
-                count += flattenInto(dir, root, outDir, written);
+                count += flattenInto(dir, root, outDir, written, keys);
             }
             if (count > 0) {
+                writeAssetManifest(outDir, keys, written);
                 getLog().info("Flattened " + count + " Flutter asset(s) into the build output");
             }
         } catch (IOException e) {
@@ -259,7 +261,27 @@ public class TranscodeFlutterMojo extends AbstractCN1Mojo {
     /** The directory names under {@code src/main/flutter} that hold bundled assets. */
     private static final String[] ASSET_ROOTS = {"assets", "packages"};
 
-    private int flattenInto(File dir, String assetPrefix, File outDir, Set<String> written) throws IOException {
+    /**
+     * The bundled list of asset keys, one per line, which the runtime's
+     * {@code FlutterAssets} reads to learn which resolution variants exist. Flutter
+     * builds the same thing (AssetManifest) for the same reason: a variant can sit
+     * in any positive scale directory -- {@code 2.5x/}, or {@code 2x/} as well as
+     * {@code 2.0x/} -- so no fixed probe list finds them all, and one outside it was
+     * bundled and never used. Its name cannot collide with an asset: every asset key
+     * starts with {@code assets/} or {@code packages/}, so every asset's flat name
+     * carries a {@code _s} after that root.
+     */
+    static final String ASSET_MANIFEST = "cn1f_AssetManifest.txt";
+
+    private void writeAssetManifest(File outDir, List<String> keys, Set<String> written) throws IOException {
+        List<String> sorted = new ArrayList<String>(keys);
+        java.util.Collections.sort(sorted);
+        Files.write(new File(outDir, ASSET_MANIFEST).toPath(), sorted, java.nio.charset.StandardCharsets.UTF_8);
+        written.add(ASSET_MANIFEST);
+    }
+
+    private int flattenInto(File dir, String assetPrefix, File outDir, Set<String> written,
+                            List<String> keys) throws IOException {
         File[] children = dir.listFiles();
         if (children == null) {
             return 0;
@@ -268,12 +290,13 @@ public class TranscodeFlutterMojo extends AbstractCN1Mojo {
         for (File child : children) {
             String key = assetPrefix + "/" + child.getName();
             if (child.isDirectory()) {
-                count += flattenInto(child, key, outDir, written);
+                count += flattenInto(child, key, outDir, written, keys);
             } else {
                 String flat = flatAssetName(key);
                 Files.copy(child.toPath(), new File(outDir, flat).toPath(),
                         StandardCopyOption.REPLACE_EXISTING);
                 written.add(flat);
+                keys.add(key);
                 count++;
             }
         }

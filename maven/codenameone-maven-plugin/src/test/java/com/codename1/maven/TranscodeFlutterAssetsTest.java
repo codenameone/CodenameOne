@@ -86,6 +86,22 @@ public class TranscodeFlutterAssetsTest {
     }
 
     @Test
+    public void theManifestListsEveryBundledAssetKey() throws Exception {
+        asset("assets/a.png");
+        asset("assets/2.5x/a.png");
+        asset("packages/lib/assets/3x/b.png");
+        mojo.copyAssets();
+        File manifest = new File(classes, TranscodeFlutterMojo.ASSET_MANIFEST);
+        assertTrue(manifest.isFile());
+        assertEquals(java.util.Arrays.asList("assets/2.5x/a.png", "assets/a.png", "packages/lib/assets/3x/b.png"),
+                Files.readAllLines(manifest.toPath(), java.nio.charset.StandardCharsets.UTF_8));
+
+        // Recorded like the assets: gone with them when the Flutter tree is.
+        mojo.removeStaleAssets(new HashSet<String>());
+        assertFalse(manifest.exists());
+    }
+
+    @Test
     public void removingFlutterRemovesItsAssets() throws Exception {
         asset("assets/a.png");
         asset("packages/lib/assets/b.png");
