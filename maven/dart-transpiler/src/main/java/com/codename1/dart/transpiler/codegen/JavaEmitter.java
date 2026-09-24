@@ -4764,10 +4764,10 @@ public final class JavaEmitter {
                     // Maps and sets iterate with Java's iterators, which report a change
                     // during iteration as java.util.ConcurrentModificationException; it is
                     // the same Dart error, so the clause takes both.
+                    // Bound as the Dart error in both cases, so `e is ConcurrentModificationError`
+                    // holds and e has that type's API.
                     test = "(" + test + " || " + caught + " instanceof java.util.ConcurrentModificationException)";
-                    bindType = "Object";
-                    bindValue = caught;
-                    varType = TypeRef.DYNAMIC;
+                    bindValue = "DartRuntime.asConcurrentModificationError(" + caught + ")";
                 }
             } else {
                 // A thrown value that is not an exception: matched by its own type.
@@ -5387,14 +5387,17 @@ public final class JavaEmitter {
                         TypeRef.INT);
             }
             if (cls.equals("Object") && n.equals("hash")) {
+                // Through DartRuntime.hash, which hashes numbers as Dart's == compares
+                // them; java.util.Objects.hash gave 1 and 1.0 different hashes.
+                ctx.importClass("dart.runtime.DartRuntime");
                 StringBuilder sb = new StringBuilder();
                 for (int i = 0; i < c.args.positional.size(); i++) {
                     if (i > 0) {
                         sb.append(", ");
                     }
-                    sb.append(boxIfPrimitive(emitExpr(c.args.positional.get(i), null, ctx), ctx));
+                    sb.append("(Object) ").append(paren(emitExpr(c.args.positional.get(i), null, ctx).code));
                 }
-                return new Out("java.util.Objects.hash(" + sb + ")", TypeRef.INT);
+                return new Out("DartRuntime.hash(" + sb + ")", TypeRef.INT);
             }
             // Dart's `Comparable.compare(a, b)` -> DartComparable.compare (delegates to compareTo).
             if (cls.equals("Comparable") && n.equals("compare")) {
@@ -6205,6 +6208,16 @@ public final class JavaEmitter {
         }
         if (cc.ctorName.equals("from")) {
             String src = emitExpr(pos.get(0), null, ctx).code;
+            // Each element is checked against a concrete element type, as Dart does
+            // (the primitive lists check their own); dynamic, Object and type variables
+            // accept anything and keep the plain copy.
+            if (pk == null && elem != null && isConcreteType(elem) && !isDynamicType(elem)) {
+                String jt = javaType(copyNonNull(elem), true, ctx);
+                int lt = jt.indexOf('<');
+                String raw = lt >= 0 ? jt.substring(0, lt) : jt;
+                return new Out(cls + witness + "fromChecked(" + src + ", " + raw + ".class, " + elem.nullable
+                        + ", " + (growable != null ? growable : "true") + ")", listType);
+            }
             // growable: false was parsed above and then dropped for from().
             return new Out(cls + witness + "from" + sfx + "(" + src
                     + (growable != null ? ", " + growable : "") + ")", listType);
