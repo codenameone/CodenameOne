@@ -6284,3 +6284,37 @@ the first half of the run, and holds. The failing run had other work started hal
 through it. Capping the warm page cache at a trigger's worth changed nothing
 measurable and was not kept -- the growth is mutator run-ahead, which the pacing cap
 (free RAM / 8 off a ceiling) permits by design.
+
+## Round 42: a real single core, and Linux never swept
+
+The one-core figures so far were emulated on the Mac (`CN1_GC_MARK_THREADS=1` with
+every core still available). This round pins a Linux container to one CPU
+(`taskset -c 0` inside podman; rootless podman has no cpuset controller), where the
+JVM picks SerialGC itself. Self-hosting hello corpus, interleaved, 3 rounds, every
+arm's output byte-identical to the JDK reference.
+
+The first attempt was invalid, and the reason was a production bug: **no Linux build
+ever reclaimed anything.** Every cycle printed "incomplete native root capture;
+skipped sweep" and every ParparVM arm sat at ~3.7GB. Cause: `getThreadLocalData()`
+tested `threadIdKey == 0` for "no key yet", glibc hands out key 0 first, so the main
+thread got a second key and a second state and the first was orphaned in
+`allThreads`. The collector signal-stopped the orphan every cycle; the handler
+answered for the real state; the stop never completed. Darwin never returns key 0.
+Fixed with `pthread_once` (bc5c0c769a). `GcOverflowSpiralApp` in the same container:
+old runtime 1219 skipped sweeps and no finish in 300s, fixed runtime 0 and a 184MB
+peak. `GcOverflowSpiralIntegrationTest` now asserts on that line.
+
+After the fix (min wall, max RSS):
+
+| arm | wall | vs JDK | RSS | vs JDK |
+|---|---:|---:|---:|---:|
+| JDK 25 (SerialGC) | 18.12s | 1.00 | 554MB | 1.00 |
+| HEAD, concurrent | 20.02s | 1.10 | 1224MB | 2.21 |
+| single-core WIP, STW only | 31.63s | 1.75 | 675MB | 1.22 |
+| single-core WIP, generational | 15.27s | 0.84 | 817MB | 1.47 |
+
+Rounds 2-3 overlapped a second container on other vCPUs; round 1 alone orders the
+arms the same way. The generational arm is the only one under JDK on time, and it
+still frees a live young object in ~25% of runs on the Mac (none of these three), so
+it is not a result yet. STW without generations loses 1.75x: the full mark of an
+old heap every cycle is exactly what a single core cannot afford.
