@@ -760,6 +760,7 @@ public final class JavaEmitter {
                         impls.append(", ");
                     }
                     impls.append(javaType(mixRef, false, ctx));
+                    emitChangeNotifierState(mixRef, body);
                     continue;
                 }
                 diags.error(c, "E0402", "Unknown mixin: " + mixRef.name);
@@ -797,6 +798,7 @@ public final class JavaEmitter {
                 impls.append(", ");
             }
             impls.append(javaType(itf, false, ctx));
+            emitChangeNotifierState(itf, body);
         }
         body.append(emitStubGetterBridges(c, ctx));
         // Dart 3 sealed → Java sealed: a sealed class with subtypes lists them in a permits clause and
@@ -4855,6 +4857,24 @@ public final class JavaEmitter {
             return "DartRuntime.dynBool(" + o.code + ")";
         }
         return paren(o.code);
+    }
+
+    /**
+     * A class mixing in ChangeNotifier holds its own listener list. The runtime's default
+     * kept them in a shared map keyed weakly by the notifier, but a listener closing over
+     * the notifier is held strongly there and leads back to the key, so a model with such a
+     * listener could never be collected unless someone called dispose.
+     */
+    private void emitChangeNotifierState(TypeRef mixin, StringBuilder body) {
+        Ast.ClassDecl sc = stubs.classes.get(mixin.name);
+        if (sc == null || !"com.codename1.flutter.foundation.ChangeNotifier".equals(sc.javaName)) {
+            return;
+        }
+        body.append("    private final java.util.List<dart.runtime.Funcs.VoidFunc0> changeNotifierListeners =\n")
+                .append("            new java.util.ArrayList<dart.runtime.Funcs.VoidFunc0>();\n\n")
+                .append("    @Override\n")
+                .append("    public java.util.List<dart.runtime.Funcs.VoidFunc0> changeNotifierListeners$() {\n")
+                .append("        return changeNotifierListeners;\n    }\n\n");
     }
 
     /** dart:core error constructors -> dart-runtime classes. */
