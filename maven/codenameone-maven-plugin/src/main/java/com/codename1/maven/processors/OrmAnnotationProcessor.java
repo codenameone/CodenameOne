@@ -1396,6 +1396,18 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
         sb.append("public boolean primitive(int index) { switch(index) {");
         for(int i=0;i<ec.fields.size();i++) if(ec.fields.get(i).primitive) sb.append("case ").append(i).append(": return true;");
         sb.append("default:return false;} }\n");
+        sb.append("public boolean nonNullQueryValue(int index) { switch(index) {\n");
+        for(int i=0;i<ec.fields.size();i++) {
+            PersistedField field=ec.fields.get(i);
+            if(field.primitive && field.converter==null) {
+                sb.append("case ").append(i).append(": return ");
+                if(field.embeddedParent!=null && field.embeddedParent.length()>0) sb.append("false");
+                else if(ec.hierarchyRoot!=null) sb.append(field.declaringType).append(".class.isAssignableFrom(").append(ec.binaryName).append(".class)");
+                else sb.append("true");
+                sb.append(";\n");
+            }
+        }
+        sb.append("default:return super.nonNullQueryValue(index);}}\n");
         sb.append("public boolean counter(int index) { switch(index) {");
         for(int i=0;i<ec.fields.size();i++) {
             PersistedField field=ec.fields.get(i);

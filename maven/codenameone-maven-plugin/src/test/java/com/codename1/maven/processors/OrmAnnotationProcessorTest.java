@@ -216,6 +216,80 @@ public class OrmAnnotationProcessorTest {
     }
 
     @Test
+    public void booleanConvertersAcceptDomainParameters() throws Exception {
+        File classes=tmp.newFolder("logicalconverter");Map<String,String> sources=new java.util.LinkedHashMap<String,String>();
+        sources.put("logicalconverter.Flag","package logicalconverter; public enum Flag { YES, NO, MISSING }");
+        sources.put("logicalconverter.Converter","package logicalconverter; public class Converter implements com.codename1.orm.session.AttributeConverter<Flag,Boolean> { public Boolean toDatabase(Flag f) { return f==null||f==Flag.MISSING?null:f==Flag.YES; } public Flag fromDatabase(Boolean b) { return b==null?Flag.MISSING:b?Flag.YES:Flag.NO; } }");
+        sources.put("logicalconverter.Entry","package logicalconverter; import com.codename1.annotations.*; import com.codename1.annotations.db.*; @Entity public class Entry { @Id public long id; @Convert(converter=Converter.class,storageType=Boolean.class) public Flag flag=Flag.YES; public boolean plain=true; }");
+        JavaSourceCompiler.compile(sources,classes,Arrays.asList(testClassesDir()));ProcessorContext client=runProcessor(classes);assertFalse(client.getErrors().toString(),client.hasErrors());ProcessorContext backend=runProcessor(classes,backendClasspath());assertFalse(backend.getErrors().toString(),backend.hasErrors());
+        try(java.net.URLClassLoader loader=new java.net.URLClassLoader(new URL[]{classes.toURI().toURL()},getClass().getClassLoader())) {
+            Class type=loader.loadClass("logicalconverter.Entry"),flag=loader.loadClass("logicalconverter.Flag");Object yes=Enum.valueOf(flag,"YES"),no=Enum.valueOf(flag,"NO"),missing=Enum.valueOf(flag,"MISSING");
+            for(String suffix:Arrays.asList("Cn1Model","Cn1BackendModel")) {
+                Map<String,com.codename1.impl.orm.EntityModel<?>> models=new java.util.LinkedHashMap<String,com.codename1.impl.orm.EntityModel<?>>();models.put(type.getName(),(com.codename1.impl.orm.EntityModel)loader.loadClass(type.getName()+suffix).newInstance());
+                com.codename1.backend.Database db=com.codename1.backend.Database.open(":memory:");com.codename1.orm.session.Session session=new com.codename1.impl.orm.SessionImpl(new com.codename1.impl.orm.BackendSqlAccess(null,db,db.dialect()),models);
+                try {
+                    session.createTables();session.beginTransaction();session.persist(type.newInstance());session.commitTransaction();
+                    for(String predicate:Arrays.asList("e.flag=:flag",":flag=e.flag","e.flag in (:flag)","e.flag=coalesce(:flag,e.flag)")) org.junit.Assert.assertEquals(predicate,1,session.createQuery("select e from Entry e where "+predicate).setParameter("flag",predicate.contains(" in ")?Arrays.asList(yes):yes).list().size());
+                    org.junit.Assert.assertEquals(1,session.query(type).eq("flag",yes).count());
+                    org.junit.Assert.assertEquals(0,session.createQuery("select e from Entry e where e.flag=:flag").setParameter("flag",missing).list().size());
+                    for(Object invalid:Arrays.asList("YES",Boolean.TRUE,1L)) org.junit.Assert.assertThrows(IllegalArgumentException.class,()->session.createQuery("select e from Entry e where e.flag=:flag").setParameter("flag",invalid).list());
+                    org.junit.Assert.assertThrows(IllegalArgumentException.class,()->session.createQuery("select e from Entry e where e.plain=:flag").setParameter("flag",1L).list());
+                    session.beginTransaction();org.junit.Assert.assertEquals(1,session.createQuery("update Entry e set e.flag=:flag").setParameter("flag",no).executeUpdate());session.commitTransaction();org.junit.Assert.assertEquals(no,session.createQuery("select e.flag from Entry e",flag).first());
+                } finally { session.close();db.close(); }
+            }
+        }
+    }
+
+    @Test
+    public void replacingUnloadedOrphansFlushesOwnershipMoves() throws Exception {
+        for(boolean many:Arrays.asList(false,true)) {
+            File classes=tmp.newFolder();Map<String,String> sources=new java.util.LinkedHashMap<String,String>();String imports="package movedorphan; import com.codename1.annotations.*; import com.codename1.annotations.db.*; ";
+            sources.put("movedorphan.Parent",imports+"@Entity public class Parent { @Id public long id; @"+(many?"OneToMany":"OneToOne")+"(mappedBy=\"parent\",fetch=FetchType.LAZY,orphanRemoval=true) public "+(many?"java.util.List<Child>":"Child")+" children; public void clearChildren() { children="+(many?"new java.util.ArrayList<Child>()":"null")+"; } }");
+            sources.put("movedorphan.Child",imports+"@Entity public class Child { @Id public long id; @"+(many?"ManyToOne":"OneToOne")+" public Parent parent; }");
+            JavaSourceCompiler.compile(sources,classes,Arrays.asList(testClassesDir()));ProcessorContext client=runProcessor(classes);assertFalse(client.getErrors().toString(),client.hasErrors());ProcessorContext backend=runProcessor(classes,backendClasspath());assertFalse(backend.getErrors().toString(),backend.hasErrors());
+            try(java.net.URLClassLoader loader=new java.net.URLClassLoader(new URL[]{classes.toURI().toURL()},getClass().getClassLoader())) {
+                Class parent=loader.loadClass("movedorphan.Parent"),child=loader.loadClass("movedorphan.Child");
+                for(String suffix:Arrays.asList("Cn1Model","Cn1BackendModel")) {
+                    Map<String,com.codename1.impl.orm.EntityModel<?>> models=new java.util.LinkedHashMap<String,com.codename1.impl.orm.EntityModel<?>>();for(Class type:Arrays.asList(parent,child)) models.put(type.getName(),(com.codename1.impl.orm.EntityModel)loader.loadClass(type.getName()+suffix).newInstance());
+                    com.codename1.backend.Database db=com.codename1.backend.Database.open(":memory:");com.codename1.orm.session.Session session=new com.codename1.impl.orm.SessionImpl(new com.codename1.impl.orm.BackendSqlAccess(null,db,db.dialect()),models);
+                    try {
+                        session.createTables();session.beginTransaction();Object oldParent=parent.newInstance(),newParent=parent.newInstance(),item=child.newInstance();child.getField("parent").set(item,oldParent);session.persist(oldParent);session.persist(newParent);session.persist(item);session.commitTransaction();Object oldId=parent.getField("id").get(oldParent),newId=parent.getField("id").get(newParent),childId=child.getField("id").get(item);session.clear();
+                        oldParent=session.find(parent,oldId);newParent=session.find(parent,newId);item=session.find(child,childId);assertFalse(session.isLoaded(oldParent,"children"));session.beginTransaction();child.getField("parent").set(item,newParent);parent.getMethod("clearChildren").invoke(oldParent);session.commitTransaction();session.clear();
+                        item=session.find(child,childId);org.junit.Assert.assertNotNull("Moving ownership must not delete the child",item);org.junit.Assert.assertEquals(newId,parent.getField("id").get(child.getField("parent").get(item)));org.junit.Assert.assertEquals(0,session.count(session.find(parent,oldId),"children"));org.junit.Assert.assertEquals(1,session.count(session.find(parent,newId),"children"));
+                        session.clear();newParent=session.find(parent,newId);assertFalse(session.isLoaded(newParent,"children"));session.beginTransaction();parent.getMethod("clearChildren").invoke(newParent);session.commitTransaction();org.junit.Assert.assertEquals(0,session.query(child).count());
+                    } finally { session.close();db.close(); }
+                }
+            }
+        }
+    }
+
+    @Test
+    public void owningToOneCountsUsePersistedForeignKeys() throws Exception {
+        for(boolean composite:Arrays.asList(false,true)) {
+            File classes=tmp.newFolder();Map<String,String> sources=new java.util.LinkedHashMap<String,String>();String imports="package storedcount; import com.codename1.annotations.*; import com.codename1.annotations.db.*; ";
+            String id=composite?"@EmbeddedId public Key id=new Key();":"@Id(autoIncrement=false) public long id;";
+            sources.put("storedcount.Key",imports+"@Embeddable public class Key { public long first,second; }");
+            sources.put("storedcount.Parent",imports+"@Entity public class Parent { "+id+" @ManyToOne(fetch=FetchType.LAZY) public Child child; public void setChild(Child value) { child=value; } }");
+            sources.put("storedcount.Child",imports+"@Entity public class Child { "+id+" }");
+            JavaSourceCompiler.compile(sources,classes,Arrays.asList(testClassesDir()));ProcessorContext client=runProcessor(classes);assertFalse(client.getErrors().toString(),client.hasErrors());ProcessorContext backend=runProcessor(classes,backendClasspath());assertFalse(backend.getErrors().toString(),backend.hasErrors());
+            try(java.net.URLClassLoader loader=new java.net.URLClassLoader(new URL[]{classes.toURI().toURL()},getClass().getClassLoader())) {
+                Class parent=loader.loadClass("storedcount.Parent"),child=loader.loadClass("storedcount.Child");
+                for(String suffix:Arrays.asList("Cn1Model","Cn1BackendModel")) {
+                    Map<String,com.codename1.impl.orm.EntityModel<?>> models=new java.util.LinkedHashMap<String,com.codename1.impl.orm.EntityModel<?>>();for(Class type:Arrays.asList(parent,child)) models.put(type.getName(),(com.codename1.impl.orm.EntityModel)loader.loadClass(type.getName()+suffix).newInstance());
+                    com.codename1.backend.Database db=com.codename1.backend.Database.open(":memory:");com.codename1.orm.session.Session session=new com.codename1.impl.orm.SessionImpl(new com.codename1.impl.orm.BackendSqlAccess(null,db,db.dialect()),models);
+                    try {
+                        session.createTables();session.beginTransaction();Object owner=parent.newInstance(),target=child.newInstance();session.persist(target);parent.getField("child").set(owner,target);session.persist(owner);session.commitTransaction();Object idValue=parent.getField("id").get(owner);session.clear();
+                        parent.getField("child").set(owner,null);org.junit.Assert.assertEquals(1,session.count(owner,"child"));
+                        Object managed=session.find(parent,idValue);assertFalse(session.isLoaded(managed,"child"));org.junit.Assert.assertEquals(1,session.count(managed,"child"));assertFalse(session.isLoaded(managed,"child"));
+                        session.beginTransaction();parent.getMethod("setChild",child).invoke(managed,new Object[]{null});org.junit.Assert.assertEquals(0,session.count(managed,"child"));session.commitTransaction();session.clear();parent.getField("child").set(owner,target);org.junit.Assert.assertEquals(0,session.count(owner,"child"));
+                        managed=session.find(parent,idValue);session.beginTransaction();session.remove(managed);session.commitTransaction();org.junit.Assert.assertEquals(0,session.count(owner,"child"));
+                    } finally { session.close();db.close(); }
+                }
+            }
+        }
+    }
+
+    @Test
     public void countOmitsOnlyOrderingJoins() throws Exception {
         File classes=tmp.newFolder("countjoins");Map<String,String> sources=new java.util.LinkedHashMap<String,String>();String imports="package countjoins; import com.codename1.annotations.*; import com.codename1.annotations.db.*; ";
         sources.put("countjoins.Child",imports+"@Entity public class Child { @Id public long id; public String name=\"child\"; @ManyToOne(cascade=CascadeType.PERSIST) public Child next; }");
@@ -232,6 +306,12 @@ public class OrmAnnotationProcessorTest {
                     org.junit.Assert.assertEquals(1,session.query(parent).orderBy("child.next.name",true).join("child.next").count());
                     org.junit.Assert.assertEquals(1,session.query(parent).join("child").orderBy("child.name",true).count());
                     org.junit.Assert.assertEquals(2,session.query(parent).leftJoin("child").orderBy("child.name",true).count());
+                    for(String path:Arrays.asList("child","child.next")) {
+                        com.codename1.orm.session.Query after=session.query(parent).orderBy(path+".name",true).leftJoin(path).isNull(path+".name");
+                        org.junit.Assert.assertEquals(path,1,after.count());org.junit.Assert.assertEquals(path,1,after.list().size());
+                        org.junit.Assert.assertSame(empty,after.first());
+                    }
+                    org.junit.Assert.assertEquals(1,session.query(parent).orderBy("children.name",true).leftJoin("children").isNull("children.name").count());
                     org.junit.Assert.assertEquals(1,session.query(parent).orderBy("children.name",true).eq("children.name","child").count());
                     org.junit.Assert.assertEquals(1,session.query(parent).join("children").orderBy("child.next.name",true).count());
                     session.beginTransaction();Object partial=parent.newInstance();parent.getField("child").set(partial,child.newInstance());session.persist(partial);session.commitTransaction();org.junit.Assert.assertEquals(2,session.query(parent).orderBy("child.next.name",true).eq("child.name","child").count());org.junit.Assert.assertEquals(1,session.query(parent).orderBy("child.next.name",true).join("child.next").count());
@@ -726,12 +806,16 @@ public class OrmAnnotationProcessorTest {
     @Test
     public void primitiveBulkNullsAreRejectedForBothGeneratedModels() throws Exception {
         File classes=tmp.newFolder("primitivebulk");
-        JavaSourceCompiler.compile(JavaSourceCompiler.singleSource("primitivebulk.Entry","package primitivebulk; import com.codename1.annotations.*; @Entity(table=\"primitive_bulk\") public class Entry { @Id public long id; public long counter; public int number; public boolean flag; public Double optional; }"),classes,Arrays.asList(testClassesDir()));
+        Map<String,String> sources=new java.util.LinkedHashMap<String,String>();
+        sources.put("primitivebulk.Entry","package primitivebulk; import com.codename1.annotations.*; import com.codename1.annotations.db.*; @Entity(table=\"primitive_bulk\") @Inheritance public class Entry { @Id public long id; public long counter; public int number; public boolean flag; public Double optional; public Long boxed; public String text; @Embedded public Details details; }");
+        sources.put("primitivebulk.Details","package primitivebulk; import com.codename1.annotations.db.*; @Embeddable public class Details { public long value; }");
+        sources.put("primitivebulk.Child","package primitivebulk; import com.codename1.annotations.*; @Entity public class Child extends Entry { public long childCounter; }");
+        JavaSourceCompiler.compile(sources,classes,Arrays.asList(testClassesDir()));
         ProcessorContext client=runProcessor(classes);assertFalse(client.getErrors().toString(),client.hasErrors());ProcessorContext backend=runProcessor(classes,backendClasspath());assertFalse(backend.getErrors().toString(),backend.hasErrors());
         try(java.net.URLClassLoader loader=new java.net.URLClassLoader(new URL[]{classes.toURI().toURL()},getClass().getClassLoader())) {
             Class type=loader.loadClass("primitivebulk.Entry");
             for(String suffix:Arrays.asList("Cn1Model","Cn1BackendModel")) {
-                Map<String,com.codename1.impl.orm.EntityModel<?>> models=new java.util.LinkedHashMap<String,com.codename1.impl.orm.EntityModel<?>>();models.put(type.getName(),(com.codename1.impl.orm.EntityModel)loader.loadClass(type.getName()+suffix).newInstance());
+                Map<String,com.codename1.impl.orm.EntityModel<?>> models=new java.util.LinkedHashMap<String,com.codename1.impl.orm.EntityModel<?>>();models.put(type.getName(),(com.codename1.impl.orm.EntityModel)loader.loadClass(type.getName()+suffix).newInstance());models.put("primitivebulk.Child",(com.codename1.impl.orm.EntityModel)loader.loadClass("primitivebulk.Child"+suffix).newInstance());
                 com.codename1.backend.Database db=com.codename1.backend.Database.open(":memory:");com.codename1.orm.session.Session session=new com.codename1.impl.orm.SessionImpl(new com.codename1.impl.orm.BackendSqlAccess(null,db,db.dialect()),models);
                 try {
                     session.createTables();session.beginTransaction();Object entity=type.newInstance();session.persist(entity);session.commitTransaction();
@@ -739,7 +823,15 @@ public class OrmAnnotationProcessorTest {
                         org.junit.Assert.assertThrows(IllegalArgumentException.class,()->session.createQuery("update primitivebulk.Entry e set e."+field+"=NULL"));
                         session.beginTransaction();org.junit.Assert.assertThrows(IllegalArgumentException.class,()->session.createQuery("update primitivebulk.Entry e set e."+field+"=:value").setParameter("value",null).executeUpdate());session.rollbackTransaction();
                     }
-                    session.beginTransaction();org.junit.Assert.assertEquals(1,session.createQuery("update primitivebulk.Entry e set e.counter=e.counter+1,e.optional=NULL").executeUpdate());session.commitTransaction();
+                    for(String expression:Arrays.asList("e.counter/0","e.counter%0","nullif(e.counter,e.counter)","e.boxed+1","length(e.text)","(select max(i.counter) from primitivebulk.Entry i where i.id<0)","coalesce(e.boxed,nullif(e.counter,e.counter))","e.details.value","e.childCounter","(select count(i.id) from primitivebulk.Entry i having count(i.id)<0)")) {
+                        org.junit.Assert.assertThrows(expression,IllegalArgumentException.class,()->session.createQuery("update primitivebulk.Entry e set e.counter="+expression));
+                    }
+                    session.beginTransaction();
+                    org.junit.Assert.assertEquals(1,session.createQuery("update primitivebulk.Entry e set e.counter=coalesce(e.counter/0,0)+:delta,e.optional=NULL").setParameter("delta",1L).executeUpdate());
+                    org.junit.Assert.assertThrows(IllegalArgumentException.class,()->session.createQuery("update primitivebulk.Entry e set e.counter=e.counter+:delta").setParameter("delta",null).executeUpdate());
+                    org.junit.Assert.assertEquals(1,session.createQuery("update primitivebulk.Entry e set e.counter=coalesce(:value,e.counter)").setParameter("value",null).executeUpdate());
+                    org.junit.Assert.assertEquals(1,session.createQuery("update primitivebulk.Entry e set e.counter=coalesce((select max(i.counter) from primitivebulk.Entry i where i.id<0),e.counter)").executeUpdate());
+                    session.commitTransaction();
                     org.junit.Assert.assertEquals(Long.valueOf(1),session.createQuery("select e.counter from primitivebulk.Entry e",Long.class).first());
                 } finally { session.close();db.close(); }
             }

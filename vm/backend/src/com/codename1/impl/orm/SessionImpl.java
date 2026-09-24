@@ -1254,14 +1254,19 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
         check();
         EntityModel owner = model(entity.getClass());
         Relationship relation = owner.relationships()[owner.relationIndex(field)];
-        Object id = owner.identifier(entity);
         autoFlush();
+        Object id = owner.identifier(entity);
         if (relation.element) {
             return countJoin(relation.joinTable, joinColumns(relation.joinColumn, owner), owner.keyValues(id));
         }
         EntityModel target = model(relation.target);
         if (relation.column >= 0) {
-            return owner.get(entity, relation.column) == null ? 0 : 1;
+            StringBuilder where = new StringBuilder(matches(keyColumns(owner), null));
+            for (String column : foreignColumns(owner, relation)) {
+                where.append(" AND ").append(q(column)).append(" IS NOT NULL");
+            }
+            return ((Number) read("SELECT COUNT(*) FROM " + tableSource(owner) + " cn1_owner WHERE " + where,
+                    owner.keyValues(id), new int[] {Attribute.BIGINT}).get(0)[0]).longValue();
         }
         if (relation.mappedBy.length() > 0) {
             Relationship inverse = target.relationships()[target.relationIndex(relation.mappedBy)];
@@ -1426,7 +1431,7 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
     void beforeAssignment(Object entity, int index) {
         Relationship relation = model(entity.getClass()).relationships()[index];
         if (relation.many || relation.orphanRemoval && relation.column < 0) {
-            initialize(entity, index);
+            initializeForAccess(entity, index);
         }
     }
     void initialize(Object entity, int index) {

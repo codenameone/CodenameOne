@@ -193,8 +193,9 @@ public interface Session {
     /// @throws PersistenceException if a mapped table or column is incompatible or inaccessible
     void validateSchema();
 
-    /// Counts related rows without loading the relationship's entities.
-    /// Flushes pending changes when a transaction is active.
+    /// Counts stored related rows without loading the relationship's entities.
+    /// Flushes pending changes when a transaction is active. Detached owners are
+    /// identified by their persisted key; local detached relationship edits are ignored.
     /// @param entity owner with a persisted identifier
     /// @param field Java name of the relationship or element collection
     /// @return relationship size; zero or one for a to-one association

@@ -49,7 +49,8 @@ public final class QueryImpl<T> implements com.codename1.orm.session.Query<T> {
     private static final class Join {
         final EntityModel model;
         final String alias;
-        final String sql;
+        String sql;
+        boolean left;
         boolean requiredForCount = true;
         boolean plural;
         Join(EntityModel model, String alias, String sql) {
@@ -365,6 +366,10 @@ public final class QueryImpl<T> implements com.codename1.orm.session.Query<T> {
         Field resolved = resolveField(field);
         return resolved.join.model.parameter(resolved.index, value);
     }
+    boolean nonNull(String field) {
+        Field resolved = resolveField(field);
+        return !resolved.join.left && resolved.join.model.nonNullQueryValue(resolved.index);
+    }
     String mapping(String field) {
         Field resolved = resolveField(field);
         return resolved.join.model.mapping(resolved.index);
@@ -387,7 +392,9 @@ public final class QueryImpl<T> implements com.codename1.orm.session.Query<T> {
                     ensureJoin(path.substring(0, parent), left);
                 }
             }
-            return existing;
+            if (!left || existing.left) {
+                return existing;
+            }
         }
         int dot = path.lastIndexOf('.');
         Join parent = dot < 0 ? new Join(model, rootAlias, "") : ensureJoin(path.substring(0, dot), left);
@@ -397,7 +404,7 @@ public final class QueryImpl<T> implements com.codename1.orm.session.Query<T> {
             throw new IllegalArgumentException("Use containsElement() for scalar collections");
         }
         EntityModel target = session.model(relation.target);
-        String alias = rootAlias + "_j" + (joins.size() + 1);
+        String alias = existing == null ? rootAlias + "_j" + (joins.size() + 1) : existing.alias;
         String prefix = left ? " LEFT JOIN " : " INNER JOIN ";
         String join;
         if (relation.column >= 0) {
@@ -427,7 +434,13 @@ public final class QueryImpl<T> implements com.codename1.orm.session.Query<T> {
                                session.keyColumns(target), alias, session.joinColumns(targetColumn, target), link);
             }
         }
+        if (existing != null) {
+            existing.sql = join;
+            existing.left = left;
+            return existing;
+        }
         Join created = new Join(target, alias, join);
+        created.left = left;
         created.requiredForCount = !resolvingOrder;
         created.plural = relation.many;
         joins.put(path, created);

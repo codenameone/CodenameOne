@@ -76,6 +76,11 @@ public abstract class EntityModel<T> {
     public boolean primitive(int index) {
         return false;
     }
+    /// Whether this field always supplies a value in a query of this model's entity type.
+    /// Generated models account for optional embedded values and subtype-only fields.
+    public boolean nonNullQueryValue(int index) {
+        return !attributes()[index].nullable;
+    }
     /// Returns whether any mapped subtype requires this column to contain a value.
     public boolean required(int index) {
         return !attributes()[index].nullable;

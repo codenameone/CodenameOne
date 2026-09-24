@@ -284,7 +284,9 @@ public final class JpqlQueryImpl<T> implements com.codename1.orm.session.JpqlQue
         }
         Object convert(Object value) {
             Object converted = query == null ? Values.storage(value) : query.parameter(field, value);
-            if (converted != null && logical && !(value instanceof Boolean)) {
+            boolean mappedBoolean = query != null && query.mapping(field).startsWith("converter:")
+                    && (Long.valueOf(0).equals(converted) || Long.valueOf(1).equals(converted));
+            if (converted != null && logical && !(value instanceof Boolean) && !mappedBoolean) {
                 throw new IllegalArgumentException("Logical parameter requires a Boolean: " + name);
             }
             Values.requireStorageKind(converted, expectedKind);
@@ -329,6 +331,9 @@ public final class JpqlQueryImpl<T> implements com.codename1.orm.session.JpqlQue
         boolean numericOperands;
         boolean association;
         boolean predicate;
+        boolean nonNull;
+        boolean nullPreserving;
+        boolean coalesce;
         QueryImpl projectionQuery;
         String projectionField;
         Object literalValue;
@@ -407,12 +412,8 @@ public final class JpqlQueryImpl<T> implements com.codename1.orm.session.JpqlQue
                     }
                     validateAssignment(root.mapping(field), value);
                     bindType(target, value);
-                    if (root.model.primitive(root.model.queryIndex(field))) {
-                        if (value.parameter != null) {
-                            value.parameter.nonNull = true;
-                        } else if (value.literal && value.literalValue == null) {
-                            throw error("Null bulk assignment to a primitive attribute");
-                        }
+                    if (root.model.primitive(root.model.queryIndex(field)) && !nonNullExpression(value, true, true)) {
+                        throw error("Nullable bulk assignment to a primitive attribute requires a non-null fallback");
                     }
                     if (attribute.nullable && root.model.required(root.model.queryIndex(field))) {
                         requireNonNull(value);
@@ -921,6 +922,9 @@ public final class JpqlQueryImpl<T> implements com.codename1.orm.session.JpqlQue
                 } else if ("AVG".equals(function)) {
                     result.sql = session.numericOperand(result.sql, Attribute.REAL);
                 }
+                result.nonNull = "COUNT".equals(function);
+                result.coalesce = "COALESCE".equals(function);
+                result.nullPreserving = " LOWER UPPER LENGTH ABS TRIM ".contains(" " + function + " ");
                 result.aggregate = " COUNT SUM AVG MIN MAX ".contains(" " + function + " ");
                 result.numericOperands = " SUM AVG MIN MAX ABS COALESCE NULLIF ".contains(" " + function + " ");
                 result.children.addAll(args);
@@ -984,6 +988,7 @@ public final class JpqlQueryImpl<T> implements com.codename1.orm.session.JpqlQue
             result.query = alias.query;
             result.field = field;
             result.association = alias.query.association(field);
+            result.nonNull = alias.query.nonNull(field);
             result.projectionQuery = result.query;
             result.projectionField = field;
             if (!SessionImpl.sameInstance(alias.query, root)) {
@@ -1071,6 +1076,7 @@ public final class JpqlQueryImpl<T> implements com.codename1.orm.session.JpqlQue
         private Expr wrap(String sql, Expr value) {
             Expr result = new Expr(sql, value.kind, value.entity);
             result.children.add(value);
+            result.nullPreserving = true;
             result.numericOperands = true;
             result.predicate = value.predicate;
             result.association = value.association;
@@ -1102,6 +1108,42 @@ public final class JpqlQueryImpl<T> implements com.codename1.orm.session.JpqlQue
                 }
             }
             return kind;
+        }
+        private boolean nonNullExpression(Expr value, boolean allowParameters, boolean enforce) {
+            if (value.parameter != null) {
+                if (allowParameters && enforce) {
+                    value.parameter.nonNull = true;
+                }
+                return allowParameters || value.parameter.nonNull;
+            }
+            if (value.literal) {
+                return value.literalBinding.convert() != null;
+            }
+            if (value.nonNull) {
+                return true;
+            }
+            if (value.coalesce) {
+                // Prefer an unconditional fallback so earlier nullable parameters
+                // remain usable when a later operand already guarantees a value.
+                for (Expr child : value.children) {
+                    if (nonNullExpression(child, false, false)) {
+                        return true;
+                    }
+                }
+                for (Expr child : value.children) {
+                    if (nonNullExpression(child, allowParameters, false)) {
+                        return nonNullExpression(child, allowParameters, enforce);
+                    }
+                }
+            } else if (value.nullPreserving) {
+                for (Expr child : value.children) {
+                    if (!nonNullExpression(child, allowParameters, enforce)) {
+                        return false;
+                    }
+                }
+                return !value.children.isEmpty();
+            }
+            return false;
         }
         private void requireNonNull(Expr value) {
             if (value.parameter != null) {
@@ -1334,6 +1376,9 @@ public final class JpqlQueryImpl<T> implements com.codename1.orm.session.JpqlQue
             requireNumeric(right, kind != Attribute.REAL);
             Expr result = binary(left, op, right, kind);
             result.numericOperands = true;
+            result.nullPreserving = !("/".equals(op) || "%".equals(op))
+                    || right.literal && right.literalValue instanceof Number
+                            && ((Number) right.literalValue).doubleValue() != 0;
             result.sql = session.arithmetic(left.sql, op, right.sql, kind);
             return result;
         }
