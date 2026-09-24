@@ -2834,13 +2834,6 @@ static void cn1RefBlockFreeNow(JAVA_LONG block);
  * extra part, plus the padding to reach it, was ~64 of the ~176 bytes of a 4-slot
  * HashMap table, on 216k live tables at the self-hosting peak.
  * Only part zero may be freed or retired. */
-JAVA_LONG cn1TablePart(JAVA_LONG table, JAVA_INT part) {
-    if(table == 0) return 0;
-    size_t cap = (size_t)cn1BlockHeader(table)->capacity;
-    size_t offset = part < 2 ? (size_t)part * cap * sizeof(JAVA_OBJECT)
-        : 2 * cap * sizeof(JAVA_OBJECT) + (size_t)(part - 2) * cap * sizeof(JAVA_INT);
-    return table + (JAVA_LONG)offset;
-}
 
 JAVA_LONG cn1TableAlloc(JAVA_INT capacity, JAVA_BOOLEAN ordered) {
     if(capacity <= 0 || (size_t)capacity >

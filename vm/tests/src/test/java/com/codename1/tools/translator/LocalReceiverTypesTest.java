@@ -112,7 +112,8 @@ class LocalReceiverTypesTest {
                     emitted.append(((com.codename1.tools.translator.bytecodes.CustomIntruction) instruction).getCode());
             }
             String code = emitted.toString();
-            assertTrue(code.contains("cn1ValsBlock"));
+            // The values are the table's part 1, derived from the keys root.
+            assertTrue(code.contains("cn1TablePart(get_field_java_util_HashMap_cn1KeysBlock(") && code.contains(", 1)"));
             assertFalse(code.contains("_values___"));
             assertFalse(code.contains("virtual_java_util_Iterator"));
             assertFalse(code.contains("__codenameOneParentClsReference"));

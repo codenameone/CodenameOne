@@ -3946,7 +3946,11 @@ static inline int cn1HmNextSlot(int i, uint32_t perturb, int mask) {
  * reading pointers it wrote itself needs no ordering at all: program order already
  * covers it, and a second mutator thread touching the same HashMap is a data race
  * whatever the load is. The generated writers and the marker's reads are unchanged. */
-#define CN1_HM_BLK(t, which) atomic_load_explicit(&(t)->java_util_HashMap_cn1##which##Block, memory_order_relaxed)
+// The keys root is the map's only table field; values and metadata are parts of it.
+#define CN1_HM_BLK(t, which) CN1_HM_BLK_##which(t)
+#define CN1_HM_BLK_Keys(t) atomic_load_explicit(&(t)->java_util_HashMap_cn1KeysBlock, memory_order_relaxed)
+#define CN1_HM_BLK_Vals(t) cn1TablePart(CN1_HM_BLK_Keys(t), 1)
+#define CN1_HM_BLK_Meta(t) cn1TablePart(CN1_HM_BLK_Keys(t), 2)
 
 static JAVA_INT cn1HmFindSlotSlow(CODENAME_ONE_THREAD_STATE, struct obj__java_util_HashMap* t, JAVA_OBJECT key, JAVA_INT marker)
     __attribute__((cold, noinline));

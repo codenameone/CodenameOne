@@ -19,6 +19,7 @@ public final class InlineIntrinsics {
         RENAMES.put("java_util_ArrayList_size___R_int", "cn1InlListSize");
         RENAMES.put("java_util_ArrayList_isEmpty___R_boolean", "cn1InlListEmpty");
         RENAMES.put("java_util_NativeStorage_capacity___long_R_int", "cn1InlStorageCapacity");
+        RENAMES.put("java_util_NativeStorage_part___long_int_R_long", "cn1InlStoragePart");
         RENAMES.put("java_util_NativeStorage_get___long_int_R_java_lang_Object", "cn1InlStorageGet");
         RENAMES.put("java_util_NativeStorage_getInt___long_int_R_int", "cn1InlStorageGetInt");
         RENAMES.put("java_util_NativeStorage_setInt___long_int_int", "cn1InlStorageSetInt");

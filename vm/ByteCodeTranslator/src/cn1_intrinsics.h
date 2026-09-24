@@ -62,6 +62,9 @@ static inline JAVA_VOID cn1InlStorageSetOwned(CODENAME_ONE_THREAD_STATE, JAVA_OB
     CN1_WRITE_BARRIER(owner, value);
     *slot = value;
 }
+static inline JAVA_LONG cn1InlStoragePart(CODENAME_ONE_THREAD_STATE, JAVA_LONG table, JAVA_INT part) {
+    return cn1TablePart(table, part);
+}
 static inline JAVA_INT cn1InlStorageCapacity(CODENAME_ONE_THREAD_STATE, JAVA_LONG block) {
     return cn1RefBlockCount(block);
 }

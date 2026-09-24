@@ -77,8 +77,9 @@ static inline int cn1CollectionMap(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT owner,
     ) {
         struct obj__java_util_HashMap* map = (struct obj__java_util_HashMap*)owner;
         out->owner = owner;
-        out->data = (JAVA_OBJECT*)(uintptr_t)(values ? map->java_util_HashMap_cn1ValsBlock : map->java_util_HashMap_cn1KeysBlock);
-        out->metadata = (JAVA_INT*)(uintptr_t)map->java_util_HashMap_cn1MetaBlock;
+        JAVA_LONG table = map->java_util_HashMap_cn1KeysBlock;
+        out->data = (JAVA_OBJECT*)(uintptr_t)cn1TablePart(table, values ? 1 : 0);
+        out->metadata = (JAVA_INT*)(uintptr_t)cn1TablePart(table, 2);
         out->capacity = map->java_util_HashMap_cn1Cap;
         out->count = map->java_util_HashMap_elementCount;
         out->kind = CN1_COLL_HASH;
@@ -87,7 +88,7 @@ static inline int cn1CollectionMap(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT owner,
             struct obj__java_util_LinkedHashMap* ordered = (struct obj__java_util_LinkedHashMap*)owner;
             out->kind = CN1_COLL_ORDERED;
             out->first = ordered->java_util_LinkedHashMap_cn1Head;
-            out->links = (JAVA_INT*)(uintptr_t)ordered->java_util_LinkedHashMap_cn1Next;
+            out->links = (JAVA_INT*)(uintptr_t)cn1TablePart(table, 4);
         }
 #endif
         return 1;

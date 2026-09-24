@@ -134,11 +134,9 @@ public class ByteCodeClass {
         new NativeBlock("java_lang_StringBuilder", "cn1Storage", false),
         new NativeBlock("java_util_IdentityHashMap", "elementData", true),
         new NativeBlock("java_util_ArrayDeque", "elements", true),
-        new NativeBlock("java_util_LinkedHashMap", "cn1Prev", false, false),
-        new NativeBlock("java_util_LinkedHashMap", "cn1Next", false, false),
         new NativeBlock("java_util_Hashtable", "cn1Keys", true),
-        new NativeBlock("java_util_Hashtable", "cn1Vals", true, false, "cn1Keys", 1),
-        new NativeBlock("java_util_Hashtable", "cn1Meta", false, false),
+        // The values PART of the table (see cn1TablePart); no field of its own.
+        new NativeBlock("java_util_Hashtable", "cn1Keys", true, false, "cn1Keys", 1),
         new NativeBlock("java_util_ArrayList", "cn1Storage", true),
         new NativeBlock("java_util_Vector", "cn1Storage", true),
         // A plain HashSet owns its table: one reference block for elements, one int
@@ -146,8 +144,7 @@ public class ByteCodeClass {
         new NativeBlock("java_util_HashSet", "cn1KeysBlock", true),
         new NativeBlock("java_util_HashSet", "cn1MetaBlock", false),
         new NativeBlock("java_util_HashMap", "cn1KeysBlock", true),
-        new NativeBlock("java_util_HashMap", "cn1ValsBlock", true, false, "cn1KeysBlock", 1),
-        new NativeBlock("java_util_HashMap", "cn1MetaBlock", false, false),
+        new NativeBlock("java_util_HashMap", "cn1KeysBlock", true, false, "cn1KeysBlock", 1),
     };
 
     private static boolean hasNativeBlocks(String cls) {

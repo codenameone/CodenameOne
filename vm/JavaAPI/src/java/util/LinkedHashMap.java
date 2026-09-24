@@ -40,9 +40,10 @@ public class LinkedHashMap<K, V> extends HashMap<K, V> implements Map<K, V> {
 
     private final boolean accessOrder;
 
-    /** doubly-linked ordering chain as slot indices; -1 terminates. */
-    transient volatile long cn1Prev;
-    transient volatile long cn1Next;
+    /* The doubly-linked ordering chain, as slot indices (-1 terminates): two int parts
+     * of the table after the base class's three, so neither needs a field. */
+    static final int PREV = 3;
+    static final int NEXT = 4;
     transient int cn1Head = -1;
     transient int cn1Tail = -1;
 
@@ -111,19 +112,15 @@ public class LinkedHashMap<K, V> extends HashMap<K, V> implements Map<K, V> {
     private void cn1InitLinks() {
         long table = NativeStorage.table(cn1Cap, true);
         cn1KeysBlock = table;
-        cn1ValsBlock = NativeStorage.part(table, 1);
-        cn1MetaBlock = NativeStorage.part(table, 2);
-        cn1Prev = NativeStorage.part(table, 3);
-        cn1Next = NativeStorage.part(table, 4);
         cn1Head = -1;
         cn1Tail = -1;
     }
 
     private void cn1LinkAppend(int idx) {
-        NativeStorage.setInt(cn1Prev, idx, cn1Tail);
-        NativeStorage.setInt(cn1Next, idx, -1);
+        NativeStorage.setInt(NativeStorage.part(cn1KeysBlock, PREV), idx, cn1Tail);
+        NativeStorage.setInt(NativeStorage.part(cn1KeysBlock, NEXT), idx, -1);
         if (cn1Tail >= 0) {
-            NativeStorage.setInt(cn1Next, cn1Tail, idx);
+            NativeStorage.setInt(NativeStorage.part(cn1KeysBlock, NEXT), cn1Tail, idx);
         } else {
             cn1Head = idx;
         }
@@ -131,15 +128,15 @@ public class LinkedHashMap<K, V> extends HashMap<K, V> implements Map<K, V> {
     }
 
     private void cn1Unlink(int idx) {
-        int p = NativeStorage.getInt(cn1Prev, idx);
-        int n = NativeStorage.getInt(cn1Next, idx);
+        int p = NativeStorage.getInt(NativeStorage.part(cn1KeysBlock, PREV), idx);
+        int n = NativeStorage.getInt(NativeStorage.part(cn1KeysBlock, NEXT), idx);
         if (p >= 0) {
-            NativeStorage.setInt(cn1Next, p, n);
+            NativeStorage.setInt(NativeStorage.part(cn1KeysBlock, NEXT), p, n);
         } else {
             cn1Head = n;
         }
         if (n >= 0) {
-            NativeStorage.setInt(cn1Prev, n, p);
+            NativeStorage.setInt(NativeStorage.part(cn1KeysBlock, PREV), n, p);
         } else {
             cn1Tail = p;
         }
@@ -162,7 +159,7 @@ public class LinkedHashMap<K, V> extends HashMap<K, V> implements Map<K, V> {
 
     @Override
     int cn1NextIndex(int idx) {
-        return NativeStorage.getInt(cn1Next, idx);
+        return NativeStorage.getInt(NativeStorage.part(cn1KeysBlock, NEXT), idx);
     }
 
     @Override
@@ -179,19 +176,15 @@ public class LinkedHashMap<K, V> extends HashMap<K, V> implements Map<K, V> {
     void cn1Grow() {
         int newCap = elementCount >= threshold ? cn1Cap << 1 : cn1Cap;
         long keys = NativeStorage.table(newCap, true);
-        long vals = NativeStorage.part(keys, 1), meta = NativeStorage.part(keys, 2);
-        long prev = NativeStorage.part(keys, 3), next = NativeStorage.part(keys, 4);
+        long vals = NativeStorage.part(keys, VALS), meta = NativeStorage.part(keys, META);
+        long prev = NativeStorage.part(keys, PREV), next = NativeStorage.part(keys, NEXT);
         // The old owner fields root every referent until the complete replacement
         // is ready. Reuse stored hashes: rebuilding must not invoke application code.
-        int head = cn1Head < 0 ? -1 : NativeStorage.getInt(cn1MetaBlock, cn1Head) & (newCap - 1);
-        int tail = NativeStorage.rehash(cn1KeysBlock, cn1ValsBlock, cn1MetaBlock, cn1Next, cn1Head,
+        int head = cn1Head < 0 ? -1 : NativeStorage.getInt(NativeStorage.part(cn1KeysBlock, META), cn1Head) & (newCap - 1);
+        int tail = NativeStorage.rehash(cn1KeysBlock, NativeStorage.part(cn1KeysBlock, VALS), NativeStorage.part(cn1KeysBlock, META), NativeStorage.part(cn1KeysBlock, NEXT), cn1Head,
                 keys, vals, meta, prev, next);
         long oldKeys = cn1KeysBlock;
         cn1KeysBlock = keys;
-        cn1ValsBlock = vals;
-        cn1MetaBlock = meta;
-        cn1Prev = prev;
-        cn1Next = next;
         cn1Head = head;
         cn1Tail = tail;
         cn1Cap = newCap;
@@ -218,7 +211,7 @@ public class LinkedHashMap<K, V> extends HashMap<K, V> implements Map<K, V> {
             cn1MoveToTail(idx);
         }
         @SuppressWarnings("unchecked")
-        V v = (V) NativeStorage.get(cn1ValsBlock, idx);
+        V v = (V) NativeStorage.get(NativeStorage.part(cn1KeysBlock, VALS), idx);
         return v;
     }
 
@@ -232,7 +225,9 @@ public class LinkedHashMap<K, V> extends HashMap<K, V> implements Map<K, V> {
      */
     @Override
     public V put(K key, V value) {
-        if (cn1Prev == 0) cn1InitLinks();
+        // Only this path gives a LinkedHashMap its first table, and it gives an ORDERED
+        // one; the base class allocates lazily in cn1PutSlot, which by then finds it.
+        if (cn1KeysBlock == 0) cn1InitLinks();
         V result = cn1PutSlot(key, value);
         if (cn1LastInserted) {
             cn1LinkAppend(cn1LastPut);

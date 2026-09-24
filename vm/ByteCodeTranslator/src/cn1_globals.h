@@ -4053,7 +4053,6 @@ static inline void cn1IntBlockSet(JAVA_LONG block, JAVA_INT index, JAVA_INT valu
 }
 extern JAVA_LONG cn1RefBlockAlloc(JAVA_INT capacity);
 extern JAVA_LONG cn1TableAlloc(JAVA_INT capacity, JAVA_BOOLEAN ordered);
-extern JAVA_LONG cn1TablePart(JAVA_LONG table, JAVA_INT part);
 extern void cn1InvokeFinalizer(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj, void (*ptr)(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT));
 extern void cn1RefBlockFree(JAVA_LONG block);
 extern void cn1StackBufferUnwind(struct ThreadLocalData* thread, struct CN1StackBuffer* until);
@@ -4096,6 +4095,19 @@ typedef struct __attribute__((aligned(16))) CN1NativeBlock {
     uint8_t reserved[3];
     JAVA_INT capacity;
 } CN1NativeBlock;
+
+// Part `part` of the hash table whose root is `table` (0 for no table). A table is keys,
+// values, then int metadata -- and, ordered, the prev and next links -- packed back to
+// back with no header between them, so a part is arithmetic on the root's capacity and
+// the owners keep no field for it. Everything that walks or writes a part derives it from
+// the root it read ONCE; see cn1TableAlloc.
+static inline JAVA_LONG cn1TablePart(JAVA_LONG table, JAVA_INT part) {
+    if(table == 0) return 0;
+    size_t cap = (size_t)((const CN1NativeBlock*)(uintptr_t)table - 1)->capacity;
+    size_t offset = part < 2 ? (size_t)part * cap * sizeof(JAVA_OBJECT)
+        : 2 * cap * sizeof(JAVA_OBJECT) + (size_t)(part - 2) * cap * sizeof(JAVA_INT);
+    return table + (JAVA_LONG)offset;
+}
 // Fixed-width copies compile to unaligned word loads without aliasing UB. Both
 // end loads stay inside the logical byte range; no padding or terminator is read.
 static inline __attribute__((always_inline)) int cn1CompactBytesEqual(const void* left, const void* right, size_t count) {

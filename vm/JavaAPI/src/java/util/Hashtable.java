@@ -40,8 +40,9 @@ public class Hashtable<K, V> extends Dictionary<K, V> implements Map<K, V> {
 
     /** parallel storage; length is always a power of two. */
     transient volatile long cn1Keys;
-    transient volatile long cn1Vals;
-    transient volatile long cn1Meta;
+    /* Values and int metadata are parts of the keys table (NativeStorage.part). */
+    static final int VALS = 1;
+    static final int META = 2;
 
     /** live mappings. */
     transient int elementCount;
@@ -96,7 +97,7 @@ public class Hashtable<K, V> extends Dictionary<K, V> implements Map<K, V> {
 
         @SuppressWarnings("unchecked")
         Entry(Hashtable<K, V> table, int index) {
-            super((K) NativeStorage.get(table.cn1Keys, index), (V) NativeStorage.get(table.cn1Vals, index));
+            super((K) NativeStorage.get(table.cn1Keys, index), (V) NativeStorage.get(NativeStorage.part(table.cn1Keys, VALS), index));
             this.table = table;
             this.index = index;
         }
@@ -108,7 +109,7 @@ public class Hashtable<K, V> extends Dictionary<K, V> implements Map<K, V> {
             }
             V result = value;
             value = object;
-            NativeStorage.setOwned(table, table.cn1Vals, index, object);
+            NativeStorage.setOwned(table, NativeStorage.part(table.cn1Keys, VALS), index, object);
             return result;
         }
 
@@ -154,8 +155,6 @@ public class Hashtable<K, V> extends Dictionary<K, V> implements Map<K, V> {
 
     final void cn1Alloc(int capacity) {
         cn1Keys = NativeStorage.table(capacity, false);
-        cn1Vals = NativeStorage.part(cn1Keys, 1);
-        cn1Meta = NativeStorage.part(cn1Keys, 2);
         elementCount = 0;
         cn1Occupied = 0;
         computeMaxSize();
@@ -172,7 +171,7 @@ public class Hashtable<K, V> extends Dictionary<K, V> implements Map<K, V> {
 
     private int cn1FindSlot(Object key, int marker) {
         int expected = modCount;
-        long meta = cn1Meta;
+        long meta = NativeStorage.part(cn1Keys, META);
         int mask = NativeStorage.capacity(cn1Keys) - 1;   // the root: a part has no header
         int i = marker & mask;
         int perturb = marker;
@@ -186,7 +185,7 @@ public class Hashtable<K, V> extends Dictionary<K, V> implements Map<K, V> {
                 Object k = NativeStorage.get(cn1Keys, i);
                 boolean matches = key == k || key.equals(k);
                 // User equality can reenter and replace or rearrange this storage.
-                if (expected != modCount || meta != cn1Meta) throw new ConcurrentModificationException();
+                if (expected != modCount || meta != NativeStorage.part(cn1Keys, META)) throw new ConcurrentModificationException();
                 if (matches) {
                     return i;
                 }
@@ -200,7 +199,7 @@ public class Hashtable<K, V> extends Dictionary<K, V> implements Map<K, V> {
 
     /** raw insert into a table known not to contain the key (rebuild path). */
     final void cn1Insert(Object key, Object value, int marker) {
-        long meta = cn1Meta;
+        long meta = NativeStorage.part(cn1Keys, META);
         int mask = NativeStorage.capacity(cn1Keys) - 1;   // the root: a part has no header
         int i = marker & mask;
         int perturb = marker;
@@ -210,14 +209,14 @@ public class Hashtable<K, V> extends Dictionary<K, V> implements Map<K, V> {
         }
         NativeStorage.setInt(meta, i, marker);
         NativeStorage.setOwned(this, cn1Keys, i, key);
-        NativeStorage.setOwned(this, cn1Vals, i, value);
+        NativeStorage.setOwned(this, NativeStorage.part(cn1Keys, VALS), i, value);
     }
 
     /** Tombstone a found slot. The single mutation point for removals. */
     final void cn1RemoveAtIndex(int idx) {
-        NativeStorage.setInt(cn1Meta, idx, META_TOMB);
+        NativeStorage.setInt(NativeStorage.part(cn1Keys, META), idx, META_TOMB);
         NativeStorage.setOwned(this, cn1Keys, idx, null);
-        NativeStorage.setOwned(this, cn1Vals, idx, null);
+        NativeStorage.setOwned(this, NativeStorage.part(cn1Keys, VALS), idx, null);
         elementCount--;
         modCount++;
     }
@@ -243,7 +242,7 @@ public class Hashtable<K, V> extends Dictionary<K, V> implements Map<K, V> {
 
         /** Advance past empty and tombstoned slots. */
         final boolean advance() {
-            long meta = cn1Meta;
+            long meta = NativeStorage.part(cn1Keys, META);
             while (position < NativeStorage.capacity(cn1Keys)) {
                 if (NativeStorage.getInt(meta, position) < 0) {
                     return true;
@@ -348,7 +347,7 @@ public class Hashtable<K, V> extends Dictionary<K, V> implements Map<K, V> {
      */
     public synchronized void clear() {
         if (elementCount > 0 || cn1Occupied > 0) {
-            NativeStorage.clearMap(cn1Keys, cn1Vals, cn1Meta, NativeStorage.capacity(cn1Keys));
+            NativeStorage.clearMap(cn1Keys, NativeStorage.part(cn1Keys, VALS), NativeStorage.part(cn1Keys, META), NativeStorage.capacity(cn1Keys));
             elementCount = 0;
             cn1Occupied = 0;
             modCount++;
@@ -390,11 +389,11 @@ public class Hashtable<K, V> extends Dictionary<K, V> implements Map<K, V> {
         }
 
         int expected = modCount;
-        long meta = cn1Meta;
+        long meta = NativeStorage.part(cn1Keys, META);
         for (int i = 0; i < NativeStorage.capacity(cn1Keys); i++) {
             if (NativeStorage.getInt(meta, i) < 0) {
-                boolean matches = value.equals(NativeStorage.get(cn1Vals, i));
-                if (expected != modCount || meta != cn1Meta) throw new ConcurrentModificationException();
+                boolean matches = value.equals(NativeStorage.get(NativeStorage.part(cn1Keys, VALS), i));
+                if (expected != modCount || meta != NativeStorage.part(cn1Keys, META)) throw new ConcurrentModificationException();
                 if (matches) return true;
             }
         }
@@ -558,7 +557,7 @@ public class Hashtable<K, V> extends Dictionary<K, V> implements Map<K, V> {
     @SuppressWarnings("unchecked")
     public synchronized V get(Object key) {
         int idx = cn1FindSlot(key);
-        return idx < 0 ? null : (V) NativeStorage.get(cn1Vals, idx);
+        return idx < 0 ? null : (V) NativeStorage.get(NativeStorage.part(cn1Keys, VALS), idx);
     }
 
     Entry<K, V> getEntry(Object key) {
@@ -752,15 +751,15 @@ public class Hashtable<K, V> extends Dictionary<K, V> implements Map<K, V> {
             int idx = cn1FindSlot(key, marker);
             if (idx >= 0) {
                 @SuppressWarnings("unchecked")
-                V result = (V) NativeStorage.get(cn1Vals, idx);
-                NativeStorage.setOwned(this, cn1Vals, idx, value);
+                V result = (V) NativeStorage.get(NativeStorage.part(cn1Keys, VALS), idx);
+                NativeStorage.setOwned(this, NativeStorage.part(cn1Keys, VALS), idx, value);
                 return result;
             }
             int ins = -idx - 1;
-            boolean wasEmpty = NativeStorage.getInt(cn1Meta, ins) == META_EMPTY;
-            NativeStorage.setInt(cn1Meta, ins, marker);
+            boolean wasEmpty = NativeStorage.getInt(NativeStorage.part(cn1Keys, META), ins) == META_EMPTY;
+            NativeStorage.setInt(NativeStorage.part(cn1Keys, META), ins, marker);
             NativeStorage.setOwned(this, cn1Keys, ins, key);
-            NativeStorage.setOwned(this, cn1Vals, ins, value);
+            NativeStorage.setOwned(this, NativeStorage.part(cn1Keys, VALS), ins, value);
             elementCount++;
             if (wasEmpty) {
                 cn1Occupied++;
@@ -811,13 +810,11 @@ public class Hashtable<K, V> extends Dictionary<K, V> implements Map<K, V> {
             newCapacity = capacity;
         }
         long newKeys = NativeStorage.table(newCapacity, false);
-        long newVals = NativeStorage.part(newKeys, 1), newMeta = NativeStorage.part(newKeys, 2);
-        NativeStorage.rehash(cn1Keys, cn1Vals, cn1Meta, 0, -1,
+        long newVals = NativeStorage.part(newKeys, VALS), newMeta = NativeStorage.part(newKeys, META);
+        NativeStorage.rehash(cn1Keys, NativeStorage.part(cn1Keys, VALS), NativeStorage.part(cn1Keys, META), 0, -1,
                 newKeys, newVals, newMeta, 0, 0);
         long oldKeys = cn1Keys;
         cn1Keys = newKeys;
-        cn1Vals = newVals;
-        cn1Meta = newMeta;
         NativeStorage.retire(oldKeys);
         computeMaxSize();
         cn1Occupied = elementCount;
@@ -841,7 +838,7 @@ public class Hashtable<K, V> extends Dictionary<K, V> implements Map<K, V> {
         if (idx < 0) {
             return null;
         }
-        V result = (V) NativeStorage.get(cn1Vals, idx);
+        V result = (V) NativeStorage.get(NativeStorage.part(cn1Keys, VALS), idx);
         cn1RemoveAtIndex(idx);
         return result;
     }
@@ -871,11 +868,11 @@ public class Hashtable<K, V> extends Dictionary<K, V> implements Map<K, V> {
 
         StringBuffer buffer = new StringBuffer(size() * 28);
         buffer.append('{');
-        long meta = cn1Meta;
+        long meta = NativeStorage.part(cn1Keys, META);
         for (int i = 0; i < NativeStorage.capacity(cn1Keys); i++) {
             if (NativeStorage.getInt(meta, i) < 0) {
                 Object k = NativeStorage.get(cn1Keys, i);
-                Object v = NativeStorage.get(cn1Vals, i);
+                Object v = NativeStorage.get(NativeStorage.part(cn1Keys, VALS), i);
                 if (k != this) {
                     buffer.append(k);
                 } else {

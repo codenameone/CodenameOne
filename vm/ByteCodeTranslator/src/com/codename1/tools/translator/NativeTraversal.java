@@ -115,7 +115,16 @@ final class NativeTraversal {
     private String field(String owner, String field, String object) {
         return "get_field_" + owner + "_" + field + "(" + object + ")";
     }
-    private String map(String field) { return field("java_util_HashMap", field, root); }
+    private String map(String field) {
+        // A map's values and metadata are parts of its keys table, not fields of their own.
+        if (field.equals("cn1ValsBlock")) return part(1);
+        if (field.equals("cn1MetaBlock")) return part(2);
+        return field("java_util_HashMap", field, root);
+    }
+    /* Part `index` of the map's table: 1 values, 2 metadata, 3 and 4 the ordered links. */
+    private String part(int index) {
+        return "cn1TablePart(" + field("java_util_HashMap", "cn1KeysBlock", root) + ", " + index + ")";
+    }
     /* The table fields for a layout. Identical names on both classes, different owner:
      * HASH_SET reads the HashSet's own table, everything else reads a map's. */
     private String table(Layout layout, String field) {
@@ -228,11 +237,11 @@ final class NativeTraversal {
                 + " ? (CN1_THROW_CME(), JAVA_NULL) : cn1RefBlockGet("
                 + field("java_util_ArrayList", "cn1Storage", root) + ", " + last + " = " + index + "++))";
         String advance = layout == Layout.ORDERED_SET
-                ? "cn1IntBlockGet(" + field("java_util_LinkedHashMap", "cn1Next", root) + ", " + index + ")"
+                ? "cn1IntBlockGet(" + part(4) + ", " + index + ")"
                 : "cn1InlTableNext(" + table(layout, "cn1MetaBlock") + ", " + index + " + 1, "
                         + table(layout, "cn1Cap") + ")";
         // A plain HashSet has keys only, so the values half of the mode never applies
-        // to it -- there is no cn1ValsBlock field on the class to name.
+        // to it -- it has no values part to name.
         String slots = layout == Layout.HASH_SET ? table(layout, "cn1KeysBlock")
                 : exact != null ? map(mapValues ? "cn1ValsBlock" : "cn1KeysBlock")
                 : "(" + mode + " & 8 ? " + map("cn1ValsBlock") + " : " + map("cn1KeysBlock") + ")";
@@ -268,8 +277,8 @@ final class NativeTraversal {
                     .append(set("java_util_AbstractList", "modCount", modification(layout) + " + 1"));
         } else {
             if (layout == Layout.ORDERED_SET) {
-                String prev = field("java_util_LinkedHashMap", "cn1Prev", root);
-                String next = field("java_util_LinkedHashMap", "cn1Next", root);
+                String prev = part(3);
+                String next = part(4);
                 code.append("JAVA_INT __p = cn1IntBlockGet(").append(prev).append(", ").append(last).append(");\n")
                         .append("JAVA_INT __n = cn1IntBlockGet(").append(next).append(", ").append(last).append(");\n")
                         .append("if(__p >= 0) cn1IntBlockSet(").append(next).append(", __p, __n); else ")
@@ -285,7 +294,8 @@ final class NativeTraversal {
                 code.append(set("java_util_HashSet", "cn1Size", field("java_util_HashSet", "cn1Size", root) + " - 1"))
                         .append(set("java_util_HashSet", "cn1ModCount", modification(layout) + " + 1"));
             } else {
-                code.append("cn1RefBlockSet(threadStateData, ").append(map("cn1ValsBlock")).append(", ").append(last).append(", JAVA_NULL);\n")
+                // Through the ROOT: a part has no header for cn1RefBlockSet's barrier to use.
+                code.append("cn1TableRefSet(threadStateData, ").append(map("cn1KeysBlock")).append(", 1, ").append(last).append(", JAVA_NULL);\n")
                         .append(set("java_util_HashMap", "elementCount", map("elementCount") + " - 1"))
                         .append(set("java_util_HashMap", "modCount", modification(layout) + " + 1"));
             }
