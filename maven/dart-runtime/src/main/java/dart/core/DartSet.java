@@ -80,14 +80,37 @@ public class DartSet<E> extends LinkedHashSet<E> {
         return super.contains(storedElement(e));
     }
 
+    /// Additions and removals, for forEachDart; see DartMap's counter of the same name.
+    private int structure;
+
+    protected final void structuralChange() {
+        structure++;
+    }
+
     @Override
     public boolean add(E e) {
-        return storedElement(e) == e ? super.add(e) : false;
+        boolean added = storedElement(e) == e && super.add(e);
+        if (added) {
+            structure++;
+        }
+        return added;
     }
 
     @Override
     public boolean remove(Object e) {
-        return super.remove(storedElement(e));
+        boolean removed = super.remove(storedElement(e));
+        if (removed) {
+            structure++;
+        }
+        return removed;
+    }
+
+    @Override
+    public void clear() {
+        if (!isEmpty()) {
+            structure++;
+        }
+        super.clear();
     }
 
     @SafeVarargs
@@ -268,10 +291,11 @@ public class DartSet<E> extends LinkedHashSet<E> {
     public void forEachDart(Funcs.VoidFunc1<E> action) {
         // As DartMap.forEachDart: checked after every callback, not only on the next step.
         int n = size();
+        int s = structure;
         for (E e : this) {
             action.call(e);
-            if (size() != n) {
-                throw new ConcurrentModificationError("set changed from " + n + " to " + size() + " elements");
+            if (size() != n || structure != s) {
+                throw new ConcurrentModificationError("set changed during forEach");
             }
         }
     }

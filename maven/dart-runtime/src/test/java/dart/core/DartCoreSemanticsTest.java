@@ -883,4 +883,41 @@ public class DartCoreSemanticsTest {
     public void intParsingTrimsDartWhitespace() {
         assertEquals(Long.valueOf(123), DString.tryParseInt("\u00A0123\u00A0"));
     }
+
+    @Test
+    @SuppressWarnings({"UnnecessaryBoxing", "removal"})
+    public void identityCollectionsTreatEqualIntsAsOneKey() {
+        Long a = new Long(1000);
+        Long b = new Long(1000);
+        assertFalse(a == b, "two separate boxes");
+        DartIdentityMap<Object, String> m = new DartIdentityMap<Object, String>();
+        m.put(a, "x");
+        m.put(b, "y");
+        assertEquals(1, m.size());
+        assertEquals("y", m.get(a));
+        DartIdentitySet<Object> set = new DartIdentitySet<Object>();
+        set.add(a);
+        set.add(b);
+        assertEquals(1, set.size());
+    }
+
+    @Test
+    public void aSameSizeSwapDuringForEachIsStillAModification() {
+        final DartMap<Long, String> m = new DartMap<Long, String>();
+        m.put(1L, "a");
+        assertThrows(ConcurrentModificationError.class, () -> m.forEachDart((k, v) -> {
+            m.remove(k);
+            m.put(2L, "b");
+        }));
+        final DartSet<Long> s = new DartSet<Long>();
+        s.add(1L);
+        assertThrows(ConcurrentModificationError.class, () -> s.forEachDart(e -> {
+            s.remove(e);
+            s.add(2L);
+        }));
+        final DartMap<Long, String> updating = new DartMap<Long, String>();
+        updating.put(1L, "a");
+        updating.forEachDart((k, v) -> updating.put(k, "b"));
+        assertEquals("b", updating.get(1L), "updating a value is not structural");
+    }
 }

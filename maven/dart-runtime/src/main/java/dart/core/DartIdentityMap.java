@@ -53,13 +53,19 @@ public final class DartIdentityMap<K, V> extends DartMap<K, V> {
             this.key = key;
         }
 
+        /// Dart's identical(), not Java's ==: two separately boxed 1000s are the same
+        /// Dart int, and were two keys here.
         @Override
         public boolean equals(Object o) {
-            return o instanceof IdKey && ((IdKey) o).key == key;
+            return o instanceof IdKey && dart.runtime.DartRuntime.identical(((IdKey) o).key, key);
         }
 
+        /// Consistent with equals: a boxed number or bool hashes by value.
         @Override
         public int hashCode() {
+            if (key instanceof Long || key instanceof Double || key instanceof Boolean) {
+                return key.hashCode();
+            }
             return System.identityHashCode(key);
         }
     }
@@ -78,7 +84,11 @@ public final class DartIdentityMap<K, V> extends DartMap<K, V> {
 
     @Override
     public V put(K key, V value) {
-        return inner.put(new IdKey(key), value);
+        IdKey k = new IdKey(key);
+        if (!inner.containsKey(k)) {
+            structuralChange();
+        }
+        return inner.put(k, value);
     }
 
     @Override
@@ -90,7 +100,11 @@ public final class DartIdentityMap<K, V> extends DartMap<K, V> {
 
     @Override
     public V remove(Object key) {
-        return inner.remove(new IdKey(key));
+        IdKey k = new IdKey(key);
+        if (inner.containsKey(k)) {
+            structuralChange();
+        }
+        return inner.remove(k);
     }
 
     @Override
@@ -111,6 +125,9 @@ public final class DartIdentityMap<K, V> extends DartMap<K, V> {
 
     @Override
     public void clear() {
+        if (!inner.isEmpty()) {
+            structuralChange();
+        }
         inner.clear();
     }
 

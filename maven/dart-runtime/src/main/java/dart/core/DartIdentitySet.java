@@ -45,6 +45,7 @@ public final class DartIdentitySet<E> extends DartSet<E> {
             return false;
         }
         inner.put(e, Boolean.TRUE);
+        structuralChange();
         return true;
     }
 
@@ -59,6 +60,7 @@ public final class DartIdentitySet<E> extends DartSet<E> {
             return false;
         }
         inner.remove(e);
+        structuralChange();
         return true;
     }
 
@@ -74,6 +76,9 @@ public final class DartIdentitySet<E> extends DartSet<E> {
 
     @Override
     public void clear() {
+        if (!inner.isEmpty()) {
+            structuralChange();
+        }
         inner.clear();
     }
 

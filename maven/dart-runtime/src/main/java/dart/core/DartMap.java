@@ -135,15 +135,43 @@ public class DartMap<K, V> extends LinkedHashMap<K, V> {
         return super.containsKey(storedKey(key));
     }
 
+    /// Counts additions and removals of keys (not value updates), so forEachDart can
+    /// tell a structural change from a same-size swap: a callback that removed its key
+    /// and inserted another left the size alone, and on a one-entry map Java's iterator
+    /// had already finished, so the change went unreported. LinkedHashMap's own counter
+    /// is package-private to java.util.
+    private int structure;
+
+    /// Records a structural change; subclasses with their own storage call it too.
+    protected final void structuralChange() {
+        structure++;
+    }
+
     @Override
     @SuppressWarnings("unchecked")
     public V put(K key, V value) {
-        return super.put((K) storedKey(key), value);
+        Object stored = storedKey(key);
+        if (!super.containsKey(stored)) {
+            structure++;
+        }
+        return super.put((K) stored, value);
     }
 
     @Override
     public V remove(Object key) {
-        return super.remove(storedKey(key));
+        Object stored = storedKey(key);
+        if (super.containsKey(stored)) {
+            structure++;
+        }
+        return super.remove(stored);
+    }
+
+    @Override
+    public void clear() {
+        if (!isEmpty()) {
+            structure++;
+        }
+        super.clear();
     }
 
     /**
@@ -273,10 +301,11 @@ public class DartMap<K, V> extends LinkedHashMap<K, V> {
         // change on its next step, so a callback that added to a one-entry map ended the
         // loop quietly instead of throwing ConcurrentModificationError.
         int n = size();
+        int s = structure;
         for (Map.Entry<K, V> e : entrySet()) {
             action.call(e.getKey(), e.getValue());
-            if (size() != n) {
-                throw new ConcurrentModificationError("map changed from " + n + " to " + size() + " entries");
+            if (size() != n || structure != s) {
+                throw new ConcurrentModificationError("map changed during forEach");
             }
         }
     }
