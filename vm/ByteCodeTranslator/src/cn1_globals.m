@@ -1034,9 +1034,6 @@ static inline int cn1GcIsOld(JAVA_OBJECT o, int m) {
 // CN1_GC_MARK_THREADS=1. Evaluated once; the mode cannot change within a process.
 JAVA_BOOLEAN cn1GcFreshFilter = JAVA_TRUE;
 static JAVA_BOOLEAN cn1GcStwCycle = JAVA_FALSE;   // GC thread only
-#ifndef CN1_EXP_LEGNOGRACE
-#define CN1_EXP_LEGNOGRACE 1
-#endif
 #ifndef CN1_DISABLE_BIBOP
 static void cn1BibopDetachPreCycle(void);
 static void cn1GcGenDecide(void);
@@ -6059,9 +6056,12 @@ void codenameOneGCMark() {
     // upstream of this pass. Cost is one extra pass over an array the sweep
     // already walks in full, and only fresh entries are traced.
 #ifndef CN1_DISABLE_LEGACY_GRACE
-    // Not in single-core mode: its sweep frees an unmarked legacy fresh object instead of
-    // keeping it, so tracing one as a root would keep what it points at for nothing.
-    if(!(CN1_EXP_LEGNOGRACE && cn1GcStwCycle)) {
+    // In single-core mode too. Freeing an unmarked legacy fresh object there instead --
+    // on the argument that every table entry was migrated with its thread paused, so it
+    // predates the root scans -- was measured unsound: under CN1_GC_VERIFY, 2 of 3
+    // contended self-hosting runs freed a large array an org.objectweb.asm.Context still
+    // held. Every single-core number in REGISTRY Rounds 43-45 was taken with this pass on.
+    {
         CN1_GC_TRUSTED_BEGIN();  // walking allObjectsInHeap: authoritative references
 #ifdef CN1_GC_VERIFY
     { extern const char* cn1GcMarkPhase; cn1GcMarkPhase = "legacy-grace-pass"; }
@@ -6572,14 +6572,9 @@ void codenameOneGCSweep() {
     for(int iter = 0 ; iter < t ; iter++) {
         JAVA_OBJECT o = allObjectsInHeap[iter];
         if(o != JAVA_NULL) {
-            // Single-core mode frees a legacy fresh object that is still unmarked: every
-            // table entry was migrated with its thread paused, so it predates the root
-            // scans, and the legacy grace pass does not run in that mode.
-            JAVA_BOOLEAN cn1FreshDead = CN1_EXP_LEGNOGRACE && cn1GcStwCycle && o->__codenameOneGcMark == -1
-                                        && o->__codenameOneParentClsReference != 0;
-            if(o->__codenameOneGcMark != -1 || cn1FreshDead) {
-                if(cn1FreshDead || cn1GcSweepReclaims(o->__codenameOneGcMark)) {
-                    if (!cn1FreshDead && o->__codenameOneGcMark <= 0) {
+            if(o->__codenameOneGcMark != -1) {
+                if(cn1GcSweepReclaims(o->__codenameOneGcMark)) {
+                    if (o->__codenameOneGcMark <= 0) {
 #if defined(__APPLE__) && defined(__OBJC__)
 #if TARGET_OS_SIMULATOR
                         CN1_GC_ASSERT(o->__codenameOneGcMark > 0, "CN1_GC_INVALID_MARK");
