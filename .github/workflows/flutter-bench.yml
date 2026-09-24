@@ -114,7 +114,10 @@ jobs:
           # -am pulls in. Without it the build dies in javase's
           # cn1-generate-build-hint-data execution, which is a long way from
           # anything this workflow is about.
-          JAVA_HOME="$JAVA_HOME_8" mvn -B -q install -DskipTests \
+          # Through retry.sh, like every other Maven step in this repository: Central
+          # throttles runners with 403/429, and a bare mvn failed this job twice in
+          # one day at resolving org.junit:junit-bom before compiling anything.
+          JAVA_HOME="$JAVA_HOME_8" bash ../scripts/ci/retry.sh mvn -B -q install -DskipTests \
               -Dmaven.javadoc.skip=true -Dmaven.source.skip=true \
               -Plocal-dev-javase \
               -Dmaven.repo.local="$GITHUB_WORKSPACE/m2" \
@@ -125,7 +128,7 @@ jobs:
       - name: Build the Flutter runtime on JDK 17
         run: |
           cd maven
-          JAVA_HOME="$JAVA_HOME_17" mvn -B -q install -DskipTests \
+          JAVA_HOME="$JAVA_HOME_17" bash ../scripts/ci/retry.sh mvn -B -q install -DskipTests \
               -Dmaven.javadoc.skip=true -Dmaven.source.skip=true \
               -Plocal-dev-javase \
               -Dmaven.repo.local="$GITHUB_WORKSPACE/m2" \
@@ -141,9 +144,55 @@ jobs:
           path: framework-m2.tgz
           retention-days: 1
 
+  # The platforms to measure. Every one on a pull request or the nightly run; on a
+  # manual dispatch, the ones its `platforms` input names. The input used to be
+  # read by nothing, so asking to re-run one platform launched all six -- several
+  # of them two-hour native builds.
+  plan:
+    name: plan
+    runs-on: ubuntu-latest
+    outputs:
+      include: ${{ steps.pick.outputs.include }}
+    steps:
+      - id: pick
+        env:
+          REQUESTED: ${{ github.event_name == 'workflow_dispatch' && inputs.platforms || 'all' }}
+        shell: python3 {0}
+        run: |
+          import json, os, sys
+          ALL = [
+              {"platform": "macos", "runner": "macos-latest"},
+              {"platform": "ios", "runner": "macos-latest"},
+              {"platform": "android", "runner": "ubuntu-latest"},
+              {"platform": "linux", "runner": "ubuntu-latest"},
+              # PINNED, like FLUTTER_REF and for the same reason. windows-latest
+              # is Server 2025 and its Visual Studio has moved to 2026 (major
+              # 18), which Flutter 3.35.4 predates: it detects that install and
+              # reports it healthy, then maps it to no generator it knows and
+              # emits "Visual Studio 16 2019" instead. Pinning Flutter without
+              # pinning the toolchain it has to drive only moved the moving part.
+              {"platform": "windows", "runner": "windows-2022"},
+              {"platform": "javascript", "runner": "ubuntu-latest"},
+          ]
+          requested = os.environ.get("REQUESTED", "").strip().lower()
+          if requested in ("", "all"):
+              chosen = ALL
+          else:
+              names = [n.strip() for n in requested.split(",") if n.strip()]
+              known = {p["platform"] for p in ALL}
+              unknown = [n for n in names if n not in known]
+              if unknown or not names:
+                  # Loud, not an empty matrix: a typo must not "succeed" by measuring nothing.
+                  sys.exit("unknown platform(s) %s; choose from %s, or all"
+                           % (", ".join(unknown) or "<none>", ", ".join(sorted(known))))
+              chosen = [p for p in ALL if p["platform"] in names]
+          print("measuring: " + ", ".join(p["platform"] for p in chosen))
+          with open(os.environ["GITHUB_OUTPUT"], "a") as out:
+              out.write("include=" + json.dumps(chosen) + "\n")
+
   measure:
     name: ${{ matrix.platform }}
-    needs: framework
+    needs: [framework, plan]
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 120
     strategy:
@@ -152,25 +201,7 @@ jobs:
       # publishes five platforms and says the sixth did not run.
       fail-fast: false
       matrix:
-        include:
-          - platform: macos
-            runner: macos-latest
-          - platform: ios
-            runner: macos-latest
-          - platform: android
-            runner: ubuntu-latest
-          - platform: linux
-            runner: ubuntu-latest
-          - platform: windows
-            # PINNED, like FLUTTER_REF and for the same reason. windows-latest
-            # is Server 2025 and its Visual Studio has moved to 2026 (major
-            # 18), which Flutter 3.35.4 predates: it detects that install and
-            # reports it healthy, then maps it to no generator it knows and
-            # emits "Visual Studio 16 2019" instead. Pinning Flutter without
-            # pinning the toolchain it has to drive only moved the moving part.
-            runner: windows-2022
-          - platform: javascript
-            runner: ubuntu-latest
+        include: ${{ fromJson(needs.plan.outputs.include) }}
 
     steps:
       - uses: actions/checkout@v4
@@ -412,9 +443,12 @@ jobs:
       # Master-only, like the port reports, so a branch's numbers never reach
       # the public page.
       - name: Publish the benchmark to the port status data
+        # Only a run of every platform: port status shows all of them, and a dispatch
+        # for a subset would publish a table missing the rest.
         if: >-
           github.ref == 'refs/heads/master' &&
-          (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch')
+          (github.event_name == 'schedule' ||
+           (github.event_name == 'workflow_dispatch' && (inputs.platforms == 'all' || inputs.platforms == '')))
         env:
           GH_TOKEN: ${{ github.token }}
         run: |

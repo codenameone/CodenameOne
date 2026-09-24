@@ -92,7 +92,9 @@ CN1_LOG="$WORK/cn1-build.log"
 
 cn1_build() {   # cn1_build <platform> <buildTarget> [extra maven args...]
   local plat="$1" target="$2"; shift 2
-  ( cd "$CN1" && $XVFB mvn -B $MVN_REPO_ARG package -DskipTests \
+  # retry.sh for Central's transient 403/429 only; a build failure is not retried.
+  ( cd "$CN1" && RETRY_ONLY_MATCHING=transient $XVFB bash "$HERE/../../ci/retry.sh" \
+      mvn -B $MVN_REPO_ARG package -DskipTests \
       -DskipComplianceCheck=true \
       -Dcodename1.platform="$plat" -Dcodename1.buildTarget="$target" "$@" ) 2>&1 | tee "$CN1_LOG"
 }

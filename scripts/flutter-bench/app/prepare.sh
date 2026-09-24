@@ -53,6 +53,10 @@ done
 [ -n "$WORK" ] || { echo "usage: prepare.sh --work <dir>" >&2; exit 2; }
 HERE="$(cd "$(dirname "$0")" && pwd)"
 REPO="$(cd "$HERE/../../.." && pwd)"
+# Maven Central throttles CI runners with 403/429, and Maven treats either as a
+# permanent resolution failure. retry.sh backs off and retries those -- only
+# those: RETRY_ONLY_MATCHING=transient returns a real failure on the first try.
+RETRY="$REPO/scripts/ci/retry.sh"
 
 # --- the Flutter SDK, and the gallery inside it -----------------------------
 
@@ -187,7 +191,8 @@ if [ -z "$CN1_VERSION" ]; then
   # `echo` as a process, and Windows has no echo executable -- it is a cmd
   # builtin -- so the Windows leg failed right here, and because stderr was
   # discarded it said nothing but an exit code. Maven's stderr stays visible.
-  CN1_VERSION="$(cd "$REPO/maven" && mvn -q -B $MVN_REPO_ARG help:evaluate \
+  CN1_VERSION="$(cd "$REPO/maven" && RETRY_ONLY_MATCHING=transient bash "$RETRY" \
+      mvn -q -B $MVN_REPO_ARG help:evaluate \
       -Dexpression=project.version -DforceStdout --non-recursive | tr -d '\r' | tail -1)"
 fi
 [ -n "$CN1_VERSION" ] || { echo "could not determine the Codename One version" >&2; exit 2; }
@@ -201,7 +206,7 @@ echo "    archetype version $CN1_VERSION"
 # the Windows leg reported an exit code and no reason for it; a build step that
 # cannot say why it failed is worse than a noisy one.
 echo "    maven repository ${MAVEN_REPO_LOCAL:-<default>}"
-( cd "$WORK" && mvn -B $MVN_REPO_ARG archetype:generate \
+( cd "$WORK" && RETRY_ONLY_MATCHING=transient bash "$RETRY" mvn -B $MVN_REPO_ARG archetype:generate \
     -DarchetypeArtifactId=cn1app-archetype \
     -DarchetypeGroupId=com.codenameone \
     -DarchetypeVersion="$CN1_VERSION" \
