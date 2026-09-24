@@ -614,7 +614,7 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
             }
         }
         if (entry.fresh) {
-            detach(entity);
+            detachOne(entity);
         }
     }
     @Override

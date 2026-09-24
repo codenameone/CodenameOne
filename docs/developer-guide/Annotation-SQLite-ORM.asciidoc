@@ -168,6 +168,8 @@ fields need a non-null literal or named parameter. Other assignment expressions
 are rejected for those fields. Literal and bound null assignments to primitive
 Java fields are rejected on both runtimes. Field-to-field assignments require
 matching enum types and converter mappings, including fields inside expressions.
+Integral attributes reject real-valued assignment expressions and floating-point
+parameter values.
 
 An `int` or `long` field annotated `@Version` is maintained by the session.
 Updates and deletes compare its previous value and throw
@@ -223,7 +225,8 @@ backend runtime doesn't contain the client properties package.
 custom basic value to a SQL scalar. The converter implements
 `com.codename1.orm.session.AttributeConverter<Code,String>` and has a public
 no-argument constructor. It receives null values too. Query-builder predicates
-and JPQL comparison parameters apply the field's converter. Identifiers and
+and JPQL comparison parameters and literals apply the field's converter. Values
+must match the converter's input type; use a named parameter for custom objects. Identifiers and
 versions can't use converters. This includes every component of an embedded identifier.
 
 ==== Identity and inheritance

@@ -975,7 +975,7 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
         return relation;
     }
 
-    private String boxedDomainType(String type) {
+    private static String boxedDomainType(String type) {
         String[] primitive={"boolean","byte","short","int","long","float","double","char"};
         String[] boxed={"Boolean","Byte","Short","Integer","Long","Float","Double","Character"};
         for(int i=0;i<primitive.length;i++) if(primitive[i].equals(type)) return "java.lang."+boxed[i];
@@ -1324,7 +1324,9 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
             sb.append("public Object parameter(int index,Object value) { switch(index) {\n");
             for(int i=0;i<ec.fields.size();i++) {
                 PersistedField field=ec.fields.get(i);
-                if(field.converter!=null) sb.append("case ").append(i).append(": return ").append(pkg).append("Values.storage(new ").append(field.converter)
+                if(field.converter!=null) sb.append("case ").append(i).append(": if(value!=null && !")
+                    .append(boxedDomainType(field.domainType)).append(".class.isInstance(value)) throw new IllegalArgumentException(\"Converter input requires ")
+                    .append(escape(field.domainType)).append("\"); return ").append(pkg).append("Values.storage(new ").append(field.converter)
                     .append("().toDatabase((").append(field.domainType).append(")value));\n");
             }
             sb.append("default:return super.parameter(index,value);}}\n");

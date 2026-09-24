@@ -218,7 +218,7 @@ public final class JpqlQueryImpl<T> implements com.codename1.orm.session.JpqlQue
                     values.add(parameter.convert(value));
                 }
             } else {
-                values.add(Values.storage(binding));
+                values.add(boundValue(binding));
             }
         }
         SessionImpl.checkParameterCount(values.size());
@@ -226,6 +226,9 @@ public final class JpqlQueryImpl<T> implements com.codename1.orm.session.JpqlQue
         return new Bound(statement.toString(), values.toArray());
     }
     private Object boundValue(Object binding) {
+        if (binding instanceof LiteralBinding) {
+            return ((LiteralBinding) binding).convert();
+        }
         if (!(binding instanceof Parameter)) {
             return binding;
         }
@@ -234,6 +237,17 @@ public final class JpqlQueryImpl<T> implements com.codename1.orm.session.JpqlQue
             throw new IllegalArgumentException("Unbound named parameter: " + parameter.name);
         }
         return parameter.convert(parameters.get(parameter.name));
+    }
+    private static final class LiteralBinding {
+        final Object value;
+        QueryImpl query;
+        String field;
+        LiteralBinding(Object value) {
+            this.value = value;
+        }
+        Object convert() {
+            return query == null ? Values.storage(value) : query.parameter(field, value);
+        }
     }
     private static final class LikeBinding {
         final Object pattern;
@@ -257,6 +271,7 @@ public final class JpqlQueryImpl<T> implements com.codename1.orm.session.JpqlQue
         boolean nonNull;
         boolean numeric;
         boolean integral;
+        boolean integralAssignment;
         boolean logical;
         int expectedKind = -1;
         Parameter(String name) {
@@ -268,6 +283,10 @@ public final class JpqlQueryImpl<T> implements com.codename1.orm.session.JpqlQue
                 throw new IllegalArgumentException("Logical parameter requires a Boolean: " + name);
             }
             Values.requireStorageKind(converted, expectedKind);
+            if (converted != null && integralAssignment && !(converted instanceof Byte
+                    || converted instanceof Short || converted instanceof Integer || converted instanceof Long)) {
+                throw new IllegalArgumentException("Integral assignment requires an integral stored value: " + name);
+            }
             if (converted != null && numeric) {
                 if (!(value instanceof Number) || !(converted instanceof Number) || integral && !(converted instanceof Byte
                         || converted instanceof Short || converted instanceof Integer || converted instanceof Long)) {
@@ -308,6 +327,7 @@ public final class JpqlQueryImpl<T> implements com.codename1.orm.session.JpqlQue
         QueryImpl projectionQuery;
         String projectionField;
         Object literalValue;
+        LiteralBinding literalBinding;
         Expr(String sql, int kind) {
             this(sql, kind, null);
         }
@@ -373,6 +393,9 @@ public final class JpqlQueryImpl<T> implements com.codename1.orm.session.JpqlQue
                     target.query = root;
                     target.field = field;
                     compatible(target, value);
+                    if (attribute.kind == Attribute.INTEGER || attribute.kind == Attribute.BIGINT) {
+                        requireIntegralAssignment(value);
+                    }
                     validateAssignment(root.mapping(field), value);
                     bindType(target, value);
                     if (root.model.primitive(root.model.queryIndex(field))) {
@@ -709,8 +732,8 @@ public final class JpqlQueryImpl<T> implements com.codename1.orm.session.JpqlQue
                     while (bindings.size() > firstBinding) {
                         bindings.remove(bindings.size() - 1);
                     }
-                    String marker = bind(new LikeBinding(pattern.parameter == null ? pattern.literalValue : pattern.parameter,
-                            !escaped ? null : escape.parameter == null ? escape.literalValue : escape.parameter, escaped));
+                    String marker = bind(new LikeBinding(pattern.parameter == null ? pattern.literalBinding : pattern.parameter,
+                            !escaped ? null : escape.parameter == null ? escape.literalBinding : escape.parameter, escaped));
                     sql = left.sql + session.likeOperator(escaped).replace("?", marker);
                 } else {
                     if (escaped) {
@@ -810,20 +833,20 @@ public final class JpqlQueryImpl<T> implements com.codename1.orm.session.JpqlQue
             }
             if (token.startsWith("'")) {
                 String value = token.substring(1, token.length() - 1).replace("''", "'");
-                return literal(bind(value), Attribute.TEXT, value);
+                return literal(Attribute.TEXT, value);
             }
             if ("NULL".equalsIgnoreCase(token)) {
-                return literal("NULL", -1, null);
+                return literal(-1, null);
             }
             if ("TRUE".equalsIgnoreCase(token) || "FALSE".equalsIgnoreCase(token)) {
-                return literal("TRUE".equalsIgnoreCase(token) ? "1" : "0", Attribute.BOOLEAN, Boolean.valueOf("TRUE".equalsIgnoreCase(token)));
+                return literal(Attribute.BOOLEAN, Boolean.valueOf("TRUE".equalsIgnoreCase(token)));
             }
             if (Character.isDigit(token.charAt(0))) {
                 Object value = token.indexOf('.') >= 0 || token.indexOf('e') >= 0 || token.indexOf('E') >= 0
                                        ? (Object) Double.valueOf(token)
                                        : Long.valueOf(Long.parseLong(token));
                 int kind = value instanceof Double ? Attribute.REAL : Attribute.BIGINT;
-                return literal(session.numericOperand(bind(value), kind), kind, value);
+                return literal(kind, value);
             }
             if (!identifier(token)) {
                 throw error("Expected expression");
@@ -1002,10 +1025,16 @@ public final class JpqlQueryImpl<T> implements com.codename1.orm.session.JpqlQue
                 }
             }
         }
-        private Expr literal(String sql, int kind, Object value) {
+        private Expr literal(int kind, Object value) {
+            LiteralBinding binding = new LiteralBinding(value);
+            String sql = value == null ? "NULL" : bind(binding);
+            if (numericKind(kind) || kind == Attribute.BOOLEAN) {
+                sql = session.numericOperand(sql, kind == Attribute.BOOLEAN ? Attribute.BIGINT : kind);
+            }
             Expr result = new Expr(sql, kind);
             result.literal = true;
             result.literalValue = value;
+            result.literalBinding = binding;
             return result;
         }
         private Expr wrap(String sql, Expr value) {
@@ -1021,6 +1050,7 @@ public final class JpqlQueryImpl<T> implements com.codename1.orm.session.JpqlQue
             result.parameter = value.parameter;
             result.literal = value.literal;
             result.literalValue = value.literalValue;
+            result.literalBinding = value.literalBinding;
             return result;
         }
         private int commonKind(List<Expr> args) {
@@ -1065,6 +1095,19 @@ public final class JpqlQueryImpl<T> implements com.codename1.orm.session.JpqlQue
             }
             return false;
         }
+        private void requireIntegralAssignment(Expr value) {
+            if (value.kind == Attribute.REAL) {
+                throw error("REAL expressions cannot be assigned to integral attributes");
+            }
+            if (value.parameter != null) {
+                value.parameter.integralAssignment = true;
+            }
+            if (value.kind < 0 || value.numericOperands) {
+                for (Expr child : value.children) {
+                    requireIntegralAssignment(child);
+                }
+            }
+        }
         private void validateAssignment(String mapping, Expr value) {
             if (value.query != null && value.field != null && !mapping.equals(value.query.mapping(value.field))) {
                 throw error("Bulk assignment requires matching domain and converter mappings");
@@ -1080,6 +1123,10 @@ public final class JpqlQueryImpl<T> implements com.codename1.orm.session.JpqlQue
         private void bindType(Expr attribute, Expr value) {
             if (attribute.query == null) {
                 return;
+            }
+            if (value.literalBinding != null && value.literalBinding.query == null) {
+                value.literalBinding.query = attribute.query;
+                value.literalBinding.field = attribute.field;
             }
             if (value.parameter != null && value.parameter.query == null) {
                 value.parameter.query = attribute.query;

@@ -215,6 +215,25 @@ class ManagedSessionTest {
         } finally { em.close(); }
     }
 
+    @Test void bulkIntegralAssignmentsRejectRealValuesBeforeWriting() throws Exception {
+        EntityManager em=manager();
+        try {
+            Session session=em.openSession();Record record=seed(session);session.beginTransaction();
+            for(String expression:new String[]{"1.5","1.0","1+0.5","coalesce(:value,1.5)","(select avg(i.counter) from ManagedSessionTest$Record i)"}) {
+                assertThrows(IllegalArgumentException.class,()->session.createQuery("update ManagedSessionTest$Record r set r.counter="+expression),expression);
+            }
+            for(String expression:new String[]{":value","(:value)","coalesce(:value,r.counter)","nullif(:value,r.counter)","r.counter+:value"}) {
+                for(Number value:new Number[]{Double.valueOf(1.5),Float.valueOf(1.5f),Double.valueOf(1)}) {
+                    assertThrows(IllegalArgumentException.class,()->session.createQuery("update ManagedSessionTest$Record r set r.counter="+expression).setParameter("value",value).executeUpdate(),expression);
+                }
+            }
+            assertEquals(0L,session.find(Record.class,record.id).counter);
+            assertEquals(1,session.createQuery("update ManagedSessionTest$Record r set r.counter=:value").setParameter("value",7L).executeUpdate());
+            assertEquals(1,session.createQuery("update ManagedSessionTest$Record r set r.counter=r.counter+2").executeUpdate());
+            session.commitTransaction();assertEquals(9L,session.find(Record.class,record.id).counter);session.close();
+        } finally { em.close(); }
+    }
+
     @Test void comparisonsNeedAKnownOperandKind() throws Exception {
         EntityManager em=manager();
         try {

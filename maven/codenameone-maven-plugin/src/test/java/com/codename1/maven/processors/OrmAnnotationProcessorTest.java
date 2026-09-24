@@ -215,6 +215,49 @@ public class OrmAnnotationProcessorTest {
     }
 
     @Test
+    public void jpqlLiteralsUseMappedConvertersLikeNamedParameters() throws Exception {
+        File classes=tmp.newFolder("mappedliterals");Map<String,String> sources=new java.util.LinkedHashMap<String,String>();String imports="package mappedliterals; import com.codename1.annotations.*; import com.codename1.annotations.db.*; ";
+        sources.put("mappedliterals.Prefix","package mappedliterals; public class Prefix implements com.codename1.orm.session.AttributeConverter<String,String> { public String toDatabase(String value) { return value==null?null:\"db:\"+value; } public String fromDatabase(String value) { return value==null?null:value.substring(3); } }");
+        sources.put("mappedliterals.Entry",imports+"@Entity public class Entry { @Id public long id; @Convert(converter=Prefix.class) public String code; }");
+        JavaSourceCompiler.compile(sources,classes,Arrays.asList(testClassesDir()));ProcessorContext client=runProcessor(classes);assertFalse(client.getErrors().toString(),client.hasErrors());ProcessorContext backend=runProcessor(classes,backendClasspath());assertFalse(backend.getErrors().toString(),backend.hasErrors());
+        try(java.net.URLClassLoader loader=new java.net.URLClassLoader(new URL[]{classes.toURI().toURL()},getClass().getClassLoader())) {
+            Class type=loader.loadClass("mappedliterals.Entry");
+            for(String suffix:Arrays.asList("Cn1Model","Cn1BackendModel")) {
+                Map<String,com.codename1.impl.orm.EntityModel<?>> models=new java.util.LinkedHashMap<String,com.codename1.impl.orm.EntityModel<?>>();models.put(type.getName(),(com.codename1.impl.orm.EntityModel)loader.loadClass(type.getName()+suffix).newInstance());
+                com.codename1.backend.Database db=com.codename1.backend.Database.open(":memory:");com.codename1.orm.session.Session session=new com.codename1.impl.orm.SessionImpl(new com.codename1.impl.orm.BackendSqlAccess(null,db,db.dialect()),models);
+                try {
+                    session.createTables();session.beginTransaction();Object entity=type.newInstance();type.getField("code").set(entity,"Paris");session.persist(entity);session.commitTransaction();Object id=type.getField("id").get(entity);
+                    for(String predicate:Arrays.asList("e.code='Paris'","'Paris'=e.code","e.code=('Paris')","e.code in ('Paris','Rome')","e.code between 'Paris' and 'Rome'","e.code like 'Par%'","e.code like 'Par%' escape '!'","coalesce(e.code,'Rome')='Paris'","e.code=nullif('Paris','Rome')")) {
+                        com.codename1.orm.session.JpqlQuery query=session.createQuery("select e from Entry e where "+predicate);org.junit.Assert.assertEquals(predicate,1,query.list().size());org.junit.Assert.assertEquals(predicate,1,query.list().size());
+                    }
+                    org.junit.Assert.assertEquals(1,session.createQuery("select e from Entry e where e.code=:code").setParameter("code","Paris").list().size());
+                    org.junit.Assert.assertEquals("Paris",session.createQuery("select 'Paris' from Entry e",String.class).first());
+                    session.beginTransaction();org.junit.Assert.assertEquals(1,session.createQuery("update Entry e set e.code='Rome' where e.code='Paris'").executeUpdate());session.commitTransaction();session.clear();org.junit.Assert.assertEquals("Rome",type.getField("code").get(session.find(type,id)));
+                } finally { session.close();db.close(); }
+            }
+        }
+    }
+
+    @Test
+    public void cancellingFreshOwnerPreservesRemovalOfPersistedDescendants() throws Exception {
+        File classes=tmp.newFolder("cancelledowner");Map<String,String> sources=new java.util.LinkedHashMap<String,String>();String imports="package cancelledowner; import com.codename1.annotations.*; import com.codename1.annotations.db.*; ";
+        sources.put("cancelledowner.Node",imports+"@Entity public class Node { @Id public long id; @ManyToOne(cascade=CascadeType.ALL) public Node child; }");
+        JavaSourceCompiler.compile(sources,classes,Arrays.asList(testClassesDir()));ProcessorContext client=runProcessor(classes);assertFalse(client.getErrors().toString(),client.hasErrors());ProcessorContext backend=runProcessor(classes,backendClasspath());assertFalse(backend.getErrors().toString(),backend.hasErrors());
+        try(java.net.URLClassLoader loader=new java.net.URLClassLoader(new URL[]{classes.toURI().toURL()},getClass().getClassLoader())) {
+            Class type=loader.loadClass("cancelledowner.Node");
+            for(String suffix:Arrays.asList("Cn1Model","Cn1BackendModel")) {
+                Map<String,com.codename1.impl.orm.EntityModel<?>> models=new java.util.LinkedHashMap<String,com.codename1.impl.orm.EntityModel<?>>();models.put(type.getName(),(com.codename1.impl.orm.EntityModel)loader.loadClass(type.getName()+suffix).newInstance());
+                com.codename1.backend.Database db=com.codename1.backend.Database.open(":memory:");com.codename1.orm.session.Session session=new com.codename1.impl.orm.SessionImpl(new com.codename1.impl.orm.BackendSqlAccess(null,db,db.dialect()),models);
+                try {
+                    session.createTables();session.beginTransaction();Object child=type.newInstance(),grandchild=type.newInstance();type.getField("child").set(child,grandchild);session.persist(child);session.commitTransaction();org.junit.Assert.assertEquals(2,session.query(type).count());
+                    session.beginTransaction();Object owner=type.newInstance();type.getField("child").set(owner,child);session.persist(owner);session.remove(owner);assertFalse(session.contains(owner));session.commitTransaction();session.clear();org.junit.Assert.assertEquals(0,session.query(type).count());
+                    session.beginTransaction();Object fresh=type.newInstance(),freshChild=type.newInstance();type.getField("child").set(fresh,freshChild);session.persist(fresh);session.remove(fresh);session.commitTransaction();org.junit.Assert.assertEquals(0,session.query(type).count());
+                } finally { session.close();db.close(); }
+            }
+        }
+    }
+
+    @Test
     public void bulkAssignmentsRequireMatchingDomainEncodings() throws Exception {
         File classes=tmp.newFolder("assignmentdomains");Map<String,String> sources=new java.util.LinkedHashMap<String,String>();
         String imports="package assignmentdomains; import com.codename1.annotations.*; import com.codename1.annotations.db.*; ";
@@ -354,7 +397,7 @@ public class OrmAnnotationProcessorTest {
             org.junit.Assert.assertSame(s.find(type,id),s.createQuery("select e from converted.Entry e where e.code in (:first, :second)",type).setParameter("first",excluded).setParameter("second",included).first());
             org.junit.Assert.assertSame(s.find(type,id),s.createQuery("select e from converted.Entry e where e.code in (:first, :second)",type).setParameter("first",included).setParameter("second",excluded).first());
             org.junit.Assert.assertNull(s.createQuery("select e from converted.Entry e where e.code not in (:first, :second)",type).setParameter("first",excluded).setParameter("second",included).first());
-            org.junit.Assert.assertSame(s.find(type,id),s.createQuery("select e from converted.Entry e where e.code in ('missing', :second)",type).setParameter("second",included).first());
+            try { s.createQuery("select e from converted.Entry e where e.code in ('missing', :second)",type).setParameter("second",included).first();fail("A string literal is not a Code domain value"); } catch(IllegalArgumentException expected) { assertTrue(expected.getMessage().contains("Converter input requires")); }
             org.junit.Assert.assertSame(s.find(type,id),s.createQuery("select e from converted.Entry e where e.code = coalesce((:code), e.code)",type).setParameter("code",included).first());
             org.junit.Assert.assertSame(s.find(type,id),s.createQuery("select e from converted.Entry e where coalesce(:code, e.code) = e.code",type).setParameter("code",null).first());
             s.beginTransaction();org.junit.Assert.assertEquals(1,s.createQuery("update converted.Entry e set e.code = coalesce(:code, e.code)").setParameter("code",included).executeUpdate());s.commitTransaction();
