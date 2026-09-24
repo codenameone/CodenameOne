@@ -690,6 +690,8 @@ public class DartCoreSemanticsTest {
     @Test
     public void byteDataRefusesALengthItCannotAllocate() {
         assertThrows(OutOfMemoryError.class, () -> new dart.typed_data.ByteData(4294967296L));
+        assertThrows(OutOfMemoryError.class, () -> new dart.typed_data.Uint8List(4294967296L));
+        assertThrows(RangeError.class, () -> new dart.typed_data.Uint8List(-1));
         assertEquals(8L, new dart.typed_data.ByteData(8).lengthInBytes());
     }
 

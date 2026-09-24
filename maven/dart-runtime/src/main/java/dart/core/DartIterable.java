@@ -23,6 +23,7 @@
  */
 package dart.core;
 
+import dart.runtime.DartRuntime;
 import dart.runtime.Funcs;
 
 import java.util.Iterator;
@@ -578,6 +579,13 @@ public class DartIterable<E> implements Iterable<E> {
 
     @Override
     public String toString() {
-        return "(" + join(", ") + ")";
+        if (!DartRuntime.beginFormat(this)) {
+            return "(...)";
+        }
+        try {
+            return "(" + join(", ") + ")";
+        } finally {
+            DartRuntime.endFormat(this);
+        }
     }
 }

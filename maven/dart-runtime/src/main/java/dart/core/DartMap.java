@@ -359,15 +359,22 @@ public class DartMap<K, V> extends LinkedHashMap<K, V> {
 
     @Override
     public String toString() {
-        StringBuilder sb = new StringBuilder("{");
-        boolean first = true;
-        for (Map.Entry<K, V> e : entrySet()) {
-            if (!first) {
-                sb.append(", ");
-            }
-            sb.append(DartRuntime.str(e.getKey())).append(": ").append(DartRuntime.str(e.getValue()));
-            first = false;
+        if (!DartRuntime.beginFormat(this)) {
+            return "{...}";   // a map that contains itself, as Dart prints it
         }
-        return sb.append("}").toString();
+        try {
+            StringBuilder sb = new StringBuilder("{");
+            boolean first = true;
+            for (Map.Entry<K, V> e : entrySet()) {
+                if (!first) {
+                    sb.append(", ");
+                }
+                sb.append(DartRuntime.str(e.getKey())).append(": ").append(DartRuntime.str(e.getValue()));
+                first = false;
+            }
+            return sb.append("}").toString();
+        } finally {
+            DartRuntime.endFormat(this);
+        }
     }
 }

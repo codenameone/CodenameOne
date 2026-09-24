@@ -322,6 +322,24 @@ public class DartList<E> extends AbstractList<E> implements RandomAccess {
     }
 
     /** Dart's List.indexOf — long-typed; named to avoid clashing with java.util.List.indexOf(Object). */
+    /**
+     * Dart's {@code lastIndexOf(element, [start])}: searching backward from {@code start}
+     * (clamped to the last index), with Dart's {@code ==}.
+     */
+    public long lastIndexOfDart(E element, long start) {
+        long from = Math.min(start, (long) size() - 1);
+        for (int i = (int) from; i >= 0; i--) {
+            if (DartRuntime.eq(get(i), element)) {
+                return i;
+            }
+        }
+        return -1;
+    }
+
+    public long lastIndexOfDart(E element) {
+        return lastIndexOfDart(element, size() - 1);
+    }
+
     public long indexOfDart(E element) {
         for (int i = 0; i < size(); i++) {
             if (DartRuntime.eq(get(i), element)) {
@@ -365,7 +383,17 @@ public class DartList<E> extends AbstractList<E> implements RandomAccess {
 
     /** Dart's {@code List.lastIndexWhere(test, [start])}. */
     public long lastIndexWhere(Funcs.Func1<E, Boolean> test) {
-        for (int i = size() - 1; i >= 0; i--) {
+        return lastIndexWhere(test, size() - 1);
+    }
+
+    /**
+     * {@code lastIndexWhere(test, start)}: searches backward FROM {@code start}, which
+     * Dart clamps to the last index. The start was dropped, so the search always began
+     * at the end: [1, 2, 1].lastIndexWhere((x) => x == 1, 1) answered 2, not 0.
+     */
+    public long lastIndexWhere(Funcs.Func1<E, Boolean> test, long start) {
+        long from = Math.min(start, (long) size() - 1);
+        for (int i = (int) from; i >= 0; i--) {
             if (Boolean.TRUE.equals(test.call(get(i)))) {
                 return i;
             }
@@ -376,20 +404,42 @@ public class DartList<E> extends AbstractList<E> implements RandomAccess {
     /** Dart's {@code List.removeWhere(test)} — removes every matching element. */
     public void removeWhere(Funcs.Func1<E, Boolean> test) {
         checkGrowable("removeWhere");
-        for (int i = size() - 1; i >= 0; i--) {
-            if (Boolean.TRUE.equals(test.call(get(i)))) {
-                remove(i);
-            }
-        }
+        filter(test, false);
     }
 
     /** Dart's {@code List.retainWhere(test)} — keeps only matching elements. */
     public void retainWhere(Funcs.Func1<E, Boolean> test) {
         checkGrowable("retainWhere");
-        for (int i = size() - 1; i >= 0; i--) {
-            if (!Boolean.TRUE.equals(test.call(get(i)))) {
-                remove(i);
+        filter(test, true);
+    }
+
+    /**
+     * Keeps the elements whose test result equals {@code keepWhen}, calling the test on
+     * every element FRONT TO BACK, as Dart does, and compacting afterwards. Walking from
+     * the end reversed the callback order, so a predicate with state -- one alternating
+     * its answer, say -- was asked about 3, 2, 1 and removed different elements. A
+     * callback that changes the length is a ConcurrentModificationError, as in Dart.
+     */
+    private void filter(Funcs.Func1<E, Boolean> test, boolean keepWhen) {
+        int n = size();
+        boolean[] keep = new boolean[n];
+        for (int i = 0; i < n; i++) {
+            keep[i] = Boolean.TRUE.equals(test.call(get(i))) == keepWhen;
+            if (size() != n) {
+                throw new ConcurrentModificationError("list length changed from " + n + " to " + size());
             }
+        }
+        int j = 0;
+        for (int i = 0; i < n; i++) {
+            if (keep[i]) {
+                if (i != j) {
+                    set(j, get(i));
+                }
+                j++;
+            }
+        }
+        for (int i = n - 1; i >= j; i--) {
+            remove(i);
         }
     }
 
@@ -629,13 +679,20 @@ public class DartList<E> extends AbstractList<E> implements RandomAccess {
 
     @Override
     public String toString() {
-        StringBuilder sb = new StringBuilder("[");
-        for (int i = 0; i < size(); i++) {
-            if (i > 0) {
-                sb.append(", ");
-            }
-            sb.append(DartRuntime.str(get(i)));
+        if (!DartRuntime.beginFormat(this)) {
+            return "[...]";
         }
-        return sb.append("]").toString();
+        try {
+            StringBuilder sb = new StringBuilder("[");
+            for (int i = 0; i < size(); i++) {
+                if (i > 0) {
+                    sb.append(", ");
+                }
+                sb.append(DartRuntime.str(get(i)));
+            }
+            return sb.append("]").toString();
+        } finally {
+            DartRuntime.endFormat(this);
+        }
     }
 }

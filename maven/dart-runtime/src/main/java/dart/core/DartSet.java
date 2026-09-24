@@ -311,15 +311,22 @@ public class DartSet<E> extends LinkedHashSet<E> {
 
     @Override
     public String toString() {
-        StringBuilder sb = new StringBuilder("{");
-        boolean first = true;
-        for (E e : this) {
-            if (!first) {
-                sb.append(", ");
-            }
-            sb.append(DartRuntime.str(e));
-            first = false;
+        if (!DartRuntime.beginFormat(this)) {
+            return "{...}";   // a set that contains itself, as Dart prints it
         }
-        return sb.append("}").toString();
+        try {
+            StringBuilder sb = new StringBuilder("{");
+            boolean first = true;
+            for (E e : this) {
+                if (!first) {
+                    sb.append(", ");
+                }
+                sb.append(DartRuntime.str(e));
+                first = false;
+            }
+            return sb.append("}").toString();
+        } finally {
+            DartRuntime.endFormat(this);
+        }
     }
 }

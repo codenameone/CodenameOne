@@ -139,6 +139,35 @@ public final class DartRuntime {
         throw new RuntimeException(t);
     }
 
+    /** Collections whose toString is running, innermost last; compared by identity. */
+    private static final java.util.ArrayList<Object> FORMATTING = new java.util.ArrayList<Object>();
+
+    /**
+     * Starts formatting {@code collection}, or answers false when it is already being
+     * formatted further up -- a list that contains itself, directly or through another
+     * collection. Dart prints such a reference as {@code [...]} (or {@code {...}},
+     * {@code (...)}); formatting it again recursed until the stack overflowed.
+     * Pair every true answer with {@link #endFormat}.
+     */
+    public static boolean beginFormat(Object collection) {
+        for (int i = 0; i < FORMATTING.size(); i++) {
+            if (FORMATTING.get(i) == collection) {
+                return false;
+            }
+        }
+        FORMATTING.add(collection);
+        return true;
+    }
+
+    public static void endFormat(Object collection) {
+        for (int i = FORMATTING.size() - 1; i >= 0; i--) {
+            if (FORMATTING.get(i) == collection) {
+                FORMATTING.remove(i);
+                return;
+            }
+        }
+    }
+
     public static boolean eq(Object a, Object b) {
         if (a instanceof Number && b instanceof Number) {
             return numEq((Number) a, (Number) b);
@@ -153,9 +182,14 @@ public final class DartRuntime {
      * Object or a boxed collection element -- {@code List<num>.contains(1.0)}
      * holding the int 1 -- compared unequal. Double's equals is also wrong for
      * Dart in both directions: NaN is never == itself and 0.0 == -0.0, which
-     * the primitive comparison below gets right. An int against a double is
-     * compared exactly, as the Dart VM does, so 2^53 + 1 does not equal the
-     * double it would round to.
+     * the primitive comparison below gets right.
+     *
+     * An int against a double is compared after converting the int to double --
+     * measured on the Dart 3.9 VM, int.parse('9007199254740993') == 9007199254740992.0
+     * is true, and so is the largest int against 2^63. This used to compare exactly
+     * and answered false for both, which no Dart program observes. (compareTo IS
+     * exact on the VM; see DartComparable.compareIntDouble. ==, <, >, min and max
+     * are not, and neither is this.)
      */
     private static boolean numEq(Number a, Number b) {
         boolean ai = isIntegral(a);
@@ -168,12 +202,7 @@ public final class DartRuntime {
         }
         long l = ai ? a.longValue() : b.longValue();
         double d = ai ? b.doubleValue() : a.doubleValue();
-        // [-2^63, 2^63): the doubles a long can hold. Outside it (or NaN) no
-        // long is equal, and the (long) cast below would saturate into one.
-        if (!(d >= -9.223372036854775808E18 && d < 9.223372036854775808E18)) {
-            return false;
-        }
-        return (long) d == l && (double) l == d;
+        return (double) l == d;
     }
 
     private static boolean isIntegral(Number n) {
@@ -273,6 +302,10 @@ public final class DartRuntime {
                 long r = y.longValue();
                 c = l < r ? -1 : l > r ? 1 : 0;
             } else {
+                // An int against a double is compared as doubles, deliberately: that is
+                // what Dart's relational operators do. Measured on the Dart 3.9 VM,
+                // 9007199254740993 > 9007199254740992.0 is FALSE (statically, as num, and
+                // as dynamic), because the int is converted first. Only compareTo is exact.
                 double l = x.doubleValue();
                 double r = y.doubleValue();
                 if (Double.isNaN(l) || Double.isNaN(r)) {

@@ -35,6 +35,10 @@ public final class Uint8List {
     private final byte[] bytes;
 
     public Uint8List(long length) {
+        // Checked on the long, before narrowing, as ByteData and the lists are:
+        // Uint8List(2^32) cast to an empty list instead of failing.
+        dart.core.RangeError.checkNotNegative(length, "length");
+        dart.core.RangeError.checkAllocatable(length);
         this.bytes = new byte[(int) length];
     }
 

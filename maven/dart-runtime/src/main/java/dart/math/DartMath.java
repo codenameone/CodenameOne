@@ -78,6 +78,11 @@ public final class DartMath {
      * {@code min(1, 2.5)} is the int 1 -- converting both to double printed
      * "1.0" and failed an {@code is int} test. As in Dart, NaN wins and -0.0 is
      * below 0.0.
+     *
+     * <p>The comparison converts an int to double, as Dart's does: measured on the Dart
+     * 3.9 VM, {@code min(9007199254740993, 9007199254740992.0)} is the INT (the operands
+     * compare equal, so the first is kept) and {@code max(9007199254740992.0,
+     * 9007199254740993)} is the double -- exactly what this answers.</p>
      */
     public static Number minNum(Number a, Number b) {
         if (isIntegral(a) && isIntegral(b)) {

@@ -104,10 +104,11 @@ public class DartRuntimeTest {
         assertTrue(DartRuntime.eq(Double.valueOf(1.0), Long.valueOf(1)));
         assertTrue(DartRuntime.eq(Double.valueOf(0.0), Double.valueOf(-0.0)), "0.0 == -0.0");
         assertFalse(DartRuntime.eq(Double.valueOf(Double.NaN), Double.valueOf(Double.NaN)), "NaN is never == itself");
-        assertFalse(DartRuntime.eq(Long.valueOf(9007199254740993L), Double.valueOf(9007199254740992.0)),
-                "an int and a double compare exactly, not after rounding the int");
-        assertFalse(DartRuntime.eq(Long.valueOf(Long.MAX_VALUE), Double.valueOf(9.223372036854775807E18)),
-                "2^63 is outside every long; the cast must not saturate into equality");
+        // Recorded from the Dart 3.9 VM: == converts the int to double first.
+        assertTrue(DartRuntime.eq(Long.valueOf(9007199254740993L), Double.valueOf(9007199254740992.0)),
+                "2^53 + 1 == 2^53.0 on the VM");
+        assertTrue(DartRuntime.eq(Long.valueOf(Long.MAX_VALUE), Double.valueOf(9.223372036854775807E18)),
+                "the largest int == 2^63 on the VM");
         assertFalse(DartRuntime.eq(Long.valueOf(1), Double.valueOf(1.5)));
         dart.core.DartList<Object> nums = new dart.core.DartList<Object>();
         nums.add(Long.valueOf(1));
