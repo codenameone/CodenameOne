@@ -394,6 +394,9 @@ class OtlpTracerTest {
                 "the refusal quoted the credential: " + refused.getMessage());
         settings.setProperty(OtlpTracer.HEADERS, "Host=collector.example");
         assertThrows(IOException.class, () -> new OtlpTracer().open(Config.of(settings, "test")));
+        settings.setProperty(OtlpTracer.HEADERS, "Content-Type=application/json");
+        assertThrows(IOException.class, () -> new OtlpTracer().open(Config.of(settings, "test")),
+                "a configured Content-Type went out as a second one");
     }
 
     @Test

@@ -155,6 +155,15 @@ public final class TelemetryConfig {
     /// Whether `url` is http or https with a host (a DNS name, an IPv4 address or
     /// a bracketed IPv6 literal) and, if it names one, a port from 1 to 65535.
     static boolean isHttpUrl(String url) {
+        // The WHOLE URL first: no space, control or DEL anywhere. Only the
+        // authority was checked, so a space in the path passed and every export
+        // then failed at transport, silently.
+        for (int i = 0; i < url.length(); i++) {
+            char c = url.charAt(i);
+            if (c <= 0x20 || c == 0x7f) {
+                return false;
+            }
+        }
         int start;
         if (url.regionMatches(true, 0, "http://", 0, 7)) {
             start = 7;
@@ -249,6 +258,13 @@ public final class TelemetryConfig {
         return (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F');
     }
 
+    /// The headers the exporter owns: its body's type and framing, and the
+    /// destination, which come from what it sends and where.
+    static boolean isExporterOwned(String name) {
+        return "Content-Type".equalsIgnoreCase(name) || "Content-Length".equalsIgnoreCase(name)
+                || "Host".equalsIgnoreCase(name) || "Transfer-Encoding".equalsIgnoreCase(name);
+    }
+
     private static boolean onlyChars(String value, String extra) {
         for (int i = 0; i < value.length(); i++) {
             char c = value.charAt(i);
@@ -298,6 +314,14 @@ public final class TelemetryConfig {
     private static void checkHeader(String name, String value) {
         if (name.length() == 0) {
             throw new IllegalArgumentException("A telemetry header needs a name");
+        }
+        if (isExporterOwned(name)) {
+            // The exporter sets these from what it sends. A Content-Type given
+            // here replaced the media type -- addRequestHeader treats it as
+            // setContentType -- so protobuf went out labelled JSON and every batch
+            // was refused, after it had left the buffer.
+            throw new IllegalArgumentException(name + " is set by the exporter from what it "
+                    + "sends and cannot be configured");
         }
         for (int i = 0; i < name.length(); i++) {
             char c = name.charAt(i);

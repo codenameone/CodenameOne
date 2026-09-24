@@ -395,7 +395,6 @@ public final class Telemetry {
             request.setUrl(exportUrl);
             request.setPost(true);
             request.setHttpMethod("POST");
-            request.setContentType(json ? "application/json" : "application/x-protobuf");
             if (config.mode == TelemetryConfig.Mode.DIRECT) {
                 for (String[] header : config.headers) {
                     request.addRequestHeader(header[0], header[1]);
@@ -403,6 +402,9 @@ public final class Telemetry {
             } else if (config.relayToken != null && config.relayToken.length() > 0) {
                 request.addRequestHeader("X-CN1-Telemetry-Token", config.relayToken);
             }
+            // AFTER the configured headers, so nothing among them can relabel the
+            // body: the config refuses a Content-Type, and this holds regardless.
+            request.setContentType(json ? "application/json" : "application/x-protobuf");
             // A failed export is dropped, never retried into the queue: telemetry
             // must not compete with the app's own requests for the network.
             request.setFailSilently(true);

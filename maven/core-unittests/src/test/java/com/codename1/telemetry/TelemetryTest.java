@@ -625,7 +625,7 @@ class TelemetryTest extends UITestBase {
         String[] bad = {"https://", "https:///v1/traces", "ftp://collector.test",
             "collector.test:4318", "https://collector example", "https://c.test:99999",
             "https://[nope]:4318", "https://bad value@collector.test", "https://u%zz@collector.test",
-            "https://u%2@collector.test"};
+            "https://u%2@collector.test", "https://collector.test/bad path"};
         for (String url : bad) {
             try {
                 new TelemetryConfig().direct(url);
@@ -652,6 +652,7 @@ class TelemetryTest extends UITestBase {
     @Test
     void aHeaderOrRatioNoExportCouldUseIsRefusedWhenGiven() {
         String[][] bad = {{"Authorization", "token\nextra"}, {"Bad Name", "x"}, {"", "x"},
+            {"Content-Type", "application/json"}, {"content-length", "3"},
             {"X-Key", "a\u0000b"}, {"X-Key", "a\u007fb"}};
         for (String[] header : bad) {
             try {

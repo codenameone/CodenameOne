@@ -167,6 +167,12 @@ public class TelemetryAnnotationProcessorTest {
         assertFalse(TelemetryAnnotationProcessor.isHttpUrl("https://bad value@collector.example"));
         assertFalse(TelemetryAnnotationProcessor.isHttpUrl("https://u%zz@collector.example"));
         assertTrue(TelemetryAnnotationProcessor.isHttpUrl("https://user:p%40ss@collector.example"));
+        assertFalse(TelemetryAnnotationProcessor.isHttpUrl("https://collector.example/bad path"));
+    }
+
+    @Test
+    public void aHeaderTheExporterOwnsIsRefused() throws Exception {
+        assertRefused("@OpenTelemetry(endpoint = \"https://c.example\", headers = \"Content-Type: application/json\")");
     }
 
     @Test

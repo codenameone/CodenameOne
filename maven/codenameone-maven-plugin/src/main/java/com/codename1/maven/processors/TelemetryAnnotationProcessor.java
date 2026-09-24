@@ -127,6 +127,14 @@ public final class TelemetryAnnotationProcessor extends AbstractAnnotationProces
                         + "header name (letters, digits and !#$%&'*+-.^_`|~ only)");
                 return;
             }
+            // The ones TelemetryConfig refuses at run time, where the generated
+            // bootstrap would throw before Display.init.
+            if (name.equalsIgnoreCase("Content-Type") || name.equalsIgnoreCase("Content-Length")
+                    || name.equalsIgnoreCase("Host") || name.equalsIgnoreCase("Transfer-Encoding")) {
+                ctx.error(cls, "@OpenTelemetry header " + name + " is set by the exporter from "
+                        + "what it sends and cannot be configured");
+                return;
+            }
             if (value.length() == 0 || hasControl(value)) {
                 ctx.error(cls, "@OpenTelemetry header " + name + " has an empty value or one "
                         + "containing a control character such as a line break");
@@ -289,6 +297,15 @@ public final class TelemetryAnnotationProcessor extends AbstractAnnotationProces
     /// normalized to "https:/v1/traces", and every export -- fail-silent by design --
     /// went nowhere while the build reported the setting as checked.
     static boolean isHttpUrl(String url) {
+        // The WHOLE URL first: no space, control or DEL anywhere. Only the
+        // authority was checked, so a space in the path passed and every export
+        // then failed at transport, silently.
+        for (int i = 0; i < url.length(); i++) {
+            char c = url.charAt(i);
+            if (c <= 0x20 || c == 0x7f) {
+                return false;
+            }
+        }
         int start;
         if (url.regionMatches(true, 0, "http://", 0, 7)) {
             start = 7;

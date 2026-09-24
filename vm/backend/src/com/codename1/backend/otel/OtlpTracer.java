@@ -425,6 +425,15 @@ public final class OtlpTracer implements Tracer {
      * produced no traces.
      */
     static boolean hasHttpAuthority(String url) {
+        // The WHOLE URL first, by the rule Web applies when it sends: no space,
+        // control or DEL anywhere. Only the authority was checked, so a space in
+        // the path passed and every export then failed at transport, silently.
+        for(int iter = 0 ; iter < url.length() ; iter++) {
+            char c = url.charAt(iter);
+            if(c <= 0x20 || c == 0x7f) {
+                return false;
+            }
+        }
         int start;
         if(url.regionMatches(true, 0, "http://", 0, 7)) {
             start = 7;
@@ -765,6 +774,13 @@ public final class OtlpTracer implements Tracer {
             if(name.length() == 0) {
                 throw new IOException(HEADERS + " has an entry with no header name");
             }
+            if(name.equalsIgnoreCase("content-type")) {
+                // The exporter sets it from the protocol, and Web sends every line,
+                // so a configured one went out as a SECOND Content-Type -- one of
+                // which contradicts the body.
+                throw new IOException(HEADERS + " sets Content-Type, which the exporter "
+                        + "sets from " + PROTOCOL);
+            }
             for(int iter = 0 ; iter < name.length() ; iter++) {
                 char c = name.charAt(iter);
                 boolean token = (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z')
@@ -852,6 +868,18 @@ public final class OtlpTracer implements Tracer {
             bytes.put((hi << 4) | lo);
             iter += 2;
         }
-        return new String(bytes.bytes(), 0, bytes.length(), "UTF-8");
+        // Well-formed UTF-8, or refused. Decoding replaced a bad sequence
+        // ("orders%C3%28") with U+FFFD, and resource attributes meet no later check,
+        // so the tracer started and exported a mangled service.name. A decode that
+        // re-encodes to anything but the same bytes was not well formed: a bad
+        // sequence comes back as the replacement character, an overlong one as
+        // its shorter spelling.
+        byte[] raw = new byte[bytes.length()];
+        System.arraycopy(bytes.bytes(), 0, raw, 0, raw.length);
+        String decoded = new String(raw, "UTF-8");
+        if(!java.util.Arrays.equals(raw, decoded.getBytes("UTF-8"))) {
+            throw new IOException(key + " has a percent escape that is not well-formed UTF-8");
+        }
+        return decoded;
     }
 }

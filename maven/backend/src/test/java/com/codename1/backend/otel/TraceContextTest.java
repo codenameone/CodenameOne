@@ -314,6 +314,9 @@ class TraceContextTest {
         assertFalse(OtlpTracer.hasHttpAuthority("https://u%zz@collector.example"));
         assertFalse(OtlpTracer.hasHttpAuthority("https://a@b@collector.example"));
         assertTrue(OtlpTracer.hasHttpAuthority("https://user:p%40ss@collector.example"));
+        // The whole URL, not only its authority.
+        assertFalse(OtlpTracer.hasHttpAuthority("https://collector.example/bad value"));
+        assertFalse(OtlpTracer.hasHttpAuthority("https://collector.example/v1?q=a\tb"));
     }
 
     @Test
@@ -353,6 +356,22 @@ class TraceContextTest {
         java.util.Map out = new java.util.LinkedHashMap();
         OtlpTracer.parsePairs("label=\ud83d\ude00%20ok", out, "test");
         assertEquals("\ud83d\ude00 ok", out.get("label"));
+    }
+
+    @Test
+    @DisplayName("a percent escape that is not well-formed UTF-8 is refused, not mangled")
+    void malformedUtf8IsRefused() throws Exception {
+        for(String bad : new String[] {"service.name=orders%C3%28", "x=%C0%AF", "x=%ED%A0%80"}) {
+            try {
+                OtlpTracer.parsePairs(bad, new java.util.LinkedHashMap(), "test");
+                throw new AssertionError("accepted " + bad);
+            } catch (java.io.IOException expected) {
+                assertTrue(expected.getMessage().contains("UTF-8"), expected.getMessage());
+            }
+        }
+        java.util.Map ok = new java.util.LinkedHashMap();
+        OtlpTracer.parsePairs("service.name=caf%C3%A9", ok, "test");
+        assertEquals("caf\u00e9", ok.get("service.name"));
     }
 
     @Test
