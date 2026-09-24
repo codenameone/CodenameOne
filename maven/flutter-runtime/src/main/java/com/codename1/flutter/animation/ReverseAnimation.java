@@ -23,6 +23,8 @@
  */
 package com.codename1.flutter.animation;
 
+import dart.runtime.Funcs;
+
 /**
  * Runs a parent animation in reverse — Flutter's {@code ReverseAnimation}. Its
  * {@link #value()} is {@code 1 - parent.value()} and its status is the parent's
@@ -33,8 +35,43 @@ public class ReverseAnimation extends Animation<Double> {
 
     private final Animation<Double> parent;
 
+    /**
+     * Forwards the parent's changes to this animation's own listeners. Listeners were
+     * stored on the wrapper and nothing ever notified them, so a fade driven by a
+     * ReverseAnimation stayed at the value it first rendered with.
+     */
+    private final Funcs.VoidFunc0 valueRelay = new Funcs.VoidFunc0() {
+        @Override
+        public void call() {
+            notifyListeners();
+        }
+    };
+
+    private final Funcs.VoidFunc1<AnimationStatus> statusRelay = new Funcs.VoidFunc1<AnimationStatus>() {
+        @Override
+        public void call(AnimationStatus s) {
+            notifyStatusListeners(reverse(s));
+        }
+    };
+
     public ReverseAnimation(Animation<Double> parent) {
         this.parent = parent;
+    }
+
+    @Override
+    protected void didStartListening() {
+        if (parent != null) {
+            parent.addListener(valueRelay);
+            parent.addStatusListener(statusRelay);
+        }
+    }
+
+    @Override
+    protected void didStopListening() {
+        if (parent != null) {
+            parent.removeListener(valueRelay);
+            parent.removeStatusListener(statusRelay);
+        }
     }
 
     public Animation<Double> getParent() {
@@ -52,7 +89,12 @@ public class ReverseAnimation extends Animation<Double> {
         if (parent == null) {
             return AnimationStatus.dismissed;
         }
-        switch (parent.status()) {
+        return reverse(parent.status());
+    }
+
+    /** The parent's status as seen running backward. */
+    private static AnimationStatus reverse(AnimationStatus s) {
+        switch (s) {
             case forward:
                 return AnimationStatus.reverse;
             case reverse:
@@ -62,7 +104,7 @@ public class ReverseAnimation extends Animation<Double> {
             case dismissed:
                 return AnimationStatus.completed;
             default:
-                return parent.status();
+                return s;
         }
     }
 }

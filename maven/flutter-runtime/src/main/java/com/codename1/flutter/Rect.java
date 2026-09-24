@@ -106,9 +106,13 @@ public final class Rect {
         return left >= right || top >= bottom;
     }
 
+    /** Flutter's {@code isFinite}: no coordinate infinite OR NaN -- a NaN rect is not finite. */
     public boolean isFinite() {
-        return !Double.isInfinite(left) && !Double.isInfinite(top)
-                && !Double.isInfinite(right) && !Double.isInfinite(bottom);
+        return finite(left) && finite(top) && finite(right) && finite(bottom);
+    }
+
+    private static boolean finite(double v) {
+        return !Double.isInfinite(v) && !Double.isNaN(v);
     }
 
     public boolean hasNaN() {

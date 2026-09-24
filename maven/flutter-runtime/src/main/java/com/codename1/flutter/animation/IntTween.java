@@ -24,8 +24,10 @@
 package com.codename1.flutter.animation;
 
 /**
- * A {@link Tween} that interpolates integers, rounding toward zero like
- * Flutter's {@code IntTween} ({@code begin + (end - begin) * t}, truncated).
+ * A {@link Tween} that interpolates integers, ROUNDING to the nearest like Flutter's
+ * {@code IntTween} ({@code (begin + (end - begin) * t).round()}). It truncated, which
+ * is neither IntTween nor StepTween (that one floors), so a 0 to 1 tween stayed 0 until
+ * the very end and every threshold landed late.
  */
 public class IntTween extends Tween<Integer> {
 
@@ -35,6 +37,6 @@ public class IntTween extends Tween<Integer> {
         Integer e = end();
         int bi = b == null ? 0 : b.intValue();
         int ei = e == null ? 0 : e.intValue();
-        return (int) (bi + (ei - bi) * t);
+        return (int) dart.runtime.DartRuntime.round(bi + (ei - bi) * t);
     }
 }

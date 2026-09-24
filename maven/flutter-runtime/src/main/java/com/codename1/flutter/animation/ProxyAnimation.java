@@ -23,6 +23,8 @@
  */
 package com.codename1.flutter.animation;
 
+import dart.runtime.Funcs;
+
 /**
  * An {@link Animation} that delegates to a swappable inner animation —
  * Flutter's {@code ProxyAnimation}. When {@link #parent(Animation)} is null the
@@ -42,12 +44,74 @@ public class ProxyAnimation extends Animation<Double> {
         parent(animation);
     }
 
+    /**
+     * Forwards the parent's changes to this proxy's listeners, as Flutter's does. They
+     * were stored and never notified, so a widget listening to the proxy froze.
+     */
+    private final Funcs.VoidFunc0 valueRelay = new Funcs.VoidFunc0() {
+        @Override
+        public void call() {
+            notifyListeners();
+        }
+    };
+
+    private final Funcs.VoidFunc1<AnimationStatus> statusRelay = new Funcs.VoidFunc1<AnimationStatus>() {
+        @Override
+        public void call(AnimationStatus s) {
+            notifyStatusListeners(s);
+        }
+    };
+
     public void parent(Animation<Double> v) {
+        if (v == parent) {
+            return;
+        }
+        double oldValue = value();
+        AnimationStatus oldStatus = status();
         if (parent != null) {
-            cachedValue = value();
-            cachedStatus = status();
+            cachedValue = oldValue;
+            cachedStatus = oldStatus;
+            if (hasAnyListeners()) {
+                unsubscribe(parent);
+            }
         }
         this.parent = v;
+        if (parent != null) {
+            if (hasAnyListeners()) {
+                subscribe(parent);
+            }
+            // Swapping the parent is itself a change, when it moves the value or status.
+            if (value() != oldValue) {
+                notifyListeners();
+            }
+            if (status() != oldStatus) {
+                notifyStatusListeners(status());
+            }
+        }
+    }
+
+    @Override
+    protected void didStartListening() {
+        if (parent != null) {
+            subscribe(parent);
+        }
+    }
+
+    @Override
+    protected void didStopListening() {
+        if (parent != null) {
+            unsubscribe(parent);
+        }
+    }
+
+    private void subscribe(Animation<Double> p) {
+        p.addListener(valueRelay);
+        p.addStatusListener(statusRelay);
+    }
+
+    private void unsubscribe(Animation<Double> p) {
+        p.removeListener(valueRelay);
+        p.removeStatusListener(statusRelay);
     }
 
     public Animation<Double> getParent() {

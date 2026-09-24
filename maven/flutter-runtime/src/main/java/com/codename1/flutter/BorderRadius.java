@@ -90,8 +90,10 @@ public final class BorderRadius extends BorderRadiusGeometry {
      */
     public static BorderRadius lerp(BorderRadius a, BorderRadius b, double t) {
         if (a == null && b == null) return null;
-        if (a == null) return b;
-        if (b == null) return a;
+        // A null end is zero, as in Flutter: the other end's corners scale by t (or
+        // 1 - t). Returning it unchanged made the tween jump to, or from, fully rounded.
+        if (a == null) return lerp(zero, b, t);
+        if (b == null) return lerp(a, zero, t);
         return new BorderRadius(
                 Radius.lerp(a.topLeft, b.topLeft, t),
                 Radius.lerp(a.topRight, b.topRight, t),

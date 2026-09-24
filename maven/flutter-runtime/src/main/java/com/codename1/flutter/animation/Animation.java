@@ -75,22 +75,55 @@ public abstract class Animation<T> implements Listenable {
 
     public void addListener(Funcs.VoidFunc0 listener) {
         if (listener != null) {
+            boolean first = !hasAnyListeners();
             listeners.add(listener);
+            if (first) {
+                didStartListening();
+            }
         }
     }
 
     public void removeListener(Funcs.VoidFunc0 listener) {
+        boolean had = hasAnyListeners();
         listeners.remove(listener);
+        if (had && !hasAnyListeners()) {
+            didStopListening();
+        }
     }
 
     public void addStatusListener(Funcs.VoidFunc1<AnimationStatus> listener) {
         if (listener != null) {
+            boolean first = !hasAnyListeners();
             statusListeners.add(listener);
+            if (first) {
+                didStartListening();
+            }
         }
     }
 
     public void removeStatusListener(Funcs.VoidFunc1<AnimationStatus> listener) {
+        boolean had = hasAnyListeners();
         statusListeners.remove(listener);
+        if (had && !hasAnyListeners()) {
+            didStopListening();
+        }
+    }
+
+    /** Whether anyone listens to this animation's value or status. */
+    protected final boolean hasAnyListeners() {
+        return !listeners.isEmpty() || !statusListeners.isEmpty();
+    }
+
+    /**
+     * The first listener arrived: an animation derived from another subscribes to it
+     * here, as Flutter's AnimationLazyListenerMixin does, so it forwards changes only
+     * while someone is listening and never holds its parent's listener list otherwise.
+     */
+    protected void didStartListening() {
+    }
+
+    /** The last listener left: undo {@link #didStartListening()}. */
+    protected void didStopListening() {
     }
 
     protected void notifyListeners() {
@@ -103,8 +136,12 @@ public abstract class Animation<T> implements Listenable {
 
     /** Removes every value and status listener, as Flutter's dispose does. */
     protected void clearListeners() {
+        boolean had = hasAnyListeners();
         listeners.clear();
         statusListeners.clear();
+        if (had) {
+            didStopListening();
+        }
     }
 
     /**
