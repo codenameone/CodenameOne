@@ -604,39 +604,89 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
             throw error;
         }
     }
+    private List<Object> removalTargets(Entry owner, int index) {
+        initialize(owner.entity, index);
+        Relationship relation = owner.model.relationships()[index];
+        EntityModel target = model(relation.target);
+        if (relation.mappedBy.length() > 0) {
+            int inverse = target.relationIndex(relation.mappedBy);
+            if (target.relationships()[inverse].column >= 0) {
+                // The database snapshot may predate pending owning-side moves.
+                // Hydration registers its rows; include incoming managed children
+                // and exclude outgoing ones without flushing a removed/fresh owner.
+                List<Object> result = new ArrayList<Object>();
+                for (Entry child : new ArrayList<Entry>(entries.values())) {
+                    if (!relation.target.isInstance(child.entity) || child.removed) {
+                        continue;
+                    }
+                    EntityState state = state(child.entity);
+                    boolean belongs;
+                    if (state != null && !state.loaded[inverse]) {
+                        belongs = !owner.fresh && same(state.keys[inverse], owner.model.identifier(owner.entity));
+                    } else {
+                        Object currentOwner = target.relation(child.entity, inverse);
+                        Entry managedOwner = entries.get(currentOwner);
+                        belongs = sameInstance(currentOwner, owner.entity)
+                                || currentOwner != null && !owner.fresh
+                                        && (managedOwner == null || !managedOwner.fresh)
+                                        && same(owner.model.identifier(currentOwner), owner.model.identifier(owner.entity));
+                    }
+                    if (belongs) {
+                        result.add(child.entity);
+                    }
+                }
+                return result;
+            }
+        }
+        Object value = owner.model.relation(owner.entity, index);
+        List<Object> result = new ArrayList<Object>();
+        if (value != null) {
+            if (relation.many) {
+                for (Object child : relatedValues(value)) {
+                    result.add(child);
+                }
+            } else {
+                result.add(value);
+            }
+        }
+        return result;
+    }
     private void removeInternal(Object entity) {
         requireTransaction();
+        List<Entry> removal = new ArrayList<Entry>();
+        collectRemoval(entity, new IdentityHashMap<Object, Boolean>(), removal);
+        // Initialize the complete cascade graph while every owner can still be
+        // found by eager back-references. Then mark it atomically for removal.
+        for (Entry entry : removal) {
+            entry.removed = true;
+        }
+        for (Entry entry : removal) {
+            if (entry.fresh) {
+                detachOne(entry.entity);
+            }
+        }
+    }
+    private void collectRemoval(Object entity, IdentityHashMap<Object, Boolean> visited, List<Entry> removal) {
         Entry entry = entries.get(entity);
         if (entry == null) {
             throw new PersistenceException("remove requires a managed entity");
         }
-        if (entry.removed) {
+        if (entry.removed || visited.put(entity, Boolean.TRUE) != null) {
             return;
         }
         checkManagedIdentity(entry);
-        entry.removed = true;
+        removal.add(entry);
         Relationship[] relations = entry.model.relationships();
         for (int i = 0; i < relations.length; i++) {
             if ((relations[i].cascade & Relationship.REMOVE) == 0 && !relations[i].orphanRemoval) {
                 continue;
             }
-            initialize(entity, i);
-            Object value = entry.model.relation(entity, i);
-            if (value == null) {
-                continue;
+            for (Object child : removalTargets(entry, i)) {
+                collectRemoval(child, visited, removal);
             }
-            if (relations[i].many) {
-                for (Object child : relatedValues(value)) {
-                    remove(child);
-                }
-            } else {
-                remove(value);
-            }
-        }
-        if (entry.fresh) {
-            detachOne(entity);
         }
     }
+
     @Override
     public void refresh(Object entity) {
         check();

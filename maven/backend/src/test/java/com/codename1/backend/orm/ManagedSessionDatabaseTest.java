@@ -122,6 +122,12 @@ class ManagedSessionDatabaseTest {
             assertEquals("record",((Object[])session.createQuery("select (select max(i.name) from ManagedSessionTest$Record i where i.id=r.id),count(r.id) from ManagedSessionTest$Record r group by r.id").first())[0]);
             assertThrows(IllegalArgumentException.class,()->session.createQuery("select r from ManagedSessionTest$Record r where :a=:b"));
             assertThrows(IllegalArgumentException.class,()->session.createQuery("select (select i.name from ManagedSessionTest$Record i) from ManagedSessionTest$Record r"));
+            for(String expression:new String[]{"r.counter+:n","coalesce(r.counter,:n)","r.counter+2"}) {
+                JpqlQuery groupedQuery=session.createQuery("select "+expression+",count(r.id) from ManagedSessionTest$Record r group by "+expression+" having count(r.id)>0");
+                if(expression.contains(":n")) groupedQuery.setParameter("n",2L);
+                Object[] groupedRow=(Object[])groupedQuery.first();assertNotNull(groupedRow);assertEquals(Long.valueOf(1),groupedRow[1]);
+            }
+            Object[] repeatedGroup=(Object[])session.createQuery("select r.counter+:n,r.counter+:n,count(r.id) from ManagedSessionTest$Record r group by r.counter+:n").setParameter("n",2L).first();assertEquals(Long.valueOf(2),repeatedGroup[0]);assertEquals(repeatedGroup[0],repeatedGroup[1]);assertEquals(Long.valueOf(1),repeatedGroup[2]);
             assertEquals(Double.valueOf(0),session.createQuery("select avg(r.counter) from ManagedSessionTest$Record r",Double.class).first());
             assertNull(session.createQuery("select avg(r.counter) from ManagedSessionTest$Record r where r.id<0",Double.class).first());
             String[] overflowExpressions={":value+1",":value-1",":value*2",":value/-1","-:value"};

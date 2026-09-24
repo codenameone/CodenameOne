@@ -109,6 +109,8 @@ to `FetchType.LAZY`. Override these defaults with the annotation's `fetch`
 member. `CascadeType` selects the persistence operations to propagate.
 `orphanRemoval=true` removes children dropped from an initialized relationship.
 Application code maintains both sides of bidirectional object relationships.
+Removal cascades on inverse to-one and to-many relationships account for pending
+owning-side moves before choosing which children to remove.
 
 The build enhances entity classes and field-access callers so a normal public
 field read can initialize a lazy relationship. No runtime proxy generator or
@@ -244,7 +246,10 @@ custom basic value to a SQL scalar. The converter implements
 no-argument constructor. It receives null values too, including mapped JPQL
 `NULL` literals. Query-builder predicates
 and JPQL comparison parameters and literals apply the field's converter.
-The builder converts values before choosing equality or SQL null predicates. Values
+The builder converts values before choosing equality or SQL null predicates.
+JPQL and builder `IS NULL` tests also apply the mapped null conversion. A converter
+that stores null as a non-null sentinel uses a comparison with that sentinel.
+Values
 must match the converter's input type; use a named parameter for custom objects. Identifiers and
 versions can't use converters. This includes every component of an embedded identifier.
 

@@ -632,6 +632,7 @@ class ManagedSessionTest {
             assertEquals(1,session.createQuery("select r.name, count(r.id) from ManagedSessionTest$Record r group by r.name having count(r.id)>0").list().size());
             assertEquals(1,session.createQuery("select upper(r.name), count(r.id) from ManagedSessionTest$Record r group by r.name order by count(r.id)").list().size());
             assertEquals(1,session.createQuery("select lower(r.name), count(r.id) from ManagedSessionTest$Record r group by lower(r.name)").list().size());
+            Object[] grouped=(Object[])session.createQuery("select r.counter+:n,count(r.id) from ManagedSessionTest$Record r group by r.counter+:n").setParameter("n",2L).first();assertEquals(Long.valueOf(2),grouped[0]);assertEquals(Long.valueOf(1),grouped[1]);
             assertEquals(Long.valueOf(2),session.createQuery("select count(r.id)+1 from ManagedSessionTest$Record r",Long.class).first());session.close();
         } finally { em.close(); }
     }

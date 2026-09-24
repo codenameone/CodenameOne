@@ -540,7 +540,18 @@ public final class JpqlQueryImpl<T> implements com.codename1.orm.session.JpqlQue
                     if (terms.length() > 0) {
                         terms.append(", ");
                     }
-                    terms.append(term.sql);
+                    // A SELECT position reuses that expression's binding positions
+                    // on PostgreSQL, where separate equal-valued parameters differ.
+                    StringBuilder selectedPositions = new StringBuilder();
+                    for (int i = 0; i < selections.size(); i++) {
+                        if (term.sql.indexOf("/*cn1-bind-") >= 0 && sameExpression(term, selections.get(i))) {
+                            if (selectedPositions.length() > 0) {
+                                selectedPositions.append(", ");
+                            }
+                            selectedPositions.append(i + 1);
+                        }
+                    }
+                    terms.append(selectedPositions.length() == 0 ? term.sql : selectedPositions.toString());
                 } while (take(","));
                 group = " GROUP BY " + terms;
             }
@@ -679,6 +690,14 @@ public final class JpqlQueryImpl<T> implements com.codename1.orm.session.JpqlQue
                 }
                 boolean not = take("NOT");
                 expect("NULL");
+                if (left.projectionQuery != null
+                        && left.projectionQuery.parameter(left.projectionField, null) != null) {
+                    Expr mappedNull = literal(left.kind, null);
+                    mappedNull.literalBinding.query = left.projectionQuery;
+                    mappedNull.literalBinding.field = left.projectionField;
+                    return node(left.sql + (not ? " <> " : " = ") + mappedNull.sql,
+                            Attribute.BOOLEAN, left, mappedNull);
+                }
                 return node(left.sql + (not ? " IS NOT NULL" : " IS NULL"), Attribute.BOOLEAN, left);
             }
             boolean not = take("NOT");

@@ -163,12 +163,12 @@ public final class QueryImpl<T> implements com.codename1.orm.session.Query<T> {
         if (kind(field) != Attribute.TEXT) {
             throw new IllegalArgumentException("LIKE requires text storage: " + field);
         }
-        String name = column(field);
         Object converted = builderParameter(field, pattern);
         if (converted != null && !(converted instanceof String)) {
             throw new IllegalArgumentException("LIKE requires a text pattern after conversion");
         }
         String normalized = session.likePattern((String) converted, null);
+        String name = column(field);
         conjunction();
         predicates.append(name).append(session.likeOperator(false));
         params.add(normalized);
@@ -186,11 +186,11 @@ public final class QueryImpl<T> implements com.codename1.orm.session.Query<T> {
     public QueryImpl<T> in(String field, Object... values) {
         SessionImpl.checkParameterCount(params.size() + values.length);
 
-        String name = column(field);
         Object[] converted = new Object[values.length];
         for (int i = 0; i < values.length; i++) {
             converted[i] = builderParameter(field, values[i]);
         }
+        String name = column(field);
         conjunction();
         if (values.length == 0) {
             predicates.append("1 = 0");
@@ -298,12 +298,12 @@ public final class QueryImpl<T> implements com.codename1.orm.session.Query<T> {
         return ((Number) rows.get(0)[0]).longValue();
     }
     private QueryImpl<T> compare(String field, String op, Object value) {
-        String name = column(field);
-        if (">".equals(op) || "<".equals(op) || ">=".equals(op) || "<=".equals(op)) {
-            name = session.orderValue(name, kind(field));
-        }
         boolean unary = op.startsWith("IS ");
-        Object converted = unary ? null : builderParameter(field, value);
+        Object converted = builderParameter(field, value);
+        if (unary && converted != null) {
+            op = "IS NULL".equals(op) ? "=" : "<>";
+            unary = false;
+        }
         if (!unary && converted == null) {
             if ("=".equals(op) || "<>".equals(op)) {
                 op = "=".equals(op) ? "IS NULL" : "IS NOT NULL";
@@ -311,6 +311,10 @@ public final class QueryImpl<T> implements com.codename1.orm.session.Query<T> {
             } else {
                 throw new IllegalArgumentException("Null comparison requires isNull/isNotNull");
             }
+        }
+        String name = column(field);
+        if (">".equals(op) || "<".equals(op) || ">=".equals(op) || "<=".equals(op)) {
+            name = session.orderValue(name, kind(field));
         }
         conjunction();
         predicates.append(name).append(' ').append(op);
@@ -328,15 +332,14 @@ public final class QueryImpl<T> implements com.codename1.orm.session.Query<T> {
             this.index = index;
         }
     }
-    private void validatePath(String path, boolean attribute) {
+    private Field validatePath(String path, boolean attribute) {
         EntityModel current = model;
         String remaining = path;
         while (true) {
             if (attribute) {
                 for (Attribute candidate : current.attributes()) {
                     if (candidate.field.equals(remaining)) {
-                        current.queryIndex(remaining);
-                        return;
+                        return new Field(new Join(current, "", ""), current.queryIndex(remaining));
                     }
                 }
             }
@@ -351,7 +354,7 @@ public final class QueryImpl<T> implements com.codename1.orm.session.Query<T> {
             }
             current = session.model(relation.target);
             if (dot < 0) {
-                return;
+                return null;
             }
             remaining = remaining.substring(dot + 1);
         }
@@ -396,7 +399,7 @@ public final class QueryImpl<T> implements com.codename1.orm.session.Query<T> {
         return converted;
     }
     Object parameter(String field, Object value) {
-        Field resolved = resolveField(field);
+        Field resolved = validatePath(field, true);
         return resolved.join.model.parameter(resolved.index, value);
     }
     boolean nonNull(String field) {
@@ -404,11 +407,11 @@ public final class QueryImpl<T> implements com.codename1.orm.session.Query<T> {
         return !resolved.join.left && resolved.join.model.nonNullQueryValue(resolved.index);
     }
     String mapping(String field) {
-        Field resolved = resolveField(field);
+        Field resolved = validatePath(field, true);
         return resolved.join.model.mapping(resolved.index);
     }
     Object project(String field, Object value) {
-        Field resolved = resolveField(field);
+        Field resolved = validatePath(field, true);
         return resolved.join.model.project(resolved.index, value);
     }
     String column(String field) {
@@ -504,7 +507,7 @@ public final class QueryImpl<T> implements com.codename1.orm.session.Query<T> {
         return result.toString();
     }
     int kind(String field) {
-        Field resolved = resolveField(field);
+        Field resolved = validatePath(field, true);
         return resolved.join.model.attributes()[resolved.index].kind;
     }
     String rootColumns() {
