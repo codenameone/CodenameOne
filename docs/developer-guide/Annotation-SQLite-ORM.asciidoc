@@ -172,8 +172,9 @@ are rejected for those fields. Literal and bound null assignments to primitive
 Java fields are rejected on both runtimes. Primitive assignments also reject
 expressions that may return null. Use `COALESCE(expression, 0)` to supply a non-null
 fallback for nullable numeric fields, division by a variable or zero, and nullable
-aggregate results. Parameters needed to keep an expression non-null are checked
-before execution. Field-to-field assignments require
+aggregate results. A scalar aggregate without `GROUP BY` or `HAVING` can be assigned
+directly when its result is non-null, such as `COUNT` or `COALESCE(SUM(...), 0)`.
+Parameters needed to keep an expression non-null are checked before execution. Field-to-field assignments require
 matching enum types and converter mappings, including fields inside expressions.
 Integral attributes reject real-valued assignment expressions and floating-point
 parameter values. Assignments also check the mapped integer range, including

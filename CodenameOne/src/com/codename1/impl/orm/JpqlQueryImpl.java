@@ -334,6 +334,7 @@ public final class JpqlQueryImpl<T> implements com.codename1.orm.session.JpqlQue
         boolean nonNull;
         boolean nullPreserving;
         boolean coalesce;
+        Expr scalarProjection;
         QueryImpl projectionQuery;
         String projectionField;
         Object literalValue;
@@ -355,6 +356,7 @@ public final class JpqlQueryImpl<T> implements com.codename1.orm.session.JpqlQue
         EntityModel entity;
         boolean mutation;
         boolean singleRow;
+        boolean guaranteedRow;
         final List<Object> bindings;
         final List<String> fetches = new ArrayList<String>();
         Plan(List<Object> bindings, List<Expr> correlations) {
@@ -611,6 +613,7 @@ public final class JpqlQueryImpl<T> implements com.codename1.orm.session.JpqlQue
                     plan.singleRow |= hasRowAggregate(expression);
                 }
             }
+            plan.guaranteedRow = plan.singleRow && having.length() == 0;
             if (mutationTable != null && "mysql".equals(session.sqlDialect()) && root.readsTable(mutationTable)) {
                 throw error("MySQL bulk subqueries cannot read the mutation target table");
             }
@@ -836,6 +839,9 @@ public final class JpqlQueryImpl<T> implements com.codename1.orm.session.JpqlQue
                     }
                     Expr result = new Expr("(" + nested.sql + ")", nested.kinds[0]);
                     result.children.addAll(nested.correlations);
+                    if (nested.guaranteedRow) {
+                        result.scalarProjection = nested.projections.get(0);
+                    }
                     result.projectionQuery = nested.projections.get(0).projectionQuery;
                     result.projectionField = nested.projections.get(0).projectionField;
                     return result;
@@ -1110,6 +1116,9 @@ public final class JpqlQueryImpl<T> implements com.codename1.orm.session.JpqlQue
             return kind;
         }
         private boolean nonNullExpression(Expr value, boolean allowParameters, boolean enforce) {
+            if (value.scalarProjection != null) {
+                return nonNullExpression(value.scalarProjection, allowParameters, enforce);
+            }
             if (value.parameter != null) {
                 if (allowParameters && enforce) {
                     value.parameter.nonNull = true;

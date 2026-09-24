@@ -62,12 +62,14 @@ public final class QueryImpl<T> implements com.codename1.orm.session.Query<T> {
     /// Adds an inner join on a mapped relationship path.
     @Override
     public QueryImpl<T> join(String path) {
+        validatePath(path, false);
         ensureJoin(path, false);
         return this;
     }
     /// Adds a left join on a mapped relationship path before using it in a predicate.
     @Override
     public QueryImpl<T> leftJoin(String path) {
+        validatePath(path, false);
         ensureJoin(path, true);
         return this;
     }
@@ -326,7 +328,38 @@ public final class QueryImpl<T> implements com.codename1.orm.session.Query<T> {
             this.index = index;
         }
     }
+    private void validatePath(String path, boolean attribute) {
+        EntityModel current = model;
+        String remaining = path;
+        while (true) {
+            if (attribute) {
+                for (Attribute candidate : current.attributes()) {
+                    if (candidate.field.equals(remaining)) {
+                        current.queryIndex(remaining);
+                        return;
+                    }
+                }
+            }
+            int dot = remaining.indexOf('.');
+            if (attribute && dot < 0) {
+                throw new IllegalArgumentException("Unknown attribute: " + path);
+            }
+            String field = dot < 0 ? remaining : remaining.substring(0, dot);
+            Relationship relation = current.relationships()[current.queryRelationIndex(field)];
+            if (relation.element) {
+                throw new IllegalArgumentException("Use containsElement() for scalar collections");
+            }
+            current = session.model(relation.target);
+            if (dot < 0) {
+                return;
+            }
+            remaining = remaining.substring(dot + 1);
+        }
+    }
     private Field resolveField(String path) {
+        // Validate the complete path before creating joins or promoting existing
+        // ordering-only joins into predicates/counts.
+        validatePath(path, true);
         Join join = new Join(model, rootAlias, "");
         String remaining = path;
         int offset = 0;

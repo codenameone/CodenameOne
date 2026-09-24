@@ -1137,13 +1137,16 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
         return "com.codename1.impl.orm.Values."+method+"("+value+")";
     }
     private static String embeddedNullCondition(String path) {
+        return embeddedNullCondition(path,"e");
+    }
+    private static String embeddedNullCondition(String path,String instance) {
         StringBuilder condition=new StringBuilder();
         int dot=path.indexOf('.');
         while(dot>=0) {
-            condition.append("e.").append(path.substring(0,dot)).append(" == null || ");
+            condition.append(instance).append('.').append(path.substring(0,dot)).append(" == null || ");
             dot=path.indexOf('.',dot+1);
         }
-        return condition.append("e.").append(path).append(" == null").toString();
+        return condition.append(instance).append('.').append(path).append(" == null").toString();
     }
 
     private static String generateModelSource(EntityClass ec, boolean backend) {
@@ -1360,7 +1363,11 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
             sb.append("public Object[] keyValues(Object key) { if(key instanceof ").append(type)
                 .append(") { ").append(type).append(" value=(").append(type).append(")key; return super.keyValues(new Object[]{");
             for(int i=0;i<ec.idFields.size();i++) {
-                if(i>0) sb.append(',');sb.append("value.").append(ec.idFields.get(i).fieldName.substring(ec.embeddedId.length()+1));
+                if(i>0) sb.append(',');
+                String component=ec.idFields.get(i).fieldName.substring(ec.embeddedId.length()+1);
+                int parent=component.lastIndexOf('.');
+                if(parent>=0) sb.append(embeddedNullCondition(component.substring(0,parent),"value")).append(" ? null : ");
+                sb.append("value.").append(component);
             }
             sb.append("}); } return super.keyValues(key); }\n");
         }

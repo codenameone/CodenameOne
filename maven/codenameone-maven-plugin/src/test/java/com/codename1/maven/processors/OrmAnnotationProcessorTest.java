@@ -290,6 +290,88 @@ public class OrmAnnotationProcessorTest {
     }
 
     @Test
+    public void scalarAggregatesPreserveNonNullGuarantees() throws Exception {
+        File classes=tmp.newFolder("scalarnonnull");Map<String,String> sources=new java.util.LinkedHashMap<String,String>();
+        String imports="package scalarnonnull; import com.codename1.annotations.*; ";
+        sources.put("scalarnonnull.Entry",imports+"@Entity public class Entry { @Id public long id; public long counter; }");
+        sources.put("scalarnonnull.Other",imports+"@Entity public class Other { @Id public long id; }");
+        JavaSourceCompiler.compile(sources,classes,Arrays.asList(testClassesDir()));ProcessorContext client=runProcessor(classes);assertFalse(client.getErrors().toString(),client.hasErrors());ProcessorContext backend=runProcessor(classes,backendClasspath());assertFalse(backend.getErrors().toString(),backend.hasErrors());
+        try(java.net.URLClassLoader loader=new java.net.URLClassLoader(new URL[]{classes.toURI().toURL()},getClass().getClassLoader())) {
+            Class entry=loader.loadClass("scalarnonnull.Entry"),other=loader.loadClass("scalarnonnull.Other");
+            for(String suffix:Arrays.asList("Cn1Model","Cn1BackendModel")) {
+                Map<String,com.codename1.impl.orm.EntityModel<?>> models=new java.util.LinkedHashMap<String,com.codename1.impl.orm.EntityModel<?>>();for(Class type:Arrays.asList(entry,other)) models.put(type.getName(),(com.codename1.impl.orm.EntityModel)loader.loadClass(type.getName()+suffix).newInstance());
+                com.codename1.backend.Database db=com.codename1.backend.Database.open(":memory:");com.codename1.orm.session.Session session=new com.codename1.impl.orm.SessionImpl(new com.codename1.impl.orm.BackendSqlAccess(null,db,db.dialect()),models);
+                try {
+                    session.createTables();session.beginTransaction();Object entity=entry.newInstance();session.persist(entity);session.commitTransaction();Object id=entry.getField("id").get(entity);
+                    for(String selection:Arrays.asList("count(i.id)","coalesce(sum(i.id),0)")) {
+                        session.beginTransaction();org.junit.Assert.assertEquals(1,session.createQuery("update Entry e set e.counter=(select "+selection+" from Other i)").executeUpdate());session.commitTransaction();org.junit.Assert.assertEquals(0,entry.getField("counter").getLong(session.find(entry,id)));
+                    }
+                    session.beginTransaction();session.persist(other.newInstance());session.persist(other.newInstance());session.commitTransaction();
+                    session.beginTransaction();org.junit.Assert.assertEquals(1,session.createQuery("update Entry e set e.counter=(select count(i.id)+:delta from Other i)").setParameter("delta",3L).executeUpdate());session.commitTransaction();org.junit.Assert.assertEquals(5,entry.getField("counter").getLong(session.find(entry,id)));
+                    session.beginTransaction();org.junit.Assert.assertThrows(IllegalArgumentException.class,()->session.createQuery("update Entry e set e.counter=(select count(i.id)+:delta from Other i)").setParameter("delta",null).executeUpdate());session.rollbackTransaction();
+                    for(String selection:Arrays.asList("count(i.id)","coalesce(sum(i.id),0)")) org.junit.Assert.assertThrows(IllegalArgumentException.class,()->session.createQuery("update Entry e set e.counter=(select "+selection+" from Other i having count(i.id)<0)"));
+                    org.junit.Assert.assertThrows(IllegalArgumentException.class,()->session.createQuery("update Entry e set e.counter=(select sum(i.id) from Other i where i.id<0)"));
+                    session.beginTransaction();org.junit.Assert.assertEquals(1,session.createQuery("update Entry e set e.counter=coalesce((select count(i.id) from Other i having count(i.id)<0),7)").executeUpdate());session.commitTransaction();org.junit.Assert.assertEquals(7,entry.getField("counter").getLong(session.find(entry,id)));
+                } finally { session.close();db.close(); }
+            }
+        }
+    }
+
+    @Test
+    public void invalidNestedPathsLeaveQueriesUnchanged() throws Exception {
+        File classes=tmp.newFolder("invalidpaths");Map<String,String> sources=new java.util.LinkedHashMap<String,String>();String imports="package invalidpaths; import com.codename1.annotations.*; import com.codename1.annotations.db.*; ";
+        sources.put("invalidpaths.Child",imports+"@Entity public class Child { @Id public long id; public String name=\"child\"; @ManyToOne public Child next; }");
+        sources.put("invalidpaths.Parent",imports+"@Entity public class Parent { @Id public long id; @ManyToOne(cascade=CascadeType.PERSIST) public Child child; @OneToMany(cascade=CascadeType.PERSIST) public java.util.List<Child> children=new java.util.ArrayList<Child>(); }");
+        JavaSourceCompiler.compile(sources,classes,Arrays.asList(testClassesDir()));ProcessorContext client=runProcessor(classes);assertFalse(client.getErrors().toString(),client.hasErrors());ProcessorContext backend=runProcessor(classes,backendClasspath());assertFalse(backend.getErrors().toString(),backend.hasErrors());
+        try(java.net.URLClassLoader loader=new java.net.URLClassLoader(new URL[]{classes.toURI().toURL()},getClass().getClassLoader())) {
+            Class parent=loader.loadClass("invalidpaths.Parent"),child=loader.loadClass("invalidpaths.Child");
+            for(String suffix:Arrays.asList("Cn1Model","Cn1BackendModel")) {
+                Map<String,com.codename1.impl.orm.EntityModel<?>> models=new java.util.LinkedHashMap<String,com.codename1.impl.orm.EntityModel<?>>();for(Class type:Arrays.asList(parent,child)) models.put(type.getName(),(com.codename1.impl.orm.EntityModel)loader.loadClass(type.getName()+suffix).newInstance());
+                com.codename1.backend.Database db=com.codename1.backend.Database.open(":memory:");com.codename1.orm.session.Session session=new com.codename1.impl.orm.SessionImpl(new com.codename1.impl.orm.BackendSqlAccess(null,db,db.dialect()),models);
+                try {
+                    session.createTables();session.beginTransaction();Object empty=parent.newInstance(),full=parent.newInstance(),item=child.newInstance();parent.getField("child").set(full,item);((java.util.List)parent.getField("children").get(full)).add(item);session.persist(empty);session.persist(full);session.commitTransaction();
+                    for(String path:Arrays.asList("child.missing","child.next.missing","children.missing")) for(int operation=0;operation<6;operation++) {
+                        com.codename1.orm.session.Query query=session.query(parent).orderBy("id",true);final int action=operation;
+                        org.junit.Assert.assertThrows(path,IllegalArgumentException.class,()->{switch(action) {case 0:query.join(path);break;case 1:query.leftJoin(path);break;case 2:query.eq(path,"x");break;case 3:query.in(path,"x");break;case 4:query.like(path,"x%");break;default:query.orderBy(path,true);}});
+                        org.junit.Assert.assertEquals(path,2,query.count());org.junit.Assert.assertEquals(path,2,query.list().size());
+                        query.leftJoin("child").isNull("child.name");org.junit.Assert.assertEquals(1,query.count());org.junit.Assert.assertSame(empty,query.first());
+                    }
+                    com.codename1.orm.session.Query ordered=session.query(parent).orderBy("child.name",true);
+                    org.junit.Assert.assertThrows(IllegalArgumentException.class,()->ordered.eq("child.next.missing","x"));org.junit.Assert.assertEquals(2,ordered.count());org.junit.Assert.assertEquals(1,ordered.list().size());
+                    com.codename1.orm.session.Query inner=session.query(parent).join("child");
+                    org.junit.Assert.assertThrows(IllegalArgumentException.class,()->inner.leftJoin("child.next.missing"));org.junit.Assert.assertEquals(1,inner.count());org.junit.Assert.assertEquals(1,inner.list().size());
+                } finally { session.close();db.close(); }
+            }
+        }
+    }
+
+    @Test
+    public void nestedEmbeddedIdentifiersRejectMissingObjects() throws Exception {
+        File classes=tmp.newFolder("nestedkeys");Map<String,String> sources=new java.util.LinkedHashMap<String,String>();String imports="package nestedkeys; import com.codename1.annotations.*; import com.codename1.annotations.db.*; ";
+        sources.put("nestedkeys.Key",imports+"@Embeddable public class Key { public String tenant=\"tenant\"; @Embedded public Part part=new Part(); }");
+        sources.put("nestedkeys.Part",imports+"@Embeddable public class Part { public String region=\"region\"; @Embedded public Leaf leaf=new Leaf(); }");
+        sources.put("nestedkeys.Leaf",imports+"@Embeddable public class Leaf { public long code=7; }");
+        sources.put("nestedkeys.Entry",imports+"@Entity public class Entry { @EmbeddedId public Key key=new Key(); public String name=\"saved\"; }");
+        JavaSourceCompiler.compile(sources,classes,Arrays.asList(testClassesDir()));ProcessorContext client=runProcessor(classes);assertFalse(client.getErrors().toString(),client.hasErrors());ProcessorContext backend=runProcessor(classes,backendClasspath());assertFalse(backend.getErrors().toString(),backend.hasErrors());
+        try(java.net.URLClassLoader loader=new java.net.URLClassLoader(new URL[]{classes.toURI().toURL()},getClass().getClassLoader())) {
+            Class entry=loader.loadClass("nestedkeys.Entry"),key=loader.loadClass("nestedkeys.Key"),part=loader.loadClass("nestedkeys.Part");
+            for(String suffix:Arrays.asList("Cn1Model","Cn1BackendModel")) {
+                Map<String,com.codename1.impl.orm.EntityModel<?>> models=new java.util.LinkedHashMap<String,com.codename1.impl.orm.EntityModel<?>>();models.put(entry.getName(),(com.codename1.impl.orm.EntityModel)loader.loadClass(entry.getName()+suffix).newInstance());
+                com.codename1.backend.Database db=com.codename1.backend.Database.open(":memory:");com.codename1.orm.session.Session session=new com.codename1.impl.orm.SessionImpl(new com.codename1.impl.orm.BackendSqlAccess(null,db,db.dialect()),models);
+                try {
+                    session.createTables();session.beginTransaction();session.persist(entry.newInstance());session.commitTransaction();session.clear();
+                    for(int missing=0;missing<4;missing++) {
+                        Object invalid=key.newInstance();Object nested=key.getField("part").get(invalid);
+                        if(missing==0)key.getField("part").set(invalid,null);else if(missing==1)part.getField("leaf").set(nested,null);else if(missing==2)part.getField("region").set(nested,null);else key.getField("tenant").set(invalid,null);
+                        org.junit.Assert.assertThrows("missing component "+missing,IllegalArgumentException.class,()->session.find(entry,invalid));
+                    }
+                    Object found=session.find(entry,key.newInstance());org.junit.Assert.assertNotNull(found);org.junit.Assert.assertEquals("saved",entry.getField("name").get(found));org.junit.Assert.assertEquals(1,session.query(entry).count());
+                } finally { session.close();db.close(); }
+            }
+        }
+    }
+
+    @Test
     public void countOmitsOnlyOrderingJoins() throws Exception {
         File classes=tmp.newFolder("countjoins");Map<String,String> sources=new java.util.LinkedHashMap<String,String>();String imports="package countjoins; import com.codename1.annotations.*; import com.codename1.annotations.db.*; ";
         sources.put("countjoins.Child",imports+"@Entity public class Child { @Id public long id; public String name=\"child\"; @ManyToOne(cascade=CascadeType.PERSIST) public Child next; }");
