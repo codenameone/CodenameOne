@@ -1589,7 +1589,7 @@ void gcReleaseObj(JAVA_OBJECT o) {
 
 // Lazily computes the per-thread native C-stack low-water mark consulted by
 // CN1_FRAMELESS_SOE_GUARD. On Apple/macOS/iOS pthread exposes the stack base and
-// size directly; elsewhere we fall back to anchoring off the current frame with a
+// size directly, and Linux through pthread_getattr_np; elsewhere we fall back to anchoring off the current frame with a
 // generous (8MB) assumed stack. The guard band is subtracted so there is room to
 // build + throw the StackOverflowError once the limit is crossed.
 #ifdef CN1_COUNT_SOE_ENTRIES
@@ -1608,6 +1608,36 @@ void cn1ComputeNativeStackLimit(CODENAME_ONE_THREAD_STATE) {
     threadStateData->nativeStackHigh = (JAVA_LONG)(intptr_t)stackBase;
     threadStateData->nativeStackLow = (JAVA_LONG)(intptr_t)stackBase - (JAVA_LONG)stackSize;
 #endif
+#elif defined(__linux__)
+    /* The real range, from glibc/musl. Anchoring on the current frame -- the fallback
+     * below -- is wrong in BOTH directions on Linux. This runs near the TOP of the
+     * stack, and the pthread's own mapping ends just above it, so the verifier's
+     * "frame + 1MB" high bound reached into whatever mapping the kernel placed next --
+     * on the self-hosting corpus, BiBOP pages -- and reported ~60,000 ordinary heap
+     * references per cycle as escaped stack objects. And the low bound assumed 8MB of
+     * stack where CN1_THREAD_STACK_BYTES asks for 16MB and the main thread gets its
+     * rlimit, so the overflow guard did not describe the stack it guards. Unlike
+     * cn1GcStackBase's other callers this one may malloc: it runs on the thread itself,
+     * at state creation, never under a freeze. */
+    {
+        pthread_attr_t attr;
+        void* addr = 0;
+        size_t ssz = 0;
+        if(pthread_getattr_np(pthread_self(), &attr) == 0) {
+            pthread_attr_getstack(&attr, &addr, &ssz);   // addr is the LOW end
+            pthread_attr_destroy(&attr);
+        }
+        if(addr != 0 && ssz != 0) {
+            threadStateData->nativeStackLimit = (JAVA_LONG)(intptr_t)addr
+                    + (JAVA_LONG)CN1_FRAMELESS_STACK_GUARD_BAND;
+#ifdef CN1_GC_VERIFY
+            threadStateData->nativeStackHigh = (JAVA_LONG)(intptr_t)addr + (JAVA_LONG)ssz;
+            threadStateData->nativeStackLow = (JAVA_LONG)(intptr_t)addr;
+#endif
+        } else {
+            threadStateData->nativeStackLimit = 0;   // sentinel below: guard disabled
+        }
+    }
 #else
     // Portable fallback: pthread stack introspection is unavailable, so anchor off
     // the current frame and assume an 8MB stack below it.
