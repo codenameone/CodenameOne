@@ -382,7 +382,40 @@ public final class OtlpTracer implements Tracer {
                     + "https://app.example.com (scheme, host and port, with no path or "
                     + "trailing slash); it is '" + value + "'");
         }
-        return value;
+        return serializedOrigin(value, start);
+    }
+
+    /**
+     * An origin as a browser serializes it -- lower-case scheme and host, no
+     * default port -- since that is the string Access-Control-Allow-Origin is
+     * compared against, character for character. HTTPS://APP.EXAMPLE.COM:443 was
+     * accepted as written and matched no page. Called on a value already checked
+     * to be scheme://host[:port].
+     */
+    private static String serializedOrigin(String value, int start) {
+        String scheme = start == 8 ? "https" : "http";
+        String hostPort = value.substring(start);
+        int close = hostPort.lastIndexOf(']');
+        int colon = hostPort.lastIndexOf(':');
+        String host = hostPort;
+        String port = null;
+        if(colon > close) {
+            host = hostPort.substring(0, colon);
+            port = hostPort.substring(colon + 1);
+        }
+        StringBuilder out = new StringBuilder(value.length());
+        out.append(scheme).append("://");
+        for(int iter = 0 ; iter < host.length() ; iter++) {
+            char c = host.charAt(iter);
+            out.append(c >= 'A' && c <= 'Z' ? (char)(c + 32) : c);
+        }
+        if(port != null && port.length() > 0) {
+            int number = Integer.parseInt(port);
+            if(number != (start == 8 ? 443 : 80)) {
+                out.append(':').append(number);
+            }
+        }
+        return out.toString();
     }
 
     /**

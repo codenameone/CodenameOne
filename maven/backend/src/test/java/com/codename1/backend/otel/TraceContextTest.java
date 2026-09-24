@@ -384,6 +384,11 @@ class TraceContextTest {
         assertEquals("https://app.example.com", cors("https://app.example.com"));
         assertEquals("http://localhost:8080", cors("http://localhost:8080"));
         assertEquals("*", cors("*"));
+        // As the browser serializes it: lower case, no default port.
+        assertEquals("https://app.example.com", cors("HTTPS://APP.Example.COM:443"));
+        assertEquals("http://app.example.com", cors("http://app.example.com:80"));
+        assertEquals("https://app.example.com:8443", cors("https://app.example.com:08443"));
+        assertEquals("http://[::1]:8080", cors("http://[::1]:8080"));
         assertNull(cors(""));
         for(String bad : new String[] {"https://app.example.com/", "https://app.example.com/app",
                 "https://a.example, https://b.example", "app.example.com", "https://u@app.example",

@@ -200,7 +200,10 @@ public final class Tracing {
         }
         if(stopFailed != null && stopFailed != claim.previous) {
             try {
-                stopFailed.shutdown(0);
+                // The same window a replaced tracer gets, not none: a start-up that
+                // failed after its database initialisation holds exactly the spans
+                // that explain the failure, and shutdown(0) dropped them unsent.
+                stopFailed.shutdown(REPLACED_SHUTDOWN_MILLIS);
             } catch (RuntimeException err) {
                 failed(err);
             }

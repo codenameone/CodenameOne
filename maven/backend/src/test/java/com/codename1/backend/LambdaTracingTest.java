@@ -162,6 +162,10 @@ class LambdaTracingTest {
         assertEquals(0, x.shutdowns);
         assertEquals(1, f.shutdowns, "A's failed tracer");
         assertEquals(1, g.shutdowns, "B's failed tracer");
+        // A failed start-up's spans are the ones that explain the failure: its
+        // tracer gets a window to export them, not a zero timeout.
+        assertTrue(g.lastShutdownMillis > 0, "a rolled-back tracer was stopped with no flush window");
+        assertTrue(f.lastShutdownMillis > 0);
 
         // And the other order: B fails first, then A.
         Tracing.Swap a2 = Tracing.swap(f = new Recorder());
@@ -231,9 +235,11 @@ class LambdaTracingTest {
         }
 
         int shutdowns;
+        int lastShutdownMillis = -1;
 
         public void shutdown(int timeoutMillis) {
             shutdowns++;
+            lastShutdownMillis = timeoutMillis;
         }
 
         public com.codename1.backend.HttpServer.Handler relay() {
