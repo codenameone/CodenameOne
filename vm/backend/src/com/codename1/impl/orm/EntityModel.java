@@ -120,6 +120,30 @@ public abstract class EntityModel<T> {
     public void relation(T entity, int index, Object value) {
         throw new IllegalArgumentException("Unknown relationship");
     }
+    /// Whether an attribute belongs to a type included by this query model.
+    public boolean queryAttribute(int index) {
+        return true;
+    }
+    /// Whether a relationship belongs to a type included by this query model.
+    public boolean queryRelationship(int index) {
+        return true;
+    }
+    /// Resolves a query attribute without exposing sibling-only table columns.
+    public final int queryIndex(String field) {
+        int index = index(field);
+        if (!queryAttribute(index)) {
+            throw new IllegalArgumentException("Attribute is not applicable to this entity type: " + field);
+        }
+        return index;
+    }
+    /// Resolves a query relationship without exposing sibling-only associations.
+    public final int queryRelationIndex(String field) {
+        int index = relationIndex(field);
+        if (!queryRelationship(index)) {
+            throw new IllegalArgumentException("Relationship is not applicable to this entity type: " + field);
+        }
+        return index;
+    }
     public final int relationIndex(String field) {
         Relationship[] all = relationships();
         for (int i = 0; i < all.length; i++) {

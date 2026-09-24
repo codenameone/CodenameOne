@@ -147,6 +147,22 @@ class ManagedSessionTest {
         }
     }
 
+    @Test void averagesRenderFloatingResultsForEveryDialect() throws Exception {
+        for(com.codename1.backend.sql.Dialect dialect:new com.codename1.backend.sql.Dialect[]{com.codename1.backend.sql.Dialect.SQLITE,com.codename1.backend.sql.Dialect.POSTGRES,com.codename1.backend.sql.Dialect.MYSQL,com.codename1.backend.sql.Dialect.MARIADB}) {
+            com.codename1.impl.orm.BackendSqlAccess adapter=new com.codename1.impl.orm.BackendSqlAccess(null,null,dialect);
+            com.codename1.impl.orm.SqlAccess access=(com.codename1.impl.orm.SqlAccess)java.lang.reflect.Proxy.newProxyInstance(getClass().getClassLoader(),new Class[]{com.codename1.impl.orm.SqlAccess.class},(proxy,method,args)-> {
+                if(method.getName().equals("query")) {
+                    String sql=(String)args[0];assertTrue(sql.contains("mysql".equals(dialect.getName())?"1e0 * AVG(":"CAST(AVG("),sql);
+                    assertTrue(sql.contains("mysql".equals(dialect.getName())?"1e0":"postgresql".equals(dialect.getName())?" AS DOUBLE PRECISION)":" AS REAL)"),sql);
+                    assertEquals(Attribute.REAL,((int[])args[2])[0]);return java.util.Collections.singletonList(new Object[]{1.5});
+                }
+                return method.invoke(adapter,args);
+            });
+            java.util.Map<String,EntityModel<?>> models=new java.util.LinkedHashMap<String,EntityModel<?>>();models.put(Record.class.getName(),new Model());Session session=new com.codename1.impl.orm.SessionImpl(access,models);
+            assertEquals(Double.valueOf(1.5),session.createQuery("select avg(r.counter) from ManagedSessionTest$Record r",Double.class).first());session.close();
+        }
+    }
+
     @Test void lengthUsesCharacterSemanticsForEachDialect() throws Exception {
         for(com.codename1.backend.sql.Dialect dialect:new com.codename1.backend.sql.Dialect[]{com.codename1.backend.sql.Dialect.SQLITE,com.codename1.backend.sql.Dialect.POSTGRES,com.codename1.backend.sql.Dialect.MYSQL,com.codename1.backend.sql.Dialect.MARIADB}) {
             com.codename1.impl.orm.BackendSqlAccess adapter=new com.codename1.impl.orm.BackendSqlAccess(null,null,dialect);
@@ -204,7 +220,7 @@ class ManagedSessionTest {
                 s.createQuery("select r.counter / 2 from ManagedSessionTest$Record r").list();String division=statements.get(statements.size()-1);
                 assertTrue(division.contains("mysql".equals(dialect.getName())?" DIV NULLIF(":" / NULLIF("),division);
                 s.createQuery("select r.counter / 2.0 from ManagedSessionTest$Record r").list();division=statements.get(statements.size()-1);
-                assertTrue(division.contains("mysql".equals(dialect.getName())?"1.0 *":"CAST("),division);
+                assertTrue(division.contains("mysql".equals(dialect.getName())?"1e0 *":"CAST("),division);
                 s.createQuery("select sum(r.counter) from ManagedSessionTest$Record r",Long.class).list();String sum=statements.get(statements.size()-1);
                 assertTrue(sum.contains("CAST(SUM("),sum);assertTrue(sum.contains("mysql".equals(dialect.getName())?" AS SIGNED)":" AS BIGINT)"),sum);
             } finally { s.close(); }
@@ -294,6 +310,42 @@ class ManagedSessionTest {
         } finally { em.close(); }
     }
 
+    @Test void comparisonsNeedAKnownOperandKind() throws Exception {
+        EntityManager em=manager();
+        try {
+            Session session=em.openSession();seed(session);
+            for(String predicate:new String[]{":left=:right","(:left)<>:right",":left>:right",":left in (:right)",":left between :low and :high","coalesce(:a,:b)=nullif(:c,:d)"}) {
+                assertThrows(IllegalArgumentException.class,()->session.createQuery("select r from ManagedSessionTest$Record r where "+predicate),predicate);
+            }
+            assertEquals(1,session.createQuery("select r from ManagedSessionTest$Record r where :value=1").setParameter("value",1L).list().size());
+            assertEquals(1,session.createQuery("select r from ManagedSessionTest$Record r where :value is null").setParameter("value",null).list().size());session.close();
+        } finally { em.close(); }
+    }
+
+    @Test void scalarSubqueriesRequireASingleRowPlan() throws Exception {
+        EntityManager em=manager();
+        try {
+            Session session=em.openSession();seed(session);session.beginTransaction();Record second=new Record();second.name="second";session.persist(second);session.commitTransaction();
+            for(String nested:new String[]{"select i.name from ManagedSessionTest$Record i","select max(i.name) from ManagedSessionTest$Record i group by i.id","select distinct i.name from ManagedSessionTest$Record i","select max(r.counter) from ManagedSessionTest$Record i","select count(r) from ManagedSessionTest$Record i"}) {
+                assertThrows(IllegalArgumentException.class,()->session.createQuery("select ("+nested+") from ManagedSessionTest$Record r"));
+            }
+            assertEquals("second",session.createQuery("select (select max(i.name) from ManagedSessionTest$Record i) from ManagedSessionTest$Record r",String.class).first());
+            assertNull(session.createQuery("select (select max(i.name) from ManagedSessionTest$Record i where i.id<0) from ManagedSessionTest$Record r",String.class).first());
+            assertEquals(2,session.createQuery("select r from ManagedSessionTest$Record r where r.id in (select i.id from ManagedSessionTest$Record i)").list().size());
+            assertEquals(2,session.createQuery("select r from ManagedSessionTest$Record r where exists (select i.id from ManagedSessionTest$Record i)").list().size());session.close();
+        } finally { em.close(); }
+    }
+
+    @Test void integralAverageReturnsDoubleIncludingFractionalResults() throws Exception {
+        EntityManager em=manager();
+        try {
+            Session session=em.openSession();Record first=seed(session);session.beginTransaction();first.counter=1;Record second=new Record();second.counter=2;session.persist(second);session.commitTransaction();
+            assertEquals(Double.valueOf(1.5),session.createQuery("select avg(r.counter) from ManagedSessionTest$Record r",Double.class).first());
+            assertEquals(Double.valueOf(1.5),session.createQuery("select avg(distinct r.counter) from ManagedSessionTest$Record r",Double.class).first());
+            assertNull(session.createQuery("select avg(r.counter) from ManagedSessionTest$Record r where r.id<0",Double.class).first());session.close();
+        } finally { em.close(); }
+    }
+
     @Test void functionsValidateUnknownOperandsAgainstKnownKinds() throws Exception {
         EntityManager em=manager();
         try {
@@ -379,7 +431,7 @@ class ManagedSessionTest {
         EntityManager em=manager();
         try {
             Session session=em.openSession();seed(session);
-            for(String expression:new String[]{"1","abs(1)","coalesce(1,2)","nullif(1,2)","min(1)","max(1)","(select 1 from ManagedSessionTest$Record i)"}) {
+            for(String expression:new String[]{"1","abs(1)","coalesce(1,2)","nullif(1,2)","min(1)","max(1)","(select max(1) from ManagedSessionTest$Record i)"}) {
                 assertEquals(Long.valueOf(1),session.createQuery("select "+expression+" from ManagedSessionTest$Record r",Long.class).first(),expression);
             }
             for(String expression:new String[]{"1.5","abs(1.5)","coalesce(1.5,2.5)","avg(1.5)"}) {

@@ -375,6 +375,38 @@ public class OrmAnnotationProcessorTest {
     }
 
     @Test
+    public void subtypeQueriesRejectSiblingOnlyPathsWhileHydratingTheSharedTable() throws Exception {
+        File classes=tmp.newFolder("querysiblings");Map<String,String> sources=new java.util.LinkedHashMap<String,String>();String imports="package querysiblings; import com.codename1.annotations.*; import com.codename1.annotations.db.*; ";
+        sources.put("querysiblings.Base",imports+"@Entity(table=\"query_siblings\") @Inheritance public abstract class Base { @Id public long id; public String common; }");
+        sources.put("querysiblings.A",imports+"@Entity public class A extends Base { public long aOnly; @ManyToOne public Target aRelation; @ElementCollection public java.util.List<String> tags=new java.util.ArrayList<String>(); }");
+        sources.put("querysiblings.B",imports+"@Entity public class B extends Base { public long bOnly; }");
+        sources.put("querysiblings.Target",imports+"@Entity public class Target { @Id public long id; }");
+        sources.put("querysiblings.Holder",imports+"@Entity public class Holder { @Id public long id; @ManyToOne public B member; }");
+        JavaSourceCompiler.compile(sources,classes,Arrays.asList(testClassesDir()));ProcessorContext client=runProcessor(classes);assertFalse(client.getErrors().toString(),client.hasErrors());ProcessorContext backend=runProcessor(classes,backendClasspath());assertFalse(backend.getErrors().toString(),backend.hasErrors());
+        try(java.net.URLClassLoader loader=new java.net.URLClassLoader(new URL[]{classes.toURI().toURL()},getClass().getClassLoader())) {
+            Class base=loader.loadClass("querysiblings.Base"),a=loader.loadClass("querysiblings.A"),b=loader.loadClass("querysiblings.B"),holder=loader.loadClass("querysiblings.Holder");
+            for(String suffix:Arrays.asList("Cn1Model","Cn1BackendModel")) {
+                Map<String,com.codename1.impl.orm.EntityModel<?>> models=new java.util.LinkedHashMap<String,com.codename1.impl.orm.EntityModel<?>>();for(String name:Arrays.asList("Base","A","B","Target","Holder")) { Class type=loader.loadClass("querysiblings."+name);models.put(type.getName(),(com.codename1.impl.orm.EntityModel)loader.loadClass(type.getName()+suffix).newInstance()); }
+                com.codename1.backend.Database db=com.codename1.backend.Database.open(":memory:");com.codename1.orm.session.Session session=new com.codename1.impl.orm.SessionImpl(new com.codename1.impl.orm.BackendSqlAccess(null,db,db.dialect()),models);
+                try {
+                    session.createTables();session.beginTransaction();Object first=a.newInstance(),second=b.newInstance();a.getField("aOnly").setLong(first,5);b.getField("bOnly").setLong(second,9);base.getField("common").set(second,"shared");session.persist(first);session.persist(second);session.commitTransaction();Object id=base.getField("id").get(second);session.clear();
+                    org.junit.Assert.assertEquals(2,session.query(base).list().size());org.junit.Assert.assertEquals(9,b.getField("bOnly").getLong(session.find(b,id)));
+                    org.junit.Assert.assertEquals(1,session.query(b).eq("common","shared").eq("bOnly",9L).list().size());
+                    org.junit.Assert.assertThrows(IllegalArgumentException.class,()->session.query(b).eq("aOnly",5L));
+                    org.junit.Assert.assertThrows(IllegalArgumentException.class,()->session.query(b).orderBy("aOnly",true));
+                    org.junit.Assert.assertThrows(IllegalArgumentException.class,()->session.query(b).join("aRelation"));
+                    org.junit.Assert.assertThrows(IllegalArgumentException.class,()->session.query(b).fetch("aRelation"));
+                    org.junit.Assert.assertThrows(IllegalArgumentException.class,()->session.query(b).containsElement("tags","x"));
+                    org.junit.Assert.assertThrows(IllegalArgumentException.class,()->session.query(holder).eq("member.aOnly",5L));
+                    for(String query:Arrays.asList("select b.aOnly from querysiblings.B b","select b from querysiblings.B b join fetch b.aRelation","update querysiblings.B b set b.aOnly=7")) org.junit.Assert.assertThrows(IllegalArgumentException.class,()->session.createQuery(query));
+                    session.beginTransaction();org.junit.Assert.assertThrows(IllegalArgumentException.class,()->session.increment(b,id,"aOnly",1));org.junit.Assert.assertEquals(1,session.createQuery("update querysiblings.B b set b.bOnly=10").executeUpdate());session.commitTransaction();
+                    org.junit.Assert.assertEquals(Long.valueOf(5),session.createQuery("select a.aOnly from querysiblings.A a",Long.class).first());org.junit.Assert.assertEquals(10,b.getField("bOnly").getLong(session.find(b,id)));
+                } finally { session.close();db.close(); }
+            }
+        }
+    }
+
+    @Test
     public void primitiveBulkNullsAreRejectedForBothGeneratedModels() throws Exception {
         File classes=tmp.newFolder("primitivebulk");
         JavaSourceCompiler.compile(JavaSourceCompiler.singleSource("primitivebulk.Entry","package primitivebulk; import com.codename1.annotations.*; @Entity(table=\"primitive_bulk\") public class Entry { @Id public long id; public long counter; public int number; public boolean flag; public Double optional; }"),classes,Arrays.asList(testClassesDir()));

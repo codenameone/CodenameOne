@@ -87,7 +87,7 @@ class ManagedSessionDatabaseTest {
             session.beginTransaction();
             ManagedSessionTest.Record entity=new ManagedSessionTest.Record();entity.name="record";entity.bytes=new byte[]{1,2};session.persist(entity);
             assertTrue(entity.id>0);session.commitTransaction();session.clear();
-            for(String expression:new String[]{"1","abs(1)","coalesce(1,2)","nullif(1,2)","min(1)","max(1)","(select 1 from ManagedSessionTest$Record i)"}) {
+            for(String expression:new String[]{"1","abs(1)","coalesce(1,2)","nullif(1,2)","min(1)","max(1)","(select max(1) from ManagedSessionTest$Record i)"}) {
                 assertEquals(Long.valueOf(1),session.createQuery("select "+expression+" from ManagedSessionTest$Record r",Long.class).first(),expression);
             }
             for(String expression:new String[]{"1.5","abs(1.5)","coalesce(1.5,2.5)","avg(1.5)"}) {
@@ -103,6 +103,10 @@ class ManagedSessionDatabaseTest {
             assertEquals(Long.valueOf(1),session.createQuery("select length('é') from ManagedSessionTest$Record r",Long.class).first());
             assertThrows(IllegalArgumentException.class,()->session.createQuery("select (select max(i.name) from ManagedSessionTest$Record i where i.id=r.id),count(r.id) from ManagedSessionTest$Record r"));
             assertEquals("record",((Object[])session.createQuery("select (select max(i.name) from ManagedSessionTest$Record i where i.id=r.id),count(r.id) from ManagedSessionTest$Record r group by r.id").first())[0]);
+            assertThrows(IllegalArgumentException.class,()->session.createQuery("select r from ManagedSessionTest$Record r where :a=:b"));
+            assertThrows(IllegalArgumentException.class,()->session.createQuery("select (select i.name from ManagedSessionTest$Record i) from ManagedSessionTest$Record r"));
+            assertEquals(Double.valueOf(0),session.createQuery("select avg(r.counter) from ManagedSessionTest$Record r",Double.class).first());
+            assertNull(session.createQuery("select avg(r.counter) from ManagedSessionTest$Record r where r.id<0",Double.class).first());
             String[] overflowExpressions={":value+1",":value-1",":value*2",":value/-1","-:value"};
             long[] overflowValues={Long.MAX_VALUE,Long.MIN_VALUE,Long.MAX_VALUE,Long.MIN_VALUE,Long.MIN_VALUE};
             for(int i=0;i<overflowExpressions.length;i++) {
@@ -131,6 +135,9 @@ class ManagedSessionDatabaseTest {
             assertArrayEquals(new byte[]{1,2},session.find(ManagedSessionTest.Record.class,entity.id).bytes);
             session.beginTransaction();
             ManagedSessionTest.Record unnamed=new ManagedSessionTest.Record(),upper=new ManagedSessionTest.Record();upper.name="Z";session.persist(unnamed);session.persist(upper);session.commitTransaction();
+            session.beginTransaction();session.createQuery("update ManagedSessionTest$Record r set r.counter=:value where r.id=:id").setParameter("value",1L).setParameter("id",unnamed.id).executeUpdate();session.commitTransaction();
+            assertEquals(1.0/3,session.createQuery("select avg(r.counter) from ManagedSessionTest$Record r",Double.class).first(),0.0000001);
+            session.beginTransaction();session.createQuery("update ManagedSessionTest$Record r set r.counter=0").executeUpdate();session.commitTransaction();
             assertEquals(unnamed.id,session.query(ManagedSessionTest.Record.class).orderBy("name",true).first().id);
             assertEquals(upper.id,session.query(ManagedSessionTest.Record.class).orderBy("name",true).offset(1).first().id);
             assertEquals(entity.id,session.query(ManagedSessionTest.Record.class).orderBy("name",false).first().id);

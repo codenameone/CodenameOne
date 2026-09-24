@@ -72,6 +72,8 @@ public interface SqlAccess {
     Object nextIdentifier(int strategy, String name, int kind) throws IOException;
     /// Begins and reserves the session connection until commit or rollback.
     void begin() throws IOException;
+    /// Whether this adapter still owns a transaction, including after a failed boundary operation.
+    boolean isTransactionActive();
     /// Commits the reserved connection and releases the transaction reservation.
     void commit() throws IOException;
     /// Rolls back the reserved connection and releases the transaction reservation.

@@ -58,7 +58,9 @@ public interface Session {
     void beginTransaction();
 
     /// Flushes pending changes and commits the active transaction.
-    /// A failure leaves the transaction requiring rollback.
+    /// A failure leaves a still-active database transaction requiring rollback.
+    /// If the database already ended the failed transaction, the session detaches
+    /// its entities and becomes inactive; a new transaction can then be started.
     /// @throws PersistenceException if no usable transaction is active or commit fails
     void commitTransaction();
 

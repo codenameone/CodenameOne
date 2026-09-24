@@ -89,7 +89,11 @@ operations. Generated metadata, field-access hooks, and SQL adapters live under
 
 Closing a session rolls back any active transaction. It never commits. A
 rollback clears the persistence context. An optimistic-lock or database failure
-requires rollback before the session can continue writing. Closing the session
+requires rollback before the session can continue writing if the database still
+has an active transaction. When a failed client commit has already ended the
+underlying transaction, the session detaches its entities and becomes inactive.
+Check `isTransactionActive()` before rolling back; an inactive session can start
+a new transaction. Closing the session
 doesn't close its entity manager's database or pool.
 
 ==== Association mappings
@@ -142,6 +146,10 @@ update/delete. String and numeric literals and named values become bound SQL
 parameters. `IN :values` and `IN (:values)` accept an `Iterable` or object array,
 including an empty collection. Unsupported syntax is rejected. Multiple scalar
 projections return `Object[]`.
+Comparisons require at least one operand with a known storage type; two untyped
+parameters can't be compared directly. A scalar nested query requires an
+aggregate without `GROUP BY`, so it returns at most one row. `IN` and `EXISTS`
+may use queries that return multiple rows.
 A `DISTINCT` query can order only by selected expressions. Text range comparisons
 and `LIKE` patterns are case-sensitive across supported databases. An explicit
 `LIKE ... ESCAPE` uses a literal or named parameter for both the pattern and the
@@ -172,7 +180,7 @@ booleans and dates, aren't counters.
 
 Scalar field projections return the mapped Java values, including enums, dates,
 booleans, property values, and converter-backed objects. Integral `SUM` results
-use `Long` on every database. Joined paths may end in embedded fields.
+use `Long` on every database, and `AVG` returns `Double`. Joined paths may end in embedded fields.
 Scalar projections need a known storage type when the query is created. Bare
 parameters and expressions such as `coalesce(:a,:b)` are rejected. Association
 projections are also rejected; select an explicit field such as `order.customer.id`
@@ -239,7 +247,9 @@ key components. Generated composite IDs are rejected.
 `@Inheritance` on an entity root enables single-table inheritance, including
 abstract roots and polymorphic queries. `@DiscriminatorValue("customer")`
 assigns a stable discriminator to a concrete subtype. A base-class lookup and a
-subclass lookup return the same managed instance for the same row. Use explicit
+subclass lookup return the same managed instance for the same row. A subtype
+query can't address fields or relationships declared only by a sibling subtype.
+The physical table still includes the complete hierarchy for row loading. Use explicit
 discriminator values when class names may change. Every hierarchy member uses
 the root's identifier generator, including its default generator name.
 

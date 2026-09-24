@@ -256,13 +256,22 @@ public final class SessionSqlAccess implements SqlAccess {
         }
     }
     @Override
+    public boolean isTransactionActive() {
+        synchronized (db) {
+            return ownsTransaction && db.isInTransaction();
+        }
+    }
+    @Override
     public void commit() throws IOException {
         synchronized (db) {
             if (!ownsTransaction) {
                 throw new IOException("Session does not own the transaction");
             }
-            db.commitTransaction();
-            ownsTransaction = false;
+            try {
+                db.commitTransaction();
+            } finally {
+                ownsTransaction = db.isInTransaction();
+            }
         }
     }
     @Override
@@ -271,8 +280,11 @@ public final class SessionSqlAccess implements SqlAccess {
             if (!ownsTransaction) {
                 throw new IOException("Session does not own the transaction");
             }
-            db.rollbackTransaction();
-            ownsTransaction = false;
+            try {
+                db.rollbackTransaction();
+            } finally {
+                ownsTransaction = db.isInTransaction();
+            }
         }
     }
     @Override

@@ -1107,6 +1107,10 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
                     if(relation.column<0) relation.column=i;all.get(i).relation=relation;
                 }
             }
+            for(EntityClass member:family) for(EntityClass candidate:family) if(descends(candidate,member)) {
+                for(PersistedField field:candidate.fields) member.queryFields.add(field.fieldName);
+                for(RelationField relation:candidate.relations) member.queryRelations.add(relation.field);
+            }
             for(EntityClass member:family) {
                 member.fields.clear();member.fields.addAll(all);member.relations.clear();member.relations.addAll(relations.values());member.indexes.clear();member.indexes.addAll(inheritedIndexes);
                 for(EntityClass descendant:family) if(!descendant.abstractClass && descends(descendant,member)) member.discriminators.add(descendant.discriminatorValue);
@@ -1347,6 +1351,14 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
         sb.append("public boolean required(int index) { switch(index) {");
         for(int i=0;i<ec.fields.size();i++) if(ec.fields.get(i).declaredRequired) sb.append("case ").append(i).append(": return true;");
         sb.append("default:return false;} }\n");
+        if(ec.hierarchyRoot!=null) {
+            sb.append("public boolean queryAttribute(int index) { switch(index) {");
+            for(int i=0;i<ec.fields.size();i++) if(ec.queryFields.contains(ec.fields.get(i).fieldName)) sb.append("case ").append(i).append(": return true;");
+            sb.append("default:return false;} }\n");
+            sb.append("public boolean queryRelationship(int index) { switch(index) {");
+            for(RelationField relation:ec.relations) if(ec.queryRelations.contains(relation.field)) sb.append("case ").append(relation.index).append(": return true;");
+            sb.append("default:return false;} }\n");
+        }
         sb.append("public boolean primitive(int index) { switch(index) {");
         for(int i=0;i<ec.fields.size();i++) if(ec.fields.get(i).primitive) sb.append("case ").append(i).append(": return true;");
         sb.append("default:return false;} }\n");
@@ -2553,6 +2565,7 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
         String parent,hierarchyRoot,discriminatorValue;
         boolean abstractClass;
         final List<String> discriminators=new ArrayList<String>();
+        final Set<String> queryFields=new LinkedHashSet<String>(),queryRelations=new LinkedHashSet<String>();
         String packageName;
         String simpleName;
         String daoBinaryName;

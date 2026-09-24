@@ -324,6 +324,7 @@ public final class JpqlQueryImpl<T> implements com.codename1.orm.session.JpqlQue
         int[] kinds = new int[0];
         EntityModel entity;
         boolean mutation;
+        boolean singleRow;
         final List<Object> bindings;
         final List<String> fetches = new ArrayList<String>();
         Plan(List<Object> bindings, List<Expr> correlations) {
@@ -362,8 +363,8 @@ public final class JpqlQueryImpl<T> implements com.codename1.orm.session.JpqlQue
                     if (field.indexOf('.') >= 0) {
                         throw error("Bulk assignment must target a root field");
                     }
-                    Attribute attribute = root.model.attributes()[root.model.index(field)];
-                    if (attribute.id || root.model.discriminatorIndex() == root.model.index(field)) {
+                    Attribute attribute = root.model.attributes()[root.model.queryIndex(field)];
+                    if (attribute.id || root.model.discriminatorIndex() == root.model.queryIndex(field)) {
                         throw error("Bulk updates cannot change entity identifiers");
                     }
                     expect("=");
@@ -373,14 +374,14 @@ public final class JpqlQueryImpl<T> implements com.codename1.orm.session.JpqlQue
                     target.field = field;
                     compatible(target, value);
                     bindType(target, value);
-                    if (root.model.primitive(root.model.index(field))) {
+                    if (root.model.primitive(root.model.queryIndex(field))) {
                         if (value.parameter != null) {
                             value.parameter.nonNull = true;
                         } else if (value.literal && value.literalValue == null) {
                             throw error("Null bulk assignment to a primitive attribute");
                         }
                     }
-                    if (attribute.nullable && root.model.required(root.model.index(field))) {
+                    if (attribute.nullable && root.model.required(root.model.queryIndex(field))) {
                         requireNonNull(value);
                     }
                     assignments.append(target.sql).append(" = ").append(value.sql);
@@ -442,7 +443,7 @@ public final class JpqlQueryImpl<T> implements com.codename1.orm.session.JpqlQue
                     if (joinPath.indexOf('.') >= 0) {
                         throw error("Nested fetch paths are not supported");
                     }
-                    root.model.relationIndex(joinPath);
+                    root.model.queryRelationIndex(joinPath);
                     plan.fetches.add(joinPath);
                 }
                 if (fetch) {
@@ -565,6 +566,11 @@ public final class JpqlQueryImpl<T> implements com.codename1.orm.session.JpqlQue
             if (!plan.fetches.isEmpty() && !SessionImpl.sameInstance(plan.entity, root.model)) {
                 throw error("Fetch joins require the root entity projection");
             }
+            if (groups.isEmpty()) {
+                for (Expr expression : groupedExpressions) {
+                    plan.singleRow |= hasRowAggregate(expression);
+                }
+            }
             plan.projections = selections;
             SessionImpl.checkParameterCount(bindings.size());
             plan.kinds = new int[kinds.size()];
@@ -634,6 +640,9 @@ public final class JpqlQueryImpl<T> implements com.codename1.orm.session.JpqlQue
                 operands.add(left);
                 if (peek() != null && peek().startsWith(":") &&
                         (!parens || position + 1 < tokens.size() && ")".equals(tokens.get(position + 1)))) {
+                    if (left.kind < 0) {
+                        throw error("IN parameter requires a known left operand storage kind");
+                    }
                     Parameter parameter = new Parameter(next().substring(1));
                     parameter.query = left.query;
                     parameter.field = left.field;
@@ -775,6 +784,9 @@ public final class JpqlQueryImpl<T> implements com.codename1.orm.session.JpqlQue
                 if (peek("SELECT") || peek("FROM")) {
                     Plan nested = subquery();
                     expect(")");
+                    if (!nested.singleRow) {
+                        throw error("Scalar subqueries require an aggregate without GROUP BY");
+                    }
                     Expr result = new Expr("(" + nested.sql + ")", nested.kinds[0]);
                     result.children.addAll(nested.correlations);
                     result.projectionQuery = nested.projections.get(0).projectionQuery;
@@ -841,7 +853,7 @@ public final class JpqlQueryImpl<T> implements com.codename1.orm.session.JpqlQue
                         if (distinct && arg.entity.idIndexes().length > 1) {
                             throw error("Use the query builder count() for distinct composite identities");
                         }
-                        sql.append(root.rootAlias)
+                        sql.append(arg.query.rootAlias)
                                 .append('.')
                                 .append(session.q(arg.entity.attributes()[arg.entity.idIndex()].column));
                     } else {
@@ -857,6 +869,8 @@ public final class JpqlQueryImpl<T> implements com.codename1.orm.session.JpqlQue
                 Expr result = new Expr(sql.append(')').toString(), kind);
                 if ("SUM".equals(function) && kind == Attribute.BIGINT) {
                     result.sql = session.integralSum(result.sql);
+                } else if ("AVG".equals(function)) {
+                    result.sql = session.numericOperand(result.sql, Attribute.REAL);
                 }
                 result.aggregate = " COUNT SUM AVG MIN MAX ".contains(" " + function + " ");
                 result.numericOperands = " SUM AVG MIN MAX ABS COALESCE NULLIF ".contains(" " + function + " ");
@@ -900,7 +914,12 @@ public final class JpqlQueryImpl<T> implements com.codename1.orm.session.JpqlQue
                 if (alias.path.length() > 0) {
                     throw error("Select a root entity or scalar fields");
                 }
-                return new Expr(alias.query.rootColumns(), Attribute.BIGINT, alias.query.model);
+                Expr result = new Expr(alias.query.rootColumns(), Attribute.BIGINT, alias.query.model);
+                result.query = alias.query;
+                if (!SessionImpl.sameInstance(alias.query, root)) {
+                    correlations.add(result);
+                }
+                return result;
             }
             String field = alias.field(full.substring(dot + 1));
             Expr result = new Expr(alias.query.column(field), alias.query.kind(field));
@@ -1139,6 +1158,9 @@ public final class JpqlQueryImpl<T> implements com.codename1.orm.session.JpqlQue
             }
         }
         private void compatible(Expr left, Expr right) {
+            if (left.kind < 0 && right.kind < 0) {
+                throw error("Comparison requires at least one known storage kind");
+            }
             if (left.kind >= 0) {
                 requireKind(right, left.kind);
             }
@@ -1225,6 +1247,26 @@ public final class JpqlQueryImpl<T> implements com.codename1.orm.session.JpqlQue
                 }
             }
             return true;
+        }
+        private boolean hasRowAggregate(Expr value) {
+            // An aggregate referencing only an outer query belongs to that outer
+            // scope; it does not reduce the rows produced by this nested query.
+            if (value.aggregate) {
+                return aggregateScope(value) != 2;
+            }
+            for (Expr child : value.children) {
+                if (hasRowAggregate(child)) {
+                    return true;
+                }
+            }
+            return false;
+        }
+        private int aggregateScope(Expr value) {
+            int scope = value.query == null ? 0 : SessionImpl.sameInstance(value.query, root) ? 1 : 2;
+            for (Expr child : value.children) {
+                scope |= aggregateScope(child);
+            }
+            return scope;
         }
         private void validateGrouped(Expr value, List<Expr> groups) {
             if (value.aggregate || value.query != null && !SessionImpl.sameInstance(value.query, root)) {

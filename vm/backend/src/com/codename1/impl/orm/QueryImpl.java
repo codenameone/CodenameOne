@@ -68,7 +68,7 @@ public final class QueryImpl<T> implements com.codename1.orm.session.Query<T> {
         return this;
     }
     void fetchJoin(String field, boolean left) {
-        Relationship relation = model.relationships()[model.relationIndex(field)];
+        Relationship relation = model.relationships()[model.queryRelationIndex(field)];
         if (!relation.element) {
             ensureJoin(field, left);
         } else if (!joins.containsKey(field)) {
@@ -84,7 +84,7 @@ public final class QueryImpl<T> implements com.codename1.orm.session.Query<T> {
     /// Overrides mapping laziness for the named direct relationship.
     @Override
     public QueryImpl<T> fetch(String field) {
-        model.relationIndex(field);
+        model.queryRelationIndex(field);
         fetches.add(field);
         return this;
     }
@@ -99,7 +99,7 @@ public final class QueryImpl<T> implements com.codename1.orm.session.Query<T> {
     /// Tests membership in an owned scalar collection without loading it.
     @Override
     public QueryImpl<T> containsElement(String field, Object value) {
-        Relationship relation = model.relationships()[model.relationIndex(field)];
+        Relationship relation = model.relationships()[model.queryRelationIndex(field)];
         if (!relation.element) {
             throw new IllegalArgumentException("Not an element collection: " + field);
         }
@@ -308,9 +308,9 @@ public final class QueryImpl<T> implements com.codename1.orm.session.Query<T> {
         int offset = 0;
         while (true) {
             Attribute[] attributes = join.model.attributes();
-            for (int i = 0; i < attributes.length; i++) {
-                if (attributes[i].field.equals(remaining)) {
-                    return new Field(join, i);
+            for (Attribute attribute : attributes) {
+                if (attribute.field.equals(remaining)) {
+                    return new Field(join, join.model.queryIndex(remaining));
                 }
             }
             int dot = remaining.indexOf('.');
@@ -358,7 +358,7 @@ public final class QueryImpl<T> implements com.codename1.orm.session.Query<T> {
         int dot = path.lastIndexOf('.');
         Join parent = dot < 0 ? new Join(model, rootAlias, "") : ensureJoin(path.substring(0, dot), left);
         String field = dot < 0 ? path : path.substring(dot + 1);
-        Relationship relation = parent.model.relationships()[parent.model.relationIndex(field)];
+        Relationship relation = parent.model.relationships()[parent.model.queryRelationIndex(field)];
         if (relation.element) {
             throw new IllegalArgumentException("Use containsElement() for scalar collections");
         }

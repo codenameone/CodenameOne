@@ -150,6 +150,7 @@ public final class BackendSqlAccess implements SqlAccess {
             db.beginExclusiveTransaction(); transaction=db;
         } finally { release(db); }
     }
+    public boolean isTransactionActive() { return transaction!=null && transaction.isInTransaction(); }
     public void commit() throws IOException {
         if(transaction==null) throw new IOException("No transaction");
         transaction.commitTransaction(); unpin();

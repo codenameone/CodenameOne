@@ -166,6 +166,24 @@ class ManagedSessionTest {
         } finally { em.close(); }
     }
 
+    @Test void failedClientCommitDetachesAndAllowsANewTransaction() throws Exception {
+        for(boolean closeAfterFailure:new boolean[]{false,true}) {
+            EntityManager em=manager();
+            try {
+                em.database().execute("CREATE TABLE commit_parent (name TEXT PRIMARY KEY)");
+                em.database().execute("CREATE TABLE managed_record (id INTEGER PRIMARY KEY AUTOINCREMENT,version INTEGER NOT NULL,counter INTEGER NOT NULL,name TEXT,bytes BLOB,FOREIGN KEY(name) REFERENCES commit_parent(name) DEFERRABLE INITIALLY DEFERRED)");
+                Session session=em.openSession();session.createTables();session.beginTransaction();Record bad=new Record();bad.name="missing";session.persist(bad);session.flush();
+                assertThrows(PersistenceException.class,session::commitTransaction);
+                assertFalse(em.database().isInTransaction());assertFalse(session.isTransactionActive());assertFalse(session.isRollbackOnly());assertFalse(session.contains(bad));
+                assertEquals(0,session.query(Record.class).count());
+                if(!closeAfterFailure) {
+                    em.database().execute("INSERT INTO commit_parent(name) VALUES ('valid')");session.beginTransaction();Record good=new Record();good.name="valid";session.persist(good);session.commitTransaction();assertEquals(1,session.query(Record.class).count());
+                }
+                session.close();assertFalse(em.database().isInTransaction());
+            } finally { em.close(); }
+        }
+    }
+
     @Test void generatedIdInsertRejectsNaNBeforeStoringARow() throws Exception {
         EntityManager em=manager();
         try {
@@ -194,6 +212,42 @@ class ManagedSessionTest {
             assertEquals(Long.valueOf(0),access.query("SELECT COUNT(*) FROM portable_values",new Object[0],new int[]{Attribute.BIGINT}).get(0)[0]);
             assertEquals(1,access.insert("INSERT INTO portable_values(value) VALUES (?)",new Object[]{1.5},"id"));
             assertEquals(Double.valueOf(1.5),access.query("SELECT value FROM portable_values",new Object[0],new int[]{Attribute.REAL}).get(0)[0]);
+        } finally { em.close(); }
+    }
+
+    @Test void comparisonsNeedAKnownOperandKind() throws Exception {
+        EntityManager em=manager();
+        try {
+            Session session=em.openSession();seed(session);
+            for(String predicate:new String[]{":left=:right","(:left)<>:right",":left>:right",":left in (:right)",":left between :low and :high","coalesce(:a,:b)=nullif(:c,:d)"}) {
+                assertThrows(IllegalArgumentException.class,()->session.createQuery("select r from ManagedSessionTest$Record r where "+predicate),predicate);
+            }
+            assertEquals(1,session.createQuery("select r from ManagedSessionTest$Record r where :value=1").setParameter("value",1L).list().size());
+            assertEquals(1,session.createQuery("select r from ManagedSessionTest$Record r where :value is null").setParameter("value",null).list().size());session.close();
+        } finally { em.close(); }
+    }
+
+    @Test void scalarSubqueriesRequireASingleRowPlan() throws Exception {
+        EntityManager em=manager();
+        try {
+            Session session=em.openSession();seed(session);session.beginTransaction();Record second=new Record();second.name="second";session.persist(second);session.commitTransaction();
+            for(String nested:new String[]{"select i.name from ManagedSessionTest$Record i","select max(i.name) from ManagedSessionTest$Record i group by i.id","select distinct i.name from ManagedSessionTest$Record i","select max(r.counter) from ManagedSessionTest$Record i","select count(r) from ManagedSessionTest$Record i"}) {
+                assertThrows(IllegalArgumentException.class,()->session.createQuery("select ("+nested+") from ManagedSessionTest$Record r"));
+            }
+            assertEquals("second",session.createQuery("select (select max(i.name) from ManagedSessionTest$Record i) from ManagedSessionTest$Record r",String.class).first());
+            assertNull(session.createQuery("select (select max(i.name) from ManagedSessionTest$Record i where i.id<0) from ManagedSessionTest$Record r",String.class).first());
+            assertEquals(2,session.createQuery("select r from ManagedSessionTest$Record r where r.id in (select i.id from ManagedSessionTest$Record i)").list().size());
+            assertEquals(2,session.createQuery("select r from ManagedSessionTest$Record r where exists (select i.id from ManagedSessionTest$Record i)").list().size());session.close();
+        } finally { em.close(); }
+    }
+
+    @Test void integralAverageReturnsDoubleIncludingFractionalResults() throws Exception {
+        EntityManager em=manager();
+        try {
+            Session session=em.openSession();Record first=seed(session);session.beginTransaction();first.counter=1;Record second=new Record();second.counter=2;session.persist(second);session.commitTransaction();
+            assertEquals(Double.valueOf(1.5),session.createQuery("select avg(r.counter) from ManagedSessionTest$Record r",Double.class).first());
+            assertEquals(Double.valueOf(1.5),session.createQuery("select avg(distinct r.counter) from ManagedSessionTest$Record r",Double.class).first());
+            assertNull(session.createQuery("select avg(r.counter) from ManagedSessionTest$Record r where r.id<0",Double.class).first());session.close();
         } finally { em.close(); }
     }
 
@@ -282,7 +336,7 @@ class ManagedSessionTest {
         EntityManager em=manager();
         try {
             Session session=em.openSession();seed(session);
-            for(String expression:new String[]{"1","abs(1)","coalesce(1,2)","nullif(1,2)","min(1)","max(1)","(select 1 from ManagedSessionTest$Record i)"}) {
+            for(String expression:new String[]{"1","abs(1)","coalesce(1,2)","nullif(1,2)","min(1)","max(1)","(select max(1) from ManagedSessionTest$Record i)"}) {
                 assertEquals(Long.valueOf(1),session.createQuery("select "+expression+" from ManagedSessionTest$Record r",Long.class).first(),expression);
             }
             for(String expression:new String[]{"1.5","abs(1.5)","coalesce(1.5,2.5)","avg(1.5)"}) {

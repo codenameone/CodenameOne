@@ -96,7 +96,7 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
             return "CAST(" + value + " AS " + (kind == Attribute.REAL ? "DOUBLE PRECISION" : "BIGINT") + ")";
         }
         if (kind == Attribute.REAL) {
-            return "mysql".equals(sql.dialect()) ? "(1.0 * " + value + ")" : "CAST(" + value + " AS REAL)";
+            return "mysql".equals(sql.dialect()) ? "(1e0 * " + value + ")" : "CAST(" + value + " AS REAL)";
         }
         return value;
     }
@@ -217,10 +217,10 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
             sql.commit();
             transaction = false;
         } catch (IOException e) {
-            rollbackOnly = true;
+            recoverTransactionFailure();
             throw failure(e);
         } catch (RuntimeException e) {
-            rollbackOnly = true;
+            recoverTransactionFailure();
             throw e;
         }
     }
@@ -235,9 +235,16 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
             transaction = false;
             rollbackOnly = false;
         } catch (IOException e) {
-            rollbackOnly = true;
+            recoverTransactionFailure();
             throw failure(e);
         } finally {
+            clear();
+        }
+    }
+    private void recoverTransactionFailure() {
+        transaction = sql.isTransactionActive();
+        rollbackOnly = transaction;
+        if (!transaction) {
             clear();
         }
     }
@@ -745,7 +752,7 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
         requireTransaction();
         flush();
         EntityModel<T> model = model(type);
-        int index = model.index(field);
+        int index = model.queryIndex(field);
         int version = model.versionIndex();
         Attribute a = model.attributes()[index];
         if (a.id || a.version || !model.counter(index)) {
