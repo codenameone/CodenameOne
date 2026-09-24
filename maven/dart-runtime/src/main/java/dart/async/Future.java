@@ -181,11 +181,18 @@ public class Future<T> {
     public static Future<DartList<Object>> wait(Iterable<? extends Future<?>> futures,
                                                 final boolean eagerError,
                                                 final Funcs.VoidFunc1<Object> cleanUp) {
-        final List<Future<?>> inputs = new ArrayList<Future<?>>();
-        for (Future<?> f : futures) {
-            inputs.add(f);
-        }
         final Future<DartList<Object>> result = new Future<DartList<Object>>();
+        final List<Future<?>> inputs = new ArrayList<Future<?>>();
+        try {
+            for (Future<?> f : futures) {
+                inputs.add(f);
+            }
+        } catch (Throwable t) {
+            // Dart returns a future failed with the traversal's error; letting it escape
+            // made Future.wait(bad).catchError(...) throw from the call itself.
+            result.completeError(t);
+            return result;
+        }
         final int count = inputs.size();
         if (count == 0) {
             result.complete(new DartList<Object>());

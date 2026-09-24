@@ -295,11 +295,27 @@ public final class DString {
     }
 
     public static String replaceFirst(String s, String from, String to) {
-        int i = s.indexOf(from);
+        return replaceFirst(s, from, to, 0);
+    }
+
+    /** Dart's {@code replaceFirst(from, to, startIndex)}: the first match at or after the start. */
+    public static String replaceFirst(String s, String from, String to, long startIndex) {
+        RangeError.checkValueInInterval(startIndex, 0, s.length(), "startIndex");
+        int i = s.indexOf(from, (int) startIndex);
         if (i < 0) {
             return s;
         }
         return s.substring(0, i) + to + s.substring(i + from.length());
+    }
+
+    /** {@link #replaceFirst(String, String, String, long)} for a RegExp pattern. */
+    public static String replaceFirst(String s, RegExp pattern, String to, long startIndex) {
+        RangeError.checkValueInInterval(startIndex, 0, s.length(), "startIndex");
+        RegExpMatch m = pattern.matchFrom(s, (int) startIndex);
+        if (m == null) {
+            return s;
+        }
+        return s.substring(0, (int) m.start()) + to + s.substring((int) m.end());
     }
 
     /** Dart's int.parse. */

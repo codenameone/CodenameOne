@@ -581,7 +581,7 @@ public final class DartRuntime {
      */
     public static long tdiv(long a, long b) {
         if (b == 0) {
-            throw new UnsupportedOperationException("Result of truncating division is not representable: " + a + " ~/ 0");
+            throw integerDivisionByZero();
         }
         return a / b;
     }
@@ -589,9 +589,20 @@ public final class DartRuntime {
     public static long tdiv(double a, double b) {
         double r = a / b;
         if (Double.isNaN(r) || Double.isInfinite(r)) {
-            throw new UnsupportedOperationException("Result of truncating division is not representable: " + a + " ~/ " + b);
+            // Dart's UnsupportedError, which `on UnsupportedError` catches; Java's
+            // UnsupportedOperationException slipped past it into an `on Exception`.
+            throw new dart.core.UnsupportedError("Result of truncating division is " + r + ": " + a + " ~/ " + b);
         }
         return (long) r;
+    }
+
+    /**
+     * Dart's IntegerDivisionByZeroException, an UnsupportedError. Checked here rather
+     * than left to the JVM: ParparVM answers 0 for an integer division or remainder by
+     * zero instead of throwing, so the device would have printed 0 where Dart throws.
+     */
+    private static dart.core.UnsupportedError integerDivisionByZero() {
+        return new dart.core.UnsupportedError("IntegerDivisionByZeroException");
     }
 
     /**
@@ -599,6 +610,9 @@ public final class DartRuntime {
      * when the divisor is non-zero, unlike Java's remainder.
      */
     public static long mod(long a, long b) {
+        if (b == 0) {
+            throw integerDivisionByZero();   // see tdiv: a remainder by zero throws too
+        }
         long r = a % b;
         return r < 0 ? r + Math.abs(b) : r;
     }

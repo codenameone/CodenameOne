@@ -37,6 +37,16 @@ public final class Await {
     private Await() {
     }
 
+    /**
+     * {@code await v} where v is a FutureOr or dynamic: a Future is awaited, anything
+     * else -- {@code await 42}, {@code await null} -- is the value itself, as in Dart.
+     * Only the Future overload existed, so awaiting a non-Future did not compile.
+     */
+    @SuppressWarnings("unchecked")
+    public static Object awaitAny(Object v) {
+        return v instanceof Future ? await$((Future<Object>) v) : v;
+    }
+
     public static <T> T await$(final Future<T> f) {
         if (f == null) {
             throw new dart.core.TypeError("await on null Future");
