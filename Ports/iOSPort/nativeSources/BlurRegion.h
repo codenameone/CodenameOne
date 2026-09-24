@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
- *
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  * This code is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License version 2 only, as
  * published by the Free Software Foundation. Codename One designates this
@@ -42,6 +42,9 @@
     float offset;
     float refract;
     float specular;
+    float curve;
+    float curveMid;
+    float outline;
     // When lens is YES this op runs the iOS 26 selection-drop LENS
     // (lensScreenRegionX) carrying these params instead of blur/glass.
     BOOL lens;
@@ -54,7 +57,7 @@
 -(id)initWithArgs:(int)xpos ypos:(int)ypos w:(int)w h:(int)h r:(float)r;
 -(id)initWithGlassArgs:(int)xpos ypos:(int)ypos w:(int)w h:(int)h r:(float)r
           cornerRadius:(float)cr sat:(float)st scale:(float)sc offset:(float)of
-               refract:(float)rf specular:(float)sp;
+               refract:(float)rf specular:(float)sp curve:(float)cv curveMid:(float)cm outline:(float)ol;
 -(id)initWithLensArgs:(int)xpos ypos:(int)ypos w:(int)w h:(int)h
          cornerRadius:(float)cr magnify:(float)mg aberration:(float)ab
             tintColor:(int)tc tintStrength:(float)ts;

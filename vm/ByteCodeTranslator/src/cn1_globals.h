@@ -3481,5 +3481,6 @@ extern struct elementStruct* cn1PopMany(CODENAME_ONE_THREAD_STATE, int count, st
 }
 
 extern struct clazz class__java_lang_Class;
+extern struct clazz ClazzClazz;
 
 #endif //__CN1GLOBALS__

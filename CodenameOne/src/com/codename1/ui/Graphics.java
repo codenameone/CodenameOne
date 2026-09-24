@@ -1650,10 +1650,34 @@ public final class Graphics {
     /// than spilling into a square. Used to realize the frosted glass
     /// backdrop-filter material.
     public boolean glassRegion(int x, int y, int width, int height, float radius, float cornerRadius, float sat, float scale, float offset, float refract, float specular) {
+        return glassRegion(x, y, width, height, radius, cornerRadius, sat, scale, offset, refract, specular, 0f, 0f, 0f);
+    }
+
+    /// As `glassRegion(int, int, int, int, float, float, float, float, float, float, float)`,
+    /// plus a luminance CURVE on top of the affine colour transform and an edge
+    /// OUTLINE in the optics. The curve is:
+    /// `c' = (lum + (c - lum) * sat) * scale + offset + curve * 255 * (lum / 255 - curveMid)^2`.
+    ///
+    /// The affine form is exact for every platform material measured so far
+    /// except iOS 27's dark glass, whose response bends: after the best affine fit
+    /// its error still runs positive at both ends of the luma range and negative
+    /// through the middle, which no choice of the affine constants can remove.
+    /// The outline is the thin dark line iOS 27 draws around the sides of its
+    /// glass (see `GlassRecipe.getOutline()`). Zero `curve` and zero `outline`
+    /// are identical to the shorter overload.
+    ///
+    /// #### Parameters
+    ///
+    /// - `curve`: curve strength; 0 for an affine material
+    ///
+    /// - `curveMid`: normalised luma (0..1) at which the curve term is zero
+    ///
+    /// - `outline`: edge outline strength, 0..1; 0 for none
+    public boolean glassRegion(int x, int y, int width, int height, float radius, float cornerRadius, float sat, float scale, float offset, float refract, float specular, float curve, float curveMid, float outline) {
         if (width <= 0 || height <= 0) {
             return true;
         }
-        return impl.glassRegion(nativeGraphics, x + xTranslate, y + yTranslate, width, height, radius, cornerRadius, sat, scale, offset, refract, specular);
+        return impl.glassRegion(nativeGraphics, x + xTranslate, y + yTranslate, width, height, radius, cornerRadius, sat, scale, offset, refract, specular, curve, curveMid, outline);
     }
 
     /// Applies the iOS 26 selection "drop" LENS to the contents already painted into

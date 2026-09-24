@@ -202,6 +202,44 @@ public final class ServerSocket {
         }
     }
 
+    /**
+     * Breaks a descriptor in both directions without closing it.
+     *
+     * For the one case a close cannot serve: a thread is parked inside a write to
+     * a peer that has stopped reading, and the connection has to go NOW. A close
+     * would free the number while that thread still holds it, and the number is
+     * reused immediately -- so the write lands in whatever connection was handed
+     * it next. shutdown(2) makes the parked write fail instead, and the close
+     * follows once the writer has left.
+     *
+     * Quiet about failure on purpose: every reason it can fail (the peer already
+     * went, the descriptor was already shut) is a state the caller wanted anyway.
+     */
+    /**
+     * The RECEIVE deadline alone, leaving the send deadline where it is.
+     *
+     * setTimeout sets both, which is right for a request -- a peer that stops
+     * reading blocks a worker in send() just as effectively as one that stops
+     * writing. A websocket wants them apart: it is idle by design, so its read
+     * allowance is minutes or nothing at all, while a send to a peer that has
+     * stopped reading must still give up. Using setTimeout for that quietly moved
+     * the send bound from fifteen seconds to five minutes, and
+     * CN1_WS_IDLE_TIMEOUT_MS=0 removed it entirely.
+     */
+    public static void setReceiveTimeout(int fd, int millis) throws IOException {
+        if(fd >= 0 && setReceiveTimeoutImpl(fd, millis) != 0) {
+            throw new IOException("Could not set the receive timeout on fd " + fd);
+        }
+    }
+
+    public static void shutdown(int fd) {
+        if(fd >= 0) {
+            shutdownImpl(fd);
+        }
+    }
+
+    private static native void shutdownImpl(int fd);
+    private static native int setReceiveTimeoutImpl(int fd, int millis);
     private static native int bindImpl(String host, int port, int backlog);
     private static native int boundPortImpl(int fd);
     private static native int acceptImpl(int serverFd);

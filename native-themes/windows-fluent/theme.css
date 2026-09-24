@@ -358,6 +358,19 @@ TextField.disabled {
 }
 
 TextArea { cn1-derive: TextField; }
+/* The placeholder a TextField shows while empty. Without it the framework default applies
+   -- light grey italics with no padding -- so the hint sat hard against the field's
+   left edge in a face no desktop uses. The padding and size match TextField, so the
+   placeholder sits exactly where typed text will. The colour is
+   TextFillColorSecondary, the PlaceholderText colour of a WinUI TextBox. */
+TextHint {
+    color: var(--text-secondary-color, #5d5d5d);
+    background-color: transparent;
+    padding: 1.3mm 2.6mm 1.3mm 2.6mm;
+    margin: 0;
+    font-family: "native:MainRegular";
+    font-size: 3.7mm;
+}
 
 /* --- Check, radio, switch -------------------------------------------------------------- */
 
@@ -800,6 +813,7 @@ ChatVoiceButton { cn1-derive: Button; padding: 1.5mm; margin: 0.5mm; }
         border-left: 0.26mm solid #363636; border-bottom: 0.4mm solid #9a9a9a;
         border-radius: 1.06mm;
     }
+    TextHint { color: var(--text-secondary-color-dark, #cfcfcf); background-color: transparent; }
     TextField.hover {
         color: #ffffff; background-color: #323232;
         border-top: 0.26mm solid #363636; border-right: 0.26mm solid #363636;

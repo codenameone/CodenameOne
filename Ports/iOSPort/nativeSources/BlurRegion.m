@@ -41,7 +41,7 @@
 
 -(id)initWithGlassArgs:(int)xpos ypos:(int)ypos w:(int)w h:(int)h r:(float)r
           cornerRadius:(float)cr sat:(float)st scale:(float)sc offset:(float)of
-               refract:(float)rf specular:(float)sp {
+               refract:(float)rf specular:(float)sp curve:(float)cv curveMid:(float)cm outline:(float)ol {
     x = xpos;
     y = ypos;
     width = w;
@@ -54,6 +54,9 @@
     offset = of;
     refract = rf;
     specular = sp;
+    curve = cv;
+    curveMid = cm;
+    outline = ol;
     return self;
 }
 
@@ -85,7 +88,8 @@
         } else if (glass) {
             [(METALView*)view glassScreenRegionX:x y:y w:width h:height radius:radius
                                    cornerRadius:cornerRadius sat:sat scale:scale
-                                         offset:offset refract:refract specular:specular];
+                                         offset:offset refract:refract specular:specular
+                                          curve:curve curveMid:curveMid outline:outline];
         } else {
             [(METALView*)view blurScreenRegionX:x y:y w:width h:height radius:radius];
         }

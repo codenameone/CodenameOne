@@ -147,6 +147,208 @@ cn1ss_java_run() {
   "$CN1SS_JAVA_BIN" "${CN1SS_JAVA_OPTS[@]}" -cp "$CN1SS_JAVA_CLASSPATH" "$class_name" "$@"
 }
 
+
+# ---------------------------------------------------------------------------
+# The websocket screenshot server
+# ---------------------------------------------------------------------------
+#
+# Two implementations, selected by CN1SS_WS_SERVER:
+#
+#   javase   (default) the Codename One backend server -- vm/backend/src plus
+#            impl/javase plus demo/cn1ss -- on this leg's JDK. Same Java the
+#            translated binary runs; no C toolchain, nothing new to install.
+#   native   the translated binary from vm/backend/build.sh. This is the arm that
+#            actually ships, and exactly one CI leg runs it.
+#   legacy   scripts/common/java/Cn1ssScreenshotServer.java, the hand-rolled
+#            server this replaced. Kept because native Windows has no backend arm
+#            (CleanTargetIntegrationTest and scripts/windows/run-hello.bat both
+#            compile and run it directly), and useful as an escape hatch while the
+#            swap settles.
+#
+# Whichever is chosen, it is proved to work with --selfcheck before the leg spends
+# forty minutes finding out otherwise: a readiness line only says a port was
+# bound, not that the handshake works or that the output directory is writable.
+
+cn1ss_repo_root() {
+  local script_dir
+  script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+  echo "$script_dir"
+}
+
+# Compiles vm/backend (shared runtime + the Java SE layer + the cn1ss demo) into a
+# content-addressed cache, so ten legs on one runner pay for it once.
+#
+# Deliberately NOT vm/backend/run-javase.sh: that script runs generate-contract.sh
+# unconditionally, which needs codenameone-core and the CN1 Maven plugin in a local
+# repository that most UI-test legs never build -- and it compiles into a mktemp
+# directory it deletes on exit, so every leg would pay the full javac every run.
+cn1ss_backend_setup() {
+  local root cache digest sources
+  root="$(cn1ss_repo_root)"
+  if [ ! -d "$root/vm/backend/src" ]; then
+    cn1ss_log "cn1ss_backend_setup: vm/backend is missing at $root"
+    return 1
+  fi
+  if [ -z "${CN1SS_JAVA_BIN:-}" ]; then
+    cn1ss_log "cn1ss_backend_setup: cn1ss_setup must run first"
+    return 1
+  fi
+  if [ -z "${CN1SS_JAVAC_BIN:-}" ]; then
+    cn1ss_log "cn1ss_backend_setup: no javac located"
+    return 1
+  fi
+
+  sources="$(mktemp)"
+  find "$root/vm/backend/src" "$root/vm/backend/impl/javase" "$root/vm/backend/demo/cn1ss" \
+    -name '*.java' -print | sort > "$sources"
+  # CONTENT, not mtime: a branch switch can leave sources older than a stamp.
+  digest="$(xargs shasum < "$sources" 2>/dev/null | shasum | awk '{print $1}')"
+  local tmp_root="${TMPDIR:-/tmp}"
+  tmp_root="${tmp_root%/}"
+  cache="${CN1SS_BACKEND_CACHE_DIR:-$tmp_root/cn1ss-backend-cache}/$digest"
+
+  if [ -d "$cache/classes" ] && [ -f "$cache/.ok" ]; then
+    CN1SS_BACKEND_CLASSPATH="$cache/classes"
+    rm -f "$sources"
+    cn1ss_log "Reusing the compiled backend server in $CN1SS_BACKEND_CLASSPATH"
+    return 0
+  fi
+
+  # Into a sibling and then moved, so two legs starting at once cannot read a
+  # half-written class directory. The digest is in the path, so the move is safe.
+  local staging
+  staging="$(mktemp -d "${cache%/*}/staging.XXXXXX" 2>/dev/null)" || {
+    mkdir -p "${cache%/*}"
+    staging="$(mktemp -d "${cache%/*}/staging.XXXXXX")"
+  }
+  cn1ss_log "Compiling the backend websocket server -> $cache/classes"
+  if ! "$CN1SS_JAVAC_BIN" -nowarn -encoding UTF-8 -d "$staging/classes" @"$sources" 2>&1 \
+      | sed 's/^/[cn1ss-backend] /'; then
+    cn1ss_log "cn1ss_backend_setup: javac failed"
+    rm -rf "$staging" "$sources"
+    return 1
+  fi
+  rm -f "$sources"
+  if [ ! -d "$staging/classes" ]; then
+    cn1ss_log "cn1ss_backend_setup: javac produced no classes"
+    rm -rf "$staging"
+    return 1
+  fi
+  touch "$staging/.ok"
+  rm -rf "$cache"
+  mkdir -p "${cache%/*}"
+  mv "$staging" "$cache" 2>/dev/null || { rm -rf "$staging"; [ -d "$cache/classes" ] || return 1; }
+  CN1SS_BACKEND_CLASSPATH="$cache/classes"
+  return 0
+}
+
+# Builds the translated binary. One leg only; cached on the source digest.
+cn1ss_backend_build_native() {
+  local root out digest
+  root="$(cn1ss_repo_root)"
+  # THE TRANSLATOR AND THE BOOT CLASSPATH TOO. build.sh consumes both, so a
+  # digest over vm/backend alone is unchanged when ByteCodeTranslator or JavaAPI
+  # moves -- and this function then reuses a cached executable and never calls
+  # build.sh at all. The one leg meant to exercise the translated server would be
+  # testing a stale translator against new sources, which is exactly the
+  # regression it exists to catch.
+  digest="$(find "$root/vm/backend/src" "$root/vm/backend/impl/parparvm" \
+      "$root/vm/backend/native" "$root/vm/backend/demo/cn1ss" \
+      "$root/vm/backend/build.sh" \
+      "$root/vm/ByteCodeTranslator/src" "$root/vm/JavaAPI/src" \
+      -type f -print0 2>/dev/null \
+      | xargs -0 shasum 2>/dev/null | shasum | awk '{print $1}')"
+  local tmp_root="${TMPDIR:-/tmp}"
+  tmp_root="${tmp_root%/}"
+  out="${CN1SS_NATIVE_CACHE_DIR:-$tmp_root/cn1ss-native-cache}/$digest/cn1ss-screenshot-server"
+  if [ -x "$out" ]; then
+    CN1SS_WS_SERVER_BINARY="$out"
+    cn1ss_log "Reusing the native screenshot server at $out"
+    return 0
+  fi
+  if [ -z "${JDK_8_HOME:-}" ]; then
+    cn1ss_log "cn1ss_backend_build_native: JDK_8_HOME is not set, which build.sh requires by name"
+    return 1
+  fi
+  mkdir -p "$(dirname "$out")"
+  cn1ss_log "Translating the screenshot server to a native binary (this is the arm that ships)"
+  # NOTE: CN1_BACKEND_HTTPS=0 would look like a free way to avoid the TLS
+  # dependencies, and it is a trap -- build.sh DELETES cn1_backend_crypto.c in
+  # that mode, and a native with no C symbol takes its Java method with it, so
+  # Crypto.sha1 would vanish and every handshake would compute the wrong accept.
+  # Install libssl/libcurl/libnghttp2 instead; the vm-tests job already does.
+  # CN1_BACKEND_STANDALONE_DEMO because this demo needs neither the @RestClient
+  # contract nor demo/common, and generating the contract needs codenameone-core
+  # in the repo-local .m2-repo -- which the legs that run this server do not
+  # build. Without it build.sh stops with "codenameone-core:8.0-SNAPSHOT is not in
+  # .m2-repo" and produces no binary.
+  ( cd "$root/vm/backend" \
+    && CN1_BACKEND_DEMO=demo/cn1ss CN1_BACKEND_SQLITE=0 CN1_BACKEND_STANDALONE_DEMO=1 \
+       ./build.sh Cn1ssScreenshotServer com.demo "$out" ) 2>&1 \
+    | sed 's/^/[cn1ss-native] /'
+  if [ ! -x "$out" ]; then
+    cn1ss_log "cn1ss_backend_build_native: build.sh produced no binary"
+    return 1
+  fi
+  CN1SS_WS_SERVER_BINARY="$out"
+  return 0
+}
+
+# Proves the chosen server really serves websockets, in about a second.
+cn1ss_ws_selfcheck() {
+  local probe_dir rc
+  probe_dir="$(mktemp -d)"
+  set -- "${CN1SS_WS_COMMAND[@]}" --port 0 --out "$probe_dir" --selfcheck
+  if "$@" >"$probe_dir/selfcheck.log" 2>&1; then
+    rc=0
+  else
+    rc=$?
+  fi
+  if [ "$rc" -ne 0 ]; then
+    cn1ss_log "Screenshot server self-check FAILED (exit $rc):"
+    sed 's/^/[cn1ss-selfcheck] /' "$probe_dir/selfcheck.log" >&2
+  fi
+  rm -rf "$probe_dir"
+  return $rc
+}
+
+# Fills CN1SS_WS_COMMAND for the selected arm.
+cn1ss_ws_prepare() {
+  local arm="${CN1SS_WS_SERVER:-javase}"
+  CN1SS_WS_COMMAND=()
+  case "$arm" in
+    legacy)
+      if [ -z "${CN1SS_JAVA_CLASSPATH:-}" ]; then
+        cn1ss_log "cn1ss_ws_prepare: cn1ss_setup must run first"
+        return 1
+      fi
+      CN1SS_WS_COMMAND=("$CN1SS_JAVA_BIN" "${CN1SS_JAVA_OPTS[@]}" -cp "$CN1SS_JAVA_CLASSPATH" \
+                        Cn1ssScreenshotServer)
+      ;;
+    javase)
+      cn1ss_backend_setup || return 1
+      CN1SS_WS_COMMAND=("$CN1SS_JAVA_BIN" "${CN1SS_JAVA_OPTS[@]}" -cp "$CN1SS_BACKEND_CLASSPATH" \
+                        com.demo.Cn1ssScreenshotServer)
+      ;;
+    native)
+      if [ -z "${CN1SS_WS_SERVER_BINARY:-}" ] || [ ! -x "${CN1SS_WS_SERVER_BINARY:-}" ]; then
+        cn1ss_backend_build_native || return 1
+      fi
+      CN1SS_WS_COMMAND=("$CN1SS_WS_SERVER_BINARY")
+      ;;
+    *)
+      cn1ss_log "cn1ss_ws_prepare: unknown CN1SS_WS_SERVER '$arm' (javase|native|legacy)"
+      return 1
+      ;;
+  esac
+  cn1ss_log "Screenshot server arm: $arm"
+  # The legacy server has no --selfcheck; it is the implementation being replaced.
+  if [ "$arm" != "legacy" ] && [ "${CN1SS_WS_SELFCHECK:-1}" = "1" ]; then
+    cn1ss_ws_selfcheck || return 1
+  fi
+  return 0
+}
+
 # WebSocket screenshot server bootstrap. Starts Cn1ssScreenshotServer on
 # an ephemeral port; captures the bound port from its first stdout line so
 # the runner can hand it to the device via -Dcn1ss.websocket.url=...
@@ -158,7 +360,11 @@ cn1ss_start_ws_server() {
     return 1
   fi
   mkdir -p "$out_dir" 2>/dev/null || true
-  if [ -z "${CN1SS_JAVA_BIN:-}" ] || [ -z "${CN1SS_JAVA_CLASSPATH:-}" ]; then
+  # The native arm needs no JDK of its own, but every leg that starts this server
+  # has already run cn1ss_setup for the report helpers, so requiring it here keeps
+  # one failure mode instead of two.
+  if [ "${CN1SS_WS_SERVER:-javase}" != "native" ] \
+     && { [ -z "${CN1SS_JAVA_BIN:-}" ] || [ -z "${CN1SS_JAVA_CLASSPATH:-}" ]; }; then
     cn1ss_log "cn1ss_start_ws_server: cn1ss_setup must be called first"
     return 1
   fi
@@ -169,8 +375,12 @@ cn1ss_start_ws_server() {
   # match CN1SS_WS_DEFAULT_PORT in Cn1ssDeviceRunnerHelper.java. CN1SS_WS_PORT
   # (set below from the server's reported port) stays the captured bound port.
   local bind_port="${CN1SS_WS_BIND_PORT:-8765}"
-  "$CN1SS_JAVA_BIN" "${CN1SS_JAVA_OPTS[@]}" -cp "$CN1SS_JAVA_CLASSPATH" \
-    Cn1ssScreenshotServer --port "$bind_port" --out "$out_dir" \
+  if ! cn1ss_ws_prepare; then
+    cn1ss_log "cn1ss_start_ws_server: could not prepare the screenshot server"
+    rm -f "$port_file"
+    return 1
+  fi
+  "${CN1SS_WS_COMMAND[@]}" --port "$bind_port" --out "$out_dir" \
     >"$port_file" 2>&1 &
   CN1SS_WS_PID=$!
   # Wait for the server to print "CN1SS_SERVER_PORT=<n>" on the first line.

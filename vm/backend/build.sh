@@ -147,7 +147,26 @@ mkdir -p "$WORK/classes"
 # The petserver demo is built FROM the shared contract, so the generated half has
 # to exist before javac runs. Doing it here rather than expecting the developer
 # (or CI) to remember is what keeps a fresh checkout buildable in one command.
-if [ -d contract ]; then ./generate-contract.sh --if-needed; fi
+# CN1_BACKEND_STANDALONE_DEMO is for a demo that needs neither the shared
+# @RestClient contract nor demo/common -- the screenshot server is one.
+#
+# Generating the contract needs codenameone-core, codenameone-backend and the CN1
+# Maven plugin installed in the repo-local .m2-repo, and most CI jobs never build
+# those: a job that wants a standalone server binary would otherwise have to run a
+# full Maven install to produce something the result never touches.
+#
+# It skips demo/common TOO, and that is not an extra convenience -- it is what
+# makes the flag work at all. demo/common's GreeterService is written against the
+# contract's Pet, so dropping the contract while still compiling common fails at
+# javac with seventeen missing symbols, which is how this flag was wrong the first
+# time. The two go together or neither does.
+STANDALONE_DEMO=0
+if [ "${CN1_BACKEND_STANDALONE_DEMO:-0}" = "1" ]; then
+    STANDALONE_DEMO=1
+fi
+if [ -d contract ] && [ "$STANDALONE_DEMO" != "1" ]; then
+    ./generate-contract.sh --if-needed
+fi
 GEN=""
 if [ -d gen ]; then GEN="gen"; fi
 # src/ is the shared runtime -- protocol logic, pure Java, identical on every
@@ -161,7 +180,7 @@ DEMO="${CN1_BACKEND_DEMO:-demo/petstore}"
 # demo/common holds what every front end shares (the service implementation); each
 # demo directory holds exactly one main class.
 COMMON=""
-[ -d demo/common ] && COMMON="demo/common"
+[ -d demo/common ] && [ "$STANDALONE_DEMO" != "1" ] && COMMON="demo/common"
 "$J8/bin/javac" -nowarn -encoding UTF-8 -bootclasspath "$JAVAAPI" ${GEN:+-cp "$GEN"} -source 1.8 -target 1.8 \
     -d "$WORK/classes" $(find src impl/parparvm $COMMON "$DEMO" -name '*.java')
 if [ -n "$GEN" ]; then cp -r "$GEN/." "$WORK/classes/"; fi

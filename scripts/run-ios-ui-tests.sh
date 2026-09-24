@@ -225,7 +225,12 @@ mkdir -p "$WS_RAW_DIR"
 if cn1ss_start_ws_server "$WS_RAW_DIR"; then
   ri_log "WebSocket screenshot server listening on port ${CN1SS_WS_PORT} (out=$WS_RAW_DIR)"
 else
-  ri_log "WebSocket screenshot server did not start; relying on base64 fallback"
+  ri_log "The websocket screenshot server did not start, and there is NO fallback:"
+  ri_log "Cn1ssDeviceRunnerHelper says so in as many words, and the device"
+  ri_log "streams every screenshot over that socket. Continuing would run the"
+  ri_log "whole suite, deliver nothing, and fail on a count gate many minutes"
+  ri_log "from here with no mention of the transport. Stopping instead."
+  exit 6
 fi
 
 # Patch scheme env vars to point to our runtime dirs. Use the requested scheme

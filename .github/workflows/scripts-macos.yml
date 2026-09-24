@@ -57,6 +57,18 @@ on:
       - 'maven/**'
       - '!maven/core-unittests/**'
       - '!docs/**'
+      # The screenshot transport is now a Codename One backend application, so the
+      # two files that are ONLY exercised here have to trigger this leg: the
+      # server itself and the script that launches it.
+      #
+      # Deliberately NOT the rest of vm/backend. The websocket protocol code is
+      # covered by maven/backend's unit tests, by vm/tests against the translated
+      # binary, and by the Autobahn conformance job -- all of which already
+      # trigger on vm/**. Fanning every backend change out to the macOS and
+      # emulator legs as well would buy nothing and cost a great deal: a change to
+      # the ORM, the database layer or the HTTP parser cannot reach this
+      # transport.
+      - 'vm/backend/demo/cn1ss/**'
   push:
     branches: [ master ]
     paths:
@@ -82,6 +94,18 @@ on:
       - 'tests/**'
       - 'maven/**'
       - '!maven/core-unittests/**'
+      # The screenshot transport is now a Codename One backend application, so the
+      # two files that are ONLY exercised here have to trigger this leg: the
+      # server itself and the script that launches it.
+      #
+      # Deliberately NOT the rest of vm/backend. The websocket protocol code is
+      # covered by maven/backend's unit tests, by vm/tests against the translated
+      # binary, and by the Autobahn conformance job -- all of which already
+      # trigger on vm/**. Fanning every backend change out to the macOS and
+      # emulator legs as well would buy nothing and cost a great deal: a change to
+      # the ORM, the database layer or the HTTP parser cannot reach this
+      # transport.
+      - 'vm/backend/demo/cn1ss/**'
 jobs:
   build-port:
     # Shared with scripts-ios.yml / scripts-ios-native.yml / ios-packaging.yml

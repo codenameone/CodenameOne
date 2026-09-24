@@ -377,6 +377,7 @@ readback
 recurse
 redeclaring
 redeclaration
+redeclares
 Redeclare
 reparent
 reparented
@@ -759,6 +760,12 @@ resizer
 epoll
 # A benchmark of one narrow operation, as against a whole application.
 microbenchmark
+# The websocket conformance suite the frame layer is gated on. Half of a product
+# name the project itself writes as "Autobahn|Testsuite".
+Testsuite
+# The container runtime, alongside Docker, that the conformance harness accepts.
+# A product name.
+Podman
 
 # -----------------------------------------------------------------------------
 # Attaching an agent to a build on a device (MCP-Headless-API.asciidoc).
@@ -766,3 +773,7 @@ microbenchmark
 # The open-source library whose iproxy tool relays a TCP port to an iPhone over
 # USB. A project name, spelled lowercase by its authors.
 libimobiledevice
+# -----------------------------------------------------------------------------
+# The GNOME desktop's design language, which names the Linux desktop native
+# theme (Native-Themes.asciidoc).
+Adwaita

@@ -75,8 +75,9 @@ class VaultTest extends UITestBase {
         /// Counted down as ensureKey is entered, and awaited before it answers. Together these
         /// stand in for a passkey prompt: the caller can act while the store is still asking the
         /// user, which is the window every mid-operation lock test needs.
-        java.util.concurrent.CountDownLatch ensureEntered;
-        java.util.concurrent.CountDownLatch releaseEnsure;
+        // Written by the test thread and read by the vault's worker, so volatile.
+        volatile java.util.concurrent.CountDownLatch ensureEntered;
+        volatile java.util.concurrent.CountDownLatch releaseEnsure;
         DeviceProtection gatedVariant;
 
         @Override
@@ -112,11 +113,17 @@ class VaultTest extends UITestBase {
 
         public AsyncResource<Boolean> ensureKey(String keyId) {
             AsyncResource<Boolean> out = new AsyncResource<Boolean>();
-            // Capture this prompt's gate before waking the test thread, which may
-            // clear releaseEnsure so a replacement operation can create its own key.
-            java.util.concurrent.CountDownLatch release = releaseEnsure;
-            if (ensureEntered != null) {
-                ensureEntered.countDown();
+            // Read the gate BEFORE announcing entry. Announcing wakes the test thread,
+            // whose next step (whileTheDeviceStoreIsPrompting's `between`) clears
+            // releaseEnsure so the replacement's own ensureKey does not block. Read
+            // after the announcement, that clear could land first: the prompt under
+            // test then never blocked, ran alongside the replacement, finished before
+            // it, and reported success -- aRememberPromptCannotPublishAKeyReplacedBy-
+            // RotationOrImport failing with "expected CONFLICT but was null".
+            final java.util.concurrent.CountDownLatch release = releaseEnsure;
+            final java.util.concurrent.CountDownLatch entered = ensureEntered;
+            if (entered != null) {
+                entered.countDown();
             }
             if (release != null) {
                 try {

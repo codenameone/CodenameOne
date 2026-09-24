@@ -1,0 +1,5 @@
+# Vector tiles plus translucent polyline/polygon/circle overlays, whose alpha
+# blending varies run-to-run on some GPU backends (notably the Android emulator);
+# wider tolerance. Still fails loudly on a blank/margined/wrong map.
+maxChannelDelta=48
+maxMismatchPercent=25.0

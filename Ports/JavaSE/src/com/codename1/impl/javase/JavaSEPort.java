@@ -247,6 +247,9 @@ public class JavaSEPort extends CodenameOneImplementation {
     private final java.util.Map<java.awt.Font, Boolean> desktopAliasFonts =
             new java.util.WeakHashMap<java.awt.Font, Boolean>();
     private Boolean darkMode;
+    /// True once the simulator's Dark/Light Mode menu exists; its "Unsupported" choice means
+    /// null on purpose there, so the OS is consulted only by a packaged desktop app.
+    private boolean simulatorAppearanceMenu;
     private AutoLocalizationBundle autoLocalizationBundle;
     private boolean autoUpdateDefaultResourceBundle;
     private float largerTextScale = 1.0f;
@@ -638,7 +641,115 @@ public class JavaSEPort extends CodenameOneImplementation {
 
     @Override
     public Boolean isDarkMode() {
+        if (darkMode == null && !simulatorAppearanceMenu && !isSimulator()) {
+            // A packaged desktop app has no Dark/Light menu to ask, so it asks the OS the
+            // way the native Windows, Linux and macOS ports do. Without this every $Dark
+            // style in a desktop native theme was unreachable outside the simulator.
+            return osDarkMode();
+        }
         return darkMode;
+    }
+
+    private static boolean osDarkModeResolved;
+    private static Boolean osDarkMode;
+
+    private static Boolean osDarkMode() {
+        if (!osDarkModeResolved) {
+            osDarkModeResolved = true;
+            try {
+                if (IS_MAC) {
+                    osDarkMode = parseMacAppearance(runAppearanceQuery("defaults", "read", "-g", "AppleInterfaceStyle"));
+                } else if (IS_LINUX) {
+                    osDarkMode = parseGnomeColorScheme(runAppearanceQuery("gsettings", "get",
+                            "org.gnome.desktop.interface", "color-scheme"));
+                } else if (File.separatorChar == '\\') {
+                    osDarkMode = parseWindowsAppsUseLightTheme(runAppearanceQuery("reg", "query",
+                            "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Themes\\Personalize",
+                            "/v", "AppsUseLightTheme"));
+                }
+            } catch (Throwable t) {
+                osDarkMode = null;
+            }
+        }
+        return osDarkMode;
+    }
+
+    /// Runs a short OS query and returns its standard output, or null when it failed or did
+    /// not finish in time. A missing key is a non-zero exit with no output, which the parsers
+    /// treat as the platform's default.
+    private static String runAppearanceQuery(String... command) throws IOException, InterruptedException {
+        ProcessBuilder pb = new ProcessBuilder(command);
+        pb.redirectErrorStream(true);
+        Process p = pb.start();
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        InputStream in = p.getInputStream();
+        try {
+            byte[] buf = new byte[512];
+            long deadline = System.currentTimeMillis() + 2000;
+            while (System.currentTimeMillis() < deadline) {
+                while (in.available() > 0) {
+                    int n = in.read(buf);
+                    if (n < 0) {
+                        break;
+                    }
+                    out.write(buf, 0, n);
+                }
+                try {
+                    p.exitValue();
+                    int n;
+                    while ((n = in.read(buf)) > 0) {
+                        out.write(buf, 0, n);
+                    }
+                    return new String(out.toByteArray(), "UTF-8");
+                } catch (IllegalThreadStateException running) {
+                    Thread.sleep(20);
+                }
+            }
+            p.destroy();
+            return null;
+        } finally {
+            in.close();
+        }
+    }
+
+    /// `defaults read -g AppleInterfaceStyle` prints "Dark" in dark mode; in light mode the
+    /// key does not exist and the command prints an error instead.
+    static Boolean parseMacAppearance(String output) {
+        if (output == null) {
+            return null;
+        }
+        return output.trim().equalsIgnoreCase("Dark") ? Boolean.TRUE : Boolean.FALSE;
+    }
+
+    /// `gsettings get org.gnome.desktop.interface color-scheme` prints 'default',
+    /// 'prefer-dark' or 'prefer-light'. Anything else (no GNOME schema) is unknown.
+    static Boolean parseGnomeColorScheme(String output) {
+        if (output == null) {
+            return null;
+        }
+        String v = output.trim();
+        if (v.indexOf("prefer-dark") >= 0) {
+            return Boolean.TRUE;
+        }
+        if (v.indexOf("prefer-light") >= 0 || v.indexOf("default") >= 0) {
+            return Boolean.FALSE;
+        }
+        return null;
+    }
+
+    /// `reg query ... /v AppsUseLightTheme` prints a REG_DWORD line ending in 0x0 (dark) or
+    /// 0x1 (light). An absent value means the Windows default, which is light.
+    static Boolean parseWindowsAppsUseLightTheme(String output) {
+        if (output == null) {
+            return null;
+        }
+        int idx = output.indexOf("REG_DWORD");
+        if (idx < 0) {
+            return Boolean.FALSE;
+        }
+        String v = output.substring(idx + "REG_DWORD".length()).trim();
+        return v.startsWith("0x0") && (v.length() == 3 || !Character.isLetterOrDigit(v.charAt(3)))
+                ? Boolean.TRUE : Boolean.FALSE;
     }
 
     
@@ -3048,8 +3159,32 @@ public class JavaSEPort extends CodenameOneImplementation {
     }
 
     static void setSimulatorDesktopNativeTheme(String platformName, boolean uwpDesktopSkin) {
-        setNativeTheme(uwpDesktopSkin ? "/winTheme.res"
-                : resolveDesktopNativeThemeResource(platformName, buildHint("desktop.themeMode"), "/iOS7Theme.res"));
+        String menuChoice = System.getProperty("cn1.forceSimulatorTheme",
+                Preferences.userNodeForPackage(JavaSEPort.class).get("simulatorNativeTheme", null));
+        String resource = uwpDesktopSkin ? "/winTheme.res"
+                : resolveSimulatorDesktopNativeTheme(platformName, menuChoice, buildHint("desktop.themeMode"));
+        setNativeTheme(resource);
+        currentSimulatorNativeTheme = resource == null ? null
+                : resource.substring(1, resource.length() - ".res".length());
+    }
+
+    /// The theme the Desktop pseudo-skin installs. The Native Theme menu is the same one a
+    /// phone skin uses, and it used to be read only by the phone path -- so picking "Windows
+    /// 11 Fluent" with Desktop.skin active restarted the simulator into exactly the theme it
+    /// already had. A named choice now wins here too. "auto" (and "embedded", which has no
+    /// skin to take a theme from on the desktop) defers to the project's desktop.themeMode
+    /// hint, the same resolution the packaged desktop app runs, with iOS 7 kept as the
+    /// fallback for a project that opted into nothing.
+    static String resolveSimulatorDesktopNativeTheme(String platformName, String menuChoice, String hintMode) {
+        if (menuChoice != null) {
+            menuChoice = menuChoice.trim();
+            if (menuChoice.length() > 0 && !"auto".equalsIgnoreCase(menuChoice)
+                    && !"embedded".equalsIgnoreCase(menuChoice)
+                    && JavaSEPort.class.getResource("/" + menuChoice + ".res") != null) {
+                return "/" + menuChoice + ".res";
+            }
+        }
+        return resolveDesktopNativeThemeResource(platformName, hintMode, "/iOS7Theme.res");
     }
 
     private static String resolveDesktopNativeThemeResource(String platformName, String mode, String legacyResource) {
@@ -8235,6 +8370,7 @@ public class JavaSEPort extends CodenameOneImplementation {
         darkModeGroup.add(lightModeItem);
         darkModeGroup.add(unsupportedModeItem);
 
+        simulatorAppearanceMenu = true;
         String savedDarkMode = pref.get("cn1.simulator.darkMode", "unsupported");
         if ("dark".equals(savedDarkMode)) {
             darkMode = Boolean.TRUE;
@@ -20659,6 +20795,14 @@ public class JavaSEPort extends CodenameOneImplementation {
     @Override
     public boolean glassRegion(Object graphics, int x, int y, int width, int height, float radius,
             float cornerRadius, float sat, float scaleParam, float offset, float refract, float specular) {
+        return glassRegion(graphics, x, y, width, height, radius, cornerRadius, sat, scaleParam, offset,
+                refract, specular, 0f, 0f, 0f);
+    }
+
+    @Override
+    public boolean glassRegion(Object graphics, int x, int y, int width, int height, float radius,
+            float cornerRadius, float sat, float scaleParam, float offset, float refract, float specular,
+            float curve, float curveMid, float outline) {
         if (radius <= 0f || width <= 0 || height <= 0) {
             return true;
         }
@@ -20715,13 +20859,22 @@ public class JavaSEPort extends CodenameOneImplementation {
                     prgb[brow + bx] = avail[arow + ax];
                 }
             }
-            glassMaterialInPlace(prgb, sat, scaleParam, offset);
+            int[] raw = null;
+            if (outline > 0f) {
+                // The outline darkens the BACKDROP under the edge, so keep the raw
+                // pixels under the component before the material transforms them.
+                raw = new int[rw * rh];
+                for (int yy = 0; yy < rh; yy++) {
+                    System.arraycopy(prgb, (yy + pad) * bw + pad, raw, yy * rw, rw);
+                }
+            }
+            glassMaterialInPlace(prgb, sat, scaleParam, offset, curve, curveMid);
             BufferedImage padded = new BufferedImage(bw, bh, BufferedImage.TYPE_INT_ARGB);
             padded.setRGB(0, 0, bw, bh, prgb, 0, bw);
             BufferedImage blurredPadded = new GaussianFilter(scaledRadius).filter(padded, null);
             int[] pbargb = blurredPadded.getRGB(0, 0, bw, bh, null, 0, bw);
             int[] out = new int[rw * rh];
-            applyGlassOptics(pbargb, bw, bh, pad, out, rw, rh, scaledCorner, refract, specular);
+            applyGlassOptics(pbargb, bw, bh, pad, out, rw, rh, scaledCorner, refract, specular, outline, raw);
             BufferedImage patch = new BufferedImage(rw, rh, BufferedImage.TYPE_INT_ARGB);
             patch.setRGB(0, 0, rw, rh, out, 0, rw);
             Graphics2D dg = dest.createGraphics();
@@ -20735,8 +20888,12 @@ public class JavaSEPort extends CodenameOneImplementation {
 
     /// The reverse-engineered iOS Liquid Glass colour material; mirrors
     /// IOSImplementation.glassMaterialInPlace (validated &lt;1 LSB against a real
-    /// UIVisualEffectView): c' = clamp((lum + (c - lum) * sat) * scale + offset).
-    private static void glassMaterialInPlace(int[] argb, float sat, float scale, float offset) {
+    /// UIVisualEffectView): c' = clamp((lum + (c - lum) * sat) * scale + offset
+    /// + curve * 255 * (lum / 255 - curveMid)^2). The curve term is zero for every
+    /// recipe except iOS 27 dark, whose material is not affine.
+    private static void glassMaterialInPlace(int[] argb, float sat, float scale, float offset,
+            float curve, float curveMid) {
+        boolean curved = curve != 0f;
         for (int i = 0; i < argb.length; i++) {
             int p = argb[i];
             int a = p & 0xff000000;
@@ -20745,6 +20902,13 @@ public class JavaSEPort extends CodenameOneImplementation {
             r = (lum + (r - lum) * sat) * scale + offset;
             g = (lum + (g - lum) * sat) * scale + offset;
             b = (lum + (b - lum) * sat) * scale + offset;
+            if (curved) {
+                float d = lum / 255f - curveMid;
+                float k = curve * 255f * d * d;
+                r += k;
+                g += k;
+                b += k;
+            }
             int ri = r < 0 ? 0 : (r > 255 ? 255 : (int) r);
             int gi = g < 0 ? 0 : (g > 255 ? 255 : (int) g);
             int bi = b < 0 ? 0 : (b > 255 ? 255 : (int) b);
@@ -20757,7 +20921,8 @@ public class JavaSEPort extends CodenameOneImplementation {
     /// refraction (quarter-circle displacement toward the centre), a specular rim
     /// glint (brightest at the top) and the anti-aliased shape mask.
     private static void applyGlassOptics(int[] src, int bw, int bh, int pad, int[] out,
-            int rw, int rh, float cornerRadius, float refract, float specular) {
+            int rw, int rh, float cornerRadius, float refract, float specular,
+            float outline, int[] raw) {
         float hw = rw / 2f, hh = rh / 2f;
         float r = cornerRadius < 0f ? Math.min(hw, hh) : Math.min(cornerRadius, Math.min(hw, hh));
         if (r < 0f) r = 0f;
@@ -20793,10 +20958,47 @@ public class JavaSEPort extends CodenameOneImplementation {
                     gg = gg + add > 255 ? 255 : gg + add;
                     bb = bb + add > 255 ? 255 : bb + add;
                 }
+                // iOS 27 edge outline (GlassRecipe.getOutline): on the outermost
+                // pixel, composite the glass over the raw backdrop and darken it,
+                // weighted by the horizontal component of the edge normal -- full on
+                // the sides, fading round the corners, none along top and bottom.
+                if (outline > 0f && depth < 1f) {
+                    float wx;
+                    if (dx > 0 && dy > 0) {
+                        wx = outside > 0f ? ax / outside : 0f;
+                    } else {
+                        wx = dx >= dy ? 1f : 0f;
+                    }
+                    float ow = outline * wx;
+                    if (ow > 0f) {
+                        int bk = raw[y * rw + x];
+                        rr = glassOutlineChannel(rr, (bk >> 16) & 0xff, alpha, ow);
+                        gg = glassOutlineChannel(gg, (bk >> 8) & 0xff, alpha, ow);
+                        bb = glassOutlineChannel(bb, bk & 0xff, alpha, ow);
+                        out[y * rw + x] = 0xff000000 | (rr << 16) | (gg << 8) | bb;
+                        continue;
+                    }
+                }
                 int a = (int) (alpha * 255f);
                 out[y * rw + x] = (a << 24) | (rr << 16) | (gg << 8) | bb;
             }
         }
+    }
+
+    /// One channel of the iOS 27 edge outline: glass `c` at coverage `alpha`
+    /// composited over backdrop `b`, then darkened by min(76 * w, 0.78 * w * b).
+    /// At full strength that is max(b - 76, 0.22 * b), the measured native line.
+    private static int glassOutlineChannel(int c, int b, float alpha, float w) {
+        float v = c * alpha;
+        float under = b * (1f - alpha);
+        v = v + under;
+        float dark = 76f * w;
+        float alt = 0.78f * w * b;
+        if (alt < dark) {
+            dark = alt;
+        }
+        v = v - dark;
+        return v <= 0f ? 0 : (v >= 255f ? 255 : (int) (v + 0.5f));
     }
 
     /// Bilinear ARGB sample with edge clamping; mirrors IOSImplementation.sampleBilinear.

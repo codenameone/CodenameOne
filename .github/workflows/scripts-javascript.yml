@@ -40,6 +40,18 @@ on:
       - 'maven/**'
       - '!maven/core-unittests/**'
       - '!docs/**'
+      # The screenshot transport is now a Codename One backend application, so the
+      # two files that are ONLY exercised here have to trigger this leg: the
+      # server itself and the script that launches it.
+      #
+      # Deliberately NOT the rest of vm/backend. The websocket protocol code is
+      # covered by maven/backend's unit tests, by vm/tests against the translated
+      # binary, and by the Autobahn conformance job -- all of which already
+      # trigger on vm/**. Fanning every backend change out to the macOS and
+      # emulator legs as well would buy nothing and cost a great deal: a change to
+      # the ORM, the database layer or the HTTP parser cannot reach this
+      # transport.
+      - 'vm/backend/demo/cn1ss/**'
   push:
     branches: [ master ]
     paths:
@@ -66,6 +78,18 @@ on:
       - 'maven/**'
       - '!maven/core-unittests/**'
       - '!docs/**'
+      # The screenshot transport is now a Codename One backend application, so the
+      # two files that are ONLY exercised here have to trigger this leg: the
+      # server itself and the script that launches it.
+      #
+      # Deliberately NOT the rest of vm/backend. The websocket protocol code is
+      # covered by maven/backend's unit tests, by vm/tests against the translated
+      # binary, and by the Autobahn conformance job -- all of which already
+      # trigger on vm/**. Fanning every backend change out to the macOS and
+      # emulator legs as well would buy nothing and cost a great deal: a change to
+      # the ORM, the database layer or the HTTP parser cannot reach this
+      # transport.
+      - 'vm/backend/demo/cn1ss/**'
 
 concurrency:
   # Cancel superseded runs of this workflow for the same PR branch
@@ -165,6 +189,11 @@ jobs:
           distribution: 'temurin'
           java-version: '8'
           cache: 'maven'
+
+      # build.sh requires a JDK 8 BY NAME, and the Java 17 setup below replaces
+      # JAVA_HOME -- so the value has to be captured while it is still correct.
+      - name: Record JDK 8 for the native screenshot server
+        run: echo "JDK_8_HOME=$JAVA_HOME" >> "$GITHUB_ENV"
 
       - name: Prepare Codename One binaries for Maven plugin
         run: |
@@ -279,7 +308,40 @@ jobs:
       # job. The screenshot suite below exercises the same boot path AND the
       # rendering, with its own per-suite timeout, so it is the single source of
       # truth. This keeps the workflow focused on the screenshot tests and fast.
+      # THIS LEG RUNS THE TRANSLATED SCREENSHOT SERVER, and it is the only one
+      # that does. Every other leg runs the same Java on a JVM, which covers the
+      # protocol but not the arm that ships. This job is the right host for it: it
+      # is Linux, which is what build.sh targets; it already sets up JDK 8 and
+      # builds the ParparVM compiler above; it is a single job rather than a
+      # matrix, so the binary is built once; and its client is the browser's own
+      # WebSocket rather than one of ours, which makes it the only pairing of our
+      # shipping server with a third-party RFC 6455 implementation.
+      #
+      # NOT with CN1_BACKEND_HTTPS=0, tempting as that is for avoiding these
+      # packages: build.sh deletes cn1_backend_crypto.c in that mode, and a native
+      # with no C symbol takes its Java method with it -- so Crypto.sha1 would
+      # vanish and every handshake would compute the wrong accept value.
+      - name: Install the native backend toolchain
+        run: |
+          bash "$GITHUB_WORKSPACE/scripts/ci/apt-get-update.sh"
+          sudo apt-get install -y --no-install-recommends \
+            clang zlib1g-dev libcurl4-openssl-dev libssl-dev libnghttp2-dev
+
+      - name: Cache the native screenshot server
+        uses: actions/cache@v5
+        with:
+          path: ${{ runner.temp }}/cn1ss-native-cache
+          # The translator and the boot classpath are inputs to build.sh too; a key
+          # without them restores a binary built by a different translator.
+          key: ${{ runner.os }}-cn1ss-native-${{ hashFiles('vm/backend/src/com/codename1/backend/**', 'vm/backend/impl/parparvm/**', 'vm/backend/native/**', 'vm/backend/demo/cn1ss/**', 'vm/backend/build.sh', 'vm/ByteCodeTranslator/src/**', 'vm/JavaAPI/src/**') }}
+
       - name: Run JavaScript screenshot browser tests
+        env:
+          # The translated binary, built and self-checked by scripts/lib/cn1ss.sh
+          # before the suite starts, so a broken one costs seconds rather than the
+          # whole 40-minute timeout.
+          CN1SS_WS_SERVER: native
+          CN1SS_NATIVE_CACHE_DIR: ${{ runner.temp }}/cn1ss-native-cache
         run: |
           mkdir -p "${ARTIFACTS_DIR}"
           ./scripts/run-javascript-browser-tests.sh "${{ steps.locate_bundle.outputs.bundle }}" "${GITHUB_WORKSPACE}/scripts/javascript/screenshots"

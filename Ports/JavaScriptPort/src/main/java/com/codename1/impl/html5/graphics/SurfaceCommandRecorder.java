@@ -355,10 +355,12 @@ public final class SurfaceCommandRecorder implements CanvasRenderingContext2D {
     /** Records a complete in-place Liquid Glass material; see OP_GLASS_SELF_REGION. */
     public void glassSelfRegion(double x, double y, double w, double h, double blurRadius,
             double cornerRadius, double saturation, double scale, double offset,
-            double refraction, double specular) {
+            double refraction, double specular, double curve, double curveMid,
+            double outline) {
         op(OP_GLASS_SELF_REGION);
         num(x); num(y); num(w); num(h); num(blurRadius); num(cornerRadius);
         num(saturation); num(scale); num(offset); num(refraction); num(specular);
+        num(curve); num(curveMid); num(outline);
     }
     @Override public String getFilter() { return "none"; }
     @Override public void clearRect(double x, double y, double width, double height) {
