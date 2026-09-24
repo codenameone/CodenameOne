@@ -458,7 +458,9 @@ public final class DartUri {
                 }
             }
         }
-        return out;
+        // Unmodifiable, as Dart's is: a write to it changed nothing about the URI, so
+        // code that "added a parameter" went on as if it had.
+        return new DartUnmodifiableMap<String, String>(out);
     }
 
     /// Dart's {@code Uri.decodeComponent}, for path segments: a {@code +} is a

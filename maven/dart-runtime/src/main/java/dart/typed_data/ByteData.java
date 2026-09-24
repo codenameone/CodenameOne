@@ -34,6 +34,9 @@ public final class ByteData {
 
     public ByteData(long length) {
         dart.core.RangeError.checkNotNegative(length, "length");
+        // Checked on the long, before narrowing: ByteData(2^32) cast to a zero-byte
+        // buffer instead of failing, as the list constructors already refuse to.
+        dart.core.RangeError.checkAllocatable(length);
         this.buffer = new byte[(int) length];
     }
 

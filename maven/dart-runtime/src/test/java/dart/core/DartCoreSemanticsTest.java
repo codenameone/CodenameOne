@@ -686,4 +686,69 @@ public class DartCoreSemanticsTest {
         DateTime modern = new DateTime(2024, 7, 1, 12, 30, 0, 0, 0);
         assertEquals("2024-07-01 12:30:00.000", modern.toString());
     }
+
+    @Test
+    public void byteDataRefusesALengthItCannotAllocate() {
+        assertThrows(OutOfMemoryError.class, () -> new dart.typed_data.ByteData(4294967296L));
+        assertEquals(8L, new dart.typed_data.ByteData(8).lengthInBytes());
+    }
+
+    @Test
+    public void typedListFromChecksEachElementsType() {
+        java.util.List<Number> mixed = new java.util.ArrayList<Number>();
+        mixed.add(Double.valueOf(1.9));
+        assertThrows(TypeError.class, () -> DartLongList.fromLongs(mixed));
+        java.util.List<Number> ints = new java.util.ArrayList<Number>();
+        ints.add(Long.valueOf(1));
+        assertThrows(TypeError.class, () -> DartDoubleList.fromDoubles(ints));
+        assertEquals(1L, DartLongList.fromLongs(ints).getLong(0));
+    }
+
+    @Test
+    public void forEachRefusesALengthChange() {
+        final DartList<Long> list = new DartList<Long>();
+        list.add(1L);
+        list.add(2L);
+        assertThrows(ConcurrentModificationError.class, () -> list.forEachDart(e -> list.add(3L)));
+    }
+
+    @Test
+    public void queryParametersAreReadOnly() {
+        DartMap<String, String> q = DartUri.parse("https://x/?a=1").queryParameters();
+        assertEquals("1", q.get("a"));
+        assertThrows(UnsupportedError.class, () -> q.put("b", "2"));
+        assertThrows(UnsupportedError.class, () -> q.idxSet("b", "2"));
+        assertThrows(UnsupportedError.class, () -> q.remove("a"));
+        assertThrows(UnsupportedError.class, q::clear);
+        assertThrows(UnsupportedOperationException.class, () -> q.keySet().clear());
+        assertEquals(1, q.size());
+    }
+
+    @Test
+    public void dateTimeRangesCompareByTheirEndpoints() {
+        DateTime a = DateTime.utc(2024, 1, 1, 0, 0, 0, 0, 0);
+        DateTime b = DateTime.utc(2024, 1, 9, 0, 0, 0, 0, 0);
+        assertEquals(new DateTimeRange(a, b), new DateTimeRange(a, b));
+        assertEquals(new DateTimeRange(a, b).hashCode(), new DateTimeRange(a, b).hashCode());
+        assertFalse(new DateTimeRange(a, b).equals(new DateTimeRange(a, a)));
+    }
+
+    @Test
+    public void containsHonoursItsStartIndex() {
+        assertFalse(DString.contains("abc", "a", 1));
+        assertTrue(DString.contains("abc", "c", 1));
+        assertFalse(DString.contains("abc", new RegExp("a"), 1));
+        assertThrows(RangeError.class, () -> DString.contains("abc", "a", 4));
+    }
+
+    @Test
+    public void hashAllHashesTheElements() {
+        DartList<Object> one = new DartList<Object>();
+        one.add(1L);
+        one.add("x");
+        DartList<Object> two = new DartList<Object>();
+        two.add(1L);
+        two.add("x");
+        assertEquals(dart.runtime.DartRuntime.hashAll(one), dart.runtime.DartRuntime.hashAll(two));
+    }
 }

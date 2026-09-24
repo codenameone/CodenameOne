@@ -34,6 +34,11 @@ public class Completer<T> {
         return future;
     }
 
+    /** Dart's {@code complete()} with the value omitted: completes with null. */
+    public void complete() {
+        future.complete(null);
+    }
+
     public void complete(T value) {
         future.complete(value);
     }

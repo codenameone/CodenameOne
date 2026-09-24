@@ -111,6 +111,11 @@ public final class DartDoubleList extends DartList<Double> {
     public static DartDoubleList fromDoubles(Iterable<? extends Number> elements) {
         DartDoubleList l = new DartDoubleList();
         for (Number e : elements) {
+            // As List<int>.from: the element must BE a double; an int is not one in Dart.
+            if (!(e instanceof Double || e instanceof Float)) {
+                throw new TypeError("type '" + (e == null ? "Null" : "int")
+                        + "' is not a subtype of type 'double'");
+            }
             l.addDouble(e.doubleValue());
         }
         return l;

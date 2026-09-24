@@ -45,6 +45,29 @@ public class DartIterable<E> implements Iterable<E> {
     }
 
     /**
+     * A {@code sync*} generator's iterable. {@code body} runs the generator's body into
+     * the list it is given, and it runs when an iteration begins -- once per iteration,
+     * as Dart re-runs a generator for each iterator. It used to run once, when the
+     * function was called: side effects happened before anyone iterated, and a second
+     * iteration replayed the first one's values instead of running the body again.
+     *
+     * <p>Still a divergence: an iteration runs the WHOLE body before its first element,
+     * where Dart suspends at each {@code yield}. An infinite generator therefore does not
+     * terminate here. Suspending needs the body rewritten as a state machine, the same
+     * continuation-passing lowering the blocking async model defers.</p>
+     */
+    public static <E> DartIterable<E> syncStar(final Funcs.VoidFunc1<DartList<E>> body) {
+        return wrap(new Iterable<E>() {
+            @Override
+            public Iterator<E> iterator() {
+                DartList<E> out = new DartList<E>();
+                body.call(out);
+                return out.iterator();
+            }
+        });
+    }
+
+    /**
      * Dart's {@code Iterable.generate(count, [generator])} — a lazy iterable of
      * {@code count} elements produced by {@code generator(index)}. With no
      * generator Dart yields the indices themselves.

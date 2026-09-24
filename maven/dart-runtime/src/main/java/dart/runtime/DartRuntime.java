@@ -95,6 +95,50 @@ public final class DartRuntime {
      * Dart's {@code ==} between reference values: null-safe, delegates to
      * equals (user {@code operator ==} overrides equals).
      */
+    /**
+     * Dart's {@code Object.hashAll(objects)}: a hash of the ELEMENTS, in order, combined
+     * as java.util.Objects.hash combines its arguments. Passing the iterable to
+     * Objects.hash hashed the collection object itself -- by identity, for a Dart list --
+     * so two equal value objects hashing {@code [a, b]} got different hashes and never
+     * found each other's map or set entries.
+     */
+    public static long hashAll(Iterable<?> objects) {
+        int h = 1;
+        if (objects != null) {
+            for (Object o : objects) {
+                h = 31 * h + (o == null ? 0 : o.hashCode());
+            }
+        }
+        return h;
+    }
+
+    /**
+     * Whether {@code t} is what Dart calls an Error, for {@code on Error}. This runtime's
+     * Dart errors -- StateError, ArgumentError, RangeError, TypeError, UnsupportedError,
+     * LateInitializationError and the rest -- are RuntimeExceptions, so the Java
+     * {@code catch (Error e)} that {@code on Error} used to become caught none of them.
+     * Everything thrown is an Error except the Dart Exceptions (DartException,
+     * FormatException) and Java's checked exceptions.
+     */
+    public static boolean isDartError(Throwable t) {
+        if (t instanceof Error) {
+            return true;
+        }
+        return t instanceof RuntimeException && !(t instanceof dart.core.DartException)
+                && !(t instanceof dart.core.FormatException);
+    }
+
+    /** Throws {@code t} on unchanged; declared to return so a caller can write {@code throw rethrow(t)}. */
+    public static RuntimeException rethrow(Throwable t) {
+        if (t instanceof RuntimeException) {
+            throw (RuntimeException) t;
+        }
+        if (t instanceof Error) {
+            throw (Error) t;
+        }
+        throw new RuntimeException(t);
+    }
+
     public static boolean eq(Object a, Object b) {
         if (a instanceof Number && b instanceof Number) {
             return numEq((Number) a, (Number) b);

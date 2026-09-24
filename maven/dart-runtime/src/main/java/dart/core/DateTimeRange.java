@@ -49,4 +49,24 @@ public final class DateTimeRange {
     public Duration duration() {
         return end.difference(start);
     }
+
+    /**
+     * Flutter's {@code DateTimeRange ==}: equal endpoints. Inherited identity made a
+     * rebuilt, unchanged range differ from the one a controlled date-range picker
+     * already held, and two equal ranges separate keys of a map or set.
+     */
+    @Override
+    public boolean equals(Object o) {
+        if (!(o instanceof DateTimeRange)) {
+            return false;
+        }
+        DateTimeRange r = (DateTimeRange) o;
+        return (start == null ? r.start == null : start.equals(r.start))
+                && (end == null ? r.end == null : end.equals(r.end));
+    }
+
+    @Override
+    public int hashCode() {
+        return 31 * (start == null ? 0 : start.hashCode()) + (end == null ? 0 : end.hashCode());
+    }
 }

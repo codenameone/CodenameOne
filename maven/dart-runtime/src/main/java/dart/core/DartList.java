@@ -601,8 +601,14 @@ public class DartList<E> extends AbstractList<E> implements RandomAccess {
 
     public void forEachDart(Funcs.VoidFunc1<E> action) {
         // Named forEachDart because AbstractList inherits Java's forEach(Consumer).
+        // A callback that changes the length is a ConcurrentModificationError in Dart;
+        // the unchecked loop ignored an append and failed on a removal with an
+        // unrelated range error.
         for (int i = 0, n = size(); i < n; i++) {
             action.call(get(i));
+            if (size() != n) {
+                throw new ConcurrentModificationError("list length changed from " + n + " to " + size());
+            }
         }
     }
 

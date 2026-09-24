@@ -103,6 +103,12 @@ public final class DartLongList extends DartList<Long> {
     public static DartLongList fromLongs(Iterable<? extends Number> elements) {
         DartLongList l = new DartLongList();
         for (Number e : elements) {
+            // Dart checks each element's type: List<int>.from(<num>[1.9]) throws, where
+            // longValue() quietly made it 1 -- and a double holding 1.0 is no int either.
+            if (!(e instanceof Long || e instanceof Integer || e instanceof Short || e instanceof Byte)) {
+                throw new TypeError("type '" + (e == null ? "Null" : "double")
+                        + "' is not a subtype of type 'int'");
+            }
             l.addLong(e.longValue());
         }
         return l;

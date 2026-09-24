@@ -167,6 +167,20 @@ public class Future<T> {
      * its handler on.
      */
     public static Future<DartList<Object>> wait(Iterable<? extends Future<?>> futures) {
+        return wait(futures, false, null);
+    }
+
+    /**
+     * Future.wait with its named arguments, which the transpiler used to drop.
+     * {@code eagerError} fails the result at the FIRST error instead of waiting for
+     * every input -- without it, an error beside an input that never completes left
+     * the result pending forever. {@code cleanUp}, once any input has failed, receives
+     * every non-null successful value: the ones already in and the ones that arrive
+     * later, as Dart hands them over.
+     */
+    public static Future<DartList<Object>> wait(Iterable<? extends Future<?>> futures,
+                                                final boolean eagerError,
+                                                final Funcs.VoidFunc1<Object> cleanUp) {
         final List<Future<?>> inputs = new ArrayList<Future<?>>();
         for (Future<?> f : futures) {
             inputs.add(f);
@@ -178,6 +192,7 @@ public class Future<T> {
             return result;
         }
         final Object[] values = new Object[count];
+        final boolean[] arrived = new boolean[count];
         // Inputs still pending, and the first error. Guarded by `pending`: on
         // the headless path inputs complete on their own threads.
         final int[] pending = {count};
@@ -189,18 +204,48 @@ public class Future<T> {
                 @Override
                 public void run() {
                     Throwable error;
+                    boolean last;
+                    boolean failNow = false;
+                    List<Object> toClean = new ArrayList<Object>();
                     synchronized (pending) {
                         if (f.error != null) {
                             if (firstError[0] == null) {
                                 firstError[0] = f.error;
+                                failNow = eagerError;
+                                // The values already in are the application's to release.
+                                for (int j = 0; j < count; j++) {
+                                    if (arrived[j] && values[j] != null) {
+                                        toClean.add(values[j]);
+                                    }
+                                }
+                            }
+                        } else if (firstError[0] != null) {
+                            if (f.value != null) {
+                                toClean.add(f.value);
                             }
                         } else {
                             values[index] = f.value;
+                            arrived[index] = true;
                         }
-                        if (--pending[0] > 0) {
-                            return;
-                        }
+                        last = --pending[0] == 0;
                         error = firstError[0];
+                    }
+                    if (cleanUp != null) {
+                        for (Object v : toClean) {
+                            try {
+                                cleanUp.call(v);
+                            } catch (Throwable t) {
+                                // Uncaught in Dart too: nothing awaits a cleanUp callback.
+                                com.codename1.io.Log.e(t);
+                            }
+                        }
+                    }
+                    if (failNow) {
+                        result.completeError(error);
+                        return;
+                    }
+                    if (!last || (error != null && eagerError)) {
+                        return;
                     }
                     if (error != null) {
                         result.completeError(error);

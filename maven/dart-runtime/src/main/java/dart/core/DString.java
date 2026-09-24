@@ -208,6 +208,22 @@ public final class DString {
     }
 
     /**
+     * Dart's {@code contains(pattern, startIndex)}: a match that starts at or after
+     * {@code startIndex}, which must lie in 0..length. The start used to be dropped, so
+     * {@code 'abc'.contains('a', 1)} searched from 0 and answered true.
+     */
+    public static boolean contains(String s, RegExp pattern, long startIndex) {
+        RangeError.checkValueInInterval(startIndex, 0, s.length(), "startIndex");
+        return pattern.matchFrom(s, (int) startIndex) != null;
+    }
+
+    /** {@link #contains(String, RegExp, long)} for a String pattern. */
+    public static boolean contains(String s, String other, long startIndex) {
+        RangeError.checkValueInInterval(startIndex, 0, s.length(), "startIndex");
+        return s.indexOf(other, (int) startIndex) >= 0;
+    }
+
+    /**
      * Dart's {@code replaceAll(Pattern, String)} for a RegExp. The replacement
      * is literal -- Dart does not expand group references here; that is
      * replaceAllMapped's job -- so every match, empty ones included, is swapped
