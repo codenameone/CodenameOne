@@ -1,0 +1,7 @@
+constructor refused the pattern
+[]
+[abab]
+[]
+null
+false
+b

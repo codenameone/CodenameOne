@@ -3609,7 +3609,7 @@ public final class JavaEmitter {
     private Out resolveTopLevel(String n, String prefix, Ctx ctx) {
         if (program.classes.containsKey(n) || program.enums.containsKey(n)
                 || stubs.isStubClass(n) || stubs.isStubEnum(n)
-                || n.equals("Future") || n.equals("Duration")) {
+                || n.equals("Future") || n.equals("Duration") || n.equals("Iterable")) {
             return new Out(n, classRef(n));
         }
         if (program.topLevelVars.containsKey(n)) {
@@ -5301,6 +5301,17 @@ public final class JavaEmitter {
                 String a = emitExpr(c.args.positional.get(0), null, ctx).code;
                 String b = emitExpr(c.args.positional.get(1), null, ctx).code;
                 return new Out("DartComparable.compare(" + a + ", " + b + ")", TypeRef.INT);
+            }
+            // Iterable.generate(count, [generator]) with no type arguments parses as a
+            // static call on the name Iterable, which resolved to nothing; the typed form
+            // (Iterable<int>.generate) is a constructor call handled with the collections.
+            if (cls.equals("Iterable") && n.equals("generate") && !c.args.positional.isEmpty()) {
+                ctx.importClass("dart.core.DartIterable");
+                String count = emitExpr(c.args.positional.get(0), TypeRef.INT, ctx).code;
+                String gen = c.args.positional.size() > 1
+                        ? ", " + emitExpr(c.args.positional.get(1), new TypeRef("IndexedGenerator"), ctx).code : "";
+                return new Out("DartIterable.<Object>generate(" + count + gen + ")",
+                        TypeRef.of("Iterable", TypeRef.DYNAMIC));
             }
             if (cls.equals("Future")) {
                 ctx.importClass("dart.async.Future");
