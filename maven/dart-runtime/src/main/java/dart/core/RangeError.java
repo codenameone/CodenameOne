@@ -51,6 +51,17 @@ public class RangeError extends ArgumentError {
      * paying a full method-stack frame on every in-range index access — the
      * dominant cost of tight index loops (e.g. quicksort) on ParparVM.
      */
+    /**
+     * A list length no array can hold. Narrowed to an int, 2^32 wrapped to 0 and the
+     * list came back empty; Dart runs out of memory trying to allocate it, and so does
+     * this, rather than handing back a plausible wrong answer.
+     */
+    public static void checkAllocatable(long length) {
+        if (length > Integer.MAX_VALUE - 8) {
+            throw new OutOfMemoryError("Cannot allocate a list of length " + length);
+        }
+    }
+
     /** Dart's {@code RangeError.checkNotNegative}. */
     public static long checkNotNegative(long value, String name) {
         if (value < 0) {

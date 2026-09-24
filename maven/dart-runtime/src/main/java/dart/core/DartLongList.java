@@ -58,6 +58,7 @@ public final class DartLongList extends DartList<Long> {
     /** Dart's List&lt;int&gt;.filled(length, fill). */
     public static DartLongList filled(long length, long fill, boolean growable) {
         RangeError.checkNotNegative(length, "length");
+        RangeError.checkAllocatable(length);
         int n = (int) length;
         long[] backing = new long[Math.max(8, n)];
         Arrays.fill(backing, 0, n, fill);
@@ -66,6 +67,7 @@ public final class DartLongList extends DartList<Long> {
 
     public static DartLongList filled(long length, long fill) {
         RangeError.checkNotNegative(length, "length");
+        RangeError.checkAllocatable(length);
         return filled(length, fill, false);
     }
 
@@ -76,6 +78,7 @@ public final class DartLongList extends DartList<Long> {
     /** Dart's List&lt;int&gt;.generate(length, generator). */
     public static DartLongList generateLongs(long length, Funcs.Func1<Long, Long> generator, boolean growable) {
         RangeError.checkNotNegative(length, "length");
+        RangeError.checkAllocatable(length);
         int n = (int) length;
         long[] backing = new long[Math.max(8, n)];
         for (int i = 0; i < n; i++) {
@@ -86,6 +89,7 @@ public final class DartLongList extends DartList<Long> {
 
     public static DartLongList generateLongs(long length, Funcs.Func1<Long, Long> generator) {
         RangeError.checkNotNegative(length, "length");
+        RangeError.checkAllocatable(length);
         return generateLongs(length, generator, true);
     }
 

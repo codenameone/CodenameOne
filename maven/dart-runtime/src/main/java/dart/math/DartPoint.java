@@ -49,6 +49,23 @@ public final class DartPoint<T> {
         return y;
     }
 
+    /**
+     * Value equality, as Dart's Point has: Point(1, 2) == Point(1, 2). Inherited identity
+     * made every two points unequal, so equal points could not find each other's entries.
+     */
+    @Override
+    public boolean equals(Object o) {
+        return o instanceof DartPoint && ((DartPoint<?>) o).x == x && ((DartPoint<?>) o).y == y;
+    }
+
+    /** Consistent with equals, whose == makes 0.0 and -0.0 equal: hashed alike. */
+    @Override
+    public int hashCode() {
+        long bits = Double.doubleToLongBits(x == 0.0 ? 0.0 : x) * 31
+                + Double.doubleToLongBits(y == 0.0 ? 0.0 : y);
+        return (int) (bits ^ (bits >>> 32));
+    }
+
     public double distanceTo(DartPoint<T> other) {
         double dx = x - other.x;
         double dy = y - other.y;

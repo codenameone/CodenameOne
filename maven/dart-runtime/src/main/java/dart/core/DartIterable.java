@@ -532,6 +532,11 @@ public class DartIterable<E> implements Iterable<E> {
         return join("");
     }
 
+    /** Dart's {@code toList(growable: ...)}: a fixed-length copy when growable is false. */
+    public DartList<E> toList(boolean growable) {
+        return growable ? toList() : DartList.from(this, false);
+    }
+
     public DartList<E> toList() {
         DartList<E> l = new DartList<>();
         for (E e : this) {

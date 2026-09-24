@@ -321,6 +321,56 @@ public final class DartRuntime {
         return (long) roundToDouble(d);
     }
 
+    /**
+     * Dart's {@code double.toInt()} (and truncate): toward zero, but refusing NaN and
+     * the infinities with UnsupportedError. A Java (long) cast made NaN 0 and saturated
+     * the infinities, so validation around a bad value went quietly through.
+     */
+    public static long toInt(double d) {
+        checkFinite(d, "toInt");
+        return (long) d;
+    }
+
+    /** Dart's {@code double.floor()}: an int, refusing NaN and the infinities. */
+    public static long floor(double d) {
+        checkFinite(d, "floor");
+        return (long) Math.floor(d);
+    }
+
+    /** Dart's {@code double.ceil()}: an int, refusing NaN and the infinities. */
+    public static long ceil(double d) {
+        checkFinite(d, "ceil");
+        return (long) Math.ceil(d);
+    }
+
+    private static void checkFinite(double d, String op) {
+        if (d != d || Double.isInfinite(d)) {
+            throw new dart.core.UnsupportedError("Unsupported operation: " + doubleStr(d) + "." + op + "()");
+        }
+    }
+
+    /**
+     * Dart's {@code int.clamp(lower, upper)}: ArgumentError when lower is above upper.
+     * Nested Math.min/max answered a plausible value instead -- 5.clamp(10, 0) was 0.
+     */
+    public static long clamp(long v, long lower, long upper) {
+        if (lower > upper) {
+            throw new dart.core.ArgumentError("Invalid argument(s): " + upper + " < " + lower);
+        }
+        return v < lower ? lower : v > upper ? upper : v;
+    }
+
+    /** Dart's {@code double.clamp}, ordered by num.compareTo (NaN compares greatest). */
+    public static double clamp(double v, double lower, double upper) {
+        if (Double.compare(lower, upper) > 0) {
+            throw new dart.core.ArgumentError("Invalid argument(s): " + doubleStr(upper) + " < " + doubleStr(lower));
+        }
+        if (Double.compare(v, lower) < 0) {
+            return lower;
+        }
+        return Double.compare(v, upper) > 0 ? upper : v;
+    }
+
     /** Dart's unary minus on a value of unknown static type. */
     public static Object dynNegate(Object a) {
         if (a instanceof Number) {

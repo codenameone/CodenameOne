@@ -546,4 +546,40 @@ public class DartCoreSemanticsTest {
         assertEquals("", DString.repeat("ab", -1));
         assertEquals(0, DartIterable.generate(-1, i -> i).length());
     }
+
+    // --- round 8 ----------------------------------------------------------------
+
+    @Test
+    public void aLengthNoArrayCanHoldIsRefusedNotWrapped() {
+        // Dart runs out of memory for List.filled(2^32, ..); narrowed first, it was an
+        // empty list.
+        assertThrows(OutOfMemoryError.class, () -> DartLongList.filled(4294967296L, 0L));
+        assertThrows(OutOfMemoryError.class, () -> DartList.filled(4294967296L, "x"));
+    }
+
+    @Test
+    public void asMapIsALiveUnmodifiableView() {
+        DartList<Object> l = DartList.of((Object) 1L, 2L);
+        DartMap<Long, Object> m = l.asMap();
+        l.set(0, 9L);
+        assertEquals(9L, m.get(0L), "the view reads the list as it is now");
+        assertEquals(2, m.size());
+        assertThrows(UnsupportedError.class, () -> m.put(0L, 5L));
+        assertEquals(java.util.Arrays.asList(0L, 1L), new java.util.ArrayList<Long>(m.keySet()));
+    }
+
+    @Test
+    public void doubleParseFollowsDartsGrammar() {
+        // Each recorded from the Dart SDK.
+        assertEquals(null, DString.tryParseDouble("1d"));
+        assertEquals(null, DString.tryParseDouble("0x1.0p0"));
+        assertEquals(null, DString.tryParseDouble("1e"));
+        assertEquals(Double.valueOf(1500.0), DString.tryParseDouble(" 1.5e3 "));
+        assertEquals(Double.valueOf(0.5), DString.tryParseDouble(".5"));
+        assertEquals(Double.valueOf(5.0), DString.tryParseDouble("5."));
+        assertEquals(Double.valueOf(1.0), DString.tryParseDouble("+1"));
+        assertTrue(DString.tryParseDouble("NaN").isNaN());
+        assertEquals(Double.valueOf(Double.NEGATIVE_INFINITY), DString.tryParseDouble("-Infinity"));
+        assertThrows(FormatException.class, () -> DString.parseDouble("1f"));
+    }
 }

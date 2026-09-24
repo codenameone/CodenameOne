@@ -224,6 +224,11 @@ public class DartSet<E> extends LinkedHashSet<E> {
         return asIterable().where(test);
     }
 
+    /** Dart's {@code toList(growable: ...)}: a fixed-length copy when growable is false. */
+    public DartList<E> toList(boolean growable) {
+        return asIterable().toList(growable);
+    }
+
     public DartList<E> toList() {
         return asIterable().toList();
     }

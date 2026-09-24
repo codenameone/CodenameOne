@@ -115,6 +115,7 @@ public class DartList<E> extends AbstractList<E> implements RandomAccess {
     /** Dart's List.filled(length, fill). */
     public static <E> DartList<E> filled(long length, E fill, boolean growable) {
         RangeError.checkNotNegative(length, "length");
+        RangeError.checkAllocatable(length);
         ArrayList<E> impl = new ArrayList<>();
         for (long i = 0; i < length; i++) {
             impl.add(fill);
@@ -124,12 +125,14 @@ public class DartList<E> extends AbstractList<E> implements RandomAccess {
 
     public static <E> DartList<E> filled(long length, E fill) {
         RangeError.checkNotNegative(length, "length");
+        RangeError.checkAllocatable(length);
         return filled(length, fill, false);
     }
 
     /** Dart's List.generate(length, generator). */
     public static <E> DartList<E> generate(long length, Funcs.Func1<Long, E> generator, boolean growable) {
         RangeError.checkNotNegative(length, "length");
+        RangeError.checkAllocatable(length);
         ArrayList<E> impl = new ArrayList<>();
         for (long i = 0; i < length; i++) {
             impl.add(generator.call(i));
@@ -139,6 +142,7 @@ public class DartList<E> extends AbstractList<E> implements RandomAccess {
 
     public static <E> DartList<E> generate(long length, Funcs.Func1<Long, E> generator) {
         RangeError.checkNotNegative(length, "length");
+        RangeError.checkAllocatable(length);
         return generate(length, generator, true);
     }
 
@@ -509,8 +513,13 @@ public class DartList<E> extends AbstractList<E> implements RandomAccess {
         return asIterable().skip(count);
     }
 
+    /**
+     * Dart's {@code List.asMap()}: an unmodifiable view backed by this list, so a later
+     * {@code list[0] = x} shows through and {@code map[0] = y} is refused. It used to be a
+     * mutable copy -- stale after the list changed, and writable without effect on it.
+     */
     public DartMap<Long, E> asMap() {
-        return asIterable().asMap();
+        return new DartListMapView<E>(this);
     }
 
     public E lastWhere(Funcs.Func1<E, Boolean> test, Funcs.Func0<E> orElse) {
@@ -550,6 +559,11 @@ public class DartList<E> extends AbstractList<E> implements RandomAccess {
         for (int i = 0, n = size(); i < n; i++) {
             action.call(get(i));
         }
+    }
+
+    /** Dart's {@code toList(growable: ...)}: a fixed-length copy when growable is false. */
+    public DartList<E> toList(boolean growable) {
+        return growable ? toList() : DartList.from(this, false);
     }
 
     public DartList<E> toList() {

@@ -391,20 +391,75 @@ public final class DString {
 
     /** Dart's double.parse. */
     public static double parseDouble(String s) {
-        try {
-            return Double.parseDouble(s.trim());
-        } catch (NumberFormatException e) {
+        Double d = tryParseDouble(s);
+        if (d == null) {
             throw new dart.core.FormatException("Invalid double: " + s);
         }
+        return d.doubleValue();
     }
 
-    /** Dart's double.tryParse. */
+    /**
+     * Dart's double.tryParse: null for anything outside Dart's grammar -- an optional
+     * sign, then NaN, Infinity, or decimal digits with an optional fraction and
+     * exponent, with surrounding whitespace allowed. Java's parser also accepts a d or f
+     * suffix and hexadecimal floats, so '1d' and '0x1.0p0' parsed to 1.0 where Dart
+     * answers null.
+     */
     public static Double tryParseDouble(String s) {
+        if (s == null) {
+            return null;
+        }
+        String t = trim(s);
+        if (!isDartDouble(t)) {
+            return null;
+        }
         try {
-            return Double.parseDouble(s.trim());
+            return Double.valueOf(Double.parseDouble(t));
         } catch (NumberFormatException e) {
             return null;
         }
+    }
+
+    private static boolean isDartDouble(String t) {
+        int i = 0;
+        int n = t.length();
+        if (i < n && (t.charAt(i) == '+' || t.charAt(i) == '-')) {
+            i++;
+        }
+        String rest = t.substring(i);
+        if (rest.equals("NaN") || rest.equals("Infinity")) {
+            return true;
+        }
+        int digits = 0;
+        while (i < n && t.charAt(i) >= '0' && t.charAt(i) <= '9') {
+            i++;
+            digits++;
+        }
+        if (i < n && t.charAt(i) == '.') {
+            i++;
+            while (i < n && t.charAt(i) >= '0' && t.charAt(i) <= '9') {
+                i++;
+                digits++;
+            }
+        }
+        if (digits == 0) {
+            return false;
+        }
+        if (i < n && (t.charAt(i) == 'e' || t.charAt(i) == 'E')) {
+            i++;
+            if (i < n && (t.charAt(i) == '+' || t.charAt(i) == '-')) {
+                i++;
+            }
+            int exp = 0;
+            while (i < n && t.charAt(i) >= '0' && t.charAt(i) <= '9') {
+                i++;
+                exp++;
+            }
+            if (exp == 0) {
+                return false;
+            }
+        }
+        return i == n;
     }
 
     public static long compareTo(String a, String b) {

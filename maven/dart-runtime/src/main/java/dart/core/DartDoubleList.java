@@ -67,6 +67,7 @@ public final class DartDoubleList extends DartList<Double> {
     /** Dart's List&lt;double&gt;.filled(length, fill). */
     public static DartDoubleList filled(long length, double fill, boolean growable) {
         RangeError.checkNotNegative(length, "length");
+        RangeError.checkAllocatable(length);
         int n = (int) length;
         double[] backing = new double[Math.max(8, n)];
         Arrays.fill(backing, 0, n, fill);
@@ -75,6 +76,7 @@ public final class DartDoubleList extends DartList<Double> {
 
     public static DartDoubleList filled(long length, double fill) {
         RangeError.checkNotNegative(length, "length");
+        RangeError.checkAllocatable(length);
         return filled(length, fill, false);
     }
 
@@ -84,6 +86,7 @@ public final class DartDoubleList extends DartList<Double> {
     /** Dart's List&lt;double&gt;.generate(length, generator). */
     public static DartDoubleList generateDoubles(long length, Funcs.Func1<Long, Double> generator, boolean growable) {
         RangeError.checkNotNegative(length, "length");
+        RangeError.checkAllocatable(length);
         int n = (int) length;
         double[] backing = new double[Math.max(8, n)];
         for (int i = 0; i < n; i++) {
@@ -94,6 +97,7 @@ public final class DartDoubleList extends DartList<Double> {
 
     public static DartDoubleList generateDoubles(long length, Funcs.Func1<Long, Double> generator) {
         RangeError.checkNotNegative(length, "length");
+        RangeError.checkAllocatable(length);
         return generateDoubles(length, generator, true);
     }
 
