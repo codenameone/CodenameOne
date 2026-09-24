@@ -169,6 +169,12 @@ or `Long` attribute without a converter, including properties holding those
 numeric types. Other values stored as integers, such as
 booleans and dates, aren't counters.
 
+Scalar field projections return the mapped Java values, including enums, dates,
+booleans, property values, and converter-backed objects. Integral `SUM` results
+use `Long` on every database. Joined paths may end in embedded fields.
+Queries accept at most 999 bound parameters in total, including expanded `IN`
+lists. Larger lists are rejected before query execution.
+
 JPQL arithmetic requires numeric operands. Parameters in integral expressions
 must be integer values; use a real operand such as `1.0` for fractional arithmetic.
 Division of integral operands truncates toward zero on every database. Division

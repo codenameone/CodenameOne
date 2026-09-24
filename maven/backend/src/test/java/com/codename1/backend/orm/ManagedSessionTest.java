@@ -190,6 +190,8 @@ class ManagedSessionTest {
                 assertTrue(division.contains("mysql".equals(dialect.getName())?" DIV NULLIF(":" / NULLIF("),division);
                 s.createQuery("select r.counter / 2.0 from ManagedSessionTest$Record r").list();division=statements.get(statements.size()-1);
                 assertTrue(division.contains("mysql".equals(dialect.getName())?"1.0 *":"CAST("),division);
+                s.createQuery("select sum(r.counter) from ManagedSessionTest$Record r",Long.class).list();String sum=statements.get(statements.size()-1);
+                assertTrue(sum.contains("CAST(SUM("),sum);assertTrue(sum.contains("mysql".equals(dialect.getName())?" AS SIGNED)":" AS BIGINT)"),sum);
             } finally { s.close(); }
         }
     }
@@ -233,6 +235,48 @@ class ManagedSessionTest {
                 } finally { session.close(); }
             }
         }
+    }
+
+    @Test void predicatesRejectIncompatibleTypesBeforeExecution() throws Exception {
+        EntityManager em=manager();
+        try {
+            Session session=em.openSession();seed(session);
+            for(String predicate:new String[]{"r.counter AND r.id=1","r.name OR r.id=1","NOT r.counter","r.counter","r.name","r.name=r.counter","r.name>1","r.counter like '1%'","r.name like r.counter","r.name between 1 and 2","r.name in (1,2)"}) {
+                assertThrows(IllegalArgumentException.class,()->session.createQuery("select r from ManagedSessionTest$Record r where "+predicate),predicate);
+            }
+            assertThrows(IllegalArgumentException.class,()->session.query(Record.class).like("counter","1%"));
+            assertThrows(IllegalArgumentException.class,()->session.query(Record.class).like("bytes","1%"));
+            assertThrows(IllegalArgumentException.class,()->session.createQuery("select r from ManagedSessionTest$Record r where :flag").setParameter("flag",1L).list());
+            assertThrows(IllegalArgumentException.class,()->session.createQuery("select r from ManagedSessionTest$Record r where r.name=:name").setParameter("name",1L).list());
+            assertEquals(1,session.createQuery("select r from ManagedSessionTest$Record r where :flag and NOT false").setParameter("flag",true).list().size());
+            assertEquals(Boolean.TRUE,session.createQuery("select r.counter=0 from ManagedSessionTest$Record r",Boolean.class).first());
+            assertEquals(1,session.createQuery("select r from ManagedSessionTest$Record r where r.counter < 0.5").list().size());session.close();
+        } finally { em.close(); }
+    }
+
+    @Test void scalarSubqueriesAndIntegralSumsPreserveResultTypes() throws Exception {
+        EntityManager em=manager();
+        try {
+            Session session=em.openSession();Record r=seed(session);session.beginTransaction();r.counter=9007199254740993L;session.commitTransaction();
+            assertEquals("first",session.createQuery("select (select max(i.name) from ManagedSessionTest$Record i) from ManagedSessionTest$Record r",String.class).first());
+            assertEquals(Long.valueOf(r.counter),session.createQuery("select (select max(i.counter) from ManagedSessionTest$Record i) from ManagedSessionTest$Record r",Long.class).first());
+            assertEquals(Long.valueOf(r.counter),session.createQuery("select sum(r.counter) from ManagedSessionTest$Record r",Long.class).first());
+            assertThrows(IllegalArgumentException.class,()->session.createQuery("select (select max(i.name) from ManagedSessionTest$Record i)+1 from ManagedSessionTest$Record r"));session.close();
+        } finally { em.close(); }
+    }
+
+    @Test void publicInListsRespectTheCombinedParameterLimit() throws Exception {
+        EntityManager em=manager();
+        try {
+            Session session=em.openSession();Record r=seed(session);Object[] allowed=new Object[999],tooMany=new Object[1000],half=new Object[500];java.util.Arrays.fill(allowed,r.id);java.util.Arrays.fill(tooMany,r.id);java.util.Arrays.fill(half,r.id);
+            assertEquals(1,session.query(Record.class).in("id",allowed).list().size());
+            assertThrows(IllegalArgumentException.class,()->session.query(Record.class).in("id",tooMany));
+            assertThrows(IllegalArgumentException.class,()->session.query(Record.class).in("id",half).in("id",half));
+            assertEquals(1,session.createQuery("select r from ManagedSessionTest$Record r where r.id in :ids").setParameter("ids",allowed).list().size());
+            assertThrows(IllegalArgumentException.class,()->session.createQuery("select r from ManagedSessionTest$Record r where r.id in :ids").setParameter("ids",tooMany).list());
+            assertThrows(IllegalArgumentException.class,()->session.createQuery("select r from ManagedSessionTest$Record r where r.id in :a and r.id in :b").setParameter("a",half).setParameter("b",half).list());
+            assertThrows(IllegalArgumentException.class,()->session.createQuery("select r from ManagedSessionTest$Record r where r.id in :ids and r.name=:name").setParameter("ids",allowed).setParameter("name","first").list());session.close();
+        } finally { em.close(); }
     }
 
     @Test void arithmeticValidatesOperandsAndUsesPortableDivision() throws Exception {

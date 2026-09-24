@@ -80,6 +80,19 @@ public abstract class EntityModel<T> {
     public boolean counter(int index) {
         return false;
     }
+    /// Converts a scalar column projection to its mapped Java value.
+    public Object project(int index, Object value) {
+        if (value == null) {
+            return null;
+        }
+        int kind = attributes()[index].kind;
+        try {
+            return kind == Attribute.BOOLEAN ? Values.asBooleanObject(value)
+                    : kind == Attribute.TIMESTAMP ? Values.asDate(value) : value;
+        } catch (java.io.IOException error) {
+            throw new PersistenceException("Invalid scalar projection", error);
+        }
+    }
     public Object parameter(int index, Object value) {
         return Values.storage(value);
     }

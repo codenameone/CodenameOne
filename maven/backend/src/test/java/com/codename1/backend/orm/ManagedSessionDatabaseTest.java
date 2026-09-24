@@ -63,7 +63,7 @@ class ManagedSessionDatabaseTest {
         db.execute(selectSchema,new Object[0]);
         Models.register(new ManagedSessionTest.Model() {
             public int generation() { return 2; }
-            public String generator() { return "record_sequence"; }
+            public String generator() { return "Record_Sequence"; }
             public Attribute[] attributes() {
                 Attribute[] attrs=super.attributes().clone();
                 attrs[0]=new Attribute("id","id",Attribute.BIGINT,true,false,false,false);return attrs;
@@ -87,6 +87,10 @@ class ManagedSessionDatabaseTest {
             session.beginTransaction();
             ManagedSessionTest.Record entity=new ManagedSessionTest.Record();entity.name="record";entity.bytes=new byte[]{1,2};session.persist(entity);
             assertTrue(entity.id>0);session.commitTransaction();session.clear();
+            assertEquals(Long.valueOf(9007199254740993L),session.createQuery("select sum(r.counter+9007199254740993) from ManagedSessionTest$Record r",Long.class).first());
+            assertEquals("record",session.createQuery("select (select max(i.name) from ManagedSessionTest$Record i) from ManagedSessionTest$Record r",String.class).first());
+            assertEquals(1,session.createQuery("select r from ManagedSessionTest$Record r where :flag and NOT false").setParameter("flag",true).list().size());
+            assertEquals(1,session.createQuery("select r from ManagedSessionTest$Record r where r.counter < 0.5").list().size());
             assertEquals(Long.valueOf(1),session.createQuery("select (r.counter+3)/2 from ManagedSessionTest$Record r",Long.class).first());
             assertEquals(Long.valueOf(-1),session.createQuery("select (r.counter-3)/2 from ManagedSessionTest$Record r",Long.class).first());
             assertEquals(Double.valueOf(1.5),session.createQuery("select (r.counter+3)/2.0 from ManagedSessionTest$Record r",Double.class).first());

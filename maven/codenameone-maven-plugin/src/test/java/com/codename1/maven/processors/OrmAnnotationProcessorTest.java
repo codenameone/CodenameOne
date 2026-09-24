@@ -114,6 +114,10 @@ public class OrmAnnotationProcessorTest {
             Object loaded=s.query(type).eq("letter",Character.valueOf('Q')).eq("symbol",Character.valueOf((char)0)).first();org.junit.Assert.assertNotNull(loaded);
             s.beginTransaction();assertTrue(s.increment(type,id,"counter",3));s.commitTransaction();
             org.junit.Assert.assertEquals(Integer.valueOf(3),((com.codename1.properties.Property)type.getField("counter").get(loaded)).get());
+            org.junit.Assert.assertEquals(Integer.valueOf(3),s.createQuery("select b.counter from propertymodel.Bean b",Integer.class).first());
+            org.junit.Assert.assertEquals(Long.valueOf(3),s.createQuery("select sum(b.counter) from propertymodel.Bean b",Long.class).first());
+            org.junit.Assert.assertEquals(Character.valueOf('Q'),s.createQuery("select b.letter from propertymodel.Bean b",Character.class).first());
+            org.junit.Assert.assertEquals(Character.valueOf((char)0),s.createQuery("select b.symbol from propertymodel.Bean b",Character.class).first());
             s.beginTransaction();((com.codename1.properties.Property)type.getField("letter").get(loaded)).set(Character.valueOf('Z'));s.commitTransaction();s.clear();
             org.junit.Assert.assertEquals(Character.valueOf('Z'),((com.codename1.properties.Property)type.getField("letter").get(s.find(type,id))).get());
         } finally { s.close();em.close();loader.close(); }
@@ -255,6 +259,7 @@ public class OrmAnnotationProcessorTest {
             s.beginTransaction();codeType.getField("value").set(type.getField("code").get(loaded),"DEF");s.commitTransaction();s.clear();
             org.junit.Assert.assertEquals("DEF",codeType.getField("value").get(type.getField("code").get(s.find(type,id))));
             Object included=codeType.getConstructor(String.class).newInstance("DEF"),excluded=codeType.getConstructor(String.class).newInstance("missing");
+            Object projected=s.createQuery("select e.code from converted.Entry e",codeType).first();org.junit.Assert.assertEquals("DEF",codeType.getField("value").get(projected));
             org.junit.Assert.assertSame(s.find(type,id),s.createQuery("select e from converted.Entry e where e.code in (:first, :second)",type).setParameter("first",excluded).setParameter("second",included).first());
             org.junit.Assert.assertSame(s.find(type,id),s.createQuery("select e from converted.Entry e where e.code in (:first, :second)",type).setParameter("first",included).setParameter("second",excluded).first());
             org.junit.Assert.assertNull(s.createQuery("select e from converted.Entry e where e.code not in (:first, :second)",type).setParameter("first",excluded).setParameter("second",included).first());
@@ -280,6 +285,50 @@ public class OrmAnnotationProcessorTest {
             s.beginTransaction();Object duplicate=type.newInstance();type.getField("code").set(duplicate,codeType.getConstructor(String.class).newInstance("DEF"));s.persist(duplicate);
             try { s.commitTransaction();fail("Unique index must reject duplicate domain values"); } catch(com.codename1.orm.session.PersistenceException expected) { s.rollbackTransaction(); }
         } finally { s.close();em.close();loader.close(); }
+    }
+
+    @Test
+    public void scalarDomainProjectionsAndJoinedEmbeddedPathsWorkForBothModels() throws Exception {
+        File classes=tmp.newFolder("scalarprojections");Map<String,String> sources=new java.util.LinkedHashMap<String,String>();
+        sources.put("scalarprojections.State","package scalarprojections; public enum State { ACTIVE, INACTIVE }");
+        sources.put("scalarprojections.Prefix","package scalarprojections; public class Prefix implements com.codename1.orm.session.AttributeConverter<String,String> { public String toDatabase(String value) { return value==null?null:\"db:\"+value; } public String fromDatabase(String value) { return value==null?null:value.substring(3); } }");
+        sources.put("scalarprojections.Address","package scalarprojections; import com.codename1.annotations.db.*; @Embeddable public class Address { @Convert(converter=Prefix.class) public String city; }");
+        sources.put("scalarprojections.Owner","package scalarprojections; import com.codename1.annotations.*; import com.codename1.annotations.db.*; @Entity(table=\"projection_owners\") @Inheritance public abstract class Owner { @Id public long id; public boolean active; public Boolean optional; public char letter; public java.util.Date moment; public State status; @Embedded public Address address=new Address(); }");
+        sources.put("scalarprojections.Person","package scalarprojections; import com.codename1.annotations.*; @Entity public class Person extends Owner { public String name; }");
+        sources.put("scalarprojections.Ticket","package scalarprojections; import com.codename1.annotations.*; import com.codename1.annotations.db.*; @Entity(table=\"projection_tickets\") public class Ticket { @Id public long id; @ManyToOne(cascade=CascadeType.PERSIST) public Owner owner; }");
+        JavaSourceCompiler.compile(sources,classes,Arrays.asList(testClassesDir()));ProcessorContext client=runProcessor(classes);assertFalse(client.getErrors().toString(),client.hasErrors());ProcessorContext backend=runProcessor(classes,backendClasspath());assertFalse(backend.getErrors().toString(),backend.hasErrors());
+        try(java.net.URLClassLoader loader=new java.net.URLClassLoader(new URL[]{classes.toURI().toURL()},getClass().getClassLoader())) {
+            Class ownerType=loader.loadClass("scalarprojections.Owner"),personType=loader.loadClass("scalarprojections.Person"),ticketType=loader.loadClass("scalarprojections.Ticket"),stateType=loader.loadClass("scalarprojections.State");Object active=Enum.valueOf(stateType,"ACTIVE");
+            for(String suffix:Arrays.asList("Cn1Model","Cn1BackendModel")) {
+                Map<String,com.codename1.impl.orm.EntityModel<?>> models=new java.util.LinkedHashMap<String,com.codename1.impl.orm.EntityModel<?>>();for(Class type:Arrays.asList(ownerType,personType,ticketType)) models.put(type.getName(),(com.codename1.impl.orm.EntityModel)loader.loadClass(type.getName()+suffix).newInstance());
+                com.codename1.backend.Database db=com.codename1.backend.Database.open(":memory:");com.codename1.orm.session.Session session=new com.codename1.impl.orm.SessionImpl(new com.codename1.impl.orm.BackendSqlAccess(null,db,db.dialect()),models);
+                try {
+                    session.createTables();Object owner=personType.newInstance();ownerType.getField("active").set(owner,true);ownerType.getField("letter").set(owner,'Q');ownerType.getField("moment").set(owner,new java.util.Date(1234));ownerType.getField("status").set(owner,active);Object address=ownerType.getField("address").get(owner);address.getClass().getField("city").set(address,"Paris");Object ticket=ticketType.newInstance();ticketType.getField("owner").set(ticket,owner);session.beginTransaction();session.persist(ticket);session.commitTransaction();
+                    org.junit.Assert.assertEquals(Boolean.TRUE,session.createQuery("select o.active from scalarprojections.Owner o",Boolean.class).first());
+                    org.junit.Assert.assertNull(session.createQuery("select o.optional from scalarprojections.Owner o",Boolean.class).first());
+                    org.junit.Assert.assertEquals(Character.valueOf('Q'),session.createQuery("select o.letter from scalarprojections.Owner o",Character.class).first());
+                    org.junit.Assert.assertEquals(new java.util.Date(1234),session.createQuery("select o.moment from scalarprojections.Owner o",java.util.Date.class).first());
+                    org.junit.Assert.assertEquals(active,session.createQuery("select o.status from scalarprojections.Owner o",stateType).first());
+                    Object[] row=(Object[])session.createQuery("select o.active,o.status,o.moment,o.letter from scalarprojections.Owner o").first();org.junit.Assert.assertArrayEquals(new Object[]{true,active,new java.util.Date(1234),'Q'},row);
+                    org.junit.Assert.assertEquals(1,session.createQuery("select o from scalarprojections.Owner o where o.active and NOT false").list().size());
+                    org.junit.Assert.assertSame(ticket,session.query(ticketType).eq("owner.address.city","Paris").orderBy("owner.address.city",true).first());
+                    org.junit.Assert.assertSame(ticket,session.query(ticketType).join("owner").like("owner.address.city","Pa%").first());
+                    org.junit.Assert.assertEquals("Paris",session.createQuery("select t.owner.address.city from scalarprojections.Ticket t where t.owner.address.city=:city",String.class).setParameter("city","Paris").first());
+                    org.junit.Assert.assertEquals("Paris",session.createQuery("select o.address.city from scalarprojections.Ticket t join t.owner o",String.class).first());
+                    org.junit.Assert.assertEquals(active,session.createQuery("select (select max(o.status) from scalarprojections.Owner o) from scalarprojections.Ticket t",stateType).first());
+                } finally { session.close();db.close(); }
+            }
+        }
+    }
+
+    @Test
+    public void inheritanceRejectsReservedDiscriminatorFieldNames() throws Exception {
+        for(boolean onRoot:Arrays.asList(false,true)) {
+            Map<String,String> sources=new java.util.LinkedHashMap<String,String>();
+            sources.put("reservedtag.Base","package reservedtag; import com.codename1.annotations.*; import com.codename1.annotations.db.*; @Entity @Inheritance public abstract class Base { @Id public long id; "+(onRoot?"public String __cn1_discriminator;":"")+" }");
+            sources.put("reservedtag.Child","package reservedtag; import com.codename1.annotations.*; @Entity public class Child extends Base { "+(onRoot?"":"public String __cn1_discriminator;")+" public String after; }");
+            rejectsMappingForBothRuntimes(sources,"Reserved persistent field name: __cn1_discriminator");
+        }
     }
 
     @Test

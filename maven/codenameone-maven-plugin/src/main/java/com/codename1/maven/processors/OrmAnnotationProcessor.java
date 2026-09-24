@@ -1081,6 +1081,9 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
                         ctx.error("Conflicting inherited relationship: "+prior.declaringType+"."+relation.field+" and "+relation.declaringType+"."+relation.field);
                 }
             }
+            if(fields.containsKey("__cn1_discriminator")) {
+                ctx.error("Reserved persistent field name: __cn1_discriminator");continue;
+            }
             PersistedField tag=new PersistedField();tag.fieldName="__cn1_discriminator";tag.columnName=discriminator;
             tag.kind=PropertyTypeKind.scalar("java.lang.String");tag.dialectKind=KIND_TEXT;tag.sqlType="TEXT";tag.discriminator=true;
             fields.put(tag.fieldName,tag);
@@ -1200,6 +1203,22 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
         sb.append("    default: throw new IllegalArgumentException(\"Unknown attribute\");\n")
           .append("    }} catch(Exception ex) { throw new com.codename1.orm.session.")
           .append("PersistenceException(ex.getMessage(),ex); }\n  }\n");
+        sb.append("public Object project(int index,Object value) { try { switch(index) {\n");
+        for(int i=0;i<ec.fields.size();i++) {
+            PersistedField field=ec.fields.get(i);
+            if(field.relation!=null || field.discriminator) continue;
+            String expression;
+            if(field.kind.kind==PropertyTypeKind.Kind.PROPERTY) {
+                expression=storageConversion(field.kind.elementBinaryName,"value");
+            } else {
+                StringBuilder setter=new StringBuilder();emitBackendWrite(setter,field);
+                String assignment=setter.toString();expression=assignment.substring(assignment.indexOf(" = ")+3,assignment.length()-1);
+            }
+            sb.append("case ").append(i).append(": return ");
+            if(field.converter==null) sb.append("value==null?null:");
+            sb.append(expression.replace(ORM,pkg)).append(";\n");
+        }
+        sb.append("default:return super.project(index,value);}} catch(Exception error) { throw new com.codename1.orm.session.PersistenceException(\"Invalid scalar projection\",error);}}\n");
         sb.append("public Object domainValue(").append(ec.binaryName).append(" e,int index) { switch(index) {\n");
         for(int i=0;i<ec.fields.size();i++) {
             PersistedField field=ec.fields.get(i);

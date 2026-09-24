@@ -80,6 +80,14 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
     String likeExpression(String expression) {
         return sql.likeExpression(expression);
     }
+    static void checkParameterCount(int count) {
+        if (count > 999) {
+            throw new IllegalArgumentException("Query exceeds the portable limit of 999 bound parameters");
+        }
+    }
+    String integralSum(String expression) {
+        return "CAST(" + expression + " AS " + ("mysql".equals(sql.dialect()) ? "SIGNED" : "BIGINT") + ")";
+    }
     String numericOperand(String value, int kind) {
         if ("postgresql".equals(sql.dialect())) {
             return "CAST(" + value + " AS " + (kind == Attribute.REAL ? "DOUBLE PRECISION" : "BIGINT") + ")";
@@ -1819,6 +1827,7 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
     }
     List<Object[]> read(String statement, Object[] params, int[] kinds) {
         check();
+        checkParameterCount(params.length);
         try {
             return sql.query(statement, params, kinds);
         } catch (IOException e) {
@@ -1830,6 +1839,7 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
     }
     int write(String statement, Object[] params) {
         check();
+        checkParameterCount(params.length);
         try {
             return sql.execute(statement, params);
         } catch (IOException e) {

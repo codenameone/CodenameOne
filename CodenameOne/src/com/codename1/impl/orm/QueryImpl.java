@@ -151,6 +151,9 @@ public final class QueryImpl<T> implements com.codename1.orm.session.Query<T> {
     }
     @Override
     public QueryImpl<T> like(String field, String pattern) {
+        if (kind(field) != Attribute.TEXT) {
+            throw new IllegalArgumentException("LIKE requires text storage: " + field);
+        }
         String name = column(field);
         conjunction();
         predicates.append(name).append(session.likeOperator(false));
@@ -171,6 +174,8 @@ public final class QueryImpl<T> implements com.codename1.orm.session.Query<T> {
     }
     @Override
     public QueryImpl<T> in(String field, Object... values) {
+        SessionImpl.checkParameterCount(params.size() + values.length);
+
         String name = column(field);
         conjunction();
         if (values.length == 0) {
@@ -283,28 +288,46 @@ public final class QueryImpl<T> implements com.codename1.orm.session.Query<T> {
         }
         return this;
     }
-    Object parameter(String field, Object value) {
-        for (Attribute attribute : model.attributes()) {
-            if (attribute.field.equals(field)) {
-                return model.parameter(model.index(field), value);
-            }
+    private static final class Field {
+        final Join join;
+        final int index;
+        Field(Join join, int index) {
+            this.join = join;
+            this.index = index;
         }
-        int dot = field.lastIndexOf('.');
-        EntityModel target = dot < 0 ? model : ensureJoin(field.substring(0, dot), false).model;
-        return target.parameter(target.index(dot < 0 ? field : field.substring(dot + 1)), value);
+    }
+    private Field resolveField(String path) {
+        Join join = new Join(model, rootAlias, "");
+        String remaining = path;
+        int offset = 0;
+        while (true) {
+            Attribute[] attributes = join.model.attributes();
+            for (int i = 0; i < attributes.length; i++) {
+                if (attributes[i].field.equals(remaining)) {
+                    return new Field(join, i);
+                }
+            }
+            int dot = remaining.indexOf('.');
+            if (dot < 0) {
+                throw new IllegalArgumentException("Unknown attribute: " + path);
+            }
+            offset += dot;
+            join = ensureJoin(path.substring(0, offset), false);
+            offset++;
+            remaining = path.substring(offset);
+        }
+    }
+    Object parameter(String field, Object value) {
+        Field resolved = resolveField(field);
+        return resolved.join.model.parameter(resolved.index, value);
+    }
+    Object project(String field, Object value) {
+        Field resolved = resolveField(field);
+        return resolved.join.model.project(resolved.index, value);
     }
     String column(String field) {
-        for (Attribute attribute : model.attributes()) {
-            if (attribute.field.equals(field)) {
-                return rootAlias + "." + session.q(attribute.column);
-            }
-        }
-        int dot = field.lastIndexOf('.');
-        if (dot < 0) {
-            return rootAlias + "." + session.q(model.attributes()[model.index(field)].column);
-        }
-        Join join = ensureJoin(field.substring(0, dot), false);
-        return join.alias + "." + session.q(join.model.attributes()[join.model.index(field.substring(dot + 1))].column);
+        Field resolved = resolveField(field);
+        return resolved.join.alias + "." + session.q(resolved.join.model.attributes()[resolved.index].column);
     }
     private Join ensureJoin(String path, boolean left) {
         Join existing = joins.get(path);
@@ -362,14 +385,8 @@ public final class QueryImpl<T> implements com.codename1.orm.session.Query<T> {
         return result.toString();
     }
     int kind(String field) {
-        for (Attribute attribute : model.attributes()) {
-            if (attribute.field.equals(field)) {
-                return attribute.kind;
-            }
-        }
-        int dot = field.lastIndexOf('.');
-        EntityModel target = dot < 0 ? model : ensureJoin(field.substring(0, dot), false).model;
-        return target.attributes()[target.index(dot < 0 ? field : field.substring(dot + 1))].kind;
+        Field resolved = resolveField(field);
+        return resolved.join.model.attributes()[resolved.index].kind;
     }
     String rootColumns() {
         return rootColumns(false);

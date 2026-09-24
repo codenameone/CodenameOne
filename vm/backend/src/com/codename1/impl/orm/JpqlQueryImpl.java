@@ -112,6 +112,18 @@ public final class JpqlQueryImpl<T> implements com.codename1.orm.session.JpqlQue
             }
         } else {
             for (Object[] row : rows) {
+                for (int i = 0; i < row.length; i++) {
+                    Expr projection = plan.projections.get(i);
+                    if (projection.projectionQuery != null) {
+                        row[i] = projection.projectionQuery.project(projection.projectionField, row[i]);
+                    } else if (plan.kinds[i] == Attribute.BOOLEAN) {
+                        try {
+                            row[i] = Values.asBooleanObject(row[i]);
+                        } catch (java.io.IOException error) {
+                            throw new PersistenceException("Invalid boolean projection", error);
+                        }
+                    }
+                }
                 result.add(checked(row.length == 1 ? row[0] : row));
             }
         }
@@ -180,6 +192,7 @@ public final class JpqlQueryImpl<T> implements com.codename1.orm.session.JpqlQue
                     int count = 0;
                     for (Object item : collection) {
                         values.add(parameter.convert(item));
+                        SessionImpl.checkParameterCount(values.size());
                         count++;
                     }
                     statement = statement.replace(
@@ -194,6 +207,7 @@ public final class JpqlQueryImpl<T> implements com.codename1.orm.session.JpqlQue
                 values.add(Values.storage(binding));
             }
         }
+        SessionImpl.checkParameterCount(values.size());
         return new Bound(statement, values.toArray());
     }
     private Object boundValue(Object binding) {
@@ -228,11 +242,23 @@ public final class JpqlQueryImpl<T> implements com.codename1.orm.session.JpqlQue
         boolean nonNull;
         boolean numeric;
         boolean integral;
+        boolean logical;
+        int expectedKind = -1;
         Parameter(String name) {
             this.name = name;
         }
         Object convert(Object value) {
             Object converted = query == null ? Values.storage(value) : query.parameter(field, value);
+            if (converted != null && logical && !(value instanceof Boolean)) {
+                throw new IllegalArgumentException("Logical parameter requires a Boolean: " + name);
+            }
+            if (converted != null && expectedKind >= 0) {
+                boolean valid = expectedKind == Attribute.TEXT ? converted instanceof String
+                        : expectedKind == Attribute.BLOB ? converted instanceof byte[] : converted instanceof Number;
+                if (!valid) {
+                    throw new IllegalArgumentException("Incompatible parameter storage type: " + name);
+                }
+            }
             if (converted != null && numeric) {
                 if (!(value instanceof Number) || !(converted instanceof Number) || integral && !(converted instanceof Byte
                         || converted instanceof Short || converted instanceof Integer || converted instanceof Long)) {
@@ -268,6 +294,9 @@ public final class JpqlQueryImpl<T> implements com.codename1.orm.session.JpqlQue
         boolean literal;
         boolean aggregate;
         boolean numericOperands;
+        boolean predicate;
+        QueryImpl projectionQuery;
+        String projectionField;
         Object literalValue;
         Expr(String sql, int kind) {
             this(sql, kind, null);
@@ -279,6 +308,7 @@ public final class JpqlQueryImpl<T> implements com.codename1.orm.session.JpqlQue
         }
     }
     private static final class Plan {
+        List<Expr> projections = new ArrayList<Expr>();
         String sql;
         int[] kinds = new int[0];
         EntityModel entity;
@@ -334,7 +364,7 @@ public final class JpqlQueryImpl<T> implements com.codename1.orm.session.JpqlQue
                     }
                     assignments.append(target.sql).append(" = ").append(value.sql);
                 } while (take(","));
-                String where = take("WHERE") ? " WHERE " + expression().sql : "";
+                String where = take("WHERE") ? " WHERE " + condition(expression()) : "";
                 String filter = session.discriminatorCondition(root.model, root.rootAlias);
                 if (filter.length() > 0) {
                     where = where.length() == 0 ? " WHERE " + filter : where + " AND " + filter;
@@ -348,7 +378,7 @@ public final class JpqlQueryImpl<T> implements com.codename1.orm.session.JpqlQue
                 plan.mutation = true;
                 expect("FROM");
                 root(true);
-                String where = take("WHERE") ? " WHERE " + expression().sql : "";
+                String where = take("WHERE") ? " WHERE " + condition(expression()) : "";
                 String filter = session.discriminatorCondition(root.model, root.rootAlias);
                 if (filter.length() > 0) {
                     where = where.length() == 0 ? " WHERE " + filter : where + " AND " + filter;
@@ -428,7 +458,7 @@ public final class JpqlQueryImpl<T> implements com.codename1.orm.session.JpqlQue
             if (predicate != null && hasAggregate(predicate)) {
                 throw error("Aggregate functions are not allowed in WHERE");
             }
-            String where = predicate == null ? "" : " WHERE " + predicate.sql;
+            String where = predicate == null ? "" : " WHERE " + condition(predicate);
             List<Expr> groups = new ArrayList<Expr>();
             List<Expr> groupedExpressions = new ArrayList<Expr>(selections);
             String group = "";
@@ -453,7 +483,7 @@ public final class JpqlQueryImpl<T> implements com.codename1.orm.session.JpqlQue
             if (take("HAVING")) {
                 Expr term = expression();
                 groupedExpressions.add(term);
-                having = " HAVING " + term.sql;
+                having = " HAVING " + condition(term);
             }
             if (take("ORDER")) {
                 expect("BY");
@@ -520,6 +550,8 @@ public final class JpqlQueryImpl<T> implements com.codename1.orm.session.JpqlQue
             if (!plan.fetches.isEmpty() && !SessionImpl.sameInstance(plan.entity, root.model)) {
                 throw error("Fetch joins require the root entity projection");
             }
+            plan.projections = selections;
+            SessionImpl.checkParameterCount(bindings.size());
             plan.kinds = new int[kinds.size()];
             for (int i = 0; i < plan.kinds.length; i++) {
                 plan.kinds[i] = kinds.get(i).intValue();
@@ -550,27 +582,27 @@ public final class JpqlQueryImpl<T> implements com.codename1.orm.session.JpqlQue
         private Expr or() {
             Expr left = and();
             while (take("OR")) {
-                left = binary(left, "OR", and(), Attribute.BOOLEAN);
+                left = logical(left, "OR", and());
             }
             return left;
         }
         private Expr and() {
             Expr left = compare();
             while (take("AND")) {
-                left = binary(left, "AND", compare(), Attribute.BOOLEAN);
+                left = logical(left, "AND", compare());
             }
             return left;
         }
         private Expr compare() {
             if (take("NOT")) {
                 Expr value = compare();
-                return node("NOT (" + value.sql + ")", Attribute.BOOLEAN, value);
+                return node("NOT (" + condition(value) + ")", Attribute.BOOLEAN, value);
             }
             if (take("EXISTS")) {
                 expect("(");
-                String sql = subquery();
+                String sql = subquery().sql;
                 expect(")");
-                return new Expr("EXISTS (" + sql + ")", Attribute.BOOLEAN);
+                return node("EXISTS (" + sql + ")", Attribute.BOOLEAN);
             }
             Expr left = add();
             if (take("IS")) {
@@ -589,6 +621,7 @@ public final class JpqlQueryImpl<T> implements com.codename1.orm.session.JpqlQue
                     Parameter parameter = new Parameter(next().substring(1));
                     parameter.query = left.query;
                     parameter.field = left.field;
+                    parameter.expectedKind = left.kind;
                     parameter.marker = "/*cn1-list-" + bindings.size() + "*/?";
                     bindings.add(parameter);
                     values = parameter.marker;
@@ -597,7 +630,9 @@ public final class JpqlQueryImpl<T> implements com.codename1.orm.session.JpqlQue
                         throw error("Expected IN parameter or parenthesized values");
                     }
                     if (peek("SELECT") || peek("FROM")) {
-                        values = subquery();
+                        Plan nested = subquery();
+                        compatible(left, nested.projections.get(0));
+                        values = nested.sql;
                     } else {
                         StringBuilder list = new StringBuilder();
                         do {
@@ -605,6 +640,7 @@ public final class JpqlQueryImpl<T> implements com.codename1.orm.session.JpqlQue
                                 list.append(", ");
                             }
                             Expr value = expression();
+                            compatible(left, value);
                             bindType(left, value);
                             operands.add(value);
                             list.append(value.sql);
@@ -622,6 +658,8 @@ public final class JpqlQueryImpl<T> implements com.codename1.orm.session.JpqlQue
                 Expr low = add();
                 expect("AND");
                 Expr high = add();
+                compatible(left, low);
+                compatible(left, high);
                 bindType(left, low);
                 bindType(left, high);
                 return node(session.orderValue(left.sql, left.kind) + (not ? " NOT BETWEEN " : " BETWEEN ")
@@ -631,6 +669,8 @@ public final class JpqlQueryImpl<T> implements com.codename1.orm.session.JpqlQue
             if (take("LIKE")) {
                 int firstBinding = bindings.size();
                 Expr pattern = add();
+                requireKind(left, Attribute.TEXT);
+                requireKind(pattern, Attribute.TEXT);
                 bindType(left, pattern);
                 boolean escaped = take("ESCAPE");
                 Expr escape = escaped ? add() : null;
@@ -660,8 +700,17 @@ public final class JpqlQueryImpl<T> implements com.codename1.orm.session.JpqlQue
                     ">=".equals(op) || "<=".equals(op)) {
                 next();
                 Expr right = add();
+                compatible(left, right);
                 bindType(left, right);
                 bindType(right, left);
+                if (left.kind == Attribute.BOOLEAN || right.kind == Attribute.BOOLEAN) {
+                    return node("(" + condition(left) + " " + op + " " + condition(right) + ")", Attribute.BOOLEAN, left, right);
+                }
+                if (numericKind(left.kind) && numericKind(right.kind)
+                        && (left.kind == Attribute.REAL || right.kind == Attribute.REAL)) {
+                    return node("(" + session.numericOperand(left.sql, Attribute.REAL) + " " + op + " "
+                            + session.numericOperand(right.sql, Attribute.REAL) + ")", Attribute.BOOLEAN, left, right);
+                }
                 if (">".equals(op) || "<".equals(op) || ">=".equals(op) || "<=".equals(op)) {
                     return node("(" + session.orderValue(left.sql, left.kind) + " " + op + " "
                             + session.orderValue(right.sql, right.kind) + ")", Attribute.BOOLEAN, left, right);
@@ -694,6 +743,7 @@ public final class JpqlQueryImpl<T> implements com.codename1.orm.session.JpqlQue
                 requireNumeric(value, value.kind != Attribute.REAL);
                 Expr result = wrap("-" + session.numericOperand(value.sql, value.kind < 0 ? Attribute.BIGINT : value.kind), value);
                 result.kind = value.kind < 0 ? Attribute.BIGINT : value.kind;
+                result.projectionQuery = null;
                 return result;
             }
             if (take("+")) {
@@ -701,13 +751,17 @@ public final class JpqlQueryImpl<T> implements com.codename1.orm.session.JpqlQue
                 requireNumeric(value, value.kind != Attribute.REAL);
                 Expr result = wrap(session.numericOperand(value.sql, value.kind < 0 ? Attribute.BIGINT : value.kind), value);
                 result.kind = value.kind < 0 ? Attribute.BIGINT : value.kind;
+                result.projectionQuery = null;
                 return result;
             }
             if (take("(")) {
                 if (peek("SELECT") || peek("FROM")) {
-                    String sql = subquery();
+                    Plan nested = subquery();
                     expect(")");
-                    return new Expr("(" + sql + ")", Attribute.BIGINT);
+                    Expr result = new Expr("(" + nested.sql + ")", nested.kinds[0]);
+                    result.projectionQuery = nested.projections.get(0).projectionQuery;
+                    result.projectionField = nested.projections.get(0).projectionField;
+                    return result;
                 }
                 Expr value = expression();
                 expect(")");
@@ -780,9 +834,13 @@ public final class JpqlQueryImpl<T> implements com.codename1.orm.session.JpqlQue
                 }
                 int kind = "COUNT".equals(function) || "LENGTH".equals(function) ? Attribute.BIGINT
                            : "LOWER".equals(function) || "UPPER".equals(function) || "TRIM".equals(function) ? Attribute.TEXT
+                           : "SUM".equals(function) && args.get(0).kind != Attribute.REAL ? Attribute.BIGINT
                            : "AVG".equals(function) ? Attribute.REAL
                            : "COALESCE".equals(function) ? commonKind(args) : args.get(0).kind;
                 Expr result = new Expr(sql.append(')').toString(), kind);
+                if ("SUM".equals(function) && kind == Attribute.BIGINT) {
+                    result.sql = session.integralSum(result.sql);
+                }
                 result.aggregate = " COUNT SUM AVG MIN MAX ".contains(" " + function + " ");
                 result.numericOperands = " SUM AVG MIN MAX ABS COALESCE NULLIF ".contains(" " + function + " ");
                 result.children.addAll(args);
@@ -798,6 +856,11 @@ public final class JpqlQueryImpl<T> implements com.codename1.orm.session.JpqlQue
                             break;
                         }
                     }
+                }
+                if (result.query != null && kind == result.query.kind(result.field)
+                        && " MIN MAX COALESCE NULLIF ".contains(" " + function + " ")) {
+                    result.projectionQuery = result.query;
+                    result.projectionField = result.field;
                 }
                 return result;
             }
@@ -821,6 +884,8 @@ public final class JpqlQueryImpl<T> implements com.codename1.orm.session.JpqlQue
             Expr result = new Expr(alias.query.column(field), alias.query.kind(field));
             result.query = alias.query;
             result.field = field;
+            result.projectionQuery = result.query;
+            result.projectionField = field;
             return result;
         }
         private void validateFunction(String function, List<Expr> args, boolean distinct) {
@@ -837,6 +902,9 @@ public final class JpqlQueryImpl<T> implements com.codename1.orm.session.JpqlQue
             for (Expr arg : args) {
                 if (aggregate && hasAggregate(arg)) {
                     throw error("Nested aggregate functions are not supported");
+                }
+                if (text) {
+                    requireKind(arg, Attribute.TEXT);
                 }
                 if (numeric) {
                     requireNumeric(arg, false);
@@ -875,6 +943,9 @@ public final class JpqlQueryImpl<T> implements com.codename1.orm.session.JpqlQue
             Expr result = new Expr(sql, value.kind, value.entity);
             result.children.add(value);
             result.numericOperands = true;
+            result.predicate = value.predicate;
+            result.projectionQuery = value.projectionQuery;
+            result.projectionField = value.projectionField;
             result.query = value.query;
             result.field = value.field;
             result.parameter = value.parameter;
@@ -936,7 +1007,7 @@ public final class JpqlQueryImpl<T> implements com.codename1.orm.session.JpqlQue
                 bindType(attribute, child);
             }
         }
-        private String subquery() {
+        private Plan subquery() {
             int start = position;
             int depth = 0;
             while (position < tokens.size()) {
@@ -957,7 +1028,7 @@ public final class JpqlQueryImpl<T> implements com.codename1.orm.session.JpqlQue
             if (plan.mutation || plan.entity != null || plan.kinds.length != 1) {
                 throw error("Subquery requires a single scalar projection");
             }
-            return plan.sql;
+            return plan;
         }
         private String local(String path) {
             int dot = path.indexOf('.');
@@ -983,6 +1054,7 @@ public final class JpqlQueryImpl<T> implements com.codename1.orm.session.JpqlQue
         }
         private Expr node(String sql, int kind, Expr... children) {
             Expr result = new Expr(sql, kind);
+            result.predicate = kind == Attribute.BOOLEAN;
             for (Expr child : children) {
                 result.children.add(child);
             }
@@ -993,9 +1065,40 @@ public final class JpqlQueryImpl<T> implements com.codename1.orm.session.JpqlQue
                 throw error("Compare entity identifiers explicitly");
             }
             Expr result = new Expr("(" + left.sql + " " + op + " " + right.sql + ")", kind);
+            result.predicate = kind == Attribute.BOOLEAN;
             result.children.add(left);
             result.children.add(right);
             return result;
+        }
+        private boolean numericKind(int kind) {
+            return kind == Attribute.INTEGER || kind == Attribute.BIGINT || kind == Attribute.REAL;
+        }
+        private void requireKind(Expr value, int kind) {
+            if (value.entity != null || value.kind >= 0 && value.kind != kind
+                    && !(numericKind(value.kind) && numericKind(kind))) {
+                throw error("Incompatible expression storage types");
+            }
+            if (value.parameter != null) {
+                value.parameter.expectedKind = kind;
+            }
+        }
+        private void compatible(Expr left, Expr right) {
+            if (left.kind >= 0) {
+                requireKind(right, left.kind);
+            }
+            if (right.kind >= 0) {
+                requireKind(left, right.kind);
+            }
+        }
+        private String condition(Expr value) {
+            requireKind(value, Attribute.BOOLEAN);
+            if (value.parameter != null) {
+                value.parameter.logical = true;
+            }
+            return value.predicate ? value.sql : "(" + value.sql + " <> 0)";
+        }
+        private Expr logical(Expr left, String op, Expr right) {
+            return node("(" + condition(left) + " " + op + " " + condition(right) + ")", Attribute.BOOLEAN, left, right);
         }
         private Expr arithmetic(Expr left, String op, Expr right) {
             int kind = left.kind == Attribute.REAL || right.kind == Attribute.REAL ? Attribute.REAL : Attribute.BIGINT;

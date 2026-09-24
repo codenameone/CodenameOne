@@ -136,7 +136,7 @@ public final class BackendSqlAccess implements SqlAccess {
             return value.toString();
         }
         if(strategy==2 && "postgresql".equals(dialect.getName()))
-            return query("SELECT nextval(?)",new Object[]{quote(name)},new int[]{Dialect.BIGINT}).get(0)[0];
+            return query("SELECT nextval(CAST(? AS regclass))",new Object[]{quote(name)},new int[]{Dialect.BIGINT}).get(0)[0];
         long max=kind==Dialect.INTEGER?Integer.MAX_VALUE:Long.MAX_VALUE;
         if(execute("UPDATE cn1_orm_sequences SET next_value = next_value + 1 WHERE sequence_name = ? AND next_value < ?",new Object[]{name,Long.valueOf(max)})!=1)
             throw new IOException("Identifier generator is missing or exhausted: "+name);
