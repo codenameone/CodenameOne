@@ -56,7 +56,10 @@ public final class DString {
         return s.charAt((int) index);
     }
 
-    /** Dart's s * n operator — repeat. */
+    /**
+     * Dart's s * n operator -- repeat. A count of zero OR LESS is the empty string, not
+     * an error: measured on the Dart 3.9 VM, {@code 'x' * -1} is {@code ''}.
+     */
     public static String repeat(String s, long times) {
         if (times <= 0) {
             return "";

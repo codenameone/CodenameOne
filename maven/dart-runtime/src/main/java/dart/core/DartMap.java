@@ -77,6 +77,12 @@ public class DartMap<K, V> extends LinkedHashMap<K, V> {
      * String key pays one instanceof. Java's wrappers are equal only within their
      * own class, which made {@code {1: 'a'}[1.0]} null and {@code m[1.0] = 'b'} a
      * second entry beside the int 1.
+     *
+     * <p>Only the EXACT twin: a lookup does not also probe the ints that merely round to
+     * a double. Dart's own maps find a key by hashCode first, and an int's hash is not
+     * the hash of the double it rounds to -- measured on the Dart 3.9 VM,
+     * {@code {9007199254740993: 'a'}[9007199254740992.0]} is null and the set
+     * equivalent is false, although those two keys are {@code ==}.</p>
      */
     static Object[] numericTwins(Object key) {
         if (key instanceof Double) {

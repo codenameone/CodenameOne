@@ -60,11 +60,14 @@ public interface IterableMixin<E> {
         return iterator().moveNext();
     }
 
+    // Dart's StateError, as DartIterable throws: an `on StateError` fallback in the
+    // application did not catch Java's NoSuchElementException/IllegalStateException.
+
     /** Dart's {@code Iterable.first}. */
     default E first() {
         Iterator<E> it = iterator();
         if (!it.moveNext()) {
-            throw new java.util.NoSuchElementException("No element");
+            throw new dart.core.StateError("No element");
         }
         return it.current();
     }
@@ -73,7 +76,7 @@ public interface IterableMixin<E> {
     default E last() {
         Iterator<E> it = iterator();
         if (!it.moveNext()) {
-            throw new java.util.NoSuchElementException("No element");
+            throw new dart.core.StateError("No element");
         }
         E result;
         do {
@@ -86,11 +89,11 @@ public interface IterableMixin<E> {
     default E single() {
         Iterator<E> it = iterator();
         if (!it.moveNext()) {
-            throw new java.util.NoSuchElementException("No element");
+            throw new dart.core.StateError("No element");
         }
         E result = it.current();
         if (it.moveNext()) {
-            throw new IllegalStateException("Too many elements");
+            throw new dart.core.StateError("Too many elements");
         }
         return result;
     }
@@ -100,7 +103,7 @@ public interface IterableMixin<E> {
         Iterator<E> it = iterator();
         while (it.moveNext()) {
             E e = it.current();
-            if (e == null ? element == null : e.equals(element)) {
+            if (dart.runtime.DartRuntime.eq(e, element)) {   // Dart's ==: 1 contains 1.0
                 return true;
             }
         }
@@ -118,7 +121,7 @@ public interface IterableMixin<E> {
     /** Dart's {@code Iterable.elementAt(index)}. */
     default E elementAt(long index) {
         if (index < 0) {
-            throw new IndexOutOfBoundsException("index: " + index);
+            throw new dart.core.RangeError("RangeError (index): Invalid value: Not in inclusive range: " + index);
         }
         Iterator<E> it = iterator();
         long i = 0;
@@ -128,7 +131,7 @@ public interface IterableMixin<E> {
             }
             i++;
         }
-        throw new IndexOutOfBoundsException("index: " + index + " (length " + i + ")");
+        throw new dart.core.RangeError("RangeError (index): Index out of range: index should be less than " + i + ": " + index);
     }
 
     /** Dart's {@code Iterable.any(test)}. */

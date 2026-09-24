@@ -59,22 +59,34 @@ public final class Timer {
             Timers.schedule(ms, r);
         } else {
             final long delay = ms;
-            new Thread(new Runnable() {
+            worker = new Thread(new Runnable() {
                 @Override
                 public void run() {
                     try {
                         Thread.sleep(delay);
                     } catch (InterruptedException ignore) {
-                        // fall through
+                        // cancel() interrupts the sleep; r checks the flag and does nothing
                     }
                     r.run();
                 }
-            }, "dart-timer").start();
+            }, "dart-timer");
+            worker.start();
         }
     }
 
+    /** The headless sleeping thread, so cancel() can end it early. */
+    private Thread worker;
+
     public void cancel() {
         cancelled = true;
+        // Headless, a timer is a (non-daemon) thread asleep until the deadline. Only
+        // setting the flag left a cancelled hours-long timer holding the JVM open and
+        // its callback reachable until then; interrupting ends the thread now.
+        Thread w = worker;
+        worker = null;
+        if (w != null) {
+            w.interrupt();
+        }
     }
 
     public boolean isActive() {

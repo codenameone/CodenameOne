@@ -71,7 +71,9 @@ public class DartIterable<E> implements Iterable<E> {
     /**
      * Dart's {@code Iterable.generate(count, [generator])} — a lazy iterable of
      * {@code count} elements produced by {@code generator(index)}. With no
-     * generator Dart yields the indices themselves.
+     * generator Dart yields the indices themselves. A negative count is an empty
+     * iterable, not an error: measured on the Dart 3.9 VM, {@code Iterable.generate(-1)}
+     * neither throws nor yields anything (only {@code List.generate(-1)} throws).
      */
     public static <E> DartIterable<E> generate(long count, Funcs.Func1<Long, E> generator) {
         return new DartIterable<>(() -> new Iterator<E>() {

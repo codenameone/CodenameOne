@@ -54,6 +54,10 @@ public final class RegExp {
 
     public RegExp(String source) {
         this.source = source == null ? "" : source;
+        // Compiled now, as Dart does: RegExp('[') throws FormatException from the
+        // constructor. Compiling on first match moved the throw out of a try around
+        // the construction -- or dropped it, for a pattern never used.
+        engine();
     }
 
     public RegExp(String source, boolean multiLine, boolean caseSensitive,
@@ -63,6 +67,7 @@ public final class RegExp {
         this.caseSensitive = caseSensitive;
         this.unicode = unicode;
         this.dotAll = dotAll;
+        engine();   // a malformed pattern throws here, as in Dart
     }
 
     // Named-argument setters (used when the transpiler lowers named ctor args

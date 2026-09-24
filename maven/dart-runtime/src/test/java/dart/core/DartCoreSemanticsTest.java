@@ -753,4 +753,57 @@ public class DartCoreSemanticsTest {
         two.add("x");
         assertEquals(dart.runtime.DartRuntime.hashAll(one), dart.runtime.DartRuntime.hashAll(two));
     }
+
+    @Test
+    public void aMalformedRegExpThrowsFromItsConstructor() {
+        assertThrows(FormatException.class, () -> new RegExp("["));
+        assertThrows(FormatException.class, () -> new RegExp("[", false, true, false, false));
+        assertTrue(new RegExp("a+").hasMatch("caab"));
+    }
+
+    @Test
+    public void iterableMixinThrowsDartErrors() {
+        dart.collection.IterableMixin<Object> empty = new dart.collection.IterableMixin<Object>() {
+            @Override
+            public dart.collection.Iterator<Object> iterator() {
+                return new dart.collection.Iterator<Object>() {
+                    @Override
+                    public boolean moveNext() {
+                        return false;
+                    }
+
+                    @Override
+                    public Object current() {
+                        return null;
+                    }
+                };
+            }
+        };
+        assertThrows(StateError.class, empty::first);
+        assertThrows(StateError.class, empty::last);
+        assertThrows(StateError.class, empty::single);
+        assertThrows(RangeError.class, () -> empty.elementAt(0));
+    }
+
+    @Test
+    public void aCancelledHeadlessTimerEndsItsThread() throws Exception {
+        dart.async.Timer t = new dart.async.Timer(Duration.of(0, 1, 0, 0, 0, 0), null);
+        t.cancel();
+        long deadline = System.currentTimeMillis() + 2000;
+        while (liveTimerThreads() > 0 && System.currentTimeMillis() < deadline) {
+            Thread.sleep(10);
+        }
+        assertEquals(0, liveTimerThreads(), "cancel ends the hour-long sleep instead of waiting it out");
+        assertFalse(t.isActive());
+    }
+
+    private static int liveTimerThreads() {
+        int n = 0;
+        for (Thread th : Thread.getAllStackTraces().keySet()) {
+            if ("dart-timer".equals(th.getName()) && th.isAlive()) {
+                n++;
+            }
+        }
+        return n;
+    }
 }
