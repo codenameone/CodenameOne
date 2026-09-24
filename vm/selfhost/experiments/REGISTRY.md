@@ -6527,3 +6527,50 @@ DFE commit; fixed by reading the fields. The one remaining failure, BackendJavaS
 | 1 core | 0.75 | 1.19 | 0.74 | 0.53 |
 | 2 cores | 0.97 | 0.87 | 0.94 | 0.80 |
 | 4 cores | 1.06 | 0.67 | 1.00 | 0.84 |
+
+## Round 48: an 8-byte object header
+
+The header was a class pointer (8), a mark int (4) and a heap position (4). None needs
+that range: a program's classes -- array classes included -- are numbered by the
+translator (1,812 ids for the self-hosting corpus, ~4N for N classes), and the mark only
+has to distinguish "this cycle" from the recent past. Three steps, each verified alone:
+
+1. **Accessors** (WIP 79cdbb3e45). ~270 raw header accesses in the runtime, the iOS,
+   Windows and backend natives, the emitted C and the test harnesses now go through
+   `CN1_OBJ_*`; every header-bearing struct declares `CN1_OBJ_HEADER_FIELDS`. No layout
+   change, byte-identical output.
+2. **A cycling mark** (1479f9fd99). The collector keeps reasoning in monotonic cycles;
+   only the per-object word stores `1 + cycle % window` and reads decode it back from
+   its age. Exact while no mark that is READ is a window old -- and dead objects break
+   that: they sit unswept on owned pages and on pages the sweep's shortcuts do not walk,
+   and a stale stack word still resolves to them. `cn1BibopRelabelStale` relabels, every
+   quarter window, whatever the sweep's own rule would reclaim to a new ANCIENT sentinel.
+   Proven with a 32-cycle window (the run wraps several times): 8/8 contended, 2/2
+   concurrent, 8/8 under CN1_GC_VERIFY, and the whole vm suite. The probes fail as they
+   must: without the relabel the verifier reports ~8,700 dangling references at the
+   first cycle after a wrap; a 4-cycle window (shorter than the major interval) breaks
+   every run.
+3. **The layout** (ff127d3720, d450ba722a): 16-bit class index into a translator-emitted
+   `cn1ClazzById` (the translator refuses a program whose ids do not fit), a signed-byte
+   mark with a 64-cycle window, a spare byte, and the 32-bit heap position. Arrays go
+   24 -> 16 bytes of header.
+
+What the suite caught that the self-hosting run did not: the String twins share String's
+classId on purpose and needed their own header indices; ClazzClazz (the runtime's class of
+class objects) was missing from the table, so getClass() on a class read back null; and
+objects lost the 8-byte alignment the class pointer used to force, so a static or stack
+object of int-sized fields could sit at an address whose low bits read as a tagged value.
+
+Census: live BiBOP after the sweep 299.5 -> 267.3MB. Mac: +8% instructions (index lookup,
+mark decode) at the same cycle count and wall time.
+
+**Ratio table r6** (interleaved, 3 rounds):
+
+| | vs JDK time | vs JDK RSS | wip/head time | wip/head RSS |
+|---|---:|---:|---:|---:|
+| 1 core | 0.75 | 1.06 | 0.73 | 0.47 |
+| 2 cores | 0.96 | 0.93 | 0.99 | 0.90 |
+| 4 cores | 1.05 | 0.69 | 0.98 | 0.87 |
+
+Next: a 4-byte header (heap position to a state byte, the legacy index to a side table;
+~11MB more by the census) and taking back the 8% of instructions.
