@@ -77,43 +77,40 @@ public class Selector<A, S> extends StatelessWidget {
         this.child = v;
     }
 
-    /** The last selection and what was built for it; per widget instance, see build. */
-    private boolean built;
-    private S lastSelected;
-    private Widget lastBuilt;
+    /** The model this selector reads, from the provider above {@code context}. */
+    @SuppressWarnings("unchecked")
+    S select(BuildContext context) {
+        A value = (A) context.providerValueOfType(providedType);
+        return selector == null ? (S) value : selector.call(context, value);
+    }
+
+    /** Whether {@code next} differs from {@code previous} enough to rebuild. */
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    boolean changed(S previous, S next) {
+        if (shouldRebuild instanceof Funcs.Func2) {
+            return Boolean.TRUE.equals(((Funcs.Func2) shouldRebuild).call(previous, next));
+        }
+        return !deepEquals(previous, next);
+    }
+
+    Widget buildFor(BuildContext context, S selected) {
+        return builder == null ? child : builder.call(context, selected, child);
+    }
+
+    /** Uncached: the element ({@link SelectorElement}) decides when to call this. */
+    @Override
+    public Widget build(BuildContext context) {
+        return buildFor(context, select(context));
+    }
 
     /**
-     * Rebuilds only when the selection changed. This recomputed the selection and called
-     * the builder on every notification of the model, so Selector did nothing a Consumer
-     * does not -- an unrelated field changing rebuilt the whole slice, and a builder with
-     * side effects ran again.
-     *
-     * <p>The cache lives on the widget: a notification rebuilds the element with the SAME
-     * widget instance, which is when an unchanged selection must not rebuild; a parent
-     * rebuild brings a new instance, and Flutter's Selector rebuilds then too. Handing
-     * back the previous child instance lets reconciliation skip the subtree.</p>
+     * An element that remembers ITS last selection. The cache used to live on the
+     * widget, which one instance mounted in two places shares: the second place got the
+     * first one's subtree, and each overwrote the other's selection.
      */
     @Override
-    @SuppressWarnings({"unchecked", "rawtypes"})
-    public Widget build(BuildContext context) {
-        A value = (A) context.providerValueOfType(providedType);
-        S selected = selector == null ? (S) value : selector.call(context, value);
-        if (built) {
-            boolean rebuild;
-            if (shouldRebuild instanceof Funcs.Func2) {
-                rebuild = Boolean.TRUE.equals(((Funcs.Func2) shouldRebuild).call(lastSelected, selected));
-            } else {
-                rebuild = !deepEquals(lastSelected, selected);
-            }
-            if (!rebuild) {
-                return lastBuilt;
-            }
-        }
-        Widget out = builder == null ? child : builder.call(context, selected, child);
-        built = true;
-        lastSelected = selected;
-        lastBuilt = out;
-        return out;
+    public com.codename1.flutter.Element createElement() {
+        return new SelectorElement<A, S>(this);
     }
 
     /** provider's default test: DeepCollectionEquality, over lists, sets and maps. */

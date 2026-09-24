@@ -21,48 +21,41 @@
  * Please contact Codename One through http://www.codenameone.com/ if you
  * need additional information or have any questions.
  */
-package com.codename1.flutter;
+package com.codename1.flutter.provider;
 
-import dart.runtime.DartRuntime;
+import com.codename1.flutter.StatelessElement;
+import com.codename1.flutter.Widget;
 
 /**
- * A key that uses value equality of the wrapped value, mirroring Flutter's
- * {@code ValueKey<T>}. Two ValueKeys are equal when they have the same
- * runtime class and equal values.
+ * The element of a {@link Selector}: rebuilds its subtree only when the selected slice
+ * changed, or when it was given a new Selector configuration -- provider's rule. The
+ * last selection and the child built for it are kept here, per mount point.
  */
-public class ValueKey<T> extends Key {
-    private final T value;
+public class SelectorElement<A, S> extends StatelessElement {
 
-    public ValueKey(T value) {
-        this.value = value;
-    }
+    private boolean built;
+    private Widget builtFor;
+    private S lastSelected;
+    private Widget lastChild;
 
-    public T value() {
-        return value;
+    public SelectorElement(Selector<A, S> widget) {
+        super(widget);
     }
 
     @Override
-    public boolean equals(Object o) {
-        if (this == o) {
-            return true;
+    @SuppressWarnings("unchecked")
+    protected Widget build() {
+        Selector<A, S> w = (Selector<A, S>) widget();
+        S selected = w.select(this);
+        if (built && builtFor == w && !w.changed(lastSelected, selected)) {
+            // Handing back the same child instance lets reconciliation skip the subtree.
+            return lastChild;
         }
-        if (o == null || o.getClass() != getClass()) {
-            return false;
-        }
-        ValueKey<?> other = (ValueKey<?>) o;
-        // Dart's ==, not Java's equals: ValueKey<num>(1) and ValueKey<num>(1.0) are
-        // the same key, and two NaN keys are not. Java's equals said the opposite
-        // on both, so a rebuild discarded and recreated a subtree it should keep.
-        return DartRuntime.eq(value, other.value);
-    }
-
-    @Override
-    public int hashCode() {
-        return DartRuntime.hashOf(value);   // consistent with DartRuntime.eq above
-    }
-
-    @Override
-    public String toString() {
-        return "ValueKey(" + value + ")";
+        Widget out = w.buildFor(this, selected);
+        built = true;
+        builtFor = w;
+        lastSelected = selected;
+        lastChild = out;
+        return out;
     }
 }

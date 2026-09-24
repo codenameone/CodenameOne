@@ -49,11 +49,18 @@ public class ObjectKey extends Key {
         if (o == null || o.getClass() != getClass()) {
             return false;
         }
-        return ((ObjectKey) o).value == this.value;
+        // Dart's identical(), not Java's ==: numbers and booleans are values in Dart, so
+        // two separately boxed ObjectKey(1000) are the same key and the keyed element
+        // keeps its state across a rebuild.
+        return dart.runtime.DartRuntime.identical(((ObjectKey) o).value, this.value);
     }
 
     @Override
     public int hashCode() {
+        // Consistent with identical(): a boxed number or bool hashes by value.
+        if (value instanceof Long || value instanceof Double || value instanceof Boolean) {
+            return value.hashCode();
+        }
         return System.identityHashCode(value);
     }
 
