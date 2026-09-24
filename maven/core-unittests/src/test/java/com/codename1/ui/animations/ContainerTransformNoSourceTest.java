@@ -29,6 +29,7 @@ import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 
 class ContainerTransformNoSourceTest extends UITestBase {
 
@@ -43,5 +44,18 @@ class ContainerTransformNoSourceTest extends UITestBase {
         t.init(null, destination);
         assertDoesNotThrow(t::initTransition);
         assertFalse(t.animate(), "with nothing to transform from there is no animation");
+    }
+
+    @Test
+    void cleanupReleasesTheForms() {
+        // A caller can still hold the transition (Display.getRunningTransition) after
+        // it ends; cleanup must drop both forms and their component trees.
+        Form source = new Form();
+        Form destination = new Form();
+        final ContainerTransformTransition t = ContainerTransformTransition.create("anything", 200);
+        t.init(source, destination);
+        t.cleanup();
+        assertNull(t.getSource());
+        assertNull(t.getDestination());
     }
 }

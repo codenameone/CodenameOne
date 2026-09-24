@@ -542,6 +542,10 @@ public final class ContainerTransformTransition extends Transition {
 
     @Override
     public void cleanup() {
+        // The base releases source and destination -- both forms and their whole
+        // component trees, which a caller holding this transition (from
+        // Display.getRunningTransition) otherwise kept reachable after it ended.
+        super.cleanup();
         sourceBuffer = null;
         destBuffer = null;
         originBuffer = null;
