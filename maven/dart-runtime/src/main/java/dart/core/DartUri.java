@@ -46,8 +46,160 @@ public final class DartUri {
     private String fragment = "";
 
     private DartUri(String text) {
-        this.text = text;
+        this.text = normalize(text);
         parse();
+    }
+
+    /** The parts of a URI whose characters are normalized, and what each allows as is. */
+    private static final int USERINFO = 0;
+    private static final int PATH = 1;
+    private static final int QUERY = 2;
+    private static final int FRAGMENT = 3;
+
+    /**
+     * The text with its user info, path, query and fragment normalized as Dart's
+     * Uri.parse does: a character the component does not allow is percent-encoded
+     * (as UTF-8, upper-case hex), an escape of an unreserved character is decoded, the
+     * hex of any other escape is upper-cased, a '%' that starts no valid escape becomes
+     * %25, and a backslash in the path is a '/'. Only the scheme and host used to be
+     * touched, so Uri.parse("https://x/a b") kept a literal space in its path and its
+     * text, and a launcher or HTTP client rejected what Dart would have sent.
+     */
+    static String normalize(String t) {
+        int end = t.length();
+        for (int i = 0; i < t.length(); i++) {
+            char c = t.charAt(i);
+            if (c == '/' || c == '?' || c == '#') {
+                end = i;
+                break;
+            }
+        }
+        StringBuilder out = new StringBuilder(t.length() + 8);
+        int pos = 0;
+        int colon = t.indexOf(':');
+        if (colon > 0 && colon < end && isScheme(t.substring(0, colon))) {
+            out.append(t.substring(0, colon + 1));
+            pos = colon + 1;
+        }
+        if (t.startsWith("//", pos)) {
+            int authEnd = t.length();
+            for (int i = pos + 2; i < t.length(); i++) {
+                char c = t.charAt(i);
+                if (c == '/' || c == '?' || c == '#') {
+                    authEnd = i;
+                    break;
+                }
+            }
+            int at = t.lastIndexOf('@', authEnd - 1);
+            if (at >= pos + 2) {
+                out.append("//");
+                component(t, pos + 2, at, USERINFO, out);
+                out.append(t.substring(at, authEnd));
+            } else {
+                out.append(t.substring(pos, authEnd));
+            }
+            pos = authEnd;
+        }
+        int hash = t.indexOf('#', pos);
+        int stop = hash >= 0 ? hash : t.length();
+        int q = t.indexOf('?', pos);
+        if (q >= stop) {
+            q = -1;
+        }
+        component(t, pos, q >= 0 ? q : stop, PATH, out);
+        if (q >= 0) {
+            out.append('?');
+            component(t, q + 1, stop, QUERY, out);
+        }
+        if (hash >= 0) {
+            out.append('#');
+            component(t, hash + 1, t.length(), FRAGMENT, out);
+        }
+        return out.toString();
+    }
+
+    private static void component(String t, int from, int to, int kind, StringBuilder out) {
+        for (int i = from; i < to; i++) {
+            char c = t.charAt(i);
+            if (c == '%') {
+                if (i + 2 < to && hexValue(t.charAt(i + 1)) >= 0 && hexValue(t.charAt(i + 2)) >= 0) {
+                    int v = hexValue(t.charAt(i + 1)) * 16 + hexValue(t.charAt(i + 2));
+                    if (isUnreserved(v)) {
+                        out.append((char) v);
+                    } else {
+                        percent(v, out);
+                    }
+                    i += 2;
+                } else {
+                    out.append("%25");
+                }
+            } else if (c == '\\' && kind == PATH) {
+                out.append('/');
+            } else if (c < 128 && allowed(c, kind)) {
+                out.append(c);
+            } else {
+                int cp = c;
+                if (Character.isHighSurrogate(c) && i + 1 < to && Character.isLowSurrogate(t.charAt(i + 1))) {
+                    cp = ((c - 0xD800) << 10) + (t.charAt(i + 1) - 0xDC00) + 0x10000;
+                    i++;
+                }
+                utf8(cp, out);
+            }
+        }
+    }
+
+    private static boolean isUnreserved(int c) {
+        return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9')
+                || c == '-' || c == '.' || c == '_' || c == '~';
+    }
+
+    private static boolean allowed(char c, int kind) {
+        if (isUnreserved(c) || "!$&'()*+,;=".indexOf(c) >= 0 || c == ':') {
+            return true;
+        }
+        if (kind == USERINFO) {
+            return false;
+        }
+        if (c == '@' || c == '/') {
+            return true;
+        }
+        return c == '?' && kind != PATH;
+    }
+
+    private static int hexValue(char c) {
+        if (c >= '0' && c <= '9') {
+            return c - '0';
+        }
+        if (c >= 'a' && c <= 'f') {
+            return c - 'a' + 10;
+        }
+        if (c >= 'A' && c <= 'F') {
+            return c - 'A' + 10;
+        }
+        return -1;
+    }
+
+    private static void percent(int b, StringBuilder out) {
+        String hex = "0123456789ABCDEF";
+        out.append('%').append(hex.charAt((b >> 4) & 0xF)).append(hex.charAt(b & 0xF));
+    }
+
+    private static void utf8(int cp, StringBuilder out) {
+        if (cp < 0x80) {
+            percent(cp, out);
+        } else if (cp < 0x800) {
+            percent(0xC0 | (cp >> 6), out);
+            percent(0x80 | (cp & 0x3F), out);
+        } else if (cp < 0x10000) {
+            percent(0xE0 | (cp >> 12), out);
+            percent(0x80 | ((cp >> 6) & 0x3F), out);
+            percent(0x80 | (cp & 0x3F), out);
+        } else {
+            percent(0xF0 | (cp >> 18), out);
+            percent(0x80 | ((cp >> 12) & 0x3F), out);
+            percent(0x80 | ((cp >> 6) & 0x3F), out);
+            percent(0x80 | (cp & 0x3F), out);
+        }
     }
 
     /** Dart's {@code Uri.parse}. */

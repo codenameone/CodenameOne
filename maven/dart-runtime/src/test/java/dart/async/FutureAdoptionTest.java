@@ -347,4 +347,23 @@ public class FutureAdoptionTest {
         RuntimeException thrown = assertThrows(RuntimeException.class, done::valueOrThrow);
         assertEquals("cleanup failed", thrown.getMessage());
     }
+
+    @Test
+    public void aCatchErrorTestThatThrowsCompletesTheFutureWithItsError() {
+        Future<Object> failed = Future.error(new IllegalStateException("op"));
+        Future<Object> handled = failed.catchError(new Funcs.Func1<Object, Object>() {
+            @Override
+            public Object call(Object e) {
+                return "recovered";
+            }
+        }, new Funcs.Func1<Object, Object>() {
+            @Override
+            public Object call(Object e) {
+                throw new IllegalArgumentException("predicate");
+            }
+        });
+        assertTrue(handled.isDone(), "the returned future completes");
+        RuntimeException thrown = assertThrows(RuntimeException.class, handled::valueOrThrow);
+        assertEquals("predicate", thrown.getMessage());
+    }
 }

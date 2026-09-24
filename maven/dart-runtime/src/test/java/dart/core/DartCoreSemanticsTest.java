@@ -624,4 +624,66 @@ public class DartCoreSemanticsTest {
         assertEquals(Double.valueOf(0.0), DartMath.maxNum(Double.valueOf(-0.0), Double.valueOf(0.0)));
         assertTrue(Double.isNaN(DartMath.minNum(Long.valueOf(1), Double.valueOf(Double.NaN)).doubleValue()));
     }
+
+    @Test
+    public void getRangeIsALiveViewThatNoticesALengthChange() {
+        DartList<Long> list = new DartList<Long>();
+        list.add(1L);
+        list.add(2L);
+        list.add(3L);
+        DartIterable<Long> range = list.getRange(0, 2);
+        list.set(0, 9L);
+        assertEquals("[9, 2]", range.toList().toString());
+        java.util.Iterator<Long> it = range.iterator();
+        it.next();
+        list.add(4L);
+        assertThrows(ConcurrentModificationError.class, it::next);
+        assertThrows(RangeError.class, () -> list.getRange(1, 9));
+    }
+
+    @Test
+    public void mapsFindValuesAndIntKeysByDartEquality() {
+        DartMap<String, Object> m = new DartMap<String, Object>();
+        m.put("a", 1L);
+        assertTrue(m.containsValue(1.0));
+        assertFalse(m.containsValue(1.5));
+        DartLongMap ints = DartLongMap.ofLongs(0, 1, 2, 3);
+        assertTrue(ints.containsValue(1.0));
+        assertEquals(Long.valueOf(3), ints.get(2.0));
+        assertTrue(ints.containsKey(2.0));
+        assertFalse(ints.containsKey(2.5));
+        assertEquals(Long.valueOf(3), ints.remove(2.0));
+        assertFalse(ints.containsKey(2L));
+    }
+
+    @Test
+    public void uriParseNormalizesItsComponents() {
+        assertEquals("https://x/a%20b", DartUri.parse("https://x/a b").toString());
+        assertEquals("/a%20b", DartUri.parse("https://x/a b").path());
+        assertEquals("https://x/a%2Fb~A%25zz%254", DartUri.parse("https://x/a%2fb%7e%41%zz%4").toString());
+        assertEquals("https://x/p?q=a%20b#f%20g", DartUri.parse("https://x/p?q=a b#f g").toString());
+        assertEquals("https://x/a/b?c%5Cd", DartUri.parse("https://x/a\\b?c\\d").toString());
+        assertEquals("https://x/caf%C3%A9%F0%9F%98%80", DartUri.parse("https://x/caf\u00e9\ud83d\ude00").toString());
+        assertEquals("https://u%20s@x/p", DartUri.parse("https://u s@x/p").toString());
+        assertEquals("mailto:a%20b@x.com", DartUri.parse("mailto:a b@x.com").toString());
+        assertEquals("https://x/!$&'()*+,;=:@-._~", DartUri.parse("https://x/!$&'()*+,;=:@-._~").toString());
+        assertEquals("a b", DartUri.parse("https://x/a b").pathSegments().get(0));
+    }
+
+    @Test
+    public void dateTimeIsProlepticGregorian() {
+        DateTime d = DateTime.utc(1582, 10, 10, 0, 0, 0, 0, 0);
+        assertEquals(1582L, d.year());
+        assertEquals(10L, d.month());
+        assertEquals(10L, d.day());
+        assertEquals(-12219724800000L, d.millisecondsSinceEpoch());
+        assertEquals(7L, d.weekday());
+        assertEquals("-0001-12-31 23:59:59.999Z", DateTime.utc(-1, 12, 31, 23, 59, 59, 999, 0).toString());
+        assertEquals("2024-03-01 00:00:00.000Z", DateTime.utc(2024, 2, 30, 0, 0, 0, 0, 0).toString());
+        // A local value round-trips its fields on both sides of the old cutover.
+        DateTime old = new DateTime(1582, 10, 10, 12, 30, 0, 0, 0);
+        assertEquals("1582-10-10 12:30:00.000", old.toString());
+        DateTime modern = new DateTime(2024, 7, 1, 12, 30, 0, 0, 0);
+        assertEquals("2024-07-01 12:30:00.000", modern.toString());
+    }
 }

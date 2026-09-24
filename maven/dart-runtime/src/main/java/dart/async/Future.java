@@ -378,10 +378,16 @@ public class Future<T> {
             public void run() {
                 if (error == null) {
                     next.complete(value);
-                } else if (!catches(test, error)) {
-                    next.completeError(error);
                 } else {
+                    // The predicate runs inside the guard: when it throws, Dart completes
+                    // the returned future with that error. Outside it, the throw escaped
+                    // the completing call (or broke listener dispatch) and left this
+                    // future pending forever.
                     try {
+                        if (!catches(test, error)) {
+                            next.completeError(error);
+                            return;
+                        }
                         onError.call(error);
                         next.complete(null);
                     } catch (Throwable t) {
@@ -401,10 +407,16 @@ public class Future<T> {
             public void run() {
                 if (error == null) {
                     next.complete(value);
-                } else if (!catches(test, error)) {
-                    next.completeError(error);
                 } else {
+                    // The predicate runs inside the guard: when it throws, Dart completes
+                    // the returned future with that error. Outside it, the throw escaped
+                    // the completing call (or broke listener dispatch) and left this
+                    // future pending forever.
                     try {
+                        if (!catches(test, error)) {
+                            next.completeError(error);
+                            return;
+                        }
                         next.complete(onError.call(error));
                     } catch (Throwable t) {
                         next.completeError(t);

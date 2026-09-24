@@ -105,7 +105,8 @@ public final class DartIdentityMap<K, V> extends DartMap<K, V> {
 
     @Override
     public boolean containsValue(Object value) {
-        return inner.containsValue(value);
+        // Identity applies to the keys only; values still compare with Dart's ==.
+        return containsValueDart(inner.values(), value);
     }
 
     @Override

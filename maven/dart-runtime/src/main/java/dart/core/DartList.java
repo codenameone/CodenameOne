@@ -530,9 +530,54 @@ public class DartList<E> extends AbstractList<E> implements RandomAccess {
         return asIterable().singleWhere(test, orElse);
     }
 
-    /** Dart's {@code List.getRange(start, end)} — a lazy view over a sub-range. */
+    /**
+     * Dart's {@code List.getRange(start, end)}: a lazy view over a sub-range. The range
+     * is checked now; the elements are read when iterated, so a change made to the list
+     * in between shows through. Copying through sublist snapshotted them instead. As in
+     * Dart, a change of length during iteration is a ConcurrentModificationError.
+     */
     public DartIterable<E> getRange(long start, long end) {
-        return sublist(start, end).asIterable();
+        RangeError.checkValueInInterval(start, 0, size(), "start");
+        RangeError.checkValueInInterval(end, start, size(), "end");
+        final int from = (int) start;
+        final int to = (int) end;
+        final DartList<E> source = this;
+        return DartIterable.wrap(new Iterable<E>() {
+            @Override
+            public java.util.Iterator<E> iterator() {
+                final int length = source.size();
+                return new java.util.Iterator<E>() {
+                    private int i = from;
+
+                    @Override
+                    public boolean hasNext() {
+                        checkLength();
+                        return i < to;
+                    }
+
+                    @Override
+                    public E next() {
+                        checkLength();
+                        if (i >= to) {
+                            throw new java.util.NoSuchElementException();
+                        }
+                        return source.get(i++);
+                    }
+
+                    @Override
+                    public void remove() {
+                        throw new UnsupportedError("Cannot remove from a range view");
+                    }
+
+                    private void checkLength() {
+                        if (source.size() != length) {
+                            throw new ConcurrentModificationError("list length changed from "
+                                    + length + " to " + source.size());
+                        }
+                    }
+                };
+            }
+        });
     }
 
     /** Dart's {@code List.unmodifiable(source)} — a fixed-length copy. */

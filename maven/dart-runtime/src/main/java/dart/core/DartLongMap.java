@@ -402,12 +402,40 @@ public final class DartLongMap extends AbstractMap<Long, Long> {
 
     @Override
     public boolean containsKey(Object key) {
-        return key instanceof Long && containsKeyLong((Long) key);
+        Long k = asKey(key);
+        return k != null && containsKeyLong(k.longValue());
+    }
+
+    /// Dart's {@code containsValue} compares with {@code ==}: {@code {0: 1}} contains
+    /// {@code 1.0}. AbstractMap's version used Long.equals, which never matches a Double.
+    @Override
+    public boolean containsValue(Object value) {
+        return DartMap.containsValueDart(values(), value);
+    }
+
+    /// A key given as any number equal to an int, as Dart's {@code ==} finds it: the
+    /// {@code [1.0]} of a {@code Map<int, int>} is its entry for 1. Null for anything
+    /// that equals no int.
+    private static Long asKey(Object key) {
+        if (key instanceof Long) {
+            return (Long) key;
+        }
+        if (key instanceof Integer || key instanceof Short || key instanceof Byte) {
+            return Long.valueOf(((Number) key).longValue());
+        }
+        if (key instanceof Double || key instanceof Float) {
+            double d = ((Number) key).doubleValue();
+            if (d >= -9.223372036854775808E18 && d < 9.223372036854775808E18 && (double) (long) d == d) {
+                return Long.valueOf((long) d);
+            }
+        }
+        return null;
     }
 
     @Override
     public Long get(Object key) {
-        return key instanceof Long ? idxLong((Long) key) : null;
+        Long k = asKey(key);
+        return k != null ? idxLong(k.longValue()) : null;
     }
 
     @Override
@@ -419,10 +447,11 @@ public final class DartLongMap extends AbstractMap<Long, Long> {
 
     @Override
     public Long remove(Object key) {
-        if (!(key instanceof Long)) {
+        Long boxed = asKey(key);
+        if (boxed == null) {
             return null;
         }
-        long k = (Long) key;
+        long k = boxed.longValue();
         int e = find(k);
         if (e < 0) {
             return null;

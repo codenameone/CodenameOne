@@ -53,6 +53,24 @@ public class DartMap<K, V> extends LinkedHashMap<K, V> {
         return System.identityHashCode(this);
     }
 
+    /// Dart's {@code containsValue} compares with {@code ==}, so {@code {0: 1}}
+    /// contains the value {@code 1.0}. The inherited LinkedHashMap version used the
+    /// wrappers' equals, which never matches a Long against a Double.
+    @Override
+    public boolean containsValue(Object value) {
+        return containsValueDart(values(), value);
+    }
+
+    /// Whether {@code values} holds {@code value} under Dart's {@code ==}.
+    static boolean containsValueDart(Iterable<?> values, Object value) {
+        for (Object v : values) {
+            if (DartRuntime.eq(v, value)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     /**
      * The other boxed forms Dart's {@code ==} equates with a numeric key: 1 with
      * 1.0, and 0.0 with -0.0 and 0. Empty for anything that is not a number, so a
