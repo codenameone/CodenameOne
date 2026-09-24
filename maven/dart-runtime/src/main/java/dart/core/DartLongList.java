@@ -44,7 +44,11 @@ public final class DartLongList extends DartList<Long> {
     }
 
     private DartLongList(long[] a, int len, boolean growable) {
-        super(growable);
+        this(a, len, growable, false);
+    }
+
+    private DartLongList(long[] a, int len, boolean growable, boolean readOnly) {
+        super(growable, readOnly);
         this.a = a;
         this.len = len;
     }
@@ -114,6 +118,12 @@ public final class DartLongList extends DartList<Long> {
         return l;
     }
 
+    /** Dart's {@code List<int>.unmodifiable(source)}: a copy that refuses every write. */
+    public static DartLongList unmodifiableLongs(Iterable<? extends Number> elements) {
+        DartLongList copy = fromLongs(elements);
+        return new DartLongList(copy.a, copy.len, false, true);
+    }
+
     private void ensure(int cap) {
         if (cap > a.length) {
             a = Arrays.copyOf(a, Math.max(cap, a.length * 2));
@@ -133,6 +143,7 @@ public final class DartLongList extends DartList<Long> {
     }
 
     public long setLong(long index, long value) {
+        checkWritable();
         if (index < 0 || index >= len) {
             RangeError.indexError(index, len);
         }
@@ -158,6 +169,7 @@ public final class DartLongList extends DartList<Long> {
 
     @Override
     public Long set(int index, Long element) {
+        checkWritable();
         RangeError.checkValidIndex(index, len);
         long old = a[index];
         a[index] = element;

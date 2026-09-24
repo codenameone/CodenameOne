@@ -125,7 +125,7 @@ public final class DartRuntime {
             return true;
         }
         return t instanceof RuntimeException && !(t instanceof dart.core.DartException)
-                && !(t instanceof dart.core.FormatException);
+                && !(t instanceof dart.core.FormatException) && !(t instanceof dart.core.DartThrown);
     }
 
     /** Throws {@code t} on unchanged; declared to return so a caller can write {@code throw rethrow(t)}. */
@@ -166,6 +166,28 @@ public final class DartRuntime {
                 return;
             }
         }
+    }
+
+    /**
+     * Dart's {@code identical(a, b)}: the same object -- except that numbers and booleans
+     * are values, not objects, in Dart, so two boxes of the same int (or of the same
+     * double bits, or the same bool) are identical even when Java allocated them apart.
+     */
+    public static boolean identical(Object a, Object b) {
+        if (a == b) {
+            return true;
+        }
+        if (a instanceof Long && b instanceof Long) {
+            return ((Long) a).longValue() == ((Long) b).longValue();
+        }
+        if (a instanceof Double && b instanceof Double) {
+            return Double.doubleToLongBits(((Double) a).doubleValue())
+                    == Double.doubleToLongBits(((Double) b).doubleValue());
+        }
+        if (a instanceof Boolean && b instanceof Boolean) {
+            return ((Boolean) a).booleanValue() == ((Boolean) b).booleanValue();
+        }
+        return false;
     }
 
     public static boolean eq(Object a, Object b) {
@@ -891,10 +913,30 @@ public final class DartRuntime {
         if (thrown instanceof RuntimeException re) {
             return re;
         }
+        if (thrown instanceof Error err) {
+            throw err;   // thrown as itself: an Error cannot be returned as a RuntimeException
+        }
         if (thrown instanceof Throwable t) {
             return new RuntimeException(t);
         }
-        return new dart.core.DartException(str(thrown));
+        // Any other object is carried, not converted, so a catch gets it back.
+        return new dart.core.DartThrown(thrown);
+    }
+
+    /**
+     * What a Dart catch clause binds for {@code t}: the thrown object itself when Dart
+     * code threw a non-exception value ({@link dart.core.DartThrown}), else {@code t}.
+     */
+    public static Object caught(Throwable t) {
+        return t instanceof dart.core.DartThrown ? ((dart.core.DartThrown) t).value() : t;
+    }
+
+    /**
+     * Whether {@code t} is what Dart calls an Exception, for {@code on Exception}: not a
+     * Dart error and not a thrown non-exception value -- a thrown String is neither.
+     */
+    public static boolean isDartException(Throwable t) {
+        return !isDartError(t) && !(t instanceof dart.core.DartThrown);
     }
 
     /** Marker for switch arms `dart analyze` proved unreachable. */

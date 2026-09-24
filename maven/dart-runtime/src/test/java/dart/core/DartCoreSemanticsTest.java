@@ -513,7 +513,7 @@ public class DartCoreSemanticsTest {
     @Test
     public void intMapIterationFailsFastWhenTheMapGrows() {
         final DartLongMap m = DartLongMap.ofLongs(1, 1);
-        assertThrows(java.util.ConcurrentModificationException.class,
+        assertThrows(ConcurrentModificationError.class,
                 () -> m.forEachDart((k, v) -> m.putLong(m.length() + 1, v)),
                 "a callback that adds keys must not be chased forever");
         DartLongMap updating = DartLongMap.ofLongs(1, 1, 2, 2);
@@ -805,5 +805,47 @@ public class DartCoreSemanticsTest {
             }
         }
         return n;
+    }
+
+    @Test
+    public void aThrownValueIsCarriedAndCaughtAsItself() {
+        Object token = new Object();
+        RuntimeException carried = dart.runtime.DartRuntime.asError(token);
+        assertTrue(carried instanceof DartThrown);
+        assertTrue(dart.runtime.DartRuntime.caught(carried) == token, "the same object comes back");
+        assertEquals("boom", dart.runtime.DartRuntime.asError("boom").toString());
+        assertFalse(dart.runtime.DartRuntime.isDartError(carried), "a thrown string is not an Error");
+        assertFalse(dart.runtime.DartRuntime.isDartException(carried), "nor an Exception");
+        assertTrue(dart.runtime.DartRuntime.isDartException(new FormatException("f")));
+        assertTrue(dart.runtime.DartRuntime.isDartError(new StateError("s")));
+        assertThrows(StackOverflowError.class, () -> dart.runtime.DartRuntime.asError(new StackOverflowError()),
+                "an Error is thrown as itself");
+    }
+
+    @Test
+    public void unmodifiableListsRefuseEveryWrite() {
+        DartList<Long> source = new DartList<Long>();
+        source.add(1L);
+        DartList<Long> ro = DartList.unmodifiable(source);
+        assertThrows(UnsupportedError.class, () -> ro.set(0, 9L));
+        assertThrows(UnsupportedError.class, () -> ro.add(2L));
+        assertThrows(UnsupportedError.class, ro::clear);
+        DartList<String> segments = DartUri.parse("https://x/a/b").pathSegments();
+        assertThrows(UnsupportedError.class, () -> segments.add("c"));
+        assertEquals("a", segments.get(0));
+    }
+
+    @Test
+    public void anIntMapChangedDuringForEachThrowsDartsError() {
+        final DartLongMap m = DartLongMap.ofLongs(1, 1);
+        assertThrows(ConcurrentModificationError.class, () -> m.forEachDart((k, v) -> m.put(k + 10, v)));
+    }
+
+    @Test
+    public void identicalTreatsNumbersAsValues() {
+        assertTrue(dart.runtime.DartRuntime.identical(Long.valueOf(100000), Long.valueOf(100000)));
+        assertTrue(dart.runtime.DartRuntime.identical(Double.valueOf(0.5), Double.valueOf(0.5)));
+        assertFalse(dart.runtime.DartRuntime.identical(Double.valueOf(0.0), Double.valueOf(-0.0)));
+        assertFalse(dart.runtime.DartRuntime.identical(new StringBuilder("a").toString(), "a"));
     }
 }

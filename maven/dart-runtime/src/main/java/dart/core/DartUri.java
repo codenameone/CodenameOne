@@ -438,7 +438,8 @@ public final class DartUri {
                 out.add(decodeComponent(seg));
             }
         }
-        return out;
+        // Unmodifiable, as Dart's is: editing it changed nothing about the URI.
+        return DartList.unmodifiable(out);
     }
 
     /** Dart's {@code Uri.queryParameters} — insertion-ordered, decoded. */

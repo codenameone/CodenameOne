@@ -266,8 +266,13 @@ public class DartSet<E> extends LinkedHashSet<E> {
     }
 
     public void forEachDart(Funcs.VoidFunc1<E> action) {
+        // As DartMap.forEachDart: checked after every callback, not only on the next step.
+        int n = size();
         for (E e : this) {
             action.call(e);
+            if (size() != n) {
+                throw new ConcurrentModificationError("set changed from " + n + " to " + size() + " elements");
+            }
         }
     }
 

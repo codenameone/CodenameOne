@@ -44,7 +44,11 @@ public final class DartDoubleList extends DartList<Double> {
     }
 
     private DartDoubleList(double[] a, int len, boolean growable) {
-        super(growable);
+        this(a, len, growable, false);
+    }
+
+    private DartDoubleList(double[] a, int len, boolean growable, boolean readOnly) {
+        super(growable, readOnly);
         this.a = a;
         this.len = len;
     }
@@ -121,6 +125,12 @@ public final class DartDoubleList extends DartList<Double> {
         return l;
     }
 
+    /** Dart's {@code List<double>.unmodifiable(source)}: a copy that refuses every write. */
+    public static DartDoubleList unmodifiableDoubles(Iterable<? extends Number> elements) {
+        DartDoubleList copy = fromDoubles(elements);
+        return new DartDoubleList(copy.a, copy.len, false, true);
+    }
+
     private void ensure(int cap) {
         if (cap > a.length) {
             a = Arrays.copyOf(a, Math.max(cap, a.length * 2));
@@ -139,6 +149,7 @@ public final class DartDoubleList extends DartList<Double> {
     }
 
     public double setDouble(long index, double value) {
+        checkWritable();
         if (index < 0 || index >= len) {
             RangeError.indexError(index, len);
         }
@@ -164,6 +175,7 @@ public final class DartDoubleList extends DartList<Double> {
 
     @Override
     public Double set(int index, Double element) {
+        checkWritable();
         RangeError.checkValidIndex(index, len);
         double old = a[index];
         a[index] = element;

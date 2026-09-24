@@ -65,21 +65,43 @@ public class DartList<E> extends AbstractList<E> implements RandomAccess {
 
     private final ArrayList<E> impl;
     private final boolean growable;
+    /// Set for List.unmodifiable and the lists Dart hands out read-only (Uri.pathSegments):
+    /// every write is refused, element stores as well as length changes.
+    private final boolean readOnly;
 
     public DartList() {
         this.impl = new ArrayList<>();
         this.growable = true;
+        this.readOnly = false;
     }
 
     DartList(ArrayList<E> impl, boolean growable) {
+        this(impl, growable, false);
+    }
+
+    DartList(ArrayList<E> impl, boolean growable, boolean readOnly) {
         this.impl = impl;
-        this.growable = growable;
+        this.growable = growable && !readOnly;
+        this.readOnly = readOnly;
     }
 
     /** Subclass hook: primitive-backed lists pass their own storage marker. */
     DartList(boolean growable) {
+        this(growable, false);
+    }
+
+    /** Subclass hook with a read-only flag: the primitive lists' List.unmodifiable. */
+    DartList(boolean growable, boolean readOnly) {
         this.impl = null;
-        this.growable = growable;
+        this.growable = growable && !readOnly;
+        this.readOnly = readOnly;
+    }
+
+    /** Refuses an element store on a read-only list; the primitive lists' setters call it too. */
+    final void checkWritable() {
+        if (readOnly) {
+            throw new UnsupportedError("Cannot modify an unmodifiable list");
+        }
     }
 
     /** Literal helper: DartList.of(a, b, c) for Dart's [a, b, c]. */
@@ -151,6 +173,9 @@ public class DartList<E> extends AbstractList<E> implements RandomAccess {
     }
 
     void checkGrowable(String op) {
+        if (readOnly) {
+            throw new UnsupportedError("Cannot " + op + " an unmodifiable list");
+        }
         if (!growable) {
             throw new UnsupportedError(op + " on a fixed-length list");
         }
@@ -169,6 +194,7 @@ public class DartList<E> extends AbstractList<E> implements RandomAccess {
 
     @Override
     public E set(int index, E element) {
+        checkWritable();
         RangeError.checkValidIndex(index, impl.size());
         return impl.set(index, element);
     }
@@ -630,7 +656,11 @@ public class DartList<E> extends AbstractList<E> implements RandomAccess {
         });
     }
 
-    /** Dart's {@code List.unmodifiable(source)} — a fixed-length copy. */
+    /**
+     * Dart's {@code List.unmodifiable(source)}: a copy that refuses EVERY write. It was
+     * only fixed-length, so {@code list[0] = x} still replaced an element of a list Dart
+     * guarantees nobody can change.
+     */
     public static <E> DartList<E> unmodifiable(Iterable<? extends E> source) {
         ArrayList<E> impl = new ArrayList<>();
         if (source != null) {
@@ -638,7 +668,7 @@ public class DartList<E> extends AbstractList<E> implements RandomAccess {
                 impl.add(e);
             }
         }
-        return new DartList<>(impl, false);
+        return new DartList<>(impl, false, true);
     }
 
     public String join(String separator) {

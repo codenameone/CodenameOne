@@ -269,8 +269,15 @@ public class DartMap<K, V> extends LinkedHashMap<K, V> {
     }
 
     public void forEachDart(Funcs.VoidFunc2<K, V> action) {
+        // Checked after every callback, as Dart does: Java's iterator only notices a
+        // change on its next step, so a callback that added to a one-entry map ended the
+        // loop quietly instead of throwing ConcurrentModificationError.
+        int n = size();
         for (Map.Entry<K, V> e : entrySet()) {
             action.call(e.getKey(), e.getValue());
+            if (size() != n) {
+                throw new ConcurrentModificationError("map changed from " + n + " to " + size() + " entries");
+            }
         }
     }
 

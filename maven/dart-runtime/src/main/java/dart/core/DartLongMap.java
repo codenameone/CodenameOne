@@ -166,7 +166,9 @@ public final class DartLongMap extends AbstractMap<Long, Long> {
 
     private void checkVersion(int expected) {
         if (version != expected) {
-            throw new java.util.ConcurrentModificationException();
+            // Dart's error type, so an `on ConcurrentModificationError` clause catches it;
+            // Java's ConcurrentModificationException went straight past one.
+            throw new ConcurrentModificationError("map modified during iteration");
         }
     }
 

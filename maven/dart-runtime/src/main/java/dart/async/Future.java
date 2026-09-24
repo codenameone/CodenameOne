@@ -328,7 +328,9 @@ public class Future<T> {
 
     /** Invokes an error handler of any shape a Dart handler transpiles to. */
     @SuppressWarnings({"unchecked", "rawtypes"})
-    private static Object callErrorHandler(Object handler, Object err) {
+    private static Object callErrorHandler(Object handler, Object thrown) {
+        // The handler gets what was thrown, not the carrier: Future.error('x') hands it 'x'.
+        Object err = thrown instanceof Throwable ? DartRuntime.caught((Throwable) thrown) : thrown;
         if (handler instanceof Funcs.Func1) {
             return ((Funcs.Func1) handler).call(err);
         }
@@ -381,7 +383,7 @@ public class Future<T> {
                     return;
                 }
                 try {
-                    onError.call(error);
+                    onError.call(DartRuntime.caught(error));
                     next.complete(null);
                 } catch (Throwable t) {
                     next.completeError(t);
@@ -402,7 +404,7 @@ public class Future<T> {
             public void run() {
                 if (error != null) {
                     try {
-                        next.complete(onError.call(error));
+                        next.complete(onError.call(DartRuntime.caught(error)));
                     } catch (Throwable t) {
                         next.completeError(t);
                     }
@@ -429,11 +431,11 @@ public class Future<T> {
                     // the completing call (or broke listener dispatch) and left this
                     // future pending forever.
                     try {
-                        if (!catches(test, error)) {
+                        if (!catches(test, DartRuntime.caught(error))) {
                             next.completeError(error);
                             return;
                         }
-                        onError.call(error);
+                        onError.call(DartRuntime.caught(error));
                         next.complete(null);
                     } catch (Throwable t) {
                         next.completeError(t);
@@ -458,11 +460,11 @@ public class Future<T> {
                     // the completing call (or broke listener dispatch) and left this
                     // future pending forever.
                     try {
-                        if (!catches(test, error)) {
+                        if (!catches(test, DartRuntime.caught(error))) {
                             next.completeError(error);
                             return;
                         }
-                        next.complete(onError.call(error));
+                        next.complete(onError.call(DartRuntime.caught(error)));
                     } catch (Throwable t) {
                         next.completeError(t);
                     }
@@ -698,6 +700,9 @@ public class Future<T> {
     T valueOrThrow() {
         synchronized (lock) {
             if (error != null) {
+                if (error instanceof Error) {
+                    throw (Error) error;   // an await rethrows an Error as itself
+                }
                 throw error instanceof RuntimeException ? (RuntimeException) error
                         : new RuntimeException(error);
             }
