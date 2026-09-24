@@ -115,12 +115,17 @@ final class NativeDebuggerHarness {
      */
     private static final String GENERATED_SYMBOLS =
             "#include \"cn1_globals.h\"\n"
-          + "struct clazz class__java_lang_Integer = { 0 };\n"
-          + "struct clazz class__java_lang_Long = { 0 };\n"
-          + "struct clazz class__java_lang_Double = { 0 };\n"
-          + "struct clazz class__java_lang_Float = { 0 };\n"
-          + "struct clazz class__java_lang_Character = { 0 };\n"
-          + "struct clazz class__java_lang_Short = { 0 };\n"
+          + "struct clazz class__java_lang_Integer = { .classId = 0 };\n"
+          + "struct clazz class__java_lang_Long = { .classId = 1 };\n"
+          + "struct clazz class__java_lang_Double = { .classId = 2 };\n"
+          + "struct clazz class__java_lang_Float = { .classId = 3 };\n"
+          + "struct clazz class__java_lang_Character = { .classId = 4 };\n"
+          + "struct clazz class__java_lang_Short = { .classId = 5 };\n"
+          // The header holds a class INDEX (classId + 1) into this table.
+          + "struct clazz* const cn1ClazzById[] = { 0, &class__java_lang_Integer, &class__java_lang_Long,\n"
+          + "    &class__java_lang_Double, &class__java_lang_Float, &class__java_lang_Character,\n"
+          + "    &class__java_lang_Short };\n"
+          + "const int cn1ClazzByIdCount = 7;\n"
           // The collector's mark entry point. Records whether a nominated
           // reference was reached, rather than buffering every mark -- the
           // table can hold thousands, so a fixed buffer would answer "was it
@@ -135,12 +140,12 @@ final class NativeDebuggerHarness {
           + "}\n"
           + "#if CN1_TAGGED_ACTIVE\n"
           + "struct JavaObjectPrototype cn1TaggedProxy[CN1_TAG_COUNT] = {\n"
-          + "    [CN1_TAG_INTEGER]   = { CN1_OBJ_HEADER_INIT(&class__java_lang_Integer) },\n"
-          + "    [CN1_TAG_LONG]      = { CN1_OBJ_HEADER_INIT(&class__java_lang_Long) },\n"
-          + "    [CN1_TAG_DOUBLE]    = { CN1_OBJ_HEADER_INIT(&class__java_lang_Double) },\n"
-          + "    [CN1_TAG_FLOAT]     = { CN1_OBJ_HEADER_INIT(&class__java_lang_Float) },\n"
-          + "    [CN1_TAG_CHARACTER] = { CN1_OBJ_HEADER_INIT(&class__java_lang_Character) },\n"
-          + "    [CN1_TAG_SHORT]     = { CN1_OBJ_HEADER_INIT(&class__java_lang_Short) }\n"
+          + "    [CN1_TAG_INTEGER]   = { CN1_OBJ_HEADER_INIT_ID(0) },\n"
+          + "    [CN1_TAG_LONG]      = { CN1_OBJ_HEADER_INIT_ID(1) },\n"
+          + "    [CN1_TAG_DOUBLE]    = { CN1_OBJ_HEADER_INIT_ID(2) },\n"
+          + "    [CN1_TAG_FLOAT]     = { CN1_OBJ_HEADER_INIT_ID(3) },\n"
+          + "    [CN1_TAG_CHARACTER] = { CN1_OBJ_HEADER_INIT_ID(4) },\n"
+          + "    [CN1_TAG_SHORT]     = { CN1_OBJ_HEADER_INIT_ID(5) }\n"
           + "};\n"
           + "#endif\n";
 

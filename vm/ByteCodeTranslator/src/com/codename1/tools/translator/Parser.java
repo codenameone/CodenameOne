@@ -1087,6 +1087,10 @@ public class Parser extends ClassVisitor {
         bld.append("#define cn1_max_class_id ");
         bld.append(arrayId - 1);
         bld.append("\n");
+        // Object-header class indices of the two java.lang.String twins, after every
+        // array id's index (see cn1ClazzById and cn1InitStringTwin).
+        bld.append("#define cn1_header_index_java_lang_String_i8 ").append(arrayId + 1).append("\n");
+        bld.append("#define cn1_header_index_java_lang_String_i16 ").append(arrayId + 2).append("\n");
 
         bld.append("\n\n");
 
@@ -1224,6 +1228,49 @@ public class Parser extends ClassVisitor {
             bldM.append(bc.getClsName().replace('/', '_').replace('$', '_'));
             bldM.append(";\n");
         }
+        // cn1ClazzById: the object header's class INDEX (classId + 1) -> descriptor, for
+        // every class and every array class this program has. Index 0 is "no class".
+        // The index is 16 bits wide (CN1_OBJ_HEADER_FIELDS); refuse a program whose
+        // numbering does not fit rather than wrap an id onto another class.
+        // The two java.lang.String twins (cn1InitStringTwin) share String's classId and take
+        // the two indices after every array id.
+        int maxId = arrayId + 2;
+        if (maxId > 0xFFFF) {
+            throw new IllegalStateException("Too many classes for the 16-bit object header class "
+                    + "index: " + classes.size() + " classes need ids up to " + maxId
+                    + " (limit 65535)");
+        }
+        String[] primitives = {"JAVA_BOOLEAN", "JAVA_CHAR", "JAVA_BYTE", "JAVA_SHORT", "JAVA_INT",
+                "JAVA_LONG", "JAVA_FLOAT", "JAVA_DOUBLE"};
+        for (ByteCodeClass bc : classes) {
+            String n = bc.getClsName().replace('/', '_').replace('$', '_');
+            for (int dim = 1; dim <= 3; dim++) {
+                if (ByteCodeClass.emitsArrayClass(n, dim)) {
+                    bldM.append("extern struct clazz class_array").append(dim).append("__").append(n).append(";\n");
+                }
+            }
+        }
+        bldM.append("\n\nstruct clazz* const cn1ClazzById[] = {\n    [0] = 0");
+        for (ByteCodeClass bc : classes) {
+            String n = bc.getClsName().replace('/', '_').replace('$', '_');
+            bldM.append(",\n    [cn1_class_id_").append(n).append(" + 1] = &class__").append(n);
+            for (int dim = 1; dim <= 3; dim++) {
+                if (ByteCodeClass.emitsArrayClass(n, dim)) {
+                    bldM.append(",\n    [cn1_array_").append(dim).append("_id_").append(n)
+                            .append(" + 1] = &class_array").append(dim).append("__").append(n);
+                }
+            }
+        }
+        for (String p : primitives) {
+            for (int dim = 1; dim <= 3; dim++) {
+                bldM.append(",\n    [cn1_array_").append(dim).append("_id_").append(p)
+                        .append(" + 1] = &class_array").append(dim).append("__").append(p);
+            }
+        }
+        bldM.append(",\n    [cn1_header_index_java_lang_String_i8] = &class__java_lang_String_i8");
+        bldM.append(",\n    [cn1_header_index_java_lang_String_i16] = &class__java_lang_String_i16");
+        bldM.append("};\nconst int cn1ClazzByIdCount = (int)(sizeof(cn1ClazzById) / sizeof(cn1ClazzById[0]));\n");
+
         bldM.append("\n\nstruct clazz* classesList[] = {");
         first = true;
         for(ByteCodeClass bc : classes) {

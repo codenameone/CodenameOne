@@ -204,6 +204,13 @@ public class ByteCodeClass {
 
 
     private static Set<String> arrayTypes = new TreeSet<String>();
+
+    /** Whether class_array{dim}__{clsName} is emitted (a used array type of that
+     *  dimension or up to two deeper needs it as a component). */
+    static boolean emitsArrayClass(String clsName, int dim) {
+        return arrayTypes.contains(dim + "_" + clsName) || arrayTypes.contains((dim + 1) + "_" + clsName)
+                || arrayTypes.contains((dim + 2) + "_" + clsName);
+    }
     
     private ByteCodeClass baseClassObject;
     private List<ByteCodeClass> baseInterfacesObject;
@@ -974,10 +981,11 @@ public class ByteCodeClass {
         b.append(" = {\n");
         // object fields so class will be compatible to object
         
+        // The header's first value is a class INDEX (classId + 1; see CN1_OBJ_HEADER_FIELDS).
         if(clsName.equals("java_lang_Class")) {
             b.append("  DEBUG_GC_INIT 0, 0, 0, ");
         } else {
-            b.append("  DEBUG_GC_INIT &class__java_lang_Class, 0, 0, ");
+            b.append("  DEBUG_GC_INIT cn1_class_id_java_lang_Class + 1, 0, 0, ");
         }
         // finalizerFunction: null unless a real finalize() exists in the hierarchy (the
         // __FINALIZER_<class> chain is still emitted for classes that DO, so subclass
@@ -1078,8 +1086,7 @@ public class ByteCodeClass {
 
         // create class objects for 1 - 3 dimension arrays
         for(int iter = 1 ; iter < 4 ; iter++) {
-            if(!(arrayTypes.contains(iter + "_" + clsName) || arrayTypes.contains((iter + 1) + "_" + clsName) || 
-                    arrayTypes.contains((iter + 2) + "_" + clsName))) {
+            if(!emitsArrayClass(clsName, iter)) {
                 continue;
             }
             b.append("struct clazz class_array");
@@ -1089,7 +1096,7 @@ public class ByteCodeClass {
             if(clsName.equals("java_lang_Class")) {
                 b.append(" = {\n DEBUG_GC_INIT 0, 0, 0, 0, &arrayFinalizerFunction, &gcMarkArrayObject, 0, cn1_array_");
             } else {
-                b.append(" = {\n DEBUG_GC_INIT &class__java_lang_Class, 0, 0, 0, &arrayFinalizerFunction, &gcMarkArrayObject, 0, cn1_array_");
+                b.append(" = {\n DEBUG_GC_INIT cn1_class_id_java_lang_Class + 1, 0, 0, 0, &arrayFinalizerFunction, &gcMarkArrayObject, 0, cn1_array_");
             }
             b.append(iter);
             b.append("_id_");

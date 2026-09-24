@@ -1118,14 +1118,14 @@ void cn1MarkDeadNow(JAVA_OBJECT o) {
     /* Only retire something still FRESH. An object the collector already marked
      * this cycle is one it reached from a root; overriding that would discard a
      * liveness decision that outranks any static proof. */
-    int expected = cn1GcMarkEncode(CN1_GC_MARK_FRESH);
+    signed char expected = (signed char)cn1GcMarkEncode(CN1_GC_MARK_FRESH);
     int floorv = atomic_load_explicit(&cn1GcReclaimedBefore, memory_order_acquire);
     int stale = currentGcMarkValue - cn1GcAgingSlack() - 1;
     if(stale < floorv) { stale = floorv; }
     // The word holds the ENCODED epoch (see CN1_GC_EPOCH_WINDOW); both sides of the swap
     // are encoded values.
     atomic_compare_exchange_strong_explicit(
-        (_Atomic int*)CN1_OBJ_MARK_PTR(o), &expected, cn1GcMarkEncode(stale),
+        (_Atomic signed char*)CN1_OBJ_MARK_PTR(o), &expected, (signed char)cn1GcMarkEncode(stale),
         memory_order_release, memory_order_relaxed);
 #else
     (void)o;
@@ -10363,7 +10363,7 @@ static void cn1BibopRelabelStale(void) {
             char* base = (char*)p + p->firstSlotOffset;
             for(int i = 0 ; i < bump ; i++) {
                 JAVA_OBJECT o = (JAVA_OBJECT)(base + (size_t)i * (size_t)p->slotSize);
-                int raw = __atomic_load_n(CN1_OBJ_MARK_PTR(o), __ATOMIC_ACQUIRE);
+                signed char raw = __atomic_load_n(CN1_OBJ_MARK_PTR(o), __ATOMIC_ACQUIRE);
                 if(raw > 0 && cn1GcSweepReclaims(cn1GcMarkDecode(raw))) {
                     __atomic_compare_exchange_n(CN1_OBJ_MARK_PTR(o), &raw, CN1_GC_MARK_ANCIENT,
                                                 0, __ATOMIC_RELEASE, __ATOMIC_RELAXED);
@@ -10974,7 +10974,7 @@ JAVA_OBJECT cn1BibopAllocRecycled(CODENAME_ONE_THREAD_STATE, int size, struct cl
     }
     CN1_CLAZZ_REGISTER(parent);
     JAVA_OBJECT o = (JAVA_OBJECT)p->freeList;
-    p->freeList = *(void**)o;
+    p->freeList = CN1_BIBOP_FREE_LINK(o);
     p->freeCount--;
     CN1_BIBOP_NOTE_RECYCLED(p, o);
     cn1BibopInitSlot(threadStateData, o, size, parent);
@@ -11001,7 +11001,7 @@ static JAVA_OBJECT cn1BibopAlloc(CODENAME_ONE_THREAD_STATE, int size, struct cla
         if(p != 0) {
             if(p->freeList != 0) {
                 o = (JAVA_OBJECT)p->freeList;
-                p->freeList = *(void**)o;
+                p->freeList = CN1_BIBOP_FREE_LINK(o);
                 p->freeCount--;
                 CN1_BIBOP_NOTE_RECYCLED(p, o);
                 break;
@@ -11621,7 +11621,7 @@ static void cn1BibopSweep(CODENAME_ONE_THREAD_STATE) {
                             if(preCycle && CN1_OBJ_CLASS(o) != 0) {
                                 cn1BibopReclaimSlot(threadStateData, o);
                                 CN1_OBJ_MARK_STORE(o, CN1_BIBOP_FREE_MARK, __ATOMIC_RELAXED);
-                                *(void**)o = fl; fl = o; freed++;
+                                CN1_BIBOP_FREE_LINK(o) = fl; fl = o; freed++;
                             } else {
                                 // Kept by grace, exactly as the full walk keeps it: promoted,
                                 // and remembered because no barrier saw its fields.
@@ -11829,12 +11829,12 @@ static void cn1BibopSweep(CODENAME_ONE_THREAD_STATE) {
                 continue;
             }
             if(m == CN1_BIBOP_FREE_MARK) {
-                *(void**)o = fl; fl = o; freeCount++;
+                CN1_BIBOP_FREE_LINK(o) = fl; fl = o; freeCount++;
 #ifdef CN1_GC_GEN_QUAR_MAJOR
             } else if(m == -8) {
                 // QA: quarantined by an earlier MAJOR; release it now.
                 CN1_OBJ_MARK_STORE(o, CN1_BIBOP_FREE_MARK, __ATOMIC_RELAXED);
-                *(void**)o = fl; fl = o; freeCount++;
+                CN1_BIBOP_FREE_LINK(o) = fl; fl = o; freeCount++;
 #endif
 #ifdef CN1_GC_VERIFY
             } else if(m == CN1_BIBOP_QUAR_MARK) {
@@ -11842,7 +11842,7 @@ static void cn1BibopSweep(CODENAME_ONE_THREAD_STATE) {
                 // to the free list now. Still counted dead the whole time -- freeCount
                 // covered it while quarantined, so page liveness never saw it as live.
                 CN1_OBJ_MARK_STORE(o, CN1_BIBOP_FREE_MARK, __ATOMIC_RELAXED);
-                *(void**)o = fl; fl = o; freeCount++;
+                CN1_BIBOP_FREE_LINK(o) = fl; fl = o; freeCount++;
 #endif
             } else if(m == -1 && !(preCycle && CN1_OBJ_CLASS(o) != 0
 #ifdef CN1_EXP_MINORGRACE
@@ -11931,7 +11931,7 @@ static void cn1BibopSweep(CODENAME_ONE_THREAD_STATE) {
                 freeCount++;
 #else
                 CN1_OBJ_MARK_STORE(o, CN1_BIBOP_FREE_MARK, __ATOMIC_RELAXED);
-                *(void**)o = fl; fl = o; freeCount++;
+                CN1_BIBOP_FREE_LINK(o) = fl; fl = o; freeCount++;
 #endif
             } else {
                 liveCount++;
@@ -15248,12 +15248,12 @@ static inline void gcMarkWorklistPush(JAVA_OBJECT obj, JAVA_BOOLEAN force) {
 // the object itself), and the slots for codes with no tagged type yet stay zero, which is
 // unreachable for the same reason: nothing produces those codes.
 struct JavaObjectPrototype cn1TaggedProxy[CN1_TAG_COUNT] = {
-    [CN1_TAG_INTEGER]   = { CN1_OBJ_HEADER_INIT(&class__java_lang_Integer) },
-    [CN1_TAG_LONG]      = { CN1_OBJ_HEADER_INIT(&class__java_lang_Long) },
-    [CN1_TAG_DOUBLE]    = { CN1_OBJ_HEADER_INIT(&class__java_lang_Double) },
-    [CN1_TAG_FLOAT]     = { CN1_OBJ_HEADER_INIT(&class__java_lang_Float) },
-    [CN1_TAG_CHARACTER] = { CN1_OBJ_HEADER_INIT(&class__java_lang_Character) },
-    [CN1_TAG_SHORT]     = { CN1_OBJ_HEADER_INIT(&class__java_lang_Short) }
+    [CN1_TAG_INTEGER]   = { CN1_OBJ_HEADER_INIT_ID(cn1_class_id_java_lang_Integer) },
+    [CN1_TAG_LONG]      = { CN1_OBJ_HEADER_INIT_ID(cn1_class_id_java_lang_Long) },
+    [CN1_TAG_DOUBLE]    = { CN1_OBJ_HEADER_INIT_ID(cn1_class_id_java_lang_Double) },
+    [CN1_TAG_FLOAT]     = { CN1_OBJ_HEADER_INIT_ID(cn1_class_id_java_lang_Float) },
+    [CN1_TAG_CHARACTER] = { CN1_OBJ_HEADER_INIT_ID(cn1_class_id_java_lang_Character) },
+    [CN1_TAG_SHORT]     = { CN1_OBJ_HEADER_INIT_ID(cn1_class_id_java_lang_Short) }
 };
 #endif
 
@@ -17349,6 +17349,10 @@ void cn1InitStringTwin(void) {
     memcpy(&class__java_lang_String_i16, &class__java_lang_String, sizeof(struct clazz));
     class__java_lang_String_i8.cn1ClazzRegistered = JAVA_FALSE;
     class__java_lang_String_i16.cn1ClazzRegistered = JAVA_FALSE;
+    // Same classId as String, so each twin names its own header index, or an object
+    // stamped with a twin would read back as plain String (cn1ClazzById).
+    class__java_lang_String_i8.cn1HeaderIndex = cn1_header_index_java_lang_String_i8;
+    class__java_lang_String_i16.cn1HeaderIndex = cn1_header_index_java_lang_String_i16;
 #ifdef CN1_ALLOC_CENSUS
     // Same reasoning for the census counters: they belong to the primary's history.
     class__java_lang_String_i8.cn1AllocCount = 0;

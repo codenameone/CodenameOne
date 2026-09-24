@@ -210,10 +210,22 @@
 // descriptor (a java.lang.Class instance) starts with exactly these members, because
 // each is cast to JavaObjectPrototype. Read and write them only through the CN1_OBJ_*
 // accessors defined after JavaObjectPrototype.
+//
+// EIGHT BYTES, down from sixteen, which is 8 bytes off every object in the heap (~37MB
+// of the ~325MB self-hosting peak):
+//   * the class is a 16-bit INDEX into cn1ClazzById, not a pointer. A program is a closed
+//     world whose classes -- array classes included -- the translator numbers, and it
+//     refuses to translate one whose numbering does not fit (Parser, cn1ClazzById);
+//   * the mark is one byte: an epoch modulo CN1_GC_EPOCH_WINDOW, or a sentinel (see
+//     cn1GcMarkEncode);
+//   * the heap position keeps its 32 bits (a legacy object's index into
+//     allObjectsInHeap). The spare byte is an unnamed bit-field, so the positional
+//     initializers of static headers still list three values.
 #define CN1_OBJ_HEADER_FIELDS \
     DEBUG_GC_VARIABLES \
-    struct clazz *__codenameOneParentClsReference; \
-    int __codenameOneGcMark; \
+    uint16_t __cn1ClassId; \
+    signed char __codenameOneGcMark; \
+    unsigned char : 8; \
     int __heapPosition;
 
 /**
@@ -334,6 +346,11 @@ struct clazz {
     // an exact registry instead of a distance heuristic (see gcMarkObject). Only
     // meaningful under CN1_CONSERVATIVE_GC_ROOTS; stays zero otherwise.
     JAVA_BOOLEAN cn1ClazzRegistered;
+    // The object-header class index of this descriptor when it is not classId + 1.
+    // Zero (the positional initializers never name it) means classId + 1. Only the two
+    // java.lang.String twins set it: they share String's classId, on purpose, and must
+    // still round-trip through the 16-bit header to themselves (cn1InitStringTwin).
+    uint16_t cn1HeaderIndex;
 #ifdef CN1_ALLOC_CENSUS
     // TRAILING for the same reason as cn1ClazzRegistered above: the generated
     // clazz initializers are positional and never name these, so C zero-fills
@@ -386,12 +403,30 @@ struct JavaObjectPrototype {
 // place. A read is an rvalue (the cast), so it cannot be assigned through by accident;
 // writes use the SET forms. Static objects initialize their header with
 // CN1_OBJ_HEADER_INIT. `o` is any object or array pointer.
-#define CN1_OBJ_CLASS(o)            ((struct clazz*)((const struct JavaObjectPrototype*)(o))->__codenameOneParentClsReference)
-#define CN1_OBJ_SET_CLASS(o, c)     (((struct JavaObjectPrototype*)(o))->__codenameOneParentClsReference = (c))
+// The class index is the class's classId plus one, so 0 means "no class" (a slot under
+// construction, or a class descriptor's own header for the primitive array classes).
+extern struct clazz* const cn1ClazzById[];
+extern const int cn1ClazzByIdCount;
+static inline __attribute__((always_inline)) uint16_t cn1ClazzIndexOf(const struct clazz* c);
+#define CN1_OBJ_CLASS(o)            (cn1ClazzById[((const struct JavaObjectPrototype*)(o))->__cn1ClassId])
+#define CN1_OBJ_SET_CLASS(o, c)     (((struct JavaObjectPrototype*)(o))->__cn1ClassId = cn1ClazzIndexOf(c))
+static inline __attribute__((always_inline)) uint16_t cn1ClazzIndexOf(const struct clazz* c) {
+    if(c == 0) {
+        return 0;
+    }
+    return c->cn1HeaderIndex != 0 ? c->cn1HeaderIndex : (uint16_t)(c->classId + 1);
+}
+// A BiBOP slot on its page's free list links to the next free slot through the word
+// AFTER the header, so the mark byte keeps reading the free mark (every slot is at least
+// 24 bytes). Free-slot bytes are dead: allocation either zeroes the slot or hands it to a
+// constructor that writes every field.
+#define CN1_BIBOP_FREE_LINK(o)      (*(void**)((char*)(o) + sizeof(struct JavaObjectPrototype)))
 #define CN1_OBJ_HEAPPOS(o)          ((int)((const struct JavaObjectPrototype*)(o))->__heapPosition)
 #define CN1_OBJ_SET_HEAPPOS(o, v)   (((struct JavaObjectPrototype*)(o))->__heapPosition = (v))
 #define CN1_OBJ_HEAPPOS_PTR(o)      (&((struct JavaObjectPrototype*)(o))->__heapPosition)
-#define CN1_OBJ_HEADER_INIT(cls)    .__codenameOneParentClsReference = (cls)
+// A static header, by class id (the cn1_class_id_* constants), since an index is only a
+// constant expression when written from the id.
+#define CN1_OBJ_HEADER_INIT_ID(id)  .__cn1ClassId = (uint16_t)((id) + 1)
 // THE MARK WORD STORES AN ENCODED EPOCH.
 //
 // The collector reasons in CYCLES: currentGcMarkValue counts up from 1 and never wraps in
@@ -413,9 +448,14 @@ struct JavaObjectPrototype {
 // Code outside the collector reads marks only through CN1_OBJ_MARK / CN1_OBJ_MARK_LOAD
 // (decoded) and writes them through CN1_OBJ_SET_MARK / CN1_OBJ_MARK_STORE (encoded). The
 // raw word is compared directly only against an encoded epoch (cn1GcFieldMarkEpoch).
+// The mark is a signed byte: sentinels are negative and epochs 1..window, so the window
+// is at most 127. 64 is a power of two (encoding is a mask) and several times the longest
+// gap between re-marks of a live object (a generational major interval).
 #ifndef CN1_GC_EPOCH_WINDOW
-#define CN1_GC_EPOCH_WINDOW (1 << 30)
+#define CN1_GC_EPOCH_WINDOW 64
 #endif
+_Static_assert(CN1_GC_EPOCH_WINDOW > 0 && CN1_GC_EPOCH_WINDOW <= 127,
+               "the mark word is a signed byte: epochs are 1..CN1_GC_EPOCH_WINDOW");
 #define CN1_GC_MARK_FRESH           (-1)
 #define CN1_GC_MARK_ANCIENT         (-2)
 #define CN1_GC_ANCIENT_CYCLE        (-(1 << 29))
@@ -501,19 +541,19 @@ struct JavaArrayPrototype {
 #ifndef DEBUG_GC_ALLOCATIONS
 /* DEBUG_GC_VARIABLES adds two ints to BOTH structs, so the prefix assertions below hold
    in that configuration too, but the absolute sizes do not -- hence the guard. */
-_Static_assert(sizeof(struct JavaArrayPrototype) == 24,
-               "array header must stay 24 bytes; it is 20% of this VM's allocation volume");
+_Static_assert(sizeof(struct JavaArrayPrototype) == 16,
+               "array header must stay 16 bytes; it is 20% of this VM's allocation volume");
 /* The payload sits at sizeof(header) from the base, so a long[] or double[] element
- * is 8-aligned only if that offset is a multiple of 8. 24 is; 20 or 28 would not be,
+ * is 8-aligned only if that offset is a multiple of 8. 16 is; 12 or 20 would not be,
  * and the failure would be a misaligned 64-bit load on some targets and a silent
  * performance cliff on the rest. */
 _Static_assert(sizeof(struct JavaArrayPrototype) % 8 == 0,
                "array payload offset must stay 8-aligned for long[] and double[]");
-_Static_assert(sizeof(struct JavaObjectPrototype) == 16, "object header must stay 16 bytes");
+_Static_assert(sizeof(struct JavaObjectPrototype) == 8, "object header must stay 8 bytes");
 #endif
-_Static_assert(offsetof(struct JavaArrayPrototype, __codenameOneParentClsReference)
-               == offsetof(struct JavaObjectPrototype, __codenameOneParentClsReference),
-               "array and object headers are cast to each other; the class pointer must align");
+_Static_assert(offsetof(struct JavaArrayPrototype, __cn1ClassId)
+               == offsetof(struct JavaObjectPrototype, __cn1ClassId),
+               "array and object headers are cast to each other; the class index must align");
 _Static_assert(offsetof(struct JavaArrayPrototype, __codenameOneGcMark)
                == offsetof(struct JavaObjectPrototype, __codenameOneGcMark),
                "array and object headers are cast to each other; the mark word must align");
@@ -2778,7 +2818,7 @@ static inline JAVA_OBJECT cn1BibopFastAllocNoZero(CODENAME_ONE_THREAD_STATE, int
 #endif
                         , 1)) {
         JAVA_OBJECT o = (JAVA_OBJECT)p->freeList;
-        p->freeList = *(void**)o;
+        p->freeList = CN1_BIBOP_FREE_LINK(o);
         p->freeCount--;
         CN1_BIBOP_NOTE_RECYCLED(p, o);
         CN1_OBJ_SET_CLASS(o, (struct clazz*)0);
