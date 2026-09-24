@@ -61,6 +61,11 @@ public class Provider extends SingleChildWidget implements InheritedValueProvide
     }
 
     @Override
+    public com.codename1.flutter.Element createElement() {
+        return new ProviderElement(this);
+    }
+
+    @Override
     public Object providedValueFor(Class<?> type) {
         return value != null && type.isInstance(value) ? value : null;
     }

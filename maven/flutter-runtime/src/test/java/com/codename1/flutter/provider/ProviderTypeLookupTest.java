@@ -129,4 +129,60 @@ class ProviderTypeLookupTest {
         assertTrue(seen[0] instanceof Localizations,
                 "the default is still nearest-wins, got " + seen[0]);
     }
+
+    /** A model a ChangeNotifierProvider listens to. */
+    static class Model implements com.codename1.flutter.foundation.ChangeNotifier {
+    }
+
+    /** A Consumer of {@code type} recording the value each build receives. */
+    private static <T> Consumer<T> recorder(Class<T> type, final Object[] seen) {
+        Consumer<T> c = new Consumer<T>();
+        c.providedType(type);
+        c.builder(new Funcs.Func3<BuildContext, T, Widget, Widget>() {
+            @Override
+            public Widget call(BuildContext context, T value, Widget child) {
+                seen[0] = value;
+                return new ProbeBox(1, 1);
+            }
+        });
+        return c;
+    }
+
+    @Test
+    @DisplayName("a Provider given a new value rebuilds its Consumer when the child is the same instance")
+    void aReplacedProviderValueReachesTheConsumer() {
+        Object[] seen = new Object[1];
+        Consumer<EmailStore> c = recorder(EmailStore.class, seen);
+        EmailStore second = new EmailStore();
+        Provider before = new Provider();
+        before.value(new EmailStore());
+        before.child(c);
+        BuildOwner owner = new BuildOwner();
+        com.codename1.flutter.Element root = FlutterUI.mount(before, new RenderHost(), owner);
+        Provider after = new Provider();
+        after.value(second);
+        after.child(c);
+        root.update(after);
+        owner.flushSync();
+        assertTrue(seen[0] == second, "the Consumer shows the new value, got " + seen[0]);
+    }
+
+    @Test
+    @DisplayName("a ChangeNotifierProvider given a new model rebuilds its Consumer when the child is the same instance")
+    void aReplacedNotifierReachesTheConsumer() {
+        Object[] seen = new Object[1];
+        Consumer<Model> c = recorder(Model.class, seen);
+        Model second = new Model();
+        ChangeNotifierProvider before = new ChangeNotifierProvider();
+        before.value(new Model());
+        before.child(c);
+        BuildOwner owner = new BuildOwner();
+        com.codename1.flutter.Element root = FlutterUI.mount(before, new RenderHost(), owner);
+        ChangeNotifierProvider after = new ChangeNotifierProvider();
+        after.value(second);
+        after.child(c);
+        root.update(after);
+        owner.flushSync();
+        assertTrue(seen[0] == second, "the Consumer shows the new model, got " + seen[0]);
+    }
 }

@@ -23,7 +23,6 @@
  */
 package com.codename1.flutter.provider;
 
-import com.codename1.flutter.StatelessElement;
 import com.codename1.flutter.StatelessWidget;
 import com.codename1.flutter.Element;
 import com.codename1.flutter.Widget;
@@ -41,7 +40,7 @@ import dart.runtime.Funcs;
  * search button, its mailbox switcher, its starring and deleting. They were not
  * unwired: the handler ran, the model changed, and no one was listening.</p>
  */
-public class ChangeNotifierProviderElement extends StatelessElement {
+public class ChangeNotifierProviderElement extends ProviderElement {
 
     private Listenable listened;
 
@@ -68,6 +67,8 @@ public class ChangeNotifierProviderElement extends StatelessElement {
 
     @Override
     public void update(Widget newWidget) {
+        // ProviderElement.update rebuilds the dependents when this brings a different
+        // model; the subscription moves to the new one either way.
         unsubscribe();
         super.update(newWidget);
         subscribe();
