@@ -10425,8 +10425,26 @@ void cn1GcRegisterClazz(struct clazz* c) {
  */
 void cn1HeapAccounting(const char* label) {
     long long pages = 0, capBytes = 0, liveBytes = 0, ownedPages = 0, emptyPages = 0;
+#ifdef CN1_ALLOC_CENSUS
+    // Where the slack is, per size class: the free-listed holes a sweep left, the
+    // never-bumped tail of pages, and the page remainder no slot fits in.
+    long long ccPages[CN1_BIBOP_NUM_CLASSES] = {0}, ccLive[CN1_BIBOP_NUM_CLASSES] = {0};
+    long long ccHoles[CN1_BIBOP_NUM_CLASSES] = {0}, ccTail[CN1_BIBOP_NUM_CLASSES] = {0};
+    long long ccEmpty[CN1_BIBOP_NUM_CLASSES] = {0};
+#endif
     CN1BibopPage* p = atomic_load_explicit(&bibopAllPages, memory_order_acquire);
     while(p != 0) {
+#ifdef CN1_ALLOC_CENSUS
+        if(p->classIndex >= 0 && p->classIndex < CN1_BIBOP_NUM_CLASSES) {
+            int ci = p->classIndex;
+            int bi = atomic_load_explicit(&p->bumpIndex, memory_order_relaxed);
+            ccPages[ci]++;
+            ccLive[ci] += (long long)(bi - p->freeCount) * p->slotSize;
+            ccHoles[ci] += (long long)p->freeCount * p->slotSize;
+            ccTail[ci] += (long long)(p->slotCount - bi) * p->slotSize;
+            if(bi - p->freeCount <= 0) ccEmpty[ci]++;
+        }
+#endif
         pages++;
         capBytes += CN1_BIBOP_PAGE_SIZE;
         int bi = atomic_load_explicit(&p->bumpIndex, memory_order_relaxed);
@@ -10505,6 +10523,14 @@ void cn1HeapAccounting(const char* label) {
             __cn1MallocInUse / 1048576.0, __cn1MallocAllocated / 1048576.0,
             (__cn1MallocAllocated - __cn1MallocInUse) / 1048576.0,
             bibopArenaTotalBytes / 1048576.0);
+#ifdef CN1_ALLOC_CENSUS
+    for(int ci = 0 ; ci < CN1_BIBOP_NUM_CLASSES ; ci++) {
+        if(ccPages[ci] == 0) continue;
+        fprintf(stderr, "[JCLASS:%s] %4d pages=%5lld empty=%4lld live=%7.2fMB holes=%6.2fMB tail=%6.2fMB\n",
+                label, cn1BibopClassSize[ci], ccPages[ci], ccEmpty[ci], ccLive[ci] / 1048576.0,
+                ccHoles[ci] / 1048576.0, ccTail[ci] / 1048576.0);
+    }
+#endif
 #ifdef CN1_COUNT_SOE_ENTRIES
     fprintf(stderr, "[SOE] guarded frameless entries so far: %lld\n", cn1SoeEntryCount);
 #endif
