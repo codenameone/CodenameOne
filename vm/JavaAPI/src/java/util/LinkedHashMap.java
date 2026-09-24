@@ -230,8 +230,8 @@ public class LinkedHashMap<K, V> extends HashMap<K, V> implements Map<K, V> {
         if (cn1KeysBlock == 0) cn1InitLinks();
         V result = cn1PutSlot(key, value);
         if (cn1LastInserted) {
+            // cn1PutSlot rebuilt, if it had to, BEFORE inserting: cn1LastPut is final.
             cn1LinkAppend(cn1LastPut);
-            cn1MaybeGrow();     // AFTER linking (the rebuild remaps slot indices)
         } else if (accessOrder) {
             cn1MoveToTail(cn1LastPut);
         }

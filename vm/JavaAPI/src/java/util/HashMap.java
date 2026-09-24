@@ -39,12 +39,13 @@ public class HashMap<K, V> extends AbstractMap<K, V> implements Map<K, V> {
 
     private static final long serialVersionUID = 362498820763181265L;
 
-    // 4, not the JDK's 16. The table is ours, not an array of Node references: a slot is
+    // 2, not the JDK's 16. The table is ours, not an array of Node references: a slot is
     // a key, a value and a hash (20 bytes), so a 16-slot table is ~330 bytes on the first
     // put. Measured on the self-hosting corpus, 221k HashMaps are live at the peak and
-    // most hold a handful of entries. Growth doubles, so a map that does fill up pays two
-    // extra rehashes on the way to 16.
-    private static final int DEFAULT_SIZE = 4;
+    // 156k of them hold exactly ONE entry, which a 2-slot table holds (threshold 1) in a
+    // 56-byte allocation where a 4-slot one took 96. Growth doubles, so a map that does
+    // fill up pays three extra rehashes on the way to 16.
+    private static final int DEFAULT_SIZE = 2;
 
     /** slot metadata: empty slot. */
     static final int META_EMPTY = 0;
@@ -88,7 +89,9 @@ public class HashMap<K, V> extends AbstractMap<K, V> implements Map<K, V> {
 
     final float loadFactor;
 
-    /** resize when cn1Occupied reaches this. */
+    /** the most slots (live + tombstones) the table holds at rest: a put that would
+     *  take one more rebuilds FIRST, so the table always keeps an empty slot, which
+     *  probing requires, and never passes through a full state. */
     int threshold;
 
     /** scratch results of cn1PutSlot for subclass (LinkedHashMap) hooks. */
@@ -120,8 +123,8 @@ public class HashMap<K, V> extends AbstractMap<K, V> implements Map<K, V> {
         if (x >= 1 << 30) {
             return 1 << 30;
         }
-        if (x == 0) {
-            return DEFAULT_SIZE;
+        if (x <= DEFAULT_SIZE) {
+            return DEFAULT_SIZE;   // a 1-slot table has no room for an entry
         }
         x = x - 1;
         x |= x >> 1;
@@ -291,6 +294,21 @@ public class HashMap<K, V> extends AbstractMap<K, V> implements Map<K, V> {
         }
         int ins = -idx - 1;
         boolean wasEmpty = NativeStorage.getInt(NativeStorage.part(cn1KeysBlock, META), ins) == META_EMPTY;
+        if (wasEmpty && cn1Occupied >= threshold) {
+            // One slot past the threshold: rebuild BEFORE inserting, then place the key
+            // with the raw insert -- it is known to be absent, so no equals() runs again.
+            // Growing after the insert (as this used to) let a table sit at threshold+1
+            // at rest, so a 4-slot table held only 2 entries where the JDK's holds 3,
+            // and a 2-slot table could not hold 1.
+            cn1Grow();
+            ins = cn1Insert(key, value, marker);
+            elementCount++;
+            cn1Occupied++;
+            modCount++;
+            cn1LastPut = ins;
+            cn1LastInserted = true;
+            return null;
+        }
         NativeStorage.setInt(NativeStorage.part(cn1KeysBlock, META), ins, marker);
         NativeStorage.setOwned(this, cn1KeysBlock, ins, key);
         NativeStorage.setOwned(this, NativeStorage.part(cn1KeysBlock, VALS), ins, value);
@@ -301,17 +319,7 @@ public class HashMap<K, V> extends AbstractMap<K, V> implements Map<K, V> {
         modCount++;
         cn1LastPut = ins;
         cn1LastInserted = true;
-        // NOTE: growth is the CALLER's responsibility (cn1MaybeGrow) so that
-        // LinkedHashMap can link the fresh slot into its ordering chain BEFORE
-        // the rebuild remaps every slot index.
         return null;
-    }
-
-    /** grow when the caller finished its post-insert bookkeeping. */
-    final void cn1MaybeGrow() {
-        if (cn1Occupied >= threshold) {
-            cn1Grow();
-        }
     }
 
     /**
@@ -540,11 +548,7 @@ public class HashMap<K, V> extends AbstractMap<K, V> implements Map<K, V> {
     public native V put(K key, V value);
 
     V putImpl(K key, V value) {
-        V old = cn1PutSlot(key, value);
-        if (cn1LastInserted) {
-            cn1MaybeGrow();
-        }
-        return old;
+        return cn1PutSlot(key, value);
     }
 
     /**

@@ -4188,17 +4188,15 @@ static JAVA_INT cn1HsFindSlot(CODENAME_ONE_THREAD_STATE, struct obj__java_util_H
     }
 }
 
-/* Derived, not stored. It was always (int)(cap * 0.75f), and cap is a power of two
- * of at least 16, for which cap - (cap >> 2) is that value exactly. The field cost 4
- * bytes on every HashSet, enough to push the object out of the 48-byte BiBOP slot
- * class into the 64-byte one.
- *
- * The old clamp ("always keep one empty slot: a table with none makes the probe
- * non-terminating") is not lost -- it is unreachable. cap >= 16 gives a threshold of
- * at most cap - 4, so four slots always stay free. */
+/* Derived, not stored: (int)(cap * 0.75f), which for a power of two is cap - (cap >> 2),
+ * clamped to cap - 1 so a 2-slot table keeps its empty slot. The field cost 4 bytes on
+ * every HashSet, enough to push the object out of the 48-byte BiBOP slot class into the
+ * 64-byte one. It is the most slots (live + tombstones) the table holds at rest: an add
+ * that would take one more rebuilds first, so probing always finds an empty slot. */
 static inline JAVA_INT cn1HsThreshold(const struct obj__java_util_HashSet* s) {
     JAVA_INT cap = s->java_util_HashSet_cn1Cap;
-    return cap - (cap >> 2);
+    JAVA_INT t = cap - (cap >> 2);
+    return t < cap ? t : cap - 1;
 }
 
 /** Rebuild. Doubles when the LIVE count reached the threshold, rebuilds at the same
@@ -4274,14 +4272,25 @@ JAVA_BOOLEAN java_util_HashSet_cn1AddNative___java_lang_Object_R_boolean(
     JAVA_INT ins = -idx - 1;
     JAVA_INT* meta = (JAVA_INT*)(uintptr_t)s->java_util_HashSet_cn1MetaBlock;
     int wasEmpty = meta[ins] == 0;
+    if(wasEmpty && s->java_util_HashSet_cn1Occupied >= cn1HsThreshold(s)) {
+        // One slot past the threshold: rebuild BEFORE inserting (see HashMap.cn1PutSlot),
+        // then take the first empty slot on this element's probe path -- the rebuilt
+        // table holds no tombstones and not this element.
+        cn1HsGrow(threadStateData, s);
+        meta = (JAVA_INT*)(uintptr_t)s->java_util_HashSet_cn1MetaBlock;
+        JAVA_INT mask = s->java_util_HashSet_cn1Cap - 1;
+        uint32_t perturb = (uint32_t)marker;
+        ins = marker & mask;
+        while(meta[ins] != 0) {
+            perturb >>= 5;
+            ins = cn1HmNextSlot(ins, perturb, mask);
+        }
+    }
     meta[ins] = marker;
     cn1RefBlockSet(threadStateData, s->java_util_HashSet_cn1KeysBlock, ins, __cn1Arg1);
     s->java_util_HashSet_cn1Size++;
     if(wasEmpty) s->java_util_HashSet_cn1Occupied++;
     s->java_util_HashSet_cn1ModCount++;
-    if(s->java_util_HashSet_cn1Occupied >= cn1HsThreshold(s)) {
-        cn1HsGrow(threadStateData, s);
-    }
     return JAVA_TRUE;
 }
 
@@ -4603,6 +4612,27 @@ JAVA_OBJECT java_util_HashMap_put___java_lang_Object_java_lang_Object_R_java_lan
     JAVA_LONG keysObj = CN1_HM_BLK(t, Keys);
     JAVA_OBJECT* keys = (JAVA_OBJECT*)(uintptr_t)keysObj;
     JAVA_BOOLEAN wasEmpty = meta[ins] == 0 ? JAVA_TRUE : JAVA_FALSE;
+    if(wasEmpty && t->java_util_HashMap_cn1Occupied >= t->java_util_HashMap_threshold) {
+        // One slot past the threshold: rebuild BEFORE inserting (see HashMap.cn1PutSlot),
+        // so the table never passes through a full state. Base-class receivers only --
+        // LinkedHashMap overrides put() in Java (virtual dispatch never routes an LHM
+        // here), and cn1Grow is package-private so application subclasses cannot override
+        // it: the direct call to the base implementation is exact.
+        java_util_HashMap_cn1Grow__(threadStateData, __cn1ThisObject);
+        // The rebuilt table holds no tombstones and not this key: take the first empty
+        // slot on its probe path, the same path cn1HmFindSlot walks.
+        meta = (JAVA_INT*)(uintptr_t)CN1_HM_BLK(t, Meta);
+        keysObj = CN1_HM_BLK(t, Keys);
+        keys = (JAVA_OBJECT*)(uintptr_t)keysObj;
+        vals = (JAVA_OBJECT*)(uintptr_t)CN1_HM_BLK(t, Vals);
+        JAVA_INT mask = t->java_util_HashMap_cn1Cap - 1;
+        uint32_t perturb = (uint32_t)marker;
+        ins = marker & mask;
+        while(meta[ins] != 0) {
+            perturb >>= 5;
+            ins = cn1HmNextSlot(ins, perturb, mask);
+        }
+    }
     meta[ins] = marker;
     CN1_WRITE_BARRIER(__cn1ThisObject, key);
     keys[ins] = key;
@@ -4613,13 +4643,6 @@ JAVA_OBJECT java_util_HashMap_put___java_lang_Object_java_lang_Object_R_java_lan
         t->java_util_HashMap_cn1Occupied++;
     }
     t->java_util_HashMap_modCount++;
-    // NOTE: base-class receivers only -- LinkedHashMap overrides put() in Java
-    // (virtual dispatch never routes an LHM here), and cn1Grow is package-
-    // private so application subclasses cannot override it: the direct call to
-    // the base implementation below is exact.
-    if(t->java_util_HashMap_cn1Occupied >= t->java_util_HashMap_threshold) {
-        java_util_HashMap_cn1Grow__(threadStateData, __cn1ThisObject);
-    }
     return JAVA_NULL;
 }
 

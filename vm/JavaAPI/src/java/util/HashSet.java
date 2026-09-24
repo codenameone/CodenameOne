@@ -55,10 +55,12 @@ public class HashSet<E> extends AbstractSet<E> implements Set<E> {
     transient int cn1Occupied;
     transient int cn1ModCount;
 
-    // The smallest table, and the default. 4 rather than 16 for the reason given at
-    // HashMap.DEFAULT_SIZE: 145k HashSets are live at the self-hosting peak. The threshold
-    // cap - (cap >> 2) still leaves an empty slot at 4 (3 of 4), which probing requires.
-    private static final int DEFAULT_CAPACITY = 4;
+    // The smallest table, and the default. 2 rather than 16 for the reason given at
+    // HashMap.DEFAULT_SIZE: 145k HashSets are live at the self-hosting peak, 32k of them
+    // holding one element. The threshold (cn1HsThreshold in nativeMethods.m) is clamped to
+    // cap - 1, so a 2-slot table holds that one element and keeps the empty slot probing
+    // requires.
+    private static final int DEFAULT_CAPACITY = 2;
 
     private native boolean cn1AddNative(Object element);
     private native boolean cn1ContainsNative(Object element);
@@ -79,12 +81,11 @@ public class HashSet<E> extends AbstractSet<E> implements Set<E> {
         while (cap < capacity) cap <<= 1;
         /* No threshold field. It was always (int)(cap * 0.75f) -- the loadFactor
          * argument is validated and then ignored -- and for the only capacities this
-         * table ever has, powers of two starting at 16, that is exactly
+         * table ever has, powers of two starting at 4, that is exactly
          * cap - (cap >> 2). Deriving it costs a shift and a subtract where the field
          * cost 4 bytes on every set, which is what took java.util.HashSet from the
-         * 48-byte BiBOP slot class into the 64-byte one. The clamp it used to apply
-         * for a table with no empty slot cannot trigger: cap >= 4 always, so
-         * cap - (cap >> 2) <= cap - 1. See cn1HsThreshold in nativeMethods.m. */
+         * 48-byte BiBOP slot class into the 64-byte one. See cn1HsThreshold in
+         * nativeMethods.m, which also keeps a 2-slot table's empty slot. */
         cn1Cap = cap;
     }
 
