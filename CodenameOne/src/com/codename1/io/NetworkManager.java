@@ -679,6 +679,23 @@ public final class NetworkManager {
         }
     }
 
+    /// Clears `req`'s tracer state on the EDT, after whatever this attempt already
+    /// queued there, unless the request was queued again in the meantime.
+    private static void scheduleTracerClear(final ConnectionRequest req, final int requeues) {
+        if (!Display.isInitialized()) {
+            clearTracerState(req);
+            return;
+        }
+        Display.getInstance().callSerially(new Runnable() {
+            @Override
+            public void run() {
+                if (req.tracerRequeues == requeues) {
+                    clearTracerState(req);
+                }
+            }
+        });
+    }
+
     /// Forgets every tracer object a finished request holds.
     static void clearTracerState(ConnectionRequest req) {
         req.tracerParent = null;
@@ -1298,14 +1315,18 @@ public final class NetworkManager {
                     req.complete = true;
                 }
                 endTracerAttempt(req, failure);
-                if (req.tracerRequeues == requeuesBefore) {
-                    // Nothing queued this request again, so that was its last
-                    // attempt. Its tracer state goes with it: the parent and the
-                    // last attempt are the tracer's own objects -- a span and,
-                    // through it, the whole installation -- and a request an app
-                    // keeps for reuse held them for as long as it lived, an
-                    // uninstalled telemetry included.
-                    clearTracerState(req);
+                if (req.tracerRequeues == requeuesBefore
+                        && (req.tracerParent != null || req.tracerLastAttempt != null)) {
+                    // Nothing queued this request again YET. Its tracer state has
+                    // to go once it is done -- the parent and the last attempt are
+                    // the tracer's own objects, a span and through it the whole
+                    // installation, and a request an app keeps for reuse held them
+                    // for as long as it lived. But not from here: an exception or
+                    // response-code listener runs LATER, on the EDT, and may still
+                    // call retry(), which needs the last attempt to continue its
+                    // trace. So the clear is queued on the EDT behind those
+                    // listener callbacks, and skipped if one of them retried.
+                    scheduleTracerClear(req, req.tracerRequeues);
                 }
                 NetworkGuard guard = getNetworkGuard();
                 if (guard != null && req.hasGuardResponse()) {

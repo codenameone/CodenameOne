@@ -277,6 +277,13 @@ public final class Telemetry {
             if (!config.requireAnalyticsConsent) {
                 return true;
             }
+            if (!Display.isInitialized()) {
+                // No storage yet, so the saved choice cannot be read -- and reading
+                // it anyway made Analytics record "loaded, nothing saved" for the
+                // rest of the run, ignoring a persisted grant, or in opt-out mode a
+                // persisted denial. Nothing is traced until it can be asked.
+                return false;
+            }
             AnalyticsConsent consent = Analytics.getConsent();
             if (consent != null) {
                 return consent.isAnalytics();
@@ -451,8 +458,10 @@ public final class Telemetry {
             if (resource == null) {
                 Map<String, Object> out = new LinkedHashMap<String, Object>();
                 String appName = Display.getInstance().getProperty("AppName", null);
-                String service = config.serviceName != null && config.serviceName.length() > 0
-                        ? config.serviceName : appName;
+                // Trimmed, as the annotation's is: " " is no name, and exported
+                // as one the app had no usable service identity.
+                String configured = config.serviceName == null ? "" : config.serviceName.trim();
+                String service = configured.length() > 0 ? configured : appName;
                 out.put("service.name", service == null || service.length() == 0
                         ? "unknown_service" : service);
                 String version = Display.getInstance().getProperty("AppVersion", null);

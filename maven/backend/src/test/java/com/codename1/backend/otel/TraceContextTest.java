@@ -377,4 +377,29 @@ class TraceContextTest {
         assertEquals(OtelSpan.MAX_VALUE_LENGTH - 1, bounded.length());
         assertFalse(Character.isHighSurrogate(bounded.charAt(bounded.length() - 1)));
     }
+
+    @Test
+    @DisplayName("the relay's CORS origin is * or one serialized origin")
+    void corsOrigin() throws Exception {
+        assertEquals("https://app.example.com", cors("https://app.example.com"));
+        assertEquals("http://localhost:8080", cors("http://localhost:8080"));
+        assertEquals("*", cors("*"));
+        assertNull(cors(""));
+        for(String bad : new String[] {"https://app.example.com/", "https://app.example.com/app",
+                "https://a.example, https://b.example", "app.example.com", "https://u@app.example",
+                "https://app.example.com?x=1"}) {
+            try {
+                cors(bad);
+                throw new AssertionError("accepted " + bad);
+            } catch (java.io.IOException expected) {
+                assertTrue(expected.getMessage().contains(OtlpTracer.RELAY_CORS_ORIGIN));
+            }
+        }
+    }
+
+    private static String cors(String value) throws java.io.IOException {
+        java.util.Properties settings = new java.util.Properties();
+        settings.setProperty(OtlpTracer.RELAY_CORS_ORIGIN, value);
+        return OtlpTracer.corsOrigin(com.codename1.backend.Config.of(settings, "test"));
+    }
 }

@@ -215,7 +215,7 @@ public final class OtlpTracer implements Tracer {
                         + "else); it is '" + path + "'");
             }
             relay = new OtlpRelay(path, config.get(RELAY_TOKEN), relayBytes,
-                    positive(config, RELAY_MAX_SPANS, 1000), config.get(RELAY_CORS_ORIGIN),
+                    positive(config, RELAY_MAX_SPANS, 1000), corsOrigin(config),
                     exporter);
         }
         exporter.start();
@@ -352,6 +352,37 @@ public final class OtlpTracer implements Tracer {
             return c - 'A' + 10;
         }
         return -1;
+    }
+
+    /**
+     * {@code cn1.otel.relay.corsOrigin}, checked: {@code *}, or ONE serialized
+     * origin -- scheme, host and port, nothing after. The value goes verbatim into
+     * Access-Control-Allow-Origin, and a browser matches it character for
+     * character against the page's origin, so a path, a trailing slash or a
+     * comma-separated list matches nothing: every preflight failed while the
+     * backend and the app's fail-silent exporter both looked configured.
+     */
+    static String corsOrigin(Config config) throws IOException {
+        String value = config.get(RELAY_CORS_ORIGIN);
+        if(value == null || value.trim().length() == 0) {
+            return null;
+        }
+        value = value.trim();
+        if("*".equals(value)) {
+            return value;
+        }
+        int start = value.regionMatches(true, 0, "https://", 0, 8) ? 8
+                : value.regionMatches(true, 0, "http://", 0, 7) ? 7 : -1;
+        boolean valid = start > 0 && hasHttpAuthority(value)
+                && value.indexOf('/', start) < 0 && value.indexOf('?') < 0
+                && value.indexOf('#') < 0 && value.indexOf('@') < 0
+                && value.indexOf(',') < 0;
+        if(!valid) {
+            throw new IOException(RELAY_CORS_ORIGIN + " must be * or one origin such as "
+                    + "https://app.example.com (scheme, host and port, with no path or "
+                    + "trailing slash); it is '" + value + "'");
+        }
+        return value;
     }
 
     /**

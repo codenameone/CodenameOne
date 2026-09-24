@@ -804,6 +804,78 @@ class TelemetryTest extends UITestBase {
     }
 
     @Test
+    void aRetryFromAResponseCodeListenerContinuesTheTrace() throws Exception {
+        // The listener runs LATER, on the EDT, after the network thread has ended
+        // the attempt; its retry must still continue the failed attempt's trace.
+        TestCodenameOneImplementation impl = TestCodenameOneImplementation.getInstance();
+        final TestCodenameOneImplementation.TestConnection mock =
+                impl.createConnection("http://flaky.test/api");
+        mock.setResponseCode(503);
+        Telemetry.install(new TelemetryConfig().direct("http://collector.test"));
+        final int[] reads = new int[1];
+        final ConnectionRequest flaky = new ConnectionRequest() {
+            @Override
+            protected void readResponse(InputStream input) {
+                reads[0]++;
+            }
+        };
+        flaky.setUrl("http://flaky.test/api");
+        flaky.setPost(false);
+        final boolean[] retried = new boolean[1];
+        flaky.addResponseCodeListener(new com.codename1.ui.events.ActionListener<com.codename1.io.NetworkEvent>() {
+            @Override
+            public void actionPerformed(com.codename1.io.NetworkEvent evt) {
+                if (!retried[0]) {
+                    retried[0] = true;
+                    mock.setResponseCode(200);
+                    flaky.retry();
+                }
+            }
+        });
+        NetworkManager.getInstance().addToQueue(flaky);
+        long deadline = System.currentTimeMillis() + 5000;
+        // Both attempts read their response: the 503 too, since error bodies are
+        // read by default.
+        while (reads[0] < 2 && System.currentTimeMillis() < deadline) {
+            flushSerialCalls();
+            Thread.sleep(20);
+        }
+        assertTrue(retried[0], "the listener never ran");
+        assertEquals(2, reads[0], "the retry never completed");
+
+        List<Span> spans = exported(2);
+        Span failed = null;
+        Span landed = null;
+        for (Span span : spans) {
+            String status = attribute(span.getAttributesList(), "http.response.status_code");
+            if ("503".equals(status)) {
+                failed = span;
+            } else if ("200".equals(status)) {
+                landed = span;
+            }
+        }
+        assertNotNull(failed, String.valueOf(spans));
+        assertNotNull(landed, String.valueOf(spans));
+        assertEquals(hex(failed.getTraceId()), hex(landed.getTraceId()),
+                "a listener's retry started an unrelated trace");
+        assertEquals(hex(failed.getSpanId()), hex(landed.getParentSpanId()));
+    }
+
+    @Test
+    void aBlankServiceNameFallsBackRatherThanExportingBlank() throws Exception {
+        Telemetry.install(new TelemetryConfig().direct("http://collector.test").serviceName("   "));
+        NetworkManager.getInstance().addToQueueAndWait(request(API + "?blank-service"));
+        Telemetry.flush();
+        exported(1);
+        ExportTraceServiceRequest sent = ExportTraceServiceRequest.parseFrom(
+                connection(COLLECTOR).getOutputData());
+        String service = attribute(sent.getResourceSpans(0).getResource().getAttributesList(),
+                "service.name");
+        assertNotNull(service);
+        assertFalse(service.trim().length() == 0, "a blank service.name was exported");
+    }
+
+    @Test
     void aTruncatedValueNeverEndsInHalfACharacter() {
         StringBuilder text = new StringBuilder();
         for (int i = 0; i < TelemetrySpan.MAX_VALUE_LENGTH - 1; i++) {
