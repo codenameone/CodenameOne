@@ -42,14 +42,19 @@ import java.util.Map;
 public class PushFeedback {
 
     /**
-     * Your durable store. Both operations belong in ONE transaction: a marker
+     * Your organization-scoped durable store. Store provider and bare token (or
+     * web endpoint) alongside the original push key; backfill existing rows before
+     * enabling cleanup. Both operations belong in ONE transaction: a marker
      * written before the deletion commits turns a retry into a silent skip,
      * and a deletion without a marker is applied twice.
      */
     public interface DeviceStore {
-        boolean alreadyApplied(String deliveryId);
+        boolean alreadyApplied(String eventKey);
 
-        void removeKeyAndMarkApplied(String deliveryId, String deviceKey) throws Exception;
+        // provider + target match normalized registration columns, NOT Push.getPushKey().
+        // Enforce a unique eventKey and delete in the same transaction.
+        void removeTargetAndMarkApplied(String eventKey, String provider, String target)
+                throws Exception;
     }
 
     /** Assigned once at start-up; there is no dependency injection here. */
@@ -75,21 +80,32 @@ public class PushFeedback {
         if (events != null) {
             for (Object entry : events) {
                 Map event = (Map) entry;
-                String deliveryId = (String) event.get("deliveryId");
-                // Digests are at-least-once, and a truncated one is followed by
-                // its next page immediately, so the same event can arrive twice.
-                if (store.alreadyApplied(deliveryId)) {
+                if (!"INVALID_TARGET".equals(event.get("reason"))) {
                     continue;
                 }
-                if ("INVALID_TARGET".equals(event.get("reason"))) {
-                    // token is absent for web push, which reports endpoint --
-                    // the identifier is normalized on admission and its
-                    // original spelling is not recoverable.
-                    String key = (String) event.get("token");
-                    if (key == null) {
-                        key = (String) event.get("endpoint");
+                String provider = (String) event.get("provider");
+                String target = (String) event.get("token");
+                if (target == null || target.length() == 0) {
+                    target = (String) event.get("endpoint");
+                }
+                if (provider == null || provider.length() == 0
+                        || target == null || target.length() == 0) {
+                    throw new IllegalArgumentException("Missing push target");
+                }
+                String deliveryId = (String) event.get("deliveryId");
+                String eventKey;
+                if (deliveryId != null && deliveryId.length() > 0) {
+                    eventKey = "delivery:" + deliveryId;
+                } else {
+                    Object at = event.get("at");
+                    if (at == null) {
+                        throw new IllegalArgumentException("Missing classic event timestamp");
                     }
-                    store.removeKeyAndMarkApplied(deliveryId, key);
+                    eventKey = "classic:" + provider + ":" + target.length()
+                            + ":" + target + ":" + at;
+                }
+                if (!store.alreadyApplied(eventKey)) {
+                    store.removeTargetAndMarkApplied(eventKey, provider, target);
                 }
             }
         }
