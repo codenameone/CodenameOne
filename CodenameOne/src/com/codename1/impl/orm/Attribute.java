@@ -26,6 +26,7 @@ package com.codename1.impl.orm;
 ///
 /// Internal ORM runtime; not an application API.
 /// @hidden
+@com.codename1.impl.SharedWithBackend
 public final class Attribute {
     public static final int TEXT = 0;
     public static final int INTEGER = 1;

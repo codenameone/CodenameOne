@@ -25,5 +25,6 @@ import java.lang.annotation.*;
 /// Flattens an embeddable value into the owner table using a field-name prefix.
 @Retention(RetentionPolicy.CLASS)
 @Target(ElementType.FIELD)
+@com.codename1.impl.SharedWithBackend
 public @interface Embedded {
 }

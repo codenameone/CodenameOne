@@ -31,6 +31,7 @@ import java.util.List;
 ///
 /// Internal ORM runtime; not an application API.
 /// @hidden
+@com.codename1.impl.SharedWithBackend
 public interface SqlAccess {
     /// Returns the dialect identifier used for schema and query choices.
     String dialect();

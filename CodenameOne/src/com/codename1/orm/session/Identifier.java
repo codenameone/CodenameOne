@@ -26,6 +26,7 @@ import com.codename1.impl.orm.Values;
 import java.util.Arrays;
 
 /// Immutable composite identity, in the model's declared identifier-field order.
+@com.codename1.impl.SharedWithBackend
 public final class Identifier {
     private final Object[] values;
     private Identifier(Object[] values) {

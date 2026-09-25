@@ -181,8 +181,11 @@ DEMO="${CN1_BACKEND_DEMO:-demo/petstore}"
 # demo directory holds exactly one main class.
 COMMON=""
 [ -d demo/common ] && [ "$STANDALONE_DEMO" != "1" ] && COMMON="demo/common"
+# The core classes marked @SharedWithBackend (the ORM, the entity annotations) are
+# compiled from CodenameOne/src directly; there is no copy of them under src/.
+SHARED="$(./shared-sources.sh)"
 "$J8/bin/javac" -nowarn -encoding UTF-8 -bootclasspath "$JAVAAPI" ${GEN:+-cp "$GEN"} -source 1.8 -target 1.8 \
-    -d "$WORK/classes" $(find src impl/parparvm $COMMON "$DEMO" -name '*.java')
+    -d "$WORK/classes" $(find src impl/parparvm $COMMON "$DEMO" -name '*.java') $SHARED
 if [ -n "$GEN" ]; then cp -r "$GEN/." "$WORK/classes/"; fi
 
 mkdir -p "$WORK/out"

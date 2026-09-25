@@ -36,6 +36,7 @@ package com.codename1.orm.session;
 /// Load relationships before detaching or serializing if they are needed later.
 /// Implementations are supplied by the ORM; applications should not implement this
 /// interface.
+@com.codename1.impl.SharedWithBackend
 public interface Session {
     /// Creates a typed query using the supported JPQL subset.
     /// Parsing and mapping validation occur immediately, before SQL execution.

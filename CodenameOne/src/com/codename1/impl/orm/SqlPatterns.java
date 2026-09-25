@@ -25,6 +25,7 @@ package com.codename1.impl.orm;
 /// Portable LIKE patterns without changing connection-wide SQLite settings.
 /// Internal ORM runtime; not an application API.
 /// @hidden
+@com.codename1.impl.SharedWithBackend
 public final class SqlPatterns {
     private SqlPatterns() {
     }

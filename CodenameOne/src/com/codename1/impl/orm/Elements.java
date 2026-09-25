@@ -27,6 +27,7 @@ import com.codename1.orm.session.PersistenceException;
 import java.io.IOException;
 import java.util.Date;
 
+@com.codename1.impl.SharedWithBackend
 final class Elements {
     private Elements() {
     }

@@ -23,6 +23,7 @@
 package com.codename1.annotations.db;
 
 /// Controls when a mapped relationship is loaded.
+@com.codename1.impl.SharedWithBackend
 public enum FetchType {
     /// Initializes the relationship when its owner is loaded.
     EAGER,

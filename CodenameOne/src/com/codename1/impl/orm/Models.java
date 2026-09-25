@@ -32,6 +32,7 @@ import java.util.Map;
 ///
 /// Internal ORM runtime; not an application API.
 /// @hidden
+@com.codename1.impl.SharedWithBackend
 public final class Models {
     private static final Map<String, EntityModel<?>> REGISTRY = new LinkedHashMap<String, EntityModel<?>>();
     private Models() {

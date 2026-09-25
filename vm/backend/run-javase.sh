@@ -79,8 +79,10 @@ trap 'rm -rf "$OUT"' EXIT
 BUILD_CP="$OUT"
 if [ -n "$GEN" ]; then BUILD_CP="$BUILD_CP:$GEN"; fi
 if [ -n "$DRIVERS" ]; then BUILD_CP="$BUILD_CP:$DRIVERS"; fi
+# The core classes marked @SharedWithBackend come from CodenameOne/src directly.
+SHARED="$(./shared-sources.sh)"
 "$JAVAC" -nowarn -encoding UTF-8 -cp "$BUILD_CP" -d "$OUT" \
-    $(find src impl/javase $COMMON "$DEMO" -name '*.java')
+    $(find src impl/javase $COMMON "$DEMO" -name '*.java') $SHARED
 if [ -n "$GEN" ]; then cp -r "$GEN/." "$OUT/"; fi
 
 CP="$OUT"

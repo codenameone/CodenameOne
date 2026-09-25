@@ -44,6 +44,7 @@ import java.util.Date;
 ///
 /// Internal ORM runtime; not an application API.
 /// @hidden
+@com.codename1.impl.SharedWithBackend
 public final class Values {
     /// Normalizes mutable and boxed values before binding or taking a snapshot.
     public static Object storage(Object value) {
