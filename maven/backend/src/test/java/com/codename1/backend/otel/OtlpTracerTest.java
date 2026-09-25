@@ -687,6 +687,34 @@ class OtlpTracerTest {
     }
 
     @Test
+    @DisplayName("the relay refuses too many spans before validating them")
+    void relaySpanCapComesFirst() throws Exception {
+        int port = freePort();
+        Properties settings = settings(port);
+        settings.setProperty(OtlpTracer.RELAY, "true");
+        settings.setProperty(OtlpTracer.RELAY_MAX_SPANS, "1");
+        Backend backend = Backend.builder(Config.of(settings, "test"))
+                .quiet()
+                .tracing(new OtlpTracer("pets"))
+                .handler(new HttpServer.Handler() {
+                    public HttpServer.Response handle(HttpServer.Request request) {
+                        return null;
+                    }
+                })
+                .start();
+        try {
+            // Two spans, both with ids the sanitizer would refuse (400). Counting
+            // first answers 413 without building the sanitized copy at all.
+            String body = "{\"resourceSpans\":[{\"scopeSpans\":[{\"spans\":["
+                    + "{\"traceId\":\"nothex\",\"spanId\":\"x\"},"
+                    + "{\"traceId\":\"nothex\",\"spanId\":\"y\"}]}]}]}";
+            assertEquals(413, post(port, "/otel/v1/traces", body, null));
+        } finally {
+            backend.stop();
+        }
+    }
+
+    @Test
     @DisplayName("OTEL_SDK_DISABLED leaves the server untraced and the collector untouched")
     void disabledAtRunTime() throws Exception {
         int port = freePort();

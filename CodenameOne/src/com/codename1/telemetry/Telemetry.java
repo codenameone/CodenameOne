@@ -69,6 +69,7 @@ import java.util.Timer;
 /// [TelemetryConfig]).
 public final class Telemetry {
     private static final String TRACEPARENT = "traceparent";
+    private static final String TRACESTATE = "tracestate";
     /// How many export batches may wait in the network queue at once.
     static final int MAX_PENDING_EXPORTS = 2;
     /// The installation. A plain field, deliberately, like the tracer and guard
@@ -547,11 +548,15 @@ public final class Telemetry {
                 // and exporting that one another.
                 return null;
             }
-            if (request.getRequestHeader(TRACEPARENT) != null) {
+            if (request.getRequestHeader(TRACEPARENT) != null
+                    || request.getRequestHeader(TRACESTATE) != null) {
                 // The app chose which trace this request belongs to. The service it
                 // reaches joins THAT trace, so a span recorded here in another one
                 // would describe the same request twice, in two traces that never
-                // meet. The app's own instrumentation owns this request.
+                // meet. The app's own instrumentation owns this request. A
+                // tracestate alone counts too: it is part of the app's context,
+                // and a traceparent of ours beside it paired the app's vendor state
+                // with an unrelated trace id.
                 return null;
             }
             String url = request.getUrl();
@@ -713,7 +718,30 @@ public final class Telemetry {
     }
 
     static boolean isSameOriginRelative(String url) {
-        if (url == null || url.length() == 0) {
+        if (url == null) {
+            return false;
+        }
+        // Read as the browser reads it (the WHATWG URL parser): leading and
+        // trailing C0 controls and spaces are stripped, and every tab and newline
+        // removed, BEFORE anything is resolved -- so " //host/x" and "\t\\\\host/x"
+        // are network paths to it, and were same-origin here.
+        StringBuilder cleaned = new StringBuilder(url.length());
+        for (int i = 0; i < url.length(); i++) {
+            char c = url.charAt(i);
+            if (c != '\t' && c != '\n' && c != '\r') {
+                cleaned.append(c);
+            }
+        }
+        int start = 0;
+        int end = cleaned.length();
+        while (start < end && cleaned.charAt(start) <= ' ') {
+            start++;
+        }
+        while (end > start && cleaned.charAt(end - 1) <= ' ') {
+            end--;
+        }
+        url = cleaned.substring(start, end);
+        if (url.length() == 0) {
             return false;
         }
         // A network-path reference names another origin, and a browser's URL

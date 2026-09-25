@@ -135,6 +135,11 @@ typedef struct {
     JAVA_INT* closed;
     int closedPairs;
     int closedCapacity;
+    /* The stream a RST_STREAM was just received for. nghttp2 delivers the frame
+       and then closes the stream within the same receive, and a reset with
+       NO_ERROR closes with error code 0 -- exactly like a response sent in full.
+       This is how the close tells the two apart. */
+    int32_t resetStream;
 } CN1H2Session;
 
 /*
@@ -832,6 +837,10 @@ static int cn1H2OnFrameRecv(nghttp2_session* session, const nghttp2_frame* frame
     CN1H2Request* r;
     int endStream = (frame->hd.flags & NGHTTP2_FLAG_END_STREAM) != 0;
     (void)session;
+    if(frame->hd.type == NGHTTP2_RST_STREAM) {
+        s->resetStream = frame->hd.stream_id;
+        return 0;
+    }
     if(frame->hd.type != NGHTTP2_HEADERS && frame->hd.type != NGHTTP2_DATA) {
         return 0;
     }
@@ -874,8 +883,18 @@ static int cn1H2OnStreamClose(nghttp2_session* session, int32_t streamId,
         }
     }
     if(s->closedPairs < s->closedCapacity) {
+        JAVA_INT code = (JAVA_INT)errorCode;
+        if(streamId == s->resetStream) {
+            /* The peer reset it. With NO_ERROR that is still a stream the response
+               may not have finished on -- a client cancelling a download -- so it
+               is reported as a failure, never as delivery. */
+            s->resetStream = 0;
+            if(code == 0) {
+                code = -1;
+            }
+        }
         s->closed[s->closedPairs * 2] = (JAVA_INT)streamId;
-        s->closed[s->closedPairs * 2 + 1] = (JAVA_INT)errorCode;
+        s->closed[s->closedPairs * 2 + 1] = code;
         s->closedPairs++;
     }
     if(r != NULL) {

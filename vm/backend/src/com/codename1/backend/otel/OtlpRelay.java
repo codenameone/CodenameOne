@@ -119,13 +119,17 @@ final class OtlpRelay implements HttpServer.Handler {
             if(!(parsed instanceof Map)) {
                 return answer(400, "an export is a JSON object");
             }
+            // Counted on what was PARSED, before the sanitized copy is built: a body
+            // under the byte cap can still hold thousands of tiny spans, and
+            // validating and deep-copying all of them only to refuse the export
+            // spent the memory the span cap is there to bound.
+            if(OtlpSchema.countSpans((Map)parsed) > maxSpans) {
+                return answer(413, "export holds more than " + maxSpans + " spans");
+            }
             Map clean = OtlpSchema.sanitize((Map)parsed);
             int spans = OtlpSchema.countSpans(clean);
             if(spans == 0) {
                 return ok();
-            }
-            if(spans > maxSpans) {
-                return answer(413, "export holds more than " + maxSpans + " spans");
             }
             encoded = exporter.isProtobuf() ? OtlpSchema.protobuf(clean) : OtlpSchema.json(clean);
         } catch (Exception err) {

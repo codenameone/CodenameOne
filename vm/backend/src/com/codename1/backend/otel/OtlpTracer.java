@@ -378,9 +378,11 @@ public final class OtlpTracer implements Tracer {
                 && value.indexOf('#') < 0 && value.indexOf('@') < 0
                 && value.indexOf(',') < 0;
         if(!valid) {
+            // Redacted: a value refused for its userinfo, query or fragment is
+            // refused BECAUSE it carries one, and this message goes to deploy logs.
             throw new IOException(RELAY_CORS_ORIGIN + " must be * or one origin such as "
                     + "https://app.example.com (scheme, host and port, with no path or "
-                    + "trailing slash); it is '" + value + "'");
+                    + "trailing slash); it is '" + BatchExporter.redact(value) + "'");
         }
         return serializedOrigin(value, start);
     }

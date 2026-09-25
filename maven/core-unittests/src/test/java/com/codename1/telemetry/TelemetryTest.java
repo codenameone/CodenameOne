@@ -536,6 +536,12 @@ class TelemetryTest extends UITestBase {
         assertFalse(Telemetry.isSameOriginRelative("/\\other.test/api"));
         assertFalse(Telemetry.isSameOriginRelative("\\/other.test/api"));
         assertTrue(Telemetry.isSameOriginRelative("\\api\\orders"));
+        // The browser strips leading whitespace and controls, and every tab and
+        // newline, before it parses: these are network paths to it.
+        assertFalse(Telemetry.isSameOriginRelative(" //other.test/api"));
+        assertFalse(Telemetry.isSameOriginRelative("\t\\\\other.test/api"));
+        assertFalse(Telemetry.isSameOriginRelative("/\n/other.test/api"));
+        assertTrue(Telemetry.isSameOriginRelative("  /api/orders"));
         assertFalse(Telemetry.isSameOriginRelative("http://other.test/api"));
         assertFalse(Telemetry.isSameOriginRelative("data:text/plain,x"));
         assertFalse(Telemetry.isSameOriginRelative(""));
@@ -1027,6 +1033,16 @@ class TelemetryTest extends UITestBase {
         span.updateName(huge.toString());
         assertTrue(span.getName().length() <= TelemetrySpan.MAX_VALUE_LENGTH);
         span.end();
+    }
+
+    @Test
+    void aRequestCarryingOnlyATracestateIsTheAppsOwn() throws Exception {
+        Telemetry.install(new TelemetryConfig().direct("http://collector.test"));
+        ConnectionRequest own = request(API + "/state-only");
+        own.addRequestHeader("tracestate", "vendor=opaque");
+        NetworkManager.getInstance().addToQueueAndWait(own);
+        assertNull(connection(API + "/state-only").getHeaders().get("traceparent"),
+                "a traceparent of ours was paired with the app's tracestate");
     }
 
     @Test

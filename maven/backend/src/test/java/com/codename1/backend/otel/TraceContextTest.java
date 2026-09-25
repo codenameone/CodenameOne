@@ -450,6 +450,14 @@ class TraceContextTest {
         assertEquals("https://app.example.com:8443", cors("https://app.example.com:08443"));
         assertEquals("http://[::1]:8080", cors("http://[::1]:8080"));
         assertNull(cors(""));
+        // Refused without quoting what made it unsafe.
+        try {
+            cors("https://user:p4ssword@app.example.com?token=s3cret");
+            throw new AssertionError("accepted userinfo");
+        } catch (java.io.IOException expected) {
+            assertFalse(expected.getMessage().contains("p4ssword"), expected.getMessage());
+            assertFalse(expected.getMessage().contains("s3cret"), expected.getMessage());
+        }
         for(String bad : new String[] {"https://app.example.com/", "https://app.example.com/app",
                 "https://a.example, https://b.example", "app.example.com", "https://u@app.example",
                 "https://app.example.com?x=1"}) {

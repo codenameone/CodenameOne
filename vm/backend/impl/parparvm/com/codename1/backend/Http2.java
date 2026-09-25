@@ -254,7 +254,9 @@ public final class Http2 {
     /**
      * The streams that have closed since the last call, as (stream id, HTTP/2
      * error code) pairs; null when none have. Code 0 is a stream whose response
-     * was sent in full; anything else is one reset before it was. The server ends
+     * was sent in full; anything else is one reset before it was. A reset the
+     * PEER sent with NO_ERROR is reported as -1, not 0: it closes with code 0 too,
+     * and is no proof the response arrived. The server ends
      * a request's span here, since a body the peer's flow-control window holds
      * back is sent turns after it was submitted.
      */
