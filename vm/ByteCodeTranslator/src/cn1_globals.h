@@ -429,6 +429,16 @@ static inline __attribute__((always_inline)) uint16_t cn1ClazzIndexOf(const stru
 #define CN1_BIBOP_FREE_LINK(o)      (*(void**)((char*)(o) + sizeof(struct JavaObjectPrototype)))
 // Bytes of an object that belong to the header; the body -- what allocation zeroes and
 // a debug poison destroys -- starts here, NOT at sizeof(struct JavaObjectPrototype).
+#ifdef DEBUG_GC_ALLOCATIONS
+// DEBUG_GC_VARIABLES puts two ints ahead of the header, so it ends 8 bytes later and
+// the aligned-store shortcut below would zero part of it.
+#define CN1_OBJ_HEADER_BYTES        12
+#define CN1_OBJ_ZERO_BODY(o, size) do { \
+        if((size) > CN1_OBJ_HEADER_BYTES) { \
+            memset((char*)(o) + CN1_OBJ_HEADER_BYTES, 0, (size_t)(size) - CN1_OBJ_HEADER_BYTES); \
+        } \
+    } while(0)
+#else
 #define CN1_OBJ_HEADER_BYTES        4
 // Zero an object's body (size = the whole object) without touching its header, whose
 // mark word is read atomically by a concurrent conservative scan. The 4 bytes after the
@@ -440,6 +450,7 @@ static inline __attribute__((always_inline)) uint16_t cn1ClazzIndexOf(const stru
             if((size) > 8) memset((char*)(o) + 8, 0, (size_t)(size) - 8); \
         } \
     } while(0)
+#endif
 // The heap position. CN1_OBJ_HEAPPOS is the STATE -- one byte load -- and compares
 // exactly as the old int did against every state, including ">= 0" for "indexed" (0 and
 // CN1_HEAPSTATE_INDEXED are the two non-negative states). Only the heap table's own code
