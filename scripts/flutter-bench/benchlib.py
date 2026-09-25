@@ -422,7 +422,8 @@ def render_compute(report):
              + "Codename One is faster.")
     lines = [intro, ""]
     if compute.get("status") != "measured":
-        lines.append("_Not measured: %s._" % compute.get("reason", "no reason given"))
+        reason = compute.get("reason", "no reason given").rstrip(".")
+        lines.append("_Not measured: %s._" % reason)
         return "\n".join(lines)
     verdict = compute["verdict"]
     lines.append("| Workload | Codename One | Flutter | Ratio |")

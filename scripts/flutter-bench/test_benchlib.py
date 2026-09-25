@@ -137,8 +137,10 @@ class ComputeTest(unittest.TestCase):
     def test_an_unmeasured_compute_run_says_why(self):
         report = _report({"install_bytes": 50}, {"install_bytes": 100})
         report.update(platform="ios", runs=5)
-        report["compute"] = {"status": "not measured", "reason": "needs signed hardware"}
-        self.assertIn("Not measured: needs signed hardware", benchlib.render_markdown([report]))
+        report["compute"] = {"status": "not measured", "reason": "needs signed hardware."}
+        body = benchlib.render_markdown([report])
+        self.assertIn("Not measured: needs signed hardware._", body)
+        self.assertNotIn(".._", body)
 
 
 class PublishRefusalTest(unittest.TestCase):
