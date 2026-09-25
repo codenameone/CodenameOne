@@ -1700,7 +1700,14 @@ final class JavascriptMethodGenerator {
             s = s.replaceAll(
                     "stack\\.p\\(([a-zA-Z_\\$][\\w\\$]*(?:\\[\\d+\\])*)\\);?\\s*locals\\[(\\d+)\\] = stack\\.q\\(\\);",
                     "locals[$2] = $1;");
-            // Rule 4: IADD/ISUB/IMUL/IAND/IOR/IXOR with int-coercion.
+            // Rule 4b: IMUL, which is Math.imul rather than a coerced multiply.
+            //   stack.p(X); stack.p(Y);
+            //   { let b = stack.q(); let a = stack.q(); stack.p(Math.imul(a, b)); }
+            //     -> stack.p(Math.imul(X, Y));
+            s = s.replaceAll(
+                    "stack\\.p\\(([^;(){},]+)\\);?\\s*stack\\.p\\(([^;(){},]+)\\);?\\s*\\{\\s*let b = stack\\.q\\(\\);\\s*let a = stack\\.q\\(\\);\\s*stack\\.p\\(Math\\.imul\\(a, b\\)\\);\\s*\\}",
+                    "stack.p(Math.imul($1, $2));");
+            // Rule 4: IADD/ISUB/IAND/IOR/IXOR with int-coercion.
             //   stack.p(X); stack.p(Y);
             //   { let b = stack.q(); let a = stack.q(); stack.p((a|0) OP (b|0)); }
             //     → stack.p(((X)|0) OP ((Y)|0));
@@ -4886,7 +4893,11 @@ final class JavascriptMethodGenerator {
             case Opcodes.ISUB:
                 return emitBinary(out, ctx, "((%s|0) - (%s|0))");
             case Opcodes.IMUL:
-                return emitBinary(out, ctx, "((%s|0) * (%s|0))");
+                // Math.imul, never (a|0) * (b|0): once the true product passes 2^53 a
+                // JavaScript multiply has already rounded it, so no |0 afterwards can
+                // recover the low 32 bits Java keeps. vm/benchmarks' intArithmetic and
+                // quicksortBench returned wrong checksums in the browser because of it.
+                return emitBinary(out, ctx, "Math.imul(%s, %s)");
             case Opcodes.LADD:
                 return emitBinary(out, ctx, "_Ladd(%s, %s)");
             case Opcodes.FADD:
@@ -6781,7 +6792,8 @@ private static void appendJsBodyMethod(StringBuilder out, ByteCodeClass cls, Byt
                 out.append("        { let b = stack.q(); let a = stack.q(); stack.p((a|0) - (b|0)); pc = ").append(index + 1).append("; break; }\n");
                 return;
             case Opcodes.IMUL:
-                out.append("        { let b = stack.q(); let a = stack.q(); stack.p((a|0) * (b|0)); pc = ").append(index + 1).append("; break; }\n");
+                // Math.imul: see the structured emitter's IMUL.
+                out.append("        { let b = stack.q(); let a = stack.q(); stack.p(Math.imul(a, b)); pc = ").append(index + 1).append("; break; }\n");
                 return;
             case Opcodes.LADD:
                 out.append("        { let b = stack.q(); let a = stack.q(); stack.p(_Ladd(a, b)); pc = ").append(index + 1).append("; break; }\n");
