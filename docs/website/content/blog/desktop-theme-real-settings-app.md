@@ -23,21 +23,21 @@ These are repository captures of the real Settings application. **All six were m
 
 ### Fluent
 
-![Settings with the Fluent theme in light mode, captured on macOS](/blog/settings-fluent-light.png)
+![Settings with the Fluent theme in light mode, captured on macOS](/developer-guide/img/desktop-theme-settings-fluent-light.png)
 
-![Settings with the Fluent theme in dark mode, captured on macOS](/blog/settings-fluent-dark.png)
+![Settings with the Fluent theme in dark mode, captured on macOS](/developer-guide/img/desktop-theme-settings-fluent-dark.png)
 
 ### Aqua
 
-![Settings with the Aqua theme in light mode, captured on macOS](/blog/settings-aqua-light.png)
+![Settings with the Aqua theme in light mode, captured on macOS](/developer-guide/img/desktop-theme-settings-aqua-light.png)
 
-![Settings with the Aqua theme in dark mode, captured on macOS](/blog/settings-aqua-dark.png)
+![Settings with the Aqua theme in dark mode, captured on macOS](/developer-guide/img/desktop-theme-settings-aqua-dark.png)
 
 ### Adwaita
 
-![Settings with the Adwaita theme in light mode, captured on macOS](/blog/settings-adwaita-light.png)
+![Settings with the Adwaita theme in light mode, captured on macOS](/developer-guide/img/desktop-theme-settings-adwaita-light.png)
 
-![Settings with the Adwaita theme in dark mode, captured on macOS](/blog/settings-adwaita-dark.png)
+![Settings with the Adwaita theme in dark mode, captured on macOS](/developer-guide/img/desktop-theme-settings-adwaita-dark.png)
 
 The captures come from the [native-theme guide](https://github.com/codenameone/CodenameOne/blob/master/docs/developer-guide/Native-Themes.asciidoc). Their value is the complete screen: the theme has to make the relationships among controls readable, rather than make one isolated button resemble a reference tile.
 
@@ -49,13 +49,13 @@ For a JavaSE desktop build, set this in the Settings app under **Build Hints**:
 desktop.themeMode=native
 ```
 
-`native` and `auto` select the host's theme. An explicit `fluent`, `aqua`, or `adwaita` selects that family even on another host. Unset remains `legacy`, preserving existing applications. On the separate native macOS port, opt into Aqua with:
+`native` and `auto` select the host's theme. An explicit `fluent`, `aqua`, or `adwaita` selects that family even on another host. Unset remains `legacy`, preserving existing applications. On the separate native macOS port, Aqua is already the default when neither `macos.themeMode` nor the shared `nativeTheme` hint is set. You can select it explicitly with:
 
 ```properties
 macos.themeMode=native
 ```
 
-The native macOS port still defaults to its previous modern theme. These are separate ports and separate defaults.
+An explicit shared theme setting still applies: for example, `nativeTheme=modern` selects the iOS-style modern theme on this port. JavaSE desktop and native macOS are separate ports with different defaults.
 
 In the simulator, select the Desktop skin, then choose a theme from **Native Theme**. With **Auto**, the Desktop skin follows `desktop.themeMode`, matching the packaged application's choice.
 
@@ -64,6 +64,12 @@ In the simulator, select the Desktop skin, then choose a theme from **Native The
 A custom UIID should begin with the native UIID whose behavior it refines. For example, in your application's `theme.css`:
 
 ```css
+/* Compiler fallbacks. Native theme palette values replace these at runtime. */
+Container {
+    --text-secondary-color: #5D5D5D;
+    --text-secondary-color-dark: #CFCFCF;
+}
+
 ProjectNameField {
     cn1-derive: TextField;
 }
@@ -81,12 +87,28 @@ ProjectHelp {
     color: var(--text-secondary-color);
 }
 
+@media (prefers-color-scheme: dark) {
+    ProjectHelp {
+        color: var(--text-secondary-color-dark);
+    }
+}
+
 #Constants {
-    --accent-color: "00796b";
+    includeNativeBool: true;
+    --accent-color: #00796B;
+    --accent-color-dark: #4DB6AC;
+    --accent-fg-color: #FFFFFF;
+    --accent-fg-color-dark: #102522;
+    --accent-pressed-color: #00695C;
+    --accent-pressed-color-dark: #26A69A;
+    --selection-color: #00796B;
+    --selection-color-dark: #4DB6AC;
 }
 ```
 
-The field gets the theme's field treatment. The card starts with its group-box treatment. Secondary text uses the role defined by the theme. The application supplies a brand accent, which the shared palette bindings apply to components that use that role.
+The `Container` declarations give the CSS compiler concrete values for `var()`. Keep these palette fallbacks outside `#Constants`: the compiler records their bindings, and the installed native theme supplies the runtime colors. Exporting the fallbacks as constants would override the platform palette.
+
+The brand colors belong in `#Constants` because they should override the native palette. Both appearances need their own values, including the pressed and selection colors. The field and card inherit the platform's control treatments; `ProjectHelp` binds to its secondary text color in each appearance.
 
 Assign the UIID in Java as usual:
 
@@ -116,15 +138,9 @@ The native desktop themes set `defaultNativeWindowModeBool` to `true`. An ordina
 
 That distinction affects focus, ownership, placement, and keyboard handling. It is also why “native dialog” needs a precise meaning here: a native window contains the CN1 dialog; we aren't claiming every dialog becomes an OS alert with OS-drawn controls.
 
-For main-window chrome, the current defaults differ:
+Packaged JavaSE apps use native title bars by default with all three themes. The wrapper generator writes `desktop.titleBar=native` when the build hint is unset, and that property takes precedence over the theme constant. Set `desktop.titleBar=custom` explicitly if you want custom desktop chrome.
 
-| Theme | `desktopTitleBarMode` |
-| --- | --- |
-| Fluent | `native` |
-| Aqua | `native` |
-| Adwaita | `custom` |
-
-Fluent and Aqua hand the title bar to the OS. Adwaita uses custom desktop chrome. Both paths replace the old assumption that a phone-style CN1 Toolbar should serve as the desktop window's title bar. An explicit `desktop.titleBar` build hint takes precedence over the theme default.
+The simulator can expose a different default: without a title-bar property, it falls back to `desktopTitleBarMode` from the theme. That constant is `native` in Fluent and Aqua, and `custom` in Adwaita. An Adwaita simulator capture therefore doesn't establish the title bar a packaged app will use. The [wrapper generator](https://github.com/codenameone/CodenameOne/blob/master/maven/codenameone-maven-plugin/src/main/java/com/codename1/maven/GenerateDesktopAppWrapperMojo.java) controls that packaging behavior.
 
 ## Mouse behavior belongs in the theme too
 

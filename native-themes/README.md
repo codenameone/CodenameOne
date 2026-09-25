@@ -168,7 +168,9 @@ untouched and nothing needs an `isDesktop()` gate.
 - `defaultNativeWindowModeBool: true` -- a `Dialog` opens as a real operating system window.
   Anchored popups (`ComboBox`, `Picker`, the context menu) never do.
 - `desktopTitleBarMode` -- `native`, `custom` or `toolbar`. A `desktop.titleBar` build hint
-  outranks it; the constant is what speaks when the project said nothing.
+  outranks it. Packaged JavaSE apps receive `desktop.titleBar=native` from the wrapper
+  generator even when the project leaves that hint unset. The simulator can fall back
+  to the theme constant when no title-bar property is present.
 - `commandBehavior: Native` -- commands go to the platform's menu. Safe on a port that has
   none: `setCommandBehavior` normalises it away there.
 - `separatorThicknessMM` -- the `Separator` rule.

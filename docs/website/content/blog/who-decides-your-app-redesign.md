@@ -13,7 +13,7 @@ series: ["release-2026-09-25"]
 
 Apple's design team doesn't know what's on your backlog. A new iOS appearance might be exactly what you want for your next release. It might also arrive halfway through a customer rollout, when changing the navigation is the last thing you need.
 
-We want to support the new SDK without making that decision for you. This week, you can select Xcode 27 on our build servers with the returning `ios.xcode_version` hint. Local builds and CI support it too, and our iOS 27 theme gets more detailed Liquid Glass effects. You choose when to adopt that appearance. Codename One renders most controls itself, so the theme ships with your app. Updating the SDK can leave that theme and your application CSS in place.
+We want to support the new SDK without making that decision for you. This week, you can select Xcode 27 on our build servers with the returning `ios.xcode_version` hint. Local builds and CI also support Xcode 27, and our iOS 27 theme gets more detailed Liquid Glass effects. You choose when to adopt that appearance. Codename One renders most controls itself, so the theme ships with your app. Updating the SDK can leave that theme and your application CSS in place.
 
 [Last week](/blog/xcode-27-build-settings/) we covered the build settings needed for Xcode 27. This week we'll show the glass in motion, explain the theme switches, and take a first look at the foldable Duo in the simulator. There is substantial work beyond iOS, too. The JPA inspired ORM is probably the biggest addition: relationships and managed sessions now work in both the app and the backend. OpenTelemetry and WebSocket support give that backend more of what a real service needs.
 
@@ -30,47 +30,23 @@ We'll cover the release in six follow-ups, with code you can try and screenshots
 
 ## Xcode Selection Is Back
 
-Long-time Codename One users might recognize this build hint. You can select Xcode 27 on the cloud build service right now. In the Settings app, under **Build Hints**, set:
+Long-time Codename One users might recognize this hint. In the Settings app, under **Build Hints**, you can now select Xcode 27 on the cloud build service:
 
 ```properties
 ios.xcode_version=27
 ```
 
-We discontinued this option years ago because Apple's Xcode upgrades kept requiring a macOS upgrade as well. With Xcode 27, that OS upgrade isn't required yet, and virtualization lets us offer the choice again.
+We discontinued Xcode selection because Apple's upgrades kept requiring a macOS upgrade too. That isn't required for 27 yet, and virtualization lets us offer the choice again. **Xcode 26 remains the default. Leave the hint unset unless you're testing or need a new SDK feature.** We'll add 27.1 after beta and move the default to 27 according to Apple's requirements.
 
-**Xcode 26 remains the default. We recommend leaving this hint unset for most apps.** Use it to test your app against Xcode 27 or when you need a feature from the new SDK. Xcode 27.1 is still in beta; we'll add it once it's released. We'll move the default to Xcode 27 when Apple's requirements call for it.
-
-The hint chooses the cloud build toolchain. It doesn't choose your app's appearance. That is a separate setting.
-
-## Keep the toolchain and the theme separate
-
-For an iOS-specific choice, these build hints opt into the iOS 27 appearance:
-
-```properties
-ios.themeMode=modern
-ios.themeGeneration=27
-```
-
-You can also select native themes across platforms:
-
-```properties
-nativeTheme=native
-ios.themeGeneration=27
-```
-
-With no `ios.themeMode` override, `nativeTheme=native` selects the modern theme on iOS and also opts desktop builds into their platform themes. Use it when you want that choice to apply across your app's targets.
-
-`ios.themeMode` selects the iOS theme family. `themeGeneration` selects its design generation. Leaving the generation unset keeps generation 26; setting it to 27 doesn't select an Xcode installation. The older iOS themes ignore the generation hint.
-
-The distinction gives an existing app a useful upgrade path. Build it with the newer SDK, check behavior, then compare the new theme against the screens you already ship. Your own CSS still layers on top. It also means our rendering work has to preserve both generations instead of replacing one baseline with another.
+This hint only affects cloud builds. Local builds use the Xcode installation selected on your Mac. The theme is a separate choice: `ios.themeMode=modern` or the shared `nativeTheme=native` selects the modern family, and `ios.themeGeneration=27` selects its iOS 27 appearance.
 
 ![Codename One tab selection under the iOS 27 dark theme](/blog/ios27-cn1-tabs-dark.gif)
 
-*Codename One's iOS renderer on an iPhone 16 simulator running iOS 27.0. This animation is assembled from deterministic timeline samples of the 480 ms selection morph; it demonstrates the rendered motion, not a live frame-rate measurement.*
+*Deterministic samples of Codename One's 480 ms tab-selection animation on an iPhone 16 simulator running iOS 27.0. The animation shows rendered motion, not a live frame-rate measurement.*
 
-Dark glass needed more than a different tint. We refined the backdrop luminance transform and the outline that keeps a dark floating surface visible. The theme now selects material recipes for bars, floating pills, and panels. Tomorrow's article shows how the selected theme generation reaches the renderer and what to check in your own screens. We still have fidelity work ahead of us, especially in the glass materials and motion.
+Saturday's follow-up covers the build and theme settings, refined glass materials, Health API changes, and local Duo testing. {{< post-link path="/blog/ios-27-glass-you-can-test" text="Read the iOS article" >}}. Duo hinge support needs a local Xcode 27.1 beta build; the cloud's Xcode 27.0 SDK doesn't contain the hinge API.
 
-This week's iOS work also removes the OpenGL ES renderer. Metal is the rendering path now. Delete the old `ios.metal` hint, including an old `false` value that used to force OpenGL ES. Retaining a deprecated renderer was adding compiler warnings and work to our builds. We can now concentrate rendering fixes and fidelity tests on the implementation we use. The removal is in [PR #5875](https://github.com/codenameone/CodenameOne/pull/5875).
+We also removed OpenGL ES. Metal is now the iOS renderer, and old projects should remove the obsolete `ios.metal` hint. Dropping that deprecated path removes compiler warnings and lets us concentrate rendering work on Metal. See [PR #5875](https://github.com/codenameone/CodenameOne/pull/5875).
 
 ## JPA Inspired ORM
 
@@ -125,7 +101,7 @@ Tuesday's article includes a complete endpoint and explains connection limits, t
 
 The cloud accepting a push request doesn't mean the provider accepted every target. Delivery feedback gives your backend the later results in a signed daily digest. It is an organization-level setting on Pro and above.
 
-The decision worth automating is narrow: remove a key after `INVALID_TARGET`. A temporary provider failure can exhaust its retry budget while the key remains valid. Wednesday's article shows how to verify the digest, deduplicate on `deliveryId`, and acknowledge only after database writes commit. The examples in [PR #5890](https://github.com/codenameone/CodenameOne/pull/5890) cover the CN1 backend, Spring, Node.js, and PHP.
+The decision worth automating is narrow: remove a key after `INVALID_TARGET`. A temporary provider failure can exhaust its retry budget while the key remains valid. Wednesday's article shows how to verify the digest, deduplicate on `deliveryId`, and acknowledge only after database writes commit. The examples in [PR #5890](https://github.com/codenameone/CodenameOne/pull/5890) cover the CN1 backend, Spring, MicroProfile, and Node/serverless JavaScript.
 
 ## Native Desktop Themes for Production Apps
 
@@ -133,11 +109,11 @@ Last week's [native desktop themes](/blog/native-desktop-themes-experiment/) wer
 
 We've adopted them in the Codename One Settings tool. Its forms and dialogs helped us find and fix the details that isolated component screenshots missed.
 
-![Codename One Settings using the Aqua theme in light mode](/blog/settings-aqua-light.png)
+![Codename One Settings using the Aqua theme in light mode](/developer-guide/img/desktop-theme-settings-aqua-light.png)
 
 *The Settings tool with the Aqua theme, captured on macOS. Thursday's article includes all three theme families in light and dark appearances.*
 
-The change reaches the window as well as the controls. Desktop native themes open ordinary dialogs in real OS windows. Fluent and Aqua select native title bars; Adwaita selects custom desktop chrome. Existing projects still choose whether to adopt these themes. [PR #5886](https://github.com/codenameone/CodenameOne/pull/5886) shows the application work that exposed and helped refine the defaults.
+The change reaches the window as well as the controls. Desktop native themes open ordinary dialogs in real OS windows. Packaged JavaSE apps use native title bars with all three themes by default; the simulator can instead use the title-bar style declared by the theme. Existing projects still choose whether to adopt these themes. [PR #5886](https://github.com/codenameone/CodenameOne/pull/5886) shows the application work that exposed and helped refine the defaults.
 
 ## Shorten the trip from documentation to a running device
 

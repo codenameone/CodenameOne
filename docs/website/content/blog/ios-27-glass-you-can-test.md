@@ -118,11 +118,11 @@ if (posture.isFoldable()) {
 
 For a top-and-bottom layout, also check that `getFoldOrientation()` is `FOLD_ORIENTATION_HORIZONTAL`. A partially open book posture needs a different layout. Keep important controls outside `getFoldBounds(null)` when a separating region exists.
 
-![Codename One test app in the iPhone Duo simulator running iOS 27.1](/blog/ios27-duo-simulator.png)
+![Codename One test app in the iPhone Duo simulator running iOS 27.1](/blog/ios27-duo-simulator.jpg)
 
 *Local capture of the installed HelloCodenameOne instrumentation app in the Duo simulator, including the simulator device frame. This shows the app running on the beta device profile. It is not a fold-transition test or a demonstration of the new glass theme.*
 
-**Duo support has been tested locally with the iOS 27.1 beta simulator. It has not been validated on shipping Duo hardware.** The bridge guards the hinge API at iOS 27.1, rather than assuming every iOS 27 runtime provides it. We expect the path to carry forward when the SDK is released, but that still needs a release-SDK and device check. The [bridge source](https://github.com/codenameone/CodenameOne/blob/master/Ports/iOSPort/nativeSources/CN1Hinge.m) and [PR #5871](https://github.com/codenameone/CodenameOne/pull/5871) show the boundary.
+**Duo support has been tested locally with the iOS 27.1 beta simulator. It has not been validated on shipping Duo hardware.** Hinge support requires the iOS 27.1 SDK at compile time as well as a supporting runtime. The bridge checks for `UIKit/UIHingeInteraction.h` before compiling the implementation, then checks runtime availability before calling it. The cloud's Xcode 27.0 toolchain does not include that header, so `ios.xcode_version=27` builds contain no hinge implementation, even if installed on iOS 27.1. For now, testing the hinge API requires a local build with the Xcode 27.1 beta. We expect the path to carry forward when the SDK is released, but that still needs a release-SDK and device check. The [bridge source](https://github.com/codenameone/CodenameOne/blob/master/Ports/iOSPort/nativeSources/CN1Hinge.m) and [PR #5871](https://github.com/codenameone/CodenameOne/pull/5871) show the boundary.
 
 ## Health data needs the same precision
 

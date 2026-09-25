@@ -99,17 +99,33 @@ class PushFeedbackCdiApplier {
     /** Marker and deletion in one transaction, as in the Spring receiver. */
     @Transactional
     public void apply(JsonObject event) {
-        String deliveryId = event.getString("deliveryId", null);
-        if (store.alreadyApplied(deliveryId)) {
+        if (!"INVALID_TARGET".equals(event.getString("reason", null))) {
             return;
         }
-        if ("INVALID_TARGET".equals(event.getString("reason", null))) {
-            String key = event.containsKey("token")
-                    ? event.getString("token")
-                    : event.getString("endpoint", null);
-            store.removeKey(key);
+        String provider = event.getString("provider", null);
+        String target = event.getString("token", null);
+        if (target == null || target.isEmpty()) {
+            target = event.getString("endpoint", null);
         }
-        store.markApplied(deliveryId);
+        if (provider == null || provider.isEmpty() || target == null || target.isEmpty()) {
+            throw new IllegalArgumentException("Missing push target");
+        }
+        String deliveryId = event.getString("deliveryId", null);
+        String eventKey;
+        if (deliveryId != null && !deliveryId.isEmpty()) {
+            eventKey = "delivery:" + deliveryId;
+        } else {
+            String at = (event.get("at") == null ? null : event.get("at").toString());
+            if (at == null) {
+                throw new IllegalArgumentException("Missing classic event timestamp");
+            }
+            eventKey = "classic:" + provider + ":" + target.length() + ":" + target + ":" + at;
+        }
+        if (store.alreadyApplied(eventKey)) {
+            return;
+        }
+        store.removeTarget(provider, target);
+        store.markApplied(eventKey);
     }
 }
 // end::push-notifications-java-microprofile[]

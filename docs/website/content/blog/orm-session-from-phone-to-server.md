@@ -126,16 +126,18 @@ The session keeps one object instance per entity identity. Finding the same row 
 
 A relationship is also a loading decision. To-one mappings default to eager loading; to-many mappings default to lazy loading. You can override either default.
 
-This query selects at most twenty orders and explicitly fetches their customers:
+This query selects at most twenty customers and loads their otherwise-lazy order collections before returning:
 
 ```java
-List<Order> orders = session.query(Order.class)
-        .eq("customer.name", "Alice")
+List<Customer> customers = session.query(Customer.class)
+        .eq("name", "Alice")
         .orderBy("id", true)
         .limit(20)
-        .fetch("customer")
+        .fetch("orders")
         .list();
 ```
+
+Without `.fetch("orders")`, these collections remain unloaded until accessed inside the session. The eager `Order.customer` mapping would not demonstrate that difference.
 
 The query uses Java field paths. The ORM resolves them into the SQL joins and parameters for the database in use. Pagination applies to the root entities before fetched collections are loaded.
 

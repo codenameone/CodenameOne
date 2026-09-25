@@ -142,15 +142,18 @@ include::../demos/common/src/main/snippets/developer-guide/push-notifications.js
 |`TRANSIENT_FAILURE` |Retried until the attempt budget ran out. `status` is `DEAD`. The key may still be good.
 |===
 
-Match on `token`, not on `device`. `cn1-gcm-` and `cn1-fcm-` are accepted
-aliases for the same key and the digest reports the canonical spelling, so a
-database still holding the legacy form won't match `device` at all. Web push
-reports `endpoint` for the same reason: the identifier is normalized when it's
-admitted and the original spelling isn't recoverable.
+Store the canonical provider and bare `token` (or web-push `endpoint`) in
+separate columns alongside the original key returned by `Push.getPushKey()`.
+The full key has a `cn1-<provider>-` prefix, so comparing it directly with the
+digest's bare token matches no row. Normalize `gcm` to `fcm` and `ios` to
+`apns` during registration and backfill existing rows before enabling cleanup.
+For web push, store the subscription endpoint in its own column.
+Match feedback on the provider and this normalized target, scoped to the
+organization. Keep the full original key for sending.
 
 ==== Semantics to build against
 
-* *A digest is at-least-once.* Deduplicate on `deliveryId`. A refused digest is resent, and a network failure can deliver one whose response never arrived.
+* *A digest is at-least-once.* Deduplicate on `deliveryId` when present. For classic events without it, use a key built from the provider, token or endpoint, and event timestamp `at`. A refused digest is resent, and a network failure can deliver one whose response never arrived.
 * *Only 2xx acknowledges the window.* It advances the watermark and that window is never sent again, so answer 2xx after your writes are durable, not before. Anything else, including a timeout, keeps the window for the next attempt.
 * *`truncated` means more is waiting.* A digest is capped, and the next page follows in the same run rather than a day later. Expect several digests in quick succession after a bad day.
 * *A failing endpoint is retried, then disabled.* Failures are retried on a shorter cadence than the daily digest; after several consecutive failures the endpoint is disabled and the reason appears on the Settings card. Re-enabling it clears the count.

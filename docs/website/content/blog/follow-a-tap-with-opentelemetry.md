@@ -79,7 +79,10 @@ Replace the example URL with your backend. Enable the relay there:
 ```properties
 cn1.otel.enabled=true
 cn1.otel.relay=true
+cn1.otel.relay.corsOrigin=https://app.example.com
 ```
+
+Set `cn1.otel.relay.corsOrigin` to your web app's origin when it differs from the relay's origin. Without it, the relay returns HTTP 405 to the browser's `OPTIONS` preflight and the browser won't send the spans. Same-origin web deployments and native clients don't need this CORS setting.
 
 The app sends spans to the backend's `/otel/v1/traces` route. The backend forwards them using its collector credentials. Those credentials stay on the server. Protect and size the ingestion route for your deployment; a relay doesn't make arbitrary client-supplied telemetry trustworthy.
 
