@@ -91,9 +91,9 @@ public final class MapStyle {
         addPolygonRule(s, "landcover", themeColor("mapLightLandcoverColor", 0xffd8e8c8));
         addPolygonRule(s, "landuse", themeColor("mapLightLanduseColor", 0xffe8f0d8));
         addPolygonRule(s, "park", themeColor("mapLightParkColor", 0xffc8e0b0));
-        addLineRule(s, "waterway", water, 6, 1.0, 16, 4.0);
-        addLineRule(s, "road", road, 6, 1.0, 18, 8.0);
-        addLineRule(s, "transportation", road, 6, 1.0, 18, 8.0).excludeFilter("class", "ferry");
+        addLineRule(s, "waterway", water, WATERWAY_ZOOMS, WATERWAY_WIDTHS);
+        addLineRule(s, "road", road, ROAD_ZOOMS, ROAD_WIDTHS);
+        addLineRule(s, "transportation", road, ROAD_ZOOMS, ROAD_WIDTHS).excludeFilter("class", "ferry");
         addPolygonRule(s, "building", building);
         addPolygonRule(s, "buildings", building);
         int label = themeColor("mapLightLabelColor", 0xff333333);
@@ -117,9 +117,9 @@ public final class MapStyle {
         addPolygonRule(s, "landcover", themeColor("mapDarkLandcoverColor", 0xff1a1d20));
         addPolygonRule(s, "landuse", themeColor("mapDarkLanduseColor", 0xff1d2024));
         addPolygonRule(s, "park", themeColor("mapDarkParkColor", 0xff17251a));
-        addLineRule(s, "waterway", water, 6, 1.0, 16, 4.0);
-        addLineRule(s, "road", road, 6, 1.0, 18, 8.0);
-        addLineRule(s, "transportation", road, 6, 1.0, 18, 8.0).excludeFilter("class", "ferry");
+        addLineRule(s, "waterway", water, WATERWAY_ZOOMS, WATERWAY_WIDTHS);
+        addLineRule(s, "road", road, ROAD_ZOOMS, ROAD_WIDTHS);
+        addLineRule(s, "transportation", road, ROAD_ZOOMS, ROAD_WIDTHS).excludeFilter("class", "ferry");
         addPolygonRule(s, "building", building);
         addPolygonRule(s, "buildings", building);
         int label = themeColor("mapDarkLabelColor", 0xffe8e8e8);
@@ -147,10 +147,18 @@ public final class MapStyle {
         s.add(new StyleLayer(StyleLayer.TYPE_FILL).sourceLayer(sourceLayer).fillColor(color));
     }
 
+    // Line widths in logical pixels. Roads keep widening past zoom 18, where
+    // the map is overzoomed and a street should read as a street, not a
+    // hairline; roughly doubling per level matches the ground they cover.
+    private static final double[] ROAD_ZOOMS = {6, 10, 14, 16, 18, 20, 22};
+    private static final double[] ROAD_WIDTHS = {0.5, 1, 2.5, 5, 10, 22, 44};
+    private static final double[] WATERWAY_ZOOMS = {6, 12, 16, 20};
+    private static final double[] WATERWAY_WIDTHS = {0.5, 1, 3, 10};
+
     private static StyleLayer addLineRule(MapStyle s, String sourceLayer, int color,
-                                          double z0, double w0, double z1, double w1) {
+                                          double[] zooms, double[] widths) {
         StyleLayer sl = new StyleLayer(StyleLayer.TYPE_LINE).sourceLayer(sourceLayer).lineColor(color)
-                .lineWidth(ZoomValue.stops(new double[]{z0, z1}, new double[]{w0, w1}));
+                .lineWidth(ZoomValue.stops(zooms, widths));
         s.add(sl);
         return sl;
     }
