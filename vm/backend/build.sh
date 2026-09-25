@@ -183,9 +183,13 @@ COMMON=""
 [ -d demo/common ] && [ "$STANDALONE_DEMO" != "1" ] && COMMON="demo/common"
 # The core classes marked @SharedWithBackend (the ORM, the entity annotations) are
 # compiled from CodenameOne/src directly; there is no copy of them under src/.
-SHARED="$(./shared-sources.sh)"
+# Read into an array: these are ABSOLUTE paths, so an unquoted expansion would
+# split a checkout that lives under a directory with a space in its name.
+SHARED_LIST="$(./shared-sources.sh)"
+SHARED=()
+while IFS= read -r f; do SHARED+=("$f"); done <<< "$SHARED_LIST"
 "$J8/bin/javac" -nowarn -encoding UTF-8 -bootclasspath "$JAVAAPI" ${GEN:+-cp "$GEN"} -source 1.8 -target 1.8 \
-    -d "$WORK/classes" $(find src impl/parparvm $COMMON "$DEMO" -name '*.java') $SHARED
+    -d "$WORK/classes" $(find src impl/parparvm $COMMON "$DEMO" -name '*.java') "${SHARED[@]}"
 if [ -n "$GEN" ]; then cp -r "$GEN/." "$WORK/classes/"; fi
 
 mkdir -p "$WORK/out"
