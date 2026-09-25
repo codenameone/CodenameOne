@@ -1966,6 +1966,9 @@ public final class HttpServer {
         // enormous, so a leak surfaces hours later as a server that cannot
         // accept sockets, with nothing pointing at the cause.
         out.put("openStaticFiles", new Integer(StaticFiles.openFileCount()));
+        // Only when tracing is on, so a server that does not trace reports
+        // exactly what it always has.
+        Tracing.metrics(out);
         return out;
     }
 
@@ -2206,9 +2209,13 @@ public final class HttpServer {
         synchronized(http2Sessions) {
             java.util.Iterator it = new java.util.ArrayList(http2Sessions.keySet()).iterator();
             while(it.hasNext()) {
-                Object h2 = http2Sessions.remove(it.next());
+                Object key = it.next();
+                Object h2 = http2Sessions.remove(key);
                 if(h2 != null) {
                     ((Http2)h2).close();
+                }
+                if(key instanceof Integer) {
+                    abandonHttp2Spans(((Integer)key).intValue());
                 }
             }
         }
@@ -3318,6 +3325,7 @@ public final class HttpServer {
         if(h2 != null) {
             ((Http2)h2).close();
         }
+        abandonHttp2Spans(fd);
         Object session = sessions.remove(new Integer(fd));
         if(session != null) {
             Tls.closeSession(((Long)session).longValue());
@@ -3352,6 +3360,12 @@ public final class HttpServer {
     private WebSocket routeWebSocket(Request request, String path) throws Exception {
         Object exact = webSocketRoutes.get(path);
         if(exact != null) {
+            // Names the handshake span as the generated HTTP routers name theirs,
+            // or every endpoint's handshake is one operation called "GET". The
+            // registered path is literal (refused with a '%' or a '?') and matched
+            // exactly, so it IS the route template. A fallback router names its
+            // own, as any hand-written router does.
+            Tracing.route(path);
             return (WebSocket)exact;
         }
         WebSocketHandler router = webSocketRouter;
@@ -3366,7 +3380,7 @@ public final class HttpServer {
      * means the request was refused with a status and the connection is still an
      * ordinary HTTP one.
      */
-    private boolean tryUpgrade(Conn conn, int fd, long session, Request request) {
+    private boolean tryUpgrade(Conn conn, int fd, long session, Request request, Span span) {
         // THE CANONICAL PATH, which is what pathIs compares for every HTTP route.
         // Taking the raw target substring instead meant `/ch%61t` missed the
         // websocket route for `/chat` and fell through to the catch-all router or
@@ -3479,6 +3493,9 @@ public final class HttpServer {
             writeHandshakeResponse(conn, WebSocketHandshake.accept(key), subprotocol);
         } catch (IOException err) {
             trace("fd=" + fd + " handshake write failed: " + err);
+            // Handled here, not by the caller: this path reports the connection
+            // as taken, so the caller will not end the handshake's span.
+            Tracing.endServer(span, -1, null);
             drop(fd);
             return true;
         }
@@ -3490,6 +3507,7 @@ public final class HttpServer {
         armWebSocketDeadline(fd);
         applyWebSocketReadTimeout(fd);
 
+        Exception onOpenError = null;
         try {
             endpoint.onOpen(socket);
         } catch (Exception err) {
@@ -3501,7 +3519,13 @@ public final class HttpServer {
             // is the same failure and gets the same answer.
             reportWebSocketError(socket, err);
             socket.failOnOpen();
+            onOpenError = err;
         }
+        // The handshake's span ends HERE, with the 101 that was sent: it covered
+        // routing, the subprotocol choice and onOpen -- so work onOpen starts is
+        // its child -- and not the session, which can last for hours. Messages
+        // after this are not spans of their own.
+        Tracing.endServer(span, 101, onOpenError);
         runWebSocket(fd, socket);
         return true;
     }
@@ -3908,6 +3932,7 @@ public final class HttpServer {
             conn.put("Content-Length: 0\r\n");
             conn.put("Connection: close\r\n\r\n");
             writeTo(conn.fd, conn.session, conn.out, 0, conn.outLength);
+            conn.writtenStatus = 426;
         } catch (IOException ignored) {
             // The peer is already gone; there is nothing better to do here.
         }
@@ -3980,6 +4005,12 @@ public final class HttpServer {
      * it is what pipelining is, and what a proxy does when it coalesces.
      */
     private final class Conn {
+        /**
+         * The status of the last refusal or handshake written on this connection,
+         * -1 when none was. A websocket handshake's span reads it: tryUpgrade
+         * answers through several writers, and each records what it sent.
+         */
+        int writtenStatus = -1;
         final int fd;
         final long session;
         byte[] buffer = new byte[0];
@@ -4828,9 +4859,25 @@ public final class HttpServer {
             // it was never told carried a websocket. After wantsKeepAlive, so
             // nothing in the ordinary flow above moves.
             if(isUpgradeRequest(request)) {
-                if(tryUpgrade(conn, fd, session, request)) {
+                // The handshake is a request like any other and gets a span like
+                // any other. Started before tryUpgrade, so the websocket router,
+                // getSubprotocols and onOpen run inside it; tryUpgrade ends it once
+                // the upgrade is done, and a refusal ends here with the status it
+                // wrote. Returning before this point left every handshake, and
+                // everything onOpen called out to, untraced.
+                Span handshake = Tracing.startServer(request, tls != null);
+                conn.writtenStatus = -1;
+                boolean upgraded;
+                try {
+                    upgraded = tryUpgrade(conn, fd, session, request, handshake);
+                } catch (RuntimeException err) {
+                    Tracing.endServer(handshake, -1, err);
+                    throw err;
+                }
+                if(upgraded) {
                     return;             // this connection is no longer HTTP
                 }
+                Tracing.endServer(handshake, conn.writtenStatus, null);
                 // REFUSED, AND THE REFUSAL SAID `Connection: close`. Carrying on
                 // to parse whatever the client pipelined behind the handshake
                 // would execute a second request the server has already promised
@@ -4846,6 +4893,14 @@ public final class HttpServer {
             // the whole of serveOne: that is the CONNECTION, which outlives this.
             inFlightRequests.incrementAndGet();
             SERVING_FD.set(new Integer(fd));
+            // Null unless a tracer is installed. Started HERE, before the handler,
+            // and read from the request now: the Request is reused by the next
+            // one on this connection. Ended after the write, in the finally below,
+            // so the span covers the response reaching the socket and a write that
+            // fails is recorded as the failure it is.
+            Span span = Tracing.startServer(request, tls != null);
+            int sentStatus = -1;
+            Exception handlerError = null;
             try {
                 try {
                     response = handler.handle(request);
@@ -4854,10 +4909,14 @@ public final class HttpServer {
                     }
                 } catch (Exception err) {
                     System.err.println("handler failed: " + err);
+                    handlerError = err;
                     response = Response.text(500, "internal error");
                 }
+                // Read before the write: writing releases what the Response held.
+                int status = response.status;
                 try {
                     writeResponse(conn, fd, session, response, keepAlive, headOnly);
+                    sentStatus = status;
                     if(conn.stripe >= 0) {
                         servedStripes[conn.stripe]++;      // single writer: this host
                     } else {
@@ -4871,6 +4930,9 @@ public final class HttpServer {
             } finally {
                 inFlightRequests.decrementAndGet();
                 SERVING_FD.set(null);
+                if(span != null) {
+                    Tracing.endServer(span, sentStatus, handlerError);
+                }
             }
             if(!keepAlive) {
                 drop(fd);
@@ -5204,6 +5266,23 @@ public final class HttpServer {
                 inFlightRequests.incrementAndGet();
                 SERVING_FD.set(new Integer(fd));
                 SERVING_H2.set(Boolean.TRUE);
+                // The HTTP/1 path's span, for the same reasons. It stops being this
+                // thread's current span in the finally that closes this stream's
+                // request, and ENDS when its stream closes (see http2Spans).
+                // server.address is set here as for HTTP/1: :authority was copied
+                // into these headers as "host" above, which is what startServer reads.
+                Span span = Tracing.startServer(request, tls != null);
+                Exception handlerError = null;
+                // -1 until the response has been SUBMITTED to the session, as on the
+                // HTTP/1 path: a respond() that throws is a response the peer never
+                // got, and must not be reported as the status the handler chose.
+                int submittedStatus = -1;
+                // The status the peer is actually sent when the session refuses the
+                // handler's response and a 503 goes in its place; -1 when it did not.
+                int fallbackStatus = -1;
+                // Whether the span has been handed to tracedStreams, which then
+                // owns ending it.
+                boolean spanRegistered = false;
                 try {
                     response = handler.handle(request);
                     if(response == null) {
@@ -5211,6 +5290,7 @@ public final class HttpServer {
                     }
                 } catch (Exception err) {
                     System.err.println("handler failed: " + err);
+                    handlerError = err;
                     response = Response.text(500, "internal error");
                 }
                 try {
@@ -5278,6 +5358,7 @@ public final class HttpServer {
                             asciiBytes("too many files in flight"))) {
                         h2.respond(stream.getId(), 503, "text/plain", refusalHeaders(), null);
                     }
+                    fallbackStatus = 503;
                 } else if(response.fileFd >= 0 && !noBody) {
                     // Streamed frame by frame out of the descriptor. Reading the file
                     // in first cost its whole size in the heap plus the same again in
@@ -5297,6 +5378,7 @@ public final class HttpServer {
                         // happens in the same step that takes the descriptor.
                         StaticFiles.closeFile(response.fileFd);
                         h2.respond(stream.getId(), 503, "text/plain", refusalHeaders(), null);
+                        fallbackStatus = 503;
                     }
                 } else {
                     // A HEAD describes the representation it is not sending, and
@@ -5355,15 +5437,32 @@ public final class HttpServer {
                         // is no room for bodies. An explanatory body here is the
                         // one allocation that must not be attempted.
                         h2.respond(stream.getId(), 503, "text/plain", refusalHeaders(), null);
+                        fallbackStatus = 503;
                     } else {
                         queuedBodyBytes += bodyBytes;
                     }
                 }
+                // What the peer received: the 503 that replaced a refused response
+                // is what the client saw, and the span must say so -- recording the
+                // handler's 200 hid exactly the overload a trace is read to find.
+                submittedStatus = fallbackStatus > 0 ? fallbackStatus : response.status;
                 requestsServed.incrementAndGet();
+                if(span != null) {
+                    // Registered NOW, before the flush just below can run: that
+                    // flush may close this very stream, and settling consumes its
+                    // one close notification. Registered after it -- in the finally
+                    // -- the span missed that notification and stayed open until
+                    // the whole connection went.
+                    Tracing.leave(span);
+                    tracedStreams(fd).put(new Integer(stream.getId()),
+                            new Object[] {span, new Integer(submittedStatus), handlerError});
+                    spanRegistered = true;
+                }
                 if(queuedBodyBytes > MAX_QUEUED_H2_BODY_BYTES
                         || Http2.pendingBodyFiles() > MAX_OPEN_H2_FILES
                         || Http2.pendingBodyBytesAll() > MAX_OPEN_H2_BODY_BYTES) {
                     flushHttp2(fd, session, h2);
+                    settleHttp2Spans(fd, h2);
                     // What the flush could NOT write, not zero. nghttp2 pulls
                     // from a submitted body only as the peer's flow-control
                     // window allows, so a client that simply stops sending
@@ -5395,9 +5494,25 @@ public final class HttpServer {
                     inFlightRequests.decrementAndGet();
                     SERVING_FD.set(null);
                     SERVING_H2.set(null);
+                    if(span != null && !spanRegistered) {
+                        // Submitting threw before the span was registered above. Not
+                        // current any more, so the next stream's span is not its
+                        // child.
+                        Tracing.leave(span);
+                        if(submittedStatus < 0) {
+                            // Nothing was submitted, so no stream close will ever
+                            // report on it: it failed here.
+                            Tracing.endServer(span, -1, handlerError);
+                        } else {
+                            tracedStreams(fd).put(new Integer(stream.getId()),
+                                    new Object[] {span, new Integer(submittedStatus),
+                                            handlerError});
+                        }
+                    }
                 }
             }
             flushHttp2(fd, session, h2);
+            settleHttp2Spans(fd, h2);
             if(!h2.isAlive()) {
                 drop(fd);
                 return;
@@ -5410,6 +5525,79 @@ public final class HttpServer {
         } finally {
             http2Turns.decrementAndGet();
         }
+    }
+
+    /**
+     * Server spans of HTTP/2 responses submitted but not yet fully sent, per
+     * connection and then per stream id: each an Object[] {span, submitted status,
+     * handler error}. A response is sent in full only when its stream CLOSES --
+     * nghttp2 pulls a body only as the peer's flow-control window allows, so a
+     * large one finishes turns after it was submitted -- and a stream the peer
+     * resets never is. Ending the span at submission, or at the first flush,
+     * reported a success for a response the peer never got. The HTTP/1 path keeps
+     * its span open through the write for the same reason.
+     */
+    private final Map http2Spans = java.util.Collections.synchronizedMap(new java.util.HashMap());
+
+    private Map tracedStreams(int fd) {
+        Integer key = new Integer(fd);
+        synchronized(http2Spans) {
+            Map streams = (Map)http2Spans.get(key);
+            if(streams == null) {
+                streams = java.util.Collections.synchronizedMap(new java.util.HashMap());
+                http2Spans.put(key, streams);
+            }
+            return streams;
+        }
+    }
+
+    /**
+     * Ends the spans of the streams that closed, after a flush put their final
+     * frames on the socket: with the status sent when the stream closed cleanly,
+     * as the failed write HTTP/1 reports (-1) when it was reset.
+     */
+    private void settleHttp2Spans(int fd, Http2 h2) {
+        int[] closed = h2.closedStreams();
+        if(closed == null) {
+            return;
+        }
+        Map streams = (Map)http2Spans.get(new Integer(fd));
+        if(streams == null) {
+            return;
+        }
+        for(int iter = 0 ; iter + 1 < closed.length ; iter += 2) {
+            Object entry = streams.remove(new Integer(closed[iter]));
+            if(entry instanceof Object[]) {
+                endHttp2Span((Object[])entry, closed[iter + 1] == 0);
+            }
+        }
+    }
+
+    /** Every span still open on a connection that is going away: none was sent in full. */
+    private void abandonHttp2Spans(int fd) {
+        Object streams = http2Spans.remove(new Integer(fd));
+        if(!(streams instanceof Map)) {
+            return;
+        }
+        synchronized(streams) {
+            java.util.Iterator it = ((Map)streams).values().iterator();
+            while(it.hasNext()) {
+                Object entry = it.next();
+                if(entry instanceof Object[]) {
+                    endHttp2Span((Object[])entry, false);
+                }
+            }
+            ((Map)streams).clear();
+        }
+    }
+
+    private static void endHttp2Span(Object[] entry, boolean sent) {
+        if(!(entry[0] instanceof Span)) {
+            return;
+        }
+        int status = sent && entry[1] instanceof Integer ? ((Integer)entry[1]).intValue() : -1;
+        Tracing.endServer((Span)entry[0], status,
+                entry[2] instanceof Exception ? (Exception)entry[2] : null);
     }
 
     /** The HTTP/2 connection preface, sent by a client that opens with h2. */
@@ -6082,8 +6270,17 @@ public final class HttpServer {
             head.append("Date: ").append(currentHttpDate()).append("\r\n");
             head.append("Content-Length: ").append(body.length).append("\r\n");
             head.append("Connection: close\r\n\r\n");
-            conn.write(head.toString().getBytes("UTF-8"));
-            conn.write(body);
+            // ONE write, as writeUpgradeRequired does. Written as head then body, a
+            // client that read the status line and closed -- leaving the rest
+            // unread, which makes the close a reset -- failed the second write,
+            // so writtenStatus was never set and the span of a 404 the client HAD
+            // received reported no status at all. Seen on a slow CI runner.
+            byte[] headBytes = head.toString().getBytes("UTF-8");
+            byte[] whole = new byte[headBytes.length + body.length];
+            System.arraycopy(headBytes, 0, whole, 0, headBytes.length);
+            System.arraycopy(body, 0, whole, headBytes.length, body.length);
+            conn.write(whole);
+            conn.writtenStatus = status;
         } catch (IOException err) {
             // The peer is already gone; there is nowhere to report this.
         }

@@ -24,7 +24,6 @@ package com.codename1.orm;
 
 import com.codename1.db.Database;
 import com.codename1.ui.Display;
-
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
@@ -58,8 +57,7 @@ import java.util.Map;
 /// site see the same renamed name within a single execution.
 public final class EntityManager {
 
-    private static final Map<String, Dao<?>> BY_NAME = new HashMap<String, Dao<?>>();
-
+    private final Map<String, Dao<?>> daos = new HashMap<String, Dao<?>>();
     private final Database db;
     private boolean closed;
 
@@ -73,8 +71,7 @@ public final class EntityManager {
     public static EntityManager open(String databaseName) throws IOException {
         Database db = Display.getInstance().openOrCreate(databaseName);
         if (db == null) {
-            throw new IOException("Platform does not support SQLite: "
-                    + Display.getInstance().getPlatformName());
+            throw new IOException("Platform does not support SQLite: " + Display.getInstance().getPlatformName());
         }
         return open(db);
     }
@@ -94,10 +91,7 @@ public final class EntityManager {
     /// for classes outside the build's annotation scan call it
     /// explicitly.
     public static <T> void registerDao(Dao<T> dao) {
-        if (dao == null) {
-            throw new IllegalArgumentException("dao is null");
-        }
-        BY_NAME.put(dao.type().getName(), dao);
+        com.codename1.impl.orm.DaoRegistry.register(dao);
     }
 
     /// Returns the dao for `entityClass`, freshly attached to this
@@ -109,15 +103,39 @@ public final class EntityManager {
         if (entityClass == null) {
             throw new IllegalArgumentException("entityClass is null");
         }
-        Dao<T> d = (Dao<T>) BY_NAME.get(entityClass.getName());
+        if (com.codename1.impl.orm.Models.requiresSession(entityClass)) {
+            throw new IllegalStateException("This entity mapping requires openSession() managed persistence");
+        }
+        if (closed) {
+            throw new IllegalStateException("Entity manager is closed");
+        }
+        Dao<T> d = (Dao<T>) daos.get(entityClass.getName());
+        if (d != null) {
+            d.attach(db);
+            return d;
+        }
+        d = com.codename1.impl.orm.DaoRegistry.create(entityClass);
         if (d == null) {
-            throw new IllegalStateException("No dao registered for "
-                    + entityClass.getName() + ". Add @Entity and ensure the "
-                    + "cn1:process-annotations Mojo ran during build, then re-run -- "
-                    + "the generated DaoBootstrap populates this registry at startup.");
+            throw new IllegalStateException("No dao registered for " + entityClass.getName() +
+                                            ". Add @Entity and ensure the "
+                                            + "cn1:process-annotations Mojo ran during build, then re-run -- "
+                                            + "the generated DaoBootstrap populates this registry at startup.");
         }
         d.attach(db);
+        daos.put(entityClass.getName(), d);
         return d;
+    }
+
+    /// Opens an independent managed persistence context over this manager's database.
+    /// The caller must close the session. Use one thread per session and complete
+    /// every transaction on that thread. Closing a session never commits it.
+    /// @return a new persistence context with independent managed entity state
+    /// @throws IllegalStateException if this manager is closed
+    public com.codename1.orm.session.Session openSession() {
+        if (closed) {
+            throw new IllegalStateException("Entity manager is closed");
+        }
+        return new com.codename1.impl.orm.SessionImpl(new com.codename1.impl.orm.SessionSqlAccess(db));
     }
 
     /// The underlying `Database`. Use it for raw SQL when the dao surface

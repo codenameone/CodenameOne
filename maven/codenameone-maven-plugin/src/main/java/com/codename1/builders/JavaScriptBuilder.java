@@ -171,6 +171,12 @@ public class JavaScriptBuilder extends Executor {
             File stageClasses = new File(buildDir, "stage-classes");
             File portClasses = new File(buildDir, "port-classes");
             File translatorOut = new File(buildDir, "translator-output");
+            // The staged classes are emptied first: the build directory is stable
+            // across builds and unzip() only overwrites what the jar carries, so a
+            // class deleted since the last build -- including a generated bootstrap
+            // whose annotation was removed, which annotationFrameworksInstallSource()
+            // probes this directory for -- would otherwise still be installed.
+            MacOSNativeBuilder.deleteRecursively(stageClasses);
             stageClasses.mkdirs();
             portClasses.mkdirs();
             translatorOut.mkdirs();
@@ -539,6 +545,14 @@ public class JavaScriptBuilder extends Executor {
             // runnable at exactly that point; a post-bootstrap stamp would miss startup because
             // bootstrap runs init/start inline. hardeningRuntimeProperties emits
             // Display.getInstance().setProperty(...) lines.
+            // The generated @Route dispatcher and annotation-framework bootstraps
+            // (@Mapped, @Bindable, @Entity, the REST/gRPC/GraphQL clients, intents,
+            // @OpenTelemetry), before Display.init as every other port's stub does.
+            // Without these lines each of those features compiled into the web build
+            // and silently did nothing. Direct references, so the translator keeps
+            // the generated classes.
+            pw.print(routeDispatcherInstallSource(stageClasses, "        "));
+            pw.print(annotationFrameworksInstallSource(stageClasses, "        "));
             pw.println("        ParparVMBootstrap.bootstrap(new " + mainClass + "(), new Runnable() {");
             pw.println("            public void run() {");
             pw.print(hardeningRuntimeProperties(request));

@@ -82,6 +82,12 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
     private static final String RESPONSE_STATUS = PKG + "ResponseStatus;";
     private static final String WEBSOCKET_MAPPING = PKG + "WebSocketMapping;";
     private static final String WEBSOCKET_INTERFACE = "com/codename1/backend/WebSocket";
+    static final String OPEN_TELEMETRY = PKG + "OpenTelemetry;";
+
+    /// The application.properties key that enables tracing without touching the
+    /// source, read at build time from the module directory -- where Config reads
+    /// the same file at run time.
+    static final String OTEL_ENABLED_PROPERTY = "cn1.otel.enabled";
 
     /** Mapping annotation to the HTTP method it stands for. */
     private static final Map<String, String> MAPPINGS;
@@ -174,6 +180,12 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
     /// Whether the generated entry point registers server-side daos. Settled
     /// when the entry point is written; see [#hasGeneratedDaos].
     private boolean daos;
+
+    /// Whether the generated entry point installs a tracer, and the service
+    /// name it passes. Settled in [#finish], before any source is generated,
+    /// because the routers name their routes for it too.
+    boolean telemetry;
+    String telemetryServiceName;
 
     private final Map<String, String> routeShapes = new LinkedHashMap<String, String>();
 
@@ -1269,6 +1281,10 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
             }
             return;
         }
+        resolveTelemetry(ctx);
+        if (ctx.hasErrors()) {
+            return;
+        }
         Map<String, String> sources = new LinkedHashMap<String, String>();
         for (Controller c : controllers.values()) {
             String router = qualify(c.packageName, c.routerSimpleName);
@@ -1463,6 +1479,16 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
             sb.append(pad).append("if (bound != null) {\n");
             pad = "                    ";
         }
+        // The TEMPLATE names the span, never the path: /pets/7 and /pets/8 are
+        // one operation, and a trace backend grouping by path would give every id
+        // its own. Emitted in EVERY build, not only a traced one: a program can
+        // install a tracer itself (Tracing.install(OtlpTracer.open(...))), and a
+        // router that never named its routes merged them all under "GET". It
+        // costs one static read with no tracer -- Tracing is linked by HttpServer
+        // regardless -- and it is the OTLP tracer, not this hook, that a build
+        // without @OpenTelemetry leaves out.
+        sb.append(pad).append("com.codename1.backend.Tracing.route(")
+          .append(quote(route.pattern)).append(");\n");
 
         emitRequiredGuards(sb, route, pad);
         emitScalarGuards(sb, route, pad);
@@ -2501,6 +2527,15 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
         // left here is the part that differs between one server and the next:
         // which controllers there are and what each of them is given.
         sb.append("        com.codename1.backend.Backend.builder()\n");
+        if (telemetry) {
+            // The ONLY reference to the tracer implementation anywhere in the
+            // program, which is what keeps it out of a binary that does not ask
+            // for it: the translator drops what nothing reaches.
+            sb.append("                .tracing(new com.codename1.backend.otel.OtlpTracer(")
+              .append(telemetryServiceName == null || telemetryServiceName.length() == 0
+                      ? "null" : quote(telemetryServiceName))
+              .append("))\n");
+        }
         if (needsDatabase() || needsDatabaseForWebSockets()) {
             // A controller that declares a DataSource or an EntityManager needs
             // a database, and this is where the build says so: the builder opens
@@ -2551,6 +2586,126 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
         sb.append("    }\n");
         sb.append("}\n");
         return sb.toString();
+    }
+
+    /// Whether this module asked for tracing, and under what service name.
+    ///
+    /// `@OpenTelemetry` on any class with a source in this module, or
+    /// `cn1.otel.enabled` in the module's `application.properties`. The
+    /// annotation is looked for across the whole class index rather than only on
+    /// controllers, so it can sit on whichever class a project keeps its settings
+    /// on. Two annotations naming different services is refused: one server
+    /// reports as one service, and picking either silently would be a guess.
+    void resolveTelemetry(ProcessorContext ctx) {
+        telemetry = false;
+        telemetryServiceName = null;
+        String owner = null;
+        for (AnnotatedClass cls : ctx.getClassIndex().values()) {
+            AnnotationValues otel = cls.getClassAnnotation(OPEN_TELEMETRY);
+            if (otel == null) {
+                continue;
+            }
+            // The same orphan rule the controllers get: a class whose source was
+            // deleted left its .class behind, and must not keep tracing on.
+            if (!BuildHintAnnotationProcessor.hasBackingSource(cls, ctx.getCompileSourceRoots(),
+                    ctx.getSourceEncoding())) {
+                continue;
+            }
+            // Trimmed: " " is no name at all, and kept raw it reached the entry
+            // point and became an empty service.name instead of unknown_service.
+            String name = otel.getStringOrDefault("serviceName", "").trim();
+            if (telemetry && name.length() > 0 && telemetryServiceName != null
+                    && telemetryServiceName.length() > 0 && !name.equals(telemetryServiceName)) {
+                ctx.error(cls, "@OpenTelemetry names the service \"" + name + "\" here and \""
+                        + telemetryServiceName + "\" on " + owner + ". A server reports as one "
+                        + "service; keep one serviceName, or set OTEL_SERVICE_NAME instead.");
+                return;
+            }
+            telemetry = true;
+            if (name.length() > 0) {
+                telemetryServiceName = name;
+                owner = cls.getBinaryName();
+            }
+        }
+        if (!telemetry && propertyEnablesTelemetry(ctx)) {
+            telemetry = true;
+        }
+    }
+
+    /// `cn1.otel.enabled` from `application.properties` beside the module, the
+    /// file Config reads at run time. Only a literal truth value counts: a
+    /// `${...}` reference cannot be resolved at build time, and building the
+    /// tracer in on a guess would make the switch mean nothing.
+    private static boolean propertyEnablesTelemetry(ProcessorContext ctx) {
+        File file = applicationProperties(ctx);
+        if (file == null) {
+            return false;
+        }
+        java.util.Properties props = new java.util.Properties();
+        InputStream in = null;
+        try {
+            in = new java.io.FileInputStream(file);
+            props.load(in);
+        } catch (IOException err) {
+            ctx.getLog().warn("cn1: could not read " + file + ": " + err.getMessage());
+            return false;
+        } finally {
+            if (in != null) {
+                try {
+                    in.close();
+                } catch (IOException ignored) {
+                    // Closing a file that was only read cannot lose anything.
+                }
+            }
+        }
+        String value = props.getProperty(OTEL_ENABLED_PROPERTY);
+        if (value == null) {
+            return false;
+        }
+        String v = value.trim();
+        return "true".equalsIgnoreCase(v) || "yes".equalsIgnoreCase(v)
+                || "on".equalsIgnoreCase(v) || "1".equals(v);
+    }
+
+    /// The backend module's `application.properties`, or null.
+    ///
+    /// Looked for beside the module that owns the output directory FIRST
+    /// (`<module>/target/classes`), because that is the file Config reads when the
+    /// module is run -- and the context's project directory is not reliably that
+    /// module: the annotation goal resolves it as the Codename One project, which
+    /// in a multi-module application is `common`. The packaging goal does pass the
+    /// module itself, which is the fallback.
+    private static File applicationProperties(ProcessorContext ctx) {
+        // Where a project keeps it, in the order Maven would see it. The copy in
+        // the classes directory FIRST: the documented layout is
+        // src/main/resources/application.properties, which process-resources has
+        // already copied there by the time this runs -- and looking only beside
+        // the module missed it, so cn1.otel.enabled=true in the standard place
+        // never linked the tracer. The source copy covers a build that skipped
+        // the resources phase; the module and project directories, the other
+        // places Config reads it from at run time.
+        List<File> candidates = new ArrayList<File>();
+        File classes = ctx.getOutputClassDir();
+        if (classes != null) {
+            candidates.add(new File(classes, "application.properties"));
+            if (classes.getParentFile() != null
+                    && "target".equals(classes.getParentFile().getName())) {
+                File module = classes.getParentFile().getParentFile();
+                candidates.add(new File(module, "src/main/resources/application.properties"));
+                candidates.add(new File(module, "application.properties"));
+            }
+        }
+        File dir = ctx.getProjectDir();
+        if (dir != null) {
+            candidates.add(new File(dir, "src/main/resources/application.properties"));
+            candidates.add(new File(dir, "application.properties"));
+        }
+        for (File file : candidates) {
+            if (file.isFile()) {
+                return file;
+            }
+        }
+        return null;
     }
 
     /// Whether any controller declared a constructor that needs a database.

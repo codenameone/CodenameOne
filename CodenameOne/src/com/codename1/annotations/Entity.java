@@ -22,6 +22,7 @@
  */
 package com.codename1.annotations;
 
+import com.codename1.annotations.db.Index;
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
@@ -57,4 +58,7 @@ import java.lang.annotation.Target;
 public @interface Entity {
     /// SQL table name. Defaults to the simple class name when blank.
     String table() default "";
+    /// Additional indexes created with the entity table.
+    /// @return index declarations, empty by default
+    Index[] indexes() default {};
 }

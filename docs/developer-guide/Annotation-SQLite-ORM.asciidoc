@@ -30,7 +30,8 @@ include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/g
 [cols="1,3", options="header"]
 |===
 | Annotation       | Purpose
-| `@Id`            | Marks the primary-key field. Exactly one per entity.
+| `@Id`            | Marks a primary-key field. The legacy DAO uses one key;
+                     managed sessions also support composite assigned keys.
                      `autoIncrement=true` (the default) emits
                      `INTEGER PRIMARY KEY AUTOINCREMENT` and back-fills
                      the field after `insert`.
@@ -56,23 +57,326 @@ dao surface isn't enough. Transactions:
 include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/AnnotationSqliteOrmJava002Snippet.java[tag=annotation-sqlite-orm-java-002,indent=0]
 ----
 
-=== Relationships
+=== Managed sessions and relationships
 
-Relationship annotations (`@OneToMany`, `@ManyToOne`, ...) aren't yet
-supported. An entity field that references another entity or a
-`java.util.List<X>` of entities fails the build with a clear error --
-mark such fields `@DbTransient` and persist the foreign key (id) as a
-separate scalar column for now.
+The managed ORM layer uses the same entity annotations on the client and the
+backend. New mappings, including relationships, `@Version`, and `@GeneratedValue`,
+live in `com.codename1.annotations.db`. The existing `@Entity`, `@Id`, `@Column`,
+and `@DbTransient` annotations remain in `com.codename1.annotations`. Open a `com.codename1.orm.session.Session` with
+`EntityManager.openSession()`. Keep one session per unit of work. A session is
+not thread-safe; a backend pooled entity manager can still be shared between
+requests, with a separate session for each request.
+
+The existing scalar `Dao` API keeps its immediate-write behavior. Entities
+using relationships, `@Version`, composite IDs, generated strategies,
+inheritance, converters, indexes, or embedded values use sessions; asking for a
+legacy DAO for these mappings throws an error rather than dropping
+managed behavior.
+
+A managed session maintains one instance per entity identity, detects changes
+at flush time, and flushes before commit and before queries in a transaction.
+`persist`, `merge`, and `remove` require an active transaction. `merge` returns
+the managed copy; it doesn't attach the supplied detached instance. Merging an
+entity already scheduled for removal is rejected.
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/ManagedOrmSnippets.java[tag=managed-orm-unit-of-work,indent=0]
+----
+
+The public `Session`, `Query`, and `JpqlQuery` interfaces describe application
+operations. Generated metadata, field-access hooks, and SQL adapters live under
+`com.codename1.impl.orm`; application code shouldn't depend on those classes.
+
+Closing a session rolls back any active transaction. It never commits. A
+rollback clears the persistence context. An optimistic-lock or database failure
+requires rollback before the session can continue writing if the database still
+has an active transaction. When a failed client commit has already ended the
+underlying transaction, the session detaches its entities and becomes inactive.
+Check `isTransactionActive()` before rolling back; an inactive session can start
+a new transaction. Closing the session
+doesn't close its entity manager's database or pool. Backend `Database.beginTransaction()`
+reserves the connection to the initiating thread until commit, rollback, or close.
+Other threads wait; the initiating thread must finish the transaction.
+
+==== Association mappings
+
+Use `@ManyToOne`, `@OneToOne`, `@OneToMany`, and `@ManyToMany` on public entity
+fields. To-many fields use `List<T>`, `Set<T>`, or `Map<K,T>`. `@JoinColumn` names an owning
+foreign-key column. `mappedBy` identifies the owning field on the other entity.
+An owning to-many relationship uses a join table; `@JoinTable` customizes its
+name and key columns.
+
+To-one relationships default to `FetchType.EAGER`; to-many relationships default
+to `FetchType.LAZY`. Override these defaults with the annotation's `fetch`
+member. `CascadeType` selects the persistence operations to propagate.
+`orphanRemoval=true` removes children dropped from an initialized relationship.
+Application code maintains both sides of bidirectional object relationships.
+Removal cascades on inverse to-one and to-many relationships account for pending
+owning-side moves, including join-table changes, before choosing which children to remove.
+
+The build enhances entity classes and field-access callers so a normal public
+field read can initialize a lazy relationship. No runtime proxy generator or
+reflection is needed. `session.isLoaded(entity, "relationship")` inspects load
+state without fetching; `session.initialize(entity, "relationship")` fetches
+explicitly. An unloaded relationship can't be read after detaching its entity
+or closing its session: this throws `LazyInitializationException`. Generated
+`@Mapped` serialization code rejects unloaded associations rather than fetching them
+during serialization; initialize the relationships needed for the output first.
+
+Fetching is synchronous. On the client, perform database work off the EDT and
+initialize the data needed by the UI before closing the session. Already-loaded
+data remains readable after the session closes.
+
+==== Queries and counters
+
+The session query builder uses Java field paths, including relationship paths:
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/ManagedOrmSnippets.java[tag=managed-orm-builder-query,indent=0]
+----
+
+`fetch` overrides laziness for a direct relationship. To-one and inverse
+foreign-key collection fetches with single-column keys are batched. Ordered,
+map, composite-key, and join-table collections currently use individual loaders. Root pagination happens before
+loading fetched collections. `query.count()` counts matching entities without
+loading them and ignores pagination, ordering, and joins needed only by ordering. `session.count(entity, "relationship")`
+counts a relationship without materializing it.
+
+`createQuery` accepts an explicit JPQL subset: entity or scalar selects,
+relationship joins, named parameters, comparisons and boolean predicates,
+aggregates, grouping/having, ordering, nested queries in scalar predicates, and bulk
+update/delete. String and numeric literals and named values become bound SQL
+parameters. `IN :values` and `IN (:values)` accept an `Iterable` or object array,
+including an empty collection. Unsupported syntax is rejected. Multiple scalar
+projections return `Object[]`. Entity names, field names, aliases, and named
+parameters accept Java identifier characters, including supplementary Unicode letters.
+Comparisons require at least one operand with a known storage type; two untyped
+parameters can't be compared directly. `IS NULL` and `IS NOT NULL` also require a
+known operand type; a standalone untyped parameter is rejected. A scalar nested query requires an
+aggregate without `GROUP BY`, so it returns at most one row. `IN` and `EXISTS`
+may use queries that return multiple rows.
+A `DISTINCT` query can order only by selected expressions. Text range comparisons
+and `LIKE` patterns are case-sensitive across supported databases. An explicit
+`LIKE ... ESCAPE` uses a literal or named parameter for both the pattern and the
+escape character.
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/ManagedOrmSnippets.java[tag=managed-orm-jpql-query,indent=0]
+----
+
+Bulk mutations use `executeUpdate()` inside a transaction. Repeated assignment
+targets are rejected during query creation. Aggregate functions
+are allowed inside scalar nested queries, but not directly in assignments or bulk
+predicates. On MySQL and MariaDB, nested queries that read the bulk mutation target
+table are rejected during query creation. They flush pending
+managed changes, bypass per-entity callbacks and cascades, and clear the context
+so later reads can't reuse stale entities. Bulk assignments to required subtype
+fields need a non-null literal or named parameter. Other assignment expressions
+are rejected for those fields. Literal and bound null assignments to primitive
+Java fields are rejected on both runtimes. Primitive assignments also reject
+expressions that may return null. Use `COALESCE(expression, 0)` to supply a non-null
+fallback for nullable numeric fields, division by a variable or zero, and nullable
+aggregate results. A scalar aggregate without `GROUP BY` or `HAVING` can be assigned
+directly when its result is non-null, such as `COUNT` or `COALESCE(SUM(...), 0)`.
+Parameters needed to keep an expression non-null are checked before execution. Field-to-field assignments require
+matching enum types and converter mappings, including fields inside expressions.
+Integral attributes reject real-valued assignment expressions and floating-point
+parameter values. Assignments also check the mapped integer range, including
+computed results and the narrower ranges of `byte`, `short`, and `char` fields.
+Builder predicates and JPQL parameters also check the mapped integer range.
+Assignments to `float` and `Float` reject finite overflow and nonzero results
+that would round to zero, including arithmetic expressions and nested query results.
+Floating-point literals that overflow or underflow double precision are rejected
+when the query is created.
+
+An `int` or `long` field annotated `@Version` is maintained by the session.
+Updates and deletes compare its previous value and throw
+`OptimisticLockException` when another writer changed or deleted the row.
+`session.increment(Entity.class, id, "counter", delta)` performs database
+arithmetic, advances the version when present, and refreshes an already-managed
+instance. It returns false for a missing row or an increment outside the
+counter/version range. It requires a transaction and an `int`, `Integer`, `long`,
+or `Long` attribute without a converter, including properties holding those
+numeric types. Other values stored as integers, such as
+booleans and dates, aren't counters. Invalid entity types, fields, or identifiers
+are rejected before pending changes are flushed.
+
+Scalar field projections return the mapped Java values, including enums, dates,
+booleans, property values, and converter-backed objects. Integral `SUM` results
+use `Long` on every database, and `AVG` returns `Double`. Joined paths may end in embedded fields.
+`LOWER`, `UPPER`, `TRIM`, and `ABS` transform stored values. Their results and
+comparison operands use SQL storage values. These results can't be assigned
+directly to a field with a converter. `MIN`, `MAX`, `COALESCE`, and `NULLIF`
+preserve compatible converter mappings.
+`COALESCE` field operands must share an enum type or converter mapping so the
+result can be decoded consistently. Field-to-field comparisons also require
+matching enum types and converter mappings. Scalar projections need a known storage type when the query is created. Bare
+parameters and expressions such as `coalesce(:a,:b)` are rejected. Association
+projections are also rejected; select an explicit field such as `order.customer.id`
+or select the relationship target as a root entity.
+Queries accept at most 999 bound parameters in total, including expanded `IN`
+lists. Larger lists are rejected before query execution.
+Generated key columns also have a combined limit of 3,072 bytes per key, counting
+up to four bytes per text character. This applies to primary keys, indexes, and
+collection keys, and is checked before schema creation. Explicit column type
+declarations remain the application's schema contract. MySQL and MariaDB reject
+default binary primary keys and secondary indexes before schema creation; these keys need an explicit
+bounded column type declaration.
+
+JPQL arithmetic requires numeric operands. Parameters in integral expressions
+must be integer values; use a real operand such as `1.0` for fractional arithmetic.
+Division of integral operands truncates toward zero on every database. Division
+and remainder by zero return null. Remainder accepts integral operands only.
+Integral addition, subtraction, multiplication, division, and negation fail if the
+result exceeds the signed 64-bit range, including in bulk assignments.
+Aggregate queries require each non-aggregate field to be covered by `GROUP BY`,
+including fields in `HAVING` and `ORDER BY` and outer fields referenced inside
+correlated nested queries. `LENGTH` counts characters on every backend.
+
+==== Values and callbacks
+
+`@MappedSuperclass` contributes public inherited fields to a concrete entity.
+`@Embedded` flattens a public `@Embeddable` value into columns prefixed with the
+embedding field name. An all-null embedded value reads as null. Embedded fields
+can be used in query paths. Enums are stored by name. Mapped query parameters and
+literals accept the declared enum type, a valid constant name, or null. Invalid
+names and constants from other enum types are rejected before execution.
+Fluent and JPQL predicates require Boolean inputs for ordinary Boolean fields;
+fields with converters accept their declared domain values. Boolean values use numeric
+storage; native `BOOL` and `BOOLEAN` column declarations are rejected.
+
+Public no-argument void methods can receive `@PrePersist`, `@PostPersist`,
+`@PreUpdate`, `@PostUpdate`, `@PreRemove`, `@PostRemove`, and `@PostLoad` callbacks.
+Entities with lifecycle callbacks require `openSession()`, even without relationships or version fields.
+Relationships added by `@PrePersist`, `@PostPersist`, or `@PreUpdate` follow `PERSIST` cascades in the current
+flush, including newly created collections.
+Flush rechecks entries changed by later callbacks, including newly inserted rows,
+until the managed state matches the database. If callbacks keep changing state
+for 1,000 passes, flush fails and the transaction requires rollback.
+
+Inherited callbacks run before subclass callbacks; overriding a callback method
+replaces the inherited declaration. Client scalar `Property` fields participate
+in dirty checking and counters. Backend entities use plain fields because the
+backend runtime doesn't contain the client properties package.
+
+`@Convert(converter=CodeConverter.class, storageType=String.class)` maps a
+custom basic value to a SQL scalar. The converter implements
+`com.codename1.orm.session.AttributeConverter<Code,String>` and has a public
+no-argument constructor. It receives null values too, including mapped JPQL
+`NULL` literals. Query-builder predicates
+and JPQL comparison parameters and literals apply the field's converter.
+The builder converts values before choosing equality or SQL null predicates.
+JPQL and builder `IS NULL` tests also apply the mapped null conversion. A converter
+that stores null as a non-null sentinel uses a comparison with that sentinel.
+Values
+must match the converter's input type; use a named parameter for custom objects. Identifiers and
+versions can't use converters. This includes every component of an embedded identifier.
+
+==== Identity and inheritance
+
+Keep `@Id` for identity-column generation. Managed mappings require `int`, `long`,
+`Integer`, or `Long` identity fields; client `IntProperty` and `LongProperty` fields
+are supported too. Use `@Id(autoIncrement=false)` for assigned keys.
+`@GeneratedValue` selects `UUID`
+(for String IDs), `SEQUENCE`, or `TABLE` (for int/long IDs). PostgreSQL uses
+native sequences; other engines use a transactional generator table. UUIDs are
+version 4. Identity IDs become available on flush; the other strategies allocate
+on persist. Production migrations must provision the selected generators.
+Mappings with a cycle of required owning to-one links and identity-generated
+keys are rejected during processing: the first insert can't supply every
+required key. SQLite and PostgreSQL support required cycles with keys assigned
+before insertion because their foreign keys are deferred until commit.
+MySQL and MariaDB enforce foreign keys immediately, so sessions reject required
+cycles before creating tables or writing data, even when the keys are known.
+
+Identifier components are normalized and checked against their storage types
+before a cache lookup or SQL query, including the mapped integer range.
+Incompatible values raise `IllegalArgumentException`.
+
+For composite IDs, use several `@Id(autoIncrement=false)` fields or one
+`@EmbeddedId` whose type is `@Embeddable`. Lookup accepts
+`Identifier.of(component1, component2)` in declared-field order; an embedded-ID
+mapping also accepts its key object. Relationships and join tables include all
+key components. Generated composite IDs are rejected.
+
+`@Inheritance` on an entity root enables single-table inheritance, including
+abstract roots and polymorphic queries. `@DiscriminatorValue("customer")`
+assigns a stable discriminator to a concrete subtype. A base-class lookup and a
+subclass lookup return the same managed instance for the same row. A subtype
+query can't address fields or relationships declared only by a sibling subtype.
+The physical table still includes the complete hierarchy for row loading. Use explicit
+discriminator values when class names may change. Every hierarchy member uses
+the root's identifier generator, including its default generator name.
+
+==== Lists, maps, and owned values
+
+Owning Lists store positions in a `list_position` join-table column by default,
+so repeated many-to-many links and reordering survive reload. `@OrderColumn`
+can name that column explicitly. `@OrderBy("name ASC, id DESC")` orders an
+entity collection by target fields at load time; the position column still
+keeps repeated links distinct. An inverse `mappedBy` collection can use `@OrderBy`.
+
+For an entity map, `@MapKey(name="code")` derives keys from a basic field on the
+target entity. The map key type must match that field's Java type before
+conversion, using the boxed type for a primitive field. Keys must be non-null
+and unique in that collection. When changing
+the target key field, update the Java map keys as well.
+
+`@ElementCollection` stores owned scalar values in a separate table. It supports
+List, Set, and Map with String keys. Values may be String, boxed primitive types,
+or `java.util.Date`. Lists preserve order and duplicate values. Map columns can
+be named with `@MapKeyColumn`; `@JoinTable` names the collection table.
+Element-map keys accept at most 255 Unicode code points on every database.
+`query.containsElement("tags", "important")` tests membership without loading
+the collection. Changing a mutable Date value is detected during flush.
+
+==== Schema and locking
+
+Run `session.createTables()` outside application transactions for development
+schemas. It creates missing entity/collection tables, primary and foreign keys,
+one-to-one uniqueness, and relationship indexes. `@Column(unique=true)` and
+`@Entity(indexes=@Index(name="by_name", fields={"name"}))` declare additional
+indexes. Generated text keys, indexed fields, and foreign keys accept at most
+255 Unicode code points during managed inserts, updates, and bulk assignments on every database. Specify
+`@Column(type=...)` to control the SQL type and its value limits yourself.
+
+`session.validateSchema()` checks mapped entity columns, storage-type families,
+whether null values are allowed, and primary-key membership in entity and
+collection tables. It doesn't migrate
+schemas or validate every database-specific constraint. Existing tables are
+left to explicit migrations. In particular, a legacy client DAO's text char
+columns need migration to the managed layer's numeric UTF-16 storage when moving
+to a managed schema.
+
+Backend sessions support `find(type, id, LockMode.PESSIMISTIC_READ)` and
+`PESSIMISTIC_WRITE`, or `lock(entity, mode)`, inside a transaction. PostgreSQL and
+MySQL/MariaDB use their row-lock clauses. SQLite rejects these modes explicitly;
+it can't provide row-level pessimistic locks. Invalid or unsupported lock modes
+are rejected before pending changes are flushed.
+
+==== Supported boundary
+
+This API provides managed persistence through CN1 annotations; it's not a JPA
+provider or a Hibernate binary replacement. Entity access uses public fields.
+Getter/setter access mappings, property-backed associations, joined/table-per-class
+inheritance, embeddable element collections, and independently stored entity-map
+keys aren't supported. Nested fetch graphs and mixed entity/scalar JPQL
+projections are also outside the current query subset. Use the builder's
+`count()` for distinct composite identities. Native device execution and each
+backend database version still require application integration testing.
 
 === Validation
 
 The annotation processor fails the build when:
 
-* `@Entity` lands on an abstract class or interface.
-* The class has no public no-arg constructor.
-* No field carries `@Id`, or more than one does.
-* A field's static type isn't supported (relationships, unsupported
-  reference types).
+* `@Entity` lands on an interface, or an abstract entity has no `@Inheritance` root.
+* A concrete entity has no public no-arg constructor.
+* No identifier is mapped, or a composite identifier requests generated values.
+* Persistent column/table/index names conflict, or `mappedBy` doesn't resolve.
+* A field's static type or relationship mapping is unsupported.
 
 Errors are accumulated so the first build run reports every offending
 entity at once.

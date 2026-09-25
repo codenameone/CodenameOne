@@ -58,6 +58,28 @@ function verifySignature(header, body) {
       && Math.abs(Date.now() - Number(parts.t)) <= MAX_AGE_MS;
 }
 
+// Store provider + bare token/web endpoint alongside the original push key.
+// Backfill existing registrations before enabling cleanup. The durable store
+// is scoped to this endpoint's organization.
+function cleanupTarget(event) {
+  const provider = event.provider;
+  const target = event.token || event.endpoint;
+  if (typeof provider !== 'string' || !provider
+      || typeof target !== 'string' || !target) {
+    throw new Error('Missing push target');
+  }
+  let eventKey;
+  if (typeof event.deliveryId === 'string' && event.deliveryId) {
+    eventKey = `delivery:${event.deliveryId}`;
+  } else {
+    if (!Number.isSafeInteger(event.at)) {
+      throw new Error('Missing classic event timestamp');
+    }
+    eventKey = `classic:${provider}:${target.length}:${target}:${event.at}`;
+  }
+  return {eventKey, provider, target};
+}
+
 app.post('/push/feedback', express.raw({type: 'application/json'}), async (req, res) => {
   const body = req.body.toString('utf8');
   if (!verifySignature(req.get('X-CN1-Signature'), body)) {
@@ -70,9 +92,9 @@ app.post('/push/feedback', express.raw({type: 'application/json'}), async (req, 
       // deletion have to commit together: a marker stored first turns a retry
       // into a silent skip, and a deletion without one is applied twice.
       if (event.reason === 'INVALID_TARGET') {
-        await removeKeyIfNotApplied(event.deliveryId, event.token || event.endpoint);
-      } else {
-        await markApplied(event.deliveryId);
+        const {eventKey, provider, target} = cleanupTarget(event);
+        // Enforce eventKey uniqueness and commit marker + removal together.
+        await removeTargetIfNotApplied(eventKey, provider, target);
       }
     }
   } catch (failure) {
@@ -122,6 +144,8 @@ exports.handler = async (event) => {
   // 2. There is no process to keep state in, so deduplication and the device
   //    table both have to be the database. A warm container that remembers
   //    delivery ids is an optimisation, never the correctness mechanism.
+  // applyDurably must use the same provider + target normalization and
+  // deliveryId/classic-event fallback as the long-running receiver above.
   await applyDurably(JSON.parse(body).events || []);
 
   // Return after the writes, not alongside them: a function that answers 200

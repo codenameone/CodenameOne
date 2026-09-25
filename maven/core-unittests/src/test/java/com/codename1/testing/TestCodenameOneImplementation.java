@@ -1486,7 +1486,33 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
         fileSystem.clear();
     }
 
+    /**
+     * Receives every component a repaint is requested for, as it is requested, or
+     * null for none. A test that asks "was X queued for repaint" by reading the
+     * paint queue afterwards races the EDT: every flush paints, and painting
+     * empties that queue. Observing the request itself does not.
+     */
+    private java.util.List<Object> repaintLog;
+
+    public void recordRepaints(java.util.List<Object> log) {
+        this.repaintLog = log;
+    }
+
+    @Override
+    public void repaint(com.codename1.ui.animations.Animation cmp) {
+        java.util.List<Object> log = repaintLog;
+        if (log != null) {
+            log.add(cmp);
+        }
+        super.repaint(cmp);
+    }
+
     public void reset() {
+        repaintLog = null;
+        // Back to the default a test class starts from. Runs on every UITestBase
+        // teardown, so a test that switches touch off and forgets -- or restores the
+        // wrong value -- cannot decide the command behaviour of the classes after it.
+        touchDevice = true;
         minimized = false;
         usesInvokeAndBlockForEditString = false;
         windowManager = null;

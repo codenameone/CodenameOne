@@ -31,13 +31,16 @@ package com.codenameone.developerguide.serverframeworks;
  * The application's own device table, as both receivers use it. Shown as an
  * interface because the digest says nothing about how you store keys; what it
  * does require is that the deduplication marker and the deletion commit
- * together.
+ * together. Scope the store to the configured organization and enforce a unique
+ * eventKey. Concurrent duplicate inserts must roll back the transaction.
  */
 public interface DeviceStore {
 
-    boolean alreadyApplied(String deliveryId);
+    boolean alreadyApplied(String eventKey);
 
-    void removeKey(String deviceKey);
+    // Delete by normalized provider + bare token/web endpoint, never by the
+    // original prefixed Push.getPushKey(). Backfill these columns first.
+    void removeTarget(String provider, String target);
 
-    void markApplied(String deliveryId);
+    void markApplied(String eventKey);
 }

@@ -208,17 +208,64 @@ public final class Web {
         // The request line's other field; see HeaderLines.requireMethod.
         HeaderLines.requireMethod(method);
         HeaderLines.validate(headers);
+        // Null unless a tracer is installed; see Tracing.startHttpClient.
+        Span span = Tracing.startHttpClient(method, url, headers);
+        int status = -1;
+        Throwable failure = null;
+        try {
+            Result result = perform(method, url, headers, body,
+                    Tracing.propagationHeaders(span, headers));
+            status = result.getStatus();
+            return result;
+        } catch (IOException err) {
+            failure = err;
+            throw err;
+        } catch (RuntimeException err) {
+            failure = err;
+            throw err;
+        } finally {
+            Tracing.endHttpClient(span, status, failure);
+        }
+    }
+
+    /**
+     * @param trace the trace-context lines, or null. Sent like any other header,
+     *              but NOT counted as the caller's: whether a redirect is followed
+     *              freely depends on whether the caller handed over something that
+     *              could leak (see CURLOPT_FOLLOWLOCATION in cn1_backend_web.c),
+     *              and a trace id is not that. Counting it would have silently
+     *              stopped every plain GET following redirects the moment tracing
+     *              was turned on.
+     */
+    private static Result perform(String method, String url, List headers, byte[] body,
+                                  List trace) throws IOException {
         StringBuilder joined = new StringBuilder();
+        boolean callerHeaders = false;
         if(headers != null) {
             for(int iter = 0 ; iter < headers.size() ; iter++) {
                 if(iter > 0) {
                     joined.append('\n');
                 }
-                joined.append(String.valueOf(headers.get(iter)));
+                String line = String.valueOf(headers.get(iter));
+                // What the native side would turn into a list entry: a line with
+                // something in it. An empty one never reached libcurl before either.
+                if(line.length() > 0) {
+                    callerHeaders = true;
+                }
+                joined.append(line);
+            }
+        }
+        if(trace != null) {
+            for(int iter = 0 ; iter < trace.size() ; iter++) {
+                if(joined.length() > 0) {
+                    joined.append('\n');
+                }
+                joined.append(String.valueOf(trace.get(iter)));
             }
         }
         initialiseCurlOnce();
-        long handle = performImpl(method, url, HeaderLines.narrowed(joined.toString()), body);
+        long handle = performImpl(method, url, HeaderLines.narrowed(joined.toString()), body,
+                callerHeaders);
         if(handle == 0) {
             // REDACTED, because this message goes wherever the caller logs it and
             // the URL may be a presigned one whose signature is the credential.
@@ -332,7 +379,7 @@ public final class Web {
     private static native int globalInitImpl();
 
     private static native long performImpl(String method, String url, byte[] headerLines,
-                                           byte[] body);
+                                           byte[] body, boolean callerHeaders);
     private static native String headersImpl(long handle);
     private static native int statusImpl(long handle);
     private static native String errorImpl(long handle);

@@ -136,18 +136,33 @@ class PushFeedbackApplier {
      */
     @Transactional
     public void apply(JsonNode event) {
-        String deliveryId = event.path("deliveryId").asText();
-        if (store.alreadyApplied(deliveryId)) {
-            return;                            // digests are at-least-once
+        if (!"INVALID_TARGET".equals(event.path("reason").asText(null))) {
+            return;
         }
-        if ("INVALID_TARGET".equals(event.path("reason").asText())) {
-            // token is absent for web push, which reports endpoint instead.
-            String key = event.hasNonNull("token")
-                    ? event.get("token").asText()
-                    : event.path("endpoint").asText();
-            store.removeKey(key);
+        String provider = event.path("provider").asText(null);
+        String target = event.path("token").asText(null);
+        if (target == null || target.isEmpty()) {
+            target = event.path("endpoint").asText(null);
         }
-        store.markApplied(deliveryId);
+        if (provider == null || provider.isEmpty() || target == null || target.isEmpty()) {
+            throw new IllegalArgumentException("Missing push target");
+        }
+        String deliveryId = event.path("deliveryId").asText(null);
+        String eventKey;
+        if (deliveryId != null && !deliveryId.isEmpty()) {
+            eventKey = "delivery:" + deliveryId;
+        } else {
+            String at = event.path("at").asText(null);
+            if (at == null) {
+                throw new IllegalArgumentException("Missing classic event timestamp");
+            }
+            eventKey = "classic:" + provider + ":" + target.length() + ":" + target + ":" + at;
+        }
+        if (store.alreadyApplied(eventKey)) {
+            return;
+        }
+        store.removeTarget(provider, target);
+        store.markApplied(eventKey);
     }
 }
 // end::push-notifications-java-spring[]

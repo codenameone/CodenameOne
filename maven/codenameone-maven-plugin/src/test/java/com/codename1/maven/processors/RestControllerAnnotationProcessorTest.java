@@ -225,6 +225,150 @@ public class RestControllerAnnotationProcessorTest {
     }
 
     @Test
+    public void theTracerIsReferencedOnlyWhenAskedFor() throws Exception {
+        // The whole zero-cost argument: the translator keeps what something
+        // reaches, and this line is the only thing that reaches the tracer.
+        RestControllerAnnotationProcessor untraced = new RestControllerAnnotationProcessor();
+        String plain = untraced.generateBootstrap("com.example");
+        assertTrue("an untraced entry point names the tracer:\n" + plain,
+                plain.indexOf("otel") < 0 && plain.indexOf(".tracing(") < 0);
+
+        RestControllerAnnotationProcessor traced = new RestControllerAnnotationProcessor();
+        traced.telemetry = true;
+        traced.telemetryServiceName = "notes";
+        String bootstrap = traced.generateBootstrap("com.example");
+        assertTrue("a traced entry point does not install the tracer:\n" + bootstrap,
+                bootstrap.indexOf(".tracing(new com.codename1.backend.otel.OtlpTracer(\"notes\"))")
+                        >= 0);
+    }
+
+    private static final String TRACED_CONTROLLER_SOURCE = CONTROLLER_SOURCE.replace(
+            "@RestController\n", "@RestController\n@OpenTelemetry(serviceName = \"notes\")\n");
+
+    @Test
+    public void openTelemetryOnAControllerTracesTheBuild() throws Exception {
+        File classes = compile(TRACED_CONTROLLER_SOURCE);
+        File root = sourceRootWith("Notes.java", TRACED_CONTROLLER_SOURCE);
+        ProcessorContext ctx = run(classes, Collections.singletonList(root.getAbsolutePath()),
+                tmp.newFolder());
+        assertFalse(String.valueOf(ctx.getErrors()), ctx.hasErrors());
+        // The router names its routes for the span: asserted on the compiled
+        // class, which is what ships, rather than on a source string.
+        assertTrue("the traced router does not name its routes",
+                references(new File(classes, "com/example/NotesRouter.class"),
+                        "com/codename1/backend/Tracing"));
+        assertTrue("the route TEMPLATE is what names the span",
+                references(new File(classes, "com/example/NotesRouter.class"),
+                        "/api/notes/{id}"));
+        assertTrue("the entry point does not install the tracer",
+                references(new File(classes, "com/example/BackendApplication.class"),
+                        "com/codename1/backend/otel/OtlpTracer"));
+    }
+
+    @Test
+    public void aBlankServiceNameIsNoServiceName() throws Exception {
+        // " " is not a name. Kept raw it reached the entry point, and the server
+        // reported an empty service.name instead of unknown_service.
+        String source = CONTROLLER_SOURCE.replace("@RestController\n",
+                "@RestController\n@OpenTelemetry(serviceName = \"  \")\n");
+        File classes = compile(source);
+        File root = sourceRootWith("Notes.java", source);
+        Map<String, AnnotatedClass> index = ClassScanner.scan(classes);
+        ProcessorContext ctx = new ProcessorContext(classes, tmp.newFolder(), index,
+                new SystemStreamLog(), tmp.newFolder(), new Properties(), null,
+                Collections.singletonList(root.getAbsolutePath()), "UTF-8",
+                Collections.<String>emptyList());
+        RestControllerAnnotationProcessor proc = new RestControllerAnnotationProcessor();
+        proc.resolveTelemetry(ctx);
+        assertFalse(String.valueOf(ctx.getErrors()), ctx.hasErrors());
+        assertTrue("the annotation still turns tracing on", proc.telemetry);
+        assertTrue("a blank name was kept: '" + proc.telemetryServiceName + "'",
+                proc.telemetryServiceName == null || proc.telemetryServiceName.length() == 0);
+        assertTrue(proc.generateBootstrap("com.example")
+                .indexOf(".tracing(new com.codename1.backend.otel.OtlpTracer(null))") >= 0);
+    }
+
+    @Test
+    public void anUntracedBuildNamesRoutesButNeverLinksTheTracer() throws Exception {
+        // The same controller without the annotation. The OTLP tracer is not
+        // linked -- that is what the build switch buys -- but the router still
+        // names its routes, for a tracer the program installs itself.
+        File classes = compile(CONTROLLER_SOURCE);
+        File root = sourceRootWith("Notes.java", CONTROLLER_SOURCE);
+        ProcessorContext ctx = run(classes, Collections.singletonList(root.getAbsolutePath()),
+                tmp.newFolder());
+        assertFalse(String.valueOf(ctx.getErrors()), ctx.hasErrors());
+        assertTrue("a manually installed tracer would see every route merged under its method",
+                references(new File(classes, "com/example/NotesRouter.class"),
+                        "com/codename1/backend/Tracing"));
+        assertFalse(references(new File(classes, "com/example/NotesRouter.class"),
+                "com/codename1/backend/otel/OtlpTracer"));
+        assertFalse(references(new File(classes, "com/example/BackendApplication.class"),
+                "com/codename1/backend/otel/OtlpTracer"));
+    }
+
+    @Test
+    public void thePropertyTracesTheBuildWithoutTheAnnotation() throws Exception {
+        File classes = compile(CONTROLLER_SOURCE);
+        File root = sourceRootWith("Notes.java", CONTROLLER_SOURCE);
+        File project = tmp.newFolder();
+        writeUtf8(new File(project, "application.properties"), "cn1.otel.enabled=true\n");
+        ProcessorContext ctx = run(classes, Collections.singletonList(root.getAbsolutePath()),
+                project);
+        assertFalse(String.valueOf(ctx.getErrors()), ctx.hasErrors());
+        assertTrue(references(new File(classes, "com/example/BackendApplication.class"),
+                "com/codename1/backend/otel/OtlpTracer"));
+        // A reference the build cannot resolve is not a yes.
+        File unresolved = compile(CONTROLLER_SOURCE);
+        File other = tmp.newFolder();
+        writeUtf8(new File(other, "application.properties"),
+                "cn1.otel.enabled=${TRACING}\n");
+        run(unresolved, Collections.singletonList(root.getAbsolutePath()), other);
+        assertFalse(references(new File(unresolved, "com/example/BackendApplication.class"),
+                "com/codename1/backend/otel/OtlpTracer"));
+    }
+
+    @Test
+    public void thePropertyInTheStandardResourcesPlaceTracesTheBuild() throws Exception {
+        // src/main/resources/application.properties, which process-resources has
+        // copied into the classes directory before this goal runs. Looking only
+        // beside the module missed it, so the documented layout never traced.
+        File classes = compile(CONTROLLER_SOURCE);
+        File root = sourceRootWith("Notes.java", CONTROLLER_SOURCE);
+        writeUtf8(new File(classes, "application.properties"), "cn1.otel.enabled=true\n");
+        ProcessorContext ctx = run(classes, Collections.singletonList(root.getAbsolutePath()),
+                tmp.newFolder());
+        assertFalse(String.valueOf(ctx.getErrors()), ctx.hasErrors());
+        assertTrue("cn1.otel.enabled in the resources copy did not trace the build",
+                references(new File(classes, "com/example/BackendApplication.class"),
+                        "com/codename1/backend/otel/OtlpTracer"));
+
+        // And straight from the source tree, for a build that skipped resources.
+        File untouched = compile(CONTROLLER_SOURCE);
+        File project = tmp.newFolder();
+        writeUtf8(new File(project, "src/main/resources/application.properties"),
+                "cn1.otel.enabled=true\n");
+        run(untouched, Collections.singletonList(root.getAbsolutePath()), project);
+        assertTrue(references(new File(untouched, "com/example/BackendApplication.class"),
+                "com/codename1/backend/otel/OtlpTracer"));
+    }
+
+    private File sourceRootWith(String file, String source) throws Exception {
+        File root = tmp.newFolder();
+        File pkg = new File(root, "com/example");
+        assertTrue(pkg.mkdirs());
+        writeUtf8(new File(pkg, file), source);
+        return root;
+    }
+
+    /** Whether a class file's constant pool holds this text. */
+    private static boolean references(File classFile, String text) throws Exception {
+        assertTrue("not generated: " + classFile, classFile.isFile());
+        byte[] bytes = java.nio.file.Files.readAllBytes(classFile.toPath());
+        return new String(bytes, "ISO-8859-1").indexOf(text) >= 0;
+    }
+
+    @Test
     public void ignoresAControllerWhoseSourceIsGone() throws Exception {
         // Maven does not clean target/classes on its own, so the .class of a
         // controller whose .java was deleted or renamed is still sitting there and
@@ -314,6 +458,7 @@ public class RestControllerAnnotationProcessorTest {
     }
 
     private static void writeUtf8(File f, String text) throws Exception {
+        f.getParentFile().mkdirs();
         java.io.OutputStream out = new java.io.FileOutputStream(f);
         try {
             out.write(text.getBytes("UTF-8"));
@@ -1992,6 +2137,12 @@ public class RestControllerAnnotationProcessorTest {
     /// front of a class whose `.java` is NOT among them -- a `target/classes`
     /// left over from before the source was deleted or renamed.
     private ProcessorContext run(File classes, List<String> compileSourceRoots) throws Exception {
+        return run(classes, compileSourceRoots, tmp.newFolder());
+    }
+
+    /// With the module directory given, where `application.properties` is read.
+    private ProcessorContext run(File classes, List<String> compileSourceRoots, File projectDir)
+            throws Exception {
         Map<String, AnnotatedClass> index = ClassScanner.scan(classes);
         RestControllerAnnotationProcessor proc = new RestControllerAnnotationProcessor();
         List<String> cp = new java.util.ArrayList<String>();
@@ -1999,7 +2150,7 @@ public class RestControllerAnnotationProcessorTest {
             cp.add(f.getAbsolutePath());
         }
         ProcessorContext ctx = new ProcessorContext(classes, tmp.newFolder(), index,
-                new SystemStreamLog(), tmp.newFolder(), new Properties(), null,
+                new SystemStreamLog(), projectDir, new Properties(), null,
                 compileSourceRoots, "UTF-8", cp);
         proc.start(ctx);
         for (AnnotatedClass cls : index.values()) {
