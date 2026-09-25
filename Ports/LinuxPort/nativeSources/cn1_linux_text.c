@@ -209,7 +209,7 @@ JAVA_INT com_codename1_impl_linux_LinuxNative_charsWidth___long_char_1ARRAY_int_
     if (chars == JAVA_NULL || length <= 0) {
         return 0;
     }
-    data = (JAVA_ARRAY_CHAR*) (*(JAVA_ARRAY) chars).data;
+    data = (JAVA_ARRAY_CHAR*) CN1_ARRAY_DATA(chars);
     utf8 = (char*) malloc((size_t) length * 4 + 1);
     for (i = 0; i < length; i++) {
         unsigned int cp = (unsigned int) data[offset + i];
@@ -265,7 +265,7 @@ JAVA_LONG com_codename1_impl_linux_LinuxNative_loadTrueTypeFontFromMemory___java
         }
         return (JAVA_LONG) (intptr_t) cn1MakeFont(name, PANGO_WEIGHT_NORMAL, 0, 18);
     }
-    bytes = (unsigned char*) (*(JAVA_ARRAY) data).data;
+    bytes = (unsigned char*) CN1_ARRAY_DATA(data);
 
     fd = mkstemp(tmpl);
     if (fd >= 0) {

@@ -304,7 +304,7 @@ JAVA_VOID com_codename1_impl_windows_WindowsNative_gl3dClear___long_int_boolean_
 JAVA_LONG com_codename1_impl_windows_WindowsNative_gl3dCreateFloatBuffer___float_1ARRAY_int_R_long(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT data, JAVA_INT floatCount) {
     ID3D11Device* dev = cn1D3DGlobalDevice();
     if (!dev || data == JAVA_NULL || floatCount <= 0) return 0;
-    JAVA_ARRAY_FLOAT* src = (JAVA_ARRAY_FLOAT*) (*(JAVA_ARRAY) data).data;
+    JAVA_ARRAY_FLOAT* src = (JAVA_ARRAY_FLOAT*) CN1_ARRAY_DATA(data);
     D3D11_BUFFER_DESC bd;
     ZeroMemory(&bd, sizeof(bd));
     bd.ByteWidth = (UINT) (floatCount * 4);
@@ -322,14 +322,14 @@ JAVA_VOID com_codename1_impl_windows_WindowsNative_gl3dUpdateFloatBuffer___long_
     ID3D11Buffer* buf = (ID3D11Buffer*) (intptr_t) bufferPeer;
     ID3D11DeviceContext* ctx = cn1D3DGlobalContext();
     if (!buf || !ctx || data == JAVA_NULL) return;
-    JAVA_ARRAY_FLOAT* src = (JAVA_ARRAY_FLOAT*) (*(JAVA_ARRAY) data).data;
+    JAVA_ARRAY_FLOAT* src = (JAVA_ARRAY_FLOAT*) CN1_ARRAY_DATA(data);
     ctx->UpdateSubresource(buf, 0, NULL, src, 0, 0);
 }
 
 JAVA_LONG com_codename1_impl_windows_WindowsNative_gl3dCreateShortBuffer___short_1ARRAY_int_R_long(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT data, JAVA_INT indexCount) {
     ID3D11Device* dev = cn1D3DGlobalDevice();
     if (!dev || data == JAVA_NULL || indexCount <= 0) return 0;
-    JAVA_ARRAY_SHORT* src = (JAVA_ARRAY_SHORT*) (*(JAVA_ARRAY) data).data;
+    JAVA_ARRAY_SHORT* src = (JAVA_ARRAY_SHORT*) CN1_ARRAY_DATA(data);
     D3D11_BUFFER_DESC bd;
     ZeroMemory(&bd, sizeof(bd));
     bd.ByteWidth = (UINT) (indexCount * 2);
@@ -347,14 +347,14 @@ JAVA_VOID com_codename1_impl_windows_WindowsNative_gl3dUpdateShortBuffer___long_
     ID3D11Buffer* buf = (ID3D11Buffer*) (intptr_t) bufferPeer;
     ID3D11DeviceContext* ctx = cn1D3DGlobalContext();
     if (!buf || !ctx || data == JAVA_NULL) return;
-    JAVA_ARRAY_SHORT* src = (JAVA_ARRAY_SHORT*) (*(JAVA_ARRAY) data).data;
+    JAVA_ARRAY_SHORT* src = (JAVA_ARRAY_SHORT*) CN1_ARRAY_DATA(data);
     ctx->UpdateSubresource(buf, 0, NULL, src, 0, 0);
 }
 
 JAVA_LONG com_codename1_impl_windows_WindowsNative_gl3dCreateTexture___int_1ARRAY_int_int_R_long(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT argb, JAVA_INT width, JAVA_INT height) {
     ID3D11Device* dev = cn1D3DGlobalDevice();
     if (!dev || argb == JAVA_NULL || width <= 0 || height <= 0) return 0;
-    JAVA_ARRAY_INT* px = (JAVA_ARRAY_INT*) (*(JAVA_ARRAY) argb).data;
+    JAVA_ARRAY_INT* px = (JAVA_ARRAY_INT*) CN1_ARRAY_DATA(argb);
     int count = width * height;
     // Convert packed ARGB (0xAARRGGBB) to RGBA byte order for DXGI_FORMAT_R8G8B8A8.
     unsigned char* rgba = (unsigned char*) malloc((size_t) count * 4);
@@ -576,7 +576,7 @@ static void cn1D3DBind(CN1D3DContext* c, CN1D3DPipeline* p, ID3D11Buffer* vbo, i
     if (c->cbuffer && uniforms != JAVA_NULL) {
         D3D11_MAPPED_SUBRESOURCE mapped;
         if (SUCCEEDED(ctx->Map(c->cbuffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &mapped))) {
-            JAVA_ARRAY_FLOAT* u = (JAVA_ARRAY_FLOAT*) (*(JAVA_ARRAY) uniforms).data;
+            JAVA_ARRAY_FLOAT* u = (JAVA_ARRAY_FLOAT*) CN1_ARRAY_DATA(uniforms);
             memcpy(mapped.pData, u, (size_t) uniformFloats * 4);
             ctx->Unmap(c->cbuffer, 0);
         }
@@ -662,7 +662,7 @@ JAVA_OBJECT com_codename1_impl_windows_WindowsNative_gl3dCaptureFrame___long_R_b
                 result = allocArray(threadStateData, (int) size,
                         &class_array1__JAVA_BYTE, sizeof(JAVA_ARRAY_BYTE), 1);
                 if (result != JAVA_NULL) {
-                    memcpy((*(JAVA_ARRAY) result).data, mem, size);
+                    memcpy(CN1_ARRAY_DATA(result), mem, size);
                 }
             }
             if (mem != NULL) {

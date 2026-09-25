@@ -461,7 +461,7 @@ JAVA_OBJECT com_codename1_impl_windows_WindowsNative_httpHeaderFieldNames___long
                  * slot, again flagged for first-build verification. */
                 JAVA_OBJECT cn1__s = cn1NetWideToJavaString(threadStateData, name);
                 CN1_WRITE_BARRIER(arr, cn1__s);  /* each allocation is a safepoint: arr may be old */
-                ((JAVA_OBJECT*)(*(JAVA_ARRAY)arr).data)[index] = cn1__s;
+                ((JAVA_OBJECT*)CN1_ARRAY_DATA(arr))[index] = cn1__s;
                 free(name);
                 index++;
             }
@@ -486,7 +486,7 @@ JAVA_INT com_codename1_impl_windows_WindowsNative_httpReadBody___long_byte_1ARRA
     if (__cn1Arg2 == JAVA_NULL || __cn1Arg4 <= 0) {
         return 0;
     }
-    data = (JAVA_ARRAY_BYTE*)(*(JAVA_ARRAY)__cn1Arg2).data;
+    data = (JAVA_ARRAY_BYTE*)CN1_ARRAY_DATA(__cn1Arg2);
     if (!WinHttpReadData(conn->request, (LPVOID)(data + __cn1Arg3),
                          (DWORD)__cn1Arg4, &bytesRead)) {
         cn1WindowsLog("httpReadBody: WinHttpReadData failed");
@@ -504,7 +504,7 @@ JAVA_INT com_codename1_impl_windows_WindowsNative_httpWriteBody___long_byte_1ARR
     if (conn == NULL || conn->sent || __cn1Arg2 == JAVA_NULL || __cn1Arg4 <= 0) {
         return 0;
     }
-    data = (JAVA_ARRAY_BYTE*)(*(JAVA_ARRAY)__cn1Arg2).data;
+    data = (JAVA_ARRAY_BYTE*)CN1_ARRAY_DATA(__cn1Arg2);
 
     /* Grow the pending body buffer as needed and append the new bytes. The
      * accumulated buffer is transmitted in a single WinHttpSendRequest. */

@@ -98,7 +98,7 @@ static JAVA_OBJECT cn1WinNewByteArray(CODENAME_ONE_THREAD_STATE, const void* src
     }
     array = allocArray(threadStateData, n, &class_array1__JAVA_BYTE, sizeof(JAVA_ARRAY_BYTE), 1);
     if (array != JAVA_NULL && n > 0 && src != 0) {
-        memcpy((*(JAVA_ARRAY) array).data, src, (size_t) n);
+        memcpy(CN1_ARRAY_DATA(array), src, (size_t) n);
     }
     return array;
 }
@@ -109,7 +109,7 @@ static unsigned char* cn1Bytes(JAVA_OBJECT array, int* length) {
         return 0;
     }
     *length = (int) (*(JAVA_ARRAY) array).length;
-    return (unsigned char*) (*(JAVA_ARRAY) array).data;
+    return (unsigned char*) CN1_ARRAY_DATA(array);
 }
 
 /* ------------------------------------------------------------ random */

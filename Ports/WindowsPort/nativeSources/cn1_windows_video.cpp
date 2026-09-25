@@ -272,7 +272,7 @@ static JAVA_OBJECT cn1ReaderFrameAt(CODENAME_ONE_THREAD_STATE, CN1VideoReader* s
             LONG absStride = bottomUp ? -stride : stride;
             result = allocArray(threadStateData, w * h * 4, &class_array1__JAVA_BYTE, sizeof(JAVA_ARRAY_BYTE), 1);
             if (result != JAVA_NULL) {
-                BYTE* out = (BYTE*) (*(JAVA_ARRAY) result).data;
+                BYTE* out = (BYTE*) CN1_ARRAY_DATA(result);
                 for (int y = 0; y < h; y++) {
                     int srcRow = bottomUp ? (h - 1 - y) : y;
                     BYTE* src = data + (size_t) srcRow * absStride;
@@ -412,7 +412,7 @@ static JAVA_OBJECT cn1ReaderReadAudio(CODENAME_ONE_THREAD_STATE, CN1VideoReader*
     if (pcm != NULL && pcmLen > 0) {
         result = allocArray(threadStateData, (int) pcmLen, &class_array1__JAVA_BYTE, sizeof(JAVA_ARRAY_BYTE), 1);
         if (result != JAVA_NULL) {
-            memcpy((*(JAVA_ARRAY) result).data, pcm, pcmLen);
+            memcpy(CN1_ARRAY_DATA(result), pcm, pcmLen);
         }
     }
     free(pcm);
@@ -645,7 +645,7 @@ JAVA_VOID com_codename1_impl_windows_WindowsNative_videoWriterFrame___long_byte_
     if (!st || rgbaObj == JAVA_NULL) {
         return;
     }
-    BYTE* rgba = (BYTE*) (*(JAVA_ARRAY) rgbaObj).data;
+    BYTE* rgba = (BYTE*) CN1_ARRAY_DATA(rgbaObj);
     DWORD len = (DWORD) (w * h * 4);
     // RGBA (Java, top-down) -> RGB32/BGRA (MF input). Media Foundation treats
     // RGB32 input as bottom-up, so write our rows reversed: buffer row 0 must be
@@ -674,7 +674,7 @@ JAVA_VOID com_codename1_impl_windows_WindowsNative_videoWriterAudio___long_byte_
     if (!st || !st->hasAudio || pcmObj == JAVA_NULL) {
         return;
     }
-    BYTE* pcm = (BYTE*) (*(JAVA_ARRAY) pcmObj).data;
+    BYTE* pcm = (BYTE*) CN1_ARRAY_DATA(pcmObj);
     DWORD len = (DWORD) (*(JAVA_ARRAY) pcmObj).length;
     int ch = channels > 0 ? channels : 1;
     DWORD frames = len / (DWORD) (2 * ch);

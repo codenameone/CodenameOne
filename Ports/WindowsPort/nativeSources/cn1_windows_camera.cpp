@@ -171,7 +171,7 @@ JAVA_OBJECT com_codename1_impl_windows_WindowsNative_cameraCaptureFrame___int_1A
             result = allocArray(threadStateData, (int) (width * height), &class_array1__JAVA_INT,
                     sizeof(JAVA_ARRAY_INT), 1);
             if (result != JAVA_NULL) {
-                JAVA_ARRAY_INT* argb = (JAVA_ARRAY_INT*) (*(JAVA_ARRAY) result).data;
+                JAVA_ARRAY_INT* argb = (JAVA_ARRAY_INT*) CN1_ARRAY_DATA(result);
                 int stride = (int) (width * 4);
                 for (UINT32 y = 0; y < height; y++) {
                     /* MFVideoFormat_RGB32 is bottom-up: row 0 is the last in memory. */
@@ -192,7 +192,7 @@ JAVA_OBJECT com_codename1_impl_windows_WindowsNative_cameraCaptureFrame___int_1A
     source->Shutdown();
 
     if (result != JAVA_NULL && outDims != JAVA_NULL) {
-        JAVA_ARRAY_INT* dims = (JAVA_ARRAY_INT*) (*(JAVA_ARRAY) outDims).data;
+        JAVA_ARRAY_INT* dims = (JAVA_ARRAY_INT*) CN1_ARRAY_DATA(outDims);
         int dlen = (*(JAVA_ARRAY) outDims).length;
         if (dlen > 0) { dims[0] = (JAVA_ARRAY_INT) width; }
         if (dlen > 1) { dims[1] = (JAVA_ARRAY_INT) height; }
@@ -354,9 +354,9 @@ JAVA_OBJECT com_codename1_impl_windows_WindowsNative_cameraSessionLatestFrame___
         int n = s->latestW * s->latestH;
         result = allocArray(threadStateData, n, &class_array1__JAVA_INT, sizeof(JAVA_ARRAY_INT), 1);
         if (result != JAVA_NULL) {
-            memcpy((*(JAVA_ARRAY) result).data, s->latest, (size_t) n * sizeof(JAVA_ARRAY_INT));
+            memcpy(CN1_ARRAY_DATA(result), s->latest, (size_t) n * sizeof(JAVA_ARRAY_INT));
             if (outDims != JAVA_NULL) {
-                JAVA_ARRAY_INT* dims = (JAVA_ARRAY_INT*) (*(JAVA_ARRAY) outDims).data;
+                JAVA_ARRAY_INT* dims = (JAVA_ARRAY_INT*) CN1_ARRAY_DATA(outDims);
                 int dlen = (*(JAVA_ARRAY) outDims).length;
                 if (dlen > 0) dims[0] = s->latestW;
                 if (dlen > 1) dims[1] = s->latestH;

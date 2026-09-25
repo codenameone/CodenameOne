@@ -1255,7 +1255,7 @@ JAVA_BOOLEAN com_codename1_impl_windows_WindowsNative_pollEvent___int_1ARRAY_R_b
     if (!cn1WinPollEvent(&ev)) {
         return JAVA_FALSE;
     }
-    JAVA_ARRAY_INT* out = (JAVA_ARRAY_INT*) (*(JAVA_ARRAY) __cn1Arg1).data;
+    JAVA_ARRAY_INT* out = (JAVA_ARRAY_INT*) CN1_ARRAY_DATA(__cn1Arg1);
     int len = (*(JAVA_ARRAY) __cn1Arg1).length;
     if (len > 0) { out[0] = ev.type; }
     if (len > 1) { out[1] = ev.x; }

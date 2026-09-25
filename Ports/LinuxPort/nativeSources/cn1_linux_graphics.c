@@ -212,9 +212,9 @@ JAVA_VOID com_codename1_impl_linux_LinuxNative_setClipShape___long_float_1ARRAY_
         g->clipIsRect = 1;
         return;
     }
-    c = (float*) (*(JAVA_ARRAY) coords).data;
+    c = (float*) CN1_ARRAY_DATA(coords);
     clen = (int) (*(JAVA_ARRAY) coords).length;
-    t = (int*) (*(JAVA_ARRAY) types).data;
+    t = (int*) CN1_ARRAY_DATA(types);
     tlen = (int) (*(JAVA_ARRAY) types).length;
     if (clen < 2) {
         g->clipIsRect = 1;
@@ -415,7 +415,7 @@ JAVA_VOID com_codename1_impl_linux_LinuxNative_fillShape___long_float_1ARRAY_int
     }
     cn1Begin(g);
     cairo_set_fill_rule(g->cr, windingRule == 0 ? CAIRO_FILL_RULE_EVEN_ODD : CAIRO_FILL_RULE_WINDING);
-    cn1BuildPath(g->cr, (float*) (*(JAVA_ARRAY) coords).data, (int*) (*(JAVA_ARRAY) types).data, typeCount);
+    cn1BuildPath(g->cr, (float*) CN1_ARRAY_DATA(coords), (int*) CN1_ARRAY_DATA(types), typeCount);
     cairo_fill(g->cr);
     cn1End(g);
 }
@@ -428,7 +428,7 @@ JAVA_VOID com_codename1_impl_linux_LinuxNative_drawShape___long_float_1ARRAY_int
     }
     cn1Begin(g);
     cairo_set_line_width(g->cr, lineWidth > 0 ? lineWidth : 1.0);
-    cn1BuildPath(g->cr, (float*) (*(JAVA_ARRAY) coords).data, (int*) (*(JAVA_ARRAY) types).data, typeCount);
+    cn1BuildPath(g->cr, (float*) CN1_ARRAY_DATA(coords), (int*) CN1_ARRAY_DATA(types), typeCount);
     cairo_stroke(g->cr);
     cn1End(g);
 }

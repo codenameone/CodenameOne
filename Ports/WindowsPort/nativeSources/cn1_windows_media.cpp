@@ -174,7 +174,7 @@ JAVA_LONG com_codename1_impl_windows_WindowsNative_mediaCreate___byte_1ARRAY_int
     if (!g_mfStarted || dataArr == NULL) {
         return 0;
     }
-    const JAVA_ARRAY_BYTE* data = (const JAVA_ARRAY_BYTE*) (*(JAVA_ARRAY) dataArr).data;
+    const JAVA_ARRAY_BYTE* data = (const JAVA_ARRAY_BYTE*) CN1_ARRAY_DATA(dataArr);
     WCHAR* mime = cn1WinJavaStringToWide(threadStateData, mimeObj, NULL);
     const wchar_t* ext = cn1MediaExtForMime(mime);
 

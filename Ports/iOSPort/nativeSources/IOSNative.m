@@ -22829,7 +22829,7 @@ JAVA_INT com_codename1_impl_ios_IOSNative_getFoldRegion___int_1ARRAY_R_int(
     JAVA_ARRAY_INT* data =
         (JAVA_ARRAY_INT*)intArray->fields.org_xmlvm_runtime_XMLVMArray.array_;
 #else
-    JAVA_ARRAY_INT* data = (JAVA_ARRAY_INT*)((JAVA_ARRAY)out)->data;
+    JAVA_ARRAY_INT* data = (JAVA_ARRAY_INT*)CN1_ARRAY_DATA(out);
 #endif
     int region[4];
     int kind = cn1HingeFoldRegion(region);

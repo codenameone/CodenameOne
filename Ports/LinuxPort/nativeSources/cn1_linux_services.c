@@ -246,7 +246,7 @@ JAVA_VOID com_codename1_impl_linux_LinuxNative_clipboardSetImage___byte_1ARRAY(C
         return;
     }
     /* The array stays reachable from this (blocked) frame for the whole call. */
-    r.bytes = (const unsigned char*) (*(JAVA_ARRAY) png).data;
+    r.bytes = (const unsigned char*) CN1_ARRAY_DATA(png);
     r.len = (int) (*(JAVA_ARRAY) png).length;
     if (r.len <= 0) {
         return;
@@ -342,7 +342,7 @@ JAVA_VOID com_codename1_impl_linux_LinuxNative_clipboardSetFiles___java_lang_Str
     if (n <= 0) {
         return;
     }
-    elements = (JAVA_OBJECT*) (*(JAVA_ARRAY) paths).data;
+    elements = (JAVA_OBJECT*) CN1_ARRAY_DATA(paths);
     data = (CN1UriListData*) g_malloc0(sizeof(CN1UriListData));
     data->uris = (gchar**) g_malloc0(sizeof(gchar*) * (n + 1));
     for (i = 0; i < n; i++) {
@@ -384,7 +384,7 @@ JAVA_OBJECT com_codename1_impl_linux_LinuxNative_clipboardGetFiles___R_java_lang
     }
     arr = allocArray(threadStateData, n, &class_array1__java_lang_String, sizeof(JAVA_OBJECT), 1);
     if (arr != JAVA_NULL) {
-        elements = (JAVA_OBJECT*) (*(JAVA_ARRAY) arr).data;
+        elements = (JAVA_OBJECT*) CN1_ARRAY_DATA(arr);
         for (i = 0; i < n; i++) {
             JAVA_OBJECT cn1__s = newStringFromCString(threadStateData, uris[i]);
             CN1_WRITE_BARRIER(arr, cn1__s);  /* each allocation is a safepoint: arr may be old */
@@ -551,7 +551,7 @@ JAVA_OBJECT com_codename1_impl_linux_LinuxNative_dpapiProtect___byte_1ARRAY_R_by
     if (data == JAVA_NULL || !cn1LoadSecret()) {
         return JAVA_NULL;
     }
-    bytes = (unsigned char*) (*(JAVA_ARRAY) data).data;
+    bytes = (unsigned char*) CN1_ARRAY_DATA(data);
     len = (int) (*(JAVA_ARRAY) data).length;
     b64 = g_base64_encode(bytes, len);
     token = g_uuid_string_random();
@@ -582,7 +582,7 @@ JAVA_OBJECT com_codename1_impl_linux_LinuxNative_dpapiUnprotect___byte_1ARRAY_R_
     if (data == JAVA_NULL || !cn1LoadSecret()) {
         return JAVA_NULL;
     }
-    tokenBytes = (unsigned char*) (*(JAVA_ARRAY) data).data;
+    tokenBytes = (unsigned char*) CN1_ARRAY_DATA(data);
     len = (int) (*(JAVA_ARRAY) data).length;
     if (len <= 0 || len >= (int) sizeof(token)) {
         return JAVA_NULL;
@@ -626,7 +626,7 @@ JAVA_INT com_codename1_impl_linux_LinuxNative_dpapiForget___byte_1ARRAY_R_int(CO
     if (data == JAVA_NULL || !cn1LoadSecret()) {
         return -1;
     }
-    tokenBytes = (unsigned char*) (*(JAVA_ARRAY) data).data;
+    tokenBytes = (unsigned char*) CN1_ARRAY_DATA(data);
     len = (int) (*(JAVA_ARRAY) data).length;
     if (len <= 0 || len >= (int) sizeof(token)) {
         return -1;
@@ -701,7 +701,7 @@ JAVA_BOOLEAN com_codename1_impl_linux_LinuxNative_locationGetCurrent___double_1A
     if (!cn1LinuxGeoclueFix(fix)) {
         return JAVA_FALSE;
     }
-    arr = (JAVA_DOUBLE*) (*(JAVA_ARRAY) out).data;
+    arr = (JAVA_DOUBLE*) CN1_ARRAY_DATA(out);
     for (i = 0; i < 6 && i < (int) (*(JAVA_ARRAY) out).length; i++) {
         arr[i] = fix[i];
     }

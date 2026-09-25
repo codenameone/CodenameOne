@@ -276,7 +276,7 @@ JAVA_OBJECT com_codename1_impl_linux_LinuxNative_httpHeaderFieldNames___long_R_j
     cn1HttpPerform(c);
     arr = allocArray(threadStateData, c->respHeaderCount, &class_array1__java_lang_String, sizeof(JAVA_OBJECT), 1);
     if (arr != JAVA_NULL) {
-        elements = (JAVA_OBJECT*) (*(JAVA_ARRAY) arr).data;
+        elements = (JAVA_OBJECT*) CN1_ARRAY_DATA(arr);
         for (i = 0; i < c->respHeaderCount; i++) {
             JAVA_OBJECT cn1__s = newStringFromCString(threadStateData, c->respHeaders[i].key);
             CN1_WRITE_BARRIER(arr, cn1__s);  /* each allocation is a safepoint: arr may be old */
@@ -300,7 +300,7 @@ JAVA_INT com_codename1_impl_linux_LinuxNative_httpReadBody___long_byte_1ARRAY_in
         return -1;
     }
     n = length < avail ? length : avail;
-    data = (char*) (*(JAVA_ARRAY) buffer).data;
+    data = (char*) CN1_ARRAY_DATA(buffer);
     memcpy(data + offset, c->respBody + c->respReadPos, (size_t) n);
     c->respReadPos += n;
     return n;
@@ -320,7 +320,7 @@ JAVA_INT com_codename1_impl_linux_LinuxNative_httpWriteBody___long_byte_1ARRAY_i
         c->reqBody = (unsigned char*) realloc(c->reqBody, cap);
         c->reqCap = cap;
     }
-    data = (char*) (*(JAVA_ARRAY) buffer).data;
+    data = (char*) CN1_ARRAY_DATA(buffer);
     memcpy(c->reqBody + c->reqLen, data + offset, (size_t) length);
     c->reqLen += length;
     return length;
