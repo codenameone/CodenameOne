@@ -11307,6 +11307,13 @@ void cn1MonitorDataSet(JAVA_OBJECT o, void* data) {
 #ifdef CN1_GC_CONFORM
     atomic_fetch_add_explicit(&cn1MonitorEntries, 1, memory_order_relaxed);
 #endif
+#if !defined(CN1_DISABLE_BIBOP) && !defined(CN1_BIBOP_NO_FASTSWEEP)
+    // Flag the object's page HERE, at the one place an entry is created, rather than at
+    // a caller: cn1BibopReclaimSlot probes this table only for a flagged page, so an
+    // entry whose page was never flagged would outlive its object and be inherited by
+    // whatever reuses the slot.
+    cn1BibopNoteMonitorAttached(o);
+#endif
     pthread_mutex_unlock(&cn1MonitorTableMutex);
 }
 
@@ -11357,6 +11364,15 @@ static void cn1BibopReclaimSlot(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT o) {
         ptr(threadStateData, o);
     }
     cn1ReleaseStringPeer(o);
+#ifndef CN1_BIBOP_NO_FASTSWEEP
+    // Only a page that ever had a monitor (gcHasMonitors, sticky until the page is
+    // reformatted) can hold a slot with one. The probe takes the monitor table's global
+    // lock, and paying it for every freed slot was 290ms of a single-core self-hosting
+    // run's minor sweeps (1086 -> 798ms), for a table that almost never holds a slot.
+    if(!((CN1BibopPage*)((uintptr_t)o & ~((uintptr_t)(CN1_BIBOP_PAGE_SIZE - 1))))->gcHasMonitors) {
+        return;
+    }
+#endif
     void* md = cn1MonitorDataRemove(o);
     if(md) {
         free(md);
@@ -15618,6 +15634,22 @@ void gcMarkObject(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj, JAVA_BOOLEAN force
     // That is exactly how a fresh object came to be grace-promoted by the sweep with
     // its subtree never traced. Do NOT set this flag around anything that marks from
     // a stack scan or a register file.
+    // MINOR CYCLE, OLD CHILD: return before the guard. A minor never traces an old
+    // object, so this only moves the old-object return below ahead of the resolve --
+    // which is what the remembered set's defensive trace of a big table paid for every
+    // entry (800 -> 490ms of a self-hosting run's minors). Reading the header first is
+    // safe for any word inside the heap window: its memory stays mapped for the life of
+    // the process (a released page reads back as zeroes, a non-object as whatever it
+    // holds), and the only outcome is SKIPPING a mark, which a minor does for every old
+    // object anyway. Anything that does not read as an old page-resident object falls
+    // through to the guard exactly as before.
+    if(cn1GcMinor && (char*)obj >= cn1HeapWindowBase && (char*)obj < cn1HeapWindowEnd) {
+        int cn1OldMark = CN1_OBJ_MARK_LOAD(obj, __ATOMIC_RELAXED);
+        int cn1OldPos = CN1_OBJ_HEAPPOS(obj);
+        if(cn1OldMark > 0 && (cn1OldPos == CN1_BIBOP_HEAP_POS || cn1OldPos == CN1_BIBOP_ADOPTED)) {
+            return;
+        }
+    }
     if(!cn1GcPreciseTrace && !cn1GcTrustedRoots
        && cn1ConservativeResolve((void*)obj) != obj && !cn1GcImmortalObjContains(obj)
        && !(cn1GcStwCycle && cn1LegacyKnown(obj))) {
