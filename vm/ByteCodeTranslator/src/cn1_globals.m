@@ -2847,12 +2847,19 @@ static size_t cn1BlockPadding(void) {
 #define CN1_BLOCK_MMAP_THRESHOLD (32 * 1024)
 #endif
 
+#ifdef _WIN32
+/* Defined after this file's <windows.h> include, which sits late on purpose (see there):
+   VirtualAlloc and its constants are not declared this far up. */
+static void* cn1BlockWinMap(size_t bytes);
+static void cn1BlockWinUnmap(void* allocation);
+#endif
+
 /* Zero-filled by the OS on both platforms, matching calloc. */
 static void* cn1BlockOsAlloc(size_t bytes) {
     atomic_fetch_add_explicit(&cn1BlockMapCount, 1, memory_order_relaxed);
     atomic_fetch_add_explicit(&cn1BlockMapBytes, (long long)bytes, memory_order_relaxed);
 #ifdef _WIN32
-    return VirtualAlloc(NULL, bytes, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
+    return cn1BlockWinMap(bytes);
 #else
     void* mem = mmap(NULL, bytes, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANON, -1, 0);
     return mem == MAP_FAILED ? NULL : mem;
@@ -2864,7 +2871,7 @@ static void cn1BlockOsFree(void* allocation, size_t bytes) {
     atomic_fetch_add_explicit(&cn1BlockUnmapBytes, (long long)bytes, memory_order_relaxed);
 #ifdef _WIN32
     (void)bytes;
-    VirtualFree(allocation, 0, MEM_RELEASE);
+    cn1BlockWinUnmap(allocation);
 #else
     munmap(allocation, bytes);
 #endif
@@ -17207,6 +17214,13 @@ JAVA_OBJECT alloc4DArray(CODENAME_ONE_THREAD_STATE, int length4, int length3, in
 #define WIN32_LEAN_AND_MEAN
 #endif
 #include <windows.h>
+/* The Windows half of cn1BlockOsAlloc/cn1BlockOsFree, declared near them. */
+static void* cn1BlockWinMap(size_t bytes) {
+    return VirtualAlloc(NULL, bytes, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
+}
+static void cn1BlockWinUnmap(void* allocation) {
+    VirtualFree(allocation, 0, MEM_RELEASE);
+}
 #endif
 
 /*
