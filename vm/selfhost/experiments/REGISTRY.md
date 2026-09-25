@@ -6574,3 +6574,30 @@ mark decode) at the same cycle count and wall time.
 
 Next: a 4-byte header (heap position to a state byte, the legacy index to a side table;
 ~11MB more by the census) and taking back the 8% of instructions.
+
+## Round 49: the 4-byte header, and why it is worth much less than the 8-byte one
+
+WIP 7a62fb6571. The heap position left the header: a one-byte state, plus a side table
+(keyed by address) for the ~1,500 objects allObjectsInHeap indexes -- large arrays and
+registered statics. The struct stays 8-aligned (a reference's low bits are the tag code),
+so the header's 4 free bytes hold a field, and only the FIRST class in a hierarchy to
+declare instance fields can use them: a subclass must keep its parent's layout as a
+prefix. The translator now puts up to 4 bytes of that class's fields there.
+
+That prefix rule is the whole story of the size of this win. The census predicted 48MB
+for a 4-byte header assuming any field could fill the gap; laid out as the translator
+emitted classes it was 2.3MB, and with the root-class fill ~10MB. Measured: VarOp,
+ArrayList and ByteCodeMethodArg 32 -> 24 bytes, BasicInstruction 40 -> 32, peak live
+278.6 -> 275.2MB; one-core container RSS 618 -> 605MB in a 5-round interleaved A/B, and
+indistinguishable in the r7 table (601-609 against 607-609MB). Mac: +2% instructions at
+equal wall time. Two costs had to be taken back first: zero meaning "indexed" made every
+allocation take the side table's lock (zero is now "index 0, no entry"), and zeroing the
+body from offset 4 was the unaligned memset path.
+
+**Ratio table r7**: 1 core 0.74x time / 1.09x RSS (the JDK's own peak moved: 559 vs 573MB
+max; WIP's raw peak is unchanged); 2 cores 0.96x / 0.86x; 4 cores 1.07x / 0.75x.
+
+Aside, not caused by this change: BibopPageFloorIntegrationTest failed once inside the
+full suite with the host at load average ~36 and passed alone twice. Its settle waits a
+fixed number of wall-clock rounds for pages to be released, so a starved collector thread
+misses the window. The settle should wait on the collector's progress, not the clock.
