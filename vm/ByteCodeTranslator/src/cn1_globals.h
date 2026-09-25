@@ -211,16 +211,18 @@
 // each is cast to JavaObjectPrototype. Read and write them only through the CN1_OBJ_*
 // accessors defined after JavaObjectPrototype.
 //
-// EIGHT BYTES, down from sixteen, which is 8 bytes off every object in the heap (~37MB
-// of the ~325MB self-hosting peak):
+// FOUR BYTES, down from sixteen (the struct is still 8-aligned, so a field of 4 bytes or
+// less takes offset 4; the translator puts one there -- ByteCodeClass.addFields):
 //   * the class is a 16-bit INDEX into cn1ClazzById, not a pointer. A program is a closed
 //     world whose classes -- array classes included -- the translator numbers, and it
 //     refuses to translate one whose numbering does not fit (Parser, cn1ClazzById);
 //   * the mark is one byte: an epoch modulo CN1_GC_EPOCH_WINDOW, or a sentinel (see
 //     cn1GcMarkEncode);
-//   * the heap position keeps its 32 bits (a legacy object's index into
-//     allObjectsInHeap). The spare byte is an unnamed bit-field, so the positional
-//     initializers of static headers still list three values.
+//   * the heap position is a one-byte STATE: a BiBOP slot, adopted, stack, embedded,
+//     poisoned ... (all small negatives), or CN1_HEAPSTATE_INDEXED, meaning the object
+//     has an index into allObjectsInHeap, kept in a side table (cn1HeapIndexOf). Zero
+//     reads as index 0 with no entry -- what a zero-initialized static object read as
+//     before -- so zeroed memory never needs the side table.
 // ALIGNED(8), which the old class POINTER gave for free: every object must be 8-aligned
 // because a reference's low three bits are the tagged-immediate code. Without it an
 // object struct holding only int-sized fields (a boxed Integer, say) is 4-aligned, and a
@@ -230,8 +232,7 @@
     DEBUG_GC_VARIABLES \
     uint16_t __cn1ClassId __attribute__((aligned(8))); \
     signed char __codenameOneGcMark; \
-    unsigned char : 8; \
-    int __heapPosition;
+    signed char __cn1HeapState;
 
 /**
  * header file containing global CN1 constants and structs
@@ -426,9 +427,53 @@ static inline __attribute__((always_inline)) uint16_t cn1ClazzIndexOf(const stru
 // 24 bytes). Free-slot bytes are dead: allocation either zeroes the slot or hands it to a
 // constructor that writes every field.
 #define CN1_BIBOP_FREE_LINK(o)      (*(void**)((char*)(o) + sizeof(struct JavaObjectPrototype)))
-#define CN1_OBJ_HEAPPOS(o)          ((int)((const struct JavaObjectPrototype*)(o))->__heapPosition)
-#define CN1_OBJ_SET_HEAPPOS(o, v)   (((struct JavaObjectPrototype*)(o))->__heapPosition = (v))
-#define CN1_OBJ_HEAPPOS_PTR(o)      (&((struct JavaObjectPrototype*)(o))->__heapPosition)
+// Bytes of an object that belong to the header; the body -- what allocation zeroes and
+// a debug poison destroys -- starts here, NOT at sizeof(struct JavaObjectPrototype).
+#define CN1_OBJ_HEADER_BYTES        4
+// Zero an object's body (size = the whole object) without touching its header, whose
+// mark word is read atomically by a concurrent conservative scan. The 4 bytes after the
+// header are one aligned store, so the bulk zeroing starts 8-aligned: a memset from
+// offset 4 measured ~2% more instructions on the self-hosting run.
+#define CN1_OBJ_ZERO_BODY(o, size) do { \
+        if((size) > CN1_OBJ_HEADER_BYTES) { \
+            *(uint32_t*)((char*)(o) + CN1_OBJ_HEADER_BYTES) = 0; \
+            if((size) > 8) memset((char*)(o) + 8, 0, (size_t)(size) - 8); \
+        } \
+    } while(0)
+// The heap position. CN1_OBJ_HEAPPOS is the STATE -- one byte load -- and compares
+// exactly as the old int did against every state, including ">= 0" for "indexed" (0 and
+// CN1_HEAPSTATE_INDEXED are the two non-negative states). Only the heap table's own code
+// needs the index itself (CN1_OBJ_HEAP_INDEX, from the side table). Setting a negative
+// state consults the side table only when the object has an entry, so allocation, which
+// starts from zeroed memory, never does.
+#define CN1_HEAPSTATE_INDEXED       1
+extern int cn1HeapIndexOf(const void* o);
+extern void cn1HeapIndexSet(const void* o, int index);
+extern void cn1HeapIndexForget(const void* o);
+static inline __attribute__((always_inline)) int cn1ObjHeapPos(const void* o) {
+    int s = ((const struct JavaObjectPrototype*)o)->__cn1HeapState;
+    if(s == CN1_HEAPSTATE_INDEXED) {
+        return cn1HeapIndexOf(o);
+    }
+    return s;   // a state, or 0: index 0 with no entry
+}
+static inline __attribute__((always_inline)) void cn1ObjSetHeapPos(void* o, int v) {
+    struct JavaObjectPrototype* h = (struct JavaObjectPrototype*)o;
+    if(v >= 0) {
+        h->__cn1HeapState = CN1_HEAPSTATE_INDEXED;
+        cn1HeapIndexSet(o, v);
+    } else {
+        if(h->__cn1HeapState == CN1_HEAPSTATE_INDEXED) {
+            cn1HeapIndexForget(o);
+        }
+        h->__cn1HeapState = (signed char)v;
+    }
+}
+#define CN1_OBJ_HEAPPOS(o)          ((int)((const struct JavaObjectPrototype*)(o))->__cn1HeapState)
+#define CN1_OBJ_HEAP_INDEX(o)       cn1ObjHeapPos((const void*)(o))
+#define CN1_OBJ_SET_HEAPPOS(o, v)   cn1ObjSetHeapPos((void*)(o), (v))
+// The state byte, for the one compare-and-swap between two STATES (slot -> adopted).
+#define CN1_OBJ_HEAPSTATE_PTR(o)    (&((struct JavaObjectPrototype*)(o))->__cn1HeapState)
 // A static header, by class id (the cn1_class_id_* constants), since an index is only a
 // constant expression when written from the id.
 #define CN1_OBJ_HEADER_INIT_ID(id)  .__cn1ClassId = (uint16_t)((id) + 1)
@@ -554,7 +599,9 @@ _Static_assert(sizeof(struct JavaArrayPrototype) == 16,
  * performance cliff on the rest. */
 _Static_assert(sizeof(struct JavaArrayPrototype) % 8 == 0,
                "array payload offset must stay 8-aligned for long[] and double[]");
-_Static_assert(sizeof(struct JavaObjectPrototype) == 8, "object header must stay 8 bytes");
+/* 8, of which the header uses CN1_OBJ_HEADER_BYTES: the rest is alignment, which the
+ * first field of 4 bytes or less occupies in every object struct. */
+_Static_assert(sizeof(struct JavaObjectPrototype) == 8, "object header struct must stay 8 bytes");
 _Static_assert(_Alignof(struct JavaObjectPrototype) == 8,
                "objects must be 8-aligned: a reference's low 3 bits are the tag code");
 #endif
@@ -564,14 +611,18 @@ _Static_assert(offsetof(struct JavaArrayPrototype, __cn1ClassId)
 _Static_assert(offsetof(struct JavaArrayPrototype, __codenameOneGcMark)
                == offsetof(struct JavaObjectPrototype, __codenameOneGcMark),
                "array and object headers are cast to each other; the mark word must align");
-_Static_assert(offsetof(struct JavaArrayPrototype, __heapPosition)
-               == offsetof(struct JavaObjectPrototype, __heapPosition),
-               "array and object headers are cast to each other; heapPosition must align");
+_Static_assert(offsetof(struct JavaArrayPrototype, __cn1HeapState)
+               == offsetof(struct JavaObjectPrototype, __cn1HeapState),
+               "array and object headers are cast to each other; the heap state must align");
+_Static_assert(offsetof(struct JavaObjectPrototype, __cn1HeapState) + 1 == CN1_OBJ_HEADER_BYTES,
+               "CN1_OBJ_HEADER_BYTES must name where the header ends");
+/* The payload begins at sizeof(struct JavaArrayPrototype) (CN1_ARRAY_PAYLOAD_OFFSET) for
+ * allocation and placement alike, so what must hold is that every header member lies
+ * below it. With a 4-byte object header the members end at 12 and the struct is 16 (the
+ * payload stays 8-aligned for long[] and double[]); the 4 bytes between are padding. */
 _Static_assert(offsetof(struct JavaArrayPrototype, dataOffset) + sizeof(unsigned short)
-               == sizeof(struct JavaArrayPrototype),
-               "dataOffset must stay the LAST header member: allocArray sizes the block "
-               "from sizeof(struct) while every placement site computes the payload "
-               "address from the same value, and the two must be the same byte");
+               <= sizeof(struct JavaArrayPrototype),
+               "every array header member must lie below the payload offset");
 
 /* The payload of an array that already exists. Equals CN1_ARRAY_PAYLOAD_PTR for every
  * ordinarily allocated array, and differs only for the aligned and stack paths, which
@@ -2687,13 +2738,10 @@ static inline JAVA_OBJECT cn1BibopFastAlloc(CODENAME_ONE_THREAD_STATE, int size,
                 abort();
             }
 #endif
-            int hdr = (int)sizeof(struct JavaObjectPrototype);
-            if(size > hdr) {
-                // NOT removable: skipping this is ~2x SLOWER -- uninitialized ref
-                // fields get scanned during the mark==-1 grace window and retain
-                // floating garbage. The body zero is load-bearing, not overhead.
-                memset((char*)o + hdr, 0, size - hdr);
-            }
+            // NOT removable: skipping this is ~2x SLOWER -- uninitialized ref
+            // fields get scanned during the mark==-1 grace window and retain
+            // floating garbage. The body zero is load-bearing, not overhead.
+            CN1_OBJ_ZERO_BODY(o, size);
             CN1_OBJ_SET_CLASS(o, parent);
             // __codenameOneReferenceCount + __codenameOneThreadData relocated out of the
             // header (force-visited / monitor side tables); no per-object stores.

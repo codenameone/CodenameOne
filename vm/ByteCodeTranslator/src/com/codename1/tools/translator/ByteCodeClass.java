@@ -2406,6 +2406,17 @@ public class ByteCodeClass {
         return 8;
     }
 
+    private boolean ancestorsDeclareInstanceFields() {
+        for (ByteCodeClass c = baseClassObject; c != null; c = c.baseClassObject) {
+            for (ByteCodeField bf : c.fields) {
+                if (!bf.isStaticField()) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
     private void addFields(StringBuilder b) {
         if(baseClassObject != null) {
             baseClassObject.addFields(b);
@@ -2416,6 +2427,26 @@ public class ByteCodeClass {
                 return fieldStorageBytes(c) - fieldStorageBytes(a);
             }
         });
+        // The header is 4 bytes (CN1_OBJ_HEADER_FIELDS) in an 8-aligned struct, so offset 4
+        // is free for fields of up to 4 bytes -- but only the FIRST class in the hierarchy
+        // to declare instance fields can use it: a subclass must keep its parent's layout
+        // as a prefix. That class puts up to 4 bytes of its smallest-fitting fields first.
+        if (!ancestorsDeclareInstanceFields()) {
+            List<ByteCodeField> head = new ArrayList<ByteCodeField>();
+            int gap = 4;
+            for (ByteCodeField bf : ordered) {
+                int n = fieldStorageBytes(bf);
+                if (!bf.isStaticField() && n <= gap && targetGuardFor(clsName, bf.getFieldName()) == null) {
+                    head.add(bf);
+                    gap -= n;
+                    if (gap == 0) {
+                        break;
+                    }
+                }
+            }
+            ordered.removeAll(head);
+            ordered.addAll(0, head);
+        }
         for(ByteCodeField bf : ordered) {
             if(!bf.isStaticField()) {
                 String guard = targetGuardFor(clsName, bf.getFieldName());

@@ -1957,6 +1957,87 @@ pthread_mutex_t* getMemoryAccessMutex() {
     return memoryAccessMutex;
 }
 
+/* ---- The heap-table index side table -------------------------------------------
+ * An object in allObjectsInHeap (a legacy allocation, or a static object registered
+ * there) records its index here, keyed by address, since the header only has room for a
+ * state byte (CN1_HEAPSTATE_INDEXED). Such objects are few -- large arrays and statics,
+ * ~1,500 on the self-hosting corpus -- and only the heap table's own code asks for the
+ * index, so an open-addressed table under one lock is plenty. An object with no entry
+ * reads index 0, which is what a zero-initialized static object read before. */
+static pthread_mutex_t cn1HeapIndexLock = PTHREAD_MUTEX_INITIALIZER;
+static const void** cn1HeapIndexKeys = 0;
+static int* cn1HeapIndexVals = 0;
+static long cn1HeapIndexCap = 0, cn1HeapIndexN = 0;
+#define CN1_HEAP_INDEX_TOMB ((const void*)(uintptr_t)1)
+static long cn1HeapIndexSlot(const void* o, long cap) {
+    return (long)((((uintptr_t)o >> 3) * (uintptr_t)0x9E3779B97F4A7C15ULL) >> 20) & (cap - 1);
+}
+static void cn1HeapIndexGrow(void) {
+    long ncap = cn1HeapIndexCap ? cn1HeapIndexCap * 2 : 4096;
+    const void** nk = (const void**)calloc((size_t)ncap, sizeof(void*));
+    int* nv = (int*)malloc((size_t)ncap * sizeof(int));
+    if(nk == 0 || nv == 0) { free(nk); free(nv); return; }
+    long n = 0;
+    for(long i = 0 ; i < cn1HeapIndexCap ; i++) {
+        const void* k = cn1HeapIndexKeys[i];
+        if(k == 0 || k == CN1_HEAP_INDEX_TOMB) continue;
+        long h = cn1HeapIndexSlot(k, ncap);
+        while(nk[h] != 0) h = (h + 1) & (ncap - 1);
+        nk[h] = k; nv[h] = cn1HeapIndexVals[i]; n++;
+    }
+    free((void*)cn1HeapIndexKeys); free(cn1HeapIndexVals);
+    cn1HeapIndexKeys = nk; cn1HeapIndexVals = nv; cn1HeapIndexCap = ncap; cn1HeapIndexN = n;
+}
+int cn1HeapIndexOf(const void* o) {
+    int v = 0;
+    pthread_mutex_lock(&cn1HeapIndexLock);
+    if(cn1HeapIndexCap != 0) {
+        long h = cn1HeapIndexSlot(o, cn1HeapIndexCap);
+        while(cn1HeapIndexKeys[h] != 0) {
+            if(cn1HeapIndexKeys[h] == o) { v = cn1HeapIndexVals[h]; break; }
+            h = (h + 1) & (cn1HeapIndexCap - 1);
+        }
+    }
+    pthread_mutex_unlock(&cn1HeapIndexLock);
+    return v;
+}
+void cn1HeapIndexSet(const void* o, int index) {
+    pthread_mutex_lock(&cn1HeapIndexLock);
+    // Keys and tombstones together stay under half the table, so a probe always ends.
+    if((cn1HeapIndexN + 1) * 2 > cn1HeapIndexCap) {
+        cn1HeapIndexGrow();
+    }
+    if(cn1HeapIndexCap != 0) {
+        long h = cn1HeapIndexSlot(o, cn1HeapIndexCap);
+        long firstTomb = -1;
+        while(cn1HeapIndexKeys[h] != 0 && cn1HeapIndexKeys[h] != o) {
+            if(cn1HeapIndexKeys[h] == CN1_HEAP_INDEX_TOMB && firstTomb < 0) firstTomb = h;
+            h = (h + 1) & (cn1HeapIndexCap - 1);
+        }
+        if(cn1HeapIndexKeys[h] == 0) {
+            if(firstTomb >= 0) {
+                h = firstTomb;
+            } else {
+                cn1HeapIndexN++;
+            }
+        }
+        cn1HeapIndexKeys[h] = o;
+        cn1HeapIndexVals[h] = index;
+    }
+    pthread_mutex_unlock(&cn1HeapIndexLock);
+}
+void cn1HeapIndexForget(const void* o) {
+    pthread_mutex_lock(&cn1HeapIndexLock);
+    if(cn1HeapIndexCap != 0) {
+        long h = cn1HeapIndexSlot(o, cn1HeapIndexCap);
+        while(cn1HeapIndexKeys[h] != 0) {
+            if(cn1HeapIndexKeys[h] == o) { cn1HeapIndexKeys[h] = CN1_HEAP_INDEX_TOMB; break; }
+            h = (h + 1) & (cn1HeapIndexCap - 1);
+        }
+    }
+    pthread_mutex_unlock(&cn1HeapIndexLock);
+}
+
 int findPointerPosInHeap(JAVA_OBJECT obj) {
     // Tagged Integers are immediate values, not heap objects, and therefore have
     // no header/heap position to read.  Keep this low-level helper total so a
@@ -1964,7 +2045,7 @@ int findPointerPosInHeap(JAVA_OBJECT obj) {
     if(obj == 0 || CN1_IS_TAGGED(obj)) {
         return -1;
     }
-    return CN1_OBJ_HEAPPOS(obj);
+    return CN1_OBJ_HEAP_INDEX(obj);
 }
 
 // this is an optimization allowing us to continue searching for available space in RAM from the previous position
@@ -2097,8 +2178,8 @@ static void cn1MatureObject(JAVA_OBJECT obj) {
        && atomic_load_explicit(&cn1GcFreezeHeld, memory_order_relaxed) != 0) {
         return;
     }
-    int expected = CN1_BIBOP_HEAP_POS;
-    if(!__atomic_compare_exchange_n(CN1_OBJ_HEAPPOS_PTR(obj), &expected, CN1_BIBOP_ADOPTED,
+    signed char expected = CN1_BIBOP_HEAP_POS;   // both states: a byte swap
+    if(!__atomic_compare_exchange_n(CN1_OBJ_HEAPSTATE_PTR(obj), &expected, (signed char)CN1_BIBOP_ADOPTED,
                                     0, __ATOMIC_RELAXED, __ATOMIC_RELAXED)) {
         return;
     }
@@ -10312,10 +10393,7 @@ static CN1BibopPage* cn1BibopAcquirePage(CODENAME_ONE_THREAD_STATE, int ci) {
 // body (after the fixed header) is zeroed, never the mark word, so there is no
 // plain-write-vs-atomic-read race on the mark.
 static inline void cn1BibopInitSlot(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT o, int size, struct clazz* parent) {
-    int hdr = (int)sizeof(struct JavaObjectPrototype);
-    if(size > hdr) {
-        memset((char*)o + hdr, 0, size - hdr);
-    }
+    CN1_OBJ_ZERO_BODY(o, size);
     CN1_OBJ_SET_CLASS(o, parent);
     // __codenameOneReferenceCount + __codenameOneThreadData relocated out of the header
     // (force-visited / monitor side tables); no per-object stores.
@@ -13278,7 +13356,7 @@ static int cn1GcQSetContains(JAVA_OBJECT o) {
 // Poison an object body, leaving the header (class pointer for forensics, the
 // poison mark, the poison heap position) intact. size 0 => header only.
 static void cn1GcPoisonBody(JAVA_OBJECT o, long size) {
-    long hdr = (long)sizeof(struct JavaObjectPrototype);
+    long hdr = (long)CN1_OBJ_HEADER_BYTES;
     if(size > hdr) {
         memset((char*)o + hdr, CN1_GC_POISON_BYTE, (size_t)(size - hdr));
     }
@@ -13289,7 +13367,7 @@ static void cn1GcPoisonBody(JAVA_OBJECT o, long size) {
 // the header is destroyed so a dangling read cannot find plausible payload
 // (this is what turns "corrupted dictionary word" into a deterministic abort).
 void cn1GcVerifyPoisonSlot(JAVA_OBJECT o, int slotSize) {
-    long hdr = (long)sizeof(struct JavaObjectPrototype);
+    long hdr = (long)CN1_OBJ_HEADER_BYTES;
     if((long)slotSize > hdr) {
         memset((char*)o + hdr, CN1_GC_POISON_BYTE, (size_t)((long)slotSize - hdr));
     }
@@ -14918,6 +14996,11 @@ void codenameOneGcFree(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj) {
         if(md) {
             free(md);
         }
+    }
+    // The heap-table index lives beside the object (cn1HeapIndexOf): drop it with the
+    // memory, or the next object malloc returns at this address inherits it.
+    if(((struct JavaObjectPrototype*)obj)->__cn1HeapState == CN1_HEAPSTATE_INDEXED) {
+        cn1HeapIndexForget(obj);
     }
 #ifdef CN1_GC_VERIFY
     // QA: poison + quarantine rather than free, so a dangling reference reads a

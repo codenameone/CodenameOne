@@ -45,7 +45,7 @@ static struct ThreadLocalData heapRemovalState;
 static int checkDescriptorRemoval(struct clazz *descriptor, int populated) {
     struct clazz *parent = CN1_OBJ_CLASS(descriptor);
     int mark = CN1_OBJ_MARK(descriptor);
-    int position = CN1_OBJ_HEAPPOS(descriptor);
+    int position = CN1_OBJ_HEAP_INDEX(descriptor);
 #ifdef CN1_CONSERVATIVE_GC_ROOTS
     int immortalCount = atomic_load(&cn1ImmortalObjSetCount);
 #endif
@@ -56,11 +56,11 @@ static int checkDescriptorRemoval(struct clazz *descriptor, int populated) {
     HEAP_CHECK(allObjectsInHeap == (populated ? heapRemovalSlots : NULL));
     HEAP_CHECK(heapRemovalSlots[0] == &heapRemovalDisplay);
     HEAP_CHECK(heapRemovalSlots[1] == &heapRemovalBuffer);
-    HEAP_CHECK(CN1_OBJ_HEAPPOS(&(heapRemovalDisplay)) == 0);
-    HEAP_CHECK(CN1_OBJ_HEAPPOS(&(heapRemovalBuffer)) == 1);
+    HEAP_CHECK(CN1_OBJ_HEAP_INDEX(&(heapRemovalDisplay)) == 0);
+    HEAP_CHECK(CN1_OBJ_HEAP_INDEX(&(heapRemovalBuffer)) == 1);
     HEAP_CHECK(CN1_OBJ_CLASS(descriptor) == parent);
     HEAP_CHECK(CN1_OBJ_MARK(descriptor) == mark);
-    HEAP_CHECK(CN1_OBJ_HEAPPOS(descriptor) == position);
+    HEAP_CHECK(CN1_OBJ_HEAP_INDEX(descriptor) == position);
     HEAP_CHECK(cn1ImmortalRootsN == rootCount);
 #ifdef CN1_CONSERVATIVE_GC_ROOTS
     HEAP_CHECK(atomic_load(&cn1ImmortalObjSetCount) == immortalCount);
