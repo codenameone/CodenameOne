@@ -21,6 +21,9 @@
         <maven.compiler.target>1.8</maven.compiler.target>
         <codename1.platform>javase</codename1.platform>
         <codename1.projectPlatform>javase</codename1.projectPlatform>
+        <!-- The JVM the smoke app runs on. The Windows x86 leg points this at a 32-bit
+             JRE while Maven itself keeps running on the 64-bit one. -->
+        <cn1.smoke.java>java</cn1.smoke.java>
     </properties>
 
     <build>
@@ -104,7 +107,7 @@
                         <artifactId>exec-maven-plugin</artifactId>
                         <configuration>
                             <workingDirectory>${basedir}/../common</workingDirectory>
-                            <executable>java</executable>
+                            <executable>${cn1.smoke.java}</executable>
                             <longClasspath>true</longClasspath>
                             <arguments>
                                 <argument>-Xmx1024M</argument>

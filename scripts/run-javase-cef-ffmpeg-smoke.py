@@ -13,6 +13,12 @@ ARTIFACTS_DIR = Path(os.environ.get("ARTIFACTS_DIR", REPO_ROOT / "artifacts" / "
 ARTIFACTS_DIR.mkdir(parents=True, exist_ok=True)
 M2_REPO = Path(os.environ.get("MAVEN_REPO_LOCAL", REPO_ROOT / ".m2" / "repository"))
 M2_REPO.mkdir(parents=True, exist_ok=True)
+# Optional: a different JVM for the smoke app than the one running Maven, and the
+# sun.arch.data.model the app must report. The Windows x86 leg sets both, so a
+# 32-bit JCEF run cannot silently pass on the 64-bit JVM.
+APP_JAVA = os.environ.get("SMOKE_APP_JAVA", "").strip()
+EXPECT_DATA_MODEL = os.environ.get("SMOKE_EXPECT_DATA_MODEL", "").strip()
+SMOKE_WORKDIR = REPO_ROOT / "maven" / "tests" / "javase-cef-ffmpeg-smoke" / "common"
 
 
 def log(message: str) -> None:
@@ -237,6 +243,8 @@ def run_smoke_app(video_file: Path, screenshot_path: Path, status_path: Path):
         "-Psimulator",
         "verify",
     ]
+    if APP_JAVA:
+        base_cmd.insert(-2, f"-Dcn1.smoke.java={APP_JAVA}")
     cmd = base_cmd
     if platform.system() == "Linux" and shutil.which("xvfb-run"):
         cmd = ["xvfb-run", "-a"] + base_cmd
@@ -303,6 +311,8 @@ def verify_status(status_path: Path):
         raise RuntimeError(f"Browser peer was not created using the CEF backend: {data}")
     if data.get("videoFrameRendered") != "true":
         raise RuntimeError(f"FFmpeg video frame was not rendered before capture: {data}")
+    if EXPECT_DATA_MODEL and data.get("javaDataModel") != EXPECT_DATA_MODEL:
+        raise RuntimeError(f"Smoke app did not run on a {EXPECT_DATA_MODEL}-bit JVM: {data}")
     if platform.system() == "Windows":
         avg = data.get("videoAverageColor", "")
         try:
@@ -311,6 +321,13 @@ def verify_status(status_path: Path):
             raise RuntimeError(f"Unable to parse Windows FFmpeg videoAverageColor from status: {data}")
         if r < 120 or r <= g + 25 or r <= b + 25:
             raise RuntimeError(f"Windows FFmpeg frame is not red enough according to backend status: {data}")
+
+
+def collect_crash_logs():
+    # A native crash inside CEF takes the JVM down without a Java exception; the
+    # hs_err file in the app's working directory is the only record of where.
+    for crash_log in SMOKE_WORKDIR.glob("hs_err_pid*.log"):
+        shutil.copy2(crash_log, ARTIFACTS_DIR / crash_log.name)
 
 
 def main():
@@ -340,3 +357,5 @@ if __name__ == "__main__":
     except Exception as exc:
         log(f"FAILED: {exc}")
         raise
+    finally:
+        collect_crash_logs()

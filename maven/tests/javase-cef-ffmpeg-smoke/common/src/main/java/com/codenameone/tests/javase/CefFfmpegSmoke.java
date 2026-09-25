@@ -184,7 +184,8 @@ public class CefFfmpegSmoke extends Lifecycle {
                 "browserReadyState=" + browserReadyState + "\n" +
                 "browserColor=" + browserColor + "\n" +
                 "mediaImplementation=" + System.getProperty("cn1.javase.mediaImplementation", "") + "\n" +
-                "browserImplementation=" + System.getProperty("cn1.javase.implementation", "") + "\n");
+                "browserImplementation=" + System.getProperty("cn1.javase.implementation", "") + "\n" +
+                "javaDataModel=" + System.getProperty("sun.arch.data.model", "") + "\n");
         Display.getInstance().screenshot(img -> {
             if (img == null) {
                 failAndExit("Screenshot callback returned null");
