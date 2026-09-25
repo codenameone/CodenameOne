@@ -200,6 +200,19 @@ public class LinuxNativeBuilder extends Executor {
         File classesDir = new File(tmpFile, "classes");
         File resDir = new File(tmpFile, "res");
         File buildinRes = new File(tmpFile, "btres");
+        // Emptied, not merely created, for the reason MacOSNativeBuilder gives:
+        // these paths are stable across builds and unzip() only overwrites what
+        // the archive carries, so a class deleted since the last build would still
+        // be translated -- and a removed @OpenTelemetry or @Route would leave its
+        // generated bootstrap behind, which annotationFrameworksInstallSource()
+        // probes this directory for and would keep installing.
+        try {
+            MacOSNativeBuilder.deleteRecursively(classesDir);
+            MacOSNativeBuilder.deleteRecursively(resDir);
+            MacOSNativeBuilder.deleteRecursively(buildinRes);
+        } catch (IOException ex) {
+            throw new BuildException("Failed to clear the staged build inputs", ex);
+        }
         classesDir.mkdirs();
         resDir.mkdirs();
         buildinRes.mkdirs();

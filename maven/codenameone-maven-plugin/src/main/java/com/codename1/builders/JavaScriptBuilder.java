@@ -171,6 +171,12 @@ public class JavaScriptBuilder extends Executor {
             File stageClasses = new File(buildDir, "stage-classes");
             File portClasses = new File(buildDir, "port-classes");
             File translatorOut = new File(buildDir, "translator-output");
+            // The staged classes are emptied first: the build directory is stable
+            // across builds and unzip() only overwrites what the jar carries, so a
+            // class deleted since the last build -- including a generated bootstrap
+            // whose annotation was removed, which annotationFrameworksInstallSource()
+            // probes this directory for -- would otherwise still be installed.
+            MacOSNativeBuilder.deleteRecursively(stageClasses);
             stageClasses.mkdirs();
             portClasses.mkdirs();
             translatorOut.mkdirs();

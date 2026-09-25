@@ -44,6 +44,7 @@ import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -626,6 +627,22 @@ class TelemetryTest extends UITestBase {
     }
 
     @Test
+    void anOversizedAttributeKeyIsDroppedNotCut() {
+        Telemetry.State state = new Telemetry.State(
+                new TelemetryConfig().direct("http://collector.test"));
+        TelemetrySpan span = state.start("keys", TelemetrySpan.KIND_INTERNAL, null);
+        StringBuilder huge = new StringBuilder();
+        while (huge.length() <= TelemetrySpan.MAX_KEY_LENGTH) {
+            huge.append("key.");
+        }
+        span.setAttribute(huge.toString(), "a");
+        span.setAttribute(huge.toString() + "other", 1L);
+        span.setAttribute("short", true);
+        assertEquals(1, span.attributes.size(), "an oversized key was kept: " + span.attributes);
+        assertEquals(2, span.droppedAttributes);
+    }
+
+    @Test
     void aSpanFromAnotherInstallationIsNeverAParent() {
         Telemetry.State before = new Telemetry.State(
                 new TelemetryConfig().direct("http://collector.test"));
@@ -943,6 +960,35 @@ class TelemetryTest extends UITestBase {
         }
         assertTrue(exported, "the buffer was dropped on stop because the export queue was full");
         assertTrue(backedUp.buffer.isEmpty());
+    }
+
+    @Test
+    void aDefaultTraceparentIsHonouredAndNeverDuplicated() throws Exception {
+        // Defaults are copied onto the request before the tracer sees it, so a trace
+        // context the app supplies as a default is the app's choice of parent, and is
+        // never joined by a second spelling -- neither the tracer's nor the request's.
+        String mine = "00-33333333333333333333333333333333-4444444444444444-01";
+        NetworkManager.getInstance().addDefaultHeader("Traceparent", mine);
+        NetworkManager.getInstance().addDefaultHeader("x-default-only", "d");
+        try {
+            Telemetry.install(new TelemetryConfig().direct("http://collector.test"));
+            NetworkManager.getInstance().addToQueueAndWait(request(API + "/default-parent"));
+            Map<String, String> sent = connection(API + "/default-parent").getHeaders();
+            assertEquals(mine, sent.get("Traceparent"));
+            assertNull(sent.get("traceparent"), "the tracer added its own beside the default");
+
+            ConnectionRequest own = request(API + "/own-spelling");
+            own.addRequestHeader("X-DEFAULT-ONLY", "r");
+            NetworkManager.getInstance().addToQueueAndWait(own);
+            sent = connection(API + "/own-spelling").getHeaders();
+            assertEquals("r", sent.get("X-DEFAULT-ONLY"));
+            assertNull(sent.get("x-default-only"),
+                    "a default went out beside the request's own spelling of the header");
+        } finally {
+            java.lang.reflect.Field headers = NetworkManager.class.getDeclaredField("userHeaders");
+            headers.setAccessible(true);
+            headers.set(NetworkManager.getInstance(), null);
+        }
     }
 
     @Test

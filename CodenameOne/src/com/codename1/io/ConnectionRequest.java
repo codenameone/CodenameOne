@@ -844,6 +844,17 @@ public class ConnectionRequest implements IOProgressListener {
         if (userHeaders == null) {
             userHeaders = new Hashtable();
         }
+        // In any spelling, as HTTP matches names. An exact-key check let a default
+        // "traceparent" go out beside the request's own "Traceparent" -- two trace
+        // contexts on one request, which a server may resolve either way. Content-Type
+        // keeps the exact check: it lives in its own field, not in userHeaders, and
+        // getRequestHeader answers for it only when it was set explicitly.
+        if (key == null) {
+            return;
+        }
+        if (!"content-type".equalsIgnoreCase(key) && getRequestHeader(key) != null) {
+            return;
+        }
         if (!userHeaders.containsKey(key)) {
             userHeaders.put(key, value);
         }
@@ -1222,7 +1233,10 @@ public class ConnectionRequest implements IOProgressListener {
             // After the guard, so the attempt the tracer times is the one that is
             // really made, and in the same place for the same reason: before
             // initConnection() writes the headers, and outside it so a subclass
-            // that overrides it cannot drop the trace context.
+            // that overrides it cannot drop the trace context. NetworkManager's
+            // default headers are already on the request by now -- NetworkThread
+            // copies them before it calls runCurrentRequest -- so a traceparent the
+            // app supplies as a default is seen here and kept, not replaced.
             try {
                 tracerAttempt = tracer.beforeRequest(this,
                         tracer == tracerParentOwner ? tracerParent : null);

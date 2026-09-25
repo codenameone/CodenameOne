@@ -107,7 +107,12 @@ public final class OtlpTracer implements Tracer {
     private Set excluded = new HashSet();
     private BatchExporter exporter;
     private OtlpRelay relay;
-    private long idState;
+    /** Ids fetched per call into the secure generator; see seedIds. */
+    private static final int ID_BLOCK = 64;
+    private final long[] ids = new long[ID_BLOCK];
+    private int idsLeft;
+    private byte[] idKey;
+    private long idCounter;
 
     /** A tracer whose service name comes from configuration alone. */
     public OtlpTracer() {
@@ -662,38 +667,71 @@ public final class OtlpTracer implements Tracer {
     // ------------------------------------------------------------------
 
     /**
-     * Seeded once from the platform's secure generator and advanced with
-     * SplitMix64, which is a bijection over its counter: ids never repeat inside a
-     * process, and processes seeded independently collide only by chance. Trace
-     * ids need to be unique and unpredictable enough not to be guessed into
-     * someone else's trace, not secret, so a CSPRNG call per span -- a native call
-     * into OpenSSL on the packaged runtime -- would buy nothing.
+     * Ids come straight from the platform's secure generator, fetched a block at a
+     * time so the native call is paid once per ID_BLOCK ids rather than per span.
+     *
+     * They used to be the output of SplitMix64 over a securely seeded counter. That
+     * is a bijection with a public inverse: one span id seen in a response header or
+     * a log recovers the state, and from it every id this process issues next --
+     * other users' trace ids included, which is exactly what makes a trace id worth
+     * guessing (joining someone else's trace, or predicting a correlation id another
+     * system trusts).
+     *
+     * A refill that fails after open() succeeded falls back to HMAC-SHA256 under a
+     * key drawn from the same generator at open() and never emitted, over a counter.
+     * That is still unpredictable without the key; it exists because nextId() runs
+     * on the request path, where throwing would fail the request being traced.
+     * open() itself fails when there is no secure generator at all.
      */
-    private void seedIds() {
-        long seed;
-        try {
-            byte[] random = Crypto.randomBytes(8);
-            seed = 0;
-            for(int iter = 0 ; iter < 8 ; iter++) {
-                seed = (seed << 8) | (random[iter] & 0xff);
-            }
-        } catch (IOException err) {
-            seed = System.currentTimeMillis() ^ (System.nanoTime() << 21)
-                    ^ System.identityHashCode(this);
+    private void seedIds() throws IOException {
+        byte[] key = Crypto.randomBytes(32);
+        synchronized(this) {
+            idKey = key;
+            idsLeft = 0;
         }
-        idState = seed;
     }
 
     private synchronized long nextId() {
         long z;
         do {
-            idState += 0x9E3779B97F4A7C15L;
-            z = idState;
-            z = (z ^ (z >>> 30)) * 0xBF58476D1CE4E5B9L;
-            z = (z ^ (z >>> 27)) * 0x94D049BB133111EBL;
-            z = z ^ (z >>> 31);
+            if(idsLeft == 0) {
+                refillIds();
+            }
+            z = ids[--idsLeft];
         } while(z == 0);
         return z;
+    }
+
+    private void refillIds() {
+        byte[] block;
+        try {
+            block = Crypto.randomBytes(ID_BLOCK * 8);
+        } catch(IOException err) {
+            block = null;
+        }
+        if(block == null || block.length < ID_BLOCK * 8) {
+            block = new byte[ID_BLOCK * 8];
+            byte[] counter = new byte[8];
+            for(int off = 0 ; off < block.length ; off += 32) {
+                long c = ++idCounter;
+                for(int b = 0 ; b < 8 ; b++) {
+                    counter[b] = (byte)(c >>> (56 - 8 * b));
+                }
+                byte[] mac = Crypto.hmacSha256(idKey, counter);
+                if(mac == null || mac.length < 32) {
+                    throw new IllegalStateException("No secure randomness for trace ids");
+                }
+                System.arraycopy(mac, 0, block, off, Math.min(32, block.length - off));
+            }
+        }
+        for(int iter = 0 ; iter < ID_BLOCK ; iter++) {
+            long v = 0;
+            for(int b = 0 ; b < 8 ; b++) {
+                v = (v << 8) | (block[iter * 8 + b] & 0xff);
+            }
+            ids[iter] = v;
+        }
+        idsLeft = ID_BLOCK;
     }
 
     // ------------------------------------------------------------------

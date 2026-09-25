@@ -426,6 +426,73 @@ class TraceContextTest {
     }
 
     @Test
+    @DisplayName("an oversized attribute key is dropped, never cut into another key")
+    void oversizedKeysAreDropped() throws Exception {
+        java.util.Properties settings = new java.util.Properties();
+        settings.setProperty(OtlpTracer.ENDPOINT, "http://127.0.0.1:9");
+        OtlpTracer tracer = new OtlpTracer();
+        assertTrue(tracer.open(com.codename1.backend.Config.of(settings, "test")));
+        try {
+            StringBuilder huge = new StringBuilder();
+            while(huge.length() <= OtelSpan.MAX_KEY_LENGTH) {
+                huge.append("key.");
+            }
+            OtelSpan span = (OtelSpan) tracer.startSpan("keys",
+                    com.codename1.backend.Span.KIND_INTERNAL, null, null, null);
+            span.setAttribute(huge.toString(), "a");
+            span.setAttribute(huge.toString() + "other", 1L);
+            span.setAttribute("short", true);
+            assertEquals(1, span.attributes.size(), "an oversized key was kept: " + span.attributes);
+            assertEquals(2, span.droppedAttributes);
+        } finally {
+            tracer.shutdown(0);
+        }
+    }
+
+    @Test
+    @DisplayName("one observed span id does not predict the next trace id")
+    void idsAreNotPredictableFromOneAnother() throws Exception {
+        java.util.Properties settings = new java.util.Properties();
+        settings.setProperty(OtlpTracer.ENDPOINT, "http://127.0.0.1:9");
+        OtlpTracer tracer = new OtlpTracer();
+        assertTrue(tracer.open(com.codename1.backend.Config.of(settings, "test")));
+        try {
+            // The attack the old generator allowed: SplitMix64 is invertible, so a
+            // span id seen in a header gives back the counter, and one step on from
+            // it is the next root span's trace id. Run it against each pair.
+            java.math.BigInteger mod = java.math.BigInteger.ONE.shiftLeft(64);
+            long inv1 = java.math.BigInteger.valueOf(0xBF58476D1CE4E5B9L).mod(mod)
+                    .modInverse(mod).longValue();
+            long inv2 = java.math.BigInteger.valueOf(0x94D049BB133111EBL).mod(mod)
+                    .modInverse(mod).longValue();
+            int predicted = 0;
+            for(int iter = 0 ; iter < 200 ; iter++) {
+                OtelSpan seen = (OtelSpan) tracer.startSpan("seen",
+                        com.codename1.backend.Span.KIND_INTERNAL, null, null, null);
+                OtelSpan next = (OtelSpan) tracer.startSpan("next",
+                        com.codename1.backend.Span.KIND_INTERNAL, null, null, null);
+                long z = seen.spanId;
+                z = z ^ (z >>> 31) ^ (z >>> 62);
+                z *= inv2;
+                z = z ^ (z >>> 27) ^ (z >>> 54);
+                z *= inv1;
+                z = z ^ (z >>> 30) ^ (z >>> 60);
+                long state = z + 0x9E3779B97F4A7C15L;
+                long guess = state;
+                guess = (guess ^ (guess >>> 30)) * 0xBF58476D1CE4E5B9L;
+                guess = (guess ^ (guess >>> 27)) * 0x94D049BB133111EBL;
+                guess = guess ^ (guess >>> 31);
+                if(guess == next.traceHi) {
+                    predicted++;
+                }
+            }
+            assertEquals(0, predicted, "trace ids followed from the previous span id");
+        } finally {
+            tracer.shutdown(0);
+        }
+    }
+
+    @Test
     @DisplayName("a truncated value never ends in half a character")
     void truncationKeepsPairsWhole() {
         StringBuilder text = new StringBuilder();

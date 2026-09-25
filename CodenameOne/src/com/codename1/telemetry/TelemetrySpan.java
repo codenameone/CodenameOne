@@ -51,6 +51,8 @@ public final class TelemetrySpan {
     static final int MAX_ATTRIBUTES = 128;
     static final int MAX_EVENTS = 32;
     static final int MAX_VALUE_LENGTH = 4096;
+    /// Past this an attribute KEY is dropped; see put.
+    static final int MAX_KEY_LENGTH = 256;
 
     final String traceId;
     final String spanId;
@@ -151,6 +153,15 @@ public final class TelemetrySpan {
 
     private TelemetrySpan put(String key, Object value) {
         if (!sampled || ended || key == null || value == null) {
+            return this;
+        }
+        // An oversized KEY is dropped rather than cut. Values are truncated because a
+        // prefix of a value is still that value; a prefix of a key is a different
+        // attribute, and two long keys sharing one would silently overwrite each other.
+        // Left unbounded, one key read from a request could carry the whole export
+        // batch past the collector's size limit and lose every span in it.
+        if (key.length() > MAX_KEY_LENGTH) {
+            droppedAttributes++;
             return this;
         }
         if (!attributes.containsKey(key) && attributes.size() >= MAX_ATTRIBUTES) {

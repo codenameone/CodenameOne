@@ -44,6 +44,8 @@ final class OtelSpan extends Span {
     static final int MAX_EVENTS = 128;
     /** Past this a string attribute is truncated. A request body in an attribute is a bug. */
     static final int MAX_VALUE_LENGTH = 4096;
+    /** Past this an attribute KEY is dropped; see put. */
+    static final int MAX_KEY_LENGTH = 256;
 
     private final OtlpTracer tracer;
     final long traceHi;
@@ -136,6 +138,15 @@ final class OtelSpan extends Span {
 
     private Span put(String key, Object value) {
         if(!sampled || ended || key == null || value == null || tracer.excluded(key)) {
+            return this;
+        }
+        // An oversized KEY is dropped rather than cut. Values are truncated because a
+        // prefix of a value is still that value; a prefix of a key is a different
+        // attribute, and two long keys sharing one would silently overwrite each other.
+        // Left unbounded, one key read from a request could carry the whole export
+        // batch past the collector's size limit and lose every span in it.
+        if(key.length() > MAX_KEY_LENGTH) {
+            droppedAttributes++;
             return this;
         }
         if(!attributes.containsKey(key) && attributes.size() >= MAX_ATTRIBUTES) {
