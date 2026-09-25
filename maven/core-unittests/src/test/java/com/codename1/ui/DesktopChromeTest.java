@@ -24,8 +24,6 @@ package com.codename1.ui;
 
 import com.codename1.junit.FormTest;
 import com.codename1.junit.UITestBase;
-import com.codename1.ui.events.ActionEvent;
-import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.layouts.BoxLayout;
 
 import java.util.Vector;
@@ -165,7 +163,8 @@ class DesktopChromeTest extends UITestBase {
      * The Initializr's barebones template does exactly this in {@code runApp()}. In native mode
      * the side menu used to be built on {@code getComponentForm()}, which is null while the
      * toolbar is detached, so the app died with a NullPointerException before its first form
-     * was shown -- a blank window on macOS and Windows, whose desktop themes ask for native.
+     * was shown -- a blank desktop window for every project generated with
+     * {@code desktop.titleBar=native}.
      */
     @FormTest
     void nativeModeBridgesSideMenuCommandsInsteadOfBuildingASideMenu() {
@@ -174,11 +173,7 @@ class DesktopChromeTest extends UITestBase {
         Form hi = new Form("Hi World", BoxLayout.y());
         hi.add(new Button("Hello World"));
         Command hello = hi.getToolbar().addMaterialCommandToSideMenu("Hello Command",
-                FontImage.MATERIAL_CHECK, 4, new ActionListener() {
-                    @Override
-                    public void actionPerformed(ActionEvent evt) {
-                    }
-                });
+                FontImage.MATERIAL_CHECK, 4, e -> { });
         hi.show();
         DisplayTest.flushEdt();
 
