@@ -395,6 +395,12 @@ public final class QueryImpl<T> implements com.codename1.orm.session.Query<T> {
     }
     private Object builderParameter(String field, Object value) {
         Object converted = parameter(field, value);
+        boolean mappedBoolean = mapping(field).startsWith("converter:")
+                && (Long.valueOf(0).equals(converted) || Long.valueOf(1).equals(converted));
+        if (converted != null && kind(field) == Attribute.BOOLEAN && !(value instanceof Boolean)
+                && !mappedBoolean) {
+            throw new IllegalArgumentException("Boolean predicate requires a Boolean: " + field);
+        }
         Values.requireStorageKind(converted, kind(field));
         requireIntegralRange(field, converted);
         return converted;

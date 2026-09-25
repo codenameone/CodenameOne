@@ -197,7 +197,8 @@ instance. It returns false for a missing row or an increment outside the
 counter/version range. It requires a transaction and an `int`, `Integer`, `long`,
 or `Long` attribute without a converter, including properties holding those
 numeric types. Other values stored as integers, such as
-booleans and dates, aren't counters.
+booleans and dates, aren't counters. Invalid entity types, fields, or identifiers
+are rejected before pending changes are flushed.
 
 Scalar field projections return the mapped Java values, including enums, dates,
 booleans, property values, and converter-backed objects. Integral `SUM` results
@@ -218,7 +219,7 @@ Generated key columns also have a combined limit of 3,072 bytes per key, countin
 up to four bytes per text character. This applies to primary keys, indexes, and
 collection keys, and is checked before schema creation. Explicit column type
 declarations remain the application's schema contract. MySQL and MariaDB reject
-default binary primary keys before schema creation; these keys need an explicit
+default binary primary keys and secondary indexes before schema creation; these keys need an explicit
 bounded column type declaration.
 
 JPQL arithmetic requires numeric operands. Parameters in integral expressions
@@ -239,7 +240,8 @@ embedding field name. An all-null embedded value reads as null. Embedded fields
 can be used in query paths. Enums are stored by name. Mapped query parameters and
 literals accept the declared enum type, a valid constant name, or null. Invalid
 names and constants from other enum types are rejected before execution.
-Boolean values use numeric
+Fluent and JPQL predicates require Boolean inputs for ordinary Boolean fields;
+fields with converters accept their declared domain values. Boolean values use numeric
 storage; native `BOOL` and `BOOLEAN` column declarations are rejected.
 
 Public no-argument void methods can receive `@PrePersist`, `@PostPersist`,
@@ -323,7 +325,7 @@ the target key field, update the Java map keys as well.
 List, Set, and Map with String keys. Values may be String, boxed primitive types,
 or `java.util.Date`. Lists preserve order and duplicate values. Map columns can
 be named with `@MapKeyColumn`; `@JoinTable` names the collection table.
-Element-map keys accept at most 255 characters on every database.
+Element-map keys accept at most 255 Unicode code points on every database.
 `query.containsElement("tags", "important")` tests membership without loading
 the collection. Changing a mutable Date value is detected during flush.
 
@@ -334,7 +336,7 @@ schemas. It creates missing entity/collection tables, primary and foreign keys,
 one-to-one uniqueness, and relationship indexes. `@Column(unique=true)` and
 `@Entity(indexes=@Index(name="by_name", fields={"name"}))` declare additional
 indexes. Generated text keys, indexed fields, and foreign keys accept at most
-255 characters during managed inserts, updates, and bulk assignments on every database. Specify
+255 Unicode code points during managed inserts, updates, and bulk assignments on every database. Specify
 `@Column(type=...)` to control the SQL type and its value limits yourself.
 
 `session.validateSchema()` checks mapped entity columns, storage-type families,
@@ -348,7 +350,8 @@ to a managed schema.
 Backend sessions support `find(type, id, LockMode.PESSIMISTIC_READ)` and
 `PESSIMISTIC_WRITE`, or `lock(entity, mode)`, inside a transaction. PostgreSQL and
 MySQL/MariaDB use their row-lock clauses. SQLite rejects these modes explicitly;
-it can't provide row-level pessimistic locks.
+it can't provide row-level pessimistic locks. Invalid or unsupported lock modes
+are rejected before pending changes are flushed.
 
 ==== Supported boundary
 

@@ -148,6 +148,27 @@ public class OrmAnnotationProcessorTest {
     }
 
     @Test
+    public void elementMapKeyLimitsCountUnicodeCharacters() throws Exception {
+        File classes=tmp.newFolder();Map<String,String> sources=new java.util.LinkedHashMap<String,String>();
+        sources.put("unicodekeys.Entry","package unicodekeys; import com.codename1.annotations.*; import com.codename1.annotations.db.*; @Entity(table=\"unicode_key_entries\") public class Entry { @Id public long id; @ElementCollection public java.util.Map<String,String> values=new java.util.LinkedHashMap<String,String>(); }");
+        JavaSourceCompiler.compile(sources,classes,Arrays.asList(testClassesDir()));ProcessorContext client=runProcessor(classes);assertFalse(client.getErrors().toString(),client.hasErrors());ProcessorContext backend=runProcessor(classes,backendClasspath());assertFalse(backend.getErrors().toString(),backend.hasErrors());
+        String boundary=new String(new char[255]).replace("\0","\ud83d\ude00"),oversize=boundary+"a";
+        try(java.net.URLClassLoader loader=new java.net.URLClassLoader(new URL[]{classes.toURI().toURL()},getClass().getClassLoader())) {
+            Class type=loader.loadClass("unicodekeys.Entry");
+            for(String suffix:Arrays.asList("Cn1Model","Cn1BackendModel")) {
+                Map<String,com.codename1.impl.orm.EntityModel<?>> models=new java.util.LinkedHashMap<String,com.codename1.impl.orm.EntityModel<?>>();models.put(type.getName(),(com.codename1.impl.orm.EntityModel)loader.loadClass(type.getName()+suffix).newInstance());
+                com.codename1.backend.Database db=com.codename1.backend.Database.open(":memory:");com.codename1.orm.session.Session session=new com.codename1.impl.orm.SessionImpl(new com.codename1.impl.orm.BackendSqlAccess(null,db,db.dialect()),models);
+                try {
+                    session.createTables();session.beginTransaction();Object entry=type.newInstance();((Map)type.getField("values").get(entry)).put(boundary,"ok");session.persist(entry);session.commitTransaction();Object id=type.getField("id").get(entry);session.clear();
+                    entry=session.find(type,id);session.initialize(entry,"values");org.junit.Assert.assertEquals("ok",((Map)type.getField("values").get(entry)).get(boundary));
+                    session.beginTransaction();((Map)type.getField("values").get(entry)).put(oversize,"invalid");org.junit.Assert.assertThrows(com.codename1.orm.session.PersistenceException.class,session::flush);session.rollbackTransaction();
+                    entry=session.find(type,id);session.initialize(entry,"values");org.junit.Assert.assertEquals(1,((Map)type.getField("values").get(entry)).size());
+                } finally { session.close();db.close(); }
+            }
+        }
+    }
+
+    @Test
     public void orderedListsAndEntityMapsRoundTripWithoutLosingDuplicateLinks() throws Exception {
         File classes=tmp.newFolder("collections");Map<String,String> sources=new java.util.LinkedHashMap<String,String>();
         sources.put("collections.Thing","package collections; import com.codename1.annotations.*; import com.codename1.annotations.db.*; @Entity(table=\"collection_things\") public class Thing { @Id public long id; public String label; }");
@@ -235,7 +256,14 @@ public class OrmAnnotationProcessorTest {
                     org.junit.Assert.assertEquals(0,session.createQuery("select e from Entry e where e.flag=:flag").setParameter("flag",missing).list().size());
                     for(Object invalid:Arrays.asList("YES",Boolean.TRUE,1L)) org.junit.Assert.assertThrows(IllegalArgumentException.class,()->session.createQuery("select e from Entry e where e.flag=:flag").setParameter("flag",invalid).list());
                     org.junit.Assert.assertThrows(IllegalArgumentException.class,()->session.createQuery("select e from Entry e where e.plain=:flag").setParameter("flag",1L).list());
+                    org.junit.Assert.assertEquals(1,session.query(type).eq("plain",Boolean.TRUE).count());
+                    org.junit.Assert.assertEquals(1,session.query(type).in("flag",new Object[]{yes,no}).count());
+                    org.junit.Assert.assertEquals(0,session.query(type).eq("plain",null).count());
                     for(Object invalid:Arrays.asList(0L,1L,2L,1.0,"true")) {
+                        com.codename1.orm.session.Query reusable=session.query(type);
+                        org.junit.Assert.assertThrows(IllegalArgumentException.class,()->reusable.eq("plain",invalid));
+                        org.junit.Assert.assertThrows(IllegalArgumentException.class,()->reusable.in("plain",new Object[]{Boolean.TRUE,invalid}));
+                        org.junit.Assert.assertEquals(1,reusable.count());
                         for(String predicate:Arrays.asList("e.plain=:flag","e.plain in (:flag)","coalesce(e.plain,false)=:flag")) org.junit.Assert.assertThrows(IllegalArgumentException.class,()->session.createQuery("select e from Entry e where "+predicate).setParameter("flag",predicate.contains(" in ")?new Object[]{invalid}:invalid).list());
                         session.beginTransaction();org.junit.Assert.assertThrows(IllegalArgumentException.class,()->session.createQuery("update Entry e set e.plain=:flag").setParameter("flag",invalid).executeUpdate());assertFalse(session.isRollbackOnly());session.commitTransaction();
                     }

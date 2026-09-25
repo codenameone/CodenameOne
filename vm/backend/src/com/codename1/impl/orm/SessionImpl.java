@@ -431,9 +431,12 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
         if (!contains(entity)) {
             throw new PersistenceException("lock requires a managed entity");
         }
+        if (mode == null) {
+            throw new IllegalArgumentException("lock mode is null");
+        }
         if (mode != LockMode.NONE) {
             requireTransaction();
-            autoFlush();
+            sql.lockClause(mode);
         }
         checkManagedIdentity(entries.get(entity));
         EntityModel model = model(entity.getClass());
@@ -886,7 +889,6 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
     @Override
     public <T> boolean increment(Class<T> type, Object id, String field, long amount) {
         requireTransaction();
-        flush();
         EntityModel<T> model = model(type);
         int index = model.queryIndex(field);
         int version = model.versionIndex();
@@ -894,6 +896,8 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
         if (a.id || a.version || !model.counter(index)) {
             throw new IllegalArgumentException("Counter must be a non-key integral field: " + field);
         }
+        Object[] keyValues = model.keyValues(id);
+        flush();
         // PostgreSQL otherwise infers INTEGER parameters, narrowing valid long deltas.
         String counter = numericOperand(q(a.column), Attribute.BIGINT);
         String operand = numericOperand("?", Attribute.BIGINT);
@@ -921,7 +925,6 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
         }
         List<Object> arguments = new ArrayList<Object>();
         arguments.add(Long.valueOf(amount));
-        Object[] keyValues = model.keyValues(id);
         arguments.addAll(Arrays.asList(keyValues));
         arguments.add(Long.valueOf(lower));
         arguments.add(Long.valueOf(upper));
@@ -1070,15 +1073,6 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
     }
     private void validateKeyWidths() {
         for (EntityModel model : models.values()) {
-            if ("mysql".equals(sql.dialect())) {
-                for (int index : model.idIndexes()) {
-                    Attribute attribute = model.attributes()[index];
-                    if (attribute.kind == Attribute.BLOB && attribute.declaredType == null) {
-                        throw new PersistenceException("MySQL/MariaDB binary primary keys require an explicit " +
-                                "bounded column declaration: " + model.table() + "." + attribute.column);
-                    }
-                }
-            }
             int primary = keyWidth(model, model.idIndexes());
             checkKeyWidth(model.table(), primary);
             for (Index index : model.indexes()) {
@@ -1104,6 +1098,10 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
             Attribute attribute = model.attributes()[index];
             // Explicit declarations remain the application's schema contract.
             if (attribute.declaredType == null) {
+                if (attribute.kind == Attribute.BLOB && "mysql".equals(sql.dialect())) {
+                    throw new PersistenceException("MySQL/MariaDB binary keys and indexes require an explicit " +
+                            "bounded column declaration: " + model.table() + "." + attribute.column);
+                }
                 width += attribute.kind == Attribute.TEXT ? 255 * 4
                         : attribute.kind == Attribute.INTEGER ? 4 : attribute.kind == Attribute.BOOLEAN ? 2 : 8;
             }
@@ -1147,10 +1145,25 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
         }
         return false;
     }
+    private static int characterCount(String value) {
+        int count = 0;
+        for (int i = 0; i < value.length(); i++) {
+            char current = value.charAt(i);
+            if (current >= '\ud800' && current <= '\udbff' && i + 1 < value.length()) {
+                char next = value.charAt(i + 1);
+                if (next >= '\udc00' && next <= '\udfff') {
+                    i++;
+                }
+            }
+            count++;
+        }
+        return count;
+    }
     private void validateTextKey(EntityModel model, int index, Object value) {
         Attribute attr = model.attributes()[index];
         if (attr.kind == Attribute.TEXT && attr.declaredType == null && value instanceof String
-                && ((String) value).length() > 255 && keyColumn(model, index)) {
+                && ((String) value).length() > 255 && keyColumn(model, index)
+                && characterCount((String) value) > 255) {
             throw new PersistenceException("Text key exceeds the portable limit of 255 characters: "
                     + model.table() + "." + attr.column);
         }
@@ -1767,7 +1780,7 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
                 if (!(entry.getKey() instanceof String)) {
                     throw new PersistenceException("Element maps require non-null String keys");
                 }
-                if (((String) entry.getKey()).length() > 255) {
+                if (characterCount((String) entry.getKey()) > 255) {
                     throw new PersistenceException("Element map key exceeds the portable limit of 255 characters: "
                             + relation.field);
                 }

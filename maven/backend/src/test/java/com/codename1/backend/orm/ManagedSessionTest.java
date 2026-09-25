@@ -123,6 +123,38 @@ class ManagedSessionTest {
         } finally { em.close(); }
     }
 
+    @Test void invalidIncrementArgumentsDoNotFlushPendingChanges() throws Exception {
+        assertInvalidOperationsDoNotFlush(false);
+    }
+    @Test void invalidLockModesDoNotFlushPendingChanges() throws Exception {
+        assertInvalidOperationsDoNotFlush(true);
+    }
+    private void assertInvalidOperationsDoNotFlush(boolean locking) throws Exception {
+        for(boolean invalidPending:new boolean[]{false,true}) {
+            Database db=Database.open(":memory:");int[] callbacks={0};
+            Model model=new Model(){public void lifecycle(Record row,int event){if(event==2) callbacks[0]++;}};
+            java.util.Map<String,EntityModel<?>> models=new java.util.LinkedHashMap<String,EntityModel<?>>();models.put(Record.class.getName(),model);
+            Session session=new com.codename1.impl.orm.SessionImpl(new com.codename1.impl.orm.BackendSqlAccess(null,db,db.dialect()),models);
+            try {
+                Record row=seed(session);session.beginTransaction();row.name="pending";if(invalidPending) row.version++;
+                if(locking) {
+                    assertThrows(IllegalArgumentException.class,()->session.lock(row,null));
+                    for(com.codename1.orm.session.LockMode mode:new com.codename1.orm.session.LockMode[]{com.codename1.orm.session.LockMode.PESSIMISTIC_READ,com.codename1.orm.session.LockMode.PESSIMISTIC_WRITE}) {
+                        assertThrows(UnsupportedOperationException.class,()->session.lock(row,mode));
+                    }
+                } else {
+                    assertThrows(IllegalArgumentException.class,()->session.increment(Record.class,row.id,"missing",1));
+                    for(String field:new String[]{"id","version","name","bytes"}) assertThrows(IllegalArgumentException.class,()->session.increment(Record.class,row.id,field,1));
+                    for(Object id:new Object[]{null,"bad",new Object[]{1L,2L}}) assertThrows(IllegalArgumentException.class,()->session.increment(Record.class,id,"counter",1));
+                    assertThrows(PersistenceException.class,()->session.increment(Object.class,row.id,"counter",1));
+                }
+                assertEquals(0,callbacks[0]);assertTrue(session.contains(row));assertFalse(session.isRollbackOnly());assertEquals(invalidPending?1:0,row.version);
+                assertEquals("first",((java.util.Map)db.query("SELECT name FROM managed_record",new Object[0]).get(0)).get("name"));
+                row.version=0;session.commitTransaction();assertEquals(1,callbacks[0]);session.clear();assertEquals("pending",session.find(Record.class,row.id).name);
+            } finally { session.close();db.close(); }
+        }
+    }
+
     @Test void bulkAssignmentsRejectDuplicateTargetsDuringParsing() throws Exception {
         EntityManager manager=manager();
         try {
@@ -166,7 +198,9 @@ class ManagedSessionTest {
                     if(explicit) { assertEquals(1,query.executeUpdate());session.commitTransaction(); }
                     else { assertThrows(PersistenceException.class,query::executeUpdate);session.rollbackTransaction();assertEquals("original",session.find(Record.class,row.id).name); }
                 }
-                for(String value:new String[]{boundary,null}) {
+                String unicode=new String(new char[255]).replace("\0","\ud83d\ude00");
+                session.beginTransaction();session.find(Record.class,row.id).name=unicode;session.commitTransaction();session.clear();assertEquals(unicode,session.find(Record.class,row.id).name);
+                for(String value:new String[]{boundary,unicode,null}) {
                     session.beginTransaction();assertEquals(1,session.createQuery("update ManagedSessionTest$Record r set r.name=:value").setParameter("value",value).executeUpdate());session.commitTransaction();assertEquals(value,session.find(Record.class,row.id).name);
                 }
             } finally { session.close(); }
@@ -198,12 +232,12 @@ class ManagedSessionTest {
     }
 
     @Test void mysqlRejectsDefaultBinaryIdentitySchemaBeforeSql() throws Exception {
-        for(com.codename1.backend.sql.Dialect dialect:new com.codename1.backend.sql.Dialect[]{com.codename1.backend.sql.Dialect.MYSQL,com.codename1.backend.sql.Dialect.MARIADB,com.codename1.backend.sql.Dialect.SQLITE,com.codename1.backend.sql.Dialect.POSTGRES}) for(boolean explicit:new boolean[]{false,true}) {
+        for(com.codename1.backend.sql.Dialect dialect:new com.codename1.backend.sql.Dialect[]{com.codename1.backend.sql.Dialect.MYSQL,com.codename1.backend.sql.Dialect.MARIADB,com.codename1.backend.sql.Dialect.SQLITE,com.codename1.backend.sql.Dialect.POSTGRES}) for(boolean explicit:new boolean[]{false,true}) for(int shape:new int[]{0,1,2}) {
             java.util.List<String> statements=new java.util.ArrayList<String>();com.codename1.impl.orm.BackendSqlAccess adapter=new com.codename1.impl.orm.BackendSqlAccess(null,null,dialect);
             com.codename1.impl.orm.SqlAccess access=(com.codename1.impl.orm.SqlAccess)java.lang.reflect.Proxy.newProxyInstance(getClass().getClassLoader(),new Class[]{com.codename1.impl.orm.SqlAccess.class},(proxy,method,args)-> {
                 if(method.getName().equals("describe")) { statements.add("describe");return java.util.Collections.emptyList(); }if(method.getName().equals("execute")) { statements.add((String)args[0]);return 0; }return method.invoke(adapter,args);
             });
-            Model model=new Model(){public Attribute[] attributes(){Attribute[] attrs=super.attributes().clone();attrs[0]=new Attribute("id","id",Attribute.BLOB,true,false,false,false,explicit?"BINARY(16)":null);return attrs;}};java.util.Map<String,EntityModel<?>> models=new java.util.LinkedHashMap<String,EntityModel<?>>();models.put(Record.class.getName(),model);Session session=new com.codename1.impl.orm.SessionImpl(access,models);
+            Model model=new Model(){public Attribute[] attributes(){Attribute[] attrs=super.attributes().clone();int index=shape==0?0:4;attrs[index]=new Attribute(shape==0?"id":"bytes",shape==0?"id":"bytes",Attribute.BLOB,shape==0,false,false,false,explicit?"BINARY(16)":null);return attrs;}public com.codename1.impl.orm.Index[] indexes(){return shape==0?new com.codename1.impl.orm.Index[0]:new com.codename1.impl.orm.Index[]{new com.codename1.impl.orm.Index("",shape==2,"bytes")};}};java.util.Map<String,EntityModel<?>> models=new java.util.LinkedHashMap<String,EntityModel<?>>();models.put(Record.class.getName(),model);Session session=new com.codename1.impl.orm.SessionImpl(access,models);
             try { if("mysql".equals(dialect.getName()) && !explicit) { PersistenceException failure=assertThrows(PersistenceException.class,session::createTables);assertTrue(failure.getMessage().contains("binary"));assertTrue(statements.isEmpty()); }else { session.createTables();assertFalse(statements.isEmpty()); } }finally{session.close();}
         }
     }
@@ -849,30 +883,32 @@ class ManagedSessionTest {
     }
 
     @Test void managedTextKeysHaveTheSameBoundOnEveryRuntime() throws Exception {
-        String boundary=new String(new char[255]).replace('\0','a'),tooLong=boundary+"b";
-        for(int shape=0;shape<5;shape++) {
-            final int mode=shape;
-            EntityManager em=manager();
-            try {
-                Models.register(new Model() {
-                    public Attribute[] attributes() {
-                        Attribute[] a=super.attributes().clone();
-                        if(mode==0) { a[0]=new Attribute("id","id",Attribute.BIGINT,false,false,false,false);a[3]=new Attribute("name","name",Attribute.TEXT,true,false,false,false); }
-                        if(mode==3) a[3]=new Attribute("name","name",Attribute.TEXT,false,false,true,false,"TEXT");
-                        return a;
+        for(String character:new String[]{"a","\ud83d\ude00"}) {
+            String boundary=new String(new char[255]).replace("\0",character),tooLong=boundary+character;
+            for(int shape=0;shape<5;shape++) {
+                final int mode=shape;
+                EntityManager em=manager();
+                try {
+                    Models.register(new Model() {
+                        public Attribute[] attributes() {
+                            Attribute[] a=super.attributes().clone();
+                            if(mode==0) { a[0]=new Attribute("id","id",Attribute.BIGINT,false,false,false,false);a[3]=new Attribute("name","name",Attribute.TEXT,true,false,false,false); }
+                            if(mode==3) a[3]=new Attribute("name","name",Attribute.TEXT,false,false,true,false,"TEXT");
+                            return a;
+                        }
+                        public com.codename1.impl.orm.Index[] indexes() { return mode==0 || mode==4 ? new com.codename1.impl.orm.Index[0] : new com.codename1.impl.orm.Index[]{new com.codename1.impl.orm.Index("text_name_index",mode==2,"name")}; }
+                    });
+                    Session session=em.openSession();session.createTables();session.beginTransaction();Record r=new Record();r.name=boundary;session.persist(r);session.commitTransaction();
+                    session.beginTransaction();Record longRecord=new Record();longRecord.name=tooLong;
+                    if(mode<3) { assertThrows(PersistenceException.class,()->{session.persist(longRecord);session.flush();});session.rollbackTransaction(); }
+                    else { session.persist(longRecord);session.commitTransaction(); }
+                    if(mode==1 || mode==2) {
+                        session.beginTransaction();Record loaded=session.find(Record.class,r.id);loaded.name=tooLong;assertThrows(PersistenceException.class,session::flush);session.rollbackTransaction();
+                        assertEquals(boundary,session.find(Record.class,r.id).name);
                     }
-                    public com.codename1.impl.orm.Index[] indexes() { return mode==0 || mode==4 ? new com.codename1.impl.orm.Index[0] : new com.codename1.impl.orm.Index[]{new com.codename1.impl.orm.Index("text_name_index",mode==2,"name")}; }
-                });
-                Session session=em.openSession();session.createTables();session.beginTransaction();Record r=new Record();r.name=boundary;session.persist(r);session.commitTransaction();
-                session.beginTransaction();Record longRecord=new Record();longRecord.name=tooLong;
-                if(mode<3) { assertThrows(PersistenceException.class,()->{session.persist(longRecord);session.flush();});session.rollbackTransaction(); }
-                else { session.persist(longRecord);session.commitTransaction(); }
-                if(mode==1 || mode==2) {
-                    session.beginTransaction();Record loaded=session.find(Record.class,r.id);loaded.name=tooLong;assertThrows(PersistenceException.class,session::flush);session.rollbackTransaction();
-                    assertEquals(boundary,session.find(Record.class,r.id).name);
-                }
-                session.close();
-            } finally { em.close(); }
+                    session.close();
+                } finally { em.close(); }
+            }
         }
     }
 
