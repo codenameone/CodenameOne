@@ -1882,6 +1882,23 @@ class CleanTargetIntegrationTest {
             return output;
         }
         StringBuilder b = new StringBuilder();
+        // ninja runs compiles in parallel, so a compiler's error lines can land anywhere in the
+        // omitted part while the tail holds only other files' warnings -- which is how a
+        // missing struct member in a port native went unreported for a whole CI round. Quote
+        // the error lines themselves, ahead of the tail.
+        int quoted = 0;
+        for (int iter = 0; iter < lines.length - keep && quoted < 40; iter++) {
+            String line = lines[iter];
+            if ((line.contains(": error") || line.contains("): error") || line.startsWith("FAILED:")
+                    || line.contains("undefined reference") || line.contains("unresolved external"))
+                    && !line.contains("warning")) {
+                if (quoted == 0) {
+                    b.append("Error lines from the omitted part:\n");
+                }
+                b.append(line).append('\n');
+                quoted++;
+            }
+        }
         b.append("... ").append(lines.length - keep)
                 .append(" earlier line(s) omitted; the last ").append(keep).append(" follow\n");
         for (int iter = lines.length - keep; iter < lines.length; iter++) {

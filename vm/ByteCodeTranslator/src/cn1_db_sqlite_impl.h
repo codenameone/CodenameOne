@@ -477,7 +477,7 @@ JAVA_VOID PREFIX##_sqlStmtBindText___long_int_byte_1ARRAY(CODENAME_ONE_THREAD_ST
      * column. Any non-null pointer with a length of zero is an empty string to SQLite. */        \
     cn1DbCheckBind(threadStateData, stmt,                                                           \
             sqlite3_bind_text(stmt, index,                                                          \
-                    arr->length > 0 ? (const char*)arr->data : "", arr->length,                     \
+                    arr->length > 0 ? (const char*)CN1_ARRAY_DATA(arr) : "", arr->length,                     \
                     SQLITE_TRANSIENT), index);                                                      \
 }                                                                                                   \
                                                                                                    \
@@ -492,7 +492,7 @@ JAVA_VOID PREFIX##_sqlStmtBindBlob___long_int_byte_1ARRAY(CODENAME_ONE_THREAD_ST
     /* Same as the text bind above: a zero length array carries a null pointer, and that is how   \
      * SQL NULL is spelled to sqlite3_bind_blob. An empty blob is a pointer that is not null. */   \
     cn1DbCheckBind(threadStateData, stmt,                                                           \
-            sqlite3_bind_blob(stmt, index, arr->length > 0 ? arr->data : (const void*)"",           \
+            sqlite3_bind_blob(stmt, index, arr->length > 0 ? CN1_ARRAY_DATA(arr) : (const void*)"",           \
                     arr->length, SQLITE_TRANSIENT), index);                                         \
 }                                                                                                   \
                                                                                                    \
