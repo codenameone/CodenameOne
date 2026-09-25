@@ -1384,6 +1384,7 @@ class VaultTest extends UITestBase {
             device.releaseEnsure.countDown();
         }
         worker.join(60000);
+        assertFalse(worker.isAlive(), "the device-store operation did not finish after releasing its prompt");
         device.ensureEntered = null;
         device.releaseEnsure = null;
         if (broke.get() != null) {

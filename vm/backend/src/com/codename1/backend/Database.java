@@ -253,6 +253,7 @@ public final class Database {
      * never the reverse -- and Db's monitor is reentrant for the callbacks.
      */
     public synchronized int execute(String sql, Object[] params) throws IOException {
+        awaitTransactionOwner();
         params = portableParameters(params);
         String rendered = bind(sql, params);
         if(sqlite != null) {
@@ -266,6 +267,7 @@ public final class Database {
 
     /** Runs a query and returns every row as a column-name to value map. */
     public synchronized List query(String sql, Object[] params) throws IOException {
+        awaitTransactionOwner();
         params = portableParameters(params);
         String rendered = bind(sql, params);
         if(sqlite != null) {
@@ -329,6 +331,7 @@ public final class Database {
      */
     public synchronized long insert(String sql, Object[] params, String idColumn)
             throws IOException {
+        awaitTransactionOwner();
         if(idColumn == null || idColumn.length() == 0) {
             throw new IOException("insert needs the name of the generated key column");
         }
@@ -652,32 +655,92 @@ public final class Database {
      * discovering the conflict at the first write; the other two get a plain
      * BEGIN, which is what they support.
      */
-    public synchronized Object transaction(Work body) throws Exception {
-        if(sqlite != null) {
-            final Work outer = body;
-            final Database self = this;
-            return sqlite.transaction(new Db.Work() {
-                public Object run(Db ignored) throws Exception {
-                    return outer.run(self);
-                }
-            });
+    private boolean managedTransaction;
+    private Thread transactionOwner;
+
+    // Match monitor acquisition semantics: waiting does not discard an interrupt.
+    private void awaitTransactionOwner() {
+        boolean interrupted = false;
+        while (transactionOwner != null && transactionOwner != Thread.currentThread()) {
+            try {
+                wait();
+            } catch (InterruptedException error) {
+                interrupted = true;
+            }
         }
-        control("BEGIN");
+        if (interrupted) {
+            Thread.currentThread().interrupt();
+        }
+    }
+
+    /**
+     * Begins a transaction reserved to the calling thread until commit, rollback,
+     * or close. Other threads' database operations wait for that boundary, as they
+     * do while {@link #transaction} holds the monitor around its callback.
+     * The owning thread must complete this transaction; do not hand it to another thread.
+     */
+    public synchronized void beginExclusiveTransaction() throws IOException {
+        beginTransaction();
+    }
+
+    private void transactionFinished() {
+        managedTransaction = false;
+        transactionOwner = null;
+        notifyAll();
+    }
+
+    /**
+     * Whether a transaction opened through this Database API is active.
+     * Waits for another thread's transaction to finish before checking,
+     * like other operations on this connection.
+     */
+    public synchronized boolean isInTransaction() {
+        awaitTransactionOwner();
+        return managedTransaction;
+    }
+
+    /**
+     * Begins a transaction reserved to the calling thread until commit, rollback,
+     * or close. Other threads wait before using this connection. The initiating
+     * thread must complete the transaction; it cannot be handed to another thread.
+     * SQLite's write lock is acquired immediately.
+     */
+    public synchronized void beginTransaction() throws IOException {
+        awaitTransactionOwner();
+        if (managedTransaction) throw new IOException("Transaction already active");
+        control(sqlite == null ? "BEGIN" : "BEGIN IMMEDIATE");
+        managedTransaction = true;
+        transactionOwner = Thread.currentThread();
+    }
+
+    /** Commits the transaction opened through this API. */
+    public synchronized void commitTransaction() throws IOException {
+        awaitTransactionOwner();
+        if (!managedTransaction) throw new IOException("No active transaction");
+        control("COMMIT");
+        transactionFinished();
+    }
+
+    /** Rolls back the transaction opened through this API. */
+    public synchronized void rollbackTransaction() throws IOException {
+        awaitTransactionOwner();
+        if (!managedTransaction) throw new IOException("No active transaction");
+        control("ROLLBACK");
+        transactionFinished();
+    }
+
+    public synchronized Object transaction(Work body) throws Exception {
+        beginTransaction();
         boolean committed = false;
         try {
             Object result = body.run(this);
-            control("COMMIT");
+            commitTransaction();
             committed = true;
             return result;
         } finally {
-            if(!committed) {
-                try {
-                    control("ROLLBACK");
-                } catch (Exception err) {
-                    // The original failure is the one worth reporting; a rollback
-                    // that also fails must not replace it.
-                    System.err.println("rollback failed: " + err);
-                }
+            if (!committed) {
+                try { rollbackTransaction(); }
+                catch (Exception err) { System.err.println("rollback failed: " + err); }
             }
         }
     }
@@ -712,6 +775,7 @@ public final class Database {
      * engine and the engine reading its own state.
      */
     public synchronized long lastInsertId() {
+        awaitTransactionOwner();
         if(sqlite != null) {
             return sqlite.lastInsertId();
         }
@@ -726,7 +790,8 @@ public final class Database {
      * readers run while a writer is active, and it has no counterpart on a server
      * engine that already does.
      */
-    public void tuneForConcurrency(int busyTimeoutMillis) throws IOException {
+    public synchronized void tuneForConcurrency(int busyTimeoutMillis) throws IOException {
+        awaitTransactionOwner();
         if(sqlite != null) {
             sqlite.enableWriteAheadLog();
             sqlite.setBusyTimeout(busyTimeoutMillis);
@@ -749,13 +814,18 @@ public final class Database {
      * the facade that fronts them was not, which left the same race one level up.
      */
     public synchronized void close() {
-        if(sqlite != null) {
-            sqliteClosed = true;
-            sqlite.close();
-        } else if(postgres != null) {
-            postgres.close();
-        } else {
-            mysql.close();
+        awaitTransactionOwner();
+        try {
+            if(sqlite != null) {
+                sqliteClosed = true;
+                sqlite.close();
+            } else if(postgres != null) {
+                postgres.close();
+            } else {
+                mysql.close();
+            }
+        } finally {
+            transactionFinished();
         }
     }
 
