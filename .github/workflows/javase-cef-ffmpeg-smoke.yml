@@ -50,7 +50,8 @@ jobs:
       matrix:
         os: [ubuntu-24.04, macos-latest, windows-latest]
         # 32-bit Windows desktop builds bundle the windows-i386 JCEF natives on a 32-bit
-        # Zulu 8 JRE. Maven stays on the 64-bit JDK; only the smoke app runs 32-bit.
+        # Zulu 8 JRE with JavaFX (zuluFx8-32bit). Maven stays on the 64-bit JDK; only the
+        # smoke app runs 32-bit, with JavaFX present as it is in the installer.
         # app-arch has to be a matrix key of its own: an include that only ADDS a key is
         # merged into the existing windows-latest leg instead of creating a new one.
         app-arch: [host]
@@ -70,6 +71,7 @@ jobs:
         with:
           distribution: zulu
           java-version: '8'
+          java-package: jdk+fx
           architecture: x86
 
       - name: Set up Java 8
