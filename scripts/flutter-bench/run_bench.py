@@ -109,6 +109,29 @@ def measure(adapter, runs, workdir):
     return sides, notes
 
 
+def measure_compute(adapter):
+    """One compute-mode launch per side, scored by benchlib.compute_verdict.
+
+    Each app repeats every workload itself (warm-ups, then the best of five),
+    so a single launch per side is a complete result. A side that cannot run
+    makes the whole section "not measured" with its reason: half a comparison
+    is not a comparison.
+    """
+    results = {}
+    for side in benchlib.SIDES:
+        try:
+            results[side] = adapter.run_compute(side)
+        except platforms.Unavailable as err:
+            return {"status": "not measured", "reason": str(err)}
+        print("  compute %-12s %d workloads" % (side, len(results[side])), flush=True)
+    return {
+        "status": "measured",
+        "codenameone": dict((k, list(v)) for k, v in results["codenameone"].items()),
+        "flutter": dict((k, list(v)) for k, v in results["flutter"].items()),
+        "verdict": benchlib.compute_verdict(results["codenameone"], results["flutter"]),
+    }
+
+
 def main(argv=None):
     parser = argparse.ArgumentParser()
     parser.add_argument("--platform")
@@ -178,6 +201,8 @@ def main(argv=None):
             "treat the first published run as the thing under review.")
     report = benchlib.build_report(adapter.id, sides, args.runs, notes)
     report["status"] = "measured"
+    print("%s: compute workloads" % adapter.label)
+    report["compute"] = measure_compute(adapter)
 
     if args.baseline_out:
         _ensure_dir(args.baseline_out)

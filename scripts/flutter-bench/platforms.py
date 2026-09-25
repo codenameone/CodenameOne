@@ -70,6 +70,16 @@ LAUNCH_TIMEOUT_S = float(os.environ.get("BENCH_LAUNCH_TIMEOUT", "90"))
 SETTLE_S = float(os.environ.get("BENCH_SETTLE", "12"))
 
 
+# Compute mode (the VM workloads) runs every workload with warm-ups and repeats
+# inside the app, so it takes minutes, not seconds -- longest on the emulator.
+COMPUTE_TIMEOUT_S = float(os.environ.get("BENCH_COMPUTE_TIMEOUT", "1800"))
+# The desktop request for compute mode: a file both apps check. The Codename One
+# port has no System.getenv to read instead. On Windows the path resolves against
+# the current drive, which the harness and both apps share.
+COMPUTE_MARKER = os.path.join(os.path.abspath(os.path.join(os.sep, "tmp", "nat")),
+                              "BENCH_COMPUTE")
+
+
 class Unavailable(Exception):
     """Raised by an adapter that cannot measure on this host."""
 
@@ -112,6 +122,37 @@ class Adapter(object):
     def launch_and_time(self, side):
         """(upper_ms, lower_ms, idle_memory_bytes) for one run."""
         raise NotImplementedError
+
+    def run_compute(self, side):
+        """{workload: (checksum, ms)} from one compute-mode launch of `side`."""
+        raise Unavailable("compute is not measured on this platform")
+
+    @staticmethod
+    def _read_compute(reader, deadline, side):
+        """Collects BENCH:COMPUTE lines until BENCH:COMPUTE-DONE.
+
+        A run that never says DONE -- a crash, a hang, a timeout -- is not a
+        result: a partial set would drop exactly the workloads that failed and
+        report a mean over the rest.
+        """
+        results = {}
+        while True:
+            now = time.time()
+            if now >= deadline:
+                raise Unavailable("the %s app did not finish its compute run within %ds "
+                                  "(%d workloads reported)"
+                                  % (side, COMPUTE_TIMEOUT_S, len(results)))
+            line = reader.get(deadline - now)
+            if line is _LineReader.EOF:
+                raise Unavailable("the %s app exited before finishing its compute run "
+                                  "(%d workloads reported)" % (side, len(results)))
+            if line is None:
+                continue
+            if benchlib.COMPUTE_DONE in line:
+                return results
+            parsed = benchlib.parse_compute_line(line)
+            if parsed:
+                results[parsed[0]] = (parsed[1], parsed[2])
 
     def notes(self):
         """Caveats that belong beside this platform's numbers.
@@ -226,6 +267,29 @@ class _ProcessAdapter(Adapter):
 
     def _memory(self, pid):
         raise NotImplementedError
+
+    def run_compute(self, side):
+        exe = self._executable(side)
+        os.makedirs(os.path.dirname(COMPUTE_MARKER), exist_ok=True)
+        with open(COMPUTE_MARKER, "w") as handle:
+            handle.write("1")
+        try:
+            proc = subprocess.Popen(
+                [exe], stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                text=True, bufsize=1, env=dict(os.environ, BENCH_MARKERS="1"))
+            try:
+                return self._read_compute(_LineReader(proc.stdout),
+                                          time.time() + COMPUTE_TIMEOUT_S, side)
+            finally:
+                proc.terminate()
+                try:
+                    proc.wait(timeout=10)
+                except subprocess.TimeoutExpired:
+                    proc.kill()
+        finally:
+            # Removed however the run ended: a marker left behind would turn every
+            # later timed launch into a compute run.
+            os.remove(COMPUTE_MARKER)
 
     def launch_and_time(self, side):
         exe = self._executable(side)
@@ -500,6 +564,12 @@ class IOSAdapter(Adapter):
     def code_size(self, side):
         return benchlib.macho_code_size(self.apps[side])
 
+    def run_compute(self, side):
+        raise Unavailable(
+            "iOS compute is not measured: a device build needs signed hardware, and on the "
+            "simulator Flutter runs its JIT debug engine rather than AOT code. The macOS row "
+            "runs the same ParparVM and Dart AOT compilers on the same Apple silicon.")
+
     def launch_and_time(self, side):
         if not self.device:
             raise Unavailable(
@@ -750,6 +820,44 @@ class AndroidAdapter(Adapter):
         # `am start -W` reports one number, so there is no bracket here.
         return cold, None, memory
 
+    def run_compute(self, side):
+        """One compute-mode launch, read back from logcat.
+
+        Codename One publishes the launch intent's data URI as AppArg; Flutter's
+        FlutterActivity passes the dart_entrypoint_args extra to main(). Both
+        print to logcat (System.out / flutter), which is polled rather than
+        streamed so a stalled logcat pipe cannot hang the job.
+        """
+        self._install(side)
+        package = self.packages[side]
+        self._adb("shell", "am", "force-stop", package)
+        self._adb("logcat", "-c")
+        component = "%s/%s" % (package, self.activities[side])
+        if side == "codenameone":
+            self._adb("shell", "am", "start", "-n", component, "-d", "benchcompute://run")
+        else:
+            self._adb("shell", "am", "start", "-n", component,
+                      "--esa", "dart_entrypoint_args", "compute")
+        deadline = time.time() + COMPUTE_TIMEOUT_S
+        results = {}
+        try:
+            while time.time() < deadline:
+                out = self._adb("logcat", "-d")
+                done = False
+                for line in out.stdout.splitlines():
+                    if benchlib.COMPUTE_DONE in line:
+                        done = True
+                    parsed = benchlib.parse_compute_line(line)
+                    if parsed:
+                        results[parsed[0]] = (parsed[1], parsed[2])
+                if done:
+                    return results
+                time.sleep(5)
+        finally:
+            self._adb("shell", "am", "force-stop", package)
+        raise Unavailable("the %s app did not finish its compute run within %ds "
+                          "(%d workloads reported)" % (side, COMPUTE_TIMEOUT_S, len(results)))
+
     def _memory(self, package):
         out = self._adb("shell", "dumpsys", "meminfo", package)
         for line in out.stdout.splitlines():
@@ -814,6 +922,54 @@ class JavaScriptAdapter(Adapter):
         raise Unavailable(
             "the JavaScript adapter needs a Chrome DevTools driver; "
             "sizes are reported and timings are not")
+
+    def run_compute(self, side):
+        """The bundle served locally and opened in headless Chrome with
+        ?benchCompute=1; the page's console is read from Chrome's log on stderr."""
+        import functools
+        import http.server
+        import tempfile
+        chrome = _find_chrome()
+        if not chrome:
+            raise Unavailable("no Chrome or Chromium on PATH")
+        if not os.path.isfile(os.path.join(self.bundles[side], "index.html")):
+            # A missing page would 404 and leave the run waiting out the timeout.
+            raise Unavailable("the %s bundle has no index.html to open" % side)
+        handler = functools.partial(_QuietHandler, directory=self.bundles[side])
+        server = http.server.ThreadingHTTPServer(("127.0.0.1", 0), handler)
+        thread = threading.Thread(target=server.serve_forever)
+        thread.daemon = True
+        thread.start()
+        profile = tempfile.mkdtemp(prefix="bench-chrome-")
+        url = "http://127.0.0.1:%d/index.html?benchCompute=1" % server.server_address[1]
+        proc = subprocess.Popen(
+            [chrome, "--headless=new", "--no-sandbox", "--disable-gpu",
+             "--no-first-run", "--enable-logging=stderr", "--v=0",
+             "--user-data-dir=" + profile, url],
+            stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, bufsize=1)
+        try:
+            return self._read_compute(_LineReader(proc.stdout),
+                                      time.time() + COMPUTE_TIMEOUT_S, side)
+        finally:
+            proc.terminate()
+            try:
+                proc.wait(timeout=10)
+            except subprocess.TimeoutExpired:
+                proc.kill()
+            server.shutdown()
+            shutil.rmtree(profile, ignore_errors=True)
+
+
+def _quiet_handler_base():
+    import http.server
+    return http.server.SimpleHTTPRequestHandler
+
+
+class _QuietHandler(_quiet_handler_base()):
+    """Serves a bundle without logging every request into the job log."""
+
+    def log_message(self, *args):
+        pass
 
 
 def _find_chrome():

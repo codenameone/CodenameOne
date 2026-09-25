@@ -91,6 +91,44 @@ class TimeStreamDeadlines(unittest.TestCase):
         self.assertLess(elapsed, 1.5)
 
 
+class ComputeReading(unittest.TestCase):
+    """A compute run is complete only when the app says so."""
+
+    def setUp(self):
+        self._saved = platforms.COMPUTE_TIMEOUT_S
+        platforms.COMPUTE_TIMEOUT_S = 3.0
+
+    def tearDown(self):
+        platforms.COMPUTE_TIMEOUT_S = self._saved
+
+    def _read(self, code):
+        proc = _child(code)
+        try:
+            return platforms.Adapter._read_compute(
+                platforms._LineReader(proc.stdout), time.time() + platforms.COMPUTE_TIMEOUT_S,
+                "codenameone")
+        finally:
+            proc.kill()
+            proc.wait()
+
+    def test_collects_every_workload_until_done(self):
+        got = self._read("print('noise'); print('BENCH:COMPUTE name=recursion checksum=7 ms=12');"
+                         "print('BENCH:COMPUTE-DONE'); import time; time.sleep(60)")
+        self.assertEqual(got, {"recursion": ("7", 12)})
+
+    def test_an_app_that_dies_midway_is_not_a_result(self):
+        with self.assertRaises(platforms.Unavailable) as ctx:
+            self._read("print('BENCH:COMPUTE name=recursion checksum=7 ms=12')")
+        self.assertIn("exited before finishing", str(ctx.exception))
+
+    def test_an_app_that_hangs_is_abandoned_at_the_timeout(self):
+        started = time.time()
+        with self.assertRaises(platforms.Unavailable) as ctx:
+            self._read("import time; time.sleep(60)")
+        self.assertIn("did not finish", str(ctx.exception))
+        self.assertLess(time.time() - started, 6.0)
+
+
 def _elf(text, rodata):
     """A minimal ELF64 with an executable .text and a non-executable .rodata."""
     import struct

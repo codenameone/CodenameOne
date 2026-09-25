@@ -133,6 +133,32 @@ result, and several were caught only after being measured the wrong way first.
   let go at the settle time. A blocking `readline()` waited for one more line
   in both cases, and the job sat until the workflow's own timeout.
 
+## Compute: the VM workloads on every platform
+
+Beside the application metrics, each platform also compares raw compute: the
+eleven workloads of `vm/benchmarks` (`CommonWorkloads.java` and its Dart port,
+`vm/benchmarks/dart/common_workloads.dart`), which the VM suite already holds to
+bit-identical checksums between the two languages.
+
+- **Same binaries.** Both benchmark apps carry the workloads and switch to them
+  when asked, so no second pair of apps is built. `prepare.sh` copies the sources
+  in from `vm/benchmarks`, their only home.
+- **How each app is asked:** a marker file `/tmp/nat/BENCH_COMPUTE` on the
+  desktop (ParparVM has no `getenv`), the launch intent on Android (a data URI
+  for Codename One, the `dart_entrypoint_args` extra for Flutter), and
+  `?benchCompute=1` on the web.
+- **Scoring.** Each app runs every workload twice to warm up and five times
+  timed, and prints the best. The ratio is Flutter's time over ours, and the
+  headline is the geometric mean. A workload whose checksums differ is shown and
+  left out of the mean -- two different computations have no ratio. On the web
+  that is expected for the 64-bit workloads, since a JavaScript number cannot
+  hold one.
+- **Gated.** A geometric mean under 1.00x fails the platform's leg, like any
+  other metric Codename One loses.
+- **iOS is not measured**: a device build needs signed hardware, and on the
+  simulator Flutter runs its JIT debug engine. The macOS row runs the same two
+  compilers on the same Apple silicon.
+
 ## Nothing here uses the cloud builder
 
 Every recipe in `app/build_apps.sh` builds on the machine it runs on. The

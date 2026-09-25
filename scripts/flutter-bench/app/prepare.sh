@@ -179,6 +179,33 @@ DECLARED_ASSET_PACKAGES="$(tr -d '\r' < "$WORK/asset-packages.txt" | tr '\n' ' '
 # Our own entry point, which prints the start-up markers the harness times
 # against. The gallery's own main.dart is left in place and unused.
 cp "$HERE/flutter/main_bench.dart" "$WORK/flutter/lib/main_bench.dart"
+# Compute mode (the VM workloads instead of the gallery). The workloads come
+# from their one home in vm/benchmarks, so the Flutter app and the Codename One
+# app below run the same source the VM suite checks checksums against.
+cp "$HERE/flutter/bench_compute.dart" "$HERE/flutter/compute_flag_io.dart" \
+   "$HERE/flutter/compute_flag_web.dart" "$WORK/flutter/lib/"
+cp "$REPO/vm/benchmarks/dart/common_workloads.dart" "$WORK/flutter/lib/common_workloads.dart"
+# The web build cannot compile longArithmetic at all: dart2js rejects its 64-bit
+# literals ("can't be represented exactly in JavaScript"), and a JavaScript
+# number could not hold its results anyway. The web variant replaces that one
+# function with a stub the runner skips; everything else is the same source.
+python3 - "$WORK/flutter/lib/common_workloads.dart" "$WORK/flutter/lib/common_workloads_web.dart" <<'PY'
+import sys
+src = open(sys.argv[1]).read()
+start = src.index("int longArithmetic() {")
+depth = 0
+for i in range(src.index("{", start), len(src)):
+    if src[i] == "{":
+        depth += 1
+    elif src[i] == "}":
+        depth -= 1
+        if depth == 0:
+            end = i + 1
+            break
+stub = ("// Not on the web: dart2js cannot represent this workload's 64-bit constants.\n"
+        "int longArithmetic() => throw UnsupportedError('64-bit integers on the web');")
+open(sys.argv[2], "w").write(src[:start] + stub + src[end:])
+PY
 
 ( cd "$WORK/flutter" && flutter pub get >/dev/null )
 
@@ -253,6 +280,10 @@ GENERATED_MAIN="$COMMON/src/main/java/com/example/bench/Bench.java"
   echo "the archetype did not generate a main class at $GENERATED_MAIN" >&2
   exit 2; }
 cp "$HERE/cn1/Bench.java" "$GENERATED_MAIN"
+# The Java side of compute mode, from the same vm/benchmarks source.
+mkdir -p "$COMMON/src/main/java/com/bench"
+cp "$REPO/vm/benchmarks/common/src/main/java/com/bench/CommonWorkloads.java" \
+   "$COMMON/src/main/java/com/bench/CommonWorkloads.java"
 
 # Assets: exactly what Flutter's own build bundles, for EVERY asset package.
 #

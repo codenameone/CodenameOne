@@ -73,8 +73,102 @@ public class Bench extends Lifecycle {
         com.codename1.io.Log.bindCrashProtection(true);
     }
 
+    /// Compute mode: the VM workloads (vm/benchmarks' CommonWorkloads, copied in
+    /// by prepare.sh) instead of the gallery, in the same binary. The Flutter app
+    /// runs the Dart port of the same workloads with the identical repetition
+    /// scheme, and both print one `BENCH:COMPUTE` line per workload.
+    private static final int COMPUTE_WARMUP = 2;
+    private static final int COMPUTE_MEASURED = 5;
+
+    /// Asked for by a marker file on the desktop, the launch intent's data URI on
+    /// Android (which the port publishes as AppArg), or the page's query string on
+    /// the web -- the channels the Flutter app reads the same request from.
+    private static boolean computeRequested() {
+        if (markerFile("BENCH_COMPUTE")) {
+            return true;
+        }
+        com.codename1.ui.Display d = com.codename1.ui.Display.getInstance();
+        String arg = d.getProperty("AppArg", null);
+        if (arg != null && arg.indexOf("benchcompute") >= 0) {
+            return true;
+        }
+        String search = d.getProperty("browser.window.location.search", null);
+        return search != null && search.indexOf("benchCompute") >= 0;
+    }
+
+    private interface Workload {
+        long run();
+    }
+
+    private static void computeOne(String name, Workload w) {
+        long checksum = 0;
+        for (int i = 0; i < COMPUTE_WARMUP; i++) {
+            checksum = w.run();
+        }
+        long best = -1;
+        for (int i = 0; i < COMPUTE_MEASURED; i++) {
+            long start = System.currentTimeMillis();
+            checksum = w.run();
+            long ms = System.currentTimeMillis() - start;
+            if (best < 0 || ms < best) {
+                best = ms;
+            }
+        }
+        System.out.println("BENCH:COMPUTE name=" + name + " checksum=" + checksum + " ms=" + best);
+        System.out.flush();
+    }
+
+    /// Off the event dispatch thread, as the Flutter side runs off the platform's
+    /// main thread: a long computation on the EDT would stall the port's own loop.
+    private static void runCompute() {
+        new Thread(new Runnable() {
+            @Override
+            public void run() {
+                computeOne("intArithmetic", new Workload() {
+                    public long run() { return com.bench.CommonWorkloads.intArithmetic(); }
+                });
+                computeOne("longArithmetic", new Workload() {
+                    public long run() { return com.bench.CommonWorkloads.longArithmetic(); }
+                });
+                computeOne("mathTranscendental", new Workload() {
+                    public long run() { return com.bench.CommonWorkloads.mathTranscendental(); }
+                });
+                computeOne("arraySequential", new Workload() {
+                    public long run() { return com.bench.CommonWorkloads.arraySequential(); }
+                });
+                computeOne("arrayRandom", new Workload() {
+                    public long run() { return com.bench.CommonWorkloads.arrayRandom(); }
+                });
+                computeOne("objectAllocation", new Workload() {
+                    public long run() { return com.bench.CommonWorkloads.objectAllocation(); }
+                });
+                computeOne("valueEscape", new Workload() {
+                    public long run() { return com.bench.CommonWorkloads.valueEscape(); }
+                });
+                computeOne("hashMapChurn", new Workload() {
+                    public long run() { return com.bench.CommonWorkloads.hashMapChurn(); }
+                });
+                computeOne("stringBuilding", new Workload() {
+                    public long run() { return com.bench.CommonWorkloads.stringBuilding(); }
+                });
+                computeOne("recursion", new Workload() {
+                    public long run() { return com.bench.CommonWorkloads.recursion(); }
+                });
+                computeOne("quicksortBench", new Workload() {
+                    public long run() { return com.bench.CommonWorkloads.quicksortBench(); }
+                });
+                System.out.println("BENCH:COMPUTE-DONE");
+                System.out.flush();
+            }
+        }).start();
+    }
+
     @Override
     public void runApp() {
+        if (computeRequested()) {
+            runCompute();
+            return;
+        }
         // The runtime's startup attribution is OFF here, because a benchmark has
         // to measure the build a user would ship. The counters it turns on are
         // per-build and per-layout -- a nanoTime pair, a class-name string and a

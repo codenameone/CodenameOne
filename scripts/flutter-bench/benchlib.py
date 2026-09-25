@@ -31,6 +31,7 @@ Rules the numbers have to obey, because it is easy to produce flattering ones:
 
 import json
 import os
+import re
 import subprocess
 import time
 import zipfile
@@ -339,6 +340,107 @@ def summarise(side):
     return out
 
 
+# ----------------------------------------------------------------------
+# Compute: the VM workloads, run inside each app
+# ----------------------------------------------------------------------
+
+# vm/benchmarks' CommonWorkloads, in its own order. The Java source runs in the
+# Codename One app and vm/benchmarks/dart/common_workloads.dart -- a port that
+# reproduces Java's 32-bit wrapping, unsigned shift and String.hashCode -- in the
+# Flutter one, so the two do the same work and must produce the same checksum.
+COMPUTE_WORKLOADS = (
+    "intArithmetic", "longArithmetic", "mathTranscendental", "arraySequential",
+    "arrayRandom", "objectAllocation", "valueEscape", "hashMapChurn",
+    "stringBuilding", "recursion", "quicksortBench",
+)
+
+COMPUTE_METRIC = "compute_geomean"
+COMPUTE_LABEL = "Compute (geomean of the VM workloads)"
+
+_COMPUTE_LINE = re.compile(
+    r"BENCH:COMPUTE name=(\w+) checksum=(-?\d+) ms=(\d+)")
+COMPUTE_DONE = "BENCH:COMPUTE-DONE"
+
+
+def parse_compute_line(line):
+    """(name, checksum, ms) from one app's result line, or None."""
+    match = _COMPUTE_LINE.search(line)
+    if not match:
+        return None
+    return match.group(1), match.group(2), int(match.group(3))
+
+
+def compute_verdict(ours, theirs):
+    """Per-workload ratios and their geometric mean.
+
+    `ours` and `theirs` map a workload to (checksum, ms). The ratio is
+    flutter_ms / codenameone_ms, so above 1.00x Codename One is faster.
+
+    A workload is only compared when both checksums are identical: a different
+    checksum means the two sides did not do the same computation -- on the web,
+    for one, JavaScript numbers cannot hold a 64-bit integer -- and a ratio
+    between two different computations is not a measurement. It is reported as
+    such and left out of the mean rather than dropped silently.
+    """
+    rows = []
+    ratios = []
+    for name in COMPUTE_WORKLOADS:
+        a = (ours or {}).get(name)
+        b = (theirs or {}).get(name)
+        if a is None or b is None:
+            rows.append({"name": name, "status": "not measured"})
+            continue
+        if a[0] != b[0]:
+            rows.append({"name": name, "status": "checksum mismatch",
+                         "codenameone": a[1], "flutter": b[1],
+                         "checksums": [a[0], b[0]]})
+            continue
+        if a[1] <= 0 or b[1] <= 0:
+            rows.append({"name": name, "status": "too fast to time",
+                         "codenameone": a[1], "flutter": b[1]})
+            continue
+        ratio = float(b[1]) / float(a[1])
+        ratios.append(ratio)
+        rows.append({"name": name, "status": "measured", "codenameone": a[1],
+                     "flutter": b[1], "ratio": round(ratio, 3)})
+    out = {"workloads": rows, "compared": len(ratios)}
+    if ratios:
+        product = 1.0
+        for r in ratios:
+            product *= r
+        out["geomean"] = round(product ** (1.0 / len(ratios)), 3)
+    return out
+
+
+def render_compute(report):
+    """The compute table for one platform, or None when nothing ran."""
+    compute = report.get("compute")
+    if not compute:
+        return None
+    lines = ["**Compute** -- the VM workloads (`vm/benchmarks`), run inside each app; "
+             "time is the best of the app's own repetitions, higher ratio means "
+             "Codename One is faster.", ""]
+    if compute.get("status") != "measured":
+        lines.append("_Not measured: %s._" % compute.get("reason", "no reason given"))
+        return "\n".join(lines)
+    verdict = compute["verdict"]
+    lines.append("| Workload | Codename One | Flutter | Ratio |")
+    lines.append("| --- | ---: | ---: | ---: |")
+    for row in verdict["workloads"]:
+        if row["status"] == "measured":
+            lines.append("| %s | %d ms | %d ms | %.2fx |" % (
+                row["name"], row["codenameone"], row["flutter"], row["ratio"]))
+        elif row["status"] == "not measured":
+            lines.append("| %s | -- | -- | not measured |" % row["name"])
+        else:
+            lines.append("| %s | %s | %s | %s |" % (
+                row["name"],
+                "%d ms" % row["codenameone"], "%d ms" % row["flutter"], row["status"]))
+    if "geomean" in verdict:
+        lines.append("| **Geometric mean** | | | **%.2fx** |" % verdict["geomean"])
+    return "\n".join(lines)
+
+
 def verdict(report):
     """Who wins each metric, and by how much.
 
@@ -455,6 +557,10 @@ def render_markdown(reports, title="Flutter vs Codename One"):
                          "as a range and the ratio uses the end least "
                          "favourable to Codename One.")
             lines.append("")
+        compute_block = render_compute(report)
+        if compute_block:
+            lines.append(compute_block)
+            lines.append("")
         gate_line = render_gate(report)
         if gate_line:
             lines.append(gate_line)
@@ -567,6 +673,17 @@ def check_behind(report):
     the ones a baseline gates, and the report says which were not measured.
     """
     findings = []
+    compute = report.get("compute") or {}
+    geomean = (compute.get("verdict") or {}).get("geomean")
+    if compute.get("status") == "measured" and geomean is not None and geomean < 1.0:
+        findings.append({
+            "metric": COMPUTE_METRIC,
+            "label": COMPUTE_LABEL,
+            "codenameone": None,
+            "flutter": None,
+            "ratio": geomean,
+            "behind": True,
+        })
     for key, label, _unit in METRICS:
         entry = (report.get("verdict") or {}).get(key, {})
         if entry.get("status") != "measured":
@@ -665,6 +782,10 @@ def render_gate(report):
 def render_regressions(platform_id, findings):
     lines = []
     for item in findings:
+        if item.get("behind") and item["metric"] == COMPUTE_METRIC:
+            lines.append("%s: %s is %.2fx (the gate requires 1.00x or better)"
+                         % (platform_id, item["label"], item["ratio"]))
+            continue
         if item.get("behind"):
             lines.append("%s: %s is %s against Flutter's %s (ratio %.2fx; the gate requires 1.00x or better)"
                          % (platform_id, item["label"],

@@ -14,6 +14,9 @@ import 'package:flutter/scheduler.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:gallery/main.dart';
 
+import 'bench_compute.dart';
+import 'compute_flag_io.dart' if (dart.library.js_interop) 'compute_flag_web.dart';
+
 int _frames = 0;
 // Set when FIRSTCONTENT is announced; the next FrameTiming to arrive belongs to
 // a frame at or after the content frame, and carries its raster timings.
@@ -24,7 +27,15 @@ int _rasterUs = 0;
 
 late final Stopwatch _benchClock;
 
-void main() {
+void main(List<String> args) {
+  // Compute mode runs the VM workloads instead of the gallery; see
+  // bench_compute.dart. The same binary: both apps carry the workloads.
+  if (computeRequested(args)) {
+    WidgetsFlutterBinding.ensureInitialized();
+    runApp(const SizedBox.shrink());
+    runCompute();
+    return;
+  }
   final Stopwatch clock = Stopwatch()..start();
   _benchClock = clock;
   GoogleFonts.config.allowRuntimeFetching = false;

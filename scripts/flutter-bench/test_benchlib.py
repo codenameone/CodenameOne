@@ -20,6 +20,7 @@ import unittest
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 import benchlib  # noqa: E402
+import platforms  # noqa: E402
 
 
 def _report(cn1, flutter):
@@ -77,6 +78,67 @@ class BehindFlutterGateTest(unittest.TestCase):
     def test_size_metrics_have_no_tolerance(self):
         for key in ("install_bytes", "code_bytes", "wire_bytes"):
             self.assertEqual(benchlib.DEFAULT_TOLERANCES[key], 0.0)
+
+
+class ComputeTest(unittest.TestCase):
+    """The VM-workload comparison: same checksum or no ratio, geomean gates."""
+
+    def test_parses_both_apps_lines_whatever_the_log_prefix(self):
+        self.assertEqual(benchlib.parse_compute_line(
+            "I/System.out( 123): BENCH:COMPUTE name=recursion checksum=-9 ms=12"),
+            ("recursion", "-9", 12))
+        self.assertEqual(benchlib.parse_compute_line(
+            'INFO:CONSOLE(3)] "BENCH:COMPUTE name=intArithmetic checksum=5 ms=40"'),
+            ("intArithmetic", "5", 40))
+        self.assertIsNone(benchlib.parse_compute_line("BENCH:FIRSTFRAME after=3ms"))
+
+    def test_ratio_is_flutter_over_ours_and_the_mean_is_geometric(self):
+        ours = {"intArithmetic": ("1", 100), "recursion": ("2", 50)}
+        theirs = {"intArithmetic": ("1", 400), "recursion": ("2", 50)}
+        v = benchlib.compute_verdict(ours, theirs)
+        rows = dict((r["name"], r) for r in v["workloads"])
+        self.assertEqual(rows["intArithmetic"]["ratio"], 4.0)
+        self.assertEqual(rows["recursion"]["ratio"], 1.0)
+        self.assertEqual(v["geomean"], 2.0)
+        self.assertEqual(v["compared"], 2)
+
+    def test_a_different_checksum_is_not_a_measurement(self):
+        v = benchlib.compute_verdict({"longArithmetic": ("1", 10), "recursion": ("2", 10)},
+                                     {"longArithmetic": ("999", 1), "recursion": ("2", 20)})
+        rows = dict((r["name"], r) for r in v["workloads"])
+        self.assertEqual(rows["longArithmetic"]["status"], "checksum mismatch")
+        self.assertEqual(v["compared"], 1)
+        self.assertEqual(v["geomean"], 2.0, "the mismatch must not reach the mean")
+
+    def test_every_workload_has_a_row_even_when_missing(self):
+        v = benchlib.compute_verdict({}, {})
+        self.assertEqual(len(v["workloads"]), len(benchlib.COMPUTE_WORKLOADS))
+        self.assertNotIn("geomean", v)
+
+    def test_a_geomean_behind_flutter_fails_the_gate(self):
+        report = _report({"install_bytes": 50}, {"install_bytes": 100})
+        report["compute"] = {"status": "measured",
+                             "verdict": benchlib.compute_verdict({"recursion": ("1", 200)},
+                                                                 {"recursion": ("1", 100)})}
+        found = benchlib.check_behind(report)
+        self.assertEqual([f["metric"] for f in found], [benchlib.COMPUTE_METRIC])
+        self.assertIn("0.50x", benchlib.render_regressions("linux", found)[0])
+
+    def test_the_comment_carries_the_compute_table(self):
+        report = _report({"install_bytes": 50}, {"install_bytes": 100})
+        report.update(platform="macos", runs=5)
+        report["compute"] = {"status": "measured",
+                             "verdict": benchlib.compute_verdict({"recursion": ("1", 50)},
+                                                                 {"recursion": ("1", 100)})}
+        body = benchlib.render_markdown([report])
+        self.assertIn("| recursion | 50 ms | 100 ms | 2.00x |", body)
+        self.assertIn("**Geometric mean**", body)
+
+    def test_an_unmeasured_compute_run_says_why(self):
+        report = _report({"install_bytes": 50}, {"install_bytes": 100})
+        report.update(platform="ios", runs=5)
+        report["compute"] = {"status": "not measured", "reason": "needs signed hardware"}
+        self.assertIn("Not measured: needs signed hardware", benchlib.render_markdown([report]))
 
 
 class PublishRefusalTest(unittest.TestCase):
@@ -357,6 +419,9 @@ class GateArming(unittest.TestCase):
 
             def notes(self):
                 return []
+
+            def run_compute(self, side):
+                raise platforms.Unavailable("the stub runs no workloads")
 
         saved = (run_bench.build_adapter, run_bench.measure, run_bench.BASELINES)
         run_bench.build_adapter = lambda args: Stub()
