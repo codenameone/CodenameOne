@@ -296,7 +296,7 @@ JAVA_INT com_codename1_backend_Tcp_readImpl___long_byte_1ARRAY_int_int_R_int(COD
     if(fd < 0 || buffer == JAVA_NULL) {
         return -2;
     }
-    data = (JAVA_ARRAY_BYTE*)((JAVA_ARRAY)buffer)->data;
+    data = (JAVA_ARRAY_BYTE*)CN1_ARRAY_DATA(buffer);
     /*
      * This blocks, and on a virtual thread it blocks the HOST.
      *
@@ -331,7 +331,7 @@ JAVA_INT com_codename1_backend_Tcp_writeImpl___long_byte_1ARRAY_int_int_R_int(CO
     if(fd < 0 || buffer == JAVA_NULL) {
         return -1;
     }
-    data = (JAVA_ARRAY_BYTE*)((JAVA_ARRAY)buffer)->data;
+    data = (JAVA_ARRAY_BYTE*)CN1_ARRAY_DATA(buffer);
     CN1_YIELD_THREAD;
     /* send() may accept less than asked; loop so the Java side can treat a short
        write as a hard failure rather than having to retry it itself. */

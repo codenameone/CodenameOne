@@ -47,7 +47,7 @@
 static JAVA_OBJECT cn1BytesToArray(CODENAME_ONE_THREAD_STATE, const unsigned char* data, int length) {
     JAVA_OBJECT arr = allocArray(threadStateData, length, &class_array1__JAVA_BYTE, sizeof(JAVA_ARRAY_BYTE), 1);
     if(length > 0 && data != NULL) {
-        memcpy((JAVA_ARRAY_BYTE*)((JAVA_ARRAY)arr)->data, data, (size_t)length);
+        memcpy((JAVA_ARRAY_BYTE*)CN1_ARRAY_DATA(arr), data, (size_t)length);
     }
     return arr;
 }
@@ -59,7 +59,7 @@ JAVA_OBJECT com_codename1_backend_Crypto_sha256Impl___byte_1ARRAY_R_byte_1ARRAY(
         return JAVA_NULL;
     }
     arr = (JAVA_ARRAY)data;
-    SHA256((const unsigned char*)(JAVA_ARRAY_BYTE*)arr->data, (size_t)arr->length, digest);
+    SHA256((const unsigned char*)(JAVA_ARRAY_BYTE*)CN1_ARRAY_DATA(arr), (size_t)arr->length, digest);
     return cn1BytesToArray(threadStateData, digest, SHA256_DIGEST_LENGTH);
 }
 
@@ -77,7 +77,7 @@ JAVA_OBJECT com_codename1_backend_Crypto_sha1Impl___byte_1ARRAY_R_byte_1ARRAY(CO
         return JAVA_NULL;
     }
     arr = (JAVA_ARRAY)data;
-    SHA1((const unsigned char*)(JAVA_ARRAY_BYTE*)arr->data, (size_t)arr->length, digest);
+    SHA1((const unsigned char*)(JAVA_ARRAY_BYTE*)CN1_ARRAY_DATA(arr), (size_t)arr->length, digest);
     return cn1BytesToArray(threadStateData, digest, SHA_DIGEST_LENGTH);
 }
 
@@ -88,7 +88,7 @@ JAVA_OBJECT com_codename1_backend_Crypto_md5Impl___byte_1ARRAY_R_byte_1ARRAY(COD
         return JAVA_NULL;
     }
     arr = (JAVA_ARRAY)data;
-    MD5((const unsigned char*)(JAVA_ARRAY_BYTE*)arr->data, (size_t)arr->length, digest);
+    MD5((const unsigned char*)(JAVA_ARRAY_BYTE*)CN1_ARRAY_DATA(arr), (size_t)arr->length, digest);
     return cn1BytesToArray(threadStateData, digest, MD5_DIGEST_LENGTH);
 }
 
@@ -103,8 +103,8 @@ JAVA_OBJECT com_codename1_backend_Crypto_hmacSha256Impl___byte_1ARRAY_byte_1ARRA
     keyArr = (JAVA_ARRAY)key;
     dataArr = (JAVA_ARRAY)data;
     if(HMAC(EVP_sha256(),
-            (const void*)(JAVA_ARRAY_BYTE*)keyArr->data, (int)keyArr->length,
-            (const unsigned char*)(JAVA_ARRAY_BYTE*)dataArr->data, (size_t)dataArr->length,
+            (const void*)(JAVA_ARRAY_BYTE*)CN1_ARRAY_DATA(keyArr), (int)keyArr->length,
+            (const unsigned char*)(JAVA_ARRAY_BYTE*)CN1_ARRAY_DATA(dataArr), (size_t)dataArr->length,
             mac, &macLength) == NULL) {
         return JAVA_NULL;
     }
@@ -126,8 +126,8 @@ JAVA_OBJECT com_codename1_backend_Crypto_pbkdf2Impl___byte_1ARRAY_byte_1ARRAY_in
         return JAVA_NULL;
     }
     CN1_YIELD_THREAD; /* deliberately slow; do not stall the collector on it */
-    if(PKCS5_PBKDF2_HMAC((const char*)(JAVA_ARRAY_BYTE*)pw->data, (int)pw->length,
-                         (const unsigned char*)(JAVA_ARRAY_BYTE*)sl->data, (int)sl->length,
+    if(PKCS5_PBKDF2_HMAC((const char*)(JAVA_ARRAY_BYTE*)CN1_ARRAY_DATA(pw), (int)pw->length,
+                         (const unsigned char*)(JAVA_ARRAY_BYTE*)CN1_ARRAY_DATA(sl), (int)sl->length,
                          (int)iterations, EVP_sha256(), (int)length, out) != 1) {
         CN1_RESUME_THREAD;
         free(out);
@@ -182,7 +182,7 @@ JAVA_BOOLEAN com_codename1_backend_Crypto_equalsConstantTimeImpl___byte_1ARRAY_b
     if(aa->length != bb->length) {
         return JAVA_FALSE;
     }
-    return CRYPTO_memcmp((const void*)(JAVA_ARRAY_BYTE*)aa->data,
-                         (const void*)(JAVA_ARRAY_BYTE*)bb->data,
+    return CRYPTO_memcmp((const void*)(JAVA_ARRAY_BYTE*)CN1_ARRAY_DATA(aa),
+                         (const void*)(JAVA_ARRAY_BYTE*)CN1_ARRAY_DATA(bb),
                          (size_t)aa->length) == 0 ? JAVA_TRUE : JAVA_FALSE;
 }
