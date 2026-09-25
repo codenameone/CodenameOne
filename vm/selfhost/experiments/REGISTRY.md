@@ -6601,3 +6601,60 @@ Aside, not caused by this change: BibopPageFloorIntegrationTest failed once insi
 full suite with the host at load average ~36 and passed alone twice. Its settle waits a
 fixed number of wall-clock rounds for pages to be released, so a starved collector thread
 misses the window. The settle should wait on the collector's progress, not the clock.
+
+## Round 50: large objects die the cycle they die, on one core
+
+Single-core cycles now free an unmarked fresh legacy object (everything over the largest
+BiBOP size class -- here the translator's 30-45KB output buffers) at every cycle instead
+of promoting it by grace and freeing it at the next major. The legacy grace pass does not
+run in that mode. Round 43's first attempt at this was unsound, and so were the first
+three here; what made it sound is worth keeping, because each hole was invisible until
+the previous one was closed:
+
+1. **The mark guard dropped legacy objects the cycle's extent snapshot did not know.**
+   Every legacy object is now registered in the heap-index side table from allocation to
+   free, and the guard in gcMarkObject accepts a pointer that table knows
+   (cn1LegacyKnown). Fixed alone: 1 clean verify run in 4.
+2. **The snapshot was built once per cycle, before any thread stopped.** A buffer a
+   thread allocated after that and held only in a local (ByteArrayOutputStream growing)
+   did not resolve when that thread's stack was scanned, was never a root, and was freed
+   under the live stream (AIOOBE in BAOS.write, 2-3 runs in 5). Single-core cycles now
+   rebuild the snapshot at each thread's pause; the concurrent collector keeps such an
+   object by grace and still builds once.
+3. **The remaining TYPE CONFUSION reports were the verifier's, and already on the
+   branch.** The committed h4 runtime (grace on) reports them in 4 of 6 runs too. Every
+   one comes from the remembered set's card trace, which visits every object starting in
+   a dirty 64-byte chunk -- dead neighbours included (owner last marked at epoch 38, read
+   at 54). A dead owner holding a pointer to a correctly freed, recycled slot is not a live
+   dangling reference, so cn1GcVerifyFieldType skips owners the remembered set is
+   tracing. Why those dead neighbours outlive several majors is a separate question
+   (open).
+
+A diagnostic that looked like a cheaper route and was not: restricting no-grace to
+majors only or to minors only fails deterministically at epoch 2-3, because the other
+cycle kind then keeps a fresh legacy object by grace WITHOUT the grace pass tracing it,
+and promotes it to old with its young children unmarked.
+
+Verification: CN1_GC_VERIFY 8/8 clean (0 violations, 0 field-type findings), 16/16
+contended verify runs and 16/16 release runs on four pinned CPUs byte-identical to the
+JDK's output, 4/4 unpinned concurrent runs identical.
+
+**One core, 5 interleaved rounds** (min wall / max RSS): JDK 25 13.74s / 557MB, h4
+10.29s / 608MB, **this 9.84s / 503MB** (4 of 5 rounds at 478-479MB). RSS against the JDK
+0.90x, down from 1.09x -- the first column to change sign in this series.
+
+The registry and its lookup are single-core only. Built for every mode first, the
+concurrent collector's guard took the side table's lock for every pointer the snapshot
+could not resolve -- mostly fresh objects met by the grace walk -- and a 4-marker sample
+showed ~330 samples of gcMarkObject waiting on that mutex that the 16-byte-header build
+never had. The concurrent collector keeps fresh legacy objects by grace and never needs
+the answer, and the mode is fixed per process.
+
+Final runtime (4-core fix included): verify 6/6 clean, 16/16 contended, 3/3 concurrent;
+vm suite 647/648 (the one failure is BackendJavaSeRuntimeTest's demo failing to compile
+against the stale processor in .m2-repo, identical on h4). One-core RSS in a second
+5-round A/B taken under load (walls void): JDK 550-557MB, h4 600-609MB, this 475-480MB.
+
+Also measured and dropped: dispatching virtual calls through a class-id-indexed vtable
+table (3 dependent loads instead of 4) moved single-core instructions by 0.5%, inside the
++-1% run-to-run spread. The 4-byte header's +9% instructions are not in dispatch.
