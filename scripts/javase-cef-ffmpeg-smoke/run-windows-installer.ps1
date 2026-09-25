@@ -54,10 +54,24 @@ Write-Host "App: $($exe.FullName)"
 
 # Run 1: the installed launcher, exactly as a user starts it.
 $run = Start-Process -FilePath $exe.FullName -WorkingDirectory $app -PassThru -ArgumentList '--l4j-debug-all'
-$exited = $run.WaitForExit(150000)
-if (-not $exited) { Save-Screen 'launcher-hung.png'; Stop-Process -Id $run.Id -Force -ErrorAction SilentlyContinue }
+# launch4j's gui header starts javaw.exe and exits without waiting for it, so the app's
+# own JVM is what has to be waited on.
+$run.WaitForExit(30000) | Out-Null
+$deadline = (Get-Date).AddSeconds(150)
+$jvm = $null
+while ((Get-Date) -lt $deadline) {
+  $jvm = Get-Process -Name javaw -ErrorAction SilentlyContinue | Select-Object -First 1
+  if ($jvm) { break }
+  Start-Sleep -Milliseconds 500
+}
+$exited = $false
+$jvmExit = ''
+if ($jvm) {
+  $exited = $jvm.WaitForExit([int][Math]::Max(1000, ($deadline - (Get-Date)).TotalMilliseconds))
+  if ($exited) { $jvmExit = $jvm.ExitCode } else { Save-Screen 'launcher-hung.png' }
+}
 Get-Process -Name java, javaw -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
-"exited=$exited exitCode=$($run.ExitCode)" | Out-File "$Out\launcher-result.txt"
+"launcherExitCode=$($run.ExitCode) jvmSeen=$([bool]$jvm) jvmExited=$exited jvmExitCode=$jvmExit" | Out-File "$Out\launcher-result.txt"
 Get-ChildItem $app -Filter 'launch4j.log' | ForEach-Object { Copy-Item $_.FullName "$Out\launch4j.log" }
 Collect 'launcher'
 
