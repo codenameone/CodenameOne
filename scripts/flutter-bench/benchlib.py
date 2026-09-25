@@ -418,8 +418,8 @@ def render_compute(report):
     if not compute:
         return None
     intro = ("**Compute** -- the VM workloads (`vm/benchmarks`), run inside each app; "
-             "time is the best of the app's own repetitions, higher ratio means "
-             "Codename One is faster.")
+             + "time is the best of the app's own repetitions, higher ratio means "
+             + "Codename One is faster.")
     lines = [intro, ""]
     if compute.get("status") != "measured":
         lines.append("_Not measured: %s._" % compute.get("reason", "no reason given"))

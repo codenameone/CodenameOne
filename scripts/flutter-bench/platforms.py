@@ -73,6 +73,10 @@ SETTLE_S = float(os.environ.get("BENCH_SETTLE", "12"))
 # Compute mode (the VM workloads) runs every workload with warm-ups and repeats
 # inside the app, so it takes minutes, not seconds -- longest on the emulator.
 COMPUTE_TIMEOUT_S = float(os.environ.get("BENCH_COMPUTE_TIMEOUT", "1800"))
+# No single workload takes minutes -- a whole native run is seconds -- so a run
+# that reports nothing new for this long has stalled, and waiting out the full
+# timeout only delays saying which workload it stalled on.
+COMPUTE_IDLE_S = float(os.environ.get("BENCH_COMPUTE_IDLE", "300"))
 # The desktop request for compute mode: a file both apps check. The Codename One
 # port has no System.getenv to read instead. On Windows the path resolves against
 # the current drive, which the harness and both apps share.
@@ -136,13 +140,19 @@ class Adapter(object):
         report a mean over the rest.
         """
         results = {}
+        last = time.time()
         while True:
             now = time.time()
             if now >= deadline:
                 raise Unavailable("the %s app did not finish its compute run within %ds "
                                   "(%d workloads reported)"
                                   % (side, COMPUTE_TIMEOUT_S, len(results)))
-            line = reader.get(deadline - now)
+            if now - last >= COMPUTE_IDLE_S:
+                raise Unavailable("the %s app stalled in its compute run: nothing for %ds "
+                                  "after %s (%d workloads reported)"
+                                  % (side, COMPUTE_IDLE_S, _last_workload(results),
+                                     len(results)))
+            line = reader.get(max(0.0, min(deadline, last + COMPUTE_IDLE_S) - now))
             if line is _LineReader.EOF:
                 raise Unavailable("the %s app exited before finishing its compute run "
                                   "(%d workloads reported)" % (side, len(results)))
@@ -153,6 +163,10 @@ class Adapter(object):
             parsed = benchlib.parse_compute_line(line)
             if parsed:
                 results[parsed[0]] = (parsed[1], parsed[2])
+                last = time.time()
+                # Echoed, so the job log shows how far each app got and when.
+                print("    %s %s checksum=%s %dms" % (side, parsed[0], parsed[1], parsed[2]),
+                      flush=True)
 
     def notes(self):
         """Caveats that belong beside this platform's numbers.
@@ -836,22 +850,42 @@ class AndroidAdapter(Adapter):
         if side == "codenameone":
             self._adb("shell", "am", "start", "-n", component, "-d", "benchcompute://run")
         else:
+            # --esal, not --esa: FlutterActivity reads the extra with
+            # getSerializableExtra and casts it to a List, which a String[] is not.
             self._adb("shell", "am", "start", "-n", component,
-                      "--esa", "dart_entrypoint_args", "compute")
-        deadline = time.time() + COMPUTE_TIMEOUT_S
+                      "--esal", "dart_entrypoint_args", "compute")
+        started = time.time()
+        deadline = started + COMPUTE_TIMEOUT_S
         results = {}
+        last = started
         try:
             while time.time() < deadline:
                 out = self._adb("logcat", "-d")
                 done = False
+                before = len(results)
                 for line in out.stdout.splitlines():
                     if benchlib.COMPUTE_DONE in line:
                         done = True
                     parsed = benchlib.parse_compute_line(line)
-                    if parsed:
+                    if parsed and parsed[0] not in results:
                         results[parsed[0]] = (parsed[1], parsed[2])
+                        print("    %s %s checksum=%s %dms"
+                              % (side, parsed[0], parsed[1], parsed[2]), flush=True)
                 if done:
                     return results
+                if len(results) > before:
+                    last = time.time()
+                elif time.time() - last >= COMPUTE_IDLE_S:
+                    raise Unavailable("the %s app stalled in its compute run: nothing for %ds "
+                                      "after %s (%d workloads reported)"
+                                      % (side, COMPUTE_IDLE_S, _last_workload(results),
+                                         len(results)))
+                # An app that is no longer running will never finish; say so now
+                # rather than waiting out the whole timeout.
+                if time.time() - started > 30 and not self._adb(
+                        "shell", "pidof", package).stdout.strip():
+                    raise Unavailable("the %s app exited before finishing its compute "
+                                      "run (%d workloads reported)" % (side, len(results)))
                 time.sleep(5)
         finally:
             self._adb("shell", "am", "force-stop", package)
@@ -970,6 +1004,17 @@ class _QuietHandler(_quiet_handler_base()):
 
     def log_message(self, *args):
         pass
+
+
+def _last_workload(results):
+    """The workload a stalled run was on: the one after the last it reported."""
+    order = benchlib.COMPUTE_WORKLOADS
+    done = [name for name in order if name in results]
+    if not done:
+        return "starting (before %s)" % order[0]
+    index = order.index(done[-1])
+    return "%s (it was running %s)" % (done[-1], order[index + 1]) \
+        if index + 1 < len(order) else done[-1]
 
 
 def _find_chrome():

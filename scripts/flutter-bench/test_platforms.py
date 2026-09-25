@@ -121,6 +121,18 @@ class ComputeReading(unittest.TestCase):
             self._read("print('BENCH:COMPUTE name=recursion checksum=7 ms=12')")
         self.assertIn("exited before finishing", str(ctx.exception))
 
+    def test_a_run_that_stops_reporting_names_where_it_stalled(self):
+        saved = platforms.COMPUTE_IDLE_S
+        platforms.COMPUTE_IDLE_S = 1.0
+        try:
+            with self.assertRaises(platforms.Unavailable) as ctx:
+                self._read("print('BENCH:COMPUTE name=intArithmetic checksum=1 ms=5');"
+                           "import time; time.sleep(60)")
+        finally:
+            platforms.COMPUTE_IDLE_S = saved
+        self.assertIn("stalled", str(ctx.exception))
+        self.assertIn("it was running longArithmetic", str(ctx.exception))
+
     def test_an_app_that_hangs_is_abandoned_at_the_timeout(self):
         started = time.time()
         with self.assertRaises(platforms.Unavailable) as ctx:
