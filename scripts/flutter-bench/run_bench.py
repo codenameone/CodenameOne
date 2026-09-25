@@ -203,6 +203,12 @@ def main(argv=None):
             findings = benchlib.check_regressions(report, baseline)
             report["regressions"] = findings
             report["gate"] = {"status": "armed", "baseline": relative}
+        # Losing to Flutter fails the gate on its own, baseline or not: the
+        # benchmark exists to show Codename One ahead on every metric, and a
+        # loss that matched the baseline would otherwise pass as "no change".
+        behind = benchlib.check_behind(report)
+        report["behind"] = behind
+        findings = findings + behind
 
     _write(args, report, [report])
     # Printed AFTER the gate is decided, so the job log carries the gate line
@@ -211,7 +217,7 @@ def main(argv=None):
     print(benchlib.render_markdown([report]))
 
     if findings:
-        print("\nREGRESSION")
+        print("\nGATE FAILED")
         for line in benchlib.render_regressions(adapter.id, findings):
             print("  " + line)
         return 1

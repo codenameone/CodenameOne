@@ -73,10 +73,13 @@ SIDES = ("codenameone", "flutter")
 # is not, and a band tight enough to catch a real regression there would fire on
 # load alone; memory at rest sits between the two. Written INTO each baseline
 # file, so a platform that needs a different band says so in the file itself.
+# Sizes get NO tolerance: they are deterministic for a given source tree and
+# toolchain, so any growth is a real change and fails the gate. Re-baseline
+# deliberately (commit the run's candidate) when growth is intended.
 DEFAULT_TOLERANCES = {
-    "install_bytes": 0.02,
-    "code_bytes": 0.02,
-    "wire_bytes": 0.02,
+    "install_bytes": 0.0,
+    "code_bytes": 0.0,
+    "wire_bytes": 0.0,
     "cold_start_ms": 0.25,
     "idle_memory_bytes": 0.15,
 }
@@ -551,6 +554,35 @@ def check_regressions(report, baseline):
     return findings
 
 
+def check_behind(report):
+    """Every measured metric on which Codename One is BEHIND Flutter.
+
+    The benchmark is a gate, not a scoreboard: a ratio under 1.00 on any metric
+    fails the job, exactly as a regression against the baseline does. It needs
+    no baseline and no tolerance -- both sides are built from the same Dart
+    source and measured interleaved on the same runner, so a slow runner slows
+    both and cannot turn a win into a loss or a loss into a win.
+
+    A metric that was not measured is not judged here; check_regressions fails
+    the ones a baseline gates, and the report says which were not measured.
+    """
+    findings = []
+    for key, label, _unit in METRICS:
+        entry = (report.get("verdict") or {}).get(key, {})
+        if entry.get("status") != "measured":
+            continue
+        if entry["ratio"] < 1.0:
+            findings.append({
+                "metric": key,
+                "label": label,
+                "codenameone": entry["codenameone"],
+                "flutter": entry["flutter"],
+                "ratio": entry["ratio"],
+                "behind": True,
+            })
+    return findings
+
+
 # Wall-clock metrics whose runner speed Flutter's own number measures.
 LOAD_NORMALISED = ("cold_start_ms",)
 
@@ -617,18 +649,29 @@ def render_gate(report):
     gate = report.get("gate")
     if not gate:
         return None
+    behind = report.get("behind") or []
+    lost = ("; **BEHIND FLUTTER** on %s" % ", ".join(item["label"] for item in behind)
+            if behind else "")
     if gate.get("status") == "armed":
         findings = report.get("regressions") or []
-        return ("**Gate:** %s against the committed baseline."
-                % ("REGRESSED" if findings else "within tolerance"))
+        return ("**Gate:** %s against the committed baseline%s."
+                % ("REGRESSED" if findings else "within tolerance", lost))
     return ("**Gate: NOT ARMED** -- %s. This run's candidate baseline is attached "
-            "to the workflow as an artifact; committing it as `%s` arms the gate."
-            % (gate.get("reason", "no baseline"), gate.get("baseline", "baselines/<platform>.json")))
+            "to the workflow as an artifact; committing it as `%s` arms the gate%s."
+            % (gate.get("reason", "no baseline"), gate.get("baseline", "baselines/<platform>.json"),
+               lost))
 
 
 def render_regressions(platform_id, findings):
     lines = []
     for item in findings:
+        if item.get("behind"):
+            lines.append("%s: %s is %s against Flutter's %s (ratio %.2fx; the gate requires 1.00x or better)"
+                         % (platform_id, item["label"],
+                            format_value(item["metric"], item["codenameone"]),
+                            format_value(item["metric"], item["flutter"]),
+                            item["ratio"]))
+            continue
         if item.get("missing"):
             lines.append("%s: %s was not measured, but the baseline gates it at %s"
                          % (platform_id, item["label"],

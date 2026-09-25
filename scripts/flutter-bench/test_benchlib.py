@@ -44,6 +44,41 @@ class PlatformIdsMatchTheWorkflow(unittest.TestCase):
         self.assertEqual(list(benchlib.PLATFORM_IDS), ids)
 
 
+class BehindFlutterGateTest(unittest.TestCase):
+    """Losing to Flutter on any measured metric fails the gate by itself."""
+
+    def test_a_loss_on_any_metric_is_a_finding(self):
+        report = _report({"install_bytes": 200, "code_bytes": 50},
+                         {"install_bytes": 100, "code_bytes": 100})
+        found = benchlib.check_behind(report)
+        self.assertEqual([f["metric"] for f in found], ["install_bytes"])
+        self.assertTrue(found[0]["behind"])
+        self.assertIn("requires 1.00x", benchlib.render_regressions("macos", found)[0])
+
+    def test_winning_everything_passes(self):
+        report = _report({"install_bytes": 50, "code_bytes": 50},
+                         {"install_bytes": 100, "code_bytes": 100})
+        self.assertEqual(benchlib.check_behind(report), [])
+
+    def test_a_tie_is_not_behind(self):
+        report = _report({"install_bytes": 100}, {"install_bytes": 100})
+        self.assertEqual(benchlib.check_behind(report), [])
+
+    def test_an_unmeasured_metric_is_not_judged_here(self):
+        report = _report({"install_bytes": 50}, {})
+        self.assertEqual(benchlib.check_behind(report), [])
+
+    def test_the_gate_line_names_what_we_lost(self):
+        report = _report({"install_bytes": 200}, {"install_bytes": 100})
+        report["gate"] = {"status": "armed"}
+        report["behind"] = benchlib.check_behind(report)
+        self.assertIn("BEHIND FLUTTER", benchlib.render_gate(report))
+
+    def test_size_metrics_have_no_tolerance(self):
+        for key in ("install_bytes", "code_bytes", "wire_bytes"):
+            self.assertEqual(benchlib.DEFAULT_TOLERANCES[key], 0.0)
+
+
 class PublishRefusalTest(unittest.TestCase):
     """Publishing replaces the public document, so only a complete run may."""
 
@@ -298,7 +333,7 @@ class GateArming(unittest.TestCase):
     def test_candidate_holds_only_codenameone_values_with_their_bands(self):
         c = benchlib.baseline_candidate(self._report())
         self.assertEqual({"install_bytes": 1000, "cold_start_ms": 500.0}, c["codenameone"])
-        self.assertEqual({"install_bytes": 0.02, "cold_start_ms": 0.25}, c["tolerances"])
+        self.assertEqual({"install_bytes": 0.0, "cold_start_ms": 0.25}, c["tolerances"])
         self.assertEqual([], benchlib.check_regressions(self._report(), c),
                          "a run compared against its own candidate is within tolerance")
 

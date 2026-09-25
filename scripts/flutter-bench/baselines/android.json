@@ -15,10 +15,10 @@
   "recorded_from": "sizes: flutter-bench run 35772357318; start-up and memory: the envelope of the runs through 35793506968 (commit fb8880b96d)",
   "schema_version": 1,
   "tolerances": {
-    "code_bytes": 0.02,
+    "code_bytes": 0.0,
     "cold_start_ms": 0.25,
     "idle_memory_bytes": 0.15,
-    "install_bytes": 0.02,
-    "wire_bytes": 0.02
+    "install_bytes": 0.0,
+    "wire_bytes": 0.0
   }
 }

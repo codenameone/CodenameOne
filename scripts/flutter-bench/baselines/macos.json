@@ -12,9 +12,9 @@
   "recorded_from": "flutter-bench run 35778830308 (commit 991df0b889)",
   "schema_version": 1,
   "tolerances": {
-    "code_bytes": 0.02,
+    "code_bytes": 0.0,
     "idle_memory_bytes": 0.15,
-    "install_bytes": 0.02,
-    "wire_bytes": 0.02
+    "install_bytes": 0.0,
+    "wire_bytes": 0.0
   }
 }
