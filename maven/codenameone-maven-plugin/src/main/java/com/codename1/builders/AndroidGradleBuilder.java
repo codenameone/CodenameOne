@@ -4400,7 +4400,11 @@ public class AndroidGradleBuilder extends Executor {
                             request.getArg("cn1.androidTheme", null),
                             request.getArg("nativeTheme", null),
                             request.getArg("cn1.nativeTheme", null),
-                            request.getArg("and.hololight", null)),
+                            // and.hololight is a run-time Display property only: no
+                            // build hint carries it into the stub, so it is set by the
+                            // application or not at all, and removeUnusedAndroid keeps
+                            // every theme for an application that names it.
+                            null),
                     dummyClassesDir);
             if (!droppedThemes.isEmpty()) {
                 log("Native themes not used by this build, not shipped: " + droppedThemes);
