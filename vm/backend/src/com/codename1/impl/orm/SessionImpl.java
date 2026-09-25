@@ -409,9 +409,9 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
         }
         requireTransaction();
         String clause = sql.lockClause(mode);
-        autoFlush();
         EntityModel<T> model = model(type);
         Object[] keyValues = model.keyValues(id);
+        autoFlush();
         List<Object[]> rows =
                 read(select(model) + " WHERE " + keyCondition(model, null) + clause, keyValues, kinds(model));
         if (rows.isEmpty()) {
@@ -553,6 +553,11 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
                             ? null
                             : find(model.type(), id);
         if (managed == null) {
+            int version = model.versionIndex();
+            Object incomingVersion = version < 0 ? null : model.get(entity, version);
+            if (incomingVersion instanceof Number && ((Number) incomingVersion).longValue() != 0) {
+                throw new OptimisticLockException("Detached row no longer exists: " + model.table());
+            }
             if (generated && id != null && (!(id instanceof Number) || ((Number) id).longValue() != 0)) {
                 throw new OptimisticLockException("Detached row no longer exists: " + model.table());
             }
@@ -1443,7 +1448,15 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
         } finally {
             deferredFetch--;
         }
-        fetchAll(model, result, fetches);
+        try {
+            fetchAll(model, result, fetches);
+        } catch (RuntimeException error) {
+            if (transaction) {
+                rollbackOnly = true;
+            }
+            clear();
+            throw error;
+        }
         return result;
     }
     private <T> void fetchAll(EntityModel<T> owner, List<T> roots, List<String> fetches) {

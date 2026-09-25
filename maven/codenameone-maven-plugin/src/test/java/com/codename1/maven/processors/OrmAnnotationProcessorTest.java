@@ -1896,6 +1896,65 @@ public class OrmAnnotationProcessorTest {
         }
     }
 
+    private java.net.URLClassLoader deferredFetchFixture(boolean eager) throws Exception {
+        File classes=tmp.newFolder();Map<String,String> sources=new java.util.LinkedHashMap<String,String>();
+        sources.put("deferred.Owner","package deferred; import com.codename1.annotations.*; import com.codename1.annotations.db.*; @Entity(table=\"deferred_owner\") public class Owner { @Id public long id; @Version public long version; public String name; public static int updates; public static java.util.List<Owner> loaded=new java.util.ArrayList<Owner>(); @PreUpdate public void updating(){updates++;} @PostLoad public void loading(){loaded.add(this);} @ManyToOne(fetch=FetchType."+(eager?"EAGER":"LAZY")+") public Target target; @OneToMany(mappedBy=\"owner\") public java.util.List<Child> children=new java.util.ArrayList<Child>(); }");
+        sources.put("deferred.Target","package deferred; import com.codename1.annotations.*; @Entity(table=\"deferred_target\") public class Target { @Id public long id; }");
+        sources.put("deferred.Child","package deferred; import com.codename1.annotations.*; import com.codename1.annotations.db.*; @Entity(table=\"deferred_child\") public class Child { @Id public long id; @ManyToOne(fetch=FetchType.LAZY) public Owner owner; }");
+        JavaSourceCompiler.compile(sources,classes,Arrays.asList(testClassesDir()));
+        ProcessorContext client=runProcessor(classes);assertFalse(client.getErrors().toString(),client.hasErrors());
+        ProcessorContext backend=runProcessor(classes,backendClasspath());assertFalse(backend.getErrors().toString(),backend.hasErrors());
+        return new java.net.URLClassLoader(new URL[]{classes.toURI().toURL()},getClass().getClassLoader());
+    }
+    private Map<String,com.codename1.impl.orm.EntityModel<?>> deferredModels(java.net.URLClassLoader loader,String suffix) throws Exception {
+        Map<String,com.codename1.impl.orm.EntityModel<?>> models=new java.util.LinkedHashMap<String,com.codename1.impl.orm.EntityModel<?>>();
+        for(String name:Arrays.asList("Owner","Target","Child")) {
+            Class type=loader.loadClass("deferred."+name);models.put(type.getName(),(com.codename1.impl.orm.EntityModel)loader.loadClass(type.getName()+suffix).newInstance());
+        }
+        return models;
+    }
+
+    @Test public void invalidJoinedOrderingDoesNotFlushPendingChanges() throws Exception {
+        try(java.net.URLClassLoader loader=deferredFetchFixture(false)) {
+            Class type=loader.loadClass("deferred.Owner");
+            for(String suffix:Arrays.asList("Cn1Model","Cn1BackendModel")) {
+                com.codename1.backend.Database db=com.codename1.backend.Database.open(":memory:");
+                com.codename1.orm.session.Session session=new com.codename1.impl.orm.SessionImpl(new com.codename1.impl.orm.BackendSqlAccess(null,db,db.dialect()),deferredModels(loader,suffix));
+                try {
+                    type.getField("updates").setInt(null,0);session.createTables();session.beginTransaction();Object owner=type.newInstance();type.getField("name").set(owner,"first");session.persist(owner);session.commitTransaction();
+                    session.beginTransaction();type.getField("name").set(owner,"pending");
+                    for(int limit:new int[]{-1,0,1}) {
+                        com.codename1.orm.session.Query query=session.query(type).join("children").orderBy("children.id",true);if(limit>=0) query.limit(limit);
+                        org.junit.Assert.assertThrows(IllegalArgumentException.class,query::list);org.junit.Assert.assertThrows(IllegalArgumentException.class,query::first);
+                    }
+                    org.junit.Assert.assertEquals(0,type.getField("updates").getInt(null));org.junit.Assert.assertEquals(0,type.getField("version").getLong(owner));assertTrue(session.contains(owner));assertFalse(session.isRollbackOnly());
+                    org.junit.Assert.assertEquals("first",((Map)db.query("SELECT name FROM deferred_owner",new Object[0]).get(0)).get("name"));
+                    session.commitTransaction();org.junit.Assert.assertEquals(1,type.getField("updates").getInt(null));
+                } finally {session.close();db.close();}
+            }
+        }
+    }
+
+    @Test public void deferredFetchFailuresClearContextAndMarkTransactionRollbackOnly() throws Exception {
+        for(boolean eager:new boolean[]{false,true}) try(java.net.URLClassLoader loader=deferredFetchFixture(eager)) {
+            Class type=loader.loadClass("deferred.Owner");
+            for(String suffix:Arrays.asList("Cn1Model","Cn1BackendModel")) for(boolean transaction:new boolean[]{false,true}) {
+                com.codename1.backend.Database db=com.codename1.backend.Database.open(":memory:");
+                com.codename1.orm.session.Session session=new com.codename1.impl.orm.SessionImpl(new com.codename1.impl.orm.BackendSqlAccess(null,db,db.dialect()),deferredModels(loader,suffix));
+                try {
+                    session.createTables();session.beginTransaction();Object existing=type.newInstance();session.persist(existing);session.commitTransaction();
+                    db.execute("PRAGMA foreign_keys=OFF",new Object[0]);db.execute("INSERT INTO deferred_owner(id,version,target_id) VALUES (100,0,999)",new Object[0]);
+                    ((List)type.getField("loaded").get(null)).clear();if(transaction) session.beginTransaction();
+                    com.codename1.orm.session.Query query=session.query(type);if(!eager) query.fetch("target");
+                    com.codename1.orm.session.PersistenceException error=org.junit.Assert.assertThrows(com.codename1.orm.session.PersistenceException.class,query::list);
+                    assertTrue(error.getMessage(),error.getMessage().contains("Missing"));assertFalse(session.contains(existing));
+                    List loaded=(List)type.getField("loaded").get(null);assertFalse(loaded.isEmpty());for(Object root:loaded) assertFalse(session.contains(root));
+                    org.junit.Assert.assertEquals(transaction,session.isRollbackOnly());if(transaction) session.rollbackTransaction();
+                } finally { session.close();db.close(); }
+            }
+        }
+    }
+
     private java.net.URLClassLoader reviewRelations(String idType) throws Exception {
         File classes=tmp.newFolder();
         Map<String,String> sources=new java.util.LinkedHashMap<String,String>();

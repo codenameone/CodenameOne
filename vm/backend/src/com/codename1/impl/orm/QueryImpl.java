@@ -255,12 +255,12 @@ public final class QueryImpl<T> implements com.codename1.orm.session.Query<T> {
         return rows.isEmpty() ? null : rows.get(0);
     }
     private List<T> list(int max) {
+        if (pluralJoin && relationOrdering) {
+            throw new IllegalArgumentException("Collection joins require ordering by a root field");
+        }
         session.autoFlush();
         if (max == 0) {
             return new ArrayList<T>();
-        }
-        if (pluralJoin && relationOrdering) {
-            throw new IllegalArgumentException("Collection joins require ordering by a root field");
         }
         StringBuilder selection = new StringBuilder("SELECT ").append(pluralJoin ? "DISTINCT " : "");
         Attribute[] attributes = model.attributes();

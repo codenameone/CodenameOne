@@ -108,7 +108,9 @@ public abstract class EntityModel<T> {
         }
         int kind = attributes()[index].kind;
         try {
-            return kind == Attribute.BOOLEAN ? Values.asBooleanObject(value)
+            return kind == Attribute.INTEGER ? Values.asIntObject(value)
+                    : kind == Attribute.BIGINT ? Values.asLongObject(value)
+                    : kind == Attribute.BOOLEAN ? Values.asBooleanObject(value)
                     : kind == Attribute.TIMESTAMP ? Values.asDate(value) : value;
         } catch (java.io.IOException error) {
             throw new PersistenceException("Invalid scalar projection", error);
@@ -256,7 +258,7 @@ public abstract class EntityModel<T> {
         int[] ids = idIndexes();
         Object[] values = new Object[ids.length];
         for (int i = 0; i < ids.length; i++) {
-            values[i] = row[ids[i]];
+            values[i] = Values.storage(project(ids[i], row[ids[i]]));
         }
         return ids.length == 1 ? values[0] : Identifier.of(values);
     }

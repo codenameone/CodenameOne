@@ -156,6 +156,10 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 60
     container: ghcr.io/codenameone/codenameone/pr-ci-container:latest
+    env:
+      # Java 8 uses the native locale for class-file names containing Unicode.
+      LANG: C.UTF-8
+      LC_ALL: C.UTF-8
     defaults:
       run:
         shell: bash

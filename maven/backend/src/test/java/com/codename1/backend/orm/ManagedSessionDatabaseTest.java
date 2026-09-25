@@ -77,6 +77,7 @@ class ManagedSessionDatabaseTest {
             Session integerSession=new com.codename1.impl.orm.SessionImpl(new com.codename1.impl.orm.BackendSqlAccess(null,db,db.dialect()),integerModels);
             try { ManagedSessionTest.assertIntegerRanges(integerSession); } finally { integerSession.close(); }
 
+            ManagedSessionTest.assertDecimalIdentifiers(db);
             ManagedSessionTest.assertBulkTextKeyBounds(db);
             ManagedSessionTest.assertMinimumLongLiteral(session);
             java.util.Map<String,com.codename1.impl.orm.EntityModel<?>> realModels=new java.util.LinkedHashMap<String,com.codename1.impl.orm.EntityModel<?>>();realModels.put(ManagedSessionTest.RealRecord.class.getName(),new ManagedSessionTest.RealModel());

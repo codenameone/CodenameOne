@@ -155,6 +155,81 @@ class ManagedSessionTest {
         }
     }
 
+    @Test void lockedFindValidatesIdentifiersBeforeFlushing() throws Exception {
+        Database db=Database.open(":memory:");int[] callbacks={0};
+        Model model=new Model(){public void lifecycle(Record row,int event){if(event==2) callbacks[0]++;}};
+        java.util.Map<String,EntityModel<?>> models=new java.util.LinkedHashMap<String,EntityModel<?>>();models.put(Record.class.getName(),model);
+        com.codename1.impl.orm.SqlAccess delegate=new com.codename1.impl.orm.BackendSqlAccess(null,db,db.dialect());
+        com.codename1.impl.orm.SqlAccess access=(com.codename1.impl.orm.SqlAccess)java.lang.reflect.Proxy.newProxyInstance(getClass().getClassLoader(),new Class[]{com.codename1.impl.orm.SqlAccess.class},(proxy,method,args)->{
+            if(method.getName().equals("lockClause")) return "";
+            try { return method.invoke(delegate,args); } catch(java.lang.reflect.InvocationTargetException error) { throw error.getCause(); }
+        });
+        Session session=new com.codename1.impl.orm.SessionImpl(access,models);
+        try {
+            Record row=seed(session);session.beginTransaction();row.name="pending";
+            for(com.codename1.orm.session.LockMode mode:new com.codename1.orm.session.LockMode[]{com.codename1.orm.session.LockMode.PESSIMISTIC_READ,com.codename1.orm.session.LockMode.PESSIMISTIC_WRITE}) {
+                for(Object id:new Object[]{null,"bad",new Object[]{1L,2L}}) assertThrows(IllegalArgumentException.class,()->session.find(Record.class,id,mode));
+                assertThrows(PersistenceException.class,()->session.find(Object.class,row.id,mode));
+            }
+            assertEquals(0,callbacks[0]);assertEquals(0,row.version);assertTrue(session.contains(row));assertFalse(session.isRollbackOnly());
+            assertEquals("first",((java.util.Map)db.query("SELECT name FROM managed_record",new Object[0]).get(0)).get("name"));
+            session.commitTransaction();assertEquals(1,callbacks[0]);
+        } finally { session.close();db.close(); }
+    }
+
+    @Test void decimalIdentifiersReuseManagedInstances() throws Exception {
+        Database db=Database.open(":memory:");
+        try { assertDecimalIdentifiers(db); } finally { db.close(); }
+    }
+    static void assertDecimalIdentifiers(Database db) throws Exception {
+        for(boolean composite:new boolean[]{false,true}) {
+            Model model=new Model(){
+                public String table(){return composite?"decimal_composite":"decimal_single";}
+                public Attribute[] attributes(){
+                    Attribute[] attrs=super.attributes().clone();
+                    attrs[0]=new Attribute("id","id",Attribute.BIGINT,true,false,false,false,"NUMERIC(20,2)");
+                    if(composite) attrs[2]=new Attribute("counter","counter",Attribute.INTEGER,true,false,false,false,"DECIMAL(12,2)");
+                    return attrs;
+                }
+                public void set(Record row,int index,Object value){
+                    try { super.set(row,index,index==0||index==2?com.codename1.impl.orm.Values.asLongObject(value):value); }
+                    catch(java.io.IOException error){throw new PersistenceException("Invalid integral value",error);}
+                }
+            };
+            java.util.Map<String,EntityModel<?>> models=new java.util.LinkedHashMap<String,EntityModel<?>>();models.put(Record.class.getName(),model);
+            Session session=new com.codename1.impl.orm.SessionImpl(new com.codename1.impl.orm.BackendSqlAccess(null,db,db.dialect()),models);
+            try {
+                session.createTables();session.beginTransaction();Record row=new Record();row.id=23;row.counter=7;session.persist(row);session.commitTransaction();session.clear();
+                Record loaded=session.query(Record.class).first();assertEquals(23,loaded.id);
+                assertSame(loaded,session.query(Record.class).first());assertSame(loaded,session.createQuery("select r from ManagedSessionTest$Record r",Record.class).first());
+                assertSame(loaded,session.find(Record.class,composite?com.codename1.orm.session.Identifier.of(23L,7):23L));
+                Object[] decimalRow={"23.00",0L,"7.00",null,null};
+                assertEquals(model.identifier(loaded),model.identifierFromRow(decimalRow));
+                decimalRow[0]="23.50";assertThrows(PersistenceException.class,()->model.identifierFromRow(decimalRow));
+            } finally { session.close(); }
+        }
+    }
+
+    @Test void mergeDoesNotResurrectMissingAssignedVersionedRows() throws Exception {
+        for(boolean composite:new boolean[]{false,true}) {
+            Database db=Database.open(":memory:");
+            Model model=new Model(){public Attribute[] attributes(){
+                Attribute[] attrs=super.attributes().clone();attrs[0]=new Attribute("id","id",Attribute.BIGINT,true,false,false,false);
+                if(composite) attrs[2]=new Attribute("counter","counter",Attribute.BIGINT,true,false,false,false);return attrs;
+            }};
+            java.util.Map<String,EntityModel<?>> models=new java.util.LinkedHashMap<String,EntityModel<?>>();models.put(Record.class.getName(),model);
+            Session session=new com.codename1.impl.orm.SessionImpl(new com.codename1.impl.orm.BackendSqlAccess(null,db,db.dialect()),models);
+            try {
+                session.createTables();session.beginTransaction();Record fresh=new Record();fresh.id=42;fresh.counter=7;
+                Record managed=session.merge(fresh);session.commitTransaction();assertEquals(0,managed.version);
+                session.beginTransaction();managed.name="versioned";session.commitTransaction();assertEquals(1,managed.version);session.detach(managed);
+                db.execute("DELETE FROM managed_record",new Object[0]);session.beginTransaction();
+                assertThrows(OptimisticLockException.class,()->session.merge(managed));assertTrue(session.isRollbackOnly());session.rollbackTransaction();
+                assertEquals(0,session.query(Record.class).count());
+            } finally { session.close();db.close(); }
+        }
+    }
+
     @Test void bulkAssignmentsRejectDuplicateTargetsDuringParsing() throws Exception {
         EntityManager manager=manager();
         try {
