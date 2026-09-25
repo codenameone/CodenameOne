@@ -296,6 +296,38 @@ public class OrmAnnotationProcessorTest {
     }
 
     @Test
+    public void removingInverseParentsReconcilesPendingJoinTableMoves() throws Exception {
+        File classes=tmp.newFolder();Map<String,String> sources=new java.util.LinkedHashMap<String,String>();
+        String imports="package joinmoves; import com.codename1.annotations.*; import com.codename1.annotations.db.*; ";
+        sources.put("joinmoves.Parent",imports+"@Entity public class Parent { @Id public long id; @ManyToMany(mappedBy=\"parents\",fetch=FetchType.LAZY,cascade=CascadeType.REMOVE) public java.util.List<Child> children=new java.util.ArrayList<Child>(); }");
+        sources.put("joinmoves.Child",imports+"@Entity public class Child { @Id public long id; @ManyToMany(fetch=FetchType.LAZY) public java.util.List<Parent> parents=new java.util.ArrayList<Parent>(); }");
+        JavaSourceCompiler.compile(sources,classes,Arrays.asList(testClassesDir()));ProcessorContext client=runProcessor(classes);assertFalse(client.getErrors().toString(),client.hasErrors());ProcessorContext backend=runProcessor(classes,backendClasspath());assertFalse(backend.getErrors().toString(),backend.hasErrors());
+        try(java.net.URLClassLoader loader=new java.net.URLClassLoader(new URL[]{classes.toURI().toURL()},getClass().getClassLoader())) {
+            Class parent=loader.loadClass("joinmoves.Parent"),child=loader.loadClass("joinmoves.Child");
+            for(String suffix:Arrays.asList("Cn1Model","Cn1BackendModel")) for(boolean destination:Arrays.asList(false,true)) for(boolean preloaded:Arrays.asList(false,true)) {
+                Map<String,com.codename1.impl.orm.EntityModel<?>> models=new java.util.LinkedHashMap<String,com.codename1.impl.orm.EntityModel<?>>();
+                for(Class type:Arrays.asList(parent,child)) models.put(type.getName(),(com.codename1.impl.orm.EntityModel)loader.loadClass(type.getName()+suffix).newInstance());
+                com.codename1.backend.Database db=com.codename1.backend.Database.open(":memory:");com.codename1.orm.session.Session session=new com.codename1.impl.orm.SessionImpl(new com.codename1.impl.orm.BackendSqlAccess(null,db,db.dialect()),models);
+                try {
+                    session.createTables();session.beginTransaction();Object oldParent=parent.newInstance(),newParent=parent.newInstance(),item=child.newInstance();
+                    ((java.util.List)child.getField("parents").get(item)).add(oldParent);session.persist(oldParent);session.persist(newParent);session.persist(item);session.commitTransaction();
+                    Object oldId=parent.getField("id").get(oldParent),newId=parent.getField("id").get(newParent),childId=child.getField("id").get(item);session.clear();
+                    oldParent=session.find(parent,oldId);newParent=session.find(parent,newId);item=session.find(child,childId);
+                    assertFalse(session.isLoaded(oldParent,"children"));
+                    if(preloaded) { session.initialize(oldParent,"children");session.initialize(newParent,"children"); }
+                    session.initialize(item,"parents");session.beginTransaction();
+                    java.util.List parents=(java.util.List)child.getField("parents").get(item);parents.clear();parents.add(newParent);
+                    session.remove(destination?newParent:oldParent);session.commitTransaction();session.clear();
+                    item=session.find(child,childId);
+                    if(destination) { org.junit.Assert.assertNull(item);org.junit.Assert.assertNotNull(session.find(parent,oldId)); }
+                    else { org.junit.Assert.assertNotNull("Pending join removal must preserve the child",item);session.initialize(item,"parents");org.junit.Assert.assertEquals(1,((java.util.List)child.getField("parents").get(item)).size());org.junit.Assert.assertEquals(newId,parent.getField("id").get(((java.util.List)child.getField("parents").get(item)).get(0))); }
+                    session.clear();Object remaining=session.find(parent,destination?oldId:newId);session.beginTransaction();session.remove(remaining);session.commitTransaction();org.junit.Assert.assertEquals(0,session.query(child).count());
+                } finally { session.close();db.close(); }
+            }
+        }
+    }
+
+    @Test
     public void owningToOneCountsUsePersistedForeignKeys() throws Exception {
         for(boolean composite:Arrays.asList(false,true)) {
             File classes=tmp.newFolder();Map<String,String> sources=new java.util.LinkedHashMap<String,String>();String imports="package storedcount; import com.codename1.annotations.*; import com.codename1.annotations.db.*; ";

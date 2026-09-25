@@ -392,6 +392,7 @@ public final class JpqlQueryImpl<T> implements com.codename1.orm.session.JpqlQue
                 mutationTable = root.model.table();
                 expect("SET");
                 StringBuilder assignments = new StringBuilder();
+                boolean[] assigned = new boolean[root.model.attributes().length];
                 do {
                     if (assignments.length() > 0) {
                         assignments.append(", ");
@@ -401,8 +402,13 @@ public final class JpqlQueryImpl<T> implements com.codename1.orm.session.JpqlQue
                     if (field.indexOf('.') >= 0) {
                         throw error("Bulk assignment must target a root field");
                     }
-                    Attribute attribute = root.model.attributes()[root.model.queryIndex(field)];
-                    if (attribute.id || root.model.discriminatorIndex() == root.model.queryIndex(field)) {
+                    int index = root.model.queryIndex(field);
+                    if (assigned[index]) {
+                        throw error("Duplicate bulk assignment target: " + field);
+                    }
+                    assigned[index] = true;
+                    Attribute attribute = root.model.attributes()[index];
+                    if (attribute.id || root.model.discriminatorIndex() == index) {
                         throw error("Bulk updates cannot change entity identifiers");
                     }
                     expect("=");
@@ -418,20 +424,20 @@ public final class JpqlQueryImpl<T> implements com.codename1.orm.session.JpqlQue
                     }
                     validateAssignment(root.mapping(field), value);
                     bindType(target, value);
-                    if (root.model.primitive(root.model.queryIndex(field)) && !nonNullExpression(value, true, true)) {
+                    if (root.model.primitive(index) && !nonNullExpression(value, true, true)) {
                         throw error("Nullable bulk assignment to a primitive attribute requires a non-null fallback");
                     }
-                    if (attribute.nullable && root.model.required(root.model.queryIndex(field))) {
+                    if (attribute.nullable && root.model.required(index)) {
                         requireNonNull(value);
                     }
                     if (attribute.kind == Attribute.INTEGER) {
-                        int index = root.model.queryIndex(field);
                         value.sql = session.checkedIntegralAssignment(value.sql,
                                 root.model.minimumIntegralValue(index), root.model.maximumIntegralValue(index));
                     }
-                    if (root.model.singlePrecision(root.model.queryIndex(field))) {
+                    if (root.model.singlePrecision(index)) {
                         value.sql = session.checkedFloatAssignment(value.sql);
                     }
+                    value.sql = session.checkedTextKeyAssignment(root.model, index, value.sql);
                     assignments.append(target.sql).append(" = ").append(value.sql);
                 } while (take(","));
                 String where = take("WHERE") ? " WHERE " + condition(rowExpression()) : "";

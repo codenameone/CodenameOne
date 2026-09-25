@@ -123,6 +123,56 @@ class ManagedSessionTest {
         } finally { em.close(); }
     }
 
+    @Test void bulkAssignmentsRejectDuplicateTargetsDuringParsing() throws Exception {
+        EntityManager manager=manager();
+        try {
+            Session session=manager.openSession();
+            try {
+                Record row=seed(session);
+                session.beginTransaction();
+                for(String assignments:new String[]{"r.name='a',r.name='b'","name='a',r.name='b'","r.counter=1,r.name='a',counter=2"}) {
+                    assertThrows(IllegalArgumentException.class,()->session.createQuery("update ManagedSessionTest$Record r set "+assignments));
+                }
+                row.name="still usable";session.commitTransaction();session.clear();
+                assertEquals("still usable",session.find(Record.class,row.id).name);
+            } finally { session.close(); }
+        } finally { manager.close(); }
+    }
+
+    @Test void bulkAssignmentsEnforceTextKeyBounds() throws Exception {
+        Database db=Database.open(":memory:");
+        try { assertBulkTextKeyBounds(db); } finally { db.close(); }
+    }
+    static void assertBulkTextKeyBounds(Database db) throws Exception {
+        for(boolean explicit:new boolean[]{false,true}) {
+            Model model=new Model() {
+                public String table() { return explicit?"bulk_text_explicit":"bulk_text_default"; }
+                public Attribute[] attributes() {
+                    Attribute[] attrs=super.attributes().clone();
+                    attrs[3]=new Attribute("name","name",Attribute.TEXT,false,false,true,false,explicit?"VARCHAR(1024)":null);
+                    return attrs;
+                }
+                public com.codename1.impl.orm.Index[] indexes() { return new com.codename1.impl.orm.Index[]{new com.codename1.impl.orm.Index("",true,new String[]{"name"})}; }
+            };
+            java.util.Map<String,EntityModel<?>> models=new java.util.LinkedHashMap<String,EntityModel<?>>();models.put(Record.class.getName(),model);
+            Session session=new com.codename1.impl.orm.SessionImpl(new com.codename1.impl.orm.BackendSqlAccess(null,db,db.dialect()),models);
+            try {
+                session.createTables();session.beginTransaction();Record row=new Record();row.name="original";session.persist(row);session.commitTransaction();
+                String boundary=new String(new char[255]).replace('\0','x'),oversize=boundary+"x";
+                for(String expression:new String[]{":value","'"+oversize+"'","upper(:value)","coalesce(:value,r.name)"}) {
+                    session.beginTransaction();
+                    com.codename1.orm.session.JpqlQuery query=session.createQuery("update ManagedSessionTest$Record r set r.name="+expression);
+                    if(expression.contains(":value")) query.setParameter("value",oversize);
+                    if(explicit) { assertEquals(1,query.executeUpdate());session.commitTransaction(); }
+                    else { assertThrows(PersistenceException.class,query::executeUpdate);session.rollbackTransaction();assertEquals("original",session.find(Record.class,row.id).name); }
+                }
+                for(String value:new String[]{boundary,null}) {
+                    session.beginTransaction();assertEquals(1,session.createQuery("update ManagedSessionTest$Record r set r.name=:value").setParameter("value",value).executeUpdate());session.commitTransaction();assertEquals(value,session.find(Record.class,row.id).name);
+                }
+            } finally { session.close(); }
+        }
+    }
+
     @Test void bulkDeleteUsesPortableAliasSyntaxForEachDialect() throws Exception {
         for(com.codename1.backend.sql.Dialect dialect:new com.codename1.backend.sql.Dialect[]{com.codename1.backend.sql.Dialect.SQLITE,com.codename1.backend.sql.Dialect.POSTGRES,com.codename1.backend.sql.Dialect.MYSQL,com.codename1.backend.sql.Dialect.MARIADB}) {
             java.util.List<String> statements=new java.util.ArrayList<String>();

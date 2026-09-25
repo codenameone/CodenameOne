@@ -127,6 +127,16 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
         return "(CASE WHEN " + value + " < " + min + " OR " + value + " > " + max
                 + " THEN " + integralOverflow(value) + " ELSE " + value + " END)";
     }
+    String checkedTextKeyAssignment(EntityModel model, int index, String expression) {
+        Attribute attribute = model.attributes()[index];
+        if (attribute.kind != Attribute.TEXT || attribute.declaredType != null || !keyColumn(model, index)) {
+            return expression;
+        }
+        String length = functionName("LENGTH") + "(" + expression + ")";
+        String textType = "mysql".equals(sql.dialect()) ? "CHAR" : "TEXT";
+        return "(CASE WHEN " + length + " > 255 THEN CAST(" + integralOverflow(length)
+                + " AS " + textType + ") ELSE " + expression + " END)";
+    }
     private String integralOverflow(String value) {
         if ("sqlite".equals(sql.dialect())) {
             return "abs(-9223372036854775808)";
@@ -633,7 +643,8 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
         EntityModel target = model(relation.target);
         if (relation.mappedBy.length() > 0) {
             int inverse = target.relationIndex(relation.mappedBy);
-            if (target.relationships()[inverse].column >= 0) {
+            Relationship owning = target.relationships()[inverse];
+            if (owning.column >= 0 || owning.many) {
                 // The database snapshot may predate pending owning-side moves.
                 // Hydration registers its rows; include incoming managed children
                 // and exclude outgoing ones without flushing a removed/fresh owner.
@@ -645,14 +656,25 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
                     EntityState state = state(child.entity);
                     boolean belongs;
                     if (state != null && !state.loaded[inverse]) {
-                        belongs = !owner.fresh && same(state.keys[inverse], owner.model.identifier(owner.entity));
+                        belongs = !owner.fresh && (owning.many
+                                ? owner.collections[index] != null && containsKey(owner.collections[index],
+                                        target.identifier(child.entity))
+                                : same(state.keys[inverse], owner.model.identifier(owner.entity)));
                     } else {
-                        Object currentOwner = target.relation(child.entity, inverse);
-                        Entry managedOwner = entries.get(currentOwner);
-                        belongs = sameInstance(currentOwner, owner.entity)
-                                || currentOwner != null && !owner.fresh
-                                        && (managedOwner == null || !managedOwner.fresh)
-                                        && same(owner.model.identifier(currentOwner), owner.model.identifier(owner.entity));
+                        Object current = target.relation(child.entity, inverse);
+                        if (owning.many) {
+                            belongs = false;
+                            if (current != null) {
+                                for (Object currentOwner : relatedValues(current)) {
+                                    if (sameOwner(owner, currentOwner)) {
+                                        belongs = true;
+                                        break;
+                                    }
+                                }
+                            }
+                        } else {
+                            belongs = sameOwner(owner, current);
+                        }
                     }
                     if (belongs) {
                         result.add(child.entity);
@@ -673,6 +695,12 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
             }
         }
         return result;
+    }
+    private boolean sameOwner(Entry owner, Object currentOwner) {
+        Entry managedOwner = entries.get(currentOwner);
+        return sameInstance(currentOwner, owner.entity)
+                || currentOwner != null && !owner.fresh && (managedOwner == null || !managedOwner.fresh)
+                        && same(owner.model.identifier(currentOwner), owner.model.identifier(owner.entity));
     }
     private void removeInternal(Object entity) {
         requireTransaction();

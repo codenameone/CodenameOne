@@ -110,7 +110,7 @@ member. `CascadeType` selects the persistence operations to propagate.
 `orphanRemoval=true` removes children dropped from an initialized relationship.
 Application code maintains both sides of bidirectional object relationships.
 Removal cascades on inverse to-one and to-many relationships account for pending
-owning-side moves before choosing which children to remove.
+owning-side moves, including join-table changes, before choosing which children to remove.
 
 The build enhances entity classes and field-access callers so a normal public
 field read can initialize a lazy relationship. No runtime proxy generator or
@@ -163,7 +163,8 @@ escape character.
 include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/ManagedOrmSnippets.java[tag=managed-orm-jpql-query,indent=0]
 ----
 
-Bulk mutations use `executeUpdate()` inside a transaction. Aggregate functions
+Bulk mutations use `executeUpdate()` inside a transaction. Repeated assignment
+targets are rejected during query creation. Aggregate functions
 are allowed inside scalar nested queries, but not directly in assignments or bulk
 predicates. On MySQL and MariaDB, nested queries that read the bulk mutation target
 table are rejected during query creation. They flush pending
@@ -333,7 +334,7 @@ schemas. It creates missing entity/collection tables, primary and foreign keys,
 one-to-one uniqueness, and relationship indexes. `@Column(unique=true)` and
 `@Entity(indexes=@Index(name="by_name", fields={"name"}))` declare additional
 indexes. Generated text keys, indexed fields, and foreign keys accept at most
-255 characters during managed inserts and updates on every database. Specify
+255 characters during managed inserts, updates, and bulk assignments on every database. Specify
 `@Column(type=...)` to control the SQL type and its value limits yourself.
 
 `session.validateSchema()` checks mapped entity columns, storage-type families,
