@@ -1046,6 +1046,43 @@ class TelemetryTest extends UITestBase {
     }
 
     @Test
+    void anExportKeepsNoneOfALargeAcknowledgement() throws Exception {
+        // A collector (or a proxy) answering 200 with a large body: the export
+        // reads it only to discard it, and holds none of it afterwards.
+        byte[] huge = new byte[1 << 20];
+        TestCodenameOneImplementation impl = TestCodenameOneImplementation.getInstance();
+        impl.addNetworkMockResponse("http://bigack.test/v1/traces", 200, "OK", huge);
+        impl.clearQueuedRequests();
+        Telemetry.install(new TelemetryConfig().direct("http://bigack.test"));
+        NetworkManager.getInstance().addToQueueAndWait(request(API + "?bigack"));
+        Telemetry.flush();
+        Telemetry.ExportRequest export = null;
+        long deadline = System.currentTimeMillis() + WAIT_MILLIS;
+        while (export == null && System.currentTimeMillis() < deadline) {
+            flushSerialCalls();
+            for (ConnectionRequest queued : impl.getQueuedRequests()) {
+                if (queued instanceof Telemetry.ExportRequest) {
+                    export = (Telemetry.ExportRequest) queued;
+                }
+            }
+            Thread.sleep(20);
+        }
+        assertNotNull(export, "no export was queued");
+        awaitConnection("http://bigack.test/v1/traces");
+        // Its response handling runs after the body was written; give it the
+        // network thread's turn to finish before looking.
+        long settle = System.currentTimeMillis() + 2000;
+        while (System.currentTimeMillis() < settle && !export.isReadResponseForErrors()
+                && export.getResponseData() == null && export.getResponseCode() == 0) {
+            flushSerialCalls();
+            Thread.sleep(20);
+        }
+        byte[] kept = export.getResponseData();
+        assertTrue(kept == null, "the export kept the collector's body in memory: "
+                + (kept == null ? 0 : kept.length) + " bytes");
+    }
+
+    @Test
     void aTruncatedValueNeverEndsInHalfACharacter() {
         StringBuilder text = new StringBuilder();
         for (int i = 0; i < TelemetrySpan.MAX_VALUE_LENGTH - 1; i++) {

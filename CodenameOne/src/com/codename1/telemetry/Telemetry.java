@@ -36,6 +36,7 @@ import com.codename1.ui.CN;
 import com.codename1.ui.Display;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.OutputStream;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -651,6 +652,20 @@ public final class Telemetry {
             setRequestBody(new ByteBody(body));
         }
 
+        /// The acknowledgement is read and DROPPED, at most 64KB of it. An OTLP
+        /// success body is empty or a few bytes; the inherited reader kept the whole
+        /// stream in memory, so a misbehaving collector or proxy answering 200 with
+        /// a large body could spend a phone's memory on every export.
+        @Override
+        protected void readResponse(InputStream input) throws IOException {
+            byte[] discard = new byte[4096];
+            int total = 0;
+            int read;
+            while (total < 65536 && (read = input.read(discard)) > 0) {
+                total += read;
+            }
+        }
+
         /// None of the app's default headers. They are the app's credentials for
         /// its own services; copied onto an export they reached a third-party
         /// collector, and a default Content-Type relabelled the body. An export
@@ -740,7 +755,8 @@ public final class Telemetry {
         while (end > start && cleaned.charAt(end - 1) <= ' ') {
             end--;
         }
-        url = cleaned.substring(start, end);
+        // Through toString(): CLDC11's StringBuilder has no substring.
+        url = cleaned.toString().substring(start, end);
         if (url.length() == 0) {
             return false;
         }

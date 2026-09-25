@@ -197,6 +197,22 @@ class LambdaTracingTest {
     }
 
     @Test
+    @DisplayName("a caller's tracestate alone is its own trace context")
+    void aStandaloneTracestateIsTheCallers() {
+        List lines = new ArrayList();
+        lines.add("Accept: application/json");
+        assertFalse(Tracing.callerTraceparent(lines));
+        lines.add("tracestate: vendor=opaque");
+        assertTrue(Tracing.callerTraceparent(lines),
+                "a traceparent of ours would have been paired with the caller's state");
+        List other = new ArrayList();
+        other.add("tracestatement: not-a-trace-header");
+        assertFalse(Tracing.callerTraceparent(other));
+        other.add("Traceparent: 00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01");
+        assertTrue(Tracing.callerTraceparent(other));
+    }
+
+    @Test
     @DisplayName("a span whose decoration throws is still ended")
     void abandonedSpansAreEnded() throws Exception {
         Recorder recorder = new Recorder();

@@ -619,21 +619,30 @@ public final class Tracing {
         }
     }
 
-    /** Whether the caller's own header lines already carry a traceparent. */
+    /**
+     * Whether the caller's own header lines already carry trace context -- a
+     * traceparent, or a tracestate alone. The state is part of the caller's
+     * context too: a traceparent of ours added beside it paired the caller's
+     * vendor state with an unrelated trace id, or, with state of our own, sent
+     * two tracestate headers.
+     */
     static boolean callerTraceparent(List callerHeaders) {
         if(callerHeaders == null) {
             return false;
         }
         for(int iter = 0 ; iter < callerHeaders.size() ; iter++) {
             String line = String.valueOf(callerHeaders.get(iter)).trim();
-            if(line.regionMatches(true, 0, TRACEPARENT, 0, TRACEPARENT.length())
-                    && line.length() > TRACEPARENT.length()
-                    && (line.charAt(TRACEPARENT.length()) == ':'
-                        || line.charAt(TRACEPARENT.length()) == ' ')) {
+            if(isHeaderLine(line, TRACEPARENT) || isHeaderLine(line, TRACESTATE)) {
                 return true;
             }
         }
         return false;
+    }
+
+    private static boolean isHeaderLine(String line, String name) {
+        return line.regionMatches(true, 0, name, 0, name.length())
+                && line.length() > name.length()
+                && (line.charAt(name.length()) == ':' || line.charAt(name.length()) == ' ');
     }
 
     /** Ends a statement's span. */
