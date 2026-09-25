@@ -3497,10 +3497,7 @@ public class BytecodeMethod implements SignatureSet {
             direct.setMethod(this);
             direct.addDependencies(dependentClasses);
             if (dependencyGraph != null) {
-                String uses = direct.getMethodUsed();
-                if (uses != null) {
-                    dependencyGraph.recordMethodCall(this, uses);
-                }
+                dependencyGraph.recordMethodCall(this, direct.getMethodUsed());
             }
         }
     }
@@ -3666,10 +3663,7 @@ public class BytecodeMethod implements SignatureSet {
             call.setMethod(this);
             call.addDependencies(dependentClasses);
             if (dependencyGraph != null) {
-                String uses = call.getMethodUsed();
-                if (uses != null) {
-                    dependencyGraph.recordMethodCall(this, uses);
-                }
+                dependencyGraph.recordMethodCall(this, call.getMethodUsed());
             }
         }
     }
@@ -4026,7 +4020,7 @@ public class BytecodeMethod implements SignatureSet {
      */
     static final boolean BCE_CENSUS =
             "true".equalsIgnoreCase(Util.getProperty("cn1.bceCensus", "false"));
-    static int bceMethods, bceMethodsWithArrays, bceRefusedTryCatch, bceRefusedOther,
+    static int bceMethods, bceMethodsWithArrays, bceRefusedTryCatch,
                bceArrayOpsTotal, bceArrayOpsRefusedTryCatch;
     /* Loops that matched the counted shape and were then refused because a handler
      * landed inside them. Non-vacuity evidence for bceHandlerLandsIn: if this is 0

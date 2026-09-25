@@ -3237,32 +3237,6 @@ public class Parser extends ClassVisitor {
         return false;       // not in this closed world
     }
 
-    /// Can any method of this class leak its own `this`? Memoised: the answer is a
-    /// property of the class, and only classes that already passed the per-site walk
-    /// are ever asked, so this stays far from the classes x methods x instructions
-    /// product that iteratorStackCensus explicitly avoids.
-    private static boolean classThisIsSafe(String mangledOwner, Map<String, Boolean> memo) {
-        Boolean cached = memo.get(mangledOwner);
-        if (cached != null) {
-            return cached.booleanValue();
-        }
-        boolean safe = true;
-        for (ByteCodeClass c : classes) {
-            if (!IteratorEscape.mangle(c.getClsName()).equals(mangledOwner)) {
-                continue;
-            }
-            for (BytecodeMethod m : c.getMethods()) {
-                if (IteratorEscape.thisEscapes(m) != IteratorEscape.SAFE) {
-                    safe = false;
-                    break;
-                }
-            }
-            break;
-        }
-        memo.put(mangledOwner, Boolean.valueOf(safe));
-        return safe;
-    }
-
     static void reportRetireCounters() {
         System.out.println("[RETIRE] seen=" + BytecodeMethod.retireSeen
                 + " kept=" + BytecodeMethod.retireKept

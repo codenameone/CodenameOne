@@ -272,7 +272,6 @@ class IteratorEscape {
         // it;`, which an ASTORE would otherwise abandon -- 9 of the refused sites were
         // exactly that. One is enough: a second store of the tracked value to a different
         // local gives up rather than growing into a general dataflow.
-        int trackedLocal = -1;
         // ALIAS SET, not a single local. The walk used to refuse outright when the
         // tracked value was stored to a SECOND local -- 59 of 137 remaining undecidable
         // sites on the self-hosting corpus, the largest single cause left. A set of
@@ -442,10 +441,8 @@ class IteratorEscape {
                 }
                 sp = Math.max(0, sp - argCount - (hasReceiver ? 1 : 0));
                 char[] out = i.getStackOutputTypes();
-                if (out != null) {
-                    for (int o = 0; o < out.length; o++) {
-                        stack = push(stack, sp++, false);
-                    }
+                for (int o = 0; o < out.length; o++) {
+                    stack = push(stack, sp++, false);
                 }
                 continue;
             }
@@ -476,7 +473,6 @@ class IteratorEscape {
                         return UNKNOWN;
                     }
                     trackedLocals[idx] = true;
-                    trackedLocal = idx;
                     lastTrackedLocal = idx;
                 }
                 // No clear on an untracked store -- see the alias-set note above.
@@ -605,7 +601,7 @@ class IteratorEscape {
         }
         // A method that never touches the reference cannot leak it. For the NEW form that
         // also means there was nothing to analyse, which the caller distinguishes.
-        return sawSource || trackThis ? SAFE : SAFE;
+        return SAFE;
     }
 
     /// TypeInstruction.appendInstruction mangles its type IN PLACE, so the same

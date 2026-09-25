@@ -879,14 +879,16 @@ public class ByteCodeClass {
         if (targets.size() > CN1_MAX_THUNK_CASES) {
             return null;
         }
-        java.util.Collections.sort(cases, new java.util.Comparator<String[]>() {
-            public int compare(String[] a, String[] b) {
-                int r = a[1].compareTo(b[1]);
-                return r != 0 ? r : a[0].compareTo(b[0]);
-            }
-        });
+        java.util.Collections.sort(cases, THUNK_CASE_ORDER);
         return cases;
     }
+
+    private static final java.util.Comparator<String[]> THUNK_CASE_ORDER = new java.util.Comparator<String[]>() {
+        public int compare(String[] a, String[] b) {
+            int r = a[1].compareTo(b[1]);
+            return r != 0 ? r : a[0].compareTo(b[0]);
+        }
+    };
 
     public String generateCCode(List<ByteCodeClass> allClasses) {
 
@@ -2398,6 +2400,12 @@ public class ByteCodeClass {
     // this struct be read as a pointer to its parent's. Every access is by field name
     // (and the offset table is taken with offsetof), so nothing depends on the order.
     // Stable, so fields of one size keep their declaration order.
+    private static final Comparator<ByteCodeField> WIDEST_FIRST = new Comparator<ByteCodeField>() {
+        public int compare(ByteCodeField a, ByteCodeField c) {
+            return fieldStorageBytes(c) - fieldStorageBytes(a);
+        }
+    };
+
     private static int fieldStorageBytes(ByteCodeField bf) {
         String d = bf.getCDefinition();
         if(d.endsWith("JAVA_BOOLEAN") || d.endsWith("JAVA_BYTE")) return 1;
@@ -2422,11 +2430,7 @@ public class ByteCodeClass {
             baseClassObject.addFields(b);
         }
         List<ByteCodeField> ordered = new ArrayList<ByteCodeField>(fields);
-        Collections.sort(ordered, new Comparator<ByteCodeField>() {
-            public int compare(ByteCodeField a, ByteCodeField c) {
-                return fieldStorageBytes(c) - fieldStorageBytes(a);
-            }
-        });
+        Collections.sort(ordered, WIDEST_FIRST);
         // The header is 4 bytes (CN1_OBJ_HEADER_FIELDS) in an 8-aligned struct, so offset 4
         // is free for fields of up to 4 bytes -- but only the FIRST class in the hierarchy
         // to declare instance fields can use it: a subclass must keep its parent's layout
@@ -3126,7 +3130,7 @@ public class ByteCodeClass {
     private String pureBodyBlocker(BytecodeMethod m, boolean ctor, java.util.Map<BytecodeMethod, String> memo) {
         if (memo.containsKey(m)) {
             String known = memo.get(m);
-            return known == IN_PROGRESS ? "recursion" : known;
+            return IN_PROGRESS.equals(known) ? "recursion" : known;
         }
         // No bytecode is not "does nothing": a native or abstract body is code this
         // analysis cannot see.
@@ -3146,7 +3150,8 @@ public class ByteCodeClass {
         return result;
     }
 
-    private static final String IN_PROGRESS = new String("in-progress");
+    // Compared by value: no blocker name contains parentheses, so this cannot collide.
+    private static final String IN_PROGRESS = "(in-progress)";
 
     /// null when the instruction is allowed in a pure <clinit> (or, with `ctor`, in a
     /// constructor it calls), else a short name for why not. A WHITELIST: an
