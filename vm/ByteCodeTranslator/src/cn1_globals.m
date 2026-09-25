@@ -17276,6 +17276,92 @@ static void cn1WinPrintAddress(const char* label, const void* addr) {
             (unsigned long long)((const char*)addr - (const char*)mod));
 }
 
+/* dbghelp, resolved at crash time so no build has to link it. With a .pdb beside
+   the executable (clang-cl /Zi, linker /DEBUG) frames print as function and line;
+   without one they still print as module+offset. */
+typedef BOOL (WINAPI *cn1SymInitializeFn)(HANDLE, PCSTR, BOOL);
+typedef BOOL (WINAPI *cn1SymFromAddrFn)(HANDLE, DWORD64, PDWORD64, void*);
+typedef BOOL (WINAPI *cn1SymGetLineFn)(HANDLE, DWORD64, PDWORD, void*);
+struct cn1WinSymbolInfo {        /* SYMBOL_INFO's layout, with room for the name */
+    ULONG SizeOfStruct; ULONG TypeIndex; ULONG64 Reserved[2]; ULONG Index; ULONG Size;
+    ULONG64 ModBase; ULONG Flags; ULONG64 Value; ULONG64 Address; ULONG Register;
+    ULONG Scope; ULONG Tag; ULONG NameLen; ULONG MaxNameLen; CHAR Name[256];
+};
+struct cn1WinLineInfo {          /* IMAGEHLP_LINE64's layout */
+    DWORD SizeOfStruct; PVOID Key; DWORD LineNumber; PCHAR FileName; DWORD64 Address;
+};
+
+/*
+ * Walks the FAULTING thread's frames from the exception context. A backtrace taken
+ * inside the filter stops at the exception dispatcher and never reaches them, so
+ * this unwinds the saved context through the image's .pdata instead.
+ */
+static void cn1WinUnwindFaultingStack(const CONTEXT* faulting) {
+    if(faulting == 0) {
+        return;
+    }
+    HANDLE proc = GetCurrentProcess();
+    HMODULE dbg = LoadLibraryA("dbghelp.dll");
+    cn1SymFromAddrFn symFromAddr = 0;
+    cn1SymGetLineFn symGetLine = 0;
+    if(dbg != 0) {
+        cn1SymInitializeFn symInit = (cn1SymInitializeFn)(void*)GetProcAddress(dbg, "SymInitialize");
+        if(symInit != 0 && symInit(proc, NULL, TRUE)) {
+            symFromAddr = (cn1SymFromAddrFn)(void*)GetProcAddress(dbg, "SymFromAddr");
+            symGetLine = (cn1SymGetLineFn)(void*)GetProcAddress(dbg, "SymGetLineFromAddr64");
+        }
+    }
+    CONTEXT c = *faulting;
+    for(int i = 0; i < 40; i++) {
+#if defined(_M_ARM64)
+        DWORD64 pc = c.Pc;
+#else
+        DWORD64 pc = c.Rip;
+#endif
+        if(pc == 0) {
+            break;
+        }
+        cn1WinPrintAddress("frame", (const void*)(uintptr_t)pc);
+        if(symFromAddr != 0) {
+            struct cn1WinSymbolInfo si;
+            DWORD64 disp = 0;
+            memset(&si, 0, sizeof(si));
+            si.SizeOfStruct = (ULONG)(sizeof(si) - sizeof(si.Name) + 1);
+            si.MaxNameLen = (ULONG)sizeof(si.Name) - 1;
+            if(symFromAddr(proc, pc, &disp, &si)) {
+                struct cn1WinLineInfo li;
+                DWORD lineDisp = 0;
+                memset(&li, 0, sizeof(li));
+                li.SizeOfStruct = (DWORD)sizeof(li);
+                if(symGetLine != 0 && symGetLine(proc, pc, &lineDisp, &li) && li.FileName != 0) {
+                    fprintf(stderr, "[CRASH]     %s+0x%llx %s:%lu\n", si.Name, (unsigned long long)disp,
+                            li.FileName, (unsigned long)li.LineNumber);
+                } else {
+                    fprintf(stderr, "[CRASH]     %s+0x%llx\n", si.Name, (unsigned long long)disp);
+                }
+            }
+        }
+        DWORD64 imageBase = 0;
+        PRUNTIME_FUNCTION fe = RtlLookupFunctionEntry(pc, &imageBase, NULL);
+        if(fe == NULL) {
+            /* A leaf: its return address has not been moved anywhere yet. */
+#if defined(_M_ARM64)
+            if(c.Lr == 0 || c.Lr == pc) {
+                break;
+            }
+            c.Pc = c.Lr;
+#else
+            c.Rip = *(DWORD64*)(uintptr_t)c.Rsp;
+            c.Rsp += 8;
+#endif
+            continue;
+        }
+        PVOID handlerData = NULL;
+        DWORD64 establisher = 0;
+        RtlVirtualUnwind(UNW_FLAG_NHANDLER, imageBase, pc, fe, &c, &handlerData, &establisher, NULL);
+    }
+}
+
 /*
  * THE WINDOWS CRASH REPORT. A POSIX build that faults gets a signal name from the
  * shell and a core or crash log from the OS; a Windows console process that takes an
@@ -17298,11 +17384,7 @@ static LONG WINAPI cn1WinCrashFilter(EXCEPTION_POINTERS* info) {
                 rec->ExceptionInformation[0] == 0 ? "read of" : (rec->ExceptionInformation[0] == 1 ? "write to" : "execute at"),
                 (void*)rec->ExceptionInformation[1]);
     }
-    void* frames[48];
-    USHORT n = RtlCaptureStackBackTrace(0, 48, frames, NULL);
-    for(USHORT i = 0; i < n; i++) {
-        cn1WinPrintAddress("frame", frames[i]);
-    }
+    cn1WinUnwindFaultingStack(info->ContextRecord);
     struct ThreadLocalData* t = cn1TlsSelf;
     if(t == 0) {
         fprintf(stderr, "[CRASH] no Java thread state on this thread\n");
