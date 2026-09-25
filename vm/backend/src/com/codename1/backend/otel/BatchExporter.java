@@ -289,7 +289,20 @@ final class BatchExporter implements Runnable {
             if(System.currentTimeMillis() >= nextTick) {
                 nextTick = System.currentTimeMillis() + delayMillis;
             }
-            int requeuedSpans = batch.isEmpty() ? 0 : exportSpans(batch);
+            int requeuedSpans = 0;
+            if(!batch.isEmpty()) {
+                if(isStopping()) {
+                    // Taken off the queue before shutdown's window closed, posted
+                    // after it: a request with the retired tracer's endpoint and
+                    // credentials after shutdown had returned. Dropped instead, the
+                    // way the relay loop drops the rest of its round.
+                    synchronized(lock) {
+                        droppedSpans += batch.size();
+                    }
+                } else {
+                    requeuedSpans = exportSpans(batch);
+                }
+            }
             int requeuedPayloads = 0;
             for(int iter = 0 ; iter < payloads.size() ; iter++) {
                 if(isStopping()) {

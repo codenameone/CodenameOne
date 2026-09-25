@@ -326,6 +326,8 @@ class TraceContextTest {
         assertTrue(OtlpTracer.hasHttpAuthority("https://[2001:db8::1]:4318"));
         assertTrue(OtlpTracer.hasHttpAuthority("https://[1:2:3:4:5:6:7:8]:4318"));
         assertTrue(OtlpTracer.hasHttpAuthority("https://[::]:4318"));
+        // A fragment is never sent, so a credential there never arrives.
+        assertFalse(OtlpTracer.hasHttpAuthority("https://collector.example/v1#api-key=s3cret"));
         // The whole URL, not only its authority.
         assertFalse(OtlpTracer.hasHttpAuthority("https://collector.example/bad value"));
         assertFalse(OtlpTracer.hasHttpAuthority("https://collector.example/v1?q=a\tb"));

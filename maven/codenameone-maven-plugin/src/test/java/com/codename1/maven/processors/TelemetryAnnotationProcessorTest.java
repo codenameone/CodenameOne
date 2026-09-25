@@ -182,6 +182,21 @@ public class TelemetryAnnotationProcessorTest {
     }
 
     @Test
+    public void aMalformedHeaderIsRefusedWithoutQuotingIt() throws Exception {
+        File classes = compile("@OpenTelemetry(endpoint = \"https://c.example\", "
+                + "headers = \"Authorization Bearer s3cret\")");
+        ProcessorContext ctx = run(classes);
+        assertTrue(ctx.hasErrors());
+        assertFalse("the refusal quoted a credential: " + ctx.getErrors(),
+                String.valueOf(ctx.getErrors()).contains("s3cret"));
+    }
+
+    @Test
+    public void anEndpointWithAFragmentIsRefused() throws Exception {
+        assertFalse(TelemetryAnnotationProcessor.isHttpUrl("https://c.example/v1#api-key=s3cret"));
+    }
+
+    @Test
     public void aHeaderTheExporterOwnsIsRefused() throws Exception {
         assertRefused("@OpenTelemetry(endpoint = \"https://c.example\", headers = \"Content-Type: application/json\")");
     }

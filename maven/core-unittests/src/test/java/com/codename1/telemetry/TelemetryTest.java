@@ -642,7 +642,8 @@ class TelemetryTest extends UITestBase {
         String[] bad = {"https://", "https:///v1/traces", "ftp://collector.test",
             "collector.test:4318", "https://collector example", "https://c.test:99999",
             "https://[nope]:4318", "https://bad value@collector.test", "https://u%zz@collector.test",
-            "https://u%2@collector.test", "https://collector.test/bad path"};
+            "https://u%2@collector.test", "https://collector.test/bad path",
+            "https://collector.test#api-key=s3cret"};
         for (String url : bad) {
             try {
                 new TelemetryConfig().direct(url);

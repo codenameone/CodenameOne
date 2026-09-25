@@ -425,6 +425,11 @@ public final class OtlpTracer implements Tracer {
      * produced no traces.
      */
     static boolean hasHttpAuthority(String url) {
+        // No fragment. HTTP never sends one, so a credential kept there never
+        // reached the collector, and every export was refused silently.
+        if(url.indexOf('#') >= 0) {
+            return false;
+        }
         // The WHOLE URL first, by the rule Web applies when it sends: no space,
         // control or DEL anywhere. Only the authority was checked, so a space in
         // the path passed and every export then failed at transport, silently.

@@ -155,6 +155,12 @@ public final class TelemetryConfig {
     /// Whether `url` is http or https with a host (a DNS name, an IPv4 address or
     /// a bracketed IPv6 literal) and, if it names one, a port from 1 to 65535.
     static boolean isHttpUrl(String url) {
+        // No fragment. HTTP never sends one, so a credential kept there
+        // ("#api-key=...") never reached the collector: telemetry installed and
+        // every export was refused, silently.
+        if (url.indexOf('#') >= 0) {
+            return false;
+        }
         // The WHOLE URL first: no space, control or DEL anywhere. Only the
         // authority was checked, so a space in the path passed and every export
         // then failed at transport, silently.

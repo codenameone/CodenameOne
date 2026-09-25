@@ -109,10 +109,16 @@ public final class TelemetryAnnotationProcessor extends AbstractAnnotationProces
                     + "https URL");
             return;
         }
+        int position = 0;
         for (String header : strings(otel.get("headers"))) {
+            position++;
             int colon = header.indexOf(':');
             if (colon <= 0 || colon == header.length() - 1) {
-                ctx.error(cls, "@OpenTelemetry header \"" + header + "\" is not \"Name: value\"");
+                // By position, never quoted: a malformed entry is still usually a
+                // credential ("Authorization Bearer ..."), and this message goes to
+                // compiler and CI logs. The later checks name only the header.
+                ctx.error(cls, "@OpenTelemetry header #" + position + " is not \"Name: value\" "
+                        + "(its value is not shown, since it is usually a credential)");
                 return;
             }
             // The whole field, not just the colon. The export is fail-silent by
@@ -297,6 +303,12 @@ public final class TelemetryAnnotationProcessor extends AbstractAnnotationProces
     /// normalized to "https:/v1/traces", and every export -- fail-silent by design --
     /// went nowhere while the build reported the setting as checked.
     static boolean isHttpUrl(String url) {
+        // No fragment. HTTP never sends one, so a credential kept there
+        // ("#api-key=...") never reached the collector: telemetry installed and
+        // every export was refused, silently.
+        if (url.indexOf('#') >= 0) {
+            return false;
+        }
         // The WHOLE URL first: no space, control or DEL anywhere. Only the
         // authority was checked, so a space in the path passed and every export
         // then failed at transport, silently.
