@@ -217,9 +217,13 @@ name = project.get("name")
 print(name if name in targets else (targets[0] if targets else ""))' )"
     [ -n "$TARGET" ] || {
       echo "the generated Xcode project declares no target to build" >&2; exit 2; }
+    # Stripped, because that is what ships: the cloud build runs `archive`, which
+    # strips the product, and a plain `build` leaves the whole symbol table in --
+    # about a quarter of the binary, measured against a stripped Flutter.
     ( cd "$XCPROJ" && xcodebuild -project *.xcodeproj -target "$TARGET" \
         -configuration Release -sdk iphoneos \
         CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO \
+        DEPLOYMENT_POSTPROCESSING=YES STRIP_INSTALLED_PRODUCT=YES STRIP_STYLE=all \
         CONFIGURATION_BUILD_DIR="$XCPROJ/build" build )
     emit flutter "$FL/build/ios/iphoneos/Runner.app"
     # Directly under the build directory, because CONFIGURATION_BUILD_DIR put
