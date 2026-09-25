@@ -3459,8 +3459,8 @@ public class IPhoneBuilder extends Executor {
         // btres holds only the port's files -- the application's own resources are
         // in resDir -- so nothing the developer shipped is removed.
         try {
-            List<String> droppedThemes = NativeThemes.removeUnused(buildinRes,
-                    NativeThemes.themeFor(iosMode, iosThemeGeneration, false), classesDir);
+            List<String> droppedThemes = NativeThemes.removeUnusedApple(buildinRes,
+                    iosMode, iosThemeGeneration, false, classesDir);
             if (!droppedThemes.isEmpty()) {
                 log("Native themes not used by this build, not shipped: " + droppedThemes);
             }

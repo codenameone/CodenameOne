@@ -276,11 +276,12 @@ public class MacOSNativeBuilder extends Executor {
             // the translator (which copies every resource on its input path into
             // the project) picks the others up; the application's own resources
             // are never touched.
-            String nativeTheme = NativeThemes.themeFor(hints.getThemeMode(), null, true);
-            List<String> droppedThemes = NativeThemes.removeUnused(nativeSources, nativeTheme, classesDir);
+            List<String> droppedThemes = NativeThemes.removeUnusedApple(nativeSources,
+                    hints.getThemeMode(), null, true, classesDir);
             // MacPort.jar carries a copy too (iPhoneTheme.res, from the iOSPort
             // sources it shares), and the port classes are translator input as well.
-            droppedThemes.addAll(NativeThemes.removeUnused(portClasses, nativeTheme, classesDir));
+            droppedThemes.addAll(NativeThemes.removeUnusedApple(portClasses,
+                    hints.getThemeMode(), null, true, classesDir));
             if (!droppedThemes.isEmpty()) {
                 log("Native themes not used by this build, not shipped: "
                         + new java.util.LinkedHashSet<String>(droppedThemes));

@@ -102,6 +102,31 @@ public class NativeThemesTest {
     }
 
     @Test
+    public void anAppThatAsksThePortForItsModernThemeKeepsIt() throws IOException {
+        // The screenshot suite installs the theme cn1.nativeThemeResource names,
+        // in an app built in the default auto mode. Filtering by the mode alone
+        // removed the modern theme, and every dark capture rendered light.
+        File dir = portDir();
+        File classes = tmp.newFolder("suite");
+        File cls = new File(classes, "com/example/tests/DualAppearanceBaseTest.class");
+        cls.getParentFile().mkdirs();
+        Files.write(cls.toPath(), bytesWith("cn1.nativeThemeResource"));
+        NativeThemes.removeUnusedApple(dir, "auto", "27", false, classes);
+        assertTrue(new File(dir, "iOS7Theme.res").isFile());
+        assertTrue(new File(dir, "iOSModern27Theme.res").isFile());
+        assertFalse(new File(dir, "iOSModernTheme.res").isFile());
+        assertFalse(new File(dir, "iPhoneTheme.res").isFile());
+    }
+
+    @Test
+    public void anAppThatDoesNotAskKeepsOnlyTheModeTheme() throws IOException {
+        File dir = portDir();
+        NativeThemes.removeUnusedApple(dir, "auto", "27", false, tmp.newFolder("plain"));
+        assertTrue(new File(dir, "iOS7Theme.res").isFile());
+        assertFalse(new File(dir, "iOSModern27Theme.res").isFile());
+    }
+
+    @Test
     public void androidKeepsTheResolvedThemeAndTheOneHasNativeThemeProbes() {
         assertEquals(set("android_holo_light"), NativeThemes.androidThemesFor(null, null, null, null, null));
         assertEquals(set("AndroidMaterialTheme", "android_holo_light"),

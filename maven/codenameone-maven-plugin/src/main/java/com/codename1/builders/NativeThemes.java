@@ -127,6 +127,28 @@ final class NativeThemes {
         return removeUnused(dir, keep, ANDROID_ALL, appClasses);
     }
 
+    /// The runtime property an application reads to learn which modern theme the
+    /// port carries, and then installs it itself -- the screenshot suite does, and
+    /// its dark captures all came out light when that theme had been filtered out.
+    /// IOSImplementation answers it with the configured generation's modern theme.
+    static final String NATIVE_THEME_RESOURCE_PROPERTY = "cn1.nativeThemeResource";
+
+    /// Removes the Apple native themes this build does not need from `dir`: every
+    /// one except the theme the stub's mode will install, a theme the application
+    /// names itself, and -- when the application asks the port for its modern
+    /// theme through {@link #NATIVE_THEME_RESOURCE_PROPERTY} -- that modern theme.
+    ///
+    /// @return the names removed, for the build log
+    static List<String> removeUnusedApple(File dir, String mode, String generation, boolean mac,
+            File appClasses) throws IOException {
+        Set<String> keep = new LinkedHashSet<String>();
+        keep.add(themeFor(mode, generation, mac));
+        if (namesAny(appClasses, new String[] {NATIVE_THEME_RESOURCE_PROPERTY})) {
+            keep.add(themeFor("modern", generation, false));
+        }
+        return removeUnused(dir, keep, ALL, appClasses);
+    }
+
     /// Deletes from `dir` every native theme other than `keep` and the ones the
     /// application names in `appClasses`.
     ///
