@@ -450,6 +450,7 @@ static inline __attribute__((always_inline)) uint16_t cn1ClazzIndexOf(const stru
 extern int cn1HeapIndexOf(const void* o);
 extern void cn1HeapIndexSet(const void* o, int index);
 extern void cn1HeapIndexForget(const void* o);
+extern int cn1LegacyKnown(const void* o);
 static inline __attribute__((always_inline)) int cn1ObjHeapPos(const void* o) {
     int s = ((const struct JavaObjectPrototype*)o)->__cn1HeapState;
     if(s == CN1_HEAPSTATE_INDEXED) {

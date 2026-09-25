@@ -2026,6 +2026,24 @@ void cn1HeapIndexSet(const void* o, int index) {
     }
     pthread_mutex_unlock(&cn1HeapIndexLock);
 }
+/* Whether `o` is the start of a live legacy (malloc'd) object: every one is entered here
+ * when it is allocated (index -1 until it is placed in allObjectsInHeap) and leaves when
+ * it is freed. The mark guard asks this about a pointer the extent snapshot could not
+ * resolve -- a legacy object allocated after the snapshot, by a thread paused later in
+ * the cycle -- so that a TRACE never skips one (see gcMarkObject). */
+int cn1LegacyKnown(const void* o) {
+    int found = 0;
+    pthread_mutex_lock(&cn1HeapIndexLock);
+    if(cn1HeapIndexCap != 0) {
+        long h = cn1HeapIndexSlot(o, cn1HeapIndexCap);
+        while(cn1HeapIndexKeys[h] != 0) {
+            if(cn1HeapIndexKeys[h] == o) { found = 1; break; }
+            h = (h + 1) & (cn1HeapIndexCap - 1);
+        }
+    }
+    pthread_mutex_unlock(&cn1HeapIndexLock);
+    return found;
+}
 void cn1HeapIndexForget(const void* o) {
     pthread_mutex_lock(&cn1HeapIndexLock);
     if(cn1HeapIndexCap != 0) {
@@ -2378,6 +2396,12 @@ static int cn1MigratePendingAllocations(struct ThreadLocalData* t) {
 // Capacity is reserved by the allocating thread before it gets here. Migration
 // can only reduce the count; it cannot invalidate that reserved space.
 static inline void cn1AppendPendingAllocation(struct ThreadLocalData* t, JAVA_OBJECT object) {
+    // Single-core mode only: known before it is placed (cn1LegacyKnown). The concurrent
+    // collector keeps a fresh legacy object by grace and never asks, and the table's
+    // lock is not free on a path every large allocation takes.
+    if(cn1GcSingleCore()) {
+        cn1HeapIndexSet(object, -1);
+    }
     if(!t->lightweightThread) lockThreadHeapMutex();
     t->pendingHeapAllocations[t->heapAllocationSize++] = object;
     if(!t->lightweightThread) unlockThreadHeapMutex();
@@ -5684,6 +5708,12 @@ void codenameOneGCMark() {
                             // freeze is held is malloc-free for the same reason (the mark
                             // worklist is a fixed-size array; the force-visited side table
                             // is only touched on the force path, which no root scan takes).
+                            if(cn1GcStwCycle) {
+                                // See the per-thread build below: single-core mode
+                                // must see what this thread allocated before it stopped.
+                                extern int cn1ConsSnapEpochReset(void);
+                                cn1ConsSnapEpochReset();
+                            }
                             cn1GcBuildRootSnapshots();
                             forcedStop = cn1GcMarkForceStopUncooperative(t);
                             if(forcedStop) {
@@ -5825,6 +5855,18 @@ void codenameOneGCMark() {
                 // may hold the allocator lock. The escalation built the snapshot before
                 // it froze the thread, so the one this would refresh already exists.
                 if(!forcedStop) {
+                    // Single-core mode rebuilds it at EVERY thread's pause, not once a
+                    // cycle. Its sweep frees an unmarked fresh legacy object, and one
+                    // this thread allocated after the cycle's first build -- held only
+                    // in a local, like a ByteArrayOutputStream's grown buffer -- does
+                    // not resolve against that build, so the scan below would not root
+                    // it. Measured: the buffer freed under a live stream in 3 of 5
+                    // CN1_GC_VERIFY self-hosting runs. The concurrent collector keeps
+                    // such an object by grace instead and needs no second build.
+                    if(cn1GcStwCycle) {
+                        extern int cn1ConsSnapEpochReset(void);
+                        cn1ConsSnapEpochReset();
+                    }
                     cn1GcBuildRootSnapshots();
                 }
 #endif
@@ -6164,12 +6206,18 @@ void codenameOneGCMark() {
     // upstream of this pass. Cost is one extra pass over an array the sweep
     // already walks in full, and only fresh entries are traced.
 #ifndef CN1_DISABLE_LEGACY_GRACE
-    // In single-core mode too. Freeing an unmarked legacy fresh object there instead --
-    // on the argument that every table entry was migrated with its thread paused, so it
-    // predates the root scans -- was measured unsound: under CN1_GC_VERIFY, 2 of 3
-    // contended self-hosting runs freed a large array an org.objectweb.asm.Context still
-    // held. Every single-core number in REGISTRY Rounds 43-45 was taken with this pass on.
-    {
+    // NOT in single-core (stop-the-world) cycles: there the legacy sweep frees a fresh
+    // legacy object the mark did not reach, so tracing it as a root would keep what it
+    // points at for nothing. That is sound only because the mark cannot SKIP a legacy
+    // object: the guard in gcMarkObject used to drop any pointer the cycle's extent
+    // snapshot could not resolve -- a legacy object allocated after the snapshot, by a
+    // thread paused later in the cycle -- and grace was what kept it. It now also accepts
+    // any pointer cn1LegacyKnown recognises (in single-core mode every legacy object is
+    // registered from allocation to free), so the trace is complete. Measured before that: CN1_GC_VERIFY
+    // found a freed large array under a live Context, ClassReader or String in every run.
+    // Dead legacy objects -- the translator's 30-45KB output buffers, up to ~120MB at a
+    // time -- used to wait for a major.
+    if(!cn1GcStwCycle) {
         CN1_GC_TRUSTED_BEGIN();  // walking allObjectsInHeap: authoritative references
 #ifdef CN1_GC_VERIFY
     { extern const char* cn1GcMarkPhase; cn1GcMarkPhase = "legacy-grace-pass"; }
@@ -6680,9 +6728,12 @@ void codenameOneGCSweep() {
     for(int iter = 0 ; iter < t ; iter++) {
         JAVA_OBJECT o = allObjectsInHeap[iter];
         if(o != JAVA_NULL) {
-            if(CN1_OBJ_MARK(o) != -1) {
-                if(cn1GcSweepReclaims(CN1_OBJ_MARK(o))) {
-                    if (CN1_OBJ_MARK(o) <= 0) {
+            // Single-core: an unmarked fresh legacy object is dead (see the legacy grace
+            // pass, which does not run in that mode).
+            JAVA_BOOLEAN cn1FreshDead = cn1GcStwCycle && CN1_OBJ_MARK(o) == -1 && CN1_OBJ_CLASS(o) != 0;
+            if(CN1_OBJ_MARK(o) != -1 || cn1FreshDead) {
+                if(cn1FreshDead || cn1GcSweepReclaims(CN1_OBJ_MARK(o))) {
+                    if (!cn1FreshDead && CN1_OBJ_MARK(o) <= 0) {
 #if defined(__APPLE__) && defined(__OBJC__)
 #if TARGET_OS_SIMULATOR
                         CN1_GC_ASSERT(CN1_OBJ_MARK(o) > 0, "CN1_GC_INVALID_MARK");
@@ -8165,6 +8216,11 @@ static void cn1RsProfDump(void) {
     for(int j = 0 ; j < 256 ; j++) if(cn1RsProfMs[j] < 0) cn1RsProfMs[j] = -cn1RsProfMs[j] - 1;
 }
 #endif
+#ifdef CN1_GC_VERIFY
+// Set while the remembered set traces an object, so cn1GcVerifyFieldType can tell a
+// DEFENSIVE trace from a real one: see there. GC thread only (single-core mode).
+int cn1GcVerifyInRsetTrace = 0;
+#endif
 static void cn1GcRsetTraceObject(struct ThreadLocalData* d, JAVA_OBJECT o) {
 #ifdef CN1_GC_GEN_CHECK
     if(cn1GcGenTracedN < (1 << 18)) cn1GcGenTraced[cn1GcGenTracedN++] = o;
@@ -8196,7 +8252,13 @@ static void cn1GcRsetTraceObject(struct ThreadLocalData* d, JAVA_OBJECT o) {
 #ifdef CN1_GC_INSTRUMENT
     struct timespec __p0, __p1; clock_gettime(CLOCK_MONOTONIC, &__p0);
 #endif
+#ifdef CN1_GC_VERIFY
+    cn1GcVerifyInRsetTrace = 1;
+#endif
     ((gcMarkFunctionPointer)c->markFunction)(d, o, JAVA_FALSE);
+#ifdef CN1_GC_VERIFY
+    cn1GcVerifyInRsetTrace = 0;
+#endif
 #ifdef CN1_GC_INSTRUMENT
     clock_gettime(CLOCK_MONOTONIC, &__p1);
     { unsigned h = (unsigned)(((uintptr_t)c >> 4) & 255); while(cn1RsProfCls[h] && cn1RsProfCls[h] != c) h = (h + 1) & 255;
@@ -12815,16 +12877,17 @@ void cn1ConsExtSortSelfTest(void) {
 // fresh, kept alive by the sweep's grace rule whether or not they resolve -- so
 // the first build of the cycle is complete for correctness purposes. Nothing is
 // freed during mark (sweep runs after), so entries can never go stale mid-cycle.
+// EXCEPT in single-core mode, whose sweep frees an unmarked fresh legacy object: it
+// rebuilds at each thread's pause (a handful of threads, against one rebuild per
+// scanned thread on the concurrent path this note was written about).
 static int cn1ConsSnapEpoch = -1;
-#ifdef CN1_GC_VERIFY
-// The QA verifier runs AFTER the sweep, when the cycle's cached snapshot still
-// lists every object the sweep just reclaimed. Invalidate it so the next build
-// indexes the post-sweep heap.
+// Invalidate the cached build: single-core mode before each thread's scan, and the QA
+// verifier after the sweep, when the cached snapshot still lists every object the sweep
+// just reclaimed.
 int cn1ConsSnapEpochReset(void) {
     cn1ConsSnapEpoch = -1;
     return 0;
 }
-#endif
 void cn1GcBuildRootSnapshots(void) {
     if(cn1ConsSnapEpoch == currentGcMarkValue) {
         return; // already built this cycle
@@ -14997,9 +15060,10 @@ void codenameOneGcFree(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj) {
             free(md);
         }
     }
-    // The heap-table index lives beside the object (cn1HeapIndexOf): drop it with the
-    // memory, or the next object malloc returns at this address inherits it.
-    if(((struct JavaObjectPrototype*)obj)->__cn1HeapState == CN1_HEAPSTATE_INDEXED) {
+    // The side-table entry (index, or in single-core mode "known legacy object") lives
+    // beside the object: drop it with the memory, or the next object malloc returns at
+    // this address inherits it.
+    if(cn1GcSingleCore() || ((struct JavaObjectPrototype*)obj)->__cn1HeapState == CN1_HEAPSTATE_INDEXED) {
         cn1HeapIndexForget(obj);
     }
 #ifdef CN1_GC_VERIFY
@@ -15398,6 +15462,20 @@ void cn1GcVerifyFieldType(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT owner, JAVA_OBJ
     if(value == JAVA_NULL || CN1_IS_TAGGED(value)) {
         return;
     }
+    // Not for an owner the remembered set is tracing. A card covers 64 bytes, so the
+    // set traces every object STARTING in a dirty chunk -- including dead neighbours of
+    // the object that was stored into, which the sweep has not reached yet (the trace is
+    // deliberately non-precise for exactly that reason). Such an owner is garbage, and a
+    // field of it pointing at a slot freed and recycled since is not a live reference.
+    // Measured: every finding on the single-core self-hosting run was of this shape --
+    // an IdentityHashMap.KeySet or Collections.SetFromMap last marked 16 cycles earlier,
+    // reached only through the remembered set, in 4 of 6 runs.
+    {
+        extern int cn1GcVerifyInRsetTrace;
+        if(cn1GcVerifyInRsetTrace) {
+            return;
+        }
+    }
     // Only ask about a pointer the collector already believes in; an unresolvable one
     // is the OTHER verifier's finding and reporting it twice helps nobody.
     if(cn1ConservativeResolve((void*)value) != value && !cn1GcImmortalObjContains(value)) {
@@ -15541,7 +15619,8 @@ void gcMarkObject(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj, JAVA_BOOLEAN force
     // its subtree never traced. Do NOT set this flag around anything that marks from
     // a stack scan or a register file.
     if(!cn1GcPreciseTrace && !cn1GcTrustedRoots
-       && cn1ConservativeResolve((void*)obj) != obj && !cn1GcImmortalObjContains(obj)) {
+       && cn1ConservativeResolve((void*)obj) != obj && !cn1GcImmortalObjContains(obj)
+       && !(cn1GcStwCycle && cn1LegacyKnown(obj))) {
         // In single-core mode this skip can make a trace INCOMPLETE rather than merely
         // cautious: a child on a page acquired after the cycle's index snapshot does not
         // resolve, grace keeps it, and the holder -- marked, so now OLD -- points at a
