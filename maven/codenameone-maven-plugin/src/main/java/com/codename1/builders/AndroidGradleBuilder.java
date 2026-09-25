@@ -4388,6 +4388,27 @@ public class AndroidGradleBuilder extends Executor {
             throw new BuildException("Failed to extract android port sources from "+androidPortSrcJar, ex);
         }
 
+        // Only the native themes installNativeTheme() can load are shipped. The port
+        // carries three -- the pre-Holo androidTheme alone is half a megabyte -- and
+        // the mode that picks one comes from the build hints the stub copies into
+        // Display properties. android_holo_light always stays: hasNativeTheme()
+        // probes for it. Placed after the port unzip, which overwrites any same-named
+        // file, so only the port's own copies can be removed.
+        try {
+            List<String> droppedThemes = NativeThemes.removeUnusedAndroid(assetsDir,
+                    NativeThemes.androidThemesFor(request.getArg("and.themeMode", null),
+                            request.getArg("cn1.androidTheme", null),
+                            request.getArg("nativeTheme", null),
+                            request.getArg("cn1.nativeTheme", null),
+                            request.getArg("and.hololight", null)),
+                    dummyClassesDir);
+            if (!droppedThemes.isEmpty()) {
+                log("Native themes not used by this build, not shipped: " + droppedThemes);
+            }
+        } catch (IOException ex) {
+            throw new BuildException("Failed to remove the unused native themes", ex);
+        }
+
         // Health background-listener bindings: generated rather than
         // resolved reflectively, so each listener is reached through a
         // direct constructor call that shrinking and obfuscation follow.

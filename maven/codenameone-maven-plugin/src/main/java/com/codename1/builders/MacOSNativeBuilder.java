@@ -268,6 +268,23 @@ public class MacOSNativeBuilder extends Executor {
             // dark palette on, so every dark-appearance screen rendered light
             // however carefully the application asked for dark. Nothing failed
             // to build and nothing was logged.
+            //
+            // Only the theme the stub's mode will load is shipped. nativemac.jar
+            // carries every native theme -- Aqua and four iOS ones, about a
+            // megabyte -- and the runtime installs exactly one of them. Removed
+            // from nativeSources, before staging, so neither the staged copy nor
+            // the translator (which copies every resource on its input path into
+            // the project) picks the others up; the application's own resources
+            // are never touched.
+            String nativeTheme = NativeThemes.themeFor(hints.getThemeMode(), null, true);
+            List<String> droppedThemes = NativeThemes.removeUnused(nativeSources, nativeTheme, classesDir);
+            // MacPort.jar carries a copy too (iPhoneTheme.res, from the iOSPort
+            // sources it shares), and the port classes are translator input as well.
+            droppedThemes.addAll(NativeThemes.removeUnused(portClasses, nativeTheme, classesDir));
+            if (!droppedThemes.isEmpty()) {
+                log("Native themes not used by this build, not shipped: "
+                        + new java.util.LinkedHashSet<String>(droppedThemes));
+            }
             stageThemeResources(nativeSources, buildinRes);
         } catch (Exception ex) {
             throw new BuildException("Failed to stage the MacPort native layer. The codenameone "
@@ -2354,6 +2371,7 @@ public class MacOSNativeBuilder extends Executor {
         // nobody notices until an Intel user reports it.
         cmd.add("ARCHS=" + hints.getArch());
         cmd.add("ONLY_ACTIVE_ARCH=NO");
+        cmd.addAll(stripSettings(hints.getConfiguration()));
         cmd.add("MACOSX_DEPLOYMENT_TARGET=" + hints.getMinDeploymentTarget());
         // The identifier signing and provisioning read. Checked against a
         // generated project rather than assumed: neither the macOS template nor
@@ -2743,6 +2761,29 @@ public class MacOSNativeBuilder extends Executor {
             }
             java.nio.file.Files.copy(f.toPath(), target.toPath());
         }
+    }
+
+    /// The xcodebuild settings that strip the shipped binary, empty for Debug.
+    ///
+    /// This builder runs `xcodebuild build`, never `archive`, and a plain build
+    /// leaves the symbol table in the product: a universal gallery binary shipped
+    /// 98,805 symbols, 8MB of __LINKEDIT per architecture, about a quarter of the
+    /// file. The iOS cloud build does not have the problem because `archive` sets
+    /// DEPLOYMENT_POSTPROCESSING itself; here it has to be asked for. Xcode strips
+    /// before it signs, so the signature covers the stripped binary -- stripping
+    /// afterwards would break it. dwarf-with-dsym keeps a dSYM beside the app so
+    /// crash reports from a stripped build can still be symbolicated.
+    // Package-visible so a test can assert it without running xcodebuild.
+    static List<String> stripSettings(String configuration) {
+        List<String> out = new ArrayList<String>();
+        if (configuration != null && configuration.trim().equalsIgnoreCase("Debug")) {
+            return out;
+        }
+        out.add("DEPLOYMENT_POSTPROCESSING=YES");
+        out.add("STRIP_INSTALLED_PRODUCT=YES");
+        out.add("STRIP_STYLE=all");
+        out.add("DEBUG_INFORMATION_FORMAT=dwarf-with-dsym");
+        return out;
     }
 
     /// Removes a tree, tolerating one that is not there.

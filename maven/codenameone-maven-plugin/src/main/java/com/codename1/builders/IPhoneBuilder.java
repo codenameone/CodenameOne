@@ -3452,6 +3452,22 @@ public class IPhoneBuilder extends Executor {
             new File(buildinRes, "iOS7Theme.res").delete();
         } 
 
+        // Only the native theme the stub's mode will load is shipped. nativeios.jar
+        // carries all four iOS themes, over a megabyte, and installNativeTheme()
+        // installs exactly one: the mode is fixed here at build time (the stub calls
+        // setIosMode / setIosThemeGeneration) and nothing reads it at run time.
+        // btres holds only the port's files -- the application's own resources are
+        // in resDir -- so nothing the developer shipped is removed.
+        try {
+            List<String> droppedThemes = NativeThemes.removeUnused(buildinRes,
+                    NativeThemes.themeFor(iosMode, iosThemeGeneration, false), classesDir);
+            if (!droppedThemes.isEmpty()) {
+                log("Native themes not used by this build, not shipped: " + droppedThemes);
+            }
+        } catch (IOException ex) {
+            throw new BuildException("Failed to remove the unused native themes", ex);
+        }
+
         // Flip the crypto build toggles in CN1Crypto.h based on what the
         // user's bytecode references. Apps that don't touch
         // com.codename1.security.* get stub-only versions of the iOS
