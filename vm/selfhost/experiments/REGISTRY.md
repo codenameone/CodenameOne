@@ -6689,3 +6689,46 @@ peak is 308-316MB:
   page can be returned while any slot on it lives; without moving objects the lever is
   which pages allocation fills first, not the sweep.
 - Thread-owned pages: 33, holding under 1MB.
+
+## Round 52: where the memory is on every core count, and two cheaper minors
+
+**The 1-core peak** (probe after every sweep, 490MB max RSS): small-object pages 310MB
+(~245 live), glibc 123-127MB (95 in use, 28-30 free), 12MB mmap. Large objects are only
+11-14MB of the 95; the rest is native blocks (collection storage): 100MB in 527k blocks,
+421k of them 128 bytes or less, each paying glibc's 8-byte chunk header and 16-byte
+rounding. Per size class the page holes total 59MB, 19MB of it in the 640-byte class
+(554 pages, 15MB live).
+
+**2 and 4 cores are a different collector and a different problem.** There the JDK peaks
+at 939-1202MB (2 cores) and 922-1081MB (4); the concurrent collector at 1005-1010 / 749-804;
+the single-core generational collector forced on those hosts at 469-485 on both -- under
+half. What the concurrent collector carries extra is collection storage: live native
+blocks peak at 300-322MB against ~103MB on one core, and at the peak ArrayLists of 17+
+elements hold 370MB (51k lists) against 56MB (29k) on one core. Half the ArrayList objects
+at that point are fresh (15%, graced) or already garbage awaiting the sweep (38%): with the
+mutator single-threaded, cycles run back to back on the spare core, each a full-heap trace
+of ~140ms, and floating garbage lives for the whole of one.
+
+**Why stop-the-world everywhere is not the answer.** The mutator alone (collection off,
+1.7GB) runs in 6.8s; the JDK's 2-core wall is 8.04s and its 4-core 7.50s. The generational
+collector's pauses total ~3.5-3.9s on one core (minors ~2.5s, majors ~1.9s before the
+changes below); with parallel markers (a scratch prototype with the marker count decoupled
+from the stop-the-world decision, verify-clean with 4 markers) the major mark falls from
+1.8s to 0.8s, but minors do not move and the result is still 1.2-1.4x the JDK. Closing a
+3x gap in pause time with 2 cores is not a parallelism problem. The memory floor on 2 and
+4 cores needs generational collection that stays concurrent: short minors on the spare
+core, so floating garbage lives one minor instead of one full-heap trace.
+
+**Two minor-cycle costs removed (single-core default, committed):**
+- The remembered set traces an old table in full and defensively, so every entry went
+  through the conservative resolve before gcMarkObject noticed it was old. A minor now
+  reads the header of a heap-window pointer first and returns for an old page-resident
+  object; the window stays mapped for the process's life, and the only outcome is a
+  skipped mark. Remembered-set time 800 -> 490ms, minor mark 1350 -> 900ms.
+- Every freed slot probed the monitor table under its global lock. It now does so only on
+  a page flagged gcHasMonitors, and the flag is set inside cn1MonitorDataSet, the one place
+  an entry is created. Minor sweep 1086 -> 798ms, major sweep 460 -> 370ms.
+
+One core, 5 interleaved rounds on a slow host (JDK 19.08-19.76s): lk4 13.56-13.81s,
+**lk5 12.83-13.21s (-5.4%)**, RSS unchanged at 477-492MB. Verify 6/6, contended 16/16 +
+16/16, concurrent 3/3, vm suite 647/648 (the known BackendJavaSeRuntimeTest demo).
