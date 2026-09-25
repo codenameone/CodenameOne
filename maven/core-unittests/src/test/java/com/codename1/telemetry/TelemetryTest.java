@@ -627,6 +627,28 @@ class TelemetryTest extends UITestBase {
     }
 
     @Test
+    void aBackslashEndsTheAuthorityAsItDoesInABrowser() {
+        String url = "https://evil.example\\@api.example/x";
+        assertEquals("evil.example", Telemetry.host(url));
+        assertEquals("https://evil.example:443", Telemetry.origin(url));
+        assertEquals("https://evil.example:8443",
+                Telemetry.origin("https://evil.example:8443\\@api.example/x"));
+    }
+
+    @Test
+    void redactionRemovesUserinfoThroughTheLastAt() {
+        assertEquals("https://host.example/x",
+                Telemetry.redact("https://alice:secret@tenant@host.example/x?q=1"));
+        assertEquals("https://host.example",
+                Telemetry.redact("https://a@b@host.example"));
+        // An '@' past the authority is path, not userinfo, and stays.
+        assertEquals("https://host.example/a@b",
+                Telemetry.redact("https://host.example/a@b"));
+        assertEquals("https://host.example\\a@b",
+                Telemetry.redact("https://host.example\\a@b"));
+    }
+
+    @Test
     void anOversizedAttributeKeyIsDroppedNotCut() {
         Telemetry.State state = new Telemetry.State(
                 new TelemetryConfig().direct("http://collector.test"));

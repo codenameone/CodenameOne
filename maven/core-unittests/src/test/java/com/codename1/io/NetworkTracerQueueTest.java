@@ -32,6 +32,7 @@ import java.lang.reflect.Field;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /// What `NetworkManager.addToQueue` records for the tracer, checked on a private
 /// manager whose queue nothing consumes. Driving the shared manager through a busy
@@ -213,6 +214,68 @@ class NetworkTracerQueueTest extends UITestBase {
         NetworkManager.getInstance().addToQueueAndWait(untraced);
         flushSerialCalls();
         assertEquals(null, untraced.tracerParentOwner, "the tracer owner outlived the request");
+    }
+
+    @Test
+    void aRequestKilledBeforeItStartsLetsGoOfItsTracerState() throws Exception {
+        // kill() on a pending request leaves it in the queue; the worker takes it
+        // and skips it without running it, so runCurrentRequest's cleanup never
+        // runs. That skip must forget the tracer state, and the worker must not
+        // keep the dead request as its current one.
+        final NetworkManager manager = idleManager();
+        NetworkManager.setNetworkTracer(new NetworkTracer() {
+            @Override
+            public Object requestQueued(ConnectionRequest request) {
+                return "the action";
+            }
+
+            @Override
+            public Object beforeRequest(ConnectionRequest request, Object parent) {
+                return "the attempt";
+            }
+
+            @Override
+            public void afterRequest(ConnectionRequest request, Object attempt, int status,
+                                     Throwable error) {
+            }
+        });
+        ConnectionRequest request = new ConnectionRequest();
+        request.setUrl("http://queue.test/killed");
+        manager.addToQueue(request, false);
+        assertEquals("the action", request.tracerParent);
+        request.kill();
+
+        Field threadsField = NetworkManager.class.getDeclaredField("networkThreads");
+        threadsField.setAccessible(true);
+        final NetworkManager.NetworkThread worker =
+                ((NetworkManager.NetworkThread[]) threadsField.get(manager))[0];
+        Field pendingField = NetworkManager.class.getDeclaredField("pending");
+        pendingField.setAccessible(true);
+        java.util.Vector pending = (java.util.Vector) pendingField.get(manager);
+        Thread runner = new Thread(worker);
+        runner.start();
+        try {
+            long deadline = System.currentTimeMillis() + 10000;
+            while (!pending.isEmpty() && System.currentTimeMillis() < deadline) {
+                Thread.sleep(5);
+            }
+            assertTrue(pending.isEmpty(), "the worker never took the killed request");
+        } finally {
+            set(manager, "running", Boolean.FALSE);
+            Field lockField = NetworkManager.class.getDeclaredField("LOCK");
+            lockField.setAccessible(true);
+            Object lock = lockField.get(null);
+            synchronized (lock) {
+                lock.notifyAll();
+            }
+            runner.join(10000);
+        }
+        // The worker removes the request and handles the skip inside one hold of
+        // the queue lock, so an empty queue means the skip has run.
+        assertEquals(null, worker.getCurrentRequest(), "the worker kept the killed request");
+        flushSerialCalls();
+        assertEquals(null, request.tracerParent, "a killed request kept its parent");
+        assertEquals(null, request.tracerParentOwner, "a killed request kept its tracer");
     }
 
     @Test

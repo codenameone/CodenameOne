@@ -247,10 +247,8 @@ public final class NetworkManager {
     /// Unlike the guard this slot does not seal: a tracer only observes, so replacing
     /// one cannot weaken anything, and telemetry that is switched off at run time has
     /// to be able to take itself out.
-    public static void setNetworkTracer(NetworkTracer tracer) {
-        synchronized (NetworkManager.class) {
-            networkTracer = tracer;
-        }
+    public static synchronized void setNetworkTracer(NetworkTracer tracer) {
+        networkTracer = tracer;
     }
 
     /// The installed tracer, or null.
@@ -1403,6 +1401,17 @@ public final class NetworkManager {
                         pending.removeElementAt(0);
                         currentRequest.prepare();
                         if (currentRequest.isKilled()) {
+                            // Killed while it waited: runCurrentRequest, whose
+                            // finally forgets the tracer state addToQueue
+                            // captured, never runs -- so forget it here, or a
+                            // request the app keeps holds the parent span and
+                            // through it the whole telemetry installation. And
+                            // let go of the request itself: the worker would
+                            // otherwise hold it as currentRequest until the
+                            // next one arrives.
+                            scheduleTracerClear(currentRequest, currentRequest.tracerRequeues);
+                            currentRequest = null;
+                            LOCK.notifyAll();
                             continue;
                         }
                         currentRequest.setId(nextConnectionId++);

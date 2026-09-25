@@ -799,15 +799,7 @@ public final class Telemetry {
             return null;
         }
         int start = scheme.length() + 3;
-        int end = url.length();
-        for (int i = start; i < url.length(); i++) {
-            char c = url.charAt(i);
-            if (c == '/' || c == '?' || c == '#') {
-                end = i;
-                break;
-            }
-        }
-        String authority = url.substring(start, end);
+        String authority = url.substring(start, authorityEnd(url, start));
         authority = authority.substring(authority.lastIndexOf('@') + 1);
         int close = authority.lastIndexOf(']');
         int colon = authority.lastIndexOf(':');
@@ -848,15 +840,7 @@ public final class Telemetry {
             return null;
         }
         int start = scheme + 3;
-        int end = url.length();
-        for (int i = start; i < url.length(); i++) {
-            char c = url.charAt(i);
-            if (c == '/' || c == '?' || c == '#') {
-                end = i;
-                break;
-            }
-        }
-        String authority = url.substring(start, end);
+        String authority = url.substring(start, authorityEnd(url, start));
         int at = authority.lastIndexOf('@');
         if (at >= 0) {
             authority = authority.substring(at + 1);
@@ -885,13 +869,32 @@ public final class Telemetry {
         String out = url.substring(0, cut);
         int scheme = out.indexOf("://");
         if (scheme >= 0) {
-            int at = out.indexOf('@', scheme + 3);
-            int slash = out.indexOf('/', scheme + 3);
-            if (at >= 0 && (slash < 0 || at < slash)) {
-                out = out.substring(0, scheme + 3) + out.substring(at + 1);
+            // The LAST '@' inside the authority, as URL parsers split it: in
+            // "https://alice:secret@tenant@host/x" the first '@' belongs to the
+            // password, and cutting there exported "tenant@" as part of url.full.
+            int start = scheme + 3;
+            int at = out.substring(start, authorityEnd(out, start)).lastIndexOf('@');
+            if (at >= 0) {
+                out = out.substring(0, start) + out.substring(start + at + 1);
             }
         }
         return out;
+    }
+
+    /// Where the authority that starts at `start` ends: the first '/', '\\', '?' or
+    /// '#'. The backslash counts because an http(s) URL parser -- the browser the
+    /// JavaScript port runs in, among them -- reads it as a slash, so
+    /// "https://evil.example\\@api.example/x" goes to evil.example. Reading the
+    /// backslash as part of the authority instead named api.example as the host,
+    /// and a trace context approved for that host went to the other one.
+    static int authorityEnd(String url, int start) {
+        for (int i = start; i < url.length(); i++) {
+            char c = url.charAt(i);
+            if (c == '/' || c == '\\' || c == '?' || c == '#') {
+                return i;
+            }
+        }
+        return url.length();
     }
 
     private static boolean isZero(String hex) {

@@ -214,6 +214,55 @@ public class ConnectionRequest implements IOProgressListener {
     private boolean contentTypeSetExplicitly;
     private Object _connection;
 
+    /// What the [NetworkTracer] returned when this request was queued: the context
+    /// its spans are children of. Kept across retries, which are the same request.
+    ///
+    /// The tracer fields are per REQUEST OBJECT, like every other field of one
+    /// execution here -- the URL, the response code, the streams, the guard's
+    /// capture. The same instance queued to run twice at once (duplicates are
+    /// allowed by default) already has its two runs overwrite each other's response
+    /// state; tracing is no more per-execution than the request it observes, and
+    /// is not the place to make it so. Queue separate instances to run in parallel.
+    Object tracerParent;
+
+    /// The tracer that produced [#tracerParent]. The context is that tracer's own
+    /// state, so it is handed only to that tracer: one installed between queuing and
+    /// running gets no parent rather than an object it cannot interpret -- or, for a
+    /// telemetry reinstall, a trace id belonging to the previous installation.
+    NetworkTracer tracerParentOwner;
+
+    /// The attempt in flight, as the tracer's own state; null when none is being
+    /// traced. Set on the network thread and cleared there when the attempt ends.
+    Object tracerAttempt;
+
+    /// The tracer that started [#tracerAttempt], which is the one that ends it. The
+    /// slot can be replaced or emptied while the attempt is in flight, and handing
+    /// one tracer's state to another -- or to none -- would leak it and lose the span.
+    NetworkTracer tracerOwner;
+
+    /// Whether this attempt received a status line. Set the moment the status is
+    /// read, because a followed redirect and a 304 revalidation both return before
+    /// the guard's capture runs, and reporting them as "no response" hid the very
+    /// 3xx that explains the attempt.
+    boolean tracerResponded;
+
+    /// The network thread running [#tracerAttempt]; only it may end the attempt.
+    Thread tracerThread;
+
+    /// The last attempt that ended, and its tracer: the parent a retry of a request
+    /// queued with no context continues from, so the attempts share one trace.
+    Object tracerLastAttempt;
+    NetworkTracer tracerLastOwner;
+
+    /// Whether [#tracerParent] is such an earlier attempt rather than the context
+    /// the request was queued under; a later retry then moves it to the newest one.
+    boolean tracerParentChained;
+
+    /// A generation, advanced by every accepted enqueue -- a retry, a redirect or a
+    /// fresh reuse. An attempt that ends with it unchanged was the request's last,
+    /// and a cleanup queued for one generation never touches the next.
+    int tracerRequeues;
+
     /// Default constructor
     public ConnectionRequest() {
         if (NetworkManager.getInstance().isAPSupported()) {
@@ -770,10 +819,7 @@ public class ConnectionRequest implements IOProgressListener {
     ///
     /// true when the header was added, false when one was already there
     public boolean addRequestHeaderIfAbsent(String key, String value) {
-        if (key == null || value == null) {
-            return false;
-        }
-        if (getRequestHeader(key) != null) {
+        if (key == null || value == null || getRequestHeader(key) != null) {
             return false;
         }
         addRequestHeader(key, value);
@@ -849,10 +895,7 @@ public class ConnectionRequest implements IOProgressListener {
         // contexts on one request, which a server may resolve either way. Content-Type
         // keeps the exact check: it lives in its own field, not in userHeaders, and
         // getRequestHeader answers for it only when it was set explicitly.
-        if (key == null) {
-            return;
-        }
-        if (!"content-type".equalsIgnoreCase(key) && getRequestHeader(key) != null) {
+        if (key == null || (!"content-type".equalsIgnoreCase(key) && getRequestHeader(key) != null)) {
             return;
         }
         if (!userHeaders.containsKey(key)) {
@@ -1239,7 +1282,7 @@ public class ConnectionRequest implements IOProgressListener {
             // app supplies as a default is seen here and kept, not replaced.
             try {
                 tracerAttempt = tracer.beforeRequest(this,
-                        tracer == tracerParentOwner ? tracerParent : null);
+                        tracer == tracerParentOwner ? tracerParent : null); //NOPMD CompareObjectsWithEquals
                 tracerOwner = tracerAttempt == null ? null : tracer;
                 tracerThread = Thread.currentThread();
             } catch (Throwable t) {
@@ -1610,55 +1653,6 @@ public class ConnectionRequest implements IOProgressListener {
     /// reuse case: without it a retained response code from an earlier attempt is reported
     /// as though it belonged to this one.
     private boolean guardResponseCaptured;
-
-    /// What the [NetworkTracer] returned when this request was queued: the context
-    /// its spans are children of. Kept across retries, which are the same request.
-    ///
-    /// The tracer fields are per REQUEST OBJECT, like every other field of one
-    /// execution here -- the URL, the response code, the streams, the guard's
-    /// capture. The same instance queued to run twice at once (duplicates are
-    /// allowed by default) already has its two runs overwrite each other's response
-    /// state; tracing is no more per-execution than the request it observes, and
-    /// is not the place to make it so. Queue separate instances to run in parallel.
-    Object tracerParent;
-
-    /// The tracer that produced [#tracerParent]. The context is that tracer's own
-    /// state, so it is handed only to that tracer: one installed between queuing and
-    /// running gets no parent rather than an object it cannot interpret -- or, for a
-    /// telemetry reinstall, a trace id belonging to the previous installation.
-    NetworkTracer tracerParentOwner;
-
-    /// The attempt in flight, as the tracer's own state; null when none is being
-    /// traced. Set on the network thread and cleared there when the attempt ends.
-    Object tracerAttempt;
-
-    /// The tracer that started [#tracerAttempt], which is the one that ends it. The
-    /// slot can be replaced or emptied while the attempt is in flight, and handing
-    /// one tracer's state to another -- or to none -- would leak it and lose the span.
-    NetworkTracer tracerOwner;
-
-    /// Whether this attempt received a status line. Set the moment the status is
-    /// read, because a followed redirect and a 304 revalidation both return before
-    /// the guard's capture runs, and reporting them as "no response" hid the very
-    /// 3xx that explains the attempt.
-    boolean tracerResponded;
-
-    /// The network thread running [#tracerAttempt]; only it may end the attempt.
-    Thread tracerThread;
-
-    /// The last attempt that ended, and its tracer: the parent a retry of a request
-    /// queued with no context continues from, so the attempts share one trace.
-    Object tracerLastAttempt;
-    NetworkTracer tracerLastOwner;
-
-    /// Whether [#tracerParent] is such an earlier attempt rather than the context
-    /// the request was queued under; a later retry then moves it to the newest one.
-    boolean tracerParentChained;
-
-    /// A generation, advanced by every accepted enqueue -- a retry, a redirect or a
-    /// fresh reuse. An attempt that ends with it unchanged was the request's last,
-    /// and a cleanup queued for one generation never touches the next.
-    int tracerRequeues;
 
     private void captureGuardHeaders(Object connection) {
         NetworkGuard guard = NetworkManager.getNetworkGuard();
