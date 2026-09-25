@@ -248,6 +248,7 @@ class SheetSwipeToDismissTest extends UITestBase {
         int dragDistance = (int) (sheet.getHeight() * 0.6);
 
         dragSheet(x, startY, 0, dragDistance, 5);
+        java.util.List<Object> afterRemoval = recordRepaintsAfterRemoval(sheet);
         implementation.dispatchPointerRelease(x, startY + dragDistance);
         flushSerialCalls();
 
@@ -260,10 +261,9 @@ class SheetSwipeToDismissTest extends UITestBase {
         assertNull(Sheet.getCurrentSheet(),
                 "Sanity: sheet must be dismissed before checking repaint state");
 
-        assertPaintScheduledOrAnimating(form,
+        assertRepaintedAfterRemoval(form, afterRemoval,
                 "After a swipe-to-dismiss the form must be queued for repaint "
-                        + "(or another animation must keep the EDT awake) so "
-                        + "the dim overlay is cleared. Otherwise the EDT "
+                        + "so the dim overlay is cleared. Otherwise the EDT "
                         + "idles with stale dim pixels until the user taps.");
     }
 
@@ -281,6 +281,7 @@ class SheetSwipeToDismissTest extends UITestBase {
         // does. With no parent sheet this routes to hide(duration), which
         // is the path the user reports as "working fine" -- the baseline
         // we want to compare swipe-dismiss against.
+        java.util.List<Object> afterRemoval = recordRepaintsAfterRemoval(sheet);
         sheet.back(300);
         flushSerialCalls();
         assertTrue(form.getAnimationManager().isAnimating(),
@@ -290,7 +291,7 @@ class SheetSwipeToDismissTest extends UITestBase {
 
         assertNull(Sheet.getCurrentSheet(),
                 "Sanity: sheet must be dismissed before checking repaint state");
-        assertPaintScheduledOrAnimating(form,
+        assertRepaintedAfterRemoval(form, afterRemoval,
                 "After a back-button dismiss the form must be queued for "
                         + "repaint so the dim overlay is cleared");
     }
@@ -340,7 +341,15 @@ class SheetSwipeToDismissTest extends UITestBase {
         // the next tick: when it flips false, the next updateAnimations
         // call is the one that runs the completion runnable.
         while (am.isAnimating() && System.currentTimeMillis() < deadline) {
-            clearPaintQueue();
+            // Cleared only while the sheet is still up. Once the dismiss has run,
+            // the repaint it scheduled is the thing under test -- and another
+            // animation still finishing on the form (the overlay's fade, which on
+            // a slow runner can outlast the slide) kept this loop going and
+            // cleared that repaint away, so the assertion below found an empty
+            // queue on a JDK 21 CI run with the fix in place.
+            if (Sheet.getCurrentSheet() != null) {
+                clearPaintQueue();
+            }
             am.updateAnimations();
             flushSerialCalls();
             sleepQuietly(10);
@@ -380,35 +389,37 @@ class SheetSwipeToDismissTest extends UITestBase {
     /// form, the content pane, or an ancestor of the content. Equivalently,
     /// if another animation is still running, a paint cycle will follow
     /// regardless and the assertion is satisfied.
-    private void assertPaintScheduledOrAnimating(Form form, String message) throws Exception {
-        AnimationManager am = form.getAnimationManager();
-        if (am.isAnimating()) {
-            return;
-        }
-        Class<?> implClass = Class.forName("com.codename1.impl.CodenameOneImplementation");
-        Field mainSurfaceField = implClass.getDeclaredField("mainSurface");
-        mainSurfaceField.setAccessible(true);
-        Object surface = mainSurfaceField.get(implementation);
-        Class<?> surfaceClass = surface.getClass();
-        Field fillField = surfaceClass.getDeclaredField("paintQueueFill");
-        Field queueField = surfaceClass.getDeclaredField("paintQueue");
-        fillField.setAccessible(true);
-        queueField.setAccessible(true);
-        int fill = fillField.getInt(surface);
-        Object queue = queueField.get(surface);
+    /// Records the components a repaint is requested for once `sheet` has left
+    /// the form -- the dismiss path's own repaint, which is what #4899 is about.
+    /// Observed as requested rather than read from the paint queue afterwards:
+    /// every flush paints and so empties that queue, and a snapshot of it failed
+    /// on CI runners with the fix in place (paintQueue=[]). Mid-animation
+    /// repaints, made while the sheet is still attached, are not counted.
+    private java.util.List<Object> recordRepaintsAfterRemoval(final Sheet sheet) {
+        final java.util.List<Object> afterRemoval = new java.util.ArrayList<Object>();
+        implementation.recordRepaints(new java.util.ArrayList<Object>() {
+            @Override
+            public boolean add(Object cmp) {
+                if (sheet.getComponentForm() == null) {
+                    afterRemoval.add(cmp);
+                }
+                return true;
+            }
+        });
+        return afterRemoval;
+    }
 
+    private void assertRepaintedAfterRemoval(Form form, java.util.List<Object> repainted,
+                                             String message) {
+        implementation.recordRepaints(null);
         Component content = form.getContentPane();
         boolean covered = false;
         StringBuilder seen = new StringBuilder("[");
-        for (int i = 0; i < fill; i++) {
-            Object entry = java.lang.reflect.Array.get(queue, i);
-            if (entry == null) {
-                continue;
-            }
+        for (Object entry : repainted) {
             if (seen.length() > 1) {
                 seen.append(", ");
             }
-            seen.append(entry.getClass().getSimpleName());
+            seen.append(entry == null ? "null" : entry.getClass().getSimpleName());
             if (entry == form || entry == content) {
                 covered = true;
             } else if (entry instanceof Container && ((Container) entry).contains(content)) {
@@ -416,7 +427,7 @@ class SheetSwipeToDismissTest extends UITestBase {
             }
         }
         seen.append("]");
-        assertTrue(covered, message + ". paintQueue=" + seen);
+        assertTrue(covered, message + ". repainted after removal=" + seen);
     }
 
     private Form showFormWithSheet(String title) {

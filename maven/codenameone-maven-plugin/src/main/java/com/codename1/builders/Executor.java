@@ -4960,14 +4960,7 @@ public abstract class Executor {
     /// `sourceZip` passed to `build(...)`) contains the build-time
     /// generated `com.codename1.router.generated.Routes` class.
     protected static boolean projectHasRouteDispatcher(File sourceZip) {
-        if (sourceZip == null || !sourceZip.isFile()) {
-            return false;
-        }
-        try (java.util.zip.ZipFile zf = new java.util.zip.ZipFile(sourceZip)) {
-            return zf.getEntry("com/codename1/router/generated/Routes.class") != null;
-        } catch (IOException e) {
-            return false;
-        }
+        return projectHasBootstrap(sourceZip, "com/codename1/router/generated/Routes.class");
     }
 
     /// Stub-source fragment to splice into a generated application stub
@@ -5031,6 +5024,13 @@ public abstract class Executor {
         if (projectHasBootstrap(sourceZip, "cn1app/IntentBootstrap.class")) {
             sb.append(indent).append("new cn1app.IntentBootstrap();\n");
         }
+        // @OpenTelemetry: installs com.codename1.telemetry.Telemetry, which puts a
+        // tracer on NetworkManager. Before Display.init like the rest, so the
+        // first request the app makes is already traced; the install reads nothing
+        // from the display until its first export.
+        if (projectHasBootstrap(sourceZip, "cn1app/TelemetryBootstrap.class")) {
+            sb.append(indent).append("new cn1app.TelemetryBootstrap();\n");
+        }
         return sb.toString();
     }
 
@@ -5038,7 +5038,16 @@ public abstract class Executor {
     /// `jar-with-dependencies`) contains `entryPath`. Used to gate the
     /// per-feature bootstrap install lines so projects that don't use
     /// every annotation framework still produce a clean stub.
+    ///
+    /// `sourceZip` may also be the DIRECTORY the project's classes were unpacked
+    /// into. The builders that write their stub after unpacking -- JavaScript and
+    /// the native desktop targets -- hold that directory rather than the jar, and
+    /// with only a jar to ask they emitted no install lines at all: every
+    /// annotation framework was silently inert on those platforms.
     protected static boolean projectHasBootstrap(File sourceZip, String entryPath) {
+        if (sourceZip != null && sourceZip.isDirectory()) {
+            return new File(sourceZip, entryPath.replace('/', File.separatorChar)).isFile();
+        }
         if (sourceZip == null || !sourceZip.isFile()) {
             return false;
         }

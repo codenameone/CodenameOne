@@ -1,0 +1,1293 @@
+/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.telemetry;
+
+import com.codename1.analytics.Analytics;
+import com.codename1.analytics.AnalyticsConsent;
+import com.codename1.analytics.ConsentMode;
+import com.codename1.io.ConnectionRequest;
+import com.codename1.io.NetworkManager;
+import com.codename1.junit.UITestBase;
+import com.codename1.testing.TestCodenameOneImplementation;
+
+import com.google.protobuf.ByteString;
+
+import io.opentelemetry.proto.collector.trace.v1.ExportTraceServiceRequest;
+import io.opentelemetry.proto.common.v1.KeyValue;
+import io.opentelemetry.proto.trace.v1.Span;
+
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+
+import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.fail;
+
+/// The app's side of distributed tracing, through the real NetworkManager against
+/// the mocked network: what a request carries to the server, and what reaches the
+/// collector -- decoded with the specification's own generated classes.
+class TelemetryTest extends UITestBase {
+    private static final String API = "http://api.test/pets";
+    private static final String COLLECTOR = "http://collector.test/v1/traces";
+    private static final String RELAY = "http://backend.test/otel/v1/traces";
+    /// How long a test waits for something the network thread does. An upper
+    /// bound, never a delay: every wait below leaves the moment its condition
+    /// holds. Generous because the whole suite shares one NetworkManager, and a
+    /// request an earlier class left in its queue can hold this one's back --
+    /// a 5s bound failed there while every test passed on its own.
+    private static final long WAIT_MILLIS = 30000;
+
+    @BeforeEach
+    void mocks() {
+        TestCodenameOneImplementation impl = TestCodenameOneImplementation.getInstance();
+        impl.clearNetworkMocks();
+        impl.clearConnections();
+        impl.addNetworkMockResponse(API, 200, "OK", "[]".getBytes(StandardCharsets.UTF_8));
+        impl.addNetworkMockResponse("http://api.test/missing", 404, "Not Found", new byte[0]);
+        impl.addNetworkMockResponse(COLLECTOR, 200, "OK", new byte[0]);
+        impl.addNetworkMockResponse(RELAY, 200, "OK", "{}".getBytes(StandardCharsets.UTF_8));
+    }
+
+    @AfterEach
+    void uninstall() {
+        Telemetry.uninstall();
+        TestCodenameOneImplementation.getInstance().clearNetworkMocks();
+    }
+
+    @Test
+    void aRequestCarriesTheTraceAndBecomesAChildSpan() throws Exception {
+        Telemetry.install(new TelemetryConfig().direct("http://collector.test")
+                .serviceName("shop-app").header("Authorization", "Api-Token t0k"));
+        final TelemetrySpan[] action = new TelemetrySpan[1];
+        Telemetry.run("checkout", new Runnable() {
+            @Override
+            public void run() {
+                action[0] = Telemetry.getCurrentSpan();
+                NetworkManager.getInstance().addToQueueAndWait(request(API + "?token=secret"));
+            }
+        });
+        assertNull(Telemetry.getCurrentSpan(), "run() restores the previous span");
+
+        TestCodenameOneImplementation.TestConnection api = connection(API + "?token=secret");
+        String traceparent = api.getHeaders().get("traceparent");
+        assertNotNull(traceparent, "the request did not carry the trace context");
+        assertTrue(traceparent.startsWith("00-" + action[0].getTraceId() + "-"),
+                "the request is part of the action's trace: " + traceparent);
+        assertTrue(traceparent.endsWith("-01"));
+
+        Telemetry.flush();
+        List<Span> spans = exported(2);
+        Span get = find(spans, "GET");
+        Span checkout = find(spans, "checkout");
+        assertEquals(action[0].getSpanId(), hex(get.getParentSpanId()));
+        assertEquals(hex(get.getSpanId()), traceparent.substring(36, 52),
+                "the header names the request's own span as the server's parent");
+        assertEquals(Span.SpanKind.SPAN_KIND_CLIENT, get.getKind());
+        assertEquals(Span.SpanKind.SPAN_KIND_INTERNAL, checkout.getKind());
+        assertEquals(0x101, get.getFlags(), "sampled, with a parent known to be local");
+        assertEquals(1, checkout.getFlags(), "a root claims nothing about a parent it lacks");
+        assertEquals(API, attribute(get.getAttributesList(), "url.full"),
+                "the query string is never recorded");
+        // One clock per trace: the request sits inside the action that caused it.
+        assertTrue(get.getStartTimeUnixNano() >= checkout.getStartTimeUnixNano());
+        assertTrue(get.getEndTimeUnixNano() <= checkout.getEndTimeUnixNano());
+        assertEquals("200", attribute(get.getAttributesList(), "http.response.status_code"));
+
+        TestCodenameOneImplementation.TestConnection export = connection(COLLECTOR);
+        assertEquals("Api-Token t0k", export.getHeaders().get("Authorization"));
+        assertNull(export.getHeaders().get("traceparent"),
+                "the export's own request must not be traced");
+    }
+
+    @Test
+    void aFailedRequestIsAnErrorSpan() throws Exception {
+        Telemetry.install(new TelemetryConfig().direct("http://collector.test"));
+        ConnectionRequest missing = request("http://api.test/missing");
+        missing.setFailSilently(true);
+        NetworkManager.getInstance().addToQueueAndWait(missing);
+        Telemetry.flush();
+        Span span = find(exported(1), "GET");
+        assertEquals("404", attribute(span.getAttributesList(), "http.response.status_code"));
+        assertEquals(io.opentelemetry.proto.trace.v1.Status.StatusCode.STATUS_CODE_ERROR,
+                span.getStatus().getCode());
+        assertEquals(0, span.getParentSpanId().size(), "a request outside any action is a root");
+    }
+
+    @Test
+    void theRelayGetsJsonAndTheTokenAndNeverTheCredential() throws Exception {
+        Telemetry.install(new TelemetryConfig().relay("http://backend.test")
+                .relayToken("r3lay").header("Authorization", "never-sent"));
+        NetworkManager.getInstance().addToQueueAndWait(request(API));
+        Telemetry.flush();
+        TestCodenameOneImplementation.TestConnection relay = awaitConnection(RELAY);
+        assertEquals("r3lay", relay.getHeaders().get("X-CN1-Telemetry-Token"));
+        assertNull(relay.getHeaders().get("Authorization"),
+                "a relay export must not carry a collector credential");
+        String json = new String(relay.getOutputData(), StandardCharsets.UTF_8);
+        assertTrue(json.startsWith("{\"resourceSpans\":[{\"resource\":{\"attributes\":"), json);
+        assertTrue(json.contains("\"name\":\"GET\""), json);
+        assertTrue(json.contains("\"kind\":3"), json);
+    }
+
+    @Test
+    void nothingIsAddedWhenTelemetryIsOff() throws Exception {
+        assertFalse(Telemetry.isInstalled());
+        NetworkManager.getInstance().addToQueueAndWait(request(API));
+        assertNull(connection(API).getHeaders().get("traceparent"));
+        TelemetrySpan span = Telemetry.startSpan("noop");
+        assertFalse(span.isRecording());
+        assertNull(span.getTraceparent(),
+                "a span with no trace must not hand out an all-zero traceparent");
+        span.end();
+    }
+
+    @Test
+    void anUnsampledTraceStillPropagatesItsDecision() throws Exception {
+        Telemetry.install(new TelemetryConfig().direct("http://collector.test").sampleRatio(0));
+        NetworkManager.getInstance().addToQueueAndWait(request(API));
+        String traceparent = connection(API).getHeaders().get("traceparent");
+        assertNotNull(traceparent);
+        assertTrue(traceparent.endsWith("-00"),
+                "the backend must be told not to record either: " + traceparent);
+        TelemetrySpan unsampled = Telemetry.startSpan("unsampled");
+        assertNotNull(unsampled.getTraceparent(), "an unsampled trace still propagates");
+        unsampled.end();
+    }
+
+    @Test
+    void consentWhenAskedForGatesTracingEntirely() throws Exception {
+        AnalyticsConsent before = Analytics.getConsent();
+        ConsentMode mode = Analytics.getConsentMode();
+        try {
+            Analytics.setConsentMode(ConsentMode.OPT_IN);
+            Analytics.setConsent(null);
+            Telemetry.install(new TelemetryConfig().direct("http://collector.test")
+                    .requireAnalyticsConsent(true));
+            NetworkManager.getInstance().addToQueueAndWait(request(API + "?before"));
+            assertNull(connection(API + "?before").getHeaders().get("traceparent"),
+                    "no consent yet under OPT_IN: the request must go out untouched");
+            assertFalse(Telemetry.startSpan("x").isRecording());
+
+            Analytics.setConsent(AnalyticsConsent.granted());
+            NetworkManager.getInstance().addToQueueAndWait(request(API + "?after"));
+            assertNotNull(connection(API + "?after").getHeaders().get("traceparent"),
+                    "consent granted: the next request is traced");
+        } finally {
+            Analytics.setConsent(before);
+            Analytics.setConsentMode(mode);
+        }
+    }
+
+    @Test
+    void aQueuedExportStopsWhenConsentIsWithdrawn() throws Exception {
+        AnalyticsConsent before = Analytics.getConsent();
+        try {
+            Analytics.setConsent(AnalyticsConsent.granted());
+            Telemetry.State gated = new Telemetry.State(new TelemetryConfig()
+                    .direct("http://collector.test").requireAnalyticsConsent(true));
+            Telemetry.ExportRequest export = new Telemetry.ExportRequest(gated, new byte[] {1});
+            assertFalse(export.shouldStop(), "with consent the export goes");
+            Analytics.setConsent(AnalyticsConsent.denied());
+            assertTrue(export.shouldStop(),
+                    "an export queued before consent was withdrawn must not be sent");
+
+            // The export answers to the installation that recorded it, not to
+            // whatever is installed when it runs: neither nothing, nor a
+            // replacement that does not ask for consent.
+            Telemetry.uninstall();
+            assertTrue(export.shouldStop(), "uninstalling released a consent-gated export");
+            Telemetry.install(new TelemetryConfig().direct("http://collector.test"));
+            assertTrue(export.shouldStop(),
+                    "an ungated reinstall released a consent-gated export");
+        } finally {
+            Analytics.setConsent(before);
+        }
+    }
+
+    @Test
+    void withoutTheFlagConsentIsNotConsulted() throws Exception {
+        AnalyticsConsent before = Analytics.getConsent();
+        try {
+            Analytics.setConsent(AnalyticsConsent.denied());
+            Telemetry.install(new TelemetryConfig().direct("http://collector.test"));
+            NetworkManager.getInstance().addToQueueAndWait(request(API + "?noflag"));
+            assertNotNull(connection(API + "?noflag").getHeaders().get("traceparent"));
+        } finally {
+            Analytics.setConsent(before);
+        }
+    }
+
+    @Test
+    void aRedirectIsTwoAttemptsEachWithItsOwnStatusAndHeader() throws Exception {
+        // The first attempt answers 302. It returns before the guard's capture
+        // runs, and was reported as "no response"; and the request object is
+        // reused for the second attempt, which must carry ITS span, not the
+        // first attempt's header left behind.
+        TestCodenameOneImplementation impl = TestCodenameOneImplementation.getInstance();
+        TestCodenameOneImplementation.TestConnection hop = impl.createConnection("http://hop.test/a");
+        hop.setResponseCode(302);
+        hop.setHeader("location", API + "?hopped");
+        Telemetry.install(new TelemetryConfig().direct("http://collector.test"));
+        NetworkManager.getInstance().addToQueueAndWait(request("http://hop.test/a"));
+        String second = connection(API + "?hopped").getHeaders().get("traceparent");
+        assertNotNull(second, "the redirected attempt was not traced");
+
+        Telemetry.flush();
+        List<Span> spans = exported(2);
+        Span redirect = null;
+        Span landed = null;
+        for (Span span : spans) {
+            String status = attribute(span.getAttributesList(), "http.response.status_code");
+            if ("302".equals(status)) {
+                redirect = span;
+            } else if ("200".equals(status)) {
+                landed = span;
+            }
+        }
+        assertNotNull(redirect, "the 302 attempt must report its status: " + spans);
+        assertNotNull(landed, "the attempt the redirect reached: " + spans);
+        assertEquals(hex(landed.getSpanId()), second.substring(36, 52),
+                "the second attempt carried its own span, not the first's header");
+        assertFalse(hex(redirect.getSpanId()).equals(hex(landed.getSpanId())));
+        // Queued outside any action, yet one logical request: the second attempt
+        // continues the first attempt's trace, as its child, rather than a new one.
+        assertEquals(hex(redirect.getTraceId()), hex(landed.getTraceId()),
+                "a redirect split the request across two traces");
+        assertEquals(hex(redirect.getSpanId()), hex(landed.getParentSpanId()));
+    }
+
+    @Test
+    void anAppsOwnTraceparentIsNeverReplacedAndOursDoesNotOutliveTheAttempt() throws Exception {
+        Telemetry.install(new TelemetryConfig().direct("http://collector.test"));
+        String mine = "00-11111111111111111111111111111111-2222222222222222-01";
+        ConnectionRequest own = request(API + "/own");
+        own.addRequestHeader("Traceparent", mine);
+        NetworkManager.getInstance().addToQueueAndWait(own);
+        assertEquals(mine, connection(API + "/own").getHeaders().get("Traceparent"));
+        assertNull(connection(API + "/own").getHeaders().get("traceparent"),
+                "a second spelling of the header was added beside the app's");
+
+        ConnectionRequest ours = request(API + "/ours");
+        NetworkManager.getInstance().addToQueueAndWait(ours);
+        assertNotNull(connection(API + "/ours").getHeaders().get("traceparent"));
+        assertTrue(ours.addRequestHeaderIfAbsent("traceparent", "x"),
+                "the tracer's header must be taken off the request when the attempt ends");
+
+        // The app's request joins the app's trace downstream, so no span of ours
+        // may describe it in another one; ours is recorded as usual.
+        Telemetry.flush();
+        List<Span> spans = exported(1);
+        boolean sawOurs = false;
+        for (Span span : spans) {
+            String url = attribute(span.getAttributesList(), "url.full");
+            assertFalse((API + "/own").equals(url),
+                    "a span was recorded for a request that carries the app's own trace");
+            sawOurs |= (API + "/ours").equals(url);
+        }
+        assertTrue(sawOurs, "the ordinary request's span is missing: " + spans);
+    }
+
+    @Test
+    void theCurrentSpanBelongsToTheThreadThatStartedIt() throws Exception {
+        Telemetry.install(new TelemetryConfig().direct("http://collector.test"));
+        final TelemetrySpan[] seenElsewhere = new TelemetrySpan[] {Telemetry.startSpan("sentinel")};
+        Telemetry.run("action", new Runnable() {
+            @Override
+            public void run() {
+                Thread other = new Thread(new Runnable() {
+                    @Override
+                    public void run() {
+                        seenElsewhere[0] = Telemetry.getCurrentSpan();
+                    }
+                });
+                other.start();
+                try {
+                    other.join();
+                } catch (InterruptedException err) {
+                    Thread.currentThread().interrupt();
+                }
+                assertNotNull(Telemetry.getCurrentSpan());
+            }
+        });
+        assertNull(seenElsewhere[0], "another thread saw this thread's action as its own");
+    }
+
+    @Test
+    void anAttemptIsEndedByTheTracerThatStartedIt() throws Exception {
+        // The slot can be emptied while an attempt is in flight; the attempt must
+        // still be ended, and by its own tracer.
+        final int[] ended = new int[1];
+        NetworkManager.setNetworkTracer(new com.codename1.io.NetworkTracer() {
+            @Override
+            public Object requestQueued(ConnectionRequest request) {
+                return null;
+            }
+
+            @Override
+            public Object beforeRequest(ConnectionRequest request, Object parent) {
+                NetworkManager.setNetworkTracer(null);
+                return "attempt";
+            }
+
+            @Override
+            public void afterRequest(ConnectionRequest request, Object attempt, int status,
+                                     Throwable error) {
+                if ("attempt".equals(attempt)) {
+                    ended[0]++;
+                }
+            }
+        });
+        try {
+            NetworkManager.getInstance().addToQueueAndWait(request(API + "?swap"));
+        } finally {
+            NetworkManager.setNetworkTracer(null);
+        }
+        assertEquals(1, ended[0]);
+    }
+
+    @Test
+    void aQueuedParentGoesOnlyToTheTracerThatCapturedIt() throws Exception {
+        // Swapped between queueing and running: the new tracer must not be handed
+        // the old one's opaque context.
+        final Object[] handed = new Object[] {"unset"};
+        final com.codename1.io.NetworkTracer second = new com.codename1.io.NetworkTracer() {
+            @Override
+            public Object requestQueued(ConnectionRequest request) {
+                return null;
+            }
+
+            @Override
+            public Object beforeRequest(ConnectionRequest request, Object parent) {
+                handed[0] = parent;
+                return null;
+            }
+
+            @Override
+            public void afterRequest(ConnectionRequest request, Object attempt, int status,
+                                     Throwable error) {
+            }
+        };
+        NetworkManager.setNetworkTracer(new com.codename1.io.NetworkTracer() {
+            @Override
+            public Object requestQueued(ConnectionRequest request) {
+                NetworkManager.setNetworkTracer(second);
+                return "the first tracer's context";
+            }
+
+            @Override
+            public Object beforeRequest(ConnectionRequest request, Object parent) {
+                return null;
+            }
+
+            @Override
+            public void afterRequest(ConnectionRequest request, Object attempt, int status,
+                                     Throwable error) {
+            }
+        });
+        try {
+            NetworkManager.getInstance().addToQueueAndWait(request(API + "?handover"));
+        } finally {
+            NetworkManager.setNetworkTracer(null);
+        }
+        assertNull(handed[0], "another tracer's context was passed on");
+    }
+
+    @Test
+    void aTrailingSlashDoesNotDuplicateTheTracesPath() {
+        assertEquals("https://c.test/v1/traces",
+                new TelemetryConfig().direct("https://c.test/v1/traces/").exportUrl());
+        assertEquals("https://c.test/v1/traces",
+                new TelemetryConfig().direct("https://c.test//").exportUrl());
+        assertEquals("https://api.test/otel/v1/traces",
+                new TelemetryConfig().relay("https://api.test/otel/v1/traces/").exportUrl());
+        assertEquals("https://api.test/otel/v1/traces",
+                new TelemetryConfig().relay("https://api.test/").exportUrl());
+        // A query carries the collector's key: the path goes BEFORE it.
+        assertEquals("https://c.test/otlp/v1/traces?api-key=s3cret",
+                new TelemetryConfig().direct("https://c.test/otlp?api-key=s3cret").exportUrl());
+        assertEquals("https://c.test/v1/traces?api-key=s3cret",
+                new TelemetryConfig().direct("https://c.test/v1/traces/?api-key=s3cret").exportUrl());
+    }
+
+    @Test
+    void whileExportsAreBackedUpNoMoreAreQueuedAndTheBufferIsBounded() throws Exception {
+        // A queue that already holds the maximum of this installation's exports.
+        final Telemetry.State backedUp = new Telemetry.State(
+                new TelemetryConfig().direct("http://collector.test")) {
+            @Override
+            int pendingExports() {
+                return Telemetry.MAX_PENDING_EXPORTS;
+            }
+        };
+        TestCodenameOneImplementation impl = TestCodenameOneImplementation.getInstance();
+        impl.clearQueuedRequests();
+        com.codename1.ui.CN.callSeriallyAndWait(new Runnable() {
+            @Override
+            public void run() {
+                for (int i = 0; i < 1000; i++) {
+                    backedUp.record(backedUp.start("s" + i, TelemetrySpan.KIND_INTERNAL, null));
+                }
+            }
+        });
+        try {
+            for (ConnectionRequest queued : impl.getQueuedRequests()) {
+                assertFalse(queued instanceof Telemetry.ExportRequest,
+                        "an export was queued behind the ones already waiting");
+            }
+            // 32 per batch, so the bound is the 128 floor; the newest spans are kept.
+            assertEquals(128, backedUp.buffer.size(), "the buffer grew past its bound");
+            assertEquals("s999", backedUp.buffer.get(backedUp.buffer.size() - 1).getName());
+        } finally {
+            // Its flush timer started with the first span; it is never installed,
+            // so nothing else would stop it.
+            com.codename1.ui.CN.callSeriallyAndWait(new Runnable() {
+                @Override
+                public void run() {
+                    backedUp.stop();
+                }
+            });
+        }
+    }
+
+    @Test
+    void uninstallLeavesAReplacementTracerInPlace() {
+        Telemetry.install(new TelemetryConfig().direct("http://collector.test"));
+        com.codename1.io.NetworkTracer mine = new com.codename1.io.NetworkTracer() {
+            @Override
+            public Object requestQueued(ConnectionRequest request) {
+                return null;
+            }
+
+            @Override
+            public Object beforeRequest(ConnectionRequest request, Object parent) {
+                return null;
+            }
+
+            @Override
+            public void afterRequest(ConnectionRequest request, Object attempt, int status,
+                                     Throwable error) {
+            }
+        };
+        NetworkManager.setNetworkTracer(mine);
+        try {
+            Telemetry.uninstall();
+            assertTrue(NetworkManager.getNetworkTracer() == mine,
+                    "uninstalling telemetry switched off the app's own tracer");
+        } finally {
+            NetworkManager.setNetworkTracer(null);
+        }
+    }
+
+    @Test
+    void anExportIsShortAndBehindTheAppsOwnRequests() throws Exception {
+        TestCodenameOneImplementation impl = TestCodenameOneImplementation.getInstance();
+        impl.clearQueuedRequests();
+        Telemetry.install(new TelemetryConfig().direct("http://collector.test"));
+        NetworkManager.getInstance().addToQueueAndWait(request(API + "/timed"));
+        Telemetry.flush();
+        awaitConnection(COLLECTOR);
+        Telemetry.ExportRequest export = null;
+        for (ConnectionRequest queued : impl.getQueuedRequests()) {
+            if (queued instanceof Telemetry.ExportRequest) {
+                export = (Telemetry.ExportRequest) queued;
+            }
+        }
+        assertNotNull(export, "no export was queued");
+        assertEquals(10000, export.getTimeout());
+        assertEquals(10000, export.getReadTimeout());
+        assertEquals(ConnectionRequest.PRIORITY_LOW, export.getPriority());
+    }
+
+    @Test
+    void onTheWebARelativeUrlIsSameOriginAndCarriesTheContext() throws Exception {
+        assertTrue(Telemetry.isSameOriginRelative("/api/orders"));
+        assertTrue(Telemetry.isSameOriginRelative("orders?next=http://x.test/"));
+        assertFalse(Telemetry.isSameOriginRelative("//other.test/api"));
+        // A browser reads '\\' as '/', so these are network paths too.
+        assertFalse(Telemetry.isSameOriginRelative("\\\\other.test/api"));
+        assertFalse(Telemetry.isSameOriginRelative("/\\other.test/api"));
+        assertFalse(Telemetry.isSameOriginRelative("\\/other.test/api"));
+        assertTrue(Telemetry.isSameOriginRelative("\\api\\orders"));
+        // The browser strips leading whitespace and controls, and every tab and
+        // newline, before it parses: these are network paths to it.
+        assertFalse(Telemetry.isSameOriginRelative(" //other.test/api"));
+        assertFalse(Telemetry.isSameOriginRelative("\t\\\\other.test/api"));
+        assertFalse(Telemetry.isSameOriginRelative("/\n/other.test/api"));
+        assertTrue(Telemetry.isSameOriginRelative("  /api/orders"));
+        assertFalse(Telemetry.isSameOriginRelative("http://other.test/api"));
+        assertFalse(Telemetry.isSameOriginRelative("data:text/plain,x"));
+        assertFalse(Telemetry.isSameOriginRelative(""));
+
+        TestCodenameOneImplementation impl = TestCodenameOneImplementation.getInstance();
+        impl.addNetworkMockResponse("/api/orders", 200, "OK", new byte[0]);
+        impl.addNetworkMockResponse("http://other.test/api", 200, "OK", new byte[0]);
+        impl.setPlatformName("HTML5");
+        try {
+            Telemetry.install(new TelemetryConfig().direct("http://collector.test"));
+            // validate() refuses a relative URL; a request that sends one to its
+            // own origin has to relax it.
+            ConnectionRequest relative = new ConnectionRequest() {
+                @Override
+                protected void validate() {
+                }
+
+                @Override
+                protected void readResponse(InputStream input) {
+                }
+            };
+            relative.setUrl("/api/orders");
+            relative.setPost(false);
+            NetworkManager.getInstance().addToQueueAndWait(relative);
+            assertNotNull(connection("/api/orders").getHeaders().get("traceparent"),
+                    "a same-origin request lost its trace context on the web");
+            NetworkManager.getInstance().addToQueueAndWait(request("http://other.test/api"));
+            assertNull(connection("http://other.test/api").getHeaders().get("traceparent"),
+                    "a cross-origin request outside the allowlist got the header");
+        } finally {
+            impl.setPlatformName(null);
+        }
+    }
+
+    @Test
+    void aFailedAttemptThatIsRetriedStillReportsItsFailure() throws Exception {
+        // The retry re-queues the request from inside the exception handler; the
+        // failed attempt must be ended with its exception before that happens.
+        Telemetry.install(new TelemetryConfig().direct("http://collector.test"));
+        final int[] reads = new int[1];
+        final int[] handled = new int[1];
+        ConnectionRequest flaky = new ConnectionRequest() {
+            @Override
+            protected void readResponse(InputStream input) throws java.io.IOException {
+                if (reads[0]++ == 0) {
+                    throw new java.io.IOException("connection reset");
+                }
+            }
+
+            @Override
+            protected void handleIOException(java.io.IOException err) {
+                handled[0]++;
+                retry();
+            }
+        };
+        flaky.setUrl(API + "?flaky");
+        flaky.setPost(false);
+        NetworkManager.getInstance().addToQueue(flaky);
+        long deadline = System.currentTimeMillis() + WAIT_MILLIS;
+        while (reads[0] < 2 && System.currentTimeMillis() < deadline) {
+            flushSerialCalls();
+            Thread.sleep(20);
+        }
+        java.lang.reflect.Field errors = NetworkManager.class.getDeclaredField("errorListeners");
+        errors.setAccessible(true);
+        assertEquals(2, reads[0], "the request was not retried: handleIOException ran "
+                + handled[0] + "x, global error listeners="
+                + errors.get(NetworkManager.getInstance()));
+
+        List<Span> spans = exported(2);
+        Span failed = null;
+        for (Span span : spans) {
+            if (span.getStatus().getCode()
+                    == io.opentelemetry.proto.trace.v1.Status.StatusCode.STATUS_CODE_ERROR) {
+                failed = span;
+            }
+        }
+        assertNotNull(failed, "the failed attempt was exported as neither failed nor answered: "
+                + spans);
+        assertEquals("connection reset", failed.getStatus().getMessage());
+        assertEquals("exception", failed.getEvents(0).getName());
+    }
+
+    @Test
+    void aBackslashEndsTheAuthorityAsItDoesInABrowser() {
+        String url = "https://evil.example\\@api.example/x";
+        assertEquals("evil.example", Telemetry.host(url));
+        assertEquals("https://evil.example:443", Telemetry.origin(url));
+        assertEquals("https://evil.example:8443",
+                Telemetry.origin("https://evil.example:8443\\@api.example/x"));
+    }
+
+    @Test
+    void redactionRemovesUserinfoThroughTheLastAt() {
+        assertEquals("https://host.example/x",
+                Telemetry.redact("https://alice:secret@tenant@host.example/x?q=1"));
+        assertEquals("https://host.example",
+                Telemetry.redact("https://a@b@host.example"));
+        // An '@' past the authority is path, not userinfo, and stays.
+        assertEquals("https://host.example/a@b",
+                Telemetry.redact("https://host.example/a@b"));
+        // A backslash does not end the authority for redaction: on a port whose
+        // URL parser keeps it in the authority, what precedes the '@' is userinfo.
+        assertEquals("https://b", Telemetry.redact("https://host.example\\a@b"));
+    }
+
+    @Test
+    void aRelayTokenNoHeaderCouldCarryIsRefused() {
+        String[] bad = {"zq9\n", " zq9", "zq9 ", "zq9\t", "zq\u00019"};
+        for (String token : bad) {
+            try {
+                new TelemetryConfig().relay("https://api.test").relayToken(token);
+                fail("accepted a relay token a header cannot carry");
+            } catch (IllegalArgumentException expected) {
+                assertFalse(expected.getMessage().contains("zq"), expected.getMessage());
+            }
+        }
+        new TelemetryConfig().relay("https://api.test").relayToken("t o\tk");
+    }
+
+    @Test
+    void anOversizedAttributeKeyIsDroppedNotCut() {
+        Telemetry.State state = new Telemetry.State(
+                new TelemetryConfig().direct("http://collector.test"));
+        TelemetrySpan span = state.start("keys", TelemetrySpan.KIND_INTERNAL, null);
+        StringBuilder huge = new StringBuilder();
+        while (huge.length() <= TelemetrySpan.MAX_KEY_LENGTH) {
+            huge.append("key.");
+        }
+        span.setAttribute(huge.toString(), "a");
+        span.setAttribute(huge.toString() + "other", 1L);
+        span.setAttribute("short", true);
+        assertEquals(1, span.attributes.size(), "an oversized key was kept: " + span.attributes);
+        assertEquals(2, span.droppedAttributes);
+    }
+
+    @Test
+    void aSpanFromAnotherInstallationIsNeverAParent() {
+        Telemetry.State before = new Telemetry.State(
+                new TelemetryConfig().direct("http://collector.test"));
+        Telemetry.State after = new Telemetry.State(
+                new TelemetryConfig().direct("http://collector.test"));
+        TelemetrySpan old = before.start("old action", TelemetrySpan.KIND_INTERNAL, null);
+        TelemetrySpan mine = after.start("request", TelemetrySpan.KIND_CLIENT, old);
+        TelemetrySpan child = after.start("child", TelemetrySpan.KIND_CLIENT, mine);
+        assertNotNull(old);
+        assertNotNull(mine);
+        assertFalse(old.getTraceId().equals(mine.getTraceId()),
+                "a new installation joined the previous one's trace");
+        assertNull(mine.parentSpanId);
+        assertEquals(mine.getTraceId(), child.getTraceId(), "its own spans still nest");
+        assertEquals(mine.getSpanId(), child.parentSpanId);
+    }
+
+    @Test
+    void anEndpointNoExportCouldReachIsRefusedWhenGiven() {
+        String[] bad = {"https://", "https:///v1/traces", "ftp://collector.test",
+            "collector.test:4318", "https://collector example", "https://c.test:99999",
+            "https://[nope]:4318", "https://bad value@collector.test", "https://u%zz@collector.test",
+            "https://u%2@collector.test", "https://collector.test/bad path",
+            "https://collector.test#api-key=s3cret"};
+        for (String url : bad) {
+            try {
+                new TelemetryConfig().direct(url);
+                throw new AssertionError("accepted " + url);
+            } catch (IllegalArgumentException expected) {
+                // Refused at the call, not lost at the first export.
+            }
+        }
+        try {
+            new TelemetryConfig().relay("https://user:s3cret@bad host/");
+            throw new AssertionError("accepted a host with a space");
+        } catch (IllegalArgumentException expected) {
+            assertFalse(expected.getMessage().contains("s3cret"),
+                    "the refusal quoted a credential: " + expected.getMessage());
+        }
+        assertNull(new TelemetryConfig().direct(null).exportUrl(), "no endpoint is still allowed");
+        assertNull(new TelemetryConfig().relay("").exportUrl());
+        assertEquals("https://[::1]:4318/v1/traces",
+                new TelemetryConfig().direct("https://[::1]:4318").exportUrl());
+        assertNotNull(new TelemetryConfig().direct("https://user:p%40ss@collector.test").exportUrl(),
+                "valid userinfo, a percent escape included, is accepted");
+        assertFalse(TelemetryConfig.isHttpUrl("https://[:::]:4318"));
+        assertFalse(TelemetryConfig.isHttpUrl("https://[1::2::3]:4318"));
+        assertFalse(TelemetryConfig.isHttpUrl("https://[1:2:3:4:5:6:7:8:9]:4318"));
+        assertFalse(TelemetryConfig.isHttpUrl("https://[::ffff:300.0.0.1]:4318"));
+        assertFalse(TelemetryConfig.isHttpUrl("https://[1:2:3:4:5:6:7]:4318"));
+        assertFalse(TelemetryConfig.isHttpUrl("https://[12345::1]:4318"));
+        assertTrue(TelemetryConfig.isHttpUrl("https://[::1]:4318"));
+        assertTrue(TelemetryConfig.isHttpUrl("https://[::ffff:10.0.0.7]:4318"));
+        assertTrue(TelemetryConfig.isHttpUrl("https://[2001:db8::1]:4318"));
+        assertTrue(TelemetryConfig.isHttpUrl("https://[1:2:3:4:5:6:7:8]:4318"));
+        assertTrue(TelemetryConfig.isHttpUrl("https://[::]:4318"));
+    }
+
+    @Test
+    void aHeaderOrRatioNoExportCouldUseIsRefusedWhenGiven() {
+        String[][] bad = {{"Authorization", "token\nextra"}, {"Bad Name", "x"}, {"", "x"},
+            {"Content-Type", "application/json"}, {"content-length", "3"},
+            {"X-Key", "a\u0000b"}, {"X-Key", "a\u007fb"}};
+        for (String[] header : bad) {
+            try {
+                new TelemetryConfig().header(header[0], header[1]);
+                throw new AssertionError("accepted header '" + header[0] + "'");
+            } catch (IllegalArgumentException expected) {
+                assertFalse(expected.getMessage().contains("token\nextra"),
+                        "the refusal quoted the value: " + expected.getMessage());
+            }
+        }
+        new TelemetryConfig().header("Authorization", "Api-Token\tabc");
+        try {
+            new TelemetryConfig().relayToken("r3lay\r\nX-Evil: 1");
+            throw new AssertionError("accepted a relay token with a line break");
+        } catch (IllegalArgumentException expected) {
+            // Sent as a header, so held to the same rules.
+        }
+        try {
+            new TelemetryConfig().sampleRatio(Double.NaN);
+            throw new AssertionError("accepted a NaN ratio");
+        } catch (IllegalArgumentException expected) {
+            // A range clamps; NaN has no nearest value.
+        }
+        assertEquals(1.0, new TelemetryConfig().sampleRatio(7).sampleRatio, 0);
+    }
+
+    @Test
+    void theRelayIsMatchedByOriginNotHost() {
+        assertEquals("https://api.example.com:443", Telemetry.origin("https://API.example.com/x"));
+        assertEquals("https://api.example.com:8443",
+                Telemetry.origin("https://u:p@api.example.com:8443/otel?q=1"));
+        assertEquals("http://api.example.com:80", Telemetry.origin("http://api.example.com"));
+        assertEquals("http://[::1]:4318", Telemetry.origin("http://[::1]:4318/v1"));
+        assertNull(Telemetry.origin("/relative"));
+
+        TestCodenameOneImplementation impl = TestCodenameOneImplementation.getInstance();
+        String same = "https://api.example.com:8443/pets";
+        String otherPort = "https://api.example.com:9443/pets";
+        String otherScheme = "http://api.example.com/pets";
+        impl.addNetworkMockResponse(same, 200, "OK", new byte[0]);
+        impl.addNetworkMockResponse(otherPort, 200, "OK", new byte[0]);
+        impl.addNetworkMockResponse(otherScheme, 200, "OK", new byte[0]);
+        impl.setPlatformName("HTML5");
+        try {
+            Telemetry.install(new TelemetryConfig().relay("https://api.example.com:8443"));
+            NetworkManager.getInstance().addToQueueAndWait(request(same));
+            NetworkManager.getInstance().addToQueueAndWait(request(otherPort));
+            NetworkManager.getInstance().addToQueueAndWait(request(otherScheme));
+            assertNotNull(connection(same).getHeaders().get("traceparent"),
+                    "the relay's own origin carries the context");
+            assertNull(connection(otherPort).getHeaders().get("traceparent"),
+                    "another port on the relay's host is another origin");
+            assertNull(connection(otherScheme).getHeaders().get("traceparent"),
+                    "another scheme on the relay's host is another origin");
+        } finally {
+            impl.setPlatformName(null);
+        }
+    }
+
+    @Test
+    void theInstalledConfigurationIsASnapshot() throws Exception {
+        // Every field, by reflection, so a field added later without being copied
+        // -- or without being set here -- fails this test instead of being read
+        // live from the caller's object again.
+        TelemetryConfig original = new TelemetryConfig().direct("https://c.test")
+                .serviceName("svc").relayToken("tok").protobuf(false).sampleRatio(0.5)
+                .batchSize(7).flushIntervalMillis(1234).header("X-A", "1")
+                .propagateTo("h.test").propagateToAllHosts().requireAnalyticsConsent(true);
+        TelemetryConfig copy = original.copy();
+        TelemetryConfig defaults = new TelemetryConfig();
+        for (java.lang.reflect.Field field : TelemetryConfig.class.getDeclaredFields()) {
+            if (java.lang.reflect.Modifier.isStatic(field.getModifiers()) || field.isSynthetic()) {
+                continue;
+            }
+            field.setAccessible(true);
+            Object set = field.get(original);
+            Object copied = field.get(copy);
+            Object unset = field.get(defaults);
+            if (set instanceof List) {
+                assertFalse(set == copied, field.getName() + " is shared, not copied");
+                assertEquals(((List<?>) set).size(), ((List<?>) copied).size(), field.getName());
+                assertFalse(((List<?>) set).isEmpty(), field.getName() + " was not set by this test");
+                continue;
+            }
+            assertEquals(set, copied, field.getName() + " was not copied");
+            assertFalse(set == null ? unset == null : set.equals(unset),
+                    field.getName() + " was not set by this test, so its copy is unchecked");
+        }
+
+        // And in use: installed as direct protobuf, then the caller's object is
+        // turned into a JSON relay. The installation must not notice.
+        TelemetryConfig live = new TelemetryConfig().direct("http://collector.test");
+        Telemetry.install(live);
+        live.relay("http://backend.test").protobuf(false);
+        NetworkManager.getInstance().addToQueueAndWait(request(API + "?snapshot"));
+        Telemetry.flush();
+        assertFalse(exported(1).isEmpty(),
+                "the export was not the protobuf the installed configuration asked for");
+    }
+
+    @Test
+    void anAttemptCancelledAfterItStartedIsAnError() throws Exception {
+        Telemetry.install(new TelemetryConfig().direct("http://collector.test"));
+        final int[] checks = new int[1];
+        ConnectionRequest cancelled = new ConnectionRequest() {
+            @Override
+            protected boolean shouldStop() {
+                // Running at the first check, stopped at the next: the span has
+                // started and no response ever arrives.
+                return checks[0]++ > 0;
+            }
+
+            @Override
+            protected void readResponse(InputStream input) {
+            }
+        };
+        cancelled.setUrl(API + "?cancelled");
+        cancelled.setPost(false);
+        NetworkManager.getInstance().addToQueueAndWait(cancelled);
+        Telemetry.flush();
+        Span span = find(exported(1), "GET");
+        assertEquals(io.opentelemetry.proto.trace.v1.Status.StatusCode.STATUS_CODE_ERROR,
+                span.getStatus().getCode(), "a cancelled attempt read as a success");
+        assertEquals("cancelled before a response", span.getStatus().getMessage());
+    }
+
+    @Test
+    void anExportIsNeverRedirectedWithItsCredential() throws Exception {
+        TestCodenameOneImplementation impl = TestCodenameOneImplementation.getInstance();
+        TestCodenameOneImplementation.TestConnection redirecting =
+                impl.createConnection("http://redirecting.test/v1/traces");
+        redirecting.setResponseCode(302);
+        redirecting.setHeader("location", "http://elsewhere.test/v1/traces");
+        impl.addNetworkMockResponse("http://elsewhere.test/v1/traces", 200, "OK", new byte[0]);
+        Telemetry.install(new TelemetryConfig().direct("http://redirecting.test")
+                .header("Authorization", "Api-Token s3cret"));
+        NetworkManager.getInstance().addToQueueAndWait(request(API + "?redirected"));
+        Telemetry.flush();
+        // An upper bound, not a delay: the loop leaves as soon as the export lands.
+        // Exports queue at low priority behind whatever else the shared network
+        // manager holds, and 3s was too short on a loaded CI runner.
+        long deadline = System.currentTimeMillis() + WAIT_MILLIS;
+        TestCodenameOneImplementation.TestConnection sent = null;
+        while (System.currentTimeMillis() < deadline) {
+            flushSerialCalls();
+            sent = impl.getConnection("http://redirecting.test/v1/traces");
+            if (sent != null && sent.getOutputData().length > 0) {
+                break;
+            }
+            Thread.sleep(20);
+        }
+        assertTrue(sent != null && sent.getOutputData().length > 0,
+                "the export never reached the collector");
+        assertNull(impl.getConnection("http://elsewhere.test/v1/traces"),
+                "the export followed a redirect, credential and all");
+    }
+
+    @Test
+    void aRetryFromAResponseCodeListenerContinuesTheTrace() throws Exception {
+        // The listener runs LATER, on the EDT, after the network thread has ended
+        // the attempt; its retry must still continue the failed attempt's trace.
+        TestCodenameOneImplementation impl = TestCodenameOneImplementation.getInstance();
+        final TestCodenameOneImplementation.TestConnection mock =
+                impl.createConnection("http://flaky.test/api");
+        mock.setResponseCode(503);
+        Telemetry.install(new TelemetryConfig().direct("http://collector.test"));
+        final int[] reads = new int[1];
+        final ConnectionRequest flaky = new ConnectionRequest() {
+            @Override
+            protected void readResponse(InputStream input) {
+                reads[0]++;
+            }
+        };
+        flaky.setUrl("http://flaky.test/api");
+        flaky.setPost(false);
+        final boolean[] retried = new boolean[1];
+        flaky.addResponseCodeListener(new com.codename1.ui.events.ActionListener<com.codename1.io.NetworkEvent>() {
+            @Override
+            public void actionPerformed(com.codename1.io.NetworkEvent evt) {
+                if (!retried[0]) {
+                    retried[0] = true;
+                    mock.setResponseCode(200);
+                    flaky.retry();
+                }
+            }
+        });
+        NetworkManager.getInstance().addToQueue(flaky);
+        long deadline = System.currentTimeMillis() + WAIT_MILLIS;
+        // Both attempts read their response: the 503 too, since error bodies are
+        // read by default.
+        while (reads[0] < 2 && System.currentTimeMillis() < deadline) {
+            flushSerialCalls();
+            Thread.sleep(20);
+        }
+        assertTrue(retried[0], "the listener never ran");
+        assertEquals(2, reads[0], "the retry never completed");
+
+        List<Span> spans = exported(2);
+        Span failed = null;
+        Span landed = null;
+        for (Span span : spans) {
+            String status = attribute(span.getAttributesList(), "http.response.status_code");
+            if ("503".equals(status)) {
+                failed = span;
+            } else if ("200".equals(status)) {
+                landed = span;
+            }
+        }
+        assertNotNull(failed, String.valueOf(spans));
+        assertNotNull(landed, String.valueOf(spans));
+        assertEquals(hex(failed.getTraceId()), hex(landed.getTraceId()),
+                "a listener's retry started an unrelated trace");
+        assertEquals(hex(failed.getSpanId()), hex(landed.getParentSpanId()));
+    }
+
+    @Test
+    void aBlankServiceNameFallsBackRatherThanExportingBlank() throws Exception {
+        Telemetry.install(new TelemetryConfig().direct("http://collector.test").serviceName("   "));
+        NetworkManager.getInstance().addToQueueAndWait(request(API + "?blank-service"));
+        Telemetry.flush();
+        exported(1);
+        ExportTraceServiceRequest sent = ExportTraceServiceRequest.parseFrom(
+                connection(COLLECTOR).getOutputData());
+        String service = attribute(sent.getResourceSpans(0).getResource().getAttributesList(),
+                "service.name");
+        assertNotNull(service);
+        assertFalse(service.trim().length() == 0, "a blank service.name was exported");
+    }
+
+    @Test
+    void stoppingBehindAFullExportQueueStillSendsTheBuffer() throws Exception {
+        // Uninstall while exports are already waiting: the final flush goes out
+        // anyway, or the buffered spans die with the installation.
+        final Telemetry.State backedUp = new Telemetry.State(
+                new TelemetryConfig().direct("http://collector.test")) {
+            @Override
+            int pendingExports() {
+                return Telemetry.MAX_PENDING_EXPORTS;
+            }
+        };
+        TestCodenameOneImplementation impl = TestCodenameOneImplementation.getInstance();
+        impl.clearQueuedRequests();
+        com.codename1.ui.CN.callSeriallyAndWait(new Runnable() {
+            @Override
+            public void run() {
+                backedUp.record(backedUp.start("last words", TelemetrySpan.KIND_INTERNAL, null));
+                backedUp.stop();
+            }
+        });
+        boolean exported = false;
+        for (ConnectionRequest queued : impl.getQueuedRequests()) {
+            exported |= queued instanceof Telemetry.ExportRequest;
+        }
+        assertTrue(exported, "the buffer was dropped on stop because the export queue was full");
+        assertTrue(backedUp.buffer.isEmpty());
+    }
+
+    @Test
+    void aDefaultTraceparentIsHonouredAndNeverDuplicated() throws Exception {
+        // Defaults are copied onto the request before the tracer sees it, so a trace
+        // context the app supplies as a default is the app's choice of parent, and is
+        // never joined by a second spelling -- neither the tracer's nor the request's.
+        String mine = "00-33333333333333333333333333333333-4444444444444444-01";
+        NetworkManager.getInstance().addDefaultHeader("Traceparent", mine);
+        NetworkManager.getInstance().addDefaultHeader("x-default-only", "d");
+        try {
+            Telemetry.install(new TelemetryConfig().direct("http://collector.test"));
+            NetworkManager.getInstance().addToQueueAndWait(request(API + "/default-parent"));
+            Map<String, String> sent = connection(API + "/default-parent").getHeaders();
+            assertEquals(mine, sent.get("Traceparent"));
+            assertNull(sent.get("traceparent"), "the tracer added its own beside the default");
+
+            ConnectionRequest own = request(API + "/own-spelling");
+            own.addRequestHeader("X-DEFAULT-ONLY", "r");
+            NetworkManager.getInstance().addToQueueAndWait(own);
+            sent = connection(API + "/own-spelling").getHeaders();
+            assertEquals("r", sent.get("X-DEFAULT-ONLY"));
+            assertNull(sent.get("x-default-only"),
+                    "a default went out beside the request's own spelling of the header");
+        } finally {
+            java.lang.reflect.Field headers = NetworkManager.class.getDeclaredField("userHeaders");
+            headers.setAccessible(true);
+            headers.set(NetworkManager.getInstance(), null);
+        }
+    }
+
+    @Test
+    void anExportNeverCarriesTheAppsDefaultHeaders() throws Exception {
+        // A default header is the app's credential for its own services; it must
+        // not reach a third-party collector, nor relabel the export's body.
+        NetworkManager.getInstance().addDefaultHeader("Authorization", "app-secret");
+        NetworkManager.getInstance().addDefaultHeader("Content-Type", "text/plain");
+        try {
+            Telemetry.install(new TelemetryConfig().direct("http://collector.test"));
+            NetworkManager.getInstance().addToQueueAndWait(request(API + "?defaults"));
+            assertEquals("app-secret", connection(API + "?defaults").getHeaders().get("Authorization"),
+                    "the app's own request still gets its default header");
+            Telemetry.flush();
+            exported(1);
+            TestCodenameOneImplementation.TestConnection export = connection(COLLECTOR);
+            assertNull(export.getHeaders().get("Authorization"),
+                    "the app's credential was sent to the collector");
+            assertFalse("text/plain".equals(export.getHeaders().get("Content-Type")),
+                    "a default Content-Type relabelled the export");
+        } finally {
+            java.lang.reflect.Field headers = NetworkManager.class.getDeclaredField("userHeaders");
+            headers.setAccessible(true);
+            headers.set(NetworkManager.getInstance(), null);
+        }
+    }
+
+    @Test
+    void aSpanThatEndedJustBeforeStopIsStillExported() throws Exception {
+        // It ends on another thread, so it is handed to the EDT -- and the stop
+        // runs on the EDT first. It finished while telemetry ran, and is sent.
+        final Telemetry.State state = new Telemetry.State(
+                new TelemetryConfig().direct("http://collector.test"));
+        TestCodenameOneImplementation impl = TestCodenameOneImplementation.getInstance();
+        impl.clearQueuedRequests();
+        com.codename1.ui.CN.callSeriallyAndWait(new Runnable() {
+            @Override
+            public void run() {
+                final TelemetrySpan[] spans = new TelemetrySpan[5];
+                for (int i = 0; i < spans.length; i++) {
+                    spans[i] = state.start("late" + i, TelemetrySpan.KIND_CLIENT, null);
+                }
+                Thread ender = new Thread(new Runnable() {
+                    @Override
+                    public void run() {
+                        for (TelemetrySpan span : spans) {
+                            span.end();
+                        }
+                    }
+                });
+                ender.start();
+                try {
+                    ender.join();
+                } catch (InterruptedException err) {
+                    Thread.currentThread().interrupt();
+                }
+                state.stop();   // before the handed-off span reaches the EDT
+            }
+        });
+        // The handoffs and then the one export they share are each a turn of the
+        // EDT, so it takes more than one flush; wait for the export itself.
+        int exports = 0;
+        long deadline = System.currentTimeMillis() + WAIT_MILLIS;
+        while (exports == 0 && System.currentTimeMillis() < deadline) {
+            flushSerialCalls();
+            for (ConnectionRequest queued : impl.getQueuedRequests()) {
+                if (queued instanceof Telemetry.ExportRequest) {
+                    exports++;
+                }
+            }
+            if (exports == 0) {
+                Thread.sleep(20);
+            }
+        }
+        assertTrue(exports > 0, "spans that ended before the stop were discarded after it");
+        assertEquals(1, exports, "a burst of late spans went out as one export per span");
+    }
+
+    @Test
+    void aSpanNameIsBounded() {
+        Telemetry.install(new TelemetryConfig().direct("http://collector.test"));
+        StringBuilder huge = new StringBuilder();
+        while (huge.length() < 50000) {
+            huge.append("name ");
+        }
+        TelemetrySpan span = Telemetry.startSpan(huge.toString());
+        assertTrue(span.getName().length() <= TelemetrySpan.MAX_VALUE_LENGTH, "" + span.getName().length());
+        span.updateName(huge.toString());
+        assertTrue(span.getName().length() <= TelemetrySpan.MAX_VALUE_LENGTH);
+        span.end();
+    }
+
+    @Test
+    void aRequestCarryingOnlyATracestateIsTheAppsOwn() throws Exception {
+        Telemetry.install(new TelemetryConfig().direct("http://collector.test"));
+        ConnectionRequest own = request(API + "/state-only");
+        own.addRequestHeader("tracestate", "vendor=opaque");
+        NetworkManager.getInstance().addToQueueAndWait(own);
+        assertNull(connection(API + "/state-only").getHeaders().get("traceparent"),
+                "a traceparent of ours was paired with the app's tracestate");
+    }
+
+    @Test
+    void anExportKeepsNoneOfALargeAcknowledgement() throws Exception {
+        // A collector (or a proxy) answering 200 with a large body: the export
+        // reads it only to discard it, and holds none of it afterwards.
+        byte[] huge = new byte[1 << 20];
+        TestCodenameOneImplementation impl = TestCodenameOneImplementation.getInstance();
+        impl.addNetworkMockResponse("http://bigack.test/v1/traces", 200, "OK", huge);
+        impl.clearQueuedRequests();
+        Telemetry.install(new TelemetryConfig().direct("http://bigack.test"));
+        NetworkManager.getInstance().addToQueueAndWait(request(API + "?bigack"));
+        Telemetry.flush();
+        Telemetry.ExportRequest export = null;
+        long deadline = System.currentTimeMillis() + WAIT_MILLIS;
+        while (export == null && System.currentTimeMillis() < deadline) {
+            flushSerialCalls();
+            for (ConnectionRequest queued : impl.getQueuedRequests()) {
+                if (queued instanceof Telemetry.ExportRequest) {
+                    export = (Telemetry.ExportRequest) queued;
+                }
+            }
+            Thread.sleep(20);
+        }
+        assertNotNull(export, "no export was queued");
+        awaitConnection("http://bigack.test/v1/traces");
+        // Its response handling runs after the body was written; give it the
+        // network thread's turn to finish before looking.
+        long settle = System.currentTimeMillis() + 2000;
+        while (System.currentTimeMillis() < settle && !export.isReadResponseForErrors()
+                && export.getResponseData() == null && export.getResponseCode() == 0) {
+            flushSerialCalls();
+            Thread.sleep(20);
+        }
+        byte[] kept = export.getResponseData();
+        assertTrue(kept == null, "the export kept the collector's body in memory: "
+                + (kept == null ? 0 : kept.length) + " bytes");
+    }
+
+    @Test
+    void aTruncatedValueNeverEndsInHalfACharacter() {
+        StringBuilder text = new StringBuilder();
+        for (int i = 0; i < TelemetrySpan.MAX_VALUE_LENGTH - 1; i++) {
+            text.append('a');
+        }
+        text.append("\ud83d\ude00tail");
+        String bounded = TelemetrySpan.bound(text.toString());
+        assertEquals(TelemetrySpan.MAX_VALUE_LENGTH - 1, bounded.length(),
+                "the pair straddling the limit must go whole");
+        assertFalse(Character.isHighSurrogate(bounded.charAt(bounded.length() - 1)));
+    }
+
+    @Test
+    void anExceptionStatusIsBounded() {
+        Telemetry.install(new TelemetryConfig().direct("http://collector.test"));
+        TelemetrySpan span = Telemetry.startSpan("big");
+        StringBuilder huge = new StringBuilder();
+        while (huge.length() < 20000) {
+            huge.append("0123456789");
+        }
+        span.recordException(new RuntimeException(huge.toString()));
+        assertEquals(TelemetrySpan.MAX_VALUE_LENGTH, span.statusMessage.length());
+        span.end();
+    }
+
+    // ------------------------------------------------------------------
+
+    private static ConnectionRequest request(String url) {
+        ConnectionRequest request = new ConnectionRequest() {
+            @Override
+            protected void readResponse(InputStream input) {
+                // The body is not what these tests are about.
+            }
+        };
+        request.setUrl(url);
+        request.setPost(false);
+        return request;
+    }
+
+    private static TestCodenameOneImplementation.TestConnection connection(String url) {
+        TestCodenameOneImplementation.TestConnection c =
+                TestCodenameOneImplementation.getInstance().getConnection(url);
+        assertNotNull(c, "no request was made to " + url);
+        return c;
+    }
+
+    /// Waits for the export: the span reaches the buffer through the EDT, and the
+    /// export itself is queued behind it.
+    private TestCodenameOneImplementation.TestConnection awaitConnection(String url)
+            throws InterruptedException {
+        long deadline = System.currentTimeMillis() + WAIT_MILLIS;
+        while (System.currentTimeMillis() < deadline) {
+            flushSerialCalls();
+            TestCodenameOneImplementation.TestConnection c =
+                    TestCodenameOneImplementation.getInstance().getConnection(url);
+            if (c != null && c.getOutputData().length > 0) {
+                return c;
+            }
+            Thread.sleep(20);
+        }
+        throw new AssertionError("nothing was exported to " + url);
+    }
+
+    /// Every span the collector has received, once there are at least `wanted`.
+    private List<Span> exported(int wanted) throws Exception {
+        long deadline = System.currentTimeMillis() + WAIT_MILLIS;
+        List<Span> spans = new ArrayList<Span>();
+        while (System.currentTimeMillis() < deadline) {
+            flushSerialCalls();
+            Telemetry.flush();
+            TestCodenameOneImplementation.TestConnection c =
+                    TestCodenameOneImplementation.getInstance().getConnection(COLLECTOR);
+            if (c != null && c.getOutputData().length > 0) {
+                // Every export to one URL writes into the same mock connection,
+                // so the bytes are several requests back to back. Protobuf
+                // messages concatenate by merging their repeated fields, which
+                // is exactly "every export's spans".
+                spans = new ArrayList<Span>();
+                ExportTraceServiceRequest merged = ExportTraceServiceRequest.parseFrom(
+                        c.getOutputData());
+                for (int r = 0; r < merged.getResourceSpansCount(); r++) {
+                    for (int s = 0; s < merged.getResourceSpans(r).getScopeSpansCount(); s++) {
+                        spans.addAll(merged.getResourceSpans(r).getScopeSpans(s).getSpansList());
+                    }
+                }
+                assertEquals("com.codename1.telemetry",
+                        merged.getResourceSpans(0).getScopeSpans(0).getScope().getName());
+                if (spans.size() >= wanted) {
+                    return spans;
+                }
+            }
+            Thread.sleep(20);
+        }
+        throw new AssertionError("expected " + wanted + " spans, got " + spans);
+    }
+
+    private static Span find(List<Span> spans, String name) {
+        for (Span span : spans) {
+            if (name.equals(span.getName())) {
+                return span;
+            }
+        }
+        throw new AssertionError("no span named " + name + " in " + spans);
+    }
+
+    private static String attribute(List<KeyValue> attributes, String key) {
+        for (KeyValue kv : attributes) {
+            if (kv.getKey().equals(key)) {
+                return kv.getValue().hasIntValue()
+                        ? String.valueOf(kv.getValue().getIntValue())
+                        : kv.getValue().getStringValue();
+            }
+        }
+        return null;
+    }
+
+    private static String hex(ByteString bytes) {
+        StringBuilder out = new StringBuilder();
+        for (int i = 0; i < bytes.size(); i++) {
+            out.append(String.format("%02x", bytes.byteAt(i) & 0xff));
+        }
+        return out.toString();
+    }
+}

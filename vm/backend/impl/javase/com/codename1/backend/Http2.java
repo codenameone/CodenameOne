@@ -144,6 +144,11 @@ public final class Http2 {
         return false;
     }
 
+    /** No session, so no stream ever closes. */
+    public int[] closedStreams() {
+        return null;
+    }
+
     /** Nothing is ever submitted here, so nothing is ever outstanding. */
     public long pendingBodyBytes() {
         return 0;

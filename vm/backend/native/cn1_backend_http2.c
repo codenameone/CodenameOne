@@ -127,6 +127,19 @@ typedef struct {
     size_t outCapacity;
     /* Response bodies still being written, one per stream. See CN1H2Body. */
     struct CN1H2Body* bodies;
+    /* Streams closed since Java last asked, as (id, error code) pairs. A server
+       span ends when its stream closes -- a response is fully sent only then,
+       which for a body held back by the peer's flow-control window is turns
+       after it was submitted -- and a nonzero code is a stream reset before it
+       was. Grown by doubling; drained by closedStreamsImpl every flush. */
+    JAVA_INT* closed;
+    int closedPairs;
+    int closedCapacity;
+    /* The stream a RST_STREAM was just received for. nghttp2 delivers the frame
+       and then closes the stream within the same receive, and a reset with
+       NO_ERROR closes with error code 0 -- exactly like a response sent in full.
+       This is how the close tells the two apart. */
+    int32_t resetStream;
 } CN1H2Session;
 
 /*
@@ -824,6 +837,10 @@ static int cn1H2OnFrameRecv(nghttp2_session* session, const nghttp2_frame* frame
     CN1H2Request* r;
     int endStream = (frame->hd.flags & NGHTTP2_FLAG_END_STREAM) != 0;
     (void)session;
+    if(frame->hd.type == NGHTTP2_RST_STREAM) {
+        s->resetStream = frame->hd.stream_id;
+        return 0;
+    }
     if(frame->hd.type != NGHTTP2_HEADERS && frame->hd.type != NGHTTP2_DATA) {
         return 0;
     }
@@ -854,7 +871,32 @@ static int cn1H2OnStreamClose(nghttp2_session* session, int32_t streamId,
     CN1H2Session* s = (CN1H2Session*)userData;
     CN1H2Request* r = cn1H2FindOpen(s, streamId);
     (void)session;
-    (void)errorCode;
+    if(s->closedPairs == s->closedCapacity) {
+        int grown = s->closedCapacity == 0 ? 16 : s->closedCapacity * 2;
+        JAVA_INT* bigger = (JAVA_INT*)realloc(s->closed, (size_t)grown * 2 * sizeof(JAVA_INT));
+        /* Out of memory: the entry is lost, and Java then ends that span as an
+           unwritten response when the connection goes -- a wrong status on one
+           span, never a crash or a leak. */
+        if(bigger != NULL) {
+            s->closed = bigger;
+            s->closedCapacity = grown;
+        }
+    }
+    if(s->closedPairs < s->closedCapacity) {
+        JAVA_INT code = (JAVA_INT)errorCode;
+        if(streamId == s->resetStream) {
+            /* The peer reset it. With NO_ERROR that is still a stream the response
+               may not have finished on -- a client cancelling a download -- so it
+               is reported as a failure, never as delivery. */
+            s->resetStream = 0;
+            if(code == 0) {
+                code = -1;
+            }
+        }
+        s->closed[s->closedPairs * 2] = (JAVA_INT)streamId;
+        s->closed[s->closedPairs * 2 + 1] = code;
+        s->closedPairs++;
+    }
     if(r != NULL) {
         /* Reset before it completed: drop it rather than leak the stream state. */
         cn1H2Unlink(&s->open, r);
@@ -1015,6 +1057,22 @@ JAVA_VOID com_codename1_backend_Http2_setMaxFileBodiesImpl___int(CODENAME_ONE_TH
 }
 
 /* Takes everything nghttp2 wants written, and empties the buffer. */
+/* The streams closed since the last call, as (id, error code) pairs, and forgets
+   them; null when there are none, so a turn with nothing closed allocates nothing. */
+JAVA_OBJECT com_codename1_backend_Http2_closedStreamsImpl___long_R_int_1ARRAY(CODENAME_ONE_THREAD_STATE, JAVA_LONG handle) {
+    CN1H2Session* s = (CN1H2Session*)(intptr_t)handle;
+    JAVA_OBJECT arr;
+    if(s == NULL || s->closedPairs == 0) {
+        return JAVA_NULL;
+    }
+    arr = allocArray(threadStateData, s->closedPairs * 2, &class_array1__JAVA_INT,
+                     sizeof(JAVA_ARRAY_INT), 1);
+    memcpy((JAVA_ARRAY_INT*)((JAVA_ARRAY)arr)->data, s->closed,
+           (size_t)s->closedPairs * 2 * sizeof(JAVA_ARRAY_INT));
+    s->closedPairs = 0;
+    return arr;
+}
+
 JAVA_OBJECT com_codename1_backend_Http2_drainImpl___long_R_byte_1ARRAY(CODENAME_ONE_THREAD_STATE, JAVA_LONG handle) {
     CN1H2Session* s = (CN1H2Session*)(intptr_t)handle;
     JAVA_OBJECT arr;
@@ -1551,6 +1609,7 @@ JAVA_VOID com_codename1_backend_Http2_destroyImpl___long(CODENAME_ONE_THREAD_STA
     }
     cn1H2FreeRequest(s->current);
     free(s->out);
+    free(s->closed);
     while(s->bodies != NULL) {
         CN1H2Body* next = s->bodies->next;
         cn1H2FreeBody(s->bodies);

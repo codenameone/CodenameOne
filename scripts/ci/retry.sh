@@ -35,7 +35,11 @@ set -uo pipefail
 # "or one of its dependencies could not be resolved" -- a plain Central hiccup that
 # two other workflows already knew to retry and that one had never been taught. One
 # definition, so the next failure mode is added once.
-TRANSIENT_RESOLUTION_FAILURE='status: (403|429|50[0-9])|Could not transfer artifact|Could not resolve dependencies|Failed to read artifact descriptor|Unresolveable build extension|Non-resolvable import POM|or one of its dependencies could not be resolved|authorization failed for https://repo\.maven\.apache\.org|Connection reset|Premature end of Content-Length'
+# UnknownHostException and the curl/glibc spellings of the same thing: a DNS
+# failure on the runner is as transient as a Central 5xx. A windows cross-build
+# died on "UnknownHostException: raw.githubusercontent.com" from an Ant <get>,
+# whose own retries all land inside the same second.
+TRANSIENT_RESOLUTION_FAILURE='status: (403|429|50[0-9])|Could not transfer artifact|Could not resolve dependencies|Failed to read artifact descriptor|Unresolveable build extension|Non-resolvable import POM|or one of its dependencies could not be resolved|authorization failed for https://repo\.maven\.apache\.org|Connection reset|Premature end of Content-Length|UnknownHostException|Could not resolve host|Temporary failure in name resolution'
 
 # Four, not three. With the growing wait below that is 30s, 2m and 5m of
 # coverage -- the same 30/120/300 the Windows cross-compile workflow settled on.
@@ -52,6 +56,55 @@ only_matching="${RETRY_ONLY_MATCHING:-}"
 if [ "$only_matching" = "transient" ]; then
   only_matching="$TRANSIENT_RESOLUTION_FAILURE"
 fi
+
+# Maven records a download that failed as a `*.lastUpdated` marker beside the
+# artifact, and then answers later resolutions from that marker instead of the
+# network: "was not found ... during a previous attempt. This failure was
+# cached in the local repository". A retry that leaves the marker in place is
+# therefore guaranteed to fail the same way -- which is how a single Central
+# hiccup took four attempts and the job with it, and, because `cache: maven`
+# stores the local repository between runs, went on failing runs that Central
+# would have answered fine.
+#
+# Clearing them before each retry is safe: the marker records only a FAILURE,
+# never a downloaded artifact, so the worst case is that Maven asks Central a
+# question it already knows the answer to.
+purge_maven_negative_cache() {
+  # EVERY place the local repository can be, not just $HOME/.m2. In a GitHub
+  # container job $HOME is /github/home, but Maven takes its repository from
+  # Java's user.home, which JDK 8 reads from the passwd entry: /root. Measured
+  # with eclipse-temurin:8 as root and HOME=/github/home -- user.home = /root.
+  # Looking only under $HOME found nothing, said nothing, and a purchase-e2e run
+  # replayed one cached miss through all five attempts.
+  repos=""
+  for arg in "$@" ${MAVEN_OPTS:-}; do
+    case "$arg" in
+      -Dmaven.repo.local=*) repos="$repos ${arg#-Dmaven.repo.local=}" ;;
+    esac
+  done
+  [ -n "${MAVEN_REPO_LOCAL:-}" ] && repos="$repos ${MAVEN_REPO_LOCAL}"
+  repos="$repos ${HOME:-}/.m2/repository"
+  java_cmd="java"
+  [ -n "${JAVA_HOME:-}" ] && [ -x "${JAVA_HOME}/bin/java" ] && java_cmd="${JAVA_HOME}/bin/java"
+  user_home="$("$java_cmd" -XshowSettings:properties -version 2>&1 \
+    | sed -n 's/^ *user\.home = //p' | head -n 1)"
+  [ -n "$user_home" ] && repos="$repos ${user_home}/.m2/repository"
+  total=0
+  for repo in $repos; do
+    [ -d "$repo" ] || continue
+    n="$(find "$repo" -name '*.lastUpdated' -type f 2>/dev/null | wc -l | tr -d ' ')"
+    if [ "${n:-0}" -gt 0 ]; then
+      find "$repo" -name '*.lastUpdated' -type f -delete 2>/dev/null || :
+      echo "retry.sh: cleared ${n} cached resolution failure(s) from ${repo}" >&2
+      total=$((total + n))
+    fi
+  done
+  # Said out loud either way: a purge that silently looked in the wrong place is
+  # how the case above went unnoticed.
+  if [ "$total" -eq 0 ]; then
+    echo "retry.sh: no cached resolution failures found under:${repos}" >&2
+  fi
+}
 
 if [ "$#" -eq 0 ]; then
   echo "retry.sh: no command given" >&2
@@ -106,6 +159,7 @@ while [ "$attempt" -le "$attempts" ]; do
   if [ "$attempt" -lt "$attempts" ]; then
     echo "retry.sh: attempt ${attempt}/${attempts} failed with status ${status};" \
       "retrying in ${wait_seconds}s (possible transient Maven Central 403/429/5xx)" >&2
+    purge_maven_negative_cache "$@"
     sleep "$wait_seconds"
     wait_seconds=$((wait_seconds * 4))
     if [ "$wait_seconds" -gt "$max_delay" ]; then

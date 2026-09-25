@@ -182,6 +182,19 @@ public class WindowsNativeBuilder extends Executor {
         File classesDir = new File(tmpFile, "classes");
         File resDir = new File(tmpFile, "res");
         File buildinRes = new File(tmpFile, "btres");
+        // Emptied, not merely created, for the reason MacOSNativeBuilder gives:
+        // these paths are stable across builds and unzip() only overwrites what
+        // the archive carries, so a class deleted since the last build would still
+        // be translated -- and a removed @OpenTelemetry or @Route would leave its
+        // generated bootstrap behind, which annotationFrameworksInstallSource()
+        // probes this directory for and would keep installing.
+        try {
+            MacOSNativeBuilder.deleteRecursively(classesDir);
+            MacOSNativeBuilder.deleteRecursively(resDir);
+            MacOSNativeBuilder.deleteRecursively(buildinRes);
+        } catch (IOException ex) {
+            throw new BuildException("Failed to clear the staged build inputs", ex);
+        }
         classesDir.mkdirs();
         resDir.mkdirs();
         buildinRes.mkdirs();
@@ -1231,6 +1244,12 @@ public class WindowsNativeBuilder extends Executor {
         src.append("    public static void main(String[] argv) {\n");
         src.append(registerNatives);
         src.append("        final ").append(main).append(" app = new ").append(main).append("();\n");
+        // The generated @Route dispatcher and annotation-framework bootstraps, before
+        // Display.init as the iOS and Android stubs install them. This stub used to
+        // install neither, so @Route, @Mapped, the generated REST/gRPC/GraphQL
+        // clients and @OpenTelemetry all compiled here and did nothing at run time.
+        src.append(routeDispatcherInstallSource(classesDir, "        "));
+        src.append(annotationFrameworksInstallSource(classesDir, "        "));
         src.append("        Display.init(null);\n");
         // The application's identity, which nothing else gives this platform. The stub passes
         // null to Display.init, so the implementation never derives a package from an object, and

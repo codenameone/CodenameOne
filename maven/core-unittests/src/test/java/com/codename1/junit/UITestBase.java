@@ -183,6 +183,23 @@ public abstract class UITestBase {
         // the singleton reset above cannot reach.
         resetDisplayBooleanArrayField("selectionPressed");
         resetDisplayIntField("dragPathLength", 0);
+        resetNetworkErrorListeners();
+    }
+
+    /// Drops the NetworkManager's GLOBAL error listeners. Every test shares the one
+    /// manager, and the framework itself registers listeners that CONSUME errors --
+    /// Lifecycle.init does, so does ToastBar -- so any test that ran an app's init
+    /// left one behind, and from then on no IOException reached a request's own
+    /// handleIOException in any later test. A test that needs a listener adds it
+    /// itself.
+    private static void resetNetworkErrorListeners() {
+        try {
+            Field errors = com.codename1.io.NetworkManager.class.getDeclaredField("errorListeners");
+            errors.setAccessible(true);
+            errors.set(com.codename1.io.NetworkManager.getInstance(), null);
+        } catch (Exception ignored) {
+            // A renamed field loses the reset, not the test run.
+        }
     }
 
     /// Takes down any native window the test left open.
