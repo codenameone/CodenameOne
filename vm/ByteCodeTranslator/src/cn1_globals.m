@@ -1815,6 +1815,11 @@ void gcReleaseObj(JAVA_OBJECT o) {
 long long cn1SoeEntryCount = 0;
 #endif
 
+#if defined(__linux__) && !defined(__APPLE__)
+#include <sys/resource.h>
+#include <sys/syscall.h>
+#include <unistd.h>
+#endif
 void cn1ComputeNativeStackLimit(CODENAME_ONE_THREAD_STATE) {
 #if defined(__APPLE__) || defined(__MACH__)
     void* stackBase = pthread_get_stackaddr_np(pthread_self());
@@ -1847,11 +1852,30 @@ void cn1ComputeNativeStackLimit(CODENAME_ONE_THREAD_STATE) {
             pthread_attr_destroy(&attr);
         }
         if(addr != 0 && ssz != 0) {
-            threadStateData->nativeStackLimit = (JAVA_LONG)(intptr_t)addr
+            char* high = (char*)addr + ssz;
+            char* low = (char*)addr;
+            /* THE MAIN THREAD'S STACK GROWS, and musl reports only what is mapped so
+             * far: its pthread_getattr_np probes the current mapping, so near startup
+             * the "low end" sits a few pages below this frame and the first deeper
+             * call reads as an overflow -- every Alpine binary threw
+             * StackOverflowError recursively at startup. glibc reports the rlimit
+             * reservation instead. Measuring the main thread down from its top by
+             * RLIMIT_STACK gives both libcs the same, real, answer. */
+            if(getpid() == (pid_t)syscall(SYS_gettid)) {
+                struct rlimit rl;
+                if(getrlimit(RLIMIT_STACK, &rl) == 0 && rl.rlim_cur != RLIM_INFINITY
+                   && (size_t)rl.rlim_cur > ssz) {
+                    low = high - (size_t)rl.rlim_cur;
+                } else if(getrlimit(RLIMIT_STACK, &rl) == 0 && rl.rlim_cur == RLIM_INFINITY
+                          && ssz < (size_t)(8L * 1024L * 1024L)) {
+                    low = high - (size_t)(8L * 1024L * 1024L);
+                }
+            }
+            threadStateData->nativeStackLimit = (JAVA_LONG)(intptr_t)low
                     + (JAVA_LONG)CN1_FRAMELESS_STACK_GUARD_BAND;
 #ifdef CN1_GC_VERIFY
-            threadStateData->nativeStackHigh = (JAVA_LONG)(intptr_t)addr + (JAVA_LONG)ssz;
-            threadStateData->nativeStackLow = (JAVA_LONG)(intptr_t)addr;
+            threadStateData->nativeStackHigh = (JAVA_LONG)(intptr_t)high;
+            threadStateData->nativeStackLow = (JAVA_LONG)(intptr_t)low;
 #endif
         } else {
             threadStateData->nativeStackLimit = 0;   // sentinel below: guard disabled
