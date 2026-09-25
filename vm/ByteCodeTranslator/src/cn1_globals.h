@@ -2137,6 +2137,9 @@ static inline void cn1ThreadYield(void) {
     sched_yield();
 #endif
 }
+// The sleeping rung, out of line: usleep is XSI, which a strict -std=c11 build of this
+// header does not declare, and after 640 spins the call costs nothing.
+extern void cn1GcHandshakeSleep(void);
 static inline void cn1GcHandshakeBackoff(int* spins) {
     int s = (*spins)++;
     if(s < 512) {
@@ -2144,7 +2147,7 @@ static inline void cn1GcHandshakeBackoff(int* spins) {
     } else if(s < 640) {
         cn1ThreadYield();
     } else {
-        usleep(50);
+        cn1GcHandshakeSleep();
     }
 }
 #define CN1_GC_WAIT_UNBLOCKED(ts) do { \

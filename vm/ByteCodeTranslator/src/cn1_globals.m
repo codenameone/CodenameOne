@@ -12907,6 +12907,10 @@ static int cn1ConsSnapEpoch = -1;
 // Invalidate the cached build: single-core mode before each thread's scan, and the QA
 // verifier after the sweep, when the cached snapshot still lists every object the sweep
 // just reclaimed.
+void cn1GcHandshakeSleep(void) {
+    usleep(50);
+}
+
 int cn1ConsSnapEpochReset(void) {
     cn1ConsSnapEpoch = -1;
     return 0;
