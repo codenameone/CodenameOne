@@ -196,9 +196,13 @@ class DesktopNativeThemeSelectionTest {
     @Test
     void simulatorPseudoSkinKeepsCustomDistinctFromLegacyAtInstallation() throws Exception {
         String previousMode = System.getProperty("codename1.arg.desktop.themeMode");
+        String previousForced = System.getProperty("cn1.forceSimulatorTheme");
         java.lang.reflect.Field nativeTheme = field("nativeTheme");
         Object previousTheme = nativeTheme.get(null);
         java.util.Map<String, Object> previousFonts = saveFontState();
+        // The Native Theme menu preference outranks the hint; pin it to "auto" so a
+        // developer's own simulator choice cannot leak into this test.
+        System.setProperty("cn1.forceSimulatorTheme", "auto");
         try {
             for (String[] host : new String[][]{{"win", "/WindowsFluentTheme.res"},
                     {"mac", "/MacOSAquaTheme.res"}, {"linux", "/GnomeAdwaitaTheme.res"}}) {
@@ -220,7 +224,60 @@ class DesktopNativeThemeSelectionTest {
             } else {
                 System.setProperty("codename1.arg.desktop.themeMode", previousMode);
             }
+            if (previousForced == null) {
+                System.clearProperty("cn1.forceSimulatorTheme");
+            } else {
+                System.setProperty("cn1.forceSimulatorTheme", previousForced);
+            }
         }
+    }
+
+    @Test
+    void desktopPseudoSkinHonoursTheNativeThemeMenu() {
+        // A named menu choice wins over the hint, on every host, for desktop and mobile themes.
+        for (String host : new String[]{"win", "mac", "linux"}) {
+            assertEquals("/WindowsFluentTheme.res",
+                    JavaSEPort.resolveSimulatorDesktopNativeTheme(host, "WindowsFluentTheme", "legacy"));
+            assertEquals("/MacOSAquaTheme.res",
+                    JavaSEPort.resolveSimulatorDesktopNativeTheme(host, "MacOSAquaTheme", "adwaita"));
+            assertEquals("/GnomeAdwaitaTheme.res",
+                    JavaSEPort.resolveSimulatorDesktopNativeTheme(host, "GnomeAdwaitaTheme", null));
+            assertEquals("/iOS7Theme.res",
+                    JavaSEPort.resolveSimulatorDesktopNativeTheme(host, "iOS7Theme", "native"));
+        }
+        // auto, embedded, unset and an unknown name all defer to the hint.
+        for (String choice : new String[]{"auto", "embedded", null, "", "NoSuchTheme"}) {
+            assertEquals("/MacOSAquaTheme.res",
+                    JavaSEPort.resolveSimulatorDesktopNativeTheme("mac", choice, "native"), String.valueOf(choice));
+            assertEquals("/iOS7Theme.res",
+                    JavaSEPort.resolveSimulatorDesktopNativeTheme("win", choice, null), String.valueOf(choice));
+            assertNull(JavaSEPort.resolveSimulatorDesktopNativeTheme("linux", choice, "custom"), String.valueOf(choice));
+        }
+    }
+
+    @Test
+    void osAppearanceQueriesParseEachPlatformsAnswer() {
+        assertEquals(Boolean.TRUE, JavaSEPort.parseMacAppearance("Dark\n"));
+        assertEquals(Boolean.FALSE, JavaSEPort.parseMacAppearance(
+                "The domain/default pair of (kCFPreferencesAnyApplication, AppleInterfaceStyle) does not exist\n"));
+        assertNull(JavaSEPort.parseMacAppearance(null));
+
+        assertEquals(Boolean.TRUE, JavaSEPort.parseGnomeColorScheme("'prefer-dark'\n"));
+        assertEquals(Boolean.FALSE, JavaSEPort.parseGnomeColorScheme("'prefer-light'\n"));
+        assertEquals(Boolean.FALSE, JavaSEPort.parseGnomeColorScheme("'default'\n"));
+        assertNull(JavaSEPort.parseGnomeColorScheme("No such key \u201ccolor-scheme\u201d\n"));
+        assertNull(JavaSEPort.parseGnomeColorScheme(null));
+
+        String key = "\r\nHKEY_CURRENT_USER\\Software\\Microsoft\\Windows\\CurrentVersion\\Themes\\Personalize\r\n";
+        assertEquals(Boolean.TRUE, JavaSEPort.parseWindowsAppsUseLightTheme(
+                key + "    AppsUseLightTheme    REG_DWORD    0x0\r\n\r\n"));
+        assertEquals(Boolean.FALSE, JavaSEPort.parseWindowsAppsUseLightTheme(
+                key + "    AppsUseLightTheme    REG_DWORD    0x1\r\n\r\n"));
+        assertEquals(Boolean.FALSE, JavaSEPort.parseWindowsAppsUseLightTheme(
+                key + "    AppsUseLightTheme    REG_DWORD    0x0a\r\n"), "0x0a is not zero");
+        assertEquals(Boolean.FALSE, JavaSEPort.parseWindowsAppsUseLightTheme(
+                "ERROR: The system was unable to find the specified registry key or value.\r\n"));
+        assertNull(JavaSEPort.parseWindowsAppsUseLightTheme(null));
     }
 
     @Test

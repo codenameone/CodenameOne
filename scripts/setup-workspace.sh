@@ -247,9 +247,30 @@ if [ -d "$CN1_BINARIES/.git" ]; then
   fi
 fi
 
+# Retried like download_archive above. This clone was the one network step here that
+# tried once: a runner that could not reach github.com for eight seconds -- "Failed to
+# connect to github.com port 443" -- failed the whole job before anything was built.
+# A failed clone can leave a partial directory behind, and git refuses to clone into
+# a non-empty one, so each attempt starts from nothing.
+clone_cn1_binaries() {
+  local delay
+  for delay in 0 15 60 180; do
+    if [ "$delay" -gt 0 ]; then
+      log "cn1-binaries clone failed; retrying in ${delay}s"
+      sleep "$delay"
+    fi
+    rm -rf "$CN1_BINARIES"
+    if git clone --depth=1 --filter=blob:none https://github.com/codenameone/cn1-binaries "$CN1_BINARIES"; then
+      return 0
+    fi
+  done
+  log "could not clone cn1-binaries" >&2
+  return 1
+}
+
 if [ ! -d "$CN1_BINARIES/.git" ]; then
   log "Cloning cn1-binaries"
-  git clone --depth=1 --filter=blob:none https://github.com/codenameone/cn1-binaries "$CN1_BINARIES"
+  clone_cn1_binaries
 fi
 
 # Both builds below run with -T 1C, so several modules install into the local

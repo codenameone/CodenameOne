@@ -510,6 +510,43 @@ class DataSourceTest {
     }
 
     @Test
+    void explicitTransactionsReserveTheConnectionUntilCompletion() throws Exception {
+        for(boolean pooled:new boolean[]{false,true}) for(int boundary=0;boundary<3;boundary++) {
+            DataSource pool=pooled?DataSource.open(":memory:",1):null;
+            Database db=pooled?pool.borrow():Database.open(":memory:");
+            java.util.concurrent.ExecutorService workers=java.util.concurrent.Executors.newFixedThreadPool(4);
+            try {
+                db.execute("CREATE TABLE explicit_owner (id INTEGER PRIMARY KEY AUTOINCREMENT, value TEXT)",null);
+                db.beginTransaction();assertTrue(db.isInTransaction());
+                assertThrows(IOException.class,db::beginTransaction);
+                db.execute("INSERT INTO explicit_owner(value) VALUES ('owner')",null);
+                java.util.concurrent.CountDownLatch started=new java.util.concurrent.CountDownLatch(4);
+                java.util.concurrent.Future<?> raw=workers.submit(()->{started.countDown();db.execute("INSERT INTO explicit_owner(value) VALUES ('raw')",null);return null;});
+                java.util.concurrent.Future<?> inserted=workers.submit(()->{started.countDown();return db.insert("INSERT INTO explicit_owner(value) VALUES ('insert')",null,"id");});
+                java.util.concurrent.Future<Integer> queried=workers.submit(()->{started.countDown();return db.query("SELECT value FROM explicit_owner WHERE value='owner'",null).size();});
+                java.util.concurrent.Future<?> callback=workers.submit(()->{started.countDown();return db.transaction(connection->{connection.execute("INSERT INTO explicit_owner(value) VALUES ('callback')",null);return null;});});
+                assertTrue(started.await(5,java.util.concurrent.TimeUnit.SECONDS));
+                for(java.util.concurrent.Future<?> future:new java.util.concurrent.Future<?>[]{raw,inserted,queried,callback}) {
+                    assertThrows(java.util.concurrent.TimeoutException.class,()->future.get(100,java.util.concurrent.TimeUnit.MILLISECONDS));
+                }
+                if(boundary==0) db.commitTransaction();else if(boundary==1) db.rollbackTransaction();else db.close();
+                for(java.util.concurrent.Future<?> future:new java.util.concurrent.Future<?>[]{raw,inserted,queried,callback}) {
+                    if(boundary==2) assertThrows(java.util.concurrent.ExecutionException.class,()->future.get(5,java.util.concurrent.TimeUnit.SECONDS));
+                    else future.get(5,java.util.concurrent.TimeUnit.SECONDS);
+                }
+                if(boundary<2) {
+                    assertEquals(boundary==0?1:0,queried.get().intValue());
+                    assertEquals(3,db.query("SELECT value FROM explicit_owner WHERE value<>'owner'",null).size());assertFalse(db.isInTransaction());
+                    db.beginTransaction();db.rollbackTransaction();
+                }
+            } finally {
+                db.close();workers.shutdownNow();assertTrue(workers.awaitTermination(5,java.util.concurrent.TimeUnit.SECONDS));
+                if(pool!=null) { pool.release(db);pool.close(); }
+            }
+        }
+    }
+
+    @Test
     @DisplayName("an insert answers with the key the database generated")
     void insertAnswersTheGeneratedKey() throws Exception {
         DataSource pool = DataSource.open(":memory:");

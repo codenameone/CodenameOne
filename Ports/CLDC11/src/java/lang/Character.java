@@ -90,6 +90,34 @@ public final class Character{
         return false; //TODO codavaj!!
     }
 
+    /// Determines whether the character can start a Java identifier.
+    /// @param ch the character to test
+    /// @return true if the character can start a Java identifier
+    public static boolean isJavaIdentifierStart(char ch) {
+        return false; // Compiler API stub; implemented by each runtime.
+    }
+
+    /// Determines whether the character can occur in a Java identifier.
+    /// @param ch the character to test
+    /// @return true if the character can occur in a Java identifier
+    public static boolean isJavaIdentifierPart(char ch) {
+        return false; // Compiler API stub; implemented by each runtime.
+    }
+
+    /// Determines whether the Unicode code point can start a Java identifier.
+    /// @param codePoint the Unicode code point to test
+    /// @return true if the code point can start a Java identifier
+    public static boolean isJavaIdentifierStart(int codePoint) {
+        return false; // Compiler API stub; implemented by each runtime.
+    }
+
+    /// Determines whether the Unicode code point can occur in a Java identifier.
+    /// @param codePoint the Unicode code point to test
+    /// @return true if the code point can occur in a Java identifier
+    public static boolean isJavaIdentifierPart(int codePoint) {
+        return false; // Compiler API stub; implemented by each runtime.
+    }
+
     /// Determines if the specified character is a lowercase character.
     /// Note that by default CLDC only supports the ISO Latin-1 range of characters.
     /// Of the ISO Latin-1 characters (character codes 0x0000 through 0x00FF), the following are lowercase:

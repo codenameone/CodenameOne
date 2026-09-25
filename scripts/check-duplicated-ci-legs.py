@@ -39,22 +39,43 @@ PAIRS = [
             ("screenshots-metal-27", "screenshots-metal"),
             ("CN1SS_IOS_METAL27_COMMENT", "CN1SS_IOS_METAL_COMMENT"),
             ("CN1SS_PREVIEW_SUBDIR: ios-metal-27", "CN1SS_PREVIEW_SUBDIR: ios-metal"),
+            # A SUBSTITUTION, not an only_in_copy entry. Declared as "extra" it
+            # matched a line the copy also still carried at ios-sim-debug, so the
+            # guard saw no drift while the leg silently used the iOS 26 ratchet.
+            ("CN1_WARNING_LEG: ios-sim-debug-xcode27", "CN1_WARNING_LEG: ios-sim-debug"),
+        ],
+        # Lines the COPY must contain, checked before any substitution. The
+        # subs list cannot do this job: it describes differences that are
+        # ALLOWED, so a copy that quietly reverts to the original's value shows
+        # up as no difference at all. That is not hypothetical -- the iOS 27 leg
+        # carried the iOS 26 warning ratchet for two full runs, compared a 27
+        # build against a 26 baseline, failed the census before taking a single
+        # screenshot, and this guard reported the legs identical throughout.
+        "required_in_copy": [
+            "CN1_WARNING_LEG: ios-sim-debug-xcode27",
+            "SCREENSHOT_REF_DIR: ${{ github.workspace }}/scripts/ios/screenshots-metal-27",
+            # The simulator this leg captures on. Both lines, because each alone
+            # is a silent fallback: no boot step and the destination names a
+            # device that does not exist; no destination and run-ios-ui-tests.sh
+            # asks for "iPhone 16" by name, finds none on the Xcode 27 image, and
+            # captures on whatever it falls back to -- an iPad, the run that
+            # exposed it. Declaring them as allowed extras only permitted them;
+            # deleting both still read as "the legs match".
+            "boot-ios-simulator.sh 'iOS-27[0-9-]*' 'iPhone 16'",
+            "IOS_SIM_DESTINATION: 'platform=iOS Simulator,id=${{ steps.sim27.outputs.udid }}'",
         ],
         "only_in_copy": [
             "CN1_XCODE_MAJOR: '27'",
             "IOS_DEPENDENCY_ARGS: '-Dcodename1.arg.ios.themeGeneration=27'",
-            # Seeding run until screenshots-metal-27 is populated; that
-            # directory's README carries the steps that remove this.
-            "continue-on-error: true",
-            # Per-toolchain warning ratchet: Xcode 27's clang emits a different
-            # diagnostic set, so this leg cannot share the iOS 26 baseline.
-            "CN1_WARNING_LEG: ios-sim-debug-xcode27",
+            "IOS_SIM_DESTINATION: 'platform=iOS Simulator,id=${{ steps.sim27.outputs.udid }}'",
         ],
         # The published port report is keyed on the port id `ios-metal` and there
         # is one iOS port; a second upload under that id would publish whichever
         # leg finished last.
         "only_in_original_steps": ["Upload iOS Metal port status"],
-        "only_in_copy_steps": [],
+        # The 26 leg finds its iPhone 16 already on the image; the 27 image has
+        # none, so this leg creates one rather than accepting a fallback device.
+        "only_in_copy_steps": ["Boot an iPhone 16 on iOS 27"],
     },
     {
         "workflow": ".github/workflows/scripts-fidelity.yml",
@@ -68,12 +89,12 @@ PAIRS = [
             ("name: ios-fidelity-27", "name: ios-fidelity"),
             ("ios-27-metal-fidelity-baseline.json", "ios-26-metal-fidelity-baseline.json"),
         ],
+        "required_in_copy": [
+            "CN1SS_FIDELITY_GOLDEN_SET: 'ios-27-metal'",
+        ],
         "only_in_copy": [
             "CN1SS_FIDELITY_GOLDEN_SET: 'ios-27-metal'",
             "CN1_XCODE_MAJOR: '27'",
-            # Non-gating until the ios-27-metal baseline can be recorded; the job
-            # header says what blocks that and what lifts it.
-            "continue-on-error: true",
         ],
         "only_in_original_steps": [],
         "only_in_copy_steps": [],
@@ -131,9 +152,32 @@ def main():
                          set(pair["only_in_original_steps"]))
         copy = normalise(job_lines(text, pair["copy"], path), set(pair["only_in_copy"]),
                          set(pair["only_in_copy_steps"]))
+        # Requirements are checked against the UNFILTERED copy: only_in_copy
+        # removes exactly the generation-specific lines a requirement is most
+        # likely to name, so checking the filtered list would always report them
+        # missing.
+        #
+        # Declared-extra STEPS are kept here too. A required line may live inside
+        # one -- the iOS 27 leg's simulator boot is exactly that -- and checking
+        # a list those steps were already removed from would report it missing
+        # even when present, or, worse, let a requirement on it be dropped as
+        # "unfindable".
+        copy_raw = normalise(job_lines(text, pair["copy"], path), set(), set())
         if not orig or not copy:
             sys.exit(f"check-duplicated-ci-legs: {pair['copy']} or {pair['original']} "
                      f"parsed empty; the parser is wrong")
+        missing = [r for r in pair.get("required_in_copy", [])
+                   if not any(r in line for line in copy_raw)]
+        if missing:
+            failures += 1
+            print(f"check-duplicated-ci-legs: FAILED -- {pair['copy']} is missing "
+                  f"line(s) that make it a SEPARATE leg rather than a duplicate of "
+                  f"{pair['original']}:")
+            for m in missing:
+                print(f"    {m}")
+            print("  Without these the copy runs against the original's own "
+                  "baselines/identity and silently validates nothing.")
+            continue
         rewritten = []
         for line in copy:
             for old, new in pair["subs"]:

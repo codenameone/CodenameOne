@@ -90,15 +90,14 @@ look everywhere asks for. `custom` installs no framework theme so your own
 `theme.css` is the only one.
 
 |`macos.themeMode`
-|`modern` (default) +
-`aqua` / `native` +
-`liquid` +
+|`aqua` (default) / `native` +
+`modern` / `liquid` +
 `ios7` / `flat`
-|The native macOS port. `aqua` selects the macOS theme; `modern` / `liquid`
-is the iOS Liquid Glass theme, which is what the port shipped before an Aqua
-theme existed and what it still installs unless asked otherwise. The default
-moves to `aqua` in the change that reseeds this port's screenshot baselines,
-which is kept separate from the one that introduces the theme.
+|The native macOS port. When neither this hint nor the shared `nativeTheme`
+hint is set, the default is Aqua. `aqua` and `native` select the macOS theme;
+`modern` / `liquid` select the iOS Liquid Glass theme. An explicit shared
+hint still applies when `macos.themeMode` is unset: `nativeTheme=modern`
+selects the modern theme, while `nativeTheme=legacy` selects `ios7`.
 |===
 
 The three desktop themes are generated from `native-themes/windows-fluent`,
@@ -110,6 +109,48 @@ a color. That matters to you and not only to the themes -- an application
 retunes a parent theme by redeclaring `#Constants`, so one vocabulary means
 the same CSS retunes all three platforms rather than only the one it was
 written against.
+
+==== One application on all three
+
+The Codename One Settings tool is built this way. Its main class declares
+`@DesktopBuild(themeMode = "native")`, so it opens in Fluent on Windows,
+Aqua on macOS and Adwaita on Linux, and its own `theme.css` never names a
+color the platform owns:
+
+* Each control derives from the native UIID it's a variant of --
+  `cn1-derive: TextField` for a field, `RaisedButton` for the primary
+  action, `GroupBox` for a card -- so borders, fills and focus rings are
+  the platform's.
+* Surfaces and text use the palette variables every desktop theme
+  declares, such as `var(--window-bg-color)` and
+  `var(--text-secondary-color)`. At runtime the installed theme's values
+  replace the ones the compiler baked in.
+* Only the brand is fixed: the tool redeclares `--accent-color` in its
+  `#Constants`, and the Save button keeps its own green.
+
+.The Settings tool under Windows 11 Fluent
+image:img/desktop-theme-settings-fluent-light.png[Settings under Fluent in light mode,scaledwidth=45%]
+image:img/desktop-theme-settings-fluent-dark.png[Settings under Fluent in dark mode,scaledwidth=45%]
+
+.The Settings tool under macOS Aqua
+image:img/desktop-theme-settings-aqua-light.png[Settings under Aqua in light mode,scaledwidth=45%]
+image:img/desktop-theme-settings-aqua-dark.png[Settings under Aqua in dark mode,scaledwidth=45%]
+
+.The Settings tool under GNOME Adwaita
+image:img/desktop-theme-settings-adwaita-light.png[Settings under Adwaita in light mode,scaledwidth=45%]
+image:img/desktop-theme-settings-adwaita-dark.png[Settings under Adwaita in dark mode,scaledwidth=45%]
+
+NOTE: All six images were captured on a Mac, not on Windows or Linux.
+Colors, borders and spacing come from the theme and are the same on every
+host, but each theme draws text in its platform's own typeface -- Segoe UI
+Variable, SF or Cantarell -- and the Fluent and Adwaita images fall back to
+the Mac's system font. On a real Windows or Linux desktop the text looks
+different.
+
+To preview a desktop theme in the simulator, pick the Desktop skin and
+choose the theme from the *Native Theme* menu. With *Auto* selected the
+Desktop skin follows `desktop.themeMode`, which is what the packaged
+application does.
 
 ==== Hover
 
@@ -159,7 +200,10 @@ appearance:
 * `null` (the default) - follow the device. iOS reads
   `UITraitCollection`, Android reads `Configuration.uiMode`. When
   the user toggles light / dark in system settings the app reflects
-  the change.
+  the change. A JavaSE desktop application reads the system appearance
+  once, at launch: `AppsUseLightTheme` on Windows, `AppleInterfaceStyle`
+  on macOS and the GNOME `color-scheme` setting on Linux. In the
+  simulator the *Dark/Light Mode* menu decides instead.
 * `true` / `false` - force the app into one mode regardless of
   system setting (useful for theme-preview screens or accessibility
   toggles).

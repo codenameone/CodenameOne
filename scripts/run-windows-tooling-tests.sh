@@ -189,6 +189,11 @@ run_settings_scenario hidpi150 -Dsun.java2d.uiScale=1.5
 run_settings_scenario hidpi175 -Dsun.java2d.uiScale=1.75
 run_settings_scenario hidpi150-dark -Dsun.java2d.uiScale=1.5 -Dsettings.darkMode=true
 run_settings_scenario locale-es -Duser.language=es -Duser.country=ES
+# Settings runs on the host's desktop native theme (desktop.themeMode=native), so the
+# scenarios above are all Fluent. The other two themes are resources in the same jar and
+# render on any host, so this is the one leg that paints all three.
+run_settings_scenario theme-aqua -Dcodename1.arg.desktop.themeMode=aqua
+run_settings_scenario theme-adwaita-dark -Dcodename1.arg.desktop.themeMode=adwaita -Dsettings.darkMode=true
 
 if [ ${#MATRIX_FAILURES[@]} -gt 0 ]; then
   wt_log "Settings render matrix failed for: ${MATRIX_FAILURES[*]}" >&2

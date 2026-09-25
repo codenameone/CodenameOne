@@ -35,7 +35,7 @@
     <h4 class="cn1-api-block__title">Parameters</h4>
     <dl class="cn1-api-params">
       {{- range $m.parameters }}
-      <dt><code>{{ .name }}</code>{{ with .type.label }} <span class="cn1-api-params__type">{{ . }}</span>{{ end }}</dt>
+      <dt{{ with .anchor }} id="{{ . }}"{{ end }}><code>{{ .name }}</code>{{ with .type.label }} <span class="cn1-api-params__type">{{ . }}</span>{{ end }}</dt>
       <dd>{{ with .doc }}{{ $page.RenderString . }}{{ else }}<span class="cn1-api-undocumented">Not documented.</span>{{ end }}</dd>
       {{- end }}
     </dl>

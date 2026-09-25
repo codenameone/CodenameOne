@@ -11,14 +11,28 @@ on:
       # a change to the @Entity processor or BackendPackageMojo alone reaches
       # PostgreSQL and MySQL through the daos it generates, and this is the only
       # matrix that stands those servers up. maven/backend has no source of its
-      # own -- it compiles vm/backend/src, which 'vm/**' already covers -- but
-      # its pom decides what the install step below produces.
+      # own -- it compiles vm/backend/src, which 'vm/**' already covers, plus the
+      # shared core classes listed below -- but its pom decides what the install
+      # step below produces.
       #
       # NOT maven/core: the contract compiles against it, so a core change can
       # break this matrix, but almost every PR touches core and this is a long
       # job. The translated tests in pr.yml catch a core break first.
       - 'maven/codenameone-maven-plugin/**'
       - 'maven/backend/**'
+      # The core classes the backend compiles as its own (the ORM and the entity
+      # annotations, marked @SharedWithBackend and listed by
+      # vm/backend/shared-sources.sh). They have no copy under vm/ any more, so
+      # 'vm/**' no longer sees a change to them. A path filter cannot read the
+      # marker; a class marked outside these directories needs its path here.
+      - 'CodenameOne/src/com/codename1/impl/SharedWithBackend.java'
+      - 'CodenameOne/src/com/codename1/impl/orm/**'
+      - 'CodenameOne/src/com/codename1/orm/session/**'
+      - 'CodenameOne/src/com/codename1/annotations/db/**'
+      - 'CodenameOne/src/com/codename1/annotations/Entity.java'
+      - 'CodenameOne/src/com/codename1/annotations/Id.java'
+      - 'CodenameOne/src/com/codename1/annotations/Column.java'
+      - 'CodenameOne/src/com/codename1/annotations/DbTransient.java'
       - '!vm/**/README.md'
       - '!vm/**/readme.md'
       - '!vm/**/docs/**'
@@ -33,14 +47,28 @@ on:
       # a change to the @Entity processor or BackendPackageMojo alone reaches
       # PostgreSQL and MySQL through the daos it generates, and this is the only
       # matrix that stands those servers up. maven/backend has no source of its
-      # own -- it compiles vm/backend/src, which 'vm/**' already covers -- but
-      # its pom decides what the install step below produces.
+      # own -- it compiles vm/backend/src, which 'vm/**' already covers, plus the
+      # shared core classes listed below -- but its pom decides what the install
+      # step below produces.
       #
       # NOT maven/core: the contract compiles against it, so a core change can
       # break this matrix, but almost every PR touches core and this is a long
       # job. The translated tests in pr.yml catch a core break first.
       - 'maven/codenameone-maven-plugin/**'
       - 'maven/backend/**'
+      # The core classes the backend compiles as its own (the ORM and the entity
+      # annotations, marked @SharedWithBackend and listed by
+      # vm/backend/shared-sources.sh). They have no copy under vm/ any more, so
+      # 'vm/**' no longer sees a change to them. A path filter cannot read the
+      # marker; a class marked outside these directories needs its path here.
+      - 'CodenameOne/src/com/codename1/impl/SharedWithBackend.java'
+      - 'CodenameOne/src/com/codename1/impl/orm/**'
+      - 'CodenameOne/src/com/codename1/orm/session/**'
+      - 'CodenameOne/src/com/codename1/annotations/db/**'
+      - 'CodenameOne/src/com/codename1/annotations/Entity.java'
+      - 'CodenameOne/src/com/codename1/annotations/Id.java'
+      - 'CodenameOne/src/com/codename1/annotations/Column.java'
+      - 'CodenameOne/src/com/codename1/annotations/DbTransient.java'
       - '!vm/**/README.md'
       - '!vm/**/readme.md'
       - '!vm/**/docs/**'

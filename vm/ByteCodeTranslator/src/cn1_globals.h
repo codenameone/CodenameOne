@@ -1016,27 +1016,27 @@ static inline JAVA_LONG cn1SaturateToLong(JAVA_DOUBLE cn1__d) {
 #define POP_MANY_AND_PUSH_OBJ(value, offset) {  \
     JAVA_OBJECT pObj = value; SP[-offset].type = CN1_TYPE_INVALID; \
     SP[-offset].data.o = pObj; SP[-offset].type = CN1_TYPE_OBJECT; \
-    SP = cn1PopMany(threadStateData, MAX(1, offset) - 1, SP); }
+    SP = cn1PopMany(threadStateData, ((offset) > 1 ? (offset) - 1 : 0), SP); }
 
 #define POP_MANY_AND_PUSH_INT(value, offset) {  \
     JAVA_INT pInt = value; SP[-offset].type = CN1_TYPE_INT; \
     SP[-offset].data.i = pInt; \
-    SP = cn1PopMany(threadStateData, MAX(1, offset) - 1, SP); }
+    SP = cn1PopMany(threadStateData, ((offset) > 1 ? (offset) - 1 : 0), SP); }
 
 #define POP_MANY_AND_PUSH_LONG(value, offset) {  \
     JAVA_LONG pLong = value; SP[-offset].type = CN1_TYPE_LONG; \
     SP[-offset].data.l = pLong; \
-    SP = cn1PopMany(threadStateData, MAX(1, offset) - 1, SP); }
+    SP = cn1PopMany(threadStateData, ((offset) > 1 ? (offset) - 1 : 0), SP); }
 
 #define POP_MANY_AND_PUSH_DOUBLE(value, offset) {  \
     JAVA_DOUBLE pDob = value; SP[-offset].type = CN1_TYPE_DOUBLE; \
     SP[-offset].data.d = pDob; \
-    SP = cn1PopMany(threadStateData, MAX(1, offset) - 1, SP); }
+    SP = cn1PopMany(threadStateData, ((offset) > 1 ? (offset) - 1 : 0), SP); }
 
 #define POP_MANY_AND_PUSH_FLOAT(value, offset) {  \
     JAVA_FLOAT pFlo = value; SP[-offset].type = CN1_TYPE_FLOAT; \
     SP[-offset].data.f = pFlo; \
-    SP = cn1PopMany(threadStateData, MAX(1, offset) - 1, SP); }
+    SP = cn1PopMany(threadStateData, ((offset) > 1 ? (offset) - 1 : 0), SP); }
 
 
 #define BC_IDIV() SP--; SP[-1].data.i = SP[-1].data.i / (*SP).data.i

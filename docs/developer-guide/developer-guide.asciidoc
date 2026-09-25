@@ -193,6 +193,8 @@ include::Advertising.asciidoc[]
 
 include::Analytics.asciidoc[]
 
+include::OpenTelemetry-Tracing.asciidoc[]
+
 include::App-Review.asciidoc[]
 
 include::Crash-Protection.asciidoc[]

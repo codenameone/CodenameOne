@@ -209,9 +209,15 @@ JAVA_INT com_codename1_backend_Web_globalInitImpl___R_int(CODENAME_ONE_THREAD_ST
 /*
  * headerLines is one string with '\n' between headers, because passing a
  * String[] would mean walking a Java array from C for no benefit.
+ *
+ * callerHeaders says whether any of those lines came from the CALLER. The rest
+ * are trace context the runtime adds itself (see Web.perform), and the redirect
+ * rule below is about what the caller handed over, so it asks this rather than
+ * whether the list is empty.
  */
-JAVA_LONG com_codename1_backend_Web_performImpl___java_lang_String_java_lang_String_byte_1ARRAY_byte_1ARRAY_R_long(
-        CODENAME_ONE_THREAD_STATE, JAVA_OBJECT method, JAVA_OBJECT url, JAVA_OBJECT headerLines, JAVA_OBJECT body) {
+JAVA_LONG com_codename1_backend_Web_performImpl___java_lang_String_java_lang_String_byte_1ARRAY_byte_1ARRAY_boolean_R_long(
+        CODENAME_ONE_THREAD_STATE, JAVA_OBJECT method, JAVA_OBJECT url, JAVA_OBJECT headerLines, JAVA_OBJECT body,
+        JAVA_BOOLEAN callerHeaders) {
     CURL* curl;
     CURLcode rc;
     struct curl_slist* headers = NULL;
@@ -433,7 +439,7 @@ JAVA_LONG com_codename1_backend_Web_performImpl___java_lang_String_java_lang_Str
        wrong in; a NULL method is libcurl's own default GET. */
     safeMethod = methodCopy == NULL || strcmp(methodCopy, "GET") == 0
             || strcmp(methodCopy, "HEAD") == 0;
-    if(headers == NULL && bodyLength == 0 && safeMethod) {
+    if(!callerHeaders && bodyLength == 0 && safeMethod) {
         curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
     } else {
         /* This #ifdef may never fire, for the same reason the PATH_AS_IS one

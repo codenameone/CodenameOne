@@ -31,6 +31,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 public class SettingsDiagnosticsTest {
@@ -72,17 +73,22 @@ public class SettingsDiagnosticsTest {
         assertTrue(report.contains("[edt-stack]"), report);
     }
 
+    /**
+     * Dark mode is resolved per style from the native theme's $Dark entries, so
+     * a sampled "...Dark" UIID would describe a style nothing asks for. The
+     * sample has to reach the native layer too, or the report cannot say which
+     * desktop theme the app is running on.
+     */
     @Test
-    public void sampledUiidsCoverBothThemeVariants() {
+    public void sampledUiidsCoverTheAppAndTheNativeTheme() {
+        boolean app = false;
+        boolean nativeBase = false;
         for (String uiid : SettingsDiagnostics.SAMPLED_UIIDS) {
-            if (uiid.endsWith("Dark")) {
-                continue;
-            }
-            boolean hasDark = false;
-            for (String candidate : SettingsDiagnostics.SAMPLED_UIIDS) {
-                hasDark |= candidate.equals(uiid + "Dark");
-            }
-            assertTrue(hasDark, "dark variant missing for sampled UIID " + uiid);
+            assertFalse(uiid.endsWith("Dark"), "dark twin UIIDs no longer exist: " + uiid);
+            app |= uiid.startsWith("Settings");
+            nativeBase |= !uiid.startsWith("Settings");
         }
+        assertTrue(app, "sample at least one Settings UIID");
+        assertTrue(nativeBase, "sample at least one native theme UIID");
     }
 }

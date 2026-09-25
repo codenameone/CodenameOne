@@ -214,6 +214,55 @@ public class ConnectionRequest implements IOProgressListener {
     private boolean contentTypeSetExplicitly;
     private Object _connection;
 
+    /// What the [NetworkTracer] returned when this request was queued: the context
+    /// its spans are children of. Kept across retries, which are the same request.
+    ///
+    /// The tracer fields are per REQUEST OBJECT, like every other field of one
+    /// execution here -- the URL, the response code, the streams, the guard's
+    /// capture. The same instance queued to run twice at once (duplicates are
+    /// allowed by default) already has its two runs overwrite each other's response
+    /// state; tracing is no more per-execution than the request it observes, and
+    /// is not the place to make it so. Queue separate instances to run in parallel.
+    Object tracerParent;
+
+    /// The tracer that produced [#tracerParent]. The context is that tracer's own
+    /// state, so it is handed only to that tracer: one installed between queuing and
+    /// running gets no parent rather than an object it cannot interpret -- or, for a
+    /// telemetry reinstall, a trace id belonging to the previous installation.
+    NetworkTracer tracerParentOwner;
+
+    /// The attempt in flight, as the tracer's own state; null when none is being
+    /// traced. Set on the network thread and cleared there when the attempt ends.
+    Object tracerAttempt;
+
+    /// The tracer that started [#tracerAttempt], which is the one that ends it. The
+    /// slot can be replaced or emptied while the attempt is in flight, and handing
+    /// one tracer's state to another -- or to none -- would leak it and lose the span.
+    NetworkTracer tracerOwner;
+
+    /// Whether this attempt received a status line. Set the moment the status is
+    /// read, because a followed redirect and a 304 revalidation both return before
+    /// the guard's capture runs, and reporting them as "no response" hid the very
+    /// 3xx that explains the attempt.
+    boolean tracerResponded;
+
+    /// The network thread running [#tracerAttempt]; only it may end the attempt.
+    Thread tracerThread;
+
+    /// The last attempt that ended, and its tracer: the parent a retry of a request
+    /// queued with no context continues from, so the attempts share one trace.
+    Object tracerLastAttempt;
+    NetworkTracer tracerLastOwner;
+
+    /// Whether [#tracerParent] is such an earlier attempt rather than the context
+    /// the request was queued under; a later retry then moves it to the newest one.
+    boolean tracerParentChained;
+
+    /// A generation, advanced by every accepted enqueue -- a retry, a redirect or a
+    /// fresh reuse. An attempt that ends with it unchanged was the request's last,
+    /// and a cleanup queued for one generation never touches the next.
+    int tracerRequeues;
+
     /// Default constructor
     public ConnectionRequest() {
         if (NetworkManager.getInstance().isAPSupported()) {
@@ -753,6 +802,63 @@ public class ConnectionRequest implements IOProgressListener {
         }
     }
 
+    /// Adds a header only when the request does not already carry one of that name, in any
+    /// spelling -- the counterpart of [#removeRequestHeaderIfUnchanged(String, String)] for
+    /// a layer that decorates a request it does not own. A tracer adding `traceparent` is
+    /// the case it exists for: when the app set its own, that is a deliberate choice of
+    /// which trace the request belongs to, and replacing it would move the request into
+    /// another one.
+    ///
+    /// #### Parameters
+    ///
+    /// - `key`: the header key, matched without regard to case as HTTP requires
+    ///
+    /// - `value`: the header value
+    ///
+    /// #### Returns
+    ///
+    /// true when the header was added, false when one was already there
+    public boolean addRequestHeaderIfAbsent(String key, String value) {
+        if (key == null || value == null || getRequestHeader(key) != null) {
+            return false;
+        }
+        addRequestHeader(key, value);
+        return true;
+    }
+
+    /// The value of a header added to this request, matched without regard to case as
+    /// HTTP requires, or null when there is none. `Content-Type` answers only when it was
+    /// set explicitly: [#addRequestHeader(String, String)] routes that one to a dedicated
+    /// field, and the default it otherwise carries is not something anyone added.
+    ///
+    /// #### Parameters
+    ///
+    /// - `key`: the header name
+    ///
+    /// #### Returns
+    ///
+    /// the value, or null
+    public String getRequestHeader(String key) {
+        if (key == null) {
+            return null;
+        }
+        if ("content-type".equalsIgnoreCase(key)) {
+            return contentTypeSetExplicitly ? contentType : null;
+        }
+        if (userHeaders != null) {
+            Enumeration keys = userHeaders.keys();
+            while (keys.hasMoreElements()) {
+                String existing = (String) keys.nextElement();
+                if (existing != null && existing.length() == key.length()
+                        && equalsIgnoreAsciiCase(existing, key)) {
+                    Object value = userHeaders.get(existing);
+                    return value == null ? null : value.toString();
+                }
+            }
+        }
+        return null;
+    }
+
     /// ASCII-only case-insensitive comparison, so the result never depends on the device locale --
     /// under the Turkish locale an uppercase `I` does not fold to `i`.
     private static boolean equalsIgnoreAsciiCase(String a, String b) {
@@ -784,9 +890,30 @@ public class ConnectionRequest implements IOProgressListener {
         if (userHeaders == null) {
             userHeaders = new Hashtable();
         }
+        // In any spelling, as HTTP matches names. An exact-key check let a default
+        // "traceparent" go out beside the request's own "Traceparent" -- two trace
+        // contexts on one request, which a server may resolve either way. Content-Type
+        // keeps the exact check: it lives in its own field, not in userHeaders, and
+        // getRequestHeader answers for it only when it was set explicitly.
+        if (key == null || (!"content-type".equalsIgnoreCase(key) && getRequestHeader(key) != null)) {
+            return;
+        }
         if (!userHeaders.containsKey(key)) {
             userHeaders.put(key, value);
         }
+    }
+
+    /// Whether the headers added with [NetworkManager#addDefaultHeader(String, String)]
+    /// are sent with this request. They are meant for the app's own services -- an
+    /// `Authorization` for its backend is the usual one -- so a request that goes
+    /// somewhere else, a third-party collector for instance, overrides this to
+    /// keep them from being disclosed there.
+    ///
+    /// #### Returns
+    ///
+    /// true, the default: every request carries the default headers
+    protected boolean shouldApplyDefaultHeaders() {
+        return true;
     }
 
     void prepare() {
@@ -1143,6 +1270,25 @@ public class ConnectionRequest implements IOProgressListener {
             // blocking token fetch would stall every other request.
             requestGuard.beforeRequest(this);
         }
+        tracerResponded = false;
+        NetworkTracer tracer = NetworkManager.getNetworkTracer();
+        if (tracer != null) {
+            // After the guard, so the attempt the tracer times is the one that is
+            // really made, and in the same place for the same reason: before
+            // initConnection() writes the headers, and outside it so a subclass
+            // that overrides it cannot drop the trace context. NetworkManager's
+            // default headers are already on the request by now -- NetworkThread
+            // copies them before it calls runCurrentRequest -- so a traceparent the
+            // app supplies as a default is seen here and kept, not replaced.
+            try {
+                tracerAttempt = tracer.beforeRequest(this,
+                        tracer == tracerParentOwner ? tracerParent : null); //NOPMD CompareObjectsWithEquals
+                tracerOwner = tracerAttempt == null ? null : tracer;
+                tracerThread = Thread.currentThread();
+            } catch (Throwable t) {
+                Log.e(t);
+            }
+        }
 
         CodenameOneImplementation impl = Util.getImplementation();
         Object connection = null;
@@ -1271,6 +1417,7 @@ public class ConnectionRequest implements IOProgressListener {
             }
             timeSinceLastUpdate = System.currentTimeMillis();
             responseCode = impl.getResponseCode(connection);
+            tracerResponded = true;
 
             if (isCookiesEnabled()) {
                 String[] cookies = impl.getHeaderFields("Set-Cookie", connection);

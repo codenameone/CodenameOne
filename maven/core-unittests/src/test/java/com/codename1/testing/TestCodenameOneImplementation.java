@@ -1486,7 +1486,33 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
         fileSystem.clear();
     }
 
+    /**
+     * Receives every component a repaint is requested for, as it is requested, or
+     * null for none. A test that asks "was X queued for repaint" by reading the
+     * paint queue afterwards races the EDT: every flush paints, and painting
+     * empties that queue. Observing the request itself does not.
+     */
+    private java.util.List<Object> repaintLog;
+
+    public void recordRepaints(java.util.List<Object> log) {
+        this.repaintLog = log;
+    }
+
+    @Override
+    public void repaint(com.codename1.ui.animations.Animation cmp) {
+        java.util.List<Object> log = repaintLog;
+        if (log != null) {
+            log.add(cmp);
+        }
+        super.repaint(cmp);
+    }
+
     public void reset() {
+        repaintLog = null;
+        // Back to the default a test class starts from. Runs on every UITestBase
+        // teardown, so a test that switches touch off and forgets -- or restores the
+        // wrong value -- cannot decide the command behaviour of the classes after it.
+        touchDevice = true;
         minimized = false;
         usesInvokeAndBlockForEditString = false;
         windowManager = null;
@@ -1570,6 +1596,20 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
         nativeTitle = false;
         softkeyCount = 2;
         thirdSoftButton = false;
+        // Every flag a test can set has to come back here, or it leaks into every
+        // test after it in the JVM. touchDevice did: DialogInWindowTest left it
+        // false, and CodenameOneImplementation.setCommandBehavior then turned a
+        // later test's COMMAND_BEHAVIOR_BUTTON_BAR into SOFTKEY, so
+        // MenuBarDialogSideMenuTest found no command button -- but only when the
+        // filesystem happened to order the two classes that way, which made it
+        // look intermittent. These six were the setter-backed fields reset()
+        // missed; the values are their declared defaults.
+        touchDevice = true;
+        portrait = true;
+        tablet = false;
+        trueTypeSupported = true;
+        autoProcessConnections = true;
+        locationButtonReady = true;
         nativeFontSchemeSupported = true;
         nativeImageCacheSupported = false;
         resetTextSelectionTracking();

@@ -95,6 +95,56 @@ if [ "${WEBSITE_CN1_VERSION}" = "auto" ]; then
   fi
 fi
 
+# Fetches the Maven wrapper jar a project's mvnw needs, with retries, before mvnw
+# runs. The takari 0.5.6 wrapper downloads it ONCE with no retry, and a failed
+# `wget -O` leaves an EMPTY jar behind that every later mvnw call trusts -- so one
+# refused TLS handshake with Maven Central ("Unable to establish SSL connection")
+# ended the website build as "Could not find or load main class
+# org.apache.maven.wrapper.MavenWrapperMain". A jar that is not a complete zip is
+# fetched again; a good one is left alone, so this costs nothing once it is there.
+# Whether $1 is a COMPLETE zip archive. The first two bytes are not enough: a
+# transfer cut off mid-body still starts with "PK", and that truncated jar was
+# accepted as downloaded. unzip -t reads every entry and its CRC; python's
+# zipfile does the same where unzip is missing.
+is_complete_jar() {
+  [ -s "$1" ] || return 1
+  if command -v unzip >/dev/null 2>&1; then
+    unzip -tq "$1" >/dev/null 2>&1
+  elif command -v python3 >/dev/null 2>&1; then
+    python3 -m zipfile -t "$1" >/dev/null 2>&1
+  else
+    echo "Neither unzip nor python3 is available to verify ${1}" >&2
+    return 1
+  fi
+}
+
+ensure_maven_wrapper_jar() {
+  local dir="$1" props jar url delay
+  props="${dir}/.mvn/wrapper/maven-wrapper.properties"
+  jar="${dir}/.mvn/wrapper/maven-wrapper.jar"
+  [ -f "${props}" ] || return 0
+  url="$(sed -n 's/^wrapperUrl=//p' "${props}" | tr -d '\r')"
+  # A wrapper with no wrapperUrl (the script-only kind) needs no jar.
+  [ -n "${url}" ] || return 0
+  for delay in 0 15 60 180; do
+    if is_complete_jar "${jar}"; then
+      return 0
+    fi
+    if [ "${delay}" -gt 0 ]; then
+      echo "Maven wrapper jar download failed; retrying in ${delay}s" >&2
+      sleep "${delay}"
+    fi
+    rm -f "${jar}"
+    curl -fsSL --retry 3 --retry-delay 5 --retry-all-errors -o "${jar}" "${url}" || true
+  done
+  if is_complete_jar "${jar}"; then
+    return 0
+  fi
+  rm -f "${jar}"
+  echo "Could not download the Maven wrapper jar from ${url}" >&2
+  return 1
+}
+
 build_javadocs_for_site() {
   if [ "${WEBSITE_INCLUDE_JAVADOCS}" != "true" ]; then
     return
@@ -447,6 +497,7 @@ build_initializr_for_site() {
   echo "Building Initializr JavaScript bundle for website..." >&2
   (
     cd "${REPO_ROOT}/scripts/initializr"
+    ensure_maven_wrapper_jar "${PWD}"
 
     run_initializr_mvn() {
       if command -v xvfb-run >/dev/null 2>&1; then
@@ -622,6 +673,7 @@ build_skindesigner_for_site() {
   echo "Building Skin Designer JavaScript bundle for website..." >&2
   (
     cd "${REPO_ROOT}/scripts/skindesigner"
+    ensure_maven_wrapper_jar "${PWD}"
     ./tools/sync-zipsupport-from-initializr.sh
     if [ "${WEBSITE_BOOTSTRAP_CN1_SNAPSHOTS}" = "true" ]; then
       activate_bootstrapped_java17

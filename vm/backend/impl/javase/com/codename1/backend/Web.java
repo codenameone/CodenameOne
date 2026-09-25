@@ -228,6 +228,33 @@ public final class Web {
         // The request line's other field; see HeaderLines.requireMethod.
         HeaderLines.requireMethod(method);
         HeaderLines.validate(headers);
+        // The translated twin's span, the same way; see Tracing.startHttpClient.
+        Span span = Tracing.startHttpClient(method, url, headers);
+        int status = -1;
+        Throwable failure = null;
+        try {
+            Result result = perform(method, url, headers, body,
+                    Tracing.propagationHeaders(span, headers));
+            status = result.getStatus();
+            return result;
+        } catch (IOException err) {
+            failure = err;
+            throw err;
+        } catch (RuntimeException err) {
+            failure = err;
+            throw err;
+        } finally {
+            Tracing.endHttpClient(span, status, failure);
+        }
+    }
+
+    /**
+     * @param trace the trace-context lines, or null. Sent, but not counted as the
+     *              caller's headers when deciding whether to follow a redirect --
+     *              the translated twin's rule, for the translated twin's reason.
+     */
+    private static Result perform(String method, String url, List headers, byte[] body,
+                                  List trace) throws IOException {
         HttpURLConnection connection;
         try {
             connection = (HttpURLConnection)new URL(url).openConnection();
@@ -290,9 +317,17 @@ public final class Web {
             connection.setInstanceFollowRedirects((headers == null || headers.isEmpty())
                     && (body == null || body.length == 0) && safeMethod);
             connection.setRequestProperty("User-Agent", "codenameone-backend");
-            if(headers != null) {
-                for(int iter = 0 ; iter < headers.size() ; iter++) {
-                    String header = String.valueOf(headers.get(iter));
+            List lines = headers;
+            if(trace != null) {
+                lines = new ArrayList();
+                if(headers != null) {
+                    lines.addAll(headers);
+                }
+                lines.addAll(trace);
+            }
+            if(lines != null) {
+                for(int iter = 0 ; iter < lines.size() ; iter++) {
+                    String header = String.valueOf(lines.get(iter));
                     int colon = header.indexOf(':');
                     if(colon > 0) {
                         // addRequestProperty, not set: the packaged client appends

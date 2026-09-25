@@ -871,7 +871,12 @@ public class MacOSNativeBuilder extends Executor {
                 // this call; this builder was written without it.
                 + "        com.codename1.impl.ios.IOSImplementation.setIosMode(\""
                 + themeMode + "\");\n"
-                + routeDispatcherInstallSource(null, "        ")
+                // The unpacked classes, not a jar: this builder never had one to
+                // pass, and passing null made both of these answer "none" for
+                // every project -- @Route and every annotation framework were
+                // inert on macOS.
+                + routeDispatcherInstallSource(classesDir, "        ")
+                + annotationFrameworksInstallSource(classesDir, "        ")
                 + "        Display.init(stub);\n"
                 + "    }\n"
                 + "}\n";

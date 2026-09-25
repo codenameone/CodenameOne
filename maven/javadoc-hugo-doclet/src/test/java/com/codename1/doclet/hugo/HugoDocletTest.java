@@ -152,6 +152,12 @@ class HugoDocletTest {
                 "    /// @param value the value",
                 "    /// @return the value",
                 "    public <V> V identity(V value) { return value; }",
+                "    /// Selects one typed value.",
+                "    /// @param <V> the selected type",
+                "    /// @param type the selected class",
+                "    /// @param index the selected position",
+                "    /// @return the selected value",
+                "    public <V> V identity(Class<V> type, int index) { return null; }",
                 "    /// A long constant",
                 "    public static final long BIG = 5L;",
                 "    /// Overloads that differ by type, not arity",
@@ -361,10 +367,16 @@ class HugoDocletTest {
                 "}",
                 ""), StandardCharsets.UTF_8);
 
+        for (String name : List.of("Index", "_index")) {
+            Files.writeString(sources.resolve(name + ".java"),
+                    "package p; public class " + name + " {}", StandardCharsets.UTF_8);
+        }
+
         DocumentationTool tool = ToolProvider.getSystemDocumentationTool();
         try (StandardJavaFileManager files = tool.getStandardFileManager(null, null, null)) {
             Iterable<? extends JavaFileObject> units = files.getJavaFileObjects(
                     sources.resolve("Sample.java"), sources.resolve("Other.java"),
+                    sources.resolve("Index.java"), sources.resolve("_index.java"),
                     sources.resolve("Child.java"),
                     sources.resolve("Shared.java"), sources.resolve("UsesShared.java"),
                     sources.resolve("Listener.java"), sources.resolve("Marker.java"),
@@ -394,6 +406,17 @@ class HugoDocletTest {
         // only characters that could be escaped, and neither appears in one.
         assertTrue(page(page).contains("\"" + anchor + "\""),
                 "expected fragment identifier " + anchor + " in " + page);
+    }
+
+    @Test
+    void reservedHugoBasenamesKeepTypeUrlsWithoutCreatingBundles() throws IOException {
+        for (String name : List.of("Index", "_index")) {
+            assertFalse(Files.exists(content.resolve("p/" + name + ".md")));
+            String page = page("type-" + name + ".md");
+            assertTrue(page.contains("\"url\": \"/javadoc/p/" + name + "/\""), page);
+        }
+        assertTrue(Files.exists(content.resolve("p/Other.md")));
+        assertTrue(Files.exists(content.resolve("p/package-summary.md")));
     }
 
     @Test
@@ -632,13 +655,13 @@ class HugoDocletTest {
 
     @Test
     void documentsAMethodsOwnTypeParameter() throws IOException {
-        // Map.of rejects a null value, and the type-parameter row passed one, so
-        // the whole generation died with a NullPointerException the moment any
-        // method documented a type parameter. Nothing in the framework does
-        // today, which is the only reason this was not already a broken build.
         String page = page("Sample.md");
         assertTrue(page.contains("the value type"), "the type parameter's text is kept");
         assertTrue(page.contains("\"<V>\""), "under its own name");
+        assertTrue(page.contains("\"anchor\": \"identity(V)-type-param-V\""),
+                "documented method type parameters retain their standard Javadoc fragment");
+        assertTrue(page.contains("\"anchor\": \"identity(java.lang.Class,int)-type-param-V\""),
+                "overloaded methods need distinct type-parameter fragments");
     }
 
     @Test

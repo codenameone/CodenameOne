@@ -62,3 +62,44 @@
   }
 }
 // end::push-notifications-json-005[]
+
+// tag::push-notifications-json-006[]
+{
+  "version": 1,
+  "organization": "9f1c2f7a-2f6e-4a5b-9d71-3f0a7c1d5e22",
+  "generatedAt": 1790179200000,
+  "window": {"from": 1790092800000, "to": 1790179200000},
+  "summary": {
+    "fcm":  {"ACCEPTED": 7412, "FAILED": 1},
+    "apns": {"ACCEPTED": 3310},
+    "web":  {"DEAD": 1}
+  },
+  "events": [
+    {
+      "deliveryId": "6f0f6f1e-9a1e-4f2a-9a7a-6d5f5f6a1b02",
+      "device": "cn1-fcm-fH9c...Qk",
+      "token": "fH9c...Qk",
+      "provider": "fcm",
+      "status": "FAILED",
+      "reason": "INVALID_TARGET",
+      "attempts": 1,
+      "at": 1790178322418,
+      "detail": "{\"error\":{\"code\":404,\"status\":\"NOT_FOUND\"}}"
+    },
+    {
+      "deliveryId": "d2b1a0c4-1f77-4a4d-9d0e-2c5b7a91f3aa",
+      "device": "cn1-web-https://push.example.com/sub/9?p256dh=KEY&auth=AUTH",
+      "endpoint": "https://push.example.com/sub/9",
+      "provider": "web",
+      "status": "DEAD",
+      "reason": "TRANSIENT_FAILURE",
+      "attempts": 6,
+      "at": 1790178901004,
+      "detail": "gave up after repeated 503 responses"
+    }
+  ],
+  "truncated": false,
+  "eventsOmitted": 10722
+}
+// end::push-notifications-json-006[]
+

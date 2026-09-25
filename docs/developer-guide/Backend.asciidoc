@@ -606,6 +606,112 @@ Sections 12 and 13 are excluded while permessage-deflate is unimplemented. They'
 excluded rather than tolerated: accepting their result as a pass would also accept
 it for a case that used to work.
 
+=== Tracing with OpenTelemetry
+
+A server can report every request it serves to any OpenTelemetry collector, and
+the reporting needs no code in the handlers. Turn it on at build time with the
+annotation, on any class in the backend module:
+
+[source,java]
+----
+include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/TracingSnippets.java[tag=backend-otel-annotation,indent=0]
+----
+
+Without touching the source, set it in `application.properties` instead:
+
+----
+cn1.otel.enabled=true
+----
+
+Either one makes the generated entry point install a tracer. From then on:
+
+* every request is a server span, named after the route that matched
+  (`GET /notes/{id}`), with its status, method and path;
+* every outbound `Web` call is a client span, and sends the W3C `traceparent`
+  and `tracestate` headers so the service it reaches joins the same trace;
+* every `Database` statement is a client span carrying the SQL as the code wrote
+  it, placeholders and all -- the bound values are never recorded;
+* an incoming `traceparent` makes the request part of the caller's trace, which is
+  how a Codename One app's spans connect to the backend's own (see
+  <<opentelemetry-tracing>>).
+
+A WebSocket connection isn't a span. It can stay open for hours and carry any
+number of messages, so it has no single start and end to time, and its upgrade
+request is answered before tracing begins.
+
+Without the annotation or the property, nothing refers to the tracer and the
+translator leaves it out of the binary.
+
+Spans go out over OTLP/HTTP, as binary protobuf by default, batched on a
+thread of their own so a slow collector never holds up a request. A queue that
+fills because the collector is down drops spans and counts them, and
+`HttpServer.getMetrics()` reports those counts. The settings are the standard
+OpenTelemetry environment variables, so a deployment configures this server the
+same way it configures everything else it runs:
+
+[cols="2,2,3"]
+|===
+| Variable | Property | Meaning
+
+| `OTEL_EXPORTER_OTLP_ENDPOINT` | `cn1.otel.endpoint` | The collector's base URL; `/v1/traces` is appended. Defaults to `http://localhost:4318`.
+| `OTEL_EXPORTER_OTLP_TRACES_ENDPOINT` | `cn1.otel.traces.endpoint` | The full URL, used as it is.
+| `OTEL_EXPORTER_OTLP_HEADERS` | `cn1.otel.headers` | `name=value` pairs, comma separated, with each value URL-encoded.
+| `OTEL_EXPORTER_OTLP_PROTOCOL` | `cn1.otel.protocol` | `http/protobuf` or `http/json`. gRPC isn't supported.
+| `OTEL_SERVICE_NAME` | `cn1.otel.service.name` | Overrides the annotation's `serviceName`.
+| `OTEL_RESOURCE_ATTRIBUTES` | `cn1.otel.resource.attributes` | Extra resource attributes, `key=value` pairs.
+| `OTEL_TRACES_SAMPLER` | `cn1.otel.sampler` | `parentbased_always_on` by default; also `always_on`, `always_off`, `traceidratio` and the other `parentbased_` forms.
+| `OTEL_TRACES_SAMPLER_ARG` | `cn1.otel.sampler.arg` | The ratio for the ratio samplers.
+| `OTEL_SDK_DISABLED` | `cn1.otel.disabled` | `true` turns tracing off at start-up without a rebuild.
+|===
+
+`cn1.otel.attributes.exclude` names attributes never to record, for example
+`db.query.text` in a code base that builds SQL by concatenating values.
+
+Sending spans to Dynatrace, which accepts OTLP over HTTP as protobuf, is a
+matter of pointing the endpoint at the environment's OTLP API and passing an
+ingest token:
+
+----
+OTEL_EXPORTER_OTLP_TRACES_ENDPOINT=https://abc12345.live.dynatrace.com/api/v2/otlp/v1/traces
+OTEL_EXPORTER_OTLP_HEADERS=Authorization=Api-Token%20dt0c01.XXXX
+----
+
+A server started without the builder -- one that calls `HttpServer.start` or runs
+the Lambda loop itself -- installs the tracer in one line:
+
+[source,java]
+----
+include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/TracingSnippets.java[tag=backend-otel-install,indent=0]
+----
+
+Under Lambda, the invocation continues the trace the host passes in its X-Ray
+header, and the loop waits for the export before it polls again, because the host
+freezes the process between invocations.
+
+`Tracing.current()` returns the request's span, for adding an attribute of the
+application's own, and `Tracing.inSpan` times a block of work as a child span.
+
+==== Relaying the app's spans
+
+A mobile app shouldn't carry the collector's credentials: anything inside an app
+package can be read by whoever installs it. With `cn1.otel.relay=true` the backend
+accepts the app's spans at `/otel/v1/traces`, adds its own credentials and
+forwards them to the same collector:
+
+----
+cn1.otel.relay=true
+# Optional: a shared secret the app sends in X-CN1-Telemetry-Token.
+cn1.otel.relay.token=${RELAY_TOKEN}
+# Only for a web app served from another origin.
+cn1.otel.relay.corsOrigin=https://app.example.com
+----
+
+The relay takes OTLP/JSON, rebuilds it against the OTLP schema -- a field the
+schema doesn't name is dropped and a malformed id is refused -- and queues it for
+export in whatever protocol the server exports with. It answers as soon as the
+spans are queued, and answers 503 when the queue is full so the app backs off.
+`cn1.otel.relay.maxBytes` and `cn1.otel.relay.maxSpans` bound a single export.
+
 === What it costs
 
 Same handler, three ways, plus Go for an outside reference. Two pinned cores, 64

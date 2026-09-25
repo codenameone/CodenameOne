@@ -23,6 +23,9 @@ name: Native theme fidelity
       - '.github/workflows/scripts-fidelity.yml'
       - 'scripts/build-fidelity-app.sh'
       - 'scripts/run-ios-fidelity-tests.sh'
+      # The iOS legs boot their simulator through this helper and read its
+      # `udid` output, so a change to it alone must exercise them.
+      - 'scripts/ci/boot-ios-simulator.sh'
       - 'scripts/run-android-fidelity-tests.sh'
       - 'scripts/lib/cn1ss.sh'
       - 'scripts/common/java/**'
@@ -63,6 +66,9 @@ name: Native theme fidelity
       - 'scripts/build-fidelity-app.sh'
       - 'scripts/run-android-fidelity-tests.sh'
       - 'scripts/run-ios-fidelity-tests.sh'
+      # The iOS legs boot their simulator through this helper and read its
+      # `udid` output, so a change to it alone must exercise them.
+      - 'scripts/ci/boot-ios-simulator.sh'
       - 'scripts/lib/cn1ss.sh'
       - 'scripts/common/java/**'
       - 'scripts/fidelity-app/**'
@@ -322,30 +328,11 @@ jobs:
   # scripts/check-duplicated-ci-legs.py holds it to that.
   fidelity-ios-metal-27:
     name: Fidelity (iOS Modern 27, Metal)
-    # NON-GATING FOR NOW, and this is the single thing that lifts it: the
-    # ios-27-metal baseline cannot be recorded yet, so there is no ratchet for
-    # this row to enforce and it would sit red on every pull request.
-    #
-    # Why it cannot be recorded, measured rather than assumed. In dark,
-    # GlassPanelGrey and GlassPanelRed render with NO silhouette: over a flat
-    # mid-grey backdrop the material arithmetic gives 128.18, the renderer emits
-    # integers, and the panel lands on 128 -- the backdrop exactly. The native
-    # capture is not flat there, averaging 128.7 over 101 distinct values where
-    # ours has 17. ProcessScreenshots therefore reports cn1_empty for those two,
-    # and FidelityGate refuses a one-sided empty because that is also what a
-    # widget missing from our render looks like -- a distinction that has already
-    # caught a real defect and must not be softened to get this row green.
-    #
-    # Closing it needs the material model to carry sub-level detail, not a
-    # different constant: an offset that puts the arithmetic at 128.68 was tried
-    # and changed nothing on device, and the only other reachable value
-    # overshoots. See GlassRecipe.liquidPanel27.
-    #
-    # The tolerance is on the fidelity STEP, not here. At job level it would turn
-    # EVERY failure into a green tick -- Xcode selection, dependency setup,
-    # compilation, simulator boot, capture -- so the row would report success
-    # while producing none of the scores this comment promises, which is worse
-    # than no row at all.
+    # A real gate, like the iOS 26 row: the committed ios-27-metal baseline is
+    # its ratchet. It was the last row to get one because iOS 27's dark glass
+    # panel over a flat backdrop drew no silhouette of its own -- what makes the
+    # native one visible is a thin dark outline iOS 27 adds around the sides of
+    # its glass, which the optics now reproduce (GlassRecipe.getOutline).
     permissions:
       contents: read
       pull-requests: write
@@ -449,9 +436,6 @@ jobs:
         # header records the runs and why the one retry it does is allowed.
         run: ./scripts/ci/boot-ios-simulator.sh 'iOS-27[0-9-]*' 'iPhone 16' iPhone16-fidelity27
       - name: Run fidelity suite (simulator, Metal)
-        # Only THIS step tolerates failure, and only until the baseline lands --
-        # see the job header. Everything before it still fails the job.
-        continue-on-error: true
         # The committed baseline is the ratchet floor: the gate fails the job
         # on any regression. To re-anchor intentionally, run locally with
         # FIDELITY_UPDATE_BASELINE=1 and commit the updated baseline JSON.

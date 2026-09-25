@@ -8813,12 +8813,20 @@ public class HTML5Implementation extends CodenameOneImplementation {
     @Override
     public boolean glassRegion(Object graphics, int x, int y, int width, int height, float radius,
             float cornerRadius, float sat, float scale, float offset, float refract, float specular) {
+        return glassRegion(graphics, x, y, width, height, radius, cornerRadius, sat, scale, offset,
+                refract, specular, 0f, 0f, 0f);
+    }
+
+    @Override
+    public boolean glassRegion(Object graphics, int x, int y, int width, int height, float radius,
+            float cornerRadius, float sat, float scale, float offset, float refract, float specular,
+            float curve, float curveMid, float outline) {
         // Preserve the complete named GlassRecipe. The host bridge applies the
         // same affine colour material and rounded-shape optics as iOS around
         // the browser's native Gaussian blur. Dropping these parameters made
         // the tab-bar pill far more transparent than native.
         g(graphics).glassRegion(x, y, width, height, radius, cornerRadius,
-                sat, scale, offset, refract, specular);
+                sat, scale, offset, refract, specular, curve, curveMid, outline);
         return true;
     }
 

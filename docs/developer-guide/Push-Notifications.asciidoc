@@ -101,6 +101,136 @@ The complete request, response, authentication, error, target, and message schem
 
 Use the Console for operator-driven messages, stored audiences, campaigns, analytics, and automations.
 
+=== Learn which sends failed
+
+A notification is acknowledged when it's admitted, not when it arrives. Both
+wire APIs
+answer before any provider has been asked -- the classic endpoint replies
+`queued` -- so the verdict lands seconds later, after your request has already
+returned. Nothing in the response can tell you that a device key is dead, and
+a dead key stays in your database being sent to.
+
+Delivery feedback closes that. Configure an HTTPS endpoint and BuildCloud posts
+a signed digest of the outcomes since the last one, once a day. It's available
+on Pro and above, and it's configured per organization rather than per
+application: callers on the classic API register an application per send, so
+there is nothing stable there to attach a setting to.
+
+Open *Push > Settings > Delivery feedback*, enter the endpoint, enable the daily
+digest, and select *Send test event*. The test posts one synthetic event through
+the same signing and sending path as a real digest and reports what your
+endpoint answered, so a broken receiver is visible immediately rather than a day
+later. The signing secret is on the same card.
+
+==== What arrives
+
+Failures are itemized and successes are counted. A busy application produces
+thousands of accepted deliveries a day and nothing can be done about any of
+them, so listing them would bury the handful of events that matter.
+
+[source,json]
+----
+include::../demos/common/src/main/snippets/developer-guide/push-notifications.json[tag=push-notifications-json-006,indent=0]
+----
+
+`reason` is the provider-independent verdict, and it decides what you do:
+
+[cols="1,3"]
+|===
+|`INVALID_TARGET` |The provider rejected the key. Delete it from your database; it will never work again.
+|`PERMANENT_FAILURE` |The provider refused the message or the credential. Fix the send, keep the key.
+|`TRANSIENT_FAILURE` |Retried until the attempt budget ran out. `status` is `DEAD`. The key may still be good.
+|===
+
+Store the canonical provider and bare `token` (or web-push `endpoint`) in
+separate columns alongside the original key returned by `Push.getPushKey()`.
+The full key has a `cn1-<provider>-` prefix, so comparing it directly with the
+digest's bare token matches no row. Normalize `gcm` to `fcm` and `ios` to
+`apns` during registration and backfill existing rows before enabling cleanup.
+For web push, store the subscription endpoint in its own column.
+Match feedback on the provider and this normalized target, scoped to the
+organization. Keep the full original key for sending.
+
+==== Semantics to build against
+
+* *A digest is at-least-once.* Deduplicate on `deliveryId` when present. For classic events without it, use a key built from the provider, token or endpoint, and event timestamp `at`. A refused digest is resent, and a network failure can deliver one whose response never arrived.
+* *Only 2xx acknowledges the window.* It advances the watermark and that window is never sent again, so answer 2xx after your writes are durable, not before. Anything else, including a timeout, keeps the window for the next attempt.
+* *`truncated` means more is waiting.* A digest is capped, and the next page follows in the same run rather than a day later. Expect several digests in quick succession after a bad day.
+* *A failing endpoint is retried, then disabled.* Failures are retried on a shorter cadence than the daily digest; after several consecutive failures the endpoint is disabled and the reason appears on the Settings card. Re-enabling it clears the count.
+* *`eventsOmitted` counts accepted deliveries*, which appear only in `summary`.
+* *One digest can span applications.* The endpoint belongs to the organization, so a receiver that keeps a device store per application correlates on `deliveryId` -- the id the v3 send returned -- or on the device key itself, which providers issue per application. A classic send returns no delivery id, so for those the key is the correlation.
+
+==== Verify the signature
+
+Every request carries `X-CN1-Signature: t=<unix-millis>,v1=<hex>`, where the hex
+is HMAC-SHA256 over `<t>.<raw body>` keyed with your signing secret. The
+timestamp is inside the signed material, so a captured digest can be rejected
+by age as well as shown to come from BuildCloud.
+
+Three things are easy to get wrong, and each one fails without a symptom or
+fails open:
+
+. *Sign the bytes you received.* Any middleware that parses JSON and re-serializes it produces a different byte string that never verifies.
+. *Compare in constant time.* A comparison that returns on the first differing byte leaks enough timing to recover a valid signature.
+. *Reject old timestamps.* Without an age bound the signature alone permits replay forever.
+
+==== A Codename One backend receiver
+
+The <<Server-side backend>> takes the raw request when a handler needs the
+exact body, which is what signature verification requires:
+
+[source,java]
+----
+include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/PushFeedback.java[tag=push-feedback-backend,indent=0]
+----
+
+==== A long-running Node server
+
+The same three rules, with the raw-body trap in the form it usually takes:
+
+[source,javascript]
+----
+include::../demos/javascript/src/main/snippets/developer-guide/push-notifications.js[tag=push-notifications-javascript-003,indent=0]
+----
+
+==== A serverless function
+
+A function behind an HTTP gateway differs in two ways that are silent when they
+are wrong: the gateway may hand you the body base64-encoded, and there is no
+process to keep deduplication state in.
+
+[source,javascript]
+----
+include::../demos/javascript/src/main/snippets/developer-guide/push-notifications.js[tag=push-notifications-javascript-004,indent=0]
+----
+
+==== A Spring server
+
+`byte[]` rather than a mapped type, for the reason above: what Jackson parses
+and re-serializes is a different byte string.
+
+[source,java]
+----
+include::../demos/serverframeworks/src/main/java/com/codenameone/developerguide/serverframeworks/PushFeedbackSpring.java[tag=push-notifications-java-spring,indent=0]
+----
+
+==== A MicroProfile or Jakarta REST server
+
+The same shape with `@HeaderParam` and a `byte[]` entity, taking the secret from
+MicroProfile Config:
+
+[source,java]
+----
+include::../demos/serverframeworks/src/main/java/com/codenameone/developerguide/serverframeworks/PushFeedbackMicroProfile.java[tag=push-notifications-java-microprofile,indent=0]
+----
+
+==== Any other stack
+
+The contract is a signed JSON POST, so a receiver in Go, Python, PHP, Ruby or a
+JVM framework is the same three steps: HMAC-SHA256 over `<t>.<raw body>`,
+constant-time compare against `v1`, reject a `t` outside your age window. Then
+apply each event no more than once, and answer 2xx after it's stored.
+
 === Build audiences in the Console
 
 Managed audiences are application-scoped. They don't contain copied device tokens. A saved segment stores a dynamic filter, and BuildCloud resolves that filter against active subscriptions when a campaign launches.

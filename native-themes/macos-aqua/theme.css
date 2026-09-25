@@ -293,6 +293,19 @@ TextField.disabled {
 }
 
 TextArea { cn1-derive: TextField; }
+/* The placeholder a TextField shows while empty. Without it the framework default applies
+   -- light grey italics with no padding -- so the hint sat hard against the field's
+   left edge in a face no desktop uses. The padding and size match TextField, so the
+   placeholder sits exactly where typed text will. The colour is
+   placeholderTextColor, which NSTextField draws upright. */
+TextHint {
+    color: var(--text-secondary-color, #7f7f7f);
+    background-color: transparent;
+    padding: 0.9mm 2.1mm 0.9mm 2.1mm;
+    margin: 0;
+    font-family: "native:MainRegular";
+    font-size: 3.4mm;
+}
 
 /* --- Check, radio, switch -------------------------------------------------------------- */
 
@@ -694,6 +707,7 @@ ChatVoiceButton { cn1-derive: Button; padding: 1.5mm; margin: 0.5mm; }
     FlatButton.pressed { color: #007aff; background-color: #4a4a4a; }
 
     TextField { color: #ffffff; background-color: #1e1e1e; border: 0.26mm solid #48484a; border-radius: 1.06mm; }
+    TextHint { color: var(--text-secondary-color-dark, #98989d); background-color: transparent; }
     TextField.selected { color: #ffffff; background-color: #1e1e1e; border: 0.53mm solid #007aff; border-radius: 1.06mm; }
     TextField.disabled { color: #6e6e6e; background-color: #2a2a2a; border: 0.26mm solid #3c3c3c; border-radius: 1.06mm; }
 

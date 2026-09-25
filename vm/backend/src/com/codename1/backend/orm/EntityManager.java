@@ -193,6 +193,8 @@ public final class EntityManager {
         if(entity == null) {
             throw new IllegalArgumentException("No entity class");
         }
+        if (com.codename1.impl.orm.Models.requiresSession(entity))
+            throw new IllegalStateException("This entity mapping requires openSession() managed persistence");
         Dao<T> dao = (Dao<T>)daos.get(entity.getName());
         if(dao == null) {
             throw new IllegalStateException("No dao was generated for " + entity.getName()
@@ -207,6 +209,18 @@ public final class EntityManager {
     }
 
     /**
+     * Opens an independent managed persistence context. The caller must close it.
+     * Begin and complete each transaction on the same thread; other users of its
+     * connection wait until commit, rollback, or session close. Closing never commits.
+     * @return a new persistence context with independent managed entity state
+     * @throws IllegalStateException if called on a transaction-scoped manager
+     */
+    public com.codename1.orm.session.Session openSession() {
+        if (transactionScoped) throw new IllegalStateException("Open a session on the outer manager; the session owns its transaction");
+        return new com.codename1.impl.orm.SessionImpl(new com.codename1.impl.orm.BackendSqlAccess(pool, pinned, dialect));
+    }
+
+    /**
      * Creates the table of every registered entity that has none.
      *
      * <p>For development and for tests. Production schemas are migrations, and
@@ -214,8 +228,21 @@ public final class EntityManager {
      */
     public void createTables() throws IOException {
         EntityDefinition[] all = registered();
-        for(int iter = 0 ; iter < all.length ; iter++) {
-            dao(all[iter].type()).createTable();
+        Map<String, com.codename1.impl.orm.EntityModel<?>> models = com.codename1.impl.orm.Models.snapshot();
+        boolean managedSchema = false;
+        for (com.codename1.impl.orm.EntityModel model : models.values()) {
+            if (model.requiresSession()) { managedSchema = true; break; }
+        }
+        if (managedSchema) {
+            com.codename1.orm.session.Session session = openSession();
+            try { session.createTables(); } finally { session.close(); }
+        }
+        for (EntityDefinition definition : all) {
+            // Hand-written legacy definitions have no generated model. They still
+            // need their tables when an application also uses managed entities.
+            if (!managedSchema || !models.containsKey(definition.type().getName())) {
+                dao(definition.type()).createTable();
+            }
         }
     }
 
@@ -424,7 +451,8 @@ public final class EntityManager {
             claimedNames.add(claimed);
             claimedBy.add(definition.type().getName());
             try {
-                out.put(definition.type().getName(), new Table(definition, dialect));
+                if(!com.codename1.impl.orm.Models.requiresSession(definition.type()))
+                    out.put(definition.type().getName(), new Table(definition, dialect));
             } catch (IllegalStateException err) {
                 // An entity with no @Id, which the generator refuses at build
                 // time -- so this is a hand-written definition. Collected rather

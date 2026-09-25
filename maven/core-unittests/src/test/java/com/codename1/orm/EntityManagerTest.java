@@ -130,6 +130,43 @@ class EntityManagerTest extends UITestBase {
     }
 
     @Test
+    void generatedFactoriesIsolateManagersAndReuseWithinOneManager() throws Exception {
+        com.codename1.impl.orm.DaoRegistry.registerFactory(SampleEntity.class, new com.codename1.impl.orm.DaoFactory<SampleEntity>() {
+            public Dao<SampleEntity> create() { return new RecordingDao(); }
+        });
+        RecordingDatabase firstDb=new RecordingDatabase(),secondDb=new RecordingDatabase();
+        EntityManager first=EntityManager.open(firstDb),second=EntityManager.open(secondDb);
+        RecordingDao a=(RecordingDao)first.dao(SampleEntity.class),b=(RecordingDao)second.dao(SampleEntity.class);
+        assertNotSame(a,b);assertSame(firstDb,a.attached);assertSame(secondDb,b.attached);
+        assertSame(a,first.dao(SampleEntity.class));assertSame(firstDb,a.attached);
+        first.close();second.close();
+        assertThrows(IllegalStateException.class,()->first.dao(SampleEntity.class));
+    }
+
+    @Test
+    void registeredDaoReattachesWhenManagersAlternate() throws Exception {
+        RecordingDao dao = new RecordingDao();
+        EntityManager.registerDao(dao);
+        RecordingDatabase firstDb = new RecordingDatabase();
+        RecordingDatabase secondDb = new RecordingDatabase();
+        EntityManager first = EntityManager.open(firstDb);
+        EntityManager second = EntityManager.open(secondDb);
+        try {
+            assertSame(dao, first.dao(SampleEntity.class));
+            assertSame(firstDb, dao.attached);
+            assertSame(dao, second.dao(SampleEntity.class));
+            assertSame(secondDb, dao.attached);
+            assertSame(dao, first.dao(SampleEntity.class));
+            assertSame(firstDb, dao.attached);
+            assertSame(dao, second.dao(SampleEntity.class));
+            assertSame(secondDb, dao.attached);
+        } finally {
+            first.close();
+            second.close();
+        }
+    }
+
+    @Test
     void openNullDatabaseThrows() {
         assertThrows(IllegalArgumentException.class, new org.junit.jupiter.api.function.Executable() {
             public void execute() {

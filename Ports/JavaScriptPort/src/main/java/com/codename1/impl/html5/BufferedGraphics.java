@@ -996,7 +996,8 @@ public class BufferedGraphics extends HTML5Graphics {
 
     @Override
     public void glassRegion(int x, int y, int width, int height, float radius, float cornerRadius,
-            float saturation, float scale, float offset, float refraction, float specular) {
+            float saturation, float scale, float offset, float refraction, float specular,
+            float curve, float curveMid, float outline) {
         // Glass samples what is behind it and draws the result. Promoted text is not behind it,
         // so the material would be made from a backdrop the text is missing from, while the text
         // itself floated over the finished glass.
@@ -1004,7 +1005,7 @@ public class BufferedGraphics extends HTML5Graphics {
                 ? roundRectCoverTest(x, y, width, height, (int) (cornerRadius * 2), (int) (cornerRadius * 2))
                 : null);
         addOp(new com.codename1.impl.html5.graphics.GlassRegion(x, y, width, height,
-                radius, cornerRadius, saturation, scale, offset, refraction, specular));
+                radius, cornerRadius, saturation, scale, offset, refraction, specular, curve, curveMid, outline));
     }
 
     @Override

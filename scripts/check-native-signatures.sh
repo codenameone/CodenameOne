@@ -59,8 +59,11 @@ if [[ -d "$REPO_ROOT/vm/backend/impl/parparvm" ]] && command -v javac >/dev/null
   backend_build="vm/backend/target/parparvm-signature-classes"
   rm -rf "${REPO_ROOT:?}/$backend_build"
   mkdir -p "$REPO_ROOT/$backend_build"
-  if find "$REPO_ROOT/vm/backend/src" "$REPO_ROOT/vm/backend/impl/parparvm" -name '*.java' \
-       -print0 | xargs -0 javac -nowarn -d "$REPO_ROOT/$backend_build" >/dev/null 2>&1; then
+  # Plus the core classes the backend shares (@SharedWithBackend), which live in
+  # CodenameOne/src rather than under vm/backend.
+  if { find "$REPO_ROOT/vm/backend/src" "$REPO_ROOT/vm/backend/impl/parparvm" -name '*.java' -print \
+       && "$REPO_ROOT/vm/backend/shared-sources.sh"; } \
+       | tr '\n' '\0' | xargs -0 javac -nowarn -d "$REPO_ROOT/$backend_build" >/dev/null 2>&1; then
     BACKEND_CLASSES="$backend_build"
   else
     echo "check-native-signatures: could not compile the backend's ParparVM sources" >&2
