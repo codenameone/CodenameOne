@@ -22,6 +22,7 @@
  */
 package com.codename1.orm.session;
 /// Explicit row-lock modes. SQLite does not support these row locks.
+@com.codename1.impl.SharedWithBackend
 public enum LockMode {
     /// Performs ordinary reads without requesting a row lock.
     NONE,

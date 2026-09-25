@@ -1829,6 +1829,10 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
     static final int KIND_TIMESTAMP = 6;
 
     private static final String ORM = "com.codename1.backend.orm.";
+    /// The column-to-field conversions. They are the core's, compiled into the
+    /// backend as a shared class (`@SharedWithBackend`), so the client and the
+    /// server daos convert through one implementation.
+    private static final String SHARED_VALUES = "com.codename1.impl.orm.Values.";
 
     /// The portable column kind for a field's Java type.
     ///
@@ -2210,7 +2214,7 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
     /// really holds 0. The tables this ORM creates declare such a column NOT
     /// NULL, so this is what answers for the ones it did not create.
     private static String required(PersistedField f) {
-        return ORM + "Values.required(value, \"" + f.fieldName + "\")";
+        return SHARED_VALUES + "required(value, \"" + f.fieldName + "\")";
     }
 
     /// A column value into a field, through the tolerant conversions in
@@ -2222,7 +2226,7 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
             sb.append("e.").append(f.fieldName).append(" = new ").append(f.converter).append("().fromDatabase(").append(conversion).append(");");return;
         }
         String field = "e." + (f.relation==null?f.fieldName:f.relation.field);
-        String values = ORM + "Values.";
+        String values = SHARED_VALUES;
         if (f.relation != null) return;
         switch (f.kind.kind) {
             case ENUM:

@@ -25,6 +25,7 @@ import java.lang.annotation.*;
 /// Orders a loaded entity collection by target attributes.
 @Retention(RetentionPolicy.CLASS)
 @Target(ElementType.FIELD)
+@com.codename1.impl.SharedWithBackend
 public @interface OrderBy {
     /// Orders loaded related entities by Java scalar attribute names.
     /// Use comma-separated names, optionally followed by ASC or DESC.

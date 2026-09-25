@@ -25,6 +25,7 @@ import java.lang.annotation.*;
 /// Mapping for an owned collection of scalar values.
 @Retention(RetentionPolicy.CLASS)
 @Target(ElementType.FIELD)
+@com.codename1.impl.SharedWithBackend
 public @interface ElementCollection {
     /// Controls relationship initialization.
     /// @return fetch policy; EAGER for to-one and LAZY for collections by default

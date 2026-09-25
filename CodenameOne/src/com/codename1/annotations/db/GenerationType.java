@@ -23,6 +23,7 @@
 package com.codename1.annotations.db;
 
 /// Identifier generation strategies for a single identifier field.
+@com.codename1.impl.SharedWithBackend
 public enum GenerationType {
     /// Uses a database-generated integral identity.
     IDENTITY,

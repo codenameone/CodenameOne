@@ -26,6 +26,7 @@ import java.lang.annotation.*;
 /// Maps a collection of related entities using a join table or an inverse mappedBy field.
 @Retention(RetentionPolicy.CLASS)
 @Target(ElementType.FIELD)
+@com.codename1.impl.SharedWithBackend
 public @interface OneToMany {
     /// Controls relationship initialization.
     /// @return fetch policy; EAGER for to-one and LAZY for collections by default

@@ -34,6 +34,7 @@ import java.lang.annotation.Target;
 /// `java.util.Date -> INTEGER`).
 @Retention(RetentionPolicy.CLASS)
 @Target(ElementType.FIELD)
+@com.codename1.impl.SharedWithBackend
 public @interface Column {
     /// Column name. Defaults to the field name when blank.
     String name() default "";
@@ -47,5 +48,12 @@ public @interface Column {
     /// Optional explicit SQL type. Use the SQLite type names (`TEXT`,
     /// `INTEGER`, `REAL`, `BLOB`, `NUMERIC`). When blank the processor infers
     /// the type from the field's Java type.
+    ///
+    /// On the backend the value is written through to the `CREATE TABLE`
+    /// unchanged, so it is engine specific by construction: a type only
+    /// PostgreSQL understands makes the entity PostgreSQL-only. Leaving it blank
+    /// keeps the entity portable, because the dialect then names the type each
+    /// engine spells differently (`TEXT`/`VARCHAR`, `REAL`/`DOUBLE PRECISION`,
+    /// `BLOB`/`BYTEA`).
     String type() default "";
 }

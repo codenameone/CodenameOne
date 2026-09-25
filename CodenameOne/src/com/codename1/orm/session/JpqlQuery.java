@@ -35,6 +35,7 @@ import java.util.List;
 /// Fetch joins initialize relationships separately. Keep the owning session open;
 /// queries are not thread-safe. Applications should not implement this interface.
 /// @param <T> result type
+@com.codename1.impl.SharedWithBackend
 public interface JpqlQuery<T> {
     /// Binds a named parameter used by this statement.
     /// @param name parameter name without the colon
