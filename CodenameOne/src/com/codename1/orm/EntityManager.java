@@ -104,7 +104,7 @@ public final class EntityManager {
             throw new IllegalArgumentException("entityClass is null");
         }
         if (com.codename1.impl.orm.Models.requiresSession(entityClass)) {
-            throw new IllegalStateException("Relationships and @Version require openSession() managed persistence");
+            throw new IllegalStateException("This entity mapping requires openSession() managed persistence");
         }
         if (closed) {
             throw new IllegalStateException("Entity manager is closed");

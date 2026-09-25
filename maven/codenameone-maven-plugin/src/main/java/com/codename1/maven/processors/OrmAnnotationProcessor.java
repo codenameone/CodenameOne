@@ -1292,9 +1292,9 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
             sb.append("; return;\n");
         }
         sb.append("default: throw new IllegalArgumentException(); }}\n");
+        if(OrmEnhancer.needsState(ec)) sb.append("  public boolean requiresSession() { return true; }\n");
         if(!ec.embedded.isEmpty()) {
-            sb.append("  public boolean requiresSession() { return true; }\n")
-              .append("  public void read(").append(ec.binaryName).append(" e,Object[] values) {\n");
+            sb.append("  public void read(").append(ec.binaryName).append(" e,Object[] values) {\n");
             for(Map.Entry<String,String> embedded:ec.embedded.entrySet()) {
                 String path=embedded.getKey();int lastDot=path.lastIndexOf('.');
                 if(lastDot>=0) sb.append("if(!(").append(embeddedNullCondition(path.substring(0,lastDot))).append(")) {\n");
@@ -1358,7 +1358,6 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
             if(field.kind.kind==PropertyTypeKind.Kind.ENUM) enumParameters=true;
         }
         if(converters || enumParameters) {
-            if(converters && ec.embedded.isEmpty()) sb.append("public boolean requiresSession() { return true; }\n");
             sb.append("public Object parameter(int index,Object value) { switch(index) {\n");
             for(int i=0;i<ec.fields.size();i++) {
                 PersistedField field=ec.fields.get(i);

@@ -147,6 +147,17 @@ class ManagedSessionTest {
         }
     }
 
+    @Test void mysqlRejectsDefaultBinaryIdentitySchemaBeforeSql() throws Exception {
+        for(com.codename1.backend.sql.Dialect dialect:new com.codename1.backend.sql.Dialect[]{com.codename1.backend.sql.Dialect.MYSQL,com.codename1.backend.sql.Dialect.MARIADB,com.codename1.backend.sql.Dialect.SQLITE,com.codename1.backend.sql.Dialect.POSTGRES}) for(boolean explicit:new boolean[]{false,true}) {
+            java.util.List<String> statements=new java.util.ArrayList<String>();com.codename1.impl.orm.BackendSqlAccess adapter=new com.codename1.impl.orm.BackendSqlAccess(null,null,dialect);
+            com.codename1.impl.orm.SqlAccess access=(com.codename1.impl.orm.SqlAccess)java.lang.reflect.Proxy.newProxyInstance(getClass().getClassLoader(),new Class[]{com.codename1.impl.orm.SqlAccess.class},(proxy,method,args)-> {
+                if(method.getName().equals("describe")) { statements.add("describe");return java.util.Collections.emptyList(); }if(method.getName().equals("execute")) { statements.add((String)args[0]);return 0; }return method.invoke(adapter,args);
+            });
+            Model model=new Model(){public Attribute[] attributes(){Attribute[] attrs=super.attributes().clone();attrs[0]=new Attribute("id","id",Attribute.BLOB,true,false,false,false,explicit?"BINARY(16)":null);return attrs;}};java.util.Map<String,EntityModel<?>> models=new java.util.LinkedHashMap<String,EntityModel<?>>();models.put(Record.class.getName(),model);Session session=new com.codename1.impl.orm.SessionImpl(access,models);
+            try { if("mysql".equals(dialect.getName()) && !explicit) { PersistenceException failure=assertThrows(PersistenceException.class,session::createTables);assertTrue(failure.getMessage().contains("binary"));assertTrue(statements.isEmpty()); }else { session.createTables();assertFalse(statements.isEmpty()); } }finally{session.close();}
+        }
+    }
+
     @Test void averagesRenderFloatingResultsForEveryDialect() throws Exception {
         for(com.codename1.backend.sql.Dialect dialect:new com.codename1.backend.sql.Dialect[]{com.codename1.backend.sql.Dialect.SQLITE,com.codename1.backend.sql.Dialect.POSTGRES,com.codename1.backend.sql.Dialect.MYSQL,com.codename1.backend.sql.Dialect.MARIADB}) {
             com.codename1.impl.orm.BackendSqlAccess adapter=new com.codename1.impl.orm.BackendSqlAccess(null,null,dialect);

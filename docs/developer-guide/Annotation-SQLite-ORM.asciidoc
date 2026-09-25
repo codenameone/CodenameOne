@@ -216,7 +216,9 @@ lists. Larger lists are rejected before query execution.
 Generated key columns also have a combined limit of 3,072 bytes per key, counting
 up to four bytes per text character. This applies to primary keys, indexes, and
 collection keys, and is checked before schema creation. Explicit column type
-declarations remain the application's schema contract.
+declarations remain the application's schema contract. MySQL and MariaDB reject
+default binary primary keys before schema creation; these keys need an explicit
+bounded column type declaration.
 
 JPQL arithmetic requires numeric operands. Parameters in integral expressions
 must be integer values; use a real operand such as `1.0` for fractional arithmetic.
@@ -241,7 +243,8 @@ storage; native `BOOL` and `BOOLEAN` column declarations are rejected.
 
 Public no-argument void methods can receive `@PrePersist`, `@PostPersist`,
 `@PreUpdate`, `@PostUpdate`, `@PreRemove`, `@PostRemove`, and `@PostLoad` callbacks.
-Relationships added by `@PrePersist` or `@PreUpdate` follow `PERSIST` cascades in the current
+Entities with lifecycle callbacks require `openSession()`, even without relationships or version fields.
+Relationships added by `@PrePersist`, `@PostPersist`, or `@PreUpdate` follow `PERSIST` cascades in the current
 flush, including newly created collections.
 Flush rechecks entries changed by later callbacks, including newly inserted rows,
 until the managed state matches the database. If callbacks keep changing state

@@ -444,6 +444,9 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
         }
     }
     private <T> void persistInternal(T entity, IdentityHashMap<Object, Boolean> visited) {
+        persistInternal(entity, visited, true);
+    }
+    private <T> void persistInternal(T entity, IdentityHashMap<Object, Boolean> visited, boolean cascade) {
         requireTransaction();
         if (entity == null) {
             throw new IllegalArgumentException("entity is null");
@@ -454,7 +457,9 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
         if (entries.containsKey(entity)) {
             Entry entry = entries.get(entity);
             entry.removed = false;
-            cascadePersist(entry, visited);
+            if (cascade) {
+                cascadePersist(entry, visited);
+            }
             return;
         }
         EntityState previous = state(entity);
@@ -492,7 +497,9 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
         }
         entries.put(entity, e);
         attachState(e, true, null);
-        cascadePersist(e, visited);
+        if (cascade) {
+            cascadePersist(e, visited);
+        }
     }
     @Override
     public <T> T merge(T entity) {
@@ -534,7 +541,9 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
             }
             managed = model.create();
             copy(model, entity, managed);
-            persist(managed);
+            // Register the copy without traversing constructor-created relations.
+            // Flush cascades only after the entire source graph has been copied.
+            persistInternal(managed, new IdentityHashMap<Object, Boolean>(), false);
         } else {
             int version = model.versionIndex();
             if (version >= 0 && !same(model.get(entity, version), model.get(managed, version))) {
@@ -1033,6 +1042,15 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
     }
     private void validateKeyWidths() {
         for (EntityModel model : models.values()) {
+            if ("mysql".equals(sql.dialect())) {
+                for (int index : model.idIndexes()) {
+                    Attribute attribute = model.attributes()[index];
+                    if (attribute.kind == Attribute.BLOB && attribute.declaredType == null) {
+                        throw new PersistenceException("MySQL/MariaDB binary primary keys require an explicit " +
+                                "bounded column declaration: " + model.table() + "." + attribute.column);
+                    }
+                }
+            }
             int primary = keyWidth(model, model.idIndexes());
             checkKeyWidth(model.table(), primary);
             for (Index index : model.indexes()) {
@@ -1401,7 +1419,7 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
                     }
                     unloaded.add(entity);
                     Object key = relation.column >= 0 ? state.keys[i] : owner.identifier(entity);
-                    if (key != null && !keys.contains(key)) {
+                    if (key != null && !containsKey(keys, key)) {
                         keys.add(key);
                     }
                 }
@@ -1885,7 +1903,7 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
                 String[] targetColumns = joinColumns(relation.inverseJoinColumn, target);
                 Object[] ownerKey = entry.model.keyValues(owner);
                 if (relation.orderColumn.length() > 0) {
-                    if (!keys.equals(old)) {
+                    if (!sameKeys(keys, old, true)) {
                         if (removals) {
                             write("DELETE FROM " + q(relation.joinTable) + " WHERE " + matches(ownerColumns, null),
                                     ownerKey);
@@ -1902,14 +1920,14 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
                     }
                 } else {
                     for (Object id : old) {
-                        if (removals && !keys.contains(id)) {
+                        if (removals && !containsKey(keys, id)) {
                             write("DELETE FROM " + q(relation.joinTable) + " WHERE " + matches(ownerColumns, null) +
                                             " AND " + matches(targetColumns, null),
                                     concat(ownerKey, target.keyValues(id)));
                         }
                     }
                     for (Object id : keys) {
-                        if (!removals && !old.contains(id)) {
+                        if (!removals && !containsKey(old, id)) {
                             Object[] args = concat(ownerKey, target.keyValues(id));
                             write("INSERT INTO " + q(relation.joinTable) + " (" + quoted(ownerColumns) + ", " +
                                             quoted(targetColumns) + ") VALUES (" + placeholders(args.length) + ")",
@@ -1923,7 +1941,7 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
             }
             if (relation.orphanRemoval) {
                 for (Object id : old) {
-                    if (!keys.contains(id)) {
+                    if (!containsKey(keys, id)) {
                         Object orphan = find(relation.target, id);
                         if (orphan != null) {
                             remove(orphan);
@@ -2175,6 +2193,7 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
             }
         }
         model.lifecycle(entry.entity, 1);
+        cascadePersist(entry);
     }
     private void completeInsert(Entry entry) {
         checkManagedIdentity(entry);
@@ -2297,10 +2316,8 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
             if (checkCollections && state != null && state.loaded[i] && relations[i].many) {
                 List current = relationKeys(relations[i], model.relation(entry.entity, i));
                 List previous = entry.collections[i];
-                if (previous == null ||
-                        ((relations[i].element || relations[i].orderColumn.length() > 0)
-                                        ? !current.equals(previous)
-                                        : current.size() != previous.size() || !current.containsAll(previous))) {
+                if (previous == null || !sameKeys(current, previous,
+                        relations[i].element || relations[i].orderColumn.length() > 0)) {
                     dirty = true;
                 }
             }
@@ -2603,6 +2620,25 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
     @SuppressWarnings("PMD.CompareObjectsWithEquals")
     static boolean sameInstance(Object left, Object right) {
         return left == right;
+    }
+    private static boolean containsKey(List keys, Object key) {
+        for (Object candidate : keys) {
+            if (same(candidate, key)) {
+                return true;
+            }
+        }
+        return false;
+    }
+    private static boolean sameKeys(List left, List right, boolean ordered) {
+        if (left.size() != right.size()) {
+            return false;
+        }
+        for (int i = 0; i < left.size(); i++) {
+            if (ordered ? !same(left.get(i), right.get(i)) : !containsKey(right, left.get(i))) {
+                return false;
+            }
+        }
+        return true;
     }
     private static boolean same(Object a, Object b) {
         if (a instanceof byte[] && b instanceof byte[]) {

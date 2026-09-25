@@ -113,6 +113,7 @@ final class OrmEnhancer {
                 || entity.generation!=0 || entity.idFields.size()>1 || entity.hierarchyRoot!=null) return true;
         for(OrmAnnotationProcessor.PersistedField field:entity.fields)
             if(field.version || field.unique || field.converter!=null) return true;
+        for(String callback:entity.callbacks) if(callback!=null) return true;
         return false;
     }
     private static Path outputPath(File directory,String name) throws IOException {

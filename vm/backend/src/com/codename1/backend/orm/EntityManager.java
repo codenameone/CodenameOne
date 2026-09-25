@@ -194,7 +194,7 @@ public final class EntityManager {
             throw new IllegalArgumentException("No entity class");
         }
         if (com.codename1.impl.orm.Models.requiresSession(entity))
-            throw new IllegalStateException("Relationships and @Version require openSession() managed persistence");
+            throw new IllegalStateException("This entity mapping requires openSession() managed persistence");
         Dao<T> dao = (Dao<T>)daos.get(entity.getName());
         if(dao == null) {
             throw new IllegalStateException("No dao was generated for " + entity.getName()
