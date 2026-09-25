@@ -51,6 +51,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.fail;
 
 /// The app's side of distributed tracing, through the real NetworkManager against
 /// the mocked network: what a request carries to the server, and what reaches the
@@ -644,8 +645,23 @@ class TelemetryTest extends UITestBase {
         // An '@' past the authority is path, not userinfo, and stays.
         assertEquals("https://host.example/a@b",
                 Telemetry.redact("https://host.example/a@b"));
-        assertEquals("https://host.example\\a@b",
-                Telemetry.redact("https://host.example\\a@b"));
+        // A backslash does not end the authority for redaction: on a port whose
+        // URL parser keeps it in the authority, what precedes the '@' is userinfo.
+        assertEquals("https://b", Telemetry.redact("https://host.example\\a@b"));
+    }
+
+    @Test
+    void aRelayTokenNoHeaderCouldCarryIsRefused() {
+        String[] bad = {"zq9\n", " zq9", "zq9 ", "zq9\t", "zq\u00019"};
+        for (String token : bad) {
+            try {
+                new TelemetryConfig().relay("https://api.test").relayToken(token);
+                fail("accepted a relay token a header cannot carry");
+            } catch (IllegalArgumentException expected) {
+                assertFalse(expected.getMessage().contains("zq"), expected.getMessage());
+            }
+        }
+        new TelemetryConfig().relay("https://api.test").relayToken("t o\tk");
     }
 
     @Test

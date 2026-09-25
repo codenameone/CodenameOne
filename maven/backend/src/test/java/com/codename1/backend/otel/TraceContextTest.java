@@ -139,6 +139,33 @@ class TraceContextTest {
                 BatchExporter.redact("https://collector.example/v1/traces#access_token=secret"));
         assertEquals("https://c.example/v1#<redacted>",
                 BatchExporter.redact("https://c.example/v1#frag?token=secret"));
+        // Through the LAST '@': the first is part of the password.
+        assertEquals("https://<redacted>@host.example",
+                BatchExporter.redact("https://alice:secret@tenant@host.example"));
+        // And past a backslash, which some parsers keep in the authority.
+        assertEquals("https://<redacted>@b/v1",
+                BatchExporter.redact("https://host.example\\a@b/v1"));
+    }
+
+    @Test
+    @DisplayName("a relay token no header could carry is refused, without echoing it")
+    void unsendableRelayTokensAreRefused() throws Exception {
+        String[] bad = {"s3cret\n", "s3cret\r\n", " s3cret", "s3cret\t", "s3\u0001cret"};
+        for(String token : bad) {
+            java.util.Properties settings = new java.util.Properties();
+            settings.setProperty(OtlpTracer.ENDPOINT, "http://127.0.0.1:9");
+            settings.setProperty(OtlpTracer.RELAY, "true");
+            settings.setProperty(OtlpTracer.RELAY_TOKEN, token);
+            OtlpTracer tracer = new OtlpTracer();
+            java.io.IOException refused = org.junit.jupiter.api.Assertions.assertThrows(
+                    java.io.IOException.class,
+                    () -> tracer.open(com.codename1.backend.Config.of(settings, "test")));
+            assertTrue(refused.getMessage().contains(OtlpTracer.RELAY_TOKEN), refused.getMessage());
+            assertFalse(refused.getMessage().contains("s3"), "the secret was echoed: "
+                    + refused.getMessage());
+            tracer.shutdown(0);
+        }
+        assertTrue(OtlpTracer.sendableFieldValue("s3cret with\tinner space"));
     }
 
     @Test

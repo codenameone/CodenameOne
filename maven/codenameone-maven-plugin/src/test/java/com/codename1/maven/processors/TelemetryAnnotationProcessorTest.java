@@ -206,6 +206,8 @@ public class TelemetryAnnotationProcessorTest {
         // TelemetryConfig would throw on it inside the bootstrap, before
         // Display.init; the build says so instead.
         assertRefused("@OpenTelemetry(relay = \"https://api.example\", relayToken = \"bad\\nvalue\")");
+        assertRefused("@OpenTelemetry(relay = \"https://api.example\", relayToken = \"trailing \")");
+        assertRefused("@OpenTelemetry(relay = \"https://api.example\", relayToken = \" leading\")");
     }
 
     // ------------------------------------------------------------------

@@ -156,9 +156,18 @@ public final class TelemetryAnnotationProcessor extends AbstractAnnotationProces
         // TelemetryConfig.relayToken refuses a control character at run time, where
         // the generated bootstrap would throw before Display.init; refused here
         // instead, where the build can say so.
-        if (hasControl(otel.getStringOrDefault("relayToken", ""))) {
+        String relayToken = otel.getStringOrDefault("relayToken", "");
+        if (hasControl(relayToken)) {
             ctx.error(cls, "@OpenTelemetry relayToken contains a control character such as a "
                     + "line break; it is sent as a header and no header may carry one");
+            return;
+        }
+        // Refused at run time too: the backend trims the whitespace around a header
+        // value and compares the token exactly, so this one could never match.
+        if (relayToken.length() > 0 && (isBlank(relayToken.charAt(0))
+                || isBlank(relayToken.charAt(relayToken.length() - 1)))) {
+            ctx.error(cls, "@OpenTelemetry relayToken begins or ends with whitespace, which "
+                    + "a header cannot carry");
             return;
         }
         double ratio = ratio(otel.get("sampleRatio"));
@@ -286,6 +295,10 @@ public final class TelemetryAnnotationProcessor extends AbstractAnnotationProces
             }
         }
         return true;
+    }
+
+    private static boolean isBlank(char c) {
+        return c == ' ' || c == '\t';
     }
 
     /// Any control character except horizontal tab, which a field value may carry.

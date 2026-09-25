@@ -596,10 +596,17 @@ final class BatchExporter implements Runnable {
         String out = url.substring(0, cut);
         int scheme = out.indexOf("://");
         if(scheme >= 0) {
-            int at = out.indexOf('@', scheme + 3);
-            int slash = out.indexOf('/', scheme + 3);
-            if(at >= 0 && (slash < 0 || at < slash)) {
-                out = out.substring(0, scheme + 3) + "<redacted>@" + out.substring(at + 1);
+            // Through the LAST '@' before the path: in "alice:secret@tenant@host"
+            // the first '@' is part of the password, and cutting there logged
+            // "tenant@". Only '/' ends the authority here, not also a backslash,
+            // though a browser reads one as a slash: java.net.URL and libcurl do
+            // not, so what a backslash separates may be userinfo, and a redactor
+            // that hides too much is the safe way to be wrong.
+            int start = scheme + 3;
+            int slash = out.indexOf('/', start);
+            int at = out.substring(start, slash < 0 ? out.length() : slash).lastIndexOf('@');
+            if(at >= 0) {
+                out = out.substring(0, start) + "<redacted>@" + out.substring(start + at + 1);
             }
         }
         // Says something was there, and which part, without saying what.

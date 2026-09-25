@@ -448,11 +448,20 @@ public final class TelemetryConfig {
     ///
     /// #### Throws
     ///
-    /// - `IllegalArgumentException`: when the token holds a control character
+    /// - `IllegalArgumentException`: when the token holds a control character, or
+    ///   begins or ends with whitespace
     public TelemetryConfig relayToken(String token) {
         if (token != null) {
-            // Sent as a header, so held to the same rules.
+            // Sent as a header, so held to the same rules -- and compared exactly,
+            // while the backend trims the spaces and tabs around a header value, so
+            // a token with them could never match.
             checkHeader("X-CN1-Telemetry-Token", token);
+            int last = token.length() - 1;
+            if (last >= 0 && (token.charAt(0) == ' ' || token.charAt(0) == '\t'
+                    || token.charAt(last) == ' ' || token.charAt(last) == '\t')) {
+                throw new IllegalArgumentException("The relay token begins or ends with "
+                        + "whitespace, which a header cannot carry");
+            }
         }
         this.relayToken = token;
         return this;

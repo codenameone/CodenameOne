@@ -219,11 +219,42 @@ public final class OtlpTracer implements Tracer {
                         + "ASCII characters a URL path allows (percent-encode anything "
                         + "else); it is '" + path + "'");
             }
-            relay = new OtlpRelay(path, config.get(RELAY_TOKEN), relayBytes,
+            String token = config.get(RELAY_TOKEN);
+            if(token != null && token.length() > 0 && !sendableFieldValue(token)) {
+                // Refused here because no client could ever present it: the request
+                // parser refuses a control character in a header value and trims
+                // surrounding spaces and tabs, so a trailing newline from a mounted
+                // secret made every relay export a 401 the app drops silently. The
+                // value itself stays out of the message -- it is a secret.
+                throw new IOException(RELAY_TOKEN + " holds a control character or "
+                        + "leading or trailing whitespace, so no request can carry it "
+                        + "in a header; remove it (a secret file's trailing newline is "
+                        + "the usual cause)");
+            }
+            relay = new OtlpRelay(path, token, relayBytes,
                     positive(config, RELAY_MAX_SPANS, 1000), corsOrigin(config),
                     exporter);
         }
         exporter.start();
+        return true;
+    }
+
+    /**
+     * Whether a request header could carry this value exactly: no control
+     * character but tab, and no space or tab at either end, which the request
+     * parser trims as surrounding whitespace.
+     */
+    static boolean sendableFieldValue(String value) {
+        int last = value.length() - 1;
+        for(int iter = 0 ; iter <= last ; iter++) {
+            char c = value.charAt(iter);
+            if((c < 0x20 && c != '\t') || c == 0x7f) {
+                return false;
+            }
+            if((iter == 0 || iter == last) && (c == ' ' || c == '\t')) {
+                return false;
+            }
+        }
         return true;
     }
 

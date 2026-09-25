@@ -223,6 +223,10 @@ class BackendOtelTest {
             assertTrue(accepted != null, "the accepted handshake has no span: " + spans);
             assertEquals("101", attribute(accepted.getAttributesList(), "http.response.status_code"));
             assertEquals("/ws", attribute(accepted.getAttributesList(), "url.path"));
+            // Named after the endpoint it reached, as an HTTP route is: otherwise
+            // every endpoint's handshake is one operation called "GET".
+            assertEquals("GET /ws", accepted.getName());
+            assertEquals("/ws", attribute(accepted.getAttributesList(), "http.route"));
             assertTrue(onOpenQuery != null, "onOpen's statement is not in the handshake's trace");
             assertEquals(hex(accepted.getSpanId()), hex(onOpenQuery.getParentSpanId()),
                     "onOpen's work is a child of the handshake");

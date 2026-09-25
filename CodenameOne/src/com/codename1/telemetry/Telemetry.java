@@ -869,11 +869,16 @@ public final class Telemetry {
         String out = url.substring(0, cut);
         int scheme = out.indexOf("://");
         if (scheme >= 0) {
-            // The LAST '@' inside the authority, as URL parsers split it: in
+            // The LAST '@' before the path, as URL parsers split it: in
             // "https://alice:secret@tenant@host/x" the first '@' belongs to the
             // password, and cutting there exported "tenant@" as part of url.full.
+            // Only '/' ends the authority here, not authorityEnd's backslash: the
+            // browser reads one as a slash but the other ports' URL parsers do
+            // not, so what it separates may be userinfo, and a redactor that
+            // hides too much is the safe way to be wrong.
             int start = scheme + 3;
-            int at = out.substring(start, authorityEnd(out, start)).lastIndexOf('@');
+            int slash = out.indexOf('/', start);
+            int at = out.substring(start, slash < 0 ? out.length() : slash).lastIndexOf('@');
             if (at >= 0) {
                 out = out.substring(0, start) + out.substring(start + at + 1);
             }

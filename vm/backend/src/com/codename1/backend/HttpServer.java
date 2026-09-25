@@ -3360,6 +3360,12 @@ public final class HttpServer {
     private WebSocket routeWebSocket(Request request, String path) throws Exception {
         Object exact = webSocketRoutes.get(path);
         if(exact != null) {
+            // Names the handshake span as the generated HTTP routers name theirs,
+            // or every endpoint's handshake is one operation called "GET". The
+            // registered path is literal (refused with a '%' or a '?') and matched
+            // exactly, so it IS the route template. A fallback router names its
+            // own, as any hand-written router does.
+            Tracing.route(path);
             return (WebSocket)exact;
         }
         WebSocketHandler router = webSocketRouter;
