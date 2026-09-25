@@ -2394,6 +2394,40 @@ public class OrmAnnotationProcessorTest {
     }
 
     @Test
+    public void managedClientMappingsRejectUnsupportedIdentityTypes() throws Exception {
+        for(String key:Arrays.asList("boolean","Boolean","byte[]","byte","Byte","short","Short","char","Character","float","Float","double","Double","java.util.Date","String")) {
+            for(String generated:Arrays.asList("","@GeneratedValue(strategy=GenerationType.IDENTITY)")) {
+                File classes=compileFixture("managedkey.Entry","package managedkey; import com.codename1.annotations.*; import com.codename1.annotations.db.*; @Entity public class Entry { @Id "+generated+" public "+key+" id; @Version public long version; }");
+                ProcessorContext ctx=runProcessor(classes);assertTrue("Managed identity type must be rejected: "+key+" "+generated,ctx.hasErrors());assertTrue(ctx.getErrors().toString(),ctx.getErrors().toString().contains("Identity generation requires"));
+            }
+        }
+        for(boolean hierarchy:new boolean[]{false,true}) {
+            File classes=tmp.newFolder();Map<String,String> sources=new java.util.LinkedHashMap<String,String>();String imports="package managedkey; import com.codename1.annotations.*; import com.codename1.annotations.db.*; ";
+            sources.put("managedkey.Root",imports+"@Entity "+(hierarchy?"@Inheritance":"")+" public class Root { @Id public boolean id; "+(hierarchy?"":"@ManyToOne public Target target;")+" }");
+            sources.put("managedkey.Target",imports+"@Entity public class Target "+(hierarchy?"extends Root":"")+" { "+(hierarchy?"":"@Id public long id;")+" }");
+            JavaSourceCompiler.compile(sources,classes,Arrays.asList(testClassesDir()));ProcessorContext ctx=runProcessor(classes);assertTrue(ctx.hasErrors());assertTrue(ctx.getErrors().toString(),ctx.getErrors().toString().contains("Identity generation requires"));
+        }
+    }
+
+    @Test
+    public void supportedClientIdentityTypesAndAssignedKeysRemainUsable() throws Exception {
+        for(String key:Arrays.asList("int","Integer","long","Long","IntProperty","LongProperty","String")) {
+            boolean property=key.endsWith("Property"),assigned=key.equals("String");String declaration=property?"public final "+key+"<Entry> id=new "+key+"<Entry>(\"id\");":"public "+key+" id;";
+            File classes=compileFixture("goodmanagedkey.Entry","package goodmanagedkey; import com.codename1.annotations.*; import com.codename1.annotations.db.*; import com.codename1.properties.*; @Entity(table=\"good_managed_key\") public class Entry "+(property?"implements PropertyBusinessObject":"")+" { @Id(autoIncrement="+(!assigned)+") "+declaration+" @Version public long version; "+(property?"private final PropertyIndex index=new PropertyIndex(this,\"Entry\",id);public PropertyIndex getPropertyIndex(){return index;}":"")+" }");
+            ProcessorContext ctx=runProcessor(classes);assertFalse(key+": "+ctx.getErrors(),ctx.hasErrors());
+            try(java.net.URLClassLoader loader=new java.net.URLClassLoader(new URL[]{classes.toURI().toURL()},getClass().getClassLoader())) {
+                Class type=loader.loadClass("goodmanagedkey.Entry");com.codename1.impl.orm.EntityModel model=(com.codename1.impl.orm.EntityModel)loader.loadClass("goodmanagedkey.EntryCn1Model").newInstance();Map<String,com.codename1.impl.orm.EntityModel<?>> models=new java.util.LinkedHashMap<String,com.codename1.impl.orm.EntityModel<?>>();models.put(type.getName(),model);
+                com.codename1.backend.Database db=com.codename1.backend.Database.open(":memory:");com.codename1.orm.session.Session session=new com.codename1.impl.orm.SessionImpl(new com.codename1.impl.orm.BackendSqlAccess(null,db,db.dialect()),models);
+                try { session.createTables();session.beginTransaction();Object first=type.newInstance(),second=type.newInstance();if(assigned) { type.getField("id").set(first,"first");type.getField("id").set(second,"second"); }session.persist(first);session.persist(second);session.commitTransaction();Object firstId=model.identifier(first),secondId=model.identifier(second);assertFalse(firstId.equals(secondId));org.junit.Assert.assertSame(first,session.find(type,firstId));org.junit.Assert.assertSame(second,session.find(type,secondId));session.clear();org.junit.Assert.assertNotNull(session.find(type,firstId));org.junit.Assert.assertNotNull(session.find(type,secondId)); } finally { session.close();db.close(); }
+            }
+        }
+        // The new managed-key check does not change legacy client DAO validation.
+        for(String key:Arrays.asList("boolean","String")) {
+            File classes=compileFixture("legacykey.Entry","package legacykey; import com.codename1.annotations.*; @Entity public class Entry { @Id public "+key+" id; }");ProcessorContext ctx=runProcessor(classes);assertFalse(ctx.getErrors().toString(),ctx.hasErrors());
+        }
+    }
+
+    @Test
     public void refusesAGeneratedKeyNoDatabaseCanGenerate() throws Exception {
         // Every one of these fails somewhere the build cannot see: a byte[] key
         // commits the insert and then throws reading the generated Long back, and

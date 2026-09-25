@@ -106,7 +106,7 @@ final class OrmEnhancer {
         for(String name:copied) records.add(name+"\t"+digest(Files.readAllBytes(outputPath(ctx.getOutputClassDir(),name))));
         Files.write(manifest,records,java.nio.charset.StandardCharsets.UTF_8);
     }
-    private static boolean needsState(OrmAnnotationProcessor.EntityClass entity) {
+    static boolean needsState(OrmAnnotationProcessor.EntityClass entity) {
         // Match generated EntityModel.requiresSession(), including mappings
         // that have managed values but no association accessors to weave.
         if(!entity.relations.isEmpty() || !entity.embedded.isEmpty() || !entity.indexes.isEmpty()

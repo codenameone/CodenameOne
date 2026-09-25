@@ -642,6 +642,14 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
         resolveRelations(ctx);
         for(EntityClass entity:accepted.values()) for(PersistedField field:entity.fields) field.declaredRequired=!field.nullable;
         resolveHierarchies(ctx);
+        // Resolve the complete mapping before deciding whether a client entity
+        // requires managed state. Legacy DAO-only mappings keep their validation.
+        if(!backend) for(EntityClass entity:accepted.values()) if(OrmEnhancer.needsState(entity)) {
+            for(PersistedField field:entity.idFields) if(field.autoIncrement && !isGeneratableKey(field.kind)) {
+                ctx.error("Identity generation requires int or long identifiers (or their boxed/property forms) in managed client mappings: "
+                        +entity.binaryName+"."+field.fieldName+". Use @Id(autoIncrement=false) for an assigned key.");
+            }
+        }
         validateRequiredIdentityCycles(ctx);
         for(EntityClass entity:accepted.values()) {
             Set<String> fields=new LinkedHashSet<String>(),columns=new LinkedHashSet<String>(),indexNames=new LinkedHashSet<String>();
@@ -1869,7 +1877,9 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
     /// or hits a row that belongs to something else. A table reaching 128 rows
     /// is not an edge case.
     private static boolean isGeneratableKey(PropertyTypeKind kind) {
-        return kind.kind == PropertyTypeKind.Kind.INT || kind.kind == PropertyTypeKind.Kind.LONG;
+        return kind.kind == PropertyTypeKind.Kind.INT || kind.kind == PropertyTypeKind.Kind.LONG
+                || kind.kind == PropertyTypeKind.Kind.PROPERTY
+                        && ("java.lang.Integer".equals(kind.elementBinaryName) || "java.lang.Long".equals(kind.elementBinaryName));
     }
 
     /// The source spelling of a kind, so the generated class references the

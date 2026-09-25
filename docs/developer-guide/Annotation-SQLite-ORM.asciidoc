@@ -267,7 +267,10 @@ versions can't use converters. This includes every component of an embedded iden
 
 ==== Identity and inheritance
 
-Keep `@Id` for identity-column generation. `@GeneratedValue` selects `UUID`
+Keep `@Id` for identity-column generation. Managed mappings require `int`, `long`,
+`Integer`, or `Long` identity fields; client `IntProperty` and `LongProperty` fields
+are supported too. Use `@Id(autoIncrement=false)` for assigned keys.
+`@GeneratedValue` selects `UUID`
 (for String IDs), `SEQUENCE`, or `TABLE` (for int/long IDs). PostgreSQL uses
 native sequences; other engines use a transactional generator table. UUIDs are
 version 4. Identity IDs become available on flush; the other strategies allocate
