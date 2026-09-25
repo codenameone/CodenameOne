@@ -396,6 +396,7 @@ public final class QueryImpl<T> implements com.codename1.orm.session.Query<T> {
     private Object builderParameter(String field, Object value) {
         Object converted = parameter(field, value);
         Values.requireStorageKind(converted, kind(field));
+        requireIntegralRange(field, converted);
         return converted;
     }
     Object parameter(String field, Object value) {

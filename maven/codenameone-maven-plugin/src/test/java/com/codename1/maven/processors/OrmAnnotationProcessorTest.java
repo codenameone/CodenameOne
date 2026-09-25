@@ -102,7 +102,7 @@ public class OrmAnnotationProcessorTest {
     public void clientPropertyScalarsAndCharactersUseManagedStorageConversions() throws Exception {
         File classes=tmp.newFolder("property-scalars");
         Map<String,String> sources=new java.util.LinkedHashMap<String,String>();
-        sources.put("propertymodel.Bean","package propertymodel; import com.codename1.annotations.*; import com.codename1.annotations.db.*; import com.codename1.properties.*; @Entity(table=\"property_beans\") public class Bean implements PropertyBusinessObject { @Id public long id; @Version public long version; public char symbol; public final IntProperty<Bean> counter=new IntProperty<Bean>(\"counter\",0); public final CharProperty<Bean> letter=new CharProperty<Bean>(\"letter\",'Q'); private final PropertyIndex index=new PropertyIndex(this,\"Bean\",counter,letter); public PropertyIndex getPropertyIndex() { return index; } }");
+        sources.put("propertymodel.Bean","package propertymodel; import com.codename1.annotations.*; import com.codename1.annotations.db.*; import com.codename1.properties.*; @Entity(table=\"property_beans\") public class Bean implements PropertyBusinessObject { @Id public long id; @Version public long version; public char symbol; public final IntProperty<Bean> counter=new IntProperty<Bean>(\"counter\",0); public final CharProperty<Bean> letter=new CharProperty<Bean>(\"letter\",'Q'); public final Property<Float,Bean> fraction=new Property<Float,Bean>(\"fraction\",Float.class,1f); private final PropertyIndex index=new PropertyIndex(this,\"Bean\",counter,letter,fraction); public PropertyIndex getPropertyIndex() { return index; } }");
         JavaSourceCompiler.compile(sources,classes,Arrays.asList(testClassesDir()));
         ProcessorContext ctx=runProcessor(classes);assertFalse(ctx.getErrors().toString(),ctx.hasErrors());
         java.net.URLClassLoader loader=new java.net.URLClassLoader(new URL[]{classes.toURI().toURL()},getClass().getClassLoader());loader.loadClass("cn1app.DaoBootstrap").newInstance();Class type=loader.loadClass("propertymodel.Bean");
@@ -120,6 +120,7 @@ public class OrmAnnotationProcessorTest {
             org.junit.Assert.assertEquals(Character.valueOf((char)0),s.createQuery("select b.symbol from propertymodel.Bean b",Character.class).first());
             s.beginTransaction();((com.codename1.properties.Property)type.getField("letter").get(loaded)).set(Character.valueOf('Z'));s.commitTransaction();s.clear();
             org.junit.Assert.assertEquals(Character.valueOf('Z'),((com.codename1.properties.Property)type.getField("letter").get(s.find(type,id))).get());
+            s.beginTransaction();org.junit.Assert.assertThrows(com.codename1.orm.session.PersistenceException.class,()->s.createQuery("update propertymodel.Bean b set b.fraction=1e100").executeUpdate());s.rollbackTransaction();
         } finally { s.close();em.close();loader.close(); }
     }
 
@@ -473,7 +474,7 @@ public class OrmAnnotationProcessorTest {
                 try { session.createTables();session.beginTransaction();session.persist(type.newInstance());session.commitTransaction();
                     String[] fields={"amount","boxed","narrow","small","letter"};long[] lows={Integer.MIN_VALUE,Integer.MIN_VALUE,Byte.MIN_VALUE,Short.MIN_VALUE,Character.MIN_VALUE},highs={Integer.MAX_VALUE,Integer.MAX_VALUE,Byte.MAX_VALUE,Short.MAX_VALUE,Character.MAX_VALUE};
                     for(int i=0;i<fields.length;i++) {
-                        for(long invalid:new long[]{lows[i]-1,highs[i]+1}) { final String predicateField=fields[i];org.junit.Assert.assertThrows(IllegalArgumentException.class,()->session.createQuery("select e from Entry e where e."+predicateField+"=:value").setParameter("value",invalid).list());session.beginTransaction();try { session.createQuery("update Entry e set e."+fields[i]+"=:value").setParameter("value",invalid).executeUpdate();fail("Stored out-of-range "+fields[i]); } catch(com.codename1.orm.session.PersistenceException expected) { session.rollbackTransaction(); } }
+                        for(long invalid:new long[]{lows[i]-1,highs[i]+1}) { final String predicateField=fields[i];org.junit.Assert.assertThrows(IllegalArgumentException.class,()->session.query(type).eq(predicateField,invalid));org.junit.Assert.assertThrows(IllegalArgumentException.class,()->session.createQuery("select e from Entry e where e."+predicateField+"=:value").setParameter("value",invalid).list());session.beginTransaction();try { session.createQuery("update Entry e set e."+fields[i]+"=:value").setParameter("value",invalid).executeUpdate();fail("Stored out-of-range "+fields[i]); } catch(com.codename1.orm.session.PersistenceException expected) { session.rollbackTransaction(); } }
                         for(long valid:new long[]{lows[i],highs[i]}) { session.beginTransaction();org.junit.Assert.assertEquals(1,session.createQuery("update Entry e set e."+fields[i]+"=:value").setParameter("value",valid).executeUpdate());session.commitTransaction();Object stored=type.getField(fields[i]).get(session.find(type,1));org.junit.Assert.assertEquals(valid,stored instanceof Character?((Character)stored).charValue():((Number)stored).longValue()); }
                     }
                     session.beginTransaction();org.junit.Assert.assertEquals(1,session.createQuery("update Entry e set e.boxed=NULL").executeUpdate());session.commitTransaction();org.junit.Assert.assertNull(type.getField("boxed").get(session.find(type,1)));
@@ -575,6 +576,41 @@ public class OrmAnnotationProcessorTest {
     @Test
     public void preUpdateCascadesJoinTheCurrentFlush() throws Exception {
         callbackCascadesJoinTheCurrentFlush(true);
+    }
+
+    @Test
+    public void laterCallbacksRevisitInsertedAndUpdatedEntries() throws Exception {
+        File classes=tmp.newFolder();Map<String,String> sources=new java.util.LinkedHashMap<String,String>();String imports="package callbackdirty; import com.codename1.annotations.*; import com.codename1.annotations.db.*; ";
+        sources.put("callbackdirty.Entry",imports+"@Entity(table=\"callback_dirty\") public class Entry { @Id public long id; @Version public long version; public String name; @ManyToOne(cascade=CascadeType.PERSIST) public Entry child; @DbTransient public Entry other; @DbTransient public int pre,post; @DbTransient public boolean cycling; @PreUpdate public void before() { pre++;if(child!=null)child.name=\"from pre\"; } @PostUpdate public void after() { post++;if(other!=null)other.name=\"from post\";if(cycling)name=name+\"!\"; } }");
+        JavaSourceCompiler.compile(sources,classes,Arrays.asList(testClassesDir()));ProcessorContext client=runProcessor(classes);assertFalse(client.getErrors().toString(),client.hasErrors());ProcessorContext backend=runProcessor(classes,backendClasspath());assertFalse(backend.getErrors().toString(),backend.hasErrors());
+        try(java.net.URLClassLoader loader=new java.net.URLClassLoader(new URL[]{classes.toURI().toURL()},getClass().getClassLoader())) {
+            Class type=loader.loadClass("callbackdirty.Entry");
+            for(String suffix:Arrays.asList("Cn1Model","Cn1BackendModel")) {
+                Map<String,com.codename1.impl.orm.EntityModel<?>> models=new java.util.LinkedHashMap<String,com.codename1.impl.orm.EntityModel<?>>();models.put(type.getName(),(com.codename1.impl.orm.EntityModel)loader.loadClass(type.getName()+suffix).newInstance());
+                com.codename1.backend.Database db=com.codename1.backend.Database.open(":memory:");com.codename1.orm.session.Session session=new com.codename1.impl.orm.SessionImpl(new com.codename1.impl.orm.BackendSqlAccess(null,db,db.dialect()),models);
+                try {
+                    session.createTables();session.beginTransaction();Object owner=type.newInstance(),existing=type.newInstance();type.getField("name").set(owner,"owner");type.getField("name").set(existing,"existing");session.persist(owner);session.persist(existing);session.commitTransaction();
+                    Object child=type.newInstance();type.getField("name").set(child,"initial");type.getField("child").set(owner,child);type.getField("other").set(owner,existing);session.beginTransaction();type.getField("name").set(owner,"dirty owner");type.getField("name").set(existing,"dirty existing");session.flush();
+                    org.junit.Assert.assertEquals("from pre",type.getField("name").get(child));org.junit.Assert.assertEquals("from post",type.getField("name").get(existing));Object childId=type.getField("id").get(child),existingId=type.getField("id").get(existing);int callbacks=type.getField("pre").getInt(owner)+type.getField("pre").getInt(child)+type.getField("pre").getInt(existing);session.flush();org.junit.Assert.assertEquals(callbacks,type.getField("pre").getInt(owner)+type.getField("pre").getInt(child)+type.getField("pre").getInt(existing));session.commitTransaction();session.clear();
+                    org.junit.Assert.assertEquals("from pre",type.getField("name").get(session.find(type,childId)));Object loaded=session.find(type,existingId);org.junit.Assert.assertEquals("from post",type.getField("name").get(loaded));
+                    session.beginTransaction();type.getField("cycling").set(loaded,true);type.getField("name").set(loaded,"cycle");org.junit.Assert.assertThrows(com.codename1.orm.session.PersistenceException.class,session::flush);assertTrue(session.isRollbackOnly());session.rollbackTransaction();org.junit.Assert.assertEquals("from post",type.getField("name").get(session.find(type,existingId)));
+                } finally { session.close();db.close(); }
+            }
+        }
+    }
+
+    @Test
+    public void generatedModelsRetainFloatStorageWidth() throws Exception {
+        File classes=tmp.newFolder();Map<String,String> sources=new java.util.LinkedHashMap<String,String>();String imports="package floatwidth; import com.codename1.annotations.*; import com.codename1.annotations.db.*; ";
+        sources.put("floatwidth.Entry",imports+"@Entity(table=\"float_width\") public class Entry { @Id public long id; public float narrow=1; public Float boxed=1f; public double wide=1; }");
+        JavaSourceCompiler.compile(sources,classes,Arrays.asList(testClassesDir()));ProcessorContext client=runProcessor(classes);assertFalse(client.getErrors().toString(),client.hasErrors());ProcessorContext backend=runProcessor(classes,backendClasspath());assertFalse(backend.getErrors().toString(),backend.hasErrors());
+        try(java.net.URLClassLoader loader=new java.net.URLClassLoader(new URL[]{classes.toURI().toURL()},getClass().getClassLoader())) {
+            Class type=loader.loadClass("floatwidth.Entry");for(String suffix:Arrays.asList("Cn1Model","Cn1BackendModel")) {
+                com.codename1.impl.orm.EntityModel model=(com.codename1.impl.orm.EntityModel)loader.loadClass(type.getName()+suffix).newInstance();Map<String,com.codename1.impl.orm.EntityModel<?>> models=new java.util.LinkedHashMap<String,com.codename1.impl.orm.EntityModel<?>>();models.put(type.getName(),model);
+                com.codename1.backend.Database db=com.codename1.backend.Database.open(":memory:");com.codename1.orm.session.Session session=new com.codename1.impl.orm.SessionImpl(new com.codename1.impl.orm.BackendSqlAccess(null,db,db.dialect()),models);
+                try { session.createTables();session.beginTransaction();session.persist(type.newInstance());session.commitTransaction();for(String field:Arrays.asList("narrow","boxed")) { session.beginTransaction();org.junit.Assert.assertThrows(com.codename1.orm.session.PersistenceException.class,()->session.createQuery("update Entry e set e."+field+"=1e100").executeUpdate());session.rollbackTransaction(); }session.beginTransaction();org.junit.Assert.assertEquals(1,session.createQuery("update Entry e set e.wide=1e100").executeUpdate());session.commitTransaction();org.junit.Assert.assertEquals(Double.valueOf(1e100),session.createQuery("select e.wide from Entry e",Double.class).first()); } finally { session.close();db.close(); }
+            }
+        }
     }
 
     private void callbackCascadesJoinTheCurrentFlush(boolean updating) throws Exception {
@@ -1602,6 +1638,27 @@ public class OrmAnnotationProcessorTest {
                     Object aid=base.getField("id").get(a),bid=base.getField("id").get(b);assertFalse(aid.equals(bid));session.clear();
                     org.junit.Assert.assertEquals(first,session.find(base,aid).getClass());org.junit.Assert.assertEquals(second,session.find(base,bid).getClass());org.junit.Assert.assertEquals(2,session.query(base).count());
                 } finally { session.close();em.close(); }
+            }
+        }
+    }
+
+    @Test
+    public void incrementalEnhancementRestoresCallersAfterRelationRemoval() throws Exception {
+        for(boolean backend:new boolean[]{false,true}) {
+            File classes=tmp.newFolder();String imports="package incrementalrelation; import com.codename1.annotations.*; import com.codename1.annotations.db.*; ";Map<String,String> sources=new java.util.LinkedHashMap<String,String>();
+            sources.put("incrementalrelation.Parent",imports+"@Entity public class Parent { @Id public long id; }");
+            sources.put("incrementalrelation.Child",imports+"@Entity public class Child { @Id public long id; @ManyToOne public Parent parent; }");
+            sources.put("incrementalrelation.Reader","package incrementalrelation; public class Reader { public static Parent read(Child child){return child.parent;}public static void write(Child child,Parent parent){child.parent=parent;} }");
+            sources.put("incrementalrelation.ViewCn1Mapper","package incrementalrelation; public class ViewCn1Mapper { public static Parent read(Child child){return child.parent;} }");
+            JavaSourceCompiler.compile(sources,classes,Arrays.asList(testClassesDir()));ProcessorContext first=runProcessor(classes,backend?backendClasspath():Collections.<String>emptyList());assertFalse(first.getErrors().toString(),first.hasErrors());
+            byte[] caller=java.nio.file.Files.readAllBytes(new File(classes,"incrementalrelation/Reader.class").toPath());
+            for(boolean relation:new boolean[]{false,true,false}) {
+                String annotation=relation?"@ManyToOne":"@DbTransient";
+                JavaSourceCompiler.compile(JavaSourceCompiler.singleSource("incrementalrelation.Child",imports+"@Entity public class Child { @Id public long id; "+annotation+" public Parent parent; }"),classes,Arrays.asList(testClassesDir(),classes));
+                org.junit.Assert.assertArrayEquals(caller,java.nio.file.Files.readAllBytes(new File(classes,"incrementalrelation/Reader.class").toPath()));
+                ProcessorContext next=runProcessor(classes,backend?backendClasspath():Collections.<String>emptyList());assertFalse(next.getErrors().toString(),next.hasErrors());
+                try(java.net.URLClassLoader loader=new java.net.URLClassLoader(new URL[]{classes.toURI().toURL()},getClass().getClassLoader())) { Class child=loader.loadClass("incrementalrelation.Child"),parent=loader.loadClass("incrementalrelation.Parent");Object entity=child.newInstance(),target=parent.newInstance();loader.loadClass("incrementalrelation.Reader").getMethod("write",child,parent).invoke(null,entity,target);org.junit.Assert.assertSame(target,loader.loadClass("incrementalrelation.Reader").getMethod("read",child).invoke(null,entity));org.junit.Assert.assertSame(target,loader.loadClass("incrementalrelation.ViewCn1Mapper").getMethod("read",child).invoke(null,entity)); }
+                caller=java.nio.file.Files.readAllBytes(new File(classes,"incrementalrelation/Reader.class").toPath());
             }
         }
     }

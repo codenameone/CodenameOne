@@ -181,6 +181,11 @@ matching enum types and converter mappings, including fields inside expressions.
 Integral attributes reject real-valued assignment expressions and floating-point
 parameter values. Assignments also check the mapped integer range, including
 computed results and the narrower ranges of `byte`, `short`, and `char` fields.
+Builder predicates and JPQL parameters also check the mapped integer range.
+Assignments to `float` and `Float` reject finite overflow and nonzero results
+that would round to zero, including arithmetic expressions and nested query results.
+Floating-point literals that overflow or underflow double precision are rejected
+when the query is created.
 
 An `int` or `long` field annotated `@Version` is maintained by the session.
 Updates and deletes compare its previous value and throw
@@ -238,6 +243,9 @@ Public no-argument void methods can receive `@PrePersist`, `@PostPersist`,
 `@PreUpdate`, `@PostUpdate`, `@PreRemove`, `@PostRemove`, and `@PostLoad` callbacks.
 Relationships added by `@PrePersist` or `@PreUpdate` follow `PERSIST` cascades in the current
 flush, including newly created collections.
+Flush rechecks entries changed by later callbacks, including newly inserted rows,
+until the managed state matches the database. If callbacks keep changing state
+for 1,000 passes, flush fails and the transaction requires rollback.
 
 Inherited callbacks run before subclass callbacks; overriding a callback method
 replaces the inherited declaration. Client scalar `Property` fields participate

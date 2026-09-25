@@ -377,6 +377,11 @@ class ManagedSessionTest {
             }
             for(long boundary:new long[]{Integer.MIN_VALUE,Integer.MAX_VALUE}) query.setParameter("value",collection?new Object[]{boundary}:boundary).list();
         }
+        for(int operation=0;operation<4;operation++) {
+            com.codename1.orm.session.Query<Record> query=session.query(Record.class);final int action=operation;
+            for(long invalid:new long[]{2147483648L,-2147483649L}) assertThrows(IllegalArgumentException.class,()-> { switch(action) { case 0:query.eq("counter",invalid);break;case 1:query.gt("counter",invalid);break;case 2:query.lt("counter",invalid);break;default:query.in("counter",new Object[]{0L,invalid}); }});
+            assertEquals(1,query.count());assertEquals(1,query.eq("counter",0L).count());
+        }
         // Arithmetic widens the expression and must still accept a long operand.
         assertEquals(1,session.createQuery("select r from ManagedSessionTest$Record r where r.counter+:delta=:expected").setParameter("delta",2147483648L).setParameter("expected",2147483648L).list().size());
         for(String expression:new String[]{"2147483648","-2147483649","r.counter+2147483648","r.counter-2147483649",":value","coalesce(:value,r.counter)","(select max(i.counter)+2147483648 from ManagedSessionTest$Record i)"}) {
@@ -398,6 +403,41 @@ class ManagedSessionTest {
             assertEquals(value,current.counter);assertEquals(version,current.version);
         }
     }
+    static class RealRecord { long id;float narrow;Float boxed;double wide; }
+    static class RealModel extends EntityModel<RealRecord> {
+        public Class<RealRecord> type() { return RealRecord.class; }
+        public String table() { return "managed_real_record"; }
+        public RealRecord create() { return new RealRecord(); }
+        public Attribute[] attributes() { return new Attribute[]{new Attribute("id","id",Attribute.BIGINT,true,true,false,false),new Attribute("narrow","narrow",Attribute.REAL,false,false,false,false),new Attribute("boxed","boxed",Attribute.REAL,false,false,true,false),new Attribute("wide","wide",Attribute.REAL,false,false,false,false)}; }
+        public boolean singlePrecision(int index) { return index==1 || index==2; }
+        public boolean primitive(int index) { return index==1 || index==3; }
+        public Object get(RealRecord r,int i) { switch(i) { case 0:return r.id;case 1:return (double)r.narrow;case 2:return r.boxed==null?null:Double.valueOf(r.boxed.doubleValue());default:return r.wide; } }
+        public void set(RealRecord r,int i,Object value) { try { switch(i) { case 0:r.id=((Number)value).longValue();break;case 1:r.narrow=com.codename1.impl.orm.Values.asFloat(value,0);break;case 2:r.boxed=com.codename1.impl.orm.Values.asFloatObject(value);break;default:r.wide=com.codename1.impl.orm.Values.asDouble(value,0); }} catch(java.io.IOException error) { throw new PersistenceException("Invalid real value",error); } }
+    }
+    static void assertRealAssignments(Session session) {
+        session.createTables();session.beginTransaction();RealRecord record=new RealRecord();record.narrow=1;record.boxed=1f;record.wide=1e100;session.persist(record);session.commitTransaction();long id=record.id;
+        for(String bad:new String[]{"1e-400","-1e-400","0.00001e-400","1e400"}) {
+            assertThrows(IllegalArgumentException.class,()->session.createQuery("select r from ManagedSessionTest$RealRecord r where r.wide="+bad));
+            assertThrows(IllegalArgumentException.class,()->session.createQuery("update ManagedSessionTest$RealRecord r set r.wide="+bad));
+        }
+        for(String field:new String[]{"narrow","boxed"}) {
+            for(String expression:new String[]{"1e100","-1e100","1e-100","-1e-100",":value","r.wide","r.wide*2","coalesce((select max(i.wide) from ManagedSessionTest$RealRecord i),0)"}) {
+                session.beginTransaction();com.codename1.orm.session.JpqlQuery query=session.createQuery("update ManagedSessionTest$RealRecord r set r."+field+"="+expression);if(expression.equals(":value"))query.setParameter("value",1e100);
+                assertThrows(PersistenceException.class,query::executeUpdate,field+"="+expression);session.rollbackTransaction();assertEquals(1f,session.find(RealRecord.class,id).narrow);assertEquals(Float.valueOf(1f),session.find(RealRecord.class,id).boxed);
+            }
+            for(double boundary:new double[]{0,-0.0,Float.MIN_VALUE,-Float.MIN_VALUE,Float.MAX_VALUE,-Float.MAX_VALUE,1e-45,-1e-45}) {
+                session.beginTransaction();assertEquals(1,session.createQuery("update ManagedSessionTest$RealRecord r set r."+field+"=:value").setParameter("value",boundary).executeUpdate());session.commitTransaction();session.clear();RealRecord loaded=session.find(RealRecord.class,id);assertEquals((float)boundary,field.equals("narrow")?loaded.narrow:loaded.boxed.floatValue(),0.0f);
+            }
+            session.beginTransaction();session.createQuery("update ManagedSessionTest$RealRecord r set r."+field+"=1").executeUpdate();session.commitTransaction();
+        }
+        session.beginTransaction();session.createQuery("update ManagedSessionTest$RealRecord r set r.boxed=NULL,r.wide=1e-100").executeUpdate();session.commitTransaction();assertNull(session.find(RealRecord.class,id).boxed);assertEquals(1e-100,session.find(RealRecord.class,id).wide);
+        session.beginTransaction();assertThrows(PersistenceException.class,()->session.createQuery("update ManagedSessionTest$RealRecord r set r.narrow=r.wide/2").executeUpdate());session.rollbackTransaction();
+        for(String zero:new String[]{"0e-400","-0e-400","0.000e-400"}) assertEquals(0.0,session.createQuery("select "+zero+" from ManagedSessionTest$RealRecord r",Double.class).first().doubleValue(),0.0);
+    }
+    @Test void realAssignmentsPreserveFloatRangeAndRejectLiteralUnderflow() throws Exception {
+        EntityManager em=manager();Models.register(new RealModel());try { Session session=em.openSession();try { assertRealAssignments(session); } finally { session.close(); } } finally { em.close(); }
+    }
+
     static void assertMinimumLongLiteral(Session session) {
         session.createTables();session.beginTransaction();Record record=new Record();record.name="minimum";session.persist(record);session.commitTransaction();
         session.beginTransaction();assertEquals(1,session.createQuery("update ManagedSessionTest$Record r set r.counter=-9223372036854775808").executeUpdate());session.commitTransaction();

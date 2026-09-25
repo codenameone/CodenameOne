@@ -69,14 +69,13 @@ final class OrmEnhancer {
             }
             if(!found) owner.relations.add(relation);
         }
-        if(owners.isEmpty()) return;
         Path manifest=outputPath(ctx.getOutputClassDir(),MANIFEST);
         Map<String,byte[]> classes=new LinkedHashMap<String,byte[]>();
         collect(ctx.getOutputClassDir(),ctx.getOutputClassDir(),classes);
         Set<String> own=new HashSet<String>(classes.keySet()),copied=new TreeSet<String>();
         if(Files.isRegularFile(manifest)) copied.addAll(readManifest(manifest.toFile()).keySet());
         own.removeAll(copied);
-        for(String path:ctx.getCompileClasspath()) {
+        if(!owners.isEmpty()) for(String path:ctx.getCompileClasspath()) {
             File file=new File(path);
             if(file.isDirectory()) collect(file,file,classes);
             else if(file.isFile() && file.getName().endsWith(".jar")) {
@@ -199,6 +198,25 @@ final class OrmEnhancer {
                 MethodVisitor method=super.visitMethod(access,name,descriptor,signature,exceptions);
                 if(name.startsWith("__cn1Orm")) return method;
                 return new MethodVisitor(Opcodes.ASM9,method) {
+                    @Override public void visitMethodInsn(int opcode,String owner,String name,String descriptor,boolean isInterface) {
+                        boolean write=name.startsWith("__cn1OrmWrite_");
+                        boolean read=name.startsWith("__cn1OrmRead_") || name.startsWith("__cn1OrmSerialize_");
+                        if(opcode==Opcodes.INVOKESTATIC && !isInterface && (read || write)) {
+                            Type[] args=Type.getArgumentTypes(descriptor);Type result=Type.getReturnType(descriptor);
+                            if(args.length==(write?2:1) && args[0].getDescriptor().equals("L"+owner+";")
+                                    && (write?result.getSort()==Type.VOID:result.getSort()==Type.OBJECT || result.getSort()==Type.ARRAY)) {
+                                // Recover the field operation, then apply current metadata.
+                                // This also removes stale calls when the last relation is gone.
+                                String prefix=write?"__cn1OrmWrite_":name.startsWith("__cn1OrmRead_")?"__cn1OrmRead_":"__cn1OrmSerialize_";
+                                String field=name.substring(prefix.length());
+                                if(field.length()>0) {
+                                    visitFieldInsn(write?Opcodes.PUTFIELD:Opcodes.GETFIELD,owner,field,write?args[1].getDescriptor():result.getDescriptor());
+                                    changed[0]=true;return;
+                                }
+                            }
+                        }
+                        super.visitMethodInsn(opcode,owner,name,descriptor,isInterface);
+                    }
                     @Override public void visitFieldInsn(int opcode,String owner,String field,String desc) {
                         OrmAnnotationProcessor.EntityClass target=owners.get(owner);
                         if(target!=null && (opcode==Opcodes.GETFIELD || opcode==Opcodes.PUTFIELD)) {

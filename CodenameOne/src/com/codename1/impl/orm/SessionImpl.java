@@ -124,20 +124,29 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
     }
     String checkedIntegralAssignment(String expression, long min, long max) {
         String value = numericOperand(expression, Attribute.BIGINT);
-        String overflow;
-        if ("sqlite".equals(sql.dialect())) {
-            overflow = "abs(-9223372036854775808)";
-        } else {
-            // Keep overflow dependent on the row value so constant folding
-            // cannot reject a valid CASE branch. Signed arithmetic also fails
-            // on MySQL when column assignment clipping is enabled.
-            String type = "mysql".equals(sql.dialect()) ? "SIGNED" : "BIGINT";
-            String signed = "CAST(" + value + " AS " + type + ")";
-            overflow = "(" + signed + " + CASE WHEN " + signed + " < 0 THEN CAST('-9223372036854775808' AS "
-                    + type + ") ELSE CAST('9223372036854775807' AS " + type + ") END)";
-        }
         return "(CASE WHEN " + value + " < " + min + " OR " + value + " > " + max
-                + " THEN " + overflow + " ELSE " + value + " END)";
+                + " THEN " + integralOverflow(value) + " ELSE " + value + " END)";
+    }
+    private String integralOverflow(String value) {
+        if ("sqlite".equals(sql.dialect())) {
+            return "abs(-9223372036854775808)";
+        }
+        // Depend on the row to avoid rejecting an unused branch during planning.
+        String type = "mysql".equals(sql.dialect()) ? "SIGNED" : "BIGINT";
+        String signed = "CAST(" + value + " AS " + type + ")";
+        return "(" + signed + " + CASE WHEN " + signed + " < 0 THEN CAST('-9223372036854775808' AS "
+                + type + ") ELSE CAST('9223372036854775807' AS " + type + ") END)";
+    }
+    String checkedFloatAssignment(String expression) {
+        String value = numericOperand(expression, Attribute.REAL);
+        String magnitude = "ABS(" + value + ")";
+        // Match Values.asFloat: reject finite overflow and rounding a nonzero
+        // double to zero. Half the smallest float rounds to zero (ties to even).
+        String invalid = "(" + magnitude + " > 3.4028234663852886e38 AND " + magnitude
+                + " <= 1.7976931348623157e308) OR (" + magnitude + " > 0 AND " + magnitude
+                + " <= 7.006492321624085e-46)";
+        String sign = "(CASE WHEN " + value + " < 0 THEN -1 ELSE 1 END)";
+        return "(CASE WHEN " + invalid + " THEN " + integralOverflow(sign) + " ELSE " + value + " END)";
     }
     String sqlDialect() {
         return sql.dialect();
@@ -771,47 +780,59 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
         flushing = true;
         boolean completed = false;
         try {
-            int previous;
-            do {
-                previous = entries.size();
+            List<Entry> inserted = new ArrayList<Entry>();
+            int collectionsReady = 0;
+            for (int pass = 0; ; pass++) {
+                if (pass == 1000) {
+                    throw new PersistenceException("Lifecycle callbacks did not reach a stable state");
+                }
+                int previous;
+                do {
+                    previous = entries.size();
+                    for (Entry entry : new ArrayList<Entry>(entries.values())) {
+                        if (!entry.removed) {
+                            cascadePersist(entry);
+                        }
+                    }
+                } while (previous != entries.size());
+                int insertedBefore = inserted.size();
+                insertPending(inserted);
+                List<Entry> updated = new ArrayList<Entry>();
                 for (Entry entry : new ArrayList<Entry>(entries.values())) {
-                    if (!entry.removed) {
-                        cascadePersist(entry);
+                    int insertedIndex = inserted.indexOf(entry);
+                    // Initial collection writes belong to INSERT. Scalars can
+                    // already be dirty because a later callback changed them.
+                    boolean checkCollections = insertedIndex < 0 || insertedIndex < collectionsReady;
+                    if (!entry.removed && update(entry, inserted, checkCollections)) {
+                        updated.add(entry);
                     }
                 }
-            } while (previous != entries.size());
-            List<Entry> inserted = new ArrayList<Entry>();
-            insertPending(inserted);
-            // PrePersist callbacks may have introduced new cascaded entities.
-            List<Entry> pending = new ArrayList<Entry>(entries.values());
-            List<Entry> updated = new ArrayList<Entry>();
-            for (Entry e : pending) {
-                if (!e.removed && !inserted.contains(e) && update(e, inserted)) {
-                    updated.add(e);
+                List<Entry> pending = new ArrayList<Entry>(entries.values());
+                // Release old links before inserting moved children.
+                for (Entry entry : pending) {
+                    if (!entry.removed) {
+                        syncCollections(entry, true);
+                    }
                 }
-            }
-            // PreUpdate callbacks may have introduced entities with collections too.
-            pending = new ArrayList<Entry>(entries.values());
-            // Release all old collection links before inserting moved children.
-            for (Entry e : pending) {
-                if (!e.removed) {
-                    syncCollections(e, true);
+                for (Entry entry : pending) {
+                    if (!entry.removed) {
+                        syncCollections(entry, false);
+                    }
                 }
-            }
-            for (Entry e : pending) {
-                if (!e.removed) {
-                    syncCollections(e, false);
+                collectionsReady = inserted.size();
+                for (Entry entry : updated) {
+                    entry.model.lifecycle(entry.entity, 3);
                 }
-            }
-            // Relationship writes are part of the update. Fire the post callback
-            // only after they succeed, including for collection-only changes.
-            for (Entry e : updated) {
-                e.model.lifecycle(e.entity, 3);
-            }
-            prepareDeletes();
-            for (Entry e : new ArrayList<Entry>(entries.values())) {
-                if (e.removed && entries.containsKey(e.entity)) {
-                    delete(e);
+                prepareDeletes();
+                boolean deleted = false;
+                for (Entry entry : new ArrayList<Entry>(entries.values())) {
+                    if (entry.removed && entries.containsKey(entry.entity)) {
+                        delete(entry);
+                        deleted = true;
+                    }
+                }
+                if (updated.isEmpty() && inserted.size() == insertedBefore && !deleted) {
+                    break;
                 }
             }
             completed = true;
@@ -2252,7 +2273,7 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
             completeInsert(inserted.get(i));
         }
     }
-    private boolean update(Entry entry, List<Entry> inserted) {
+    private boolean update(Entry entry, List<Entry> inserted, boolean checkCollections) {
         checkTransientAssociations(entry);
         EntityModel model = entry.model;
         Attribute[] attrs = model.attributes();
@@ -2273,7 +2294,7 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
         EntityState state = state(entry.entity);
         Relationship[] relations = model.relationships();
         for (int i = 0; i < relations.length; i++) {
-            if (state != null && state.loaded[i] && relations[i].many) {
+            if (checkCollections && state != null && state.loaded[i] && relations[i].many) {
                 List current = relationKeys(relations[i], model.relation(entry.entity, i));
                 List previous = entry.collections[i];
                 if (previous == null ||

@@ -1337,6 +1337,13 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
             }
             sb.append("default:return super.").append(method).append("(index);}}\n");
         }
+        sb.append("public boolean singlePrecision(int index) { switch(index) {\n");
+        for(int i=0;i<ec.fields.size();i++) {
+            PersistedField field=ec.fields.get(i);
+            String type=field.kind.kind==PropertyTypeKind.Kind.PROPERTY?field.kind.elementBinaryName:field.kind.binaryName;
+            if("java.lang.Float".equals(boxedDomainType(type))) sb.append("case ").append(i).append(": return true;\n");
+        }
+        sb.append("default:return false;}}\n");
         boolean converters=false,enumParameters=false;
         for(PersistedField field:ec.fields) {
             if(field.converter!=null) converters=true;

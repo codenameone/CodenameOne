@@ -93,6 +93,10 @@ public abstract class EntityModel<T> {
     public long maximumIntegralValue(int index) {
         return attributes()[index].kind == Attribute.INTEGER ? Integer.MAX_VALUE : Long.MAX_VALUE;
     }
+    /// Whether reading this REAL attribute narrows its stored value to a float.
+    public boolean singlePrecision(int index) {
+        return false;
+    }
     /// True only for unconverted int/Integer or long/Long values, including numeric properties.
     public boolean counter(int index) {
         return false;

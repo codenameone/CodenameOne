@@ -429,6 +429,9 @@ public final class JpqlQueryImpl<T> implements com.codename1.orm.session.JpqlQue
                         value.sql = session.checkedIntegralAssignment(value.sql,
                                 root.model.minimumIntegralValue(index), root.model.maximumIntegralValue(index));
                     }
+                    if (root.model.singlePrecision(root.model.queryIndex(field))) {
+                        value.sql = session.checkedFloatAssignment(value.sql);
+                    }
                     assignments.append(target.sql).append(" = ").append(value.sql);
                 } while (take(","));
                 String where = take("WHERE") ? " WHERE " + condition(rowExpression()) : "";
@@ -900,6 +903,19 @@ public final class JpqlQueryImpl<T> implements com.codename1.orm.session.JpqlQue
                 Object value = token.indexOf('.') >= 0 || token.indexOf('e') >= 0 || token.indexOf('E') >= 0
                                        ? (Object) Double.valueOf(token)
                                        : Long.valueOf(Long.parseLong(token));
+                if (value instanceof Double) {
+                    double number = ((Double) value).doubleValue();
+                    if (Double.isInfinite(number)) {
+                        throw error("Floating-point literal overflow");
+                    }
+                    if (number == 0.0) {
+                        for (int i = 0; i < token.length() && token.charAt(i) != 'e' && token.charAt(i) != 'E'; i++) {
+                            if (token.charAt(i) >= '1' && token.charAt(i) <= '9') {
+                                throw error("Floating-point literal underflow");
+                            }
+                        }
+                    }
+                }
                 int kind = value instanceof Double ? Attribute.REAL : Attribute.BIGINT;
                 return literal(kind, value);
             }
