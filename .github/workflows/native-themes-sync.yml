@@ -36,7 +36,7 @@ concurrency:
 
 jobs:
   rebuild-and-commit:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     container: ghcr.io/codenameone/codenameone/pr-ci-container:latest
     defaults:
       run:

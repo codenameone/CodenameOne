@@ -141,7 +141,7 @@ jobs:
       contents: read
       pull-requests: write
       issues: write
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 60
     env:
       GITHUB_TOKEN: ${{ secrets.CN1SS_GH_TOKEN }}

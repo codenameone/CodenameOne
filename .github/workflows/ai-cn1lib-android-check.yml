@@ -22,7 +22,7 @@ on:
 
 jobs:
   android-native-check:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v6
       - name: Set up JDK 17

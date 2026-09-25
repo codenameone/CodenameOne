@@ -153,7 +153,7 @@ concurrency:
 jobs:
   build-test:
 
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 60
     container: ghcr.io/codenameone/codenameone/pr-ci-container:latest
     env:
@@ -935,7 +935,7 @@ jobs:
     # pull request the image is never fetched.
     if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/master' }}
     needs: build-test
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - name: Download the distribution bundle
         uses: actions/download-artifact@v7

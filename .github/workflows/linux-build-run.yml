@@ -1,7 +1,7 @@
 # Native Linux (GTK3) build + run pipeline. The Linux port builds natively on the
 # runner -- no cross-compile -- so each architecture both builds and runs the
 # binary. It runs on BOTH architectures GitHub hosts natively: x86_64
-# (ubuntu-latest) and arm64 (ubuntu-24.04-arm), giving the port the same two-arch
+# (ubuntu-24.04) and arm64 (ubuntu-24.04-arm), giving the port the same two-arch
 # screenshot coverage the native Windows port has.
 #
 # The hellocodenameone screenshot suite is compiled by the codenameone maven
@@ -92,7 +92,7 @@ jobs:
   # so both arch legs translate from these same classes.
   prepare-suite:
     name: build suite classes (x64)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 60
     steps:
       - name: Check out repository
@@ -163,7 +163,7 @@ jobs:
       matrix:
         include:
           - arch: x64
-            runner: ubuntu-latest
+            runner: ubuntu-24.04
           - arch: arm64
             runner: ubuntu-24.04-arm
     steps:
@@ -471,7 +471,7 @@ jobs:
   build-run-musl:
     name: build + run suite (musl, Alpine x64)
     needs: prepare-suite
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
       - name: Download suite classes
@@ -554,7 +554,7 @@ jobs:
       !cancelled() &&
       (github.event_name == 'pull_request' || github.event_name == 'push' ||
       github.event_name == 'schedule' || github.event_name == 'workflow_dispatch')
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     permissions:
       # write, because this job publishes the normalized report to the
       # port-status-data branch itself (see the publish step below).

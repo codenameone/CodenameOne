@@ -33,7 +33,7 @@ concurrency:
 jobs:
   cross-compile:
     name: cross-compile (x64 PE on Linux)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     # A ceiling, because there was not one: this job hung in apt and ran for six
     # hours before GitHub's own limit stopped it. The work takes well under an
     # hour, so anything past that is stuck rather than slow.

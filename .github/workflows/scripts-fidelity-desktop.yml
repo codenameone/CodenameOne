@@ -95,7 +95,7 @@ jobs:
   # and costs one ubuntu minute.
   select:
     name: select legs
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     outputs:
       matrix: ${{ steps.pick.outputs.matrix }}
       any: ${{ steps.pick.outputs.any }}
@@ -120,7 +120,7 @@ jobs:
           entries=''
           for leg in $legs; do
             case "$leg" in
-              gnome)   runner=ubuntu-latest ;;
+              gnome)   runner=ubuntu-24.04 ;;
               windows) runner=windows-11-arm ;;
               macos)   runner=macos-15 ;;
             esac

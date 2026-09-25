@@ -746,7 +746,7 @@ jobs:
       needs.windows-port-screenshot.result != 'cancelled' &&
       needs.windows-port-screenshot.result != 'skipped' &&
       (github.event_name == 'pull_request' || github.event_name == 'push' || github.event_name == 'schedule' || github.event_name == 'workflow_dispatch')
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     permissions:
       contents: read
       pull-requests: write
@@ -847,7 +847,7 @@ jobs:
       needs.windows-port-screenshot-arm64.result != 'cancelled' &&
       needs.windows-port-screenshot-arm64.result != 'skipped' &&
       (github.event_name == 'pull_request' || github.event_name == 'push' || github.event_name == 'schedule' || github.event_name == 'workflow_dispatch')
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     permissions:
       contents: read
       pull-requests: write

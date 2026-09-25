@@ -45,7 +45,7 @@ concurrency:
 jobs:
   self-test:
     name: Canary assertions still fire
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@v6
@@ -70,7 +70,7 @@ jobs:
       # masking a platform-specific launcher failure.
       max-parallel: 1
       matrix:
-        os: [ubuntu-latest, windows-latest]
+        os: [ubuntu-24.04, windows-latest]
     runs-on: ${{ matrix.os }}
     # Must exceed everything starter_canary.py can spend: HTTP_ALLOWANCE 10m +
     # SEED_TIMEOUT 10m + LAUNCH_TIMEOUT 30m + POLL_TIMEOUT 20m = 70m, plus
@@ -159,7 +159,7 @@ jobs:
   alert:
     needs: canary
     if: always() && github.event_name != 'pull_request'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     permissions:
       contents: read
       issues: write
@@ -205,7 +205,7 @@ jobs:
             };
 
             const results = [
-              read('ubuntu-latest', 'Linux'),
+              read('ubuntu-24.04', 'Linux'),
               read('windows-latest', 'Windows'),
             ];
             const problems = results.map(r => r.problem).filter(Boolean);
