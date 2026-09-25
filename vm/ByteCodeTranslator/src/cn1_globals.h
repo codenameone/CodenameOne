@@ -1756,9 +1756,6 @@ struct TryBlock {
 extern JAVA_BOOLEAN cn1GcFreshFilter;
 #define CN1_SATB_FRESH_INLINE(o) (cn1GcFreshFilter && CN1_OBJ_MARK_LOAD((o), __ATOMIC_RELAXED) == -1)
 #endif
-#if defined(CN1_DISABLE_SATB)
-#define CN1_WRITE_BARRIER(target, value) do { } while(0)
-#else
 // Two halves share the gate. The SATB half runs only while a mark is in progress. The
 // GENERATIONAL half (single-core mode only, see cn1GcSingleCore) runs always: a young
 // (mark == -1) value stored into an OLD object records that object in the remembered
@@ -1784,6 +1781,17 @@ extern void cn1GcGenNoteStore(JAVA_OBJECT target, JAVA_OBJECT value);
 #else
 #define CN1_GEN_NOTE(t, v) ((void)0)
 #endif
+#if defined(CN1_DISABLE_SATB)
+// No SATB half, but the GENERATIONAL half must stay: single-core minors skip the old
+// generation on the strength of the remembered set, and a barrier that stopped
+// recording old->young stores would let a minor free a young object an old one holds.
+#define CN1_WRITE_BARRIER(target, value) \
+    do { if(__builtin_expect(cn1GcGenBarrier, 0)) { \
+             JAVA_OBJECT cn1__nv = (JAVA_OBJECT)(value); \
+             if(cn1__nv != JAVA_NULL && !CN1_IS_TAGGED(cn1__nv)) { \
+                 CN1_GEN_NOTE(target, cn1__nv); \
+                 CN1_GEN_REMEMBER(target, cn1__nv); } } } while(0)
+#else
 #define CN1_WRITE_BARRIER(target, value) \
     do { if(__builtin_expect(gcSatbActive | cn1GcGenBarrier, 0)) { \
              JAVA_OBJECT cn1__nv = (JAVA_OBJECT)(value); \
@@ -3656,23 +3664,31 @@ extern JAVA_OBJECT allocMultiArray(int* lengths, struct clazz* type, int primiti
  * relative to the SIMD work that follows it), while a stack overflow is fatal
  * with no chance to recover. */
 #define CN1_SIMD_STACK_HEAP_THRESHOLD (32 * 1024)
-#define CN1_SIMD_STACK_PRIMITIVE_ARRAY(length, arrayClass, primitiveSize) \
+#define CN1_SIMD_STACK_PRIMITIVE_ARRAY(cn1Len, cn1ArrClass, cn1PrimSize) \
     __extension__ ({ \
-        int __cn1StackLength = (length); \
+        int __cn1StackLength = (cn1Len); \
         const int __cn1Alignment = CN1_SIMD_ALIGNMENT; \
-        int __cn1ActualSize = __cn1StackLength * (primitiveSize); \
+        int __cn1ActualSize = __cn1StackLength * (cn1PrimSize); \
         JAVA_OBJECT __cn1Result; \
         if (__cn1StackLength < 0 || __cn1ActualSize > CN1_SIMD_STACK_HEAP_THRESHOLD) { \
             /* Too large to safely place on the stack - fall back to a regular */ \
             /* aligned heap allocation. The returned array still satisfies the */ \
             /* SIMD alignment contract; only the lifetime widens (GC-managed */ \
             /* instead of method-local), which is harmless for callers. */ \
-            __cn1Result = allocArrayAligned(threadStateData, __cn1StackLength, (arrayClass), (primitiveSize), 1, __cn1Alignment); \
+            __cn1Result = allocArrayAligned(threadStateData, __cn1StackLength, (cn1ArrClass), (cn1PrimSize), 1, __cn1Alignment); \
         } else { \
             /* header + payload + alignment slack for the payload start */ \
             char* __cn1StackMem = (char*)__builtin_alloca(CN1_ARRAY_ALLOC_BYTES(__cn1ActualSize) + __cn1Alignment - 1); \
             JAVA_ARRAY __cn1StackArray = (JAVA_ARRAY)__cn1StackMem; \
-            *__cn1StackArray = (struct JavaArrayPrototype){DEBUG_GC_INIT (arrayClass), 0, 0, __cn1StackLength, 1, (primitiveSize), (unsigned short)CN1_ARRAY_PAYLOAD_OFFSET}; \
+            /* Field by field, never a positional initializer: the header's class is a \
+             * 16-bit index now, and a positional list silently put the class POINTER \
+             * there -- an int-conversion error under clang-cl, a truncated id elsewhere. */ \
+            memset(__cn1StackArray, 0, sizeof(struct JavaArrayPrototype)); \
+            CN1_OBJ_SET_CLASS(__cn1StackArray, (cn1ArrClass)); \
+            __cn1StackArray->length = __cn1StackLength; \
+            __cn1StackArray->dimensions = 1; \
+            __cn1StackArray->primitiveSize = (unsigned char)(cn1PrimSize); \
+            __cn1StackArray->dataOffset = (unsigned short)CN1_ARRAY_PAYLOAD_OFFSET; \
             if (__cn1ActualSize > 0) { \
                 char* __cn1Data = (char*)CN1_ARRAY_PAYLOAD_PTR(__cn1StackArray); \
                 /* round the payload start up by adding alignment-1 then masking off the low bits */ \

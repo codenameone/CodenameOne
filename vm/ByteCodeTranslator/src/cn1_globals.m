@@ -914,11 +914,16 @@ static int cn1RhFind(JAVA_OBJECT o, int* epoch) {
 }
 static int cn1RhSweeping = 0;
 #endif
+#if defined(CN1_GC_GEN_CHECK2) || defined(CN1_GC_GEN_QUAR)
+// The object whose children are being traced. CN1_GC_GEN_CHECK2 maintains it on every
+// trace; CN1_GC_GEN_QUAR alone sets only its block-scan sentinel, which is all the
+// quarantine needs to tell a remembered block from an object parent.
+static JAVA_OBJECT cn1GcGenCurParent = 0;
+#endif
 #ifdef CN1_GC_GEN_CHECK2
 // QA ONLY: minors run in trace-everything mode (which is correct) and report every edge a
 // real minor would have missed -- a TRACED (so reachable) parent that was already old,
 // not in the remembered set, pointing at a young object on a pre-cycle page.
-static JAVA_OBJECT cn1GcGenCurParent = 0;
 static JAVA_OBJECT* cn1GcGenOldSet = 0;  static long cn1GcGenOldCap = 0, cn1GcGenOldN = 0;
 static JAVA_OBJECT* cn1GcGenRsSet = 0;   static long cn1GcGenRsCap = 0, cn1GcGenRsN = 0;
 static long cn1GcGenMissed = 0;
@@ -2477,6 +2482,11 @@ volatile int gcSatbActive = 0;
 // Single-core generational mode: set once, at the first collection, and never cleared.
 // Adjacent to gcSatbActive because CN1_WRITE_BARRIER reads both on every reference store.
 volatile int cn1GcGenBarrier = 0;
+// Out of line so cn1_globals.h need not declare usleep, which strict C11 hides on glibc.
+// Defined outside every configuration guard: codenameOneGcMalloc calls it in all of them.
+void cn1GcHandshakeSleep(void) {
+    usleep(50);
+}
 // Set for the whole of mark TERMINATION, across every trial clear, and cleared only once the
 // mark is genuinely over. gcSatbActive alone is not a safe thing for a caller to test: it
 // drops to 0 and comes back up during the trial-clear protocol, so a bulk copy that sampled
@@ -2536,10 +2546,16 @@ static JAVA_BOOLEAN gcMarkWorklistOverflow;
 static int gcMarkWorklistTop;
 static int gcMarkWorklistCapacity = CN1_GC_MARK_WORKLIST_SIZE;
 static _Atomic JAVA_BOOLEAN gcMarkOverflowSeen = JAVA_FALSE;
+// The address of slot i on a page. Defined unconditionally, because the grace walk
+// that reads it is compiled in every configuration -- under -DCN1_DISABLE_BIBOP it
+// simply finds no pages -- and a definition inside the BiBOP guard left that arm
+// with an implicit declaration.
+static inline JAVA_OBJECT cn1BibopSlot(CN1BibopPage* p, int i) {
+    return (JAVA_OBJECT)((char*)p + p->firstSlotOffset + (long)i * p->slotSize);
+}
 #ifndef CN1_DISABLE_BIBOP
 // Forward declarations -- defined below; the grace-subtree pass in codenameOneGCMark
-// walks the page registry and its slots before their definitions.
-static inline JAVA_OBJECT cn1BibopSlot(CN1BibopPage* p, int i);
+// walks the page registry before its definition.
 static CN1BibopPage* _Atomic bibopAllPages;
 #ifdef CN1_ALLOC_CENSUS
 // Defined far below, beside the BiBOP page structures they read. Declared up here
@@ -2936,6 +2952,13 @@ static void cn1BlockNoteRefBytes(JAVA_LONG block, size_t refBytes) {
 static void cn1GcGenTagTable(JAVA_LONG table, int parts);
 static void cn1GcForceMajor(void);
 static int cn1GcGenBlockDeferFree(JAVA_LONG block);
+#ifdef CN1_DISABLE_BIBOP
+// Generational collection runs on BiBOP pages only, so without them cn1GcGenBarrier is
+// never raised and nothing is ever remembered. These keep the barrier's out-of-line
+// calls linkable in that arm.
+void cn1GcRememberSlow(JAVA_OBJECT t) { (void)t; }
+static void cn1GcForceMajor(void) { }
+#endif
 #ifndef CN1_DISABLE_BIBOP
 static void cn1BibopRelabelStale(void);
 #endif
@@ -5519,7 +5542,10 @@ void codenameOneGCMark() {
                      * rather than the flag: not "has it parked" but "is it
                      * executing", which for a virtual thread is answerable exactly.
                      */
+#ifdef CN1_CONSERVATIVE_GC_ROOTS
+                    // The virtual-thread snapshot exists only with conservative roots.
                     vtOfState = cn1GcVtForState(t);
+#endif
                     if(vtOfState != 0) {
                         /*
                          * CLAIMED BEFORE THE WAIT, not inside it, because the wait
@@ -8599,6 +8625,12 @@ static void* cn1HeapWindowCarve(size_t sz) {
 #endif
 }
 
+// True for any address inside the reserved page window. Its memory stays mapped for
+// the life of the process, so a header read there cannot fault.
+static inline int cn1InHeapWindow(const void* obj) {
+    return (const char*)obj >= cn1HeapWindowBase && (const char*)obj < cn1HeapWindowEnd;
+}
+
 void cn1HeapWindowReport(void) {
     if(!getenv("CN1_LOG_HEAP_WINDOW")) {
         return;
@@ -9195,10 +9227,6 @@ static CN1BibopPage* cn1BibopNewPage(int ci) {
     // base-sorted page array off this (nodes never unlink or reorder)
     atomic_fetch_add_explicit(&bibopAllPagesCount, 1, memory_order_release);
     return p;
-}
-
-static inline JAVA_OBJECT cn1BibopSlot(CN1BibopPage* p, int i) {
-    return (JAVA_OBJECT)((char*)p + p->firstSlotOffset + (long)i * p->slotSize);
 }
 
 // Trigger a full GC if BiBOP allocation volume since the last collection has
@@ -12907,10 +12935,6 @@ static int cn1ConsSnapEpoch = -1;
 // Invalidate the cached build: single-core mode before each thread's scan, and the QA
 // verifier after the sweep, when the cached snapshot still lists every object the sweep
 // just reclaimed.
-void cn1GcHandshakeSleep(void) {
-    usleep(50);
-}
-
 int cn1ConsSnapEpochReset(void) {
     cn1ConsSnapEpoch = -1;
     return 0;
@@ -15566,6 +15590,8 @@ void gcMarkObject(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj, JAVA_BOOLEAN force
             CN1_OBJ_MARK_STORE(obj, -1, __ATOMIC_RELAXED);
             P = 0;
         } else if(++cn1QuarHits <= 40) {
+#ifdef CN1_GC_GEN_CHECK2
+            // Parent attribution needs CHECK2's store log and remembered-set copy.
             if(P) {
                 int nm = 0, ne = 0;
                 int found = cn1GcGenNoteFind(P, &nm, &ne);
@@ -15574,6 +15600,7 @@ void gcMarkObject(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj, JAVA_BOOLEAN force
                         found ? "yes" : "no", nm, ne, cn1GcGenSetHas(cn1GcGenRsSet, cn1GcGenRsCap, P),
                         atomic_load(&pp->gcRsetQueued));
             }
+#endif
             fprintf(stderr, "[GEN-QUAR] epoch=%d %s cycle reached a minor-freed %s %p via parent %s %p (mark=%d heapPos=%d)\n",
                     currentGcMarkValue, cn1GcMinor ? "minor" : "major",
                     CN1_OBJ_CLASS(obj) ? CN1_OBJ_CLASS(obj)->clsName : "?", (void*)obj,
@@ -15654,13 +15681,15 @@ void gcMarkObject(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj, JAVA_BOOLEAN force
     // holds), and the only outcome is SKIPPING a mark, which a minor does for every old
     // object anyway. Anything that does not read as an old page-resident object falls
     // through to the guard exactly as before.
-    if(cn1GcMinor && (char*)obj >= cn1HeapWindowBase && (char*)obj < cn1HeapWindowEnd) {
+#ifndef CN1_DISABLE_BIBOP
+    if(cn1GcMinor && cn1InHeapWindow(obj)) {
         int cn1OldMark = CN1_OBJ_MARK_LOAD(obj, __ATOMIC_RELAXED);
         int cn1OldPos = CN1_OBJ_HEAPPOS(obj);
         if(cn1OldMark > 0 && (cn1OldPos == CN1_BIBOP_HEAP_POS || cn1OldPos == CN1_BIBOP_ADOPTED)) {
             return;
         }
     }
+#endif
     if(!cn1GcPreciseTrace && !cn1GcTrustedRoots
        && cn1ConservativeResolve((void*)obj) != obj && !cn1GcImmortalObjContains(obj)
        && !(cn1GcStwCycle && cn1LegacyKnown(obj))) {
@@ -17224,6 +17253,75 @@ static void* cn1BlockWinMap(size_t bytes) {
 }
 static void cn1BlockWinUnmap(void* allocation) {
     VirtualFree(allocation, 0, MEM_RELEASE);
+}
+
+/* Prints "module+0xRVA" for an address, so a report from a CI runner can be resolved
+   against a map file of the same binary. Uses only calls that do not allocate. */
+static void cn1WinPrintAddress(const char* label, const void* addr) {
+    HMODULE mod = 0;
+    char path[MAX_PATH];
+    const char* name = "?";
+    if(GetModuleHandleExA(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
+                          (LPCSTR)addr, &mod) && mod != 0
+       && GetModuleFileNameA(mod, path, (DWORD)sizeof(path)) > 0) {
+        const char* slash = path;
+        for(const char* c = path; *c; c++) {
+            if(*c == '\\' || *c == '/') {
+                slash = c + 1;
+            }
+        }
+        name = slash;
+    }
+    fprintf(stderr, "[CRASH]   %s %p %s+0x%llx\n", label, addr, name,
+            (unsigned long long)((const char*)addr - (const char*)mod));
+}
+
+/*
+ * THE WINDOWS CRASH REPORT. A POSIX build that faults gets a signal name from the
+ * shell and a core or crash log from the OS; a Windows console process that takes an
+ * access violation just exits with 0xC0000005 and prints nothing, which is all a CI
+ * log then shows. This prints the exception, the faulting instruction, the native
+ * frames above it and the Java call stack of the faulting thread (class and method
+ * constant-pool ids and line, which resolve against the same translation), then lets
+ * the default handling continue so the exit code is unchanged.
+ */
+static LONG WINAPI cn1WinCrashFilter(EXCEPTION_POINTERS* info) {
+    EXCEPTION_RECORD* rec = info != 0 ? info->ExceptionRecord : 0;
+    if(rec == 0) {
+        return EXCEPTION_CONTINUE_SEARCH;
+    }
+    fprintf(stderr, "[CRASH] unhandled exception 0x%08lx thread %lu\n",
+            (unsigned long)rec->ExceptionCode, (unsigned long)GetCurrentThreadId());
+    cn1WinPrintAddress("at", rec->ExceptionAddress);
+    if(rec->ExceptionCode == EXCEPTION_ACCESS_VIOLATION && rec->NumberParameters >= 2) {
+        fprintf(stderr, "[CRASH]   %s address %p\n",
+                rec->ExceptionInformation[0] == 0 ? "read of" : (rec->ExceptionInformation[0] == 1 ? "write to" : "execute at"),
+                (void*)rec->ExceptionInformation[1]);
+    }
+    void* frames[48];
+    USHORT n = RtlCaptureStackBackTrace(0, 48, frames, NULL);
+    for(USHORT i = 0; i < n; i++) {
+        cn1WinPrintAddress("frame", frames[i]);
+    }
+    struct ThreadLocalData* t = cn1TlsSelf;
+    if(t == 0) {
+        fprintf(stderr, "[CRASH] no Java thread state on this thread\n");
+    } else {
+        int off = t->callStackOffset;
+        if(off > CN1_MAX_STACK_CALL_DEPTH) {
+            off = CN1_MAX_STACK_CALL_DEPTH;
+        }
+        fprintf(stderr, "[CRASH] Java stack, %d frame(s), innermost first (classId methodId line):\n", off);
+        for(int i = off - 1; i >= 0 && i >= off - 40; i--) {
+            fprintf(stderr, "[CRASH]   %d %d %d\n", t->callStackClass[i], t->callStackMethod[i], t->callStackLine[i]);
+        }
+    }
+    fflush(stderr);
+    return EXCEPTION_CONTINUE_SEARCH;
+}
+
+void cn1InstallWinCrashReporter(void) {
+    SetUnhandledExceptionFilter(cn1WinCrashFilter);
 }
 #endif
 
@@ -19088,7 +19186,13 @@ void cn1RunEagerInitializer(CODENAME_ONE_THREAD_STATE, void (*initializer)(CODEN
     threadStateData->tryBlockOffset = tryBlock;
 }
 
+#ifdef _WIN32
+extern void cn1InstallWinCrashReporter(void);
+#endif
 void initConstantPool() {
+#ifdef _WIN32
+    cn1InstallWinCrashReporter();   // first: nothing before it may fault unreported
+#endif
     cn1StartupPhase("main");
     __STATIC_INITIALIZER_java_lang_Class(getThreadLocalData());
     // Before ANY Java runs -- including the allocations further down this function,
@@ -19164,7 +19268,9 @@ void initConstantPool() {
     { extern void cn1GcFaultInitPublic(void); cn1GcFaultInitPublic(); }
 #endif
     atexit(cn1ReportBlockSyscalls);
+#ifndef CN1_DISABLE_BIBOP
     atexit(cn1HeapWindowReport);
+#endif
     atexit(cn1ReportLowMemoryParks);
     atexit(cn1ReportPacingParks);
     atexit(cn1ReportGcOverflow);
@@ -19540,6 +19646,9 @@ CN1_NORETURN void cn1ThrowNullPointerOrDie(CODENAME_ONE_THREAD_STATE) {
  * wrong here. A frameless method returns to let its caller's frame take the pending
  * exception, and the expression forms must produce a value. */
 #ifdef CN1_IMPLICIT_NULL_CHECKS
+// cn1_globals.h includes this only for conservative roots; the handler needs it in
+// every configuration.
+#include <signal.h>
 /* The landing pad for a null dereference.
  *
  * MUST NOT RETURN. A plain function returns through the link register, which on
