@@ -256,6 +256,28 @@ class NetworkTracerQueueTest extends UITestBase {
     }
 
     @Test
+    void aRetryFromAnotherThreadChainsToTheAttemptStillInFlight() throws Exception {
+        // A listener retrying from the EDT can beat the network thread to the end
+        // of the attempt it is reacting to. That attempt has not ended -- there is
+        // no "last attempt" yet -- and the retry must still continue it.
+        NetworkManager manager = idleManager();
+        NetworkTracer tracer = new NetworkTracer() {
+            public Object requestQueued(ConnectionRequest r) { return null; }
+            public Object beforeRequest(ConnectionRequest r, Object p) { return null; }
+            public void afterRequest(ConnectionRequest r, Object at, int s, Throwable e) { }
+        };
+        ConnectionRequest request = new ConnectionRequest();
+        request.setUrl("http://queue.test/in-flight");
+        request.tracerAttempt = "the attempt still running";
+        request.tracerOwner = tracer;
+        request.tracerThread = new Thread();   // not this thread: it cannot end it
+        manager.addToQueue(request, true);
+        assertEquals("the attempt still running", request.tracerParent,
+                "a retry that beat the network thread started a new trace");
+        assertSame(tracer, request.tracerParentOwner);
+    }
+
+    @Test
     void addIfAbsentLeavesAnExplicitContentTypeAlone() {
         ConnectionRequest request = new ConnectionRequest();
         request.setContentType("application/json");

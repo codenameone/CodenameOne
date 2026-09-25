@@ -732,11 +732,20 @@ public final class NetworkManager {
             // A parent some OTHER tracer captured is as good as none: the tracer
             // that ran this attempt will not use it (it only takes its own), and
             // keeping it blocked the chain, so every retry started a new root.
+            // The attempt to continue from is the last one that ENDED -- or, when a
+            // listener retries from the EDT before the network thread has finished
+            // the attempt it is reacting to, that attempt, still in flight. Waiting
+            // for "ended" alone lost the race on a fast EDT, and the retry started
+            // an unrelated trace.
+            Object previous = request.tracerAttempt != null
+                    ? request.tracerAttempt : request.tracerLastAttempt;
+            NetworkTracer previousOwner = request.tracerAttempt != null
+                    ? request.tracerOwner : request.tracerLastOwner;
             if ((request.tracerParent == null || request.tracerParentChained
-                    || request.tracerParentOwner != request.tracerLastOwner) //NOPMD CompareObjectsWithEquals
-                    && request.tracerLastAttempt != null) {
-                request.tracerParent = request.tracerLastAttempt;
-                request.tracerParentOwner = request.tracerLastOwner;
+                    || request.tracerParentOwner != previousOwner) //NOPMD CompareObjectsWithEquals
+                    && previous != null) {
+                request.tracerParent = previous;
+                request.tracerParentOwner = previousOwner;
                 request.tracerParentChained = true;
             }
         }

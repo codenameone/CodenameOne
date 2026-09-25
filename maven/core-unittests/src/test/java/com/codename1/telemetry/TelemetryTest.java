@@ -58,6 +58,12 @@ class TelemetryTest extends UITestBase {
     private static final String API = "http://api.test/pets";
     private static final String COLLECTOR = "http://collector.test/v1/traces";
     private static final String RELAY = "http://backend.test/otel/v1/traces";
+    /// How long a test waits for something the network thread does. An upper
+    /// bound, never a delay: every wait below leaves the moment its condition
+    /// holds. Generous because the whole suite shares one NetworkManager, and a
+    /// request an earlier class left in its queue can hold this one's back --
+    /// a 5s bound failed there while every test passed on its own.
+    private static final long WAIT_MILLIS = 30000;
 
     @BeforeEach
     void mocks() {
@@ -570,6 +576,7 @@ class TelemetryTest extends UITestBase {
         // failed attempt must be ended with its exception before that happens.
         Telemetry.install(new TelemetryConfig().direct("http://collector.test"));
         final int[] reads = new int[1];
+        final int[] handled = new int[1];
         ConnectionRequest flaky = new ConnectionRequest() {
             @Override
             protected void readResponse(InputStream input) throws java.io.IOException {
@@ -580,18 +587,23 @@ class TelemetryTest extends UITestBase {
 
             @Override
             protected void handleIOException(java.io.IOException err) {
+                handled[0]++;
                 retry();
             }
         };
         flaky.setUrl(API + "?flaky");
         flaky.setPost(false);
         NetworkManager.getInstance().addToQueue(flaky);
-        long deadline = System.currentTimeMillis() + 5000;
+        long deadline = System.currentTimeMillis() + WAIT_MILLIS;
         while (reads[0] < 2 && System.currentTimeMillis() < deadline) {
             flushSerialCalls();
             Thread.sleep(20);
         }
-        assertEquals(2, reads[0], "the request was not retried");
+        java.lang.reflect.Field errors = NetworkManager.class.getDeclaredField("errorListeners");
+        errors.setAccessible(true);
+        assertEquals(2, reads[0], "the request was not retried: handleIOException ran "
+                + handled[0] + "x, global error listeners="
+                + errors.get(NetworkManager.getInstance()));
 
         List<Span> spans = exported(2);
         Span failed = null;
@@ -810,7 +822,7 @@ class TelemetryTest extends UITestBase {
         // An upper bound, not a delay: the loop leaves as soon as the export lands.
         // Exports queue at low priority behind whatever else the shared network
         // manager holds, and 3s was too short on a loaded CI runner.
-        long deadline = System.currentTimeMillis() + 15000;
+        long deadline = System.currentTimeMillis() + WAIT_MILLIS;
         TestCodenameOneImplementation.TestConnection sent = null;
         while (System.currentTimeMillis() < deadline) {
             flushSerialCalls();
@@ -856,7 +868,7 @@ class TelemetryTest extends UITestBase {
             }
         });
         NetworkManager.getInstance().addToQueue(flaky);
-        long deadline = System.currentTimeMillis() + 5000;
+        long deadline = System.currentTimeMillis() + WAIT_MILLIS;
         // Both attempts read their response: the 503 too, since error bodies are
         // read by default.
         while (reads[0] < 2 && System.currentTimeMillis() < deadline) {
@@ -983,11 +995,19 @@ class TelemetryTest extends UITestBase {
                 state.stop();   // before the handed-off span reaches the EDT
             }
         });
-        flushSerialCalls();
+        // The handoffs and then the one export they share are each a turn of the
+        // EDT, so it takes more than one flush; wait for the export itself.
         int exports = 0;
-        for (ConnectionRequest queued : impl.getQueuedRequests()) {
-            if (queued instanceof Telemetry.ExportRequest) {
-                exports++;
+        long deadline = System.currentTimeMillis() + WAIT_MILLIS;
+        while (exports == 0 && System.currentTimeMillis() < deadline) {
+            flushSerialCalls();
+            for (ConnectionRequest queued : impl.getQueuedRequests()) {
+                if (queued instanceof Telemetry.ExportRequest) {
+                    exports++;
+                }
+            }
+            if (exports == 0) {
+                Thread.sleep(20);
             }
         }
         assertTrue(exports > 0, "spans that ended before the stop were discarded after it");
@@ -1059,7 +1079,7 @@ class TelemetryTest extends UITestBase {
     /// export itself is queued behind it.
     private TestCodenameOneImplementation.TestConnection awaitConnection(String url)
             throws InterruptedException {
-        long deadline = System.currentTimeMillis() + 5000;
+        long deadline = System.currentTimeMillis() + WAIT_MILLIS;
         while (System.currentTimeMillis() < deadline) {
             flushSerialCalls();
             TestCodenameOneImplementation.TestConnection c =
@@ -1074,7 +1094,7 @@ class TelemetryTest extends UITestBase {
 
     /// Every span the collector has received, once there are at least `wanted`.
     private List<Span> exported(int wanted) throws Exception {
-        long deadline = System.currentTimeMillis() + 5000;
+        long deadline = System.currentTimeMillis() + WAIT_MILLIS;
         List<Span> spans = new ArrayList<Span>();
         while (System.currentTimeMillis() < deadline) {
             flushSerialCalls();
