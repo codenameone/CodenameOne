@@ -155,3 +155,27 @@ jobs:
           name: javase-cef-ffmpeg-smoke-${{ runner.os }}${{ matrix.app-arch == 'x86' && '-x86' || '' }}
           path: artifacts/javase-cef-ffmpeg-smoke
           if-no-files-found: warn
+
+  # The installed app, not the simulator: a desktop_windows cloud build of a BrowserComponent
+  # page that loads Google Maps, built with desktop.win.cef=true on zuluFx8-32bit. This runs
+  # the installer, the launch4j exe, the bundled 32-bit JRE and the JCEF natives it ships.
+  windows-installer:
+    name: windows-latest installer (x86)
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install and run the desktop installer
+        shell: powershell
+        env:
+          INSTALLER_URL: https://s3.amazonaws.com/codenameone-build-response/16b81b0d-2431-4450-8b47-253048ce1baa-1790365751996-result.zip
+        run: ./scripts/javase-cef-ffmpeg-smoke/run-windows-installer.ps1 -Url $env:INSTALLER_URL -Out artifacts/windows-installer
+
+      - name: Upload installer run artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: javase-cef-windows-installer-x86
+          path: artifacts/windows-installer
+          if-no-files-found: warn
