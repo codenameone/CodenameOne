@@ -24,10 +24,14 @@ package com.codename1.ui;
 
 import com.codename1.junit.FormTest;
 import com.codename1.junit.UITestBase;
+import com.codename1.ui.events.ActionEvent;
+import com.codename1.ui.events.ActionListener;
+import com.codename1.ui.layouts.BoxLayout;
 
 import java.util.Vector;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -155,6 +159,89 @@ class DesktopChromeTest extends UITestBase {
             Display.getInstance().setCommandBehavior(Display.COMMAND_BEHAVIOR_DEFAULT);
             Toolbar.setGlobalToolbar(true);
         }
+    }
+
+    /**
+     * The Initializr's barebones template does exactly this in {@code runApp()}. In native mode
+     * the side menu used to be built on {@code getComponentForm()}, which is null while the
+     * toolbar is detached, so the app died with a NullPointerException before its first form
+     * was shown -- a blank window on macOS and Windows, whose desktop themes ask for native.
+     */
+    @FormTest
+    void nativeModeBridgesSideMenuCommandsInsteadOfBuildingASideMenu() {
+        desktopMode("native");
+
+        Form hi = new Form("Hi World", BoxLayout.y());
+        hi.add(new Button("Hello World"));
+        Command hello = hi.getToolbar().addMaterialCommandToSideMenu("Hello Command",
+                FontImage.MATERIAL_CHECK, 4, new ActionListener() {
+                    @Override
+                    public void actionPerformed(ActionEvent evt) {
+                    }
+                });
+        hi.show();
+        DisplayTest.flushEdt();
+
+        assertNull(hi.getToolbar().getParent(), "the toolbar stays detached in native mode");
+        Vector bridged = implementation.getLastNativeCommands();
+        assertNotNull(bridged, "commands must be bridged to the native menu bar");
+        assertTrue(bridged.contains(hello), "the side-menu command must reach the native menu bar");
+    }
+
+    /** The rest of the Toolbar API that assumed an attached form. */
+    @FormTest
+    void nativeModeToolbarCallsDoNotNeedAnAttachedForm() {
+        desktopMode("native");
+
+        Form f = new Form("Detached");
+        Toolbar tb = f.getToolbar();
+        Command item = new Command("Item");
+        tb.addComponentToSideMenu(new Label("Header"));
+        tb.addComponentToSideMenu(new Button("Row"), item);
+        tb.addComponentToRightSideMenu(new Label("Right header"));
+        Command back = new Command("Back");
+        tb.setBackCommand(back);
+        assertEquals(back, f.getBackCommand(), "the back command still reaches the form");
+        tb.hideToolbar();
+        tb.showToolbar();
+        tb.openSideMenu();
+        tb.openRightSideMenu();
+        f.show();
+        DisplayTest.flushEdt();
+
+        assertTrue(implementation.getLastNativeCommands().contains(item),
+                "a component row's command reaches the native menu bar");
+    }
+
+    @FormTest
+    void nativeModeRemovedSideMenuCommandLeavesTheNativeMenu() {
+        desktopMode("native");
+
+        Form f = new Form("Remove");
+        Command gone = new Command("Gone");
+        f.getToolbar().addCommandToSideMenu(gone);
+        f.getToolbar().removeCommand(gone);
+
+        assertFalse(f.getToolbar().getAllNativeMenuCommands().contains(gone),
+                "a removed command must not be bridged");
+    }
+
+    @FormTest
+    void nativeModeSideMenuCommandsChangedAfterShowReachTheNativeMenu() {
+        desktopMode("native");
+
+        Form f = new Form("Later");
+        f.show();
+        DisplayTest.flushEdt();
+
+        Command later = new Command("Later");
+        f.getToolbar().addCommandToSideMenu(later);
+        assertTrue(implementation.getLastNativeCommands().contains(later),
+                "a command added while the form is showing must be published");
+
+        f.getToolbar().removeCommand(later);
+        assertFalse(implementation.getLastNativeCommands().contains(later),
+                "and removing it must unpublish it");
     }
 
     private boolean hasButtonLabelled(Container root, String text) {

@@ -227,6 +227,14 @@ public class Toolbar extends Container {
     private boolean rightSideMenuCmdsAlignedToLeft = false;
     private Container permanentSideMenuContainer;
     private Container permanentRightSideMenuContainer;
+    /// The form this toolbar belongs to while the desktop {@code native} title-bar mode keeps it
+    /// detached from that form (see `ToolbarSideMenu.initMenuBar`), null otherwise. While
+    /// detached `getComponentForm()` is null, so this is the only route back to the form.
+    private Form desktopHiddenHost;
+    /// Side menu commands added while the toolbar is detached in the desktop {@code native}
+    /// title-bar mode. There is no side menu to draw them in, so they are only bridged to the
+    /// native menu bar through `getAllNativeMenuCommands()`.
+    private Vector<Command> desktopHiddenSideMenuCommands;
     private Command searchCommand;
     /// Component placed on the bottom (south) portion of the permanent/on-top
     /// side menu.
@@ -414,6 +422,9 @@ public class Toolbar extends Container {
     /// for cases where we want to place the menu button in a "creative way" in
     /// which case we can bind the side menu to this
     public void openSideMenu() {
+        if (isDesktopHidden()) {
+            return;
+        }
         if (onTopSideMenu) {
             showOnTopSidemenu(-1, false);
         } else {
@@ -432,6 +443,9 @@ public class Toolbar extends Container {
     /// for cases where we want to place the menu button in a "creative way" in
     /// which case we can bind the side menu to this
     public void openRightSideMenu() {
+        if (isDesktopHidden()) {
+            return;
+        }
         if (onTopSideMenu) {
             showOnTopRightSidemenu(-1, false);
         }
@@ -735,7 +749,7 @@ public class Toolbar extends Container {
         if (iconSize < 0) {
             iconSize = 3;
         }
-        getComponentForm().setBackCommand(cmd);
+        getHostForm().setBackCommand(cmd);
         switch (policy) {
             case ALWAYS:
                 if (UIManager.getInstance().isThemeConstant("landscapeTitleUiidBool", false)) {
@@ -1447,8 +1461,59 @@ public class Toolbar extends Container {
         addCommandToSideMenu(cmd, false);
     }
 
+    /// Indicates that the desktop {@code native} title-bar mode keeps this toolbar detached from
+    /// its form. The side menu is built on that form, so it cannot exist in this state.
+    private boolean isDesktopHidden() {
+        return desktopHiddenHost != null && getComponentForm() == null;
+    }
+
+    /// Returns the form this toolbar belongs to, including while it is detached in the desktop
+    /// {@code native} title-bar mode.
+    private Form getHostForm() {
+        Form f = getComponentForm();
+        if (f != null) {
+            return f;
+        }
+        return desktopHiddenHost;
+    }
+
+    /// While the toolbar is detached in the desktop {@code native} title-bar mode, records a side
+    /// menu command for the native menu bar instead of building a side menu.
+    ///
+    /// #### Returns
+    ///
+    /// true if the toolbar is detached and the command was handled here
+    private boolean addDesktopHiddenSideMenuCommand(Command cmd) {
+        if (!isDesktopHidden()) {
+            return false;
+        }
+        if (cmd != null) {
+            if (desktopHiddenSideMenuCommands == null) {
+                desktopHiddenSideMenuCommands = new Vector<Command>();
+            }
+            if (!desktopHiddenSideMenuCommands.contains(cmd)) {
+                desktopHiddenSideMenuCommands.addElement(cmd);
+                refreshDesktopHiddenNativeCommands();
+            }
+        }
+        return true;
+    }
+
+    /// Re-publishes the native menu bar when the detached toolbar's commands change while its
+    /// form is showing. Before the form is shown `Form.initComponentImpl` publishes them.
+    private void refreshDesktopHiddenNativeCommands() {
+        Form host = desktopHiddenHost;
+        if (host != null && host.isInitialized() && host.getParent() == null
+                && Display.getInstance().getCurrent() == host) { //NOPMD CompareObjectsWithEquals
+            Display.impl.setNativeCommands(getAllNativeMenuCommands());
+        }
+    }
+
     private void addCommandToSideMenu(Command cmd, boolean isLeft) {
         checkIfInitialized();
+        if (addDesktopHiddenSideMenuCommand(cmd)) {
+            return;
+        }
         if (permanentSideMenu) {
             if (isLeft) {
                 constructPermanentSideMenu();
@@ -2271,6 +2336,9 @@ public class Toolbar extends Container {
     /// - `cmd`: a Command to handle the events
     public void addComponentToLeftSideMenu(Component cmp, Command cmd) {
         checkIfInitialized();
+        if (addDesktopHiddenSideMenuCommand(cmd)) {
+            return;
+        }
         if (permanentSideMenu) {
             constructPermanentSideMenu();
             Container cnt = new Container(new BorderLayout());
@@ -2309,6 +2377,9 @@ public class Toolbar extends Container {
     /// - `cmd`: a Command to handle the events
     public void addComponentToRightSideMenu(Component cmp, Command cmd) {
         checkIfInitialized();
+        if (addDesktopHiddenSideMenuCommand(cmd)) {
+            return;
+        }
         if (permanentSideMenu) {
             constructPermanentRightSideMenu();
             Container cnt = new Container(new BorderLayout());
@@ -2339,6 +2410,10 @@ public class Toolbar extends Container {
     /// - `cmp`: c Component to be added to the menu
     public void addComponentToLeftSideMenu(Component cmp) {
         checkIfInitialized();
+        if (isDesktopHidden()) {
+            // a bare component has no native menu equivalent
+            return;
+        }
         if (permanentSideMenu) {
             constructPermanentSideMenu();
             addComponentToLeftSideMenu(permanentSideMenuContainer, cmp);
@@ -2364,6 +2439,10 @@ public class Toolbar extends Container {
     /// - `cmp`: c Component to be added to the menu
     public void addComponentToRightSideMenu(Component cmp) {
         checkIfInitialized();
+        if (isDesktopHidden()) {
+            // a bare component has no native menu equivalent
+            return;
+        }
         if (permanentSideMenu) {
             constructPermanentRightSideMenu();
             addComponentToRightSideMenu(permanentRightSideMenuContainer, cmp);
@@ -2454,6 +2533,9 @@ public class Toolbar extends Container {
     ///
     /// - `cmd`: Command to remove
     public void removeCommand(Command cmd) {
+        if (desktopHiddenSideMenuCommands != null && desktopHiddenSideMenuCommands.removeElement(cmd)) {
+            refreshDesktopHiddenNativeCommands();
+        }
         getMenuBar().removeCommand(cmd);
     }
 
@@ -2576,6 +2658,7 @@ public class Toolbar extends Container {
                 }
             }
         }
+        addUniqueCommands(all, desktopHiddenSideMenuCommands);
         return all;
     }
 
@@ -2836,7 +2919,9 @@ public class Toolbar extends Container {
     /// Hide the Toolbar if it is currently showing
     public void hideToolbar() {
         showing = false;
-        if (Display.INSTANCE.getCurrent() != getComponentForm()) { //NOPMD CompareObjectsWithEquals
+        // A detached toolbar (desktop "native" title-bar mode, or not yet added to a form)
+        // has no form to animate against.
+        if (getComponentForm() == null || Display.INSTANCE.getCurrent() != getComponentForm()) { //NOPMD CompareObjectsWithEquals
             setVisible(false);
             setHidden(true);
             return;
@@ -2855,14 +2940,21 @@ public class Toolbar extends Container {
     /// Show the Toolbar if it is currently not showing
     public void showToolbar() {
         showing = true;
+        Form f = getComponentForm();
+        if (f == null) {
+            // detached (desktop "native" title-bar mode, or not yet added to a form)
+            setVisible(true);
+            setHidden(false);
+            return;
+        }
         if (!isVisible()) {
             setVisible(true);
             setHidden(false);
-            getComponentForm().animateLayout(200);
+            f.animateLayout(200);
             return;
         }
         hideShowMotion = Motion.createSplineMotion(getY(), initialY, 300);
-        getComponentForm().registerAnimated(this);
+        f.registerAnimated(this);
         hideShowMotion.start();
     }
 
@@ -3244,12 +3336,14 @@ public class Toolbar extends Container {
                 // desktop "native" mode: keep the Toolbar object (so the command API and command
                 // harvesting work) but never attach it to the form, so no title strip is painted.
                 // The title goes to the OS window and commands go to the native menu bar.
+                desktopHiddenHost = parent;
                 initialized = true;
                 setTitle(parent.getTitle());
                 parent.revalidate();
                 initTitleBarStatus();
                 return;
             }
+            desktopHiddenHost = null;
             if (layered) {
                 Container layeredPane = parent.getLayeredPane();
                 Container p = layeredPane.getParent();
