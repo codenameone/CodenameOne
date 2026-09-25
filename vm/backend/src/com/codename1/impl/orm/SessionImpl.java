@@ -538,8 +538,12 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
             throw new IllegalArgumentException("entity is null");
         }
         if (entries.containsKey(entity)) {
+            Entry entry = entries.get(entity);
+            if (entry.removed) {
+                throw new PersistenceException("Cannot merge a removed entity");
+            }
             merging.put(entity, entity);
-            mergeRelations(entries.get(entity).model, entity, entity, merging);
+            mergeRelations(entry.model, entity, entity, merging);
             return entity;
         }
         EntityModel<T> model = model((Class<T>) entity.getClass());

@@ -76,7 +76,8 @@ managed behavior.
 A managed session maintains one instance per entity identity, detects changes
 at flush time, and flushes before commit and before queries in a transaction.
 `persist`, `merge`, and `remove` require an active transaction. `merge` returns
-the managed copy; it doesn't attach the supplied detached instance.
+the managed copy; it doesn't attach the supplied detached instance. Merging an
+entity already scheduled for removal is rejected.
 
 [source,java]
 ----
@@ -94,7 +95,9 @@ has an active transaction. When a failed client commit has already ended the
 underlying transaction, the session detaches its entities and becomes inactive.
 Check `isTransactionActive()` before rolling back; an inactive session can start
 a new transaction. Closing the session
-doesn't close its entity manager's database or pool.
+doesn't close its entity manager's database or pool. Backend `Database.beginTransaction()`
+reserves the connection to the initiating thread until commit, rollback, or close.
+Other threads wait; the initiating thread must finish the transaction.
 
 ==== Association mappings
 
@@ -147,7 +150,8 @@ aggregates, grouping/having, ordering, nested queries in scalar predicates, and 
 update/delete. String and numeric literals and named values become bound SQL
 parameters. `IN :values` and `IN (:values)` accept an `Iterable` or object array,
 including an empty collection. Unsupported syntax is rejected. Multiple scalar
-projections return `Object[]`.
+projections return `Object[]`. Entity names, field names, aliases, and named
+parameters accept Java identifier characters, including supplementary Unicode letters.
 Comparisons require at least one operand with a known storage type; two untyped
 parameters can't be compared directly. `IS NULL` and `IS NOT NULL` also require a
 known operand type; a standalone untyped parameter is rejected. A scalar nested query requires an

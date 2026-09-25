@@ -1584,13 +1584,15 @@ public final class JpqlQueryImpl<T> implements com.codename1.orm.session.JpqlQue
                 "HAVING".equalsIgnoreCase(token) || "ORDER".equalsIgnoreCase(token) || "SET".equalsIgnoreCase(token);
     }
     private static boolean identifier(String token) {
-        if (token.length() == 0 || !Character.isJavaIdentifierStart(token.charAt(0))) {
+        if (token.length() == 0) {
             return false;
         }
-        for (int i = 1; i < token.length(); i++) {
-            if (!Character.isJavaIdentifierPart(token.charAt(i))) {
+        for (int i = 0; i < token.length();) {
+            int codePoint = Character.codePointAt(token, i);
+            if (i == 0 ? !Character.isJavaIdentifierStart(codePoint) : !Character.isJavaIdentifierPart(codePoint)) {
                 return false;
             }
+            i += Character.charCount(codePoint);
         }
         return true;
     }
@@ -1602,7 +1604,9 @@ public final class JpqlQueryImpl<T> implements com.codename1.orm.session.JpqlQue
                 i++;
                 continue;
             }
-            int start = i++;
+            int codePoint = Character.codePointAt(text, i);
+            int start = i;
+            i += Character.charCount(codePoint);
             if (c == '\'') {
                 boolean closed = false;
                 while (i < text.length()) {
@@ -1621,15 +1625,15 @@ public final class JpqlQueryImpl<T> implements com.codename1.orm.session.JpqlQue
                     throw new IllegalArgumentException("Unterminated string literal");
                 }
             } else if (c == ':') {
-                if (i >= text.length() || !Character.isJavaIdentifierStart(text.charAt(i))) {
+                if (i >= text.length() || !Character.isJavaIdentifierStart(Character.codePointAt(text, i))) {
                     throw new IllegalArgumentException("Invalid named parameter");
                 }
-                while (i < text.length() && Character.isJavaIdentifierPart(text.charAt(i))) {
-                    i++;
+                while (i < text.length() && Character.isJavaIdentifierPart(Character.codePointAt(text, i))) {
+                    i += Character.charCount(Character.codePointAt(text, i));
                 }
-            } else if (Character.isJavaIdentifierStart(c)) {
-                while (i < text.length() && Character.isJavaIdentifierPart(text.charAt(i))) {
-                    i++;
+            } else if (Character.isJavaIdentifierStart(codePoint)) {
+                while (i < text.length() && Character.isJavaIdentifierPart(Character.codePointAt(text, i))) {
+                    i += Character.charCount(Character.codePointAt(text, i));
                 }
             } else if (Character.isDigit(c)) {
                 while (i < text.length() && Character.isDigit(text.charAt(i))) {

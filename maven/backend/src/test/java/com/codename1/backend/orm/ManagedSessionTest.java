@@ -1059,6 +1059,21 @@ class ManagedSessionTest {
             s.beginTransaction();assertThrows(OptimisticLockException.class,()->s.merge(r));s.rollbackTransaction();s.close();
         } finally { em.close(); }
     }
+    @Test void mergeRejectsManagedEntitiesPendingRemoval() throws Exception {
+        EntityManager manager=manager();
+        try {
+            Session session=manager.openSession();
+            try {
+                Record row=seed(session);session.beginTransaction();session.remove(row);assertFalse(session.contains(row));
+                PersistenceException failure=assertThrows(PersistenceException.class,()->session.merge(row));
+                assertTrue(failure.getMessage().contains("removed"));assertTrue(session.isRollbackOnly());session.rollbackTransaction();
+                Record restored=session.find(Record.class,row.id);assertNotNull(restored);assertEquals("first",restored.name);
+                session.beginTransaction();assertSame(restored,session.merge(restored));restored.name="valid merge";session.commitTransaction();
+                session.beginTransaction();session.remove(restored);session.persist(restored);assertSame(restored,session.merge(restored));session.commitTransaction();session.clear();assertNotNull(session.find(Record.class,row.id));
+            } finally { session.close(); }
+        } finally { manager.close(); }
+    }
+
     @Test void closeDiscardsPooledConnectionWhenRollbackFails() throws Exception {
         com.codename1.backend.DataSource pool=com.codename1.backend.DataSource.open(":memory:",1);
         Database damaged=pool.borrow();pool.release(damaged);

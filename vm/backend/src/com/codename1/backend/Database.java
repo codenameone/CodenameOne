@@ -681,7 +681,6 @@ public final class Database {
      */
     public synchronized void beginExclusiveTransaction() throws IOException {
         beginTransaction();
-        transactionOwner = Thread.currentThread();
     }
 
     private void transactionFinished() {
@@ -692,7 +691,7 @@ public final class Database {
 
     /**
      * Whether a transaction opened through this Database API is active.
-     * Waits for another thread's exclusive transaction to finish before checking,
+     * Waits for another thread's transaction to finish before checking,
      * like other operations on this connection.
      */
     public synchronized boolean isInTransaction() {
@@ -700,12 +699,18 @@ public final class Database {
         return managedTransaction;
     }
 
-    /** Begins an explicitly bounded transaction, pinning SQLite's write lock. */
+    /**
+     * Begins a transaction reserved to the calling thread until commit, rollback,
+     * or close. Other threads wait before using this connection. The initiating
+     * thread must complete the transaction; it cannot be handed to another thread.
+     * SQLite's write lock is acquired immediately.
+     */
     public synchronized void beginTransaction() throws IOException {
         awaitTransactionOwner();
         if (managedTransaction) throw new IOException("Transaction already active");
         control(sqlite == null ? "BEGIN" : "BEGIN IMMEDIATE");
         managedTransaction = true;
+        transactionOwner = Thread.currentThread();
     }
 
     /** Commits the transaction opened through this API. */

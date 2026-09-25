@@ -148,6 +148,34 @@ public class OrmAnnotationProcessorTest {
     }
 
     @Test
+    public void jpqlAcceptsSupplementaryJavaIdentifiers() throws Exception {
+        String letter="\ud801\udc00",entityName=letter+"Entity",field=letter+"Value",continuation="tail"+letter;
+        File classes=tmp.newFolder();Map<String,String> sources=new java.util.LinkedHashMap<String,String>();
+        sources.put("unicodejpql."+entityName,"package unicodejpql; import com.codename1.annotations.*; @Entity(table=\"unicode_jpql\") public class "+entityName+" { @Id public long id; @Column(name=\"value_text\") public String "+field+"; @Column(name=\"tail_text\") public String "+continuation+"; }");
+        JavaSourceCompiler.compile(sources,classes,Arrays.asList(testClassesDir()));ProcessorContext client=runProcessor(classes);assertFalse(client.getErrors().toString(),client.hasErrors());ProcessorContext backend=runProcessor(classes,backendClasspath());assertFalse(backend.getErrors().toString(),backend.hasErrors());
+        try(java.net.URLClassLoader loader=new java.net.URLClassLoader(new URL[]{classes.toURI().toURL()},getClass().getClassLoader())) {
+            Class type=loader.loadClass("unicodejpql."+entityName);
+            for(String suffix:Arrays.asList("Cn1Model","Cn1BackendModel")) {
+                Map<String,com.codename1.impl.orm.EntityModel<?>> models=new java.util.LinkedHashMap<String,com.codename1.impl.orm.EntityModel<?>>();models.put(type.getName(),(com.codename1.impl.orm.EntityModel)loader.loadClass(type.getName()+suffix).newInstance());
+                com.codename1.backend.Database db=com.codename1.backend.Database.open(":memory:");com.codename1.orm.session.Session session=new com.codename1.impl.orm.SessionImpl(new com.codename1.impl.orm.BackendSqlAccess(null,db,db.dialect()),models);
+                try {
+                    session.createTables();session.beginTransaction();Object entity=type.newInstance();type.getField(field).set(entity,"first");type.getField(continuation).set(entity,"tail");session.persist(entity);session.commitTransaction();
+                    for(String alias:Arrays.asList("e",letter,"prefix"+letter)) for(String parameter:Arrays.asList(letter,"prefix"+letter)) {
+                        org.junit.Assert.assertSame(entity,session.createQuery("select "+alias+" from unicodejpql."+entityName+" "+alias+" where "+alias+"."+field+"=:"+parameter,type).setParameter(parameter,"first").first());
+                        org.junit.Assert.assertEquals("tail",session.createQuery("select "+alias+"."+continuation+" from "+entityName+" "+alias,String.class).first());
+                    }
+                    session.beginTransaction();org.junit.Assert.assertEquals(1,session.createQuery("update "+entityName+" "+letter+" set "+letter+"."+field+"=:"+letter).setParameter(letter,"updated").executeUpdate());session.commitTransaction();
+                    org.junit.Assert.assertEquals("updated",session.createQuery("select e."+field+" from "+entityName+" e",String.class).first());
+                    for(String invalid:Arrays.asList("\ud801","\udc00","\ud83d\ude00")) {
+                        org.junit.Assert.assertThrows(IllegalArgumentException.class,()->session.createQuery("select "+invalid+" from "+entityName+" "+invalid));
+                        org.junit.Assert.assertThrows(IllegalArgumentException.class,()->session.createQuery("select e from "+entityName+" e where e."+field+"=:"+invalid));
+                    }
+                } finally { session.close();db.close(); }
+            }
+        }
+    }
+
+    @Test
     public void elementMapKeyLimitsCountUnicodeCharacters() throws Exception {
         File classes=tmp.newFolder();Map<String,String> sources=new java.util.LinkedHashMap<String,String>();
         sources.put("unicodekeys.Entry","package unicodekeys; import com.codename1.annotations.*; import com.codename1.annotations.db.*; @Entity(table=\"unicode_key_entries\") public class Entry { @Id public long id; @ElementCollection public java.util.Map<String,String> values=new java.util.LinkedHashMap<String,String>(); }");
