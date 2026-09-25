@@ -6658,3 +6658,34 @@ against the stale processor in .m2-repo, identical on h4). One-core RSS in a sec
 Also measured and dropped: dispatching virtual calls through a class-id-indexed vtable
 table (3 dependent loads instead of 4) moved single-core instructions by 0.5%, inside the
 +-1% run-to-run spread. The 4-byte header's +9% instructions are not in dispatch.
+
+## Round 51: where the BiBOP arena's slack is, measured
+
+Round 50 left open why dead objects outlive majors. A census (scratch runtime only) walked
+every page at each single-core major, before and after the sweep, classing each slot as
+live (current epoch), fresh, dead or free, and each page by where it sits (free pool,
+partial pool, sweep stack, pre-cycle list, thread-owned, none). Two runs; the arena at the
+peak is 308-316MB:
+
+| after a major sweep, at the peak | MB |
+|---|---:|
+| live | 231-251 |
+| free slots inside partial pages | 50-60 |
+| dead left by the sweep | 0-14 |
+| never bumped | 0-11 |
+
+- **Unswept pages are not the story.** At a single-core major the partial pools ARE spliced
+  onto the sweep list, so every pooled page is swept. What survives a major dead is (a)
+  whole pages the sweep VISITED and kept -- the O(1) "still in grace" branch keeps a page
+  whose grace epoch is V-1, 163 pages (~9MB) at one major, freed at the next -- and
+  (b) up to 9 pages in no pool at all that no sweep reached across several majors
+  (~0.5MB). Neither is worth a change on its own.
+- **Floating garbage between majors: 13-33MB** dead before each major's sweep, since a
+  minor frees nothing with an epoch. That is the price of 8 minors per major.
+- **The largest slack is free slots in partial pages, 50-60MB**, and it is working
+  headroom, not waste: page acquisition takes the partial pool before the free pool, so
+  those slots are refilled before a new page is formatted (the page count grew only
+  4903 -> 5026 over the last three majors). It is fragmentation in the sense that no
+  page can be returned while any slot on it lives; without moving objects the lever is
+  which pages allocation fills first, not the sweep.
+- Thread-owned pages: 33, holding under 1MB.
