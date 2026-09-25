@@ -2304,7 +2304,14 @@ struct ThreadLocalData* cn1CreateThreadLocalData(JAVA_BOOLEAN bindToCallingOsThr
     struct ThreadLocalData* i;
         JAVA_LONG nativeThreadId = threadKeyCounter;
     threadKeyCounter++;
-    i = malloc(sizeof(struct ThreadLocalData));
+    // Zeroed. bibopCurrent[] used to be a __thread array, which the loader zeroes; as a
+    // field of this struct it held whatever malloc returned, and a thread that died
+    // before allocating from every size class retired those garbage pages in
+    // cn1BibopRetireThreadPages -- a SIGSEGV at thread exit on every platform.
+    i = calloc(1, sizeof(struct ThreadLocalData));
+    if(i == NULL) {
+        return NULL;
+    }
     i->threadId = nativeThreadId;
     i->tryBlockOffset = 0;
     i->nativeBuffers = NULL;
