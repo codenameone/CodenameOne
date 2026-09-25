@@ -6270,8 +6270,16 @@ public final class HttpServer {
             head.append("Date: ").append(currentHttpDate()).append("\r\n");
             head.append("Content-Length: ").append(body.length).append("\r\n");
             head.append("Connection: close\r\n\r\n");
-            conn.write(head.toString().getBytes("UTF-8"));
-            conn.write(body);
+            // ONE write, as writeUpgradeRequired does. Written as head then body, a
+            // client that read the status line and closed -- leaving the rest
+            // unread, which makes the close a reset -- failed the second write,
+            // so writtenStatus was never set and the span of a 404 the client HAD
+            // received reported no status at all. Seen on a slow CI runner.
+            byte[] headBytes = head.toString().getBytes("UTF-8");
+            byte[] whole = new byte[headBytes.length + body.length];
+            System.arraycopy(headBytes, 0, whole, 0, headBytes.length);
+            System.arraycopy(body, 0, whole, headBytes.length, body.length);
+            conn.write(whole);
             conn.writtenStatus = status;
         } catch (IOException err) {
             // The peer is already gone; there is nowhere to report this.
