@@ -1,57 +1,41 @@
 name: ParparVM Performance
 
-# DOES PARPARVM STILL BEAT HOTSPOT, AND BY HOW MUCH.
+# IS PARPARVM STILL COMPETITIVE WITH HOTSPOT, ON EVERY PLATFORM IT SHIPS ON.
 #
-# The self-hosting translator is the only whole-program workload this repo has that
-# is both large and reproducible: 37.6k lines that hammer collections, strings,
-# exceptions and the GC, run over a fixed corpus, with the emitted C compared
-# byte-for-byte between arms. That last part is what makes it a PERFORMANCE
-# benchmark rather than a timing script -- bench-selfhost.py refuses to print any
-# ratio unless every arm produced identical output, so a number here is also a
-# correctness result and a "win" cannot come from doing less work.
+# The workload is the self-hosted translator (ParparVM's own translator, compiled with
+# ParparVM) translating the HelloCodenameOne application -- the framework, its Kotlin
+# dependencies and the app, 5,326 classes. JDK 25 runs the same translator on the same
+# input, and every run's output is compared byte for byte, so a ratio can never come
+# from doing less work.
 #
-# Measured on a developer Mac, three interleaved 5-round runs on 2026-09-17:
-# elapsed 0.759-0.843x and peak memory 0.587-0.599x against JDK 25. This workflow
-# exists so that stops being a thing somebody remembers and becomes a thing CI
-# asserts.
+# JDK 25 IS THE UNIT OF MEASURE. Nothing absolute is printed or reported: each round
+# runs both arms back to back and yields a paired ratio, and the gate compares the
+# median ratio against vm/selfhost/perf-baseline.json. A shared runner that is slower
+# today slows both halves of a pair, so the same baseline holds on a fast runner and a
+# slow one. A ratio more than the file's tolerance above its baseline fails the job and
+# the PR. See vm/selfhost/perf-gate.py.
 #
-# WHY A SEPARATE WORKFLOW FROM parparvm-selfhost.yml. That one is the CORRECTNESS
-# suite (gate D, gate A, the negative control) and it is gated behind a label
-# because a full run is expensive. A performance regression needs to fail on the PR
-# that causes it, not on whichever nightly someone reads next, so this runs on
-# every pull request that touches the VM. It builds at -O3 -- the shipping shape,
-# ThinLTO and all -- because a ratio taken from the -O1 diff-gate binary is a ratio
-# nobody ships.
+# Core counts 1, 2 and 4 (as many as the runner has) are pinned with CPU affinity on
+# Linux and Windows. macOS has no affinity API, so its counts are logical: both arms
+# are told the count and neither is confined to it. The report marks those rows.
 #
-# WHAT IS ACTUALLY GATED, and why it is not the same on both halves:
-#   memory  ALWAYS. It is the stable half -- 0.587/0.590/0.599 across three runs on
-#           a machine that was not quiet -- so an unstable peak is itself a finding.
-#   time    Only when the run was steady enough to mean something. perf-guard.sh
-#           reads the per-arm spread bench-selfhost.py prints and declines to assert
-#           on a wall clock it can see is noise. A perf gate that fails at random
-#           gets re-run until green and then ignored, and this repo's rule is that
-#           there is no such thing as an acceptable flake.
-#
-# The ceilings themselves live in vm/selfhost/perf-guard.sh, per platform, each with
-# the measurement it came from written beside it. The Linux ones are direction-only
-# on purpose: there is no runner data yet and the metric there is peak RSS rather
-# than phys_footprint, so they assert that ParparVM must not be slower and must use
-# meaningfully less memory, and get tightened from nightly spread in a follow-up.
+# The corpus is built ONCE, on macOS, because it is the macOS port's translator input:
+# build-macos-app.sh stops after translation, and the staged classes are handed to
+# every platform's job. Classes are platform-independent.
 
 on:
   schedule:
-    # 05:40 UTC, clear of parparvm-selfhost.yml's 04:20 so the two do not contend
-    # for runners and then blame each other for the timings.
     - cron: '40 5 * * *'
   workflow_dispatch:
     inputs:
       rounds:
-        description: 'Measured rounds per arm (a warmup round is discarded on top)'
+        description: 'Measured rounds per core count (a warmup round is discarded on top)'
         required: false
         default: '5'
   pull_request:
     paths:
       - 'vm/**'
+      - 'scripts/build-macos-app.sh'
       - '.github/workflows/parparvm-perf.yml'
       - '!vm/**/README.md'
       - '!vm/**/docs/**'
@@ -61,31 +45,141 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
   cancel-in-progress: true
 
-jobs:
-  performance:
-    runs-on: ubuntu-latest
-    timeout-minutes: 90
-    steps:
-      - name: Check out repository
-        uses: actions/checkout@v6
+permissions:
+  contents: read
 
-      - name: Install native build tools
+jobs:
+  mac-port:
+    uses: ./.github/workflows/_build-mac-port.yml
+
+  corpus:
+    needs: mac-port
+    runs-on: macos-15
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Compute setup-workspace hash
+        id: setup_hash
+        run: echo "hash=$(shasum -a 256 scripts/setup-workspace.sh | awk '{print $1}')" >> "$GITHUB_OUTPUT"
+
+      # build-macos-app.sh reads ${TMPDIR}/codenameone-tools/tools/env.sh, which the
+      # mac-port bundle carries relative to runner.temp.
+      - name: Set TMPDIR
+        run: echo "TMPDIR=${{ runner.temp }}" >> $GITHUB_ENV
+
+      - name: Cache codenameone-tools
+        uses: actions/cache@v5
+        with:
+          path: ${{ runner.temp }}/codenameone-tools
+          key: ${{ runner.os }}-cn1-tools-${{ steps.setup_hash.outputs.hash }}
+          restore-keys: |
+            ${{ runner.os }}-cn1-tools-
+
+      - name: Cache Maven repository
+        uses: actions/cache@v5
+        with:
+          path: ~/.m2/repository
+          key: ${{ runner.os }}-m2-${{ hashFiles('**/pom.xml') }}
+          restore-keys: |
+            ${{ runner.os }}-m2-
+
+      - name: Restore cn1-binaries cache
+        uses: actions/cache@v5
+        with:
+          path: ../cn1-binaries
+          key: cn1-binaries-${{ runner.os }}-${{ steps.setup_hash.outputs.hash }}
+          restore-keys: |
+            cn1-binaries-${{ runner.os }}-
+
+      - name: Download built CN1 + mac port bundle
+        uses: actions/download-artifact@v4
+        with:
+          name: cn1-built-mac-bundle
+          path: ${{ runner.temp }}
+
+      - name: Restore built CN1 + mac port tree
+        run: tar -C / -xf "$RUNNER_TEMP/cn1-built-mac-bundle.tar"
+
+      - name: Build and translate HelloCodenameOne for macOS (no Xcode build)
+        env:
+          CN1_MACOS_STOP_AFTER_TRANSLATION: '1'
+        run: ./scripts/build-macos-app.sh -q -DskipTests
+        timeout-minutes: 30
+
+      - name: Upload the translator input
+        uses: actions/upload-artifact@v4
+        with:
+          name: selfhost-hello-classes
+          path: |
+            scripts/hellocodenameone/mac/target/codenameone/antProject/dist/macos-build/classes
+            scripts/hellocodenameone/mac/target/codenameone/antProject/dist/macos-build/macPort/classes
+          if-no-files-found: error
+          retention-days: 3
+
+  perf:
+    needs: corpus
+    name: perf (${{ matrix.platform }})
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 120
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: linux-x64
+            runner: ubuntu-latest
+          - platform: linux-arm64
+            runner: ubuntu-24.04-arm
+          - platform: macos-arm64
+            runner: macos-15
+          - platform: windows-x64
+            runner: windows-latest
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Install native build tools (Linux)
+        if: runner.os == 'Linux'
         run: |
           bash scripts/ci/apt-get-update.sh
-          # GNU time, not the shell builtin: bench-selfhost.py's Linux peak-memory
-          # probe reads its "Maximum resident set size" line.
+          # GNU time, not the shell builtin: its "Maximum resident set size" is the
+          # Linux peak-memory probe.
           sudo apt-get install -y clang time
 
+      # clang-cl uses the MSVC headers, CRT and linker, and build-selfhost.sh builds
+      # the translator's own CMake project with it, exactly as
+      # CleanTargetIntegrationTest does on these runners.
+      - name: Set up MSVC environment (Windows)
+        if: runner.os == 'Windows'
+        uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: amd64
+
+      - name: Set up Ninja (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $ok = $false
+          for ($i = 1; $i -le 3; $i++) {
+            python -m pip install --upgrade ninja
+            if ($LASTEXITCODE -eq 0) { $ok = $true; break }
+            Start-Sleep -Seconds 5
+          }
+          if (-not $ok) { throw "Failed to install Ninja after 3 attempts" }
+          clang-cl --version
+          ninja --version
+          cmake --version
+
       # JDK 25 FIRST, so the JDK 8 below is the one left on PATH for Maven.
-      # bench-selfhost.py names each arm after the JDK's real feature version, so a
-      # missing JDK 25 no longer silently reports JDK 8 twice -- it raises.
-      - name: Set up JDK 25 (the performance reference)
+      - name: Set up JDK 25 (the reference)
         uses: actions/setup-java@v5
         with:
           distribution: 'temurin'
           java-version: '25'
       - name: Save JDK 25 path
-        run: echo "JDK_25_HOME=$JAVA_HOME" >> $GITHUB_ENV
+        run: echo "JDK_25_HOME=$JAVA_HOME" >> "$GITHUB_ENV"
 
       - name: Set up JDK 8
         uses: actions/setup-java@v5
@@ -94,53 +188,110 @@ jobs:
           java-version: '8'
           cache: 'maven'
       - name: Save JDK 8 path
-        run: echo "JDK_8_HOME=$JAVA_HOME" >> $GITHUB_ENV
+        run: echo "JDK_8_HOME=$JAVA_HOME" >> "$GITHUB_ENV"
 
       - name: Build the translator
+        working-directory: vm
         run: >-
           "$GITHUB_WORKSPACE/scripts/ci/retry.sh" mvn -q -B
           -pl ByteCodeTranslator -am package -DskipTests
-        working-directory: vm
 
-      # perf-guard.sh and bench-selfhost.py both read this file and now fail with a
-      # pointed message when it is absent -- `mvn clean package` removes target/ and
-      # takes it along, which used to surface as a bare `cat:` error that the guard
-      # then reported as a possible CORRECTNESS failure.
       - name: Resolve the ASM classpath
+        working-directory: vm
         run: >-
           "$GITHUB_WORKSPACE/scripts/ci/retry.sh" mvn -q -B -pl ByteCodeTranslator
           dependency:build-classpath
           -Dmdep.outputFile=target/selfhost-asm-classpath.txt
-        working-directory: vm
 
       - name: Build the self-hosted translator at -O3 (the shipping shape)
         run: vm/selfhost/build-selfhost.sh -O3
 
-      # Redirected, not piped: `perf-guard.sh | tee` reports tee's exit status, which
-      # would turn a real regression into a green step.
-      - name: Beat HotSpot
+      - name: Download the translator input
+        uses: actions/download-artifact@v4
+        with:
+          name: selfhost-hello-classes
+          path: ${{ runner.temp }}/macos-build
+
+      - name: Prepare the corpus
         run: |
+          PY="$(command -v python3 || command -v python)"
+          "$PY" vm/selfhost/prepare-hello-corpus.py "$RUNNER_TEMP/macos-build"
+
+      # Redirected, not piped: a pipe reports the last command's status, which would
+      # turn a regression into a green step.
+      - name: Compare with JDK 25
+        run: |
+          mkdir -p perf-results
+          PY="$(command -v python3 || command -v python)"
           rc=0
-          vm/selfhost/perf-guard.sh "${{ github.event.inputs.rounds || '5' }}" \
-            > perf-guard.log 2>&1 || rc=$?
-          cat perf-guard.log
-          {
-            echo '### ParparVM vs HotSpot'
-            echo '```'
-            grep -E '^(spread|vs |perf-guard:)' perf-guard.log || cat perf-guard.log
-            echo '```'
-          } >> "$GITHUB_STEP_SUMMARY"
+          "$PY" vm/selfhost/perf-gate.py --rounds "${{ github.event.inputs.rounds || '5' }}" \
+            --platform "${{ matrix.platform }}" \
+            --out "perf-results/${{ matrix.platform }}.json" > perf-gate.log 2>&1 || rc=$?
+          cat perf-gate.log
           exit "$rc"
 
-      # Always, not just on failure: the run-to-run spread on this runner is the data
-      # the Linux ceilings are waiting on, and it is only useful if it accumulates.
-      - name: Upload the measurement evidence
+      - name: Upload the ratios
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: parparvm-perf-evidence
-          path: |
-            perf-guard.log
-            vm/selfhost/target/bench/*/results.json
-            vm/selfhost/target/bench/*/*.log
+          name: perf-results-${{ matrix.platform }}
+          path: perf-results/*.json
+          if-no-files-found: ignore
           retention-days: 30
+
+  report:
+    needs: perf
+    if: always()
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v6
+
+      # The gate's own logic is tested here rather than trusted: a verdict or a report
+      # that silently cannot fail would turn every run green. Named explicitly rather than
+      # discovered, so an unrelated test in the directory cannot decide this gate.
+      - name: Test the gate
+        working-directory: vm/selfhost
+        run: python3 -m unittest test_bench_selfhost test_perf_gate
+
+      - name: Download every platform's ratios
+        uses: actions/download-artifact@v4
+        with:
+          pattern: perf-results-*
+          path: perf-results
+          merge-multiple: true
+
+      - name: Render the report
+        id: render
+        run: |
+          rc=0
+          python3 vm/selfhost/perf-report.py perf-results perf-report.md \
+            linux-x64 linux-arm64 macos-arm64 windows-x64 > /dev/null || rc=$?
+          cat perf-report.md >> "$GITHUB_STEP_SUMMARY"
+          echo "rc=$rc" >> "$GITHUB_OUTPUT"
+
+      # A fork's token is read-only, so the comment is posted only for branches of this
+      # repository; the job summary above carries the same table either way.
+      - name: Post or update the PR comment
+        if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const body = fs.readFileSync('perf-report.md', 'utf8');
+            const marker = '<!-- parparvm-perf-gate -->';
+            const { owner, repo } = context.repo;
+            const issue_number = context.payload.pull_request.number;
+            const comments = await github.paginate(github.rest.issues.listComments,
+              { owner, repo, issue_number, per_page: 100 });
+            const mine = comments.find(c => c.body && c.body.startsWith(marker));
+            if (mine) {
+              await github.rest.issues.updateComment({ owner, repo, comment_id: mine.id, body });
+            } else {
+              await github.rest.issues.createComment({ owner, repo, issue_number, body });
+            }
+
+      - name: Fail on a regression or a missing platform
+        run: exit "${{ steps.render.outputs.rc }}"

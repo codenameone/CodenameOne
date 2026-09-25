@@ -1,0 +1,4 @@
+{
+  "tolerance": {"time": 0.10, "memory": 0.10},
+  "platforms": {}
+}

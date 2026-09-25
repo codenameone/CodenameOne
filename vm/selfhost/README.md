@@ -74,6 +74,43 @@ The [17 September follow-up](NATIVE-LOWERING-2026-09-17.md) covers native builde
 ownership across helper calls and exceptions, concurrent tracing changes, linked
 assembly evidence, and the subsequent whole-workload comparison.
 
+## The CI performance gate
+
+`.github/workflows/parparvm-perf.yml` runs `perf-gate.py` on Linux x64, Linux arm64,
+macOS arm64 and Windows x64 for every pull request that touches `vm/`. It builds the
+self-hosted translator at `-O3`, and measures it translating the HelloCodenameOne
+corpus against JDK 25 at 1, 2 and 4 cores (as many as the runner has):
+
+```bash
+python3 vm/selfhost/prepare-hello-corpus.py
+python3 vm/selfhost/perf-gate.py --cores 1,2,4 --rounds 5
+```
+
+**JDK 25 is the unit of measure.** Each round runs both arms back to back, alternating
+which goes first, and yields a paired ratio -- ParparVM's elapsed time and peak memory
+over the JDK run beside it. The result is the median of those ratios. Nothing absolute
+is printed or kept: a shared runner that is slow today slows both halves of a pair, so
+one baseline holds on a fast runner and a slow one. Every run's output is compared byte
+for byte, as in the comparisons above.
+
+Core counts are pinned with CPU affinity on Linux and Windows. macOS has no affinity
+API, so there the count is logical: both arms are told it (`CN1_GC_MARK_THREADS`,
+`-XX:ActiveProcessorCount`) and neither is confined to it. That makes the macOS
+one-core row a different comparison -- the JDK's compiler threads still run on the
+other cores -- and the report marks it.
+
+**The gate compares against `perf-baseline.json`**: a ratio per platform and core count,
+and a tolerance per metric. A ratio more than the tolerance above its baseline fails the
+job and the pull request. The report job merges every platform into one table, posts it
+as a single pull-request comment that later runs update, and is red on a regression or
+on a platform that produced no result.
+
+**Calibrating.** Baselines must come from the runners that enforce them: a ratio depends
+on the hardware, so one measured on a developer machine is not a baseline for CI. A
+platform or core count with no entry is reported as "not gated", and the job log prints
+the entry to add. When a change moves performance on purpose, update the entries in the
+same pull request, from that pull request's own run.
+
 ## Native collection and string implementation
 
 `java.util.NativeStorage` is the common private buffer interface. Its C backing

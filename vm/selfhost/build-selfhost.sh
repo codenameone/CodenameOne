@@ -7,6 +7,8 @@
 # Requirements:
 #   JDK_8_HOME  a working JDK 8 (JavaAPI and the translator compile with it)
 #   clang, and maven on PATH the first time (to resolve ASM)
+#   Windows (Git Bash): cmake, ninja and clang-cl on PATH, i.e. an MSVC developer
+#   environment -- the same toolchain CleanTargetIntegrationTest builds with there
 #
 # The mandatory clang flags below are not negotiable for generated C: Java
 # arithmetic wraps, and clang -O3 provably miscompiles without -fwrapv
@@ -20,13 +22,30 @@ OPT="${1:--O1}"
 # 1.70s for -O2 and 1.73s for plain -O3. Benchmarking a bare -O3 binary and calling it
 # the release build understates it, so the flag is not left to the caller to remember.
 case "$OPT" in -O3) CN1_SELFHOST_CFLAGS="-flto=thin $CN1_SELFHOST_CFLAGS";; esac
+# WINDOWS (Git Bash) differs in three places, and each fails silently rather than loudly
+# if missed: a Java classpath separator is ';', and a colon-joined list of drive-letter
+# paths splits at every "C:"; the JDK wants Windows paths; and the native build is the
+# translator's own CMake project under clang-cl rather than a direct clang line.
+case "$(uname -s)" in
+    MINGW*|MSYS*|CYGWIN*) WINDOWS=1; CPSEP=';'; EXE=.exe ;;
+    *) WINDOWS=0; CPSEP=':'; EXE= ;;
+esac
+# Windows runners ship `python`, and not always `python3`.
+PYTHON="$(command -v python3 || command -v python)"
+# `cygpath -m` (C:/x/y), not -w: the JDK and CMake both take forward slashes, and a
+# backslash inside a javac @argfile is an escape rather than a separator.
+native_path() { if [ "$WINDOWS" = 1 ]; then cygpath -m "$1"; else echo "$1"; fi; }
+# A list file the JDK reads itself gets no MSYS path conversion, so convert its lines.
+native_list() { if [ "$WINDOWS" = 1 ]; then cygpath -m -f "$1"; else cat "$1"; fi; }
 CC="${CN1_SELFHOST_CC:-clang}"
 J8="${JDK_8_HOME:?set JDK_8_HOME to a working JDK 8}"
+# setup-java hands Git Bash a backslashed Windows path, which it cannot reliably exec.
+[ "$WINDOWS" = 1 ] && J8="$(cygpath -u "$J8")"
 OUT="$REPO/vm/selfhost/target"
 mkdir -p "$OUT"
-CN1_BUILD_SOURCE_SNAPSHOT="$(mktemp -t cn1sources)"
+CN1_BUILD_SOURCE_SNAPSHOT="$(native_path "$(mktemp -t cn1sources)")"
 export CN1_BUILD_SOURCE_SNAPSHOT
-python3 "$REPO/vm/selfhost/bench-selfhost.py" --snapshot-sources "$CN1_BUILD_SOURCE_SNAPSHOT"
+"$PYTHON" "$REPO/vm/selfhost/bench-selfhost.py" --snapshot-sources "$CN1_BUILD_SOURCE_SNAPSHOT"
 
 # 1. translator classes + ASM classpath, built once by maven and then cached.
 TRANSLATOR="$REPO/vm/ByteCodeTranslator/target/classes"
@@ -125,7 +144,10 @@ if [ ! -f "$JAVAAPI/java/lang/Object.class" ] || [ ! -f "$STAMP" ] || [ ! -f "$M
    ! cmp -s "$MANIFEST" "$MANIFEST.now" || \
    [ -n "$(find "$REPO/vm/JavaAPI/src" -name '*.java' -newer "$STAMP" -print -quit 2>/dev/null)" ]; then
     rm -rf "$JAVAAPI"; mkdir -p "$JAVAAPI"
-    "$J8/bin/javac" -nowarn -Xmaxerrs 10000 -source 1.8 -target 1.8 -d "$JAVAAPI" $(cat "$MANIFEST.now")
+    native_list "$MANIFEST.now" > "$MANIFEST.args"
+    "$J8/bin/javac" -nowarn -Xmaxerrs 10000 -source 1.8 -target 1.8 -d "$(native_path "$JAVAAPI")" \
+        "@$(native_path "$MANIFEST.args")"
+    rm -f "$MANIFEST.args"
     mv "$MANIFEST.now" "$MANIFEST"
     touch "$STAMP"
 else
@@ -152,18 +174,23 @@ find "$SRC" -name '*.java' \
   | grep -v '/CastSemanticsVerifier\.java$' \
   | grep -v '/NativeSignatureVerifierCli\.java$' > "$SRCLIST"
 find "$STUBS" -name '*.java' >> "$SRCLIST"
+native_list "$SRCLIST" > "$SRCLIST.args"
 
 # 5. compile it against JavaAPI ALONE. -Xmaxerrs because javac's default cap of 100
 #    silently truncates and makes a large gap look small.
 rm -rf "$OUT/classes"; mkdir -p "$OUT/classes"
 "$J8/bin/javac" -nowarn -Xmaxerrs 100000 -source 1.8 -target 1.8 \
-    -bootclasspath "$JAVAAPI" -cp "$ASM_CP" -d "$OUT/classes" "@$SRCLIST"
+    -bootclasspath "$(native_path "$JAVAAPI")" -cp "$ASM_CP" -d "$(native_path "$OUT/classes")" \
+    "@$(native_path "$SRCLIST.args")"
 
 # 6. ASM as class files: the translator walks directories, never archives.
 rm -rf "$OUT/asm-classes"; mkdir -p "$OUT/asm-classes"
-for jar in $(echo "$ASM_CP" | tr ':' '\n' | grep -E 'asm.*\.jar$'); do
-    (cd "$OUT/asm-classes" && unzip -oq "$jar" -x 'module-info.class' 'META-INF/*')
+# `jar xf` rather than unzip, which Git Bash does not reliably ship. The same entries
+# are then dropped that the unzip excluded.
+echo "$ASM_CP" | tr "$CPSEP" '\n' | grep -E 'asm.*\.jar$' | while read -r jar; do
+    (cd "$OUT/asm-classes" && "$J8/bin/jar" xf "$jar")
 done
+rm -rf "$OUT/asm-classes/META-INF" "$OUT/asm-classes/module-info.class"
 
 # 7. translate. The app name has to be the mangled main class: three classes in the
 #    set declare main, and ByteCodeClass.addMethod refuses to pick one otherwise.
@@ -175,8 +202,10 @@ rm -rf "$OUT/out"; mkdir -p "$OUT/out"
 # every object reference onto threadObjectStack; with frameless codegen on (the default)
 # a live reference can exist ONLY in a C local, so any collector that scans the precise
 # stack alone will miss it. Word-split on purpose: this is a list of options.
-"$J8/bin/java" -Xmx4g $CN1_SELFHOST_JAVA_OPTS -cp "$TRANSLATOR:$ASM_CP" com.codename1.tools.translator.ByteCodeTranslator \
-    clean "$JAVAAPI;$OUT/asm-classes;$OUT/classes" "$OUT/out" \
+"$J8/bin/java" -Xmx4g $CN1_SELFHOST_JAVA_OPTS -cp "$(native_path "$TRANSLATOR")$CPSEP$ASM_CP" \
+    com.codename1.tools.translator.ByteCodeTranslator \
+    clean "$(native_path "$JAVAAPI");$(native_path "$OUT/asm-classes");$(native_path "$OUT/classes")" \
+    "$(native_path "$OUT/out")" \
     "$APP" com.codename1.tools.translator "$APP" 1.0 clean none \
     > "$OUT/translate.log" 2>&1 \
     || { echo "TRANSLATE FAILED"; tail -40 "$OUT/translate.log"; exit 1; }
@@ -186,10 +215,38 @@ rm -rf "$OUT/out"; mkdir -p "$OUT/out"
 #    invocation links against a missing cn1VirtualThreadSwitch.
 SRCDIR="$OUT/out/dist/$APP-src"
 ASMS=$(ls "$SRCDIR"/*.S 2>/dev/null || true)
-BIN="$OUT/parpar$( [ "$OPT" = "-O3" ] && echo "-O3" || echo "" )"
+BIN="$OUT/parpar$( [ "$OPT" = "-O3" ] && echo "-O3" || echo "" )$EXE"
+if [ "$WINDOWS" = 1 ]; then
+    # The translator's own CMake project, turned into an executable the way
+    # CleanTargetIntegrationTest does it, so this compiles exactly what that test proves
+    # compiles on Windows. Release plus /clang:$OPT; no ThinLTO, which would need lld-link
+    # and is not what the Windows builder ships.
+    CMAKE_LISTS="$OUT/out/dist/CMakeLists.txt"
+    "$PYTHON" - "$CMAKE_LISTS" <<'PYEOF'
+import sys
+path = sys.argv[1]
+text = open(path, encoding='utf-8').read()
+at = text.index('add_library(${PROJECT_NAME}')
+end = text.index(')', at)
+text = text[:at] + 'add_executable(' + text[at + len('add_library('):end + 1] + text[end + 1:]
+open(path, 'w', encoding='utf-8').write(text)
+PYEOF
+    rm -rf "$OUT/cmake-build"
+    cmake -S "$(native_path "$OUT/out/dist")" -B "$(native_path "$OUT/cmake-build")" -G Ninja \
+        -DCMAKE_C_COMPILER=clang-cl -DCMAKE_BUILD_TYPE=Release \
+        "-DCMAKE_C_FLAGS_RELEASE=/O2 /Ob2 /DNDEBUG /clang:$OPT $CN1_SELFHOST_CFLAGS_WINDOWS" \
+        > "$OUT/cc.log" 2>&1 \
+        && cmake --build "$(native_path "$OUT/cmake-build")" >> "$OUT/cc.log" 2>&1 \
+        || { echo "COMPILE FAILED"; tail -40 "$OUT/cc.log"; exit 1; }
+    cp "$OUT/cmake-build/$APP.exe" "$BIN"
+    CN1_BUILD_FLAGS="Release /clang:$OPT $CN1_SELFHOST_CFLAGS_WINDOWS" CN1_SELFHOST_CC=clang-cl \
+        "$PYTHON" "$REPO/vm/selfhost/bench-selfhost.py" --record-build "$BIN"
+    echo "built $BIN"
+    exit 0
+fi
 $CC $OPT -w -fwrapv -fno-strict-aliasing -fno-builtin-fmod -fno-builtin-fmodf \
     $CN1_SELFHOST_CFLAGS -I"$SRCDIR" "$SRCDIR"/*.c $ASMS -lm -lpthread -o "$BIN" \
     2> "$OUT/cc.log" || { echo "COMPILE FAILED"; tail -40 "$OUT/cc.log"; exit 1; }
 CN1_BUILD_FLAGS="$OPT -fwrapv -fno-strict-aliasing -fno-builtin-fmod -fno-builtin-fmodf $CN1_SELFHOST_CFLAGS" \
-    python3 "$REPO/vm/selfhost/bench-selfhost.py" --record-build "$BIN"
+    "$PYTHON" "$REPO/vm/selfhost/bench-selfhost.py" --record-build "$BIN"
 echo "built $BIN"

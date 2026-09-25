@@ -72,7 +72,61 @@ def parse_usage(output, system):
     return {'peak_bytes': int(peak[1]) * factor, 'cpu_seconds': sum(cpu)}
 
 
+def run_windows(command, env, log, timeout):
+    """Windows has no /usr/bin/time. The peak working set and CPU times are read off the
+    process handle after exit -- still open, because Popen keeps it until the object is
+    collected -- which is the same quantity GNU time reports as the maximum RSS."""
+    import ctypes
+    from ctypes import wintypes
+
+    class PROCESS_MEMORY_COUNTERS(ctypes.Structure):
+        _fields_ = [('cb', wintypes.DWORD), ('PageFaultCount', wintypes.DWORD),
+                    ('PeakWorkingSetSize', ctypes.c_size_t), ('WorkingSetSize', ctypes.c_size_t),
+                    ('QuotaPeakPagedPoolUsage', ctypes.c_size_t),
+                    ('QuotaPagedPoolUsage', ctypes.c_size_t),
+                    ('QuotaPeakNonPagedPoolUsage', ctypes.c_size_t),
+                    ('QuotaNonPagedPoolUsage', ctypes.c_size_t),
+                    ('PagefileUsage', ctypes.c_size_t), ('PeakPagefileUsage', ctypes.c_size_t)]
+
+    start = time.monotonic()
+    with log.open('w') as output:
+        process = subprocess.Popen(command, env=env, stdout=output, stderr=output)
+        try:
+            process.wait(timeout=timeout)
+        except subprocess.TimeoutExpired:
+            # Kill the whole tree: a JVM launcher can outlive a plain terminate().
+            subprocess.call(['taskkill', '/F', '/T', '/PID', str(process.pid)],
+                            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            process.wait()
+            raise
+        elapsed = time.monotonic() - start
+        handle = wintypes.HANDLE(int(process._handle))
+        counters = PROCESS_MEMORY_COUNTERS()
+        counters.cb = ctypes.sizeof(counters)
+        if not ctypes.windll.psapi.GetProcessMemoryInfo(handle, ctypes.byref(counters),
+                                                        counters.cb):
+            raise RuntimeError('GetProcessMemoryInfo failed; see the run log')
+        created, exited, kernel, user = (wintypes.FILETIME() for _ in range(4))
+        if not ctypes.windll.kernel32.GetProcessTimes(handle, ctypes.byref(created),
+                                                      ctypes.byref(exited),
+                                                      ctypes.byref(kernel),
+                                                      ctypes.byref(user)):
+            raise RuntimeError('GetProcessTimes failed; see the run log')
+    if process.returncode:
+        raise RuntimeError('Process exited with %s: %s' % (process.returncode, log))
+
+    def seconds(filetime):
+        return ((filetime.dwHighDateTime << 32) | filetime.dwLowDateTime) / 1e7
+
+    if counters.PeakWorkingSetSize <= 0:
+        raise RuntimeError('Missing or invalid process resource usage; see the run log')
+    return {'peak_bytes': int(counters.PeakWorkingSetSize),
+            'cpu_seconds': seconds(kernel) + seconds(user), 'elapsed_seconds': elapsed}
+
+
 def run(command, env, log, system, timeout=300):
+    if system == 'Windows':
+        return run_windows(command, env, log, timeout)
     wrapper = ['/usr/bin/time', '-l' if system == 'Darwin' else '-v']
     start = time.monotonic()
     with log.open('w') as output:
@@ -206,7 +260,7 @@ def main(args):
               'metric': 'peak phys_footprint' if system == 'Darwin' else 'peak RSS',
               'corpus': {str(p): digest(p) for p in corpus},
               'executables': {name: {'path': path, 'sha256': digest(path)} for name, path in arms},
-              'versions': versions, 'asm': {p: digest(p) for p in asm.split(':')},
+              'versions': versions, 'asm': {p: digest(p) for p in asm.split(os.pathsep)},
               'samples': [], 'complete': False}
     result_file = work / 'results.json'
 
@@ -226,7 +280,7 @@ def main(args):
                 command = [executable]
                 if name != 'parpar':
                     command += jdk_opts
-                    command += ['-cp', str(host) + ':' + asm,
+                    command += ['-cp', str(host) + os.pathsep + asm,
                                 'com.codename1.tools.translator.ByteCodeTranslator']
                 command += ['clean', ';'.join(map(str, [javaapi] + corpus)), str(out),
                             app, package, app, '1.0', 'clean', 'none']
