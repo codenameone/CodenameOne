@@ -27,6 +27,8 @@ import org.junit.Test;
 
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
+import java.util.Arrays;
+import java.util.List;
 import java.util.Properties;
 
 import static org.junit.Assert.assertEquals;
@@ -107,6 +109,31 @@ public class CN1BuildMojoTest {
     public void keepsArtifactsWithoutAScope() {
         // A null scope is not a statement that the artifact is outside the application.
         assertFalse(CN1BuildMojo.isStrippedFromStagedJar("com.mycompany", "some-lib", null, "ios-device"));
+    }
+
+    @Test
+    public void neverStagesTheDesktopRuntimeBinaries() {
+        // The aggregator itself, whatever scope an older generated pom gave it.
+        assertTrue(CN1BuildMojo.isDesktopRuntimeBinary("com.codenameone", "cn1-binaries-javase", null));
+        // What it pulls in: ffmpeg and its per-platform natives, at compile scope.
+        List<String> viaAggregator = Arrays.asList(
+                "com.example:myapp-javase:jar:1.0-SNAPSHOT",
+                "com.codenameone:cn1-binaries-javase:pom:8.0-SNAPSHOT",
+                "org.bytedeco:ffmpeg-platform:jar:7.1-1.5.11",
+                "org.bytedeco:ffmpeg:jar:windows-x86_64:7.1-1.5.11");
+        assertTrue(CN1BuildMojo.isDesktopRuntimeBinary("org.bytedeco", "ffmpeg", viaAggregator));
+    }
+
+    @Test
+    public void keepsAnOrgBytedecoDependencyTheAppDeclaresItself() {
+        List<String> direct = Arrays.asList(
+                "com.example:myapp-javase:jar:1.0-SNAPSHOT",
+                "org.bytedeco:javacv:jar:1.5.11");
+        assertFalse(CN1BuildMojo.isDesktopRuntimeBinary("org.bytedeco", "javacv", direct));
+        assertFalse(CN1BuildMojo.isDesktopRuntimeBinary("org.bytedeco", "javacv", null));
+        // Another com.codenameone artifact whose name merely starts the same way.
+        assertFalse(CN1BuildMojo.isDesktopRuntimeBinary("com.codenameone", "cn1-binaries-javase-extra",
+                Arrays.asList("com.codenameone:cn1-binaries-javase-extra:jar:1.0")));
     }
 
     @Test

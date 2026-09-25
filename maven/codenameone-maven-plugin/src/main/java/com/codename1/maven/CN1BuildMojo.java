@@ -93,6 +93,16 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
     private boolean automated;
 
     /**
+     * Stop once the jar the build would send has been assembled and checked,
+     * without submitting anything or building locally. The jar is left at
+     * target/&lt;finalName&gt;-&lt;buildTarget&gt;-jar-with-dependencies.jar. This is
+     * what lets CI inspect the real upload for every target with no account
+     * and no network: maven/integration-tests/cn1app-staged-jar-test.sh.
+     */
+    @Parameter(property = "codename1.stageOnly", defaultValue = "false")
+    private boolean stageOnly;
+
+    /**
      * Flag of whether to open the xcode/android studio project.
      */
     @Parameter(property = "open", defaultValue = "true")
@@ -868,7 +878,45 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
     }
 
     private boolean isStrippedFromStagedJar(Artifact artifact) {
-        return isStrippedFromStagedJar(artifact.getGroupId(), artifact.getArtifactId(), artifact.getScope(), buildTarget);
+        return isDesktopRuntimeBinary(artifact.getGroupId(), artifact.getArtifactId(), artifact.getDependencyTrail())
+                || isStrippedFromStagedJar(artifact.getGroupId(), artifact.getArtifactId(), artifact.getScope(), buildTarget);
+    }
+
+    /**
+     * The aggregator that puts the desktop media runtime -- org.bytedeco's ffmpeg,
+     * with natives for Android, iOS, Linux, macOS and Windows -- on the simulator
+     * and desktop run classpaths.
+     */
+    static final String DESKTOP_RUNTIME_BINARIES_ARTIFACT_ID = "cn1-binaries-javase";
+
+    /**
+     * Whether the artifact is the desktop runtime aggregator or was pulled in
+     * only through it. These are never sent to a build, whatever their scope.
+     *
+     * <p>Projects generated from the archetype between #5380 and the fix for it
+     * declare the aggregator at compile scope, and no profile re-scopes it, so
+     * by scope alone it lands in the staged jar: about 300 MB of ffmpeg natives
+     * that the build client refuses to upload, failing every desktop build of
+     * every such project. Deciding by the dependency trail rather than the scope
+     * repairs those projects without asking anyone to edit a pom. An app that
+     * declares an org.bytedeco artifact itself reaches it by its own, shorter
+     * trail, which Maven prefers, so that dependency is still sent.</p>
+     */
+    static boolean isDesktopRuntimeBinary(String groupId, String artifactId, List<String> dependencyTrail) {
+        if (GROUP_ID.equals(groupId) && DESKTOP_RUNTIME_BINARIES_ARTIFACT_ID.equals(artifactId)) {
+            return true;
+        }
+        if (dependencyTrail == null) {
+            return false;
+        }
+        // Trail entries are Artifact.getId(): groupId:artifactId:type:version.
+        String aggregator = GROUP_ID + ":" + DESKTOP_RUNTIME_BINARIES_ARTIFACT_ID + ":";
+        for (String node : dependencyTrail) {
+            if (node != null && node.startsWith(aggregator)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**
@@ -1500,6 +1548,12 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
         }
 
         verifyApplicationClassClosure(jarWithDependencies, cpElements);
+
+        if (stageOnly) {
+            getLog().info("codename1.stageOnly is set: staged " + jarWithDependencies + " ("
+                    + jarWithDependencies.length() + " bytes) for " + buildTarget + " and stopped before building");
+            return;
+        }
 
         try {
             updateCodenameOne(false);
