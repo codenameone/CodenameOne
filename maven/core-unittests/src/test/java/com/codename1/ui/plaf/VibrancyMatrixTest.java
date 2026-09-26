@@ -35,8 +35,9 @@ import static org.junit.jupiter.api.Assertions.*;
 /**
  * Holds VibrancyMatrix to the matrices UIKit itself installs for a tab bar tint,
  * read from the iOS 27 simulator (tab-glass-motion/native-vibrancy.csv). The
- * comparison is on OUTPUT colours over a spread of backdrops, since that is what
- * a user sees: every channel must land within the stated levels of native.
+ * closed forms must reproduce every native matrix entry to the precision the
+ * fixture stores, and the OUTPUT colours -- what a user sees -- over a spread of
+ * backdrops to within rounding.
  */
 class VibrancyMatrixTest {
 
@@ -49,8 +50,10 @@ class VibrancyMatrixTest {
         assertNotNull(in);
         BufferedReader r = new BufferedReader(new InputStreamReader(in, StandardCharsets.UTF_8));
         int n = 0;
+        int grey = 0;
         int worstDark = 0;
         int worstLight = 0;
+        double worstEntry = 0;
         try {
             String line;
             while ((line = r.readLine()) != null) {
@@ -65,6 +68,12 @@ class VibrancyMatrixTest {
                     nat[i] = Float.parseFloat(p[2 + i]);
                 }
                 float[] m = VibrancyMatrix.forTint(tint, dark);
+                for (int i = 0; i < 12; i++) {
+                    worstEntry = Math.max(worstEntry, Math.abs(m[i] - nat[i]));
+                }
+                if (((tint >> 16) & 0xff) == (tint & 0xff) && ((tint >> 8) & 0xff) == (tint & 0xff)) {
+                    grey++;
+                }
                 for (int b : BACKDROPS) {
                     int d = maxChannelDelta(VibrancyMatrix.apply(nat, b), VibrancyMatrix.apply(m, b));
                     if (dark) {
@@ -79,10 +88,31 @@ class VibrancyMatrixTest {
             r.close();
         }
         assertTrue(n > 600, "fixture truncated: " + n);
-        // Dark is a closed form: exact up to rounding.
+        assertTrue(grey >= 30, "fixture lost its grey ramp: " + grey);
+        // The fixture stores five decimals (half a unit is 5e-6); the capture itself
+        // is float precision. Anything beyond that is a different formula.
+        assertTrue(worstEntry <= 2e-5, "matrix entry off by " + worstEntry);
         assertTrue(worstDark <= 1, "dark off by " + worstDark + " levels");
-        // Light is a fitted table: under 2 levels even over black, the worst backdrop.
-        assertTrue(worstLight <= 2, "light off by " + worstLight + " levels");
+        assertTrue(worstLight <= 1, "light off by " + worstLight + " levels");
+    }
+
+    @Test
+    void lightPaintsTheTintItselfOverWhite() {
+        // The light alpha is exactly the value that maps a white backdrop to the tint;
+        // sweep a coarse RGB grid (grey tints follow their own ramp and are skipped).
+        int worst = 0;
+        for (int r = 0; r < 256; r += 17) {
+            for (int g = 0; g < 256; g += 17) {
+                for (int b = 0; b < 256; b += 17) {
+                    if (r == g && g == b) {
+                        continue;
+                    }
+                    int tint = (r << 16) | (g << 8) | b;
+                    worst = Math.max(worst, maxChannelDelta(tint, VibrancyMatrix.apply(VibrancyMatrix.forTint(tint, false), 0xffffff)));
+                }
+            }
+        }
+        assertTrue(worst <= 1, "white backdrop off the tint by " + worst + " levels");
     }
 
     @Test

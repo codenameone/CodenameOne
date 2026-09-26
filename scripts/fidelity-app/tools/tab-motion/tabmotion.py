@@ -33,10 +33,9 @@ Gestures (holds and drags, see TabGlassGesture):
 
 Vibrancy (the colour matrix of vibrant content, see VibrancyMatrix):
 
-  vibrancy --light LOG... --grey LOG [--dark-check LOG] -o VibrancyMatrix.java
-      Fits the light-appearance alpha table and the grey ramp from PROBE_TINTSWEEP
-      logs and rewrites the tables between the "generated tables (tabmotion.py
-      vibrancy)" markers.
+  vibrancy --dark LOG... --light LOG...
+      Holds every matrix in PROBE_TINTSWEEP logs to the closed forms VibrancyMatrix
+      implements, and fails if any is off by more than the log's precision.
   vibrancy-fixture --dark LOG --light LOG --grey-dark LOG --grey-light LOG -o native-vibrancy.csv
       Exports the measured matrices VibrancyMatrixTest checks the Java against.
 
@@ -443,7 +442,6 @@ SETTLE_N = int(1.25 * FPS)
 FIR_TAPS = 60
 FIR_RIDGE = 1e-2
 GESTURE_BEGIN = "    // ---- generated tables (tabmotion.py gesture) ----\n"
-VIBRANCY_BEGIN = "    // ---- generated tables (tabmotion.py vibrancy) ----\n"
 TABLES_END = "    // ---- end of generated tables ----\n"
 
 
@@ -809,12 +807,29 @@ def springs(press_logs, drag_log):
 
 # --------------------------------------------------------------------------- vibrancy
 
-# Light-appearance alpha table nodes: chroma max - min (in 1/255), normalised value
-# min / (1 - chroma), hue position (mid - min) / (max - min).
-CHROMA_NODES = [0, 1, 2, 3, 4, 6, 8, 10, 12, 16, 20, 24, 32, 40, 48, 56, 64, 80, 96, 128, 160, 192, 224, 255]
-VALUE_NODES = [0, .02, .05, .1, .2, .35, .5, .65, .8, .9, .95, .98, 1]
-HUE_NODES = 9
-VIB_SMOOTH = 1e-3
+# The closed forms VibrancyMatrix implements; `vibrancy` holds every logged matrix to
+# them. Structure and constants were found from these captures (see VibrancyMatrix).
+VIB_TOLERANCE = 2e-5
+
+
+def dark_matrix(t):
+    mx, mn = t.max(), t.min()
+    e = 0.5 * mn / mx
+    return (0.5 - e) * np.outer(np.ones(3), t) / (t @ t) + e * np.eye(3), t.copy()
+
+
+def light_matrix(t):
+    mx, mn = t.max(), t.min()
+    e = 0.5 * mn / mx
+    d = 1 - t
+    c = 0.3 * (0.5 - e) / (d @ d)
+    alpha = 1 - e - c * d.sum()
+    return c * np.outer(1 + t, d) + e * np.eye(3), alpha * (1 + t) - 1 + e * t
+
+
+def grey_matrix(g):
+    q = 1 + 0.05 * g * (1 - g)
+    return 5.0 / 16 / q * np.eye(3), np.full(3, (19.0 / 16 * g - 0.25) / q)
 
 
 def load_tints(path):
@@ -838,138 +853,27 @@ def load_tints(path):
     return out
 
 
-def dark_matrix(t):
-    mx, mn = t.max(), t.min()
-    e = 0.5 * mn / mx
-    return (0.5 - e) * np.outer(np.ones(3), t) / (t @ t) + e * np.eye(3), t.copy()
-
-
-def light_matrix(t, alpha):
-    mx, mn = t.max(), t.min()
-    e = 0.5 * mn / mx
-    c = (1 - alpha - e) / (1 - t).sum()
-    return c * np.outer(1 + t, 1 - t) + e * np.eye(3), alpha * (1 + t) - 1 + e * t
-
-
-def light_alpha(t, mats):
-    """The alpha whose light matrix fits one of the logged matrices best, and its error."""
-    from scipy.optimize import least_squares
-    best = None
-    for M in mats:
-        def f(a):
-            W, off = light_matrix(t, a[0])
-            return np.r_[(W - M[:3, :3]).ravel(), off - M[:3, 4]]
-        r = least_squares(f, [0.8])
-        err = np.abs(r.fun).max()
-        if best is None or err < best[1]:
-            best = (r.x[0], err)
-    return best
-
-
-def vib_weights(t):
-    """Trilinear (node index, weight) pairs of a tint in the alpha table."""
-    s = np.sort(t)[::-1]
-    mx, md, mn = s
-    C = mx - mn
-    coords = (C, (mx - C) / (1 - C) if C < 1 else 0.0, (md - mn) / C if C > 0 else 0.0)
-    axes = (np.array(CHROMA_NODES) / 255., np.array(VALUE_NODES, dtype=float), np.linspace(0, 1, HUE_NODES))
-    cells = []
-    for ax, x in zip(axes, coords):
-        i = int(np.clip(np.searchsorted(ax, x) - 1, 0, len(ax) - 2))
-        cells.append((i, (x - ax[i]) / (ax[i + 1] - ax[i])))
-    out = []
-    for dc in (0, 1):
-        for dv in (0, 1):
-            for dw in (0, 1):
-                w = 1.0
-                for (i, f), dd in zip(cells, (dc, dv, dw)):
-                    w *= f if dd else 1 - f
-                out.append(((cells[0][0] + dc, cells[1][0] + dv, cells[2][0] + dw), w))
-    return out
-
-
-def fit_alpha_table(samples, lam=VIB_SMOOTH):
-    """Least squares over the trilinear table, with second-difference smoothing."""
-    from scipy.sparse import lil_matrix
-    from scipy.sparse.linalg import lsqr
-    shape = (len(CHROMA_NODES), len(VALUE_NODES), HUE_NODES)
-    N = int(np.prod(shape))
-    A = lil_matrix((len(samples) + 3 * N, N))
-    b = np.zeros(len(samples) + 3 * N)
-    for r, (t, a) in enumerate(samples):
-        for idx, w in vib_weights(t):
-            A[r, np.ravel_multi_index(idx, shape)] += w
-        b[r] = a
-    r = len(samples)
-    for ax in range(3):
-        for idx in np.ndindex(*shape):
-            if 0 < idx[ax] < shape[ax] - 1:
-                lo, hi = list(idx), list(idx)
-                lo[ax] -= 1
-                hi[ax] += 1
-                A[r, np.ravel_multi_index(tuple(lo), shape)] += lam
-                A[r, np.ravel_multi_index(idx, shape)] -= 2 * lam
-                A[r, np.ravel_multi_index(tuple(hi), shape)] += lam
-                r += 1
-    x = lsqr(A[:r].tocsr(), b[:r], atol=1e-12, btol=1e-12, iter_lim=20000)[0]
-    return x.reshape(shape)
-
-
-def grey_ramp(path):
-    """Diagonal gain and offset of the selected item's matrix for grey 0, 17 .. 255."""
-    grey = {}
-    for h, t, mats in load_tints(path):
-        if t.max() == t.min():
-            grey[int(round(t[0] * 255))] = (mats[0][0, 0], mats[0][0, 4])
-    levels = list(range(0, 256, 17))
-    missing = [g for g in levels if g not in grey]
-    if missing:
-        sys.exit("%s has no grey tint %s" % (path, missing))
-    return [grey[g][0] for g in levels], [grey[g][1] for g in levels]
-
-
-def vibrancy_tables(light_logs, grey_log, dark_check=None):
-    if dark_check:
-        errs = [min(np.abs(M[:3, :3] - dark_matrix(t)[0]).max() + np.abs(M[:3, 4] - dark_matrix(t)[1]).max()
-                    for M in mats) for h, t, mats in load_tints(dark_check) if t.max() - t.min() > 1e-9]
-        print("dark formula vs %s: %d tints, max error %.6f" % (dark_check, len(errs), max(errs)), file=sys.stderr)
-    samples, structure = [], 0
-    for log in light_logs:
+def vibrancy_check(dark_logs, light_logs):
+    """Worst matrix-entry error of the closed forms against every logged tint. A
+    tint's item layers carry several matrices (selected and unselected items), so
+    each tint is scored against the one that matches best -- the selected item's."""
+    worst = 0.0
+    for appearance, logs, colour in (("dark", dark_logs, dark_matrix), ("light", light_logs, light_matrix)):
         n = 0
-        for h, t, mats in load_tints(log):
-            if t.max() - t.min() < 1e-9:
-                continue
-            a, err = light_alpha(t, mats)
-            samples.append((t, a))
-            structure = max(structure, err)
-            n += 1
-        print("%s: %d tints" % (log, n), file=sys.stderr)
-    print("light structure: worst matrix error at the best alpha %.6f" % structure, file=sys.stderr)
-    T = fit_alpha_table(samples)
-    err = np.array([abs(sum(w * T[idx] for idx, w in vib_weights(t)) - a) for t, a in samples])
-    print("light alpha table: %d tints, max error %.4f p99 %.4f" % (len(samples), err.max(), np.percentile(err, 99)),
-          file=sys.stderr)
-    gain, off = grey_ramp(grey_log)
-
-    def fmt(vals):
-        s = ["%.5ff" % v for v in vals]
-        lines = ["            " + ", ".join(s[i:i + 10]) + "," for i in range(0, len(s), 10)]
-        lines[-1] = lines[-1].rstrip(",")
-        return "\n".join(lines)
-
-    out = ["    /// Chroma nodes of the light-appearance table, in 1/255 units of max - min.",
-           "    private static final int[] CHROMA_NODES = {" + ", ".join(str(c) for c in CHROMA_NODES) + "};",
-           "    /// Nodes of the normalised value min / (1 - chroma).",
-           "    private static final float[] VALUE_NODES = {" + ", ".join(("%g" % v) + "f" for v in VALUE_NODES) + "};",
-           "    /// Hue-position nodes (mid - min) / (max - min): 0, 1/8 .. 1.",
-           "    private static final int HUE_NODES = %d;" % HUE_NODES,
-           "    /// Light-appearance darkening alpha, [chroma][value][hue] flattened.",
-           "    private static final float[] LIGHT_ALPHA = {\n" + fmt(T.ravel()) + "\n    };",
-           "    /// Grey tints (both appearances): the diagonal and the offset for grey levels",
-           "    /// 0, 17, 34 .. 255.",
-           "    private static final float[] GREY_GAIN = {\n" + fmt(gain) + "\n    };",
-           "    private static final float[] GREY_OFFSET = {\n" + fmt(off) + "\n    };"]
-    return "\n".join(out) + "\n"
+        for log in logs:
+            for h, t, mats in load_tints(log):
+                if not mats:
+                    continue
+                W, off = grey_matrix(t[0]) if t.max() == t.min() else colour(t)
+                err = min(max(np.abs(M[:3, :3] - W).max(), np.abs(M[:3, 4] - off).max()) for M in mats)
+                if err > VIB_TOLERANCE:
+                    print("%s %s %s: off by %.2e" % (log, appearance, h, err), file=sys.stderr)
+                worst = max(worst, err)
+                n += 1
+        print("%s: %d tints" % (appearance, n), file=sys.stderr)
+    print("worst entry error %.2e (tolerance %.0e)" % (worst, VIB_TOLERANCE), file=sys.stderr)
+    if worst > VIB_TOLERANCE:
+        sys.exit("the vibrancy closed forms no longer match the capture")
 
 
 def vibrancy_fixture(dark, light, grey_dark, grey_light, path, count=300):
@@ -1025,10 +929,8 @@ def main():
     a.add_argument("--press", nargs="+", required=True)
     a.add_argument("--drag", required=True)
     a = sub.add_parser("vibrancy")
+    a.add_argument("--dark", nargs="+", required=True)
     a.add_argument("--light", nargs="+", required=True)
-    a.add_argument("--grey", required=True)
-    a.add_argument("--dark-check")
-    a.add_argument("-o", required=True)
     a = sub.add_parser("vibrancy-fixture")
     for k in ("--dark", "--light", "--grey-dark", "--grey-light", "-o"):
         a.add_argument(k, required=True)
@@ -1058,7 +960,7 @@ def main():
     elif args.cmd == "springs":
         springs(args.press, args.drag)
     elif args.cmd == "vibrancy":
-        splice(args.o, VIBRANCY_BEGIN, vibrancy_tables(args.light, args.grey, args.dark_check))
+        vibrancy_check(args.dark, args.light)
     elif args.cmd == "vibrancy-fixture":
         vibrancy_fixture(args.dark, args.light, args.grey_dark, args.grey_light, args.o)
 
