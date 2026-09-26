@@ -46,6 +46,7 @@ import org.eclipse.aether.artifact.ArtifactTypeRegistry;
 import org.eclipse.aether.collection.CollectRequest;
 import org.eclipse.aether.collection.CollectResult;
 import org.eclipse.aether.graph.DependencyNode;
+import org.eclipse.aether.graph.Exclusion;
 import javax.imageio.ImageIO;
 import java.awt.image.BufferedImage;
 import java.io.*;
@@ -960,7 +961,7 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
                         || (scope != null && scope.length() > 0 && !"compile".equals(scope))) {
                     continue;
                 }
-                request.addDependency(RepositoryUtils.toDependency(dependency, types));
+                request.addDependency(withoutDesktopRuntime(RepositoryUtils.toDependency(dependency, types)));
             }
             DependencyManagement management = project.getDependencyManagement();
             if (management != null) {
@@ -979,6 +980,18 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
             neededWithoutDesktopRuntime = null;
         }
         return neededWithoutDesktopRuntime;
+    }
+
+    /**
+     * The dependency with the desktop runtime aggregator excluded from everything below it.
+     * Skipping the aggregator where the project declares it is not enough: a library can
+     * bring it in transitively, and the collection would then find it again through that
+     * library and report all of ffmpeg as needed. Exclusions apply at every depth.
+     */
+    static org.eclipse.aether.graph.Dependency withoutDesktopRuntime(org.eclipse.aether.graph.Dependency dependency) {
+        List<Exclusion> exclusions = new ArrayList<Exclusion>(dependency.getExclusions());
+        exclusions.add(new Exclusion(GROUP_ID, DESKTOP_RUNTIME_BINARIES_ARTIFACT_ID, "*", "*"));
+        return dependency.setExclusions(exclusions);
     }
 
     private static void addDependencyKeys(DependencyNode node, Set<String> keys) {

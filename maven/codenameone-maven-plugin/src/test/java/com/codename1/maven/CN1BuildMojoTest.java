@@ -156,6 +156,25 @@ public class CN1BuildMojoTest {
     }
 
     @Test
+    public void excludesTheDesktopRuntimeBelowEveryCollectedDependency() {
+        org.eclipse.aether.graph.Exclusion own = new org.eclipse.aether.graph.Exclusion("org.slf4j", "slf4j-api", "*", "*");
+        org.eclipse.aether.graph.Dependency library = new org.eclipse.aether.graph.Dependency(
+                new org.eclipse.aether.artifact.DefaultArtifact("com.example:some-cn1lib:1.0"), "compile",
+                false, Arrays.asList(own));
+        org.eclipse.aether.graph.Dependency result = CN1BuildMojo.withoutDesktopRuntime(library);
+        boolean aggregatorExcluded = false;
+        for (org.eclipse.aether.graph.Exclusion e : result.getExclusions()) {
+            if ("com.codenameone".equals(e.getGroupId()) && "cn1-binaries-javase".equals(e.getArtifactId())
+                    && "*".equals(e.getClassifier()) && "*".equals(e.getExtension())) {
+                aggregatorExcluded = true;
+            }
+        }
+        assertTrue(aggregatorExcluded);
+        // The library's own exclusions survive.
+        assertTrue(result.getExclusions().contains(own));
+    }
+
+    @Test
     public void reusesAStagedJarOnlyWhenItsInputsMatch() {
         long start = 1000000L;
         assertTrue(CN1BuildMojo.mayReuseStagedJar("/a.jar\n/b.jar", "/a.jar\n/b.jar\n", 5, start));
