@@ -73,6 +73,28 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
 
     private String serverMustProvideKotlinVersion;
 
+    /** System properties with this prefix are handed to build.xml without it. */
+    static final String ANT_PROPERTY_PREFIX = "codename1.ant.";
+
+    /**
+     * The release gate (BuildDaemon release-gate/) sends a build to one daemon release's
+     * canary queue, so it can prove that release built it. build.xml names each target's
+     * queue with {@code <property name="<platform>.targetType">}, and Ant keeps the first
+     * value a property is given, so a value passed in wins. Only {@code *.targetType} is
+     * accepted -- nothing else in build.xml can be steered this way -- and BuildCloud
+     * refuses the {@code debug_} queues this is used for to anyone outside Codename One.
+     */
+    static Properties releaseGateQueueOverrides(Properties system) {
+        Properties out = new Properties();
+        for (String name : system.stringPropertyNames()) {
+            if (name.startsWith(ANT_PROPERTY_PREFIX) && name.endsWith(".targetType")
+                    && name.length() > ANT_PROPERTY_PREFIX.length() + ".targetType".length()) {
+                out.setProperty(name.substring(ANT_PROPERTY_PREFIX.length()), system.getProperty(name));
+            }
+        }
+        return out;
+    }
+
     /**
      * The target platform.  E.g. javase, javascript, ios, android, win
      */
@@ -1518,6 +1540,7 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
         if (automated) {
             p.setProperty("automated", "true");
         }
+        p.putAll(releaseGateQueueOverrides(System.getProperties()));
         getLog().info("Running ANT build target " + buildTarget);
         String logPasskey = UUID.randomUUID().toString();
         Properties cn1SettingsProps = new Properties();
