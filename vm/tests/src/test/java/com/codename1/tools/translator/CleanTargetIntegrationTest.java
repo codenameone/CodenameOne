@@ -1359,6 +1359,14 @@ class CleanTargetIntegrationTest {
             final java.util.concurrent.atomic.AtomicInteger finishedTests = new java.util.concurrent.atomic.AtomicInteger(0);
             final java.util.concurrent.atomic.AtomicReference<String> lastLine =
                     new java.util.concurrent.atomic.AtomicReference<String>("");
+            // When the suite last said anything. The stabilization window below is
+            // measured from this as well as from the last screenshot: the suite's tail is
+            // long NON-rendering tests (DatabaseEncryptionTest, CommonWorkloadBenchmarkTest)
+            // that emit no PNG for minutes while logging steadily, and a window measured
+            // from screenshots alone stopped waiting in the middle of them -- 44 tests then
+            // counted as not run, at a different test each time, depending only on timing.
+            final java.util.concurrent.atomic.AtomicLong lastActivity =
+                    new java.util.concurrent.atomic.AtomicLong(System.currentTimeMillis());
             // Set by the suite watchdog when a test blocks the event dispatch
             // thread; the run cannot progress past that point, so stop waiting.
             final java.util.concurrent.atomic.AtomicReference<String> wedged =
@@ -1396,7 +1404,10 @@ class CleanTargetIntegrationTest {
                             if (line.contains("CN1SS:SUITE:WEDGED")) { wedged.set(line); }
                             int suite = line.indexOf("CN1SS:");
                             if (suite >= 0) { suiteLog.add(line.substring(suite)); }
-                            if (line.contains("CN1SS:") || line.contains("suite ")) { lastLine.set(line); }
+                            if (line.contains("CN1SS:") || line.contains("suite ")) {
+                                lastLine.set(line);
+                                lastActivity.set(System.currentTimeMillis());
+                            }
                         }
                     } catch (IOException ignore) {
                     }
@@ -1429,9 +1440,19 @@ class CleanTargetIntegrationTest {
                     System.out.println("CN1SS:HARNESS: " + wedged.get());
                     break;
                 }
+                if (!app.isAlive()) {
+                    // Said here, and into the suite log the report is built from, so an
+                    // early end reads as a crash rather than as tests that never ran.
+                    String ended = "CN1SS:HARNESS: the suite process exited with code " + app.exitValue()
+                            + " before finishing";
+                    System.out.println(ended);
+                    suiteLog.add(ended);
+                    break;
+                }
                 pngs = countPngFiles(outDir);
                 if (pngs != lastPngs) { lastPngs = pngs; lastChange = System.currentTimeMillis(); }
-                if (!requireSuite && pngs >= minPngs && (System.currentTimeMillis() - lastChange) >= stableMs
+                long quietSince = Math.max(lastChange, lastActivity.get());
+                if (!requireSuite && pngs >= minPngs && (System.currentTimeMillis() - quietSince) >= stableMs
                         && (!requirePerformance || performanceFinished.get())) { break; }
                 Thread.sleep(3000);
             }
