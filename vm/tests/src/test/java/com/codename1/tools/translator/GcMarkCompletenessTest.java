@@ -58,14 +58,8 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
  * private final instance field, and the Canvas in its place was itself live
  * (mark epoch 18, not the -1 that means fresh) -- a recycled slot, not garbage.
  *
- * What this checks is the ONE structural property that makes such a reclaim
- * possible from the translator's side: ByteCodeClass emits a mark body from
- * `fullFieldList`, filtered to non-static object fields DECLARED by the class
- * (inherited ones are the base class's mark function's job). Anything that
- * makes a field fall out of that filter -- a descriptor the parser types
- * wrongly, a new field kind, a refactor of isObjectType -- silently stops the
- * field being traced. Reading the emitted C is the only place that assumption
- * is observable.
+ * The emitted mark callback must cover the complete flattened layout, including
+ * inherited fields. Weak referents must be registered rather than marked strongly.
  */
 class GcMarkCompletenessTest {
 
@@ -93,7 +87,9 @@ class GcMarkCompletenessTest {
         // visible.
         Path app = src.resolve("GcMarkApp.java");
         Files.write(app, ("import java.util.*;\n" +
-                "class MarkBase { Object baseRef; int basePrim; }\n" +
+                "class MarkList extends ArrayList<Object> {}\n" +
+                "class MarkBase { Object baseRef; private Object privateRef = new Object(); int basePrim;\n" +
+                "    int reads() { return (baseRef != null ? 1 : 0) + (privateRef != null ? 1 : 0) + basePrim; } }\n" +
                 "class MarkMid extends MarkBase { String midRef; }\n" +
                 "class MarkLeaf extends MarkMid {\n" +
                 "    final ArrayList<Runnable> pending = new ArrayList<Runnable>();\n" +
@@ -101,9 +97,9 @@ class GcMarkCompletenessTest {
                 "    Runnable iface; Map<String,String> mapRef;\n" +
                 "}\n" +
                 "public class GcMarkApp {\n" +
-                "    static MarkLeaf keep;\n" +
+                "    static MarkLeaf keep; static MarkList list; static java.lang.ref.WeakReference<Object> weak;\n" +
                 "    public static void main(String[] args) {\n" +
-                "        keep = new MarkLeaf();\n" +
+                "        keep = new MarkLeaf(); list = new MarkList(); list.add(keep); weak = new java.lang.ref.WeakReference<Object>(keep);\n" +
                 "        keep.pending.add(new Runnable(){ public void run(){} });\n" +
                 "        keep.mixedOne = new Object();\n" +
                 "        keep.arrayRef = new String[2];\n" +
@@ -111,7 +107,12 @@ class GcMarkCompletenessTest {
                 "        keep.mapRef = new HashMap<String,String>();\n" +
                 "        keep.baseRef = new Object();\n" +
                 "        keep.midRef = \"x\";\n" +
-                "        System.out.println(keep.pending.size());\n" +
+                // Every field is READ as well as written: the translator removes an
+                // instance field nothing reads (DeadFieldElimination), and a removed
+                // field has no mark-function entry for this test to find.
+                "        System.out.println(keep.pending.size() + keep.reads() + (keep.midRef != null ? 1 : 0)\n" +
+                "            + (keep.mixedOne != null ? 1 : 0) + (keep.arrayRef != null ? 1 : 0) + keep.a + keep.c + (int) keep.b\n" +
+                "            + (keep.iface != null ? 1 : 0) + (keep.mapRef != null ? 1 : 0));\n" +
                 "    }\n" +
                 "}\n").getBytes(StandardCharsets.UTF_8));
 
@@ -160,18 +161,7 @@ class GcMarkCompletenessTest {
                 while (mf.find()) {
                     String cls = mf.group(1);
                     String markBody = mf.group(2);
-                    // struct obj__X FLATTENS the inherited fields, but the mark
-                    // function deliberately marks only what the class DECLARES and
-                    // chains to its base for the rest -- so requiring every struct
-                    // member here would demand that Error re-mark Throwable's fields.
-                    // The mangled name carries its declaring class, which is the same
-                    // filter ByteCodeClass applies (fld.getClsName().equals(clsName)).
-                    Set<String> declared = new LinkedHashSet<String>();
-                    for (String f : declaredObjectFields(head, cls)) {
-                        if (f.startsWith(cls + "_")) {
-                            declared.add(f);
-                        }
-                    }
+                    Set<String> declared = declaredObjectFields(head, cls);
                     if (declared.isEmpty()) {
                         continue;
                     }
@@ -179,10 +169,10 @@ class GcMarkCompletenessTest {
                     for (String f : declared) {
                         fieldsChecked++;
                         // The emitted body names the field directly, whether it goes
-                        // through gcMarkObject, gcMarkArrayObject or
+                        // through cn1GcMarkField or
                         // cn1GcDiscoverReference (the WeakReference referent, which is
                         // deliberately not traced but IS handed to the collector).
-                        if (!markBody.contains(f)) {
+                        if (!tracesField(markBody, f)) {
                             missing.add(cls + "." + f);
                         }
                     }
@@ -190,29 +180,23 @@ class GcMarkCompletenessTest {
             }
         }
 
-        // The filter above is only sound because a class DELEGATES to its base, so
-        // check the delegation actually exists wherever the base declares object
-        // fields. Without this, "declared by me" and "marked by me" could both be
-        // empty for a whole hierarchy and the test would still pass.
-        List<String> brokenChain = new ArrayList<String>();
-        try (Stream<Path> files2 = Files.walk(srcRoot)) {
-            for (Path c : (Iterable<Path>) files2.filter(p -> p.toString().endsWith(".c"))::iterator) {
-                String body = new String(Files.readAllBytes(c), StandardCharsets.ISO_8859_1);
-                Matcher mf = MARKFN.matcher(body);
-                while (mf.find()) {
-                    String cls = mf.group(1);
-                    String markBody = mf.group(2);
-                    String base = baseOf(body, cls);
-                    if (base != null && !base.equals("java_lang_Object")
-                            && !markBody.contains("__GC_MARK_" + base)) {
-                        brokenChain.add(cls + " -> " + base);
-                    }
-                }
-            }
-        }
-        assertTrue(brokenChain.isEmpty(),
-                "__GC_MARK_ must chain to the base class, or the base's declared fields "
-                        + "are traced by nobody: " + brokenChain);
+        String leaf = new String(Files.readAllBytes(srcRoot.resolve("MarkLeaf.c")), StandardCharsets.ISO_8859_1);
+        Matcher leafMark = MARKFN.matcher(leaf);
+        assertTrue(leafMark.find());
+        assertFalse(leafMark.group(2).contains("__GC_MARK_MarkMid"));
+        assertTrue(leafMark.group(2).contains("objInstance->MarkBase_baseRef"));
+        assertTrue(leafMark.group(2).contains("objInstance->MarkBase_privateRef"));
+        assertTrue(leafMark.group(2).contains("objInstance->MarkMid_midRef"));
+        String list = new String(Files.readAllBytes(srcRoot.resolve("MarkList.c")), StandardCharsets.ISO_8859_1);
+        Matcher listMark = MARKFN.matcher(list);
+        assertTrue(listMark.find());
+        assertTrue(listMark.group(2).contains("java_util_ArrayList_cn1Storage"),
+                "subclass must trace its inherited native reference block");
+        String weak = new String(Files.readAllBytes(srcRoot.resolve("java_lang_ref_WeakReference.c")), StandardCharsets.ISO_8859_1);
+        Matcher weakMark = MARKFN.matcher(weak);
+        assertTrue(weakMark.find());
+        assertTrue(weakMark.group(2).contains("cn1GcDiscoverReference"));
+        assertFalse(weakMark.group(2).contains("cn1GcMarkField(threadStateData, objInstance->java_lang_ref_Reference_objReference"));
 
         // A pass that inspected nothing is not a pass. The fixture alone declares
         // eight object fields across three classes in one hierarchy.
@@ -238,10 +222,11 @@ class GcMarkCompletenessTest {
         Set<String> declared = declaredObjectFields(head, "Foo");
         assertTrue(declared.contains("Foo_kept") && declared.contains("Foo_dropped"),
                 "fixture parse: " + declared);
-        String markBody = "    gcMarkObject(threadStateData, objInstance->Foo_kept, force);";
+        String markBody = "    cn1GcMarkField(threadStateData, objInstance->Foo_kept, force, epoch);\n"
+                + "    cn1GcVerifyFieldType(threadStateData, obj, objInstance->Foo_dropped, 1, \"Foo.dropped\");";
         List<String> missing = new ArrayList<String>();
         for (String f : declared) {
-            if (!markBody.contains(f)) {
+            if (!tracesField(markBody, f)) {
                 missing.add(f);
             }
         }
@@ -250,15 +235,9 @@ class GcMarkCompletenessTest {
                 "it must name exactly the untraced field, got " + missing);
     }
 
-    /** The base class name from the emitted `struct clazz` initialiser, or null. */
-    private static String baseOf(String body, String cls) {
-        Matcher m = Pattern.compile("struct clazz class__" + Pattern.quote(cls)
-                + "\\s*=\\s*\\{(.*?)\\};", Pattern.DOTALL).matcher(body);
-        if (!m.find()) {
-            return null;
-        }
-        Matcher b = Pattern.compile("&class__(\\w+)\\s*,\\s*(?:base_interfaces|EMPTY_INTERFACES)").matcher(m.group(1));
-        return b.find() ? b.group(1) : null;
+    private static boolean tracesField(String body, String field) {
+        return Pattern.compile("(?:cn1GcMarkField|cn1GcDiscoverReference)\\([^\\n]*\\b"
+                + Pattern.quote(field) + "\\b").matcher(body).find();
     }
 
     private CompilerHelper.CompilerConfig selectCompiler() {

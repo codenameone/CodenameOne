@@ -23,11 +23,12 @@
 
 (function(global) {
 const CN1_STRING_VALUE = "cn1_java_lang_String_value";
-const CN1_STRING_OFFSET = "cn1_java_lang_String_offset";
 const CN1_STRING_COUNT = "cn1_java_lang_String_count";
 const CN1_STRING_HASH = "cn1_java_lang_String_hashCode";
 const CN1_SB_VALUE = "cn1_java_lang_StringBuilder_value";
 const CN1_SB_COUNT = "cn1_java_lang_StringBuilder_count";
+const CN1_SB_CAPACITY = "cn1_java_lang_StringBuilder_capacity";
+const CN1_SB_WIDE = "cn1_java_lang_StringBuilder_wide";
 const CN1_THREAD_ALIVE = "cn1_java_lang_Thread_alive";
 const CN1_THREAD_NAME = "cn1_java_lang_Thread_name";
 const CN1_THREAD_NATIVE_ID = "cn1_java_lang_Thread_nativeThreadId";
@@ -2191,7 +2192,6 @@ const jvm = {
       }
       const str = this.newObject("java_lang_String");
       str[CN1_STRING_VALUE] = chars;
-      str[CN1_STRING_OFFSET] = 0;
       str[CN1_STRING_COUNT] = value.length;
       str[CN1_STRING_HASH] = 0;
       str.__nativeString = value;
@@ -2211,11 +2211,10 @@ const jvm = {
     }
     if (value.__class === "java_lang_String") {
       const data = value[CN1_STRING_VALUE];
-      const offset = value[CN1_STRING_OFFSET] | 0;
       const count = value[CN1_STRING_COUNT] | 0;
       let out = "";
       for (let i = 0; i < count; i++) {
-        out += String.fromCharCode(data[offset + i] | 0);
+        out += String.fromCharCode(data[i] | 0);
       }
       value.__nativeString = out;
       return out;
@@ -4874,29 +4873,35 @@ function runtimeBoxedPrimitiveValue(value) {
       return null;
   }
 }
-function sbEnsureCapacity(sb, size) {
-  let data = sb[CN1_SB_VALUE];
-  if (!data) {
-    data = jvm.newArray(Math.max(16, size), "JAVA_CHAR", 1);
-    sb[CN1_SB_VALUE] = data;
-    return data;
-  }
-  if (data.length >= size) {
-    return data;
-  }
-  const next = jvm.newArray(Math.max(size, (data.length * 2) + 2), "JAVA_CHAR", 1);
-  for (let i = 0; i < data.length; i++) {
-    next[i] = data[i];
-  }
+function sbIsLatin1(data) {
+  return data && data.__class === jvm.arrayClassName("JAVA_BYTE", 1);
+}
+function sbResize(sb, capacity, wide) {
+  const data = sb[CN1_SB_VALUE];
+  const next = jvm.newArray(capacity, wide ? "JAVA_CHAR" : "JAVA_BYTE", 1);
+  const count = sb[CN1_SB_COUNT] | 0;
+  for (let i = 0; data && i < count && i < capacity; i++) next[i] = sbIsLatin1(data) ? data[i] & 255 : data[i];
   sb[CN1_SB_VALUE] = next;
+  sb[CN1_SB_CAPACITY] = capacity;
+  sb[CN1_SB_WIDE] = !!wide;
   return next;
+}
+function sbEnsureCapacity(sb, size, wide) {
+  const data = sb[CN1_SB_VALUE];
+  const needsWide = !!wide || (data && !sbIsLatin1(data));
+  if (data && data.length >= size && !(wide && sbIsLatin1(data))) return data;
+  const capacity = data && data.length >= size ? data.length : Math.max(size, data ? data.length * 2 + 2 : 16);
+  return sbResize(sb, capacity, needsWide);
 }
 function sbAppendNativeString(sb, value) {
   value = value == null ? "null" : String(value);
   const count = sb[CN1_SB_COUNT] | 0;
-  const data = sbEnsureCapacity(sb, count + value.length);
+  let wide = false;
+  for (let i = 0; i < value.length; i++) if (value.charCodeAt(i) > 255) { wide = true; break; }
+  const data = sbEnsureCapacity(sb, count + value.length, wide);
   for (let i = 0; i < value.length; i++) {
-    data[count + i] = value.charCodeAt(i);
+    const ch = value.charCodeAt(i);
+    data[count + i] = sbIsLatin1(data) ? (ch << 24) >> 24 : ch;
   }
   sb[CN1_SB_COUNT] = count + value.length;
   return sb;
@@ -5625,6 +5630,42 @@ bindNative(["cn1_java_lang_Double_longBitsToDouble_long_R_double"], function(bit
 bindNative(["cn1_java_lang_Double_toStringImpl_double_boolean_R_java_lang_String"], function(v, scientificNotation) {
   return createJavaString(formatJavaFloating(v, !!scientificNotation));
 });
+// The Java caller retains the generic CharSequence loop on this target.
+bindNative(["cn1_java_lang_StringBuilder_tryAppendRange_java_lang_CharSequence_int_int_R_boolean"], function() { return 0; });
+bindNative(["cn1_java_lang_StringBuilder_resizeBufferImpl_int_boolean_R_boolean"], function(sb, capacity, wide) {
+  capacity |= 0;
+  if (capacity < 0 || (wide && capacity > 0x3fffffff)) return false;
+  sbResize(sb, capacity, wide);
+  return true;
+});
+bindNative(["cn1_java_lang_StringBuilder_unit_int_R_char"], function(sb, index) {
+  const data = sb[CN1_SB_VALUE];
+  return sbIsLatin1(data) ? data[index] & 255 : data[index] | 0;
+});
+bindNative(["cn1_java_lang_StringBuilder_put_int_char"], function(sb, index, ch) {
+  const data = sbEnsureCapacity(sb, sb[CN1_SB_CAPACITY] | 0, ch > 255);
+  data[index] = sbIsLatin1(data) ? (ch << 24) >> 24 : ch;
+});
+bindNative(["cn1_java_lang_StringBuilder_move_int_int_int"], function(sb, from, to, length) {
+  const data = sb[CN1_SB_VALUE];
+  if (to > from) for (let i = length - 1; i >= 0; i--) data[to + i] = data[from + i];
+  else for (let i = 0; i < length; i++) data[to + i] = data[from + i];
+});
+bindNative(["cn1_java_lang_StringBuilder_zero_int_int"], function(sb, from, length) {
+  const data = sb[CN1_SB_VALUE];
+  for (let i = 0; i < length; i++) data[from + i] = 0;
+});
+bindNative(["cn1_java_lang_StringBuilder_append_char_1ARRAY_int_int_R_java_lang_StringBuilder"], function(sb, input, offset, length) {
+  if (input == null) throw new Error("NullPointerException");
+  if (offset < 0 || length < 0 || offset > input.length - length) throw new Error("IndexOutOfBoundsException");
+  let wide = false;
+  for (let i = 0; i < length; i++) if (input[offset + i] > 255) { wide = true; break; }
+  const count = sb[CN1_SB_COUNT] | 0;
+  const data = sbEnsureCapacity(sb, count + length, wide);
+  for (let i = 0; i < length; i++) data[count + i] = sbIsLatin1(data) ? (input[offset + i] << 24) >> 24 : input[offset + i];
+  sb[CN1_SB_COUNT] = count + length;
+  return sb;
+});
 bindNative(["cn1_java_lang_StringBuilder_append_char_R_java_lang_StringBuilder"], function(__cn1ThisObject, ch) { return sbAppendNativeString(__cn1ThisObject, String.fromCharCode(ch | 0)); });
 bindNative(["cn1_java_lang_StringBuilder_append_int_R_java_lang_StringBuilder"], function(__cn1ThisObject, value) { return sbAppendNativeString(__cn1ThisObject, String(value | 0)); });
 bindNative(["cn1_java_lang_StringBuilder_append_long_R_java_lang_StringBuilder"], function(__cn1ThisObject, value) { return sbAppendNativeString(__cn1ThisObject, _LtoStr(value)); });
@@ -5645,7 +5686,8 @@ bindNative(["cn1_java_lang_StringBuilder_charAt_int_R_char"], function(__cn1This
   if (index < 0 || index >= (__cn1ThisObject[CN1_SB_COUNT] | 0)) {
     throw new Error("ArrayIndexOutOfBoundsException");
   }
-  return (__cn1ThisObject[CN1_SB_VALUE][index] || 0) | 0;
+  const data = __cn1ThisObject[CN1_SB_VALUE];
+  return sbIsLatin1(data) ? data[index] & 255 : data[index] | 0;
 });
 bindNative(["cn1_java_lang_StringBuilder_length_R_int"], function(__cn1ThisObject) { return __cn1ThisObject[CN1_SB_COUNT] | 0; });
 bindNative(["cn1_java_lang_StringBuilder_toString_R_java_lang_String"], function(__cn1ThisObject) {
@@ -5653,7 +5695,7 @@ bindNative(["cn1_java_lang_StringBuilder_toString_R_java_lang_String"], function
   const data = __cn1ThisObject[CN1_SB_VALUE];
   let out = "";
   for (let i = 0; i < count; i++) {
-    out += String.fromCharCode(data[i] | 0);
+    out += String.fromCharCode(sbIsLatin1(data) ? data[i] & 255 : data[i] | 0);
   }
   return createJavaString(out);
 });
@@ -5663,7 +5705,7 @@ bindNative(["cn1_java_lang_StringBuilder_getChars_int_int_char_1ARRAY_int"], fun
   }
   const value = __cn1ThisObject[CN1_SB_VALUE];
   for (let i = start | 0; i < (end | 0); i++) {
-    dst[(dstStart | 0) + i - (start | 0)] = value[i] | 0;
+    dst[(dstStart | 0) + i - (start | 0)] = sbIsLatin1(value) ? value[i] & 255 : value[i] | 0;
   }
   return null;
 });
@@ -5674,6 +5716,22 @@ bindNative(["cn1_java_lang_String_charAt_int_R_char"], function(__cn1ThisObject,
     throw new Error("ArrayIndexOutOfBoundsException");
   }
   return ns.charCodeAt(index) | 0;
+});
+// String's INLINE-storage natives. The C VM keeps a short string's characters inside
+// the object and leaves value null; String.java then asks these two for the storage.
+// A JS string is native and a String's value can read null here as well, so both are
+// live and answer from the native string itself rather than being stubs.
+bindNative(["cn1_java_lang_String_cn1InlineCharAt_int_R_char"], function(__cn1ThisObject, index) {
+  return jvm.toNativeString(__cn1ThisObject).charCodeAt(index | 0) | 0;
+});
+bindNative(["cn1_java_lang_String_cn1InlineLatin1_R_boolean"], function(__cn1ThisObject) {
+  const ns = jvm.toNativeString(__cn1ThisObject);
+  for (let i = 0; i < ns.length; i++) {
+    if (ns.charCodeAt(i) > 255) {
+      return 0;
+    }
+  }
+  return 1;
 });
 bindNative(["cn1_java_lang_String_equals_java_lang_Object_R_boolean"], function(__cn1ThisObject, obj) {
   return (obj != null && obj.__class === "java_lang_String" && jvm.toNativeString(__cn1ThisObject) === jvm.toNativeString(obj)) ? 1 : 0;
@@ -5719,6 +5777,8 @@ bindNative(["cn1_java_lang_String_releaseNSString_long"], function() { return nu
 // never happens on the JS runtime (strings are native), so at runtime this is unreachable --
 // but it is statically reachable from cn1ConcatN's bytecode, so it needs a binding. A plain
 // string concatenation is the correct result. null maps to "null" like makeConcat.
+// The Java substring constructor is the portable fallback for this optional C fusion.
+bindNative(["cn1_java_lang_String_cn1SubstringFused_int_int_R_java_lang_String"], function() { return null; });
 function cn1FusedConcatArg(x) { return x == null ? "null" : jvm.toNativeString(x); }
 bindNative(["cn1_java_lang_String_cn1FusedConcat2_java_lang_String_java_lang_String_R_java_lang_String"], function(a, b) {
   return createJavaString(cn1FusedConcatArg(a) + cn1FusedConcatArg(b));
@@ -5754,6 +5814,9 @@ bindNative(["cn1_java_io_InputStreamReader_bytesToChars_byte_1ARRAY_int_int_java
   // String.bytesToChars body doesn't tip ``yield*`` into a
   // ``not iterable`` TypeError.
   return yield* adaptVirtualResult(cn1_java_lang_String_bytesToChars_byte_1ARRAY_int_int_java_lang_String_R_char_1ARRAY(bytes, off, len, encoding));
+});
+bindNative(["cn1_java_lang_String_compactBytes_java_lang_String_R_byte_1ARRAY"], function() {
+  return null; // Java fallback uses this runtime's string encoder.
 });
 bindNative(["cn1_java_lang_String_charsToBytes_char_1ARRAY_char_1ARRAY_R_byte_1ARRAY"], function(chars) {
   // The original ``text += String.fromCharCode(chars[i] | 0)`` loop
@@ -5951,6 +6014,81 @@ bindNative(["cn1_java_util_HashMap_areEqualKeys_java_lang_Object_java_lang_Objec
   const equalsMethod = jvm.resolveVirtual(key1.__class, "cn1_s_equals_java_lang_Object_R_boolean");
   return (yield* adaptVirtualResult(equalsMethod(key1, key2))) ? 1 : 0;
 });
+// A private long handle carries its backing store on JS. It is never used in
+// arithmetic; _Lc preserves the handle object. No global table retains dead buffers.
+// The Java fallback preserves custom collection semantics on this target.
+bindNative(["cn1_java_util_ArrayList_addAllNative_int_java_util_Collection_R_int",
+            "cn1_java_util_ArrayList_initFromNative_java_util_Collection_R_int"], function() { return -1; });
+let cn1StorageId = 1;
+// "No block" for a NativeStorage handle. A handle is always a long OBJECT carrying its
+// storage, but a long FIELD nobody has assigned yet defaults to the plain number 0 in
+// this runtime -- every long helper coerces that through _Lc, and _LisZero does not, so
+// an ArrayList that had never allocated read .storage off a number and threw. Any
+// number here can only be that default: allocation never returns one.
+function cn1StorageAbsent(b) { return b == null || typeof b === "number" || _LisZero(b); }
+function cn1StorageAllocate(capacity, references) {
+  if (capacity === 0) return _L0;
+  const handle = _LfromNumber(cn1StorageId++);
+  handle.storage = references ? new Array(capacity).fill(null) : new Int32Array(capacity);
+  return handle;
+}
+bindNative(["cn1_java_util_NativeStorage_allocateTable_int_boolean_R_long"], function(n, ordered) {
+  if (n === 0) return _L0;
+  const root = cn1StorageAllocate(n, true);
+  root.parts = [root, cn1StorageAllocate(n, true), cn1StorageAllocate(n, false)];
+  if (ordered) root.parts.push(cn1StorageAllocate(n, false), cn1StorageAllocate(n, false));
+  return root;
+});
+bindNative(["cn1_java_util_NativeStorage_part_long_int_R_long"], function(root, part) {
+  return cn1StorageAbsent(root) ? _L0 : root.parts[part];
+});
+bindNative(["cn1_java_util_NativeStorage_allocateReferences_int_R_long"], function(n) { return cn1StorageAllocate(n, true); });
+bindNative(["cn1_java_util_NativeStorage_allocateIntegers_int_R_long"], function(n) { return cn1StorageAllocate(n, false); });
+bindNative(["cn1_java_util_NativeStorage_capacity_long_R_int"], function(b) { return cn1StorageAbsent(b) ? 0 : b.storage.length; });
+bindNative(["cn1_java_util_NativeStorage_free_long"], function(b) { if (!cn1StorageAbsent(b)) b.storage = null; });
+bindNative(["cn1_java_util_NativeStorage_retire_long"], function(b) { /* JavaScript owns the handle lifetime. */ });
+bindNative(["cn1_java_util_NativeStorage_get_long_int_R_java_lang_Object"], function(b, i) { return b.storage[i]; });
+bindNative(["cn1_java_util_NativeStorage_set_long_int_java_lang_Object"], function(b, i, v) { b.storage[i] = v; });
+bindNative(["cn1_java_util_NativeStorage_setOwned_java_lang_Object_long_int_java_lang_Object"], function(owner, b, i, v) { b.storage[i] = v; });
+bindNative(["cn1_java_util_NativeStorage_getInt_long_int_R_int"], function(b, i) { return b.storage[i]; });
+bindNative(["cn1_java_util_NativeStorage_setInt_long_int_int"], function(b, i, v) { b.storage[i] = v; });
+bindNative(["cn1_java_util_NativeStorage_nextOccupied_long_int_int_R_int"], function(b, from, cap) {
+  if (cn1StorageAbsent(b)) return -1;
+  for (let i = from; i < cap; i++) if (b.storage[i] < 0) return i;
+  return -1;
+});
+bindNative(["cn1_java_util_NativeStorage_clearMap_long_long_long_int"], function(keys, vals, meta, cap) {
+  if (cap) { keys.storage.fill(null); vals.storage.fill(null); meta.storage.fill(0); }
+});
+bindNative(["cn1_java_util_NativeStorage_move_long_int_int_int"], function(b, from, to, count) {
+  if (count) b.storage.copyWithin(to, from, from + count);
+});
+bindNative(["cn1_java_util_NativeStorage_clear_long_int_int"], function(b, from, count) {
+  if (count) b.storage.fill(null, from, from + count);
+});
+bindNative(["cn1_java_util_NativeStorage_copy_long_int_long_int_int"], function(src, from, dst, to, count) {
+  for (let i = 0; i < count; i++) dst.storage[to + i] = src.storage[from + i];
+});
+bindNative(["cn1_java_util_NativeStorage_rehash_long_long_long_long_int_long_long_long_long_long_R_int"], function(keys, values, metadata, links, head, newKeys, newValues, newMetadata, newPrev, newNext) {
+  const ordered = !cn1StorageAbsent(links), source = metadata.storage, target = newMetadata.storage;
+  const mask = target.length - 1;
+  let tail = -1;
+  for (let i = ordered ? head : 0; i >= 0 && i < source.length; i = ordered ? links.storage[i] : i + 1) {
+    const marker = source[i];
+    if (marker >= 0) continue;
+    let slot = marker & mask, perturb = marker;
+    while (target[slot] !== 0) { perturb >>>= 5; slot = (slot * 5 + 1 + perturb) & mask; }
+    target[slot] = marker;
+    newKeys.storage[slot] = keys.storage[i];
+    newValues.storage[slot] = values.storage[i];
+    if (ordered) {
+      newPrev.storage[slot] = tail; newNext.storage[slot] = -1;
+      if (tail >= 0) newNext.storage[tail] = slot;
+      tail = slot;
+    }
+  }
+  return tail;
+});
 // COMPACT HashMap natives: the C implementations are hand-tuned probe loops;
 // on the JS backend every one of them simply delegates to the pure-Java *Impl
 // twin (the semantic source of truth) that the translator compiled to JS.
@@ -5968,6 +6106,29 @@ bindNative(["cn1_java_util_HashMap_containsKey_java_lang_Object_R_boolean"], fun
 });
 bindNative(["cn1_java_util_HashMap_clear"], function*(__cn1ThisObject) {
   return yield* adaptVirtualResult(cn1_java_util_HashMap_clearImpl(__cn1ThisObject));
+});
+// HashSet keeps its table natively on the C targets; here each native delegates to
+// the pure-Java twin in HashSet.java, exactly as HashMap's do above.
+bindNative(["cn1_java_util_HashSet_cn1AddNative_java_lang_Object_R_boolean"], function*(__cn1ThisObject, element) {
+  return yield* adaptVirtualResult(cn1_java_util_HashSet_cn1AddImpl_java_lang_Object_R_boolean(__cn1ThisObject, element));
+});
+bindNative(["cn1_java_util_HashSet_cn1ContainsNative_java_lang_Object_R_boolean"], function*(__cn1ThisObject, element) {
+  return yield* adaptVirtualResult(cn1_java_util_HashSet_cn1ContainsImpl_java_lang_Object_R_boolean(__cn1ThisObject, element));
+});
+bindNative(["cn1_java_util_HashSet_cn1RemoveNative_java_lang_Object_R_boolean"], function*(__cn1ThisObject, element) {
+  return yield* adaptVirtualResult(cn1_java_util_HashSet_cn1RemoveImpl_java_lang_Object_R_boolean(__cn1ThisObject, element));
+});
+bindNative(["cn1_java_util_HashSet_cn1ClearNative"], function*(__cn1ThisObject) {
+  return yield* adaptVirtualResult(cn1_java_util_HashSet_cn1ClearImpl(__cn1ThisObject));
+});
+bindNative(["cn1_java_util_HashSet_cn1NextOccupied_int_R_int"], function*(__cn1ThisObject, from) {
+  return yield* adaptVirtualResult(cn1_java_util_HashSet_cn1NextOccupiedImpl_int_R_int(__cn1ThisObject, from));
+});
+bindNative(["cn1_java_util_HashSet_cn1ElementAt_int_R_java_lang_Object"], function*(__cn1ThisObject, index) {
+  return yield* adaptVirtualResult(cn1_java_util_HashSet_cn1ElementAtImpl_int_R_java_lang_Object(__cn1ThisObject, index));
+});
+bindNative(["cn1_java_util_HashSet_cn1RemoveSlot_int"], function*(__cn1ThisObject, index) {
+  return yield* adaptVirtualResult(cn1_java_util_HashSet_cn1RemoveSlotImpl_int(__cn1ThisObject, index));
 });
 bindNative(["cn1_java_io_NSLogOutputStream_write_byte_1ARRAY_int_int"], function*(__cn1ThisObject, bytes, off, len) {
   const chars = yield* adaptVirtualResult(cn1_java_lang_String_bytesToChars_byte_1ARRAY_int_int_java_lang_String_R_char_1ARRAY(bytes, off, len, createJavaString("utf-8")));

@@ -37,11 +37,23 @@ public class TryCatch extends Instruction {
     private Label end;
     private Label handler;
     private String type;
+    /*
+     * Restores the pre-fix eager catch-depth computation, which cached a wrong END_TRY
+     * depth for every nested try (see LabelInstruction.setCatchDepthInstructions). It
+     * exists so NestedTryIntegrationTest can require the old behaviour to reproduce the
+     * escape -- a gate that cannot be shown to fail is not a gate. Nothing else reads it.
+     */
+    private static boolean legacyCatchDepth;
     private static boolean firstException;
     private static boolean hasTryCatch;
     private static int counter;
     
     public static void reset() {
+        // Re-read per method rather than once per class load: the integration test drives
+        // the translator IN PROCESS, so a static final captured at class-init would answer
+        // for whichever run happened to load the class first.
+        legacyCatchDepth = "true".equalsIgnoreCase(
+                com.codename1.tools.translator.Util.getProperty("cn1.legacyCatchDepth", "false"));
         firstException = true;
         hasTryCatch = false;
         counter = 1;
@@ -128,14 +140,16 @@ public class TryCatch extends Instruction {
         b.append(counter);
         b.append(");\n");
         LabelInstruction.addTryEndLabel(end);
-        // We store the label catch depth so that we can explicitly use it 
-        // for TRY_EXIT()
-        // Originally, TRY_EXIT() just blindly decremented the tryBlockLevel
-        // but this is insufficient in cases where the catch handler
-        // points to a position *inside* the catch block, which happens
-        // where there is a synchronized() block surrounding an exception
-        // point.
-        LabelInstruction.getLabelCatchDepth(end, instructions);
+        // The label's END_TRY needs an explicit depth: blindly decrementing tryBlockLevel
+        // is insufficient where a catch handler points to a position *inside* the
+        // try/catch block, which happens with a synchronized() block around an exception
+        // point. This used to COMPUTE that depth here, which cached a wrong answer for
+        // every nested try -- see setCatchDepthInstructions. Hand over the list instead
+        // and let the label ask when every try/catch in the method has registered.
+        LabelInstruction.setCatchDepthInstructions(instructions);
+        if(legacyCatchDepth) {
+            LabelInstruction.getLabelCatchDepth(end, instructions);
+        }
         counter++;
 //        b.append("/* try/catch start: ");
 //        b.append(start);

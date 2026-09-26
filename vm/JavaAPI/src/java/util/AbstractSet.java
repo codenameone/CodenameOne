@@ -75,9 +75,7 @@ public abstract class AbstractSet<E> extends AbstractCollection<E> implements
     @Override
     public int hashCode() {
         int result = 0;
-        Iterator<?> it = iterator();
-        while (it.hasNext()) {
-            Object next = it.next();
+        for (Object next : this) {
             result += next == null ? 0 : next.hashCode();
         }
         return result;
@@ -106,9 +104,10 @@ public abstract class AbstractSet<E> extends AbstractCollection<E> implements
                 }
             }
         } else {
-            Iterator<?> it = collection.iterator();
-            while (it.hasNext()) {
-                result = remove(it.next()) || result;
+            // This arm removes BY VALUE rather than through the iterator, so it can be
+            // a for-each; the arm above cannot, because it calls it.remove().
+            for (Object element : collection) {
+                result = remove(element) || result;
             }
         }
         return result;

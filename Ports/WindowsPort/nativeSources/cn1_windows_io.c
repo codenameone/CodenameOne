@@ -175,7 +175,7 @@ JAVA_INT com_codename1_impl_windows_WindowsNative_fileRead___long_byte_1ARRAY_in
     if (h == NULL || h == INVALID_HANDLE_VALUE || __cn1Arg2 == JAVA_NULL || __cn1Arg4 <= 0) {
         return -1;
     }
-    data = (char*)(*(JAVA_ARRAY)__cn1Arg2).data;
+    data = (char*)CN1_ARRAY_DATA(__cn1Arg2);
     ok = ReadFile(h, data + __cn1Arg3, (DWORD)__cn1Arg4, &readBytes, NULL);
     if (!ok) {
         return -1;
@@ -194,7 +194,7 @@ JAVA_INT com_codename1_impl_windows_WindowsNative_fileWrite___long_byte_1ARRAY_i
     if (h == NULL || h == INVALID_HANDLE_VALUE || __cn1Arg2 == JAVA_NULL || __cn1Arg4 <= 0) {
         return 0;
     }
-    data = (char*)(*(JAVA_ARRAY)__cn1Arg2).data;
+    data = (char*)CN1_ARRAY_DATA(__cn1Arg2);
     if (!WriteFile(h, data + __cn1Arg3, (DWORD)__cn1Arg4, &written, NULL)) {
         return 0;
     }
@@ -564,7 +564,7 @@ JAVA_OBJECT com_codename1_impl_windows_WindowsNative_fileList___java_lang_String
     /* allocate the Java String[] and copy collected references in */
     arr = allocArray(threadStateData, count, &class_array1__java_lang_String, sizeof(JAVA_OBJECT), 1);
     if (arr != JAVA_NULL) {
-        JAVA_OBJECT* elements = (JAVA_OBJECT*)(*(JAVA_ARRAY)arr).data;
+        JAVA_OBJECT* elements = (JAVA_OBJECT*)CN1_ARRAY_DATA(arr);
         for (i = 0; i < count; i++) {
             elements[i] = names[i];
         }
@@ -650,7 +650,7 @@ JAVA_OBJECT com_codename1_impl_windows_WindowsNative_fileRoots___R_java_lang_Str
 
     arr = allocArray(threadStateData, count, &class_array1__java_lang_String, sizeof(JAVA_OBJECT), 1);
     if (arr != JAVA_NULL) {
-        JAVA_OBJECT* elements = (JAVA_OBJECT*)(*(JAVA_ARRAY)arr).data;
+        JAVA_OBJECT* elements = (JAVA_OBJECT*)CN1_ARRAY_DATA(arr);
         for (i = 0; i < count; i++) {
             elements[i] = names[i];
         }
@@ -807,7 +807,7 @@ JAVA_VOID com_codename1_impl_windows_WindowsNative_clipboardSetImage___byte_1ARR
     if (__cn1Arg1 == JAVA_NULL) {
         return;
     }
-    bytes = (BYTE*) (*(JAVA_ARRAY) __cn1Arg1).data;
+    bytes = (BYTE*) CN1_ARRAY_DATA(__cn1Arg1);
     len = (DWORD) (*(JAVA_ARRAY) __cn1Arg1).length;
     cf = RegisterClipboardFormatW(L"PNG");
     if (cf == 0) {
@@ -867,7 +867,7 @@ JAVA_OBJECT com_codename1_impl_windows_WindowsNative_clipboardGetImage___R_byte_
     }
     result = allocArray(threadStateData, (int) sz, &class_array1__JAVA_BYTE, sizeof(JAVA_ARRAY_BYTE), 1);
     if (result != JAVA_NULL) {
-        memcpy((*(JAVA_ARRAY) result).data, p, (size_t) sz);
+        memcpy(CN1_ARRAY_DATA(result), p, (size_t) sz);
     }
     GlobalUnlock(data);
     CloseClipboard();
@@ -897,7 +897,7 @@ JAVA_VOID com_codename1_impl_windows_WindowsNative_clipboardSetFiles___java_lang
     if (n <= 0) {
         return;
     }
-    elems = (JAVA_OBJECT*) (*(JAVA_ARRAY) __cn1Arg1).data;
+    elems = (JAVA_OBJECT*) CN1_ARRAY_DATA(__cn1Arg1);
     paths = (WCHAR**) calloc((size_t) n, sizeof(WCHAR*));
     if (paths == NULL) {
         return;
@@ -1001,13 +1001,15 @@ JAVA_OBJECT com_codename1_impl_windows_WindowsNative_clipboardGetFiles___R_java_
     count = DragQueryFileW(drop, 0xFFFFFFFF, NULL, 0);
     arr = allocArray(threadStateData, (int) count, &class_array1__java_lang_String, sizeof(JAVA_OBJECT), 1);
     if (arr != JAVA_NULL) {
-        JAVA_OBJECT* elements = (JAVA_OBJECT*) (*(JAVA_ARRAY) arr).data;
+        JAVA_OBJECT* elements = (JAVA_OBJECT*) CN1_ARRAY_DATA(arr);
         for (i = 0; i < count; i++) {
             WCHAR path[MAX_PATH];
             path[0] = 0;
             /* the HDROP is owned by the clipboard: query only, no DragFinish */
             if (DragQueryFileW(drop, i, path, MAX_PATH) > 0) {
-                elements[i] = cn1WinWideToJavaString(threadStateData, path);
+                JAVA_OBJECT cn1__s = cn1WinWideToJavaString(threadStateData, path);
+                CN1_WRITE_BARRIER(arr, cn1__s);  /* each allocation is a safepoint: arr may be old */
+                elements[i] = cn1__s;
             }
         }
     }
@@ -1152,7 +1154,7 @@ JAVA_OBJECT com_codename1_impl_windows_WindowsNative_dpapiProtect___byte_1ARRAY_
         return JAVA_NULL;
     }
     in.cbData = (DWORD) (*(JAVA_ARRAY) __cn1Arg1).length;
-    in.pbData = (BYTE*) (*(JAVA_ARRAY) __cn1Arg1).data;
+    in.pbData = (BYTE*) CN1_ARRAY_DATA(__cn1Arg1);
     out.cbData = 0;
     out.pbData = NULL;
     if (!CryptProtectData(&in, L"cn1securestorage", NULL, NULL, NULL,
@@ -1161,7 +1163,7 @@ JAVA_OBJECT com_codename1_impl_windows_WindowsNative_dpapiProtect___byte_1ARRAY_
     }
     result = allocArray(threadStateData, (int) out.cbData, &class_array1__JAVA_BYTE, sizeof(JAVA_ARRAY_BYTE), 1);
     if (result != JAVA_NULL) {
-        memcpy((*(JAVA_ARRAY) result).data, out.pbData, out.cbData);
+        memcpy(CN1_ARRAY_DATA(result), out.pbData, out.cbData);
     }
     LocalFree(out.pbData);
     return result;
@@ -1178,7 +1180,7 @@ JAVA_OBJECT com_codename1_impl_windows_WindowsNative_dpapiUnprotect___byte_1ARRA
         return JAVA_NULL;
     }
     in.cbData = (DWORD) (*(JAVA_ARRAY) __cn1Arg1).length;
-    in.pbData = (BYTE*) (*(JAVA_ARRAY) __cn1Arg1).data;
+    in.pbData = (BYTE*) CN1_ARRAY_DATA(__cn1Arg1);
     out.cbData = 0;
     out.pbData = NULL;
     if (!CryptUnprotectData(&in, NULL, NULL, NULL, NULL,
@@ -1187,7 +1189,7 @@ JAVA_OBJECT com_codename1_impl_windows_WindowsNative_dpapiUnprotect___byte_1ARRA
     }
     result = allocArray(threadStateData, (int) out.cbData, &class_array1__JAVA_BYTE, sizeof(JAVA_ARRAY_BYTE), 1);
     if (result != JAVA_NULL) {
-        memcpy((*(JAVA_ARRAY) result).data, out.pbData, out.cbData);
+        memcpy(CN1_ARRAY_DATA(result), out.pbData, out.cbData);
     }
     LocalFree(out.pbData);
     return result;

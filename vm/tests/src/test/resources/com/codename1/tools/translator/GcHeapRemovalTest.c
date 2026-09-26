@@ -43,9 +43,9 @@ static JAVA_OBJECT heapRemovalSlots[2];
 static struct ThreadLocalData heapRemovalState;
 
 static int checkDescriptorRemoval(struct clazz *descriptor, int populated) {
-    struct clazz *parent = descriptor->__codenameOneParentClsReference;
-    int mark = descriptor->__codenameOneGcMark;
-    int position = descriptor->__heapPosition;
+    struct clazz *parent = CN1_OBJ_CLASS(descriptor);
+    int mark = CN1_OBJ_MARK(descriptor);
+    int position = CN1_OBJ_HEAP_INDEX(descriptor);
 #ifdef CN1_CONSERVATIVE_GC_ROOTS
     int immortalCount = atomic_load(&cn1ImmortalObjSetCount);
 #endif
@@ -56,11 +56,11 @@ static int checkDescriptorRemoval(struct clazz *descriptor, int populated) {
     HEAP_CHECK(allObjectsInHeap == (populated ? heapRemovalSlots : NULL));
     HEAP_CHECK(heapRemovalSlots[0] == &heapRemovalDisplay);
     HEAP_CHECK(heapRemovalSlots[1] == &heapRemovalBuffer);
-    HEAP_CHECK(heapRemovalDisplay.__heapPosition == 0);
-    HEAP_CHECK(heapRemovalBuffer.__heapPosition == 1);
-    HEAP_CHECK(descriptor->__codenameOneParentClsReference == parent);
-    HEAP_CHECK(descriptor->__codenameOneGcMark == mark);
-    HEAP_CHECK(descriptor->__heapPosition == position);
+    HEAP_CHECK(CN1_OBJ_HEAP_INDEX(&(heapRemovalDisplay)) == 0);
+    HEAP_CHECK(CN1_OBJ_HEAP_INDEX(&(heapRemovalBuffer)) == 1);
+    HEAP_CHECK(CN1_OBJ_CLASS(descriptor) == parent);
+    HEAP_CHECK(CN1_OBJ_MARK(descriptor) == mark);
+    HEAP_CHECK(CN1_OBJ_HEAP_INDEX(descriptor) == position);
     HEAP_CHECK(cn1ImmortalRootsN == rootCount);
 #ifdef CN1_CONSERVATIVE_GC_ROOTS
     HEAP_CHECK(atomic_load(&cn1ImmortalObjSetCount) == immortalCount);
@@ -81,11 +81,11 @@ int cn1TestHeapRemoval(void) {
         ARRAY_DESCRIPTORS(java_lang_Class), ARRAY_DESCRIPTORS(GetClassApp_Entry),
         &class__GetClassApp_Entry, &class__java_lang_Class, &ClazzClazz
     };
-    heapRemovalDisplay.__codenameOneParentClsReference = &class__GetClassApp_Entry;
-    heapRemovalDisplay.__codenameOneGcMark = 2;
-    heapRemovalDisplay.__heapPosition = 0;
+    CN1_OBJ_SET_CLASS(&(heapRemovalDisplay), &class__GetClassApp_Entry);
+    CN1_OBJ_SET_MARK(&(heapRemovalDisplay), 2);
+    CN1_OBJ_SET_HEAPPOS(&(heapRemovalDisplay), 0);
     heapRemovalBuffer = heapRemovalDisplay;
-    heapRemovalBuffer.__heapPosition = 1;
+    CN1_OBJ_SET_HEAPPOS(&(heapRemovalBuffer), 1);
     heapRemovalSlots[0] = &heapRemovalDisplay;
     heapRemovalSlots[1] = &heapRemovalBuffer;
     sizeOfAllObjectsInHeap = 2;
@@ -101,10 +101,10 @@ int cn1TestHeapRemoval(void) {
         // Then execute the real getClass rewrite before a later static-final
         // store. An object's own class parent changing must not unroot it.
         struct JavaObjectPrototype instance = {0};
-        instance.__codenameOneParentClsReference = descriptor;
+        CN1_OBJ_SET_CLASS(&(instance), descriptor);
         HEAP_CHECK(java_lang_Object_getClassImpl___R_java_lang_Class(
                 &heapRemovalState, &instance) == (JAVA_OBJECT)descriptor);
-        HEAP_CHECK(descriptor->__codenameOneParentClsReference == &ClazzClazz);
+        HEAP_CHECK(CN1_OBJ_CLASS(descriptor) == &ClazzClazz);
         if (checkDescriptorRemoval(descriptor, 1)
                 || checkDescriptorRemoval(descriptor, 0)) return 1;
     }
@@ -117,14 +117,14 @@ int cn1TestHeapRemoval(void) {
             &heapRemovalBuffer) == JAVA_TRUE);
     HEAP_CHECK(heapRemovalSlots[1] == NULL);
     HEAP_CHECK(heapRemovalSlots[0] == &heapRemovalDisplay);
-    HEAP_CHECK(heapRemovalBuffer.__heapPosition == -1);
+    HEAP_CHECK(CN1_OBJ_HEAPPOS(&(heapRemovalBuffer)) == -1);
 #ifdef CN1_CONSERVATIVE_GC_ROOTS
     HEAP_CHECK(cn1GcImmortalObjContains(&heapRemovalBuffer));
 #endif
     HEAP_CHECK(removeObjectFromHeapCollection(&heapRemovalState,
             &heapRemovalDisplay) == JAVA_TRUE);
     HEAP_CHECK(heapRemovalSlots[0] == NULL);
-    HEAP_CHECK(heapRemovalDisplay.__heapPosition == -1);
+    HEAP_CHECK(CN1_OBJ_HEAPPOS(&(heapRemovalDisplay)) == -1);
 #ifdef CN1_CONSERVATIVE_GC_ROOTS
     HEAP_CHECK(cn1GcImmortalObjContains(&heapRemovalDisplay));
 #endif

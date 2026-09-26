@@ -38,6 +38,24 @@ public class TypeInstruction extends Instruction {
     private String actualType;
     private int stackAllocId = -1;
     private boolean scalarReplaced = false;
+
+    /// Index of the frame-exit retire guard this NEW writes into, or -1.
+    ///
+    /// The guard exists so the retire scope points at a variable that can ONLY ever
+    /// hold the object from this site. Pointing it at the LOCAL instead is unsound in a
+    /// way no gate reliably shows: the escape analysis proves the OBJECT ALLOCATED HERE
+    /// never leaves the frame, while the local it was stored into may later be
+    /// overwritten by a parameter or a field read -- and the scope would then retire an
+    /// object nothing proved dead.
+    private int deadGuardId = -1;
+
+    public void setDeadGuardId(int id) {
+        this.deadGuardId = id;
+    }
+
+    public int getDeadGuardId() {
+        return deadGuardId;
+    }
     private int scalarStructId = -1;
     private boolean initBeforePublish = false;
     private String originalType;
@@ -138,6 +156,10 @@ public class TypeInstruction extends Instruction {
         this.implicitStackAlloc = true;
     }
 
+    private int stackBuilderBytes;
+    public void setStackBuilderBytes(int bytes) { stackBuilderBytes = bytes; }
+    public int getStackBuilderBytes() { return stackBuilderBytes; }
+
     private int stackFusedLen = -1;
     private String stackFusedElemCType;
     private String stackFusedClassRef;
@@ -171,6 +193,23 @@ public class TypeInstruction extends Instruction {
 
     public String getTypeName() {
         return type;
+    }
+
+    /**
+     * The class this INSTANCEOF tests against, or null when this is not an INSTANCEOF
+     * or when it tests an array type. Array ids sit outside the bitmap's row range and
+     * keep the instanceofFunction path.
+     *
+     * @return the mangled class name, or null
+     */
+    public String instanceofTargetClass() {
+        if(getOpcode() != Opcodes.INSTANCEOF) {
+            return null;
+        }
+        if(type.indexOf('[') > -1) {
+            return null;
+        }
+        return actualType;
     }
 
     public String getActualType() {
@@ -270,6 +309,9 @@ public class TypeInstruction extends Instruction {
                     // in ByteCodeClass. A plain load here let a thread see the flag
                     // set while the vtable / classToInterfaceMap rows it describes
                     // were still invisible.
+                    if(stackBuilderBytes > 0) {
+                        b.append("cn1StackBufferReset(&__cn1sbscope_").append(stackAllocId).append("); ");
+                    }
                     b.append("if(__builtin_expect(!__atomic_load_n(&class__");
                     b.append(type);
                     b.append(".initialized, __ATOMIC_ACQUIRE), 0)) __STATIC_INITIALIZER_");
@@ -278,15 +320,23 @@ public class TypeInstruction extends Instruction {
                     b.append(stackAllocId);
                     b.append(", 0, sizeof(struct obj__");
                     b.append(type);
-                    b.append(")); __cn1stk_");
+                    b.append(")); CN1_OBJ_SET_CLASS(&__cn1stk_");
                     b.append(stackAllocId);
-                    b.append(".__codenameOneParentClsReference = &class__");
+                    b.append(", &class__");
                     b.append(type);
-                    b.append("; __cn1stk_");
+                    b.append("); CN1_OBJ_SET_MARK(&__cn1stk_");
                     b.append(stackAllocId);
-                    b.append(".__codenameOneGcMark = -1; __cn1stk_");
+                    b.append(", CN1_GC_MARK_FRESH); CN1_OBJ_SET_HEAPPOS(&__cn1stk_");
                     b.append(stackAllocId);
-                    b.append(".__heapPosition = -1; ");
+                    b.append(", -1); ");
+                    if(stackBuilderBytes > 0) {
+                        b.append("CN1_OBJ_SET_HEAPPOS(&__cn1stk_").append(stackAllocId).append(", CN1_GC_STACK_BUILDER); ");
+                        b.append("*(struct CN1StackBuffer**)__cn1stk_").append(stackAllocId)
+                                .append(".__cn1InlineStorage = &__cn1sbscope_").append(stackAllocId).append("; ");
+                        b.append("__cn1stk_").append(stackAllocId)
+                                .append(".java_lang_StringBuilder_cn1Storage = (JAVA_LONG)(uintptr_t)__cn1sbdata_")
+                                .append(stackAllocId).append("; ");
+                    }
                     if(stackFusedLen >= 0) {
                         // stack-resident fused child: install a normal array header,
                         // point the owner's field at it BEFORE the ctor (keep-if-null
@@ -331,9 +381,20 @@ public class TypeInstruction extends Instruction {
                 // CN1_FAST_NEW inlines the BiBOP bump fast-path at the allocation
                 // site (Lever 1, -DCN1_INLINE_ALLOC); with the flag off it expands
                 // verbatim to __NEW_<type>(threadStateData).
-                b.append("PUSH_POINTER(CN1_FAST_NEW(");
+                // An iterator the escape analysis cleared takes the caller's pending
+                // stack buffer when one is on offer; CN1_ITER_NEW falls through to
+                // CN1_FAST_NEW when there is none, so this is the same allocation
+                // everywhere else.
+                b.append("PUSH_POINTER(");
+                if(deadGuardId >= 0) {
+                    b.append("__cn1dead_").append(deadGuardId).append(" = ");
+                }
+                b.append(com.codename1.tools.translator.Parser.isStackIterator(type)
+                         ? "CN1_ITER_NEW(" : "CN1_FAST_NEW(");
                 b.append(type);
-                b.append(")); /* NEW */\n");
+                b.append(")");
+                b.append(deadGuardId >= 0 ? "); /* NEW, frame-exit retired */\n"
+                                          : "); /* NEW */\n");
                 break;
             case Opcodes.ANEWARRAY:
                 if(type.startsWith("[")) {
@@ -350,11 +411,11 @@ public class TypeInstruction extends Instruction {
                     b.append(actualType);
                     b.append(", sizeof(JAVA_OBJECT), ");
                     b.append(dim);
-                    b.append("));\n    SP[-1].data.o->__codenameOneParentClsReference = &class_array");
+                    b.append("));\n    CN1_OBJ_SET_CLASS(SP[-1].data.o, &class_array");
                     b.append(dim);
                     b.append("__");
                     b.append(actualType);
-                    b.append("; /* ANEWARRAY multi */\n");
+                    b.append("); /* ANEWARRAY multi */\n");
                     break;
                 }
                 b.append("SP--;\n    PUSH_POINTER(__NEW_ARRAY_");
@@ -408,6 +469,33 @@ public class TypeInstruction extends Instruction {
                     b.append("_id_");
                     b.append(actualType);
                 } else {
+                    // Constant-time form when this type has a bitmap bit, which is
+                    // every non-array type an instanceof anywhere in the application
+                    // tests against. The id is still passed so the array fallback
+                    // inside the macro has something to call with.
+                    // Leaf first: nothing live extends it, so the class word IS the
+                    // answer and the classId load disappears with the bitmap lookup.
+                    // String is a leaf but its class word is not unique -- fused
+                    // Strings carry a twin clazz. See BC_INSTANCEOF_STRING.
+                    if("java_lang_String".equals(actualType)) {
+                        b.append("BC_INSTANCEOF_STRING();\n");
+                        break;
+                    }
+                    if(Parser.isLeafClass(actualType)) {
+                        b.append("BC_INSTANCEOF_LEAF(class__");
+                        b.append(actualType);
+                        b.append(");\n");
+                        break;
+                    }
+                    int typeTestIdx = Parser.typeTestIndex(actualType);
+                    if(typeTestIdx >= 0) {
+                        b.append("BC_INSTANCEOF_FAST(");
+                        b.append(typeTestIdx);
+                        b.append(", cn1_class_id_");
+                        b.append(actualType);
+                        b.append(");\n");
+                        break;
+                    }
                     b.append("BC_INSTANCEOF(cn1_class_id_");
                     b.append(actualType);
                 }

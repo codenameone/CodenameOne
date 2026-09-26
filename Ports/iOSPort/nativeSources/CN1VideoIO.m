@@ -531,7 +531,7 @@ void com_codename1_impl_ios_IOSNative_videoWriterAddFrame___long_byte_1ARRAY_int
 #ifndef NEW_CODENAME_ONE_VM
     JAVA_ARRAY_BYTE* data = (JAVA_ARRAY_BYTE*)((org_xmlvm_runtime_XMLVMArray*)rgba)->fields.org_xmlvm_runtime_XMLVMArray.array_;
 #else
-    JAVA_ARRAY_BYTE* data = (JAVA_ARRAY_BYTE*)((JAVA_ARRAY)rgba)->data;
+    JAVA_ARRAY_BYTE* data = (JAVA_ARRAY_BYTE*)CN1_ARRAY_DATA((JAVA_ARRAY)rgba);
 #endif
     cn1WriterAddFrame(WRITER(peer), data, w, h, ptsMs);
 }
@@ -543,7 +543,7 @@ void com_codename1_impl_ios_IOSNative_videoWriterAddAudio___long_byte_1ARRAY_int
     int len = arr->fields.org_xmlvm_runtime_XMLVMArray.length_;
 #else
     JAVA_ARRAY arr = (JAVA_ARRAY)pcm;
-    JAVA_ARRAY_BYTE* data = (JAVA_ARRAY_BYTE*)arr->data;
+    JAVA_ARRAY_BYTE* data = (JAVA_ARRAY_BYTE*)CN1_ARRAY_DATA(arr);
     int len = arr->length;
 #endif
     cn1WriterAddAudio(WRITER(peer), data, len, sampleRate, channels, ptsMs);

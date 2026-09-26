@@ -321,7 +321,7 @@ JAVA_OBJECT com_codename1_impl_windows_WindowsNative_browserCapturePng___long_R_
     }
     JAVA_OBJECT result = allocArray(threadStateData, (int) bytes.size(), &class_array1__JAVA_BYTE, sizeof(JAVA_ARRAY_BYTE), 1);
     if (result != JAVA_NULL) {
-        memcpy((*(JAVA_ARRAY) result).data, bytes.data(), bytes.size());
+        memcpy(CN1_ARRAY_DATA(result), bytes.data(), bytes.size());
     }
     return result;
 }

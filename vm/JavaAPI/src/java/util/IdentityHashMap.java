@@ -39,10 +39,26 @@ public class IdentityHashMap<K, V> extends AbstractMap<K, V> implements
         Map<K, V> {
 
     /*
-     * The internal data structure to hold key value pairs This array holds keys
-     * and values in an alternating fashion.
+     * The internal data structure to hold key value pairs. Keys and values sit in
+     * alternating cells, so an index's low bit is always 0 for a key.
+     *
+     * A NATIVE reference block, not an Object[]. The block lives outside the Java
+     * heap and is traced by the collector as a root range, which is what lets
+     * cn1CollectionMap in cn1_collections.h hand a for-each loop the raw
+     * JAVA_OBJECT* and iterate it with no bounds check, no interface dispatch and
+     * no iterator object -- see NativeTraversal.Layout.IDENTITY. It also keeps the
+     * table itself out of the object graph the marker has to walk cell by cell.
+     *
+     * volatile for the same reason HashMap's blocks are: the handle is published
+     * before the block's contents are reachable through it, and a marker thread
+     * that observes a torn handle would trace a freed block.
      */
-    transient Object[] elementData;
+    transient volatile long elementData;
+
+    /* Cell count of elementData. cn1RefBlockCount can answer this and the C side
+     * uses it, but a field keeps it out of the probe and rehash loops, where it is
+     * read on every step. */
+    transient int elementCapacity;
 
     /* Actual number of key-value pairs. */
     int size;
@@ -163,10 +179,10 @@ public class IdentityHashMap<K, V> extends AbstractMap<K, V> implements
         public boolean hasNext() {
             // elementData hoisted into a local: it was re-loaded from the outer map
             // on every comparison AND on every array access, twice per probe step.
-            Object[] data = associatedMap.elementData;
+            long data = associatedMap.elementData;
             int p = position;
-            int len = data.length;
-            while (p < len && data[p] == null) {
+            int len = associatedMap.elementCapacity;
+            while (p < len && NativeStorage.get(data, p) == null) {
                 p += 2;
             }
             position = p;
@@ -199,10 +215,10 @@ public class IdentityHashMap<K, V> extends AbstractMap<K, V> implements
             if (expectedModCount != associatedMap.modCount) {
                 throw new ConcurrentModificationException();
             }
-            Object[] data = associatedMap.elementData;
+            long data = associatedMap.elementData;
             int p = position;
-            int len = data.length;
-            while (p < len && data[p] == null) {
+            int len = associatedMap.elementCapacity;
+            while (p < len && NativeStorage.get(data, p) == null) {
                 p += 2;
             }
             if (p >= len) {
@@ -215,11 +231,11 @@ public class IdentityHashMap<K, V> extends AbstractMap<K, V> implements
             canRemove = true;
 
             if (kind == KIND_KEY) {
-                Object key = associatedMap.elementData[lastPosition];
+                Object key = NativeStorage.get(associatedMap.elementData, lastPosition);
                 return (E) (key == NULL_OBJECT ? null : key);
             }
             if (kind == KIND_VALUE) {
-                Object value = associatedMap.elementData[lastPosition + 1];
+                Object value = NativeStorage.get(associatedMap.elementData, lastPosition + 1);
                 return (E) (value == NULL_OBJECT ? null : value);
             }
             return type.get(associatedMap.getEntry(lastPosition));
@@ -232,7 +248,8 @@ public class IdentityHashMap<K, V> extends AbstractMap<K, V> implements
             }
 
             canRemove = false;
-            associatedMap.remove(associatedMap.elementData[lastPosition]);
+            associatedMap.remove(
+                    (Object) NativeStorage.get(associatedMap.elementData, lastPosition));
             position = lastPosition;
             expectedModCount++;
         }
@@ -355,8 +372,9 @@ public class IdentityHashMap<K, V> extends AbstractMap<K, V> implements
      *            the number of elements
      * @return Reference to the element array
      */
-    private Object[] newElementArray(int s) {
-        return new Object[s];
+    private long newElementArray(int s) {
+        elementCapacity = s;
+        return NativeStorage.references(s);
     }
 
     /**
@@ -384,9 +402,10 @@ public class IdentityHashMap<K, V> extends AbstractMap<K, V> implements
     @Override
     public void clear() {
         size = 0;
-        for (int i = 0; i < elementData.length; i++) {
-            elementData[i] = null;
-        }
+        // One native clear of the whole range rather than a store per cell, and it
+        // drops the block's references in one pass so the collector sees them gone
+        // together.
+        NativeStorage.clear(elementData, 0, elementCapacity);
         modCount++;
     }
 
@@ -404,8 +423,8 @@ public class IdentityHashMap<K, V> extends AbstractMap<K, V> implements
             key = NULL_OBJECT;
         }
 
-        int index = findIndex(key, elementData);
-        return elementData[index] == key;
+        int index = findIndex(key, elementData, elementCapacity);
+        return NativeStorage.get(elementData, index) == key;
     }
 
     /**
@@ -422,8 +441,8 @@ public class IdentityHashMap<K, V> extends AbstractMap<K, V> implements
             value = NULL_OBJECT;
         }
 
-        for (int i = 1; i < elementData.length; i = i + 2) {
-            if (elementData[i] == value) {
+        for (int i = 1; i < elementCapacity; i = i + 2) {
+            if (NativeStorage.get(elementData, i) == value) {
                 return true;
             }
         }
@@ -443,10 +462,10 @@ public class IdentityHashMap<K, V> extends AbstractMap<K, V> implements
             key = NULL_OBJECT;
         }
 
-        int index = findIndex(key, elementData);
+        int index = findIndex(key, elementData, elementCapacity);
 
-        if (elementData[index] == key) {
-            Object result = elementData[index + 1];
+        if (NativeStorage.get(elementData, index) == key) {
+            Object result = NativeStorage.get(elementData, index + 1);
             return massageValue(result);
         }
 
@@ -458,8 +477,8 @@ public class IdentityHashMap<K, V> extends AbstractMap<K, V> implements
             key = NULL_OBJECT;
         }
 
-        int index = findIndex(key, elementData);
-        if (elementData[index] == key) {
+        int index = findIndex(key, elementData, elementCapacity);
+        if (NativeStorage.get(elementData, index) == key) {
             return getEntry(index);
         }
 
@@ -472,8 +491,8 @@ public class IdentityHashMap<K, V> extends AbstractMap<K, V> implements
      */
     @SuppressWarnings("unchecked")
     private IdentityHashMapEntry<K, V> getEntry(int index) {
-        Object key = elementData[index];
-        Object value = elementData[index + 1];
+        Object key = NativeStorage.get(elementData, index);
+        Object value = NativeStorage.get(elementData, index + 1);
 
         if (key == NULL_OBJECT) {
             key = null;
@@ -489,13 +508,15 @@ public class IdentityHashMap<K, V> extends AbstractMap<K, V> implements
      * Returns the index where the key is found at, or the index of the next
      * empty spot if the key is not found in this table.
      */
-    private int findIndex(Object key, Object[] array) {
-        int length = array.length;
+    private int findIndex(Object key, long array, int length) {
         int mask = length - 1;
         int index = getModuloHash(key, length);
         int last = (index + length - 2) & mask;
         while (index != last) {
-            if (array[index] == key || (array[index] == null)) {
+            // One load per step. The cell is read once and tested twice, where the
+            // array form indexed twice and let the bounds check run twice with it.
+            Object cell = NativeStorage.get(array, index);
+            if (cell == key || cell == null) {
                 /*
                  * Found the key, or the next empty spot (which means key is not
                  * in the table)
@@ -566,24 +587,24 @@ public class IdentityHashMap<K, V> extends AbstractMap<K, V> implements
             _value = NULL_OBJECT;
         }
 
-        int index = findIndex(_key, elementData);
+        int index = findIndex(_key, elementData, elementCapacity);
 
         // if the key doesn't exist in the table
-        if (elementData[index] != _key) {
+        if (NativeStorage.get(elementData, index) != _key) {
             modCount++;
             if (++size > threshold) {
                 rehash();
-                index = findIndex(_key, elementData);
+                index = findIndex(_key, elementData, elementCapacity);
             }
 
             // insert the key and assign the value to null initially
-            elementData[index] = _key;
-            elementData[index + 1] = null;
+            NativeStorage.setOwned(this, elementData, index, _key);
+            NativeStorage.setOwned(this, elementData, index + 1, null);
         }
 
         // insert value to where it needs to go, return the old value
-        Object result = elementData[index + 1];
-        elementData[index + 1] = _value;
+        Object result = NativeStorage.get(elementData, index + 1);
+        NativeStorage.setOwned(this, elementData, index + 1, _value);
 
         return massageValue(result);
     }
@@ -609,29 +630,37 @@ public class IdentityHashMap<K, V> extends AbstractMap<K, V> implements
         // array length, which would have split every key from its value; the
         // real bound is MAXIMUM_ARRAY_SIZE, above which there is nowhere to
         // grow and the load factor simply rises.
-        int newlength = elementData.length << 1;
+        int oldCapacity = elementCapacity;
+        int newlength = oldCapacity << 1;
         if (newlength <= 0 || newlength > MAXIMUM_ARRAY_SIZE) {
-            if (elementData.length >= MAXIMUM_ARRAY_SIZE) {
+            if (oldCapacity >= MAXIMUM_ARRAY_SIZE) {
                 return;
             }
             newlength = MAXIMUM_ARRAY_SIZE;
         }
-        Object[] newData = newElementArray(newlength);
-        for (int i = 0; i < elementData.length; i = i + 2) {
-            Object key = elementData[i];
+        // The old block is read while the new one is filled, so BOTH have to stay
+        // reachable across the loop -- newElementArray publishes the new capacity,
+        // so the old one is kept in a local rather than re-read from the field.
+        long oldData = elementData;
+        long newData = newElementArray(newlength);
+        for (int i = 0; i < oldCapacity; i = i + 2) {
+            Object key = NativeStorage.get(oldData, i);
             if (key != null) {
                 // if not empty
-                int index = findIndex(key, newData);
-                newData[index] = key;
-                newData[index + 1] = elementData[i + 1];
+                int index = findIndex(key, newData, newlength);
+                NativeStorage.setOwned(this, newData, index, key);
+                NativeStorage.setOwned(this, newData, index + 1, NativeStorage.get(oldData, i + 1));
             }
         }
         elementData = newData;
+        // retire, not free: the collector may still be tracing the old block in
+        // this cycle, so it is handed back only once no marker can be inside it.
+        NativeStorage.retire(oldData);
         computeMaxSize();
     }
 
     private void computeMaxSize() {
-        threshold = (int) ((long) (elementData.length / 2) * loadFactor / 10000);
+        threshold = (int) ((long) (elementCapacity / 2) * loadFactor / 10000);
     }
 
     /**
@@ -651,22 +680,22 @@ public class IdentityHashMap<K, V> extends AbstractMap<K, V> implements
         boolean hashedOk;
         int index, next, hash;
         Object result, object;
-        index = next = findIndex(key, elementData);
+        index = next = findIndex(key, elementData, elementCapacity);
 
-        if (elementData[index] != key) {
+        if (NativeStorage.get(elementData, index) != key) {
             return null;
         }
 
         // store the value for this key
-        result = elementData[index + 1];
+        result = NativeStorage.get(elementData, index + 1);
 
         // shift the following elements up if needed
         // until we reach an empty spot
-        int length = elementData.length;
+        int length = elementCapacity;
         int mask = length - 1;
         while (true) {
             next = (next + 2) & mask;
-            object = elementData[next];
+            object = NativeStorage.get(elementData, next);
             if (object == null) {
                 break;
             }
@@ -679,8 +708,9 @@ public class IdentityHashMap<K, V> extends AbstractMap<K, V> implements
                 hashedOk = hashedOk && (hash <= next);
             }
             if (!hashedOk) {
-                elementData[index] = object;
-                elementData[index + 1] = elementData[next + 1];
+                NativeStorage.setOwned(this, elementData, index, object);
+                NativeStorage.setOwned(this, elementData, index + 1,
+                        NativeStorage.get(elementData, next + 1));
                 index = next;
             }
         }
@@ -689,8 +719,8 @@ public class IdentityHashMap<K, V> extends AbstractMap<K, V> implements
         modCount++;
 
         // clear both the key and the value
-        elementData[index] = null;
-        elementData[index + 1] = null;
+        NativeStorage.setOwned(this, elementData, index, null);
+        NativeStorage.setOwned(this, elementData, index + 1, null);
 
         return massageValue(result);
     }
@@ -717,37 +747,7 @@ public class IdentityHashMap<K, V> extends AbstractMap<K, V> implements
     @Override
     public Set<K> keySet() {
         if (keySet == null) {
-            keySet = new AbstractSet<K>() {
-                @Override
-                public boolean contains(Object object) {
-                    return containsKey(object);
-                }
-
-                @Override
-                public int size() {
-                    return IdentityHashMap.this.size();
-                }
-
-                @Override
-                public void clear() {
-                    IdentityHashMap.this.clear();
-                }
-
-                @Override
-                public boolean remove(Object key) {
-                    if (containsKey(key)) {
-                        IdentityHashMap.this.remove(key);
-                        return true;
-                    }
-                    return false;
-                }
-
-                @Override
-                public Iterator<K> iterator() {
-                    return new IdentityHashMapIterator<K, K, V>(
-                            IdentityHashMapIterator.KIND_KEY, IdentityHashMap.this);
-                }
-            };
+            keySet = new KeySet<K, V>(this);
         }
         return keySet;
     }
@@ -774,43 +774,97 @@ public class IdentityHashMap<K, V> extends AbstractMap<K, V> implements
     @Override
     public Collection<V> values() {
         if (valuesCollection == null) {
-            valuesCollection = new AbstractCollection<V>() {
-                @Override
-                public boolean contains(Object object) {
-                    return containsValue(object);
-                }
-
-                @Override
-                public int size() {
-                    return IdentityHashMap.this.size();
-                }
-
-                @Override
-                public void clear() {
-                    IdentityHashMap.this.clear();
-                }
-
-                @Override
-                public Iterator<V> iterator() {
-                    return new IdentityHashMapIterator<V, K, V>(
-                            IdentityHashMapIterator.KIND_VALUE, IdentityHashMap.this);
-                }
-
-                @Override
-                public boolean remove(Object object) {
-                    Iterator<?> it = iterator();
-                    while (it.hasNext()) {
-                        if (object == it.next()) {
-                            it.remove();
-                            return true;
-                        }
-                    }
-                    return false;
-                }
-            };
+            valuesCollection = new Values<K, V>(this);
         }
         return valuesCollection;
     }
+
+    private static final class KeySet<K, V> extends AbstractSet<K> {
+        final IdentityHashMap<K, V> map;
+        KeySet(IdentityHashMap<K, V> map) { this.map = map; }
+
+        @Override
+        public boolean contains(Object object) {
+            return map.containsKey(object);
+        }
+
+        @Override
+        public int size() {
+            return map.size();
+        }
+
+        @Override
+        public void clear() {
+            map.clear();
+        }
+
+        @Override
+        public boolean remove(Object key) {
+            if (map.containsKey(key)) {
+                map.remove(key);
+                return true;
+            }
+            return false;
+        }
+
+        @Override
+        public Iterator<K> iterator() {
+            return new IdentityHashMapIterator<K, K, V>(
+                    IdentityHashMapIterator.KIND_KEY, map);
+        }
+    }
+
+    private static final class Values<K, V> extends AbstractCollection<V> {
+        final IdentityHashMap<K, V> map;
+        Values(IdentityHashMap<K, V> map) { this.map = map; }
+
+        @Override
+        public boolean contains(Object object) {
+            return map.containsValue(object);
+        }
+
+        @Override
+        public int size() {
+            return map.size();
+        }
+
+        @Override
+        public void clear() {
+            map.clear();
+        }
+
+        @Override
+        public Iterator<V> iterator() {
+            return new IdentityHashMapIterator<V, K, V>(
+                    IdentityHashMapIterator.KIND_VALUE, map);
+        }
+
+        @Override
+        public boolean remove(Object object) {
+            Iterator<?> it = iterator();
+            while (it.hasNext()) {
+                if (object == it.next()) {
+                    it.remove();
+                    return true;
+                }
+            }
+            return false;
+        }
+    }
+
+    /**
+     * Compares this map with other objects. This map is equal to another map is
+     * it represents the same set of mappings. With this map, two mappings are
+     * the same if both the key and the value are equal by reference. When
+     * compared with a map that is not an IdentityHashMap, the equals method is
+     * neither necessarily symmetric (a.equals(b) implies b.equals(a)) nor
+     * transitive (a.equals(b) and b.equals(c) implies a.equals(c)).
+     * 
+     * @param object
+     *            the object to compare to.
+     * @return whether the argument object is equal to this object.
+     */
+
 
     /**
      * Compares this map with other objects. This map is equal to another map is

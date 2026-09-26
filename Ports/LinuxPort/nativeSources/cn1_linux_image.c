@@ -82,7 +82,7 @@ JAVA_LONG com_codename1_impl_linux_LinuxNative_createImageFromARGB___int_1ARRAY_
     if (argb == JAVA_NULL || width <= 0 || height <= 0) {
         return 0;
     }
-    px = (JAVA_INT*) (*(JAVA_ARRAY) argb).data;
+    px = (JAVA_INT*) CN1_ARRAY_DATA(argb);
     return (JAVA_LONG) (intptr_t) cn1WrapSurface(cn1SurfaceFromArgb(px, width, height));
 }
 
@@ -127,7 +127,7 @@ JAVA_LONG com_codename1_impl_linux_LinuxNative_createImageFromBytes___byte_1ARRA
     if (data == JAVA_NULL || length <= 0) {
         return 0;
     }
-    bytes = (unsigned char*) (*(JAVA_ARRAY) data).data;
+    bytes = (unsigned char*) CN1_ARRAY_DATA(data);
     stream = g_memory_input_stream_new_from_data(bytes + offset, length, 0);
     pix = gdk_pixbuf_new_from_stream(stream, 0, 0);
     g_object_unref(stream);
@@ -188,7 +188,7 @@ JAVA_VOID com_codename1_impl_linux_LinuxNative_imageGetRGB___long_int_1ARRAY_int
     if (!img || arr == JAVA_NULL) {
         return;
     }
-    out = (JAVA_INT*) (*(JAVA_ARRAY) arr).data;
+    out = (JAVA_INT*) CN1_ARRAY_DATA(arr);
     cairo_surface_flush(img->surface);
     base = cairo_image_surface_get_data(img->surface);
     stride = cairo_image_surface_get_stride(img->surface);
@@ -284,7 +284,7 @@ JAVA_VOID com_codename1_impl_linux_LinuxNative_drawRGB___long_int_1ARRAY_int_int
     if (!g || rgbData == JAVA_NULL || width <= 0 || height <= 0) {
         return;
     }
-    px = (JAVA_INT*) (*(JAVA_ARRAY) rgbData).data;
+    px = (JAVA_INT*) CN1_ARRAY_DATA(rgbData);
     tmp = cn1SurfaceFromArgb(px + offset, width, height);
     cairo_save(g->cr);
     cn1LinuxApplyClip(g);
@@ -304,7 +304,7 @@ JAVA_OBJECT com_codename1_impl_linux_LinuxNative_encodeArgbToPng___int_1ARRAY_in
     if (argb == JAVA_NULL || width <= 0 || height <= 0) {
         return JAVA_NULL;
     }
-    px = (JAVA_INT*) (*(JAVA_ARRAY) argb).data;
+    px = (JAVA_INT*) CN1_ARRAY_DATA(argb);
     s = cn1SurfaceFromArgb(px, width, height);
     if (!cn1LinuxSurfaceToPng(s, &data, &len)) {
         cairo_surface_destroy(s);

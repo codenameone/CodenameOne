@@ -137,12 +137,35 @@ int pthread_setschedparam(pthread_t thread, int policy, const struct sched_param
 
 /* --- <unistd.h> / <sys/time.h> replacements --- */
 int usleep(unsigned int usec);
+int sched_yield(void);
 int gettimeofday(struct timeval* tv, void* tz);
 
 /* Monotonic microsecond clock (QueryPerformanceCounter), immune to wall-clock
    adjustments. Used for Thread.sleep deadline arithmetic, where a stepped
    system clock must not stretch or cut the remaining sleep. */
 long long cn1_monotonic_micros(void);
+
+/* Physical memory the host could still hand this process, in bytes
+   (GlobalMemoryStatusEx ullAvailPhys), or 0 when the call fails. A safety
+   bound for the collector's trigger, never a size target: see
+   cn1HostMemoryBound in cn1_globals.m. */
+long long cn1_win_available_memory(void);
+
+/* Logical processors this process may run on (GetActiveProcessorCount over
+   every group), or 0 when the call fails. Sizes the collector's mark pool. */
+int cn1_win_cpu_count(void);
+
+/* The calling thread's own stack, as [*low, *high). Windows has no way to ask for
+   another thread's bounds, so each thread records its own when it registers. */
+void cn1_win_current_stack_limits(void** low, void** high);
+
+/* Suspend the thread with this id and copy its general registers into regs (at most
+   cap bytes, *lenOut set to what was written). Returns its stack pointer, or 0 when it
+   could not be stopped; on success *handleOut must be passed to cn1_win_resume_thread.
+   The counterpart of the POSIX stop signal, which Windows does not have. */
+void* cn1_win_suspend_capture(unsigned long threadId, void** handleOut, char* regs,
+                              size_t cap, size_t* lenOut);
+void cn1_win_resume_thread(void* handle);
 
 /* --- IANA time zone offsets ---
    Answers the total offset (zone plus daylight) in milliseconds for an IANA

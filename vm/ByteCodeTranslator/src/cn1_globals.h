@@ -48,6 +48,7 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <stddef.h>   /* offsetof, for the array-header assertions */
 #include <string.h>
 #include <limits.h>
 #include "cn1_class_method_index.h"
@@ -205,6 +206,34 @@
 #define DEBUG_GC_INIT 
 #endif
 
+// THE OBJECT HEADER, in one place: every object struct, every array and every class
+// descriptor (a java.lang.Class instance) starts with exactly these members, because
+// each is cast to JavaObjectPrototype. Read and write them only through the CN1_OBJ_*
+// accessors defined after JavaObjectPrototype.
+//
+// FOUR BYTES, down from sixteen (the struct is still 8-aligned, so a field of 4 bytes or
+// less takes offset 4; the translator puts one there -- ByteCodeClass.addFields):
+//   * the class is a 16-bit INDEX into cn1ClazzById, not a pointer. A program is a closed
+//     world whose classes -- array classes included -- the translator numbers, and it
+//     refuses to translate one whose numbering does not fit (Parser, cn1ClazzById);
+//   * the mark is one byte: an epoch modulo CN1_GC_EPOCH_WINDOW, or a sentinel (see
+//     cn1GcMarkEncode);
+//   * the heap position is a one-byte STATE: a BiBOP slot, adopted, stack, embedded,
+//     poisoned ... (all small negatives), or CN1_HEAPSTATE_INDEXED, meaning the object
+//     has an index into allObjectsInHeap, kept in a side table (cn1HeapIndexOf). Zero
+//     reads as index 0 with no entry -- what a zero-initialized static object read as
+//     before -- so zeroed memory never needs the side table.
+// ALIGNED(8), which the old class POINTER gave for free: every object must be 8-aligned
+// because a reference's low three bits are the tagged-immediate code. Without it an
+// object struct holding only int-sized fields (a boxed Integer, say) is 4-aligned, and a
+// static or stack-allocated one at a 4-mod-8 address reads as a tagged value -- measured:
+// GcHeapRemovalTest's static test object was classified "tagged" and never removed.
+#define CN1_OBJ_HEADER_FIELDS \
+    DEBUG_GC_VARIABLES \
+    uint16_t __cn1ClassId __attribute__((aligned(8))); \
+    signed char __codenameOneGcMark; \
+    signed char __cn1HeapState;
+
 /**
  * header file containing global CN1 constants and structs
  */
@@ -280,11 +309,8 @@ struct CN1ThreadData {
 };
 
 struct clazz {
-    DEBUG_GC_VARIABLES
-    // these first  fields aren't really used but they allow us to treat a clazz as an object
-    struct clazz *__codenameOneParentClsReference;
-    int __codenameOneGcMark;
-    int __heapPosition;
+    // A class descriptor is a java.lang.Class instance, so it starts with an object header.
+    CN1_OBJ_HEADER_FIELDS
 
     void* finalizerFunction;
     void* releaseFieldsFunction;
@@ -326,6 +352,11 @@ struct clazz {
     // an exact registry instead of a distance heuristic (see gcMarkObject). Only
     // meaningful under CN1_CONSERVATIVE_GC_ROOTS; stays zero otherwise.
     JAVA_BOOLEAN cn1ClazzRegistered;
+    // The object-header class index of this descriptor when it is not classId + 1.
+    // Zero (the positional initializers never name it) means classId + 1. Only the two
+    // java.lang.String twins set it: they share String's classId, on purpose, and must
+    // still round-trip through the 16-bit header to themselves (cn1InitStringTwin).
+    uint16_t cn1HeaderIndex;
 #ifdef CN1_ALLOC_CENSUS
     // TRAILING for the same reason as cn1ClazzRegistered above: the generated
     // clazz initializers are positional and never name these, so C zero-fills
@@ -356,9 +387,8 @@ extern void cn1GcRegisterClazz(struct clazz* c);
 // Allocation volume BY CLASS. "The heap is 60MB" names nothing anyone can act
 // on; "3.1MB of java_lang_Long" names a fix. Counted at every allocation path
 // (both inline BiBOP bump paths and the out-of-line codenameOneGcMalloc), so
-// unlike a walk of allObjectsInHeap it does not silently miss the BiBOP and
-// nursery objects -- which is precisely where small, high-churn objects such as
-// boxed values live.
+// unlike a walk of allObjectsInHeap it does not silently miss BiBOP objects --
+// which is precisely where small, high-churn objects such as boxed values live.
 #ifdef CN1_ALLOC_CENSUS
 #define CN1_ALLOC_CENSUS_COUNT(cptr, sz) do { \
         struct clazz* __cc = (struct clazz*)(cptr); \
@@ -371,22 +401,246 @@ extern void cn1GcRegisterClazz(struct clazz* c);
 #define EMPTY_INTERFACES ((const struct clazz**)0)
 
 struct JavaObjectPrototype {
-    DEBUG_GC_VARIABLES
-    struct clazz *__codenameOneParentClsReference;
-    int __codenameOneGcMark;
-    int __heapPosition;
+    CN1_OBJ_HEADER_FIELDS
 };
 
+// OBJECT HEADER ACCESS. Every read and write of an object's class and heap position goes
+// through these, never through the members, so the header's layout is decided in one
+// place. A read is an rvalue (the cast), so it cannot be assigned through by accident;
+// writes use the SET forms. Static objects initialize their header with
+// CN1_OBJ_HEADER_INIT. `o` is any object or array pointer.
+// The class index is the class's classId plus one, so 0 means "no class" (a slot under
+// construction, or a class descriptor's own header for the primitive array classes).
+extern struct clazz* const cn1ClazzById[];
+extern const int cn1ClazzByIdCount;
+static inline __attribute__((always_inline)) uint16_t cn1ClazzIndexOf(const struct clazz* c);
+#define CN1_OBJ_CLASS(o)            (cn1ClazzById[((const struct JavaObjectPrototype*)(o))->__cn1ClassId])
+#define CN1_OBJ_SET_CLASS(o, c)     (((struct JavaObjectPrototype*)(o))->__cn1ClassId = cn1ClazzIndexOf(c))
+static inline __attribute__((always_inline)) uint16_t cn1ClazzIndexOf(const struct clazz* c) {
+    if(c == 0) {
+        return 0;
+    }
+    return c->cn1HeaderIndex != 0 ? c->cn1HeaderIndex : (uint16_t)(c->classId + 1);
+}
+// A BiBOP slot on its page's free list links to the next free slot through the word
+// AFTER the header, so the mark byte keeps reading the free mark (every slot is at least
+// 24 bytes). Free-slot bytes are dead: allocation either zeroes the slot or hands it to a
+// constructor that writes every field.
+#define CN1_BIBOP_FREE_LINK(o)      (*(void**)((char*)(o) + sizeof(struct JavaObjectPrototype)))
+// Bytes of an object that belong to the header; the body -- what allocation zeroes and
+// a debug poison destroys -- starts here, NOT at sizeof(struct JavaObjectPrototype).
+#ifdef DEBUG_GC_ALLOCATIONS
+// DEBUG_GC_VARIABLES puts two ints ahead of the header, so it ends 8 bytes later and
+// the aligned-store shortcut below would zero part of it.
+#define CN1_OBJ_HEADER_BYTES        12
+#define CN1_OBJ_ZERO_BODY(o, size) do { \
+        if((size) > CN1_OBJ_HEADER_BYTES) { \
+            memset((char*)(o) + CN1_OBJ_HEADER_BYTES, 0, (size_t)(size) - CN1_OBJ_HEADER_BYTES); \
+        } \
+    } while(0)
+#else
+#define CN1_OBJ_HEADER_BYTES        4
+// Zero an object's body (size = the whole object) without touching its header, whose
+// mark word is read atomically by a concurrent conservative scan. The 4 bytes after the
+// header are one aligned store, so the bulk zeroing starts 8-aligned: a memset from
+// offset 4 measured ~2% more instructions on the self-hosting run.
+#define CN1_OBJ_ZERO_BODY(o, size) do { \
+        if((size) > CN1_OBJ_HEADER_BYTES) { \
+            *(uint32_t*)((char*)(o) + CN1_OBJ_HEADER_BYTES) = 0; \
+            if((size) > 8) memset((char*)(o) + 8, 0, (size_t)(size) - 8); \
+        } \
+    } while(0)
+#endif
+// The heap position. CN1_OBJ_HEAPPOS is the STATE -- one byte load -- and compares
+// exactly as the old int did against every state, including ">= 0" for "indexed" (0 and
+// CN1_HEAPSTATE_INDEXED are the two non-negative states). Only the heap table's own code
+// needs the index itself (CN1_OBJ_HEAP_INDEX, from the side table). Setting a negative
+// state consults the side table only when the object has an entry, so allocation, which
+// starts from zeroed memory, never does.
+#define CN1_HEAPSTATE_INDEXED       1
+extern int cn1HeapIndexOf(const void* o);
+extern void cn1HeapIndexSet(const void* o, int index);
+extern void cn1HeapIndexForget(const void* o);
+extern int cn1LegacyKnown(const void* o);
+static inline __attribute__((always_inline)) int cn1ObjHeapPos(const void* o) {
+    int s = ((const struct JavaObjectPrototype*)o)->__cn1HeapState;
+    if(s == CN1_HEAPSTATE_INDEXED) {
+        return cn1HeapIndexOf(o);
+    }
+    return s;   // a state, or 0: index 0 with no entry
+}
+static inline __attribute__((always_inline)) void cn1ObjSetHeapPos(void* o, int v) {
+    struct JavaObjectPrototype* h = (struct JavaObjectPrototype*)o;
+    if(v >= 0) {
+        h->__cn1HeapState = CN1_HEAPSTATE_INDEXED;
+        cn1HeapIndexSet(o, v);
+    } else {
+        if(h->__cn1HeapState == CN1_HEAPSTATE_INDEXED) {
+            cn1HeapIndexForget(o);
+        }
+        h->__cn1HeapState = (signed char)v;
+    }
+}
+#define CN1_OBJ_HEAPPOS(o)          ((int)((const struct JavaObjectPrototype*)(o))->__cn1HeapState)
+#define CN1_OBJ_HEAP_INDEX(o)       cn1ObjHeapPos((const void*)(o))
+#define CN1_OBJ_SET_HEAPPOS(o, v)   cn1ObjSetHeapPos((void*)(o), (v))
+// The state byte, for the one compare-and-swap between two STATES (slot -> adopted).
+#define CN1_OBJ_HEAPSTATE_PTR(o)    (&((struct JavaObjectPrototype*)(o))->__cn1HeapState)
+// A static header, by class id (the cn1_class_id_* constants), since an index is only a
+// constant expression when written from the id.
+#define CN1_OBJ_HEADER_INIT_ID(id)  .__cn1ClassId = (uint16_t)((id) + 1)
+// THE MARK WORD STORES AN ENCODED EPOCH.
+//
+// The collector reasons in CYCLES: currentGcMarkValue counts up from 1 and never wraps in
+// practice, and every epoch it keeps outside an object -- page and thread bookkeeping,
+// cn1GcReclaimedBefore, the aging slack arithmetic -- is a cycle number compared with <.
+// An object's mark does not need that range. What is stored is the cycle modulo
+// CN1_GC_EPOCH_WINDOW (plus one, so 0 stays "never marked"), and a read turns it back into
+// a cycle by taking its age relative to the current one. That round trip is exact while
+// no mark that is READ is a full window old, which holds because every live object is
+// re-marked at least once per full cycle (every concurrent cycle, every generational
+// major), and a dead object's mark, which can sit unswept on an owned page or a page the
+// sweep's shortcuts skip, is relabelled CN1_GC_MARK_ANCIENT every quarter window
+// (cn1BibopRelabelStale).
+//
+// Negative values are sentinels and are stored as themselves: -1 fresh, the free and
+// quarantine marks, the debug poison marks, and ANCIENT, which decodes to a cycle older
+// than any the collector compares against, so every rule reads it as long dead.
+//
+// Code outside the collector reads marks only through CN1_OBJ_MARK / CN1_OBJ_MARK_LOAD
+// (decoded) and writes them through CN1_OBJ_SET_MARK / CN1_OBJ_MARK_STORE (encoded). The
+// raw word is compared directly only against an encoded epoch (cn1GcFieldMarkEpoch).
+// The mark is a signed byte: sentinels are negative and epochs 1..window, so the window
+// is at most 127. 64 is a power of two (encoding is a mask) and several times the longest
+// gap between re-marks of a live object (a generational major interval).
+#ifndef CN1_GC_EPOCH_WINDOW
+#define CN1_GC_EPOCH_WINDOW 64
+#endif
+_Static_assert(CN1_GC_EPOCH_WINDOW > 0 && CN1_GC_EPOCH_WINDOW <= 127,
+               "the mark word is a signed byte: epochs are 1..CN1_GC_EPOCH_WINDOW");
+#define CN1_GC_MARK_FRESH           (-1)
+#define CN1_GC_MARK_ANCIENT         (-2)
+#define CN1_GC_ANCIENT_CYCLE        (-(1 << 29))
+extern int currentGcMarkValue;
+static inline __attribute__((always_inline)) int cn1GcMarkEncode(int v) {
+    if(v <= 0) {
+        return v == CN1_GC_ANCIENT_CYCLE ? CN1_GC_MARK_ANCIENT : v;
+    }
+    return 1 + (int)((unsigned)v % (unsigned)CN1_GC_EPOCH_WINDOW);
+}
+static inline __attribute__((always_inline)) int cn1GcMarkDecode(int raw) {
+    if(raw <= 0) {
+        return raw == CN1_GC_MARK_ANCIENT ? CN1_GC_ANCIENT_CYCLE : raw;
+    }
+    int cur = __atomic_load_n(&currentGcMarkValue, __ATOMIC_RELAXED);
+    int age = cn1GcMarkEncode(cur) - raw;
+    if(age < 0) {
+        age += CN1_GC_EPOCH_WINDOW;
+    }
+    return cur - age;
+}
+#define CN1_OBJ_MARK_PTR(o)         (&((struct JavaObjectPrototype*)(o))->__codenameOneGcMark)
+#define CN1_OBJ_MARK(o)             cn1GcMarkDecode(((const struct JavaObjectPrototype*)(o))->__codenameOneGcMark)
+#define CN1_OBJ_SET_MARK(o, v)      (((struct JavaObjectPrototype*)(o))->__codenameOneGcMark = cn1GcMarkEncode(v))
+#define CN1_OBJ_MARK_LOAD(o, ord)   cn1GcMarkDecode(__atomic_load_n(CN1_OBJ_MARK_PTR(o), (ord)))
+#define CN1_OBJ_MARK_STORE(o, v, ord) __atomic_store_n(CN1_OBJ_MARK_PTR(o), cn1GcMarkEncode(v), (ord))
+
+// THE ARRAY HEADER IS 32 BYTES, AND EIGHT OF THOSE WERE PURE PADDING PLUS SLACK.
+//
+// Array headers are the single largest line item in this VM's allocation volume: on the
+// self-hosting corpus 551,580 of the 1,401,234 objects allocated per GC cycle are arrays,
+// so at the previous 40-byte header they were 21.0MB of the 105.3MB allocated per cycle --
+// TWENTY PERCENT of every byte this VM allocates, before a single element of payload.
+//
+// dimensions is at most 4 and primitiveSize at most 8 (sizeof(JAVA_ARRAY_DOUBLE) and
+// sizeof(JAVA_OBJECT)); both were `int`. Narrowing them to a byte each lets `data` sit in
+// the 4 bytes of tail padding the old layout already wasted, taking the header 40 -> 32.
+//
+// NARROWED RATHER THAN REMOVED, ON PURPOSE. Both values are derivable from the array's
+// clazz (which carries its own `dimensions`, and whose component type fixes the element
+// size), so deleting them outright would save the same 8 bytes -- and would break every
+// native that reads `arr->primitiveSize`, including two in the iOS port, the on-device
+// debugger, and any cn1lib's natives, which are not ours to break. Keeping the field
+// NAMES keeps all of that source compiling and reading the correct value through integer
+// promotion; only code taking their address or assuming sizeof(int) is affected, and
+// there is none.
+//
+// THE PREFIX IS LOAD-BEARING: the first three members must match JavaObjectPrototype
+// member for member, because array and object pointers are cast to each other throughout
+// the collector. `length` keeps its offset too, which every generated bounds check reads.
+// The static assertions below hold all of that, because none of it was checked before and
+// all of it is silent when wrong -- a mis-set primitiveSize is a wrong element stride,
+// which reads and writes past the end of the payload with nothing thrown.
 struct JavaArrayPrototype {
-    DEBUG_GC_VARIABLES
-    struct clazz *__codenameOneParentClsReference;
-    int __codenameOneGcMark;
-    int __heapPosition;
+    CN1_OBJ_HEADER_FIELDS
     int length;
-    int dimensions;
-    int primitiveSize;
-    void* data;
+    unsigned char dimensions;
+    unsigned char primitiveSize;
+    /* Byte distance from THIS HEADER to the payload, not a pointer to it.
+     *
+     * The pointer was 8 of the header's 32 bytes, and this header is 20% of the
+     * VM's allocation volume -- so it was 5% of everything the collector ever has
+     * to sweep, spent re-storing a value that is a small constant away from the
+     * object it sits in. An offset makes the header 24 bytes:
+     *
+     *     16 object header | length 4 | dimensions 1 | primitiveSize 1 | offset 2
+     *
+     * and turns every array access from a dependent load into an add, which the
+     * address-generation unit does for free alongside the index arithmetic.
+     *
+     * Two bytes rather than one because the offset is not always
+     * CN1_ARRAY_PAYLOAD_OFFSET: allocArrayAligned and the SIMD stack path round the
+     * payload start up to an alignment that is a PARAMETER, so the distance can be
+     * the header plus up to alignment-1. One byte covers alignments to 224 and
+     * silently truncates above that; two covers any alignment this VM could ask for
+     * and costs nothing, because dimensions and primitiveSize leave exactly two
+     * bytes before the next 4-byte boundary.
+     *
+     * Read it through CN1_ARRAY_DATA, never directly. */
+    unsigned short dataOffset;
 };
+
+#ifndef DEBUG_GC_ALLOCATIONS
+/* DEBUG_GC_VARIABLES adds two ints to BOTH structs, so the prefix assertions below hold
+   in that configuration too, but the absolute sizes do not -- hence the guard. */
+_Static_assert(sizeof(struct JavaArrayPrototype) == 16,
+               "array header must stay 16 bytes; it is 20% of this VM's allocation volume");
+/* The payload sits at sizeof(header) from the base, so a long[] or double[] element
+ * is 8-aligned only if that offset is a multiple of 8. 16 is; 12 or 20 would not be,
+ * and the failure would be a misaligned 64-bit load on some targets and a silent
+ * performance cliff on the rest. */
+_Static_assert(sizeof(struct JavaArrayPrototype) % 8 == 0,
+               "array payload offset must stay 8-aligned for long[] and double[]");
+/* 8, of which the header uses CN1_OBJ_HEADER_BYTES: the rest is alignment, which the
+ * first field of 4 bytes or less occupies in every object struct. */
+_Static_assert(sizeof(struct JavaObjectPrototype) == 8, "object header struct must stay 8 bytes");
+_Static_assert(_Alignof(struct JavaObjectPrototype) == 8,
+               "objects must be 8-aligned: a reference's low 3 bits are the tag code");
+#endif
+_Static_assert(offsetof(struct JavaArrayPrototype, __cn1ClassId)
+               == offsetof(struct JavaObjectPrototype, __cn1ClassId),
+               "array and object headers are cast to each other; the class index must align");
+_Static_assert(offsetof(struct JavaArrayPrototype, __codenameOneGcMark)
+               == offsetof(struct JavaObjectPrototype, __codenameOneGcMark),
+               "array and object headers are cast to each other; the mark word must align");
+_Static_assert(offsetof(struct JavaArrayPrototype, __cn1HeapState)
+               == offsetof(struct JavaObjectPrototype, __cn1HeapState),
+               "array and object headers are cast to each other; the heap state must align");
+_Static_assert(offsetof(struct JavaObjectPrototype, __cn1HeapState) + 1 == CN1_OBJ_HEADER_BYTES,
+               "CN1_OBJ_HEADER_BYTES must name where the header ends");
+/* The payload begins at sizeof(struct JavaArrayPrototype) (CN1_ARRAY_PAYLOAD_OFFSET) for
+ * allocation and placement alike, so what must hold is that every header member lies
+ * below it. With a 4-byte object header the members end at 12 and the struct is 16 (the
+ * payload stays 8-aligned for long[] and double[]); the 4 bytes between are padding. */
+_Static_assert(offsetof(struct JavaArrayPrototype, dataOffset) + sizeof(unsigned short)
+               <= sizeof(struct JavaArrayPrototype),
+               "every array header member must lie below the payload offset");
+
+/* The payload of an array that already exists. Equals CN1_ARRAY_PAYLOAD_PTR for every
+ * ordinarily allocated array, and differs only for the aligned and stack paths, which
+ * push the start up to an alignment boundary. This replaced a `data` pointer field --
+ * see the comment on dataOffset. */
+#define CN1_ARRAY_DATA(a) ((void*)((char*)(a) + ((JAVA_ARRAY)(a))->dataOffset))
 
 typedef union {
     JAVA_OBJECT  o;
@@ -515,7 +769,13 @@ typedef struct clazz*       JAVA_CLASS;
     if((value) != JAVA_NULL && (arrayObj) != JAVA_NULL \
             && CN1_CLASS_OF(arrayObj)->dimensions == 1) { \
         struct clazz* cn1__comp = CN1_CLASS_OF(arrayObj)->arrayType; \
-        if(cn1__comp != NULL && !instanceofFunction(cn1__comp->classId, GET_CLASS_ID(value))) { \
+        /* Constructed inline rather than behind a cold helper like the others:
+         * java_lang_ArrayStoreException is culled from any application that never
+         * stores into a reference array, so a reference to it from cn1_globals.m --
+         * which every application links -- fails to link for those. The macro only
+         * expands where an aastore exists, which is exactly where the class is kept
+         * alive. The branch hint is the part that carries over. */ \
+        if(__builtin_expect(cn1__comp != NULL && !instanceofFunction(cn1__comp->classId, GET_CLASS_ID(value)), 0)) { \
             cn1ThrowTypeError(threadStateData, __NEW_INSTANCE_java_lang_ArrayStoreException(threadStateData), CN1_CLASS_OF(value)->clsName, NULL); \
         } \
     } \
@@ -706,8 +966,8 @@ static inline JAVA_LONG cn1SaturateToLong(JAVA_DOUBLE cn1__d) {
 
 #ifdef CN1_INCLUDE_NPE_CHECKS
 #define BC_ARRAYLENGTH() { \
-    if(SP[-1].data.o == JAVA_NULL) { \
-        throwException(threadStateData, __NEW_INSTANCE_java_lang_NullPointerException(threadStateData)); \
+    if(__builtin_expect(SP[-1].data.o == JAVA_NULL, 0)) { \
+        cn1ThrowNullPointerHere(threadStateData); \
     }; \
     SP[-1].type = CN1_TYPE_INT; \
     SP[-1].data.i = (*((JAVA_ARRAY)SP[-1].data.o)).length; \
@@ -1023,9 +1283,25 @@ extern void cn1StartupPhase(const char* name);
 /// any case, and on arm64 it is one that actually reorders).
 #define CN1_CONSTANT_POOL_LOAD(off) \
     ((JAVA_OBJECT)__atomic_load_n(&constantPoolObjects[off], __ATOMIC_ACQUIRE))
-#define STRING_FROM_CONSTANT_POOL_OFFSET(off) \
-    (__builtin_expect(CN1_CONSTANT_POOL_LOAD(off) != JAVA_NULL, 1) \
-        ? CN1_CONSTANT_POOL_LOAD(off) : cn1MaterializeConstantPoolString(off))
+/// Reads the slot ONCE. The macro this replaces named CN1_CONSTANT_POOL_LOAD
+/// twice, and clang cannot fold the pair away: an acquire load is a
+/// synchronisation point it will not CSE, and for all the optimiser knows that
+/// very acquire synchronises-with a writer to constantPoolObjects itself, so
+/// even the base pointer had to be re-loaded. Every string literal in the
+/// program therefore paid ldr/add/ldapr twice -- six instructions and two
+/// ordering primitives where three and one do.
+///
+/// Folding them is safe because a slot is written exactly once, null -> object
+/// under constantPoolMutex, and never cleared; the base is assigned once during
+/// init. The two loads could only ever have returned the same pointer.
+static inline JAVA_OBJECT cn1ConstantPoolString(int off) {
+    JAVA_OBJECT o = CN1_CONSTANT_POOL_LOAD(off);
+    if(__builtin_expect(o != JAVA_NULL, 1)) {
+        return o;
+    }
+    return cn1MaterializeConstantPoolString(off);
+}
+#define STRING_FROM_CONSTANT_POOL_OFFSET(off) cn1ConstantPoolString(off)
 
 #define BC_IINC(val, num) ilocals_##val##_ += num;
 
@@ -1110,7 +1386,7 @@ static inline struct clazz* cn1ClassOf(JAVA_OBJECT o) {
     uintptr_t cn1__code = ((uintptr_t)o) & CN1_TAG_MASK;
     struct JavaObjectPrototype* cn1__p = cn1__code ? &cn1TaggedProxy[cn1__code]
                                                    : (struct JavaObjectPrototype*)o;
-    return cn1__p->__codenameOneParentClsReference;
+    return CN1_OBJ_CLASS(cn1__p);
 }
 #define CN1_TAG_INT(v) ((JAVA_OBJECT)((((uintptr_t)(intptr_t)(JAVA_INT)(v)) << CN1_TAG_SHIFT) | CN1_TAG_INTEGER))
 #define CN1_UNTAG_INT(o) ((JAVA_INT)(((intptr_t)(o)) >> CN1_TAG_SHIFT))
@@ -1152,10 +1428,147 @@ static inline struct clazz* cn1ClassOf(JAVA_OBJECT o) {
 #else
 #define CN1_TAG_CODE(o) (0)
 #define CN1_IS_TAGGED(o) (0)
-#define CN1_CLASS_OF(o) ((o)->__codenameOneParentClsReference)
+#define CN1_CLASS_OF(o) (CN1_OBJ_CLASS((o)))
 #endif
 
+/* The class word, read DIRECTLY, for a receiver that cannot be a tagged immediate.
+ *
+ * CN1_CLASS_OF masks, tests the tag and selects between a proxy entry and the
+ * object -- five instructions before it loads anything. That work only ever finds
+ * something for a boxed Integer/Long/Double/Float/Character/Short, so a thunk
+ * whose owner none of those is assignable to can skip it entirely. The translator
+ * decides that from the hierarchy (Parser.canReceiveTagged); using this where a
+ * tagged value CAN arrive dereferences a small integer.
+ */
+#define CN1_CLASS_OF_UNTAGGED(o) (CN1_OBJ_CLASS((o)))
+
 #define GET_CLASS_ID(JavaObj) ((CN1_CLASS_OF(JavaObj))->classId)
+
+/* ---- java.lang.String TWIN CLASS -------------------------------------------
+ *
+ * Two clazz structs, one classId. class__java_lang_String_i8 is a byte-for-byte
+ * copy of class__java_lang_String, so it carries the same classId, name, vtable
+ * pointer, mark function and type-test row. Everything that decides behaviour
+ * keys on the ID -- instanceof, getClass, the interface map row, the thunk
+ * switch, the type-test bitset -- so an object of the twin is a java.lang.String
+ * in every way a program can observe.
+ *
+ * What differs is the ADDRESS, and that is the point: the class word is already
+ * in every object header, so a pointer compare against it carries a bit that
+ * costs nothing to store. String needs exactly such a bit -- its coder -- and
+ * the only place that bit lives today is a 24-byte JavaArrayPrototype wrapped
+ * around a payload no one else can reach.
+ *
+ * Anything comparing a class pointer to &class__java_lang_String by IDENTITY has
+ * to ask cn1IsStringClass instead. Missing one does not fail loudly: it compiles,
+ * and simply answers "not a String".
+ */
+extern struct clazz class__java_lang_String;
+extern struct clazz class__java_lang_String_i8;
+extern struct clazz class__java_lang_String_i16;
+static inline int cn1IsStringClass(const struct clazz* c) {
+    return c == &class__java_lang_String
+        || c == &class__java_lang_String_i8
+        || c == &class__java_lang_String_i16;
+}
+/* MUST be called before either twin is used as an allocation class. The twins are
+ * filled by a lazy memcpy from the primary -- lazy so it lands after
+ * java.lang.String's clinit, where the vtable pointer is real -- and until that
+ * runs they are all zeros: null vtable, classId 0. Every path that allocates with
+ * a twin calls this first. Getting it wrong is not subtle but it IS remote: the
+ * first virtual call on such a String dereferences vtable[n] off NULL, which is
+ * where this was found. */
+extern void cn1InitStringTwin(void);
+
+/* A String whose characters sit INSIDE it: value is JAVA_NULL and the payload
+ * begins at the first 8-aligned byte after the fields. The coder is the twin. */
+static inline int cn1IsInlineStringClass(const struct clazz* c) {
+    return c == &class__java_lang_String_i8 || c == &class__java_lang_String_i16;
+}
+
+/* How a String's characters are reached. DECLARED here and defined in
+ * nativeMethods.m, because a declaration needs no struct while the definition
+ * needs the generated obj__java_lang_String -- and this header is included long
+ * before that one exists.
+ *
+ * Not static inline in a header, which is what the first attempt tried:
+ * cn1_intrinsics.h is pulled into generated .c files that do not necessarily
+ * include java_lang_String.h, and its __has_include guard cannot help because
+ * __has_include asks whether the FILE EXISTS, not whether this translation unit
+ * included it -- and it always exists. Out-of-line is the answer, and costs
+ * nothing where it matters: -O3 ships -flto=thin, so these inline across
+ * translation units anyway.
+ *
+ * String is special-cased in the runtime on purpose. It is the most allocated
+ * class in the VM and the only one whose storage the collector, the intrinsics
+ * and the natives all have opinions about, so its access belongs in one place
+ * rather than re-derived at each. */
+extern void* cn1StrChars(JAVA_OBJECT s);
+extern int cn1StrIsLatin1(JAVA_OBJECT s);
+extern JAVA_CHAR cn1StrCharAtRaw(JAVA_OBJECT s, JAVA_INT i);
+
+
+/* Constant-time instanceof against a type the translator assigned a dense bit
+ * index to (see Parser.typeTestIds). One load of the runtime class id, one load
+ * from the class's bitmap row, a shift and an and -- no call and no loop, where
+ * BC_INSTANCEOF walks the supertype list one dependent load at a time.
+ *
+ * cn1TypeTestBits has a row per ordinary class id only. An array's id lives above
+ * cn1_array_start_offset, i.e. past CN1_TYPETEST_ROWS, so those fall back to
+ * instanceofFunction, which has always handled array types before it reaches the
+ * scan. The bound test is also what keeps a row lookup in range. */
+/* instanceof against a class NOTHING LIVE EXTENDS.
+ *
+ * The general form reads the class word, then reads classId out of it -- a second
+ * load, dependent on the first -- and indexes the type-test bitmap. Against a leaf
+ * the class word IS the answer, so this is ONE load and a compare.
+ *
+ * The tagged test stays and is cheap: a tagged immediate is a boxed value, whose
+ * class is never a leaf the application tests for, so !CN1_IS_TAGGED settles it
+ * without resolving anything. It must come BEFORE the field read, because
+ * dereferencing a tagged word reads whatever that small integer points at.
+ *
+ * Measured against C2's output for the same test: HotSpot compares the klass word
+ * directly because the klass is the identity there, and that single dependent load
+ * was most of the 31% load gap on BytecodeMethod.equals.
+ */
+/* instanceof java.lang.String.
+ *
+ * String is final, so it is a leaf and the leaf form above would apply -- except
+ * that its class word is not unique. A fused String carries a TWIN clazz, same
+ * classId and vtable, different address, so a plain identity compare against
+ * &class__java_lang_String answers FALSE for exactly the Strings the VM creates
+ * most. The twin commit said in as many words that identity comparisons must ask
+ * cn1IsStringClass; this is that rule applying to code written after it.
+ *
+ * Still worth having: one load and up to three compares, against the general
+ * form's two dependent loads plus a bitmap index.
+ */
+#define BC_INSTANCEOF_STRING() { \
+        JAVA_OBJECT cn1__io = SP[-1].data.o; \
+        SP[-1].type = CN1_TYPE_INT; \
+        SP[-1].data.i = (cn1__io != JAVA_NULL && !CN1_IS_TAGGED(cn1__io) \
+                && cn1IsStringClass(CN1_OBJ_CLASS(cn1__io))) ? 1 : 0; \
+    }
+
+#define BC_INSTANCEOF_LEAF(clsSymbol) { \
+        JAVA_OBJECT cn1__io = SP[-1].data.o; \
+        SP[-1].type = CN1_TYPE_INT; \
+        SP[-1].data.i = (cn1__io != JAVA_NULL && !CN1_IS_TAGGED(cn1__io) \
+                && CN1_OBJ_CLASS(cn1__io) == &(clsSymbol)) ? 1 : 0; \
+    }
+
+#define BC_INSTANCEOF_FAST(typeTestIdx, typeOfInstanceOf) { \
+    if(SP[-1].data.o != JAVA_NULL) { \
+        int tmpInstanceOfId = GET_CLASS_ID(SP[-1].data.o); \
+        SP[-1].type = CN1_TYPE_INVALID; \
+        SP[-1].data.i = (tmpInstanceOfId < CN1_TYPETEST_ROWS) \
+            ? (JAVA_INT)((cn1TypeTestBits[(size_t)tmpInstanceOfId * CN1_TYPETEST_WORDS \
+                    + ((typeTestIdx) >> 6)] >> ((typeTestIdx) & 63)) & 1ULL) \
+            : instanceofFunction( typeOfInstanceOf, tmpInstanceOfId ); \
+    } \
+    SP[-1].type = CN1_TYPE_INT; \
+}
 
 #define BC_INSTANCEOF(typeOfInstanceOf) { \
     if(SP[-1].data.o != JAVA_NULL) { \
@@ -1168,7 +1581,7 @@ static inline struct clazz* cn1ClassOf(JAVA_OBJECT o) {
 
 #define BC_IALOAD() { CHECK_ARRAY_ACCESS(2, SP[-1].data.i); \
     SP--; SP[-1].type = CN1_TYPE_INT; \
-    SP[-1].data.i = ((JAVA_ARRAY_INT*) (*(JAVA_ARRAY)SP[-1].data.o).data)[(*SP).data.i]; \
+    SP[-1].data.i = ((JAVA_ARRAY_INT*) CN1_ARRAY_DATA((JAVA_ARRAY)SP[-1].data.o))[(*SP).data.i]; \
     }
 
 #define BC_LALOAD() { CHECK_ARRAY_ACCESS(2, SP[-1].data.i); \
@@ -1188,36 +1601,36 @@ static inline struct clazz* cn1ClassOf(JAVA_OBJECT o) {
 
 #define BC_AALOAD() { CHECK_ARRAY_ACCESS(2, SP[-1].data.i); \
     SP--; SP[-1].type = CN1_TYPE_INVALID; \
-    SP[-1].data.o = ((JAVA_ARRAY_OBJECT*) (*(JAVA_ARRAY)SP[-1].data.o).data)[(*SP).data.i]; \
+    SP[-1].data.o = ((JAVA_ARRAY_OBJECT*) CN1_ARRAY_DATA((JAVA_ARRAY)SP[-1].data.o))[(*SP).data.i]; \
     SP[-1].type = CN1_TYPE_OBJECT;  }
 
 #define BC_BALOAD() { CHECK_ARRAY_ACCESS(2, SP[-1].data.i); \
     SP--; SP[-1].type = CN1_TYPE_INT; \
-    SP[-1].data.i = ((JAVA_ARRAY_BYTE*) (*(JAVA_ARRAY)SP[-1].data.o).data)[(*SP).data.i]; \
+    SP[-1].data.i = ((JAVA_ARRAY_BYTE*) CN1_ARRAY_DATA((JAVA_ARRAY)SP[-1].data.o))[(*SP).data.i]; \
     }
 
 #define BC_CALOAD() { CHECK_ARRAY_ACCESS(2, SP[-1].data.i); \
     SP--; SP[-1].type = CN1_TYPE_INT; \
-    SP[-1].data.i = ((JAVA_ARRAY_CHAR*) (*(JAVA_ARRAY)SP[-1].data.o).data)[(*SP).data.i]; \
+    SP[-1].data.i = ((JAVA_ARRAY_CHAR*) CN1_ARRAY_DATA((JAVA_ARRAY)SP[-1].data.o))[(*SP).data.i]; \
     }
 
 #define BC_SALOAD() { CHECK_ARRAY_ACCESS(2, SP[-1].data.i); \
     SP--; SP[-1].type = CN1_TYPE_INT; \
-    SP[-1].data.i = ((JAVA_ARRAY_SHORT*) (*(JAVA_ARRAY)SP[-1].data.o).data)[(*SP).data.i]; \
+    SP[-1].data.i = ((JAVA_ARRAY_SHORT*) CN1_ARRAY_DATA((JAVA_ARRAY)SP[-1].data.o))[(*SP).data.i]; \
     }
 
 
 #define BC_BASTORE() CHECK_ARRAY_ACCESS(3, SP[-2].data.i); \
-    ((JAVA_ARRAY_BYTE*) (*(JAVA_ARRAY)SP[-3].data.o).data)[SP[-2].data.i] = SP[-1].data.i; SP-=3
+    ((JAVA_ARRAY_BYTE*) CN1_ARRAY_DATA((JAVA_ARRAY)SP[-3].data.o))[SP[-2].data.i] = SP[-1].data.i; SP-=3
 
 #define BC_CASTORE() CHECK_ARRAY_ACCESS(3, SP[-2].data.i); \
-    ((JAVA_ARRAY_CHAR*) (*(JAVA_ARRAY)SP[-3].data.o).data)[SP[-2].data.i] = SP[-1].data.i; SP-=3
+    ((JAVA_ARRAY_CHAR*) CN1_ARRAY_DATA((JAVA_ARRAY)SP[-3].data.o))[SP[-2].data.i] = SP[-1].data.i; SP-=3
 
 #define BC_SASTORE() CHECK_ARRAY_ACCESS(3, SP[-2].data.i); \
-    ((JAVA_ARRAY_SHORT*) (*(JAVA_ARRAY)SP[-3].data.o).data)[SP[-2].data.i] = SP[-1].data.i; SP-=3
+    ((JAVA_ARRAY_SHORT*) CN1_ARRAY_DATA((JAVA_ARRAY)SP[-3].data.o))[SP[-2].data.i] = SP[-1].data.i; SP-=3
 
 #define BC_IASTORE() CHECK_ARRAY_ACCESS(3, SP[-2].data.i); \
-    ((JAVA_ARRAY_INT*) (*(JAVA_ARRAY)SP[-3].data.o).data)[SP[-2].data.i] = SP[-1].data.i; SP-=3
+    ((JAVA_ARRAY_INT*) CN1_ARRAY_DATA((JAVA_ARRAY)SP[-3].data.o))[SP[-2].data.i] = SP[-1].data.i; SP-=3
 
 #define BC_LASTORE() CHECK_ARRAY_ACCESS(3, SP[-2].data.i); \
     LONG_ARRAY_LOOKUP((JAVA_ARRAY)SP[-3].data.o, SP[-2].data.i) = SP[-1].data.l; SP-=3
@@ -1231,33 +1644,45 @@ static inline struct clazz* cn1ClassOf(JAVA_OBJECT o) {
 #define BC_AASTORE() CHECK_ARRAY_ACCESS(3, SP[-2].data.i); { \
     JAVA_OBJECT aastoreTmp = SP[-3].data.o; \
     CN1_WRITE_BARRIER(aastoreTmp, SP[-1].data.o); \
-    ((JAVA_ARRAY_OBJECT*) (*(JAVA_ARRAY)aastoreTmp).data)[SP[-2].data.i] = SP[-1].data.o; \
+    ((JAVA_ARRAY_OBJECT*) CN1_ARRAY_DATA((JAVA_ARRAY)aastoreTmp))[SP[-2].data.i] = SP[-1].data.o; \
     SP-=3; \
 }
 #define BC_AASTORE_WITH_ARGS(array, index, value) CHECK_ARRAY_ACCESS(3, SP[-2].data.i); { \
     JAVA_OBJECT aastoreTmp = SP[-3].data.o; \
     CN1_WRITE_BARRIER(aastoreTmp, SP[-1].data.o); \
-    ((JAVA_ARRAY_OBJECT*) (*(JAVA_ARRAY)aastoreTmp).data)[SP[-2].data.i] = SP[-1].data.o; \
+    ((JAVA_ARRAY_OBJECT*) CN1_ARRAY_DATA((JAVA_ARRAY)aastoreTmp))[SP[-2].data.i] = SP[-1].data.o; \
     SP-=3; \
 }
 
 
-//#define BYTE_ARRAY_LOOKUP(array, offset) ((JAVA_ARRAY_BYTE*) (*array).data)[offset]
-//#define SHORT_ARRAY_LOOKUP(array, offset) ((JAVA_ARRAY_SHORT*) (*array).data)[offset]
-//#define CHAR_ARRAY_LOOKUP(array, offset) ((JAVA_ARRAY_CHAR*) (*array).data)[offset]
-//#define INT_ARRAY_LOOKUP(array, offset) ((JAVA_ARRAY_INT*) (*array).data)[offset]
+//#define BYTE_ARRAY_LOOKUP(array, offset) ((JAVA_ARRAY_BYTE*) CN1_ARRAY_DATA(array))[offset]
+//#define SHORT_ARRAY_LOOKUP(array, offset) ((JAVA_ARRAY_SHORT*) CN1_ARRAY_DATA(array))[offset]
+//#define CHAR_ARRAY_LOOKUP(array, offset) ((JAVA_ARRAY_CHAR*) CN1_ARRAY_DATA(array))[offset]
+//#define INT_ARRAY_LOOKUP(array, offset) ((JAVA_ARRAY_INT*) CN1_ARRAY_DATA(array))[offset]
 
-#define LONG_ARRAY_LOOKUP(array, offset) ((JAVA_ARRAY_LONG*) (*array).data)[offset]
+#define LONG_ARRAY_LOOKUP(array, offset) ((JAVA_ARRAY_LONG*) CN1_ARRAY_DATA(array))[offset]
 
-#define FLOAT_ARRAY_LOOKUP(array, offset) ((JAVA_ARRAY_FLOAT*) (*array).data)[offset]
+#define FLOAT_ARRAY_LOOKUP(array, offset) ((JAVA_ARRAY_FLOAT*) CN1_ARRAY_DATA(array))[offset]
 
-#define DOUBLE_ARRAY_LOOKUP(array, offset) ((JAVA_ARRAY_DOUBLE*) (*array).data)[offset]
+#define DOUBLE_ARRAY_LOOKUP(array, offset) ((JAVA_ARRAY_DOUBLE*) CN1_ARRAY_DATA(array))[offset]
 
-//#define OBJECT_ARRAY_LOOKUP(array, offset) ((JAVA_ARRAY_OBJECT*) (*array).data)[offset]
+//#define OBJECT_ARRAY_LOOKUP(array, offset) ((JAVA_ARRAY_OBJECT*) CN1_ARRAY_DATA(array))[offset]
+
+// Native buffers owned by an escape-proven C stack object. Java exceptions
+// unwind this chain before longjmp; C cleanup attributes handle ordinary returns.
+struct CN1StackBuffer {
+    struct CN1StackBuffer* previous;
+    struct ThreadLocalData* thread;
+    JAVA_OBJECT owner;
+    void* initialData;
+    JAVA_LONG owned;
+    int initialBytes;
+};
 
 // indicates a try/catch block currently in frame
 struct TryBlock {
     jmp_buf destination;
+    struct CN1StackBuffer* nativeBuffers;
     
     // -1 for all exceptions
     JAVA_INT exceptionClass;
@@ -1306,149 +1731,74 @@ struct TryBlock {
 #define CN1_THREAD_STACK_BYTES (16 * 1024 * 1024)
 #endif
 
-// The SATB entry points are DEFINED unconditionally in cn1_globals.m, and nativeMethods.m
-// calls the bulk trio from java_lang_System_arraycopy with no #ifdef around it -- so these
-// declarations have to be visible in both branches below. They used to sit inside the
-// no-nursery #else, which meant a -DCN1_NURSERY build failed to compile on three implicit
-// declarations and had done for as long as the bulk barrier has existed. That silently
-// retired an ablation arm this tree documents, and it is why the missing tag guard in the
-// nursery root scan could not be caught by building the configuration it affects.
-extern volatile int gcSatbActive;
-extern void cn1SatbEnqueue(JAVA_OBJECT old);
-extern volatile int gcSatbTerminating;
-extern JAVA_BOOLEAN cn1SatbBulkBegin(void);
-extern void cn1SatbEnqueueRangeLocked(JAVA_ARRAY_OBJECT* refs, int count);
-extern void cn1SatbBulkEnd(void);
-extern void cn1SatbBulkQuiesce(void);
-
-#ifdef CN1_NURSERY
-// Tunables (override with -D). Block size and arena size trade footprint against
-// how long churn lives before a minor collection (the bigger the nursery, the more
-// short-lived garbage dies in-place instead of being promoted).
-// 64 KB measured better than 256 KB across the allocation benchmarks (less waste when
-// a block tenures at low density -> stringBuilding 0.92x -> 1.23x, objectAllocation
-// slightly better, hashMapChurn ~neutral). Configurable for fragmentation tuning.
-#ifndef CN1_NURSERY_BLOCK_SIZE
-#define CN1_NURSERY_BLOCK_SIZE (64*1024)
-#endif
-#ifndef CN1_NURSERY_ARENA_SIZE
-#define CN1_NURSERY_ARENA_SIZE (64*1024*1024)
-#endif
-#ifndef CN1_NURSERY_MAX_OBJECT
-#define CN1_NURSERY_MAX_OBJECT 512
-#endif
-// Minor collection fires after this many bytes have been bump-allocated by a thread.
-#ifndef CN1_NURSERY_MINOR_TRIGGER
-#define CN1_NURSERY_MINOR_TRIGGER (8*1024*1024)
-#endif
-// Adaptive survival-based bypass. When a minor collection finds that at least
-// CN1_NURSERY_BYPASS_SURVIVAL_PCT% of the objects allocated since the last collection
-// survived (escaped/were promoted), the nursery is pure overhead for this phase: the
-// thread bypasses it and allocates straight into the global heap for the next
-// CN1_NURSERY_BYPASS_ALLOCS allocations, then re-probes by allocating in the nursery
-// again. CN1_NURSERY_BYPASS_MIN_SAMPLE avoids deciding on a tiny sample.
-#ifndef CN1_NURSERY_BYPASS_SURVIVAL_PCT
-#define CN1_NURSERY_BYPASS_SURVIVAL_PCT 60
-#endif
-#ifndef CN1_NURSERY_BYPASS_ALLOCS
-#define CN1_NURSERY_BYPASS_ALLOCS 200000
-#endif
-#ifndef CN1_NURSERY_BYPASS_MIN_SAMPLE
-#define CN1_NURSERY_BYPASS_MIN_SAMPLE 1024
-#endif
-// When re-probing after a bypass, collect after this many bytes (a small sample)
-// instead of the full minor trigger, so a still-escaping phase pays only a tiny
-// re-measurement cost before bypassing again.
-#ifndef CN1_NURSERY_REPROBE_BYTES
-#define CN1_NURSERY_REPROBE_BYTES (512*1024)
-#endif
-extern char* cn1NurseryArenaStart;
-extern char* cn1NurseryArenaEnd;
-// Forward-declare at file scope so the prototype below refers to THIS tag, not a new
-// prototype-scoped one. CODENAME_ONE_THREAD_STATE isn't defined this early either.
-struct ThreadLocalData;
-extern JAVA_OBJECT cn1NurseryAlloc(struct ThreadLocalData* threadStateData, int size, struct clazz* parent);
-extern void cn1NurseryWriteBarrier(JAVA_OBJECT target, JAVA_OBJECT value);
-static inline JAVA_BOOLEAN cn1InNursery(void* p) {
-    // A tagged immediate is a VALUE, not an address, and EVERY caller of this dereferences
-    // the header the moment it answers true -- `cn1InNursery(o) && o->__heapPosition == -1`
-    // is the shape at all six call sites. So the guard belongs here rather than at each of
-    // them: a Double carries the raw IEEE pattern and a Long a shifted payload, either of
-    // which can land inside the arena range by coincidence, and the read that follows is
-    // then an unaligned load off a word that has no object header. With a ONE-bit tag this
-    // survived on the range check happening to exclude small odd addresses; with three bits
-    // and five more types it does not.
-    if(CN1_IS_TAGGED(p)) {
-        return JAVA_FALSE;
-    }
-    return (char*)p >= cn1NurseryArenaStart && (char*)p < cn1NurseryArenaEnd;
-}
-// "Is this object STILL IN the young generation?" -- which is NOT the same question as
-// cn1InNursery(), and conflating the two is a use-after-free.
-//
-// Promotion does not MOVE anything: cn1NurseryPromote flips __heapPosition from -1 to -2
-// and registers the object with the global collector, but the bytes stay at the same
-// address inside the arena. So cn1InNursery() -- a pure address-range test -- keeps
-// answering TRUE for an object that has belonged to the old generation for a long time.
-//
-// Every barrier that asks "is the TARGET young?" must therefore ask this instead. Asking
-// cn1InNursery() alone makes a store into a promoted container look like a young->young
-// store, which needs no promotion, so the VALUE is never promoted -- and the value's
-// block is then recycled while the promoted container still points at it. Observed as a
-// fault inside ASM's MethodNode.getLabelNodes reading an Object[] element whose class
-// pointer had been poisoned by the retiring collection.
-static inline JAVA_BOOLEAN cn1IsYoungObject(void* p) {
-    return (JAVA_BOOLEAN)(cn1InNursery(p) && ((JAVA_OBJECT)p)->__heapPosition == -1);
-}
-// Emitted by the translator before an object-reference store into a heap location.
-// Fast path is INLINE: only a value that actually lives in the nursery can escape, so
-// the overwhelmingly common heap->heap / null store collapses to a two-compare range
-// check with no call and no getThreadLocalData() TLS lookup. This matters enormously
-// for store-heavy code (HashMap internals, etc.) and makes the barrier ~free whenever
-// the nursery isn't holding the value (including while bypassed).
-// Tagged immediates are excluded by cn1InNursery itself -- see the note there; this used
-// to carry its own CN1_IS_TAGGED test, which fixed the barrier and left the five other
-// call sites that dereference straight after it still exposed.
-//
-// IT ALSO HAS TO CARRY THE SATB INSERTION HALF. This macro is the only barrier the
-// translator emits at an object store, so in the no-nursery build it doubles as SATB
-// insertion (see the #else). Defining CN1_NURSERY used to REPLACE that rather than
-// compose with it, which silently dropped insertion from the concurrent collector --
-// the half whose absence lets a fresh container that takes an older child mid-mark have
-// that child recorded nowhere, so the sweep reclaims it while the container still points
-// at it. cn1_globals.m's deletion-filter argument names this build as its one exception,
-// and the exception only existed because nothing compiled it. The two halves are
-// independent (nursery escape-promotion vs. mark liveness) and both must run.
-// ORDER MATTERS AND THE YOUNG TEST COMES SECOND. The nursery barrier runs first and
-// PROMOTES an escaping value, so by the time the SATB test runs the value is young only
-// if it is staying in the young generation -- a young->young store. Those must NOT enter
-// the SATB log: the log is drained by the collector, which would then mark and trace an
-// object whose lifetime belongs to the minor collector, and a minor collection is free to
-// reclaim it in between. That is a use-after-free with the collector holding the stale
-// reference, which is the worst possible owner of one.
-#define CN1_WRITE_BARRIER(target, value) \
-    do { JAVA_OBJECT cn1__bv = (JAVA_OBJECT)(value); \
-         if(cn1__bv != JAVA_NULL) { \
-             if(cn1InNursery(cn1__bv)) { \
-                 cn1NurseryWriteBarrier((JAVA_OBJECT)(target), cn1__bv); } \
-             if(__builtin_expect(gcSatbActive, 0) && !CN1_IS_TAGGED(cn1__bv) \
-                && !cn1IsYoungObject(cn1__bv)) { \
-                 cn1SatbEnqueue(cn1__bv); } } } while(0)
-#else
-// No nursery: repurpose the (already-emitted-at-every-object-store) write barrier as the
-// SATB INSERTION half. During the mark, enqueue the NEW reference being stored so an
+// THE OBJECT-STORE WRITE BARRIER IS THE SATB INSERTION HALF.
+// The translator emits CN1_WRITE_BARRIER at every object store, so it is the natural
+// place for it. During the mark, enqueue the NEW reference being stored so an
 // object linked into the graph mid-mark is kept alive even if the container it is stored
 // into is a fresh grace object not yet reachable (the residual Property->Double /
 // container->content crash). Pairs with CN1_SATB_DELETE (the deletion half) for a
 // complete snapshot + incremental barrier. Off-mark: one predicted-not-taken flag load.
+// FRESH VALUES ARE FILTERED INLINE. cn1SatbEnqueue discards a fresh (mark == -1)
+// reference anyway -- the sweep's grace rule keeps it -- but only after the call and
+// three acquire loads. In allocation-heavy code nearly every stored reference is a
+// newly allocated object, so that out-of-line call was the cost: 12.6-26.4% of
+// objectAllocation's main thread. The mark word is exactly what the out-of-line
+// filter reads first, so skipping here drops no reference it would have kept.
+// -DCN1_SATB_LOG_FRESH logs fresh references on purpose (it is the negative control
+// GcSteadyStateIntegrationTest rebuilds with), so the filter is off in that arm.
+#ifdef CN1_SATB_LOG_FRESH
+#define CN1_SATB_FRESH_INLINE(o) 0
+#else
+// The filter is only sound while the sweep grants EVERY fresh object a cycle of grace.
+// Single-core mode (see cn1GcSingleCore in cn1_globals.m) reclaims fresh objects that
+// were allocated before the cycle began, so there a fresh reference is logged like any
+// other; cn1GcFreshFilter is set once, at the first collection, and never changes.
+extern JAVA_BOOLEAN cn1GcFreshFilter;
+#define CN1_SATB_FRESH_INLINE(o) (cn1GcFreshFilter && CN1_OBJ_MARK_LOAD((o), __ATOMIC_RELAXED) == -1)
+#endif
+// Two halves share the gate. The SATB half runs only while a mark is in progress. The
+// GENERATIONAL half (single-core mode only, see cn1GcSingleCore) runs always: a young
+// (mark == -1) value stored into an OLD object records that object in the remembered
+// set, which is what lets a minor cycle skip tracing the old generation.
+extern volatile int cn1GcGenBarrier;
+extern void cn1GcRememberSlow(JAVA_OBJECT target);
+// A native reference block (NativeStorage) is remembered itself, not through an object.
+extern void cn1GcRememberBlock(JAVA_LONG block);
+#define CN1_GEN_REMEMBER_BLOCK(block, v) \
+    do { JAVA_OBJECT cn1__bv = (JAVA_OBJECT)(v); \
+         if(__builtin_expect(cn1GcGenBarrier, 0) && cn1__bv != JAVA_NULL && !CN1_IS_TAGGED(cn1__bv) \
+            && CN1_OBJ_MARK_LOAD(cn1__bv, __ATOMIC_RELAXED) == -1) \
+             cn1GcRememberBlock(block); } while(0)
+#define CN1_GEN_REMEMBER(target, v) \
+    do { JAVA_OBJECT cn1__gt = (JAVA_OBJECT)(target); \
+         if(cn1__gt != JAVA_NULL \
+            && CN1_OBJ_MARK_LOAD((v), __ATOMIC_RELAXED) == -1 \
+            && CN1_OBJ_MARK_LOAD(cn1__gt, __ATOMIC_RELAXED) > 0) \
+             cn1GcRememberSlow(cn1__gt); } while(0)
+#ifdef CN1_GC_GEN_CHECK2
+extern void cn1GcGenNoteStore(JAVA_OBJECT target, JAVA_OBJECT value);
+#define CN1_GEN_NOTE(t, v) cn1GcGenNoteStore((JAVA_OBJECT)(t), (v))
+#else
+#define CN1_GEN_NOTE(t, v) ((void)0)
+#endif
 #if defined(CN1_DISABLE_SATB)
-#define CN1_WRITE_BARRIER(target, value) do { } while(0)
+// No SATB half, but the GENERATIONAL half must stay: single-core minors skip the old
+// generation on the strength of the remembered set, and a barrier that stopped
+// recording old->young stores would let a minor free a young object an old one holds.
+#define CN1_WRITE_BARRIER(target, value) \
+    do { if(__builtin_expect(cn1GcGenBarrier, 0)) { \
+             JAVA_OBJECT cn1__nv = (JAVA_OBJECT)(value); \
+             if(cn1__nv != JAVA_NULL && !CN1_IS_TAGGED(cn1__nv)) { \
+                 CN1_GEN_NOTE(target, cn1__nv); \
+                 CN1_GEN_REMEMBER(target, cn1__nv); } } } while(0)
 #else
 #define CN1_WRITE_BARRIER(target, value) \
-    do { if(__builtin_expect(gcSatbActive, 0)) { \
+    do { if(__builtin_expect(gcSatbActive | cn1GcGenBarrier, 0)) { \
              JAVA_OBJECT cn1__nv = (JAVA_OBJECT)(value); \
-             if(cn1__nv != JAVA_NULL && !CN1_IS_TAGGED(cn1__nv)) cn1SatbEnqueue(cn1__nv); } } while(0)
-#endif
+             if(cn1__nv != JAVA_NULL && !CN1_IS_TAGGED(cn1__nv)) { \
+                 if(gcSatbActive && !CN1_SATB_FRESH_INLINE(cn1__nv)) cn1SatbEnqueue(cn1__nv); \
+                 CN1_GEN_NOTE(target, cn1__nv); \
+                 if(cn1GcGenBarrier) CN1_GEN_REMEMBER(target, cn1__nv); } } } while(0)
 #endif
 
 // ---- Snapshot-at-the-beginning (Yuasa) DELETION write barrier ---------------
@@ -1472,16 +1822,38 @@ static inline JAVA_BOOLEAN cn1IsYoungObject(void* p) {
 // heap ref store), which thread-pausing structurally cannot.
 extern volatile int gcSatbActive;
 extern void cn1SatbEnqueue(JAVA_OBJECT old);
-// DECLARED HERE, not beside the write barrier, because that copy sits in the #else of
-// the CN1_NURSERY split and these four have callers that are not conditional on it:
-// nativeMethods' arraycopy/cloneArray bulk barrier and CN1_REF_LOAD_BEGIN/END. With the
-// declarations behind the nursery #else, -DCN1_NURSERY compiled those calls as implicit
-// C89 declarations returning int, which clang has rejected outright since C99 became the
-// default -- so the nursery build did not compile at all, and nothing noticed because no
-// gate builds that arm. Duplicating an extern is legal and keeps the two halves honest.
+// The bulk trio is DECLARED here and DEFINED unconditionally in cn1_globals.m, because
+// nativeMethods' arraycopy/cloneArray bulk barrier and CN1_REF_LOAD_BEGIN/END call it
+// with no #ifdef around them. Keep it that way: these declarations previously sat inside
+// a configuration branch, and the arm that did not see them compiled those calls as
+// implicit C89 declarations returning int -- which clang has rejected since C99 became
+// the default, so that arm did not build at all and no gate noticed.
 extern volatile int gcSatbTerminating;
 extern JAVA_BOOLEAN cn1SatbBulkBegin(void);
 extern void cn1SatbEnqueueRangeLocked(JAVA_ARRAY_OBJECT* refs, int count);
+/// A MOVE WITHIN ONE REFERENCE BLOCK OWES THE DELETION BARRIER EVERY SLOT IT OVERWRITES.
+///
+/// The tempting narrowing is to log only the min(count, |to-from|) slots whose old
+/// value leaves the block, since a shift otherwise only permutes references. It is
+/// wrong, and it shipped for a while: a marker can be scanning this same block WHILE
+/// the memmove runs, and nothing orders the two. For ArrayList.remove(0) the memmove
+/// runs upward faster than the marker does, overtakes it, and the one element that
+/// slides from the unscanned side of the scan position to the scanned side is seen
+/// in neither place. That element is logged by nobody and swept under a live list:
+/// the self-hosting translator lost a LineNumber out of an instruction list this way,
+/// about one run in twenty. MoveRace (run-gc-verify.sh) reproduces it.
+///
+/// Logging the whole overwritten range [to, to+count) is sound for any scan order and
+/// any store ordering: a moved value either had its old slot inside that range, so its
+/// old value is logged, or it never leaves its old slot during the move (the tail of a
+/// left shift, the head of a right shift), so a scan finds it there whenever it looks.
+/// No insertion half is needed for the same reason -- nothing is written that was not
+/// already in the block.
+///
+/// That is the FALLBACK now, not the common case. On 64-bit targets a move during a mark
+/// queues its block for a collector re-scan and logs only the min(count, |to-from|)
+/// slots that leave -- the narrow form made sound by the re-scan, which finds whatever
+/// the concurrent scan missed. See DEFERRED BLOCK RE-SCAN in cn1_globals.m.
 extern void cn1SatbBulkEnd(void);
 extern void cn1SatbBulkQuiesce(void);
 #if defined(CN1_DISABLE_SATB)
@@ -1490,23 +1862,12 @@ extern void cn1SatbBulkQuiesce(void);
 // barrier compiles out entirely, so there is zero footprint on the store hot path.
 #define CN1_SATB_DELETE(fieldAddr) do { } while(0)
 #else
-#ifdef CN1_NURSERY
-// The young exclusion applies to the DELETION half for the same reason as the insertion
-// half: the overwritten value can be a young object, and handing one to the collector's
-// log lets it trace memory the minor collector owns and may already have reclaimed.
 #define CN1_SATB_DELETE(fieldAddr) \
     do { if(__builtin_expect(gcSatbActive, 0)) { \
              JAVA_OBJECT cn1__old = *(JAVA_OBJECT volatile*)(fieldAddr); \
-             if(cn1__old != JAVA_NULL && !CN1_IS_TAGGED(cn1__old) \
-                && !cn1IsYoungObject(cn1__old)) cn1SatbEnqueue(cn1__old); \
+             if(cn1__old != JAVA_NULL && !CN1_IS_TAGGED(cn1__old) && !CN1_SATB_FRESH_INLINE(cn1__old)) \
+                 cn1SatbEnqueue(cn1__old); \
          } } while(0)
-#else
-#define CN1_SATB_DELETE(fieldAddr) \
-    do { if(__builtin_expect(gcSatbActive, 0)) { \
-             JAVA_OBJECT cn1__old = *(JAVA_OBJECT volatile*)(fieldAddr); \
-             if(cn1__old != JAVA_NULL && !CN1_IS_TAGGED(cn1__old)) cn1SatbEnqueue(cn1__old); \
-         } } while(0)
-#endif
 #endif
 
 // ---- java.lang.ref support -------------------------------------------------
@@ -1543,9 +1904,20 @@ extern const char* volatile cn1LastNamSetter; // diagnosis: last bracket toucher
 #define finishedNativeAllocations() do { threadStateData->nativeAllocationMode = JAVA_FALSE; cn1LastNamSetter = 0; } while(0)
 #endif
 
+/* A malloc buffer is not a conservative Java root. Keep its Java owner live
+ * until the borrowing method returns, even when C optimization retains only an
+ * interior buffer pointer. The empty asm is a compiler lifetime fence; it emits
+ * no call or instruction. cleanup covers every normal return. A Java exception
+ * leaves the borrowing scope via longjmp, after which the borrow is no longer used. */
+static inline void cn1NativeOwnerFence(JAVA_OBJECT* owner) {
+    __asm__ __volatile__("" : : "r"(*owner) : "memory");
+}
+#define CN1_KEEP_NATIVE_OWNER(name, value) \
+    JAVA_OBJECT name __attribute__((cleanup(cn1NativeOwnerFence))) = (value)
+
 // Shared by ThreadLocalData's adaptive state and the page allocator below.
 #ifndef CN1_BIBOP_NUM_CLASSES
-#define CN1_BIBOP_NUM_CLASSES 15
+#define CN1_BIBOP_NUM_CLASSES 32
 #endif
 
 // handles the stack used for print stack trace and GC
@@ -1553,6 +1925,7 @@ struct ThreadLocalData {
     JAVA_LONG threadId;
     JAVA_OBJECT currentThreadObject;
     struct TryBlock* blocks;
+    struct CN1StackBuffer* nativeBuffers;
     int tryBlockOffset;
     JAVA_OBJECT exception;
     
@@ -1580,39 +1953,6 @@ struct ThreadLocalData {
     JAVA_INT heapAllocationSize;
     JAVA_INT threadHeapTotalSize;
 
-#ifdef CN1_NURSERY
-    // Thread-local young-generation ("nursery") bump allocator. Small objects are
-    // bump-allocated here and NEVER enter allObjectsInHeap; a thread-local minor
-    // collection promotes only the survivors and reclaims the rest in bulk, so the
-    // global mark/sweep cost becomes O(survivors) instead of O(allocated).
-    char* nurseryBump;                 // next free byte in the current block
-    char* nurseryEnd;                  // end of the current block
-    int   nurseryCurrentBlock;         // index of the current block (-1 = none)
-    int*  nurseryYoungBlocks;          // block indices owned by this thread's young gen
-    int   nurseryYoungCount;
-    int   nurseryYoungCapacity;
-    long  nurseryBytesSinceMinor;      // drives the minor-GC trigger
-    // Per-thread promotion state. MUST be per-thread: the concurrent GC thread runs
-    // gcMarkObject at the same time a mutator promotes, and a shared flag would make
-    // the GC thread promote-instead-of-mark and corrupt the heap.
-    JAVA_BOOLEAN nurseryPromoting;
-#ifdef CN1_NURSERY_VERIFY
-    // QA: while set, gcMarkObject REPORTS young referents instead of promoting them, so
-    // the generational invariant can be checked rather than assumed. Holder is whatever
-    // object's mark function is currently running, which is what names the guilty field.
-    JAVA_BOOLEAN nurseryVerifying;
-    JAVA_OBJECT  nurseryVerifyHolder;
-#endif
-    JAVA_OBJECT* nurseryPromoteWorklist;
-    int   nurseryPromoteTop;
-    int   nurseryPromoteCap;
-    // Adaptive bypass: survival sampling + bypass countdown (see CN1_NURSERY_BYPASS_*).
-    int   nurseryAllocSinceMinor;      // objects bump-allocated since the last minor
-    int   nurseryPromotedSinceMinor;   // of those, how many survived (were promoted)
-    JAVA_BOOLEAN nurseryBypass;        // true => allocate straight to the global heap
-    int   nurseryBypassCountdown;      // allocations left before re-probing the nursery
-    JAVA_BOOLEAN nurseryReprobing;     // just exited bypass: collect on a small sample
-#endif
 
     // used to construct stack trace
     int* callStackClass;
@@ -1628,6 +1968,25 @@ struct ThreadLocalData {
     // 0 == not yet computed (lazily initialized once per thread on first use).
     JAVA_LONG nativeStackLimit;
 
+    /* Per-size-class current BiBOP page. See the note at the fast path: this was
+     * `__thread`, which costs an indirect call per allocation on Darwin. */
+    struct CN1BibopPage* bibopCurrent[CN1_BIBOP_NUM_CLASSES];
+
+#ifdef CN1_GC_VERIFY
+    // The thread's whole C stack, [low, high), recorded beside the limit above and
+    // used by nothing but the verifier's escaped-stack-object check. A heap object's
+    // reference field pointing in here is a stack-allocated object that outlived its
+    // frame -- the failure mode every stack-allocation analysis in this translator
+    // risks, and the one the verifier could not see: an address in a dead frame is
+    // not in a BiBOP page or a legacy extent, so cn1GcVerifyClassify calls it
+    // UNKNOWN and SKIPS it, which is the same answer it gives a static or an
+    // immortal. Ranges make the three distinguishable without dereferencing
+    // anything. 0/0 means not yet computed, which costs a missed detection and
+    // never a false one.
+    JAVA_LONG nativeStackLow;
+    JAVA_LONG nativeStackHigh;
+#endif
+
     // LEVER A (perf-tier1): per-thread, plain-add accumulator for BiBOP allocation
     // volume. Replaces the per-object atomic_fetch_add on the global bibopBytesSinceGc
     // (which an uncontended single thread still pays as an arm64 exclusive-monitor RMW,
@@ -1641,8 +2000,6 @@ struct ThreadLocalData {
     JAVA_LONG bibopEpochBytes;
     int bibopObservedGcEpoch;
     int bibopHighThroughputUntilEpoch;
-    int bibopBypassSeen[CN1_BIBOP_NUM_CLASSES];
-    int bibopBypassRemaining[CN1_BIBOP_NUM_CLASSES];
 
 #ifdef CN1_ON_DEVICE_DEBUG
     // Per-frame pointer to a stack-allocated array of void* addresses, one per
@@ -1671,6 +2028,16 @@ struct ThreadLocalData {
     struct ThreadLocalData* gcDeadNext;
     JAVA_BOOLEAN gcQueuedForDrain;
     JAVA_BOOLEAN gcReleaseRequested;
+    // THREAD IDENTITY, AND DELIBERATELY OUTSIDE THE CONSERVATIVE-ROOTS GUARD BELOW.
+    // These two say "this TLD belongs to a real registered thread", which is a question
+    // every configuration asks: CN1_RESUME_THREAD reads gcPthreadValid unconditionally
+    // to decide whether it may republish threadActive. They used to sit inside the
+    // #ifdef, so -DCN1_DISABLE_CONSERVATIVE_GC_ROOTS did not compile -- four errors in
+    // nativeMethods.c, all of them CN1_RESUME_THREAD -- and had not for long enough that
+    // nobody could tell when it broke. That is the same failure that retired the nursery
+    // arm: a documented configuration no gate builds stops building and nothing says so.
+    pthread_t    gcPthread;              // pthread_self() of THIS thread (set at startup)
+    JAVA_BOOLEAN gcPthreadValid;         // gcPthread has been filled in
 #ifdef CN1_CONSERVATIVE_GC_ROOTS
     // PHASE 3b: state for conservatively scanning this thread's native C stack as a
     // GC root source (so object-bearing FRAMELESS methods, whose object roots live in
@@ -1680,8 +2047,6 @@ struct ThreadLocalData {
     //       safepoint runs CN1_GC_PARK_CAPTURE just before publishing threadActive=0.
     //   (2) SIGNAL stop: the GC pthread_kills any thread it could not cooperatively
     //       park; the async-signal-safe handler captures SP+regs and spins here.
-    pthread_t    gcPthread;              // pthread_self() of THIS thread (set at startup)
-    JAVA_BOOLEAN gcPthreadValid;         // gcPthread has been filled in
     // cooperative-park capture
     jmp_buf      gcRegisterSnapshot;     // setjmp flushes callee-saved regs -> scanned
     void* volatile gcStackPointerAtPark; // SP-ish low bound captured at the park point
@@ -1712,6 +2077,15 @@ struct ThreadLocalData {
     size_t       gcSigStackSize;
     char         gcSigRegs[4096];            // raw copy of the interrupted ucontext (GPRs)
     volatile sig_atomic_t gcSigRegsLen;      // valid bytes in gcSigRegs
+    // Set while this thread is held by an OS suspend -- Mach thread_suspend on Apple,
+    // SuspendThread on Windows -- instead of parked in the stop-signal handler; see
+    // cn1GcMachStopOne / cn1GcWinStopOne. Release must resume it, not signal it.
+    volatile int gcOsSuspended;
+    void*        gcSuspendHandle;       // Windows: the handle the suspend opened
+    // Windows only: this thread's own stack, recorded when it registers, because
+    // Windows cannot report another thread's bounds. [gcOwnStackHigh - size, high).
+    char*        gcOwnStackHigh;
+    size_t       gcOwnStackSize;
     // Set while the MARK LOOP owns a signal freeze it took because this thread would
     // not reach a safepoint (see CN1_GC_CAN_FORCE_STOP). It tells
     // cn1GcScanThreadNativeStack to reuse that freeze rather than take its own: a
@@ -1729,9 +2103,74 @@ struct ThreadLocalData {
     // banking the lifetime in markDeadThread makes the integral exact instead of sampled.
     long long gcThreadStartMs;
 #endif
+    /// A C stack buffer the CALLER has offered for the next iterator allocation, or NULL.
+    ///
+    /// An iterator is a parent pointer plus a couple of ints, it is created and discarded
+    /// inside one loop, and it is by far the largest single source of allocation left in
+    /// this VM. It cannot be stack-allocated the way @StackAllocate objects are, because
+    /// the NEW is not in the loop's method at all -- it is inside whatever iterator()
+    /// implementation the receiver turns out to have, and at the sites that matter the
+    /// receiver's type is not provable. So the loop hands DOWN a buffer instead of the
+    /// callee handing UP an object, and the allocation site takes it without ever knowing
+    /// who offered it. That is what reaches the sites a receiver proof cannot.
+    ///
+    /// Strictly one-shot: whoever takes it clears it. An iterator that wraps another
+    /// therefore puts the outer one on the stack and the inner one on the heap, which is
+    /// correct rather than merely safe -- the inner one's lifetime is the outer one's.
+    void* pendingStackIter;
 };
 
 //#define BLOCK_FOR_GC() while(threadStateData->threadBlockedByGC) { usleep(500); }
+
+// WAITING OUT A STOP. A parked thread used to poll threadBlockedByGC with usleep(500)
+// (usleep(1000) on the legacy allocation paths), so every handshake cost the mutator at
+// least that long however quickly the collector released it -- the collector scans a
+// parked thread in microseconds. Measured on objectAllocation: every start-of-mark
+// handshake sat in the 512-1024us bucket, 9% of wall at one marker and the fixed cost
+// that made small collection triggers slow. So the wait spins briefly, then yields, and
+// only then sleeps -- in 50us steps, not 500.
+//
+// The flag is read with an explicit atomic load: it is a plain field, and the old loops
+// only re-read it because usleep is an opaque call. Spinning is safe for the collector's
+// scan of this thread: its stack was captured before it parked, and the spin only writes
+// below the captured stack pointer, as the usleep call did.
+#ifndef _WIN32
+#include <unistd.h>
+#include <sched.h>
+#endif
+static inline void cn1CpuRelax(void) {
+#if defined(__aarch64__) || defined(__arm__)
+    __asm__ __volatile__("yield" ::: "memory");
+#elif defined(__x86_64__) || defined(__i386__)
+    __asm__ __volatile__("pause" ::: "memory");
+#else
+    __asm__ __volatile__("" ::: "memory");
+#endif
+}
+static inline void cn1ThreadYield(void) {
+    /* On Windows the compatibility layer's sched_yield is SwitchToThread, which unlike
+       Sleep(0) also yields to the lower-priority collector thread. */
+    sched_yield();
+}
+// The sleeping rung, out of line: usleep is XSI, which a strict -std=c11 build of this
+// header does not declare, and after 640 spins the call costs nothing.
+extern void cn1GcHandshakeSleep(void);
+static inline void cn1GcHandshakeBackoff(int* spins) {
+    int s = (*spins)++;
+    if(s < 512) {
+        cn1CpuRelax();
+    } else if(s < 640) {
+        cn1ThreadYield();
+    } else {
+        cn1GcHandshakeSleep();
+    }
+}
+#define CN1_GC_WAIT_UNBLOCKED(ts) do { \
+        int cn1__gcw = 0; \
+        while(__atomic_load_n(&(ts)->threadBlockedByGC, __ATOMIC_ACQUIRE)) { \
+            cn1GcHandshakeBackoff(&cn1__gcw); \
+        } \
+    } while(0)
 
 #ifdef CN1_ON_DEVICE_DEBUG
 // One row of the variable side-table: a single (line, slot, typeCode) tuple.
@@ -1820,9 +2259,9 @@ extern void cn1_debugger_mark_issued_roots(struct ThreadLocalData* threadStateDa
 // runtime still compiles and links.
 extern void cn1_debugger_register_class(int classId, struct clazz* cls);
 
-#define __CN1_DEBUG_INFO(line) \
+#define __CN1_DEBUG_INFO_AT(slot, line) \
     do { \
-        threadStateData->callStackLine[threadStateData->callStackOffset - 1] = (line); \
+        *(slot) = (line); \
         if (__builtin_expect(cn1DebuggerActive, 0)) { \
             cn1_debugger_check(threadStateData, (line)); \
         } \
@@ -1835,13 +2274,18 @@ extern void cn1_debugger_register_class(int classId, struct clazz* cls);
 // fully under the on-device debugger (which steps line-by-line and needs every
 // line); elided in release/device builds, where it removes the only per-line hot
 // cost (lets clang keep tight loops in registers / vectorize).
+#define __CN1_DEBUG_INFO_AT_NT(slot, line) __CN1_DEBUG_INFO_AT(slot, line)
 #define __CN1_DEBUG_INFO_NT(line) __CN1_DEBUG_INFO(line)
 #else
-#define __CN1_DEBUG_INFO(line) threadStateData->callStackLine[threadStateData->callStackOffset - 1] = line;
+#define __CN1_DEBUG_INFO_AT(slot, line) (*(slot) = (line))
+#define __CN1_DEBUG_INFO_AT_NT(slot, line) do {} while(0)
 #define __CN1_DEBUG_INFO_NT(line) do {} while(0)
 // Release builds carry no debug side-channel, so pushing a frame costs nothing.
 #define CN1_DEBUG_FRAME_ENTER(threadStateData)
 #endif
+
+#define __CN1_DEBUG_INFO(line) \
+    __CN1_DEBUG_INFO_AT(&threadStateData->callStackLine[threadStateData->callStackOffset - 1], line)
 
 // we need to throw stack overflow error but its unavailable here...
 /*#define ENTERING_CODENAME_ONE_METHOD(classIdNumber, methodIdNumber) { \
@@ -1896,8 +2340,19 @@ const int currentCodenameOneCallStackOffset = threadStateData->callStackOffset;
 #ifndef CN1_BIBOP_PAGE_SIZE
 #define CN1_BIBOP_PAGE_SIZE (64*1024)
 #endif
+// RAISED FROM 512. The legacy path costs a calloc, an allObjectsInHeap
+// registration and an extent-snapshot entry PER OBJECT; BiBOP costs a bump.
+// Measured on the hello corpus, interleaved, every run verified at 2,933 emitted
+// files: legacy objects 28,000 -> 2,300, a 92% cut, and the 2048 arm was faster
+// in 7 of 8 paired rounds (median 5.54s against 5.59s).
+//
+// It is a THROUGHPUT change, not a footprint one, and the measurement says why:
+// the 26,000 objects that moved carried only ~6MB with them. What is left on the
+// legacy path is 2,300 objects holding 140MB -- 61KB each, the class-file and
+// emitted-source buffers, far above any size class worth having. Peak footprint
+// is unchanged (medians 1556MB against 1560MB).
 #ifndef CN1_BIBOP_MAX_OBJECT
-#define CN1_BIBOP_MAX_OBJECT 512
+#define CN1_BIBOP_MAX_OBJECT 2048
 #endif
 #ifndef CN1_BIBOP_HEAP_POS
 #define CN1_BIBOP_HEAP_POS (-3)
@@ -1911,26 +2366,154 @@ const int currentCodenameOneCallStackOffset = threadStateData->callStackOffset;
 #ifndef CN1_BIBOP_ADOPTED
 #define CN1_BIBOP_ADOPTED (-4)
 #endif
-// Slot sizes (16-aligned); a size maps to the smallest class >= size.
+// Slot sizes; a size maps to the smallest class >= size. EIGHT-byte steps up to 128:
+// an object struct is a multiple of 8, and with only 16-byte steps every one whose size
+// is an odd multiple of 8 paid 8 bytes of padding -- measured on the self-hosting corpus,
+// 19MB of the ~350MB live set (VarOp 40 -> 48, Label 104 -> 112, ArrayList 40 -> 48,
+// HashMap 72 -> 80, ...). Slots are 8-aligned, which is all a Java object needs (tagged
+// references use the low 3 bits). A type that asks for more -- StringBuilder's inline
+// storage is aligned(16) -- has a size that is a multiple of its alignment, so it lands
+// in a class that is also a multiple of 16 and its slots stay 16-aligned.
 // Compile-time size -> class-index. With a constant `sz` (sizeof(...)) clang
 // folds the whole chain to an int literal (or -1 for oversized => fast path
 // dead-code-eliminated, slow path only).
+/* Size -> class index, for the INLINE bump path. It must agree with
+ * cn1BibopClassSize[] in cn1_globals.m, and when it does not the failure is
+ * silent and expensive: a size this macro answers -1 for skips the inlined bump
+ * entirely and goes out of line to __NEW_X -> codenameOneGcMalloc, which then
+ * finds a perfectly good class for it in the RUNTIME table and allocates from
+ * BiBOP anyway. Everything still works; the object just paid for a call.
+ *
+ * That is exactly what happened when CN1_BIBOP_MAX_OBJECT went from 512 to 2048:
+ * the runtime table learned the eight new classes, this macro did not, and every
+ * 513..2048-byte object took the slow path while the census reported the ceiling
+ * raise as working. The static assertion below is the part that matters -- it
+ * makes the two definitions unable to drift again. */
 #define CN1_BIBOP_CIDX(sz) ( \
-  (sz)<=32?0:(sz)<=48?1:(sz)<=64?2:(sz)<=80?3:(sz)<=96?4:(sz)<=112?5: \
-  (sz)<=128?6:(sz)<=160?7:(sz)<=192?8:(sz)<=224?9:(sz)<=256?10: \
-  (sz)<=320?11:(sz)<=384?12:(sz)<=448?13:(sz)<=512?14:-1)
+  (sz)<=24?0: (sz)<=32?1: (sz)<=40?2: (sz)<=48?3: (sz)<=56?4: (sz)<=64?5: (sz)<=72?6: \
+  (sz)<=80?7: (sz)<=88?8: (sz)<=96?9: (sz)<=104?10: (sz)<=112?11: (sz)<=120?12: \
+  (sz)<=128?13: (sz)<=144?14: (sz)<=160?15: (sz)<=176?16: (sz)<=192?17: (sz)<=224?18: \
+  (sz)<=256?19: (sz)<=320?20: (sz)<=384?21: (sz)<=448?22: (sz)<=512?23: \
+  (CN1_BIBOP_NUM_CLASSES<=24)?-1: (sz)<=640?24: (sz)<=768?25: (sz)<=896?26: \
+  (sz)<=1024?27: (sz)<=1280?28: (sz)<=1536?29: (sz)<=1792?30: (sz)<=2048?31: -1)
+
+/* THE PAGE GEOMETRY IS A COMPILE-TIME CONSTANT, so stop loading it.
+ *
+ * cn1BibopFormatPage derives all three of slotSize, firstSlotOffset and
+ * slotCount from ci and CN1_BIBOP_PAGE_SIZE alone, and ci is a constant at every
+ * CN1_FAST_NEW call site (it comes from sizeof(struct obj__X)). Yet the fast path
+ * loaded all three back out of the page header, and TWO OF THEM SAT ON THE
+ * ADDRESS-GENERATION DEPENDENCY CHAIN:
+ *
+ *     ldr   x9,  [x0,#144]      ; p
+ *     ldrsw x8,  [x9,#28]       ; firstSlotOffset   <- depends on p
+ *     ldrsw x11, [x9,#20]       ; slotSize          <- depends on p
+ *     ldr   w10, [x9,#32]       ; bumpIndex         <- depends on p
+ *     smaddl x8, w11, w10, x8   ; slot address      <- depends on all three
+ *
+ * As constants that collapses to an add of an immediate plus a shifted index, the
+ * multiply-accumulate disappears, and three loads leave the load ports. This is
+ * not an instruction-count argument: the two geometry loads are ON the chain that
+ * produces the address the allocation then writes through.
+ *
+ * Identical by construction -- the definitions below are the same expressions
+ * cn1BibopFormatPage uses, and the assertions in cn1_globals.m check them against
+ * the runtime table rather than trusting that they stay in step. */
+#define CN1_BIBOP_CLASS_SIZE(ci) ( \
+  (ci)==0?24: (ci)==1?32: (ci)==2?40: (ci)==3?48: (ci)==4?56: (ci)==5?64: (ci)==6?72: \
+  (ci)==7?80: (ci)==8?88: (ci)==9?96: (ci)==10?104: (ci)==11?112: (ci)==12?120: \
+  (ci)==13?128: (ci)==14?144: (ci)==15?160: (ci)==16?176: (ci)==17?192: (ci)==18?224: \
+  (ci)==19?256: (ci)==20?320: (ci)==21?384: (ci)==22?448: (ci)==23?512: (ci)==24?640: \
+  (ci)==25?768: (ci)==26?896: (ci)==27?1024: (ci)==28?1280: (ci)==29?1536: \
+  (ci)==30?1792: (ci)==31?2048: 0)
+#define CN1_BIBOP_HDR_BYTES ((int)((sizeof(CN1BibopPage) + 15) & ~((size_t)15)))
+#define CN1_BIBOP_SLOT_COUNT(ci) \
+    ((CN1_BIBOP_PAGE_SIZE - CN1_BIBOP_HDR_BYTES) / CN1_BIBOP_CLASS_SIZE(ci))
+
+/* The ceiling must name the LAST class the macro knows, and the macro must
+ * refuse anything above it. Either half breaking is a silent slow path. */
+_Static_assert(CN1_BIBOP_CIDX(CN1_BIBOP_MAX_OBJECT) == CN1_BIBOP_NUM_CLASSES - 1,
+               "CN1_BIBOP_CIDX and CN1_BIBOP_MAX_OBJECT disagree about the last size class");
+_Static_assert(CN1_BIBOP_CIDX(CN1_BIBOP_MAX_OBJECT + 1) == -1,
+               "CN1_BIBOP_CIDX must refuse sizes above CN1_BIBOP_MAX_OBJECT");
 
 typedef struct CN1BibopPage {
     struct CN1BibopPage* _Atomic nextAll; // append-only global registry chain
     struct CN1BibopPage* nextPool;        // FREE/PARTIAL pool / SWEEP stack link
+    /* The one class every object in this page belongs to, or NULL while the page
+     * is size-classed and may hold a mix -- which is every page today. Inert for
+     * now: nothing sets it, and the validator's R10 check is therefore a no-op.
+     * It is here so the rule can be CHECKED the moment typed pages exist, rather
+     * than after they have already corrupted something.
+     * See vm/BIBOP-INVARIANTS.md rules R10-R13. */
+    struct clazz* pageClazz;
     int classIndex;
     int slotSize;
     int slotCount;
     int firstSlotOffset;                  // byte offset of slot 0 from page base
-    _Atomic int bumpIndex;                // next slot to bump-allocate (published)
+    /* ---- CACHE-LINE SPLIT, and it is load-bearing -----------------------------
+     * bumpIndex is written by the OWNING MUTATOR on every single allocation (a
+     * store-release), and gcAllocedSinceSweep on every allocation too. The GC
+     * fields below -- nextAll walked to enumerate pages, gcGraceMarked,
+     * gcLastMarkedEpoch, the sweep bookkeeping -- are read and written by the
+     * MARKER THREADS concurrently. With the whole header in one 64/128B line
+     * those are the same line, so every allocation and every marker touch
+     * ping-pong it between cores.
+     *
+     * Measured before this split, objectAllocation mean over 5 reps at default
+     * trigger, mutator single-threaded on a 16-core machine:
+     *
+     *     1 marker  78.5ms   2 markers  79.9ms   4 markers 103.4ms   8 markers 103.3ms
+     *
+     * i.e. 32% slower purely from adding marker threads that have idle cores to
+     * run on, while intArithmetic in the same process stayed flat (56.7-61.7).
+     * A collector on its own core is supposed to be free to the mutator; this is
+     * the mechanism by which it was not.
+     *
+     * The alignment puts the mutator-hot pair on their own line. Do not move a
+     * GC-written field above this boundary.
+     *
+     * WHAT THIS DID AND DID NOT FIX. After the split the marker-count dependence
+     * is GONE -- 1/2/4/8 markers measure 97.1/102.7/95.5/90.4, flat, where before
+     * they stepped 78.5/79.9/103.4/103.3. So the collector no longer charges the
+     * mutator for having more marker threads, which is the property that matters.
+     *
+     * It did NOT move the headline. A 40-rep interleaved A/B at 8 markers:
+     * mean 103.8 -> 100.9 (0.973) but median 94.2 -> 115.6, with the control
+     * (intArithmetic) at 0.998. Those disagree, and with objectAllocation bimodal
+     * at ~30ms/~150ms the benchmark cannot resolve the difference. Kept anyway:
+     * a field written on every allocation sharing a line with fields concurrent
+     * markers write is wrong independently of what one benchmark can measure, and
+     * the padding costs ~8 slots of 2047 in a 64KB page.
+     *
+     * The 73% of objectAllocation that IS the collector survives this fix, so it
+     * is the memory traffic of tracing the heap, not header contention. */
+    _Atomic int bumpIndex __attribute__((aligned(128))); // next slot to bump-allocate (published)
     void* freeList;                       // intrusive free-list head (slot ptr)
     int freeCount;
     JAVA_BOOLEAN owned;
+    // COLLECTOR-ONLY. Set on a page retired BEFORE the running cycle began, when that
+    // cycle is a single-core stop-the-world one: its fresh slots predate every root
+    // scan, so an unmarked one is garbage and gets no grace. Cleared by the sweep.
+    JAVA_BOOLEAN gcPreCycle;
+    // REMEMBERED SET, single-core generational mode: one bit per 1KB card of this page,
+    // set by the barrier when a young reference is stored into an old object starting in
+    // that card. gcRsetQueued says the page is on the dirty-page array; it is the ONLY
+    // record of membership, so reformatting a page (which clears the cards) cannot drop
+    // other pages' records the way an intrusive link reset did.
+    // One bit per 64-byte chunk in which a remembered object STARTS. It was one bit per
+    // 1KB card, and the scan traced every object starting on a dirty card: measured,
+    // 1.79M objects traced for the ~0.2M actually remembered once owners (rather than
+    // blocks) were remembered, since a collection's card also holds its neighbours.
+    _Atomic uint64_t gcRsetCards[CN1_BIBOP_PAGE_SIZE / 64 / 64];
+    _Atomic int gcRsetQueued;
+    // YOUNG-SLOT MAP, so a minor sweep walks what was allocated since the last sweep
+    // instead of the whole page. Bump allocation is the range [gcSweptBump, bumpIndex);
+    // a slot recycled from the free list sets the bit of the 64-byte chunk it starts in
+    // (one shift, no division, on the allocating thread, which owns the page). Cleared
+    // by every walk and by format.
+    int gcSweptBump;
+    uint64_t gcYoungChunks[CN1_BIBOP_PAGE_SIZE / 64 / 64];
     // ---- O(live-pages) sweep bookkeeping (perf-tier1, gated by CN1_BIBOP_NO_FASTSWEEP)
     // These let cn1BibopSweep reclaim an all-dead page or skip an all-live (in-grace)
     // page in O(1) -- without the per-slot walk -- whenever it can PROVE the page is
@@ -1948,7 +2531,8 @@ typedef struct CN1BibopPage {
                                           //  owner's stores
                                           // (owner-thread single-writer; published to the
                                           //  GC via the sweep-stack release-push)
-    JAVA_BOOLEAN gcNeedsReclaim;          // a survivor carries a finalizer or monitor ->
+    /* Everything from here on is GC-side: keep it off the mutator's line. */
+    JAVA_BOOLEAN gcNeedsReclaim __attribute__((aligned(128))); // a survivor carries a finalizer or monitor ->
                                           //  dead slots must reach cn1BibopReclaimSlot
     JAVA_BOOLEAN gcHasMonitors;           // STICKY: a monitor was ever attached to an
                                           //  object in this page (set by
@@ -1970,6 +2554,9 @@ typedef struct CN1BibopPage {
                                           //  whole page out from under them (set by
                                           //  cn1MatureObject, cleared only by
                                           //  cn1BibopFormatPage).
+    // A legacy sweep returned an adopted slot to this page. Revisit a partial
+    // page in this sweep instead of waiting for allocation or the major cadence.
+    _Atomic int gcAdoptedDied;
     _Atomic int gcLastMarkedEpoch;        // currentGcMarkValue stamped by gcMarkObject when
                                           //  a slot on this page is marked live (relaxed;
                                           //  idempotent across parallel markers)
@@ -2012,16 +2599,29 @@ typedef struct CN1BibopPage {
                                           //  FREE pool
 #endif
 } CN1BibopPage;
+#define CN1_BIBOP_NOTE_RECYCLED(p, o) do { \
+        uintptr_t cn1__c = ((uintptr_t)(o) - (uintptr_t)(p)) >> 6; \
+        (p)->gcYoungChunks[cn1__c >> 6] |= (uint64_t)1 << (cn1__c & 63); } while(0)
 
 // Per-thread current page per size class; defined in cn1_globals.m. Touched only
 // by the owning thread (alloc) and by that same thread on death.
-extern __thread CN1BibopPage* bibopCurrent[CN1_BIBOP_NUM_CLASSES];
+/* The per-thread current page per size class. It USED TO BE `__thread`, and on
+ * Darwin that is not a cheap addressing mode -- it is the TLS-descriptor
+ * sequence, which is an adrp/ldr pair, a load of the descriptor and an INDIRECT
+ * CALL, per allocation. Measured standalone against the same fast path reading
+ * the array out of the thread state: 1.508ns -> 1.264ns, -16%, and the
+ * disassembly loses a `blr`, two loads and the stack frame that only existed to
+ * spill around that call.
+ *
+ * threadStateData is already parameter one of every generated function, so this
+ * is the same storage reached by one `ldr` off x0. Declared here (rather than in
+ * the struct's own section) so it sits next to the fast path that reads it. */
+extern struct ThreadLocalData* getThreadLocalData(void);
 extern _Atomic long bibopBytesSinceGc;
 extern _Atomic long bibopGcTriggerBytes;
 // Atomic mirror of currentGcMarkValue for mutator-side adaptive-policy
 // decisions. currentGcMarkValue itself remains owned by the GC/mark threads.
 extern _Atomic int bibopGcEpoch;
-extern _Atomic int bibopBypassGeneration[CN1_BIBOP_NUM_CLASSES];
 #if defined(CN1_GC_INSTRUMENT) && !defined(CN1_DISABLE_BIBOP)
 // QA-only diagnostics. Production builds contain neither the counters nor
 // their atomic updates.
@@ -2033,6 +2633,30 @@ extern _Atomic long cn1BibopBeltRuns;
 extern _Atomic long cn1BibopAdoptedRescanSkips;
 #endif
 extern int currentGcMarkValue;
+
+// Retire a statically-proven-dead, non-escaping object one cycle early.
+// Defined in cn1_globals.m; see the block comment there for why the value it
+// writes is an ordinary stale epoch and not a new mark state.
+void cn1MarkDeadNow(JAVA_OBJECT o);
+
+// ONE HOOK PER FRAME, NOT ONE PER RETURN.
+//
+// A method returns through many emitted paths -- one per return type, plus the
+// exception variants -- and patching each is how one gets missed. A cleanup
+// attribute fires on every ordinary return from the scope regardless of which
+// path took it, which is the same mechanism CN1StackBuffer already uses for
+// native buffers. Exception exits (longjmp) do NOT run it, and that is fine:
+// missing the call skips an optimization, it never breaks a program.
+struct CN1RetireScope {
+    JAVA_OBJECT* slots[8];
+    int count;
+};
+
+static inline void cn1RetireScopeLeave(struct CN1RetireScope* s) {
+    for(int i = 0 ; i < s->count ; i++) {
+        cn1MarkDeadNow(*(s->slots[i]));
+    }
+}
 #ifndef CN1_BIBOP_NO_FASTSWEEP
 // Called from monitorEnter (any thread) when a monitor (CN1ThreadData) is freshly
 // attached to a heap object. If the object is a BiBOP slot it bumps a global live-monitor
@@ -2099,11 +2723,11 @@ void cn1RecordAllocation(struct clazz* parent, int size);
 
 // Inlined bump fast path. Returns 0 (slow path: page full / free-list present /
 // ineligible / oversized) -> caller falls back to __NEW_X / codenameOneGcMalloc.
+// Out of line, and only reached when the inline bump path misses: a slot from the
+// current page's FREE LIST, which the inline path does not take. See the definition.
+extern JAVA_OBJECT cn1BibopAllocRecycled(CODENAME_ONE_THREAD_STATE, int size, struct clazz* parent, int ci);
 static inline JAVA_OBJECT cn1BibopFastAlloc(CODENAME_ONE_THREAD_STATE, int size, struct clazz* parent, int ci) {
     if(ci < 0) return (JAVA_OBJECT)0; // oversized: folded away for big types
-    if(__builtin_expect(threadStateData->bibopBypassRemaining[ci] > 0, 0)) {
-        return (JAVA_OBJECT)0; // cn1BibopAlloc consumes the legacy-bypass budget
-    }
     // EVERY allocation path must register the class BEFORE the object publishes --
     // including this inline bump. That completes the invariant the GC mark guard
     // depends on: a resolved (current) slot whose class pointer is NOT in the
@@ -2115,7 +2739,7 @@ static inline JAVA_OBJECT cn1BibopFastAlloc(CODENAME_ONE_THREAD_STATE, int size,
     // cn1GcRegisterClazz.) Cost is one predictable flag-test per alloc, measured
     // at noise level on allocation-heavy renders.
     CN1_CLAZZ_REGISTER(parent);
-    CN1BibopPage* p = bibopCurrent[ci];
+    CN1BibopPage* p = threadStateData->bibopCurrent[ci];
     if(__builtin_expect(p != (CN1BibopPage*)0 && p->freeList == (void*)0 &&
                         constantPoolObjects != (JAVA_OBJECT*)0
 #ifndef CN1_CONSERVATIVE_GC_ROOTS
@@ -2123,8 +2747,9 @@ static inline JAVA_OBJECT cn1BibopFastAlloc(CODENAME_ONE_THREAD_STATE, int size,
 #endif
                         , 1)) {
         int bi = atomic_load_explicit(&p->bumpIndex, memory_order_relaxed);
-        if(__builtin_expect(bi < p->slotCount, 1)) {
-            JAVA_OBJECT o = (JAVA_OBJECT)((char*)p + p->firstSlotOffset + (long)bi * p->slotSize);
+        if(__builtin_expect(bi < CN1_BIBOP_SLOT_COUNT(ci), 1)) {
+            JAVA_OBJECT o = (JAVA_OBJECT)((char*)p + CN1_BIBOP_HDR_BYTES
+                    + (long)bi * CN1_BIBOP_CLASS_SIZE(ci));
 #ifdef CN1_BIBOP_VALIDATE
             // INVARIANT: the per-thread current page must be OWNED and match this
             // size class, and the bumped slot must lie inside the page. A violation
@@ -2143,23 +2768,20 @@ static inline JAVA_OBJECT cn1BibopFastAlloc(CODENAME_ONE_THREAD_STATE, int size,
                 abort();
             }
 #endif
-            int hdr = (int)sizeof(struct JavaObjectPrototype);
-            if(size > hdr) {
-                // NOT removable: skipping this is ~2x SLOWER -- uninitialized ref
-                // fields get scanned during the mark==-1 grace window and retain
-                // floating garbage. The body zero is load-bearing, not overhead.
-                memset((char*)o + hdr, 0, size - hdr);
-            }
-            o->__codenameOneParentClsReference = parent;
+            // NOT removable: skipping this is ~2x SLOWER -- uninitialized ref
+            // fields get scanned during the mark==-1 grace window and retain
+            // floating garbage. The body zero is load-bearing, not overhead.
+            CN1_OBJ_ZERO_BODY(o, size);
+            CN1_OBJ_SET_CLASS(o, parent);
             // __codenameOneReferenceCount + __codenameOneThreadData relocated out of the
             // header (force-visited / monitor side tables); no per-object stores.
-            o->__heapPosition = CN1_BIBOP_HEAP_POS;
+            CN1_OBJ_SET_HEAPPOS(o, CN1_BIBOP_HEAP_POS);
             CN1_ALLOC_CENSUS_COUNT(parent, size);
 #ifdef DEBUG_GC_ALLOCATIONS
             o->className = threadStateData->callStackClass[threadStateData->callStackOffset - 1];
             o->line = threadStateData->callStackLine[threadStateData->callStackOffset - 1];
 #endif
-            __atomic_store_n(&o->__codenameOneGcMark, -1, __ATOMIC_RELEASE);
+            CN1_OBJ_MARK_STORE(o, -1, __ATOMIC_RELEASE);
             atomic_store_explicit(&p->bumpIndex, bi + 1, memory_order_release);
 #ifndef CN1_BIBOP_NO_FASTSWEEP
             // Mark the page dirty: the O(1) sweep never treats a page that still has
@@ -2174,7 +2796,7 @@ static inline JAVA_OBJECT cn1BibopFastAlloc(CODENAME_ONE_THREAD_STATE, int size,
             // sweep (never a concurrent phase) clears the flag.
             __atomic_store_n(&p->gcAllocedSinceSweep, JAVA_TRUE, __ATOMIC_RELAXED);
 #endif
-            CN1_BIBOP_ACCOUNT_BYTES(threadStateData, p->slotSize);
+            CN1_BIBOP_ACCOUNT_BYTES(threadStateData, CN1_BIBOP_CLASS_SIZE(ci));
             // allocationsSinceLastGC / totalAllocations (the isHighFrequencyGC heuristic)
             // are now bumped in bulk by CN1_BIBOP_FLUSH_BYTES once per page-acquire, not
             // per object -- removing two global-counter stores from the hot path.
@@ -2208,11 +2830,8 @@ static inline JAVA_OBJECT cn1BibopFastAlloc(CODENAME_ONE_THREAD_STATE, int size,
 
 static inline JAVA_OBJECT cn1BibopFastAllocNoZero(CODENAME_ONE_THREAD_STATE, int size, struct clazz* parent, int ci) {
     if(ci < 0) return (JAVA_OBJECT)0; // oversized: folded away for big types
-    if(__builtin_expect(threadStateData->bibopBypassRemaining[ci] > 0, 0)) {
-        return (JAVA_OBJECT)0; // cn1BibopAlloc consumes the legacy-bypass budget
-    }
     CN1_CLAZZ_REGISTER(parent); // see cn1BibopFastAlloc: every alloc path registers
-    CN1BibopPage* p = bibopCurrent[ci];
+    CN1BibopPage* p = threadStateData->bibopCurrent[ci];
     if(__builtin_expect(p != (CN1BibopPage*)0 && p->freeList == (void*)0 &&
                         constantPoolObjects != (JAVA_OBJECT*)0
 #ifndef CN1_CONSERVATIVE_GC_ROOTS
@@ -2220,8 +2839,9 @@ static inline JAVA_OBJECT cn1BibopFastAllocNoZero(CODENAME_ONE_THREAD_STATE, int
 #endif
                         , 1)) {
         int bi = atomic_load_explicit(&p->bumpIndex, memory_order_relaxed);
-        if(__builtin_expect(bi < p->slotCount, 1)) {
-            JAVA_OBJECT o = (JAVA_OBJECT)((char*)p + p->firstSlotOffset + (long)bi * p->slotSize);
+        if(__builtin_expect(bi < CN1_BIBOP_SLOT_COUNT(ci), 1)) {
+            JAVA_OBJECT o = (JAVA_OBJECT)((char*)p + CN1_BIBOP_HDR_BYTES
+                    + (long)bi * CN1_BIBOP_CLASS_SIZE(ci));
 #ifdef CN1_BIBOP_VALIDATE
             if(p->classIndex != ci || p->owned != JAVA_TRUE ||
                (char*)o < (char*)p + p->firstSlotOffset ||
@@ -2246,25 +2866,62 @@ static inline JAVA_OBJECT cn1BibopFastAllocNoZero(CODENAME_ONE_THREAD_STATE, int
             // The explicit 0 store matters: a bump slot recycled by the O(1)
             // homogeneous page reclaim still holds the DEAD previous occupant's
             // class pointer.
-            o->__codenameOneParentClsReference = (struct clazz*)0;
-            o->__heapPosition = CN1_BIBOP_HEAP_POS;
+            CN1_OBJ_SET_CLASS(o, (struct clazz*)0);
+            CN1_OBJ_SET_HEAPPOS(o, CN1_BIBOP_HEAP_POS);
             CN1_ALLOC_CENSUS_COUNT(parent, size);
 #ifdef DEBUG_GC_ALLOCATIONS
             o->className = threadStateData->callStackClass[threadStateData->callStackOffset - 1];
             o->line = threadStateData->callStackLine[threadStateData->callStackOffset - 1];
 #endif
-            __atomic_store_n(&o->__codenameOneGcMark, -1, __ATOMIC_RELEASE);
+            CN1_OBJ_MARK_STORE(o, -1, __ATOMIC_RELEASE);
             atomic_store_explicit(&p->bumpIndex, bi + 1, memory_order_release);
 #ifndef CN1_BIBOP_NO_FASTSWEEP
             // relaxed: concurrently read by the grace pass (see cn1BibopFastAlloc)
             __atomic_store_n(&p->gcAllocedSinceSweep, JAVA_TRUE, __ATOMIC_RELAXED);
 #endif
-            CN1_BIBOP_ACCOUNT_BYTES(threadStateData, p->slotSize);
+            CN1_BIBOP_ACCOUNT_BYTES(threadStateData, CN1_BIBOP_CLASS_SIZE(ci));
 #ifdef CN1_GC_CONFORM
             cn1RecordAllocation(parent, size);
 #endif
             return o;
         }
+    }
+    // A RECYCLED page: take a slot its last sweep freed. This used to fall through to
+    // __NEW_X and the full slow path for EVERY object once pages came back partial --
+    // which is every allocation in a heap small enough to be reused. Profiled at an 8MB
+    // trigger, that slow path (cn1BibopAlloc, codenameOneGcMalloc, its pthread_once and
+    // the class-initializer call) was ~55% of objectAllocation's main thread, and it is
+    // why small triggers were slow. Sound under the same argument as the bump slot above:
+    // parentCls is 0 until the constructor publishes it, so a conservative scan of the
+    // construction window stops at the guard, and a recycled bump slot already holds a
+    // dead occupant's bytes exactly as this one does (the free-list link is in the word
+    // zeroed here). The slot reads FREE_MARK until the release store of -1.
+    if(__builtin_expect(p != (CN1BibopPage*)0 && p->freeList != (void*)0 &&
+                        constantPoolObjects != (JAVA_OBJECT*)0
+#ifndef CN1_CONSERVATIVE_GC_ROOTS
+                        && !threadStateData->nativeAllocationMode
+#endif
+                        , 1)) {
+        JAVA_OBJECT o = (JAVA_OBJECT)p->freeList;
+        p->freeList = CN1_BIBOP_FREE_LINK(o);
+        p->freeCount--;
+        CN1_BIBOP_NOTE_RECYCLED(p, o);
+        CN1_OBJ_SET_CLASS(o, (struct clazz*)0);
+        CN1_OBJ_SET_HEAPPOS(o, CN1_BIBOP_HEAP_POS);
+        CN1_ALLOC_CENSUS_COUNT(parent, size);
+#ifdef DEBUG_GC_ALLOCATIONS
+        o->className = threadStateData->callStackClass[threadStateData->callStackOffset - 1];
+        o->line = threadStateData->callStackLine[threadStateData->callStackOffset - 1];
+#endif
+        CN1_OBJ_MARK_STORE(o, -1, __ATOMIC_RELEASE);
+#ifndef CN1_BIBOP_NO_FASTSWEEP
+        __atomic_store_n(&p->gcAllocedSinceSweep, JAVA_TRUE, __ATOMIC_RELAXED);
+#endif
+        CN1_BIBOP_ACCOUNT_BYTES(threadStateData, CN1_BIBOP_CLASS_SIZE(ci));
+#ifdef CN1_GC_CONFORM
+        cn1RecordAllocation(parent, size);
+#endif
+        return o;
     }
     return (JAVA_OBJECT)0;
 }
@@ -2274,10 +2931,23 @@ static inline JAVA_OBJECT cn1BibopFastAllocNoZero(CODENAME_ONE_THREAD_STATE, int
 // (the bump fast path can be reached for a class whose <clinit> hasn't run,
 // because bibopCurrent[] is shared across all classes of the same size class).
 #if !defined(CN1_DISABLE_INLINE_ALLOC) && !defined(CN1_DISABLE_BIBOP)
+/* THE ALLOCATION GUARD IS KEPT EVEN FOR AN EAGERLY INITIALIZED CLASS, and that is
+ * measured rather than assumed. Dropping it here -- the class is initialized at
+ * startup, so the check is always false -- made objectAllocation ~11% SLOWER, on every
+ * one of four code layouts (function/loop alignment 16/32/64/128; mean 28.63 -> 31.90ms),
+ * while the hot loop was otherwise instruction-for-instruction identical and the
+ * collector counters did not move. The unproven explanation: the acquire load orders
+ * the next iteration's bumpIndex load behind the previous iteration's store-release to
+ * the same word, and without it the core speculates that load early and pays for it.
+ * Static-method entries and interface thunks DO drop the guard for eager classes; only
+ * allocation sites keep it. */
 #define CN1_FAST_NEW(X) ({ \
     if(__builtin_expect(!__atomic_load_n(&class__##X.initialized, __ATOMIC_ACQUIRE), 0)) __STATIC_INITIALIZER_##X(threadStateData); \
     JAVA_OBJECT __cn1fo = cn1BibopFastAlloc(threadStateData, sizeof(struct obj__##X), &class__##X, CN1_BIBOP_CIDX(sizeof(struct obj__##X))); \
-    if(__builtin_expect(__cn1fo == (JAVA_OBJECT)0, 0)) __cn1fo = __NEW_##X(threadStateData); \
+    if(__builtin_expect(__cn1fo == (JAVA_OBJECT)0, 0)) { \
+        __cn1fo = cn1BibopAllocRecycled(threadStateData, sizeof(struct obj__##X), &class__##X, CN1_BIBOP_CIDX(sizeof(struct obj__##X))); \
+        if(__cn1fo == (JAVA_OBJECT)0) __cn1fo = __NEW_##X(threadStateData); \
+    } \
     __cn1fo; })
 // No-body-zero variant (init-before-publish). The slow-path fallback __NEW_X
 // still fully zeroes (calloc) -- correct, just un-elided on the rare page-full
@@ -2291,6 +2961,24 @@ static inline JAVA_OBJECT cn1BibopFastAllocNoZero(CODENAME_ONE_THREAD_STATE, int
 #define CN1_FAST_NEW(X) __NEW_##X(threadStateData)
 #define CN1_FAST_NEW_NOZERO(X) __NEW_##X(threadStateData)
 #endif
+
+/// NEW of an iterator the translator proved cannot outlive the loop that creates it.
+///
+/// Takes the caller's pending stack buffer when there is one, and otherwise allocates
+/// exactly as before. It has to exist separately from CN1_FAST_NEW because the hot
+/// allocation never reaches __NEW_X at all: the generated code calls
+/// CN1_FAST_NEW(java_util_ArrayList_ArrayListIterator), which goes straight to the BiBOP
+/// fast path and only falls back to __NEW_X when a page is full. A hook placed in __NEW_X
+/// is therefore dead on exactly the path that matters -- measured, before this macro
+/// existed: 460 ArrayListIterator allocations with the mechanism on, 460 with it off.
+///
+/// The static initializer runs FIRST and unconditionally, because taking the buffer skips
+/// CN1_FAST_NEW entirely and with it the initialized check that every other path performs.
+#define CN1_ITER_NEW(X) ({ \
+    if(__builtin_expect(!__atomic_load_n(&class__##X.initialized, __ATOMIC_ACQUIRE), 0)) __STATIC_INITIALIZER_##X(threadStateData); \
+    JAVA_OBJECT __cn1io = cn1IterScopeTake(threadStateData, &class__##X, (int)sizeof(struct obj__##X)); \
+    if(__cn1io == JAVA_NULL) __cn1io = CN1_FAST_NEW(X); \
+    __cn1io; })
 
 #define CN1_THREAD_STATE_SINGLE_ARG CODENAME_ONE_THREAD_STATE
 #define CN1_THREAD_STATE_MULTI_ARG CODENAME_ONE_THREAD_STATE,
@@ -2362,6 +3050,7 @@ extern struct ThreadLocalData* getThreadLocalData();
 
 #define BEGIN_TRY(classId, destinationJump) {\
         threadStateData->blocks[threadStateData->tryBlockOffset].monitor = 0; \
+        threadStateData->blocks[threadStateData->tryBlockOffset].nativeBuffers = threadStateData->nativeBuffers; \
         threadStateData->blocks[threadStateData->tryBlockOffset].exceptionClass = classId; \
         memcpy(threadStateData->blocks[threadStateData->tryBlockOffset].destination, destinationJump, sizeof(jmp_buf)); \
         threadStateData->tryBlockOffset++; \
@@ -2438,9 +3127,95 @@ extern JAVA_OBJECT __NEW_java_lang_ArrayIndexOutOfBoundsException(CODENAME_ONE_T
 extern JAVA_VOID java_lang_ArrayIndexOutOfBoundsException___INIT_____int(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject, JAVA_INT __cn1Arg1);
 extern void throwArrayIndexOutOfBoundsException(CODENAME_ONE_THREAD_STATE, int index);
 extern JAVA_BOOLEAN throwArrayIndexOutOfBoundsException_R_boolean(CODENAME_ONE_THREAD_STATE, int index);
+extern JAVA_OBJECT __NEW_INSTANCE_java_util_ConcurrentModificationException(CODENAME_ONE_THREAD_STATE);
+/// Thrown by the intrinsified for-each when the collection is structurally modified
+/// under it. Declared here, exactly like the NullPointerException above, because the
+/// intrinsic is emitted into arbitrary translation units that do not include the
+/// collection headers. Keeping the check means the fast path is a faithful replacement
+/// for ArrayListIterator rather than a quietly different loop.
+extern JAVA_OBJECT __NEW_INSTANCE_java_lang_IllegalStateException(CODENAME_ONE_THREAD_STATE);
+#define CN1_THROW_ISE() throwException(threadStateData, __NEW_INSTANCE_java_lang_IllegalStateException(threadStateData))
+#define CN1_THROW_CME()    throwException(threadStateData, __NEW_INSTANCE_java_util_ConcurrentModificationException(threadStateData))
+// Same shape as CN1_THROW_CME above: a native raising OutOfMemoryError needs the
+// constructor declared, because nothing in the generated headers reaches
+// nativeMethods.m. Used by the C collection kernels, where a failed block
+// allocation must surface as the Java error rather than as a null table.
+extern JAVA_OBJECT __NEW_INSTANCE_java_lang_OutOfMemoryError(CODENAME_ONE_THREAD_STATE);
+#define CN1_THROW_OOM() throwException(threadStateData, __NEW_INSTANCE_java_lang_OutOfMemoryError(threadStateData))
 #define THROW_NULL_POINTER_EXCEPTION()    throwException(threadStateData, __NEW_INSTANCE_java_lang_NullPointerException(threadStateData))
 
 #define THROW_ARRAY_INDEX_EXCEPTION(index)    throwArrayIndexOutOfBoundsException(threadStateData, index)
+
+/* Marks a throw path. The branch is already predicted with __builtin_expect, but
+ * that only orders the blocks -- clang still allocates registers for the throw as
+ * though it were ordinary code, and every value the fast path wants in a register
+ * has to survive across it. cold says the opposite: the call is rare, it is worth no
+ * registers, and its block belongs out of the loop body entirely.
+ *
+ * It only pays if the exception is CONSTRUCTED behind the call too. A macro that
+ * expands to throwException(ts, __NEW_INSTANCE_...(ts)) has the allocation inline on
+ * the fast path's register pressure no matter how the call is annotated, which is
+ * why the helpers below take no exception argument and build their own. */
+#if defined(_MSC_VER)
+    #define CN1_COLD
+#else
+    #define CN1_COLD __attribute__((cold))
+#endif
+
+/* A copy of at most 32 bytes WITHOUT a libc call. A memcpy whose length is not a
+ * compile-time constant is emitted as a call to memmove, whatever the length --
+ * and string building is dominated by exactly such copies: "item-", ":", a few
+ * digits. Profiling stringBuilding put _platform_memmove at ~480 of ~3200 mutator
+ * samples, all from appends and toString of strings well under 32 bytes.
+ *
+ * Overlapping fixed-width moves cover every length in a band with two loads and
+ * two stores: [8,16] as two 8-byte words anchored at each end, [4,8) as two
+ * 4-byte words, (16,32] as two 16-byte halves. Each fixed-size memcpy below is
+ * folded to plain loads and stores. The source and destination must not overlap,
+ * which holds at every caller: they copy between distinct objects. */
+static inline void cn1SmallCopy(void* dst, const void* src, size_t n) {
+    char* d = (char*)dst;
+    const char* s = (const char*)src;
+    if(n >= 8) {
+        if(n <= 16) {
+            uint64_t a, b;
+            memcpy(&a, s, 8); memcpy(&b, s + n - 8, 8);
+            memcpy(d, &a, 8); memcpy(d + n - 8, &b, 8);
+        } else if(n <= 32) {
+            uint64_t a, b, c, e;
+            memcpy(&a, s, 8); memcpy(&b, s + 8, 8);
+            memcpy(&c, s + n - 16, 8); memcpy(&e, s + n - 8, 8);
+            memcpy(d, &a, 8); memcpy(d + 8, &b, 8);
+            memcpy(d + n - 16, &c, 8); memcpy(d + n - 8, &e, 8);
+        } else {
+            memcpy(d, s, n);
+        }
+    } else if(n >= 4) {
+        uint32_t a, b;
+        memcpy(&a, s, 4); memcpy(&b, s + n - 4, 4);
+        memcpy(d, &a, 4); memcpy(d + n - 4, &b, 4);
+    } else if(n > 0) {
+        d[0] = s[0];
+        d[n - 1] = s[n - 1];
+        if(n == 3) {
+            d[1] = s[1];
+        }
+    }
+}
+
+/* The static initializer: called from the entry of every static method and every
+ * allocation site of its class, behind a check that is false for the whole life of
+ * the program after the first call. CN1_COLD alone does not keep it out of line --
+ * with ThinLTO clang inlined the ENTIRE initializer (the monitorEnter, the usleep
+ * wait loop, the vtable setup) into CommonWorkloads.fib, and to keep registers free
+ * for that never-taken path every fib call saved and restored twelve callee-saved
+ * registers and materialised ~10 global addresses before doing its eight
+ * instructions of work. noinline is what keeps the cold body a call. */
+#if defined(_MSC_VER)
+    #define CN1_CLINIT_ATTR __declspec(noinline)
+#else
+    #define CN1_CLINIT_ATTR __attribute__((cold, noinline))
+#endif
 
 #if defined(_MSC_VER)
     #define CN1_NORETURN __declspec(noreturn)
@@ -2460,7 +3235,7 @@ extern JAVA_BOOLEAN throwArrayIndexOutOfBoundsException_R_boolean(CODENAME_ONE_T
 //
 // The noreturn attribute is also what makes bounds checks cheap: without it clang
 // must assume the (cold, never-taken) throw call may return and clobber memory, so
-// it reloads the array header -- both ->length and ->data -- on EVERY iteration of
+// it reloads the array header -- both ->length and ->dataOffset -- on EVERY iteration of
 // a scanning loop rather than hoisting them into registers once.
 extern CN1_NORETURN void cn1ThrowArrayIndexOrDie(CODENAME_ONE_THREAD_STATE, int index);
 
@@ -2484,6 +3259,16 @@ extern CN1_NORETURN void cn1ThrowArrayIndexOrDie(CODENAME_ONE_THREAD_STATE, int 
 // usually reads adjacent heap rather than faulting, so no signal ever arrives.
 extern CN1_NORETURN void cn1ThrowNullPointerOrDie(CODENAME_ONE_THREAD_STATE);
 
+/* Constructing throw helpers for the paths that must RETURN rather than die: a
+ * frameless method hands the pending exception back to its caller's frame, and the
+ * expression forms have to yield a value. Each allocates its own exception so the
+ * allocation sits behind the cold call instead of in the caller's register
+ * allocation. */
+extern CN1_COLD void cn1ThrowNullPointerHere(CODENAME_ONE_THREAD_STATE);
+extern CN1_COLD void cn1ThrowArrayIndexHere(CODENAME_ONE_THREAD_STATE, int index);
+extern CN1_COLD JAVA_BOOLEAN cn1ThrowNullPointer_R_boolean(CODENAME_ONE_THREAD_STATE);
+extern CN1_COLD JAVA_INT cn1ThrowNullPointer_R_int(CODENAME_ONE_THREAD_STATE);
+
 // Array bounds checks are ALWAYS compiled in, in every configuration.
 //
 // They used to sit inside #ifdef CN1_INCLUDE_NPE_CHECKS, which is commented out
@@ -2502,17 +3287,52 @@ extern CN1_NORETURN void cn1ThrowNullPointerOrDie(CODENAME_ONE_THREAD_STATE);
 // removed earlier and for free by the bounds-check-elimination pass
 // (BytecodeMethod.analyzeBoundsChecks), and a method may opt out deliberately via
 // the DisableNullAndArrayBoundsChecks annotation.
+/* IMPLICIT NULL CHECKS -- a platform capability, not an option.
+ *
+ * Where the hardware can tell us, an array access does not need to TEST for null:
+ * the bounds check already loads ->length, and on a null array that load faults at
+ * offsetof(length) == 16. A handler turns a fault below CN1_NULL_GUARD_BYTES into
+ * the NullPointerException the test would have thrown, so the compare and branch
+ * disappear from every array access in the program while the semantics -- NPE
+ * before ArrayIndexOutOfBounds -- are preserved by the ORDER: the length load is
+ * what faults, and it happens before the comparison it feeds.
+ *
+ * Off where we cannot install the handler (Windows needs SEH, not sigaction), and
+ * there the explicit test stays. That is a difference in what the platform can do,
+ * not a switch anybody chooses.
+ *
+ * THE EXPOSURE, stated plainly: a wild pointer that happens to land below the
+ * guard page becomes a NullPointerException instead of a crash. HotSpot carries
+ * the same exposure. What bounds it here is that the window is one page and the
+ * handler re-raises anything outside it, so corruption at a real address still
+ * dies loudly.
+ */
+#if !defined(_WIN32) && (defined(__APPLE__) || defined(__linux__))
+#define CN1_IMPLICIT_NULL_CHECKS 1
+#endif
+#define CN1_NULL_GUARD_BYTES 4096
+extern void cn1InstallFaultHandler(void);
+
 // One guard, used by every configuration: null then bounds, matching the order
 // and the semantics cn1_array_access_validate() has always had. The bounds test
 // is a single unsigned compare, so it covers index < 0 and index >= length.
+#ifdef CN1_IMPLICIT_NULL_CHECKS
+// No null test: the ->length load below faults on a null array and the handler
+// raises the NullPointerException. Order is what keeps the semantics right.
+#define CN1_ARRAY_ACCESS_GUARD(array, bounds) \
+    do { \
+        if(__builtin_expect(((unsigned int)(bounds)) >= (unsigned int)(((JAVA_ARRAY)(array))->length), 0)) { cn1ThrowArrayIndexOrDie(threadStateData, bounds); } \
+    } while(0)
+#else
 #define CN1_ARRAY_ACCESS_GUARD(array, bounds) \
     do { \
         if(__builtin_expect((array) == JAVA_NULL, 0)) { cn1ThrowNullPointerOrDie(threadStateData); } \
         if(__builtin_expect(((unsigned int)(bounds)) >= (unsigned int)(((JAVA_ARRAY)(array))->length), 0)) { cn1ThrowArrayIndexOrDie(threadStateData, bounds); } \
     } while(0)
+#endif
 
 #define CN1_ARRAY_ACCESS_GUARD_EXPR(array, bounds) \
-    (__builtin_expect((array) == JAVA_NULL, 0) ? throwException_R_boolean(threadStateData, __NEW_INSTANCE_java_lang_NullPointerException(threadStateData)) \
+    (__builtin_expect((array) == JAVA_NULL, 0) ? cn1ThrowNullPointer_R_boolean(threadStateData) \
      : __builtin_expect(((unsigned int)(bounds)) >= (unsigned int)(((JAVA_ARRAY)(array))->length), 0) ? throwArrayIndexOutOfBoundsException_R_boolean(threadStateData, bounds) : JAVA_TRUE)
 
 // DIVERGING form for FRAMELESS methods only: the failure path throws and RETURNS
@@ -2520,8 +3340,8 @@ extern CN1_NORETURN void cn1ThrowNullPointerOrDie(CODENAME_ONE_THREAD_STATE);
 // returning throw helpers rather than the ...OrDie() pair.
 #define CN1_ARRAY_CHECK_DIVERGE(array, bounds, retval) \
     do { \
-        if(__builtin_expect((array) == JAVA_NULL, 0)) { THROW_NULL_POINTER_EXCEPTION(); return retval; } \
-        if(__builtin_expect(((unsigned int)(bounds)) >= (unsigned int)(((JAVA_ARRAY)(array))->length), 0)) { THROW_ARRAY_INDEX_EXCEPTION(bounds); return retval; } \
+        if(__builtin_expect((array) == JAVA_NULL, 0)) { cn1ThrowNullPointerHere(threadStateData); return retval; } \
+        if(__builtin_expect(((unsigned int)(bounds)) >= (unsigned int)(((JAVA_ARRAY)(array))->length), 0)) { cn1ThrowArrayIndexHere(threadStateData, bounds); return retval; } \
     } while(0)
 
 #define CHECK_ARRAY_ACCESS(array_pos, bounds) CN1_ARRAY_ACCESS_GUARD(SP[- array_pos].data.o, bounds)
@@ -2543,7 +3363,7 @@ extern CN1_NORETURN void cn1ThrowNullPointerOrDie(CODENAME_ONE_THREAD_STATE);
 #define CHECK_ARRAY_BOUNDS_AT_STACK(pos, bounds) CN1_ARRAY_ACCESS_GUARD(PEEK_OBJ(pos), bounds)
 
 #ifdef CN1_INCLUDE_NPE_CHECKS
-#define CN1_ARRAY_LENGTH(array) ((array == JAVA_NULL) ? throwException_R_int(threadStateData, __NEW_INSTANCE_java_lang_NullPointerException(threadStateData)) : (*((JAVA_ARRAY)array)).length)
+#define CN1_ARRAY_LENGTH(array) (__builtin_expect((array) == JAVA_NULL, 0) ? cn1ThrowNullPointer_R_int(threadStateData) : (*((JAVA_ARRAY)array)).length)
 #else
 #define CN1_ARRAY_LENGTH(array) ((*((JAVA_ARRAY)array)).length)
 #endif
@@ -2568,114 +3388,114 @@ static inline JAVA_INT cn1_array_element_int(CODENAME_ONE_THREAD_STATE, JAVA_OBJ
     if (!cn1_array_access_in_bounds(array, index) && !cn1_array_access_validate(threadStateData, array, index)) {
         return 0;
     }
-    return ((JAVA_ARRAY_INT*) (*(JAVA_ARRAY)array).data)[index];
+    return ((JAVA_ARRAY_INT*) CN1_ARRAY_DATA((JAVA_ARRAY)array))[index];
 }
 
 static inline JAVA_BYTE cn1_array_element_byte(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT array, JAVA_INT index) {
     if (!cn1_array_access_in_bounds(array, index) && !cn1_array_access_validate(threadStateData, array, index)) {
         return 0;
     }
-    return ((JAVA_ARRAY_BYTE*) (*(JAVA_ARRAY)array).data)[index];
+    return ((JAVA_ARRAY_BYTE*) CN1_ARRAY_DATA((JAVA_ARRAY)array))[index];
 }
 
 static inline JAVA_FLOAT cn1_array_element_float(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT array, JAVA_INT index) {
     if (!cn1_array_access_in_bounds(array, index) && !cn1_array_access_validate(threadStateData, array, index)) {
         return 0;
     }
-    return ((JAVA_ARRAY_FLOAT*) (*(JAVA_ARRAY)array).data)[index];
+    return ((JAVA_ARRAY_FLOAT*) CN1_ARRAY_DATA((JAVA_ARRAY)array))[index];
 }
 
 static inline JAVA_DOUBLE cn1_array_element_double(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT array, JAVA_INT index) {
     if (!cn1_array_access_in_bounds(array, index) && !cn1_array_access_validate(threadStateData, array, index)) {
         return 0;
     }
-    return ((JAVA_ARRAY_DOUBLE*) (*(JAVA_ARRAY)array).data)[index];
+    return ((JAVA_ARRAY_DOUBLE*) CN1_ARRAY_DATA((JAVA_ARRAY)array))[index];
 }
 
 static inline JAVA_LONG cn1_array_element_long(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT array, JAVA_INT index) {
     if (!cn1_array_access_in_bounds(array, index) && !cn1_array_access_validate(threadStateData, array, index)) {
         return 0;
     }
-    return ((JAVA_ARRAY_LONG*) (*(JAVA_ARRAY)array).data)[index];
+    return ((JAVA_ARRAY_LONG*) CN1_ARRAY_DATA((JAVA_ARRAY)array))[index];
 }
 
 static inline JAVA_OBJECT cn1_array_element_object(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT array, JAVA_INT index) {
     if (!cn1_array_access_in_bounds(array, index) && !cn1_array_access_validate(threadStateData, array, index)) {
         return JAVA_NULL;
     }
-    return ((JAVA_ARRAY_OBJECT*) (*(JAVA_ARRAY)array).data)[index];
+    return ((JAVA_ARRAY_OBJECT*) CN1_ARRAY_DATA((JAVA_ARRAY)array))[index];
 }
 
 static inline JAVA_SHORT cn1_array_element_short(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT array, JAVA_INT index) {
     if (!cn1_array_access_in_bounds(array, index) && !cn1_array_access_validate(threadStateData, array, index)) {
         return 0;
     }
-    return ((JAVA_ARRAY_SHORT*) (*(JAVA_ARRAY)array).data)[index];
+    return ((JAVA_ARRAY_SHORT*) CN1_ARRAY_DATA((JAVA_ARRAY)array))[index];
 }
 
 static inline JAVA_CHAR cn1_array_element_char(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT array, JAVA_INT index) {
     if (!cn1_array_access_in_bounds(array, index) && !cn1_array_access_validate(threadStateData, array, index)) {
         return 0;
     }
-    return ((JAVA_ARRAY_CHAR*) (*(JAVA_ARRAY)array).data)[index];
+    return ((JAVA_ARRAY_CHAR*) CN1_ARRAY_DATA((JAVA_ARRAY)array))[index];
 }
 
 static inline JAVA_VOID cn1_set_array_element_int(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT array, JAVA_INT index, JAVA_INT value) {
     if (!cn1_array_access_in_bounds(array, index) && !cn1_array_access_validate(threadStateData, array, index)) {
         return;
     }
-    ((JAVA_ARRAY_INT*) (*(JAVA_ARRAY)array).data)[index] = value;
+    ((JAVA_ARRAY_INT*) CN1_ARRAY_DATA((JAVA_ARRAY)array))[index] = value;
 }
 
 static inline JAVA_VOID cn1_set_array_element_byte(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT array, JAVA_INT index, JAVA_BYTE value) {
     if (!cn1_array_access_in_bounds(array, index) && !cn1_array_access_validate(threadStateData, array, index)) {
         return;
     }
-    ((JAVA_ARRAY_BYTE*) (*(JAVA_ARRAY)array).data)[index] = value;
+    ((JAVA_ARRAY_BYTE*) CN1_ARRAY_DATA((JAVA_ARRAY)array))[index] = value;
 }
 
 static inline JAVA_VOID cn1_set_array_element_float(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT array, JAVA_INT index, JAVA_FLOAT value) {
     if (!cn1_array_access_in_bounds(array, index) && !cn1_array_access_validate(threadStateData, array, index)) {
         return;
     }
-    ((JAVA_ARRAY_FLOAT*) (*(JAVA_ARRAY)array).data)[index] = value;
+    ((JAVA_ARRAY_FLOAT*) CN1_ARRAY_DATA((JAVA_ARRAY)array))[index] = value;
 }
 
 static inline JAVA_VOID cn1_set_array_element_double(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT array, JAVA_INT index, JAVA_DOUBLE value) {
     if (!cn1_array_access_in_bounds(array, index) && !cn1_array_access_validate(threadStateData, array, index)) {
         return;
     }
-    ((JAVA_ARRAY_DOUBLE*) (*(JAVA_ARRAY)array).data)[index] = value;
+    ((JAVA_ARRAY_DOUBLE*) CN1_ARRAY_DATA((JAVA_ARRAY)array))[index] = value;
 }
 
 static inline JAVA_VOID cn1_set_array_element_long(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT array, JAVA_INT index, JAVA_LONG value) {
     if (!cn1_array_access_in_bounds(array, index) && !cn1_array_access_validate(threadStateData, array, index)) {
         return;
     }
-    ((JAVA_ARRAY_LONG*) (*(JAVA_ARRAY)array).data)[index] = value;
+    ((JAVA_ARRAY_LONG*) CN1_ARRAY_DATA((JAVA_ARRAY)array))[index] = value;
 }
 
 static inline JAVA_VOID cn1_set_array_element_object(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT array, JAVA_INT index, JAVA_OBJECT value) {
     if (!cn1_array_access_in_bounds(array, index) && !cn1_array_access_validate(threadStateData, array, index)) {
         return;
     }
-    CN1_WRITE_BARRIER(array, value); // nursery: storing a ref into a (heap) array escapes
-    CN1_SATB_DELETE(&((JAVA_ARRAY_OBJECT*) (*(JAVA_ARRAY)array).data)[index]); // SATB: preserve overwritten ref
-    ((JAVA_ARRAY_OBJECT*) (*(JAVA_ARRAY)array).data)[index] = value;
+    CN1_WRITE_BARRIER(array, value); // SATB: record the ref being stored
+    CN1_SATB_DELETE(&((JAVA_ARRAY_OBJECT*) CN1_ARRAY_DATA((JAVA_ARRAY)array))[index]); // SATB: preserve overwritten ref
+    ((JAVA_ARRAY_OBJECT*) CN1_ARRAY_DATA((JAVA_ARRAY)array))[index] = value;
 }
 
 static inline JAVA_VOID cn1_set_array_element_short(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT array, JAVA_INT index, JAVA_SHORT value) {
     if (!cn1_array_access_in_bounds(array, index) && !cn1_array_access_validate(threadStateData, array, index)) {
         return;
     }
-    ((JAVA_ARRAY_SHORT*) (*(JAVA_ARRAY)array).data)[index] = value;
+    ((JAVA_ARRAY_SHORT*) CN1_ARRAY_DATA((JAVA_ARRAY)array))[index] = value;
 }
 
 static inline JAVA_VOID cn1_set_array_element_char(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT array, JAVA_INT index, JAVA_CHAR value) {
     if (!cn1_array_access_in_bounds(array, index) && !cn1_array_access_validate(threadStateData, array, index)) {
         return;
     }
-    ((JAVA_ARRAY_CHAR*) (*(JAVA_ARRAY)array).data)[index] = value;
+    ((JAVA_ARRAY_CHAR*) CN1_ARRAY_DATA((JAVA_ARRAY)array))[index] = value;
 }
 
 #define CN1_ARRAY_ELEMENT_INT(array, index) cn1_array_element_int(threadStateData, array, index)
@@ -2693,14 +3513,41 @@ static inline JAVA_VOID cn1_set_array_element_char(CODENAME_ONE_THREAD_STATE, JA
 // bounded by arr.length). No null/bounds branch -> the C compiler is free to keep
 // the load in registers and auto-vectorize. If the proof is ever wrong this reads
 // out of bounds, so the pass is deliberately conservative and fail-closed.
-#define CN1_ARRAY_ELEMENT_INT_NOCHK(array, index) (((JAVA_ARRAY_INT*) (*(JAVA_ARRAY)(array)).data)[(index)])
-#define CN1_ARRAY_ELEMENT_BYTE_NOCHK(array, index) (((JAVA_ARRAY_BYTE*) (*(JAVA_ARRAY)(array)).data)[(index)])
-#define CN1_ARRAY_ELEMENT_FLOAT_NOCHK(array, index) (((JAVA_ARRAY_FLOAT*) (*(JAVA_ARRAY)(array)).data)[(index)])
-#define CN1_ARRAY_ELEMENT_DOUBLE_NOCHK(array, index) (((JAVA_ARRAY_DOUBLE*) (*(JAVA_ARRAY)(array)).data)[(index)])
-#define CN1_ARRAY_ELEMENT_LONG_NOCHK(array, index) (((JAVA_ARRAY_LONG*) (*(JAVA_ARRAY)(array)).data)[(index)])
-#define CN1_ARRAY_ELEMENT_OBJECT_NOCHK(array, index) (((JAVA_ARRAY_OBJECT*) (*(JAVA_ARRAY)(array)).data)[(index)])
-#define CN1_ARRAY_ELEMENT_SHORT_NOCHK(array, index) (((JAVA_ARRAY_SHORT*) (*(JAVA_ARRAY)(array)).data)[(index)])
-#define CN1_ARRAY_ELEMENT_CHAR_NOCHK(array, index) (((JAVA_ARRAY_CHAR*) (*(JAVA_ARRAY)(array)).data)[(index)])
+#define CN1_ARRAY_ELEMENT_INT_NOCHK(array, index) (((JAVA_ARRAY_INT*) CN1_ARRAY_DATA(array))[(index)])
+#define CN1_ARRAY_ELEMENT_BYTE_NOCHK(array, index) (((JAVA_ARRAY_BYTE*) CN1_ARRAY_DATA(array))[(index)])
+#define CN1_ARRAY_ELEMENT_FLOAT_NOCHK(array, index) (((JAVA_ARRAY_FLOAT*) CN1_ARRAY_DATA(array))[(index)])
+#define CN1_ARRAY_ELEMENT_DOUBLE_NOCHK(array, index) (((JAVA_ARRAY_DOUBLE*) CN1_ARRAY_DATA(array))[(index)])
+#define CN1_ARRAY_ELEMENT_LONG_NOCHK(array, index) (((JAVA_ARRAY_LONG*) CN1_ARRAY_DATA(array))[(index)])
+#define CN1_ARRAY_ELEMENT_OBJECT_NOCHK(array, index) (((JAVA_ARRAY_OBJECT*) CN1_ARRAY_DATA(array))[(index)])
+#define CN1_ARRAY_ELEMENT_SHORT_NOCHK(array, index) (((JAVA_ARRAY_SHORT*) CN1_ARRAY_DATA(array))[(index)])
+#define CN1_ARRAY_ELEMENT_CHAR_NOCHK(array, index) (((JAVA_ARRAY_CHAR*) CN1_ARRAY_DATA(array))[(index)])
+
+// Unchecked array element WRITES, the store half of the reads above and emitted
+// under the same proof. The pass marks a store only when the operand stack walks
+// back from it to the same ALOAD a ; ILOAD i pair the loop's test bounded, so the
+// value expression in between -- which is why a store cannot be matched by
+// adjacency the way a load can -- is accounted for rather than assumed simple.
+#define CN1_SET_ARRAY_ELEMENT_INT_NOCHK(array, index, value) (((JAVA_ARRAY_INT*) CN1_ARRAY_DATA((JAVA_ARRAY)(array)))[(index)] = (value))
+#define CN1_SET_ARRAY_ELEMENT_BYTE_NOCHK(array, index, value) (((JAVA_ARRAY_BYTE*) CN1_ARRAY_DATA((JAVA_ARRAY)(array)))[(index)] = (value))
+#define CN1_SET_ARRAY_ELEMENT_FLOAT_NOCHK(array, index, value) (((JAVA_ARRAY_FLOAT*) CN1_ARRAY_DATA((JAVA_ARRAY)(array)))[(index)] = (value))
+#define CN1_SET_ARRAY_ELEMENT_DOUBLE_NOCHK(array, index, value) (((JAVA_ARRAY_DOUBLE*) CN1_ARRAY_DATA((JAVA_ARRAY)(array)))[(index)] = (value))
+#define CN1_SET_ARRAY_ELEMENT_LONG_NOCHK(array, index, value) (((JAVA_ARRAY_LONG*) CN1_ARRAY_DATA((JAVA_ARRAY)(array)))[(index)] = (value))
+// NOCHK means the BOUNDS are proven, not that the store is invisible to the collector.
+// This used to be the bare assignment, so every bounds-proven object store -- 1,616 of
+// them in one self-hosting build -- skipped BOTH SATB halves: during a concurrent mark a
+// thread already scanned and released could load an element into a local, overwrite the
+// slot here, and leave that element unmarked if the slot was its only snapshot path. The
+// checked setter (cn1_set_array_element_object) always carried both halves; this now
+// carries exactly the same pair, and outside a mark it costs the one gated load.
+#define CN1_SET_ARRAY_ELEMENT_OBJECT_NOCHK(array, index, value) do { \
+        JAVA_OBJECT cn1__na = (JAVA_OBJECT)(array); \
+        JAVA_OBJECT* cn1__ns = &((JAVA_ARRAY_OBJECT*) CN1_ARRAY_DATA((JAVA_ARRAY)cn1__na))[(index)]; \
+        JAVA_OBJECT cn1__nv2 = (JAVA_OBJECT)(value); \
+        CN1_WRITE_BARRIER(cn1__na, cn1__nv2); \
+        CN1_SATB_DELETE(cn1__ns); \
+        *cn1__ns = cn1__nv2; } while(0)
+#define CN1_SET_ARRAY_ELEMENT_SHORT_NOCHK(array, index, value) (((JAVA_ARRAY_SHORT*) CN1_ARRAY_DATA((JAVA_ARRAY)(array)))[(index)] = (value))
+#define CN1_SET_ARRAY_ELEMENT_CHAR_NOCHK(array, index, value) (((JAVA_ARRAY_CHAR*) CN1_ARRAY_DATA((JAVA_ARRAY)(array)))[(index)] = (value))
 
 #define CN1_SET_ARRAY_ELEMENT_INT(array, index, value) cn1_set_array_element_int(threadStateData, array, index, value)
 #define CN1_SET_ARRAY_ELEMENT_BYTE(array, index, value) cn1_set_array_element_byte(threadStateData, array, index, value)
@@ -2724,6 +3571,43 @@ extern void arrayFinalizerFunction(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT array)
 
 extern void gcReleaseObj(JAVA_OBJECT o);
 
+// ARRAY PAYLOAD PLACEMENT, IN ONE PLACE, BECAUSE THE SIZE AND THE ADDRESS DISAGREED.
+//
+// `data` is the LAST member of the header, so the two spellings of "where the
+// elements start" -- (char*)a + a->dataOffset, which every placement site
+// uses, and (char*)a + sizeof(struct JavaArrayPrototype), which the sweep uses --
+// are the SAME address. The static assert below is what makes that a fact rather
+// than a coincidence of the current field order.
+//
+// The ADDRESS was always computed that way; the SIZE asked for one pointer more.
+// allocArray requested `sizeof(header) + elements + sizeof(void*)` while the
+// payload has always ended at `sizeof(header) + elements`, so every heap array
+// carried eight dead bytes.
+//
+// THIS IS NOT A CONSEQUENCE OF THE 40 -> 32 HEADER NARROWING, and saying so was
+// wrong twice over. On origin/master the header is 40 (dimensions and
+// primitiveSize are `int` there), `data` sits at 32, the payload begins at
+// &data+8 == 40 == sizeof(struct), and allocArray asks for 40 + n + 8. Master
+// over-allocates exactly the same eight bytes. The narrowing moved both numbers
+// together and changed nothing about the bug; it is simply older than either.
+// CN1_FUSED_ARR_BYTES below carried the identical `+ sizeof(void*)` and was
+// corrected separately, so it was never the counterexample that revealed this.
+//
+// Eight bytes is the raw figure and it understates the cost: BiBOP rounds
+// 32+payload up to a size class, so the real saving is a whole class step --
+// measured, a char[8] moved from the 64-byte class to the 48 (-25%) and an
+// Object[0] from 48 to 32 (-33%). See vm/benchmarks/memshape.sh.
+//
+// WHAT THIS REMOVED, AND WHY IT MATTERS ELSEWHERE: the slack used to absorb small
+// fixed-width overruns. `spare` is now sizeclass(32+payload) - (32+payload), which
+// is ZERO whenever 32+payload lands on a class boundary -- char[8], int[8] and
+// Object[8] all do. Any native that writes more than `length * primitiveSize`
+// bytes into a payload is now a heap corruption rather than a silent scribble on
+// padding; IOSNative.m's NSData converters were exactly that and are fixed.
+#define CN1_ARRAY_PAYLOAD_OFFSET (sizeof(struct JavaArrayPrototype))
+#define CN1_ARRAY_ALLOC_BYTES(actualSize) (CN1_ARRAY_PAYLOAD_OFFSET + (size_t)(actualSize))
+#define CN1_ARRAY_PAYLOAD_PTR(a) ((void*)((char*)(a) + CN1_ARRAY_PAYLOAD_OFFSET))
+
 extern JAVA_OBJECT allocArray(CODENAME_ONE_THREAD_STATE, int length, struct clazz* type, int primitiveSize, int dim);
 extern JAVA_OBJECT allocArrayAligned(CODENAME_ONE_THREAD_STATE, int length, struct clazz* type, int primitiveSize, int dim, int alignment);
 // Fused-object block allocator (owner + encapsulated child in ONE BiBOP slot;
@@ -2732,33 +3616,33 @@ extern JAVA_OBJECT allocArrayAligned(CODENAME_ONE_THREAD_STATE, int length, stru
 extern JAVA_OBJECT cn1AllocFused(CODENAME_ONE_THREAD_STATE, int totalSize, struct clazz* cls);
 
 // Bytes a fused primitive-array child occupies inside the owner block: array
-// header + the data-pointer skip allocArray uses + elements, 8-aligned so a
+// header + elements, 8-aligned so a
 // following child's header is aligned.
 #define CN1_FUSED_ARR_BYTES(len, esz) \
-    ((int)((sizeof(struct JavaArrayPrototype) + sizeof(void*) + (size_t)(len) * (esz) + 7) & ~(size_t)7))
+    ((int)((CN1_ARRAY_ALLOC_BYTES((size_t)(len) * (esz)) + 7) & ~(size_t)7))
+
+// Embedded primitive arrays have no independent mark or sweep lifetime.
+#define CN1_GC_EMBEDDED_PRIMITIVE (-5)
+#define CN1_GC_STACK_BUILDER (-6)
 
 // Lay out a fused child array INSIDE an owner block freshly returned by
 // cn1AllocFused (zeroed, owner parentCls set). The child gets a full ordinary
 // array header -- every reader sees a normal array -- but no independent GC
 // identity: the page sweep walks slot boundaries only, and the conservative
 // resolver maps any pointer into the block to the OWNER (slot base), so the
-// child lives and dies with it. heapPosition -1 = never registered; the
-// remove/free paths no-op on it. Element placement mirrors allocArray.
+// child lives and dies with it. A distinct negative heap position identifies
+// this storage to precise tracing. Element placement mirrors allocArray.
 static inline JAVA_OBJECT cn1FusedInstallPrimArray(JAVA_OBJECT owner, int off, struct clazz* acls, int esz, int len) {
     struct JavaArrayPrototype* a = (struct JavaArrayPrototype*)((char*)owner + off);
-    a->__codenameOneParentClsReference = acls;
-    a->__codenameOneGcMark = -1;   // not yet published; see codenameOneGcMalloc
-    a->__heapPosition = -1;
+    CN1_OBJ_SET_CLASS(a, acls);
+    CN1_OBJ_SET_MARK(a, -1);   // not yet published; see codenameOneGcMalloc
+    CN1_OBJ_SET_HEAPPOS(a, CN1_GC_EMBEDDED_PRIMITIVE);
     a->length = len;
     a->dimensions = 1;
     a->primitiveSize = esz;
-    if(len > 0) {
-        void* p = (void*)&(a->data);
-        p = (char*)p + sizeof(void*);
-        a->data = p;
-    } else {
-        a->data = 0;
-    }
+    /* Set unconditionally, including for a zero-length array: there is nothing to
+     * read there, and an offset of 0 would make CN1_ARRAY_DATA point at the header. */
+    a->dataOffset = (unsigned short)CN1_ARRAY_PAYLOAD_OFFSET;
     return (JAVA_OBJECT)a;
 }
 // Register an object referenced only from C globals as a permanent GC root.
@@ -2767,6 +3651,15 @@ extern void cn1AddImmortalRoot(JAVA_OBJECT o);
 // its dead slots then always reach cn1BibopReclaimSlot, which releases the
 // peer -- instead of the O(1) all-dead page reclaim, which would leak it.
 extern void cn1BibopNoteNativePeer(JAVA_OBJECT o);
+// Clear a fresh String's cached NSString peer. The field is only DECLARED on
+// ObjC targets (see ByteCodeClass.targetGuardFor), so the stores that used to
+// zero it by hand have to compile away everywhere else. Fused and NoZero slots
+// can hand back garbage, so on iOS this must still happen.
+#if defined(__APPLE__) && defined(__OBJC__)
+#define CN1_STRING_CLEAR_PEER(s) do { (s)->java_lang_String_nsString = 0; } while(0)
+#else
+#define CN1_STRING_CLEAR_PEER(s) do { (void)(s); } while(0)
+#endif
 extern JAVA_OBJECT allocMultiArray(int* lengths, struct clazz* type, int primitiveSize, int dim);
 #define CN1_SIMD_ALIGNMENT 16
 /* Maximum payload size we are willing to alloca() on the per-thread stack
@@ -2778,31 +3671,39 @@ extern JAVA_OBJECT allocMultiArray(int* lengths, struct clazz* type, int primiti
  * relative to the SIMD work that follows it), while a stack overflow is fatal
  * with no chance to recover. */
 #define CN1_SIMD_STACK_HEAP_THRESHOLD (32 * 1024)
-#define CN1_SIMD_STACK_PRIMITIVE_ARRAY(length, arrayClass, primitiveSize) \
+#define CN1_SIMD_STACK_PRIMITIVE_ARRAY(cn1Len, cn1ArrClass, cn1PrimSize) \
     __extension__ ({ \
-        int __cn1StackLength = (length); \
+        int __cn1StackLength = (cn1Len); \
         const int __cn1Alignment = CN1_SIMD_ALIGNMENT; \
-        int __cn1ActualSize = __cn1StackLength * (primitiveSize); \
+        int __cn1ActualSize = __cn1StackLength * (cn1PrimSize); \
         JAVA_OBJECT __cn1Result; \
         if (__cn1StackLength < 0 || __cn1ActualSize > CN1_SIMD_STACK_HEAP_THRESHOLD) { \
             /* Too large to safely place on the stack - fall back to a regular */ \
             /* aligned heap allocation. The returned array still satisfies the */ \
             /* SIMD alignment contract; only the lifetime widens (GC-managed */ \
             /* instead of method-local), which is harmless for callers. */ \
-            __cn1Result = allocArrayAligned(threadStateData, __cn1StackLength, (arrayClass), (primitiveSize), 1, __cn1Alignment); \
+            __cn1Result = allocArrayAligned(threadStateData, __cn1StackLength, (cn1ArrClass), (cn1PrimSize), 1, __cn1Alignment); \
         } else { \
-            /* header + embedded data pointer slot + payload + alignment slack for the payload start */ \
-            char* __cn1StackMem = (char*)__builtin_alloca(sizeof(struct JavaArrayPrototype) + sizeof(void*) + __cn1ActualSize + __cn1Alignment - 1); \
+            /* header + payload + alignment slack for the payload start */ \
+            char* __cn1StackMem = (char*)__builtin_alloca(CN1_ARRAY_ALLOC_BYTES(__cn1ActualSize) + __cn1Alignment - 1); \
             JAVA_ARRAY __cn1StackArray = (JAVA_ARRAY)__cn1StackMem; \
-            *__cn1StackArray = (struct JavaArrayPrototype){DEBUG_GC_INIT (arrayClass), 0, 0, __cn1StackLength, 1, (primitiveSize), 0}; \
+            /* Field by field, never a positional initializer: the header's class is a \
+             * 16-bit index now, and a positional list silently put the class POINTER \
+             * there -- an int-conversion error under clang-cl, a truncated id elsewhere. */ \
+            memset(__cn1StackArray, 0, sizeof(struct JavaArrayPrototype)); \
+            CN1_OBJ_SET_CLASS(__cn1StackArray, (cn1ArrClass)); \
+            __cn1StackArray->length = __cn1StackLength; \
+            __cn1StackArray->dimensions = 1; \
+            __cn1StackArray->primitiveSize = (unsigned char)(cn1PrimSize); \
+            __cn1StackArray->dataOffset = (unsigned short)CN1_ARRAY_PAYLOAD_OFFSET; \
             if (__cn1ActualSize > 0) { \
-                char* __cn1Data = (char*)(&(__cn1StackArray->data)); \
-                __cn1Data += sizeof(void*); \
+                char* __cn1Data = (char*)CN1_ARRAY_PAYLOAD_PTR(__cn1StackArray); \
                 /* round the payload start up by adding alignment-1 then masking off the low bits */ \
                 uintptr_t __cn1Aligned = (((uintptr_t)__cn1Data) + ((uintptr_t)__cn1Alignment - 1)) & ~((uintptr_t)__cn1Alignment - 1); \
-                __cn1StackArray->data = (void*)__cn1Aligned; \
-            } else { \
-                __cn1StackArray->data = 0; \
+                /* Stored as a DISTANCE from the header, which is what makes the header \
+                 * 24 bytes instead of 32. The slack above is what can push it past \
+                 * CN1_ARRAY_PAYLOAD_OFFSET, and it is bounded by alignment-1. */ \
+                __cn1StackArray->dataOffset = (unsigned short)(__cn1Aligned - (uintptr_t)__cn1StackArray); \
             } \
             __cn1Result = (JAVA_OBJECT)__cn1StackArray; \
         } \
@@ -2816,7 +3717,7 @@ extern JAVA_OBJECT allocMultiArray(int* lengths, struct clazz* type, int primiti
         int __cn1InitLength = (length); \
         JAVA_ARRAY __cn1StackArray = (JAVA_ARRAY)CN1_SIMD_ALLOCA_BYTE(__cn1InitLength); \
         if (__cn1InitLength > 0) { \
-            memset(__cn1StackArray->data, 0, (size_t)__cn1InitLength); \
+            memset(CN1_ARRAY_DATA(__cn1StackArray), 0, (size_t)__cn1InitLength); \
         } \
         (JAVA_OBJECT)__cn1StackArray; \
     })
@@ -2825,7 +3726,7 @@ extern JAVA_OBJECT allocMultiArray(int* lengths, struct clazz* type, int primiti
         int __cn1InitLength = (length); \
         JAVA_ARRAY __cn1StackArray = (JAVA_ARRAY)CN1_SIMD_ALLOCA_INT(__cn1InitLength); \
         if (__cn1InitLength > 0) { \
-            memset(__cn1StackArray->data, 0, (size_t)__cn1InitLength * sizeof(JAVA_ARRAY_INT)); \
+            memset(CN1_ARRAY_DATA(__cn1StackArray), 0, (size_t)__cn1InitLength * sizeof(JAVA_ARRAY_INT)); \
         } \
         (JAVA_OBJECT)__cn1StackArray; \
     })
@@ -2834,7 +3735,7 @@ extern JAVA_OBJECT allocMultiArray(int* lengths, struct clazz* type, int primiti
         int __cn1InitLength = (length); \
         JAVA_ARRAY __cn1StackArray = (JAVA_ARRAY)CN1_SIMD_ALLOCA_FLOAT(__cn1InitLength); \
         if (__cn1InitLength > 0) { \
-            memset(__cn1StackArray->data, 0, (size_t)__cn1InitLength * sizeof(JAVA_ARRAY_FLOAT)); \
+            memset(CN1_ARRAY_DATA(__cn1StackArray), 0, (size_t)__cn1InitLength * sizeof(JAVA_ARRAY_FLOAT)); \
         } \
         (JAVA_OBJECT)__cn1StackArray; \
     })
@@ -2843,7 +3744,7 @@ extern JAVA_OBJECT allocMultiArray(int* lengths, struct clazz* type, int primiti
         int __cn1InitLength = (length); \
         JAVA_ARRAY __cn1StackArray = (JAVA_ARRAY)CN1_SIMD_ALLOCA_BYTE(__cn1InitLength); \
         if (__cn1InitLength > 0) { \
-            memset(__cn1StackArray->data, (value), (size_t)__cn1InitLength); \
+            memset(CN1_ARRAY_DATA(__cn1StackArray), (value), (size_t)__cn1InitLength); \
         } \
         (JAVA_OBJECT)__cn1StackArray; \
     })
@@ -2852,9 +3753,9 @@ extern JAVA_OBJECT allocMultiArray(int* lengths, struct clazz* type, int primiti
         int __cn1InitLength = (length); \
         JAVA_ARRAY_INT __cn1InitValue = (value); \
         JAVA_ARRAY __cn1StackArray = (JAVA_ARRAY)CN1_SIMD_ALLOCA_INT(__cn1InitLength); \
-        JAVA_ARRAY_INT* __cn1Data = (JAVA_ARRAY_INT*)__cn1StackArray->data; \
+        JAVA_ARRAY_INT* __cn1Data = (JAVA_ARRAY_INT*)CN1_ARRAY_DATA(__cn1StackArray); \
         if (__cn1InitValue == 0 && __cn1InitLength > 0) { \
-            memset(__cn1StackArray->data, 0, (size_t)__cn1InitLength * sizeof(JAVA_ARRAY_INT)); \
+            memset(CN1_ARRAY_DATA(__cn1StackArray), 0, (size_t)__cn1InitLength * sizeof(JAVA_ARRAY_INT)); \
         } else { \
             for (int __cn1FillIndex = 0; __cn1FillIndex < __cn1InitLength; __cn1FillIndex++) { \
                 __cn1Data[__cn1FillIndex] = __cn1InitValue; \
@@ -2867,9 +3768,9 @@ extern JAVA_OBJECT allocMultiArray(int* lengths, struct clazz* type, int primiti
         int __cn1InitLength = (length); \
         JAVA_ARRAY_FLOAT __cn1InitValue = (value); \
         JAVA_ARRAY __cn1StackArray = (JAVA_ARRAY)CN1_SIMD_ALLOCA_FLOAT(__cn1InitLength); \
-        JAVA_ARRAY_FLOAT* __cn1Data = (JAVA_ARRAY_FLOAT*)__cn1StackArray->data; \
+        JAVA_ARRAY_FLOAT* __cn1Data = (JAVA_ARRAY_FLOAT*)CN1_ARRAY_DATA(__cn1StackArray); \
         if (__cn1InitValue == 0.0f && __cn1InitLength > 0) { \
-            memset(__cn1StackArray->data, 0, (size_t)__cn1InitLength * sizeof(JAVA_ARRAY_FLOAT)); \
+            memset(CN1_ARRAY_DATA(__cn1StackArray), 0, (size_t)__cn1InitLength * sizeof(JAVA_ARRAY_FLOAT)); \
         } else { \
             for (int __cn1FillIndex = 0; __cn1FillIndex < __cn1InitLength; __cn1FillIndex++) { \
                 __cn1Data[__cn1FillIndex] = __cn1InitValue; \
@@ -2956,6 +3857,11 @@ extern JAVA_OBJECT cn1FusedLatin1Begin(CODENAME_ONE_THREAD_STATE, int len, JAVA_
 #define cn1FusedLatin1End(so, n) (((struct obj__java_lang_String*)(so))->java_lang_String_count = (n))
 extern JAVA_OBJECT cn1MainArgs(CODENAME_ONE_THREAD_STATE, int argc, char* argv[]);
 extern void initConstantPool();
+/* Generated into cn1_class_method_index: runs the static initializer of every class
+ * and interface without a <clinit>, once, from the start of initConstantPool. */
+extern void cn1EagerInitClasses(CODENAME_ONE_THREAD_STATE);
+extern void cn1EagerInitPureClasses(CODENAME_ONE_THREAD_STATE);
+extern void cn1RunEagerInitializer(CODENAME_ONE_THREAD_STATE, void (*initializer)(CODENAME_ONE_THREAD_STATE), const char* className);
 
 extern void initMethodStack(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject, int stackSize, int localsStackSize, int classNameId, int methodNameId);
 static inline void cn1_init_method_stack_fast(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject, int stackSize, int localsStackSize, JAVA_BOOLEAN fullClear) {
@@ -3057,6 +3963,7 @@ static inline void cn1InitMethodStackInline(CODENAME_ONE_THREAD_STATE, JAVA_OBJE
     CN1_DECLARE_SP(spQualifier, spPosition) \
     cn1InitMethodStackInline(threadStateData, (JAVA_OBJECT)1, stackSize, localsStackSize, classNameId, methodNameId); \
     const int currentCodenameOneCallStackOffset CN1_UNUSED = threadStateData->callStackOffset;\
+    int* const cn1CurrentLine CN1_UNUSED = &threadStateData->callStackLine[currentCodenameOneCallStackOffset - 1]; \
     int methodBlockOffset CN1_UNUSED = threadStateData->tryBlockOffset;
 
 #define DEFINE_METHOD_STACK(stackSize, localsStackSize, spPosition, classNameId, methodNameId) DEFINE_METHOD_STACK_IMPL(, stackSize, localsStackSize, spPosition, classNameId, methodNameId)
@@ -3069,6 +3976,7 @@ static inline void cn1InitMethodStackInline(CODENAME_ONE_THREAD_STATE, JAVA_OBJE
     CN1_DECLARE_SP(spQualifier, spPosition) \
     cn1InitMethodStackInline(threadStateData, __cn1ThisObject, stackSize, localsStackSize, classNameId, methodNameId); \
     const int currentCodenameOneCallStackOffset CN1_UNUSED = threadStateData->callStackOffset;\
+    int* const cn1CurrentLine CN1_UNUSED = &threadStateData->callStackLine[currentCodenameOneCallStackOffset - 1]; \
     int methodBlockOffset CN1_UNUSED = threadStateData->tryBlockOffset;
 
 #define DEFINE_INSTANCE_METHOD_STACK(stackSize, localsStackSize, spPosition, classNameId, methodNameId) DEFINE_INSTANCE_METHOD_STACK_IMPL(, stackSize, localsStackSize, spPosition, classNameId, methodNameId)
@@ -3081,6 +3989,7 @@ static inline void cn1InitMethodStackInline(CODENAME_ONE_THREAD_STATE, JAVA_OBJE
     CN1_DECLARE_SP(spQualifier, spPosition) \
     cn1_init_method_stack_fast(threadStateData, (JAVA_OBJECT)1, stackSize, localsStackSize, JAVA_TRUE); \
     const int currentCodenameOneCallStackOffset CN1_UNUSED = threadStateData->callStackOffset;\
+    int* const cn1CurrentLine CN1_UNUSED = &threadStateData->callStackLine[currentCodenameOneCallStackOffset - 1]; \
     int methodBlockOffset CN1_UNUSED = threadStateData->tryBlockOffset;
 
 #define DEFINE_METHOD_STACK_FAST_REF(stackSize, localsStackSize, spPosition) DEFINE_METHOD_STACK_FAST_REF_IMPL(, stackSize, localsStackSize, spPosition)
@@ -3093,6 +4002,7 @@ static inline void cn1InitMethodStackInline(CODENAME_ONE_THREAD_STATE, JAVA_OBJE
     CN1_DECLARE_SP(spQualifier, spPosition) \
     cn1_init_method_stack_fast(threadStateData, __cn1ThisObject, stackSize, localsStackSize, JAVA_TRUE); \
     const int currentCodenameOneCallStackOffset CN1_UNUSED = threadStateData->callStackOffset;\
+    int* const cn1CurrentLine CN1_UNUSED = &threadStateData->callStackLine[currentCodenameOneCallStackOffset - 1]; \
     int methodBlockOffset CN1_UNUSED = threadStateData->tryBlockOffset;
 
 #define DEFINE_INSTANCE_METHOD_STACK_FAST_REF(stackSize, localsStackSize, spPosition) DEFINE_INSTANCE_METHOD_STACK_FAST_REF_IMPL(, stackSize, localsStackSize, spPosition)
@@ -3105,6 +4015,7 @@ static inline void cn1InitMethodStackInline(CODENAME_ONE_THREAD_STATE, JAVA_OBJE
     CN1_DECLARE_SP(spQualifier, spPosition) \
     cn1_init_method_stack_fast(threadStateData, (JAVA_OBJECT)1, stackSize, localsStackSize, JAVA_FALSE); \
     const int currentCodenameOneCallStackOffset CN1_UNUSED = threadStateData->callStackOffset;\
+    int* const cn1CurrentLine CN1_UNUSED = &threadStateData->callStackLine[currentCodenameOneCallStackOffset - 1]; \
     int methodBlockOffset CN1_UNUSED = threadStateData->tryBlockOffset;
 
 #define DEFINE_METHOD_STACK_FAST_PRIMITIVE(stackSize, localsStackSize, spPosition) DEFINE_METHOD_STACK_FAST_PRIMITIVE_IMPL(, stackSize, localsStackSize, spPosition)
@@ -3117,6 +4028,7 @@ static inline void cn1InitMethodStackInline(CODENAME_ONE_THREAD_STATE, JAVA_OBJE
     CN1_DECLARE_SP(spQualifier, spPosition) \
     cn1_init_method_stack_fast(threadStateData, __cn1ThisObject, stackSize, localsStackSize, JAVA_FALSE); \
     const int currentCodenameOneCallStackOffset CN1_UNUSED = threadStateData->callStackOffset;\
+    int* const cn1CurrentLine CN1_UNUSED = &threadStateData->callStackLine[currentCodenameOneCallStackOffset - 1]; \
     int methodBlockOffset CN1_UNUSED = threadStateData->tryBlockOffset;
 
 #define DEFINE_INSTANCE_METHOD_STACK_FAST_PRIMITIVE(stackSize, localsStackSize, spPosition) DEFINE_INSTANCE_METHOD_STACK_FAST_PRIMITIVE_IMPL(, stackSize, localsStackSize, spPosition)
@@ -3143,6 +4055,48 @@ static inline void cn1InitMethodStackInline(CODENAME_ONE_THREAD_STATE, JAVA_OBJE
 
 #define DEFINE_METHOD_STACK_FRAMELESS(stackSize, localsStackSize, spPosition) DEFINE_METHOD_STACK_FRAMELESS_IMPL(, stackSize, localsStackSize, spPosition)
 #define DEFINE_METHOD_STACK_FRAMELESS_VSP(stackSize, localsStackSize, spPosition) DEFINE_METHOD_STACK_FRAMELESS_IMPL(volatile, stackSize, localsStackSize, spPosition)
+
+// The two names a try/catch needs that a frameless frame does not otherwise define.
+// Emitted ONLY into frameless methods that contain one, so the other 90% of frameless
+// methods stay byte-for-byte what they were.
+//
+//   methodBlockOffset                  END_TRY and JUMP_TO restore tryBlockOffset to it
+//   currentCodenameOneCallStackOffset  DEFINE_CATCH_BLOCK restores callStackOffset to it
+//
+// Both are the value AT ENTRY, and for a frameless frame that is also the value the
+// method never changes -- it pushes no call-stack entry and opens no thread-stack slice.
+// The catch block's restore is therefore a no-op for this frame and the right thing for
+// any CALLEE frame a longjmp unwound through.
+#define CN1_FRAMELESS_TRY_FRAME() \
+    const int currentCodenameOneCallStackOffset CN1_UNUSED = threadStateData->callStackOffset; \
+    int methodBlockOffset CN1_UNUSED = threadStateData->tryBlockOffset;
+
+// A RETURN out of a try block skips the end label where END_TRY would have run, so the
+// block stack has to be unwound here instead. This is the frameless half of what
+// releaseForReturnInException does for an ordinary frame -- only the tryBlockOffset
+// part, because a frameless frame has no thread-stack slice to release and no call-stack
+// entry to pop.
+#define CN1_FRAMELESS_TRY_RETURN() threadStateData->tryBlockOffset = methodBlockOffset;
+
+// An explicit THROW from a frameless frame. Such a frame pushes no call-stack entry,
+// so a trace filled in by its own throw did not name it at all -- the uncaught report
+// read "java.lang.IllegalStateException" and nothing else, which is the frame a crash
+// report exists to find. So the entry is pushed for the throw alone, with the line the
+// translator knows statically, and taken off again if throwException returns (an app
+// target with no handler). When it longjmps instead, the handler's frame restores
+// callStackOffset to its own entry value, which removes this one with it.
+#define CN1_FRAMELESS_THROW(ex, classNameId, methodNameId, line) do { \
+    JAVA_OBJECT cn1__thrown = (ex); \
+    int cn1__depth = threadStateData->callStackOffset; \
+    if(cn1__depth < CN1_MAX_STACK_CALL_DEPTH) { \
+        threadStateData->callStackClass[cn1__depth] = (classNameId); \
+        threadStateData->callStackMethod[cn1__depth] = (methodNameId); \
+        threadStateData->callStackLine[cn1__depth] = (line); \
+        threadStateData->callStackOffset = cn1__depth + 1; \
+    } \
+    throwException(threadStateData, cn1__thrown); \
+    threadStateData->callStackOffset = cn1__depth; \
+} while(0)
 
 // Headroom (bytes) kept below the end of the native C stack: enough to detect the
 // overflow and still build + throw the StackOverflowError without overrunning.
@@ -3171,9 +4125,20 @@ extern void cn1ComputeNativeStackLimit(CODENAME_ONE_THREAD_STATE);
 // stack essentially never maps into the 256KB band of another stack, while a
 // genuinely overflowing stack must descend THROUGH the band (no single
 // frameless frame approaches 256KB), so overflow detection is preserved.
+/* -DCN1_COUNT_SOE_ENTRIES makes every guarded entry tick a plain counter, so the
+ * guard's whole-program ceiling can be computed from a real call count instead of
+ * guessed at. Not atomic and not meant to be: the count only needs an order of
+ * magnitude, and an atomic here would cost more than the thing being measured. */
+#ifdef CN1_COUNT_SOE_ENTRIES
+extern long long cn1SoeEntryCount;
+#define CN1_SOE_TICK() (cn1SoeEntryCount++)
+#else
+#define CN1_SOE_TICK() ((void)0)
+#endif
+
 #define CN1_FRAMELESS_SOE_GUARD(retval) \
     do { \
-        if (__builtin_expect(threadStateData->nativeStackLimit == 0, 0)) { cn1ComputeNativeStackLimit(threadStateData); } \
+        CN1_SOE_TICK(); \
         JAVA_LONG __cn1FrameAddr = (JAVA_LONG)(intptr_t)__builtin_frame_address(0); \
         if (__builtin_expect(__cn1FrameAddr < threadStateData->nativeStackLimit \
                 && __cn1FrameAddr >= threadStateData->nativeStackLimit - (JAVA_LONG)CN1_FRAMELESS_STACK_GUARD_BAND, 0)) { \
@@ -3213,10 +4178,207 @@ extern const char* stringToUTF8(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT str);
 extern const char* stringToUTF8Len(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT str, JAVA_INT* lengthOut);
 
 JAVA_OBJECT codenameOneGcMalloc(CODENAME_ONE_THREAD_STATE, int size, struct clazz* parent);
+
+/// Uniform size of a stack iterator buffer. Every iterator in the closed world is a parent
+/// reference plus a handful of primitives; the largest measured is ~56 bytes including the
+/// 16-byte header. The bound is checked at COMPILE time in the taker below, so a class that
+/// outgrows it silently falls back to the heap instead of overflowing the buffer.
+#define CN1_ITER_BUF_BYTES 96
+
+/// Offer this frame's buffer to the next eligible iterator allocation.
+static inline void cn1IterScopeBegin(struct ThreadLocalData* threadStateData, void* buf) {
+    threadStateData->pendingStackIter = buf;
+}
+
+/// Withdraw the offer. Called when the loop ends, so a buffer nobody took cannot be taken
+/// later by an unrelated allocation further down the method.
+static inline void cn1IterScopeEnd(struct ThreadLocalData* threadStateData) {
+    threadStateData->pendingStackIter = 0;
+}
+
+/// Take the pending buffer for an object of `sz` bytes, or answer NULL to allocate
+/// normally. Emitted into __NEW_X only for classes the translator proved cannot escape
+/// the loop -- see IteratorEscape.
+static inline JAVA_OBJECT cn1IterScopeTake(struct ThreadLocalData* threadStateData,
+        struct clazz* cls, int sz) {
+    void* b = threadStateData->pendingStackIter;
+    if(b == 0 || sz > CN1_ITER_BUF_BYTES) {
+        return JAVA_NULL;
+    }
+    threadStateData->pendingStackIter = 0;   // one-shot
+    JAVA_OBJECT o = (JAVA_OBJECT)b;
+    memset(b, 0, (size_t)sz);
+    // EXACTLY the header the @StackAllocate path writes: a class pointer so the GC can
+    // walk its fields when it finds the pointer on the C stack, mark -1 so no sweep
+    // treats it as aged, and heapPosition -1 because it was never registered in the heap
+    // table and must never be freed. It dies when the frame unwinds.
+    CN1_OBJ_SET_CLASS(o, cls);
+    CN1_OBJ_SET_MARK(o, -1);
+    CN1_OBJ_SET_HEAPPOS(o, -1);
+    return o;
+}
 void codenameOneGcFree(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj);
 
 extern int currentGcMarkValue;
 extern void gcMarkObject(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj, JAVA_BOOLEAN force);
+// One context lookup per generated tracing callback. A zero epoch retains the
+// full conservative, serial forced-rescan, and verifier paths.
+extern int cn1GcFieldMarkEpoch(JAVA_BOOLEAN force);
+static inline __attribute__((always_inline)) void cn1GcMarkField(
+        CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj, JAVA_BOOLEAN force, int epoch) {
+    if (obj == JAVA_NULL || CN1_IS_TAGGED(obj)) return;
+    // epoch is ENCODED (cn1GcFieldMarkEpoch): a raw word compare.
+    if (epoch != 0 && __atomic_load_n(CN1_OBJ_MARK_PTR(obj), __ATOMIC_ACQUIRE) == epoch) return;
+    gcMarkObject(threadStateData, obj, force);
+}
+
+
+// Native reference blocks -- ArrayList/HashMap backing stores held in C memory rather
+// than in a Java array. See the block comment beside the implementations in cn1_globals.m;
+// the short version is that the elements are live Java references, so the owner's
+// generated __GC_MARK_ must call cn1GcMarkRefBlock and its __FINALIZER_ must call
+// cn1RefBlockFree, and every mutation below already carries the SATB barrier that AASTORE
+// and System.arraycopy carry.
+static inline JAVA_INT cn1InlTableNext(JAVA_LONG metadata, JAVA_INT from, JAVA_INT capacity) {
+    if(metadata == 0) return -1;
+    JAVA_INT* slots = (JAVA_INT*)(uintptr_t)metadata;
+    for(JAVA_INT i = from; i < capacity; i++) if(slots[i] < 0) return i;
+    return -1;
+}
+
+// Untraced, exclusively owned primitive storage; growth preserves existing bytes.
+extern JAVA_LONG cn1PrimitiveBlockResize(JAVA_LONG block, JAVA_INT bytes);
+extern JAVA_LONG cn1IntBlockAlloc(JAVA_INT capacity);
+extern void cn1IntBlockClear(JAVA_LONG block, JAVA_INT capacity);
+static inline JAVA_INT cn1IntBlockGet(JAVA_LONG block, JAVA_INT index) {
+    return ((JAVA_INT*)(uintptr_t)block)[index];
+}
+static inline void cn1IntBlockSet(JAVA_LONG block, JAVA_INT index, JAVA_INT value) {
+    ((JAVA_INT*)(uintptr_t)block)[index] = value;
+}
+extern JAVA_LONG cn1RefBlockAlloc(JAVA_INT capacity);
+extern JAVA_LONG cn1TableAlloc(JAVA_INT capacity, JAVA_BOOLEAN ordered);
+extern void cn1InvokeFinalizer(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj, void (*ptr)(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT));
+extern void cn1RefBlockFree(JAVA_LONG block);
+extern void cn1StackBufferUnwind(struct ThreadLocalData* thread, struct CN1StackBuffer* until);
+static inline void cn1StackBufferReset(struct CN1StackBuffer* scope) {
+    if(scope->owned != 0) { cn1RefBlockFree(scope->owned); scope->owned = 0; }
+}
+static inline void cn1StackBufferLeave(struct CN1StackBuffer* scope) {
+    cn1StackBufferReset(scope);
+    scope->thread->nativeBuffers = scope->previous;
+}
+extern void cn1RefBlockRetire(JAVA_LONG block);
+extern void cn1RefBlockDrainRetired(void);
+extern void cn1RefBlockBeginCycle(void);
+extern void cn1RefBlockEndCycle(void);
+extern void cn1NativeBlockAccounting(size_t* live, size_t* retired, size_t* released);
+extern void cn1RefBlockSet(CODENAME_ONE_THREAD_STATE, JAVA_LONG block, JAVA_INT index, JAVA_OBJECT value);
+extern void cn1TableRefSet(CODENAME_ONE_THREAD_STATE, JAVA_LONG table, JAVA_INT part, JAVA_INT index, JAVA_OBJECT value);
+extern void cn1RefBlockMove(CODENAME_ONE_THREAD_STATE, JAVA_LONG block, JAVA_INT from, JAVA_INT to, JAVA_INT count);
+extern void cn1RefBlockClear(CODENAME_ONE_THREAD_STATE, JAVA_LONG block, JAVA_INT from, JAVA_INT count);
+extern void cn1GcMarkRefBlock(CODENAME_ONE_THREAD_STATE, JAVA_LONG block, JAVA_BOOLEAN force);
+extern void cn1GcMarkTablePart(CODENAME_ONE_THREAD_STATE, JAVA_LONG table, JAVA_INT part, JAVA_BOOLEAN force);
+// Deferred block re-scan, mover side (cn1_globals.m, DEFERRED BLOCK RE-SCAN). Only inside
+// a cn1SatbBulkBegin() bracket that answered TRUE; begin answers whether the collector
+// will re-scan the block after this write (1) or the caller must log every overwritten
+// slot itself (0). Pair every begin with an end after the last write.
+extern int cn1BlockMoveBegin(JAVA_LONG block);
+extern void cn1BlockMoveEnd(JAVA_LONG block);
+// All standalone buffers and table slices begin on a 16-byte boundary.
+// The immutable capacity belongs to the published pointer, not a second field.
+// 16 BYTES, not 32. A collection's storage is a block, and at the self-hosting peak
+// 606k blocks are live, 89% of them 256 bytes or less; a 32-byte header was 19MB of the
+// 127MB they held. The size fits 32 bits (a block's element count is an int and nothing
+// here is that big), the allocation is the header less a small alignment offset (0
+// wherever malloc aligns to 16), and the retirement link lives outside the block (see
+// cn1RefBlockRetire). What the rest of the runtime reads stays where it was: the
+// capacity 8 bytes before the data and the re-scan word 4 bytes before it.
+typedef struct __attribute__((aligned(16))) CN1NativeBlock {
+    uint32_t bytes;          // size of the whole allocation, header included
+    uint8_t allocOffset;     // header - allocation
+    uint8_t reserved[3];
+    JAVA_INT capacity;
+} CN1NativeBlock;
+
+// Part `part` of the hash table whose root is `table` (0 for no table). A table is keys,
+// values, then int metadata -- and, ordered, the prev and next links -- packed back to
+// back with no header between them, so a part is arithmetic on the root's capacity and
+// the owners keep no field for it. Everything that walks or writes a part derives it from
+// the root it read ONCE; see cn1TableAlloc.
+// A HashSet's table: `capacity` element references, then `capacity` int markers, in
+// one allocation. The header's capacity is the element count, so the ordinary
+// reference-block walk traces exactly the elements; the markers are found from it.
+extern JAVA_LONG cn1SetTableAlloc(JAVA_INT capacity);
+static inline JAVA_LONG cn1SetTableMeta(JAVA_LONG table) {
+    if(table == 0) return 0;
+    return table + (JAVA_LONG)((size_t)((const CN1NativeBlock*)(uintptr_t)table - 1)->capacity * sizeof(JAVA_OBJECT));
+}
+static inline JAVA_LONG cn1TablePart(JAVA_LONG table, JAVA_INT part) {
+    if(table == 0) return 0;
+    size_t cap = (size_t)((const CN1NativeBlock*)(uintptr_t)table - 1)->capacity;
+    size_t offset = part < 2 ? (size_t)part * cap * sizeof(JAVA_OBJECT)
+        : 2 * cap * sizeof(JAVA_OBJECT) + (size_t)(part - 2) * cap * sizeof(JAVA_INT);
+    return table + (JAVA_LONG)offset;
+}
+// Fixed-width copies compile to unaligned word loads without aliasing UB. Both
+// end loads stay inside the logical byte range; no padding or terminator is read.
+static inline __attribute__((always_inline)) int cn1CompactBytesEqual(const void* left, const void* right, size_t count) {
+    const uint8_t* a = (const uint8_t*)left;
+    const uint8_t* b = (const uint8_t*)right;
+    if (count > 32) return memcmp(a, b, count) == 0;
+    if (count >= 16) {
+        uint64_t a0, a1, a2, a3, b0, b1, b2, b3;
+        memcpy(&a0, a, 8); memcpy(&b0, b, 8);
+        memcpy(&a1, a + 8, 8); memcpy(&b1, b + 8, 8);
+        memcpy(&a2, a + count - 16, 8); memcpy(&b2, b + count - 16, 8);
+        memcpy(&a3, a + count - 8, 8); memcpy(&b3, b + count - 8, 8);
+        return ((a0 ^ b0) | (a1 ^ b1) | (a2 ^ b2) | (a3 ^ b3)) == 0;
+    }
+    if (count >= 8) {
+        uint64_t a0, a1, b0, b1;
+        memcpy(&a0, a, 8); memcpy(&b0, b, 8);
+        memcpy(&a1, a + count - 8, 8); memcpy(&b1, b + count - 8, 8);
+        return ((a0 ^ b0) | (a1 ^ b1)) == 0;
+    }
+    if (count >= 4) {
+        uint32_t a0, a1, b0, b1;
+        memcpy(&a0, a, 4); memcpy(&b0, b, 4);
+        memcpy(&a1, a + count - 4, 4); memcpy(&b1, b + count - 4, 4);
+        return ((a0 ^ b0) | (a1 ^ b1)) == 0;
+    }
+    if (count >= 2) {
+        uint16_t a0, a1, b0, b1;
+        memcpy(&a0, a, 2); memcpy(&b0, b, 2);
+        memcpy(&a1, a + count - 2, 2); memcpy(&b1, b + count - 2, 2);
+        return ((a0 ^ b0) | (a1 ^ b1)) == 0;
+    }
+    return count == 0 || *a == *b;
+}
+
+// Read-only mixed-coder comparison. Keeping this independent of Java entry
+// points exposes its lack of allocation, safepoints and writes to the optimizer.
+static inline __attribute__((pure)) int cn1CompactMixedEquals(
+        const uint8_t* latin, const uint16_t* wide, size_t count) {
+    for (size_t i = 0; i < count; i++) {
+        if ((uint16_t)latin[i] != wide[i]) return 0;
+    }
+    return 1;
+}
+
+static inline JAVA_INT cn1RefBlockCount(JAVA_LONG block) {
+    return block == 0 ? 0 : *(const JAVA_INT*)((const char*)(uintptr_t)block
+            - (sizeof(CN1NativeBlock) - offsetof(CN1NativeBlock, capacity)));
+}
+
+// READ is inline and unchecked on purpose: it is the operation the for-each lowering
+// emits per element, and a C block has no header and no payload offset to add, so
+// this is strictly cheaper than the array access it replaces.
+static inline JAVA_OBJECT cn1RefBlockGet(JAVA_LONG block, JAVA_INT index) {
+    return ((JAVA_OBJECT*)(uintptr_t)block)[index];
+}
+
+
 // Drop every soft referent at the next collection, whatever the retention policy would
 // otherwise have decided. Called when an allocation has actually failed: SoftReference's
 // one hard guarantee is that all of them are cleared before the VM gives up, and the
@@ -3322,7 +4484,7 @@ extern _Atomic long cn1RefGets;
 #define CN1_SATB_REF_KEEP(active, refVal) \
     do { CN1_REF_COUNT_GET(); JAVA_OBJECT cn1__r = (refVal); \
          if((active) && cn1__r != JAVA_NULL && !CN1_IS_TAGGED(cn1__r)) { \
-             int cn1__m = __atomic_load_n(&cn1__r->__codenameOneGcMark, __ATOMIC_RELAXED); \
+             int cn1__m = CN1_OBJ_MARK_LOAD(cn1__r, __ATOMIC_RELAXED); \
              int cn1__e = atomic_load_explicit(&bibopGcEpoch, memory_order_relaxed); \
              if(cn1__m != -1 && cn1__m != cn1__e) cn1SatbEnqueue(cn1__r); \
          } } while(0)

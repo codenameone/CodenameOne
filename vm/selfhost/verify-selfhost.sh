@@ -28,11 +28,39 @@ CLASSES="${1:?usage: verify-selfhost.sh <classesDir> <AppName> <package>}"
 APP="${2:?}"
 PKG="${3:?}"
 
-PARPAR="$REPO/vm/selfhost/target/parpar"
-[ -x "$PARPAR" ] || { echo "no $PARPAR -- run build-selfhost.sh first"; exit 1; }
+# RESOLVE THE BINARY THAT EXISTS, preferring the release shape, and honour an explicit
+# CN1_SELFHOST_BIN. build-selfhost.sh -O3 writes parpar-O3 and a bare build-selfhost.sh
+# writes parpar, so hardcoding either one makes this die on a missing file rather than
+# on a divergence -- which is what it did for anyone who had only ever built -O3.
+# Optimisation level cannot change the emitted C (that is the property these gates
+# exist to check), so either binary is a valid subject; the name is printed so a run
+# is never ambiguous about which one it verified.
+if [ -z "${CN1_SELFHOST_BIN:-}" ]; then
+    for c in "$REPO/vm/selfhost/target/parpar-O3" "$REPO/vm/selfhost/target/parpar"; do
+        [ -x "$c" ] && { CN1_SELFHOST_BIN="$c"; break; }
+    done
+fi
+PARPAR="${CN1_SELFHOST_BIN:-}"
+[ -n "$PARPAR" ] && [ -x "$PARPAR" ] || {
+    echo "no self-hosted binary in $REPO/vm/selfhost/target -- run build-selfhost.sh first"
+    exit 1; }
+echo "verify-selfhost: subject $PARPAR"
 JAPI="$REPO/vm/selfhost/target/javaapi-classes"
 TR="$REPO/vm/ByteCodeTranslator/target/classes"
-ASM="$(cat "$REPO/vm/ByteCodeTranslator/target/selfhost-asm-classpath.txt")"
+ASM_CP_FILE="$REPO/vm/ByteCodeTranslator/target/selfhost-asm-classpath.txt"
+# A MISSING CLASSPATH FILE IS A SETUP ERROR, NOT A CORRECTNESS FAILURE, and it did
+# not read as one: `mvn clean package` (which translate-and-build.sh runs whenever
+# the translator sources change, i.e. after running the gauntlet) deletes target/
+# and takes this file with it. The bare `cat` that used to be here then failed with
+# one line of shell noise, the gate exited non-zero, and perf-guard's own message
+# said to "treat this as a correctness failure". It is not; it just needs the
+# regenerating build to have run.
+[ -r "$ASM_CP_FILE" ] || {
+    echo "missing $ASM_CP_FILE" >&2
+    echo "  mvn clean package removes target/, and the gauntlet triggers one." >&2
+    echo "  Run $REPO/vm/selfhost/build-selfhost.sh -O3 first; it regenerates it." >&2
+    exit 1; }
+ASM="$(cat "$ASM_CP_FILE")"
 
 # The JVM side of gate A runs target/classes, which nothing in this script builds
 # -- build-selfhost.sh compiles the translator only for the NATIVE side. A source
@@ -49,6 +77,25 @@ if [ -n "$newest_src" ]; then
     echo "gate A would compare the new translator against the old one. Run:" >&2
     echo "  (cd $REPO/vm && mvn -q -B -pl ByteCodeTranslator clean package -DskipTests)" >&2
     echo "and restore target/selfhost-asm-classpath.txt, which clean removes." >&2
+    exit 1
+fi
+
+# THE SUBJECT BINARY GETS THE SAME STALENESS GUARD, AND IT IS NOT A HYPOTHETICAL.
+# The chooser above prefers parpar-O3, while `build-selfhost.sh` with no arguments
+# writes parpar -- so a parpar-O3 left over from an earlier session is verified in
+# place of what was just built, and it reports a translator change as a VM divergence
+# on exactly the files that change was supposed to touch. That cost a correct
+# optimization: it was measured, it failed gate A against a binary three hours older
+# than the source, and it was withdrawn. Printing the subject is not enough, because
+# the name says nothing about the binary's age.
+newest_bin_src="$(find "$REPO/vm/ByteCodeTranslator/src" -type f -newer "$PARPAR" -print -quit 2>/dev/null || true)"
+if [ -n "$newest_bin_src" ]; then
+    echo "STALE: subject $PARPAR is older than $newest_bin_src" >&2
+    echo "gate A would compare the new translator against an old BINARY. Run:" >&2
+    echo "  $REPO/vm/selfhost/build-selfhost.sh          # writes target/parpar" >&2
+    echo "  $REPO/vm/selfhost/build-selfhost.sh -O3      # writes target/parpar-O3" >&2
+    echo "or pin one with CN1_SELFHOST_BIN=<path>. Building only one of the two leaves" >&2
+    echo "the other stale, and the chooser prefers parpar-O3." >&2
     exit 1
 fi
 

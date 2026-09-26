@@ -157,7 +157,8 @@ jobs:
     name: build + run suite (${{ matrix.arch }})
     needs: prepare-suite
     runs-on: ${{ matrix.runner }}
-    timeout-minutes: 90
+    # 90 for the suite plus the ParparVM vs JDK 25 performance gate below.
+    timeout-minutes: 140
     strategy:
       fail-fast: false
       matrix:
@@ -196,7 +197,8 @@ jobs:
             libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev gstreamer1.0-plugins-base gstreamer1.0-plugins-good \
             gstreamer1.0-plugins-bad gstreamer1.0-plugins-ugly gstreamer1.0-libav \
             libwebkit2gtk-4.1-dev libsecret-1-dev libnotify-dev libgeoclue-2-dev \
-            libepoxy-dev libegl1-mesa-dev libgles2-mesa-dev libgl1-mesa-dri
+            libepoxy-dev libegl1-mesa-dev libgles2-mesa-dev libgl1-mesa-dri \
+            clang time
 
       - name: Set up JDK 8
         uses: actions/setup-java@v5
@@ -305,6 +307,8 @@ jobs:
           # windowed demo ELF here (best-effort; never fails the suite).
           CN1_LINUX_DEMO_OUT: ${{ github.workspace }}/artifacts/linux-port/demo/codenameone-linux-demo-${{ matrix.arch }}
           LIBGL_ALWAYS_SOFTWARE: '1'
+          # The suite's own translation, replayed by the performance gate below.
+          CN1_TRANSLATION_RECORD: ${{ github.workspace }}/artifacts/linux-port/raw/translation-record.jsonl
         run: |
           set -e
           # Not silenced, and the outcome is stated. The hang dump attaches gdb from
@@ -383,6 +387,18 @@ jobs:
           fi
           exit $rc
 
+      # ParparVM against JDK 25 on this runner: this build's own suite translation, the
+      # translator translating itself, and every Bench workload. The table lands in this
+      # arch's screenshot comment (the compare-comment job appends perf-comment.md) and
+      # the job's last step fails it on a regression. Before the upload below, so the
+      # results travel with the screenshots.
+      - name: ParparVM vs JDK 25 (performance gate)
+        if: success() || failure()
+        run: |
+          vm/selfhost/ci-perf-gate.sh run linux-${{ matrix.arch }} artifacts/linux-port/raw/perf \
+            --hello-workload "$GITHUB_WORKSPACE/artifacts/linux-port/raw/translation-record.jsonl" \
+            --hello-app LinuxHelloMain
+
       - name: Upload screenshot artifact (${{ matrix.arch }})
         if: always()
         uses: actions/upload-artifact@v4
@@ -460,6 +476,10 @@ jobs:
           path: artifacts/linux-port/demo
           if-no-files-found: warn
           retention-days: 14
+
+      - name: Fail on a ParparVM performance regression (${{ matrix.arch }})
+        if: success() || failure()
+        run: vm/selfhost/ci-perf-gate.sh verdict artifacts/linux-port/raw/perf
 
   # The musl target. The default build is glibc (old-targeted, portable across
   # mainstream distros); musl is the opt-in Alpine target, where the GTK stack is
@@ -648,6 +668,8 @@ jobs:
             export CN1SS_PORT_ID="linux-$arch"
             export CN1SS_SUITE_LOG="$raw/app-output.log"
             export CN1SS_BINARY_PATH="$ART/demo-$arch/codenameone-linux-demo-$arch"
+            # This arch's ParparVM vs JDK 25 table, measured by its build-run leg.
+            export CN1SS_EXTRA_MARKDOWN="$raw/perf/perf-comment.md"
             set +e
             CN1SS_COMMENT_MARKER="<!-- CN1SS_LINUX_${arch}_COMMENT -->" \
             CN1SS_COMMENT_LOG_PREFIX="[linux-gtk-$arch]" \

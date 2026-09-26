@@ -99,7 +99,28 @@ public class BasicInstruction extends Instruction implements AssignableExpressio
         return synchronizedMethod;
     }
 
+    /**
+     * The unwind a RETURN out of a frameless method's try block has to do for itself.
+     *
+     * An ordinary frame calls releaseForReturnInException, which restores three things;
+     * a frameless frame opens no thread-stack slice and pushes no call-stack entry, so
+     * only the try-block stack is left. Empty for every frameless method without a
+     * try/catch, which is 90% of them, so their emitted C is unchanged.
+     */
+    private String framelessTryUnwind() {
+        return TryCatch.isTryCatchInMethod() ? "    CN1_FRAMELESS_TRY_RETURN();\n" : "";
+    }
+
     private boolean shouldEmitNullAndArrayBoundsChecks() {
+        // isBoundsSafe() belongs here as much as in ArrayLoadExpression: the reduction
+        // passes fold most array accesses into expressions, but the ones they cannot
+        // fold fall through to the raw BC_*ALOAD / BC_*ASTORE emission below, and those
+        // were ignoring the proof outright. Array STORES have no folded form that reads
+        // the mark at all except the frameless diverging one, so without this a proven
+        // store kept its check on every other path.
+        if (isBoundsSafe()) {
+            return false;
+        }
         return getMethod() == null || !getMethod().isDisableNullAndArrayBoundsChecks();
     }
 
@@ -129,6 +150,27 @@ public class BasicInstruction extends Instruction implements AssignableExpressio
     
     
     
+    /// The source line of the nearest LineNumber before this instruction, or -1.
+    private int lineBefore(List<Instruction> instructions) {
+        if (instructions == null) {
+            return -1;
+        }
+        int at = -1;
+        for (int i = 0; i < instructions.size(); i++) {
+            if (instructions.get(i) == this) {
+                at = i;
+                break;
+            }
+        }
+        for (int i = at - 1; i >= 0; i--) {
+            Instruction prev = instructions.get(i);
+            if (prev instanceof LineNumber) {
+                return ((LineNumber) prev).getLine();
+            }
+        }
+        return -1;
+    }
+
     @Override
     public void appendInstruction(StringBuilder b, List<Instruction> instructions) {
         switch(opcode) {
@@ -202,7 +244,7 @@ public class BasicInstruction extends Instruction implements AssignableExpressio
                 }
                 b.append("/* BALOAD */ \n" +
                     "    SP--; SP[-1].type = CN1_TYPE_INT; \n" +
-                    "    SP[-1].data.i = ((JAVA_ARRAY_BYTE*) (*(JAVA_ARRAY)SP[-1].data.o).data)[(*SP).data.i]; \n" +
+                    "    SP[-1].data.i = ((JAVA_ARRAY_BYTE*) CN1_ARRAY_DATA((JAVA_ARRAY)SP[-1].data.o))[(*SP).data.i]; \n" +
                     "    }\n");
                 break;
 
@@ -214,7 +256,7 @@ public class BasicInstruction extends Instruction implements AssignableExpressio
                 }
                 b.append("/* CALOAD */\n" +
                     "    SP--; SP[-1].type = CN1_TYPE_INT; \n" +
-                    "    SP[-1].data.i = ((JAVA_ARRAY_CHAR*) (*(JAVA_ARRAY)SP[-1].data.o).data)[(*SP).data.i];\n");
+                    "    SP[-1].data.i = ((JAVA_ARRAY_CHAR*) CN1_ARRAY_DATA((JAVA_ARRAY)SP[-1].data.o))[(*SP).data.i];\n");
                 break;
                 
             case Opcodes.IALOAD:
@@ -225,7 +267,7 @@ public class BasicInstruction extends Instruction implements AssignableExpressio
                 }
                 b.append("/* IALOAD */\n" +
                         "    SP--; SP[-1].type = CN1_TYPE_INT; \n" +
-                        "    SP[-1].data.i = ((JAVA_ARRAY_INT*) (*(JAVA_ARRAY)SP[-1].data.o).data)[(*SP).data.i];\n");
+                        "    SP[-1].data.i = ((JAVA_ARRAY_INT*) CN1_ARRAY_DATA((JAVA_ARRAY)SP[-1].data.o))[(*SP).data.i];\n");
                 break;
 
             case Opcodes.SALOAD:
@@ -234,7 +276,7 @@ public class BasicInstruction extends Instruction implements AssignableExpressio
                 }
                 b.append(
                         "    SP--; SP[-1].type = CN1_TYPE_INT; \n" +
-                        "    SP[-1].data.i = ((JAVA_ARRAY_SHORT*) (*(JAVA_ARRAY)SP[-1].data.o).data)[(*SP).data.i]; /* SALOAD */\n");
+                        "    SP[-1].data.i = ((JAVA_ARRAY_SHORT*) CN1_ARRAY_DATA((JAVA_ARRAY)SP[-1].data.o))[(*SP).data.i]; /* SALOAD */\n");
                 break;
 
             case Opcodes.LALOAD:
@@ -278,7 +320,7 @@ public class BasicInstruction extends Instruction implements AssignableExpressio
                 }
                 b.append("/* AALOAD */\n" +
                         "    SP--; SP[-1].type = CN1_TYPE_INVALID; \n" +
-                        "    SP[-1].data.o = ((JAVA_ARRAY_OBJECT*) (*(JAVA_ARRAY)SP[-1].data.o).data)[(*SP).data.i]; \n" +
+                        "    SP[-1].data.o = ((JAVA_ARRAY_OBJECT*) CN1_ARRAY_DATA((JAVA_ARRAY)SP[-1].data.o))[(*SP).data.i]; \n" +
                         "    SP[-1].type = CN1_TYPE_OBJECT; \n");
                 break;
 
@@ -289,7 +331,7 @@ public class BasicInstruction extends Instruction implements AssignableExpressio
                     b.append("    ");
                 }
                 b.append("/* BASTORE */\n" +
-                        "    ((JAVA_ARRAY_BYTE*) (*(JAVA_ARRAY)SP[-3].data.o).data)[SP[-2].data.i] = SP[-1].data.i; SP -= 3;\n");
+                        "    ((JAVA_ARRAY_BYTE*) CN1_ARRAY_DATA((JAVA_ARRAY)SP[-3].data.o))[SP[-2].data.i] = SP[-1].data.i; SP -= 3;\n");
                 break;
 
             case Opcodes.CASTORE:
@@ -299,7 +341,7 @@ public class BasicInstruction extends Instruction implements AssignableExpressio
                     b.append("    ");
                 }
                 b.append("/* CASTORE */\n" +
-                        "    ((JAVA_ARRAY_CHAR*) (*(JAVA_ARRAY)SP[-3].data.o).data)[SP[-2].data.i] = SP[-1].data.i; SP -= 3;\n\n");
+                        "    ((JAVA_ARRAY_CHAR*) CN1_ARRAY_DATA((JAVA_ARRAY)SP[-3].data.o))[SP[-2].data.i] = SP[-1].data.i; SP -= 3;\n\n");
                 break;
 
             case Opcodes.SASTORE:
@@ -309,7 +351,7 @@ public class BasicInstruction extends Instruction implements AssignableExpressio
                     b.append("    ");
                 }
                 b.append("/* SASTORE */\n" +
-                        "    ((JAVA_ARRAY_SHORT*) (*(JAVA_ARRAY)SP[-3].data.o).data)[SP[-2].data.i] = SP[-1].data.i; SP -= 3;\n");
+                        "    ((JAVA_ARRAY_SHORT*) CN1_ARRAY_DATA((JAVA_ARRAY)SP[-3].data.o))[SP[-2].data.i] = SP[-1].data.i; SP -= 3;\n");
                 break;
 
             case Opcodes.IASTORE:
@@ -319,7 +361,7 @@ public class BasicInstruction extends Instruction implements AssignableExpressio
                     b.append("    ");
                 }
                 b.append("/* IASTORE */\n" +
-                        "    ((JAVA_ARRAY_INT*) (*(JAVA_ARRAY)SP[-3].data.o).data)[SP[-2].data.i] = SP[-1].data.i; SP -= 3;\n");
+                        "    ((JAVA_ARRAY_INT*) CN1_ARRAY_DATA((JAVA_ARRAY)SP[-3].data.o))[SP[-2].data.i] = SP[-1].data.i; SP -= 3;\n");
                 break;
 
             case Opcodes.LASTORE:
@@ -362,8 +404,8 @@ public class BasicInstruction extends Instruction implements AssignableExpressio
                         (ByteCodeTranslator.isCheckedCastsEnabled()
                                 ? "    CN1_ARRAY_STORE_CHECK(aastoreTmp, SP[-1].data.o); \n" : "") +
                         "    CN1_WRITE_BARRIER(aastoreTmp, SP[-1].data.o); \n" +
-                        "    CN1_SATB_DELETE(&((JAVA_ARRAY_OBJECT*) (*(JAVA_ARRAY)aastoreTmp).data)[SP[-2].data.i]); \n" +
-                        "    ((JAVA_ARRAY_OBJECT*) (*(JAVA_ARRAY)aastoreTmp).data)[SP[-2].data.i] = SP[-1].data.o; \n" +
+                        "    CN1_SATB_DELETE(&((JAVA_ARRAY_OBJECT*) CN1_ARRAY_DATA((JAVA_ARRAY)aastoreTmp))[SP[-2].data.i]); \n" +
+                        "    ((JAVA_ARRAY_OBJECT*) CN1_ARRAY_DATA((JAVA_ARRAY)aastoreTmp))[SP[-2].data.i] = SP[-1].data.o; \n" +
                         "    SP -= 3; }\n");
                 break;
 
@@ -642,7 +684,7 @@ public class BasicInstruction extends Instruction implements AssignableExpressio
                 appendSynchronized(b);
 
                 if(getMethod() != null && getMethod().isFrameless()) {
-                    b.append("    return SP[-1].data.i;\n");
+                    b.append(framelessTryUnwind()).append("    return SP[-1].data.i;\n");
                 } else if(TryCatch.isTryCatchInMethod()) {
                     b.append("    releaseForReturnInException(threadStateData, cn1LocalsBeginInThread, methodBlockOffset); return SP[-1].data.i;\n");
 //                    b.append(maxLocals);
@@ -666,7 +708,7 @@ public class BasicInstruction extends Instruction implements AssignableExpressio
                 appendSynchronized(b);
 
                 if(getMethod() != null && getMethod().isFrameless()) {
-                    b.append("    return POP_LONG();\n");
+                    b.append(framelessTryUnwind()).append("    return POP_LONG();\n");
                 } else if(TryCatch.isTryCatchInMethod()) {
                     b.append("    releaseForReturnInException(threadStateData, cn1LocalsBeginInThread, methodBlockOffset); \n    return POP_LONG();\n");
                 } else {
@@ -686,7 +728,7 @@ public class BasicInstruction extends Instruction implements AssignableExpressio
                 appendSynchronized(b);
 
                 if(getMethod() != null && getMethod().isFrameless()) {
-                    b.append("    return POP_FLOAT();\n");
+                    b.append(framelessTryUnwind()).append("    return POP_FLOAT();\n");
                 } else if(TryCatch.isTryCatchInMethod()) {
                     b.append("    releaseForReturnInException(threadStateData, cn1LocalsBeginInThread, methodBlockOffset); \n    return POP_FLOAT();\n");
                 } else {
@@ -706,7 +748,7 @@ public class BasicInstruction extends Instruction implements AssignableExpressio
                 appendSynchronized(b);
 
                 if(getMethod() != null && getMethod().isFrameless()) {
-                    b.append("    return POP_DOUBLE();\n");
+                    b.append(framelessTryUnwind()).append("    return POP_DOUBLE();\n");
                 } else if(TryCatch.isTryCatchInMethod()) {
                     b.append("    releaseForReturnInException(threadStateData, cn1LocalsBeginInThread, methodBlockOffset); \n    return POP_DOUBLE();\n");
                 } else {
@@ -728,7 +770,7 @@ public class BasicInstruction extends Instruction implements AssignableExpressio
                 if(getMethod() != null && getMethod().isFrameless()) {
                     // No frame to release -- the operand stack is a method-local array and
                     // the object roots live in native C storage scanned conservatively.
-                    b.append("    return POP_OBJ();\n");
+                    b.append(framelessTryUnwind()).append("    return POP_OBJ();\n");
                 } else if(TryCatch.isTryCatchInMethod()) {
                     b.append("    releaseForReturnInException(threadStateData, cn1LocalsBeginInThread, methodBlockOffset); \n    return POP_OBJ();\n");
                 } else {
@@ -752,7 +794,7 @@ public class BasicInstruction extends Instruction implements AssignableExpressio
                     break;
                 }
                 if(getMethod() != null && getMethod().isFrameless()) {
-                    b.append("    return;\n");
+                    b.append(framelessTryUnwind()).append("    return;\n");
                 } else if(TryCatch.isTryCatchInMethod()) {
                     b.append("    releaseForReturnInException(threadStateData, cn1LocalsBeginInThread, methodBlockOffset); \n    return;\n");
                 } else {
@@ -778,10 +820,21 @@ public class BasicInstruction extends Instruction implements AssignableExpressio
                     "    }\n");
                 break;                
                 
-            case Opcodes.ATHROW:
-                //b.append("    NSLog(@\"Exception thrown %s %d %s %s\\n\", __FILE__, __LINE__, __PRETTY_FUNCTION__, __FUNCTION__);\n");
-                b.append("    throwException(threadStateData, POP_OBJ());\n");
-                break;                
+            case Opcodes.ATHROW: {
+                // A frameless frame names itself in the trace for its own throw; see
+                // CN1_FRAMELESS_THROW. The ids are the ones a framed prologue passes.
+                com.codename1.tools.translator.BytecodeMethod owner = getMethod();
+                if (owner != null && owner.isFrameless()) {
+                    b.append("    CN1_FRAMELESS_THROW(POP_OBJ(), ")
+                     .append(com.codename1.tools.translator.Parser.addToConstantPool(owner.getClsName()))
+                     .append(", ")
+                     .append(com.codename1.tools.translator.Parser.addToConstantPool(owner.getMethodName()))
+                     .append(", ").append(lineBefore(instructions)).append(");\n");
+                } else {
+                    b.append("    throwException(threadStateData, POP_OBJ());\n");
+                }
+                break;
+            }                
                 
             case Opcodes.MONITORENTER:
                 b.append("    monitorEnter(threadStateData, POP_OBJ());\n");

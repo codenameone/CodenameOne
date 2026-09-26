@@ -39,17 +39,44 @@ public class HashMap<K, V> extends AbstractMap<K, V> implements Map<K, V> {
 
     private static final long serialVersionUID = 362498820763181265L;
 
-    private static final int DEFAULT_SIZE = 16;
+    // 2, not the JDK's 16. The table is ours, not an array of Node references: a slot is
+    // a key, a value and a hash (20 bytes), so a 16-slot table is ~330 bytes on the first
+    // put. Measured on the self-hosting corpus, 221k HashMaps are live at the peak and
+    // 156k of them hold exactly ONE entry, which a 2-slot table holds (threshold 1) in a
+    // 56-byte allocation where a 4-slot one took 96. Growth doubles, so a map that does
+    // fill up pays three extra rehashes on the way to 16.
+    private static final int DEFAULT_SIZE = 2;
 
     /** slot metadata: empty slot. */
     static final int META_EMPTY = 0;
     /** slot metadata: tombstone (previously occupied). */
     static final int META_TOMB = 1;
 
-    /** parallel storage; length is always a power of two. */
-    transient Object[] cn1Keys;
-    transient Object[] cn1Vals;
-    transient int[] cn1Meta;
+    /**
+     * PARALLEL STORAGE, HELD IN C BLOCKS RATHER THAN JAVA ARRAYS. Capacity is always a
+     * power of two and lives in {@link #cn1Cap}; there is no array to ask for a length.
+     *
+     * No Java code outside this class ever sees these, so they do not need to be arrays,
+     * and being arrays is expensive: on the self-hosting corpus HashMap's three arrays are
+     * 349,806 of the 577,239 live Object[] and 174,903 of the 185,860 live int[], each
+     * paying a 32-byte array header, a BiBOP size-class rounding and a slot for the sweep
+     * to walk. A block pays a malloc header and is freed the moment the map dies.
+     *
+     * THE COLLECTOR STILL TRACES THE REFERENCE BLOCKS. ByteCodeClass.NATIVE_REF_BLOCKS
+     * makes the generated __GC_MARK_ walk them and the generated __FINALIZER_ free them;
+     * the finalize() below is what puts this class on the per-slot reclaim path, without
+     * which a page taking the O(1) all-dead reclaim would never free a block.
+     */
+    transient volatile long cn1KeysBlock;
+
+    /* The table's other parts: values and int metadata live in the same allocation as
+     * the keys and are derived from it (NativeStorage.part), so a map pays one field for
+     * its table rather than three. */
+    static final int VALS = 1;
+    static final int META = 2;
+
+    /** capacity of all three blocks, always a power of two. */
+    transient int cn1Cap;
 
     /** live mappings. */
     transient int elementCount;
@@ -62,7 +89,9 @@ public class HashMap<K, V> extends AbstractMap<K, V> implements Map<K, V> {
 
     final float loadFactor;
 
-    /** resize when cn1Occupied reaches this. */
+    /** the most slots (live + tombstones) the table holds at rest: a put that would
+     *  take one more rebuilds FIRST, so the table always keeps an empty slot, which
+     *  probing requires, and never passes through a full state. */
     int threshold;
 
     /** scratch results of cn1PutSlot for subclass (LinkedHashMap) hooks. */
@@ -94,8 +123,8 @@ public class HashMap<K, V> extends AbstractMap<K, V> implements Map<K, V> {
         if (x >= 1 << 30) {
             return 1 << 30;
         }
-        if (x == 0) {
-            return 16;
+        if (x <= DEFAULT_SIZE) {
+            return DEFAULT_SIZE;   // a 1-slot table has no room for an entry
         }
         x = x - 1;
         x |= x >> 1;
@@ -119,7 +148,8 @@ public class HashMap<K, V> extends AbstractMap<K, V> implements Map<K, V> {
         if (capacity >= 0 && loadFactor > 0) {
             capacity = calculateCapacity(capacity);
             this.loadFactor = loadFactor;
-            cn1Alloc(capacity);
+            cn1Cap = capacity;
+            threshold = Math.min((int) (capacity * loadFactor), capacity - 1);
         } else {
             throw new IllegalArgumentException();
         }
@@ -137,9 +167,11 @@ public class HashMap<K, V> extends AbstractMap<K, V> implements Map<K, V> {
     }
 
     final void cn1Alloc(int capacity) {
-        cn1Keys = new Object[capacity];
-        cn1Vals = new Object[capacity];
-        cn1Meta = new int[capacity];
+        long keys = NativeStorage.table(capacity, false);
+        long oldKeys = cn1KeysBlock;
+        cn1KeysBlock = keys;
+        NativeStorage.retire(oldKeys);
+        cn1Cap = capacity;
         elementCount = 0;
         cn1Occupied = 0;
         threshold = (int) (capacity * loadFactor);
@@ -210,21 +242,29 @@ public class HashMap<K, V> extends AbstractMap<K, V> implements Map<K, V> {
      * tombstone met on the probe path (reuse), or the terminating empty slot.
      */
     final int cn1FindSlotImpl(Object key) {
-        int marker = cn1Marker(key);
-        int[] meta = cn1Meta;
-        int mask = meta.length - 1;
+        return cn1FindSlotImpl(key, cn1Marker(key));
+    }
+
+    private int cn1FindSlotImpl(Object key, int marker) {
+        int expected = modCount;
+        long meta = NativeStorage.part(cn1KeysBlock, META);
+        int mask = cn1Cap - 1;
         int i = marker & mask;
+        if (meta == 0) return -(i + 1);
         int perturb = marker;
         int firstTomb = -1;
         while (true) {
-            int m = meta[i];
+            int m = NativeStorage.getInt(meta, i);
             if (m == META_EMPTY) {
                 int ins = firstTomb >= 0 ? firstTomb : i;
                 return -(ins + 1);
             }
             if (m == marker) {
-                Object k = cn1Keys[i];
-                if (key == null ? k == null : (key == k || areEqualKeys(key, k))) {
+                Object k = NativeStorage.get(cn1KeysBlock, i);
+                boolean matches = key == null ? k == null : (key == k || areEqualKeys(key, k));
+                // User equality can reenter and replace or rearrange this storage.
+                if (expected != modCount || meta != NativeStorage.part(cn1KeysBlock, META)) throw new ConcurrentModificationException();
+                if (matches) {
                     return i;
                 }
             } else if (m == META_TOMB && firstTomb < 0) {
@@ -241,20 +281,37 @@ public class HashMap<K, V> extends AbstractMap<K, V> implements Map<K, V> {
      * a NEW mapping was created (vs a value replacement).
      */
     final V cn1PutSlot(K key, V value) {
-        int idx = cn1FindSlotImpl(key);
+        int marker = cn1Marker(key);
+        if (cn1KeysBlock == 0) cn1Alloc(cn1Cap);
+        int idx = cn1FindSlotImpl(key, marker);
         if (idx >= 0) {
             @SuppressWarnings("unchecked")
-            V old = (V) cn1Vals[idx];
-            cn1Vals[idx] = value;
+            V old = (V) NativeStorage.get(NativeStorage.part(cn1KeysBlock, VALS), idx);
+            NativeStorage.setOwned(this, NativeStorage.part(cn1KeysBlock, VALS), idx, value);
             cn1LastPut = idx;
             cn1LastInserted = false;
             return old;
         }
         int ins = -idx - 1;
-        boolean wasEmpty = cn1Meta[ins] == META_EMPTY;
-        cn1Meta[ins] = cn1Marker(key);
-        cn1Keys[ins] = key;
-        cn1Vals[ins] = value;
+        boolean wasEmpty = NativeStorage.getInt(NativeStorage.part(cn1KeysBlock, META), ins) == META_EMPTY;
+        if (wasEmpty && cn1Occupied >= threshold) {
+            // One slot past the threshold: rebuild BEFORE inserting, then place the key
+            // with the raw insert -- it is known to be absent, so no equals() runs again.
+            // Growing after the insert (as this used to) let a table sit at threshold+1
+            // at rest, so a 4-slot table held only 2 entries where the JDK's holds 3,
+            // and a 2-slot table could not hold 1.
+            cn1Grow();
+            ins = cn1Insert(key, value, marker);
+            elementCount++;
+            cn1Occupied++;
+            modCount++;
+            cn1LastPut = ins;
+            cn1LastInserted = true;
+            return null;
+        }
+        NativeStorage.setInt(NativeStorage.part(cn1KeysBlock, META), ins, marker);
+        NativeStorage.setOwned(this, cn1KeysBlock, ins, key);
+        NativeStorage.setOwned(this, NativeStorage.part(cn1KeysBlock, VALS), ins, value);
         elementCount++;
         if (wasEmpty) {
             cn1Occupied++;
@@ -262,17 +319,7 @@ public class HashMap<K, V> extends AbstractMap<K, V> implements Map<K, V> {
         modCount++;
         cn1LastPut = ins;
         cn1LastInserted = true;
-        // NOTE: growth is the CALLER's responsibility (cn1MaybeGrow) so that
-        // LinkedHashMap can link the fresh slot into its ordering chain BEFORE
-        // the rebuild remaps every slot index.
         return null;
-    }
-
-    /** grow when the caller finished its post-insert bookkeeping. */
-    final void cn1MaybeGrow() {
-        if (cn1Occupied >= threshold) {
-            cn1Grow();
-        }
     }
 
     /**
@@ -281,7 +328,7 @@ public class HashMap<K, V> extends AbstractMap<K, V> implements Map<K, V> {
      * LinkedHashMap overrides this to preserve its ordering links.
      */
     void cn1Grow() {
-        int cap = cn1Meta.length;
+        int cap = cn1Cap;
         // Grow when the LIVE count has reached the threshold; rebuild at the
         // same size only when the threshold was reached because of TOMBSTONES.
         //
@@ -295,34 +342,46 @@ public class HashMap<K, V> extends AbstractMap<K, V> implements Map<K, V> {
         // any positive load factor, so this was reachable from ordinary code.
         // At 0.75 and 0.5 the two rules agree exactly, rebuild for rebuild.
         int newCap = (elementCount >= threshold) ? cap << 1 : cap;
-        Object[] oldK = cn1Keys;
-        Object[] oldV = cn1Vals;
-        int[] oldM = cn1Meta;
-        cn1Alloc(newCap);
-        int count = 0;
-        for (int i = 0; i < oldM.length; i++) {
-            if (oldM[i] < 0) {
-                cn1Insert(oldK[i], oldV[i], oldM[i]);
-                count++;
-            }
+        // REHASH OUT OF THE CURRENT BLOCKS, THEN SWAP -- not the other way round.
+        //
+        // The array version could allocate first and rehash from locals, because the old
+        // arrays were heap objects the collector still traced. A block is traced only
+        // while a FIELD of this map points at it, so allocating into the fields first
+        // would leave the old block holding the only reference to every key and value
+        // while it is no longer traced -- collectible mid-rehash. Reading from the fields
+        // and writing into locals keeps the source traced for the whole loop, and every
+        // reference written into the new blocks is also still in the old ones, so nothing
+        // is unreachable at any point.
+        long newKeys = NativeStorage.table(newCap, false);
+        long newVals = NativeStorage.part(newKeys, VALS), newMeta = NativeStorage.part(newKeys, META);
+        NativeStorage.rehash(cn1KeysBlock, NativeStorage.part(cn1KeysBlock, VALS), NativeStorage.part(cn1KeysBlock, META), 0, -1,
+                newKeys, newVals, newMeta, 0, 0);
+        long oldK = cn1KeysBlock;
+        cn1KeysBlock = newKeys;
+        cn1Cap = newCap;
+        threshold = (int) (newCap * loadFactor);
+        if (threshold >= newCap) {
+            threshold = newCap - 1;
         }
-        elementCount = count;
-        cn1Occupied = count;
+        // RETIRE, not free: a marker that loaded these pointers before the swap above
+        // may still be walking them. The sweep releases them once the mark has ended.
+        NativeStorage.retire(oldK);
+        cn1Occupied = elementCount;
     }
 
     /** raw insert into a table known not to contain the key (rebuild path). */
     final int cn1Insert(Object key, Object value, int marker) {
-        int[] meta = cn1Meta;
-        int mask = meta.length - 1;
+        long meta = NativeStorage.part(cn1KeysBlock, META);
+        int mask = cn1Cap - 1;
         int i = marker & mask;
         int perturb = marker;
-        while (meta[i] != META_EMPTY) {
+        while (NativeStorage.getInt(meta, i) != META_EMPTY) {
             perturb >>>= 5;
             i = cn1NextSlot(i, perturb, mask);
         }
-        meta[i] = marker;
-        cn1Keys[i] = key;
-        cn1Vals[i] = value;
+        NativeStorage.setInt(meta, i, marker);
+        NativeStorage.setOwned(this, cn1KeysBlock, i, key);
+        NativeStorage.setOwned(this, NativeStorage.part(cn1KeysBlock, VALS), i, value);
         return i;
     }
 
@@ -331,9 +390,9 @@ public class HashMap<K, V> extends AbstractMap<K, V> implements Map<K, V> {
      * first; ALWAYS the single mutation point for removals (iterators too).
      */
     void cn1RemoveAtIndex(int idx) {
-        cn1Meta[idx] = META_TOMB;
-        cn1Keys[idx] = null;
-        cn1Vals[idx] = null;
+        NativeStorage.setInt(NativeStorage.part(cn1KeysBlock, META), idx, META_TOMB);
+        NativeStorage.setOwned(this, cn1KeysBlock, idx, null);
+        NativeStorage.setOwned(this, NativeStorage.part(cn1KeysBlock, VALS), idx, null);
         elementCount--;
         modCount++;
     }
@@ -349,13 +408,7 @@ public class HashMap<K, V> extends AbstractMap<K, V> implements Map<K, V> {
     }
 
     final int cn1NextOccupied(int from) {
-        int[] meta = cn1Meta;
-        for (int i = from; i < meta.length; i++) {
-            if (meta[i] < 0) {
-                return i;
-            }
-        }
-        return -1;
+        return NativeStorage.nextOccupied(NativeStorage.part(cn1KeysBlock, META), from, cn1Cap);
     }
 
     /**
@@ -371,14 +424,7 @@ public class HashMap<K, V> extends AbstractMap<K, V> implements Map<K, V> {
 
     void clearImpl() {
         if (elementCount > 0 || cn1Occupied > 0) {
-            Object[] k = cn1Keys;
-            Object[] v = cn1Vals;
-            int[] m = cn1Meta;
-            for (int i = 0; i < m.length; i++) {
-                m[i] = META_EMPTY;
-                k[i] = null;
-                v[i] = null;
-            }
+            NativeStorage.clearMap(cn1KeysBlock, NativeStorage.part(cn1KeysBlock, VALS), NativeStorage.part(cn1KeysBlock, META), cn1Cap);
             elementCount = 0;
             cn1Occupied = 0;
             modCount++;
@@ -408,17 +454,22 @@ public class HashMap<K, V> extends AbstractMap<K, V> implements Map<K, V> {
      */
     @Override
     public boolean containsValue(Object value) {
-        int[] meta = cn1Meta;
-        Object[] vals = cn1Vals;
+        if (elementCount == 0) return false;
+        int expected = modCount;
+        long meta = NativeStorage.part(cn1KeysBlock, META);
+        long vals = NativeStorage.part(cn1KeysBlock, VALS);
         if (value != null) {
-            for (int i = 0; i < meta.length; i++) {
-                if (meta[i] < 0 && (value == vals[i] || areEqualKeys(value, vals[i]))) {
-                    return true;
+            for (int i = 0; i < cn1Cap; i++) {
+                if (NativeStorage.getInt(meta, i) < 0) {
+                    Object v = NativeStorage.get(vals, i);
+                    boolean matches = value == v || areEqualKeys(value, v);
+                    if (expected != modCount || meta != NativeStorage.part(cn1KeysBlock, META)) throw new ConcurrentModificationException();
+                    if (matches) return true;
                 }
             }
         } else {
-            for (int i = 0; i < meta.length; i++) {
-                if (meta[i] < 0 && vals[i] == null) {
+            for (int i = 0; i < cn1Cap; i++) {
+                if (NativeStorage.getInt(meta, i) < 0 && NativeStorage.get(vals, i) == null) {
                     return true;
                 }
             }
@@ -454,7 +505,7 @@ public class HashMap<K, V> extends AbstractMap<K, V> implements Map<K, V> {
             return null;
         }
         @SuppressWarnings("unchecked")
-        V v = (V) cn1Vals[idx];
+        V v = (V) NativeStorage.get(NativeStorage.part(cn1KeysBlock, VALS), idx);
         return v;
     }
 
@@ -480,32 +531,7 @@ public class HashMap<K, V> extends AbstractMap<K, V> implements Map<K, V> {
     @Override
     public Set<K> keySet() {
         if (keySet == null) {
-            keySet = new AbstractSet<K>() {
-                @Override
-                public boolean contains(Object object) {
-                    return containsKey(object);
-                }
-
-                @Override
-                public int size() {
-                    return HashMap.this.size();
-                }
-
-                @Override
-                public void clear() {
-                    HashMap.this.clear();
-                }
-
-                @Override
-                public boolean remove(Object key) {
-                    return HashMap.this.cn1RemoveKey(key);
-                }
-
-                @Override
-                public Iterator<K> iterator() {
-                    return new KeyIterator<K, V>(HashMap.this);
-                }
-            };
+            keySet = new KeySet<K, V>(this);
         }
         return keySet;
     }
@@ -522,11 +548,7 @@ public class HashMap<K, V> extends AbstractMap<K, V> implements Map<K, V> {
     public native V put(K key, V value);
 
     V putImpl(K key, V value) {
-        V old = cn1PutSlot(key, value);
-        if (cn1LastInserted) {
-            cn1MaybeGrow();
-        }
-        return old;
+        return cn1PutSlot(key, value);
     }
 
     /**
@@ -568,7 +590,7 @@ public class HashMap<K, V> extends AbstractMap<K, V> implements Map<K, V> {
             return null;
         }
         @SuppressWarnings("unchecked")
-        V old = (V) cn1Vals[idx];
+        V old = (V) NativeStorage.get(NativeStorage.part(cn1KeysBlock, VALS), idx);
         cn1RemoveAtIndex(idx);
         return old;
     }
@@ -604,29 +626,29 @@ public class HashMap<K, V> extends AbstractMap<K, V> implements Map<K, V> {
     @Override
     public Collection<V> values() {
         if (valuesCollection == null) {
-            valuesCollection = new AbstractCollection<V>() {
-                @Override
-                public boolean contains(Object object) {
-                    return containsValue(object);
-                }
-
-                @Override
-                public int size() {
-                    return HashMap.this.size();
-                }
-
-                @Override
-                public void clear() {
-                    HashMap.this.clear();
-                }
-
-                @Override
-                public Iterator<V> iterator() {
-                    return new ValueIterator<K, V>(HashMap.this);
-                }
-            };
+            valuesCollection = new Values<K, V>(this);
         }
         return valuesCollection;
+    }
+
+    /** Named VM-private views share the same native table cursor as HashSet. */
+    static final class KeySet<K, V> extends AbstractSet<K> {
+        final HashMap<K, V> map;
+        KeySet(HashMap<K, V> map) { this.map = map; }
+        public boolean contains(Object key) { return map.containsKey(key); }
+        public int size() { return map.size(); }
+        public void clear() { map.clear(); }
+        public boolean remove(Object key) { return map.cn1RemoveKey(key); }
+        public Iterator<K> iterator() { return new KeyIterator<K, V>(map); }
+    }
+
+    static final class Values<K, V> extends AbstractCollection<V> {
+        final HashMap<K, V> map;
+        Values(HashMap<K, V> map) { this.map = map; }
+        public boolean contains(Object value) { return map.containsValue(value); }
+        public int size() { return map.size(); }
+        public void clear() { map.clear(); }
+        public Iterator<V> iterator() { return new ValueIterator<K, V>(map); }
     }
 
     /*
@@ -703,7 +725,7 @@ public class HashMap<K, V> extends AbstractMap<K, V> implements Map<K, V> {
         @SuppressWarnings("unchecked")
         public K next() {
             makeNext();
-            return (K) associatedMap.cn1Keys[currentIndex];
+            return (K) NativeStorage.get(associatedMap.cn1KeysBlock, currentIndex);
         }
     }
 
@@ -715,7 +737,7 @@ public class HashMap<K, V> extends AbstractMap<K, V> implements Map<K, V> {
         @SuppressWarnings("unchecked")
         public V next() {
             makeNext();
-            return (V) associatedMap.cn1Vals[currentIndex];
+            return (V) NativeStorage.get(NativeStorage.part(associatedMap.cn1KeysBlock, VALS), currentIndex);
         }
     }
 
@@ -736,17 +758,17 @@ public class HashMap<K, V> extends AbstractMap<K, V> implements Map<K, V> {
 
         @SuppressWarnings("unchecked")
         public K getKey() {
-            return (K) map.cn1Keys[index];
+            return (K) NativeStorage.get(map.cn1KeysBlock, index);
         }
 
         @SuppressWarnings("unchecked")
         public V getValue() {
-            return (V) map.cn1Vals[index];
+            return (V) NativeStorage.get(NativeStorage.part(map.cn1KeysBlock, VALS), index);
         }
 
         public V setValue(V object) {
             V result = getValue();
-            map.cn1Vals[index] = object;
+            NativeStorage.setOwned(map, NativeStorage.part(map.cn1KeysBlock, VALS), index, object);
             return result;
         }
 
@@ -804,7 +826,7 @@ public class HashMap<K, V> extends AbstractMap<K, V> implements Map<K, V> {
             if (object instanceof Map.Entry) {
                 Map.Entry<?, ?> oEntry = (Map.Entry<?, ?>) object;
                 int idx = associatedMap.cn1FindSlotImpl(oEntry.getKey());
-                if (idx >= 0 && valuesEq(associatedMap.cn1Vals[idx], oEntry)) {
+                if (idx >= 0 && valuesEq(NativeStorage.get(NativeStorage.part(associatedMap.cn1KeysBlock, VALS), idx), oEntry)) {
                     associatedMap.cn1RemoveAtIndex(idx);
                     return true;
                 }
@@ -817,7 +839,7 @@ public class HashMap<K, V> extends AbstractMap<K, V> implements Map<K, V> {
             if (object instanceof Map.Entry) {
                 Map.Entry<?, ?> oEntry = (Map.Entry<?, ?>) object;
                 int idx = associatedMap.cn1FindSlotImpl(oEntry.getKey());
-                return idx >= 0 && valuesEq(associatedMap.cn1Vals[idx], oEntry);
+                return idx >= 0 && valuesEq(NativeStorage.get(NativeStorage.part(associatedMap.cn1KeysBlock, VALS), idx), oEntry);
             }
             return false;
         }

@@ -27,20 +27,224 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-/**
- * Exercises the parts of ArrayList and IdentityHashMap that were changed to stop
- * allocating: ArrayList no longer allocates a backing array until the first growth,
- * and IdentityHashMap's key and value iterators no longer build an Entry per step.
- *
- * Every line is compared against a real JDK run, so the JDK is the oracle rather
- * than a hand-written expectation.
- */
+/** Compares collection API behavior with the host JDK, including native storage,
+ * exposed subclass arrays, views, typed arrays and callback reentry. */
 public class CollectionSemanticsApp {
     static void emit(String k, Object v) {
         System.out.println("CASE|" + k + "|" + v);
     }
 
+    static class ExposedVector extends java.util.Vector<String> {
+        Object[] data() { return elementData; }
+        void replace() { elementData = new Object[] {"direct", "second", null}; elementCount = 2; }
+    }
+
+    static class ReentrantKey {
+        java.util.Map<Object, Object> owner;
+        boolean armed;
+        ReentrantKey partner;
+        public int hashCode() { return 7; }
+        public boolean equals(Object other) {
+            if (armed) {
+                armed = false;
+                partner.armed = false;
+                for (int i = 0; i < 200; i++) owner.put(Integer.valueOf(i), Integer.valueOf(i));
+            }
+            return this == other;
+        }
+    }
+
+    static void nativeStorageCases() {
+        java.util.Vector<String> vector = new java.util.Vector<String>(0, 3);
+        vector.add("a"); vector.add("c"); vector.add(1, "b");
+        vector.addAll(2, java.util.Arrays.asList("x", "y"));
+        vector.remove(1); vector.subList(1, 3).clear();
+        vector.setSize(5); vector.set(4, "tail"); vector.trimToSize();
+        emit("vector.contents", vector.toString());
+        emit("vector.capacity", vector.capacity());
+        emit("vector.array", java.util.Arrays.toString(vector.toArray(new String[0])));
+        try { vector.get(-1); emit("vector.negative", "bad"); }
+        catch (ArrayIndexOutOfBoundsException expected) { emit("vector.negative", "checked"); }
+        ExposedVector exposed = new ExposedVector();
+        exposed.add("before"); exposed.data()[0] = "after";
+        emit("vector.exposed", exposed.get(0));
+        exposed.replace(); exposed.add("third"); exposed.add("fourth");
+        emit("vector.replaced", exposed.toString());
+        java.util.ArrayDeque<Integer> deque = new java.util.ArrayDeque<Integer>(4);
+        for (int i = 0; i < 32; i++) deque.add(i);
+        java.util.Iterator<Integer> forward = deque.iterator();
+        while (forward.hasNext()) if ((forward.next() & 1) == 0) forward.remove();
+        emit("deque.forwardRemove", deque.toString());
+        java.util.Iterator<Integer> reverse = deque.descendingIterator();
+        while (reverse.hasNext()) if (reverse.next() % 3 == 0) reverse.remove();
+        emit("deque.reverseRemove", deque.toString());
+        while (!deque.isEmpty()) deque.removeLastOccurrence(deque.peekLast());
+        emit("deque.empty", deque.size());
+        java.util.Stack<String> stack = new java.util.Stack<String>();
+        stack.push("a"); stack.push(null); stack.push("b");
+        emit("stack.search", stack.search(null));
+        emit("stack.peek", stack.peek());
+        emit("stack.pop", stack.pop()); stack.pop(); stack.pop();
+        try { stack.peek(); emit("stack.empty", "bad"); }
+        catch (java.util.EmptyStackException expected) { emit("stack.empty", "checked"); }
+        for (int type = 0; type < 3; type++) {
+            java.util.Map<Object, Object> map = type == 0 ? new java.util.HashMap<Object, Object>()
+                    : type == 1 ? new java.util.Hashtable<Object, Object>()
+                    : new java.util.LinkedHashMap<Object, Object>();
+            ReentrantKey stored = new ReentrantKey(), probe = new ReentrantKey();
+            probe.owner = stored.owner = map;
+            probe.partner = stored; stored.partner = probe;
+            map.put(stored, "stored"); probe.armed = stored.armed = true;
+            // The API does not promise a result for reentrant structural modification.
+            // Either a clean rejection or a completed lookup must leave the table valid.
+            try { map.get(probe); } catch (java.util.ConcurrentModificationException expected) { }
+            emit("map.reentry." + type, map.size() + ":" + map.get(199) + ":" + map.get(stored));
+        }
+    }
+
+    static class CustomList extends ArrayList<String> {
+        public Object[] toArray() { return new Object[] {"override", null}; }
+    }
+
+    static class ConstructorOverride extends ArrayList<String> {
+        static int calls;
+        ConstructorOverride(java.util.Collection<String> source) { super(source); }
+        public boolean addAll(java.util.Collection<? extends String> source) {
+            calls++;
+            return super.addAll(source);
+        }
+    }
+
+    // An addAll that reads the subclass's own state. If the ArrayList(Collection)
+    // constructor dispatched to it, it would run before `log` is assigned.
+    static class FieldDependent extends ArrayList<String> {
+        private final java.util.List<String> log = new java.util.ArrayList<String>();
+        FieldDependent(java.util.Collection<String> source) { super(source); }
+        public boolean addAll(java.util.Collection<? extends String> source) {
+            log.add("addAll");
+            return super.addAll(source);
+        }
+    }
+
+    static void bulkCopyCases() {
+        for (int capacity : new int[] {0, 30}) {
+            for (int index = 0; index <= 4; index++) {
+                ArrayList<String> list = new ArrayList<String>(capacity);
+                list.addAll(java.util.Arrays.asList("a", null, "c", "d"));
+                Iterator<String> prior = list.iterator();
+                list.addAll(index, list);
+                emit("bulk.self." + capacity + "." + index, list);
+                try { prior.next(); emit("bulk.mod." + capacity + "." + index, "bad"); }
+                catch (java.util.ConcurrentModificationException expected) {
+                    emit("bulk.mod." + capacity + "." + index, "checked");
+                }
+            }
+        }
+        java.util.LinkedHashMap<String, String> ordered = new java.util.LinkedHashMap<String, String>();
+        ordered.put("z", "last"); ordered.put(null, "middle"); ordered.put("a", null);
+        emit("bulk.ordered.keys", new ArrayList<String>(ordered.keySet()));
+        emit("bulk.ordered.values", new ArrayList<String>(ordered.values()));
+        ArrayList<String> destination = new ArrayList<String>();
+        destination.add("prefix"); destination.add("suffix");
+        destination.addAll(1, ordered.keySet());
+        emit("bulk.insert", destination);
+        emit("bulk.source", ordered);
+        ConstructorOverride overridden = new ConstructorOverride(java.util.Arrays.asList("x", "y"));
+        emit("bulk.constructorOverride", overridden);
+        // The copy constructor never dispatches to the override, as on the JDK.
+        emit("bulk.constructorOverride.calls", ConstructorOverride.calls);
+        emit("bulk.fieldDependent", new FieldDependent(java.util.Arrays.asList("p", "q")));
+        CustomList custom = new CustomList(); custom.add("ignored");
+        emit("bulk.override", new ArrayList<String>(custom));
+        emit("bulk.empty", destination.addAll(java.util.Collections.<String>emptyList()));
+
+        IdentityHashMap<Object, Object> identities = new IdentityHashMap<Object, Object>();
+        Object a = new Object(), b = new Object(), c = new Object();
+        identities.put(a, b); identities.put(b, null); identities.put(null, c);
+        ArrayList<Object> keys = new ArrayList<Object>(identities.keySet());
+        ArrayList<Object> values = new ArrayList<Object>(identities.values());
+        emit("bulk.identity", keys.size() + ":" + keys.contains(a) + ":" + keys.contains(b)
+                + ":" + keys.contains(null) + ":" + values.contains(b) + ":" + values.contains(c) + ":" + values.contains(null));
+        Set<Object> set = java.util.Collections.newSetFromMap(new IdentityHashMap<Object, Boolean>());
+        set.add(a); set.add(b); set.add(null);
+        ArrayList<Object> copied = new ArrayList<Object>(set);
+        int seen = 0, nulls = 0;
+        for (Object value : set) { seen++; if (value == null) nulls++; }
+        emit("bulk.identitySet", copied.size() + ":" + copied.contains(null) + ":" + seen + ":" + nulls);
+        for (Iterator<Object> it = identities.keySet().iterator(); it.hasNext();) {
+            it.next(); it.remove();
+        }
+        emit("bulk.identityRemove", identities.size());
+        identities.put(a, b);
+        try {
+            for (Iterator<Object> it = identities.values().iterator(); it.hasNext();) {
+                identities.put(c, c);
+                it.next();
+            }
+            emit("bulk.identityCme", "bad");
+        } catch (java.util.ConcurrentModificationException expected) { emit("bulk.identityCme", "checked"); }
+    }
+
+    private List<String> traversalField;
+    private int traversalCalls;
+    private CollectionSemanticsApp traversalOwner() { traversalCalls++; return this; }
+    private List<String> traversalResult() { traversalCalls++; return traversalField; }
+    private java.util.List<String> directList = new java.util.ArrayList<String>();
+    private static int directEffects;
+    private static int effectIndex() { directEffects = directEffects * 10 + 1; return 0; }
+    private static String effectValue() { directEffects = directEffects * 10 + 2; return "value"; }
+    private static java.util.List<String> populatedFactory() {
+        java.util.List<String> result = new java.util.ArrayList<String>();
+        result.add("factory"); return result;
+    }
+    static class DirectParent extends java.util.ArrayList<String> {
+        public String get(int index) { return "override"; }
+    }
+    static class DirectChild extends DirectParent { }
+    private void directCallCases() {
+        directList.add("first");
+        emit("direct.field", directList.size() + ":" + directList.get(0));
+        emit("direct.factory", populatedFactory().get(0));
+        java.util.List<String> inherited = new DirectChild();
+        emit("direct.inherited", inherited.get(0));
+        java.util.Random random = new java.util.Random();
+        random.setSeed(0x123456789abcdefL);
+        emit("direct.wide", random.nextLong());
+        directList = null;
+        directEffects = 0;
+        try { directList.add(effectIndex(), effectValue()); emit("direct.null", "bad"); }
+        catch (NullPointerException expected) { emit("direct.null", directEffects); }
+        directEffects = 0;
+        try { directList.get(effectIndex()); emit("direct.nullResult", "bad"); }
+        catch (NullPointerException expected) { emit("direct.nullResult", directEffects); }
+        java.util.List<String> unknown = System.currentTimeMillis() == 0
+                ? new java.util.ArrayList<String>() : new java.util.LinkedList<String>();
+        unknown.add("unknown"); emit("direct.mixed", unknown.get(0));
+    }
+
+    private void fieldTraversalCases() {
+        for (int kind = 0; kind < 2; kind++) {
+            traversalField = kind == 0 ? new ArrayList<String>() : new java.util.LinkedList<String>();
+            traversalField.add("a"); traversalField.add("b");
+            traversalCalls = 0;
+            String value = "";
+            for (String item : traversalOwner().traversalField) value += item;
+            for (String item : traversalResult()) value += item;
+            for (String item : traversalField) value += item;
+            emit("fieldTraversal." + kind, value + ":" + traversalCalls);
+        }
+        traversalField = null;
+        try {
+            for (String item : traversalOwner().traversalField) emit("fieldTraversal.bad", item);
+            emit("fieldTraversal.null", "bad");
+        } catch (NullPointerException expected) { emit("fieldTraversal.null", traversalCalls); }
+    }
+
     public static void main(String[] args) {
+        new CollectionSemanticsApp().fieldTraversalCases();
+        new CollectionSemanticsApp().directCallCases();
+        nativeStorageCases();
+        bulkCopyCases();
         // ---- an ArrayList that is never added to -------------------------------
         List<String> empty = new ArrayList<String>();
         emit("empty.size", empty.size());

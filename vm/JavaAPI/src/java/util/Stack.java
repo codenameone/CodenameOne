@@ -53,7 +53,7 @@ public class Stack<E> extends Vector<E> {
     @SuppressWarnings("unchecked")
     public synchronized E peek() {
         try {
-            return (E) elementData[elementCount - 1];
+            return (E) cn1Get(elementCount - 1);
         } catch (IndexOutOfBoundsException e) {
             throw new EmptyStackException();
         }
@@ -74,8 +74,8 @@ public class Stack<E> extends Vector<E> {
             throw new EmptyStackException();
         }
         final int index = --elementCount;
-        final E obj = (E) elementData[index];
-        elementData[index] = null;
+        final E obj = (E) cn1Get(index);
+        cn1Set(index, null);
         modCount++;
         return obj;
     }
@@ -104,17 +104,16 @@ public class Stack<E> extends Vector<E> {
      *            the object to be searched.
      */
     public synchronized int search(Object o) {
-        final Object[] dumpArray = elementData;
         final int size = elementCount;
         if (o != null) {
             for (int i = size - 1; i >= 0; i--) {
-                if (o.equals(dumpArray[i])) {
+                if (o.equals(cn1Get(i))) {
                     return size - i;
                 }
             }
         } else {
             for (int i = size - 1; i >= 0; i--) {
-                if (dumpArray[i] == null) {
+                if (cn1Get(i) == null) {
                     return size - i;
                 }
             }

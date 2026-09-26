@@ -174,17 +174,21 @@ class GcSteadyStateIntegrationTest {
      * Free-memory reading to pin for the pending-table scenarios. Every threshold in
      * init_gc_thresholds is derived from this number divided by an assumed 128-byte
      * average allocation, so a developer machine's reading puts them in the tens of
-     * millions of slots and the path is unreachable. 16MB is a plausible reading for a
-     * memory-tight device and puts the per-thread cap in the tens of thousands.
+     * millions of slots and the path is unreachable. 4MB selects the 10,000-slot minimum
+     * pending-table limit, so this gate exercises table exhaustion even when
+     * small objects remain in page arenas instead of entering the legacy table.
      */
-    private static final long DEVICE_FREE_MB = 16;
+    private static final long DEVICE_FREE_MB = 4;
 
     /**
-     * Ints in the fixture's per-node throwaway array for the legacy-path scenarios. 160 =
-     * 640 bytes, over CN1_BIBOP_MAX_OBJECT, so every node's array takes the legacy
-     * calloc + allObjectsInHeap + per-thread-pending-table path.
+     * Ints in the fixture's per-node throwaway array for the legacy-path scenarios. 640 =
+     * 2560 bytes of payload, over CN1_BIBOP_MAX_OBJECT (2048), so every node's array takes
+     * the legacy calloc + allObjectsInHeap + per-thread-pending-table path. It was 160
+     * while that ceiling was 512 bytes; raising the ceiling turned those arrays into
+     * ordinary page objects and left scenario 10 measuring nothing -- which its own
+     * non-vacuity guard reported. Keep this above the ceiling if the ceiling moves again.
      */
-    private static final int LEGACY_CHURN_INTS = 160;
+    private static final int LEGACY_CHURN_INTS = 640;
 
     /**
      * How much bigger the unfiltered SATB log must be than the filtered one. Measured
@@ -257,12 +261,16 @@ class GcSteadyStateIntegrationTest {
         long pendingFullParks;
         long meanPendingFullUs;
         long maxPendingFullUs;
+        long pendingEmptyWaits = -1;
 
         static Stalls parse(String output) {
             Stalls s = new Stalls();
             for (String line : output.split("\\R")) {
                 if (!line.startsWith("[GCSTALL]")) {
                     continue;
+                }
+                if (line.contains("pendingEmptyWaits=")) {
+                    s.pendingEmptyWaits = field(line, "pendingEmptyWaits=");
                 }
                 if (line.contains("cyclesOnDemand=")) {
                     s.reported = true;
@@ -348,7 +356,7 @@ class GcSteadyStateIntegrationTest {
         }
     }
 
-    private void runGate(List<Path> tempDirs) throws Exception {
+    private Fixture prepareFixture(List<Path> tempDirs) throws Exception {
         Path sourceDir = Files.createTempDirectory("gc-steady-sources");
         Path classesDir = Files.createTempDirectory("gc-steady-classes");
         Path javaApiDir = Files.createTempDirectory("gc-steady-javaapi");
@@ -396,6 +404,28 @@ class GcSteadyStateIntegrationTest {
         assertTrue(Files.exists(cmakeLists), "Translator should emit a CMake project");
         CleanTargetIntegrationTest.replaceLibraryWithExecutableTarget(cmakeLists, "GcSteadyStateApp-src");
 
+        return new Fixture(config, javaApiDir, distDir, javaResult);
+    }
+
+    private static final class Fixture {
+        final CompilerHelper.CompilerConfig config;
+        final Path javaApiDir, distDir;
+        final String javaResult;
+
+        Fixture(CompilerHelper.CompilerConfig config, Path javaApiDir, Path distDir, String javaResult) {
+            this.config = config;
+            this.javaApiDir = javaApiDir;
+            this.distDir = distDir;
+            this.javaResult = javaResult;
+        }
+    }
+
+    private void runGate(List<Path> tempDirs) throws Exception {
+        Fixture fixture = prepareFixture(tempDirs);
+        CompilerHelper.CompilerConfig config = fixture.config;
+        Path javaApiDir = fixture.javaApiDir;
+        Path distDir = fixture.distDir;
+        String javaResult = fixture.javaResult;
         // ---- 1. the gate ------------------------------------------------------
         Path fixed = build(distDir, tempDirs, "fixed", "-DCN1_GC_CONFORM");
         Run clean = run(fixed, distDir);
@@ -472,9 +502,15 @@ class GcSteadyStateIntegrationTest {
         // process converges on ceiling-minus-margin however small its live set is. That
         // is survivable only until something else spends out of the same budget, which
         // on iOS the renderer does.
+        // Small objects now stay in page arenas and this fixture fits far below
+        // the ceiling even with reserve pacing disabled. Exercise the existing
+        // oversized-array variant here so these assertions cover actual legacy
+        // allocation pressure without depending on the removed small-object bypass.
+        Path legacyDist = buildLegacyChurnVariant(tempDirs, config, javaApiDir, javaResult);
+        Path legacyFixed = build(legacyDist, tempDirs, "legacyfixed", "-DCN1_GC_CONFORM");
         Map<String, String> ceiling = new HashMap<>();
         ceiling.put("CN1_SIMULATE_PROC_MEMORY_LIMIT", Long.toString(CEILING_MB * 1024 * 1024));
-        Run bounded = run(fixed, distDir, ceiling);
+        Run bounded = run(legacyFixed, legacyDist, ceiling);
         assertHealthy(bounded, "the run under a simulated ceiling", javaResult);
         long boundedHeadroomMb = minHeadroomMb(bounded.output);
         assertTrue(boundedHeadroomMb >= 0,
@@ -512,9 +548,9 @@ class GcSteadyStateIntegrationTest {
                 + volumeParks);
 
         // ---- 4. proof that scenario 3 can fail ---------------------------------
-        Path noReserve = build(distDir, tempDirs, "noreserve",
+        Path noReserve = build(legacyDist, tempDirs, "noreserve",
                 "-DCN1_GC_CONFORM -DCN1_PACING_NO_RESERVE");
-        Run unbounded = run(noReserve, distDir, ceiling);
+        Run unbounded = run(noReserve, legacyDist, ceiling);
         assertHealthy(unbounded, "the -DCN1_PACING_NO_RESERVE build", javaResult);
         long unboundedHeadroomMb = minHeadroomMb(unbounded.output);
         assertTrue(unboundedHeadroomMb >= 0,
@@ -556,10 +592,12 @@ class GcSteadyStateIntegrationTest {
         // collector started because a collection was owed, cyclesAfterIdle counts cycles
         // it started after idling first. A collector keeping up with a workload that
         // parks its mutators must be answering demand, on any machine.
-        Stalls goodStalls = Stalls.parse(clean.output);
+        Run pressure = run(legacyFixed, legacyDist);
+        assertHealthy(pressure, "the legacy allocation pressure run", javaResult);
+        Stalls goodStalls = Stalls.parse(pressure.output);
         assertTrue(goodStalls.reported,
                 "No [GCSTALL] report from the fixed build, so the stall instrument did not"
-                        + " run and scenarios 5 and 6 measure nothing. Output: " + tail(clean.output));
+                        + " run and scenarios 5 and 6 measure nothing. Output: " + tail(pressure.output));
         assertTrue(goodStalls.volumeParks > 0,
                 "The workload never parked on the run-ahead cap, so it never depended on the"
                         + " collector's responsiveness and this scenario proves nothing. "
@@ -576,9 +614,9 @@ class GcSteadyStateIntegrationTest {
         // request in cn1BibopMaybeGc and the discarded one in gcIdleWaitMillis. They are
         // one defect -- a demand signal that is never raised and, if raised, never
         // answered -- so one macro re-injects both.
-        Path noDemand = build(distDir, tempDirs, "nodemand",
+        Path noDemand = build(legacyDist, tempDirs, "nodemand",
                 "-DCN1_GC_CONFORM -DCN1_GC_NO_DEMAND_SIGNAL");
-        Run starved = run(noDemand, distDir);
+        Run starved = run(noDemand, legacyDist);
         assertHealthy(starved, "the -DCN1_GC_NO_DEMAND_SIGNAL build", javaResult);
         Stalls badStalls = Stalls.parse(starved.output);
         assertTrue(badStalls.reported,
@@ -680,6 +718,26 @@ class GcSteadyStateIntegrationTest {
                 "The extent sort disagreed with libc qsort: " + sortLine);
         System.err.println("[GcSteadyState] " + sortLine);
 
+    }
+
+    @Test
+    void pendingTablesWaitForMigration() throws Exception {
+        Parser.cleanup();
+        List<Path> tempDirs = new ArrayList<>();
+        try {
+            runPendingGate(tempDirs);
+        } finally {
+            for (Path dir : tempDirs) {
+                deleteRecursively(dir);
+            }
+        }
+    }
+
+    private void runPendingGate(List<Path> tempDirs) throws Exception {
+        Fixture fixture = prepareFixture(tempDirs);
+        String javaResult = fixture.javaResult;
+        Path legacyDist = buildLegacyChurnVariant(tempDirs, fixture.config, fixture.javaApiDir, javaResult);
+        Path legacyFixed = build(legacyDist, tempDirs, "legacyfixed", "-DCN1_GC_CONFORM");
         // ---- 10. a mutator must not wait a whole collection for table space -----
         // Legacy allocations land in a per-thread pending table that only the collector
         // empties, at mark start. When the table fills, the thread has to wait for a
@@ -696,8 +754,7 @@ class GcSteadyStateIntegrationTest {
         // scenario 3, and is what makes the device regime testable here at all.
         Map<String, String> deviceMemory = new HashMap<>();
         deviceMemory.put("CN1_SIMULATE_FREE_MEMORY", Long.toString(DEVICE_FREE_MB * 1024 * 1024));
-        Path legacyDist = buildLegacyChurnVariant(tempDirs, config, javaApiDir, javaResult);
-        Path legacyFixed = build(legacyDist, tempDirs, "legacyfixed", "-DCN1_GC_CONFORM");
+
         Run tight = run(legacyFixed, legacyDist, deviceMemory);
         assertHealthy(tight, "the run under a device-sized free-memory reading", javaResult);
         Stalls tightStalls = Stalls.parse(tight.output);
@@ -719,25 +776,15 @@ class GcSteadyStateIntegrationTest {
         assertTrue(waitStalls.pendingFullParks > 0,
                 "The faulted build never filled its pending table either, so there is"
                         + " nothing to compare. " + waitStalls);
-        // The WORST stall is what this fix is about: waiting for a whole extra cycle does
-        // not change the mean nearly as much as it changes the tail. Asserted relative to
-        // the same machine in the same session, for the reason scenario 6 gives.
-        // Same treatment, same reason. What scenario 10 asserts hard is that the path is
-        // EXERCISED at all under a device-sized free-memory reading -- the thing that was
-        // untestable off-device until CN1_SIMULATE_FREE_MEMORY covered init_gc_thresholds.
-        // The tail ratio is 17x on a developer machine, and it is a duration, so it is
-        // subject to the same saturation as scenario 6's.
-        //
-        // A mechanism counter was tried and REJECTED rather than assumed: collection epochs
-        // spanned per pending-table wait, on the theory that the old shape waits a running
-        // cycle out and then asks for another, so it should span two where the fix spans
-        // one. Measured 1.04 against 1.00 -- the old shape's while(gcCurrentlyRunning) exits
-        // immediately whenever no cycle happens to be running, so epochs do not separate the
-        // arms. The counter was removed rather than shipped inert.
-        assertTrue(waitStalls.maxPendingFullUs >= tightStalls.maxPendingFullUs,
-                "Restoring the wait-out-the-whole-cycle shape made the worst pending-table"
-                        + " stall SHORTER, which inverts the effect. fixed=" + tightStalls
-                        + " faulted=" + waitStalls);
+        // A maximum duration is dominated by a single descheduling event. In the
+        // old gate the correct arm had a 206ms outlier while the faulty arm's
+        // mean wait was six times longer, yet its maximum was only 134ms.
+        // Assert the actual defect: sleeping after the table has been migrated,
+        // solely because the rest of the collection has not finished.
+        assertEquals(0, tightStalls.pendingEmptyWaits,
+                "A migrated pending table must not wait for the rest of the collection");
+        assertTrue(waitStalls.pendingEmptyWaits > 0,
+                "The fault did not delay any waiter after migration; the control is inert");
         System.err.println("[GcSteadyState] pending tail ratio faulted/fixed: "
                 + String.format("%.2f", tightStalls.maxPendingFullUs == 0 ? 0.0
                         : (double) waitStalls.maxPendingFullUs / tightStalls.maxPendingFullUs));

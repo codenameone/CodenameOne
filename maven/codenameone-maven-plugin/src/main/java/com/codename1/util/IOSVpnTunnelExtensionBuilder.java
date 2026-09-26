@@ -803,7 +803,7 @@ public final class IOSVpnTunnelExtensionBuilder {
         sb.append("                // batch has nowhere to go either.\n");
         sb.append("                break;\n");
         sb.append("            }\n");
-        sb.append("            memcpy(((JAVA_ARRAY)bytes)->data, [p bytes],\n");
+        sb.append("            memcpy(CN1_ARRAY_DATA(bytes), [p bytes],\n");
         sb.append("                    [p length]);\n");
         sb.append("            com_codename1_impl_vpn_ExtensionTunnelHost_received___int_int(\n");
         sb.append("                    threadStateData, (JAVA_INT)[p length],\n");
@@ -960,13 +960,13 @@ public final class IOSVpnTunnelExtensionBuilder {
                 + "        return;\n"
                 + "    }\n"
                 + "    NSData *data = [NSData dataWithBytes:\n"
-                + "            ((char *)((JAVA_ARRAY)packet)->data) + offset\n"
+                + "            ((char *)CN1_ARRAY_DATA(packet)) + offset\n"
                 + "            length:(NSUInteger)length];\n"
                 + "    // The family the system needs to route it. Read from\n"
                 + "    // the packet's own version nibble rather than assumed:\n"
                 + "    // a v6 packet written as AF_INET is dropped silently.\n"
                 + "    unsigned char first =\n"
-                + "            ((unsigned char *)((JAVA_ARRAY)packet)->data)[offset];\n"
+                + "            ((unsigned char *)CN1_ARRAY_DATA(packet))[offset];\n"
                 + "    NSNumber *family = [NSNumber numberWithInt:\n"
                 + "            ((first >> 4) == 6) ? AF_INET6 : AF_INET];\n"
                 + "    [flow.packetFlow\n"

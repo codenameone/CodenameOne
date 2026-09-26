@@ -48,127 +48,38 @@ public class ArrayDeque<E> extends AbstractCollection<E> implements Deque<E> {
     // the pointer of the "next" position of the tail element
     private transient int rear;
 
-    private transient E[] elements;
+    private transient volatile long elements;
 
-    @SuppressWarnings("hiding")
-    private class ArrayDequeIterator<E> implements Iterator<E> {
+    private class ArrayDequeIterator implements Iterator<E> {
         private int pos;
+        private int remaining = size();
+        private int expectedModCount = modCount;
+        private int last = -1;
+        private final boolean reverse;
 
-        private final int expectedModCount;
-
-        private boolean canRemove;
-
-        @SuppressWarnings("synthetic-access")
-        ArrayDequeIterator() {
-            super();
-            pos = front;
-            expectedModCount = modCount;
-            canRemove = false;
+        ArrayDequeIterator(boolean reverse) {
+            this.reverse = reverse;
+            pos = reverse ? circularSmallerPos(rear) : front;
         }
 
-        @SuppressWarnings("synthetic-access")
-        public boolean hasNext() {
-            if (expectedModCount != modCount) {
-                return false;
-            }
-            return hasNextInternal();
-        }
+        public boolean hasNext() { return remaining != 0; }
 
-        private boolean hasNextInternal() {
-            // canRemove means "next" method is called, and the Full
-            // status can ensure that this method is not called just
-            // after "remove" method is call.(so, canRemove can keep
-            // true after "next" method called)
-            return (pos != rear)
-                    || ((status == DequeStatus.Full) && !canRemove);
-        }
-
-        @SuppressWarnings( { "synthetic-access", "unchecked" })
         public E next() {
-            if (hasNextInternal()) {
-                E result = (E) elements[pos];
-                if (expectedModCount == modCount && null != result) {
-                    canRemove = true;
-                    pos = circularBiggerPos(pos);
-                    return result;
-                }
-                throw new ConcurrentModificationException();
-            }
-            throw new NoSuchElementException();
+            if (remaining == 0) throw new NoSuchElementException();
+            if (expectedModCount != modCount) throw new ConcurrentModificationException();
+            E value = NativeStorage.get(elements, pos);
+            last = pos;
+            pos = reverse ? circularSmallerPos(pos) : circularBiggerPos(pos);
+            remaining--;
+            return value;
         }
 
-        @SuppressWarnings("synthetic-access")
         public void remove() {
-            if (canRemove) {
-                int removedPos = circularSmallerPos(pos);
-                if (expectedModCount == modCount
-                        && null != elements[removedPos]) {
-                    removeInternal(removedPos, true);
-                    canRemove = false;
-                    return;
-                }
-                throw new ConcurrentModificationException();
-            }
-            throw new IllegalStateException();
-        }
-    }
-
-    /*
-     * NOTES:descendingIterator is not fail-fast, according to the documentation
-     * and test case.
-     */
-    @SuppressWarnings("hiding")
-    private class ReverseArrayDequeIterator<E> implements Iterator<E> {
-        private int pos;
-
-        private final int expectedModCount;
-
-        private boolean canRemove;
-
-        @SuppressWarnings("synthetic-access")
-        ReverseArrayDequeIterator() {
-            super();
+            if (last < 0) throw new IllegalStateException();
+            if (expectedModCount != modCount) throw new ConcurrentModificationException();
+            removeInternal(last, !reverse);
             expectedModCount = modCount;
-            pos = circularSmallerPos(rear);
-            canRemove = false;
-        }
-
-        @SuppressWarnings("synthetic-access")
-        public boolean hasNext() {
-            if (expectedModCount != modCount) {
-                return false;
-            }
-            return hasNextInternal();
-        }
-
-        private boolean hasNextInternal() {
-            // canRemove means "next" method is called, and the Full
-            // status can ensure that this method is not called just
-            // after "remove" method is call.(so, canRemove can keep
-            // true after "next" method called)
-            return (circularBiggerPos(pos) != front)
-                    || ((status == DequeStatus.Full) && !canRemove);
-        }
-
-        @SuppressWarnings( { "synthetic-access", "unchecked" })
-        public E next() {
-            if (hasNextInternal()) {
-                E result = (E) elements[pos];
-                canRemove = true;
-                pos = circularSmallerPos(pos);
-                return result;
-            }
-            throw new NoSuchElementException();
-        }
-
-        @SuppressWarnings("synthetic-access")
-        public void remove() {
-            if (canRemove) {
-                removeInternal(circularBiggerPos(pos), false);
-                canRemove = false;
-                return;
-            }
-            throw new IllegalStateException();
+            last = -1;
         }
     }
 
@@ -189,7 +100,7 @@ public class ArrayDeque<E> extends AbstractCollection<E> implements Deque<E> {
     @SuppressWarnings("unchecked")
     public ArrayDeque(final int minSize) {
         int size = countInitSize(minSize);
-        elements = (E[]) new Object[size];
+        elements = NativeStorage.references(size);
         front = rear = 0;
         status = DequeStatus.Empty;
         modCount = 0;
@@ -214,7 +125,7 @@ public class ArrayDeque<E> extends AbstractCollection<E> implements Deque<E> {
      */
     @SuppressWarnings("unchecked")
     public ArrayDeque(Collection<? extends E> c) {
-        elements = (E[]) new Object[countInitSize(c.size())];
+        elements = NativeStorage.references(countInitSize(c.size()));
         front = rear = 0;
         status = DequeStatus.Empty;
         modCount = 0;
@@ -264,7 +175,7 @@ public class ArrayDeque<E> extends AbstractCollection<E> implements Deque<E> {
         checkNull(e);
         checkAndExpand();
         front = circularSmallerPos(front);
-        elements[front] = e;
+        NativeStorage.setOwned(this, elements, front, e);
         resetStatus(true);
         modCount++;
         return true;
@@ -416,7 +327,7 @@ public class ArrayDeque<E> extends AbstractCollection<E> implements Deque<E> {
      */
     public  E getFirst() {
         checkEmpty();
-        return elements[front];
+        return NativeStorage.get(elements, front);
     }
 
     /**
@@ -442,7 +353,7 @@ public class ArrayDeque<E> extends AbstractCollection<E> implements Deque<E> {
      */
     public  E getLast() {
         checkEmpty();
-        return elements[circularSmallerPos(rear)];
+        return NativeStorage.get(elements, circularSmallerPos(rear));
     }
 
     /**
@@ -452,7 +363,7 @@ public class ArrayDeque<E> extends AbstractCollection<E> implements Deque<E> {
      * @see java.util.Deque#peekFirst()
      */
     public  E peekFirst() {
-        return (status == DequeStatus.Empty) ? null : elements[front];
+        return (status == DequeStatus.Empty) ? null : NativeStorage.get(elements, front);
     }
 
     /**
@@ -463,7 +374,7 @@ public class ArrayDeque<E> extends AbstractCollection<E> implements Deque<E> {
      * @see java.util.Queue#peek()
      */
     public  E peek() {
-        return (status == DequeStatus.Empty) ? null : elements[front];
+        return (status == DequeStatus.Empty) ? null : NativeStorage.get(elements, front);
     }
 
     /**
@@ -474,7 +385,7 @@ public class ArrayDeque<E> extends AbstractCollection<E> implements Deque<E> {
      */
     public  E peekLast() {
         return (status == DequeStatus.Empty) ? null
-                : elements[circularSmallerPos(rear)];
+                : NativeStorage.get(elements, circularSmallerPos(rear));
     }
 
     private void checkNull(E e) {
@@ -490,11 +401,11 @@ public class ArrayDeque<E> extends AbstractCollection<E> implements Deque<E> {
     }
 
     private int circularSmallerPos(int current) {
-        return (current - 1 < 0) ? (elements.length - 1) : current - 1;
+        return (current - 1 < 0) ? (NativeStorage.capacity(elements) - 1) : current - 1;
     }
 
     private int circularBiggerPos(int current) {
-        return (current + 1 >= elements.length) ? 0 : current + 1;
+        return (current + 1 >= NativeStorage.capacity(elements)) ? 0 : current + 1;
     }
 
     @SuppressWarnings("unchecked")
@@ -506,22 +417,24 @@ public class ArrayDeque<E> extends AbstractCollection<E> implements Deque<E> {
         if (status != DequeStatus.Full) {
             return;
         }
-        if (Integer.MAX_VALUE == elements.length) {
+        if (Integer.MAX_VALUE == NativeStorage.capacity(elements)) {
             throw new IllegalStateException();
         }
-        int length = elements.length;
+        int length = NativeStorage.capacity(elements);
         int newLength = length << 1;
         // bigger than Integer.MAX_VALUE
         if (newLength < 0) {
             newLength = Integer.MAX_VALUE;
         }
-        E[] newElements = (E[]) new Object[newLength];
-        System.arraycopy(elements, front, newElements, 0, length - front);
-        System.arraycopy(elements, 0, newElements, length - front, front);
+        long newElements = NativeStorage.references(newLength);
+        NativeStorage.copy(elements, front, newElements, 0, length - front);
+        NativeStorage.copy(elements, 0, newElements, length - front, front);
         front = 0;
         rear = length;
         status = DequeStatus.Normal;
+        long previous = elements;
         elements = newElements;
+        NativeStorage.retire(previous);
     }
 
     /**
@@ -541,7 +454,7 @@ public class ArrayDeque<E> extends AbstractCollection<E> implements Deque<E> {
     private  boolean addLastImpl(E e) {
         checkNull(e);
         checkAndExpand();
-        elements[rear] = e;
+        NativeStorage.setOwned(this, elements, rear, e);
         rear = circularBiggerPos(rear);
         resetStatus(true);
         modCount++;
@@ -549,8 +462,8 @@ public class ArrayDeque<E> extends AbstractCollection<E> implements Deque<E> {
     }
 
     private E removePollFirstImpl() {
-        E element = elements[front];
-        elements[front] = null;
+        E element = NativeStorage.get(elements, front);
+        NativeStorage.setOwned(this, elements, front, null);
         front = circularBiggerPos(front);
         resetStatus(false);
         modCount++;
@@ -559,8 +472,8 @@ public class ArrayDeque<E> extends AbstractCollection<E> implements Deque<E> {
 
     private E removeLastImpl() {
         int last = circularSmallerPos(rear);
-        E element = elements[last];
-        elements[last] = null;
+        E element = NativeStorage.get(elements, last);
+        NativeStorage.setOwned(this, elements, last, null);
         rear = last;
         resetStatus(false);
         modCount++;
@@ -639,21 +552,24 @@ public class ArrayDeque<E> extends AbstractCollection<E> implements Deque<E> {
         int cursor = current;
         if (frontShift) {
             while (cursor != front) {
-                int next = circularSmallerPos(cursor);
-                elements[cursor] = elements[next];
-                cursor = next;
+                int previous = circularSmallerPos(cursor);
+                NativeStorage.setOwned(this, elements, cursor, NativeStorage.get(elements, previous));
+                cursor = previous;
             }
+            NativeStorage.setOwned(this, elements, front, null);
             front = circularBiggerPos(front);
         } else {
-            while (cursor != rear) {
+            int last = circularSmallerPos(rear);
+            while (cursor != last) {
                 int next = circularBiggerPos(cursor);
-                elements[cursor] = elements[next];
+                NativeStorage.setOwned(this, elements, cursor, NativeStorage.get(elements, next));
                 cursor = next;
             }
-            rear = circularSmallerPos(rear);
+            NativeStorage.setOwned(this, elements, last, null);
+            rear = last;
         }
-        elements[cursor] = null;
         resetStatus(false);
+        modCount++;
     }
 
     /**
@@ -665,10 +581,10 @@ public class ArrayDeque<E> extends AbstractCollection<E> implements Deque<E> {
     @Override
     public  int size() {
         if (status == DequeStatus.Full) {
-            return elements.length;
+            return NativeStorage.capacity(elements);
         }
         return (front <= rear) ? (rear - front)
-                : (rear + elements.length - front);
+                : (rear + NativeStorage.capacity(elements) - front);
     }
 
     /**
@@ -694,7 +610,7 @@ public class ArrayDeque<E> extends AbstractCollection<E> implements Deque<E> {
     @Override
     public  boolean contains(final Object obj) {
         if (null != obj) {
-            Iterator<E> it = new ArrayDequeIterator<E>();
+            Iterator<E> it = new ArrayDequeIterator(false);
             while (it.hasNext()) {
                 if (obj.equals((E) it.next())) {
                     return true;
@@ -715,7 +631,7 @@ public class ArrayDeque<E> extends AbstractCollection<E> implements Deque<E> {
         if (status != DequeStatus.Empty) {
             int cursor = front;
             do {
-                elements[cursor] = null;
+                NativeStorage.setOwned(this, elements, cursor, null);
                 cursor = circularBiggerPos(cursor);
             } while (cursor != rear);
             status = DequeStatus.Empty;
@@ -734,7 +650,7 @@ public class ArrayDeque<E> extends AbstractCollection<E> implements Deque<E> {
     @SuppressWarnings("synthetic-access")
     @Override
     public Iterator<E> iterator() {
-        return new ArrayDequeIterator<E>();
+        return new ArrayDequeIterator(false);
     }
 
     /**
@@ -744,7 +660,7 @@ public class ArrayDeque<E> extends AbstractCollection<E> implements Deque<E> {
      * @see java.util.Deque#descendingIterator()
      */
     public Iterator<E> descendingIterator() {
-        return new ReverseArrayDequeIterator<E>();
+        return new ArrayDequeIterator(true);
     }
 
 }

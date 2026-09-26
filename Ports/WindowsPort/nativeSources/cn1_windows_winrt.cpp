@@ -271,7 +271,7 @@ JAVA_BOOLEAN com_codename1_impl_windows_WindowsNative_locationGetCurrent___doubl
         speedRef->get_Value(&speed);
     }
     JAVA_ARRAY arr = (JAVA_ARRAY) outArr;
-    double* out = (double*) arr->data;
+    double* out = (double*) CN1_ARRAY_DATA(arr);
     int n = arr->length;
     if (n > 0) { out[0] = latitude; }
     if (n > 1) { out[1] = longitude; }

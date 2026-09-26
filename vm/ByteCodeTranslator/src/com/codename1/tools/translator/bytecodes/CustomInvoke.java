@@ -58,6 +58,9 @@ public class CustomInvoke extends Instruction {
         this.itf = itf;
     }
     
+    private String provenDirectOwner;
+    /** Carried from the Invoke this replaced; see Invoke.isExactReceiverNonNull. */
+    private boolean exactReceiverNonNull;
     private String cMethodName;
     private String getCMethodName() {
         if (cMethodName == null) {
@@ -85,6 +88,8 @@ public class CustomInvoke extends Instruction {
         }
         // Same for a FUSED construction (the deferred NEW's owner+children block).
         ci.fusedPlan = invoke.getFusedPlan();
+        ci.provenDirectOwner = invoke.getProvenDirectOwner();
+        ci.exactReceiverNonNull = invoke.isExactReceiverNonNull();
         return ci;
     }
 
@@ -100,8 +105,8 @@ public class CustomInvoke extends Instruction {
     
     @Override
     public void addDependencies(List<String> dependencyList) {
-        String dependencyOwner = owner;
-        if (origOpcode == Opcodes.INVOKEVIRTUAL) {
+        String dependencyOwner = provenDirectOwner == null ? owner : provenDirectOwner;
+        if (provenDirectOwner == null && origOpcode == Opcodes.INVOKEVIRTUAL) {
             ByteCodeClass bc = Parser.getClassObject(Util.mangle(owner));
             String resolvedConcreteOwner = resolveConcreteInvokeOwner(bc, true);
             if (resolvedConcreteOwner != null) {
@@ -286,8 +291,9 @@ public class CustomInvoke extends Instruction {
             // Well, it is actually legal to call private methods with invoke virtual, and kotlin
             // generates such calls.  But ParparVM strips out these virtual method definitions
             // so we need to check 
-            boolean isVirtual = true;
-            if (origOpcode == Opcodes.INVOKEVIRTUAL) {
+            boolean isVirtual = provenDirectOwner == null;
+            if (provenDirectOwner != null) invokeOwner = provenDirectOwner;
+            if (isVirtual && origOpcode == Opcodes.INVOKEVIRTUAL) {
                 ByteCodeClass bc = Parser.getClassObject(Util.mangle(owner));
                 if (bc == null) {
                     System.err.println("WARNING: Failed to find class object for owner "+owner+" when rendering virtual method "+name);
@@ -357,33 +363,14 @@ public class CustomInvoke extends Instruction {
         if (numLiteralArgs > 0) {
             b.append("/* CustomInvoke */");
         }
-        b.append(bld);
-        
-        b.append("(threadStateData");
+        if (returnVal == null || (origOpcode != Opcodes.INVOKESTATIC && targetObjectLiteral == null)) return false;
+        for (int i = 0; i < args.size(); i++) {
+            if (literalArgs == null || literalArgs[i] == null) return false;
+        }
+        NativeInvocation.append(b, bld.toString(),
+                origOpcode == Opcodes.INVOKESTATIC ? null : targetObjectLiteral,
+                args, literalArgs, args.size(), provenDirectOwner != null);
 
-        if(origOpcode != Opcodes.INVOKESTATIC) {
-            if (targetObjectLiteral == null) {
-                return false;
-            } else {
-                b.append(", ").append(targetObjectLiteral);
-            }
-        }
-        int argIndex=0;
-        for(String ignored : args) {
-            b.append(", ");
-            if (literalArgs != null && literalArgs[argIndex] != null) {
-                b.append(literalArgs[argIndex]);
-            } else {
-                return false;
-            }
-            argIndex++;
-        }
-        if (returnVal == null) {
-            return false;
-        }
-        
-        b.append(")");
-        
         return true;
     }
     
@@ -393,6 +380,15 @@ public class CustomInvoke extends Instruction {
     // this flag stops it from inlining again (infinite recursion).
     private boolean emittingInlineCtorElse = false;
     private InlinableConstructor inlineCtorPlan;
+
+    /// Frame-exit retire guard for the object this fused constructor allocates, or -1.
+    /// InlinableConstructor is a PLAN, not an Instruction -- CustomInvoke is the
+    /// instruction in the list, so the guard has to arrive here and be handed down.
+    private int deadGuardId = -1;
+
+    public void setDeadGuardId(int id) {
+        this.deadGuardId = id;
+    }
     private boolean inlineCtorAnalyzed = false;
     // Copied from the source Invoke by create() -- this <init> allocates + builds
     // + publishes its object (the matching NEW only pushed a placeholder).
@@ -443,7 +439,7 @@ public class CustomInvoke extends Instruction {
             // Literal-arg ctor with the receiver on-stack (from NEW;DUP): the
             // survivor sits one slot below the receiver (SP[-2]); pop the receiver.
             String cType = Util.mangle(owner);
-            inlineCtorPlan.appendInitBeforePublish(b, cType, argExprs, argCats, 2, 1);
+            inlineCtorPlan.appendInitBeforePublish(b, cType, argExprs, argCats, 2, 1, deadGuardId);
             return true;
         }
         b.append("\n#ifndef CN1_DISABLE_INLINE_CTOR\n"); // leading \n: the previous emission may not end a line, and a directive must start one
@@ -538,8 +534,9 @@ public class CustomInvoke extends Instruction {
             // Well, it is actually legal to call private methods with invoke virtual, and kotlin
             // generates such calls.  But ParparVM strips out these virtual method definitions
             // so we need to check 
-            boolean isVirtual = true;
-            if (origOpcode == Opcodes.INVOKEVIRTUAL) {
+            boolean isVirtual = provenDirectOwner == null;
+            if (provenDirectOwner != null) invokeOwner = provenDirectOwner;
+            if (isVirtual && origOpcode == Opcodes.INVOKEVIRTUAL) {
                 ByteCodeClass bc = Parser.getClassObject(Util.mangle(owner));
                 if (bc == null) {
                     System.err.println("WARNING: Failed to find class object for owner "+owner+" when rendering virtual method "+name);
@@ -606,13 +603,13 @@ public class CustomInvoke extends Instruction {
             }
         }
         int numLiteralArgs = this.getNumLiteralArgs();
+        String receiver = origOpcode == Opcodes.INVOKESTATIC ? null : targetObjectLiteral == null
+                ? "SP[-" + (args.size() + 1 - numLiteralArgs) + "].data.o" : targetObjectLiteral;
         if (numLiteralArgs > 0) {
             b.append("/* CustomInvoke */");
         }
         boolean noPop = false;
-        if(returnVal == null || noReturn) {
-            b.append(bld);
-        } else {
+        if (returnVal != null && !noReturn) {
             if(args.size() - numLiteralArgs == 0 && origOpcode == Opcodes.INVOKESTATIC) {
                 // special case for static method
                 if(returnVal.equals("JAVA_OBJECT")) {
@@ -644,45 +641,17 @@ public class CustomInvoke extends Instruction {
                 b.append(returnVal);
                 b.append(" tmpResult = ");
             }
-            b.append(bld);
+
         }
-        b.append("(threadStateData");
-        
-        
-        
-        if(origOpcode != Opcodes.INVOKESTATIC) {
-            if (targetObjectLiteral == null) {
-                b.append(", SP[-");
-                b.append(args.size() + 1 - numLiteralArgs);
-                b.append("].data.o");
-            } else {
-                b.append(", ").append(targetObjectLiteral);
-                numLiteralArgs++;
-            }
-        }
-        int offset = args.size();
-        //int numArgs = offset;
-        int argIndex=0;
-        for(String a : args) {
-            
-            b.append(", ");
-            if (literalArgs != null && literalArgs[argIndex] != null) {
-                b.append(literalArgs[argIndex]);
-            } else {
-                b.append("SP[-");
-                b.append(offset);
-                b.append("].data.");
-                b.append(a);
-                offset--;
-            }
-            argIndex++;
-        }
+        NativeInvocation.append(b, bld.toString(), receiver, args, literalArgs, args.size(),
+                provenDirectOwner != null && !exactReceiverNonNull);
+        if (origOpcode != Opcodes.INVOKESTATIC && targetObjectLiteral != null) numLiteralArgs++;
         if(noPop) {
-            b.append("));\n");
+            b.append(");\n");
             return;
         }
         if(returnVal != null && !noReturn) {
-            b.append(");\n");
+            b.append(";\n");
             if(origOpcode != Opcodes.INVOKESTATIC) {
                 if(args.size() - numLiteralArgs > 0) {
                     b.append("    SP -= ");
@@ -748,7 +717,7 @@ public class CustomInvoke extends Instruction {
             
             return;
         }
-        b.append("); ");
+        b.append("; ");
         int val; 
         if(origOpcode != Opcodes.INVOKESTATIC) {
             val = args.size() + 1 - numLiteralArgs;

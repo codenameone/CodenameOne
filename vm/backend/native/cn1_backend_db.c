@@ -323,7 +323,7 @@ JAVA_INT com_codename1_backend_Db_bindBlobImpl___long_int_byte_1ARRAY_R_int(CODE
     arr = (JAVA_ARRAY)value;
     /* SQLITE_TRANSIENT: sqlite copies, so the array may be collected or moved the
        moment this returns. */
-    return sqlite3_bind_blob(stmt, index, (const void*)(JAVA_ARRAY_BYTE*)arr->data,
+    return sqlite3_bind_blob(stmt, index, (const void*)(JAVA_ARRAY_BYTE*)CN1_ARRAY_DATA(arr),
                              (int)arr->length, SQLITE_TRANSIENT);
 }
 
@@ -345,7 +345,7 @@ JAVA_OBJECT com_codename1_backend_Db_columnBlobImpl___long_int_R_byte_1ARRAY(COD
     }
     arr = allocArray(threadStateData, length, &class_array1__JAVA_BYTE, sizeof(JAVA_ARRAY_BYTE), 1);
     if(length > 0) {
-        memcpy((JAVA_ARRAY_BYTE*)((JAVA_ARRAY)arr)->data, data, (size_t)length);
+        memcpy((JAVA_ARRAY_BYTE*)CN1_ARRAY_DATA(arr), data, (size_t)length);
     }
     return arr;
 }

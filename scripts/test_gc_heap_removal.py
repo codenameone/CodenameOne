@@ -58,6 +58,18 @@ static int cn1SweepRemoving;
 static JAVA_OBJECT registered, rooted;
 static void cn1GcRegisterImmortalObj(JAVA_OBJECT o) { registered = o; }
 static void cn1AddImmortalRoot(JAVA_OBJECT o) { rooted = o; }
+/* The runtime reads and writes the header only through these accessors (the real
+ * header packs a class index, a mark and a heap state into 4 bytes and keeps heap
+ * indexes in a side table). Mapping them onto this harness's plain fields keeps the
+ * pasted functions exactly as they ship. */
+#define CN1_OBJ_CLASS(o) (((struct JavaObjectPrototype*)(o))->__codenameOneParentClsReference)
+#define CN1_OBJ_SET_CLASS(o, c) (((struct JavaObjectPrototype*)(o))->__codenameOneParentClsReference = (c))
+#define CN1_OBJ_HEAPPOS(o) (((struct JavaObjectPrototype*)(o))->__heapPosition)
+#define CN1_OBJ_SET_HEAPPOS(o, v) (((struct JavaObjectPrototype*)(o))->__heapPosition = (v))
+#define CN1_OBJ_HEAP_INDEX(o) CN1_OBJ_HEAPPOS(o)
+/* No String twins in this harness. */
+static struct clazz class__java_lang_String;
+static int cn1IsInlineStringClass(const struct clazz *c) { (void)c; return 0; }
 '''
 
 

@@ -633,7 +633,7 @@ void com_codename1_impl_ios_IOSNative_cn1ArAddReferenceImage___long_byte_1ARRAY_
         JAVA_OBJECT encodedImage, JAVA_OBJECT name, JAVA_FLOAT widthMeters) {
 #if defined(INCLUDE_CN1_AR) && !TARGET_OS_TV && !TARGET_OS_WATCH
     JAVA_ARRAY arr = (JAVA_ARRAY) encodedImage;
-    NSData *data = [NSData dataWithBytes:arr->data length:(NSUInteger) arr->length];
+    NSData *data = [NSData dataWithBytes:CN1_ARRAY_DATA(arr) length:(NSUInteger) arr->length];
     NSString *nameStr = toNSString(CN1_THREAD_GET_STATE_PASS_ARG name);
     [CN1AR_PEER(sessionPeer) addReferenceImage:data name:nameStr width:widthMeters];
 #endif
@@ -733,16 +733,16 @@ void com_codename1_impl_ios_IOSNative_cn1ArAddAnchorMesh___long_java_lang_String
     NSData *texture = nil;
     if (encodedTexture != JAVA_NULL) {
         JAVA_ARRAY texArr = (JAVA_ARRAY) encodedTexture;
-        texture = [NSData dataWithBytes:texArr->data length:(NSUInteger) texArr->length];
+        texture = [NSData dataWithBytes:CN1_ARRAY_DATA(texArr) length:(NSUInteger) texArr->length];
     }
     [CN1AR_PEER(sessionPeer) addAnchorMesh:idStr
-                               interleaved:(const float *) vArr->data
+                               interleaved:(const float *) CN1_ARRAY_DATA(vArr)
                                vertexCount:vertexCount
-                                   indices:(const int *) iArr->data
+                                   indices:(const int *) CN1_ARRAY_DATA(iArr)
                                 indexCount:indexCount
                                       argb:argbColor
                             encodedTexture:texture
-                            localTransform:(const float *) tArr->data];
+                            localTransform:(const float *) CN1_ARRAY_DATA(tArr)];
 #endif
 }
 

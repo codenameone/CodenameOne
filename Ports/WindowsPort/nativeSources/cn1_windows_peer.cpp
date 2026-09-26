@@ -108,7 +108,7 @@ JAVA_VOID com_codename1_impl_windows_WindowsNative_peerDeinitialized___long(
 JAVA_VOID com_codename1_impl_windows_WindowsNative_peerCalcPreferredSize___long_int_int_int_1ARRAY(
         CODENAME_ONE_THREAD_STATE, JAVA_LONG peer, JAVA_INT dispW, JAVA_INT dispH, JAVA_OBJECT out) {
     if (out == JAVA_NULL) return;
-    JAVA_ARRAY_INT* o = (JAVA_ARRAY_INT*) (*(JAVA_ARRAY) out).data;
+    JAVA_ARRAY_INT* o = (JAVA_ARRAY_INT*) CN1_ARRAY_DATA(out);
     int olen = (*(JAVA_ARRAY) out).length;
     int w = 0, h = 0;
     HWND hwnd = cn1PeerHwnd(peer);
@@ -151,14 +151,14 @@ JAVA_OBJECT com_codename1_impl_windows_WindowsNative_peerCaptureArgb___long_int_
         result = allocArray(threadStateData, w * h, &class_array1__JAVA_INT, sizeof(JAVA_ARRAY_INT), 1);
         if (result != JAVA_NULL) {
             const BYTE* src = (const BYTE*) bits;   /* BGRA, top-down */
-            JAVA_ARRAY_INT* dst = (JAVA_ARRAY_INT*) (*(JAVA_ARRAY) result).data;
+            JAVA_ARRAY_INT* dst = (JAVA_ARRAY_INT*) CN1_ARRAY_DATA(result);
             int n = w * h;
             for (int i = 0; i < n; i++) {
                 BYTE b = src[i * 4 + 0], g = src[i * 4 + 1], r = src[i * 4 + 2];
                 dst[i] = (JAVA_ARRAY_INT) (0xff000000u | (r << 16) | (g << 8) | b);
             }
             if (outDims != JAVA_NULL) {
-                JAVA_ARRAY_INT* dims = (JAVA_ARRAY_INT*) (*(JAVA_ARRAY) outDims).data;
+                JAVA_ARRAY_INT* dims = (JAVA_ARRAY_INT*) CN1_ARRAY_DATA(outDims);
                 int dlen = (*(JAVA_ARRAY) outDims).length;
                 if (dlen > 0) dims[0] = w;
                 if (dlen > 1) dims[1] = h;

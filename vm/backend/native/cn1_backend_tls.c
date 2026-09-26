@@ -301,7 +301,7 @@ JAVA_INT com_codename1_backend_Tls_readImpl___long_byte_1ARRAY_int_int_R_int(COD
     if(ssl == NULL || buffer == JAVA_NULL) {
         return -2;
     }
-    data = (JAVA_ARRAY_BYTE*)((JAVA_ARRAY)buffer)->data;
+    data = (JAVA_ARRAY_BYTE*)CN1_ARRAY_DATA(buffer);
     CN1_YIELD_THREAD;
     n = SSL_read(ssl, &data[offset], length);
     CN1_RESUME_THREAD;
@@ -325,7 +325,7 @@ JAVA_INT com_codename1_backend_Tls_writeImpl___long_byte_1ARRAY_int_int_R_int(CO
     if(ssl == NULL || buffer == JAVA_NULL) {
         return -1;
     }
-    data = (JAVA_ARRAY_BYTE*)((JAVA_ARRAY)buffer)->data;
+    data = (JAVA_ARRAY_BYTE*)CN1_ARRAY_DATA(buffer);
     CN1_YIELD_THREAD;
     while(written < length) {
         int n = SSL_write(ssl, &data[offset + written], length - written);

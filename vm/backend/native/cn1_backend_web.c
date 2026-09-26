@@ -273,7 +273,7 @@ JAVA_LONG com_codename1_backend_Web_performImpl___java_lang_String_java_lang_Str
         if(headerLength > 0) {
             char* copy = (char*)malloc((size_t)headerLength + 1);
             if(copy != NULL) {
-                memcpy(copy, (JAVA_ARRAY_BYTE*)((JAVA_ARRAY)headerLines)->data,
+                memcpy(copy, (JAVA_ARRAY_BYTE*)CN1_ARRAY_DATA(headerLines),
                        (size_t)headerLength);
                 /* Terminated because the loop below walks a C string; the
                    validation refuses every character under 0x20, NUL included. */
@@ -339,7 +339,7 @@ JAVA_LONG com_codename1_backend_Web_performImpl___java_lang_String_java_lang_Str
             return 0;
         }
         if(bodyCopy != NULL && bodyLength > 0) {
-            memcpy(bodyCopy, (JAVA_ARRAY_BYTE*)arr->data, (size_t)bodyLength);
+            memcpy(bodyCopy, (JAVA_ARRAY_BYTE*)CN1_ARRAY_DATA(arr), (size_t)bodyLength);
         }
     }
 
@@ -566,7 +566,7 @@ JAVA_OBJECT com_codename1_backend_Web_bodyImpl___long_R_byte_1ARRAY(CODENAME_ONE
     }
     arr = allocArray(threadStateData, (int)r->length, &class_array1__JAVA_BYTE, sizeof(JAVA_ARRAY_BYTE), 1);
     if(r->length > 0 && r->data != NULL) {
-        memcpy((JAVA_ARRAY_BYTE*)((JAVA_ARRAY)arr)->data, r->data, r->length);
+        memcpy((JAVA_ARRAY_BYTE*)CN1_ARRAY_DATA(arr), r->data, r->length);
     }
     return arr;
 }

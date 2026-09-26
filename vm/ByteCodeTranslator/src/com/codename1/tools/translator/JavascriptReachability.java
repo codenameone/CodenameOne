@@ -547,7 +547,7 @@ final class JavascriptReachability {
         // receiver is a Java object, not a JS handler.
         seedJsoBridgeInterfaceMethods(classes);
         // The runtime's bindNative fast paths for the native HashMap /
-        // StringBuilder / Integer methods DELEGATE to pure-Java *Impl twins
+        // Integer methods DELEGATE to pure-Java *Impl twins
         // (cn1_java_util_HashMap_getImpl_... etc.) straight from
         // parparvm_runtime.js -- edges invisible to bytecode-only RTA. Without
         // these seeds the twins are culled and the delegation throws
@@ -557,7 +557,13 @@ final class JavascriptReachability {
         seedRuntimeDispatched("java_util_HashMap", "removeImpl", "(Ljava/lang/Object;)Ljava/lang/Object;");
         seedRuntimeDispatched("java_util_HashMap", "containsKeyImpl", "(Ljava/lang/Object;)Z");
         seedRuntimeDispatched("java_util_HashMap", "clearImpl", "()V");
-        seedRuntimeDispatched("java_lang_StringBuilder", "toStringImpl", "()Ljava/lang/String;");
+        seedRuntimeDispatched("java_util_HashSet", "cn1AddImpl", "(Ljava/lang/Object;)Z");
+        seedRuntimeDispatched("java_util_HashSet", "cn1ContainsImpl", "(Ljava/lang/Object;)Z");
+        seedRuntimeDispatched("java_util_HashSet", "cn1RemoveImpl", "(Ljava/lang/Object;)Z");
+        seedRuntimeDispatched("java_util_HashSet", "cn1ClearImpl", "()V");
+        seedRuntimeDispatched("java_util_HashSet", "cn1NextOccupiedImpl", "(I)I");
+        seedRuntimeDispatched("java_util_HashSet", "cn1ElementAtImpl", "(I)Ljava/lang/Object;");
+        seedRuntimeDispatched("java_util_HashSet", "cn1RemoveSlotImpl", "(I)V");
         // valueOfHeap is STATIC: virtual seeding does not resolve it. One per tagged box --
         // every type whose valueOf became a native to return an immediate on the C targets
         // delegates to its heap twin here, and the JS port has no immediates so it ALWAYS

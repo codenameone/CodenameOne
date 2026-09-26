@@ -415,10 +415,12 @@ static int field_read_into(JAVA_OBJECT obj, const cn1_field_entry* fe,
     char* base = (char*)obj + fe->offset;
     *outType = fe->type;
     switch (fe->type) {
-        case 'Z': *outValue = (uint64_t)(*(JAVA_BOOLEAN*)base & 1); return 1;
-        case 'B': *outValue = (uint64_t)(uint8_t)(*(JAVA_BYTE*)base); return 1;
-        case 'S': *outValue = (uint64_t)(uint16_t)(*(JAVA_SHORT*)base); return 1;
-        case 'C': *outValue = (uint64_t)(uint16_t)(*(JAVA_CHAR*)base); return 1;
+        // Instance fields of these types are stored at their real width (the translator's
+        // getCInstanceStorageDefinition), not as the int JAVA_BOOLEAN & co. name.
+        case 'Z': *outValue = (uint64_t)(*(JAVA_ARRAY_BOOLEAN*)base & 1); return 1;
+        case 'B': *outValue = (uint64_t)(uint8_t)(*(JAVA_ARRAY_BYTE*)base); return 1;
+        case 'S': *outValue = (uint64_t)(uint16_t)(*(JAVA_ARRAY_SHORT*)base); return 1;
+        case 'C': *outValue = (uint64_t)(uint16_t)(*(JAVA_ARRAY_CHAR*)base); return 1;
         case 'I': *outValue = (uint64_t)(uint32_t)(*(JAVA_INT*)base); return 1;
         case 'F': {
             JAVA_FLOAT f = *(JAVA_FLOAT*)base;
@@ -1496,7 +1498,7 @@ static int handleCommand(uint8_t cmd, const uint8_t* payload, uint32_t len) {
             int firstIdx = (int)ntohl(fstBE);
             int reqCount = (int)ntohl(cntBE);
             JAVA_OBJECT obj = (JAVA_OBJECT)(uintptr_t)ptr;
-            // Everything below indexes arr->data, so the reference has to be
+            // Everything below indexes CN1_ARRAY_DATA(arr), so the reference has to be
             // a verified array before any of it runs.
             struct clazz* objArrCls = cn1_debugger_class_of_wire_id(obj);
             if (objArrCls == NULL || cn1_debugger_is_tagged_value(obj) || !objArrCls->isArray) {
@@ -1572,21 +1574,23 @@ static int handleCommand(uint8_t cmd, const uint8_t* payload, uint32_t len) {
             for (int i = 0; i < count; i++) {
                 int idx = firstIdx + i;
                 switch (tag) {
-                    case 'Z': p[0] = ((JAVA_BOOLEAN*)arr->data)[idx] & 1; p += 1; break;
-                    case 'B': p[0] = (uint8_t)((JAVA_BYTE*)arr->data)[idx]; p += 1; break;
-                    case 'S': { JAVA_SHORT s = ((JAVA_SHORT*)arr->data)[idx];
+                    // Array elements are the narrow types too; indexing with the int
+                    // JAVA_BOOLEAN/JAVA_BYTE/... read element idx*4, not idx.
+                    case 'Z': p[0] = ((JAVA_ARRAY_BOOLEAN*)CN1_ARRAY_DATA(arr))[idx] & 1; p += 1; break;
+                    case 'B': p[0] = (uint8_t)((JAVA_ARRAY_BYTE*)CN1_ARRAY_DATA(arr))[idx]; p += 1; break;
+                    case 'S': { JAVA_SHORT s = ((JAVA_ARRAY_SHORT*)CN1_ARRAY_DATA(arr))[idx];
                                 p[0] = (uint8_t)((s >> 8) & 0xff); p[1] = (uint8_t)(s & 0xff); }
                               p += 2; break;
-                    case 'C': { JAVA_CHAR c = ((JAVA_CHAR*)arr->data)[idx];
+                    case 'C': { JAVA_CHAR c = ((JAVA_ARRAY_CHAR*)CN1_ARRAY_DATA(arr))[idx];
                                 p[0] = (uint8_t)((c >> 8) & 0xff); p[1] = (uint8_t)(c & 0xff); }
                               p += 2; break;
-                    case 'I': writeBE32(p, (uint32_t)((JAVA_INT*)arr->data)[idx]); p += 4; break;
-                    case 'F': { JAVA_FLOAT f = ((JAVA_FLOAT*)arr->data)[idx];
+                    case 'I': writeBE32(p, (uint32_t)((JAVA_INT*)CN1_ARRAY_DATA(arr))[idx]); p += 4; break;
+                    case 'F': { JAVA_FLOAT f = ((JAVA_FLOAT*)CN1_ARRAY_DATA(arr))[idx];
                                 uint32_t fb; memcpy(&fb, &f, 4);
                                 writeBE32(p, fb); }
                               p += 4; break;
-                    case 'J': writeBE64(p, (uint64_t)((JAVA_LONG*)arr->data)[idx]); p += 8; break;
-                    case 'D': { JAVA_DOUBLE d = ((JAVA_DOUBLE*)arr->data)[idx];
+                    case 'J': writeBE64(p, (uint64_t)((JAVA_LONG*)CN1_ARRAY_DATA(arr))[idx]); p += 8; break;
+                    case 'D': { JAVA_DOUBLE d = ((JAVA_DOUBLE*)CN1_ARRAY_DATA(arr))[idx];
                                 uint64_t db; memcpy(&db, &d, 8);
                                 writeBE64(p, db); }
                               p += 8; break;
@@ -1594,7 +1598,7 @@ static int handleCommand(uint8_t cmd, const uint8_t* payload, uint32_t len) {
                         // Only hand back element references we can verify;
                         // anything else would come straight back to us as an
                         // objectID the IDE expects us to dereference.
-                        JAVA_OBJECT v = ((JAVA_OBJECT*)arr->data)[idx];
+                        JAVA_OBJECT v = ((JAVA_OBJECT*)CN1_ARRAY_DATA(arr))[idx];
                         if (!cn1_debugger_is_valid_object(v)
                                 || !cn1_debugger_note_issued_inheriting(v, obj)) {
                             v = JAVA_NULL;

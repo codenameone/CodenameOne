@@ -64,10 +64,21 @@ public class FileOutputStream extends OutputStream {
         this(file == null ? null : file.getPath(), append);
     }
 
+    /* The one-byte array is a field rather than a fresh allocation per call: this
+     * path is reached once per byte, so allocating there hands the collector a short
+     * lived object for every byte written. It is passed to the
+     * overridable array form, so a subclass that retained it would see it change
+     * on the next call -- no in-tree subclass does, and the array holds one byte
+     * of data the caller already has, and two threads writing one stream with no synchronization is
+     * already undefined for OutputStream. */
+    private byte[] oneByte;
+
     public void write(int b) throws IOException {
-        byte[] one = new byte[1];
-        one[0] = (byte)b;
-        write(one, 0, 1);
+        if(oneByte == null) {
+            oneByte = new byte[1];
+        }
+        oneByte[0] = (byte)b;
+        write(oneByte, 0, 1);
     }
 
     public void write(byte[] b) throws IOException {
