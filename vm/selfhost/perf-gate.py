@@ -258,10 +258,14 @@ def paired(values):
             'rounds': values}
 
 
-def verdict(ratio, base, tolerance):
+def verdict(ratio, base, tolerance, floor=0.0):
+    """A regression is a ratio more than `tolerance` above its baseline AND more than
+    `floor` above it in absolute terms. The floor is for RAM: a workload whose ParparVM
+    footprint is a few MB against the JVM's ~40MB sits at ratios near 0.05, where under a
+    megabyte of jitter is a +30% change that means nothing."""
     if base is None:
         return 'uncalibrated'
-    if ratio > base * (1 + tolerance):
+    if ratio > base * (1 + tolerance) and ratio - base > floor:
         return 'regression'
     if ratio < base * (1 - tolerance):
         return 'improved'
@@ -344,7 +348,8 @@ def render_markdown(report):
               'smaller (RAM). Median of %d interleaved, paired rounds; every run\'s output '
               'was verified. A regression is a ratio more than %d%% (time) / %d%% (RAM) above '
               'its baseline in `vm/selfhost/perf-baseline.json` (more, for a row whose '
-              'calibration runs were noisier; the file records it).'
+              'calibration runs were noisier; the file records it), and for RAM also more '
+              'than 0.05x above it in absolute terms.'
               % (report['rounds'], round(tol['time'] * 100), round(tol['memory'] * 100)), '',
               '| Benchmark | Cores | Time | RAM | Status |', '|---|---:|---|---|---|']
     logical = False
@@ -465,9 +470,11 @@ def main(argv):
                     # unchanged code already disagreed by more than the global one, the
                     # global one would fail on noise alone.
                     row_tolerance = base.get('tolerance', {}).get(metric, tolerance[metric])
+                    floor = baseline.get('floor', {}).get(metric, 0.0)
                     entry[metric] = dict(paired(values), baseline=base.get(metric),
                                          tolerance=row_tolerance,
-                                         verdict=verdict(median, base.get(metric), row_tolerance))
+                                         verdict=verdict(median, base.get(metric), row_tolerance,
+                                                         floor))
                     if entry[metric]['verdict'] == 'regression':
                         report['regression'] = True
                 report['results'].setdefault(spec['id'], {})[str(cores)] = entry

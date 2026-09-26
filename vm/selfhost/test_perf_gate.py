@@ -38,6 +38,12 @@ class VerdictTests(unittest.TestCase):
         self.assertEqual('improved', gate.verdict(0.89, 1.0, 0.1))
         self.assertEqual('uncalibrated', gate.verdict(5.0, None, 0.1))
 
+    def test_a_ram_change_below_the_floor_is_not_a_regression(self):
+        # 0.06x -> 0.08x is +33%, and under a megabyte for a few-MB process.
+        self.assertEqual('ok', gate.verdict(0.08, 0.06, 0.15, 0.05))
+        self.assertEqual('regression', gate.verdict(0.20, 0.06, 0.15, 0.05))
+        self.assertEqual('regression', gate.verdict(0.80, 0.60, 0.15, 0.05))
+
     def test_platform_keys(self):
         self.assertRegex(gate.platform_key(), r'^(linux|macos|windows)-(x64|arm64)$')
 

@@ -3,6 +3,10 @@
   "time": 0.15,
   "memory": 0.15
  },
+ "floor": {
+  "time": 0.0,
+  "memory": 0.05
+ },
  "platforms": {
   "linux-x64": {
    "hello": {
