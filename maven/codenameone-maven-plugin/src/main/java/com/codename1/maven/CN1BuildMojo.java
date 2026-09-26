@@ -940,9 +940,15 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
     /**
      * What the application's compile dependencies need once the desktop runtime aggregator is
      * taken away, collected (poms only, nothing downloaded) the same way Maven resolved the
-     * project. Only compile scope counts, because only compile scope reaches the staged jar.
-     * {@code null} when the collection fails: nothing is then stripped as desktop runtime,
-     * since an upload that is too large fails loudly and one missing classes does not.
+     * project. The roots are the compile scope dependencies, because only compile scope
+     * reaches the staged jar. {@code null} when the collection fails: nothing is then stripped
+     * as desktop runtime, since an upload that is too large fails loudly and one missing
+     * classes does not.
+     *
+     * <p>Known limit, left deliberately: nodes below the roots are not filtered by scope, so
+     * an artifact a library needs only at runtime counts as needed. That can only keep an
+     * artifact that could have been stripped -- an upload too large, which the build client
+     * refuses loudly -- never drop one the application needs.</p>
      */
     private Set<String> neededWithoutDesktopRuntime() {
         if (neededWithoutDesktopRuntimeComputed) {
@@ -1021,6 +1027,12 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
      * its own pom to control what is uploaded, and that is still honoured: such a jar is
      * written during the current Maven run, while a stale one predates it.</p>
      *
+     * <p>Known limit, left deliberately: a record wins over the current-run exception. A
+     * project that once let this mojo stage the jar, then starts producing it from its own
+     * pom without cleaning target, and whose dependencies changed in between, has its jar
+     * replaced by a merged one. That customization is undocumented and used by nothing in
+     * the tree or the archetypes; the fix is to clean target once.</p>
+     *
      * @param recorded the recorded inputs, trimmed, or {@code null} if there is no record
      * @param current the inputs this build would merge
      * @param jarModified the staged jar's modification time
@@ -1031,6 +1043,19 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
             return jarModified >= sessionStart;
         }
         return recorded.equals(current.trim());
+    }
+
+    /**
+     * Deletes a staged jar that must not be reused, and fails if it is still there. Ignoring
+     * a failed delete (a jar held open on Windows, a read-only target) would skip the merge
+     * and upload the very jar that was just found stale.
+     */
+    static void discardStagedJar(File jar) throws MojoExecutionException {
+        if (!jar.delete() && jar.exists()) {
+            throw new MojoExecutionException("Could not delete the out of date staged jar " + jar
+                    + ", so it cannot be rebuilt and would be uploaded as it is. Close anything that"
+                    + " has it open (an IDE, an antivirus scanner) or delete it by hand, then build again.");
+        }
     }
 
     /**
@@ -1690,21 +1715,21 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
             if (!mayReuseStagedJar(readTextFileOrNull(stagedInputsFile), stagedInputs,
                     jarWithDependencies.lastModified(), sessionStart)) {
                 getLog().debug("Jar file was not staged from these inputs. "+jarWithDependencies+". Deleting");
-                jarWithDependencies.delete();
+                discardStagedJar(jarWithDependencies);
             } else {
                 for (String artifact : cpElements) {
                     File jar = new File(artifact);
                     if (jar.isDirectory()) {
                         if (jarWithDependencies.lastModified() < lastModifiedRecursive(jar)) {
                             getLog().debug("Jar file out of date.  Dependencies have changed. "+jarWithDependencies+". Deleting");
-                            jarWithDependencies.delete();
+                            discardStagedJar(jarWithDependencies);
                             break;
                         }
                     } else if (jar.exists() && jar.lastModified() > jarWithDependencies.lastModified()) {
                         // One of the dependency jar files is newer... so we delete the dependencies jar file
                         // and will generate a new one.
                         getLog().debug("Jar file out of date.  Dependencies have changed. "+jarWithDependencies+". Deleting");
-                        jarWithDependencies.delete();
+                        discardStagedJar(jarWithDependencies);
                         break;
                     }
                 }

@@ -191,6 +191,40 @@ public class CN1BuildMojoTest {
     }
 
     @Test
+    public void discardsAStaleStagedJar() throws Exception {
+        java.io.File dir = java.nio.file.Files.createTempDirectory("staged").toFile();
+        java.io.File jar = new java.io.File(dir, "app-mac-os-x-desktop-jar-with-dependencies.jar");
+        assertTrue(jar.createNewFile());
+        CN1BuildMojo.discardStagedJar(jar);
+        assertFalse(jar.exists());
+        assertTrue(dir.delete());
+    }
+
+    @Test
+    public void failsWhenAStaleStagedJarCannotBeDeleted() throws Exception {
+        java.io.File dir = java.nio.file.Files.createTempDirectory("staged").toFile();
+        java.io.File jar = new java.io.File(dir, "app-mac-os-x-desktop-jar-with-dependencies.jar");
+        assertTrue(jar.createNewFile());
+        // A read-only directory stands in for a jar held open on Windows.
+        assertTrue(dir.setWritable(false));
+        try {
+            org.junit.Assume.assumeFalse("a privileged user can delete from a read-only directory",
+                    jar.delete());
+            try {
+                CN1BuildMojo.discardStagedJar(jar);
+                fail("a stale jar that could not be deleted must stop the build");
+            } catch (org.apache.maven.plugin.MojoExecutionException expected) {
+                assertTrue(expected.getMessage().contains("would be uploaded as it is"));
+            }
+            assertTrue(jar.exists());
+        } finally {
+            dir.setWritable(true);
+            jar.delete();
+            dir.delete();
+        }
+    }
+
+    @Test
     public void toleratesAnAbsentBuildTarget() {
         assertTrue(CN1BuildMojo.isSuppliedByBuildServer("com.codenameone", "codenameone-core", null));
         assertFalse(CN1BuildMojo.isSuppliedByBuildServer("com.thirdparty", "some-api", null));
